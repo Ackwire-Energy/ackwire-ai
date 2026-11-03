@@ -4523,7 +4523,19 @@
       "intro": "Wer sie übernimmt, Person oder Agent, erscheint mit dem Fortschritt auf dem Board.",
       "criteriaFound_one": "{{count}} Akzeptanzkriterium",
       "criteriaFound_other": "{{count}} Akzeptanzkriterien",
-      "agentStarts": "{{name}} beginnt, sobald die Aufgabe erstellt ist. Alles Sensible fragt nach deiner Freigabe."
+      "agentStarts": "{{name}} beginnt, sobald die Aufgabe erstellt ist. Alles Sensible fragt nach deiner Freigabe.",
+      "agentStartsAll": "{{name}} beginnt, sobald die Aufgabe erstellt ist, mit der Beschreibung, den Kriterien und den Anhängen. Alles Sensible fragt nach deiner Freigabe.",
+      "titleShort": "Titel der Aufgabe",
+      "quickPlaceholder": "Beschreib, was gebraucht wird. Screenshots einfügen, Dateien hineinziehen. Zeilen, die mit „-“ beginnen, werden zu Akzeptanzkriterien.",
+      "pasteHint": "Füg einen Screenshot mit {{keys}} ein oder zieh Dateien hierher.",
+      "expand": "Vollständiges Formular öffnen",
+      "collapse": "Zurück zum schnellen Formular",
+      "another": "Noch eine erstellen",
+      "addCriterion": "Kriterium hinzufügen",
+      "removeCriterion": "Kriterium entfernen",
+      "drop": "Loslassen, um es an die Aufgabe anzuhängen",
+      "dropText": "Fotos, Videos, PDFs, Tabellen… bis zu {{max}} MB pro Datei.",
+      "createHint": "{{keys}} erstellt die Aufgabe"
     },
     "back": "Aufgaben",
     "notFound": "Diese Aufgabe gibt es nicht, oder du hast keinen Zugriff.",
@@ -4546,6 +4558,8 @@
     "asked": "Anfrage gesendet. {{name}} postet den Fortschritt hier. Eure Unterhaltung bleibt in deiner Direktnachricht.",
     "activity": "Aktivität",
     "noActivity": "Noch nichts.",
+    "discussion": "Diskussion",
+    "noComments": "Noch keine Kommentare.",
     "comment": "Aufgabe kommentieren",
     "commentPlaceholder": "Kommentar · mit @ rufst du einen Agent",
     "send": "Kommentieren",
@@ -4561,6 +4575,26 @@
     "noLinks": "Noch nichts verknüpft.",
     "openConversation": "Unterhaltung ansehen",
     "labels": "Labels",
+    "tabs": {
+      "label": "Bereiche der Aufgabe",
+      "details": "Übersicht",
+      "files": "Anhänge",
+      "history": "Verlauf"
+    },
+    "files": {
+      "title": "Anhänge",
+      "add": "Dateien hinzufügen",
+      "addHint": "oder hierher ziehen",
+      "grid": "Raster",
+      "empty": "Noch keine Anhänge. Zieh Dateien hierher oder füg einen Screenshot ein.",
+      "fromCreation": "Beim Erstellen · {{when}}",
+      "fromComment": "Kommentar von {{name}} · {{when}}",
+      "linked": "Verknüpft von {{name}}"
+    },
+    "history": {
+      "commented": "hat kommentiert",
+      "commentedFiles": "hat mit Anhängen kommentiert"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "hat die Hintergrundarbeit gestoppt",
@@ -12509,6 +12543,146 @@
       "upright": "Hochkant drehen",
       "message": "{{name}} schreiben",
       "chooseOnWeb": "Wähle ihn auf agentes.chat unter Einstellungen › Computer."
+    }
+  },
+  "taskManager": {
+    "title": "Task-Manager",
+    "nav": "Task-Manager",
+    "search": "Aufgabe, Agent oder App suchen",
+    "working_one": "{{count}} in Arbeit",
+    "working_other": "{{count}} in Arbeit",
+    "waiting_one": "{{count}} wartet auf dich",
+    "waiting_other": "{{count}} warten auf dich",
+    "all": "Alle",
+    "now": "Jetzt",
+    "agentTasks": "Aufgaben von {{name}}",
+    "tasks_one": "{{count}} Aufgabe",
+    "tasks_other": "{{count}} Aufgaben",
+    "free": "Frei",
+    "columns": {
+      "task": "Aufgabe",
+      "state": "Status",
+      "using": "Nutzt gerade",
+      "time": "Dauer",
+      "computer": "Läuft auf"
+    },
+    "sections": {
+      "asked": "Von Personen beauftragt",
+      "background": "Routinen im Hintergrund"
+    },
+    "state": {
+      "working": "Arbeitet",
+      "ok": "Wartet auf dein Okay",
+      "answer": "Wartet auf eine Antwort",
+      "computerBusy": "Wartet auf Platz am Computer",
+      "inLine": "Warteschlange · Platz {{position}}",
+      "computerOffline": "Wartet auf den Computer",
+      "plan": "Wartet auf das Abo",
+      "budget": "Wartet auf das Budget",
+      "queued": "In der Warteschlange",
+      "stopping": "Wird gestoppt…",
+      "stopped": "Gestoppt"
+    },
+    "where": {
+      "dm": "Direkte Unterhaltung",
+      "routine": "Routine „{{name}}“",
+      "background": "Im Hintergrund"
+    },
+    "askedBy": "Auftrag von {{name}}",
+    "askedByYou": "Dein Auftrag",
+    "servers": "Unsere Server",
+    "plan": "{{done}} von {{total}} erledigt",
+    "program": {
+      "browser": "Browser",
+      "screen": "Bildschirm des Computers",
+      "terminal": "Terminal",
+      "agentes": "agentes",
+      "thinking": "Denkt nach",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "Schritte ansehen",
+      "stop": "Stoppen",
+      "stopTask": "Aufgabe stoppen",
+      "stopAll": "Alle stoppen",
+      "stopAllOf": "Alles von {{name}} stoppen",
+      "open": "In der Unterhaltung öffnen",
+      "openManager": "Im Task-Manager öffnen"
+    },
+    "confirm": {
+      "title_one": "Die Aufgabe von {{name}} stoppen?",
+      "title_other": "Die {{count}} Aufgaben von {{name}} stoppen?",
+      "body": "Was schon erledigt ist, bleibt erhalten, und {{name}} erfährt, dass du sie gestoppt hast.",
+      "short": "{{name}} erfährt, dass du sie gestoppt hast.",
+      "reason": "Warum? (optional)",
+      "stop_one": "Stoppen",
+      "stop_other": "{{count}} stoppen"
+    },
+    "ended": {
+      "title": "Heute beendet",
+      "done": "Erledigt",
+      "stopped": "Von dir gestoppt",
+      "stoppedBy": "Von {{name}} gestoppt",
+      "failed": "Nicht geschafft",
+      "none": "Heute ist noch nichts beendet."
+    },
+    "empty": {
+      "title": "Gerade arbeitet kein Agent",
+      "body": "Sobald ein Agent eine Aufgabe beginnt, erscheint sie hier."
+    },
+    "strip": {
+      "tasks_one": "{{name}} an {{count}} Aufgabe",
+      "tasks_other": "{{name}} an {{count}} Aufgaben",
+      "waiting_one": "{{count}} wartet auf dich",
+      "waiting_other": "{{count}} warten auf dich",
+      "see": "Ansehen",
+      "hide": "Schließen",
+      "stopHere": "Diese stoppen",
+      "here": "hier"
+    },
+    "stopped": {
+      "line": "Du hast diese Aufgabe gestoppt",
+      "lineBy": "{{name}} hat diese Aufgabe gestoppt",
+      "told": "{{agent}} wurde informiert und macht nur weiter, wenn jemand darum bittet.",
+      "reason": "Grund: „{{reason}}“",
+      "sayWhy": "Grund nennen",
+      "whyPlaceholder": "Möchtest du sagen, warum? (optional)",
+      "send": "Senden"
+    },
+    "activity": "Letzte 30 Min.",
+    "failed": "Stoppen hat nicht geklappt. Versuch es noch einmal.",
+    "queue": {
+      "see": "Warteschlange ansehen",
+      "full_one": "Voll · {{count}} in der Warteschlange",
+      "full_other": "Voll · {{count}} in der Warteschlange",
+      "room": "Hat Platz",
+      "computers": "Computer"
+    },
+    "navWhat": "Was jeder Agent gerade tut, und stoppen, was nötig ist",
+    "cards": {
+      "label": "Agenten",
+      "previous": "Vorherige Agenten",
+      "next": "Weitere Agenten"
+    },
+    "table": "Aufgaben",
+    "noResults": "Keine Aufgabe passt zu dieser Suche.",
+    "toggleAgent": "Aufgaben von {{name}} ein- oder ausblenden",
+    "using": "Nutzt {{names}}",
+    "activityOf": "Was {{name}} in den letzten 30 Min. getan hat",
+    "activityAll": "Was die Agenten in den letzten 30 Min. getan haben",
+    "panel": {
+      "steps": "Schritte",
+      "noSteps": "Noch keine Schritte."
+    },
+    "agentPanel": {
+      "now_one": "{{count}} aktiv",
+      "now_other": "{{count}} aktiv",
+      "wells": {
+        "now": "Jetzt",
+        "waiting": "Wartet auf dich",
+        "done": "Heute erledigt"
+      },
+      "none": "{{name}} ist gerade frei."
     }
   }
 }

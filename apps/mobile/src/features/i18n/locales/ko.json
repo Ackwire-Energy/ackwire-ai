@@ -1115,6 +1115,10 @@
     "anyAgent": "모든 에이전트",
     "create": "만들기"
   },
+  "taskManager": {
+    "loadFailed": "작업을 불러오지 못했어요.",
+    "gone": "이 작업은 더 이상 없어요."
+  },
   "homeNow": {
     "working_other": "{{count}}명 작업 중",
     "finished": {

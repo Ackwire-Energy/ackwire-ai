@@ -4359,7 +4359,19 @@
       "created": "タスク #{{number}}を作成しました。",
       "intro": "担当する人やエージェントは、進捗とともにボードに表示されます。",
       "criteriaFound_other": "受け入れ条件{{count}}件",
-      "agentStarts": "タスクが作成されると、{{name}}がすぐに始めます。重要な操作はあなたの承認を求めます。"
+      "agentStarts": "タスクが作成されると、{{name}}がすぐに始めます。重要な操作はあなたの承認を求めます。",
+      "agentStartsAll": "タスクが作成されると、{{name}}が説明、受け入れ条件、添付ファイルを受け取ってすぐに始めます。重要な操作はあなたの承認を求めます。",
+      "titleShort": "タスクのタイトル",
+      "quickPlaceholder": "必要なことを書いてください。スクリーンショットの貼り付けやファイルのドロップもできます。「-」で始まる行は受け入れ条件になります。",
+      "pasteHint": "{{keys}}でスクリーンショットを貼り付けるか、ここにファイルをドロップしてください。",
+      "expand": "詳しいフォームを開く",
+      "collapse": "かんたんフォームに戻る",
+      "another": "続けて作成",
+      "addCriterion": "条件を追加",
+      "removeCriterion": "条件を削除",
+      "drop": "ドロップしてタスクに添付",
+      "dropText": "写真、動画、PDF、スプレッドシートなど。1ファイル{{max}} MBまで。",
+      "createHint": "{{keys}}でタスクを作成"
     },
     "back": "タスク",
     "notFound": "このタスクは存在しないか、アクセス権がありません。",
@@ -4382,6 +4394,8 @@
     "asked": "依頼を送りました。{{name}}がここに進捗を投稿します。あなたとのやり取りはDMに残ります。",
     "activity": "アクティビティ",
     "noActivity": "まだ何もありません。",
+    "discussion": "ディスカッション",
+    "noComments": "まだコメントはありません。",
     "comment": "タスクにコメント",
     "commentPlaceholder": "コメント · @でエージェントを呼べます",
     "send": "コメント",
@@ -4397,6 +4411,26 @@
     "noLinks": "リンクされたものはまだありません。",
     "openConversation": "会話を見る",
     "labels": "ラベル",
+    "tabs": {
+      "label": "タスクのセクション",
+      "details": "詳細",
+      "files": "添付ファイル",
+      "history": "履歴"
+    },
+    "files": {
+      "title": "添付ファイル",
+      "add": "ファイルを追加",
+      "addHint": "またはここにドロップ",
+      "grid": "グリッド",
+      "empty": "まだ添付ファイルはありません。ここにファイルをドロップするか、スクリーンショットを貼り付けてください。",
+      "fromCreation": "作成時 · {{when}}",
+      "fromComment": "{{name}}のコメント · {{when}}",
+      "linked": "{{name}}がリンク"
+    },
+    "history": {
+      "commented": "がコメントしました",
+      "commentedFiles": "が添付ファイル付きでコメントしました"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "バックグラウンドの作業を停止しました",
@@ -12086,6 +12120,137 @@
       "upright": "縦向きにする",
       "message": "{{name}}にメッセージ",
       "chooseOnWeb": "agentes.chatの「設定 › コンピューター」で選択してください。"
+    }
+  },
+  "taskManager": {
+    "title": "タスクマネージャー",
+    "nav": "タスクマネージャー",
+    "search": "タスク、エージェント、アプリを検索",
+    "working_other": "{{count}}件作業中",
+    "waiting_other": "{{count}}件があなたの対応待ち",
+    "all": "すべて",
+    "now": "現在",
+    "agentTasks": "{{name}}のタスク",
+    "tasks_other": "{{count}}件のタスク",
+    "free": "対応可能",
+    "columns": {
+      "task": "タスク",
+      "state": "状態",
+      "using": "使用中",
+      "time": "時間",
+      "computer": "実行場所"
+    },
+    "sections": {
+      "asked": "人からの依頼",
+      "background": "バックグラウンドのルーティン"
+    },
+    "state": {
+      "working": "作業中",
+      "ok": "あなたの承認待ち",
+      "answer": "回答待ち",
+      "computerBusy": "コンピューターの空き待ち",
+      "inLine": "順番待ち · {{position}}番目",
+      "computerOffline": "コンピューター待ち",
+      "plan": "プランのリセット待ち",
+      "budget": "予算のリセット待ち",
+      "queued": "待機中",
+      "stopping": "停止しています…",
+      "stopped": "停止"
+    },
+    "where": {
+      "dm": "ダイレクトメッセージ",
+      "routine": "ルーティン「{{name}}」",
+      "background": "バックグラウンド"
+    },
+    "askedBy": "{{name}}が依頼",
+    "askedByYou": "あなたが依頼",
+    "servers": "agentesのサーバー",
+    "plan": "{{total}}件中{{done}}件完了",
+    "program": {
+      "browser": "ブラウザ",
+      "screen": "コンピューターの画面",
+      "terminal": "ターミナル",
+      "agentes": "agentes",
+      "thinking": "考え中",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "ステップを見る",
+      "stop": "停止",
+      "stopTask": "タスクを停止",
+      "stopAll": "すべて停止",
+      "stopAllOf": "{{name}}のタスクをすべて停止",
+      "open": "会話で開く",
+      "openManager": "タスクマネージャーで開く"
+    },
+    "confirm": {
+      "title_other": "{{name}}の{{count}}件のタスクを停止しますか？",
+      "body": "ここまでの作業は残ります。{{name}}には、あなたが停止したことが伝わります。",
+      "short": "{{name}}には、あなたが停止したことが伝わります。",
+      "reason": "理由（任意）",
+      "stop_other": "{{count}}件を停止"
+    },
+    "ended": {
+      "title": "今日終了",
+      "done": "完了",
+      "stopped": "あなたが停止",
+      "stoppedBy": "{{name}}が停止",
+      "failed": "完了できませんでした",
+      "none": "今日終了したものはまだありません。"
+    },
+    "empty": {
+      "title": "今作業中のエージェントはいません",
+      "body": "エージェントがタスクを始めると、ここに表示されます。"
+    },
+    "strip": {
+      "tasks_other": "{{name}}が{{count}}件のタスクに対応中",
+      "waiting_other": "{{count}}件があなたの対応待ち",
+      "see": "見る",
+      "hide": "閉じる",
+      "stopHere": "これを停止",
+      "here": "ここ"
+    },
+    "stopped": {
+      "line": "あなたがこのタスクを停止しました",
+      "lineBy": "{{name}}がこのタスクを停止しました",
+      "told": "{{agent}}に伝えました。誰かが依頼しない限り再開しません。",
+      "reason": "理由:「{{reason}}」",
+      "sayWhy": "理由を伝える",
+      "whyPlaceholder": "理由を伝えますか？（任意）",
+      "send": "送信"
+    },
+    "activity": "過去30分",
+    "failed": "停止できませんでした。もう一度お試しください。",
+    "queue": {
+      "see": "順番待ちを見る",
+      "full_other": "空きなし · {{count}}件が順番待ち",
+      "room": "空きあり",
+      "computers": "コンピューター"
+    },
+    "navWhat": "各エージェントが今していることを見て、必要なものを停止できます",
+    "cards": {
+      "label": "エージェント",
+      "previous": "前のエージェント",
+      "next": "ほかのエージェント"
+    },
+    "table": "タスク",
+    "noResults": "この検索に一致するタスクはありません。",
+    "toggleAgent": "{{name}}のタスクの表示を切り替え",
+    "using": "{{names}}を使用中",
+    "activityOf": "{{name}}が過去30分にしたこと",
+    "activityAll": "エージェントが過去30分にしたこと",
+    "panel": {
+      "steps": "ステップ",
+      "noSteps": "まだステップはありません。"
+    },
+    "agentPanel": {
+      "now_other": "現在{{count}}件",
+      "wells": {
+        "now": "現在",
+        "waiting": "あなたの対応待ち",
+        "done": "今日完了"
+      },
+      "none": "{{name}}は今、手が空いています。"
     }
   }
 }

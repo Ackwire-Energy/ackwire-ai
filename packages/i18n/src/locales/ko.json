@@ -4355,7 +4355,19 @@
       "created": "작업 #{{number}}을(를) 만들었어요.",
       "intro": "맡은 사람이나 에이전트가 진행 상황과 함께 보드에 표시돼요.",
       "criteriaFound_other": "완료 조건 {{count}}개",
-      "agentStarts": "작업이 만들어지는 대로 {{name}}이(가) 시작해요. 민감한 작업은 승인을 요청해요."
+      "agentStarts": "작업이 만들어지는 대로 {{name}}이(가) 시작해요. 민감한 작업은 승인을 요청해요.",
+      "agentStartsAll": "작업이 만들어지는 대로 {{name}}이(가) 설명, 완료 조건, 첨부 파일을 받아 시작해요. 민감한 작업은 승인을 요청해요.",
+      "titleShort": "작업 제목",
+      "quickPlaceholder": "필요한 내용을 적어 주세요. 스크린샷을 붙여 넣거나 파일을 끌어다 놓을 수 있어요. “-”로 시작하는 줄은 완료 조건이 돼요.",
+      "pasteHint": "{{keys}}로 스크린샷을 붙여 넣거나 여기로 파일을 끌어다 놓으세요.",
+      "expand": "전체 양식 열기",
+      "collapse": "간단한 양식으로 돌아가기",
+      "another": "계속 만들기",
+      "addCriterion": "조건 추가",
+      "removeCriterion": "조건 빼기",
+      "drop": "놓으면 작업에 첨부돼요",
+      "dropText": "사진, 동영상, PDF, 스프레드시트 등 파일당 최대 {{max}} MB.",
+      "createHint": "{{keys}}로 작업 만들기"
     },
     "back": "작업",
     "notFound": "이 작업은 없거나 접근 권한이 없어요.",
@@ -4378,6 +4390,8 @@
     "asked": "요청을 보냈어요. {{name}}이(가) 여기에 진행 상황을 올려요. 대화는 내 DM에 남아요.",
     "activity": "활동",
     "noActivity": "아직 아무것도 없어요.",
+    "discussion": "토론",
+    "noComments": "아직 댓글이 없어요.",
     "comment": "작업에 댓글 달기",
     "commentPlaceholder": "댓글 · @로 에이전트 호출",
     "send": "댓글",
@@ -4393,6 +4407,26 @@
     "noLinks": "아직 연결된 항목이 없어요.",
     "openConversation": "대화 보기",
     "labels": "라벨",
+    "tabs": {
+      "label": "작업 구성",
+      "details": "세부 정보",
+      "files": "첨부 파일",
+      "history": "기록"
+    },
+    "files": {
+      "title": "첨부 파일",
+      "add": "파일 추가",
+      "addHint": "또는 여기로 끌어다 놓기",
+      "grid": "격자",
+      "empty": "아직 첨부 파일이 없어요. 여기로 파일을 끌어다 놓거나 스크린샷을 붙여 넣으세요.",
+      "fromCreation": "만들 때 · {{when}}",
+      "fromComment": "{{name}}의 댓글 · {{when}}",
+      "linked": "{{name}}이(가) 연결함"
+    },
+    "history": {
+      "commented": "댓글을 남겼어요",
+      "commentedFiles": "첨부 파일과 함께 댓글을 남겼어요"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "백그라운드 작업을 중지했어요",
@@ -12077,6 +12111,137 @@
       "upright": "세로로 돌리기",
       "message": "{{name}}에게 메시지 보내기",
       "chooseOnWeb": "agentes.chat의 설정 › 컴퓨터에서 선택하세요."
+    }
+  },
+  "taskManager": {
+    "title": "작업 관리자",
+    "nav": "작업 관리자",
+    "search": "작업, 에이전트, 앱 검색",
+    "working_other": "{{count}}개 작업 중",
+    "waiting_other": "{{count}}개 내 확인 대기",
+    "all": "전체",
+    "now": "지금",
+    "agentTasks": "{{name}}의 작업",
+    "tasks_other": "작업 {{count}}개",
+    "free": "작업 없음",
+    "columns": {
+      "task": "작업",
+      "state": "상태",
+      "using": "지금 사용 중",
+      "time": "시간",
+      "computer": "실행 위치"
+    },
+    "sections": {
+      "asked": "사람이 요청한 작업",
+      "background": "백그라운드 루틴"
+    },
+    "state": {
+      "working": "작업 중",
+      "ok": "내 승인 대기 중",
+      "answer": "답변 대기 중",
+      "computerBusy": "컴퓨터 자리 대기 중",
+      "inLine": "차례 대기 · {{position}}번째",
+      "computerOffline": "컴퓨터 대기 중",
+      "plan": "요금제 초기화 대기 중",
+      "budget": "예산 초기화 대기 중",
+      "queued": "대기 중",
+      "stopping": "중지하는 중…",
+      "stopped": "중지됨"
+    },
+    "where": {
+      "dm": "다이렉트 메시지",
+      "routine": "루틴 «{{name}}»",
+      "background": "백그라운드"
+    },
+    "askedBy": "{{name}}이(가) 요청함",
+    "askedByYou": "내가 요청함",
+    "servers": "agentes 서버",
+    "plan": "{{total}}개 중 {{done}}개 완료",
+    "program": {
+      "browser": "브라우저",
+      "screen": "컴퓨터 화면",
+      "terminal": "터미널",
+      "agentes": "agentes",
+      "thinking": "생각 중",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "단계 보기",
+      "stop": "중지",
+      "stopTask": "작업 중지",
+      "stopAll": "모두 중지",
+      "stopAllOf": "{{name}}의 작업 모두 중지",
+      "open": "대화에서 열기",
+      "openManager": "작업 관리자에서 열기"
+    },
+    "confirm": {
+      "title_other": "{{name}}의 작업 {{count}}개를 중지할까요?",
+      "body": "이미 한 일은 그대로 남고, {{name}}에게 내가 중지했다고 알려요.",
+      "short": "{{name}}에게 내가 중지했다고 알려요.",
+      "reason": "이유(선택)",
+      "stop_other": "{{count}}개 중지"
+    },
+    "ended": {
+      "title": "오늘 끝난 작업",
+      "done": "완료",
+      "stopped": "내가 중지함",
+      "stoppedBy": "{{name}}이(가) 중지함",
+      "failed": "끝내지 못함",
+      "none": "오늘 끝난 작업이 아직 없어요."
+    },
+    "empty": {
+      "title": "지금 작업 중인 에이전트가 없어요",
+      "body": "에이전트가 작업을 시작하면 여기에 표시돼요."
+    },
+    "strip": {
+      "tasks_other": "{{name}}이(가) 작업 {{count}}개 진행 중",
+      "waiting_other": "{{count}}개 내 확인 대기",
+      "see": "보기",
+      "hide": "닫기",
+      "stopHere": "이 작업 중지",
+      "here": "여기"
+    },
+    "stopped": {
+      "line": "내가 이 작업을 중지했어요",
+      "lineBy": "{{name}}이(가) 이 작업을 중지했어요",
+      "told": "{{agent}}에게 알렸어요. 누군가 요청할 때만 다시 시작해요.",
+      "reason": "이유: «{{reason}}»",
+      "sayWhy": "이유 말하기",
+      "whyPlaceholder": "이유를 알려 줄래요? (선택)",
+      "send": "보내기"
+    },
+    "activity": "최근 30분",
+    "failed": "중지하지 못했어요. 다시 시도해 주세요.",
+    "queue": {
+      "see": "대기열 보기",
+      "full_other": "꽉 참 · {{count}}개 대기 중",
+      "room": "자리 있음",
+      "computers": "컴퓨터"
+    },
+    "navWhat": "에이전트마다 지금 하는 일을 보고, 필요한 작업은 중지해요",
+    "cards": {
+      "label": "에이전트",
+      "previous": "이전 에이전트",
+      "next": "에이전트 더 보기"
+    },
+    "table": "작업",
+    "noResults": "이 검색과 일치하는 작업이 없어요.",
+    "toggleAgent": "{{name}}의 작업 표시 또는 숨기기",
+    "using": "{{names}} 사용 중",
+    "activityOf": "{{name}}이(가) 최근 30분 동안 한 일",
+    "activityAll": "에이전트들이 최근 30분 동안 한 일",
+    "panel": {
+      "steps": "단계",
+      "noSteps": "아직 단계가 없어요."
+    },
+    "agentPanel": {
+      "now_other": "지금 {{count}}개",
+      "wells": {
+        "now": "지금",
+        "waiting": "내 확인 대기",
+        "done": "오늘 완료"
+      },
+      "none": "{{name}}은(는) 지금 하는 작업이 없어요."
     }
   }
 }

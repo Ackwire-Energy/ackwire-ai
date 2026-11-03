@@ -35,6 +35,11 @@ const go = async (path: string, api = createFakeApi(seedState())) => {
 };
 const column = (name: string) => screen().getByRole("region", { name });
 const cardTitles = (el: HTMLElement) => Array.from(el.querySelectorAll(".issue-card__title")).map((x) => x.textContent);
+/** Radix tabs switch on mouse down. */
+const tab = async (name: string | RegExp) => {
+  await act(async () => fireEvent.mouseDown(screen().getByRole("tab", { name }), { button: 0 }));
+  await settle(3);
+};
 
 describe("Issues (board and list)", () => {
   test("board by status with counts, summary, PR, priority and due date", async () => {
@@ -108,7 +113,7 @@ describe("Issues (board and list)", () => {
     expect(rows.find((r) => r.textContent?.includes("#126"))?.textContent).toContain("Feito");
   });
 
-  test("Nova issue: title, criteria from '-' lines, assignee (each by its face) and priority", async () => {
+  test("Nova tarefa: title, criteria from '-' lines, assignee (each by its face), priority and a pasted print", async () => {
     const state = seedState();
     const [ada, atlas] = state.agents;
     if (ada) ada.appearance = { color: "green", accessory: "headphones" };
@@ -119,16 +124,20 @@ describe("Issues (board and list)", () => {
     const create = within(dialog).getByRole("button", { name: "Criar tarefa" });
     expect(create.hasAttribute("disabled")).toBe(true);
     await type(within(dialog).getByLabelText("Título"), "Exportar agenda em PDF");
-    await type(
-      within(dialog).getByLabelText("Descrição e critérios de aceite"),
-      "Pedido de 18 reviews.\n- Botão na agenda\n- PDF com o logo da clínica",
-    );
-    const assignee = within(dialog).getByRole("combobox", { name: "Responsável" });
-    assignee.focus();
-    await key(assignee, "Enter");
-    // People by their photo or initials, agents by their own face, no one by a glyph as wide as the faces (18px).
-    const leads = within(screen().getByRole("listbox"))
-      .getAllByRole("option")
+    const text = within(dialog).getByLabelText("Descrição e critérios de aceite");
+    await type(text, "Pedido de 18 reviews.\n- Botão na agenda\n- PDF com o logo da clínica");
+    expect(dialog.textContent).toContain("2 critérios de aceite");
+    // A print pasted into the box goes to the Drive at once and shows under the text.
+    const print = new File(["png"], "image.png", { type: "image/png" });
+    await act(async () => fireEvent.paste(text, { clipboardData: { files: [print] } }));
+    await settle(4);
+    expect(within(dialog).getByRole("button", { name: "Remover image.png" })).toBeTruthy();
+    // Who takes it: a small button, each one by their face.
+    const who = within(dialog).getByRole("button", { name: "Responsável" });
+    who.focus();
+    await key(who, "Enter");
+    const leads = within(screen().getByRole("menu"))
+      .getAllByRole("menuitem")
       .map((o) => {
         const lead = o.querySelector<HTMLElement | SVGElement>(".ac-menu__leading > *");
         const kind = lead?.getAttribute("data-kind");
@@ -144,12 +153,14 @@ describe("Issues (board and list)", () => {
       ["Ada", "headphones"],
       ["Atlas", "crown"],
     ]);
-    await click(within(screen().getByRole("listbox")).getByRole("option", { name: /Ada/ }));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Ada" }));
     await settle(3);
-    await pick(within(dialog).getByRole("combobox", { name: "Prioridade" }), "Alta");
-    await type(within(dialog).getByLabelText("Prazo (opcional)"), "31/02");
-    expect(dialog.textContent).toContain("Use 24/10 ou 24/10/2026.");
-    await type(within(dialog).getByLabelText("Prazo (opcional)"), "");
+    expect(dialog.textContent).toContain("com a descrição, os critérios e os anexos");
+    const priority = within(dialog).getByRole("button", { name: "Prioridade: Normal" });
+    priority.focus();
+    await key(priority, "Enter");
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Alta" }));
+    await settle(3);
     await click(create);
     await settle(5);
     expect(screen().getByText("Tarefa #133 criada.")).toBeTruthy();
@@ -162,6 +173,35 @@ describe("Issues (board and list)", () => {
       assignee: { type: "agent" },
     });
     expect(created.criteria.map((c) => c.text)).toEqual(["Botão na agenda", "PDF com o logo da clínica"]);
+    expect(created.artifacts).toHaveLength(1);
+  });
+
+  test("Nova tarefa → formulário completo: the text splits into description and criteria, and comes back", async () => {
+    await go("issues");
+    await click(screen().getByRole("button", { name: "Nova tarefa" }));
+    const dialog = screen().getByRole("dialog", { name: "Nova tarefa" });
+    await type(within(dialog).getByLabelText("Título"), "Exportar agenda");
+    await type(
+      within(dialog).getByLabelText("Descrição e critérios de aceite"),
+      "Pedido de clientes.\n- Botão na agenda",
+    );
+    await click(within(dialog).getByRole("button", { name: "Abrir o formulário completo" }));
+    const field = (label: string, tag: string) =>
+      within(dialog)
+        .getAllByLabelText(label)
+        .filter((e) => e.tagName === tag) as HTMLInputElement[];
+    expect((within(dialog).getByLabelText("Título") as HTMLInputElement).value).toBe("Exportar agenda");
+    expect(field("Descrição", "TEXTAREA")[0]?.value).toBe("Pedido de clientes.");
+    expect(field("Critérios de aceite", "INPUT").map((e) => e.value)).toEqual(["Botão na agenda"]);
+    const add = within(dialog).getByPlaceholderText("Adicionar critério");
+    await type(add, "PDF com o logo");
+    await key(add, "Enter");
+    expect(field("Critérios de aceite", "INPUT").map((e) => e.value)).toEqual(["Botão na agenda", "PDF com o logo"]);
+    expect(within(dialog).getByRole("region", { name: "Anexos" })).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Voltar ao formulário rápido" }));
+    expect((within(dialog).getByLabelText("Descrição e critérios de aceite") as HTMLTextAreaElement).value).toBe(
+      "Pedido de clientes.\n\n- Botão na agenda\n- PDF com o logo",
+    );
   });
 });
 
@@ -249,8 +289,8 @@ describe("Issue detail", () => {
     const aside = screen().getByRole("complementary", { name: "Detalhes da tarefa" });
     expect(within(aside).getByRole("combobox", { name: "Coluna" }).textContent).toContain("Em andamento");
     expect(within(aside).getByRole("combobox", { name: "Responsável" }).textContent).toContain("Ada");
-    const activity = screen().getByRole("region", { name: "Atividade" });
-    expect(activity.textContent).toContain("Walter pediu a Ada para fazer");
+    await tab("Histórico");
+    expect(screen().getByRole("region", { name: "Histórico" }).textContent).toContain("Walter pediu a Ada para fazer");
   });
 
   test("comment and change the status", async () => {
@@ -260,12 +300,30 @@ describe("Issue detail", () => {
       fireEvent.keyDown(screen().getByRole("combobox", { name: "Comentar na tarefa" }), { key: "Enter" }),
     );
     await settle(5);
-    const activity = screen().getByRole("region", { name: "Atividade" });
-    expect(activity.textContent).toContain("Começo amanhã.");
+    expect(screen().getByRole("region", { name: "Discussão" }).textContent).toContain("Começo amanhã.");
     const aside = screen().getByRole("complementary", { name: "Detalhes da tarefa" });
     await pick(within(aside).getByRole("combobox", { name: "Coluna" }), "Em revisão");
     await settle(4);
-    expect(screen().getByRole("region", { name: "Atividade" }).textContent).toContain("mudou o status para Em revisão");
+    await tab("Histórico");
+    const history = screen().getByRole("region", { name: "Histórico" });
+    expect(history.textContent).toContain("Walter comentou");
+    expect(history.textContent).toContain("mudou o status para Em revisão");
+  });
+
+  test("a print pasted in a comment shows as a picture, and the Anexos tab lists it", async () => {
+    await go("issues/131");
+    const box = screen().getByRole("combobox", { name: "Comentar na tarefa" });
+    const print = new File(["png"], "image.png", { type: "image/png" });
+    await act(async () => fireEvent.paste(box, { clipboardData: { files: [print] } }));
+    await settle(4);
+    await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+    await settle(5);
+    // Like a chat message: the file as a tile, not a bare link with its name.
+    expect(screen().getByRole("region", { name: "Discussão" }).querySelector(".artifact-tile")).toBeTruthy();
+    await tab(/^Anexos/);
+    const files = screen().getByRole("region", { name: "Anexos" });
+    expect(files.querySelectorAll(".issue-file")).toHaveLength(1);
+    expect(files.textContent).toContain("Comentário de Walter");
   });
 
   test("a missing issue says so", async () => {

@@ -41,6 +41,7 @@ import { Route as OrgOrgIdProposalsRouteImport } from './routes/org.$orgId.propo
 import { Route as OrgOrgIdRoutinesRouteImport } from './routes/org.$orgId.routines'
 import { Route as OrgOrgIdSearchRouteImport } from './routes/org.$orgId.search'
 import { Route as OrgOrgIdSettingsRouteImport } from './routes/org.$orgId.settings'
+import { Route as OrgOrgIdTaskManagerRouteImport } from './routes/org.$orgId.task-manager'
 import { Route as OrgOrgIdTeamRouteImport } from './routes/org.$orgId.team'
 import { Route as OrgOrgIdWikiRouteImport } from './routes/org.$orgId.wiki'
 import { Route as OrgOrgIdAgentsNewRouteImport } from './routes/org.$orgId.agents.new'
@@ -218,6 +219,11 @@ const OrgOrgIdSettingsRoute = OrgOrgIdSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => OrgOrgIdRoute,
 } as any)
+const OrgOrgIdTaskManagerRoute = OrgOrgIdTaskManagerRouteImport.update({
+  id: '/task-manager',
+  path: '/task-manager',
+  getParentRoute: () => OrgOrgIdRoute,
+} as any)
 const OrgOrgIdTeamRoute = OrgOrgIdTeamRouteImport.update({
   id: '/team',
   path: '/team',
@@ -334,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/org/$orgId/routines': typeof OrgOrgIdRoutinesRoute
   '/org/$orgId/search': typeof OrgOrgIdSearchRoute
   '/org/$orgId/settings': typeof OrgOrgIdSettingsRoute
+  '/org/$orgId/task-manager': typeof OrgOrgIdTaskManagerRoute
   '/org/$orgId/team': typeof OrgOrgIdTeamRoute
   '/org/$orgId/wiki': typeof OrgOrgIdWikiRoute
   '/org/$orgId/': typeof OrgOrgIdIndexRoute
@@ -383,6 +390,7 @@ export interface FileRoutesByTo {
   '/org/$orgId/routines': typeof OrgOrgIdRoutinesRoute
   '/org/$orgId/search': typeof OrgOrgIdSearchRoute
   '/org/$orgId/settings': typeof OrgOrgIdSettingsRoute
+  '/org/$orgId/task-manager': typeof OrgOrgIdTaskManagerRoute
   '/org/$orgId/team': typeof OrgOrgIdTeamRoute
   '/org/$orgId/wiki': typeof OrgOrgIdWikiRoute
   '/org/$orgId': typeof OrgOrgIdIndexRoute
@@ -434,6 +442,7 @@ export interface FileRoutesById {
   '/org/$orgId/routines': typeof OrgOrgIdRoutinesRoute
   '/org/$orgId/search': typeof OrgOrgIdSearchRoute
   '/org/$orgId/settings': typeof OrgOrgIdSettingsRoute
+  '/org/$orgId/task-manager': typeof OrgOrgIdTaskManagerRoute
   '/org/$orgId/team': typeof OrgOrgIdTeamRoute
   '/org/$orgId/wiki': typeof OrgOrgIdWikiRoute
   '/org/$orgId/': typeof OrgOrgIdIndexRoute
@@ -486,6 +495,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/routines'
     | '/org/$orgId/search'
     | '/org/$orgId/settings'
+    | '/org/$orgId/task-manager'
     | '/org/$orgId/team'
     | '/org/$orgId/wiki'
     | '/org/$orgId/'
@@ -535,6 +545,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/routines'
     | '/org/$orgId/search'
     | '/org/$orgId/settings'
+    | '/org/$orgId/task-manager'
     | '/org/$orgId/team'
     | '/org/$orgId/wiki'
     | '/org/$orgId'
@@ -585,6 +596,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/routines'
     | '/org/$orgId/search'
     | '/org/$orgId/settings'
+    | '/org/$orgId/task-manager'
     | '/org/$orgId/team'
     | '/org/$orgId/wiki'
     | '/org/$orgId/'
@@ -852,6 +864,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgOrgIdSettingsRouteImport
       parentRoute: typeof OrgOrgIdRoute
     }
+    '/org/$orgId/task-manager': {
+      id: '/org/$orgId/task-manager'
+      path: '/task-manager'
+      fullPath: '/org/$orgId/task-manager'
+      preLoaderRoute: typeof OrgOrgIdTaskManagerRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
     '/org/$orgId/team': {
       id: '/org/$orgId/team'
       path: '/team'
@@ -980,6 +999,7 @@ interface OrgOrgIdRouteChildren {
   OrgOrgIdRoutinesRoute: typeof OrgOrgIdRoutinesRoute
   OrgOrgIdSearchRoute: typeof OrgOrgIdSearchRoute
   OrgOrgIdSettingsRoute: typeof OrgOrgIdSettingsRoute
+  OrgOrgIdTaskManagerRoute: typeof OrgOrgIdTaskManagerRoute
   OrgOrgIdTeamRoute: typeof OrgOrgIdTeamRoute
   OrgOrgIdWikiRoute: typeof OrgOrgIdWikiRoute
   OrgOrgIdIndexRoute: typeof OrgOrgIdIndexRoute
@@ -1012,6 +1032,7 @@ const OrgOrgIdRouteChildren: OrgOrgIdRouteChildren = {
   OrgOrgIdRoutinesRoute: OrgOrgIdRoutinesRoute,
   OrgOrgIdSearchRoute: OrgOrgIdSearchRoute,
   OrgOrgIdSettingsRoute: OrgOrgIdSettingsRoute,
+  OrgOrgIdTaskManagerRoute: OrgOrgIdTaskManagerRoute,
   OrgOrgIdTeamRoute: OrgOrgIdTeamRoute,
   OrgOrgIdWikiRoute: OrgOrgIdWikiRoute,
   OrgOrgIdIndexRoute: OrgOrgIdIndexRoute,

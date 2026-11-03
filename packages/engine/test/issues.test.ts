@@ -19,6 +19,7 @@ import {
   grantScopes,
   insertMessage,
   issueFromMessage,
+  issueWorkBrief,
   listIssueActivity,
   listIssues,
   NEW_AGENT_DEFAULTS,
@@ -496,6 +497,49 @@ describe("issues", () => {
     const theirs = await file(other.id, "deles.pdf");
     await expect(
       commentIssue(deps, person(f.owner.id), f.org.id, issue.id, "olha", { attachmentIds: [theirs] }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test("a new issue can carry the author's Drive files: linked, on the created event and in the agent's brief", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const file = async (by: string, title: string) => {
+      const [row] = await f.db
+        .insert(schema.artifacts)
+        .values({
+          orgId: f.org.id,
+          kind: "file",
+          title,
+          createdByType: "person",
+          createdById: by,
+          updatedByType: "person",
+          updatedById: by,
+        })
+        .returning();
+      return row?.id ?? "";
+    };
+    const shot = await file(f.owner.id, "print-checkout.png");
+    const log = await file(f.owner.id, "log-pagamento.txt");
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, {
+      title: "Botão de pagar some no celular",
+      attachmentIds: [shot, log],
+    });
+    expect(issue.artifacts.map((a) => a.id)).toEqual([shot, log]);
+    const created = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id)).find(
+      (a) => a.event === "created",
+    );
+    expect(created?.attachments).toEqual([
+      { id: shot, title: "print-checkout.png" },
+      { id: log, title: "log-pagamento.txt" },
+    ]);
+    const brief = await issueWorkBrief(f.db, f.org.id, issue.id);
+    expect(brief).toContain("## Files attached to the issue");
+    expect(brief).toContain(`- print-checkout.png (artifact ${shot})`);
+    // Someone else's file can't ride along on a new issue either.
+    const other = await addMember(f.db, f.org.id, "member", "Ana");
+    const theirs = await file(other.id, "deles.pdf");
+    await expect(
+      createIssue(deps, person(f.owner.id), f.org.id, { title: "Outra", attachmentIds: [theirs] }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 

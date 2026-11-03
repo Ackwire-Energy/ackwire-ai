@@ -1308,7 +1308,8 @@ test("a cancel while the run waits for its computer ends it at once", async () =
   expect(Date.now() - started).toBeLessThan(5_000);
   expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("canceled");
   expect(seen.length).toBe(0);
-  const main = await timeline(f);
+  // The agent's own "stopped" line ends what people read (the notice after it is the agent's, ADR 0128).
+  const main = (await timeline(f)).filter((m) => !m.meta.notice);
   expect(main.at(-1)?.body).toBe("_Stopped by ana._");
   expect(main.some((m) => m.meta.bodyCode === "brain_unavailable")).toBe(false);
 });

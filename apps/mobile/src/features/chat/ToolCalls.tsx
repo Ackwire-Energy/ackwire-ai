@@ -1,4 +1,4 @@
-import { isScreenTool, type ScreenKind, useCatalog, useRun } from "@agenteschat/client";
+import { isScreenTool, type ScreenKind, useCatalog, useRun, useTaskSteps } from "@agenteschat/client";
 import type { Activity, ActivityKind } from "@agenteschat/client/lib/activity";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -138,8 +138,11 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
 /** How many logos the closed line stacks (a phone has no room for more). */
 const LOGOS_MAX = 4;
 
-/** A call's logo: its service's mark as the connectors screens draw it (`callLogo`), or the icon of one of our tools. */
-function useLogo() {
+/**
+ * A call's logo: its service's mark as the connectors screens draw it (`callLogo`), or the icon of one of our tools.
+ * The task manager draws what a task uses now with it too (ADR 0128).
+ */
+export function useCallLogo() {
   const catalog = useCatalog();
   return (a: Activity, size = 20): ReactNode => {
     const logo = callLogo(a, catalog.data?.connectors ?? []);
@@ -572,7 +575,7 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode): 
 
 function useBlockItems(items: ToolItem[]): BlockItem[] {
   const { t, i18n } = useTranslation();
-  const logo = useLogo();
+  const logo = useCallLogo();
   return items.flatMap((item): BlockItem[] =>
     item.kind === "call"
       ? [{ kind: "line", line: blockLine(t, i18n.language, item.line, logo(item.line)) }]
@@ -620,7 +623,7 @@ export function TurnTools({
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const blockItems = useBlockItems(items);
-  const logo = useLogo();
+  const logo = useCallLogo();
   // A lone quick read that only fed the answer: no card, as if it called nothing. Done, its tools are the summary
   // the person chose not to see (`showActivity`) unless they turned it on.
   const now = quietWork(items) || (done && !showsActivity(org)) ? null : toolNow(items);
@@ -703,7 +706,7 @@ export function SavedTools({
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
   const run = useRun(orgId, open ? runId : null);
-  const logo = useLogo();
+  const logo = useCallLogo();
   const compact = workMeta(meta);
   const onCard = (name: unknown) => skipScreens.some((screen) => isScreenTool(String(name ?? ""), screen));
   const work = run.data
@@ -775,6 +778,77 @@ export function SavedTools({
 }
 
 /**
+ * A task's steps on its own screen (ADR 0128): every call of the run so far, open, each opening again on what it ran
+ * or was given and answered. `calls` is how many calls the task made: when it grows, the steps load again. While it
+ * works (`live`) its last call still waiting on an answer is the one running.
+ */
+export function RunSteps({
+  runId,
+  color,
+  calls,
+  live,
+}: {
+  runId: string;
+  color: AgentColorName;
+  calls: number;
+  live: boolean;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const orgId = useOrgId();
+  // The task manager's own read (ADR 0128): whoever sees the task sees its steps, without usage access.
+  const run = useTaskSteps(orgId, runId);
+  const { refetch } = run;
+  const seen = useRef(calls);
+  useEffect(() => {
+    if (seen.current === calls) return;
+    seen.current = calls;
+    void refetch();
+  }, [calls, refetch]);
+  const work = run.data ? workFromSteps(run.data.steps, run.data.run) : null;
+  const saved = work ? toolItemsSaved(work) : [];
+  const lastCall = saved.findLastIndex((i) => i.kind === "call");
+  const items: ToolItem[] = saved.map((item, i) =>
+    live && i === lastCall && item.kind === "call" && item.line.state === "stop"
+      ? { ...item, line: { ...item.line, state: "run" as const } }
+      : item,
+  );
+  const blockItems = useBlockItems(items);
+  if (!work)
+    return run.isError ? (
+      <Text variant="footnote" tone="muted">
+        {t("chat.work.failed")}
+      </Text>
+    ) : (
+      <View style={styles.loading}>
+        <PixelOrbit color={color} size={14} />
+        <Text variant="footnote" tone="faint">
+          {t("mobile.common.loading")}
+        </Text>
+      </View>
+    );
+  if (blockItems.length === 0)
+    return (
+      <Text variant="footnote" tone="faint">
+        {t("taskManager.panel.noSteps")}
+      </Text>
+    );
+  return (
+    <View style={[styles.block, styles.steps, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+      {blockItems.map((item) =>
+        item.kind === "note" ? (
+          <View key={item.key} style={styles.note}>
+            {item.node}
+          </View>
+        ) : (
+          <Line key={item.line.key} line={item.line} color={color} />
+        ),
+      )}
+    </View>
+  );
+}
+
+/**
  * A message it read while working, under its tools: "Leu seu recado · …", or "Parou para ler seu recado ·
  * …" when it was asked to stop and read (until then the message itself says "lê na próxima pausa").
  */
@@ -824,6 +898,8 @@ const styles = StyleSheet.create({
   mark: { width: 16, height: 16, alignItems: "center", justifyContent: "center" },
   flip: { transform: [{ rotate: "180deg" }] },
   lines: { borderTopWidth: StyleSheet.hairlineWidth, padding: 4 },
+  // A task's steps (`RunSteps`): the block's open lines, without its head.
+  steps: { marginTop: 0, marginBottom: 0, padding: 4 },
   line: { borderRadius: 10 },
   // Its 20px first line in the middle of 40: the logo's height; the phrase's 18px line, the time's 16px and the
   // mark's 16px are brought down onto it (`firstLine`, `level`).

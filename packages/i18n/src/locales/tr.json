@@ -4485,7 +4485,19 @@
       "intro": "Onu alan, kişi ya da ajan, ilerlemesiyle birlikte panoda görünür.",
       "criteriaFound_one": "{{count}} kabul kriteri",
       "criteriaFound_other": "{{count}} kabul kriteri",
-      "agentStarts": "{{name}} görev oluşturulur oluşturulmaz başlar. Hassas olan her şey onayınızı ister."
+      "agentStarts": "{{name}} görev oluşturulur oluşturulmaz başlar. Hassas olan her şey onayınızı ister.",
+      "agentStartsAll": "{{name}} görev oluşturulur oluşturulmaz açıklama, kriterler ve eklerle başlar. Hassas olan her şey onayınızı ister.",
+      "titleShort": "Görevin başlığı",
+      "quickPlaceholder": "Neye ihtiyaç olduğunu yazın. Ekran görüntüsü yapıştırın, dosya sürükleyin. “-” ile başlayan satırlar kabul kriteri olur.",
+      "pasteHint": "{{keys}} ile bir ekran görüntüsü yapıştırın ya da dosyaları buraya sürükleyin.",
+      "expand": "Tam formu aç",
+      "collapse": "Hızlı forma dön",
+      "another": "Bir tane daha oluştur",
+      "addCriterion": "Kriter ekle",
+      "removeCriterion": "Kriteri kaldır",
+      "drop": "Göreve eklemek için bırakın",
+      "dropText": "Fotoğraf, video, PDF, tablo… dosya başına en fazla {{max}} MB.",
+      "createHint": "{{keys}} görevi oluşturur"
     },
     "back": "Görevler",
     "notFound": "Bu görev yok ya da erişiminiz yok.",
@@ -4508,6 +4520,8 @@
     "asked": "İstek gönderildi. {{name}} ilerlemeyi buraya yazar. Konuşmanız doğrudan mesajınızda kalır.",
     "activity": "Etkinlik",
     "noActivity": "Henüz bir şey yok.",
+    "discussion": "Tartışma",
+    "noComments": "Henüz yorum yok.",
     "comment": "Göreve yorum yap",
     "commentPlaceholder": "Yorum · bir ajanı çağırmak için @ kullanın",
     "send": "Yorum yap",
@@ -4523,6 +4537,26 @@
     "noLinks": "Henüz bağlantılı bir şey yok.",
     "openConversation": "Konuşmayı gör",
     "labels": "Etiketler",
+    "tabs": {
+      "label": "Görevin bölümleri",
+      "details": "Ayrıntılar",
+      "files": "Ekler",
+      "history": "Geçmiş"
+    },
+    "files": {
+      "title": "Ekler",
+      "add": "Dosya ekle",
+      "addHint": "ya da buraya sürükleyin",
+      "grid": "Izgara",
+      "empty": "Henüz ek yok. Dosyaları buraya sürükleyin ya da bir ekran görüntüsü yapıştırın.",
+      "fromCreation": "Oluşturulurken · {{when}}",
+      "fromComment": "{{name}} yorumu · {{when}}",
+      "linked": "{{name}} bağladı"
+    },
+    "history": {
+      "commented": "yorum yaptı",
+      "commentedFiles": "eklerle yorum yaptı"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "arka plandaki çalışmayı durdurdu",
@@ -12441,6 +12475,146 @@
       "upright": "Dik çevirin",
       "message": "{{name}} ajanına mesaj gönder",
       "chooseOnWeb": "agentes.chat üzerinde, Ayarlar › Bilgisayarlar bölümünden seçin."
+    }
+  },
+  "taskManager": {
+    "title": "Görev yöneticisi",
+    "nav": "Görev yöneticisi",
+    "search": "Görev, ajan veya uygulama ara",
+    "working_one": "{{count}} çalışıyor",
+    "working_other": "{{count}} çalışıyor",
+    "waiting_one": "{{count}} sizi bekliyor",
+    "waiting_other": "{{count}} sizi bekliyor",
+    "all": "Tümü",
+    "now": "Şu an",
+    "agentTasks": "{{name}} ajanının görevleri",
+    "tasks_one": "{{count}} görev",
+    "tasks_other": "{{count}} görev",
+    "free": "Boşta",
+    "columns": {
+      "task": "Görev",
+      "state": "Durum",
+      "using": "Şu an kullanılan",
+      "time": "Süre",
+      "computer": "Çalıştığı yer"
+    },
+    "sections": {
+      "asked": "Kişilerin istedikleri",
+      "background": "Arka planda rutinler"
+    },
+    "state": {
+      "working": "Çalışıyor",
+      "ok": "Onayınızı bekliyor",
+      "answer": "Yanıt bekliyor",
+      "computerBusy": "Bilgisayarda yer bekliyor",
+      "inLine": "Sırada · {{position}}.",
+      "computerOffline": "Bilgisayarı bekliyor",
+      "plan": "Plan limitini bekliyor",
+      "budget": "Bütçeyi bekliyor",
+      "queued": "Sırada",
+      "stopping": "Durduruluyor…",
+      "stopped": "Durduruldu"
+    },
+    "where": {
+      "dm": "Doğrudan mesaj",
+      "routine": "«{{name}}» rutini",
+      "background": "Arka planda"
+    },
+    "askedBy": "{{name}} istedi",
+    "askedByYou": "Siz istediniz",
+    "servers": "Sunucularımız",
+    "plan": "{{done}}/{{total}} tamamlandı",
+    "program": {
+      "browser": "Tarayıcı",
+      "screen": "Bilgisayar ekranı",
+      "terminal": "Terminal",
+      "agentes": "agentes",
+      "thinking": "Düşünüyor",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "Adımları gör",
+      "stop": "Durdur",
+      "stopTask": "Görevi durdur",
+      "stopAll": "Tümünü durdur",
+      "stopAllOf": "{{name}} ajanının tüm görevlerini durdur",
+      "open": "Sohbette aç",
+      "openManager": "Görev yöneticisinde aç"
+    },
+    "confirm": {
+      "title_one": "{{name}} ajanının görevi durdurulsun mu?",
+      "title_other": "{{name}} ajanının {{count}} görevi durdurulsun mu?",
+      "body": "Yapılanlar korunur ve {{name}} ajanına durdurduğunuz bildirilir.",
+      "short": "{{name}} ajanına durdurduğunuz bildirilir.",
+      "reason": "Neden? (isteğe bağlı)",
+      "stop_one": "Durdur",
+      "stop_other": "{{count}} tanesini durdur"
+    },
+    "ended": {
+      "title": "Bugün bitenler",
+      "done": "Bitti",
+      "stopped": "Siz durdurdunuz",
+      "stoppedBy": "{{name}} durdurdu",
+      "failed": "Bitirilemedi",
+      "none": "Bugün henüz biten bir şey yok."
+    },
+    "empty": {
+      "title": "Şu anda çalışan ajan yok",
+      "body": "Bir ajan bir göreve başladığında görev burada görünür."
+    },
+    "strip": {
+      "tasks_one": "{{name}} {{count}} görev üzerinde",
+      "tasks_other": "{{name}} {{count}} görev üzerinde",
+      "waiting_one": "{{count}} sizi bekliyor",
+      "waiting_other": "{{count}} sizi bekliyor",
+      "see": "Gör",
+      "hide": "Kapat",
+      "stopHere": "Bunu durdur",
+      "here": "burada"
+    },
+    "stopped": {
+      "line": "Bu görevi siz durdurdunuz",
+      "lineBy": "{{name}} bu görevi durdurdu",
+      "told": "{{agent}} bilgilendirildi ve ancak biri isterse devam eder.",
+      "reason": "Neden: «{{reason}}»",
+      "sayWhy": "Nedenini söyle",
+      "whyPlaceholder": "Nedenini söylemek ister misiniz? (isteğe bağlı)",
+      "send": "Gönder"
+    },
+    "activity": "Son 30 dk",
+    "failed": "Durdurulamadı. Tekrar deneyin.",
+    "queue": {
+      "see": "Sırayı gör",
+      "full_one": "Dolu · {{count}} sırada",
+      "full_other": "Dolu · {{count}} sırada",
+      "room": "Yer var",
+      "computers": "Bilgisayarlar"
+    },
+    "navWhat": "Her ajanın şu an ne yaptığı ve gerekeni durdurma",
+    "cards": {
+      "label": "Ajanlar",
+      "previous": "Önceki ajanlar",
+      "next": "Diğer ajanlar"
+    },
+    "table": "Görevler",
+    "noResults": "Bu aramayla eşleşen görev yok.",
+    "toggleAgent": "{{name}} ajanının görevlerini göster veya gizle",
+    "using": "{{names}} kullanıyor",
+    "activityOf": "{{name}} ajanının son 30 dakikada yaptıkları",
+    "activityAll": "Ajanların son 30 dakikada yaptıkları",
+    "panel": {
+      "steps": "Adımlar",
+      "noSteps": "Henüz adım yok."
+    },
+    "agentPanel": {
+      "now_one": "Şu an {{count}}",
+      "now_other": "Şu an {{count}}",
+      "wells": {
+        "now": "Şu an",
+        "waiting": "Sizi bekliyor",
+        "done": "Bugün bitenler"
+      },
+      "none": "{{name}} şu an boşta."
     }
   }
 }

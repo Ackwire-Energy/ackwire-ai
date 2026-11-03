@@ -4513,6 +4513,84 @@ export function useWorkingRuns(orgId: string, enabled = true, pollMs: number | f
   });
 }
 
+/** How often the task manager asks again while it's open (ADR 0128): it follows every conversation at once. */
+export const TASK_MANAGER_POLL_MS = 3_000;
+
+/**
+ * The task manager (ADR 0128): what the agents are doing now, what each one uses, each agent's last hour and what
+ * ended since `since` (default: the last 24 h). Asked again every `pollMs` while shown.
+ */
+export function useTaskManager(
+  orgId: string,
+  options: { since?: string; enabled?: boolean; pollMs?: number | false } = {},
+) {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...keys.taskManager(orgId), options.since ?? null],
+    queryFn: () => {
+      const working = part(api, "working");
+      if (!working.taskManager) throw new Error("This server has no task manager yet");
+      return working.taskManager(orgId, options.since);
+    },
+    enabled: (options.enabled ?? true) && Boolean(api.working?.taskManager),
+    staleTime: 1_000,
+    refetchInterval: options.pollMs ?? TASK_MANAGER_POLL_MS,
+  });
+}
+
+/**
+ * A task's steps for "Ver passos" (ADR 0128), to whoever sees it in the task manager: `workFromSteps(data.steps,
+ * data.run)` draws them like the chat's work block. `pollMs` while it still works.
+ */
+export function useTaskSteps(orgId: string, runId: string | null, pollMs: number | false = false) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.taskSteps(orgId, runId ?? ""),
+    queryFn: () => {
+      const working = part(api, "working");
+      if (!working.taskSteps) throw new Error("This server can't show a task's steps yet");
+      return working.taskSteps(orgId, runId ?? "");
+    },
+    enabled: runId !== null && Boolean(api.working?.taskSteps),
+    refetchInterval: pollMs,
+  });
+}
+
+/**
+ * "Parar" from the task manager or the chat's strip (ADR 0128): stops each task (with the reason the agent reads)
+ * and refreshes the lists. Stopping several (an agent's "Parar todas") stops them one by one; one refused doesn't
+ * keep the others running.
+ */
+export function useStopTasks(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { runIds: string[]; reason?: string }) => {
+      const results = await Promise.allSettled(input.runIds.map((id) => api.agents.cancelRun(orgId, id, input.reason)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed === results.length && failed > 0) throw (results[0] as PromiseRejectedResult).reason;
+      return { stopped: results.length - failed, failed };
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.taskManager(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.working(orgId) });
+    },
+  });
+}
+
+/** "Dizer por quê" after stopping a task: the agent reads it (only who stopped it, once). */
+export function useStopReason(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { runId: string; reason: string }) => {
+      if (!api.agents.stopReason) throw new Error("This server can't take a reason yet");
+      return api.agents.stopReason(orgId, input.runId, input.reason);
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.taskManager(orgId) }),
+  });
+}
+
 /** Your pending reminders, soonest first. */
 export function useReminders(orgId: string, enabled = true) {
   const api = useApi();

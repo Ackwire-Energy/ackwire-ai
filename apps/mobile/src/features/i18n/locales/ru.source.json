@@ -2906,6 +2906,12 @@
   "routines.create": {
     "value": "Create"
   },
+  "taskManager.loadFailed": {
+    "value": "Couldn't load the tasks."
+  },
+  "taskManager.gone": {
+    "value": "This task is no longer here."
+  },
   "homeNow.working": {
     "value": {
       "one": "{{count}} working",

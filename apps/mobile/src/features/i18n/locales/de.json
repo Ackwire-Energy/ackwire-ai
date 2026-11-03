@@ -1180,6 +1180,10 @@
     "anyAgent": "Alle Agenten",
     "create": "Erstellen"
   },
+  "taskManager": {
+    "loadFailed": "Die Aufgaben konnten nicht geladen werden.",
+    "gone": "Diese Aufgabe ist nicht mehr da."
+  },
   "homeNow": {
     "working_one": "{{count}} arbeitet",
     "working_other": "{{count}} arbeiten",

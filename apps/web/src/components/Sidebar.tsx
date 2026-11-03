@@ -1272,7 +1272,20 @@ function MoreTools({
             {countOf(id)}
           </Link>
         ))}
-        {items.length > 0 && <div className="ac-menu__separator" aria-hidden="true" />}
+        {/* The task manager (ADR 0128): always here, not one of the tools a person places (`SIDEBAR_ITEMS`). */}
+        <Link
+          to="/org/$orgId/task-manager"
+          params={{ orgId: org.id }}
+          className="ac-menu__item sidebar__more-item"
+          onClick={() => setOpen(false)}
+        >
+          <Icon name="chart" />
+          <span className="ac-menu__label">
+            {t("taskManager.title")}
+            <span className="ac-menu__desc">{t("taskManager.navWhat")}</span>
+          </span>
+        </Link>
+        <div className="ac-menu__separator" aria-hidden="true" />
         <button
           type="button"
           className="ac-menu__item sidebar__more-item"
@@ -1287,7 +1300,18 @@ function MoreTools({
           <span className="ac-menu__label">{t("shell.customizeSidebar")}</span>
         </button>
       </Popover>
-      <div className="sidebar__more-active">{items.map(row)}</div>
+      <div className="sidebar__more-active">
+        {items.map(row)}
+        <Link
+          to="/org/$orgId/task-manager"
+          params={{ orgId: org.id }}
+          className="sidebar__item"
+          title={t("taskManager.title")}
+        >
+          <Icon name="chart" />
+          <span className="sidebar__item-label">{t("taskManager.nav")}</span>
+        </Link>
+      </div>
     </>
   );
 }

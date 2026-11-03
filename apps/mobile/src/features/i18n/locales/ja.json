@@ -1115,6 +1115,10 @@
     "anyAgent": "すべてのエージェント",
     "create": "作成"
   },
+  "taskManager": {
+    "loadFailed": "タスクを読み込めませんでした。",
+    "gone": "このタスクはもうありません。"
+  },
   "homeNow": {
     "working_other": "{{count}}人が作業中",
     "finished": {
