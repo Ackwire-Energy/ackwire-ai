@@ -582,6 +582,57 @@ describe("writes asked for outside the turn's folders", () => {
   });
 });
 
+describe("read-only gh (allowed at once, no card)", () => {
+  test("views, lists, diffs, checks and searches pass in any turn; writes, gh api, the token and --web don't", () => {
+    for (const command of [
+      "gh pr view 12",
+      "gh pr view 12 --json title,body --jq .title",
+      "gh -R acme/web pr diff 12",
+      "gh pr checks 12 --repo acme/web",
+      "gh pr list --state open --search 'review:required'",
+      "gh pr status",
+      "gh run view 123 --log-failed",
+      "gh run list --limit 5",
+      "gh run watch 123",
+      "gh issue view 7 --comments",
+      "gh issue list --label bug",
+      "gh workflow list",
+      "gh repo view acme/web",
+      "gh release list",
+      "gh project item-list 3 --owner acme --format json",
+      "gh project field-list 3 --owner acme",
+      "gh label list",
+      "gh gist view abc",
+      "gh search issues 'is:open label:bug'",
+      "gh status",
+    ]) {
+      expect([command, bash(command)]).toEqual([command, true]);
+      expect([command, readOnlyCall("Bash", { command }, scope, "plan")]).toEqual([command, true]);
+    }
+    for (const command of [
+      "gh issue create --title x --body y",
+      "gh pr comment 12 --body ok",
+      "gh pr review 12 --approve",
+      "gh pr merge 12",
+      "gh project item-edit --id x",
+      "gh workflow run deploy.yml",
+      "gh run rerun 123",
+      "gh run download 123",
+      "gh repo clone acme/web",
+      "gh api repos/acme/web/pulls/12/comments",
+      "gh auth token",
+      "gh auth status",
+      "gh pr view 12 --web",
+      "gh issue list -w",
+      "gh pr view 12 --json body --jq '$ENV'",
+      "gh my-extension view",
+      "gh pr view 12 | sh",
+    ]) {
+      expect([command, bash(command)]).toEqual([command, false]);
+    }
+  });
+});
+
 describe("the plan profile reads only", () => {
   const plan = (command: string) => readOnlyCall("Bash", { command }, scope, "plan");
   test("no web, no fetches, no writes at all; plain reads pass", () => {

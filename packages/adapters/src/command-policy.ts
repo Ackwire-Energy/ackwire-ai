@@ -773,6 +773,38 @@ function fetchIntoFolders(argv: string[], scope: CommandScope) {
   }
 }
 
+/**
+ * gh's subcommands that only print what GitHub has, by group (`gh status` and `gh search …` alone are reads too).
+ * Writes, `gh api` (its own deny rule), `gh auth` (the token), extensions and aliases are none of these.
+ */
+const GH_READS: Record<string, ReadonlySet<string>> = {
+  pr: new Set(["view", "diff", "checks", "list", "status"]),
+  issue: new Set(["view", "list", "status"]),
+  run: new Set(["view", "list", "watch"]),
+  workflow: new Set(["view", "list"]),
+  repo: new Set(["view", "list"]),
+  release: new Set(["view", "list"]),
+  project: new Set(["view", "list", "item-list", "field-list"]),
+  label: new Set(["list"]),
+  gist: new Set(["view", "list"]),
+};
+
+/** Read-only gh (`gh pr view 12 --json title`, `gh run list -R a/b`): never `--web`, which opens a browser. */
+function readOnlyGh(argv: string[]) {
+  const words: string[] = [];
+  for (let i = 1; i < argv.length; i++) {
+    const a = argv[i] as string;
+    if (GH_VALUE.has(a)) i++;
+    else if (!/^--(repo|hostname)=/.test(a)) words.push(a);
+  }
+  if (words.some((a) => a === "-w" || a === "--web")) return false;
+  // gh's own jq reads the environment (`$ENV`, `env`), where keys live.
+  if (words.some((a) => /^(-q|--jq)/.test(a)) && words.some((a) => /env/i.test(a))) return false;
+  const [group = "", sub = ""] = words;
+  if (group === "status" || group === "search") return true;
+  return GH_READS[group]?.has(sub) === true;
+}
+
 function readOnlySimple(s: Simple, scope: CommandScope, plan = false): boolean {
   const [cmd, ...args] = s.argv;
   if (!cmd) return false;
@@ -797,6 +829,9 @@ function readOnlySimple(s: Simple, scope: CommandScope, plan = false): boolean {
     case "git":
       // A plan turn fetches nothing (a clone or a pull writes into the folder).
       return readOnlyGit(s.argv) || (!plan && fetchIntoFolders(s.argv, scope));
+    // Like read-only git, a plan turn may read GitHub too: what a plan needs (the issue, the pull request, its checks).
+    case "gh":
+      return readOnlyGh(s.argv);
     // No web in a plan turn, not even a GET.
     case "curl":
       return !plan && readOnlyCurl(s.argv, scope);
