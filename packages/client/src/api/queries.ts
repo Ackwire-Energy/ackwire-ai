@@ -1,5 +1,6 @@
 import {
   type InfiniteData,
+  mutationOptions,
   type QueryClient,
   queryOptions,
   useInfiniteQuery,
@@ -13,7 +14,8 @@ import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
-import { noAnswer, sendWaits } from "../lib/errors";
+import { forPeople } from "../lib/consultations";
+import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
 import { GIF_PAGE, messageMediaOf, postedMedia } from "../lib/media";
 import {
@@ -843,12 +845,15 @@ export const THREAD_PAGE = 200;
 export const messagesQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
     queryKey: keys.messages(orgId, channelId),
-    queryFn: async ({ client, queryKey }) =>
-      withLocalCopies(
+    queryFn: async ({ client, queryKey }) => {
+      const start = client.getQueryData<Message[]>(queryKey);
+      return withLocalCopies(
         await api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE }),
         client.getQueryData<Message[]>(queryKey),
         outbox.has,
-      ),
+        start,
+      );
+    },
     staleTime: 30_000,
     gcTime: 30 * 60_000,
   });
@@ -1133,28 +1138,40 @@ function cacheSent(qc: QueryClient, orgId: string, message: Message, { clientId,
  * or the WebSocket, whichever comes first), or turns `failed` with a retry.
  * One with no answer from the server waits in the `outbox` instead.
  */
-export function usePostMessage(
+export function usePostMessage(orgId: string, channelId: string, options: PostMessageOptions) {
+  return useMutation(postMessageMutation(useApi(), useQueryClient(), orgId, channelId, options));
+}
+
+export interface PostMessageOptions {
+  me: { id: string };
+  /** Agents the text mentions (client-side guess, for the instant "pensando…" row). */
+  mentioned?: (body: string) => string[];
+  onSent?: (message: Message, local: Message) => void;
+  onOptimistic?: (local: Message) => void;
+  /**
+   * The server refused it, or no answer came (the message turns "failed" either way: with a retry, or waiting in
+   * the `outbox` when `waits`). `clientId` is the failed message's (its optimistic copy's).
+   */
+  onFailed?: (error: unknown, failed: { clientId: string; waits: boolean }) => void;
+}
+
+/** `usePostMessage`'s mutation, for a `MutationObserver` outside React (tests). */
+export function postMessageMutation(
+  api: ApiClient,
+  qc: QueryClient,
   orgId: string,
   channelId: string,
-  options: {
-    me: { id: string };
-    /** Agents the text mentions (client-side guess, for the instant "pensando…" row). */
-    mentioned?: (body: string) => string[];
-    onSent?: (message: Message, local: Message) => void;
-    onOptimistic?: (local: Message) => void;
-    /**
-     * The server refused it, or no answer came (the message turns "failed" either way: with a retry, or waiting in
-     * the `outbox` when `waits`). `clientId` is the failed message's (its optimistic copy's).
-     */
-    onFailed?: (error: unknown, failed: { clientId: string; waits: boolean }) => void;
-  },
+  options: PostMessageOptions,
 ) {
-  const api = useApi();
-  const qc = useQueryClient();
   const key = keys.messages(orgId, channelId);
-  return useMutation({
+  return mutationOptions({
     meta: { silent: true },
-    mutationFn: (input: PostInput) => api.chat.post(orgId, channelId, postBody(input)),
+    // Always tried: paused while the browser says offline, it would stay "enviando…" (and out of the outbox) until an
+    // `online` event a sleep or a webview may never fire. Offline it fails at once and waits in the outbox instead.
+    networkMode: "always",
+    // A POST a dead connection holds would keep it "enviando…" for good: past `SEND_ANSWER_MS` it waits in the outbox
+    // and goes again with the same `clientId` (written once), unless its copy comes over the socket first.
+    mutationFn: (input: PostInput) => answerWithin(api.chat.post(orgId, channelId, postBody(input)), SEND_ANSWER_MS),
     onMutate: ({ body, clientId, threadId, meta }) => {
       const local: Message = {
         id: `local-${clientId}`,
@@ -1196,6 +1213,9 @@ export function usePostMessage(
     },
   });
 }
+
+/** How long a send waits for the server's answer before it counts as unanswered (`answerWithin`). */
+export const SEND_ANSWER_MS = 20_000;
 
 /** Local copies of recordings on their way, to play before the server has them: `clientId` → object URL. */
 const voiceLocal = new Map<string, string>();
@@ -1379,7 +1399,7 @@ export function flushOutbox(
       }
       const input: PostInput = { body: local.body, clientId, threadId: local.threadId, meta: local.meta };
       try {
-        const message = await api.chat.post(orgId, local.channelId, postBody(input));
+        const message = await answerWithin(api.chat.post(orgId, local.channelId, postBody(input)), SEND_ANSWER_MS);
         outbox.remove(clientId);
         // A conversation the cache let go meanwhile reads it from the server when it opens.
         if (qc.getQueryData(keys.messages(orgId, local.channelId))) cacheSent(qc, orgId, message, input);
@@ -2251,7 +2271,11 @@ export const useConsultationConversation = (orgId: string, channelId: string, co
   const api = useApi();
   return useQuery({
     queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
-    queryFn: () => api.agents.consultation(orgId, channelId, consultationId ?? ""),
+    // The relay line the server opens a mention to an agent outside the conversation with is the agent's, not people's.
+    queryFn: async () => {
+      const talk = await api.agents.consultation(orgId, channelId, consultationId ?? "");
+      return talk && { ...talk, ...forPeople(talk) };
+    },
     enabled: consultationId !== null,
     refetchInterval: (q) => (q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false),
   });
@@ -3911,7 +3935,11 @@ export function useThreadMessages(orgId: string, channelId: string | undefined, 
   const api = useApi();
   return useQuery({
     queryKey: keys.thread(orgId, channelId ?? "", rootId),
-    queryFn: () => api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: THREAD_PAGE }),
+    queryFn: async ({ client, queryKey }) => {
+      const start = client.getQueryData<Message[]>(queryKey);
+      const read = await api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: THREAD_PAGE });
+      return withLocalCopies(read, client.getQueryData<Message[]>(queryKey), outbox.has, start);
+    },
     enabled: Boolean(channelId),
     staleTime: 30_000,
   });

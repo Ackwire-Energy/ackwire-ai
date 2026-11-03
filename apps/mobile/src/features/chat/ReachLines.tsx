@@ -2,19 +2,18 @@ import { type Agent, type Message, useChannels, useUpdateAgent } from "@agentesc
 import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Icon, PillButton, Text, useTheme, useToast } from "@/ui";
-import { consultationHref } from "../links/logic";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
+import { AgentTalkPill, TalkPills } from "./ConsultGroup";
 
 /**
  * On the phone, under an agent's message, every agent it @named that its mention didn't wake (`meta.reach`): one
- * outside the conversation got it by direct message (Ver opens the two agents' conversation), one it couldn't call
+ * outside the conversation got it by direct message (the two agents' pill, opening their conversation), one it couldn't call
  * says why, and the agent's owner can let that person talk to it. The team actions' sunken row (TeamChecks.tsx).
  */
 export function ReachLines({ message: m }: { message: Message }) {
@@ -23,13 +22,13 @@ export function ReachLines({ message: m }: { message: Message }) {
   return (
     <View style={styles.list}>
       {list.map((e) => (
-        <Row key={e.agentId} entry={e} channelId={m.channelId} />
+        <Row key={e.agentId} entry={e} channelId={m.channelId} authorId={m.author.id ?? ""} />
       ))}
     </View>
   );
 }
 
-function Row({ entry: e, channelId }: { entry: ReachEntry; channelId: string }) {
+function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: string; authorId: string }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const orgId = useOrgId();
@@ -47,6 +46,13 @@ function Row({ entry: e, channelId }: { entry: ReachEntry; channelId: string }) 
   ]
     .filter(Boolean)
     .join(" · ");
+  // Handed to it by direct message: the two agents talking, as one pill that opens their conversation.
+  if (reachOpens(e) && e.consultationId)
+    return (
+      <TalkPills>
+        <AgentTalkPill consultationId={e.consultationId} channelId={channelId} fromId={authorId} toId={e.agentId} />
+      </TalkPills>
+    );
   return (
     <View style={[styles.one, { backgroundColor: colors.sunken }]}>
       <View style={[styles.tile, { backgroundColor: colors.raised }]}>
@@ -70,16 +76,6 @@ function Row({ entry: e, channelId }: { entry: ReachEntry; channelId: string }) 
           </Text>
         ) : null}
       </View>
-      {reachOpens(e) ? (
-        <PillButton
-          label={t("reach.see")}
-          accessibilityRole="link"
-          onPress={() => {
-            tapHaptic();
-            if (e.consultationId) router.push(consultationHref(e.consultationId, channelId));
-          }}
-        />
-      ) : null}
       {!handed && agent && e.userId ? <AllowTalkPill agent={agent} userId={e.userId} /> : null}
     </View>
   );

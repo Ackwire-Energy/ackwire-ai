@@ -18,18 +18,24 @@ export function upsertMessage(list: Message[] | undefined, message: Message): Me
 /**
  * A list read again from the server, keeping my messages of the list before that are still on their way or wait to
  * go out (`waits`, by `clientId`) while the server doesn't have them (no message of its with their `clientId`). One
- * the server refused goes with the read.
+ * the server refused goes with the read. `start` is the list when the read began: a message that came live while it
+ * was on its way (in `before`, not in `start`) is kept too, since a read made before it was written lacks it.
  */
 export function withLocalCopies(
   read: Message[],
   before: Message[] | undefined,
   waits: (clientId: string | null | undefined) => boolean,
+  start?: Message[],
 ): Message[] {
   const written = new Set(read.map((m) => m.clientId));
-  const local = (before ?? []).filter(
-    (m) => (m.local === "pending" || (m.local === "failed" && waits(m.clientId))) && !written.has(m.clientId),
+  const readIds = new Set(read.map((m) => m.id));
+  const had = new Set((start ?? []).map((m) => m.id));
+  const kept = (before ?? []).filter((m) =>
+    m.local
+      ? (m.local === "pending" || waits(m.clientId)) && !written.has(m.clientId)
+      : !had.has(m.id) && !readIds.has(m.id),
   );
-  return local.length === 0 ? read : [...read, ...local].sort(byTime);
+  return kept.length === 0 ? read : [...read, ...kept].sort(byTime);
 }
 
 /**

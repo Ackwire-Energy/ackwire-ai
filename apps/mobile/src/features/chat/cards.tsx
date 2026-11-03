@@ -27,7 +27,8 @@ import {
   decisionOutcome,
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
-import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
+import { consultAskedKey, openableConsultation } from "@agenteschat/client/lib/consult-group";
+import { withoutRelayLine } from "@agenteschat/client/lib/consultations";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
@@ -47,7 +48,7 @@ import {
   useCancelAhead,
   useOriginShort,
 } from "../approvals/parts";
-import { chatHref, consultationHref } from "../links/logic";
+import { chatHref } from "../links/logic";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
@@ -56,6 +57,7 @@ import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { askEndedAt } from "./ask-store";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "./asks";
+import { AgentTalkPill, TalkPills } from "./ConsultGroup";
 import { markName, threadFaces } from "./logic";
 
 /**
@@ -66,10 +68,9 @@ import { markName, threadFaces } from "./logic";
 // ── Consultation ─────────────────────────────────────────────────────────────
 
 /**
- * "Infra respondeu": what the agent asked another agent before answering, in a private conversation. With the
- * conversation it was asked from (`channelId`), a tap opens the two agents' conversation on its own screen, as the
- * reply's block lines do: a long question or answer reads there, never stretching the chat. Without it (already
- * on that screen) it opens in place.
+ * What the agent asked another agent before answering, in a private conversation: with the conversation it was
+ * asked from (`channelId`), the two agents' pill ("Ada ⇄ Infra · respondeu") opening their talk on its own screen.
+ * Without it (already on that screen), or with no talk to open, "Infra respondeu" opening in place.
  */
 export function ConsultationCard({
   askerId,
@@ -80,6 +81,17 @@ export function ConsultationCard({
   consultation: MessageConsultation;
   channelId?: string;
 }) {
+  const id = openableConsultation(cs.consultationId);
+  if (id && channelId)
+    return (
+      <TalkPills>
+        <AgentTalkPill consultationId={id} channelId={channelId} fromId={askerId} toId={cs.agentId} stored={cs} />
+      </TalkPills>
+    );
+  return <ConsultationDetails askerId={askerId} consultation={cs} />;
+}
+
+function ConsultationDetails({ askerId, consultation: cs }: { askerId: string; consultation: MessageConsultation }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
@@ -100,16 +112,9 @@ export function ConsultationCard({
   return (
     <View style={[styles.box, styles.cs, surface]}>
       <Pressable
-        onPress={
-          channelId
-            ? () => {
-                tapHaptic();
-                router.push(consultationHref(cs.consultationId, channelId));
-              }
-            : () => setOpen((v) => !v)
-        }
+        onPress={() => setOpen((v) => !v)}
         accessibilityRole="button"
-        accessibilityState={channelId ? undefined : { expanded: open }}
+        accessibilityState={{ expanded: open }}
         style={styles.head}
       >
         <AgentFace agentId={cs.agentId} size={18} live={false} />
@@ -119,21 +124,17 @@ export function ConsultationCard({
         <Text variant="small" tone="faint" numberOfLines={1} style={[styles.grow, open && styles.hidden]}>
           {cs.answer ? previewOf(cs.answer) : ""}
         </Text>
-        {channelId ? (
-          <Icon name="right" size={16} color={c.faint} />
-        ) : (
-          <View style={open ? styles.flip : undefined}>
-            <Icon name="chev" size={16} color={c.faint} />
-          </View>
-        )}
+        <View style={open ? styles.flip : undefined}>
+          <Icon name="chev" size={16} color={c.faint} />
+        </View>
       </Pressable>
-      {open && !channelId ? (
+      {open ? (
         <View style={styles.csBody}>
           <Text variant="caption" tone="faint" style={styles.bold}>
             {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}
           </Text>
           <Text variant="small" tone="muted">
-            {cs.question}
+            {withoutRelayLine(cs.question)}
           </Text>
           <Text variant="caption" tone="faint" style={[styles.bold, styles.gap]}>
             {t(`mobile.chat.consult.answerOf${gn}`, { name })}

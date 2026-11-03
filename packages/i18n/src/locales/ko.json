@@ -10567,6 +10567,13 @@
       "answeredRequestFar": "{{to}}이(가) {{from}}의 요청에 답했어요",
       "see": "보기"
     },
+    "agentTalk": {
+      "waiting": "대화 중…",
+      "waitingFor": "{{time}}째 대화 중",
+      "answered": "답변함",
+      "answeredIn": "{{time}} 만에 답변",
+      "failed": "답변 없음"
+    },
     "talk": {
       "readAll": "전체 읽기",
       "more_other": "{{count}}줄 더"

@@ -19,7 +19,7 @@ const open = async (state = seedState(), api = createFakeApi(state)) => {
 };
 /**
  * The reply moved under João's post and that thread opened beside the channel: a thread view has no panel of its
- * own, so the card there opens in place (in the channel it opens the two agents' conversation in the panel).
+ * own, so the pill there opens in place (in the channel it opens the two agents' conversation in the panel).
  */
 const openInThread = async (state: ReturnType<typeof seedState>) => {
   const reply = state.messages.at(-1) as (typeof state.messages)[number];
@@ -60,29 +60,11 @@ function withReply(meta: Record<string, unknown>, body = "Já subi o fix em stag
   return state;
 }
 
-describe("the consultation card (meta.consulted)", () => {
-  test("in a channel: one line that opens the two agents' conversation in the panel (a toggle, not a disclosure), never in place", async () => {
-    await open(
-      withReply({
-        consulted: [
-          { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
-        ],
-      }),
-    );
-    const card = rowWith("Já subi o fix").querySelector(".ac-consult") as HTMLElement;
-    const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
-    expect(head.getAttribute("aria-expanded")).toBeNull();
-    expect(head.getAttribute("aria-pressed")).toBe("false");
-    expect(card.querySelector(".ac-consult__pv")?.textContent).toBe(
-      "Staging sobe sozinho quando o PR entra. Hoje use a fila reserva.",
-    );
-    await act(async () => fireEvent.click(head));
-    await settle(3);
-    expect(card.querySelector(".ac-consult__body")).toBeNull();
-  });
+const pillsIn = (el: ParentNode) => [...el.querySelectorAll(".ac-talk")] as HTMLElement[];
 
-  test("answered, in a thread: one line 'Atlas respondeu' with a preview; opens to the question, the answer and who saw it", async () => {
-    await openInThread(
+describe("what another agent said before the reply (meta.consulted): the two agents' pill", () => {
+  test("answered: 'Ada ⇄ Atlas · respondeu' on top of the reply; a click opens their conversation beside", async () => {
+    await open(
       withReply({
         consulted: [
           { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
@@ -90,56 +72,44 @@ describe("the consultation card (meta.consulted)", () => {
       }),
     );
     const row = rowWith("Já subi o fix");
-    const card = row.querySelector(".ac-consult") as HTMLElement;
-    expect(card).not.toBeNull();
+    const [pill] = pillsIn(row);
+    expect(pill?.textContent).toBe("Ada ⇄ Atlas · respondeu");
+    expect(pill?.querySelectorAll(".ac-avatar--agent")).toHaveLength(2);
     // On top of the reply's text.
     expect(
-      card.compareDocumentPosition(row.querySelector(".ac-msg__text") as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+      (pill as HTMLElement).compareDocumentPosition(row.querySelector(".ac-msg__text") as Node) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
-    expect(head.getAttribute("aria-expanded")).toBe("false");
-    expect(card.querySelector(".ac-avatar--agent")).not.toBeNull();
-    expect(card.querySelector(".ac-consult__pv")?.textContent).toBe(
-      "Staging sobe sozinho quando o PR entra. Hoje use a fila reserva.",
+    await act(async () => fireEvent.click(pill as HTMLElement));
+    await settle(3);
+    // The panel beside the channel opens on that conversation (the fake backend has none stored for it).
+    expect(document.querySelector("aside.thread-panel")?.getAttribute("aria-label")).toMatch(/^Conversa entre /);
+  });
+
+  test("in a thread (no panel): the pill opens in place to the question, the answer and who saw it", async () => {
+    const { thread } = await openInThread(
+      withReply({
+        consulted: [
+          { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
+        ],
+      }),
     );
-    expect(card.querySelector(".ac-consult__body")).toBeNull();
-    await act(async () => fireEvent.click(head));
-    expect(head.getAttribute("aria-expanded")).toBe("true");
-    const body = card.querySelector(".ac-consult__body") as HTMLElement;
-    expect(head.getAttribute("aria-controls")).toBe(body.id);
+    const [pill] = pillsIn(thread);
+    expect(pill?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => fireEvent.click(pill as HTMLElement));
+    const body = thread.querySelector(".ac-talk-detail") as HTMLElement;
     expect(body.textContent).toContain("Ada perguntou");
     expect(body.textContent).toContain(QUESTION);
     expect(body.textContent).toContain("Resposta do Atlas");
     expect(body.querySelector("strong")?.textContent).toBe("Staging");
-    expect(body.querySelector(".ac-consult__foot")?.textContent).toBe("Conversa só entre Ada e Atlas");
-    await act(async () => fireEvent.click(head));
-    expect(card.querySelector(".ac-consult__body")).toBeNull();
+    expect(body.textContent).toContain("Conversa só entre Ada e Atlas");
   });
 
-  test("expired: calm, a clock icon, 'O Atlas não respondeu a tempo' / 'Esperou 15 min'; opened, the question", async () => {
-    await openInThread(
-      withReply(
-        {
-          consulted: [{ agentId: ATLAS_ID, consultationId: "k2", status: "expired", question: QUESTION, answer: null }],
-        },
-        "O Atlas não respondeu. Quer que eu suba do jeito de sempre?",
-      ),
-    );
-    const card = rowWith("do jeito de sempre").querySelector(".ac-consult") as HTMLElement;
-    expect(card.querySelector(".ac-avatar")).toBeNull();
-    expect(card.querySelector(".ac-consult__ic svg")).not.toBeNull();
-    const head = within(card).getByRole("button", { name: /O Atlas não respondeu a tempo/ });
-    expect(card.querySelector(".ac-consult__pv")?.textContent).toBe("Esperou 15 min");
-    await act(async () => fireEvent.click(head));
-    const body = card.querySelector(".ac-consult__body") as HTMLElement;
-    expect(body.textContent).toContain(QUESTION);
-    expect(body.textContent).toContain("Sem resposta em 15 min. Ada respondeu sem ela.");
-  });
-
-  test("failed, and one card per agent asked", async () => {
+  test("expired or failed: 'sem resposta'; one pill per agent asked", async () => {
     await open(
       withReply({
         consulted: [
+          { agentId: ATLAS_ID, consultationId: "k2", status: "expired", question: QUESTION, answer: null },
           { agentId: ATLAS_ID, consultationId: "k3", status: "failed", question: QUESTION, answer: null },
           {
             agentId: ATLAS_ID,
@@ -151,17 +121,19 @@ describe("the consultation card (meta.consulted)", () => {
         ],
       }),
     );
-    const cards = rowWith("Já subi o fix").querySelectorAll(".ac-consult");
-    expect(cards).toHaveLength(2);
-    expect(cards[0]?.textContent).toContain("O Atlas não conseguiu responder");
-    expect(cards[0]?.textContent).toContain("Seguiu sem a resposta");
-    expect(cards[1]?.textContent).toContain("Atlas respondeu");
+    const pills = pillsIn(rowWith("Já subi o fix"));
+    expect(pills.map((p) => p.textContent)).toEqual([
+      "Ada ⇄ Atlas · sem resposta",
+      "Ada ⇄ Atlas · sem resposta",
+      "Ada ⇄ Atlas · respondeu",
+    ]);
+    expect(pills[0]?.classList.contains("ac-talk--failed")).toBe(true);
   });
 });
 
 describe("what came of work handed off (a `consult_reply` notice with `kind` `note`)", () => {
-  /** Ada's conversation got what Atlas did with the work she handed it. */
-  const withResult = (status: string, answer: string | null) => {
+  /** Ada's conversation got what Atlas did with the work she handed it (`consultationId` none: nothing to open). */
+  const withResult = (status: string, answer: string | null, consultationId?: string) => {
     const state = seedState();
     state.messages.push({
       id: "msg-result",
@@ -178,12 +150,13 @@ describe("what came of work handed off (a `consult_reply` notice with `kind` `no
           from: "@atlas",
           refs: {
             kind: "note",
-            consultationId: "k9",
+            ...(consultationId ? { consultationId } : {}),
             runId: "r-handed",
             askerAgentId: ADA_ID,
             agentId: ATLAS_ID,
             status,
-            question: "Passa a pasta ao Diogo e confirma que ele abre.",
+            question:
+              "[@ada mentioned you in a conversation, where you aren't a member, so it reaches you here]\n\nPassa a pasta ao Diogo e confirma que ele abre.",
             ...(answer ? { answer } : {}),
           },
         },
@@ -193,20 +166,24 @@ describe("what came of work handed off (a `consult_reply` notice with `kind` `no
     return state;
   };
 
-  test("its card says what Ada wrote, not what she asked", async () => {
-    const { thread } = await openInThread(withResult("answered", "Passei a pasta; o Diogo abriu."));
-    const card = thread.querySelector(".ac-consult") as HTMLElement;
-    const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
-    await act(async () => fireEvent.click(head));
-    const body = card.querySelector(".ac-consult__body") as HTMLElement;
+  test("its pill opens what Ada wrote in place when there is no conversation to open, never the relay line", async () => {
+    await open(withResult("answered", "Passei a pasta; o Diogo abriu."));
+    const [pill] = pillsIn(document);
+    expect(pill?.textContent).toBe("Ada ⇄ Atlas · respondeu");
+    expect(pill?.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => fireEvent.click(pill as HTMLElement));
+    const body = document.querySelector(".ac-talk-detail") as HTMLElement;
     expect(body.textContent).toContain("Ada escreveu");
     expect(body.textContent).not.toContain("Ada perguntou");
     expect(body.textContent).toContain("Passa a pasta ao Diogo");
+    expect(body.textContent).not.toContain("mentioned you");
   });
 
-  test("one that couldn't be finished says so", async () => {
-    await open(withResult("failed", null));
-    expect(document.querySelector(".ac-consult")?.textContent).toContain("O Atlas não conseguiu terminar");
+  test("one that couldn't be finished: 'sem resposta'; with its id, the pill opens the conversation", async () => {
+    await open(withResult("failed", null, "k9"));
+    const [pill] = pillsIn(document);
+    expect(pill?.textContent).toBe("Ada ⇄ Atlas · sem resposta");
+    expect(pill?.hasAttribute("aria-expanded")).toBe(false);
   });
 });
 

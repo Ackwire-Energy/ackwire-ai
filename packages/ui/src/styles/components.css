@@ -1581,6 +1581,13 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   min-width: var(--radix-select-trigger-width);
   max-height: min(280px, var(--radix-select-content-available-height));
 }
+/*
+ * A select's rows scroll in its viewport: the room at the ends goes inside it, so the last row keeps it once
+ * scrolled to the bottom (the menu's own padding, outside the scroll, reads as next to none there).
+ */
+.ac-menu--select [data-radix-select-viewport] {
+  padding-block: var(--space-1);
+}
 .ac-menu--dropdown {
   min-width: 200px;
   /* A dropdown shows all its actions; it scrolls only when the screen is short. */
@@ -8885,6 +8892,69 @@ html:not([data-pointer]) .ac-consult__head:focus-visible {
 /* Inside a tool block's line (the questions a reply asked): the line's own padding holds it */
 .ac-consult__body.ac-consult__body--inline {
   padding: 0;
+}
+/* Two agents talking (a question, work handed off, its answer): one pill, a face on each side of the arrows. */
+.ac-talks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+.ac-talk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 4px 12px 4px 6px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink2);
+  text-align: left;
+  cursor: pointer;
+}
+.ac-talk:hover {
+  background: color-mix(in srgb, var(--raised) 94%, var(--ink));
+}
+.ac-talk[aria-pressed="true"] {
+  box-shadow:
+    var(--e1),
+    inset 0 0 0 1.5px var(--line-strong, var(--line));
+}
+html:not([data-pointer]) .ac-talk:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-talk__faces {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  color: var(--faint);
+}
+.ac-talk__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ac-talk__names {
+  font-weight: 650;
+  color: var(--ink);
+}
+.ac-talk__state {
+  color: var(--faint);
+}
+.ac-talk--failed .ac-talk__state {
+  color: var(--muted);
+}
+/* Opened in place (a thread view, with no panel beside it): what was asked and answered, under the pill. */
+.ac-talk-detail {
+  flex-basis: 100%;
+  max-width: var(--msg-card-w);
+  padding: 4px 2px 2px;
 }
 
 /* An agent's reply nobody asked for: a faint word next to the time; a glass tip on hover/focus says why */

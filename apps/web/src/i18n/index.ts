@@ -7,10 +7,9 @@ import {
   DEFAULT_LOCALE,
   isAppLocale,
   LOCALE_CODES,
-  localeInfo,
   readyLocales,
 } from "@agenteschat/i18n/locale";
-import i18n, { type i18n as I18n, type InitOptions, type TFunction } from "i18next";
+import i18n, { type i18n as I18n, type InitOptions } from "i18next";
 import { useEffect, useState } from "react";
 import { initReactI18next, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -154,9 +153,6 @@ export function useServerLocale(user: { id: string; locale?: string | null; loca
     send: (patch) => api.account.updateMe(patch),
   });
 }
-
-/** "Automatic (English)": the picker's first option, with the language it picks now. */
-export const autoLabel = (t: TFunction) => t("shell.languageAuto", { language: localeInfo(detectedLocale()).native });
 
 const options = (lng: LocaleCode): InitOptions => ({
   lng,

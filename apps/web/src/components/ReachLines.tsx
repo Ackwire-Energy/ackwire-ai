@@ -5,7 +5,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
 import { Icon } from "@agenteschat/ui";
 import { Trans, useTranslation } from "react-i18next";
-import { useChannelActions } from "@/components/channel-actions";
+import { AgentTalkPill } from "@/components/ConsultGroup";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -29,7 +29,14 @@ export function ReachLines({ message }: { message: Message }) {
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div className="ag-rcs ag-rcs--stack" role="group" aria-label={t("reach.group")}>
       {list.map((e) => (
-        <ReachRow key={e.agentId} entry={e} channelId={message.channelId} place={place} addable={!!channel} />
+        <ReachRow
+          key={e.agentId}
+          entry={e}
+          authorId={message.author.id ?? ""}
+          channelId={message.channelId}
+          place={place}
+          addable={!!channel}
+        />
       ))}
     </div>
   );
@@ -37,11 +44,14 @@ export function ReachLines({ message }: { message: Message }) {
 
 function ReachRow({
   entry: e,
+  authorId,
   channelId,
   place,
   addable,
 }: {
   entry: ReachEntry;
+  /** The agent whose message @named it. */
+  authorId: string;
   channelId: string;
   place: string;
   addable: boolean;
@@ -49,7 +59,6 @@ function ReachRow({
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const actions = useChannelActions();
   const toast = useToast();
   const add = useAddChannelMember(org.id);
   const agent = dir.agentById.get(e.agentId);
@@ -62,6 +71,31 @@ function ReachRow({
   ]
     .filter(Boolean)
     .join(" · ");
+  const addButton = ((handed && e.reason === "not_in_channel") || e.private) &&
+    addable &&
+    can(org, "manage_channels") && (
+      <button
+        type="button"
+        className="ag-rc__btn"
+        disabled={add.isPending || add.isSuccess}
+        onClick={() =>
+          add.mutate(
+            { channelId, member: { agentId: e.agentId } },
+            { onSuccess: () => toast.show(t("reach.added", { name: g.name })) },
+          )
+        }
+      >
+        {t("reach.add")}
+      </button>
+    );
+  // Handed to it by direct message: the two agents talking, as one pill that opens their conversation.
+  if (handed && reachOpens(e))
+    return (
+      <div className="ac-talks ag-rc--talk">
+        <AgentTalkPill consultationId={e.consultationId} fromId={authorId} toId={e.agentId} />
+        {addButton}
+      </div>
+    );
   return (
     <div className="ag-rc">
       <span className="ag-rc__ic" aria-hidden="true">
@@ -73,30 +107,7 @@ function ReachRow({
         </span>
         {detail && <span className="ag-rc__by">{detail}</span>}
       </span>
-      {reachOpens(e) && actions?.openConsultation && (
-        <button
-          type="button"
-          className="ag-rc__btn"
-          onClick={() => e.consultationId && actions.openConsultation?.(e.consultationId)}
-        >
-          {t("reach.see")}
-        </button>
-      )}
-      {((handed && e.reason === "not_in_channel") || e.private) && addable && can(org, "manage_channels") && (
-        <button
-          type="button"
-          className="ag-rc__btn"
-          disabled={add.isPending || add.isSuccess}
-          onClick={() =>
-            add.mutate(
-              { channelId, member: { agentId: e.agentId } },
-              { onSuccess: () => toast.show(t("reach.added", { name: g.name })) },
-            )
-          }
-        >
-          {t("reach.add")}
-        </button>
-      )}
+      {addButton}
       {!handed && agent && e.userId && <AllowTalkButton agent={agent} userId={e.userId} className="ag-rc__btn" />}
     </div>
   );

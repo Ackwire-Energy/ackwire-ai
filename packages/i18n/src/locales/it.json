@@ -11428,6 +11428,13 @@
       "answeredRequestFar_female": "{{to}} ha risposto alla richiesta di {{from}}",
       "see": "Vedi"
     },
+    "agentTalk": {
+      "waiting": "in conversazione…",
+      "waitingFor": "in conversazione da {{time}}",
+      "answered": "ha risposto",
+      "answeredIn": "ha risposto in {{time}}",
+      "failed": "nessuna risposta"
+    },
     "talk": {
       "readAll": "Leggi tutto",
       "more_one": "{{count}} riga in più",

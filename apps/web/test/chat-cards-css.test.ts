@@ -99,3 +99,13 @@ test("a card's rows start under its title: a row's hover never covers it", () =>
   expect(value(".ac-card__head+.settings-rows", "margin-top")).toBe("0");
   expect(value(".ac-card__head+.settings-rows>.settings-row:first-child", "border-top")).toBe("1px solid var(--line)");
 });
+
+test("two agents talking is one pill that wraps its words, never cuts them", () => {
+  expect(value(".ac-talk", "display")).toBe("inline-flex");
+  expect(value(".ac-talk__text", "text-overflow")).toBeUndefined();
+  expect(value(".ac-talk__text", "overflow-wrap")).toBe("anywhere");
+});
+
+test("a select's list keeps room under its last row once scrolled to the bottom", () => {
+  expect(value(".ac-menu--select [data-radix-select-viewport]", "padding-block")).toBe("var(--space-1)");
+});

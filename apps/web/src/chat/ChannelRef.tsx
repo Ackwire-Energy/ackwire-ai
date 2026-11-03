@@ -3,19 +3,20 @@ import { joinable } from "@agenteschat/client/lib/channel-access";
 import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
 import { Button, Chip, Icon, Popover, useHoverCard } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type FocusEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type FocusEvent, type KeyboardEvent, type MouseEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { HOVER_OPEN_MS } from "@/components/ProfileCard";
 
 /**
  * `#name` in a message: a link to the channel it means (`resolveChannelRef`), with its card on hover or keyboard
- * focus. A channel the viewer can't see stays the text as written; an archived one opens only its card. From the
+ * focus; a click opens the channel, even with the card showing. A channel the viewer can't see stays the text as written; an archived one opens only its card. From the
  * keyboard, Enter opens the channel and ArrowDown or Space moves into the card (Join, Open).
  */
 export function ChannelRef({ name, text, refs }: { name: string; text: string; refs?: Record<string, string> }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const navigate = useNavigate();
   const channels = useChannels(org.id).data ?? [];
   const ref = resolveChannelRef(name, refs, channels);
   // A channel the list doesn't have (archived, or not mine): only the server knows if it may show.
@@ -69,6 +70,14 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
             className={className}
             aria-label={label}
             aria-keyshortcuts="ArrowDown Space"
+            // Before the hover card's own click, which would pin the card it shows instead of following the link.
+            onClick={(e: MouseEvent) => {
+              if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              e.preventDefault();
+              setFocused(false);
+              card.close();
+              void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: ref.id } });
+            }}
             onKeyDown={(e: KeyboardEvent) => {
               if (e.key !== "ArrowDown" && e.key !== " ") return;
               e.preventDefault();

@@ -11691,6 +11691,13 @@
       "answeredRequestFar": "{{to}} ответил на запрос {{from}}",
       "see": "Показать"
     },
+    "agentTalk": {
+      "waiting": "общаются…",
+      "waitingFor": "общаются уже {{time}}",
+      "answered": "есть ответ",
+      "answeredIn": "ответ за {{time}}",
+      "failed": "нет ответа"
+    },
     "talk": {
       "readAll": "Читать полностью",
       "more_one": "ещё {{count}} строка",

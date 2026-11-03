@@ -10355,6 +10355,17 @@ export const en = {
       answeredRequestFar: "{{to}} answered {{from}}'s request",
       see: "See",
     },
+    /**
+     * Two agents talking, as one pill in the conversation (faces with the arrows between, then the names): what came
+     * of it, after "Caio ⇄ Theo · ".
+     */
+    agentTalk: {
+      waiting: "talking…",
+      waitingFor: "talking for {{time}}",
+      answered: "answered",
+      answeredIn: "answered in {{time}}",
+      failed: "no answer",
+    },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
     /** A long message from one agent to another, folded to its first paragraph: the whole opens in its thread. */
     talk: {

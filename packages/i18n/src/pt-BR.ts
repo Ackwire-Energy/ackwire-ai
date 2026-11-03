@@ -10585,6 +10585,17 @@ export const ptBR = {
       answeredRequestFar_female: "{{to}} respondeu ao pedido da {{from}}",
       see: "Ver",
     },
+    /**
+     * Two agents talking, as one pill in the conversation (faces with the arrows between, then the names): what came
+     * of it, after "Caio ⇄ Theo · ".
+     */
+    agentTalk: {
+      waiting: "conversando…",
+      waitingFor: "conversando há {{time}}",
+      answered: "respondeu",
+      answeredIn: "respondeu em {{time}}",
+      failed: "sem resposta",
+    },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
     /** A long message from one agent to another, folded to its first paragraph: the whole opens in its thread. */
     talk: {

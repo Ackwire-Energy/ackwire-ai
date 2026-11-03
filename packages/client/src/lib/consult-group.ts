@@ -358,6 +358,34 @@ export function useConsultBlockRequest(runId: string | null): ConsultBlockReques
   return hit?.runId === runId ? hit : null;
 }
 
+/**
+ * Two agents talking (a question, work handed off, its answer) as one pill: "Caio ⇄ Theo · respondeu em 8 s". Its
+ * state: still out, answered, or no answer (failed or expired).
+ */
+export type TalkState = "waiting" | "answered" | "failed";
+
+export const talkState = (state: ConsultLineState): TalkState =>
+  state === "answered" ? "answered" : state === "failed" || state === "expired" ? "failed" : "waiting";
+
+/** What a stored card knows (`meta.consulted`, a `consult_reply` notice): how it ended. */
+export const talkStateOf = (status: string, answer: string | null | undefined): TalkState =>
+  status === "answered" && answer?.trim() ? "answered" : status === "open" ? "waiting" : "failed";
+
+/** The pill's words after the names, with the time (`formatLineTime`) when it is known. */
+export function talkStatus(state: TalkState, time: string | null) {
+  if (state === "failed") return { key: "chat.agentTalk.failed" as const, values: {} };
+  if (state === "answered")
+    return time
+      ? { key: "chat.agentTalk.answeredIn" as const, values: { time } }
+      : { key: "chat.agentTalk.answered" as const, values: {} };
+  return time
+    ? { key: "chat.agentTalk.waitingFor" as const, values: { time } }
+    : { key: "chat.agentTalk.waiting" as const, values: {} };
+}
+
+/** A stored card's id that opens the two agents' conversation: not the stand-in `consultationsOf` makes for none. */
+export const openableConsultation = (id: string | null | undefined) => (id && !id.includes(":") ? id : null);
+
 /** Seconds since the question went out (while open) or until it closed. */
 export function consultSeconds(c: RunConsultation, now: number): number {
   const end = c.answeredAt ? Date.parse(c.answeredAt) : now;

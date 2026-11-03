@@ -26680,6 +26680,21 @@
   "chat.consultGroup.see": {
     "value": "See"
   },
+  "chat.agentTalk.waiting": {
+    "value": "talking…"
+  },
+  "chat.agentTalk.waitingFor": {
+    "value": "talking for {{time}}"
+  },
+  "chat.agentTalk.answered": {
+    "value": "answered"
+  },
+  "chat.agentTalk.answeredIn": {
+    "value": "answered in {{time}}"
+  },
+  "chat.agentTalk.failed": {
+    "value": "no answer"
+  },
   "chat.talk.readAll": {
     "value": "Read all"
   },
