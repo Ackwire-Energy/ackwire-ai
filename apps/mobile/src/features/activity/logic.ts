@@ -3,7 +3,7 @@ import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { namesText } from "@agenteschat/client/lib/format";
 import { upcomingRoutines } from "@agenteschat/client/lib/home";
 import { mediaKindOf } from "@agenteschat/client/lib/media";
-import { askersOf } from "@agenteschat/client/lib/notifications";
+import { askersOf, runFailedGroupOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import type { TFunction } from "i18next";
 import { daysAgo } from "../shared/logic";
@@ -150,6 +150,25 @@ export function joinRequestLine(
         ? t("notifications.wait.joinSuggestion", { by: n.latest.suggestedBy, name: asked.names[0] })
         : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
   return { text, faces: asked.names.slice(0, 2) };
+}
+
+/**
+ * A row standing for several agents that failed for one cause close together: "15 agents couldn't go on: the Claude
+ * account was disconnected" over who they are ("Ada, Atlas and 13 more"). Null for any other row.
+ */
+export function runFailedLines(
+  t: TFunction,
+  n: Pick<AppNotification, "kind" | "latest">,
+  agentName: (id: string) => string,
+): { title: string; sub: string } | null {
+  const group = runFailedGroupOf(n);
+  if (!group) return null;
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const title = group.cause
+    ? tt("notifications.what.runFailedMany", { count: group.agents, cause: tt(group.cause.key, group.cause.values) })
+    : tt("notifications.what.runFailedManyAny", { count: group.agents });
+  const names = [...new Set(group.failures.map((f) => agentName(f.agentId)))];
+  return { title: title.replace(/<\/?b>/g, ""), sub: namesText(t, names, 2, group.agents) };
 }
 
 /** The next real thing coming: the soonest run of an active routine, still ahead. */

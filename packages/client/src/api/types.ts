@@ -1000,8 +1000,8 @@ export type ConsultationWait = "approval" | "input" | "computer" | "agents" | "o
 
 /**
  * A question an agent asked another agent from a conversation, or work it handed one (`GET
- * …/channels/{id}/consultations`): drawn inside the reply of the run that asked ("Perguntou a 3 colegas", "Passou
- * para 1 colega"), each with where it is and, once closed, the answer.
+ * …/channels/{id}/consultations`): drawn as one row before the reply of the run that asked ("Theo ⇄ Atlas · 2 min"),
+ * with where each is and, once closed, the answer (shown only when opened).
  */
 export interface RunConsultation {
   id: string;
@@ -5451,6 +5451,20 @@ export interface NotificationLatest {
   diskFreeGb?: number;
   /** `app_created`: how many of each kind (`agent`, `routine`, `skill`, `memory`, `channel`). */
   created?: Record<string, number>;
+  /** `run_failed`: every run the row stands for, failed for one cause close together (`latest.reason`). */
+  failures?: RunFailure[];
+  /** `run_failed` on a computer brain: the plan's name its cause names ("Claude"). */
+  plan?: string;
+}
+
+/** A run a `run_failed` row lists: its agent and where it failed (`key` names both). */
+export interface RunFailure {
+  key: string;
+  agentId: string;
+  channelId: string;
+  threadId?: string;
+  messageId: string;
+  label?: string;
 }
 
 export interface AppNotification {

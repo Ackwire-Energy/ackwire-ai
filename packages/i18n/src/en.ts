@@ -2506,6 +2506,11 @@ export const en = {
       routineFinished: "<b>{{name}}</b> finished a routine",
       routineFailed: "<b>{{name}}</b> couldn't run a routine",
       runFailed: "<b>{{name}}</b> couldn't finish",
+      /** Agents that failed for one cause close together, on one row; `cause` is a `failedCause` line. */
+      runFailedMany_one: "<b>{{count}} agent</b> couldn't go on: {{cause}}",
+      runFailedMany_other: "<b>{{count}} agents</b> couldn't go on: {{cause}}",
+      runFailedManyAny_one: "<b>{{count}} agent</b> couldn't go on",
+      runFailedManyAny_other: "<b>{{count}} agents</b> couldn't go on",
       routinePaused: "A routine of <b>{{name}}</b> was paused",
       routineStalled: "<b>{{name}}</b> is waiting for the computer to run a routine",
       agentUnreached: "A routine couldn't call <b>{{name}}</b>",
@@ -2551,7 +2556,24 @@ export const en = {
     showReplies_other: "See {{count}} replies",
     showComments_one: "See {{count}} comment",
     showComments_other: "See {{count}} comments",
+    showAgents_one: "See {{count}} agent",
+    showAgents_other: "See {{count}} agents",
     hide: "Hide",
+    /** Why agents couldn't go on, after "15 agents couldn't go on:". `plan` is the plan's name (Claude, ChatGPT). */
+    failedCause: {
+      not_logged_in: "the {{plan}} account was disconnected",
+      plan_limit: "the {{plan}} plan hit its limit",
+      machine_offline: "the computer went offline",
+      machine_paused: "the computer is paused",
+      computer_busy: "the computer stayed busy with other work",
+      runner_outdated: "the program on the computer needs an update",
+      budget_exceeded: "the month's budget ran out",
+      provider_error: "the model had an error",
+      provider_unavailable: "the model didn't answer",
+      gave_up: "the model didn't answer after several tries",
+      missing_credential: "an API key is missing",
+      credential_revoked: "the API key was revoked",
+    },
     youReplied: "You replied: {{text}}",
     actions: "Actions",
     reply: "Reply",
@@ -7483,6 +7505,8 @@ export const en = {
     button_other: "Computer · {{count}} waiting",
     buttonIdle: "Computer",
     see: "See queue",
+    /** In the line's dialog opened from a DM: on to the agent's computer. */
+    openComputer: "Open the computer",
     /** The dialog's label for screen readers; the visible title is the computer's name. */
     label: "Line for {{name}}",
     full: "Full",
@@ -10360,33 +10384,15 @@ export const en = {
       failed: "{{name}} couldn't answer",
       /** Work handed off (`tell_agent`) that its agent couldn't finish. */
       failedNote: "{{name}} couldn't finish",
-      waited: "Waited {{minutes}} min",
-      wentOn: "Went on without the answer",
       asked: "{{name}} asked",
       /** Over the work an agent handed off, as it went to the other agent. */
       wrote: "{{name}} wrote",
       answerOf: "{{name}}'s answer",
-      answer: "Answer",
-      noAnswer: "No answer in {{minutes}} min. {{from}} answered without it.",
-      couldNot: "{{to}} couldn't answer. {{from}} went on without it.",
       private: "A talk only between {{from}} and {{to}}",
     },
-    /**
-     * Inside the reply that asked: the questions the agent asked other agents in that turn, and the work it handed
-     * them, one line each.
-     */
+    /** The words of each question an agent asked other agents (or work it handed them), by where it is. */
     consultGroup: {
-      asked_one: "Asked {{count}} teammate",
-      asked_other: "Asked {{count}} teammates",
-      /** Only work handed off (`tell_agent`). */
-      handed_one: "Handed off to {{count}} teammate",
-      handed_other: "Handed off to {{count}} teammates",
-      /** Questions and work handed off together. */
-      brought_one: "Brought in {{count}} teammate",
-      brought_other: "Brought in {{count}} teammates",
       progress: "{{done}} of {{total}}",
-      label: "{{name}}'s questions to other agents",
-      labelRequests: "{{name}}'s requests to other agents",
       working: "{{name}} is working",
       waitingApproval: "{{name}} is waiting for an approval",
       waitingInput: "{{name}} is waiting for an answer",
@@ -10396,13 +10402,32 @@ export const en = {
       waitingProvider: "{{name}}: the AI provider is down · retries by itself",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{name}} handed part of it on and is waiting to hear back",
-      /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */
-      posted_one: "{{count}} message so far · {{latest}}",
-      posted_other: "{{count}} messages so far · {{latest}}",
       /** An answer whose question is in a reply farther up: one line where it arrived, "See" goes to that reply. */
       answeredFar: "{{to}} answered {{from}}'s question",
       answeredRequestFar: "{{to}} answered {{from}}'s request",
       see: "See",
+    },
+    /**
+     * The slim row before a reply whose agent asked others first ("Theo ⇄ Atlas · 2 min"): the short word after the
+     * names while a question is out or once it went unanswered, lowercase, then the time.
+     */
+    consultPair: {
+      asking: "asking",
+      /** Work handed off (`tell_agent`), still on it. */
+      working: "working on it",
+      waitingApproval: "waiting for approval",
+      waitingInput: "waiting for an answer",
+      waitingComputer: "waiting for its computer",
+      waitingProvider: "AI provider down",
+      /** Its part done, it waits on agents it handed some to. */
+      handedOn: "waiting on other agents",
+      noAnswer: "didn't answer",
+      /** Work handed off that its agent couldn't finish. */
+      notFinished: "didn't finish",
+      /** Several asked, some never answered. */
+      someAnswered: "{{done}} of {{total}} answered",
+      /** Its tip when several were asked: "Theo's talks with Atlas, Rio and Iris". */
+      labelMany: "{{from}}'s talks with {{to}}",
     },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
     /** A long message from one agent to another, folded to its first paragraph: the whole opens in its thread. */

@@ -1,5 +1,5 @@
 import type { Message } from "@agenteschat/client";
-import { type ConsultNoticeFold, consultFarKey } from "@agenteschat/client/lib/consult-group";
+import { type ConsultNoticeFold, consultFarKey, pairItemOf } from "@agenteschat/client/lib/consult-group";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { consultationOfNotice, stoppedNoticeOf } from "@agenteschat/client/lib/notices";
@@ -9,7 +9,7 @@ import { StyleSheet, View } from "react-native";
 import { LineIcon, Text } from "@/ui";
 import { withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
-import { ConsultationCard } from "./cards";
+import { ConsultPairRow } from "./ConsultGroup";
 import { eventLineOf } from "./logic";
 import { MessageText } from "./MessageText";
 import { StoppedLine } from "./StoppedLine";
@@ -75,8 +75,8 @@ export function EventLine({
       </View>
     );
   }
-  // An answer from another agent that carries the consultation (who asked whom, the question and the
-  // answer apart): the same card as a reply that waited for it, not the text written for the agent.
+  // An answer from another agent that carries the consultation, its reply not here: the same pair row a reply
+  // has (who asked whom), never the text written for the agent; a tap opens what they said.
   const consulted = consultationOfNotice(message.meta);
   const line = eventLineOf(
     message,
@@ -88,13 +88,11 @@ export function EventLine({
   );
   if (consulted)
     return (
-      <View style={styles.line}>
-        <ConsultationCard
-          askerId={consulted.askerId}
-          consultation={consulted.consultation}
-          channelId={message.channelId}
-        />
-      </View>
+      <ConsultPairRow
+        askerId={consulted.askerId}
+        channelId={message.channelId}
+        items={[pairItemOf(consulted.consultation)]}
+      />
     );
   if (!line) return null;
   return (

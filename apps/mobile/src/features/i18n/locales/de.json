@@ -348,20 +348,6 @@
       "back": "Wieder verbunden"
     },
     "longPressHint": "Gedrückt halten, um zu reagieren und mehr Aktionen zu sehen",
-    "consult": {
-      "answered": "{{name}} hat geantwortet",
-      "expiredF": "{{name}} hat nicht rechtzeitig geantwortet",
-      "expiredM": "{{name}} hat nicht rechtzeitig geantwortet",
-      "failedF": "{{name}} konnte nicht antworten",
-      "failedM": "{{name}} konnte nicht antworten",
-      "answerOfF": "Antwort von {{name}}",
-      "answerOfM": "Antwort von {{name}}",
-      "noAnswer": "Keine Antwort.",
-      "privateFF": "Ein privater Chat zwischen {{from}} und {{to}}",
-      "privateFM": "Ein privater Chat zwischen {{from}} und {{to}}",
-      "privateMF": "Ein privater Chat zwischen {{from}} und {{to}}",
-      "privateMM": "Ein privater Chat zwischen {{from}} und {{to}}"
-    },
     "file": "Datei",
     "fileOpen": "Zum Öffnen tippen",
     "fileDeleted": "Datei entfernt",

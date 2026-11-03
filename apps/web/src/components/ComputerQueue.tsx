@@ -6,6 +6,7 @@ import {
   fanOutOf,
   fanOutText,
   fanShows,
+  nthText,
   type QueueNames,
   type QueuePlace,
   queueAllStartedText,
@@ -20,8 +21,18 @@ import {
   queueWhereText,
   waitingFor,
 } from "@agenteschat/client/lib/computer-queue";
-import { Button, Chip, Dialog, DialogBody, Icon, Message as MessageRow, useNow } from "@agenteschat/ui";
-import { type ReactNode, useState } from "react";
+import {
+  Button,
+  Chip,
+  CountChip,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Icon,
+  Message as MessageRow,
+  useNow,
+} from "@agenteschat/ui";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -93,10 +104,12 @@ export function QueueDialog({
   machineId,
   open,
   onOpenChange,
+  onOpenComputer,
 }: {
   machineId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenComputer?: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -130,12 +143,19 @@ export function QueueDialog({
           <LoadingList count={3} />
         )}
       </DialogBody>
+      {onOpenComputer && (
+        <DialogFooter>
+          <Button icon="computer" onClick={onOpenComputer}>
+            {t("queue.openComputer")}
+          </Button>
+        </DialogFooter>
+      )}
     </Dialog>
   );
 }
 
 function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typeof useQueueNames>; now: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const view = queueView(queue, names.viewerId);
   const allStarted = queueAllStartedText(t, view, now);
   const agentName = (id: string) => names.agent(id) ?? t("channel.unknownAgent");
@@ -149,11 +169,13 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
         <ol className="cq__rows">
           {view.working.map((w) => (
             <li key={w.runId} className="cq__row" data-mine={w.mine || undefined}>
-              <span className="cq__n" />
               <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="thinking" />
               <span className="cq__text">
-                <b>{agentName(w.agentId)}</b>{" "}
-                <span>
+                <span className="cq__l1">
+                  <b>{agentName(w.agentId)}</b>
+                  <span className="cq__time">{queueLeftText(t, w, now)}</span>
+                </span>
+                <span className="cq__l2">
                   {[
                     queuePurposeText(t, w.purpose, names),
                     queueWhereText(t, names.place(w.where)),
@@ -161,7 +183,6 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
                   ].join(" · ")}
                 </span>
               </span>
-              <span className="cq__time">{queueLeftText(t, w, now)}</span>
             </li>
           ))}
         </ol>
@@ -175,16 +196,18 @@ function QueueLists({ queue, names, now }: { queue: Queue; names: ReturnType<typ
           <ol className="cq__rows">
             {view.waiting.map((w) => (
               <li key={w.runId} className="cq__row" data-mine={w.mine || undefined}>
-                <span className="cq__n">{w.position}</span>
                 <AgentAvatar agentId={w.agentId} name={agentName(w.agentId)} size="xs" state="idle" />
                 <span className="cq__text">
-                  <b>{agentName(w.agentId)}</b>{" "}
-                  <span>
+                  <span className="cq__l1">
+                    <b>{agentName(w.agentId)}</b>
+                    <span className="cq__nth">{nthText(t, i18n.language, w.position)}</span>
+                    <span className="cq__time">{queueStartText(t, w, names.agent, now)}</span>
+                  </span>
+                  <span className="cq__l2">
                     {[queuePurposeText(t, w.purpose, names), queueWhereText(t, names.place(w.where))].join(" · ")}
                   </span>
                   {w.mine && w.people && <Chip className="cq-first">{t("queue.youFirst")}</Chip>}
                 </span>
-                <span className="cq__time">{queueStartText(t, w, names.agent, now)}</span>
               </li>
             ))}
           </ol>
@@ -319,22 +342,64 @@ export function FanOutStrip({ message, otherwise = null }: { message: Message; o
   );
 }
 
-/** The conversation header's button while anyone waits for this computer: "Computer · 9 waiting", opening the line. */
-export function QueueButton({ machineId }: { machineId: string | null }) {
+/**
+ * The conversation header's computer button: "Computer · 9 waiting" while anyone waits for this computer, opening the
+ * line, else `idle` (a DM's own Computer button). `onOpenComputer` gives the line "Open the computer".
+ */
+/** The computer's state a header button shows as a dot (`brw-dm`), and says to a screen reader. */
+export type EntrySignal = { state?: "waiting" | "live"; style?: CSSProperties; line?: string };
+
+export function QueueButton({
+  machineId,
+  idle = null,
+  signal,
+  onOpenComputer,
+}: {
+  machineId: string | null;
+  idle?: ReactNode;
+  signal?: EntrySignal;
+  onOpenComputer?: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const q = useMachineQueue(org.id, machineId);
   const [open, setOpen] = useState(false);
-  if (!machineId) return null;
+  const waiting = machineId ? (q.data?.waiting.length ?? 0) : 0;
   return (
     <>
-      {q.data?.waiting.length ? (
-        <Button size="sm" icon="computer" onClick={() => setOpen(true)}>
-          {queueButtonText(t, q.data)}
+      {waiting > 0 ? (
+        <Button
+          size="sm"
+          icon="computer"
+          className={signal ? "cq-btn brw-dm" : "cq-btn"}
+          data-state={signal?.state}
+          style={signal?.style}
+          onClick={() => setOpen(true)}
+        >
+          <span className="cq-btn__label">{queueButtonText(t, q.data)}</span>
+          <CountChip size="sm" className="cq-btn__count" aria-hidden="true">
+            {waiting > 99 ? "99+" : waiting}
+          </CountChip>
+          {signal?.line && <span className="ac-visually-hidden">{signal.line}</span>}
         </Button>
-      ) : null}
+      ) : (
+        idle
+      )}
       {/* Stays open as the line empties: the person sees it end. */}
-      {open && <QueueDialog machineId={machineId} open={open} onOpenChange={setOpen} />}
+      {open && machineId && (
+        <QueueDialog
+          machineId={machineId}
+          open={open}
+          onOpenChange={setOpen}
+          onOpenComputer={
+            onOpenComputer &&
+            (() => {
+              setOpen(false);
+              onOpenComputer();
+            })
+          }
+        />
+      )}
     </>
   );
 }

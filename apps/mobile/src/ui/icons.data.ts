@@ -160,6 +160,8 @@ export const ICONS = {
   person: [c(12, 8.4, 3.8), p("M5 20.4c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5")],
   // The web's reply arrow on this grid. `reply` here is the web's thread drawing.
   replyTo: [p("M9.6 6 4.8 10.8l4.8 4.8M4.8 10.8h8.4a6 6 0 0 1 6 6v1.8")],
+  // The web's swap arrows on this grid: one agent asking another, between their faces.
+  swap: [p("M4.8 8.4h13.8M15.6 5.4l3 3-3 3M19.2 15.6H5.4M8.4 12.6l-3 3 3 3")],
 } satisfies Record<string, IconShape[]>;
 
 export type IconName = keyof typeof ICONS;

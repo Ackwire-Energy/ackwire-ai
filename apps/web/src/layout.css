@@ -367,17 +367,127 @@ p {
   color: var(--ink-muted);
 }
 
-/* A consulted agent's answer, closed: only its start, two lines at most; the whole answer shows once opened. */
-.ac-consult-group .ac-tools__label small {
-  display: -webkit-box;
-  flex-basis: 100%;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+/* The pair row right before a reply whose agent asked others first: "Theo ⇄ Atlas · 2 min", 26px tall. Its first
+   face sits centred over the reply's 32px face (16px row padding + 7px, less the button's own 10px). */
+.consult-pair {
+  margin: 6px 0 -6px;
+  padding: 0 16px 0 13px;
+  min-width: 0;
 }
-.ac-consult-group .ac-tools__row[aria-expanded="true"] .ac-tools__label small {
-  display: none;
+.consult-pair__row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 8px 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
+}
+.consult-pair__row:hover {
+  background: var(--plate);
+  color: var(--ink2);
+}
+html:not([data-pointer]) .consult-pair__row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.consult-pair__row[aria-pressed="true"] {
+  background: var(--agent-soft);
+}
+.consult-pair__name {
+  font-weight: 600;
+  color: var(--ink2);
+  min-width: 0;
+  overflow: hidden;
+}
+.consult-pair__swap,
+.consult-pair__chev {
+  flex: none;
+  color: var(--faint);
+}
+.consult-pair__swap {
+  width: 15px;
+  height: 15px;
+  margin: 0 1px;
+}
+.consult-pair__faces {
+  flex: none;
+}
+.consult-pair__faces > .ac-avatar {
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+.consult-pair__faces > .ac-avatar + .ac-avatar {
+  margin-left: -5px;
+}
+.consult-pair__off {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+.consult-pair__sep,
+.consult-pair__time {
+  color: var(--faint);
+}
+.consult-pair__time {
+  font-variant-numeric: tabular-nums;
+}
+.consult-pair__row--live .consult-pair__word,
+.consult-pair__row--live .consult-pair__swap {
+  color: var(--agent);
+  font-weight: 550;
+}
+.consult-pair__row--bad .consult-pair__word {
+  color: var(--warn);
+  font-weight: 550;
+}
+/* The chevron says it opens: on hover, keyboard focus, and while it is open. */
+.consult-pair__chev {
+  margin-left: -2px;
+  opacity: 0;
+  transition:
+    opacity 0.12s,
+    transform 0.2s var(--out);
+}
+.consult-pair__row:is(:hover, :focus-visible, [aria-pressed="true"], [aria-expanded="true"]) .consult-pair__chev {
+  opacity: 1;
+}
+.consult-pair__row[aria-pressed="true"] :is(.consult-pair__swap, .consult-pair__chev) {
+  color: var(--agent);
+}
+.consult-pair__row[aria-expanded="true"] .consult-pair__chev {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .consult-pair__row--live .consult-pair__swap {
+    animation: consult-pair-pulse 1.4s ease-in-out infinite;
+  }
+}
+@keyframes consult-pair-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Opened in place (a thread view, the panel): aligned with the reply's words, one card width. */
+.consult-pair__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: var(--msg-card-w);
+  padding: 6px 0 6px 47px;
 }
 
 /* The agent's one card while it waits for its computer (instead of repeated messages); a card face, never the well. */

@@ -438,7 +438,12 @@ const UNREPORTED = new Set(["agent_archived", "no_ai", "canceled"]);
  * finish"), so it tries another way or tells the person; hand-offs in an agents' DM close through their own rows
  * (`onConsultedRunFinished`) and notify nobody here. Never throws.
  */
-export async function reportRunFailure(deps: { db: Database; pubsub?: PubSub }, run: AgentRun, reason: string) {
+export async function reportRunFailure(
+  deps: { db: Database; pubsub?: PubSub },
+  run: AgentRun,
+  reason: string,
+  cause?: { code?: string; plan?: string },
+) {
   if (run.background || UNREPORTED.has(reason)) return;
   try {
     const channel = await getChannelCached(deps.db, run.orgId, run.channelId);
@@ -447,7 +452,7 @@ export async function reportRunFailure(deps: { db: Database; pubsub?: PubSub }, 
     // and the hand-off's line where the work came from (`onConsultedRunFinished`).
     if (isAgentOnlyDm(channel) && (await handedOffRun(deps.db, run))) return;
     const person = accountablePerson(await runAuthority(deps.db, run));
-    await notifyRunFailed(deps, run, person, reason);
+    await notifyRunFailed(deps, run, person, reason, cause);
     if (isAgentOnlyDm(channel)) return;
     const [trigger] = await deps.db
       .select({ agentId: schema.messages.authorAgentId, runId: schema.messages.agentRunId })

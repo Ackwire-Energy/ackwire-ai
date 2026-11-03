@@ -83,6 +83,23 @@ const Notification = z
         .openapi({ description: "`join_request`: the first two people who asked, in the order they asked." }),
       diskUse: z.number().optional().openapi({ description: "`computer_disk_full`: the share of the disk in use." }),
       diskFreeGb: z.number().optional().openapi({ description: "`computer_disk_full`: the GB left on it." }),
+      failures: z
+        .array(
+          z.object({
+            key: z.string(),
+            agentId: z.string(),
+            channelId: z.string(),
+            threadId: z.string().optional(),
+            messageId: z.string(),
+            label: z.string().optional(),
+          }),
+        )
+        .optional()
+        .openapi({ description: "`run_failed`: every run the row stands for, failed for one cause close together." }),
+      plan: z
+        .string()
+        .optional()
+        .openapi({ description: "`run_failed` on a computer brain: the plan's name its cause names." }),
       holdKind: z
         .string()
         .optional()

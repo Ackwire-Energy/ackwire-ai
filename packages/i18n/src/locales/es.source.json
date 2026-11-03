@@ -6289,6 +6289,18 @@
   "notifications.what.runFailed": {
     "value": "<b>{{name}}</b> couldn't finish"
   },
+  "notifications.what.runFailedMany": {
+    "value": {
+      "one": "<b>{{count}} agent</b> couldn't go on: {{cause}}",
+      "other": "<b>{{count}} agents</b> couldn't go on: {{cause}}"
+    }
+  },
+  "notifications.what.runFailedManyAny": {
+    "value": {
+      "one": "<b>{{count}} agent</b> couldn't go on",
+      "other": "<b>{{count}} agents</b> couldn't go on"
+    }
+  },
   "notifications.what.routinePaused": {
     "value": "A routine of <b>{{name}}</b> was paused"
   },
@@ -6415,8 +6427,50 @@
       "other": "See {{count}} comments"
     }
   },
+  "notifications.showAgents": {
+    "value": {
+      "one": "See {{count}} agent",
+      "other": "See {{count}} agents"
+    }
+  },
   "notifications.hide": {
     "value": "Hide"
+  },
+  "notifications.failedCause.not_logged_in": {
+    "value": "the {{plan}} account was disconnected"
+  },
+  "notifications.failedCause.plan_limit": {
+    "value": "the {{plan}} plan hit its limit"
+  },
+  "notifications.failedCause.machine_offline": {
+    "value": "the computer went offline"
+  },
+  "notifications.failedCause.machine_paused": {
+    "value": "the computer is paused"
+  },
+  "notifications.failedCause.computer_busy": {
+    "value": "the computer stayed busy with other work"
+  },
+  "notifications.failedCause.runner_outdated": {
+    "value": "the program on the computer needs an update"
+  },
+  "notifications.failedCause.budget_exceeded": {
+    "value": "the month's budget ran out"
+  },
+  "notifications.failedCause.provider_error": {
+    "value": "the model had an error"
+  },
+  "notifications.failedCause.provider_unavailable": {
+    "value": "the model didn't answer"
+  },
+  "notifications.failedCause.gave_up": {
+    "value": "the model didn't answer after several tries"
+  },
+  "notifications.failedCause.missing_credential": {
+    "value": "an API key is missing"
+  },
+  "notifications.failedCause.credential_revoked": {
+    "value": "the API key was revoked"
   },
   "notifications.youReplied": {
     "value": "You replied: {{text}}"
@@ -19099,6 +19153,9 @@
   "queue.see": {
     "value": "See queue"
   },
+  "queue.openComputer": {
+    "value": "Open the computer"
+  },
   "queue.label": {
     "value": "Line for {{name}}"
   },
@@ -26647,12 +26704,6 @@
   "chat.consultation.failedNote": {
     "value": "{{name}} couldn't finish"
   },
-  "chat.consultation.waited": {
-    "value": "Waited {{minutes}} min"
-  },
-  "chat.consultation.wentOn": {
-    "value": "Went on without the answer"
-  },
   "chat.consultation.asked": {
     "value": "{{name}} asked"
   },
@@ -26662,44 +26713,11 @@
   "chat.consultation.answerOf": {
     "value": "{{name}}'s answer"
   },
-  "chat.consultation.answer": {
-    "value": "Answer"
-  },
-  "chat.consultation.noAnswer": {
-    "value": "No answer in {{minutes}} min. {{from}} answered without it."
-  },
-  "chat.consultation.couldNot": {
-    "value": "{{to}} couldn't answer. {{from}} went on without it."
-  },
   "chat.consultation.private": {
     "value": "A talk only between {{from}} and {{to}}"
   },
-  "chat.consultGroup.asked": {
-    "value": {
-      "one": "Asked {{count}} teammate",
-      "other": "Asked {{count}} teammates"
-    }
-  },
-  "chat.consultGroup.handed": {
-    "value": {
-      "one": "Handed off to {{count}} teammate",
-      "other": "Handed off to {{count}} teammates"
-    }
-  },
-  "chat.consultGroup.brought": {
-    "value": {
-      "one": "Brought in {{count}} teammate",
-      "other": "Brought in {{count}} teammates"
-    }
-  },
   "chat.consultGroup.progress": {
     "value": "{{done}} of {{total}}"
-  },
-  "chat.consultGroup.label": {
-    "value": "{{name}}'s questions to other agents"
-  },
-  "chat.consultGroup.labelRequests": {
-    "value": "{{name}}'s requests to other agents"
   },
   "chat.consultGroup.working": {
     "value": "{{name}} is working"
@@ -26719,12 +26737,6 @@
   "chat.consultGroup.waitingAgents": {
     "value": "{{name}} handed part of it on and is waiting to hear back"
   },
-  "chat.consultGroup.posted": {
-    "value": {
-      "one": "{{count}} message so far · {{latest}}",
-      "other": "{{count}} messages so far · {{latest}}"
-    }
-  },
   "chat.consultGroup.answeredFar": {
     "value": "{{to}} answered {{from}}'s question"
   },
@@ -26733,6 +26745,39 @@
   },
   "chat.consultGroup.see": {
     "value": "See"
+  },
+  "chat.consultPair.asking": {
+    "value": "asking"
+  },
+  "chat.consultPair.working": {
+    "value": "working on it"
+  },
+  "chat.consultPair.waitingApproval": {
+    "value": "waiting for approval"
+  },
+  "chat.consultPair.waitingInput": {
+    "value": "waiting for an answer"
+  },
+  "chat.consultPair.waitingComputer": {
+    "value": "waiting for its computer"
+  },
+  "chat.consultPair.waitingProvider": {
+    "value": "AI provider down"
+  },
+  "chat.consultPair.handedOn": {
+    "value": "waiting on other agents"
+  },
+  "chat.consultPair.noAnswer": {
+    "value": "didn't answer"
+  },
+  "chat.consultPair.notFinished": {
+    "value": "didn't finish"
+  },
+  "chat.consultPair.someAnswered": {
+    "value": "{{done}} of {{total}} answered"
+  },
+  "chat.consultPair.labelMany": {
+    "value": "{{from}}'s talks with {{to}}"
   },
   "chat.talk.readAll": {
     "value": "Read all"

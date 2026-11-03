@@ -1118,3 +1118,48 @@ html:not([data-pointer]) .nt-nb:focus-visible {
     transition: none;
   }
 }
+
+/* A shared failure row's agents: each a button to its conversation. */
+.nt-fails {
+  margin-bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+.nt-fails > li + li .nt-rep {
+  border-top: 1px solid var(--line);
+}
+.nt-fails .nt-rep {
+  width: 100%;
+  align-items: center;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nt-fails > li:first-child .nt-rep {
+  border-radius: 14px 14px 0 0;
+}
+.nt-fails > li:last-child .nt-rep {
+  border-radius: 0 0 14px 14px;
+}
+.nt-fails > li:only-child .nt-rep {
+  border-radius: 14px;
+}
+.nt-fails .nt-rep:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+html:not([data-pointer]) .nt-fails .nt-rep:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.nt-fails .nt-rep__head {
+  min-width: 0;
+}
+.nt-fails .nt-rep__head small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

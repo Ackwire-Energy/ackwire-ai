@@ -363,20 +363,6 @@
       "back": "Conectado de nuevo"
     },
     "longPressHint": "Mantén presionado para reaccionar y ver más acciones",
-    "consult": {
-      "answered": "{{name}} respondió",
-      "expiredF": "{{name}} no respondió a tiempo",
-      "expiredM": "{{name}} no respondió a tiempo",
-      "failedF": "{{name}} no pudo responder",
-      "failedM": "{{name}} no pudo responder",
-      "answerOfF": "Respuesta de {{name}}",
-      "answerOfM": "Respuesta de {{name}}",
-      "noAnswer": "Sin respuesta.",
-      "privateFF": "Un chat privado entre {{from}} y {{to}}",
-      "privateFM": "Un chat privado entre {{from}} y {{to}}",
-      "privateMF": "Un chat privado entre {{from}} y {{to}}",
-      "privateMM": "Un chat privado entre {{from}} y {{to}}"
-    },
     "file": "Archivo",
     "fileOpen": "Toca para abrir",
     "fileDeleted": "Archivo eliminado",

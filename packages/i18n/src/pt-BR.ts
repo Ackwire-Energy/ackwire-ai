@@ -2543,6 +2543,11 @@ export const ptBR = {
       routineFinished: "<b>{{name}}</b> terminou uma rotina",
       routineFailed: "<b>{{name}}</b> não conseguiu rodar uma rotina",
       runFailed: "<b>{{name}}</b> não conseguiu terminar",
+      /** Agents that failed for one cause close together, on one row; `cause` is a `failedCause` line. */
+      runFailedMany_one: "<b>{{count}} agente</b> não conseguiu continuar: {{cause}}",
+      runFailedMany_other: "<b>{{count}} agentes</b> não conseguiram continuar: {{cause}}",
+      runFailedManyAny_one: "<b>{{count}} agente</b> não conseguiu continuar",
+      runFailedManyAny_other: "<b>{{count}} agentes</b> não conseguiram continuar",
       routinePaused: "Uma rotina de <b>{{name}}</b> foi pausada",
       routineStalled: "<b>{{name}}</b> espera o computador para rodar uma rotina",
       agentUnreached: "Uma rotina não conseguiu chamar <b>{{name}}</b>",
@@ -2588,7 +2593,24 @@ export const ptBR = {
     showReplies_other: "Ver {{count}} respostas",
     showComments_one: "Ver {{count}} comentário",
     showComments_other: "Ver {{count}} comentários",
+    showAgents_one: "Ver {{count}} agente",
+    showAgents_other: "Ver {{count}} agentes",
     hide: "Esconder",
+    /** Why agents couldn't go on, after "15 agents couldn't go on:". `plan` is the plan's name (Claude, ChatGPT). */
+    failedCause: {
+      not_logged_in: "a conta do {{plan}} foi desconectada",
+      plan_limit: "o plano do {{plan}} chegou ao limite",
+      machine_offline: "o computador ficou offline",
+      machine_paused: "o computador está pausado",
+      computer_busy: "o computador continuou ocupado com outras tarefas",
+      runner_outdated: "o programa no computador precisa ser atualizado",
+      budget_exceeded: "o orçamento do mês acabou",
+      provider_error: "o modelo deu erro",
+      provider_unavailable: "o modelo não respondeu",
+      gave_up: "o modelo não respondeu depois de várias tentativas",
+      missing_credential: "falta uma chave de API",
+      credential_revoked: "a chave de API foi revogada",
+    },
     youReplied: "Você respondeu: {{text}}",
     actions: "Ações",
     reply: "Responder",
@@ -7688,6 +7710,8 @@ export const ptBR = {
     button_other: "Computador · {{count}} aguardando",
     buttonIdle: "Computador",
     see: "Ver fila",
+    /** In the line's dialog opened from a DM: on to the agent's computer. */
+    openComputer: "Abrir o computador",
     label: "Fila de {{name}}",
     full: "Cheio",
     fullNext: "Cheio · o próximo começa em cerca de {{n}} min",
@@ -10581,36 +10605,16 @@ export const ptBR = {
       /** Work handed off (`tell_agent`) that its agent couldn't finish. */
       failedNote: "O {{name}} não conseguiu terminar",
       failedNote_female: "A {{name}} não conseguiu terminar",
-      waited: "Esperou {{minutes}} min",
-      wentOn: "Seguiu sem a resposta",
       asked: "{{name}} perguntou",
       /** Over the work an agent handed off, as it went to the other agent. */
       wrote: "{{name}} escreveu",
       answerOf: "Resposta do {{name}}",
       answerOf_female: "Resposta da {{name}}",
-      answer: "Resposta",
-      noAnswer: "Sem resposta em {{minutes}} min. {{from}} respondeu sem ela.",
-      couldNot: "{{to}} não conseguiu responder. {{from}} seguiu sem ela.",
       private: "Conversa só entre {{from}} e {{to}}",
     },
-    /**
-     * Inside the reply that asked: the questions the agent asked other agents in that turn, and the work it handed
-     * them, one line each.
-     */
+    /** The words of each question an agent asked other agents (or work it handed them), by where it is. */
     consultGroup: {
-      asked_one: "Perguntou a {{count}} colega",
-      asked_other: "Perguntou a {{count}} colegas",
-      /** Only work handed off (`tell_agent`). */
-      handed_one: "Passou para {{count}} colega",
-      handed_other: "Passou para {{count}} colegas",
-      /** Questions and work handed off together. */
-      brought_one: "Chamou {{count}} colega",
-      brought_other: "Chamou {{count}} colegas",
       progress: "{{done}} de {{total}}",
-      label: "Perguntas do {{name}} a outros agentes",
-      label_female: "Perguntas da {{name}} a outros agentes",
-      labelRequests: "Pedidos do {{name}} a outros agentes",
-      labelRequests_female: "Pedidos da {{name}} a outros agentes",
       working: "{{name}} está trabalhando",
       waitingApproval: "O {{name}} espera uma aprovação",
       waitingApproval_female: "A {{name}} espera uma aprovação",
@@ -10624,15 +10628,34 @@ export const ptBR = {
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "O {{name}} passou uma parte adiante e espera o retorno",
       waitingAgents_female: "A {{name}} passou uma parte adiante e espera o retorno",
-      /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */
-      posted_one: "{{count}} mensagem até agora · {{latest}}",
-      posted_other: "{{count}} mensagens até agora · {{latest}}",
       /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
       answeredFar: "{{to}} respondeu à pergunta do {{from}}",
       answeredFar_female: "{{to}} respondeu à pergunta da {{from}}",
       answeredRequestFar: "{{to}} respondeu ao pedido do {{from}}",
       answeredRequestFar_female: "{{to}} respondeu ao pedido da {{from}}",
       see: "Ver",
+    },
+    /**
+     * The slim row before a reply whose agent asked others first ("Theo ⇄ Atlas · 2 min"): the short word after the
+     * names while a question is out or once it went unanswered, lowercase, then the time.
+     */
+    consultPair: {
+      asking: "perguntando",
+      /** Work handed off (`tell_agent`), still on it. */
+      working: "trabalhando",
+      waitingApproval: "esperando aprovação",
+      waitingInput: "esperando uma resposta",
+      waitingComputer: "esperando o computador",
+      waitingProvider: "IA fora do ar",
+      /** Its part done, it waits on agents it handed some to. */
+      handedOn: "esperando outros agentes",
+      noAnswer: "não respondeu",
+      /** Work handed off that its agent couldn't finish. */
+      notFinished: "não terminou",
+      /** Several asked, some never answered. */
+      someAnswered: "{{done}} de {{total}} responderam",
+      /** Its tip when several were asked: "Theo's talks with Atlas, Rio and Iris". */
+      labelMany: "Conversas de {{from}} com {{to}}",
     },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
     /** A long message from one agent to another, folded to its first paragraph: the whole opens in its thread. */
