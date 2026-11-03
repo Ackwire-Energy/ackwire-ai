@@ -37,20 +37,21 @@
   color: var(--faint);
 }
 /* Last in the list, for who manages the channel: the channel details' add flow (the plus tile is theirs too).
-   A smaller tile and text than a member's row, so "Adicionar pessoa ou agente" stays on one line in 264px. */
+   A smaller tile and text than a member's row and less room on the right, so the label stays on one line in 264px
+   even beside the 8px scrollbar (German's, the longest, ~186px of the 190px left). */
 .members-side__add {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
   min-height: 46px;
-  padding: 5px 8px;
+  padding: 5px 4px 5px 8px;
   box-sizing: border-box;
   border: 0;
   border-radius: var(--control-r-md);
   background: none;
   font: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 18px;
   color: var(--ink-muted);

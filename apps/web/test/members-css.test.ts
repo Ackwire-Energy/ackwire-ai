@@ -34,13 +34,14 @@ test("the members column: 264px on the sidebar's surface, offline rows quieter, 
   expect(last(phone, ".channel__acts>.channel__threads", "display")).toBe("none");
 });
 
-test("the column's add row: a 24px plus tile and 13.5px text, so it fits one line in the 264px column", async () => {
+test("the column's add row: a 24px plus tile and 13px text, so it fits one line in the 264px column", async () => {
   const shipped = topLevel(await builtCss("src/styles.css", "src/components/members/members.css"));
   const last = (selector: string, property: string) =>
     declarations(shipped, selector)
       .filter(([p]) => p === property)
       .at(-1)?.[1];
-  expect(last(".members-side__add", "font-size")).toBe("13.5px");
+  expect(last(".members-side__add", "font-size")).toBe("13px");
+  expect(last(".members-side__add", "padding")).toBe("5px 4px 5px 8px");
   expect(last(".members-side__add", "gap")).toBe("8px");
   expect(last(".members-side__add .member-row__plus", "width")).toBe("24px");
   expect(last(".members-side__add .member-row__plus", "height")).toBe("24px");

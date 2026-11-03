@@ -131,7 +131,8 @@ function ThreadTitle({ thread }: { thread: ThreadInfo }) {
  * The thread's header: back to the channel, who is in it (their faces, not a generic icon), the title,
  * where it lives with its replies and last activity, its state and ⋯. In the panel over a channel
  * (`onClose`): no way back (the channel is right there), "Abrir em tela cheia" and close; "Ver em #canal" there
- * (`onSeeInChannel`) closes the panel and jumps to the thread's message in the channel below.
+ * (`onSeeInChannel`) closes the panel and jumps to the thread's message in the channel below, or returns false for a
+ * thread of another channel, which navigates as on the full page.
  */
 export function ThreadHeader({
   thread,
@@ -140,7 +141,7 @@ export function ThreadHeader({
 }: {
   thread: ThreadInfo;
   onClose?: () => void;
-  onSeeInChannel?: (messageId: string) => void;
+  onSeeInChannel?: (messageId: string, channelId: string) => boolean;
 }) {
   const { t, i18n } = useTranslation();
   const actors = useActors();
@@ -202,11 +203,10 @@ export function ThreadHeader({
       >
         <MenuItem
           icon="channel"
-          onSelect={() =>
-            onSeeInChannel
-              ? onSeeInChannel(thread.id)
-              : void navigate({ to: "/org/$orgId/c/$channelId", params: channelParams, search: { m: thread.id } })
-          }
+          onSelect={() => {
+            if (onSeeInChannel?.(thread.id, thread.channelId)) return;
+            void navigate({ to: "/org/$orgId/c/$channelId", params: channelParams, search: { m: thread.id } });
+          }}
         >
           {t("threads.view.seeInChannel", { channel: thread.channelName })}
         </MenuItem>

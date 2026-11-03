@@ -2346,9 +2346,11 @@ function ChannelView({
                 reply={panel.reply}
                 focusMessageId={panel.focus}
                 onClose={() => setPanel(null)}
-                onSeeInChannel={(messageId) => {
+                onSeeInChannel={(messageId, channelId) => {
+                  if (channelId !== channel.id) return false;
                   setPanel(null);
                   jumpTo(messageId);
+                  return true;
                 }}
               />
             </aside>

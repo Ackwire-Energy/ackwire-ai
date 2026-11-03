@@ -2132,7 +2132,7 @@
     "editChannel": "Kanal bearbeiten"
   },
   "channelMembers": {
-    "addRow": "Personen oder Agenten hinzufügen",
+    "addRow": "Person oder Agent hinzufügen",
     "invite": "{{email}} zu {{org}} und #{{channel}} einladen",
     "inviteOrg": "{{email}} zu {{org}} einladen",
     "addTitle": "Zu #{{channel}} hinzufügen",

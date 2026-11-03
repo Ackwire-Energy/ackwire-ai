@@ -29,8 +29,9 @@ export function ThreadPage({
   /** Open at this message (a card someone was sent to). */
   focusMessageId?: string;
   onClose?: () => void;
-  /** In the panel: "Ver em #canal" jumps to this message in the channel beside it instead of navigating. */
-  onSeeInChannel?: (messageId: string) => void;
+  /** In the panel: "Ver em #canal" jumps to this message in the channel beside it instead of navigating (false: not
+   * that channel's thread). */
+  onSeeInChannel?: (messageId: string, channelId: string) => boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
