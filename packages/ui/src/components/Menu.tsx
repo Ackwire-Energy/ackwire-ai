@@ -151,6 +151,7 @@ export function MenuCheckboxItem({
   checked,
   onCheckedChange,
   icon,
+  leading,
   children,
   hint,
 }: {
@@ -158,6 +159,8 @@ export function MenuCheckboxItem({
   onCheckedChange: (checked: boolean) => void;
   /** Lines its name up with the icon items around it. */
   icon?: IconName;
+  /** In place of the icon: whose item it is (an agent's face, a person's avatar), as in `MenuItem`. */
+  leading?: ReactNode;
   children: ReactNode;
   /** Quiet text on the right (how many it shows). */
   hint?: ReactNode;
@@ -169,7 +172,13 @@ export function MenuCheckboxItem({
       onCheckedChange={(v) => onCheckedChange(v === true)}
       onSelect={(e) => e.preventDefault()}
     >
-      {icon && <Icon name={icon} />}
+      {leading ? (
+        <span className="ac-menu__leading" aria-hidden="true">
+          {leading}
+        </span>
+      ) : (
+        icon && <Icon name={icon} />
+      )}
       <span className="ac-menu__label">{children}</span>
       {hint && <span className="ac-menu__hint">{hint}</span>}
       <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">

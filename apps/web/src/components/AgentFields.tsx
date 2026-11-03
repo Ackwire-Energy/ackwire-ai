@@ -13,7 +13,9 @@ import {
   ColorPicker,
   colorKey,
   Field,
+  fold,
   Icon,
+  type IconName,
   isHexColor,
   matchesWords,
   Popover,
@@ -23,15 +25,25 @@ import {
   type SelectOption,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { QUICK_BUDGETS, readBudget } from "@/lib/new-agent";
+import { QUICK_BUDGETS, ROLE_IDS, ROLE_PRESETS, readBudget } from "@/lib/new-agent";
 
 /*
  * The pieces "Criar agente" and the agent page share (same markup, same
  * `newag__*` styles): the look, the owner and key pickers, "Quem pensa",
- * the budget and the instruction tips.
+ * the budget and the instruction tips; the role as a tag and text edited in place.
  */
 
 /** Select value for "Sem responsável" (the API takes `ownerUserId: null`). */
@@ -585,5 +597,318 @@ export function InstructionTips({ helper, onAdd }: { helper: string; onAdd: (tex
         </button>
       ))}
     </div>
+  );
+}
+
+type KnownRole = { id: string; name: string; icon: IconName };
+
+/** The roles "Criar agente" offers (all but "Do zero"): each one's icon and its name in the person's language. */
+const knownRoles = (t: TFunction): KnownRole[] =>
+  ROLE_IDS.filter((id) => id !== "custom").map((id) => ({
+    id,
+    name: t(`newAgent.roles.${id}.name`),
+    icon: ROLE_PRESETS[id].icon,
+  }));
+
+const iconIn = (roles: KnownRole[], role: string): IconName =>
+  roles.find((r) => fold(r.name) === fold(role.trim()))?.icon ?? "agent";
+
+/** The icon of a role named like one "Criar agente" offers (any case or accents), else the agent's own. */
+export const roleIcon = (t: TFunction, role: string) => iconIn(knownRoles(t), role);
+
+/** Editing in place: the field takes the focus as it opens, and its button gets it back after Enter or Esc. */
+function useInPlace(editing: boolean) {
+  const button = useRef<HTMLButtonElement>(null);
+  const field = useRef<HTMLInputElement>(null);
+  // One ending per opening: taking the focused field away can blur it after Enter or Esc already ended it.
+  const open = useRef(false);
+  const back = useRef(false);
+  useLayoutEffect(() => {
+    if (editing) {
+      const el = field.current;
+      el?.focus();
+      el?.setSelectionRange(el.value.length, el.value.length);
+    } else if (back.current) {
+      back.current = false;
+      button.current?.focus();
+    }
+  }, [editing]);
+  return {
+    button,
+    field,
+    begin: () => {
+      open.current = true;
+    },
+    /** True once per opening; `refocus` gives the focus back to the button. */
+    end: (refocus: boolean) => {
+      if (!open.current) return false;
+      open.current = false;
+      back.current = refocus;
+      return true;
+    },
+  };
+}
+
+/**
+ * Text that edits where it is (the agent's name and @ on its settings): the value, with a pencil on hover that takes
+ * no room otherwise; a click turns it into a field of the same size. Enter or leaving keeps what was typed (nothing
+ * typed keeps the value), Esc puts back what it was. It only calls `onCommit`: the page's draft, which its save bar
+ * saves.
+ */
+export function InPlaceText({
+  id,
+  value,
+  shown,
+  prefix,
+  label,
+  editLabel,
+  maxLength,
+  clean,
+  spellCheck,
+  invalid,
+  describedBy,
+  onCommit,
+}: {
+  id: string;
+  value: string;
+  /** How it reads while not edited ("@ada"); the value by default. */
+  shown?: string;
+  /** Before the field, outside what is typed ("@"). */
+  prefix?: string;
+  /** The field's name ("Nome"). */
+  label: string;
+  /** The button's name, with the value in it ("Editar nome: Ada"). */
+  editLabel: string;
+  maxLength?: number;
+  /** Applied as it is typed (`cleanHandle`). */
+  clean?: (typed: string) => string;
+  spellCheck?: boolean;
+  invalid?: boolean;
+  /** The id of an error about it. */
+  describedBy?: string;
+  onCommit: (value: string) => void;
+}) {
+  const [typed, setTyped] = useState<string | null>(null);
+  const edit = useInPlace(typed !== null);
+  const close = (keep: boolean, refocus: boolean) => {
+    if (!edit.end(refocus)) return;
+    const next = (typed ?? "").trim();
+    if (keep && next && next !== value) onCommit(next);
+    setTyped(null);
+  };
+  if (typed !== null)
+    return (
+      <span className="agp-inplace__field">
+        {prefix && (
+          <span className="agp-inplace__prefix" aria-hidden="true">
+            {prefix}
+          </span>
+        )}
+        <input
+          ref={edit.field}
+          id={id}
+          value={typed}
+          size={Math.max(4, typed.length + 1)}
+          maxLength={maxLength}
+          autoComplete="off"
+          spellCheck={spellCheck}
+          aria-label={label}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
+          onChange={(e) => setTyped(clean ? clean(e.target.value) : e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === "Enter") {
+              e.preventDefault();
+              close(true, true);
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              e.stopPropagation();
+              close(false, true);
+            }
+          }}
+          onBlur={() => close(true, false)}
+        />
+      </span>
+    );
+  return (
+    <button
+      ref={edit.button}
+      type="button"
+      id={id}
+      className="agp-inplace"
+      aria-label={editLabel}
+      aria-describedby={describedBy}
+      onClick={() => {
+        edit.begin();
+        setTyped(value);
+      }}
+    >
+      {shown ?? value}
+      <span className="agp-inplace__pen">
+        <Icon name="edit" size={14} />
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The agent's role as a tag: the icon "Criar agente" gives that role (`roleIcon`) and its name ("Sem cargo" when
+ * empty), a pencil on hover. With `onChange`, a click turns it into a field of the same shape over the roles the app
+ * knows (a combobox): every one as it opens, the one it has highlighted and marked; typing filters them and offers
+ * what was typed as a role of its own. Arrows move, Enter picks the highlighted one (or what was typed), Esc puts it
+ * back, leaving keeps what was typed. Without `onChange`, a static chip.
+ */
+export function RoleTag({
+  id,
+  value,
+  onChange,
+  maxLength = 200,
+}: {
+  id?: string;
+  value: string;
+  onChange?: (role: string) => void;
+  maxLength?: number;
+}) {
+  const { t } = useTranslation();
+  const listId = useId();
+  const roles = useMemo(() => knownRoles(t), [t]);
+  const [typed, setTyped] = useState<string | null>(null);
+  /** What was typed since it opened: until then the list shows every role. */
+  const [query, setQuery] = useState<string | null>(null);
+  const [active, setActive] = useState(-1);
+  const list = useRef<HTMLDivElement>(null);
+  const edit = useInPlace(typed !== null);
+  const role = value.trim();
+  const text = role || t("agent.noRole");
+  const q = (query ?? "").trim();
+  const own = q && !roles.some((r) => fold(r.name) === fold(q)) ? q : "";
+  const options = [
+    ...roles.filter((r) => matchesWords(r.name, q)).map((r) => ({ ...r, own: false })),
+    ...(own ? [{ id: "own", name: own, icon: "agent" as const, own: true }] : []),
+  ];
+  const optionId = (i: number) => `${listId}-${i}`;
+  useEffect(() => {
+    const box = list.current;
+    // Only a list that scrolls (never in layout-less test DOMs).
+    if (active < 0 || !box || box.scrollHeight <= box.clientHeight) return;
+    box.querySelector(`[data-index="${active}"]`)?.scrollIntoView?.({ block: "nearest" });
+  }, [active]);
+
+  const close = (next: string | null, refocus: boolean) => {
+    if (!edit.end(refocus)) return;
+    if (next !== null && next !== role) onChange?.(next);
+    setTyped(null);
+    setQuery(null);
+    setActive(-1);
+  };
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const n = options.length;
+      if (n === 0) return;
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      // From nothing highlighted, down starts at the first and up at the last.
+      const from = active < 0 && step > 0 ? -1 : Math.max(active, 0);
+      setActive((from + step + n) % n);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      close(options[active]?.name ?? (typed ?? "").trim(), true);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      close(null, true);
+    }
+  };
+
+  if (!onChange)
+    return (
+      <span id={id} className="agp-roletag" data-empty={!role || undefined}>
+        <Icon name={iconIn(roles, role)} size={16} />
+        <span className="agp-roletag__text" title={role || undefined}>
+          {text}
+        </span>
+      </span>
+    );
+  if (typed === null)
+    return (
+      <button
+        ref={edit.button}
+        type="button"
+        id={id}
+        className="agp-roletag"
+        data-empty={!role || undefined}
+        aria-label={t("agent.editRole", { role: text })}
+        onClick={() => {
+          edit.begin();
+          setTyped(value);
+          setQuery(null);
+          setActive(roles.findIndex((r) => fold(r.name) === fold(role)));
+        }}
+      >
+        <Icon name={iconIn(roles, role)} size={16} />
+        <span className="agp-roletag__text" title={role || undefined}>
+          {text}
+        </span>
+        <span className="agp-roletag__pen">
+          <Icon name="edit" size={14} />
+        </span>
+      </button>
+    );
+  return (
+    <span className="agp-roleedit">
+      <span className="agp-roletag agp-roletag--edit">
+        <Icon name={iconIn(roles, typed)} size={16} />
+        <input
+          ref={edit.field}
+          id={id}
+          role="combobox"
+          aria-label={t("agent.roleLabel")}
+          aria-expanded="true"
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={active >= 0 ? optionId(active) : undefined}
+          value={typed}
+          maxLength={maxLength}
+          autoComplete="off"
+          placeholder={t("agent.rolePlaceholder")}
+          onChange={(e) => {
+            setTyped(e.target.value);
+            setQuery(e.target.value);
+            setActive(e.target.value.trim() ? 0 : -1);
+          }}
+          onKeyDown={onKey}
+          onBlur={() => close(typed.trim(), false)}
+        />
+      </span>
+      <div ref={list} id={listId} role="listbox" aria-label={t("agent.roleList")} className="ac-menu agp-roles">
+        {options.map((o, i) => (
+          // biome-ignore lint/a11y/useFocusableInteractive: options are reached through aria-activedescendant
+          // biome-ignore lint/a11y/useKeyWithClickEvents: the field handles the keys
+          <div
+            key={o.id}
+            id={optionId(i)}
+            role="option"
+            data-index={i}
+            aria-selected={i === active}
+            data-highlighted={i === active || undefined}
+            className="ac-menu__item"
+            // The focus stays in the field: leaving it would keep what was typed before the pick.
+            onMouseDown={(e) => e.preventDefault()}
+            onPointerMove={() => setActive(i)}
+            onClick={() => close(o.name, true)}
+          >
+            <span className="ac-menu__leading">
+              <Icon name={o.icon} size={16} />
+            </span>
+            <span className="ac-menu__label">
+              <span className="agp-roles__name">{o.own ? t("agent.roleUse", { role: o.name }) : o.name}</span>
+            </span>
+            {!o.own && fold(o.name) === fold(role) && <span className="agp-roles__hint">{t("agent.roleCurrent")}</span>}
+          </div>
+        ))}
+      </div>
+    </span>
   );
 }

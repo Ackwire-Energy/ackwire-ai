@@ -2896,6 +2896,18 @@ export const en = {
     nameLabel: "Name",
     roleLabel: "Role",
     roleHelp: "What it does for the team, e.g. Email and calendar assistant.",
+    /** The name, @ and role on the agent's settings: buttons that open their fields (what screen readers say). */
+    editName: "Edit name: {{name}}",
+    editHandle: "Edit mentions: @{{handle}}",
+    editRole: "Edit role: {{role}}",
+    noRole: "No role",
+    rolePlaceholder: "E.g. Support",
+    /** The list of roles under the role's field. */
+    roleList: "Roles",
+    /** In that list: what the person typed, as a role of its own. */
+    roleUse: "Use “{{role}}”",
+    /** In that list, beside the role the agent has now. */
+    roleCurrent: "current",
     edit: "Edit",
     chat: "Chat",
     moreActions: "More actions",
@@ -4008,16 +4020,18 @@ export const en = {
       member: "already in {{org}}",
       invited: "already invited",
     },
-    // The invite dialog, opened from Members, the workspace menu, ⌘K and a channel (ADR 0090).
+    // The invite dialog, opened from Members, the workspace menu, ⌘K and a channel (ADR 0090): a step at a time, the
+    // workspace's first agent asking each one in its bubble; the link on a screen of its own.
     dialog: {
       title: "Invite to {{org}}",
-      sub: "By email they join directly. Through the link, they ask and you approve.",
-      subLink: "Whoever opens the link asks to join, and you approve each person.",
+      /** Under the title: the step out of four, and its name. */
+      stepOf: "Step {{n}} of {{total}} · {{step}}",
+      steps: { who: "Who", role: "Role", where: "Where they start", note: "Note" },
       emails: "Emails",
       moreEmails: "More emails…",
-      help: "Each person gets an email and joins directly, in the role you pick. The invitation works for 7 days.",
       checkMarked: "Check the marked emails: they won't get an invitation.",
-      channelsAndNote: "Channels and note",
+      pasteHelp: "Paste a list if you like: commas, spaces or one per line.",
+      leftOut: "Whoever is already in or already invited stays out.",
       withNote: "with a note",
       alsoJoin: "They also join",
       generalAlways: "Everyone joins #{{channel}}",
@@ -4025,11 +4039,89 @@ export const en = {
       optional: "(optional)",
       notePlaceholder: "Hi. Come join {{org}}: the team and the agents are all here.",
       or: "or send the link",
+      /** The first step's button with more than one address (with one, "Continue"). */
+      continueWith: "Continue with {{count}}",
       send_one: "Invite {{count}} person",
       send_other: "Invite {{count}} people",
       sent: "Invitation sent to {{email}}.",
       sentMany: "{{count}} invitations sent.",
       alsoIn: "They also join {{channels}}.",
+      // What the host asks on each step. `name`: the address's first word, capitalized ("Julia" from julia.m@…), so
+      // nothing here may need to know the person's gender.
+      who: {
+        title: "Who do you want to bring in?",
+        lead: "Give me their emails. Each person gets an invitation and joins directly.",
+      },
+      orLink: {
+        title: "Rather send a link?",
+        text: "Whoever opens it asks to join, and you approve.",
+        open: "See the link",
+      },
+      role: {
+        titleOne: "What role does {{name}} join with?",
+        titleMany: "What role do these people join with?",
+        lead: "The role says what each person can do. You can change it later.",
+        each: "A role for each person",
+        same: "The same role for everyone",
+      },
+      where: {
+        titleOne: "Which channels does {{name}} join right away?",
+        titleMany: "Which channels do these people join right away?",
+        lead: "Everyone starts in #{{channel}}. You pick the others.",
+        label: "Channels",
+        everyone: "Everyone joins",
+        private: "Private · you're in it",
+        people_one: "{{count}} person",
+        people_other: "{{count}} people",
+        fromChannel: "#{{channel}} comes checked: you invited from there.",
+      },
+      noteStep: {
+        title: "Want me to say something in the invitation?",
+        lead: "It goes in the email. If not, I'll send it as it is.",
+      },
+      /** Over the email as it arrives: the first names it goes to. */
+      mailFor: "This is how it reaches {{names}}",
+      // The invitation email in the words the server sends it in (packages/engine/src/email/words): keep them alike.
+      mail: {
+        from: "agentes.chat · to {{to}}",
+        toMany: "{{email}} and {{count}} more",
+        subject: "You're invited to a workspace on agentes.chat",
+        headline: "You're invited to a workspace",
+        body: "<b>{{name}}</b> ({{email}}) invited you to join <b>{{org}}</b> as a member.",
+        noteFrom: "<b>{{name}}:</b> “{{note}}”",
+        what: "agentes.chat is where people and AI agents work together.",
+        button: "Accept invitation",
+        small: "The invitation works for 7 days. Accept it with this email address.",
+      },
+      // The host's answer once the invitations went: `channels` is where they start ("#general and #eng").
+      done: {
+        title: "Done, I sent the invitation to {{names}}.",
+        leadOne: "When {{name}} joins, I'll greet them in {{channels}} and let you know.",
+        leadMany: "When each person joins, I'll greet them in {{channels}} and let you know.",
+        none: "No invitation went out this time.",
+        noneLead: "Each address's reason is below.",
+      },
+      /** Each address after the send: sent, or why not (as `members.batch` says it). */
+      result: {
+        invited: "Sent",
+        already_member: "already in {{org}}",
+        already_invited: "already had an invitation",
+        invalid_email: "invalid email",
+      },
+      again: "Invite more people",
+      finish: "Done",
+      // The link's own screen (ADR 0068).
+      linkStep: {
+        title: "This is {{org}}'s link.",
+        lead: "Whoever opens it asks to join. I'll show you each request, and you approve.",
+        how1: "The person opens the link and says who they are.",
+        how2: "The request reaches whoever invites, here and on the phone.",
+        how3: "You approve and pick the role they join with.",
+        waiting_one: "One request waiting for you",
+        waiting_other: "{{count}} requests waiting for you",
+        seeRequests: "See requests",
+        byEmail: "Invite by email",
+      },
     },
     // Sent invitations: each one's link at any time, sent again with the same link, its role, cancel (ADR 0090).
     invitations: {
@@ -4290,7 +4382,6 @@ export const en = {
     },
   },
   issues: {
-    moreFilters: "Filter by assignee and priority",
     assigneeFilter: "Assignee",
     priorityFilter: "Priority",
     title: "Tasks",
@@ -4301,14 +4392,12 @@ export const en = {
     list: "List",
     new: "New task",
     filters: "Filter tasks",
-    filter: { all: "All", agents: "With agents", people: "With people", mine: "Mine", none: "Unassigned" },
     unassigned_one: "{{count}} unassigned",
     unassigned_other: "{{count}} unassigned",
     emptyTitle: "No tasks yet",
     panelLabel: "Task #{{number}}",
     openPage: "Open the task's page",
     close: "Close",
-    dropHere: "Drop here",
     moved: "#{{number}} in {{status}}.",
     movedTo: "Moved to {{column}}",
     newIn: "New task in {{column}}",
@@ -4319,6 +4408,46 @@ export const en = {
       "The task moves on its own, to the first column of each stage: In progress when an agent starts, In review when it's ready to check, Done when you approve.",
     moreOptions: "More options",
     showCanceled: "Show canceled",
+    filterButton: "Filter",
+    filterValue: "{{filter}}: {{value}}",
+    me: "Me",
+    display: {
+      title: "Display",
+      label: "Display: {{layout}} · {{group}}",
+      layout: "Layout",
+      group: "Group by",
+      sort: "Sort by",
+      fields: "On the cards",
+      saved: "Saved for you in this workspace",
+      reset: "Back to default",
+      by: { stage: "Stage", assignee: "Assignee", priority: "Priority" },
+      order: { manual: "Manual", priority: "Priority", due: "Due date" },
+      field: {
+        assignee: "Assignee",
+        priority: "Priority",
+        due: "Due date",
+        criteria: "Criteria",
+        pullRequest: "Pull request",
+        label: "Label",
+      },
+    },
+    drop: {
+      stage: "Drop in {{name}}",
+      assignee: "Drop to give it to {{name}}",
+      unassign: "Drop to unassign",
+      priority: "Drop for {{priority}} priority",
+    },
+    drag: {
+      role: "draggable task",
+      help: "Space picks the task up, the arrows move it, Space drops it and Esc cancels.",
+      picked: "You picked up #{{number}}. The arrows move it, Space drops it, Esc cancels.",
+      moved: "#{{number}}: {{group}}, position {{position}} of {{total}}.",
+      dropped: "You dropped #{{number}} in {{group}}.",
+      canceled: "#{{number}} went back to its place.",
+      assigned: "#{{number}} is now with {{name}}.",
+      unassigned: "#{{number}} has no assignee now.",
+      prioritized: "#{{number}} now has {{priority}} priority.",
+    },
     canceledColumn: "Canceled",
     columns: {
       add: "Add column",
@@ -4721,6 +4850,19 @@ export const en = {
         artifact: "Becomes a document in the Drive",
       },
       ahead: "Prepared for later",
+      /** Above the name on the routine's page: `date` is a short day ("28 out"). */
+      createdBy: "Created by {{name}} · {{date}}",
+      nameLabel: "Routine name",
+      editName: "Edit the name",
+      editWhat: "Edit what it does",
+      tabs: { label: "Parts of the routine", details: "Details", runs: "Runs" },
+      nexts: "Next runs",
+      who: "Who does it",
+      /** Under "No ar" / "Pausada" on the aside's switch. */
+      onAirLine: "Runs by itself when it's time",
+      offAirLine: "Doesn't run until you turn it on",
+      /** Under each "Quando posta" answer. */
+      reportHint: { always: "Even with nothing new", when_new: "Quiet when there's nothing new" },
       ownActions: "Does on its own",
     },
     /** The connected-app actions a routine's runs do without asking: the job its creator set it up for. */

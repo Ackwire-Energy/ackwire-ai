@@ -13,6 +13,7 @@ import {
   useCardProposals,
 } from "@agenteschat/client";
 import { agentProposalOf, proposalStatus } from "@agenteschat/client/lib/action-cards";
+import { entriesOffScreen } from "@agenteschat/client/lib/activity";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isOpen, messageProposalCards, proposalTarget, proposerOf } from "@agenteschat/client/lib/proposals";
@@ -60,8 +61,9 @@ import {
   secretRequestOf,
   timerDelay,
 } from "./ask-store";
-import { LineStop } from "./LiveRows";
+import { LineStop, useRowsInView } from "./LiveRows";
 import { approvalIdOf, lineStops, markedParts, markName, questionOf, workingEntries } from "./logic";
+import type { RowSight } from "./row-sight";
 
 /**
  * A request in the conversation (an approval, a secret, a question, help in the agent's browser or on its
@@ -611,7 +613,8 @@ export function AskDone({
 /**
  * The line above the composer while a request waits out of view (waiting beats working): the agent's face,
  * the breathing square, "Ada espera sua aprovação · Enviar e-mail", "+1" when more wait, and Ver, which
- * scrolls to it. While one agent works here, the working line's "Parar" stays at its end.
+ * scrolls to it. While one agent works here with its live row out of view, the working line's "Parar" stays at its
+ * end (a row on screen carries its own).
  */
 export function AskBar({
   away,
@@ -620,6 +623,7 @@ export function AskBar({
   consults,
   canStop,
   onStop,
+  sight,
 }: {
   away: AwayAsk;
   onSee: () => void;
@@ -628,6 +632,8 @@ export function AskBar({
   consults: LiveConsult[];
   canStop: (run: LiveRun) => boolean;
   onStop: (run: LiveRun) => void;
+  /** Which agents' live rows are on screen (theirs carry their stop). */
+  sight: RowSight;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -646,10 +652,17 @@ export function AskBar({
   }).replace(/<\/?b>/g, "");
   const parts = markedParts(sentence);
   const plain = parts.map((p) => p.text).join("");
+  const inView = useRowsInView(sight);
+  const rowInView = (r: LiveRun) => inView.has(r.runId);
   const stops = lineStops(
-    workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""),
+    entriesOffScreen(
+      workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""),
+      runs,
+      rowInView,
+    ),
     runs,
     canStop,
+    rowInView,
   );
   const see = () => {
     tapHaptic();

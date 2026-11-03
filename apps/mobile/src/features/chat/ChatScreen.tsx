@@ -133,7 +133,7 @@ import { FirstDay } from "./FirstDay";
 import { HeaderPill } from "./HeaderPill";
 import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
-import { browsingRuns, TurnRow, WorkingLine } from "./LiveRows";
+import { browsingRuns, LiveRowsProvider, TurnRow, useRowWatch, WorkingLine } from "./LiveRows";
 import { useChatLive } from "./live";
 import {
   buildRows,
@@ -144,6 +144,7 @@ import {
   parseSlash,
   pinTarget,
   readMark,
+  rowStopOf,
   stoppableInLine,
   workingEntries,
 } from "./logic";
@@ -155,6 +156,7 @@ import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinnedBar, PinsSheet } from "./PinsSheet";
+import { RowSight } from "./row-sight";
 import {
   appendedKeys,
   type HeldRun,
@@ -426,6 +428,11 @@ function Chat({
       },
     };
   }, [busyRuns, stoppable, stopRun, dir.agentById, t]);
+  // Which agents' live rows are on screen: the line above the composer speaks only for those out of view, and the
+  // row itself says its step, its time and its stop (the latest run here I may stop, as on the web).
+  const [sight] = useState(() => new RowSight());
+  const rowStop = useMemo(() => rowStopOf(runs, canStop)?.runId, [runs, canStop]);
+  const liveRows = useMemo(() => ({ sight, stopRunId: rowStop, onStop: stopRun }), [sight, rowStop, stopRun]);
   // An agent's DM header counts its tasks, here and elsewhere (ADR 0128); a tap opens them, pushed like a thread.
   const agentTasks = useDmAgentTasks(member && !isThread ? dmAgentId : null);
 
@@ -710,6 +717,26 @@ function Chat({
     [rows, letGo],
   );
   const seeAsk = useCallback(() => void holdAt(awayAsk?.ask.messageId), [awayAsk, holdAt]);
+  // "Ver" on the working line: back to the agent's live row (its browser card while it works there). The live rows
+  // close the conversation, so landing on one is landing at the end, which the list then follows again.
+  const seeRun = useCallback(
+    (run: LiveRun) => {
+      const at = rows.findIndex((r) => (r.kind === "run" || r.kind === "browser") && r.run?.runId === run.runId);
+      const key = rows[at]?.key;
+      if (!key) return;
+      if (rows.slice(at + 1).every((r) => r.kind === "run" || r.kind === "browser")) {
+        toEnd();
+        return;
+      }
+      letGo();
+      requestAnimationFrame(() => {
+        const index = listRef.current?.getState().indexByKey(key);
+        if (index === undefined) return;
+        void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5, viewPositionFallback: "end" });
+      });
+    },
+    [rows, toEnd, letGo],
+  );
 
   // Rows that arrive at the bottom while the screen is open rise in; older pages and the first load don't.
   const prevKeysRef = useRef<string[]>([]);
@@ -1642,6 +1669,12 @@ function Chat({
     return state !== undefined && index !== undefined && index >= state.startBuffered && index <= state.endBuffered;
   }, []);
   const watchAsks = useAskWatch(asks, { frame: () => listFrame.current, insets: askInsets, drawn: askDrawn });
+  // The agents' live rows in the same band: the line above the composer leaves out those that show.
+  const watchRows = useRowWatch(sight, { frame: () => listFrame.current, insets: askInsets });
+  const watchList = useCallback(() => {
+    watchAsks();
+    watchRows();
+  }, [watchAsks, watchRows]);
 
   // The list shows once it sits at the end (no frame of it placing itself), as Bluesky's and Expensify's do; from
   // a little opacity, not none, so the glass inside rows keeps drawing.
@@ -1650,8 +1683,8 @@ function Chat({
   const revealList = useCallback(() => {
     listShown.value = withTiming(1, { duration: 160 });
     listPlaced.current = true;
-    watchAsks();
-  }, [listShown, watchAsks]);
+    watchList();
+  }, [listShown, watchList]);
   useEffect(() => {
     if (!showList) return;
     const timer = setTimeout(revealList, SHOW_LIST_MS);
@@ -1712,13 +1745,13 @@ function Chat({
     if (!state) return;
     return state.listen("totalSize", checkReading);
   }, [showList, checkReading]);
-  // Rows growing or shrinking (a reply streaming, a card opening) move the waiting requests' cards too.
+  // Rows growing or shrinking (a reply streaming, a card opening) move the waiting requests' cards and the live rows.
   useEffect(() => {
     if (!showList) return;
     const state = listRef.current?.getState();
     if (!state) return;
-    return state.listen("totalSize", watchAsks);
-  }, [showList, watchAsks]);
+    return state.listen("totalSize", watchList);
+  }, [showList, watchList]);
   // The person scrolled down to the end of what they were reading: the list follows again.
   const releaseAtEnd = useCallback(() => {
     const state = listRef.current?.getState();
@@ -1760,62 +1793,65 @@ function Chat({
                   hears it open, and its first message landed under it. */}
               <Animated.View style={[styles.grow, listFade]}>
                 {/* The list's frame, where the waiting requests' cards are measured from (never flattened away). */}
-                <View ref={listFrame} collapsable={false} style={styles.grow} onLayout={watchAsks}>
+                <View ref={listFrame} collapsable={false} style={styles.grow} onLayout={watchList}>
                   <StickerStageContext.Provider value={stickers}>
                     <JumpToMessageContext.Provider value={jumpToMessage}>
-                      <KeyboardAwareLegendList
-                        ref={listRef}
-                        style={styles.grow}
-                        data={shownRows}
-                        keyExtractor={rowKey}
-                        getItemType={rowType}
-                        renderItem={renderItem}
-                        // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
-                        // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-                        extraData={renderItem}
-                        estimatedItemSize={72}
-                        // Opens at the latest message, short conversations sit at the bottom like any chat.
-                        initialScrollAtEnd
-                        alignItemsAtEnd
-                        // New messages, a reply growing word by word and the working line keep the end in view, but
-                        // only while the person is near it.
-                        maintainScrollAtEnd={!readHold}
-                        maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-                        // Older pages above and rows changing size keep what is on screen still.
-                        maintainVisibleContentPosition
-                        // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's
-                        // room is the content's top padding, the indicator kept below the bar.
-                        contentInsetAdjustmentBehavior="never"
-                        automaticallyAdjustContentInsets={false}
-                        scrollIndicatorInsets={{ top: headerHeight }}
-                        // Still while a sheet or the agent's computer covers the conversation.
-                        freeze={freeze}
-                        onReady={revealList}
-                        onStartReached={loadOlder}
-                        // A look at the waiting requests' cards, once a frame and only while one waits.
-                        onScroll={watchAsks}
-                        onViewableItemsChanged={onViewable}
-                        viewabilityConfig={STICKER_VIEW}
-                        onScrollBeginDrag={() => {
-                          dragging.current = true;
-                          showDay();
-                        }}
-                        onScrollEndDrag={() => {
-                          releaseAtEnd();
-                          hideDay();
-                        }}
-                        onMomentumScrollBegin={showDay}
-                        onMomentumScrollEnd={() => {
-                          releaseAtEnd();
-                          hideDay();
-                        }}
-                        onStartReachedThreshold={0.5}
-                        keyboardDismissMode="interactive"
-                        keyboardShouldPersistTaps="handled"
-                        keyboardOffset={lift}
-                        contentInsetEndAdjustment={contentInsetEndAdjustment}
-                        contentContainerStyle={listPad}
-                      />
+                      <LiveRowsProvider value={liveRows}>
+                        <KeyboardAwareLegendList
+                          ref={listRef}
+                          style={styles.grow}
+                          data={shownRows}
+                          keyExtractor={rowKey}
+                          getItemType={rowType}
+                          renderItem={renderItem}
+                          // The list redraws mounted rows only when this changes: what a row shows beyond its message
+                          // (the thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+                          extraData={renderItem}
+                          estimatedItemSize={72}
+                          // Opens at the latest message, short conversations sit at the bottom like any chat.
+                          initialScrollAtEnd
+                          alignItemsAtEnd
+                          // New messages, a reply growing word by word and the working line keep the end in view, but
+                          // only while the person is near it.
+                          maintainScrollAtEnd={!readHold}
+                          maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+                          // Older pages above and rows changing size keep what is on screen still.
+                          maintainVisibleContentPosition
+                          // Our own insets, never the system's (the keyboard library's advice for chat lists): the
+                          // bar's room is the content's top padding, the indicator kept below the bar.
+                          contentInsetAdjustmentBehavior="never"
+                          automaticallyAdjustContentInsets={false}
+                          scrollIndicatorInsets={{ top: headerHeight }}
+                          // Still while a sheet or the agent's computer covers the conversation.
+                          freeze={freeze}
+                          onReady={revealList}
+                          onStartReached={loadOlder}
+                          // A look at the waiting requests' cards and the live rows, once a frame and only while
+                          // there is one.
+                          onScroll={watchList}
+                          onViewableItemsChanged={onViewable}
+                          viewabilityConfig={STICKER_VIEW}
+                          onScrollBeginDrag={() => {
+                            dragging.current = true;
+                            showDay();
+                          }}
+                          onScrollEndDrag={() => {
+                            releaseAtEnd();
+                            hideDay();
+                          }}
+                          onMomentumScrollBegin={showDay}
+                          onMomentumScrollEnd={() => {
+                            releaseAtEnd();
+                            hideDay();
+                          }}
+                          onStartReachedThreshold={0.5}
+                          keyboardDismissMode="interactive"
+                          keyboardShouldPersistTaps="handled"
+                          keyboardOffset={lift}
+                          contentInsetEndAdjustment={contentInsetEndAdjustment}
+                          contentContainerStyle={listPad}
+                        />
+                      </LiveRowsProvider>
                     </JumpToMessageContext.Provider>
                   </StickerStageContext.Provider>
                   <DatePill day={topDay} shown={dayShown} top={hasPin ? 8 : headerHeight + 8} />
@@ -1892,6 +1928,7 @@ function Chat({
                   consults={lineConsults}
                   canStop={canStop}
                   onStop={stopRun}
+                  sight={sight}
                 />
               ) : null}
               {member && !awayAsk ? (
@@ -1906,6 +1943,8 @@ function Chat({
                     toggleBrowser(agentId, true);
                     toEnd();
                   }}
+                  sight={sight}
+                  onSee={seeRun}
                 />
               ) : null}
               {member ? (

@@ -460,7 +460,10 @@ describe("agent page: inline editing and the save bar", () => {
         .textContent,
     ).toBe("Instruções1");
     await openTab(/^Configurações/);
+    // The name edits in place: its button opens the field, Enter keeps what was typed.
+    await click(screen().getByRole("button", { name: /^Editar nome/ }));
     await type(screen().getByLabelText("Nome"), "Ada Lovelace");
+    await act(async () => fireEvent.keyDown(screen().getByLabelText("Nome"), { key: "Enter" }));
     const bar = saveBar() as HTMLElement;
     // A new name moves the @ too.
     expect(bar.textContent).toContain("3 alterações");
@@ -471,7 +474,7 @@ describe("agent page: inline editing and the save bar", () => {
     expect(list.textContent).toContain("Ada → Ada Lovelace");
     expect(list.textContent).toContain("@ada → @adalovelace");
     await click(within(list).getByRole("button", { name: "Desfazer: Nome" }));
-    expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("Ada");
+    expect(document.getElementById("agp-name")?.textContent).toBe("Ada");
     expect(saveBar()?.textContent).toContain("1 alteração");
     await click(within(saveBar() as HTMLElement).getByRole("button", { name: "Descartar" }));
     expect(saveBar()).toBeNull();

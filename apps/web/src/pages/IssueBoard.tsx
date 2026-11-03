@@ -1,4 +1,4 @@
-import type { Issue, IssueColumn, IssueStatus } from "@agenteschat/client";
+import type { Issue, IssueColumn, IssuePatch, IssueStatus } from "@agenteschat/client";
 import { keys, useIssueAction, useIssueColumnAction } from "@agenteschat/client";
 import {
   Button,
@@ -17,49 +17,31 @@ import {
   OptionList,
 } from "@agenteschat/ui";
 import { type Query, useQueryClient } from "@tanstack/react-query";
-import { type CSSProperties, type DragEvent, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
-import {
-  BOARD,
-  boardStages,
-  columnIdOf,
-  columnsOf,
-  groupByColumn,
-  isCustomBoard,
-  rankAt,
-  STATUS_ICON,
-  useColumnTitle,
-  useStageName,
-} from "@/lib/issues";
+import { BOARD, columnIdOf, columnsOf, isCustomBoard, STATUS_ICON, useColumnTitle, useStageName } from "@/lib/issues";
 import { useToast } from "@/lib/toast";
+import type { DragEntry, IssueDrag } from "./issue-drag";
 
 /** The issue lists in the cache (every search): a move shows in all of them at once. */
 const isList = (q: Query) => q.queryKey[3] === "list";
 
 /**
- * Moves an issue to a column at a rank, optimistically (the card lands at
- * once; the server's answer or an error puts the truth back). Says where it
- * went with "Desfazer" when the column changed.
+ * Changes an issue optimistically: `shown` lands on every list in the cache at once, `patch` goes to the server, and
+ * an error puts the lists back as they were (the server's answer refreshes them anyway).
  */
-export function useMoveIssue(columns: IssueColumn[]) {
-  const { t } = useTranslation();
+export function usePatchIssue() {
   const { org } = useOrg();
   const qc = useQueryClient();
-  const toast = useToast();
   const action = useIssueAction(org.id);
-  const title = useColumnTitle();
-  const stageName = useStageName();
-  const custom = isCustomBoard(columns);
-  const apply = (issue: Issue, column: IssueColumn, boardRank: number, onDone?: () => void) => {
+  return (issue: Issue, patch: IssuePatch, shown: Partial<Issue>, onDone?: () => void) => {
     const filters = { queryKey: keys.issues(org.id), predicate: isList };
     void qc.cancelQueries(filters);
     const before = qc.getQueriesData<Issue[]>(filters);
-    qc.setQueriesData<Issue[]>(filters, (list) =>
-      list?.map((i) => (i.id === issue.id ? { ...i, columnId: column.id, status: column.stage, boardRank } : i)),
-    );
+    qc.setQueriesData<Issue[]>(filters, (list) => list?.map((i) => (i.id === issue.id ? { ...i, ...shown } : i)));
     action.mutate(
-      { type: "update", id: issue.id, patch: { columnId: column.id, boardRank } },
+      { type: "update", id: issue.id, patch },
       {
         onError: () => {
           for (const [key, data] of before) qc.setQueryData(key, data);
@@ -68,6 +50,22 @@ export function useMoveIssue(columns: IssueColumn[]) {
       },
     );
   };
+}
+
+/**
+ * Moves an issue to a column at a rank, optimistically (the card lands at
+ * once; the server's answer or an error puts the truth back). Says where it
+ * went with "Desfazer" when the column changed.
+ */
+export function useMoveIssue(columns: IssueColumn[]) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const patch = usePatchIssue();
+  const title = useColumnTitle();
+  const stageName = useStageName();
+  const custom = isCustomBoard(columns);
+  const apply = (issue: Issue, column: IssueColumn, boardRank: number, onDone?: () => void) =>
+    patch(issue, { columnId: column.id, boardRank }, { columnId: column.id, status: column.stage, boardRank }, onDone);
   return (issue: Issue, column: IssueColumn, boardRank: number) => {
     const fromId = columnIdOf(issue, columns);
     const from = columns.find((c) => c.id === fromId);
@@ -91,153 +89,146 @@ export function useMoveIssue(columns: IssueColumn[]) {
   };
 }
 
-interface DragProps {
-  dragging: boolean;
-  onDragStart: (e: DragEvent) => void;
-  onDragEnd: () => void;
+/** A group of the board or the list: a column (grouped by stage), an assignee or a priority. */
+export interface IssueGroup {
+  id: string;
+  name: string;
+  /** Its cards, in the order they show. */
+  items: Issue[];
+  /** Before its name: the stage's icon, a face, the priority's mark. */
+  lead: ReactNode;
+  /** What it says while a card moves and it has none: what a drop there does. */
+  dropText: string;
+}
+
+/** How a card shows while one moves: under the pointer (hidden), flying home (landing), picked with Space. */
+export type CardState = Extract<DragEntry<Issue>, { kind: "card" }>["state"];
+
+/**
+ * The cards of one group as they show now: each card in its slot (hidden while it is under the pointer), the well
+ * where a moving card would land, or what an empty group says (only while a card moves: what a drop there does).
+ */
+function ColumnCards({
+  group: g,
+  dnd,
+  renderCard,
+}: {
+  group: IssueGroup;
+  dnd: IssueDrag<Issue>;
+  renderCard: (issue: Issue, group: string, state: CardState) => ReactNode;
+}) {
+  const { t } = useTranslation();
+  const entries = dnd.entries(g.id);
+  const shown = entries.some((e) => e.kind === "spot" || e.state !== "hidden");
+  return (
+    <div className="issues-col__cards" data-drop={g.id}>
+      {entries.map((e) =>
+        e.kind === "spot" ? (
+          <div key={e.key} className="issue-spot" data-spot style={e.style} aria-hidden="true" />
+        ) : (
+          <div
+            key={e.item.id}
+            className="issues-col__slot"
+            data-slot={e.item.id}
+            hidden={e.state === "hidden" || undefined}
+            data-landing={e.state === "landing" || undefined}
+          >
+            {renderCard(e.item, g.id, e.state)}
+          </div>
+        ),
+      )}
+      {!shown && dnd.active && (
+        <p className="issues-col__drop" aria-hidden="true">
+          {g.dropText}
+        </p>
+      )}
+      {!shown && !dnd.active && <p className="issues-col__empty">{t("issues.columnEmpty")}</p>}
+    </div>
+  );
 }
 
 /**
- * The board: the org's columns, each in a fixed stage.
- * Stage headers group the columns only when the board is customized; cards
- * drag between and inside columns with an insertion line.
+ * The board. Grouped by stage: the org's columns, each in a fixed stage, with stage headers only when the board is
+ * customized, each column's menu, and "Nova tarefa" under A fazer. Grouped by assignee or priority: one column each.
+ * Cards move between and inside columns (`useIssueDrag`).
  */
 export function Board({
-  issues,
+  groups,
+  stages,
   columns,
-  showCanceled,
+  dnd,
   renderCard,
   onNew,
 }: {
-  issues: Issue[];
+  groups: IssueGroup[];
+  /** Grouped by stage: the stages with their columns (each column one of `groups`); else null. */
+  stages: { stage: IssueStatus; columns: IssueColumn[] }[] | null;
   columns: IssueColumn[];
-  showCanceled: boolean;
-  renderCard: (issue: Issue, drag: DragProps) => ReactNode;
+  dnd: IssueDrag<Issue>;
+  renderCard: (issue: Issue, group: string, state: CardState) => ReactNode;
   onNew: (columnId: string) => void;
 }) {
   const { t } = useTranslation();
   const stageName = useStageName();
   const title = useColumnTitle();
-  const move = useMoveIssue(columns);
-  const [dragging, setDragging] = useState<number | null>(null);
-  const [over, setOver] = useState<{ col: string; index: number } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ afterId: string | null } | null>(null);
   const [deleting, setDeleting] = useState<IssueColumn | null>(null);
-  const grouped = isCustomBoard(columns);
-  const byColumn = groupByColumn(issues, columns);
-  const stages = boardStages(columns, showCanceled);
-
-  // Where the card would land: before the first card whose middle is below the pointer.
-  const indexAt = (e: DragEvent<HTMLElement>) => {
-    const cards = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-card]")].filter(
-      (el) => el.dataset.card !== String(dragging),
-    );
-    const k = cards.findIndex((el) => {
-      const r = el.getBoundingClientRect();
-      return e.clientY < r.top + r.height / 2;
-    });
-    return k < 0 ? cards.length : k;
-  };
-  const drop = (col: IssueColumn, index: number, number: number) => {
-    const issue = issues.find((i) => i.number === number);
-    if (!issue) return;
-    const list = byColumn.get(col.id) ?? [];
-    const others = list.filter((i) => i.id !== issue.id);
-    if (columnIdOf(issue, columns) === col.id && list.indexOf(issue) === index) return;
-    move(issue, col, rankAt(others, index));
-  };
+  const grouped = stages !== null && isCustomBoard(columns);
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus, foot?: ReactNode) => (
+    <section
+      key={g.id}
+      className={cx("issues-col", dnd.over === g.id && "is-over", stage === "canceled" && "is-canceled")}
+      aria-label={g.name}
+      data-col
+    >
+      {head}
+      <ColumnCards group={g} dnd={dnd} renderCard={renderCard} />
+      {foot}
+    </section>
+  );
 
   return (
     <>
       <div className="issues-boardwrap">
         <div className={cx("issues-board", grouped && "is-grouped")}>
-          {stages.map(({ stage, columns: cols }) => (
-            <section
-              key={stage}
-              className="issues-stage"
-              style={{ "--n": cols.length } as CSSProperties}
-              // A named region only when it groups columns (a plain board names each column).
-              aria-label={grouped ? stageName(stage) : undefined}
-            >
-              {grouped && (
-                <div className="issues-stage__head">
-                  <Icon name={STATUS_ICON[stage]} size={16} />
-                  <h2>{stageName(stage)}</h2>
-                  <span>{cols.reduce((n, c) => n + (byColumn.get(c.id)?.length ?? 0), 0)}</span>
-                </div>
-              )}
-              <div className="issues-stage__cols">
-                {cols.map((col, k) => {
-                  const items = byColumn.get(col.id) ?? [];
-                  const others = items.filter((i) => i.number !== dragging);
-                  const lineAt = over?.col === col.id ? over.index : null;
-                  const line = <div key="line" className="issues-col__line" aria-hidden="true" />;
-                  return (
-                    <section
-                      key={col.id}
-                      className={cx(
-                        "issues-col",
-                        over?.col === col.id && "is-over",
-                        col.stage === "canceled" && "is-canceled",
-                      )}
-                      aria-label={title(col)}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = "move";
-                        const index = indexAt(e);
-                        if (over?.col !== col.id || over.index !== index) setOver({ col: col.id, index });
-                      }}
-                      onDragLeave={(e) => {
-                        if (!e.currentTarget.contains(e.relatedTarget as Node | null))
-                          setOver((o) => (o?.col === col.id ? null : o));
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const index = indexAt(e);
-                        const n = dragging ?? Number(e.dataTransfer.getData("text/plain"));
-                        setOver(null);
-                        setDragging(null);
-                        if (n) drop(col, index, n);
-                      }}
-                    >
+          {stages ? (
+            stages.map(({ stage, columns: cols }) => (
+              <section
+                key={stage}
+                className="issues-stage"
+                style={{ "--n": cols.length } as CSSProperties}
+                // A named region only when it groups columns (a plain board names each column).
+                aria-label={grouped ? stageName(stage) : undefined}
+              >
+                {grouped && (
+                  <div className="issues-stage__head">
+                    <Icon name={STATUS_ICON[stage]} size={16} />
+                    <h2>{stageName(stage)}</h2>
+                    <span>{cols.reduce((n, c) => n + dnd.count(c.id), 0)}</span>
+                  </div>
+                )}
+                <div className="issues-stage__cols">
+                  {cols.map((col, k) => {
+                    const g = byId.get(col.id);
+                    if (!g) return null;
+                    return column(
+                      g,
                       <ColumnHead
                         column={col}
                         siblings={cols}
                         index={k}
-                        count={items.length}
+                        count={dnd.count(col.id)}
                         showIcon={!grouped}
                         renaming={renaming === col.id}
                         onRename={() => setRenaming(col.id)}
                         onRenamed={() => setRenaming(null)}
                         onAddAfter={() => setAdding({ afterId: col.id })}
                         onDelete={() => setDeleting(col)}
-                      />
-                      <div className="issues-col__cards">
-                        {items.map((i) => {
-                          const pos = others.indexOf(i);
-                          return [
-                            lineAt !== null && pos >= 0 && pos === lineAt ? line : null,
-                            <div key={i.id} className="issues-col__slot">
-                              {renderCard(i, {
-                                dragging: dragging === i.number,
-                                onDragStart: (e) => {
-                                  e.dataTransfer.setData("text/plain", String(i.number));
-                                  e.dataTransfer.effectAllowed = "move";
-                                  setDragging(i.number);
-                                },
-                                onDragEnd: () => {
-                                  setDragging(null);
-                                  setOver(null);
-                                },
-                              })}
-                            </div>,
-                          ];
-                        })}
-                        {lineAt !== null && lineAt >= others.length && line}
-                        {items.length === 0 && <p className="issues-col__empty">{t("issues.dropHere")}</p>}
-                      </div>
-                      {col.stage === "todo" && (
+                      />,
+                      stage,
+                      col.stage === "todo" && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -249,23 +240,47 @@ export function Board({
                         >
                           {t("issues.new")}
                         </Button>
-                      )}
-                    </section>
-                  );
-                })}
+                      ),
+                    );
+                  })}
+                </div>
+              </section>
+            ))
+          ) : (
+            <section className="issues-stage" style={{ "--n": groups.length } as CSSProperties}>
+              <div className="issues-stage__cols">
+                {groups.map((g) =>
+                  column(
+                    g,
+                    <div className="issues-col__head">
+                      {g.lead}
+                      <h2>{g.name}</h2>
+                      <span className="tabular" data-count={g.id}>
+                        {dnd.count(g.id)}
+                      </span>
+                    </div>,
+                  ),
+                )}
               </div>
             </section>
-          ))}
+          )}
         </div>
       </div>
-      <AddColumnDialog
-        open={adding !== null}
-        afterId={adding?.afterId ?? null}
-        columns={columns}
-        onClose={() => setAdding(null)}
-      />
-      {deleting && (
-        <DeleteColumnDialog column={deleting} columns={columns} issues={issues} onClose={() => setDeleting(null)} />
+      {stages && (
+        <AddColumnDialog
+          open={adding !== null}
+          afterId={adding?.afterId ?? null}
+          columns={columns}
+          onClose={() => setAdding(null)}
+        />
+      )}
+      {stages && deleting && (
+        <DeleteColumnDialog
+          column={deleting}
+          columns={columns}
+          issues={groups.flatMap((g) => g.items)}
+          onClose={() => setDeleting(null)}
+        />
       )}
     </>
   );
@@ -350,7 +365,9 @@ function ColumnHead({
       ) : (
         <>
           <h2>{name}</h2>
-          <span className="tabular">{count}</span>
+          <span className="tabular" data-count={col.id}>
+            {count}
+          </span>
           <span className="issues-col__grow" />
           {col.stage !== "canceled" && (
             <Menu

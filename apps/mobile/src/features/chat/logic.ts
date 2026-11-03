@@ -351,14 +351,39 @@ export const stoppableInLine = (runs: LiveRun[]) =>
 
 /**
  * What the line above the composer stops with its own "Parar" (the working line, or the requests' line while it
- * takes its place): the runs I may stop of the one agent at work here. With several, the line can't say whose (the
- * box's own stop stops them all).
+ * takes its place): the runs I may stop of the one agent at work here, whose live rows are out of view (a row on
+ * screen carries its own stop). With several, the line can't say whose (the box's own stop stops them all).
  */
-export function lineStops(entries: ActivityEntry[], runs: LiveRun[], canStop: (run: LiveRun) => boolean): LiveRun[] {
+export function lineStops(
+  entries: ActivityEntry[],
+  runs: LiveRun[],
+  canStop: (run: LiveRun) => boolean,
+  rowInView: (run: LiveRun) => boolean = () => false,
+): LiveRun[] {
   const agents = entries.filter((e) => e.type === "agent");
   const solo = agents.length === 1 ? agents[0] : undefined;
-  return solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
+  return solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r) && !rowInView(r)) : [];
 }
+
+/**
+ * The one agent the working line speaks for while its live row is out of view (`entriesOffScreen` left it in): its
+ * run, for the row's step, its time, "Ver" and its stop. None with several agents, or while its row is on screen
+ * (a question it asks keeps its phrase in the line; the row says the rest).
+ */
+export function awayRun(
+  entries: ActivityEntry[],
+  runs: LiveRun[],
+  rowInView: (run: LiveRun) => boolean,
+): LiveRun | undefined {
+  const agents = entries.filter((e) => e.type === "agent");
+  const solo = agents.length === 1 ? agents[0] : undefined;
+  const run = solo ? runs.find((r) => r.agentId === solo.id) : undefined;
+  return run && !rowInView(run) ? run : undefined;
+}
+
+/** The run whose live row offers its stop (the web's rule): the latest one here I may stop. */
+export const rowStopOf = (runs: LiveRun[], canStop: (run: LiveRun) => boolean): LiveRun | undefined =>
+  stoppableInLine(runs).findLast((r) => canStop(r));
 
 /**
  * Who may press "Parar" (the web's `useStopRun`): admins, the agent's owner,

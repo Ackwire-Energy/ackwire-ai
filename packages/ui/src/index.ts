@@ -421,7 +421,7 @@ export {
   zonedInstant,
 } from "./recurrence";
 export { fold, matchesWords } from "./search";
-export { pixelBurst } from "./sky/burst";
+export { pixelBurst, pixelConfetti } from "./sky/burst";
 export { ditherCells, ditherSvg, ditherTones, ditherUrl } from "./sky/dither";
 export {
   drawSprite,

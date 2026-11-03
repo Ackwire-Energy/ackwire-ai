@@ -3209,7 +3209,15 @@
     "budgetDefaultHelp": "Puste: domyślny dla przestrzeni roboczej.",
     "budgetDefaultHelpAmount": "Puste: domyślny dla przestrzeni roboczej ({{amount}}).",
     "budgetInvalid": "Podaj wartość większą od zera.",
-    "notFound": "Ten agent nie istnieje albo został zarchiwizowany."
+    "notFound": "Ten agent nie istnieje albo został zarchiwizowany.",
+    "editName": "Edytuj nazwę: {{name}}",
+    "editHandle": "Edytuj wzmianki: @{{handle}}",
+    "editRole": "Edytuj rolę: {{role}}",
+    "noRole": "Brak roli",
+    "rolePlaceholder": "Np. Wsparcie",
+    "roleList": "Role",
+    "roleUse": "Użyj „{{role}}”",
+    "roleCurrent": "obecna"
   },
   "agentPage": {
     "work": {
@@ -4415,13 +4423,9 @@
     },
     "dialog": {
       "title": "Zaproś do {{org}}",
-      "sub": "Przez e-mail osoby dołączają od razu. Przez link proszą o dołączenie, a ty zatwierdzasz.",
-      "subLink": "Każdy, kto otworzy link, prosi o dołączenie, a ty zatwierdzasz każdą osobę.",
       "emails": "Adresy e-mail",
       "moreEmails": "Więcej adresów…",
-      "help": "Każda osoba dostaje e-mail i dołącza od razu, z wybraną przez ciebie rolą. Zaproszenie działa przez 7 dni.",
       "checkMarked": "Sprawdź zaznaczone adresy: nie dostaną zaproszenia.",
-      "channelsAndNote": "Kanały i notatka",
       "withNote": "z notatką",
       "alsoJoin": "Dołączą też do",
       "generalAlways": "Wszyscy dołączają do #{{channel}}",
@@ -4435,7 +4439,90 @@
       "send_other": "Zaproś {{count}} osoby",
       "sent": "Wysłano zaproszenie do {{email}}.",
       "sentMany": "Wysłane zaproszenia: {{count}}.",
-      "alsoIn": "Dołączą też do: {{channels}}."
+      "alsoIn": "Dołączą też do: {{channels}}.",
+      "stepOf": "Krok {{n}} z {{total}} · {{step}}",
+      "steps": {
+        "who": "Kto",
+        "role": "Rola",
+        "where": "Na start",
+        "note": "Notatka"
+      },
+      "pasteHelp": "Możesz wkleić listę: przecinki, spacje albo jeden adres w wierszu.",
+      "leftOut": "Osoby, które już są albo mają zaproszenie, zostają pominięte.",
+      "continueWith": "Kontynuuj ({{count}})",
+      "who": {
+        "title": "Kogo chcesz zaprosić?",
+        "lead": "Podaj mi adresy e-mail. Każda osoba dostanie zaproszenie i dołączy od razu."
+      },
+      "orLink": {
+        "title": "Wolisz wysłać link?",
+        "text": "Osoba, która go otworzy, poprosi o dołączenie, a ty zatwierdzasz.",
+        "open": "Pokaż link"
+      },
+      "role": {
+        "titleOne": "Z jaką rolą dołącza {{name}}?",
+        "titleMany": "Z jaką rolą dołączają te osoby?",
+        "lead": "Rola mówi, co każda osoba może robić. Możesz ją później zmienić.",
+        "each": "Osobna rola dla każdej osoby",
+        "same": "Ta sama rola dla wszystkich"
+      },
+      "where": {
+        "titleOne": "Do jakich kanałów {{name}} dołącza od razu?",
+        "titleMany": "Do jakich kanałów te osoby dołączają od razu?",
+        "lead": "Wszyscy zaczynają w #{{channel}}. Pozostałe wybierasz ty.",
+        "label": "Kanały",
+        "everyone": "Dołączają wszyscy",
+        "private": "Prywatny · jesteś w nim",
+        "people_one": "{{count}} osoba",
+        "people_few": "{{count}} osoby",
+        "people_many": "{{count}} osób",
+        "people_other": "{{count}} osoby",
+        "fromChannel": "#{{channel}} jest już zaznaczony: zapraszasz z tego kanału."
+      },
+      "noteStep": {
+        "title": "Mam coś dopisać do zaproszenia?",
+        "lead": "Trafi do e-maila. Jeśli nie, wyślę je tak, jak jest."
+      },
+      "mailFor": "Tak to dotrze do: {{names}}",
+      "mail": {
+        "from": "agentes.chat · do {{to}}",
+        "toMany": "{{email}} i {{count}} więcej",
+        "subject": "Masz zaproszenie do przestrzeni roboczej w agentes.chat",
+        "headline": "Masz zaproszenie do przestrzeni roboczej",
+        "body": "<b>{{name}}</b> ({{email}}) zaprasza cię do przestrzeni roboczej <b>{{org}}</b> jako członek.",
+        "noteFrom": "<b>{{name}}:</b> „{{note}}”",
+        "what": "agentes.chat to miejsce, w którym osoby i agenci AI pracują razem.",
+        "button": "Przyjmij zaproszenie",
+        "small": "Zaproszenie jest ważne przez 7 dni. Przyjmij je z tego adresu e-mail."
+      },
+      "done": {
+        "title": "Gotowe, zaproszenie poszło do: {{names}}.",
+        "leadOne": "Kiedy {{name}} dołączy, przywitam tę osobę w {{channels}} i dam ci znać.",
+        "leadMany": "Kiedy ktoś dołączy, przywitam tę osobę w {{channels}} i dam ci znać.",
+        "none": "Tym razem nie wyszło żadne zaproszenie.",
+        "noneLead": "Powód przy każdym adresie jest niżej."
+      },
+      "result": {
+        "invited": "Wysłano",
+        "already_member": "już w {{org}}",
+        "already_invited": "zaproszenie już było",
+        "invalid_email": "nieprawidłowy e-mail"
+      },
+      "again": "Zaproś więcej osób",
+      "finish": "Zakończ",
+      "linkStep": {
+        "title": "To jest link do {{org}}.",
+        "lead": "Osoba, która go otworzy, prosi o dołączenie. Pokażę ci każdą prośbę, a ty zatwierdzasz.",
+        "how1": "Osoba otwiera link i mówi, kim jest.",
+        "how2": "Prośba trafia do osób, które zapraszają, tutaj i na telefon.",
+        "how3": "Zatwierdzasz i wybierasz rolę, z jaką osoba dołącza.",
+        "waiting_one": "Jedna prośba czeka na ciebie",
+        "waiting_few": "{{count}} prośby czekają na ciebie",
+        "waiting_many": "{{count}} próśb czeka na ciebie",
+        "waiting_other": "{{count}} prośby czeka na ciebie",
+        "seeRequests": "Pokaż prośby",
+        "byEmail": "Zaproś e-mailem"
+      }
     },
     "invitations": {
       "title": "Wysłane zaproszenia",
@@ -4737,7 +4824,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filtruj według osoby przypisanej i priorytetu",
     "assigneeFilter": "Przypisana osoba",
     "priorityFilter": "Priorytet",
     "title": "Zadania",
@@ -4748,13 +4834,6 @@
     "list": "Lista",
     "new": "Nowe zadanie",
     "filters": "Filtruj zadania",
-    "filter": {
-      "all": "Wszystkie",
-      "agents": "Z agentami",
-      "people": "Z ludźmi",
-      "mine": "Moje",
-      "none": "Nieprzypisane"
-    },
     "unassigned_one": "{{count}} nieprzypisane",
     "unassigned_few": "{{count}} nieprzypisane",
     "unassigned_many": "{{count}} nieprzypisanych",
@@ -4763,7 +4842,6 @@
     "panelLabel": "Zadanie #{{number}}",
     "openPage": "Otwórz stronę zadania",
     "close": "Zamknij",
-    "dropHere": "Upuść tutaj",
     "moved": "#{{number}} w: {{status}}.",
     "movedTo": "Przeniesiono do: {{column}}",
     "newIn": "Nowe zadanie w: {{column}}",
@@ -5021,6 +5099,54 @@
       "agent_asked": "poprosił(a) o wykonanie: {{name}}",
       "forum_opened": "przeniósł(osła) na forum: {{title}}",
       "forum_evaluated": "przyniósł(osła) wynik z forum: {{title}}"
+    },
+    "filterButton": "Filtr",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ja",
+    "display": {
+      "title": "Wyświetlanie",
+      "label": "Wyświetlanie: {{layout}} · {{group}}",
+      "layout": "Układ",
+      "group": "Grupuj według",
+      "sort": "Sortuj według",
+      "fields": "Na kartach",
+      "saved": "Zapisane dla ciebie w tej przestrzeni roboczej",
+      "reset": "Wróć do domyślnych",
+      "by": {
+        "stage": "Etap",
+        "assignee": "Przypisana osoba",
+        "priority": "Priorytet"
+      },
+      "order": {
+        "manual": "Ręcznie",
+        "priority": "Priorytet",
+        "due": "Termin"
+      },
+      "field": {
+        "assignee": "Przypisana osoba",
+        "priority": "Priorytet",
+        "due": "Termin",
+        "criteria": "Kryteria",
+        "pullRequest": "Pull request",
+        "label": "Etykieta"
+      }
+    },
+    "drop": {
+      "stage": "Upuść w: {{name}}",
+      "assignee": "Upuść, aby dać: {{name}}",
+      "unassign": "Upuść, aby usunąć przypisanie",
+      "priority": "Upuść, aby ustawić priorytet {{priority}}"
+    },
+    "drag": {
+      "role": "zadanie do przeciągania",
+      "help": "Spacja podnosi zadanie, strzałki je przesuwają, Spacja je upuszcza, a Esc anuluje.",
+      "picked": "Podnosisz #{{number}}. Strzałki przesuwają, Spacja upuszcza, Esc anuluje.",
+      "moved": "#{{number}}: {{group}}, pozycja {{position}} z {{total}}.",
+      "dropped": "Upuszczono #{{number}} w: {{group}}.",
+      "canceled": "#{{number}} wróciło na miejsce.",
+      "assigned": "#{{number}} jest teraz u: {{name}}.",
+      "unassigned": "#{{number}} nie ma teraz przypisanej osoby.",
+      "prioritized": "#{{number}} ma teraz priorytet {{priority}}."
     }
   },
   "routines": {
@@ -5210,7 +5336,24 @@
         "artifact": "Staje się dokumentem na Drive"
       },
       "ahead": "Przygotowane na później",
-      "ownActions": "Robi sama"
+      "ownActions": "Robi sama",
+      "createdBy": "Utworzona przez: {{name}} · {{date}}",
+      "nameLabel": "Nazwa rutyny",
+      "editName": "Edytuj nazwę",
+      "editWhat": "Edytuj, co robi",
+      "tabs": {
+        "label": "Części rutyny",
+        "details": "Szczegóły",
+        "runs": "Uruchomienia"
+      },
+      "nexts": "Następne",
+      "who": "Kto ją wykonuje",
+      "onAirLine": "Uruchamia się sama, gdy przyjdzie pora",
+      "offAirLine": "Nie uruchomi się, dopóki jej nie włączysz",
+      "reportHint": {
+        "always": "Nawet gdy nie ma nic nowego",
+        "when_new": "Cisza, gdy nie ma nic nowego"
+      }
     },
     "ownActions": {
       "hint": "Każde uruchomienie robi to w twoich połączonych aplikacjach bez pytania. Każda inna akcja w nich najpierw prosi osobę o zgodę, a merge, deploy i rollback zawsze o nią proszą.",

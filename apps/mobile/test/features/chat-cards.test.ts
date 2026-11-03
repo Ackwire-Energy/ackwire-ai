@@ -82,7 +82,9 @@ describe("agents it asked first: one pair row right before the reply, never insi
   test("live: a turn that posted nothing yet carries the row above its working row", () => {
     const live = source("LiveRows.tsx");
     expect(live).toContain("const consults = useRunConsults(run.runId, run, null);");
-    expect(ascending(at(live, ["{pair}\n        <View style={styles.msg}>", "<WaitLine work={run.work}"]))).toBe(true);
+    // The row the screen measures (never flattened away): the line above the composer speaks for it only out of view.
+    const row = "{pair}\n        <View ref={seen} collapsable={false} style={styles.msg}>";
+    expect(ascending(at(live, [row, "<WaitLine work={run.work}"]))).toBe(true);
   });
 
   test("the row says no answer: only faces, names, a short word and the time", () => {

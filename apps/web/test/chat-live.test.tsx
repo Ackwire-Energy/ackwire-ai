@@ -150,44 +150,47 @@ const bar = () => ({ textContent: typingBar().querySelector(".ac-typing__text")?
 const lastPerson = (state: ReturnType<typeof seedState>) => state.messages[state.messages.length - 1];
 
 describe("typing bar above the composer", () => {
-  test("mention → the bar says 'Atlas' (its face only until its row shows); its block, last in the timeline", async () => {
+  test("mention → the bar says 'Atlas pensando…' while its row is out of view; its block, last in the timeline", async () => {
     const { socket } = await open();
     await sendText("@atlas olha o deploy");
-    expect(bar().textContent).toBe("Atlas");
+    expect(bar().textContent).toBe("Atlas pensando…");
     // Agents at work: their faces open the pill, no pixel orbit beside them (the dots are for people typing).
     expect(typingBar().querySelector(".ac-pixspin")).toBeNull();
     expect(typingBar().querySelector(".ac-typing__dots")).toBeNull();
-    // Its row isn't in the conversation yet: the bar keeps its face meanwhile.
+    // Its row isn't in the conversation yet: the bar has its face.
     expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
     // The words are the bar's.
     expect(rowsWith("Atlas está")).toHaveLength(0);
     await settle(4);
     const run = { threadId: null, runId: "r-live", agentId: ATLAS_ID };
     await push(socket, { type: "agent.thinking", ...run });
-    expect(bar().textContent).toBe("Atlas");
+    expect(bar().textContent).toBe("Atlas pensando…");
     await push(socket, { type: "agent.typing", ...run });
     await push(socket, { type: "agent.delta", ...run, seq: 1, text: "Deploy ok" });
     await settle();
     const streaming = document.querySelector(".ac-msg--streaming") as HTMLElement;
     expect(streaming.textContent).toContain("Deploy ok");
-    // It's the last row of the timeline; the card above the box stays on while it works.
+    // It's the last row of the timeline; with no layout here the row counts as out of view, so the card above the box
+    // speaks for it (its face and what it does now).
     const rows = screen().getAllByRole("article");
     expect(rows[rows.length - 1]).toBe(streaming);
-    expect(bar().textContent).toBe("Atlas");
-    // One agent on its own with its row in the conversation: its face is there, not in the bar again.
-    expect(typingBar().querySelector(".ac-avatar--agent")).toBeNull();
+    expect(bar().textContent).toBe("Atlas escrevendo…");
+    expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
     await push(socket, { type: "agent.idle", ...run });
     await settle();
     expect(document.querySelector(".ac-msg--streaming")).toBeNull();
   });
 
-  test("groups agents and people: 'Atlas está trabalhando · João está digitando…'; our typing frames are throttled", async () => {
+  test("an agent out of view and people: 'Atlas pensando… · João digitando…'; our typing frames are throttled", async () => {
     const { socket } = await open();
     await sendText("@atlas tudo certo?");
     await settle(2);
     await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
     await settle();
-    expect(bar().textContent).toBe("Atlas está trabalhando · João está digitando…");
+    expect(bar().textContent).toBe("Atlas pensando…");
+    // Who is typing comes after the agent's own words and time; the pill widens for both.
+    expect(typingBar().querySelector(".ac-typing__also")?.textContent).toBe("João digitando…");
+    expect(typingBar().dataset.wide).toBe("true");
     await push(socket, {
       type: "agent.delta",
       threadId: null,
@@ -198,7 +201,8 @@ describe("typing bar above the composer", () => {
     });
     await settle();
     // Atlas writes now; it stays on the card while it works.
-    expect(bar().textContent).toBe("Atlas está escrevendo · João está digitando…");
+    expect(bar().textContent).toBe("Atlas escrevendo…");
+    expect(typingBar().querySelector(".ac-typing__also")?.textContent).toBe("João digitando…");
     for (const v of ["o", "oi", "oi ", "oi j"])
       await act(async () => fireEvent.change(composer(), { target: { value: v } }));
     // One frame per new message (the first one's, then this one's first keystroke), its next keystrokes throttled.
@@ -304,9 +308,11 @@ describe("typing bar above the composer", () => {
     await push(socket, { type: "agent.idle", threadId: null, runId: "r-b", agentId: ATLAS_ID });
     await push(socket, { type: "run.finished", threadId: null, runId: "r-b", agentId: ATLAS_ID, status: "done" });
     await settle();
-    expect(bar().textContent).toBe("Ada está consultando o GitHub · João está digitando…");
+    expect(bar().textContent).toStartWith("Ada consultando o GitHub");
     const took = typingBar().querySelector(".ac-typing__elapsed") as HTMLElement;
     expect(took.textContent).toMatch(/^1\d s$/);
+    // Who is typing after its time; the time and the stop stay the agent's.
+    expect(took.nextElementSibling?.textContent).toBe("João digitando…");
     // Tabular figures: the seconds tick without nudging what is beside them.
     expect(took.classList.contains("ac-num")).toBe(true);
   });
@@ -919,7 +925,7 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     await sendText("oi @ada");
     await settle(4);
     const first = lastPerson(state);
-    expect(bar().textContent).toBe("Ada");
+    expect(bar().textContent).toBe("Ada pensando…");
     const run = { threadId: first?.id, runId: "r-1st", agentId: ADA_ID };
     await pushG({ type: "agent.delta", ...run, seq: 1, text: "Oi!" });
     await pushG({
@@ -1085,7 +1091,7 @@ describe("direct messages with an agent", () => {
         .map((l) => l.getAttribute("href"));
     expect(dmLinks()).not.toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     await sendText("lembra que deploy é só de segunda a quinta");
-    expect(bar().textContent).toBe("Ada");
+    expect(bar().textContent).toBe("Ada pensando…");
     // With its first message, it is.
     await settle(4);
     expect(dmLinks()).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);

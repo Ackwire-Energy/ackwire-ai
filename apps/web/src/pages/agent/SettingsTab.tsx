@@ -6,7 +6,6 @@ import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import { addsAgentsTo } from "@agenteschat/client/lib/permissions";
 import {
-  AffixInput,
   type AgentAppearance,
   agentGradient,
   Button,
@@ -17,7 +16,6 @@ import {
   Field,
   Icon,
   type IconName,
-  Input,
   Meter,
   randomAppearance,
   Select,
@@ -30,7 +28,16 @@ import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerPanel } from "@/components/AgentComputer";
-import { BudgetField, LookRows, NO_OWNER, OwnerSelect, OwnerValue, usd } from "@/components/AgentFields";
+import {
+  BudgetField,
+  InPlaceText,
+  LookRows,
+  NO_OWNER,
+  OwnerSelect,
+  OwnerValue,
+  RoleTag,
+  usd,
+} from "@/components/AgentFields";
 import { AgentSecretsList } from "@/components/AgentSecrets";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -98,6 +105,86 @@ function Section({
 
 /** A read-only value where an input would be (members, or what the owner can't change). */
 const ReadValue = ({ children }: { children: ReactNode }) => <span className="agp-ro">{children}</span>;
+
+/**
+ * The agent's identity as a card: its name big, then "@handle · role". Each piece edits where it is (into the draft,
+ * which the page's save bar saves) and reads as a plain value for who can't change it.
+ */
+function IdentityCard() {
+  const { t } = useTranslation();
+  const { agent, draft, set, can, errors, changeOf } = useAgentEdit();
+  const changed = (["name", "handle", "role"] as const).some((k) => changeOf(k)?.was);
+  return (
+    <>
+      <div className="agp-id__name">
+        {can("name") ? (
+          <InPlaceText
+            id="agp-name"
+            value={draft.name}
+            label={t("agent.nameLabel")}
+            editLabel={t("agent.editName", { name: draft.name })}
+            maxLength={80}
+            invalid={!!errors.name}
+            describedBy={errors.name ? "agp-name-error" : undefined}
+            onCommit={(v) => set("name", v)}
+          />
+        ) : (
+          draft.name
+        )}
+      </div>
+      <div className="agp-id__line">
+        <span className="agp-id__handle">
+          {can("handle") ? (
+            <InPlaceText
+              id="agp-handle"
+              value={draft.handle}
+              shown={`@${draft.handle}`}
+              prefix="@"
+              label={t("agent.handleLabel")}
+              editLabel={t("agent.editHandle", { handle: draft.handle })}
+              maxLength={32}
+              clean={cleanHandle}
+              spellCheck={false}
+              invalid={!!errors.handle}
+              describedBy={errors.handle ? "agp-handle-error" : undefined}
+              onCommit={(v) => set("handle", v)}
+            />
+          ) : (
+            `@${draft.handle}`
+          )}
+        </span>
+        <span className="agp-id__dot" aria-hidden="true">
+          ·
+        </span>
+        <RoleTag id="agp-role" value={draft.role} onChange={can("role") ? (v) => set("role", v) : undefined} />
+      </div>
+      {errors.name && (
+        <span className="newag__err" id="agp-name-error" role="alert">
+          <Icon name="info" size={14} />
+          {errors.name}
+        </span>
+      )}
+      {errors.handle && (
+        <span className="newag__err" id="agp-handle-error" role="alert">
+          <Icon name="info" size={14} />
+          {errors.handle}
+        </span>
+      )}
+      {changed && (
+        <div className="agp-id__was">
+          <WasLine changeKey="name" />
+          <WasLine changeKey="handle" />
+          <WasLine changeKey="role" />
+        </div>
+      )}
+      <span className="small muted">
+        {draft.handle !== agent.handle && !errors.handle
+          ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
+          : t("agent.identityHelp")}
+      </span>
+    </>
+  );
+}
 
 /** Configurações: identity and look, who thinks (and the API's model and key), budget, owner, audience, channels, computer. */
 export function SettingsTab({
@@ -208,62 +295,7 @@ export function SettingsTab({
                 <AgentAvatar size="lg" framed={false} name={draft.name || agent.name} appearance={look} />
               </span>
               <div className="agp-id__fields">
-                {can("name") ? (
-                  <>
-                    <div className="newag__grid2">
-                      <Field label={t("agent.nameLabel")} id="agp-name" error={errors.name}>
-                        <Input
-                          value={draft.name}
-                          maxLength={80}
-                          autoComplete="off"
-                          onChange={(e) => set("name", e.target.value)}
-                        />
-                      </Field>
-                      <Field label={t("agent.roleLabel")} id="agp-role">
-                        <Input
-                          value={draft.role}
-                          maxLength={200}
-                          autoComplete="off"
-                          onChange={(e) => set("role", e.target.value)}
-                        />
-                      </Field>
-                      <WasLine changeKey="name" />
-                      <WasLine changeKey="role" />
-                    </div>
-                    <div className="newag__grid2">
-                      <Field label={t("agent.handleLabel")} id="agp-handle" error={errors.handle}>
-                        <AffixInput
-                          prefix="@"
-                          value={draft.handle}
-                          maxLength={32}
-                          autoComplete="off"
-                          spellCheck={false}
-                          onChange={(e) => set("handle", cleanHandle(e.target.value))}
-                        />
-                      </Field>
-                    </div>
-                  </>
-                ) : (
-                  <div className="newag__grid2">
-                    <div className="agp-field">
-                      <span className="newag__label">{t("agent.nameLabel")}</span>
-                      <ReadValue>{agent.name}</ReadValue>
-                    </div>
-                    <div className="agp-field">
-                      <span className="newag__label">{t("agent.roleLabel")}</span>
-                      <ReadValue>{agent.role || t("agentPage.none")}</ReadValue>
-                    </div>
-                    <div className="agp-field">
-                      <span className="newag__label">{t("agent.handleLabel")}</span>
-                      <ReadValue>@{agent.handle}</ReadValue>
-                    </div>
-                  </div>
-                )}
-                <span className="small muted">
-                  {draft.handle !== agent.handle && !errors.handle
-                    ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
-                    : t("agent.identityHelp")}
-                </span>
+                <IdentityCard />
                 {/* Only once the workspace has groups (ADR 0083); they are made in the sidebar. */}
                 {groups.length > 0 && can("group") ? (
                   <div className="agp-field">

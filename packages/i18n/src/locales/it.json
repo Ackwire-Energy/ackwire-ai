@@ -3125,7 +3125,15 @@
     "budgetDefaultHelp": "Vuoto: il predefinito dello spazio di lavoro.",
     "budgetDefaultHelpAmount": "Vuoto: il predefinito dello spazio di lavoro ({{amount}}).",
     "budgetInvalid": "Usa un valore maggiore di zero.",
-    "notFound": "Questo agente non esiste o è stato archiviato."
+    "notFound": "Questo agente non esiste o è stato archiviato.",
+    "editName": "Modifica nome: {{name}}",
+    "editHandle": "Modifica menzioni: @{{handle}}",
+    "editRole": "Modifica ruolo: {{role}}",
+    "noRole": "Nessun ruolo",
+    "rolePlaceholder": "Es.: Supporto",
+    "roleList": "Ruoli",
+    "roleUse": "Usa “{{role}}”",
+    "roleCurrent": "attuale"
   },
   "agentPage": {
     "work": {
@@ -4306,13 +4314,9 @@
     },
     "dialog": {
       "title": "Invita in {{org}}",
-      "sub": "Via email entrano subito. Con il link, lo chiedono e tu approvi.",
-      "subLink": "Chi apre il link chiede di entrare e tu approvi ogni persona.",
       "emails": "Email",
       "moreEmails": "Altre email…",
-      "help": "Ogni persona riceve un'email ed entra subito, con il ruolo che scegli. L'invito vale 7 giorni.",
       "checkMarked": "Controlla le email segnate: non riceveranno l'invito.",
-      "channelsAndNote": "Canali e nota",
       "withNote": "con una nota",
       "alsoJoin": "Entrano anche in",
       "generalAlways": "Tutti entrano in #{{channel}}",
@@ -4325,7 +4329,88 @@
       "send_other": "Invita {{count}} persone",
       "sent": "Invito inviato a {{email}}.",
       "sentMany": "{{count}} inviti inviati.",
-      "alsoIn": "Entrano anche in {{channels}}."
+      "alsoIn": "Entrano anche in {{channels}}.",
+      "stepOf": "Passo {{n}} di {{total}} · {{step}}",
+      "steps": {
+        "who": "Chi",
+        "role": "Ruolo",
+        "where": "Da dove si parte",
+        "note": "Nota"
+      },
+      "pasteHelp": "Incolla una lista, se vuoi: virgole, spazi o una per riga.",
+      "leftOut": "Chi è già dentro o ha già un invito resta fuori.",
+      "continueWith": "Continua con {{count}}",
+      "who": {
+        "title": "Chi vuoi portare qui?",
+        "lead": "Dammi le email. Ogni persona riceve un invito ed entra subito."
+      },
+      "orLink": {
+        "title": "Preferisci mandare un link?",
+        "text": "Chi lo apre chiede di entrare, e tu approvi.",
+        "open": "Vedi il link"
+      },
+      "role": {
+        "titleOne": "Con quale ruolo entra {{name}}?",
+        "titleMany": "Con quale ruolo entrano queste persone?",
+        "lead": "Il ruolo dice cosa può fare ogni persona. Puoi cambiarlo dopo.",
+        "each": "Un ruolo per ogni persona",
+        "same": "Lo stesso ruolo per tutte le persone"
+      },
+      "where": {
+        "titleOne": "In quali canali entra subito {{name}}?",
+        "titleMany": "In quali canali entrano subito queste persone?",
+        "lead": "Si comincia sempre da #{{channel}}. Gli altri li scegli tu.",
+        "label": "Canali",
+        "everyone": "Ci entra ogni persona",
+        "private": "Privato · ci sei dentro",
+        "people_one": "{{count}} persona",
+        "people_many": "{{count}} persone",
+        "people_other": "{{count}} persone",
+        "fromChannel": "#{{channel}} è già selezionato: hai invitato da lì."
+      },
+      "noteStep": {
+        "title": "Vuoi che scriva qualcosa nell'invito?",
+        "lead": "Va nell'email. Se no, lo mando così."
+      },
+      "mailFor": "Ecco come arriva a {{names}}",
+      "mail": {
+        "from": "agentes.chat · a {{to}}",
+        "toMany": "{{email}} e {{count}} in più",
+        "subject": "Hai un invito per uno spazio di lavoro su agentes.chat",
+        "headline": "Hai un invito per uno spazio di lavoro",
+        "body": "<b>{{name}}</b> ({{email}}) ti ha invitato a entrare in <b>{{org}}</b> come membro.",
+        "noteFrom": "<b>{{name}}:</b> “{{note}}”",
+        "what": "agentes.chat è il posto dove persone e agenti IA lavorano insieme.",
+        "button": "Accetta l’invito",
+        "small": "L’invito vale per 7 giorni. Accettalo con questo indirizzo email."
+      },
+      "done": {
+        "title": "Fatto, ho mandato l'invito a {{names}}.",
+        "leadOne": "Quando {{name}} entra, gli do il benvenuto in {{channels}} e ti avviso.",
+        "leadMany": "Quando ogni persona entra, le do il benvenuto in {{channels}} e ti avviso.",
+        "none": "Questa volta non è partito nessun invito.",
+        "noneLead": "Qui sotto c'è il motivo per ogni indirizzo."
+      },
+      "result": {
+        "invited": "Inviato",
+        "already_member": "già in {{org}}",
+        "already_invited": "aveva già un invito",
+        "invalid_email": "email non valida"
+      },
+      "again": "Invita altre persone",
+      "finish": "Concludi",
+      "linkStep": {
+        "title": "Questo è il link di {{org}}.",
+        "lead": "Chi lo apre chiede di entrare. Ti mostro ogni richiesta, e tu approvi.",
+        "how1": "La persona apre il link e dice chi è.",
+        "how2": "La richiesta arriva a chi invita, qui e sul telefono.",
+        "how3": "Tu approvi e scegli con quale ruolo entra la persona.",
+        "waiting_one": "Una richiesta ti aspetta",
+        "waiting_many": "{{count}} richieste ti aspettano",
+        "waiting_other": "{{count}} richieste ti aspettano",
+        "seeRequests": "Vedi le richieste",
+        "byEmail": "Invita via email"
+      }
     },
     "invitations": {
       "title": "Inviti inviati",
@@ -4624,7 +4709,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filtra per assegnatario e priorità",
     "assigneeFilter": "Assegnatario",
     "priorityFilter": "Priorità",
     "title": "Attività",
@@ -4635,13 +4719,6 @@
     "list": "Elenco",
     "new": "Nuova attività",
     "filters": "Filtra attività",
-    "filter": {
-      "all": "Tutte",
-      "agents": "Con agenti",
-      "people": "Con persone",
-      "mine": "Mie",
-      "none": "Non assegnate"
-    },
     "unassigned_one": "{{count}} non assegnata",
     "unassigned_many": "{{count}} non assegnate",
     "unassigned_other": "{{count}} non assegnate",
@@ -4649,7 +4726,6 @@
     "panelLabel": "Attività #{{number}}",
     "openPage": "Apri la pagina dell'attività",
     "close": "Chiudi",
-    "dropHere": "Rilascia qui",
     "moved": "#{{number}} in {{status}}.",
     "movedTo": "Spostata in {{column}}",
     "newIn": "Nuova attività in {{column}}",
@@ -4911,6 +4987,54 @@
       "agent_asked": "ha chiesto a {{name}} di farla",
       "forum_opened": "l'ha portata nel forum: {{title}}",
       "forum_evaluated": "ha riportato il risultato del forum: {{title}}"
+    },
+    "filterButton": "Filtro",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Io",
+    "display": {
+      "title": "Visualizzazione",
+      "label": "Visualizzazione: {{layout}} · {{group}}",
+      "layout": "Disposizione",
+      "group": "Raggruppa per",
+      "sort": "Ordina per",
+      "fields": "Sulle schede",
+      "saved": "Salvato per te in questo spazio di lavoro",
+      "reset": "Torna all'impostazione predefinita",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Assegnatario",
+        "priority": "Priorità"
+      },
+      "order": {
+        "manual": "Manuale",
+        "priority": "Priorità",
+        "due": "Scadenza"
+      },
+      "field": {
+        "assignee": "Assegnatario",
+        "priority": "Priorità",
+        "due": "Scadenza",
+        "criteria": "Criteri",
+        "pullRequest": "Pull request",
+        "label": "Etichetta"
+      }
+    },
+    "drop": {
+      "stage": "Rilascia in {{name}}",
+      "assignee": "Rilascia per assegnarla a {{name}}",
+      "unassign": "Rilascia per togliere l'assegnatario",
+      "priority": "Rilascia per priorità {{priority}}"
+    },
+    "drag": {
+      "role": "attività trascinabile",
+      "help": "Spazio prende l'attività, le frecce la spostano, Spazio la rilascia ed Esc annulla.",
+      "picked": "Hai preso la #{{number}}. Le frecce la spostano, Spazio la rilascia, Esc annulla.",
+      "moved": "#{{number}}: {{group}}, posizione {{position}} di {{total}}.",
+      "dropped": "Hai rilasciato la #{{number}} in {{group}}.",
+      "canceled": "La #{{number}} è tornata al suo posto.",
+      "assigned": "La #{{number}} ora è di {{name}}.",
+      "unassigned": "La #{{number}} ora non ha un assegnatario.",
+      "prioritized": "La #{{number}} ora ha priorità {{priority}}."
     }
   },
   "routines": {
@@ -5098,7 +5222,24 @@
         "artifact": "Diventa un documento nel Drive"
       },
       "ahead": "Preparate per dopo",
-      "ownActions": "Fa da sola"
+      "ownActions": "Fa da sola",
+      "createdBy": "Creata da {{name}} · {{date}}",
+      "nameLabel": "Nome della routine",
+      "editName": "Modifica il nome",
+      "editWhat": "Modifica cosa fa",
+      "tabs": {
+        "label": "Sezioni della routine",
+        "details": "Dettagli",
+        "runs": "Esecuzioni"
+      },
+      "nexts": "Prossime",
+      "who": "Chi la svolge",
+      "onAirLine": "Viene eseguita da sola quando è il momento",
+      "offAirLine": "Non viene eseguita finché non la attivi",
+      "reportHint": {
+        "always": "Anche senza novità",
+        "when_new": "In silenzio quando non c'è nulla di nuovo"
+      }
     },
     "ownActions": {
       "hint": "Ogni esecuzione fa queste azioni nelle tue app collegate senza chiedere. Qualsiasi altra azione lì chiede prima l’approvazione di una persona, e merge, deploy e rollback la chiedono sempre.",

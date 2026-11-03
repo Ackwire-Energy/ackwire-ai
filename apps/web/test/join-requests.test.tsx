@@ -877,22 +877,42 @@ describe("Members › Convidar pessoas", () => {
     expect((await note("everyone")).line).toBeFalsy();
   });
 
-  test("a server that sends no email: the link alone, nothing to type; one that does: the addresses, then the link", async () => {
+  test("a server that sends no email: the link's screen alone, with who waits; one that does: the addresses first, the link a step aside", async () => {
     const link = {
       id: "link-1",
       url: "http://localhost:3000/invite/k3J",
       expiresAt: new Date(Date.now() + 20 * 86_400_000).toISOString(),
       createdAt: new Date().toISOString(),
       createdBy: "Walter",
-      waiting: 0,
+      waiting: 2,
     };
-    await members("", { joinRequests: [], inviteLinks: [link], authConfig: { passwordReset: false } });
+    const { router } = await members("", { inviteLinks: [link], authConfig: { passwordReset: false } });
     let invite = await openInvite();
-    expect(invite.textContent).toContain("Quem abrir o link pede para entrar, e você aprova cada pessoa.");
+    // The host shows the link; no steps, nothing to type, nothing to send, no way back to the addresses.
+    expect(invite.querySelector(".auth__title")?.textContent).toBe("Este é o link da Acme.");
+    expect(invite.textContent).toContain("Quem abrir pede para entrar. Eu te mostro cada pedido, e você aprova.");
+    expect(invite.querySelector(".ac-dialog__sub")).toBeNull();
+    expect(invite.querySelector(".ac-steps")).toBeNull();
     expect(within(invite).queryByLabelText("E-mails")).toBeNull();
     expect(within(invite).queryByRole("button", { name: /^Convidar/ })).toBeNull();
-    expect(invite.querySelector(".invite-or")).toBeNull();
     expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(link.url);
+    // How it works, a step a line.
+    expect([...invite.querySelectorAll(".invite-how li")].map((li) => li.textContent)).toEqual([
+      "1A pessoa abre o link e diz quem é.",
+      "2O pedido chega para quem convida, aqui e no celular.",
+      "3Você aprova e escolhe com que papel a pessoa entra.",
+    ]);
+    // Who waits, and the way to answer them in Members.
+    await settle(2);
+    const waiting = invite.querySelector(".invite-waiting") as HTMLElement;
+    expect(waiting.textContent).toContain("2 pedidos esperando você");
+    expect(waiting.textContent).toContain("Ana Souza e Bruno Lima");
+    const see = within(waiting).getByRole("link", { name: "Ver pedidos" });
+    expect(see.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/members`);
+    await click(see);
+    await settle(4);
+    expect(screen().queryByRole("dialog", { name: "Convidar para a Acme" })).toBeNull();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
     cleanup();
 
     await members("", {
@@ -902,12 +922,21 @@ describe("Members › Convidar pessoas", () => {
       authConfig: { passwordReset: true },
     });
     invite = await openInvite();
-    expect(invite.textContent).toContain("Por e-mail a pessoa entra direto. Pelo link, ela pede e você aprova.");
+    expect(invite.querySelector(".ac-dialog__sub")?.textContent).toBe("Passo 1 de 4 · Quem");
     expect(within(invite).getByLabelText("E-mails")).toBeTruthy();
-    // Nothing to send yet.
-    expect(within(invite).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
-    expect(invite.querySelector(".invite-or")?.textContent).toBe("ou mande o link");
+    // Nothing to invite yet.
+    expect(within(invite).getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
+    expect(within(invite).queryByLabelText("Link de convite")).toBeNull();
+    expect(invite.querySelector(".invite-orlink")?.textContent).toContain("Prefere mandar um link?");
+    await click(within(invite).getByRole("button", { name: "Ver o link" }));
+    await settle(2);
+    expect(invite.querySelector(".auth__title")?.textContent).toBe("Este é o link da Acme.");
     expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(link.url);
+    // Nobody waits: no row for it.
+    expect(invite.querySelector(".invite-waiting")).toBeNull();
+    await click(within(invite).getByRole("button", { name: "Convidar por e-mail" }));
+    expect(invite.querySelector(".ac-dialog__sub")?.textContent).toBe("Passo 1 de 4 · Quem");
+    expect(within(invite).getByLabelText("E-mails")).toBeTruthy();
   });
 });
 
@@ -953,6 +982,8 @@ describe("Members › the invitation link", () => {
     expect(state.calls.some((c) => c.method === "invites.createLink")).toBe(false);
 
     const invite = await openInvite();
+    await click(within(invite).getByRole("button", { name: "Ver o link" }));
+    await settle(2);
     expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(
       "http://localhost:3000/invite/k3J",
     );

@@ -127,6 +127,7 @@ import type {
   IssueInput,
   IssuePatch,
   IssueStatus,
+  IssuesView,
   JevKey,
   JoinApproval,
   JoinClaim,
@@ -410,6 +411,10 @@ export interface ApiClient {
     sidebarOrder(orgId: string): Promise<SidebarSection[]>;
     /** Saves my section order here (`null`: the default). */
     setSidebarOrder(orgId: string, order: SidebarSection[] | null): Promise<SidebarSection[]>;
+    /** How I look at Tarefas here, on every device (the default until I change it). */
+    issuesView(orgId: string): Promise<IssuesView>;
+    /** Keeps how I look at Tarefas here; answers with what the server kept. */
+    setIssuesView(orgId: string, view: IssuesView): Promise<IssuesView>;
     /** The sidebar's tools in my order here (every tool; its place says list or More). */
     sidebarToolOrder(orgId: string): Promise<SidebarItem[]>;
     /** Saves my order of the tools here (`null`: the default). */

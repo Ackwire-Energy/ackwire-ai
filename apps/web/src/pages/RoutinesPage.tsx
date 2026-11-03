@@ -32,6 +32,7 @@ import { formatBytes } from "@agenteschat/client/lib/files";
 import {
   capitalize,
   clockHour,
+  formatShortDate,
   formatTime,
   formatTokensShort,
   formatUsd,
@@ -96,18 +97,22 @@ import {
   type RecurrenceRule,
   RunKey,
   RunLane,
+  RunMark,
   RunStrip,
+  SavedNote,
   SearchField,
   Segmented,
   Select,
   Switch,
+  TabPanel,
+  Tabs,
   Textarea,
   Toolbar,
   zonedInstant,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type CSSProperties, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { CancelAhead } from "@/components/ApprovalItem";
@@ -122,6 +127,7 @@ import {
 } from "@/components/ConnectorTrigger";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { DetailsLink } from "@/components/details-link";
+import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
 import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
@@ -137,6 +143,7 @@ import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
 import { defaultRule, fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
+import "./issues.css";
 import "./routines.css";
 
 export const ROUTINE_EVENTS: RoutineEvent[] = [
@@ -265,7 +272,6 @@ export function RoutinesPage() {
   const routines = useRoutines(org.id);
   const now = useNow();
   const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<Routine | null>(null);
   // The routine whose details are open, in the URL (`?open=…`).
   const [openId, setOpenId] = useOpenParam();
   const [showDone, setShowDone] = useState(false);
@@ -326,7 +332,7 @@ export function RoutinesPage() {
               now={now}
               selected={r.id === openId}
               onOpen={() => toggleOpen(r.id)}
-              onEdit={() => setEditing(r)}
+              onEdit={() => setOpenId(r.id)}
             />
           ))}
         </div>
@@ -439,7 +445,7 @@ export function RoutinesPage() {
                         now={now}
                         selected={r.id === openId}
                         onOpen={() => toggleOpen(r.id)}
-                        onEdit={() => setEditing(r)}
+                        onEdit={() => setOpenId(r.id)}
                       />
                     ))}
                   </div>
@@ -449,17 +455,8 @@ export function RoutinesPage() {
           </>
         )}
       </div>
-      {open && (
-        <RoutineDetails routine={open} now={now} onClose={() => setOpenId(null)} onEdit={() => setEditing(open)} />
-      )}
+      {open && <RoutineDetails routine={open} now={now} onClose={() => setOpenId(null)} />}
       <RoutineDialog open={creating} onClose={() => setCreating(false)} onWebhook={(r) => setOpenId(r.id)} />
-      <RoutineDialog
-        key={editing?.id ?? "none"}
-        open={Boolean(editing)}
-        routine={editing ?? undefined}
-        onClose={() => setEditing(null)}
-        onWebhook={(r) => setOpenId(r.id)}
-      />
     </div>
   );
 }
@@ -555,14 +552,16 @@ function useRoutineControls(r: Routine) {
   const running = isRunning(r);
   return {
     action,
-    setActive: (active: boolean) =>
+    setActive: (active: boolean, onDone?: () => void) =>
       action.mutate(
         { type: "active", id: r.id, active },
         {
-          onSuccess: () =>
+          onSuccess: () => {
             toast.show(
               t(active ? "routines.resumedToast" : running ? "routines.pausedRunningToast" : "routines.pausedToast"),
-            ),
+            );
+            onDone?.();
+          },
         },
       ),
     run: () => action.mutate({ type: "run", id: r.id }),
@@ -1076,7 +1075,7 @@ function AgentFace({ agentId }: { agentId: string }) {
 
 /**
  * A routine's details over whatever page is open (`DetailsHost`): the chat's routine tag, an agent's receipts,
- * the calendar. "Editar" opens the routine's form there too.
+ * the calendar. It is edited where it is, as on Rotinas.
  */
 export function RoutineDetailsDialog({ routineId, onClose }: { routineId: string; onClose: () => void }) {
   const { t } = useTranslation();
@@ -1084,7 +1083,6 @@ export function RoutineDetailsDialog({ routineId, onClose }: { routineId: string
   const toast = useToast();
   const routines = useRoutines(org.id);
   const now = useNow();
-  const [editing, setEditing] = useState(false);
   const routine = routines.data?.find((r) => r.id === routineId);
   // Gone, or not one the viewer may see: says so and closes.
   const gone = routines.isError || (routines.isSuccess && !routine);
@@ -1094,53 +1092,45 @@ export function RoutineDetailsDialog({ routineId, onClose }: { routineId: string
     onClose();
   }, [gone, toast, t, onClose]);
   if (!routine) return null;
-  return (
-    <>
-      <RoutineDetails routine={routine} now={now} onClose={onClose} onEdit={() => setEditing(true)} />
-      <RoutineDialog
-        key={editing ? "edit" : "none"}
-        open={editing}
-        onClose={() => setEditing(false)}
-        routine={routine}
-      />
-    </>
-  );
+  return <RoutineDetails routine={routine} now={now} onClose={onClose} />;
+}
+
+/** Who sees what it delivers: a conversation in a DM is the person's alone, not everyone in a channel. */
+function useWhereHint() {
+  const { org } = useOrg();
+  const dms = useDms(org.id);
+  return (target: RoutineTarget): "thread" | "channel" | "dm" | "forum" | "artifact" => {
+    if (target.type !== "conversation") return target.type;
+    if (dms.data?.some((d) => d.channelId === target.channelId)) return "dm";
+    return target.threadId ? "thread" : "channel";
+  };
 }
 
 /**
- * The routine's details: its state, the week, what it does, when, where, how it works and its runs. Where it runs
- * only where the workspace has more than one computer, by its name. Short sections sit two to a row when the dialog
- * is wide enough (`routine-details__pair`).
+ * The routine's own page in the details dialog, always full height (as a task's): who made it, its name (edited in
+ * place), its agent, state and when, this week in pixels, then "Detalhes" (what it does, edited in place; the next
+ * runs; the webhook; what was prepared for later) and "Execuções"; the aside holds "No ar" and the fields that change
+ * at once. "Rodar agora" (or Parar) and the one-tap fix are on the bar. Who can't change it sees the values.
  */
-function RoutineDetails({
-  routine: r,
-  now,
-  onClose,
-  onEdit,
-}: {
-  routine: Routine;
-  now: Date;
-  onClose: () => void;
-  onEdit: () => void;
-}) {
+function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: Date; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
   const controls = useRoutineControls(r);
   const action = controls.action;
   const runs = useRoutineRuns(org.id, r.id);
-  const target = useTargetLabel();
   const when = useWhen();
   const nextText = useNextText();
   const say = useSay();
   const outages = useMachineOutages(org.id, r.state === "waiting_computer");
   const [switching, setSwitching] = useState(false);
+  const [tab, setTab] = useState<"details" | "runs">("details");
+  const [saved, flashSaved] = useSavedFlash();
   const agent = { type: "agent" as const, id: r.agentId };
   const name = actors.name(agent);
   const title = routineTitle(r);
   const done = isDoneOnce(r);
   const fired = hasFired(r);
-  const running = isRunning(r);
   const stoppable = isStoppable(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const described = useRuleDescribe(
@@ -1156,7 +1146,6 @@ function RoutineDetails({
     selfHost && r.state === "waiting_computer" && r.waitingFor && can(org, "manage_agents")
       ? outages.data?.outages.find((o) => o.machineId === r.waitingFor?.machineId)
       : undefined;
-  const health = healthWords(r.health);
   const usage = usageParts(r.usage, can(org, "view_usage"));
   const usageText = usage
     ? [
@@ -1173,206 +1162,607 @@ function RoutineDetails({
   const runsOn = whereItRuns(r.brain, namesComputer);
   const perDay = r.trigger.type === "schedule" ? runsPerDay(r.trigger.rule ?? null, r.trigger.cron) : 0;
   const busy = r.active ? busyOnComputer(r.brain, perDay, { selfHost, namesComputer }) : null;
-  const whereHint =
-    r.target.type === "conversation"
-      ? r.target.threadId
-        ? "thread"
-        : "channel"
-      : r.target.type === "dm"
-        ? "dm"
-        : r.target.type;
   const list = runs.data ?? r.recentRuns;
+  const creator = r.createdByUserId ? actors.name({ type: "person", id: r.createdByUserId }) : null;
   return (
     <DetailsDialog
       open
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("routines.panel.close")}
       className="routine-details"
-      eyebrow={t("routines.panel.eyebrow")}
-      icon={<AgentAvatar agentId={r.agentId} name={name} size="md" running={running} />}
-      title={title}
-      subtitle={
+      size="lg"
+      fill
+      titleHidden
+      eyebrow={
         <>
-          <span>{name}</span>
-          {done ? <Chip icon="check">{t("routines.panel.state.done")}</Chip> : <RoutineStateChip routine={r} />}
+          {t("routines.panel.eyebrow")}
+          <SavedNote shown={saved} label={t("common.saved")} className="issue-details__saved" />
         </>
       }
+      title={title}
+      // Esc in a text being edited in place saves it and stays: the dialog closes on the next Esc.
+      onEscapeKeyDown={(e) => {
+        const el = document.activeElement;
+        if (el instanceof HTMLElement && el.closest("[data-inplace]")) {
+          e.preventDefault();
+          el.blur();
+        }
+      }}
+      actions={
+        r.canManage && (
+          <>
+            {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
+            {outage && outages.data && (
+              <Button size="sm" variant="primary" icon="computer" onClick={() => setSwitching(true)}>
+                {t("outage.switch")}
+              </Button>
+            )}
+            {(stoppable || !fired) &&
+              !reminder &&
+              (stoppable ? (
+                <Button size="sm" icon="stop" disabled={action.isPending} onClick={controls.stop}>
+                  {t(stopWordsKey(r))}
+                </Button>
+              ) : (
+                <Button size="sm" icon="play" disabled={action.isPending} onClick={controls.run}>
+                  {t("routines.runNow")}
+                </Button>
+              ))}
+          </>
+        )
+      }
     >
-      {r.canManage && (
-        <div className="routine-details__actions">
-          {fix && fix !== "resume" && <FixButton routine={r} fix={fix} />}
+      <div className="issue-layout">
+        <div className="issue-details issue-layout__main">
+          <header className="issue-details__head">
+            {creator && (
+              <span className="small muted">
+                {t("routines.panel.createdBy", { name: creator, date: formatShortDate(i18n.language, r.createdAt) })}
+              </span>
+            )}
+            <RoutineName routine={r} onSaved={flashSaved} />
+            <span className="routine-page__line">
+              <AgentAvatar agentId={r.agentId} name={name} size="xs" running={isRunning(r)} />
+              <b>{name}</b>
+              <span className="routine-page__dot" aria-hidden="true">
+                ·
+              </span>
+              {done ? <Chip icon="check">{t("routines.panel.state.done")}</Chip> : <RoutineStateChip routine={r} />}
+              <span className="routine-page__dot" aria-hidden="true">
+                ·
+              </span>
+              <span className="muted">{when(r)}</span>
+            </span>
+            <RoutineWeek routine={r} runs={list} now={now} />
+          </header>
+          {r.state === "usage_paused" && <UsagePausedNote routine={r} />}
           {outage && outages.data && (
-            <Button size="sm" variant="primary" icon="computer" onClick={() => setSwitching(true)}>
-              {t("outage.switch")}
-            </Button>
+            <SwitchComputerDialog open={switching} onOpenChange={setSwitching} outage={outage} data={outages.data} />
           )}
-          <Button size="sm" icon="edit" onClick={onEdit}>
-            {t("routines.edit")}
-          </Button>
-          {(stoppable || !fired) &&
-            !reminder &&
-            (stoppable ? (
-              <Button size="sm" icon="stop" disabled={action.isPending} onClick={controls.stop}>
-                {t(stopWordsKey(r))}
-              </Button>
-            ) : (
-              <Button size="sm" icon="play" disabled={action.isPending} onClick={controls.run}>
-                {t("routines.runNow")}
-              </Button>
-            ))}
-          {!fired && (
-            <Button size="sm" icon={r.active ? "pause" : "play"} onClick={() => controls.setActive(!r.active)}>
-              {r.active ? t("routines.panel.pause") : t("routines.resume")}
-            </Button>
+          <Tabs
+            value={tab}
+            onValueChange={setTab}
+            label={t("routines.panel.tabs.label")}
+            items={[
+              { value: "details", label: t("routines.panel.tabs.details") },
+              { value: "runs", label: t("routines.panel.tabs.runs"), count: list.length || undefined },
+            ]}
+          >
+            <TabPanel value="details">
+              <DetailsSection title={t("routines.panel.what", agentGrammar(name))}>
+                <RoutinePrompt routine={r} onSaved={flashSaved} />
+              </DetailsSection>
+              {r.canSeeDetails && (
+                <DetailsSection title={t("routines.panel.ownActions")}>
+                  <OwnActions routine={r} />
+                </DetailsSection>
+              )}
+              <DetailsSection title={t("routines.panel.nexts")}>
+                {mailTrouble(r) && (
+                  <Chip icon="alert" tone="waiting">
+                    {t(mailTrouble(r) === "error" ? "mail.routine.error" : "mail.routine.needsReconnect")}
+                  </Chip>
+                )}
+                {r.trigger.type === "email" || r.trigger.type === "connector" ? (
+                  <p className="small muted">{t("mail.routine.every")}</p>
+                ) : r.trigger.type === "webhook" ? (
+                  <p className="small muted">
+                    {t("common.joinSentences", {
+                      a: t("routines.webhook.every"),
+                      b: t("routines.webhook.methodsLine", { methods: (r.trigger.methods ?? ["POST"]).join(", ") }),
+                    })}
+                  </p>
+                ) : r.trigger.type === "event" ? (
+                  <p className="small muted">{t("routines.panel.eventEvery")}</p>
+                ) : (
+                  nexts.length > 0 &&
+                  !done && (
+                    <div className="routine-details__nexts">
+                      {nexts.map((iso) => (
+                        <span key={iso}>{nextLabel(i18n.language, iso)}</span>
+                      ))}
+                    </div>
+                  )
+                )}
+                {!done && <p className="small muted">{nextText(r, now)}</p>}
+                {busy && (
+                  <p className="routine-note small ac-iconline">
+                    <Icon name="computer" size={14} />
+                    <span>{say(busy)}</span>
+                  </p>
+                )}
+              </DetailsSection>
+              {r.trigger.type === "webhook" && (
+                <DetailsSection title={t("routines.form.kind.webhook")}>
+                  {r.canManage ? (
+                    <WebhookPanel routine={r} runs={list} />
+                  ) : (
+                    <p className="small muted">{t("routines.webhook.hidden")}</p>
+                  )}
+                </DetailsSection>
+              )}
+              {r.ahead && r.ahead.length > 0 && (
+                <DetailsSection title={t("routines.panel.ahead")}>
+                  <ul className="routine-ahead">
+                    {r.ahead.map((a) => (
+                      <li key={a.id} className="routine-details__where routine-ahead__item">
+                        <span className="routine-details__where-icon">
+                          <Icon name={a.status === "approved" ? "calendar" : "waiting"} size={16} />
+                        </span>
+                        <span className="routine-ahead__text">
+                          <Link
+                            to="/org/$orgId/approvals"
+                            params={{ orgId: org.id }}
+                            search={{ open: a.id }}
+                            className="routine-ahead__title"
+                          >
+                            {approvalTitle(t, { ...a, email: null })}
+                          </Link>
+                          <small>
+                            {t(a.status === "approved" ? "routines.ahead.approved" : "routines.ahead.pending", {
+                              when: nextLabel(i18n.language, a.runAt),
+                            })}
+                          </small>
+                        </span>
+                        {a.canCancel && (
+                          <span className="ac-acts">
+                            <CancelAhead id={a.id} />
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="small muted">{t("routines.ahead.hint")}</p>
+                </DetailsSection>
+              )}
+            </TabPanel>
+            <TabPanel value="runs">
+              <DetailsSection title={t("routines.panel.runs")}>
+                {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
+                {list.length > 0 && (
+                  <ol className="routine-runs">
+                    {list.slice(0, 30).map((x) => (
+                      <RunItem key={x.id} run={x} routine={r} />
+                    ))}
+                  </ol>
+                )}
+                {runs.isSuccess && list.length === 0 && (
+                  <p className="small muted">
+                    {t("routines.noRuns")}
+                    {nexts[0] &&
+                      !done &&
+                      ` ${t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) })}`}
+                  </p>
+                )}
+              </DetailsSection>
+            </TabPanel>
+          </Tabs>
+        </div>
+        <RoutineAside routine={r} now={now} runsOn={runsOn} usageText={usageText} onSaved={flashSaved} />
+      </div>
+    </DetailsDialog>
+  );
+}
+
+/** The name, edited in place: Enter, Esc or leaving the field saves it (an empty one keeps the old name). */
+function RoutineName({ routine: r, onSaved }: { routine: Routine; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const action = useRoutineAction(org.id);
+  const [draft, setDraft] = useState<string | null>(null);
+  const sent = useSent<string>(r.name);
+  const name = sent.pending ?? r.name;
+  const ref = useFocusAtEnd<HTMLInputElement>(draft !== null);
+  const shown = routineTitle({ name, prompt: r.prompt });
+  if (!r.canManage) return <h1 className="issue-details__title">{shown}</h1>;
+  const save = () => {
+    if (draft === null) return;
+    const next = draft.trim();
+    setDraft(null);
+    if (!next || next === name) return;
+    sent.send(next);
+    action.mutate(
+      { type: "update", id: r.id, patch: { name: next } },
+      {
+        onSuccess: onSaved,
+        onError: (error) => {
+          sent.clear();
+          toast.show(errorText(t, error), "error");
+        },
+      },
+    );
+  };
+  if (draft !== null)
+    return (
+      <input
+        ref={ref}
+        className="issue-inplace__title"
+        value={draft}
+        maxLength={120}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== "Escape") return;
+          e.preventDefault();
+          e.currentTarget.blur();
+        }}
+        aria-label={t("routines.panel.nameLabel")}
+        data-inplace=""
+      />
+    );
+  return (
+    <EditInPlace label={t("routines.panel.editName")} onEdit={() => setDraft(name)}>
+      <h1 className="issue-details__title">{shown}</h1>
+    </EditInPlace>
+  );
+}
+
+/**
+ * What it does, edited in place in the task description's box: leaving it, Esc or ⌘↵ saves it (an empty one keeps
+ * the old text); the agents it names that it can't call are said under the box. Who may see only its outcomes reads
+ * that the details are hidden.
+ */
+function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const action = useRoutineAction(org.id);
+  const [draft, setDraft] = useState<string | null>(null);
+  const sent = useSent<string>(r.prompt ?? "");
+  const prompt = sent.pending ?? r.prompt ?? "";
+  const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
+  if (!r.canSeeDetails || r.prompt === null) return <p className="small muted">{t("routines.detailsHidden")}</p>;
+  if (!r.canManage) return <p className="routine-details__prompt">{prompt}</p>;
+  const save = () => {
+    if (draft === null) return;
+    const next = draft.trim();
+    setDraft(null);
+    if (!next || next === prompt.trim()) return;
+    sent.send(next);
+    action.mutate(
+      { type: "update", id: r.id, patch: { prompt: next } },
+      {
+        onSuccess: onSaved,
+        onError: (error) => {
+          sent.clear();
+          toast.show(errorText(t, error), "error");
+        },
+      },
+    );
+  };
+  if (draft !== null)
+    return (
+      <>
+        <div className="issue-new__editor" data-inplace="">
+          <textarea
+            ref={ref}
+            className="issue-new__text routine-prompt__text"
+            rows={8}
+            value={draft}
+            maxLength={10_000}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={save}
+            onKeyDown={(e) => {
+              if (e.key !== "Escape" && !(e.key === "Enter" && (e.metaKey || e.ctrlKey))) return;
+              e.preventDefault();
+              e.currentTarget.blur();
+            }}
+            placeholder={t("routines.form.whatPlaceholder")}
+            aria-label={t("routines.form.what")}
+          />
+        </div>
+        <p className="issue-new__hint small muted">{t("issues.edit.hint")}</p>
+        <RoutineReachWarnings prompt={draft} agentId={r.agentId} creatorUserId={r.createdByUserId} />
+      </>
+    );
+  return (
+    <EditInPlace label={t("routines.panel.editWhat")} onEdit={() => setDraft(prompt)}>
+      <p className="routine-details__prompt">{prompt}</p>
+    </EditInPlace>
+  );
+}
+
+/** At most this many of a day's runs in the week's pixels (an hourly routine would make a tower). */
+const WEEK_CELLS = 4;
+
+/**
+ * This week in a well: how many runs went right ("12 de 14 OK esta semana") and what else happened, beside the last
+ * seven days in pixels, one cell per run in its color (a few at most a day), today last.
+ */
+function RoutineWeek({ routine: r, runs, now }: { routine: Routine; runs: RoutineRun[]; now: Date }) {
+  const { t, i18n } = useTranslation();
+  const say = useSay();
+  const words = useRunWords();
+  const { color } = useLook()(r.agentId);
+  const [first, ...rest] = healthWords(r.health) ?? [];
+  const days = Array.from({ length: 7 }, (_, k) => {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + k);
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+    const cells = runs.flatMap((x) => {
+      const at = new Date(x.at);
+      const status = at >= start && at < end ? runPixelStatus(x.status) : null;
+      return status ? [status] : [];
+    });
+    return {
+      key: toYmd(start),
+      label: new Intl.DateTimeFormat(i18n.language, { weekday: "short" }).format(start).replace(/\./g, ""),
+      cells: cells.slice(0, WEEK_CELLS),
+    };
+  });
+  return (
+    <div className="routine-week">
+      <span className="routine-week__text">
+        <b>{first ? say(first) : t("routines.health.none")}</b>
+        {rest.length > 0 && <span className="small muted">{rest.map(say).join(" · ")}</span>}
+      </span>
+      <span className="routine-week__days" role="img" aria-label={words.label(r)}>
+        {days.map((d) => (
+          <span key={d.key} className="routine-week__day">
+            <span className="routine-week__cells">
+              {d.cells.length > 0 ? (
+                d.cells.map((status, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a day's runs in order, never reordered
+                  <RunMark key={i} color={color} status={status} />
+                ))
+              ) : (
+                <i className="routine-week__none" />
+              )}
+            </span>
+            <small aria-hidden="true">{d.label}</small>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/** The value of a field in the aside, with its short line under it (on a picker's trigger, or read only). */
+function AsideValue({ lead, label, line }: { lead?: ReactNode; label: ReactNode; line?: ReactNode }) {
+  return (
+    <span className="routine-sel__value">
+      {lead}
+      <span className="routine-sel__text">
+        <b>{label}</b>
+        {line && <small>{line}</small>}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The routine's aside, sticky in the dialog as a task's: "No ar" (a switch, with what it means), then who does it,
+ * when (the creation form's schedule and triggers, in a dialog of their own), where it delivers (a forum asks its
+ * agents and rounds in that dialog), when it posts and where it runs, each changing at once; then its usage this
+ * week. Who can't change it sees the values.
+ */
+function RoutineAside({
+  routine: r,
+  now,
+  runsOn,
+  usageText,
+  onSaved,
+}: {
+  routine: Routine;
+  now: Date;
+  runsOn: string | null;
+  usageText: string | null;
+  onSaved: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const actors = useActors();
+  const toast = useToast();
+  const channels = useChannels(org.id);
+  const controls = useRoutineControls(r);
+  const targetLabel = useTargetLabel();
+  const whereHint = useWhereHint();
+  const when = useWhen();
+  const nextText = useNextText();
+  const [part, setPart] = useState<{ part: RoutinePart; target?: string } | null>(null);
+  const manage = r.canManage;
+  const fired = hasFired(r);
+  const agent = { type: "agent" as const, id: r.agentId };
+  const update = (patch: RoutinePatch) =>
+    controls.action.mutate(
+      { type: "update", id: r.id, patch },
+      { onSuccess: onSaved, onError: (error) => toast.show(errorText(t, error), "error") },
+    );
+  const hint = (kind: ReturnType<typeof whereHint>) => t(`routines.panel.whereHint.${kind}`);
+  const agentOptions = [
+    ...actors.dir.agents.map((a) => ({
+      value: a.id,
+      label: a.name,
+      description: a.role || undefined,
+      leading: actors.avatar({ type: "agent", id: a.id }),
+    })),
+    ...(actors.dir.agentById.has(r.agentId)
+      ? []
+      : [{ value: r.agentId, label: actors.name(agent), description: undefined, leading: actors.avatar(agent) }]),
+  ];
+  const choice = targetChoice(r.target);
+  const channelList = channels.data ?? [];
+  const where = capitalize(targetLabel(r.target), i18n.language);
+  const targetOptions = [
+    ...(choice === TARGET_KEEP || (r.target.type === "channel" && !channelList.some((c) => c.id === choice))
+      ? [{ value: choice, label: where }]
+      : []),
+    ...channelList.map((c) => ({ value: c.id, label: `#${c.name}` })),
+    { value: TARGET_DM, label: t("routines.target.dm"), description: hint("dm") },
+    { value: TARGET_ARTIFACT, label: t("routines.target.artifact"), description: hint("artifact") },
+    { value: TARGET_FORUM, label: t("routines.target.forum"), description: hint("forum") },
+  ];
+  const pickTarget = (v: string) => {
+    if (v === choice || v === TARGET_KEEP) return;
+    if (v === TARGET_FORUM) setPart({ part: "where", target: TARGET_FORUM });
+    else update({ target: targetInputOf(v) });
+  };
+  const reportLine = (v: RoutineReport) => t(`routines.panel.reportHint.${v}`);
+  const reportHint = {
+    name: t("common.about", { label: t("routines.panel.report") }),
+    text: t("routines.report.hint"),
+  };
+  const shown = (label: string, value: ReactNode) => (
+    <div className="issue-aside__item">
+      <span className="ac-field__label">{label}</span>
+      {value}
+    </div>
+  );
+  return (
+    <aside aria-label={t("routines.panel.label", { name: routineTitle(r) })} className="issue-aside">
+      {!fired && (
+        <div className="issue-aside__item routine-onair">
+          <span className="routine-onair__text">
+            <b>{t(r.active ? "routines.panel.state.live" : "routines.panel.state.paused")}</b>
+            <small>{t(r.active ? "routines.panel.onAirLine" : "routines.panel.offAirLine")}</small>
+          </span>
+          {manage && (
+            <Switch
+              checked={r.active}
+              onCheckedChange={(on) => controls.setActive(on, onSaved)}
+              aria-label={t("routines.panel.state.live")}
+            />
           )}
         </div>
       )}
-      {r.state === "usage_paused" && <UsagePausedNote routine={r} />}
-      {outage && outages.data && (
-        <SwitchComputerDialog open={switching} onOpenChange={setSwitching} outage={outage} data={outages.data} />
+      {manage ? (
+        <Field label={t("routines.panel.who")} id={`rt-who-${r.id}`}>
+          <Select
+            size="sm"
+            className="routine-sel"
+            value={r.agentId}
+            onValueChange={(v) => {
+              if (v !== r.agentId) update({ agentId: v });
+            }}
+            options={agentOptions}
+            renderValue={(o) => <AsideValue lead={o.leading} label={o.label} line={o.description} />}
+          />
+        </Field>
+      ) : (
+        shown(
+          t("routines.panel.who"),
+          <AsideValue
+            lead={actors.avatar(agent)}
+            label={actors.name(agent)}
+            line={actors.dir.agentById.get(r.agentId)?.role || undefined}
+          />,
+        )
       )}
-      <div className="routine-details__pair">
-        <DetailsSection title={t("routines.panel.week")}>
-          <p className="routine-details__sentence">
-            {health ? health.map(say).join(" · ") : t("routines.health.none")}
-          </p>
-          {usageText && <p className="small muted">{`${t("routines.panel.usage")}: ${usageText}`}</p>}
-        </DetailsSection>
-        <DetailsSection title={t("routines.panel.where")}>
-          <div className="routine-details__where">
-            <span className="routine-details__where-icon">
-              <Icon name={targetIcon(r.target)} size={16} />
-            </span>
-            <span>
-              <b>{target(r.target)}</b>
-              <small>{t(`routines.panel.whereHint.${whereHint}`)}</small>
-            </span>
+      {manage ? (
+        <Field label={t("routines.panel.when")} id={`rt-when-${r.id}`}>
+          <div className="ac-select ac-select--sm routine-sel">
+            <button
+              type="button"
+              id={`rt-when-${r.id}`}
+              className="ac-select__trigger"
+              aria-haspopup="dialog"
+              onClick={() => setPart({ part: "when" })}
+            >
+              <span className="ac-select__value">
+                <AsideValue label={when(r)} line={isDoneOnce(r) ? undefined : nextText(r, now)} />
+              </span>
+              <svg className="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m6 8 4 4 4-4" />
+              </svg>
+            </button>
           </div>
-        </DetailsSection>
-      </div>
-      {runsOn && (
-        <DetailsSection title={t("routines.panel.runsOn")}>
-          <p className="routine-details__sentence">{runsOn}</p>
-        </DetailsSection>
+        </Field>
+      ) : (
+        shown(
+          t("routines.panel.when"),
+          <AsideValue label={when(r)} line={isDoneOnce(r) ? undefined : nextText(r, now)} />,
+        )
       )}
-      <DetailsSection title={t("routines.panel.what", agentGrammar(name))}>
-        {r.canSeeDetails && r.prompt !== null ? (
-          <p className="routine-details__prompt">{r.prompt}</p>
-        ) : (
-          <p className="small muted">{t("routines.detailsHidden")}</p>
-        )}
-      </DetailsSection>
-      {r.canSeeDetails && (
-        <DetailsSection title={t("routines.panel.ownActions")}>
-          <OwnActions routine={r} />
-        </DetailsSection>
+      {manage ? (
+        <Field
+          label={t("routines.panel.where")}
+          id={`rt-where-${r.id}`}
+          labelAside={
+            r.target.type === "forum" && (
+              <Button size="sm" variant="ghost" onClick={() => setPart({ part: "where" })}>
+                {t("routines.form.adjust")}
+              </Button>
+            )
+          }
+        >
+          <Select
+            size="sm"
+            className="routine-sel"
+            value={choice}
+            onValueChange={pickTarget}
+            options={targetOptions}
+            renderValue={(o) => <AsideValue label={o.label} line={hint(whereHint(r.target))} />}
+          />
+        </Field>
+      ) : (
+        shown(
+          t("routines.panel.where"),
+          <AsideValue
+            label={targetOptions.find((o) => o.value === choice)?.label ?? where}
+            line={hint(whereHint(r.target))}
+          />,
+        )
       )}
-      <DetailsSection title={t("routines.panel.when")}>
-        <p className="routine-details__sentence">{when(r)}</p>
-        {mailTrouble(r) && (
-          <Chip icon="alert" tone="waiting">
-            {t(mailTrouble(r) === "error" ? "mail.routine.error" : "mail.routine.needsReconnect")}
-          </Chip>
-        )}
-        {r.trigger.type === "email" || r.trigger.type === "connector" ? (
-          <p className="small muted">{t("mail.routine.every")}</p>
-        ) : r.trigger.type === "webhook" ? (
-          <p className="small muted">
-            {t("common.joinSentences", {
-              a: t("routines.webhook.every"),
-              b: t("routines.webhook.methodsLine", { methods: (r.trigger.methods ?? ["POST"]).join(", ") }),
-            })}
-          </p>
-        ) : r.trigger.type === "event" ? (
-          <p className="small muted">{t("routines.panel.eventEvery")}</p>
-        ) : (
-          nexts.length > 0 &&
-          !done && (
-            <div className="routine-details__nexts">
-              {nexts.map((iso) => (
-                <span key={iso}>{nextLabel(i18n.language, iso)}</span>
-              ))}
-            </div>
-          )
-        )}
-        {!done && <p className="small muted">{nextText(r, now)}</p>}
-        {busy && (
-          <p className="routine-note small ac-iconline">
-            <Icon name="computer" size={14} />
-            <span>{say(busy)}</span>
-          </p>
-        )}
-      </DetailsSection>
-      {r.trigger.type === "webhook" && (
-        <DetailsSection title={t("routines.form.kind.webhook")}>
-          {r.canManage ? (
-            <WebhookPanel routine={r} runs={list} />
-          ) : (
-            <p className="small muted">{t("routines.webhook.hidden")}</p>
-          )}
-        </DetailsSection>
-      )}
-      {r.ahead && r.ahead.length > 0 && (
-        <DetailsSection title={t("routines.panel.ahead")}>
-          <ul className="routine-ahead">
-            {r.ahead.map((a) => (
-              <li key={a.id} className="routine-details__where routine-ahead__item">
-                <span className="routine-details__where-icon">
-                  <Icon name={a.status === "approved" ? "calendar" : "waiting"} size={16} />
-                </span>
-                <span className="routine-ahead__text">
-                  <Link
-                    to="/org/$orgId/approvals"
-                    params={{ orgId: org.id }}
-                    search={{ open: a.id }}
-                    className="routine-ahead__title"
-                  >
-                    {approvalTitle(t, { ...a, email: null })}
-                  </Link>
-                  <small>
-                    {t(a.status === "approved" ? "routines.ahead.approved" : "routines.ahead.pending", {
-                      when: nextLabel(i18n.language, a.runAt),
-                    })}
-                  </small>
-                </span>
-                {a.canCancel && (
-                  <span className="ac-acts">
-                    <CancelAhead id={a.id} />
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-          <p className="small muted">{t("routines.ahead.hint")}</p>
-        </DetailsSection>
-      )}
-      <DetailsSection title={t("routines.panel.report")}>
-        <p className="routine-details__sentence">
+      {manage ? (
+        <Field label={t("routines.panel.report")} id={`rt-report-${r.id}`} hint={reportHint}>
+          <Select
+            size="sm"
+            className="routine-sel"
+            value={r.report}
+            onValueChange={(v) => {
+              if (v !== r.report) update({ report: v as RoutineReport });
+            }}
+            options={(["always", "when_new"] as const).map((v) => ({
+              value: v,
+              label: t(`routines.report.${v}`),
+              description: reportLine(v),
+            }))}
+            renderValue={(o) => <AsideValue label={o.label} line={o.description} />}
+          />
+        </Field>
+      ) : (
+        <div className="issue-aside__item">
           <span className="ac-hintline">
-            {t(`routines.report.${r.report}`)}
-            <InfoHint name={t("common.about", { label: t("routines.panel.report") })}>
-              {t("routines.report.hint")}
-            </InfoHint>
+            <span className="ac-field__label">{t("routines.panel.report")}</span>
+            <InfoHint name={reportHint.name}>{reportHint.text}</InfoHint>
           </span>
-        </p>
-      </DetailsSection>
-      <DetailsSection title={t("routines.panel.runs")}>
-        {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
-        {list.length > 0 && (
-          <ol className="routine-runs">
-            {list.slice(0, 30).map((x) => (
-              <RunItem key={x.id} run={x} routine={r} />
-            ))}
-          </ol>
-        )}
-        {runs.isSuccess && list.length === 0 && (
-          <p className="small muted">
-            {t("routines.noRuns")}
-            {nexts[0] && !done && ` ${t("routines.panel.firstRun", { when: nextLabel(i18n.language, nexts[0]) })}`}
-          </p>
-        )}
-      </DetailsSection>
-    </DetailsDialog>
+          <AsideValue label={t(`routines.report.${r.report}`)} line={reportLine(r.report)} />
+        </div>
+      )}
+      {runsOn &&
+        shown(t("routines.panel.runsOn"), <AsideValue lead={<Icon name="computer" size={16} />} label={runsOn} />)}
+      {usageText && shown(t("routines.panel.usage"), <span className="small muted">{usageText}</span>)}
+      {manage && part && (
+        <RoutineDialog
+          open
+          routine={r}
+          part={part.part}
+          initialTarget={part.target}
+          onSaved={onSaved}
+          onClose={() => setPart(null)}
+        />
+      )}
+    </aside>
   );
 }
 
@@ -1673,6 +2063,9 @@ const TARGET_FORUM = "forum";
 /** Editing a routine made in the chat (a thread or DM): keep where it delivers. */
 const TARGET_KEEP = "keep";
 const FORUM_ROUNDS = ["1", "2", "3", "5"] as const;
+/** A part of a routine its page's aside opens in the form: when it runs, or where it delivers. */
+type RoutinePart = "when" | "where";
+const PART_FIELDS: Record<RoutinePart, (keyof RoutinePatch)[]> = { when: ["trigger"], where: ["target"] };
 
 /** Where a routine delivers, as the form's select value. */
 function targetChoice(target: RoutineTarget | undefined): string {
@@ -1683,6 +2076,10 @@ function targetChoice(target: RoutineTarget | undefined): string {
   if (target.type === "forum") return TARGET_FORUM;
   return TARGET_KEEP;
 }
+
+/** A target picked from the form's or the aside's select (a channel by its id). */
+const targetInputOf = (v: string): RoutineTargetInput =>
+  v === TARGET_DM ? { type: "dm" } : v === TARGET_ARTIFACT ? { type: "artifact" } : { type: "channel", channelId: v };
 
 /** The phrase the routine was written with, as the person wrote it (made with the picker, or new: none). */
 const phraseOf = (r: Routine | undefined) => (r?.trigger.type === "schedule" ? (r.trigger.phrase ?? "") : "");
@@ -1717,19 +2114,28 @@ const emailDraftOf = (r: Routine | undefined): EmailTriggerDraft =>
 const isUtc = (z: string) => z === "UTC" || z === "Etc/UTC";
 
 /**
- * "Nova rotina" and "Editar" (the same form). Editing starts from the routine
- * and saves only what changed; a routine still read in UTC (made before time
- * zones) starts in my zone, with a hint to keep UTC instead.
+ * "Nova rotina", and one part of a routine opened from its page's aside ("Quando": the trigger and the schedule;
+ * "Onde entrega": the target with a forum's agents and rounds). A part starts from the routine and saves only what
+ * changed in it; a routine still read in UTC (made before time zones) starts in my zone, with a hint to keep UTC.
  */
 function RoutineDialog({
   open,
   onClose,
   routine,
+  part,
+  initialTarget,
+  onSaved,
   onWebhook,
 }: {
   open: boolean;
   onClose: () => void;
   routine?: Routine;
+  /** With `routine`: only this part of the form. */
+  part?: RoutinePart;
+  /** Where it starts delivering (a forum picked in the aside, whose agents and rounds this part asks). */
+  initialTarget?: string;
+  /** A part was saved. */
+  onSaved?: () => void;
   /** It just became a webhook routine (made, or switched to one): its address is on its page, which opens. */
   onWebhook?: (routine: Routine) => void;
 }) {
@@ -1742,12 +2148,13 @@ function RoutineDialog({
   const action = useRoutineAction(org.id);
   const agents = actors.dir.agents;
   const editing = Boolean(routine);
+  const shows = (p: RoutinePart) => !part || part === p;
   const initialForum = routine?.target.type === "forum" ? routine.target : null;
   const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "America/Sao_Paulo";
   const savedZone = zoneOf(routine);
   const wasUtc = editing && routine !== undefined && !isEventDriven(routine) && isUtc(savedZone);
   const [agentId, setAgentId] = useState(routine?.agentId ?? "");
-  const [target, setTarget] = useState(targetChoice(routine?.target));
+  const [target, setTarget] = useState(initialTarget ?? targetChoice(routine?.target));
   // "Um tópico no fórum": which agents discuss, and how many rounds.
   const [forumAgents, setForumAgents] = useState<string[]>(initialForum?.agentIds ?? []);
   const [forumRounds, setForumRounds] = useState<(typeof FORUM_ROUNDS)[number]>(
@@ -1783,7 +2190,6 @@ function RoutineDialog({
   const [event, setEvent] = useState<RoutineEvent>(
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
-  const [active, setActive] = useState(routine?.active ?? true);
   // When it posts.
   const [report, setReport] = useState<RoutineReport>(routine?.report ?? "when_new");
   const say = useSay();
@@ -1926,7 +2332,6 @@ function RoutineDialog({
                   JSON.stringify(trigger()) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
                 : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
     if (triggerChanged) patch.trigger = trigger();
-    if (active !== r.active) patch.active = active;
     if (report !== r.report) patch.report = report;
     return patch;
   };
@@ -1965,9 +2370,13 @@ function RoutineDialog({
   };
   const submit = () => {
     setTouched(true);
-    if (!prompt.trim() || !agentId || !scheduleOk) return;
+    if ((!part && !prompt.trim()) || !agentId || !scheduleOk) return;
     if (routine) {
-      const patch = changes(routine);
+      const all = changes(routine);
+      // A part sends only its own fields (a prompt stored with spaces around it is not a change of "Quando").
+      const patch: RoutinePatch = part
+        ? Object.fromEntries(Object.entries(all).filter(([k]) => PART_FIELDS[part].includes(k as keyof RoutinePatch)))
+        : all;
       if (Object.keys(patch).length === 0) {
         onClose();
         return;
@@ -1982,6 +2391,7 @@ function RoutineDialog({
                 ? t("routines.form.saved", { next: t("routines.next", { when: nextLabel(i18n.language, next) }) })
                 : t("routines.form.savedNoNext"),
             );
+            onSaved?.();
             onClose();
             if (routine.trigger.type !== "webhook") becameWebhook(saved as Routine);
           },
@@ -2013,11 +2423,26 @@ function RoutineDialog({
       },
     );
   };
+  const targetField = (
+    <Field label={t("routines.form.target")} id="nr-target">
+      <Select
+        value={target || undefined}
+        onValueChange={setTarget}
+        options={[
+          ...(routine && target === TARGET_KEEP ? [{ value: TARGET_KEEP, label: targetLabel(routine.target) }] : []),
+          ...(channels.data ?? []).map((c) => ({ value: c.id, label: `#${c.name}` })),
+          { value: TARGET_DM, label: t("routines.target.dm") },
+          { value: TARGET_ARTIFACT, label: t("routines.target.artifact") },
+          { value: TARGET_FORUM, label: t("routines.target.forum") },
+        ]}
+      />
+    </Field>
+  );
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={editing ? t("routines.editTitle") : t("routines.new")}
+      title={part ? t(part === "when" ? "routines.panel.when" : "routines.panel.where") : t("routines.new")}
       closeLabel={t("common.close")}
       width={560}
     >
@@ -2029,7 +2454,7 @@ function RoutineDialog({
         }}
       >
         <DialogBody>
-          {agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
+          {!part && agents.length === 0 && <p className="small muted">{t("routines.form.noAgents")}</p>}
           {!editing && !prompt.trim() && (
             <fieldset className="routine-presets">
               <legend className="ac-eyebrow">{t("routines.presets.title")}</legend>
@@ -2048,36 +2473,26 @@ function RoutineDialog({
               </div>
             </fieldset>
           )}
-          <div className="grid-fields">
-            <Field label={t("routines.form.agent")} id="nr-agent">
-              <Select
-                value={agentId || undefined}
-                onValueChange={setAgentId}
-                options={agents.map((a) => ({
-                  value: a.id,
-                  label: a.name,
-                  description: a.role || undefined,
-                  leading: actors.avatar({ type: "agent", id: a.id }),
-                }))}
-              />
-            </Field>
-            <Field label={t("routines.form.target")} id="nr-target">
-              <Select
-                value={target || undefined}
-                onValueChange={setTarget}
-                options={[
-                  ...(routine && target === TARGET_KEEP
-                    ? [{ value: TARGET_KEEP, label: targetLabel(routine.target) }]
-                    : []),
-                  ...(channels.data ?? []).map((c) => ({ value: c.id, label: `#${c.name}` })),
-                  { value: TARGET_DM, label: t("routines.target.dm") },
-                  { value: TARGET_ARTIFACT, label: t("routines.target.artifact") },
-                  { value: TARGET_FORUM, label: t("routines.target.forum") },
-                ]}
-              />
-            </Field>
-          </div>
-          {target === TARGET_FORUM && (
+          {!part ? (
+            <div className="grid-fields">
+              <Field label={t("routines.form.agent")} id="nr-agent">
+                <Select
+                  value={agentId || undefined}
+                  onValueChange={setAgentId}
+                  options={agents.map((a) => ({
+                    value: a.id,
+                    label: a.name,
+                    description: a.role || undefined,
+                    leading: actors.avatar({ type: "agent", id: a.id }),
+                  }))}
+                />
+              </Field>
+              {targetField}
+            </div>
+          ) : (
+            part === "where" && targetField
+          )}
+          {shows("where") && target === TARGET_FORUM && (
             <div className="routine-forum">
               <span className="ac-field__label">{t("routines.form.forumAgents")}</span>
               {agents.map((a) => {
@@ -2113,159 +2528,174 @@ function RoutineDialog({
               />
             </div>
           )}
-          <Field
-            label={t("routines.form.what")}
-            id="nr-what"
-            error={touched && !prompt.trim() ? t("routines.form.required") : undefined}
-          >
-            <Textarea
-              rows={3}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={t("routines.form.whatPlaceholder")}
-            />
-          </Field>
-          <Field label={editing ? t("routines.form.title") : t("routines.form.name")} id="nr-name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <div className="routine-kind">
-            <span className="ac-field__label">{t("routines.form.when")}</span>
-            <Segmented
-              label={t("routines.form.when")}
-              value={kind}
-              onValueChange={setKind}
-              options={[
-                { value: "schedule" as const, label: t("routines.form.kind.schedule") },
-                { value: "event" as const, label: t("routines.form.kind.event") },
-                ...(hasMail ? [{ value: "email" as const, label: t("routines.form.kind.email") }] : []),
-                ...(hasMillionSend ? [{ value: "connector" as const, label: t("routines.form.kind.connector") }] : []),
-                { value: "webhook" as const, label: t("routines.form.kind.webhook") },
-              ]}
-            />
-          </div>
-          {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
-          {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
-          {kind === "webhook" &&
-            (routine?.trigger.type === "webhook" ? (
-              <WebhookPanel routine={routine} runs={routine.recentRuns} />
-            ) : (
-              <p className="routine-note small ac-iconline">
-                <Icon name="link" size={14} />
-                <span>{t("routines.webhook.newNote")}</span>
-              </p>
-            ))}
-          {kind === "schedule" && (
-            <div className="routine-when">
-              <div className="routine-when__head">
-                <span className="routine-when__sentence" aria-live="polite">
-                  {ruleSentence(t, i18n.language, rule, new Date(), false)}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  icon="repeat"
-                  aria-expanded={pickerOpen}
-                  onClick={() => setPickerOpen((o) => !o)}
-                >
-                  {t("routines.form.adjust")}
-                </Button>
-              </div>
-              {!pickerOpen && upcoming.length > 0 && (
-                <div className="ac-recur__upcoming">
-                  <span className="ac-recur__label">{t("routines.form.next")}</span>
-                  <ol>
-                    {upcoming.map((label) => (
-                      <li key={label} className="tabular">
-                        {label}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-              {pickerOpen && (
-                <RecurrencePicker
-                  value={rule}
-                  onChange={pickRule}
-                  labels={recurrenceLabels(t, i18n.language, rule)}
-                  locale={i18n.language}
-                  upcoming={upcoming}
-                  hideTimezone
-                />
-              )}
-            </div>
-          )}
-          {kind === "schedule" && (
+          {!part && (
             <>
-              {!once && (
-                <Field label={t("routines.form.frequency")} id="nr-when" error={phraseError()}>
-                  <Input
-                    value={phrase}
-                    onChange={(e) => typePhrase(e.target.value)}
-                    placeholder={t("recurrence.phrasePlaceholder")}
-                  />
-                </Field>
-              )}
-              <Field label={t("routines.form.timezone")} id="nr-zone">
-                <ZoneSelect value={zone} onChange={setZone} />
+              <Field
+                label={t("routines.form.what")}
+                id="nr-what"
+                error={touched && !prompt.trim() ? t("routines.form.required") : undefined}
+              >
+                <Textarea
+                  rows={3}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={t("routines.form.whatPlaceholder")}
+                />
+              </Field>
+              <Field label={t("routines.form.name")} id="nr-name">
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
               </Field>
             </>
           )}
-          {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
-            <p className="routine-utc-hint small ac-iconline">
-              <Icon name="waiting" size={14} />
-              <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
-              <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
-                {t("routines.form.keepUtc")}
-              </button>
-            </p>
+          {shows("when") && (
+            <>
+              <div className="routine-kind">
+                <span className="ac-field__label">{t("routines.form.when")}</span>
+                <Segmented
+                  label={t("routines.form.when")}
+                  value={kind}
+                  onValueChange={setKind}
+                  options={[
+                    { value: "schedule" as const, label: t("routines.form.kind.schedule") },
+                    { value: "event" as const, label: t("routines.form.kind.event") },
+                    ...(hasMail ? [{ value: "email" as const, label: t("routines.form.kind.email") }] : []),
+                    ...(hasMillionSend
+                      ? [{ value: "connector" as const, label: t("routines.form.kind.connector") }]
+                      : []),
+                    { value: "webhook" as const, label: t("routines.form.kind.webhook") },
+                  ]}
+                />
+              </div>
+              {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
+              {kind === "connector" && <ConnectorTriggerFields value={connector} onChange={setConnector} />}
+              {kind === "webhook" &&
+                (routine?.trigger.type === "webhook" ? (
+                  <WebhookPanel routine={routine} runs={routine.recentRuns} />
+                ) : (
+                  <p className="routine-note small ac-iconline">
+                    <Icon name="link" size={14} />
+                    <span>{t("routines.webhook.newNote")}</span>
+                  </p>
+                ))}
+              {kind === "schedule" && (
+                <div className="routine-when">
+                  <div className="routine-when__head">
+                    <span className="routine-when__sentence" aria-live="polite">
+                      {ruleSentence(t, i18n.language, rule, new Date(), false)}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      icon="repeat"
+                      aria-expanded={pickerOpen}
+                      onClick={() => setPickerOpen((o) => !o)}
+                    >
+                      {t("routines.form.adjust")}
+                    </Button>
+                  </div>
+                  {!pickerOpen && upcoming.length > 0 && (
+                    <div className="ac-recur__upcoming">
+                      <span className="ac-recur__label">{t("routines.form.next")}</span>
+                      <ol>
+                        {upcoming.map((label) => (
+                          <li key={label} className="tabular">
+                            {label}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                  {pickerOpen && (
+                    <RecurrencePicker
+                      value={rule}
+                      onChange={pickRule}
+                      labels={recurrenceLabels(t, i18n.language, rule)}
+                      locale={i18n.language}
+                      upcoming={upcoming}
+                      hideTimezone
+                    />
+                  )}
+                </div>
+              )}
+              {kind === "schedule" && (
+                <>
+                  {!once && (
+                    <Field label={t("routines.form.frequency")} id="nr-when" error={phraseError()}>
+                      <Input
+                        value={phrase}
+                        onChange={(e) => typePhrase(e.target.value)}
+                        placeholder={t("recurrence.phrasePlaceholder")}
+                      />
+                    </Field>
+                  )}
+                  <Field label={t("routines.form.timezone")} id="nr-zone">
+                    <ZoneSelect value={zone} onChange={setZone} />
+                  </Field>
+                </>
+              )}
+              {kind === "schedule" && wasUtc && !isUtc(shownZone) && (
+                <p className="routine-utc-hint small ac-iconline">
+                  <Icon name="waiting" size={14} />
+                  <span>{t("routines.form.utcHint", { zone: timezoneName(shownZone, i18n.language) })}</span>
+                  <button type="button" className="ac-link" onClick={() => setZone("UTC")}>
+                    {t("routines.form.keepUtc")}
+                  </button>
+                </p>
+              )}
+              {kind !== "event" ? null : (
+                <Field
+                  label={t("routines.form.event")}
+                  id="nr-event"
+                  hint={{
+                    name: t("common.about", { label: t("routines.form.event") }),
+                    text: t("routines.form.eventHelp", { org: org.name }),
+                  }}
+                >
+                  <Select
+                    value={event}
+                    onValueChange={(v) => setEvent(v as RoutineEvent)}
+                    options={ROUTINE_EVENTS.map((e) => ({ value: e, label: t(`routines.event.${e}`) }))}
+                  />
+                </Field>
+              )}
+              {busy && (
+                <p className="routine-note small ac-iconline" role="status">
+                  <Icon name="computer" size={14} />
+                  <span>{say(busy)}</span>
+                </p>
+              )}
+            </>
           )}
-          {kind !== "event" ? null : (
-            <Field
-              label={t("routines.form.event")}
-              id="nr-event"
-              hint={{
-                name: t("common.about", { label: t("routines.form.event") }),
-                text: t("routines.form.eventHelp", { org: org.name }),
-              }}
-            >
-              <Select
-                value={event}
-                onValueChange={(v) => setEvent(v as RoutineEvent)}
-                options={ROUTINE_EVENTS.map((e) => ({ value: e, label: t(`routines.event.${e}`) }))}
+          {!part && (
+            <>
+              <div className="routine-kind">
+                <span className="ac-hintline">
+                  <span className="ac-field__label">{t("routines.form.report")}</span>
+                  <InfoHint name={t("common.about", { label: t("routines.form.report") })}>
+                    {t("routines.report.hint")}
+                  </InfoHint>
+                </span>
+                <Segmented
+                  label={t("routines.form.report")}
+                  value={report}
+                  onValueChange={setReport}
+                  options={(["always", "when_new"] as const).map((v) => ({
+                    value: v,
+                    label: t(`routines.report.${v}`),
+                  }))}
+                />
+              </div>
+              <div className="routine-own-actions">
+                <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
+                <OwnActions routine={routine} />
+              </div>
+              <RoutineReachWarnings
+                prompt={prompt}
+                agentId={agentId || null}
+                creatorUserId={routine?.createdByUserId}
               />
-            </Field>
-          )}
-          {busy && (
-            <p className="routine-note small ac-iconline" role="status">
-              <Icon name="computer" size={14} />
-              <span>{say(busy)}</span>
-            </p>
-          )}
-          <div className="routine-kind">
-            <span className="ac-hintline">
-              <span className="ac-field__label">{t("routines.form.report")}</span>
-              <InfoHint name={t("common.about", { label: t("routines.form.report") })}>
-                {t("routines.report.hint")}
-              </InfoHint>
-            </span>
-            <Segmented
-              label={t("routines.form.report")}
-              value={report}
-              onValueChange={setReport}
-              options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
-            />
-          </div>
-          <div className="routine-own-actions">
-            <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
-            <OwnActions routine={routine} />
-          </div>
-          <RoutineReachWarnings prompt={prompt} agentId={agentId || null} creatorUserId={routine?.createdByUserId} />
-          {editing && !(routine && isDoneOnce(routine)) && (
-            <label className="routine-active" htmlFor="nr-active">
-              <Switch id="nr-active" checked={active} onCheckedChange={setActive} />
-              <span>{t("routines.form.active")}</span>
-            </label>
+            </>
           )}
         </DialogBody>
         <DialogFooter>

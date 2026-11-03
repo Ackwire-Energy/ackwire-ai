@@ -124,6 +124,7 @@ export * from "./issue-columns";
 export * from "./issue-tools";
 export * from "./issue-work";
 export * from "./issues";
+export * from "./issues-view";
 export * from "./jev-key";
 export * from "./jobs";
 export * from "./judge";

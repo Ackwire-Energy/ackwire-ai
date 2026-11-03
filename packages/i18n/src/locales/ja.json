@@ -2914,7 +2914,15 @@
     "budgetDefaultHelp": "空欄: ワークスペースのデフォルト。",
     "budgetDefaultHelpAmount": "空欄: ワークスペースのデフォルト（{{amount}}）。",
     "budgetInvalid": "0より大きい値を入力してください。",
-    "notFound": "このエージェントは存在しないか、アーカイブされています。"
+    "notFound": "このエージェントは存在しないか、アーカイブされています。",
+    "editName": "名前を編集: {{name}}",
+    "editHandle": "メンションを編集: @{{handle}}",
+    "editRole": "役割を編集: {{role}}",
+    "noRole": "役割なし",
+    "rolePlaceholder": "例: サポート",
+    "roleList": "役割の一覧",
+    "roleUse": "「{{role}}」を使う",
+    "roleCurrent": "現在"
   },
   "agentPage": {
     "work": {
@@ -3967,13 +3975,9 @@
     },
     "dialog": {
       "title": "{{org}}に招待",
-      "sub": "メールで招待するとそのまま参加します。リンクの場合は、相手がリクエストし、あなたが承認します。",
-      "subLink": "リンクを開いた人は参加をリクエストし、あなたが一人ずつ承認します。",
       "emails": "メールアドレス",
       "moreEmails": "メールアドレスを追加…",
-      "help": "各自にメールが届き、選んだロールでそのまま参加します。招待は7日間有効です。",
       "checkMarked": "マークされたメールアドレスを確認してください。招待は届きません。",
-      "channelsAndNote": "チャンネルとメッセージ",
       "withNote": "メッセージ付き",
       "alsoJoin": "あわせて参加するチャンネル",
       "generalAlways": "全員が#{{channel}}に参加します",
@@ -3984,7 +3988,84 @@
       "send_other": "{{count}}人を招待",
       "sent": "{{email}}に招待を送信しました。",
       "sentMany": "{{count}}件の招待を送信しました。",
-      "alsoIn": "{{channels}}にもあわせて参加します。"
+      "alsoIn": "{{channels}}にもあわせて参加します。",
+      "stepOf": "ステップ {{n}}/{{total}} · {{step}}",
+      "steps": {
+        "who": "招待する人",
+        "role": "ロール",
+        "where": "参加チャンネル",
+        "note": "メッセージ"
+      },
+      "pasteHelp": "リストを貼り付けることもできます。カンマ、スペース、または1行に1件で区切ってください。",
+      "leftOut": "すでに参加している人や招待済みの人は除かれます。",
+      "continueWith": "{{count}}人で続ける",
+      "who": {
+        "title": "だれを招待しますか？",
+        "lead": "メールアドレスを教えてください。それぞれに招待が届き、そのまま参加できます。"
+      },
+      "orLink": {
+        "title": "リンクを送りますか？",
+        "text": "開いた人が参加をリクエストし、あなたが承認します。",
+        "open": "リンクを見る"
+      },
+      "role": {
+        "titleOne": "{{name}}さんのロールはどれにしますか？",
+        "titleMany": "この人たちのロールはどれにしますか？",
+        "lead": "ロールで、それぞれができることが決まります。あとで変更できます。",
+        "each": "一人ずつロールを選ぶ",
+        "same": "全員に同じロール"
+      },
+      "where": {
+        "titleOne": "{{name}}さんが最初から参加するチャンネルは？",
+        "titleMany": "この人たちが最初から参加するチャンネルは？",
+        "lead": "全員が#{{channel}}から始まります。ほかのチャンネルはあなたが選びます。",
+        "label": "チャンネル",
+        "everyone": "全員が参加",
+        "private": "プライベート · あなたも参加中",
+        "people_other": "{{count}}人",
+        "fromChannel": "このチャンネルから招待したので、#{{channel}}は選択済みです。"
+      },
+      "noteStep": {
+        "title": "招待にメッセージを添えますか？",
+        "lead": "メールに一緒に載ります。なくても、そのまま送ります。"
+      },
+      "mailFor": "{{names}}に届くメール",
+      "mail": {
+        "from": "agentes.chat · 宛先: {{to}}",
+        "toMany": "{{email}} ほか{{count}}件",
+        "subject": "agentes.chat のワークスペースに招待されました",
+        "headline": "ワークスペースに招待されました",
+        "body": "<b>{{name}}</b> ({{email}}) から、<b>{{org}}</b> にメンバーとして招待されました。",
+        "noteFrom": "<b>{{name}}:</b> 「{{note}}」",
+        "what": "agentes.chat は、人と AI エージェントが一緒に働く場所です。",
+        "button": "招待を承諾",
+        "small": "招待の有効期限は7日間です。このメールアドレスで承諾してください。"
+      },
+      "done": {
+        "title": "{{names}}に招待を送りました。",
+        "leadOne": "{{name}}さんが参加したら、{{channels}}で迎えて、お知らせします。",
+        "leadMany": "参加した人から順に{{channels}}で迎えて、お知らせします。",
+        "none": "今回は招待を送りませんでした。",
+        "noneLead": "各アドレスの理由は下にあります。"
+      },
+      "result": {
+        "invited": "送信済み",
+        "already_member": "{{org}}に参加済み",
+        "already_invited": "招待済み",
+        "invalid_email": "無効なメールアドレス"
+      },
+      "again": "さらに招待",
+      "finish": "完了",
+      "linkStep": {
+        "title": "{{org}}の招待リンクです。",
+        "lead": "開いた人は参加をリクエストします。リクエストはひとつずつお見せするので、承認してください。",
+        "how1": "相手がリンクを開いて、だれなのかを伝えます。",
+        "how2": "リクエストは、招待できる人にここと携帯電話で届きます。",
+        "how3": "承認するときに、参加するロールを選びます。",
+        "waiting_other": "{{count}}件のリクエストが承認を待っています",
+        "seeRequests": "リクエストを見る",
+        "byEmail": "メールで招待"
+      }
     },
     "invitations": {
       "title": "送信済みの招待",
@@ -4277,7 +4358,6 @@
     }
   },
   "issues": {
-    "moreFilters": "担当者と優先度で絞り込む",
     "assigneeFilter": "担当者",
     "priorityFilter": "優先度",
     "title": "タスク",
@@ -4288,19 +4368,11 @@
     "list": "リスト",
     "new": "新しいタスク",
     "filters": "タスクを絞り込む",
-    "filter": {
-      "all": "すべて",
-      "agents": "エージェント担当",
-      "people": "人が担当",
-      "mine": "自分の担当",
-      "none": "未割り当て"
-    },
     "unassigned_other": "未割り当て{{count}}件",
     "emptyTitle": "タスクはまだありません",
     "panelLabel": "タスク #{{number}}",
     "openPage": "タスクのページを開く",
     "close": "閉じる",
-    "dropHere": "ここにドロップ",
     "moved": "#{{number}}を{{status}}に移動しました。",
     "movedTo": "{{column}}に移動しました",
     "newIn": "{{column}}に新しいタスク",
@@ -4543,6 +4615,54 @@
       "agent_asked": "{{name}}に作業を頼みました",
       "forum_opened": "フォーラムに持ち込みました: {{title}}",
       "forum_evaluated": "フォーラムの結果を戻しました: {{title}}"
+    },
+    "filterButton": "フィルター",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "自分",
+    "display": {
+      "title": "表示設定",
+      "label": "表示設定：{{layout}} · {{group}}",
+      "layout": "レイアウト",
+      "group": "グループ化",
+      "sort": "並べ替え",
+      "fields": "カードに表示",
+      "saved": "このワークスペースであなた用に保存されます",
+      "reset": "デフォルトに戻す",
+      "by": {
+        "stage": "段階",
+        "assignee": "担当者",
+        "priority": "優先度"
+      },
+      "order": {
+        "manual": "手動",
+        "priority": "優先度",
+        "due": "期日"
+      },
+      "field": {
+        "assignee": "担当者",
+        "priority": "優先度",
+        "due": "期日",
+        "criteria": "条件",
+        "pullRequest": "プルリクエスト",
+        "label": "ラベル"
+      }
+    },
+    "drop": {
+      "stage": "{{name}}にドロップ",
+      "assignee": "ドロップして{{name}}に渡す",
+      "unassign": "ドロップして担当者を外す",
+      "priority": "ドロップして優先度を{{priority}}にする"
+    },
+    "drag": {
+      "role": "ドラッグできるタスク",
+      "help": "スペースでタスクを持ち上げ、矢印キーで移動し、スペースで置き、Escでキャンセルします。",
+      "picked": "#{{number}}を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
+      "moved": "#{{number}}：{{group}}、{{total}}件中{{position}}番目。",
+      "dropped": "#{{number}}を{{group}}に置きました。",
+      "canceled": "#{{number}}は元の場所に戻りました。",
+      "assigned": "#{{number}}の担当は{{name}}になりました。",
+      "unassigned": "#{{number}}の担当者がいなくなりました。",
+      "prioritized": "#{{number}}の優先度は{{priority}}になりました。"
     }
   },
   "routines": {
@@ -4729,7 +4849,24 @@
         "artifact": "Driveのドキュメントになります"
       },
       "ahead": "あとで実行する準備済み",
-      "ownActions": "自動で行うこと"
+      "ownActions": "自動で行うこと",
+      "createdBy": "作成者: {{name}} · {{date}}",
+      "nameLabel": "ルーティンの名前",
+      "editName": "名前を編集",
+      "editWhat": "やることを編集",
+      "tabs": {
+        "label": "ルーティンのセクション",
+        "details": "詳細",
+        "runs": "実行履歴"
+      },
+      "nexts": "次の実行",
+      "who": "担当",
+      "onAirLine": "時間になると自動で実行されます",
+      "offAirLine": "オンにするまで実行されません",
+      "reportHint": {
+        "always": "新しい情報がなくても",
+        "when_new": "新しい情報がなければ投稿しません"
+      }
     },
     "ownActions": {
       "hint": "毎回の実行で、接続済みアプリでこれらを確認なしで行います。それ以外の操作は先に人の承認を求め、マージ、デプロイ、ロールバックは常に承認を求めます。",

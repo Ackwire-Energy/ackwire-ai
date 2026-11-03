@@ -3030,7 +3030,15 @@
     "budgetDefaultHelp": "Leeg: de standaard van de werkruimte.",
     "budgetDefaultHelpAmount": "Leeg: de standaard van de werkruimte ({{amount}}).",
     "budgetInvalid": "Gebruik een waarde groter dan nul.",
-    "notFound": "Deze agent bestaat niet of is gearchiveerd."
+    "notFound": "Deze agent bestaat niet of is gearchiveerd.",
+    "editName": "Naam bewerken: {{name}}",
+    "editHandle": "Vermeldingen bewerken: @{{handle}}",
+    "editRole": "Rol bewerken: {{role}}",
+    "noRole": "Geen rol",
+    "rolePlaceholder": "Bijv. Support",
+    "roleList": "Rollen",
+    "roleUse": "“{{role}}” gebruiken",
+    "roleCurrent": "huidig"
   },
   "agentPage": {
     "work": {
@@ -4170,13 +4178,9 @@
     },
     "dialog": {
       "title": "Uitnodigen voor {{org}}",
-      "sub": "Via e-mail doen ze direct mee. Via de link vragen ze het aan en keur jij het goed.",
-      "subLink": "Wie de link opent vraagt om mee te doen, en jij keurt elke persoon goed.",
       "emails": "E-mailadressen",
       "moreEmails": "Meer e-mailadressen…",
-      "help": "Elke persoon krijgt een e-mail en doet direct mee, met de rol die je kiest. De uitnodiging werkt 7 dagen.",
       "checkMarked": "Controleer de gemarkeerde e-mailadressen: die krijgen geen uitnodiging.",
-      "channelsAndNote": "Kanalen en notitie",
       "withNote": "met een notitie",
       "alsoJoin": "Ze komen ook in",
       "generalAlways": "Iedereen komt in #{{channel}}",
@@ -4188,7 +4192,86 @@
       "send_other": "{{count}} mensen uitnodigen",
       "sent": "Uitnodiging verstuurd naar {{email}}.",
       "sentMany": "{{count}} uitnodigingen verstuurd.",
-      "alsoIn": "Ze komen ook in {{channels}}."
+      "alsoIn": "Ze komen ook in {{channels}}.",
+      "stepOf": "Stap {{n}} van {{total}} · {{step}}",
+      "steps": {
+        "who": "Wie",
+        "role": "Rol",
+        "where": "Waar ze beginnen",
+        "note": "Notitie"
+      },
+      "pasteHelp": "Plak een lijst als je wilt: komma's, spaties of één per regel.",
+      "leftOut": "Wie er al is of al is uitgenodigd, valt erbuiten.",
+      "continueWith": "Doorgaan met {{count}}",
+      "who": {
+        "title": "Wie wil je erbij halen?",
+        "lead": "Geef me de e-mailadressen. Elke persoon krijgt een uitnodiging en doet direct mee."
+      },
+      "orLink": {
+        "title": "Liever een link sturen?",
+        "text": "Wie hem opent vraagt om mee te doen, en jij keurt het goed.",
+        "open": "Link bekijken"
+      },
+      "role": {
+        "titleOne": "Met welke rol komt {{name}} erbij?",
+        "titleMany": "Met welke rol komen deze mensen erbij?",
+        "lead": "De rol bepaalt wat elke persoon kan doen. Je kunt hem later wijzigen.",
+        "each": "Een rol per persoon",
+        "same": "Dezelfde rol voor iedereen"
+      },
+      "where": {
+        "titleOne": "In welke kanalen komt {{name}} meteen?",
+        "titleMany": "In welke kanalen komen deze mensen meteen?",
+        "lead": "Iedereen begint in #{{channel}}. De andere kies jij.",
+        "label": "Kanalen",
+        "everyone": "Iedereen komt erin",
+        "private": "Privé · jij zit erin",
+        "people_one": "{{count}} persoon",
+        "people_other": "{{count}} mensen",
+        "fromChannel": "#{{channel}} staat al aangevinkt: je nodigde vanuit dat kanaal uit."
+      },
+      "noteStep": {
+        "title": "Zal ik iets in de uitnodiging zeggen?",
+        "lead": "Het gaat mee in de e-mail. Zo niet, dan stuur ik hem zo."
+      },
+      "mailFor": "Zo komt het aan bij {{names}}",
+      "mail": {
+        "from": "agentes.chat · aan {{to}}",
+        "toMany": "{{email}} en {{count}} meer",
+        "subject": "Je bent uitgenodigd voor een werkruimte op agentes.chat",
+        "headline": "Je bent uitgenodigd voor een werkruimte",
+        "body": "<b>{{name}}</b> ({{email}}) nodigt je uit om lid te worden van <b>{{org}}</b> als lid.",
+        "noteFrom": "<b>{{name}}:</b> ‘{{note}}’",
+        "what": "Op agentes.chat werken mensen en AI-agents samen.",
+        "button": "Uitnodiging accepteren",
+        "small": "De uitnodiging werkt 7 dagen. Accepteer haar met dit e-mailadres."
+      },
+      "done": {
+        "title": "Klaar, ik heb de uitnodiging naar {{names}} gestuurd.",
+        "leadOne": "Als {{name}} erbij komt, verwelkom ik die persoon in {{channels}} en laat ik het je weten.",
+        "leadMany": "Als iemand erbij komt, verwelkom ik die persoon in {{channels}} en laat ik het je weten.",
+        "none": "Deze keer is er geen uitnodiging verstuurd.",
+        "noneLead": "Hieronder staat de reden per adres."
+      },
+      "result": {
+        "invited": "Verstuurd",
+        "already_member": "zit al in {{org}}",
+        "already_invited": "had al een uitnodiging",
+        "invalid_email": "ongeldig e-mailadres"
+      },
+      "again": "Meer mensen uitnodigen",
+      "finish": "Klaar",
+      "linkStep": {
+        "title": "Dit is de link van {{org}}.",
+        "lead": "Wie hem opent, vraagt om mee te doen. Ik laat je elk verzoek zien, en jij keurt het goed.",
+        "how1": "De persoon opent de link en zegt wie die is.",
+        "how2": "Het verzoek komt bij wie uitnodigt, hier en op de telefoon.",
+        "how3": "Jij keurt het goed en kiest met welke rol de persoon meedoet.",
+        "waiting_one": "Eén verzoek wacht op je",
+        "waiting_other": "{{count}} verzoeken wachten op je",
+        "seeRequests": "Verzoeken bekijken",
+        "byEmail": "Uitnodigen via e-mail"
+      }
     },
     "invitations": {
       "title": "Verstuurde uitnodigingen",
@@ -4485,7 +4568,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filteren op toegewezen persoon en prioriteit",
     "assigneeFilter": "Toegewezen aan",
     "priorityFilter": "Prioriteit",
     "title": "Taken",
@@ -4496,20 +4578,12 @@
     "list": "Lijst",
     "new": "Nieuwe taak",
     "filters": "Taken filteren",
-    "filter": {
-      "all": "Alle",
-      "agents": "Bij agents",
-      "people": "Bij mensen",
-      "mine": "Van mij",
-      "none": "Niet toegewezen"
-    },
     "unassigned_one": "{{count}} niet toegewezen",
     "unassigned_other": "{{count}} niet toegewezen",
     "emptyTitle": "Nog geen taken",
     "panelLabel": "Taak #{{number}}",
     "openPage": "De pagina van de taak openen",
     "close": "Sluiten",
-    "dropHere": "Hier loslaten",
     "moved": "#{{number}} in {{status}}.",
     "movedTo": "Verplaatst naar {{column}}",
     "newIn": "Nieuwe taak in {{column}}",
@@ -4766,6 +4840,54 @@
       "agent_asked": "heeft {{name}} gevraagd het te doen",
       "forum_opened": "heeft het naar het forum gebracht: {{title}}",
       "forum_evaluated": "heeft het resultaat van het forum teruggebracht: {{title}}"
+    },
+    "filterButton": "Filteren",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ik",
+    "display": {
+      "title": "Weergave",
+      "label": "Weergave: {{layout}} · {{group}}",
+      "layout": "Indeling",
+      "group": "Groeperen op",
+      "sort": "Sorteren op",
+      "fields": "Op de kaarten",
+      "saved": "Voor jou bewaard in deze werkruimte",
+      "reset": "Terug naar standaard",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit"
+      },
+      "order": {
+        "manual": "Handmatig",
+        "priority": "Prioriteit",
+        "due": "Deadline"
+      },
+      "field": {
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit",
+        "due": "Deadline",
+        "criteria": "Voorwaarden",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Loslaten in {{name}}",
+      "assignee": "Loslaten om aan {{name}} te geven",
+      "unassign": "Loslaten om de toewijzing weg te halen",
+      "priority": "Loslaten voor prioriteit {{priority}}"
+    },
+    "drag": {
+      "role": "versleepbare taak",
+      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
+      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
+      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
+      "canceled": "#{{number}} staat weer op zijn plek.",
+      "assigned": "#{{number}} ligt nu bij {{name}}.",
+      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
+      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
     }
   },
   "routines": {
@@ -4951,7 +5073,24 @@
         "artifact": "Wordt een document in de Drive"
       },
       "ahead": "Klaargezet voor later",
-      "ownActions": "Doet zelf"
+      "ownActions": "Doet zelf",
+      "createdBy": "Gemaakt door {{name}} · {{date}}",
+      "nameLabel": "Naam van de routine",
+      "editName": "Naam bewerken",
+      "editWhat": "Bewerken wat hij doet",
+      "tabs": {
+        "label": "Onderdelen van de routine",
+        "details": "Gegevens",
+        "runs": "Uitvoeringen"
+      },
+      "nexts": "Volgende",
+      "who": "Wie het doet",
+      "onAirLine": "Draait vanzelf als het tijd is",
+      "offAirLine": "Draait niet tot je hem aanzet",
+      "reportHint": {
+        "always": "Ook als er niets nieuws is",
+        "when_new": "Stil als er niets nieuws is"
+      }
     },
     "ownActions": {
       "hint": "Elke run doet dit in je gekoppelde apps zonder te vragen. Elke andere actie daar vraagt eerst een persoon om goedkeuring, en merge, deploy en rollback vragen dat altijd.",

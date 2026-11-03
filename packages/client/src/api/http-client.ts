@@ -99,6 +99,7 @@ import type {
   Issue,
   IssueActivity,
   IssueColumn,
+  IssuesView,
   JevKey,
   JoinApproval,
   JoinClaim,
@@ -508,6 +509,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: { order },
           })
         ).order,
+      issuesView: async (orgId) => (await request<{ view: IssuesView }>(`${org(orgId)}/me/issues-view`)).view,
+      setIssuesView: async (orgId, view) =>
+        (await request<{ view: IssuesView }>(`${org(orgId)}/me/issues-view`, { method: "PUT", json: { view } })).view,
       sidebarToolOrder: async (orgId) =>
         (await request<{ order: SidebarItem[] }>(`${org(orgId)}/me/sidebar/tools`)).order,
       setSidebarToolOrder: async (orgId, order) =>

@@ -3018,7 +3018,15 @@
     "budgetDefaultHelp": "Leer: der Standard des Workspace.",
     "budgetDefaultHelpAmount": "Leer: der Standard des Workspace ({{amount}}).",
     "budgetInvalid": "Gib einen Wert über null ein.",
-    "notFound": "Diesen Agenten gibt es nicht oder er wurde archiviert."
+    "notFound": "Diesen Agenten gibt es nicht oder er wurde archiviert.",
+    "editName": "Namen bearbeiten: {{name}}",
+    "editHandle": "Erwähnungen bearbeiten: @{{handle}}",
+    "editRole": "Rolle bearbeiten: {{role}}",
+    "noRole": "Keine Rolle",
+    "rolePlaceholder": "z. B. Kundenservice",
+    "roleList": "Rollen",
+    "roleUse": "„{{role}}“ verwenden",
+    "roleCurrent": "aktuell"
   },
   "agentPage": {
     "work": {
@@ -4126,13 +4134,9 @@
     },
     "dialog": {
       "title": "Zu {{org}} einladen",
-      "sub": "Per E-Mail treten sie direkt bei. Über den Link fragen sie an und du bestätigst.",
-      "subLink": "Wer den Link öffnet, fragt nach Beitritt, und du bestätigst jede Person.",
       "emails": "E-Mails",
       "moreEmails": "Weitere E-Mails…",
-      "help": "Jede Person bekommt eine E-Mail und tritt direkt bei, mit der Rolle, die du wählst. Die Einladung gilt 7 Tage.",
       "checkMarked": "Prüfe die markierten E-Mail-Adressen: Sie bekommen keine Einladung.",
-      "channelsAndNote": "Kanäle und Notiz",
       "withNote": "mit einer Notiz",
       "alsoJoin": "Sie treten auch bei",
       "generalAlways": "Alle treten #{{channel}} bei",
@@ -4144,7 +4148,86 @@
       "send_other": "{{count}} Personen einladen",
       "sent": "Einladung an {{email}} gesendet.",
       "sentMany": "{{count}} Einladungen gesendet.",
-      "alsoIn": "Sie treten auch {{channels}} bei."
+      "alsoIn": "Sie treten auch {{channels}} bei.",
+      "stepOf": "Schritt {{n}} von {{total}} · {{step}}",
+      "steps": {
+        "who": "Wer",
+        "role": "Rolle",
+        "where": "Wo es losgeht",
+        "note": "Notiz"
+      },
+      "pasteHelp": "Füge eine Liste ein, wenn du willst: Kommas, Leerzeichen oder eine pro Zeile.",
+      "leftOut": "Wer schon dabei oder schon eingeladen ist, bleibt außen vor.",
+      "continueWith": "Weiter mit {{count}}",
+      "who": {
+        "title": "Wen möchtest du dazuholen?",
+        "lead": "Gib mir die E-Mail-Adressen. Jede Person bekommt eine Einladung und tritt direkt bei."
+      },
+      "orLink": {
+        "title": "Lieber einen Link schicken?",
+        "text": "Wer ihn öffnet, fragt nach Beitritt, und du bestätigst.",
+        "open": "Link ansehen"
+      },
+      "role": {
+        "titleOne": "Mit welcher Rolle tritt {{name}} bei?",
+        "titleMany": "Mit welcher Rolle treten diese Personen bei?",
+        "lead": "Die Rolle bestimmt, was jede Person tun kann. Du kannst sie später ändern.",
+        "each": "Eine Rolle pro Person",
+        "same": "Dieselbe Rolle für alle"
+      },
+      "where": {
+        "titleOne": "In welchen Kanälen ist {{name}} gleich dabei?",
+        "titleMany": "In welchen Kanälen sind diese Personen gleich dabei?",
+        "lead": "Alle starten in #{{channel}}. Die anderen wählst du.",
+        "label": "Kanäle",
+        "everyone": "Alle sind dabei",
+        "private": "Privat · du bist drin",
+        "people_one": "{{count}} Person",
+        "people_other": "{{count}} Personen",
+        "fromChannel": "#{{channel}} ist schon angehakt: Du hast von dort eingeladen."
+      },
+      "noteStep": {
+        "title": "Soll ich etwas in die Einladung schreiben?",
+        "lead": "Es steht dann in der E-Mail. Wenn nicht, schicke ich sie so."
+      },
+      "mailFor": "So kommt es bei {{names}} an",
+      "mail": {
+        "from": "agentes.chat · an {{to}}",
+        "toMany": "{{email}} und {{count}} weitere",
+        "subject": "Du bist zu einem Workspace auf agentes.chat eingeladen",
+        "headline": "Du bist zu einem Workspace eingeladen",
+        "body": "<b>{{name}}</b> ({{email}}) lädt dich ein, <b>{{org}}</b> als Mitglied beizutreten.",
+        "noteFrom": "<b>{{name}}:</b> „{{note}}“",
+        "what": "Auf agentes.chat arbeiten Menschen und KI-Agenten zusammen.",
+        "button": "Einladung annehmen",
+        "small": "Die Einladung gilt 7 Tage lang. Nimm sie mit dieser E-Mail-Adresse an."
+      },
+      "done": {
+        "title": "Fertig, ich habe die Einladung an {{names}} geschickt.",
+        "leadOne": "Wenn {{name}} beitritt, begrüße ich die Person in {{channels}} und sage dir Bescheid.",
+        "leadMany": "Wenn jemand beitritt, begrüße ich die Person in {{channels}} und sage dir Bescheid.",
+        "none": "Diesmal ist keine Einladung rausgegangen.",
+        "noneLead": "Den Grund für jede Adresse siehst du unten."
+      },
+      "result": {
+        "invited": "Gesendet",
+        "already_member": "schon in {{org}}",
+        "already_invited": "hatte schon eine Einladung",
+        "invalid_email": "ungültige E-Mail"
+      },
+      "again": "Weitere Personen einladen",
+      "finish": "Fertig",
+      "linkStep": {
+        "title": "Das ist der Link von {{org}}.",
+        "lead": "Wer ihn öffnet, fragt nach Beitritt. Ich zeige dir jede Anfrage, und du bestätigst.",
+        "how1": "Die Person öffnet den Link und sagt, wer sie ist.",
+        "how2": "Die Anfrage geht an alle, die einladen, hier und auf dem Handy.",
+        "how3": "Du bestätigst und wählst, mit welcher Rolle die Person beitritt.",
+        "waiting_one": "Eine Anfrage wartet auf dich",
+        "waiting_other": "{{count}} Anfragen warten auf dich",
+        "seeRequests": "Anfragen ansehen",
+        "byEmail": "Per E-Mail einladen"
+      }
     },
     "invitations": {
       "title": "Gesendete Einladungen",
@@ -4441,7 +4524,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Nach Zuständigen und Priorität filtern",
     "assigneeFilter": "Zuständig",
     "priorityFilter": "Priorität",
     "title": "Aufgaben",
@@ -4452,20 +4534,12 @@
     "list": "Liste",
     "new": "Neue Aufgabe",
     "filters": "Aufgaben filtern",
-    "filter": {
-      "all": "Alle",
-      "agents": "Bei Agenten",
-      "people": "Bei Personen",
-      "mine": "Meine",
-      "none": "Nicht zugewiesen"
-    },
     "unassigned_one": "{{count}} nicht zugewiesen",
     "unassigned_other": "{{count}} nicht zugewiesen",
     "emptyTitle": "Noch keine Aufgaben",
     "panelLabel": "Aufgabe #{{number}}",
     "openPage": "Seite der Aufgabe öffnen",
     "close": "Schließen",
-    "dropHere": "Hier ablegen",
     "moved": "#{{number}} in {{status}}.",
     "movedTo": "Verschoben nach {{column}}",
     "newIn": "Neue Aufgabe in {{column}}",
@@ -4713,6 +4787,54 @@
       "agent_asked": "hat {{name}} gebeten, sie zu erledigen",
       "forum_opened": "hat sie ins Forum gebracht: {{title}}",
       "forum_evaluated": "hat das Ergebnis aus dem Forum zurückgebracht: {{title}}"
+    },
+    "filterButton": "Filtern",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ich",
+    "display": {
+      "title": "Darstellung",
+      "label": "Darstellung: {{layout}} · {{group}}",
+      "layout": "Anordnung",
+      "group": "Gruppieren nach",
+      "sort": "Sortieren nach",
+      "fields": "Auf den Karten",
+      "saved": "Für dich in diesem Workspace gespeichert",
+      "reset": "Zurück zum Standard",
+      "by": {
+        "stage": "Phase",
+        "assignee": "Zuständig",
+        "priority": "Priorität"
+      },
+      "order": {
+        "manual": "Manuell",
+        "priority": "Priorität",
+        "due": "Fälligkeit"
+      },
+      "field": {
+        "assignee": "Zuständig",
+        "priority": "Priorität",
+        "due": "Fälligkeit",
+        "criteria": "Kriterien",
+        "pullRequest": "Pull-Request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "In {{name}} ablegen",
+      "assignee": "Ablegen, um sie {{name}} zu geben",
+      "unassign": "Ablegen, um die Zuständigkeit zu entfernen",
+      "priority": "Ablegen für Priorität {{priority}}"
+    },
+    "drag": {
+      "role": "verschiebbare Aufgabe",
+      "help": "Leertaste nimmt die Aufgabe, die Pfeiltasten verschieben sie, Leertaste legt sie ab und Esc bricht ab.",
+      "picked": "Du hast #{{number}} aufgenommen. Die Pfeiltasten verschieben sie, Leertaste legt sie ab, Esc bricht ab.",
+      "moved": "#{{number}}: {{group}}, Position {{position}} von {{total}}.",
+      "dropped": "Du hast #{{number}} in {{group}} abgelegt.",
+      "canceled": "#{{number}} ist wieder an ihrem Platz.",
+      "assigned": "#{{number}} liegt jetzt bei {{name}}.",
+      "unassigned": "#{{number}} ist jetzt niemandem zugewiesen.",
+      "prioritized": "#{{number}} hat jetzt Priorität {{priority}}."
     }
   },
   "routines": {
@@ -4901,7 +5023,24 @@
         "artifact": "Wird zu einem Dokument im Drive"
       },
       "ahead": "Für später vorbereitet",
-      "ownActions": "Macht selbst"
+      "ownActions": "Macht selbst",
+      "createdBy": "Erstellt von {{name}} · {{date}}",
+      "nameLabel": "Name der Routine",
+      "editName": "Namen bearbeiten",
+      "editWhat": "Bearbeiten, was sie tut",
+      "tabs": {
+        "label": "Bereiche der Routine",
+        "details": "Übersicht",
+        "runs": "Ausführungen"
+      },
+      "nexts": "Nächste Ausführungen",
+      "who": "Wer sie ausführt",
+      "onAirLine": "Läuft von selbst, wenn es so weit ist",
+      "offAirLine": "Läuft nicht, bis du sie einschaltest",
+      "reportHint": {
+        "always": "Auch wenn es nichts Neues gibt",
+        "when_new": "Still, wenn es nichts Neues gibt"
+      }
     },
     "ownActions": {
       "hint": "Jeder Lauf erledigt das in deinen verbundenen Apps, ohne zu fragen. Jede andere Aktion dort fragt zuerst eine Person, und Merge, Deploy und Rollback fragen immer.",

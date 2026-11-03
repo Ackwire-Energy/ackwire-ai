@@ -2,9 +2,11 @@ import { elapsedClock, type LiveWork } from "@agenteschat/client";
 import {
   type ActivityEntry,
   activitySentence,
+  activityVerb,
   barAsking,
   barFaces,
   barWords,
+  listNames,
   markedPieces,
   markInk,
 } from "@agenteschat/client/lib/activity";
@@ -76,6 +78,38 @@ export function BarPhrase({ entries }: { entries: ActivityEntry[] }) {
 }
 
 /**
+ * One agent whose row is out of view: its name and its row's step ("Nina consultando o Email · …"). The step keeps
+ * one width (cut with "…"), so its time and the controls after it never move under the pointer as it turns; the
+ * whole step stays for screen readers and as the tip.
+ */
+export function BarStep({ name, step }: { name: string; step: string }) {
+  return (
+    <span className="ac-typing__agents">
+      <b>{name}</b>{" "}
+      <span className="ac-typing__step" title={step}>
+        <TurnText text={step} />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Who is typing beside that agent, after its time: "· Marina digitando…". The names give way first, never what they
+ * do; the time and the stop stay the agent's.
+ */
+export function BarAlsoTyping({ entries }: { entries: ActivityEntry[] }) {
+  const { t } = useTranslation();
+  const people = entries.flatMap((e) => (e.type === "person" ? [e.name] : []));
+  if (people.length === 0) return null;
+  return (
+    <span className="ac-typing__also">
+      <span className="ac-typing__typers">{boldNames(listNames(t, people, markInk))}</span>
+      {` ${activityVerb(t, { kind: "typing" })}…`}
+    </span>
+  );
+}
+
+/**
  * A new phrase comes up from below while the old one leaves upward (just a swap with reduced motion).
  * The one leaving is drawn from an attribute, so the text on the page is only the phrase now.
  */
@@ -102,12 +136,22 @@ function TurnText({ text }: { text: string }) {
 
 /**
  * The waiting row's body, beside the agent's face until its first words arrive: three pixels in its color lighting up
- * in turn, then a muted line saying what it does now (`waitStep`), turning like the bar's phrase. In the dark theme
- * the pixels take the color's light tone.
+ * in turn, then a muted line saying what it does now (`waitStep`), turning like the bar's phrase, in one width (cut
+ * with "…", the whole step as the tip), and `tail` after it (its time and its stop). In the dark theme the pixels
+ * take the color's light tone.
  */
-export function WaitLine({ work, color }: { work: LiveWork[] | undefined; color?: AgentColor }) {
+export function WaitLine({
+  work,
+  color,
+  tail,
+}: {
+  work: LiveWork[] | undefined;
+  color?: AgentColor;
+  tail?: ReactNode;
+}) {
   const { t } = useTranslation();
   const [light, deep] = agentGradient(color);
+  const step = waitStep(t, work);
   return (
     <div className="ac-wait" style={{ "--wait-deep": deep, "--wait-light": light } as CSSProperties}>
       <span className="ac-wait__dots" aria-hidden="true">
@@ -115,9 +159,10 @@ export function WaitLine({ work, color }: { work: LiveWork[] | undefined; color?
         <i />
         <i />
       </span>
-      <span className="ac-wait__step">
-        <TurnText text={waitStep(t, work)} />
+      <span className="ac-wait__step" title={step}>
+        <TurnText text={step} />
       </span>
+      {tail}
     </div>
   );
 }

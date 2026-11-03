@@ -444,15 +444,36 @@ export function elapsedParts(ms: number): { m: number; s: number } | null {
 const turnAtWork = (runs: LiveRun[], agentId: string) =>
   runs.find((r) => r.agentId === agentId && r.status !== "failed" && r.status !== "canceled");
 
+/** How long a run has been at it ("16 s", "1 min 5 s"), from 2 s on: the bar's time and its live row's alike. */
+export function runElapsed(t: TFunction, run: Pick<LiveRun, "startedAt">, now: number): string | null {
+  const took = elapsedParts(now - (run.startedAt ?? now));
+  if (!took) return null;
+  return took.m > 0 ? t("run.elapsedMinutes", { m: took.m, s: took.s }) : t("run.elapsedSeconds", { n: took.s });
+}
+
 /** How long one agent on its own has been at it ("16 s", "1 min 5 s"): none for several, or while it asks another. */
 export function barElapsed(t: TFunction, entries: ActivityEntry[], runs: LiveRun[], now: number): string | null {
   const agents = entries.filter((e) => e.type === "agent");
   const only = agents.length === 1 ? agents[0] : undefined;
   if (!only || only.consult?.status === "asking") return null;
   const run = turnAtWork(runs, only.id);
-  const took = run ? elapsedParts(now - (run.startedAt ?? now)) : null;
-  if (!took) return null;
-  return took.m > 0 ? t("run.elapsedMinutes", { m: took.m, s: took.s }) : t("run.elapsedSeconds", { n: took.s });
+  return run ? runElapsed(t, run, now) : null;
+}
+
+/**
+ * The entries the bar still tells once the agents whose live rows are on screen say it there (their step, time and
+ * stop at the end of the row): saying it twice was noise. A question out keeps its own phrase, and people typing stay.
+ */
+export function entriesOffScreen(
+  entries: ActivityEntry[],
+  runs: LiveRun[],
+  rowInView: (run: LiveRun) => boolean,
+): ActivityEntry[] {
+  return entries.filter((e) => {
+    if (e.type !== "agent" || e.consult) return true;
+    const run = runs.find((r) => r.agentId === e.id && BAR_STATUSES.has(r.status));
+    return !run || !rowInView(run);
+  });
 }
 
 /** "trabalhando", "consultando o GitHub". */

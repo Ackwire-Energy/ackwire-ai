@@ -227,11 +227,11 @@ describe("live row in the timeline", () => {
   const bar = () => document.querySelector(".ac-typing") as HTMLElement;
   const shownText = (el: Element) => [...el.querySelectorAll(".ac-turn__in")].map((e) => e.textContent).join("|");
 
-  test("the waiting row after a moment: face, pixels and step, no name or time; it stays last while it works", async () => {
+  test("the waiting row after a moment: face, pixels, step, its time and stop, no name; it stays last while it works", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(2);
-    // Right after it starts: no row yet (the bar says it works, with its face until the row shows).
+    // Right after it starts: no row yet (the bar says it works, with its face).
     expect(row()).toBeNull();
     expect(bar().querySelector(".ac-typing__avatars")).not.toBeNull();
     await act(() => new Promise((r) => setTimeout(r, 2100)));
@@ -239,13 +239,20 @@ describe("live row in the timeline", () => {
     expect(row().querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();
     expect(row().querySelectorAll(".ac-wait__dots > i")).toHaveLength(3);
     expect(shownText(row().querySelector(".ac-wait__step") as Element)).toBe("Pensando…");
-    // No name, no time, no placeholder words on screen (the name is there for screen readers only).
+    // No name, no time it started, no placeholder words on screen (the name is there for screen readers only).
     expect(row().querySelector(".ac-msg__head")).toBeNull();
     expect(row().querySelector("time")?.closest(".ac-visually-hidden")).not.toBeNull();
     expect(row().querySelector(".ac-msg__text")).toBeNull();
-    // The bar: the agent's name and no face of its own (its row has it).
-    expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada");
-    expect(bar().querySelector(".ac-typing__avatars")).toBeNull();
+    // The step line ends in how long it has been at it and its stop, the bar's no longer.
+    const tail = row().querySelector(".ac-wait > .run-tail") as HTMLElement;
+    expect(tail.previousElementSibling?.classList.contains("ac-wait__step")).toBe(true);
+    expect(tail.querySelector(".run-tail__clock.ac-num")).not.toBeNull();
+    expect(within(tail).getByRole("button", { name: "Parar" })).toBeTruthy();
+    // The whole step stays as its tip (the line keeps one width and cuts it with "…").
+    expect(row().querySelector(".ac-wait__step")?.getAttribute("title")).toBe("Pensando…");
+    // No layout here, so the row counts as out of view: the bar speaks for it, its face and the row's step.
+    expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
+    expect(bar().querySelector(".ac-typing__avatars")).not.toBeNull();
     await post(ev, "m-later", "Também confere o refresh");
     await settle(3);
     const later = screen().getByText("Também confere o refresh").closest(".ac-msg") as HTMLElement;
@@ -279,6 +286,10 @@ describe("live row in the timeline", () => {
     expect(row().classList.contains("ac-msg--waiting")).toBe(false);
     expect(row().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
     expect(row().querySelector(".ac-msg__head time")).not.toBeNull();
+    // Its time and its stop follow it into the header, after the time it started.
+    const tail = row().querySelector(".ac-msg__head .ac-msg__status .run-tail") as HTMLElement;
+    expect(tail.querySelector(".run-tail__clock")).not.toBeNull();
+    expect(within(tail).getByRole("button", { name: "Parar" })).toBeTruthy();
     expect(row().querySelector(".ac-wait")).toBeNull();
     expect(row().textContent).toContain("O login devolve 401");
   });

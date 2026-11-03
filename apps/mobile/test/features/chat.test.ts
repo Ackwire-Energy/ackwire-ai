@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
-import { activitySentence, barElapsed, barFaces, barWords } from "@agenteschat/client/lib/activity";
+import { activitySentence, barElapsed, barFaces, barWords, entriesOffScreen } from "@agenteschat/client/lib/activity";
 import { runAround, runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -9,6 +9,7 @@ import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib
 import {
   AGENT_WORDS_MIN,
   artifactsOf,
+  awayRun,
   buildRows,
   consultationsOf,
   eventLineOf,
@@ -17,6 +18,7 @@ import {
   type LineWords,
   leavingWords,
   lineFit,
+  lineStops,
   markedParts,
   markName,
   mayStopRun,
@@ -34,6 +36,7 @@ import {
   reactionName,
   reactionPills,
   readMark,
+  rowStopOf,
   standsAlone,
   stoppableInLine,
   threadFaces,
@@ -455,17 +458,89 @@ describe("working line", () => {
     expect(line).not.toContain("Date.now()");
   });
 
-  test("one agent on its own: the line says its name (its row says what it does), with no face of its own", async () => {
+  test("one agent on its own: the line says its name; with its row out of view, its face opens the line", async () => {
     const en = await translator("en");
     const ada = run({ runId: "r", agentId: "ada" });
     const atlas = run({ runId: "s", agentId: "atlas" });
     expect(barWords(en, workingEntries([ada], [], name), markName)[0]).toBe(markName("Ada"));
     expect(barWords(en, workingEntries([ada, atlas], [], name))[0]).toBe("Ada and Atlas are working…");
+    // The agents left in the line are the ones whose rows are out of view: their faces lead it (no orbit).
     const lines = await source("features/chat/LiveRows.tsx");
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
-    expect(line).toContain(
-      "entries.length === 1 && soloRun && turnShows(soloRun, now) && !asking ? [] : barFaces(entries)",
-    );
+    expect(line).toContain("const faces = barFaces(entries);");
+    expect(line).not.toContain("PixelOrbit");
+  });
+
+  test("said once: an agent whose live row is on screen is left out of the line; people typing always stay", () => {
+    const ada = run({ runId: "r", agentId: "ada", status: "running" });
+    const atlas = run({ runId: "s", agentId: "atlas", status: "running" });
+    const runs = [ada, atlas];
+    const all = workingEntries(runs, [], name, ["joao"], (id) => (id === "joao" ? "João" : undefined));
+    const adaShows = (r: LiveRun) => r.runId === "r";
+    const left = entriesOffScreen(all, runs, adaShows);
+    expect(left.map((e) => e.id)).toEqual(["atlas", "joao"]);
+    expect(barFaces(left).map((e) => e.id)).toEqual(["atlas", "joao"]);
+    // Both rows on screen: only who types is left (the line shows just that).
+    expect(entriesOffScreen(all, runs, () => true).map((e) => e.id)).toEqual(["joao"]);
+    // Nothing at work out of view and no one typing: no line at all.
+    expect(entriesOffScreen(workingEntries([ada], [], name), [ada], adaShows)).toEqual([]);
+  });
+
+  test("its row out of view, the line speaks for that one agent: its step, its time, Ver and its stop", async () => {
+    const en = await translator("en");
+    const now = 1_000_000;
+    const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: now - 16_000 });
+    const atlas = run({ runId: "s", agentId: "atlas", status: "running" });
+    const shows = (r: LiveRun) => r.runId === "s";
+    const left = entriesOffScreen(workingEntries([ada, atlas], [], name), [ada, atlas], shows);
+    expect(awayRun(left, [ada, atlas], shows)?.runId).toBe("r");
+    expect(barElapsed(en, left, [ada, atlas], now)).toBe("16s");
+    expect(lineStops(left, [ada, atlas], () => true, shows).map((r) => r.runId)).toEqual(["r"]);
+    // Its row on screen: the line has nothing of its own to say about it, and its stop is on the row.
+    const alone = workingEntries([ada], [], name);
+    expect(awayRun(alone, [ada], () => true)).toBeUndefined();
+    expect(
+      lineStops(
+        alone,
+        [ada],
+        () => true,
+        () => true,
+      ),
+    ).toEqual([]);
+    // Two agents out of view: the line can't say whose time or stop.
+    const both = workingEntries([ada, atlas], [], name);
+    expect(awayRun(both, [ada, atlas], () => false)).toBeUndefined();
+    // The step keeps one width in the line and in the row, so the clock and the stop never move as it turns.
+    const lines = await source("features/chat/LiveRows.tsx");
+    expect(lines).toContain("barStep: { flexBasis: 150, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
+    expect(lines).toContain("waitStep: { flexBasis: 200, flexGrow: 0, flexShrink: 1, minWidth: 0 },");
+    // "Ver" only once its row is in the conversation, and then the stop after it, without a second rule.
+    const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
+    expect(line).toContain("const seeable = away && turnShows(away, now) ? away : undefined;");
+    expect(line).toContain("<LineStop runs={stoppable} onStop={onStop} rule={!seeable} />");
+  });
+
+  test("the row's stop: the latest run here I may stop (the web's rule), never a guess", () => {
+    const runs = [
+      run({ runId: "a", agentId: "ada", status: "running" }),
+      run({ runId: "b", agentId: "atlas", status: "running" }),
+      run({ runId: "p", agentId: "infra", provisional: true }),
+    ];
+    expect(rowStopOf(runs, () => true)?.runId).toBe("b");
+    expect(rowStopOf(runs, (r) => r.agentId === "ada")?.runId).toBe("a");
+    expect(rowStopOf(runs, () => false)).toBeUndefined();
+  });
+
+  test("the live row ends in its time and its stop, outside its spoken step so both stay reachable", async () => {
+    const lines = await source("features/chat/LiveRows.tsx");
+    const row = lines.slice(lines.indexOf("export const TurnRow"), lines.indexOf("function WaitLine("));
+    expect(row).toContain("<WaitLine work={run.work} color={color} tail={<RunTail run={run} now={now} />} />");
+    expect(row).toContain("{live ? <RunTail run={run} now={now} /> : null}");
+    const tail = lines.slice(lines.indexOf("function RunTail("), lines.indexOf("function RevealText("));
+    expect(tail).toContain("runElapsed(t, run, now)");
+    expect(tail).toContain('<LineStop runs={stops} onStop={rows.onStop} rule={false} place="row" />');
+    // 24 points drawn, 44 to the finger.
+    expect(lines).toContain("hitSlop={10}");
   });
 
   test("once its words arrive, the block's header says the name and its start time, as on the web (no orbit)", async () => {

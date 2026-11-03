@@ -108,10 +108,14 @@ describe("the agent's name and role", () => {
     await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Editar nome e cargo" }));
     await settle(4);
     expect(document.body.textContent).toContain("É como todo mundo vê o agente. O @ acompanha o nome.");
+    // The name edits in place: the menu opens its field.
     const name = screen().getByLabelText("Nome") as HTMLInputElement;
-    const role = screen().getByLabelText("Cargo") as HTMLInputElement;
     await act(async () => fireEvent.change(name, { target: { value: "Ada Lovelace" } }));
+    await act(async () => fireEvent.keyDown(name, { key: "Enter" }));
+    await click(screen().getByRole("button", { name: /^Editar cargo/ }));
+    const role = screen().getByRole("combobox", { name: "Cargo" });
     await act(async () => fireEvent.change(role, { target: { value: "Tech lead" } }));
+    await act(async () => fireEvent.keyDown(role, { key: "Enter" }));
     // The page title follows the draft.
     expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada Lovelace");
     await click(

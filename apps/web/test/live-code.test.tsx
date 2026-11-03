@@ -78,7 +78,7 @@ describe("code the agent runs", () => {
     await ev({ type: "agent.tool.output", ...run, stream: "stdout", text: "lendo 48 linhas\n" });
     await ev({ type: "agent.tool.output", ...run, stream: "stderr", text: "aviso: coluna vazia" });
     await settle(3);
-    expect(document.querySelector(".ac-typing__text")?.textContent).toBe("Ada");
+    expect(document.querySelector(".ac-typing__text")?.textContent).toStartWith("Ada ");
     await click(screen().getByRole("button", { name: "Ver código da Ada" }));
     const panel = document.querySelector(".live-code") as HTMLElement;
     expect(within(panel).getByLabelText("Código (python)").textContent).toBe("import csv");

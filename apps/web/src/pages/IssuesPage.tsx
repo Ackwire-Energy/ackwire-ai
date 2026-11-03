@@ -1,61 +1,59 @@
-import type { Issue, IssueColumn, IssueStatus } from "@agenteschat/client";
-import { useIssueColumns, useIssues } from "@agenteschat/client";
+import type { Actor, Issue, IssueColumn, IssuePriority, IssueStatus, IssuesView } from "@agenteschat/client";
+import { useIssueColumns, useIssues, useIssuesView, useSetIssuesView } from "@agenteschat/client";
 import { dueLabel, relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { ISSUES_VIEW_DEFAULT, PRIORITY_ORDER, sortIssues } from "@agenteschat/client/lib/issues-view";
 import {
   Button,
   Chip,
   CriteriaPixels,
   cx,
   EmptyState,
-  FilterBar,
-  FilterChip,
   Icon,
+  Kbd,
   Menu,
-  MenuCheckboxItem,
   MenuItem,
   SearchField,
-  Segmented,
   Toolbar,
   WorkSweep,
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type DragEvent, useDeferredValue, useEffect, useRef, useState } from "react";
+import { type ReactNode, useDeferredValue, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { useActors } from "@/components/actors";
+import { actorFromKey, actorKey, NO_ACTOR, useActors } from "@/components/actors";
 import { IssueCardWork } from "@/components/BackgroundWork";
-import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
+import { useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import {
   BOARD,
-  columnsOf,
+  boardStages,
   groupByColumn,
   isCustomBoard,
   isOpen,
   isStalled,
   isWorking,
+  rankAt,
   STATUS_ICON,
-  STATUSES,
   useAssigneeColor,
   useColumnTitle,
   useStageName,
   useStepText,
 } from "@/lib/issues";
+import { lookOf } from "@/lib/look";
 import { inPlaceClick } from "@/lib/navigate";
 import { useOpenParam } from "@/lib/open-param";
-import { useToast } from "@/lib/toast";
-import { AddColumnDialog, Board } from "./IssueBoard";
+import { type ToastText, useToast } from "@/lib/toast";
+import { AddColumnDialog, Board, type CardState, type IssueGroup, useMoveIssue, usePatchIssue } from "./IssueBoard";
 import { IssueDialog } from "./IssuePage";
+import { DisplayButton, IssueFilters, PRIORITY_ICON } from "./IssuesToolbar";
+import { type CardMove, type DropResult, type IssueDrag, useIssueDrag } from "./issue-drag";
 import { NewIssueDialog } from "./NewIssueDialog";
 import "./issues.css";
 
 export { BOARD, PRIORITIES, STATUSES, splitCriteria } from "@/lib/issues";
-
-type Filter = "all" | "agents" | "people" | "mine" | "none";
-const FILTERS: Filter[] = ["all", "agents", "people", "mine", "none"];
 
 export function StatusChip({ status }: { status: IssueStatus }) {
   const { t } = useTranslation();
@@ -63,48 +61,41 @@ export function StatusChip({ status }: { status: IssueStatus }) {
 }
 
 /**
- * Tarefas (issues in the code): agents working now, the
- * org's board (custom columns in fixed stages, drag between and inside them)
- * or a list, a details panel.
+ * Tarefas (issues in the code): agents working now, then the tasks as a board or a list, grouped by stage (the org's
+ * custom columns in fixed stages), by assignee or by priority, with a details dialog. How the person looks at them
+ * (layout, grouping, order, what the cards show, filters) is theirs per workspace, on the server, so every device
+ * opens it the same way; the search is not kept.
  */
 export function IssuesPage() {
   const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const [view, setView] = useState<"board" | "list">("board");
-  const [filter, setFilter] = useState<Filter>("all");
+  const { org } = useOrg();
+  const viewQuery = useIssuesView(org.id);
+  const view = viewQuery.data ?? ISSUES_VIEW_DEFAULT;
+  const changeView = useSetIssuesView(org.id);
   const [q, setQ] = useState("");
-  const [assignees, setAssignees] = useState<string[]>([]);
-  const [priority, setPriority] = useState<string[]>([]);
   // The open issue lives in the URL (`?open=131`): a reload or a shared link reopens it.
   const [openParam, setOpenParam] = useOpenParam();
   const openNumber = openParam && /^\d+$/.test(openParam) ? Number(openParam) : null;
-  const actorOptions = useActorFilterOptions();
   const copy = useFilterCopy();
   const searchRef = useRef<HTMLInputElement>(null);
   // "Nova tarefa": false, or open (in a given column of A fazer, or the first).
   const [creating, setCreating] = useState<false | { columnId: string | null }>(false);
-  const [showCanceled, setShowCanceled] = useState(false);
   const [addingColumn, setAddingColumn] = useState(false);
   const search = useDeferredValue(q.trim());
   const issues = useIssues(org.id, search);
   const columnsQuery = useIssueColumns(org.id);
   const columns = columnsQuery.data;
   const all = issues.data ?? [];
-  const pass = (i: Issue, f: Filter) =>
-    f === "all" ||
-    (f === "agents" && i.assignee?.type === "agent") ||
-    (f === "people" && i.assignee?.type === "person") ||
-    (f === "mine" && i.assignee?.type === "person" && i.assignee.id === me.user.id) ||
-    (f === "none" && !i.assignee);
-  const visible = all.filter(
+  const filtered = all.filter(
     (i) =>
-      pass(i, filter) &&
-      (assignees.length === 0 || (i.assignee !== null && assignees.includes(`${i.assignee.type}:${i.assignee.id}`))) &&
-      (priority.length === 0 || priority.includes(i.priority)),
+      (view.assignees.length === 0 || view.assignees.includes(actorKey(i.assignee))) &&
+      (view.priorities.length === 0 || view.priorities.includes(i.priority)),
   );
   const open = all.filter(isOpen);
   const opened = all.find((i) => i.number === openNumber) ?? null;
   const toggle = (n: number) => setOpenParam(openNumber === n ? null : n);
+  // The saved view decides the layout: until it comes, the skeleton (not the default board, then the list).
+  const viewLoading = viewQuery.isLoading;
   // "N" opens "Nova issue", "/" the search (not while typing or in a dialog; the details dialog closes itself on Esc).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -146,6 +137,7 @@ export function IssuesPage() {
         </header>
         <WorkingNow issues={all} onOpen={toggle} />
         <Toolbar
+          label={t("issues.filters")}
           search={
             <SearchField
               ref={searchRef}
@@ -155,115 +147,30 @@ export function IssuesPage() {
               clearLabel={copy.clearSearch}
               placeholder={t("issues.search")}
               aria-label={t("issues.search")}
+              shortcut={<Kbd aria-hidden="true">/</Kbd>}
             />
           }
           actions={
             <span className="issues-tools">
-              <Segmented
-                label={t("issues.view")}
-                value={view}
-                onValueChange={setView}
-                options={[
-                  {
-                    value: "board",
-                    label: (
-                      <>
-                        <Icon name="grid" size={16} />
-                        {t("issues.board")}
-                      </>
-                    ),
-                  },
-                  {
-                    value: "list",
-                    label: (
-                      <>
-                        <Icon name="list" size={16} />
-                        {t("issues.list")}
-                      </>
-                    ),
-                  },
-                ]}
-              />
-              <Menu
-                align="end"
-                label={t("issues.moreOptions")}
-                trigger={<Button size="sm" iconOnly icon="more" aria-label={t("issues.moreOptions")} />}
-              >
-                <MenuItem icon="layers" onSelect={() => setAddingColumn(true)} disabled={!columns}>
-                  {t("issues.columns.add")}
-                </MenuItem>
-                <MenuCheckboxItem
-                  icon="eye"
-                  checked={showCanceled}
-                  onCheckedChange={setShowCanceled}
-                  hint={all.filter((i) => i.status === "canceled").length}
+              <DisplayButton view={view} onChange={changeView} />
+              {view.group === "stage" && (
+                <Menu
+                  align="end"
+                  label={t("issues.moreOptions")}
+                  trigger={<Button size="sm" iconOnly icon="more" aria-label={t("issues.moreOptions")} />}
                 >
-                  {t("issues.showCanceled")}
-                </MenuCheckboxItem>
-              </Menu>
+                  <MenuItem icon="layers" onSelect={() => setAddingColumn(true)} disabled={!columns}>
+                    {t("issues.columns.add")}
+                  </MenuItem>
+                </Menu>
+              )}
             </span>
           }
         >
-          <Segmented
-            label={t("issues.filters")}
-            value={filter}
-            onValueChange={setFilter}
-            options={FILTERS.map((f) => ({
-              value: f,
-              label: t(`issues.filter.${f}`),
-              count: all.filter((i) => isOpen(i) && pass(i, f)).length,
-            }))}
-          />
-          <FilterBar
-            label={t("issues.moreFilters")}
-            clearText={copy.clearAll}
-            onClear={() => {
-              setAssignees([]);
-              setPriority([]);
-            }}
-            filters={[
-              {
-                key: "assignee",
-                active: assignees.length > 0,
-                node: (
-                  <FilterChip
-                    label={t("issues.assigneeFilter")}
-                    icon="person"
-                    multiple
-                    options={actorOptions}
-                    value={assignees}
-                    onChange={setAssignees}
-                    valueText={(o) => o.label}
-                    countText={copy.people}
-                    clearLabel={copy.clearOf(t("issues.assigneeFilter"))}
-                    searchLabel={copy.searchLabel}
-                    searchPlaceholder={copy.searchPlaceholder}
-                    noResults={copy.noResults}
-                  />
-                ),
-              },
-              {
-                key: "priority",
-                active: priority.length > 0,
-                node: (
-                  <FilterChip
-                    label={t("issues.priorityFilter")}
-                    icon="alert"
-                    options={(["high", "normal", "low"] as const).map((p) => ({
-                      value: p,
-                      label: t(`issues.priority.${p}`),
-                    }))}
-                    value={priority}
-                    onChange={setPriority}
-                    clearLabel={copy.clearOf(t("issues.priorityFilter"))}
-                  />
-                ),
-              },
-            ]}
-          />
+          <IssueFilters view={view} issues={all} onChange={changeView} />
         </Toolbar>
-        {(issues.isLoading || (view === "board" && !columns && columnsQuery.isLoading)) &&
-          (view === "board" ? (
+        {(issues.isLoading || viewLoading || (!columns && columnsQuery.isLoading)) &&
+          (view.layout === "board" ? (
             <div className="issues-board">
               {BOARD.map((status) => (
                 <section key={status} className="issues-col" aria-label={t(`issues.status.${status}`)}>
@@ -291,29 +198,21 @@ export function IssuesPage() {
             {t("issues.empty")}
           </EmptyState>
         )}
-        {issues.isSuccess && visible.length === 0 && (all.length > 0 || search) && (
+        {issues.isSuccess && filtered.length === 0 && (all.length > 0 || search) && (
           <EmptyState icon="search">{t("issues.noResults")}</EmptyState>
         )}
         {columnsQuery.isError && !columns && (
           <ErrorState error={columnsQuery.error} onRetry={() => void columnsQuery.refetch()} />
         )}
-        {visible.length > 0 && view === "board" && columns && (
-          <Board
-            issues={visible.filter((i) => showCanceled || i.status !== "canceled")}
+        {!viewLoading && filtered.length > 0 && columns && (
+          <IssuesBody
+            view={view}
             columns={columns}
-            showCanceled={showCanceled}
-            onNew={(columnId) => setCreating({ columnId })}
-            renderCard={(i, drag) => (
-              <IssueCard issue={i} selected={i.number === openNumber} onOpen={() => toggle(i.number)} drag={drag} />
-            )}
-          />
-        )}
-        {visible.length > 0 && view === "list" && columns && (
-          <IssueList
-            issues={visible.filter((i) => showCanceled || i.status !== "canceled")}
-            columns={columns}
+            issues={filtered.filter((i) => view.showCanceled || i.status !== "canceled")}
+            all={all}
             openNumber={openNumber}
             onOpen={toggle}
+            onNew={(columnId) => setCreating({ columnId })}
           />
         )}
       </div>
@@ -326,6 +225,195 @@ export function IssuesPage() {
       />
       {columns && (
         <AddColumnDialog open={addingColumn} afterId={null} columns={columns} onClose={() => setAddingColumn(false)} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The tasks in the view's groups, as a board or a list, and what a drop means in each grouping: by stage the card
+ * goes to that column at that place (`useMoveIssue`); by assignee it changes hands, through the same update the
+ * task's own assignee field makes; by priority it takes that priority. Each says what happened, with Desfazer.
+ */
+function IssuesBody({
+  view,
+  columns,
+  issues,
+  all,
+  openNumber,
+  onOpen,
+  onNew,
+}: {
+  view: IssuesView;
+  columns: IssueColumn[];
+  /** The tasks on screen: filtered, canceled ones only when asked. */
+  issues: Issue[];
+  /** Every task loaded: who has one gets a column when grouped by assignee. */
+  all: Issue[];
+  openNumber: number | null;
+  onOpen: (n: number) => void;
+  onNew: (columnId: string) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const actors = useActors();
+  const color = useAssigneeColor();
+  const title = useColumnTitle();
+  const toast = useToast();
+  const move = useMoveIssue(columns);
+  const patch = usePatchIssue();
+  const helpId = useId();
+  const stages = boardStages(columns, view.showCanceled);
+  const byColumn = groupByColumn(issues, columns);
+  // The board's own order, column by column: the order inside an assignee's or a priority's group.
+  const reading = new Map<string, number>();
+  for (const { columns: cols } of boardStages(columns, true))
+    for (const c of cols) for (const i of byColumn.get(c.id) ?? []) reading.set(i.id, reading.size);
+  const byReading = (a: Issue, b: Issue) => (reading.get(a.id) ?? 0) - (reading.get(b.id) ?? 0);
+  const inOrder = (list: Issue[]) => sortIssues([...list].sort(byReading), view.sort);
+
+  const groups: IssueGroup[] = [];
+  if (view.group === "stage") {
+    for (const { stage, columns: cols } of stages) {
+      for (const c of cols) {
+        groups.push({
+          id: c.id,
+          name: title(c),
+          items: sortIssues(byColumn.get(c.id) ?? [], view.sort),
+          lead: <Icon name={STATUS_ICON[stage]} size={16} />,
+          dropText: t("issues.drop.stage", { name: title(c) }),
+        });
+      }
+    }
+  } else if (view.group === "assignee") {
+    // Everyone with a task here (and anyone the filter names), by name; "Sem responsável" last.
+    const keys = new Set([
+      ...all.filter((i) => view.showCanceled || i.status !== "canceled").map((i) => actorKey(i.assignee)),
+      ...view.assignees,
+    ]);
+    keys.delete(NO_ACTOR);
+    const people = [...keys]
+      .map((k) => actorFromKey(k))
+      .filter((a): a is Actor => a !== null)
+      .map((a) => ({ actor: a, name: actors.name(a) }))
+      .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
+    for (const { actor, name } of people) {
+      groups.push({
+        id: actorKey(actor),
+        name,
+        items: inOrder(issues.filter((i) => actorKey(i.assignee) === actorKey(actor))),
+        lead: <ActorAvatar actor={actor} name={name} size="xs" />,
+        dropText: t("issues.drop.assignee", { name }),
+      });
+    }
+    groups.push({
+      id: NO_ACTOR,
+      name: t("issues.noAssignee"),
+      items: inOrder(issues.filter((i) => !i.assignee)),
+      lead: <Icon name="person" size={16} />,
+      dropText: t("issues.drop.unassign"),
+    });
+  } else {
+    for (const p of PRIORITY_ORDER) {
+      groups.push({
+        id: p,
+        name: t(`issues.priority.${p}`),
+        items: inOrder(issues.filter((i) => i.priority === p)),
+        lead: <Icon name={PRIORITY_ICON[p]} size={16} />,
+        dropText: t("issues.drop.priority", { priority: t(`issues.priorityLower.${p}`) }),
+      });
+    }
+  }
+
+  const undo = (run: () => void) => ({ label: t("issues.undo"), run });
+  // An agent named in the toast shows its face before its name.
+  const assignedText = (issue: Issue, to: Actor | null): ToastText => {
+    if (!to) return t("issues.drag.unassigned", { number: issue.number });
+    const name = actors.name(to);
+    const text = t("issues.drag.assigned", { number: issue.number, name });
+    return to.type === "agent" ? { text, who: { name, appearance: lookOf(actors.dir.agentById.get(to.id)) } } : text;
+  };
+  const reassign = (issue: Issue, to: Actor | null) => {
+    const was = issue.assignee;
+    const back = () => patch({ ...issue, assignee: to }, { assignee: was }, { assignee: was });
+    patch(issue, { assignee: to }, { assignee: to }, () => toast.show(assignedText(issue, to), "info", undo(back)));
+  };
+  const prioritize = (issue: Issue, priority: IssuePriority) => {
+    const was = issue.priority;
+    const back = () => patch({ ...issue, priority }, { priority: was }, { priority: was });
+    const text = t("issues.drag.prioritized", {
+      number: issue.number,
+      priority: t(`issues.priorityLower.${priority}`),
+    });
+    patch(issue, { priority }, { priority }, () => toast.show(text, "info", undo(back)));
+  };
+  const onDrop = ({ id, from, to, index }: CardMove): DropResult => {
+    const issue = issues.find((i) => i.id === id);
+    if (!issue) return { changed: false };
+    if (view.group === "stage") {
+      const column = columns.find((c) => c.id === to);
+      // Sorted by priority or due date, a column's order isn't the person's to change.
+      if (!column || (view.sort !== "manual" && from === to)) return { changed: false };
+      const others = (byColumn.get(to) ?? []).filter((i) => i.id !== id);
+      move(issue, column, view.sort === "manual" ? rankAt(others, index) : rankAt(others, 0));
+      const done = column.stage === "done" && issue.status !== "done";
+      return done ? { changed: true, burst: color(issue) } : { changed: true };
+    }
+    if (from === to) return { changed: false };
+    if (view.group === "assignee") reassign(issue, actorFromKey(to));
+    else prioritize(issue, to as IssuePriority);
+    return { changed: true };
+  };
+  const nameOf = (group: string) => groups.find((g) => g.id === group)?.name ?? "";
+  const dnd = useIssueDrag<Issue>({
+    groups,
+    layout: view.layout,
+    onDrop,
+    words: {
+      picked: (i) => t("issues.drag.picked", { number: i.number }),
+      moved: (i, group, position, total) =>
+        t("issues.drag.moved", { number: i.number, group: nameOf(group), position, total }),
+      dropped: (i, group) => t("issues.drag.dropped", { number: i.number, group: nameOf(group) }),
+      canceled: (i) => t("issues.drag.canceled", { number: i.number }),
+    },
+  });
+  const renderCard = (i: Issue, group: string, state: CardState) => (
+    <IssueCard
+      issue={i}
+      selected={i.number === openNumber}
+      onOpen={() => onOpen(i.number)}
+      drag={{ ...dnd.card(i, group), help: helpId }}
+      picked={state === "picked"}
+      fields={view.fields}
+    />
+  );
+  return (
+    <div ref={dnd.root} className="issues-body">
+      <p id={helpId} className="ac-visually-hidden">
+        {t("issues.drag.help")}
+      </p>
+      <p className="ac-visually-hidden" aria-live="assertive">
+        {dnd.live}
+      </p>
+      {view.layout === "board" ? (
+        <Board
+          groups={groups}
+          stages={view.group === "stage" ? stages : null}
+          columns={columns}
+          dnd={dnd}
+          renderCard={renderCard}
+          onNew={onNew}
+        />
+      ) : (
+        <IssueList
+          groups={groups}
+          stages={view.group === "stage" ? stages : null}
+          columns={columns}
+          dnd={dnd}
+          openNumber={openNumber}
+          onOpen={onOpen}
+          fields={view.fields}
+          helpId={helpId}
+        />
       )}
     </div>
   );
@@ -436,12 +524,23 @@ function Criteria({ issue: i }: { issue: Issue }) {
   );
 }
 
-/** Who has it, or what the agent is doing (the step, "Pede aprovação", "Parado há 2 dias"). */
+/**
+ * Who has it, or what the agent is doing (the step, "Pede aprovação", "Parado há 2 dias"). Nobody: an empty place the
+ * size of a face, so the name lines up with the cards that have one.
+ */
 function WhoLine({ issue: i }: { issue: Issue }) {
   const { t, i18n } = useTranslation();
   const actors = useActors();
   const stepText = useStepText();
-  if (!i.assignee) return <span className="issue-who__name muted">{t("issues.noAssignee")}</span>;
+  if (!i.assignee)
+    return (
+      <>
+        <span className="issue-nobody" aria-hidden="true">
+          <Icon name="person" size={14} />
+        </span>
+        <span className="issue-who__name muted">{t("issues.noAssignee")}</span>
+      </>
+    );
   const w = i.work;
   const name = actors.name(i.assignee);
   const avatar =
@@ -515,105 +614,164 @@ function useIssueMenu() {
     ]);
 }
 
+/** What a card takes to move: the pointer and keyboard handlers, and the line that says how. */
+type CardDrag = ReturnType<IssueDrag<Issue>["card"]> & { help: string };
+
+/** A card's or a row's own keys first (the menu key), then Space picks it up. */
+function withMenuKeys(menu: ReturnType<ReturnType<typeof useIssueMenu>>, drag: CardDrag) {
+  return (e: Parameters<CardDrag["onKeyDown"]>[0]) => {
+    menu.onKeyDown(e);
+    drag.onKeyDown(e);
+  };
+}
+
 function IssueCard({
   issue: i,
   selected,
   onOpen,
   drag,
+  picked,
+  fields,
 }: {
   issue: Issue;
   selected: boolean;
   onOpen: () => void;
-  drag: { dragging: boolean; onDragStart: (e: DragEvent) => void; onDragEnd: () => void };
+  drag: CardDrag;
+  picked: boolean;
+  fields: IssuesView["fields"];
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const color = useAssigneeColor();
-  const pr = i.pullRequests.at(-1);
-  const menu = useIssueMenu();
+  const pr = fields.pullRequest ? i.pullRequests.at(-1) : undefined;
+  const menu = useIssueMenu()(i, () => !selected && onOpen());
   return (
     <Link
       to="/org/$orgId/issues/$number"
       params={{ orgId: org.id, number: String(i.number) }}
-      className={cx("issue-card", selected && "is-on", drag.dragging && "is-dragging")}
+      className={cx("issue-card", selected && "is-on", picked && "is-picked")}
       aria-label={t("issues.open", { number: i.number, title: i.title })}
       aria-current={selected || undefined}
-      draggable
+      aria-roledescription={t("issues.drag.role")}
+      aria-describedby={drag.help}
+      draggable={drag.draggable}
       onDragStart={drag.onDragStart}
-      onDragEnd={drag.onDragEnd}
+      onPointerDown={drag.onPointerDown}
       onClick={(e) => inPlaceClick(e, onOpen)}
-      {...menu(i, () => !selected && onOpen())}
+      onContextMenu={menu.onContextMenu}
+      onKeyDown={withMenuKeys(menu, drag)}
       data-status={i.status}
       data-card={i.number}
     >
       <span className="issue-card__top tabular">
         <span>#{i.number}</span>
-        {i.labels[0] && <span>· {i.labels[0]}</span>}
+        {fields.label && i.labels[0] && <span>· {i.labels[0]}</span>}
         <span className="issue-card__grow" />
-        <PriorityChip issue={i} />
-        <DueChip issue={i} />
+        {fields.priority && <PriorityChip issue={i} />}
+        {fields.due && <DueChip issue={i} />}
       </span>
       <span className="issue-card__title">{i.title}</span>
-      <Criteria issue={i} />
+      {fields.criteria && <Criteria issue={i} />}
       <IssueCardWork issue={i} />
-      <span className="issue-card__foot">
-        <WhoLine issue={i} />
-        <span className="issue-card__grow" />
-        {pr && (
-          <Chip icon="pullRequest" className="issue-card__pr">
-            {t("issues.pr", { number: pr.number })}
-          </Chip>
-        )}
-      </span>
+      {(fields.assignee || pr) && (
+        <span className="issue-card__foot">
+          {fields.assignee && <WhoLine issue={i} />}
+          <span className="issue-card__grow" />
+          {pr && (
+            <Chip icon="pullRequest" className="issue-card__pr">
+              {t("issues.pr", { number: pr.number })}
+            </Chip>
+          )}
+        </span>
+      )}
       {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
     </Link>
   );
 }
 
-/** The list: grouped by stage, then by column when the board is customized. */
+/**
+ * The list. Grouped by stage: each stage, then its columns when the board is customized. Otherwise one group per
+ * assignee or priority. A group with nothing in it shows only while a card moves, so there is somewhere to drop it.
+ */
 function IssueList({
-  issues,
+  groups,
+  stages,
   columns,
+  dnd,
   openNumber,
   onOpen,
+  fields,
+  helpId,
 }: {
-  issues: Issue[];
+  groups: IssueGroup[];
+  stages: { stage: IssueStatus; columns: IssueColumn[] }[] | null;
   columns: IssueColumn[];
+  dnd: IssueDrag<Issue>;
   openNumber: number | null;
   onOpen: (n: number) => void;
+  fields: IssuesView["fields"];
+  helpId: string;
 }) {
   const stageName = useStageName();
   const title = useColumnTitle();
   const custom = isCustomBoard(columns);
-  const byColumn = groupByColumn(issues, columns);
-  return (
-    <div className="issues-groups">
-      {STATUSES.map((status) => {
-        const cols = columnsOf(columns, status);
-        const count = cols.reduce((n, c) => n + (byColumn.get(c.id)?.length ?? 0), 0);
-        if (count === 0) return null;
-        return (
-          <section key={status} className="issues-group" aria-label={stageName(status)}>
-            <h2 className="issues-group__title">
-              <Icon name={STATUS_ICON[status]} size={16} />
-              {stageName(status)}
-              <span>{count}</span>
-            </h2>
-            {cols.map((c) => {
-              const items = byColumn.get(c.id) ?? [];
-              if (items.length === 0) return null;
-              return (
-                <div key={c.id} className="issues-group__col">
-                  {custom && status !== "canceled" && (
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  const zone = (g: IssueGroup, heading?: ReactNode) => (
+    <div key={g.id} className={cx("issues-group__col", dnd.over === g.id && "is-over")} data-col>
+      {heading}
+      <IssueRows group={g} dnd={dnd} openNumber={openNumber} onOpen={onOpen} fields={fields} helpId={helpId} />
+    </div>
+  );
+  if (stages)
+    return (
+      <div className="issues-groups">
+        {stages.map(({ stage, columns: cols }) => {
+          const count = cols.reduce((n, c) => n + dnd.count(c.id), 0);
+          if (count === 0 && !dnd.active) return null;
+          return (
+            <section key={stage} className="issues-group" aria-label={stageName(stage)}>
+              <h2 className="issues-group__title">
+                <Icon name={STATUS_ICON[stage]} size={16} />
+                {stageName(stage)}
+                <span className="tabular" data-count={custom ? undefined : cols[0]?.id}>
+                  {count}
+                </span>
+              </h2>
+              {cols.map((c) => {
+                const g = byId.get(c.id);
+                if (!g || (dnd.count(c.id) === 0 && !dnd.active)) return null;
+                return zone(
+                  g,
+                  custom && stage !== "canceled" && (
                     <h3 className="issues-group__sub">
                       {title(c)}
-                      <span>{items.length}</span>
+                      <span className="tabular" data-count={c.id}>
+                        {dnd.count(c.id)}
+                      </span>
                     </h3>
-                  )}
-                  <IssueRows issues={items} openNumber={openNumber} onOpen={onOpen} />
-                </div>
-              );
-            })}
+                  ),
+                );
+              })}
+            </section>
+          );
+        })}
+      </div>
+    );
+  return (
+    <div className="issues-groups">
+      {groups.map((g) => {
+        const count = dnd.count(g.id);
+        if (count === 0 && !dnd.active) return null;
+        return (
+          <section key={g.id} className="issues-group" aria-label={g.name}>
+            <h2 className="issues-group__title">
+              {g.lead}
+              {g.name}
+              <span className="tabular" data-count={g.id}>
+                {count}
+              </span>
+            </h2>
+            {zone(g)}
           </section>
         );
       })}
@@ -622,48 +780,74 @@ function IssueList({
 }
 
 function IssueRows({
-  issues,
+  group: g,
+  dnd,
   openNumber,
   onOpen,
+  fields,
+  helpId,
 }: {
-  issues: Issue[];
+  group: IssueGroup;
+  dnd: IssueDrag<Issue>;
   openNumber: number | null;
   onOpen: (n: number) => void;
+  fields: IssuesView["fields"];
+  helpId: string;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const color = useAssigneeColor();
-  const menu = useIssueMenu();
+  const menuOf = useIssueMenu();
+  const entries = dnd.entries(g.id);
+  const shown = entries.some((e) => e.kind === "spot" || e.state !== "hidden");
   return (
-    <ul className="issue-list">
-      {issues.map((i) => (
-        <li key={i.id}>
-          <Link
-            to="/org/$orgId/issues/$number"
-            params={{ orgId: org.id, number: String(i.number) }}
-            className={cx("issue-list__row", i.number === openNumber && "is-on")}
-            onClick={(e) => inPlaceClick(e, () => onOpen(i.number))}
-            {...menu(i, () => i.number !== openNumber && onOpen(i.number))}
+    <ul className="issue-list" data-drop={g.id}>
+      {entries.map((e) => {
+        if (e.kind === "spot")
+          return <li key={e.key} className="issue-spot issue-spot--row" data-spot style={e.style} aria-hidden="true" />;
+        const i = e.item;
+        const menu = menuOf(i, () => i.number !== openNumber && onOpen(i.number));
+        const drag = { ...dnd.card(i, g.id), help: helpId };
+        return (
+          <li
+            key={i.id}
+            data-slot={i.id}
+            hidden={e.state === "hidden" || undefined}
+            data-landing={e.state === "landing" || undefined}
           >
-            <span className="issue-list__num tabular">#{i.number}</span>
-            <span className="issue-list__title">
-              <b>{i.title}</b>
-              <PriorityChip issue={i} />
-            </span>
-            <span className="issue-list__crit">
-              <Criteria issue={i} />
-            </span>
-            <span className="issue-list__who">
-              <WhoLine issue={i} />
-            </span>
-            <span className="issue-list__due">
-              <DueChip issue={i} />
-            </span>
-            <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
-            {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
-          </Link>
+            <Link
+              to="/org/$orgId/issues/$number"
+              params={{ orgId: org.id, number: String(i.number) }}
+              className={cx("issue-list__row", i.number === openNumber && "is-on", e.state === "picked" && "is-picked")}
+              aria-roledescription={t("issues.drag.role")}
+              aria-describedby={drag.help}
+              draggable={drag.draggable}
+              onDragStart={drag.onDragStart}
+              onPointerDown={drag.onPointerDown}
+              onClick={(ev) => inPlaceClick(ev, () => onOpen(i.number))}
+              onContextMenu={menu.onContextMenu}
+              onKeyDown={withMenuKeys(menu, drag)}
+              data-card={i.number}
+            >
+              <span className="issue-list__num tabular">#{i.number}</span>
+              <span className="issue-list__title">
+                <b>{i.title}</b>
+                {fields.priority && <PriorityChip issue={i} />}
+              </span>
+              <span className="issue-list__crit">{fields.criteria && <Criteria issue={i} />}</span>
+              <span className="issue-list__who">{fields.assignee && <WhoLine issue={i} />}</span>
+              <span className="issue-list__due">{fields.due && <DueChip issue={i} />}</span>
+              <span className="issue-sr">{t(`issues.status.${i.status}`)}</span>
+              {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
+            </Link>
+          </li>
+        );
+      })}
+      {!shown && dnd.active && (
+        <li className="issue-list__drop" aria-hidden="true">
+          {g.dropText}
         </li>
-      ))}
+      )}
     </ul>
   );
 }

@@ -16,6 +16,7 @@ import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
+import { ISSUES_VIEW_DEFAULT, type IssuesViewChange, withIssuesView } from "../lib/issues-view";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
 import { GIF_PAGE, messageMediaOf, postedMedia } from "../lib/media";
 import {
@@ -90,6 +91,7 @@ import type {
   IssueInput,
   IssuePatch,
   IssueStatus,
+  IssuesView,
   JevKey,
   Machine,
   MachineAccessReduce,
@@ -4234,6 +4236,48 @@ export function useSetSidebarOrder(orgId: string) {
     onError: (_error, _order, context) => qc.setQueryData(keys.sidebarOrder(orgId), context?.before),
     onSuccess: (order) => qc.setQueryData(keys.sidebarOrder(orgId), order),
   });
+}
+
+/** How I look at Tarefas in this workspace (the default until it loads, or when it can't). */
+export const useIssuesView = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.issuesView(orgId),
+    queryFn: () => api.orgs.issuesView(orgId),
+    staleTime: 60_000,
+  });
+};
+
+/**
+ * Changes how I look at Tarefas (`null`: back to the default): the screen changes at once and the whole view goes to
+ * the server, one request at a time, so the last change is what stays. Each change starts from the screen's latest
+ * view, so two quick ones never undo each other; a refusal brings back what the server keeps.
+ */
+export function useSetIssuesView(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.issuesView(orgId);
+  const mutationKey = ["issues-view", orgId];
+  const save = useMutation({
+    mutationKey,
+    scope: { id: `issues-view:${orgId}` },
+    mutationFn: (view: IssuesView) => api.orgs.setIssuesView(orgId, view),
+    onError: () => {
+      if (qc.isMutating({ mutationKey }) > 1) return;
+      void qc.invalidateQueries({ queryKey: key });
+    },
+    // A later change still on its way keeps the screen until its own answer.
+    onSuccess: (view) => {
+      if (qc.isMutating({ mutationKey }) <= 1) qc.setQueryData(key, view);
+    },
+  });
+  return (change: IssuesViewChange | null) => {
+    void qc.cancelQueries({ queryKey: key });
+    const now = qc.getQueryData<IssuesView>(key) ?? ISSUES_VIEW_DEFAULT;
+    const next = withIssuesView(change ? now : ISSUES_VIEW_DEFAULT, change ?? {});
+    qc.setQueryData(key, next);
+    save.mutate(next);
+  };
 }
 
 /** The sidebar's tools in my order in this workspace (the default until it loads). */
