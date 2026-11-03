@@ -33,6 +33,8 @@ const SENT_MS = 1400;
 const OPEN_MAX = 4;
 /** The closing island folds back into itself. */
 const LEAVE_MS = 340;
+/** The key's cap, as the keyboard prints it (not words to translate). */
+const ESC = "Esc";
 
 /**
  * The island (ADR 0071 §9): a dark pill at the top of the work area with what reached me while I'm here, the face
@@ -160,7 +162,7 @@ export function NoticeIsland() {
                 {t("island.all")}
               </Link>
               <span className="ni__hint">
-                <Kbd>Esc</Kbd>
+                <Kbd>{ESC}</Kbd>
                 {t("island.closes")}
               </span>
             </div>
