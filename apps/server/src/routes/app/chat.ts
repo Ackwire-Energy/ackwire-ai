@@ -14,6 +14,7 @@ import {
   listWorkingRuns,
   MEDIA_REFUSALS,
   type MessageView,
+  messageCard,
   openConsultationsIn,
   postPersonMessage,
   requireChannelAccess,
@@ -259,6 +260,36 @@ export function chatRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
       return c.json(await channelCard(db, c.get("user").id, orgId, channelId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/messages/{messageId}/card",
+      tags,
+      security,
+      summary: "A message link's pill: where the message is and who wrote it, never its text",
+      description:
+        "404 for a message the viewer can't see: a private channel they can't see, a DM they aren't in, a deleted message. `name` is the channel's, or for a DM who else is in it. `threadId`: the thread a reply is in, else null.",
+      request: { params: OrgParams.extend({ messageId: z.uuid() }) },
+      responses: {
+        200: json(
+          z.object({
+            id: z.uuid(),
+            channelId: z.uuid(),
+            threadId: z.uuid().nullable(),
+            kind: z.enum(["channel", "dm"]),
+            name: z.string(),
+            author: z.string(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(await messageCard(db, c.get("user").id, orgId, messageId), 200);
     },
   );
 

@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./channel-refs": "./src/channel-refs.ts",
     "./look": "./src/look.ts",
+    "./message-links": "./src/message-links.ts",
     "./names": "./src/names.ts"
   },
   "scripts": {

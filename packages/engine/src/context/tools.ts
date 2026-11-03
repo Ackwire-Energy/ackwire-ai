@@ -1,11 +1,14 @@
 import {
   and,
   arrayContained,
+  asc,
   type Database,
   desc,
   eq,
+  gt,
   inArray,
   isNull,
+  lte,
   or,
   rowsOf,
   type SQL,
@@ -16,10 +19,14 @@ import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
 import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-reads";
+import { UUID } from "../authority";
 import { caches } from "../cache";
+import { isChannelMember } from "../channels";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
+import { type DescribedMessage, describeMessages, messageIdOf } from "../message-links";
 import { announceMessageMemories } from "../message-memories";
+import { quietNoticeSql } from "../notices";
 import { can, getMembership } from "../organizations";
 import { personWords, runReadOutsideById, UNASKED_DESTINATION, unaskedDestination } from "../outside";
 import { personBehindCall, wikiActorOfCall } from "../requester";
@@ -130,12 +137,23 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             )
           : null;
         const hits = found.filter((_, i) => dmReadable?.[i] !== false);
+        const said = new Map(
+          (
+            await describeMessages(
+              ctx.db,
+              ctx.orgId,
+              hits.filter((h) => h.kind === "message").map((h) => h.sourceId),
+            )
+          ).map((m) => [m.id, m]),
+        );
         const lines = hits
           .filter((h) => personMayRead(items.get(h.sourceId), person, ctx.agentId))
           .map((h) => {
             const item = items.get(h.sourceId);
             const label = item ? itemLabel(item) : `[${h.kind}]`;
-            return `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)}) ${h.snippet.replace(/\s+/g, " ")}`;
+            const m = said.get(h.sourceId);
+            const by = m ? ` ${m.who} in ${m.where} ${m.link}` : "";
+            return `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)})${by} ${h.snippet.replace(/\s+/g, " ")}`;
           });
         return {
           content: untrustedBlock("workspace search", [...lines, ...steps].join("\n")),
@@ -307,6 +325,106 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           ...srcOutcomes.map((o) => `source outcome ${o.id}: ${o.polarity} ${o.kind} ${o.subject} ${o.summary}`),
         ];
         return { content: lines.join("\n") };
+      },
+    },
+    {
+      name: READ_CONVERSATION_TOOL,
+      description:
+        "Read messages with who wrote them, where and their links: one message (`message`: its id or link) with those around it, or a channel's (`channel`: its name) or a thread's, the latest or `around` a time. Without them: this conversation.",
+      scope: "context:read",
+      inputSchema: {
+        type: "object",
+        properties: {
+          message: { type: "string", maxLength: 300 },
+          channel: { type: "string", maxLength: 100 },
+          thread_id: { type: "string", maxLength: 36 },
+          around: { type: "string", maxLength: 40, description: "ISO date-time" },
+          limit: { type: "integer", minimum: 1, maximum: CONVERSATION_MAX },
+        },
+        additionalProperties: false,
+      },
+      async execute(input, ctx) {
+        const notFound = { content: "Not found, or not a conversation you can read.", isError: true };
+        if ([input.message, input.channel, input.thread_id].filter((v) => str(v).trim()).length > 1) {
+          return { content: "Give only one of message, channel or thread_id.", isError: true };
+        }
+        const limit = typeof input.limit === "number" ? Math.min(input.limit, CONVERSATION_MAX) : 20;
+        const around = str(input.around) ? new Date(str(input.around)) : null;
+        if (around && Number.isNaN(around.getTime())) return { content: "around: an ISO date-time.", isError: true };
+        const allowed = await visible(ctx);
+        let place: { channelId: string; threadId: string | null } = { channelId: ctx.channelId, threadId: null };
+        let pivot = around;
+        let focus: string | null = null;
+        if (str(input.message)) {
+          const id = messageIdOf(str(input.message), ctx.orgId);
+          const [m] = id ? await describeMessages(ctx.db, ctx.orgId, [id]) : [];
+          if (!m) return notFound;
+          // The message this conversation's agent message was sent because of, read by the person it answers.
+          if (!allowed.includes(m.channelId)) {
+            return (await originReadable(ctx, m)) ? { content: conversationText([m], m.id) } : notFound;
+          }
+          place = { channelId: m.channelId, threadId: m.threadId };
+          pivot = m.createdAt;
+          focus = m.id;
+        } else if (str(input.channel)) {
+          const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
+          const [found] = await ctx.db
+            .select({ id: schema.channels.id })
+            .from(schema.channels)
+            .where(
+              and(
+                eq(schema.channels.orgId, ctx.orgId),
+                eq(schema.channels.name, name),
+                eq(schema.channels.kind, "channel"),
+              ),
+            );
+          if (!found || !allowed.includes(found.id)) return notFound;
+          place = { channelId: found.id, threadId: null };
+        } else if (str(input.thread_id)) {
+          const [root] = await describeMessages(
+            ctx.db,
+            ctx.orgId,
+            [str(input.thread_id)].filter((v) => UUID.test(v)),
+          );
+          if (!root || !allowed.includes(root.channelId)) return notFound;
+          place = { channelId: root.channelId, threadId: root.threadId ?? root.id };
+        } else if (!allowed.includes(ctx.channelId)) return notFound;
+        const scope = and(
+          eq(messages.orgId, ctx.orgId),
+          eq(messages.channelId, place.channelId),
+          isNull(messages.deletedAt),
+          sql`not ${quietNoticeSql(sql`${messages.meta}`)}`,
+          place.threadId
+            ? or(eq(messages.id, place.threadId), eq(messages.threadId, place.threadId))
+            : isNull(messages.threadId),
+        );
+        const window = (where: SQL | undefined, order: "asc" | "desc", n: number) =>
+          ctx.db
+            .select({ id: messages.id })
+            .from(messages)
+            .where(and(scope, where))
+            .orderBy(order === "asc" ? asc(messages.createdAt) : desc(messages.createdAt))
+            .limit(n);
+        const ids = pivot
+          ? [
+              ...(await window(lte(messages.createdAt, pivot), "desc", Math.ceil(limit / 2))),
+              ...(await window(gt(messages.createdAt, pivot), "asc", Math.floor(limit / 2))),
+            ]
+          : await window(undefined, "desc", limit);
+        let rows = (
+          await describeMessages(
+            ctx.db,
+            ctx.orgId,
+            ids.map((r) => r.id),
+          )
+        ).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+        // In the agents' DM: only what was said for the same person.
+        const dm = await agentsDmReads(ctx.db, ctx.orgId, place.channelId, () => readerOfCall(ctx));
+        if (dm) {
+          const mine = await Promise.all(rows.map((m) => dm.ofMessages([m.id])));
+          rows = rows.filter((_, i) => mine[i]);
+        }
+        return rows.length ? { content: conversationText(rows, focus) } : { content: "No messages there." };
       },
     },
     {
@@ -652,6 +770,46 @@ const decidedBy = (p: Proposal) =>
 /** Memory tools only act on a person's request in the current turn (never on tool, webhook or document text). */
 /** The person behind the run (`authority.ts`); null for a routine's work and unattended runs. */
 const personRequester = (ctx: ToolContext): Promise<string | null> => personBehindCall(ctx);
+
+export const READ_CONVERSATION_TOOL = "read_conversation";
+const CONVERSATION_MAX = 40;
+const CONVERSATION_MESSAGE_CHARS = 1500;
+
+/** `read_conversation`'s lines: who, where, when and the link above each text; `focus` marked. */
+function conversationText(rows: DescribedMessage[], focus: string | null) {
+  const lines = rows.map((m) => {
+    const reply = m.threadId && m.threadId !== m.id ? ", in a thread" : "";
+    const at = `${m.createdAt.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+    return `${m.id === focus ? "→ " : ""}${m.who} in ${m.where}${reply}, ${at} ${m.link}\n${cutText(m.body, CONVERSATION_MESSAGE_CHARS)}`;
+  });
+  return untrustedBlock("workspace messages", lines.join("\n\n"), 16_000);
+}
+
+/**
+ * A message outside what the agent may read (`agentSearchChannels`) that a message of this conversation was sent
+ * because of (`meta.agentDm` or `meta.postedFrom`: "asked in #general to DM you"), read by the person this run
+ * answers when they are in its channel (ADR 0017): "where did he ask?" gets the request itself.
+ */
+async function originReadable(ctx: ToolContext, origin: DescribedMessage) {
+  const person = await personBehindCall(ctx);
+  if (!person || !(await isChannelMember(ctx.db, ctx.orgId, origin.channelId, person))) return false;
+  const [cited] = await ctx.db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, ctx.orgId),
+        eq(messages.channelId, ctx.channelId),
+        isNull(messages.deletedAt),
+        or(
+          sql`${messages.meta}->'agentDm'->>'fromMessageId' = ${origin.id}`,
+          sql`${messages.meta}->'postedFrom'->>'fromMessageId' = ${origin.id}`,
+        ),
+      ),
+    )
+    .limit(1);
+  return cited !== undefined;
+}
 /** Whom the call's run works for in the agents' DM (`readerOf`); the trigger's person without a run. */
 const readerOfCall = (ctx: ToolContext): Promise<string | null> =>
   ctx.runId ? readerOfRun(ctx.db, ctx.orgId, ctx.runId) : personBehindCall(ctx);

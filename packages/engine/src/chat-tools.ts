@@ -6,6 +6,7 @@ import { answersAgentsOnly } from "./consultations";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
+import { messageLink } from "./message-links";
 import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
 import { runReadOutsideById } from "./outside";
@@ -31,6 +32,17 @@ const failed = (error: unknown): ToolOutput => ({
 /** A run consulted for someone outside its agent's audience answers the agent that asked, nowhere else. */
 const AGENTS_ONLY =
   "You were consulted by another agent for someone who doesn't talk to you directly: answer that agent with what you found (it passes it on), never them or anyone else from here.";
+
+/**
+ * Why a message the agent sends elsewhere was sent: who asked, and the message that asked (`fromMessageId`, in its
+ * thread `fromThreadId`), so the agent's later runs there can quote it and link to it (`originNotes` in context.ts).
+ */
+const origin = (ctx: ToolContext, requester: string | null) => ({
+  requesterUserId: requester,
+  fromChannelId: ctx.channelId,
+  fromMessageId: ctx.triggerMessageId,
+  fromThreadId: ctx.threadRootId,
+});
 
 /** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
@@ -194,6 +206,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             body: text,
             meta: {
               ...(files.length > 0 ? { artifacts: files } : {}),
+              postedFrom: origin(ctx, requester),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
@@ -217,7 +230,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           }
           const note = unreachedNote(unreached, `#${channel.name}`, true);
           return {
-            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}. Tell the person it's there.${note ? ` ${note}` : ""}`,
+            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}: ${messageLink(ctx.orgId, message)}. Tell the person it's there.${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: channel.id } },
           };
         } catch (error) {
@@ -299,7 +312,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             body: text,
             // Started by the agent on someone's behalf: the person is notified (an agent's reply isn't).
             meta: {
-              agentDm: { requesterUserId: requester, fromChannelId: ctx.channelId },
+              agentDm: origin(ctx, requester),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
               ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
@@ -329,7 +342,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           }
           const note = unreachedNote(unreached, `your DM with ${to.name}`, false);
           return {
-            content: `Sent to ${to.name} in your DM with them. Tell the person who asked.${note ? ` ${note}` : ""}`,
+            content: `Sent to ${to.name} in your DM with them: ${messageLink(ctx.orgId, message)}. Tell the person who asked.${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: dm.id } },
           };
         } catch (error) {
