@@ -123,6 +123,10 @@ html:not([data-pointer]) .cq-link:focus-visible {
 .cq__text > .cq-first {
   margin-top: 4px;
 }
+/* On the viewer's own plate the chip's fill matches the plate, so only its words show: line them up with the row's text. */
+.cq__row[data-mine] .cq-first {
+  margin-left: calc(-1 * var(--space-2));
+}
 
 /* The waiting agent's turn after the message it answers, where "thinking" shows otherwise. */
 .cq-turn__say {
