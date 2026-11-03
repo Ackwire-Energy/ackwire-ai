@@ -283,14 +283,14 @@ describe("Your own server", () => {
       expect(el.textContent).toContain("This Mac becomes the server, while it's on.");
       expect(button("Which one to choose?")?.className).toBe("ac-link ac-link--muted dk-link");
       await press("Which one to choose?");
-      expect(opened).toEqual(["https://app.agentes.chat/help/run-on-your-computer?lang=en#who"]);
+      expect(opened).toEqual(["https://agentes.chat/docs/run-on-your-computer#who"]);
     });
     await firstRun(
       "first",
       async ({ press, opened }) => {
         await press("Usar o seu próprio servidor");
         await press("Qual escolher?");
-        expect(opened).toEqual(["https://app.agentes.chat/help/run-on-your-computer?lang=pt-BR#who"]);
+        expect(opened).toEqual(["https://agentes.chat/pt/docs/run-on-your-computer#who"]);
       },
       { lang: "pt-BR" },
     );

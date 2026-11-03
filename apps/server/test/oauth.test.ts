@@ -60,7 +60,7 @@ describe("discovery", () => {
         scopes_supported: ["read", "write", "manage"],
         bearer_methods_supported: ["header"],
         resource_name: "agentes.chat",
-        resource_documentation: `${ORIGIN}/help/apps-de-ia`,
+        resource_documentation: "https://agentes.chat/docs/apps-de-ia",
       });
     }
     const as = await (await t.app.request("/.well-known/oauth-authorization-server")).json();

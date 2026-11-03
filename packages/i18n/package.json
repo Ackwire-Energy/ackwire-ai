@@ -16,6 +16,7 @@
     "./locales/*": "./src/locales/*",
     "./legal": "./src/legal/index.ts",
     "./help": "./src/help/index.ts",
+    "./docs": "./src/docs.ts",
     "./testing": "./test/check-locale.ts",
     "./glossary": "./glossary.json",
     "./tree": "./src/tree.ts",

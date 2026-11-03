@@ -1,3 +1,6 @@
+import { requestLocale } from "@agenteschat/engine";
+import { helpDocsUrl } from "@agenteschat/i18n/help";
+import { appLocale } from "@agenteschat/i18n/locale";
 import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
@@ -302,6 +305,16 @@ export function createApp(options: AppOptions) {
     app.get(path, (c) =>
       c.body(installScript, 200, { "content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store" }),
     );
+  }
+  // The help pages moved to the public docs site: old links (`?lang=` or the browser's language) land on the same
+  // page there; the browser keeps the #section across the redirect. Vary: a 301 is cached, by browsers and by a CDN
+  // in front, and without `?lang=` the target is the browser's language.
+  for (const path of ["/help", "/help/", "/help/:slug"]) {
+    app.get(path, (c) => {
+      c.header("vary", "accept-language");
+      const locale = appLocale([c.req.query("lang")], true) ?? requestLocale(c.req.header("accept-language")) ?? "en";
+      return c.redirect(helpDocsUrl(c.req.param("slug"), locale), 301);
+    });
   }
   // The setup downloads it into a folder that has none: this release's, from any instance.
   app.get("/install/docker-compose.yml", (c) =>

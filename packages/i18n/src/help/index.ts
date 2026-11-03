@@ -1,7 +1,8 @@
 /**
- * The help pages on the site (`/help/<slug>`), in English and the languages that translated them: each holds the
+ * The help pages on the docs site (`docsUrl`), in English and the languages that translated them: each holds the
  * background reading that a screen of the app links to once, where it helps.
  */
+import { docsUrl } from "../docs";
 import { type LegalInline, legalInline } from "../legal";
 import { type AppLocale, appLocale } from "../locale";
 import { helpDe } from "./pages.de";
@@ -61,6 +62,15 @@ export const HELP: Record<AppLocale, Partial<Record<HelpSlug, HelpDocument>>> = 
 /** The page in `locale` ("pt-PT" reads pt-BR), or in English where that language has none. */
 export function helpDocument(slug: HelpSlug, locale: string): HelpDocument {
   return HELP[appLocale([locale], true) ?? "en"][slug] ?? helpEn[slug];
+}
+
+/**
+ * Where an old `/help/<slug>` address goes now: the docs page in `locale`, in English where that language has no
+ * page (as `helpDocument`), the docs index for a page that doesn't exist.
+ */
+export function helpDocsUrl(slug: string | undefined, locale: AppLocale): string {
+  if (!slug || !isHelpSlug(slug)) return docsUrl(locale);
+  return docsUrl(HELP[locale][slug] ? locale : "en", slug);
 }
 
 /** A piece of inline help text: plain, `**bold**`, `` `code` `` or a link. */

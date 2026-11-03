@@ -726,7 +726,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     ]);
     expect(within(pop).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
     expect(within(pop).getByRole("link", { name: "Como os agentes são escolhidos" }).getAttribute("href")).toBe(
-      "https://app.agentes.chat/help/who-answers?lang=pt-BR",
+      "https://agentes.chat/pt/docs/who-answers",
     );
   });
 
