@@ -5003,7 +5003,8 @@
         "schedule": "Heure",
         "event": "Événement",
         "email": "E-mail",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "E-mail MillionSend"
       },
       "frequency": "Fréquence",
       "frequencyPlaceholder": "Ex. : tous les lundis à 9 h",
@@ -5208,8 +5209,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code planifie et code sur l'ordinateur. {{name}} suit et fait le relais.",
-      "codex": "Codex (expérimental)",
-      "codexText": "Codex code sur l'ordinateur. Encore en test.",
+      "codex": "Codex",
+      "codexText": "Codex code sur l'ordinateur.",
       "agent": "{{name}} (l'agent lui-même)",
       "agentText": "{{name}} code directement sur l'ordinateur, avec ses propres outils.",
       "agentText_female": "{{name}} code directement sur l'ordinateur, avec ses propres outils."
@@ -5803,7 +5804,6 @@
         "codexText": "Le fait sur l'ordinateur.",
         "agentText": "{{name}} le fait, avec ses propres outils.",
         "agentText_female": "{{name}} le fait, avec ses propres outils.",
-        "testing": "En test",
         "locked": "Ne peut plus changer une fois la mission démarrée.",
         "open": "Peut changer jusqu'au démarrage de la mission.",
         "saved": "Qui fait le travail : {{name}}",
@@ -8069,7 +8069,6 @@
       "inPlan": "Inclus dans votre abonnement Cursor",
       "apiPrice": "Facturé par Cursor au prix de l'API"
     },
-    "testing": "Test en cours",
     "reasons": {
       "no_computer": "Choisissez un ordinateur connecté dans Ordinateur pour l'utiliser.",
       "exec_off": "L'ordinateur a été connecté sans permission d'exécuter des programmes.",
@@ -9959,6 +9958,9 @@
       "openConnectors": "Ouvrir Connecteurs",
       "when": "Quand un e-mail arrive sur {{address}}",
       "whenFolder": "Quand un e-mail arrive sur {{address}} ({{folder}})",
+      "whenMillionSend": "Quand un e-mail arrive sur MillionSend",
+      "inboxAddress": "Adresse de la boîte",
+      "inboxAddressHelp": "Vide = n'importe quelle boîte MillionSend.",
       "unknownMailbox": "une boîte mail",
       "waiting": "En attente d'un e-mail",
       "thisWeek_one": "{{count}} e-mail cette semaine",

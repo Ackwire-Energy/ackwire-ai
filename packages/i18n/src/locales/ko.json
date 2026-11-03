@@ -4644,7 +4644,8 @@
         "schedule": "시간",
         "event": "이벤트",
         "email": "이메일",
-        "webhook": "웹훅"
+        "webhook": "웹훅",
+        "connector": "MillionSend 이메일"
       },
       "frequency": "빈도",
       "frequencyPlaceholder": "예: 매주 월요일 오전 9시",
@@ -4833,8 +4834,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code가 컴퓨터에서 계획하고 코드를 작성해요. {{name}}은(는) 진행을 지켜보며 전달해요.",
-      "codex": "Codex(실험 단계)",
-      "codexText": "Codex가 컴퓨터에서 코드를 작성해요. 아직 테스트 중이에요.",
+      "codex": "Codex",
+      "codexText": "Codex가 컴퓨터에서 코드를 작성해요.",
       "agent": "{{name}}(에이전트가 직접)",
       "agentText": "{{name}}이(가) 자기 도구로 컴퓨터에서 직접 코드를 작성해요."
     },
@@ -5337,7 +5338,6 @@
         "codex": "Codex",
         "codexText": "컴퓨터에서 실행해요.",
         "agentText": "{{name}}이(가) 자기 도구로 실행해요.",
-        "testing": "테스트 중",
         "locked": "미션이 시작되면 바꿀 수 없어요.",
         "open": "미션이 시작되기 전까지 바꿀 수 있어요.",
         "saved": "작업 담당: {{name}}",
@@ -7394,7 +7394,6 @@
       "inPlan": "내 Cursor 요금제에 포함",
       "apiPrice": "Cursor가 API 가격으로 청구"
     },
-    "testing": "테스트 중",
     "reasons": {
       "no_computer": "사용하려면 컴퓨터에서 연결된 컴퓨터를 선택하세요.",
       "exec_off": "프로그램 실행 권한 없이 연결된 컴퓨터예요.",
@@ -9185,6 +9184,9 @@
       "openConnectors": "커넥터 열기",
       "when": "{{address}}에 이메일이 도착하면",
       "whenFolder": "{{address}}({{folder}})에 이메일이 도착하면",
+      "whenMillionSend": "MillionSend에 이메일이 도착하면",
+      "inboxAddress": "메일함 주소",
+      "inboxAddressHelp": "비워 두면 모든 MillionSend 메일함이에요.",
       "unknownMailbox": "메일함",
       "waiting": "이메일을 기다리는 중",
       "thisWeek_other": "이번 주 이메일 {{count}}개",

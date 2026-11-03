@@ -4605,7 +4605,7 @@ export const en = {
       whatPlaceholder: "E.g.: Summarize what happened this week in #eng and #product.",
       name: "Name (optional)",
       when: "When",
-      kind: { schedule: "Time", event: "Event", email: "Email", webhook: "Webhook" },
+      kind: { schedule: "Time", event: "Event", email: "Email", webhook: "Webhook", connector: "MillionSend email" },
       frequency: "Frequency",
       frequencyPlaceholder: "E.g.: every Monday at 9am",
       timezone: "Time zone",
@@ -4807,8 +4807,8 @@ export const en = {
     executor: {
       claude: "Claude Code",
       claudeText: "Claude Code plans and codes on the computer. {{name}} follows and relays.",
-      codex: "Codex (experimental)",
-      codexText: "Codex codes on the computer. Still being tested.",
+      codex: "Codex",
+      codexText: "Codex codes on the computer.",
       agent: "{{name}} (the agent itself)",
       agentText: "{{name}} codes straight on the computer, with his own tools.",
       agentText_female: "{{name}} codes straight on the computer, with her own tools.",
@@ -5347,7 +5347,6 @@ export const en = {
         codexText: "Does it on the computer.",
         agentText: "{{name}} does it, with his own tools.",
         agentText_female: "{{name}} does it, with her own tools.",
-        testing: "Testing",
         locked: "It can't change once the mission has started.",
         open: "It can change until the mission starts.",
         saved: "Who does the work: {{name}}",
@@ -7362,7 +7361,6 @@ export const en = {
     cursorText: "Uses the Cursor plan of whoever connected the computer.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "In your Cursor plan", apiPrice: "Billed by Cursor at API prices" },
-    testing: "Testing",
     reasons: {
       no_computer: "Choose a connected computer under Computer to use it.",
       exec_off: "The computer was connected without permission to run programs.",
@@ -8962,6 +8960,10 @@ export const en = {
       openConnectors: "Open Connectors",
       when: "When an email arrives at {{address}}",
       whenFolder: "When an email arrives at {{address}} ({{folder}})",
+      /** A routine on MillionSend's received email (ADR 0130) that names no inbox. */
+      whenMillionSend: "When an email arrives in MillionSend",
+      inboxAddress: "Inbox address",
+      inboxAddressHelp: "Empty = any MillionSend inbox.",
       unknownMailbox: "a mailbox",
       waiting: "Waiting for an email",
       thisWeek_one: "{{count}} email this week",

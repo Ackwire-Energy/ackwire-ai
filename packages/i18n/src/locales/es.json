@@ -4949,7 +4949,8 @@
         "schedule": "Hora",
         "event": "Evento",
         "email": "Correo",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "Correo de MillionSend"
       },
       "frequency": "Frecuencia",
       "frequencyPlaceholder": "Ej.: cada lunes a las 9",
@@ -5154,8 +5155,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code planifica y programa en la computadora. {{name}} lo sigue y te cuenta.",
-      "codex": "Codex (experimental)",
-      "codexText": "Codex programa en la computadora. Todavía en pruebas.",
+      "codex": "Codex",
+      "codexText": "Codex programa en la computadora.",
       "agent": "{{name}} (el propio agente)",
       "agentText": "{{name}} programa directamente en la computadora, con sus propias herramientas.",
       "agentText_female": "{{name}} programa directamente en la computadora, con sus propias herramientas."
@@ -5749,7 +5750,6 @@
         "codexText": "Lo hace en la computadora.",
         "agentText": "{{name}} lo hace, con sus propias herramientas.",
         "agentText_female": "{{name}} lo hace, con sus propias herramientas.",
-        "testing": "En pruebas",
         "locked": "No se puede cambiar una vez que empezó la misión.",
         "open": "Se puede cambiar hasta que empiece la misión.",
         "saved": "Quién hace el trabajo: {{name}}",
@@ -7997,7 +7997,6 @@
       "inPlan": "Incluido en tu plan de Cursor",
       "apiPrice": "Cursor lo cobra a precios de API"
     },
-    "testing": "En prueba",
     "reasons": {
       "no_computer": "Elige una computadora conectada en Computadora para usarlo.",
       "exec_off": "La computadora se conectó sin permiso para ejecutar programas.",
@@ -9887,6 +9886,9 @@
       "openConnectors": "Abrir Conectores",
       "when": "Cuando llega un correo a {{address}}",
       "whenFolder": "Cuando llega un correo a {{address}} ({{folder}})",
+      "whenMillionSend": "Cuando llega un correo a MillionSend",
+      "inboxAddress": "Dirección del buzón",
+      "inboxAddressHelp": "Vacío = cualquier buzón de MillionSend.",
       "unknownMailbox": "un buzón",
       "waiting": "Esperando un correo",
       "thisWeek_one": "{{count}} correo esta semana",

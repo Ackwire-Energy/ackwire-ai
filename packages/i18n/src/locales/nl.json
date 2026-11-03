@@ -4863,7 +4863,8 @@
         "schedule": "Tijd",
         "event": "Gebeurtenis",
         "email": "E-mail",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend-mail"
       },
       "frequency": "Frequentie",
       "frequencyPlaceholder": "Bijv.: elke maandag om 9:00",
@@ -5060,8 +5061,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code plant en programmeert op de computer. {{name}} volgt het en geeft het door.",
-      "codex": "Codex (experimenteel)",
-      "codexText": "Codex programmeert op de computer. Wordt nog getest.",
+      "codex": "Codex",
+      "codexText": "Codex programmeert op de computer.",
       "agent": "{{name}} (de agent zelf)",
       "agentText": "{{name}} programmeert direct op de computer, met zijn eigen tools.",
       "agentText_female": "{{name}} programmeert direct op de computer, met haar eigen tools."
@@ -5622,7 +5623,6 @@
         "codexText": "Doet het op de computer.",
         "agentText": "{{name}} doet het, met zijn eigen tools.",
         "agentText_female": "{{name}} doet het, met haar eigen tools.",
-        "testing": "In test",
         "locked": "Dit kan niet meer veranderen zodra de missie is gestart.",
         "open": "Dit kan veranderen tot de missie start.",
         "saved": "Wie het werk doet: {{name}}",
@@ -7799,7 +7799,6 @@
       "inPlan": "In je Cursor-abonnement",
       "apiPrice": "Door Cursor gefactureerd tegen API-prijzen"
     },
-    "testing": "Testen",
     "reasons": {
       "no_computer": "Kies een gekoppelde computer bij Computer om dit te gebruiken.",
       "exec_off": "De computer is gekoppeld zonder toestemming om programma's uit te voeren.",
@@ -9639,6 +9638,9 @@
       "openConnectors": "Connectors openen",
       "when": "Als er een mail binnenkomt op {{address}}",
       "whenFolder": "Als er een mail binnenkomt op {{address}} ({{folder}})",
+      "whenMillionSend": "Als er een mail binnenkomt op MillionSend",
+      "inboxAddress": "Adres van de mailbox",
+      "inboxAddressHelp": "Leeg = elke MillionSend-mailbox.",
       "unknownMailbox": "een mailbox",
       "waiting": "Wachten op een mail",
       "thisWeek_one": "{{count}} mail deze week",

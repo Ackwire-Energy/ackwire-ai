@@ -1,12 +1,16 @@
 import type { Adapters } from "@agenteschat/adapters";
-import type { Config } from "@agenteschat/config";
+import { type Config, connectorOAuthApps } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
   type AiStatusDeps,
+  type ConnectorTriggerDeps,
+  composioConnectorsOf,
+  connectOverHttp,
   ForbiddenError,
   type RoutineHookConfig,
   type RoutineHookDeps,
   requireAgentDetails,
+  withComposio,
 } from "@agenteschat/engine";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
@@ -42,6 +46,21 @@ export const routineHookDeps = (deps: AppDeps): RoutineHookDeps => ({
   keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
   rateLimiter: deps.adapters.rateLimiter,
 });
+
+/** How routines reach a connection's service to register their connector events (ADR 0130), as connectors do. */
+export const routineConnectorDeps = (deps: AppDeps): ConnectorTriggerDeps => {
+  const composio = composioConnectorsOf(deps.adapters.mail);
+  return {
+    db: deps.db,
+    keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
+    oauthApps: connectorOAuthApps(deps.config),
+    publicUrl: deps.config.PUBLIC_URL,
+    http: deps.extras?.http,
+    resolveHost: deps.extras?.resolveHost,
+    connect: withComposio(deps.extras?.mcpConnect ?? connectOverHttp, composio),
+    composio,
+  };
+};
 
 /** Allowed browser origins for state-changing requests and WebSocket upgrades. */
 export function allowedOrigins(config: Config): Set<string> {

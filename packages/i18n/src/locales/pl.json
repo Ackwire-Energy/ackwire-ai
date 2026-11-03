@@ -5109,7 +5109,8 @@
         "schedule": "Godzina",
         "event": "Zdarzenie",
         "email": "E-mail",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "E-mail w MillionSend"
       },
       "frequency": "Częstotliwość",
       "frequencyPlaceholder": "Np.: w każdy poniedziałek o 9:00",
@@ -5322,8 +5323,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code planuje i programuje na komputerze. {{name}} śledzi postępy i przekazuje je dalej.",
-      "codex": "Codex (eksperymentalny)",
-      "codexText": "Codex programuje na komputerze. Wciąż w fazie testów.",
+      "codex": "Codex",
+      "codexText": "Codex programuje na komputerze.",
       "agent": "{{name}} (sam agent)",
       "agentText": "{{name}} programuje bezpośrednio na komputerze, własnymi narzędziami.",
       "agentText_female": "{{name}} programuje bezpośrednio na komputerze, własnymi narzędziami."
@@ -5961,7 +5962,6 @@
         "codexText": "Wykonuje na komputerze.",
         "agentText": "Wykonuje {{name}}, własnymi narzędziami.",
         "agentText_female": "Wykonuje {{name}}, własnymi narzędziami.",
-        "testing": "Testy",
         "locked": "Nie można tego zmienić po rozpoczęciu misji.",
         "open": "Można to zmienić do rozpoczęcia misji.",
         "saved": "Kto wykonuje pracę: {{name}}",
@@ -8294,7 +8294,6 @@
       "inPlan": "W twoim planie Cursor",
       "apiPrice": "Rozliczane przez Cursor po cenach API"
     },
-    "testing": "Testowe",
     "reasons": {
       "no_computer": "Wybierz połączony komputer w sekcji Komputer, żeby z tego korzystać.",
       "exec_off": "Komputer połączono bez uprawnienia do uruchamiania programów.",
@@ -10237,6 +10236,9 @@
       "openConnectors": "Otwórz Konektory",
       "when": "Gdy przyjdzie e-mail na {{address}}",
       "whenFolder": "Gdy przyjdzie e-mail na {{address}} ({{folder}})",
+      "whenMillionSend": "Gdy przyjdzie e-mail do MillionSend",
+      "inboxAddress": "Adres skrzynki",
+      "inboxAddressHelp": "Puste = dowolna skrzynka MillionSend.",
       "unknownMailbox": "skrzynka",
       "waiting": "Czeka na e-mail",
       "thisWeek_one": "{{count}} e-mail w tym tygodniu",

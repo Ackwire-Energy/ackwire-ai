@@ -12158,10 +12158,10 @@
     "value": "Claude Code plans and codes on the computer. {{name}} follows and relays."
   },
   "missions.executor.codex": {
-    "value": "Codex (experimental)"
+    "value": "Codex"
   },
   "missions.executor.codexText": {
-    "value": "Codex codes on the computer. Still being tested."
+    "value": "Codex codes on the computer."
   },
   "missions.executor.agent": {
     "value": "{{name}} (the agent itself)"
@@ -13542,9 +13542,6 @@
   "missions.settings.executor.agentText": {
     "value": "{{name}} does it, with his own tools.",
     "female": "{{name}} does it, with her own tools."
-  },
-  "missions.settings.executor.testing": {
-    "value": "Testing"
   },
   "missions.settings.executor.locked": {
     "value": "It can't change once the mission has started."
@@ -18909,9 +18906,6 @@
   },
   "brain.cursorModel.apiPrice": {
     "value": "Billed by Cursor at API prices"
-  },
-  "brain.testing": {
-    "value": "Testing"
   },
   "brain.reasons.no_computer": {
     "value": "Choose a connected computer under Computer to use it."
@@ -29938,5 +29932,17 @@
   },
   "agentComputer.phone.chooseOnWeb": {
     "value": "Choose it on agentes.chat, in Settings › Computers."
+  },
+  "routines.form.kind.connector": {
+    "value": "MillionSend email"
+  },
+  "mail.routine.whenMillionSend": {
+    "value": "When an email arrives in MillionSend"
+  },
+  "mail.routine.inboxAddress": {
+    "value": "Inbox address"
+  },
+  "mail.routine.inboxAddressHelp": {
+    "value": "Empty = any MillionSend inbox."
   }
 }

@@ -1504,7 +1504,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
       });
       const brain = r.api.agents.brain;
       // The Cloud's computer has Cursor's CLI for every agent, as Claude's and Codex's: its tile is ready too.
-      const cursor = { kind: "cursor" as const, available: true, experimental: false, models: [], defaultModel: null };
+      const cursor = { kind: "cursor" as const, available: true, models: [], defaultModel: null };
       r.api.agents.brain = async (...args) => {
         const answer = await brain(...args);
         await viewBack;

@@ -1393,7 +1393,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   <ProviderLogo id={planMark(c)} off={off} />
                 ),
               title: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
-              tag: c === "chatgpt" || c === "cursor" ? t("brain.testing") : undefined,
               description:
                 c === "key"
                   ? t("agentPage.work.brain.modelText", g)

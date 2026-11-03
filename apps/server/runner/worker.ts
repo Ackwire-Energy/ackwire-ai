@@ -340,6 +340,11 @@ export class WorkerLink {
     this.write(JSON.stringify({ type: "usage", kind, account, info } satisfies WorkerLinkFrame));
   }
 
+  /** A ChatGPT sign-in root keeps, refreshed by this agent's Codex: root takes it only for a turn it sent here. */
+  codexAuth(account: string, auth: string) {
+    this.write(JSON.stringify({ type: "codex.auth", account, auth } satisfies WorkerLinkFrame));
+  }
+
   /** What its agent's Chrome sent and received since the last time (protocol 23); nothing when it moved nothing. */
   traffic({ up, down }: { up: number; down: number }) {
     if (up > 0 || down > 0) this.write(JSON.stringify({ type: "browser.traffic", up, down } satisfies WorkerLinkFrame));
@@ -422,6 +427,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     ...lentAccounts(),
     agentHome: (kind: AccountKind, id: string) => agentAccountHome(home, kind, id),
     noteRateLimit: (account: string, info: unknown) => link.usage("claude_code", account, info),
+    codexAuth: (account: string, auth: string) => link.codexAuth(account, auth),
   };
   const tasks = new TaskManager({
     mcp: mcpCommand,

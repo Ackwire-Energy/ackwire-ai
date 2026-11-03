@@ -15,6 +15,7 @@ import {
   type RunnerAccountInfo,
   type ServerFrame,
   SHARED_ACCOUNTS_PROTOCOL,
+  SHARED_CODEX_PROTOCOL,
   sealSecret,
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
@@ -716,7 +717,7 @@ test("ownership is bound when the sign-in starts: a member's account on a comput
   ).toMatchObject({ label: "Startup", mine: true });
 });
 
-test("ChatGPT: the same email twice for one owner on one computer is refused, and the new sign-in is removed there", async () => {
+test("ChatGPT: the same account again signs in as a login of its own, under the account's name, like Claude's", async () => {
   f = await setup();
   const { machineId } = await ownedMachine();
   await addAccount(machineId, CODEX_ID, "codex", { label: "Trabalho", email: "Ana@Example.com", plan: "plus" });
@@ -727,23 +728,35 @@ test("ChatGPT: the same email twice for one owner on one computer is refused, an
     return { runner, login, status };
   };
   const { runner, login, status } = await signInChatGpt("ana@example.com");
-  // Named, and the account itself: its owner may think with it instead.
   expect(status).toMatchObject({
-    state: "failed",
-    duplicate: {
-      label: "Trabalho",
-      account: { id: CODEX_ID, label: "Trabalho", email: "Ana@Example.com", mine: true, status: "active", usedBy: [] },
-    },
+    state: "done",
+    account: { id: login.loginId, label: "Trabalho", email: "ana@example.com", status: "active", usedBy: [] },
   });
-  expect(runner.calls.at(-1)).toEqual({ op: "account", action: "remove", kind: "codex", accountId: login.loginId });
-  expect((await accountRows(machineId)).map((r) => r.id)).toEqual([CODEX_ID]);
-  expect(await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "account.added"))).toEqual([]);
+  expect(status.duplicate).toBeUndefined();
+  expect(runner.calls.filter((c) => c.action === "remove")).toEqual([]);
+  expect((await accountRows(machineId)).map((r) => r.id).sort()).toEqual([CODEX_ID, login.loginId].sort());
 
   // Another email is another account.
   expect((await signInChatGpt("ana.pessoal@example.com")).status).toMatchObject({
     state: "done",
     account: { label: "ChatGPT" },
   });
+});
+
+test("ChatGPT's sign-in is made for all of its owner's agents from runner protocol 38 on, never before", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(SHARED_CODEX_PROTOCOL);
+  const begun = async (protocol: number) => {
+    const runner = fakeHub(
+      machineId,
+      (req) => (req.action === "begin" ? { url: "https://auth.openai.com/codex/device", userCode: "ABCD-1234" } : {}),
+      { protocol },
+    );
+    await beginAccountLogin(runner.deps, f.owner.id, f.org.id, machineId, "codex");
+    return (runner.calls.find((c) => c.action === "begin") as { shared?: boolean } | undefined)?.shared;
+  };
+  expect(await begun(SHARED_CODEX_PROTOCOL)).toBe(true);
+  expect(await begun(SHARED_CODEX_PROTOCOL - 1)).toBeUndefined();
 });
 
 test("Claude: an account another agent thinks with signs in again as a login of its own, under the account's name", async () => {
@@ -955,14 +968,16 @@ test("one login per agent where the account allows it: a key's logins share its 
   expect(remove).toEqual([]);
   expect(await accountRow(DESKTOP_ID)).toMatchObject({ label: "Time", createdBy: f.owner.id, status: "active" });
 
-  // ChatGPT's sign-ins stay one per account: the same ChatGPT account again is refused.
+  // ChatGPT's like Claude's: the same ChatGPT account again is one more login, under its name.
   const chatgpt = codexRunner(machineId, "ana@example.com");
   const signInChatGpt = async () => {
     const login = await beginAccountLogin(chatgpt.deps, f.owner.id, f.org.id, machineId, "codex");
     return accountLoginStatus(chatgpt.deps, f.owner.id, f.org.id, machineId, login.loginId);
   };
   expect(await signInChatGpt()).toMatchObject({ state: "done", account: { label: "ChatGPT" } });
-  expect(await signInChatGpt()).toMatchObject({ state: "failed", duplicate: { label: "ChatGPT" } });
+  const again = await signInChatGpt();
+  expect(again).toMatchObject({ state: "done", account: { label: "ChatGPT" } });
+  expect(again.duplicate).toBeUndefined();
 });
 
 test("rename and remove: the owner renames; the owner or the pairer removes; offline, a tombstone until the next hello", async () => {
@@ -1479,9 +1494,9 @@ test("an account the runner no longer says is for all agents: the two agents on 
   expect(taken).toMatchObject({ code: "account.in_use" });
 });
 
-test("where each agent is its own OS user, the switch decides: Claude's sign-ins and plans' keys for all, ChatGPT's not yet", async () => {
+test("where each agent is its own OS user, the switch decides: Claude's and ChatGPT's sign-ins and plans' keys for all", async () => {
   f = await setup();
-  const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);
+  const { machineId } = await ownedMachine(SHARED_CODEX_PROTOCOL);
   const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId));
   await f.db
     .update(schema.machines)
@@ -1489,11 +1504,21 @@ test("where each agent is its own OS user, the switch decides: Claude's sign-ins
     .where(eq(schema.machines.id, machineId));
   expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.shares).toEqual({
     claude_code: true,
+    codex: true,
+    cursor: false,
+    key: true,
+  });
+  // A runner before protocol 38 shares Claude's and keys only, and an older one nothing.
+  await f.db
+    .update(schema.machines)
+    .set({ protocol: SHARED_CODEX_PROTOCOL - 1 })
+    .where(eq(schema.machines.id, machineId));
+  expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.shares).toEqual({
+    claude_code: true,
     codex: false,
     cursor: false,
     key: true,
   });
-  // An older runner shares nothing.
   await f.db
     .update(schema.machines)
     .set({ protocol: SHARED_ACCOUNTS_PROTOCOL - 1 })

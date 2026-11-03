@@ -51,7 +51,7 @@ const setup = (patch: Partial<ComputerSetup> = {}) =>
 const option = (kind: "claude_code" | "codex", over: Partial<AgentBrain["options"][number]> = {}) => ({
   kind,
   available: true,
-  experimental: false,
+
   models: [],
   defaultModel: null,
   ...over,
@@ -259,9 +259,9 @@ describe("the agent a plan starts on, and the order of the plans", () => {
 });
 
 describe("All agents: one login per agent, the key pasted once", () => {
-  test("Claude and the coding plans sign in once per agent; ChatGPT stays one agent per account", () => {
-    expect(LOGIN_PER_AGENT).toEqual({ claude_code: true, codex: false, cursor: false, key: true });
-    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual(["claude", "zai", "kimi", "minimax", "opencode"]);
+  test("every plan signs in once per agent, ChatGPT's and Cursor's too", () => {
+    expect(LOGIN_PER_AGENT).toEqual({ claude_code: true, codex: true, cursor: true, key: true });
+    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual([...PLAN_CHOICES]);
   });
 
   /** Ada and Theo have no AI, Lia is on GLM Coding, Bo on the API key, Cy on Claude, Di on the other computer. */
@@ -282,15 +282,15 @@ describe("All agents: one login per agent, the key pasted once", () => {
     ).toEqual(["ada", "theo", "lia", "bo", "cy", "di"]);
   });
 
-  test("Claude's like a coding plan's; none for ChatGPT, and none for a single agent", () => {
+  test("Claude's and ChatGPT's like a coding plan's, and none for a single agent", () => {
     expect(set("claude")).toEqual(["ada", "theo", "cy"]);
-    expect(set("chatgpt")).toEqual([]);
+    expect(set("chatgpt")).toEqual(["ada", "theo"]);
     expect(set("zai", [{ id: "ada" }, { id: "bo" }])).toEqual([]);
   });
 
   test("one sign-in for all of them where the computer says so: ChatGPT's too", () => {
-    // Where each agent is its own OS user, Claude's sign-in and plans' keys think for all; ChatGPT's not yet.
-    expect(SHARED_SIGN_INS).toEqual({ claude_code: true, key: true });
+    // Where each agent is its own OS user, Claude's and ChatGPT's sign-ins and plans' keys think for all.
+    expect(SHARED_SIGN_INS).toEqual({ claude_code: true, codex: true, key: true });
     const sharing = { shares: { claude_code: true, codex: true, key: true } };
     expect(signsInOnce("chatgpt", sharing)).toBe(true);
     expect(signsInOnce("zai", { shares: { claude_code: true, codex: false, key: false } })).toBe(false);
@@ -305,10 +305,12 @@ describe("All agents: one login per agent, the key pasted once", () => {
         sharedOn,
       }).map((a) => a.id);
     expect(once("chatgpt")).toEqual(["ada", "theo"]);
-    // Elsewhere ChatGPT's still thinks for one agent.
+    // Elsewhere ChatGPT's signs in once per agent, as Claude's.
     expect(
-      allAgents({ choice: "chatgpt", agents: team, aiOf: (id) => ai[id] ?? null, machineOf: () => "m2", sharedOn }),
-    ).toEqual([]);
+      allAgents({ choice: "chatgpt", agents: team, aiOf: (id) => ai[id] ?? null, machineOf: () => "m2", sharedOn }).map(
+        (a) => a.id,
+      ),
+    ).toEqual(["ada", "theo", "di"]);
   });
 
   test("the panel opens on the agent asked for, then all of them while two have no AI, then the first with no AI", () => {
@@ -466,13 +468,13 @@ describe("a card whose plan's sign-in ended", () => {
 });
 
 describe("Cursor (ADR 0114): a plan of its own, signed in through its CLI", () => {
-  test("its accounts and agents read as Cursor's plan, one agent per sign-in, and a signed-out CLI names Cursor", () => {
+  test("its accounts and agents read as Cursor's plan, signed in once per agent, and a signed-out CLI names Cursor", () => {
     expect(planOfKind("cursor")).toBe("cursor");
     expect(planOfAccount({ kind: "cursor", provider: null })).toBe("cursor");
     // An account made with a Cursor API key is still Cursor's plan.
     expect(planOfAccount({ kind: "cursor", provider: "cursor" })).toBe("cursor");
     expect(agentAi({ brain: { kind: "cursor", model: null } }, "ready")).toBe("cursor");
-    expect(signsInPerAgent("cursor")).toBe(false);
+    expect(signsInPerAgent("cursor")).toBe(true);
     const t = ((key: string, o?: { brain?: string }) => `${key}:${o?.brain ?? ""}`) as unknown as TFunction;
     expect(serverBody(t, "…", { bodyCode: "no_ai", noAi: { reason: "not_signed_in", own: "cursor" } })).toBe(
       "chat.body.no_ai_not_signed_in:Cursor",

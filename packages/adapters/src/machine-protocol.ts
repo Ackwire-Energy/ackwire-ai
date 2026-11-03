@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 37;
+export const MACHINE_PROTOCOL_VERSION = 38;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -444,6 +444,11 @@ export const CURSOR_KEY_PROVIDER = "cursor";
  * each agent and has no such command.
  */
 export const SHARED_COMPUTER_PROTOCOL = 37;
+/**
+ * From this protocol on, in system mode a ChatGPT sign-in is made for all of its owner's agents there too (`begin`'s
+ * `shared` for `codex`): root keeps its `auth.json`, hands each turn a copy and takes refreshed copies back.
+ */
+export const SHARED_CODEX_PROTOCOL = 38;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex" | "cursor";

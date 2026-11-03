@@ -243,6 +243,11 @@ export const routineHooks = pgTable("routine_hooks", {
   secretCiphertext: text(),
   secretWrappedKey: text(),
   secretKekId: text(),
+  /**
+   * A connector's event behind the address (ADR 0130): the connection, the event, its filter and the webhook the
+   * provider keeps for it (`ConnectorTriggerSource`). Null: a plain webhook routine.
+   */
+  source: jsonb(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

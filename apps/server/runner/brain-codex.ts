@@ -5,14 +5,20 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import {
-  type AccountKind,
   type AgentScope,
   type BrainEffort,
   isAccountId,
   isBrainEffort,
   isContextTokens,
 } from "@agenteschat/adapters/machine-protocol";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv } from "./accounts";
+import {
+  ACCOUNT_MISSING_MESSAGE,
+  ACCOUNT_SIGNED_OUT,
+  type AccountFolders,
+  type AccountGrant,
+  accountEnv,
+  accountSignIn,
+} from "./accounts";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { cachedExecutors, resolveCommand } from "./executors";
@@ -684,7 +690,9 @@ export interface CodexBrainContext {
   /** Protocol 10: folders allowed for the agent besides its own (real paths). */
   grants?: string[];
   /** Protocol 13: the accounts' folders (ADR 0041); without it a turn with an account is `account_missing`. */
-  accounts?: { accountDir(kind: AccountKind, id: string): string | null };
+  accounts?: AccountFolders;
+  /** Set per request in a worker (protocol 29): what root handed this turn for its account (`AccountManager.grant`). */
+  grant?: AccountGrant;
   /** Protocol 15: the app-server processes (live steering); without it every turn is `codex exec`. */
   app?: CodexAppRunner;
   spawn?: Spawn;
@@ -727,15 +735,21 @@ export async function handleCodexBrainTurn(
   }
   // ADR 0041: the account's folder or nothing (never the machine's own sign-in instead).
   let account: { id: string; home: string } | undefined;
+  let release: (() => void) | undefined;
   const accountId: unknown = req.account;
   if (accountId !== undefined && accountId !== null && accountId !== "") {
     if (!isAccountId(accountId)) throw new RunnerError("bad_request", "Invalid account id");
-    const home = ctx.accounts?.accountDir("codex", accountId);
-    if (!home) {
+    const signIn = await accountSignIn(ctx.accounts, "codex", accountId, ctx.grant);
+    if (signIn === "signed_out") {
+      scope.emit({ type: "error", code: "not_logged_in", message: ACCOUNT_SIGNED_OUT, retryable: true });
+      return;
+    }
+    if (signIn === "missing") {
       scope.emit({ type: "error", code: "account_missing", message: ACCOUNT_MISSING_MESSAGE.codex, retryable: false });
       return;
     }
-    account = { id: accountId, home };
+    account = { id: accountId, home: signIn.home };
+    release = signIn.release;
   }
   // Starting in one of its checkouts (`repos/owner/name`), the agent keeps its whole folder (its other checkouts).
   const writableRoots = [...(cwd !== folder ? [folder] : []), ...(ctx.grants ?? []).filter((g) => !isInside(g, cwd))];
@@ -743,40 +757,44 @@ export async function handleCodexBrainTurn(
   const file = codexThreadsFile(ctx.runnerHome);
   const threads = ctx.threads ?? threadStores.get(file) ?? new CodexThreads(file);
   threadStores.set(file, threads);
-  await runCodexTurn(
-    {
-      runId: req.runId,
-      sessionId: req.session.id,
-      cwd,
-      ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
-      system: typeof req.system === "string" ? req.system : "",
-      prompt: typeof req.prompt === "string" ? req.prompt : "",
-      mcp: {
-        token: req.mcp.token,
-        ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}),
-        ...(typeof req.mcp.tools === "string" && req.mcp.tools ? { tools: req.mcp.tools.slice(0, 64_000) } : {}),
+  try {
+    await runCodexTurn(
+      {
+        runId: req.runId,
+        sessionId: req.session.id,
+        cwd,
+        ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
+        system: typeof req.system === "string" ? req.system : "",
+        prompt: typeof req.prompt === "string" ? req.prompt : "",
+        mcp: {
+          token: req.mcp.token,
+          ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}),
+          ...(typeof req.mcp.tools === "string" && req.mcp.tools ? { tools: req.mcp.tools.slice(0, 64_000) } : {}),
+        },
+        ...(writableRoots.length ? { writableRoots } : {}),
+        ...(account ? { account } : {}),
+        ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
+        ...(isContextTokens(req.contextTokens) ? { contextTokens: req.contextTokens } : {}),
+        agentId: String(req.agent.id),
+        folder,
+        profile: codexProfileOf(req),
+        ...(req.keepAlive === false ? { keepAlive: false } : {}),
       },
-      ...(writableRoots.length ? { writableRoots } : {}),
-      ...(account ? { account } : {}),
-      ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
-      ...(isContextTokens(req.contextTokens) ? { contextTokens: req.contextTokens } : {}),
-      agentId: String(req.agent.id),
-      folder,
-      profile: codexProfileOf(req),
-      ...(req.keepAlive === false ? { keepAlive: false } : {}),
-    },
-    {
-      threads,
-      workDir: path.join(ctx.runnerHome, "brain", "turns", req.runId),
-      emit: scope.emit,
-      signal: scope.signal,
-      runnerHome: ctx.runnerHome,
-      ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
-      ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
-      ...(ctx.codexVersion ? { codexVersion: ctx.codexVersion } : {}),
-      ...(ctx.bin ? { bin: ctx.bin } : {}),
-      ...(ctx.app ? { app: ctx.app } : {}),
-      ...(ctx.spawn ? { spawn: ctx.spawn } : {}),
-    },
-  );
+      {
+        threads,
+        workDir: path.join(ctx.runnerHome, "brain", "turns", req.runId),
+        emit: scope.emit,
+        signal: scope.signal,
+        runnerHome: ctx.runnerHome,
+        ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
+        ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
+        ...(ctx.codexVersion ? { codexVersion: ctx.codexVersion } : {}),
+        ...(ctx.bin ? { bin: ctx.bin } : {}),
+        ...(ctx.app ? { app: ctx.app } : {}),
+        ...(ctx.spawn ? { spawn: ctx.spawn } : {}),
+      },
+    );
+  } finally {
+    release?.();
+  }
 }

@@ -315,7 +315,6 @@ function SettingsBody({
                   {executorName(e)}
                 </>
               ),
-              tag: e === "codex" ? t("missions.settings.executor.testing") : undefined,
               description:
                 e === "agent"
                   ? t("missions.settings.executor.agentText", g)

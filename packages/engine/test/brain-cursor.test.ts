@@ -182,7 +182,7 @@ test("Quem pensa lists Cursor with the models its CLI listed, the plan's own fir
     ...over,
   });
   const cursor = (m: ReturnType<typeof machine> | null) => brainOptions(m).find((o) => o.kind === "cursor");
-  expect(cursor(machine())).toMatchObject({ available: true, experimental: true, defaultModel: null });
+  expect(cursor(machine())).toMatchObject({ available: true, defaultModel: null });
   expect(cursor(machine())?.models.map((o) => [o.value, o.label, o.inPlan ?? false])).toEqual([
     ["grok-5-code", "Grok 5 Code", true],
     ["claude-opus-5-5", "Claude Opus 5.5", false],
@@ -198,9 +198,9 @@ test("Quem pensa lists Cursor with the models its CLI listed, the plan's own fir
   expect(() => normalizeBrainModel("cursor", "rm -rf /")).toThrow();
 });
 
-test("Cursor accounts: named Cursor, one agent per sign-in, a key thinks for several", () => {
+test("Cursor accounts: named Cursor, signed in once per agent, a key thinks for several", () => {
   expect(defaultAccountLabel("cursor")).toBe("Cursor");
   expect(defaultAccountLabel("cursor", ["Cursor"])).toBe("Cursor 2");
-  expect(loginPerAgent("cursor")).toBe(false);
+  expect(loginPerAgent("cursor")).toBe(true);
   expect(loginPerAgent("cursor", "cursor")).toBe(true);
 });

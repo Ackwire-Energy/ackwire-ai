@@ -4684,7 +4684,8 @@
         "schedule": "Waktu",
         "event": "Peristiwa",
         "email": "Email",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "Email MillionSend"
       },
       "frequency": "Frekuensi",
       "frequencyPlaceholder": "Misalnya: setiap Senin pukul 9 pagi",
@@ -4873,8 +4874,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code merencanakan dan menulis kode di komputer. {{name}} mengikuti dan meneruskan.",
-      "codex": "Codex (eksperimental)",
-      "codexText": "Codex menulis kode di komputer. Masih diuji.",
+      "codex": "Codex",
+      "codexText": "Codex menulis kode di komputer.",
       "agent": "{{name}} (agen itu sendiri)",
       "agentText": "{{name}} menulis kode langsung di komputer, dengan alatnya sendiri.",
       "agentText_female": "{{name}} menulis kode langsung di komputer, dengan alatnya sendiri."
@@ -5391,7 +5392,6 @@
         "codexText": "Mengerjakannya di komputer.",
         "agentText": "{{name}} yang mengerjakannya, dengan alatnya sendiri.",
         "agentText_female": "{{name}} yang mengerjakannya, dengan alatnya sendiri.",
-        "testing": "Uji coba",
         "locked": "Tidak bisa diubah setelah misi dimulai.",
         "open": "Bisa diubah sampai misi dimulai.",
         "saved": "Siapa yang mengerjakan: {{name}}",
@@ -7467,7 +7467,6 @@
       "inPlan": "Termasuk dalam paket Cursor-mu",
       "apiPrice": "Ditagih oleh Cursor dengan harga API"
     },
-    "testing": "Menguji",
     "reasons": {
       "no_computer": "Pilih komputer yang terhubung di Komputer untuk memakainya.",
       "exec_off": "Komputer ini terhubung tanpa izin menjalankan program.",
@@ -9259,6 +9258,9 @@
       "openConnectors": "Buka Konektor",
       "when": "Saat email masuk ke {{address}}",
       "whenFolder": "Saat email masuk ke {{address}} ({{folder}})",
+      "whenMillionSend": "Saat email masuk ke MillionSend",
+      "inboxAddress": "Alamat kotak surat",
+      "inboxAddressHelp": "Kosong = kotak surat MillionSend mana pun.",
       "unknownMailbox": "sebuah kotak surat",
       "waiting": "Menunggu email",
       "thisWeek_other": "{{count}} email minggu ini",

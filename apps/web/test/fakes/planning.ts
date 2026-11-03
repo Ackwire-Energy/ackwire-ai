@@ -650,6 +650,7 @@ export function createMockPlanning(
             description: input.trigger.at,
           };
         else if (input.trigger.type === "webhook") trigger = { type: "webhook", url: null, signed: false };
+        else if (input.trigger.type === "connector") trigger = { ...input.trigger, status: "active", lastError: null };
         else trigger = input.trigger;
         const agents = await ctx.lookup.agents(orgId);
         const id = mockId("rt");
@@ -690,6 +691,8 @@ export function createMockPlanning(
           };
         else if (patch.trigger?.type === "webhook")
           r.trigger = { type: "webhook", url: hookOf(await store(orgId), id).url, signed: false };
+        else if (patch.trigger?.type === "connector")
+          r.trigger = { ...patch.trigger, status: "active", lastError: null };
         else if (patch.trigger) r.trigger = patch.trigger;
         r.nextRunAt =
           r.active && r.trigger.type === "schedule"

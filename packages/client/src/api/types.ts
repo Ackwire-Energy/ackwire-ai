@@ -2097,6 +2097,8 @@ export interface CustomServer {
   /** Why its tools couldn't be read the last time they were listed (short); null or absent when they were. */
   toolsError?: string | null;
   tools: CustomTool[];
+  /** What routines can wait on from it (ADR 0130). Older servers leave it out. */
+  events?: RoutineConnectorTrigger["event"][];
   /** Last time an admin saved the classification; null = never (nothing exposed). */
   reviewedAt: string | null;
   createdAt: string;
@@ -2928,7 +2930,22 @@ export type RoutineTrigger =
   /** A one-off (reminders, "amanhã às 9h"): fires once at `at`, then the routine is inactive. */
   | { type: "once"; at: string; timezone: string; description: string }
   | RoutineEmailTrigger
-  | RoutineWebhookTrigger;
+  | RoutineWebhookTrigger
+  | RoutineConnectorTrigger;
+
+/** A connector's event (ADR 0130): "Quando chegar um e-mail no MillionSend", from an inbox or all of them. */
+export interface RoutineConnectorTrigger {
+  type: "connector";
+  connectionId: string;
+  event: "millionsend.email.received";
+  /** Null: every inbox of the team. */
+  inboxId: string | null;
+  /** `to`: the inbox's address ("Quando chegar um e-mail em vendas@…"). */
+  filter: Pick<RoutineEmailFilter, "from" | "subject"> & { to?: string };
+  /** `error`: the service refused the webhook (`lastError`); saving the routine again retries. */
+  status: "active" | "error";
+  lastError: string | null;
+}
 
 /**
  * "Quando o webhook for chamado" (ADR 0106): a call to the routine's own address starts it. `url` only for who may
@@ -3149,7 +3166,8 @@ export interface RoutineInput {
     | { type: "event"; event: RoutineEvent }
     | { type: "once"; at: string; timezone?: string }
     | Omit<RoutineEmailTrigger, "status">
-    | { type: "webhook" };
+    | { type: "webhook" }
+    | Omit<RoutineConnectorTrigger, "status" | "lastError">;
   /** Ignored: every routine acts (ADR 0109). */
   access?: RoutineAccess;
   /** Default `when_new` ("Só quando tiver novidade"). */
@@ -4550,7 +4568,7 @@ export interface PlanItem {
   note?: string;
 }
 
-/** Who programs a mission: Claude Code, Codex (experimental) or the agent itself with its own tools. */
+/** Who programs a mission: Claude Code, Codex or the agent itself with its own tools. */
 export type MissionExecutor = "claude" | "codex" | "agent";
 
 /**
@@ -4762,8 +4780,6 @@ export interface BrainOption {
   kind: BrainKind;
   available: boolean;
   reason?: BrainUnavailable;
-  /** "Em teste" (Codex). */
-  experimental: boolean;
   models: BrainModelOption[];
   defaultModel: string | null;
 }

@@ -190,6 +190,7 @@ function whenText(t: RoutineTrigger) {
   if (t.type === "webhook") return `when ${EVENT_WORDS["webhook.received"]}${t.signed ? " (signed calls only)" : ""}`;
   const from = t.filter.from?.length ? ` from ${t.filter.from.join(", ")}` : "";
   const subject = t.filter.subject ? ` with "${t.filter.subject}" in the subject` : "";
+  if (t.type === "connector") return `when an email arrives in a MillionSend inbox${from}${subject}`;
   return `when new mail arrives in ${t.folder}${from}${subject}`;
 }
 
@@ -213,6 +214,8 @@ function whenParams(t: RoutineTrigger): AgentActionParams {
       return { trigger: "event", event: t.event };
     case "email":
       return { trigger: "email", folder: t.folder };
+    case "connector":
+      return { trigger: "connector", event: t.event };
     case "webhook":
       return { trigger: "webhook" };
   }

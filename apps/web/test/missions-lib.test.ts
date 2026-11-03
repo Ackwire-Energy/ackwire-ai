@@ -455,7 +455,7 @@ describe("who programs (ADR 0029, executor agent)", () => {
     expect(viaText(te, "agent", "Dev", "MacBook")).toBe("Dev on MacBook");
     expect(viaText(t, "codex", "Dev", null)).toBe("via Codex");
     const options = executorOptions(t, ["codex", "agent"], "Dev");
-    expect(options.map((o) => o.label)).toEqual(["Codex (experimental)", "Dev (o próprio agente)"]);
+    expect(options.map((o) => o.label)).toEqual(["Codex", "Dev (o próprio agente)"]);
     expect(executorOptions(te, ["claude"], "Dev")[0]?.description).toContain("Claude Code plans and codes");
   });
 });
@@ -488,7 +488,7 @@ describe("who programs, as a mark", () => {
     expect(executorOnText(t, "agent", "Ada", "mac")).toBe("Ada no mac");
     expect(executorOnText(t, "claude", "Ada", null)).toBe("Claude Code");
     const options = executorOptions(t, ["claude", "codex", "agent"], "Ada", "a1");
-    expect(options.map((o) => o.label)).toEqual(["Claude Code", "Codex (experimental)", "Ada (o próprio agente)"]);
+    expect(options.map((o) => o.label)).toEqual(["Claude Code", "Codex", "Ada (o próprio agente)"]);
     expect(options.every((o) => o.leading)).toBe(true);
   });
 });

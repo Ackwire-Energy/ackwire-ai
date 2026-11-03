@@ -4648,7 +4648,8 @@
         "schedule": "時刻",
         "event": "イベント",
         "email": "メール",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend のメール"
       },
       "frequency": "頻度",
       "frequencyPlaceholder": "例: 毎週月曜の9時",
@@ -4837,8 +4838,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Codeがコンピューター上で計画を立ててコードを書きます。{{name}}は進行を見守り、伝えます。",
-      "codex": "Codex（試験運用）",
-      "codexText": "Codexがコンピューター上でコードを書きます。まだテスト中です。",
+      "codex": "Codex",
+      "codexText": "Codexがコンピューター上でコードを書きます。",
       "agent": "{{name}}（エージェント本人）",
       "agentText": "{{name}}が自分のツールで、コンピューター上で直接コードを書きます。",
       "agentText_female": "{{name}}が自分のツールで、コンピューター上で直接コードを書きます。"
@@ -5344,7 +5345,6 @@
         "codexText": "コンピューター上で実行します。",
         "agentText": "{{name}}が自分のツールで実行します。",
         "agentText_female": "{{name}}が自分のツールで実行します。",
-        "testing": "テスト中",
         "locked": "ミッション開始後は変更できません。",
         "open": "ミッションが始まるまで変更できます。",
         "saved": "作業する人: {{name}}",
@@ -7401,7 +7401,6 @@
       "inPlan": "Cursorプランに含まれます",
       "apiPrice": "CursorからAPI料金で請求されます"
     },
-    "testing": "テスト中",
     "reasons": {
       "no_computer": "使うには「コンピューター」で接続済みのコンピューターを選んでください。",
       "exec_off": "このコンピューターは、プログラムの実行を許可せずに接続されています。",
@@ -9192,6 +9191,9 @@
       "openConnectors": "コネクタを開く",
       "when": "{{address}}にメールが届いたとき",
       "whenFolder": "{{address}}（{{folder}}）にメールが届いたとき",
+      "whenMillionSend": "MillionSend にメールが届いたとき",
+      "inboxAddress": "メールボックスのアドレス",
+      "inboxAddressHelp": "空欄の場合は MillionSend のどのメールボックスでも。",
       "unknownMailbox": "メールボックス",
       "waiting": "メールを待っています",
       "thisWeek_other": "今週のメール {{count}}件",

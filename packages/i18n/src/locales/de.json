@@ -4812,7 +4812,8 @@
         "schedule": "Uhrzeit",
         "event": "Ereignis",
         "email": "E-Mail",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend-E-Mail"
       },
       "frequency": "Häufigkeit",
       "frequencyPlaceholder": "Z. B.: jeden Montag um 9 Uhr",
@@ -5009,8 +5010,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code plant und programmiert auf dem Computer. {{name}} begleitet und gibt weiter.",
-      "codex": "Codex (experimentell)",
-      "codexText": "Codex programmiert auf dem Computer. Wird noch getestet.",
+      "codex": "Codex",
+      "codexText": "Codex programmiert auf dem Computer.",
       "agent": "{{name}} (der Agent selbst)",
       "agentText": "{{name}} programmiert direkt auf dem Computer, mit seinen eigenen Tools.",
       "agentText_female": "{{name}} programmiert direkt auf dem Computer, mit ihren eigenen Tools."
@@ -5571,7 +5572,6 @@
         "codexText": "Erledigt es auf dem Computer.",
         "agentText": "{{name}} erledigt es, mit seinen eigenen Tools.",
         "agentText_female": "{{name}} erledigt es, mit ihren eigenen Tools.",
-        "testing": "Im Test",
         "locked": "Das lässt sich nicht mehr ändern, sobald die Mission begonnen hat.",
         "open": "Das lässt sich ändern, bis die Mission beginnt.",
         "saved": "Wer die Arbeit macht: {{name}}",
@@ -7717,7 +7717,6 @@
       "inPlan": "In deinem Cursor-Abo",
       "apiPrice": "Von Cursor zu API-Preisen abgerechnet"
     },
-    "testing": "Im Test",
     "reasons": {
       "no_computer": "Wähle unter Computer einen verbundenen Computer, um es zu nutzen.",
       "exec_off": "Der Computer wurde ohne die Berechtigung verbunden, Programme auszuführen.",
@@ -9560,6 +9559,9 @@
       "openConnectors": "Konnektoren öffnen",
       "when": "Wenn eine E-Mail bei {{address}} eingeht",
       "whenFolder": "Wenn eine E-Mail bei {{address}} eingeht ({{folder}})",
+      "whenMillionSend": "Wenn eine E-Mail bei MillionSend eingeht",
+      "inboxAddress": "Adresse des Postfachs",
+      "inboxAddressHelp": "Leer = jedes MillionSend-Postfach.",
       "unknownMailbox": "ein Postfach",
       "waiting": "Wartet auf eine E-Mail",
       "thisWeek_one": "{{count}} E-Mail diese Woche",

@@ -1,4 +1,5 @@
 import {
+  CONNECTOR_EVENTS,
   cancelReminder,
   continueRoutineUsagePause,
   createReminderFromApp,
@@ -49,6 +50,7 @@ import {
   noContent,
   OrgParams,
   requireSession,
+  routineConnectorDeps,
   routineHookDeps,
   security,
 } from "./context";
@@ -192,6 +194,16 @@ const RoutineRun = z
     finishedAt: z.string().nullable(),
   })
   .openapi("RoutineRun");
+const ConnectorEvent = z.enum(CONNECTOR_EVENTS).openapi("RoutineConnectorEvent");
+
+const ConnectorFilterSchema = z
+  .object({
+    to: z.string().max(320).optional().openapi({ description: "The inbox's address the email was sent to." }),
+    from: z.array(z.string().max(320)).max(50).optional().openapi({ description: "Addresses or `@domains`." }),
+    subject: z.string().max(200).optional().openapi({ description: "Words the subject contains." }),
+  })
+  .openapi("RoutineConnectorFilter");
+
 const Routine = z
   .object({
     id: z.uuid(),
@@ -233,6 +245,17 @@ const Routine = z
           description: "Its address (`POST` to start it); null unless you may manage the routine.",
         }),
         signed: z.boolean().openapi({ description: "Calls must carry an HMAC-SHA256 signature of the body." }),
+      }),
+      z.object({
+        type: z.literal("connector"),
+        connectionId: z.uuid(),
+        event: ConnectorEvent,
+        inboxId: z.string().nullable().openapi({ description: "MillionSend: the inbox; null: every inbox." }),
+        filter: ConnectorFilterSchema,
+        status: z.enum(["active", "error"]).openapi({
+          description: "`error`: the service refused the webhook (`lastError`); saving the routine tries again.",
+        }),
+        lastError: z.string().nullable(),
       }),
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
@@ -365,6 +388,18 @@ const TriggerInput = z.union([
   z
     .object({ type: z.literal("webhook") })
     .openapi({ description: "A call to an address of its own (`GET …/hook` gives it to who manages the routine)." }),
+  z
+    .object({
+      type: z.literal("connector"),
+      connectionId: z.uuid(),
+      event: ConnectorEvent,
+      inboxId: z.uuid().nullable().optional(),
+      filter: ConnectorFilterSchema.optional(),
+    })
+    .openapi({
+      description:
+        "A connector's event (ADR 0130), from a connection the agent may read: the server registers the routine's address at the service.",
+    }),
 ]);
 
 const HookCall = z
@@ -404,6 +439,7 @@ export function routineRoutes(deps: AppDeps) {
     artifacts: deps.extras?.artifacts,
     mail: adapters.mail,
     hooks,
+    connectors: routineConnectorDeps(deps),
   };
   const hookDeps = routineHookDeps(deps);
 

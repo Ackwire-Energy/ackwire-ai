@@ -4743,7 +4743,13 @@ export const ptBR = {
       whatPlaceholder: "Ex.: Resuma o que aconteceu na semana nos canais #eng e #produto.",
       name: "Nome (opcional)",
       when: "Quando",
-      kind: { schedule: "Horário", event: "Evento", email: "Email", webhook: "Webhook" },
+      kind: {
+        schedule: "Horário",
+        event: "Evento",
+        email: "Email",
+        webhook: "Webhook",
+        connector: "Email no MillionSend",
+      },
       frequency: "Frequência",
       frequencyPlaceholder: "Ex.: toda segunda às 9h",
       timezone: "Fuso horário",
@@ -4945,8 +4951,8 @@ export const ptBR = {
     executor: {
       claude: "Claude Code",
       claudeText: "O Claude Code planeja e programa no computador. {{name}} acompanha e repassa.",
-      codex: "Codex (experimental)",
-      codexText: "O Codex programa no computador. Ainda em teste.",
+      codex: "Codex",
+      codexText: "O Codex programa no computador.",
       agent: "{{name}} (o próprio agente)",
       agentText: "{{name}} programa direto no computador, com as próprias ferramentas.",
     },
@@ -5495,7 +5501,6 @@ export const ptBR = {
         codexText: "Faz no computador.",
         agentText: "O {{name}} faz, com as próprias ferramentas.",
         agentText_female: "A {{name}} faz, com as próprias ferramentas.",
-        testing: "Em teste",
         locked: "Não dá para trocar depois que a missão começa.",
         open: "Dá para trocar até a missão começar.",
         saved: "Quem faz o trabalho: {{name}}",
@@ -7570,7 +7575,6 @@ export const ptBR = {
     cursorText: "Usa o plano do Cursor de quem conectou o computador.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "No seu plano do Cursor", apiPrice: "O Cursor cobra pelo preço da API" },
-    testing: "Em teste",
     reasons: {
       no_computer: "Escolha um computador conectado em Computador para usar.",
       exec_off: "O computador foi conectado sem permissão para rodar programas.",
@@ -9160,6 +9164,10 @@ export const ptBR = {
       openConnectors: "Abrir Conectores",
       when: "Quando chegar um email em {{address}}",
       whenFolder: "Quando chegar um email em {{address}} ({{folder}})",
+      /** A routine on MillionSend's received email (ADR 0130) that names no inbox. */
+      whenMillionSend: "Quando chegar um email no MillionSend",
+      inboxAddress: "Endereço da caixa",
+      inboxAddressHelp: "Vazio = qualquer caixa do MillionSend.",
       unknownMailbox: "uma caixa de email",
       waiting: "Esperando um email",
       thisWeek_one: "{{count}} email esta semana",

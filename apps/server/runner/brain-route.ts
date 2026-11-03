@@ -4,7 +4,6 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import os from "node:os";
 import path from "node:path";
 import {
-  type AccountKind,
   type BrainRouteReply,
   type BrainRouteRequest,
   isAccountId,
@@ -13,9 +12,11 @@ import {
   ROUTE_TIMEOUT_MS,
 } from "@agenteschat/adapters/machine-protocol";
 import {
+  type AccountFolders,
   type AccountGrant,
   accountEnv,
   accountSettingsEnv,
+  accountSignIn,
   handToken,
   planKeyOf,
   routesRunning,
@@ -182,10 +183,7 @@ export function codexRouteUsage(stdout: string) {
 
 export interface RouteDeps {
   /** The account folders: root's, or those lent to this agent's worker, and its own for one root keeps. */
-  accounts?: {
-    accountDir(kind: AccountKind, id: string): string | null;
-    agentHome?(kind: AccountKind, id: string): string | null;
-  };
+  accounts?: AccountFolders;
   /** System mode, in a worker (protocol 29): what root handed this route for its account. */
   grant?: AccountGrant;
   /** The processes kept for turns: a sign-in with one open is busy. */
@@ -228,18 +226,18 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
   }
   const account = req.account ?? null;
   if (account !== null && !isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
-  if (account && deps.grant?.kind === "none") throw new RunnerError("not_found", "That account is signed out here");
-  const home = !account
-    ? null
-    : deps.grant
-      ? deps.accounts?.agentHome?.(req.kind, account)
-      : deps.accounts?.accountDir(req.kind, account);
-  if (account && !home) throw new RunnerError("not_found", "That account isn't on this computer anymore");
+  const signIn = account ? await accountSignIn(deps.accounts, req.kind, account, deps.grant) : null;
+  if (signIn === "signed_out") throw new RunnerError("not_found", "That account is signed out here");
+  if (signIn === "missing") throw new RunnerError("not_found", "That account isn't on this computer anymore");
+  const home = signIn?.home ?? null;
   const key = signInKey(req.kind, home);
   const open = req.kind === "codex" ? deps.codexApp : deps.brains;
   const cli = req.kind === "codex" ? "codex" : "claude";
   const task = deps.tasks?.runningTasks().some((t) => t.executor === cli && (t.account ?? null) === account);
-  if (routesRunning.has(key) || open?.holds(account) || task) return { busy: true };
+  if (routesRunning.has(key) || open?.holds(account) || task) {
+    signIn?.release?.();
+    return { busy: true };
+  }
   const stop = new AbortController();
   const signal = deps.signal ? AbortSignal.any([deps.signal, stop.signal]) : stop.signal;
   const done = route(req, { ...deps, signal }, home ?? null, key);
@@ -248,6 +246,7 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
     return await done;
   } finally {
     routesRunning.delete(key);
+    signIn?.release?.();
   }
 }
 

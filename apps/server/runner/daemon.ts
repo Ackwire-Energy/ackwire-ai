@@ -1097,6 +1097,7 @@ export class RunnerDaemon implements RequestObserver {
           kind === "codex"
             ? this.accounts.noteCodexRateLimits(accountId, info)
             : this.accounts.noteRateLimit(accountId, info),
+        codexAuth: (accountId, auth) => this.accounts.keepCodexAuth(accountId, auth),
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
         account: (agentId) => this.agentAccount(agentId),
