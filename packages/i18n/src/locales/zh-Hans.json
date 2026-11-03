@@ -3410,6 +3410,8 @@
         "org_deleting": "工作区正在删除中。",
         "agent_paused": "该智能体已暂停。",
         "computer_busy": "电脑一直忙于其他任务。",
+        "computer_failed": "电脑遇到问题，已停止。",
+        "computer_timeout": "电脑响应时间过长。",
         "unknown": "失败。"
       }
     },

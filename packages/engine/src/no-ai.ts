@@ -183,12 +183,12 @@ async function didWork(db: Executor, runId: string) {
 }
 
 /**
- * Starts a failed `no_ai` run again on the person's own message, in one transaction: the old run is
- * deleted (it did nothing; its steps go with it), so `(trigger_message_id, agent_id)` stays unique and the
- * requester, authority and context are the normal ones. Null when another call got there first; `worked`
- * when the run had done something, and stays.
+ * Starts a failed run again on the person's own message, in one transaction: the old run is deleted (it
+ * did nothing; its steps go with it, its usage records stay), so `(trigger_message_id, agent_id)` stays
+ * unique and the requester, authority, hop and budget checks are the normal ones. When another call got
+ * there first, the run it started (null if none); `worked` when the run had done something, and stays.
  */
-async function restartNoAiRun(deps: AnswerNowDeps, userId: string, failed: AgentRun) {
+async function restartFailedRun(deps: AnswerNowDeps, userId: string, failed: AgentRun) {
   const trigger = await getMessage(deps.db, failed.orgId, failed.triggerMessageId);
   if (!trigger || trigger.deletedAt) return null;
   // A failed run gets no more steps, so this still holds in the transaction below.
@@ -196,7 +196,7 @@ async function restartNoAiRun(deps: AnswerNowDeps, userId: string, failed: Agent
   const started = await deps.db.transaction(async (tx) => {
     const [gone] = await tx
       .delete(agentRuns)
-      .where(and(eq(agentRuns.id, failed.id), eq(agentRuns.status, "failed"), eq(agentRuns.error, NO_AI)))
+      .where(and(eq(agentRuns.id, failed.id), eq(agentRuns.status, "failed")))
       .returning({ id: agentRuns.id });
     if (!gone) return null;
     // A person's click: an agent's message it answers starts a stretch of its own (ADR 0089).
@@ -212,13 +212,13 @@ async function restartNoAiRun(deps: AnswerNowDeps, userId: string, failed: Agent
     await recordAudit(tx, {
       orgId: failed.orgId,
       actor: { type: "person", id: userId },
-      action: "run.answered_after_connect",
+      action: failed.error === NO_AI ? "run.answered_after_connect" : "run.retried",
       target: { type: "agent_run", id: runId },
       details: { oldRunId: failed.id, agentId: failed.agentId, messageId: trigger.id },
     });
     return { runId, created: "created" in next ? next.created : null };
   });
-  if (!started) return null;
+  if (!started) return current(deps.db, failed);
   if (started.created) {
     await publishChannelEvent(deps.pubsub, {
       type: "agent.thinking",
@@ -229,6 +229,22 @@ async function restartNoAiRun(deps: AnswerNowDeps, userId: string, failed: Agent
     });
   }
   return { agentId: failed.agentId, runId: started.runId };
+}
+
+/** What answers `(trigger, agent)` now that another call restarted the failed run: a second click returns it. */
+async function current(db: Executor, failed: AgentRun) {
+  const [run] = await db
+    .select({ id: agentRuns.id, status: agentRuns.status })
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.orgId, failed.orgId),
+        eq(agentRuns.triggerMessageId, failed.triggerMessageId),
+        eq(agentRuns.agentId, failed.agentId),
+      ),
+    )
+    .limit(1);
+  return run && run.status !== "failed" ? { agentId: failed.agentId, runId: run.id } : null;
 }
 
 /**
@@ -265,7 +281,9 @@ async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, membershi
  * "Responder agora" (`POST …/messages/{id}/answer-now`, ADR 0061), once an AI is connected. The id is a
  * no-AI card (its agent's newest run in that conversation) or the person's message (the runs it started,
  * else its `no_ai` routing decision). A failed `no_ai` run that did nothing starts again on the person's
- * own message (one that did something: 409 `run.not_restartable`); a `no_ai` decision is routed again. The
+ * own message (one that did something: 409 `run.not_restartable`); a `no_ai` decision is routed again. On the
+ * person's own message any failed run that did nothing starts again the same way ("Tentar de novo": no second
+ * copy of the message); a failed one it can't restart (long work, background) isn't returned. The
  * same people as "Continuar" (`mayStopRun`). 409 `ai.still_missing` while there's still none;
  * 403 `audience.*` when the agent no longer answers who asked; pressed again, it returns what answers the
  * message. On a stretch's pause card it is that card's Continuar (`continueStretch`, ADR 0089).
@@ -285,7 +303,11 @@ export async function answerNow(
   if (usage) return continueUsagePause(deps, userId, membership, message, usage);
   const card = noAiCardOf(message);
   const found = await answeringRuns(deps.db, message, card);
-  const failed = found.filter((r) => r.run.status === "failed" && r.run.error === NO_AI && !r.run.background);
+  // "Tentar de novo" on a person's own message restarts any failed run of theirs; elsewhere only `no_ai` ones.
+  const retried = !card && message.authorType === "person";
+  const failed = found.filter(
+    (r) => r.run.status === "failed" && !r.run.background && (r.run.error === NO_AI || (retried && !r.run.workId)),
+  );
   if (failed.length > 0) {
     const allowed: AnsweringRun[] = [];
     for (const r of failed)
@@ -309,7 +331,7 @@ export async function answerNow(
     const runs: Answering = [];
     let worked = false;
     for (const r of heard) {
-      const started = await restartNoAiRun(deps, userId, r.run);
+      const started = await restartFailedRun(deps, userId, r.run);
       if (started === "worked") worked = true;
       else if (started) runs.push(started);
     }
@@ -320,5 +342,8 @@ export async function answerNow(
     const rerouted = await rerouteNoAiMessage(deps, userId, membership, message);
     if (rerouted) return { runs: rerouted };
   }
-  return { runs: found.map((r) => ({ agentId: r.run.agentId, runId: r.run.id })) };
+  // A failed run left here (long work, a background run) doesn't answer: an empty list sends the words again.
+  return {
+    runs: found.filter((r) => r.run.status !== "failed").map((r) => ({ agentId: r.run.agentId, runId: r.run.id })),
+  };
 }

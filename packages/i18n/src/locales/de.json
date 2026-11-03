@@ -3498,6 +3498,8 @@
         "org_deleting": "Der Workspace wird gelöscht.",
         "agent_paused": "Der Agent ist pausiert.",
         "computer_busy": "Der Computer war mit anderen Aufgaben beschäftigt.",
+        "computer_failed": "Der Computer hatte ein Problem und hat angehalten.",
+        "computer_timeout": "Der Computer hat zu lange für eine Antwort gebraucht.",
         "unknown": "Fehlgeschlagen."
       }
     },

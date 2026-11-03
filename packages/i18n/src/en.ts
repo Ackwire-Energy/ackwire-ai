@@ -3404,6 +3404,9 @@ export const en = {
         org_deleting: "The workspace is being deleted.",
         agent_paused: "The agent is paused.",
         computer_busy: "The computer stayed busy with other tasks.",
+        /** A computer brain (Claude Code, Codex) stopped with an error code; the code shows only on hover. */
+        computer_failed: "The computer ran into a problem and stopped.",
+        computer_timeout: "The computer took too long to answer.",
         unknown: "Failed.",
       },
     },

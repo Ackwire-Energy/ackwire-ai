@@ -3535,6 +3535,8 @@
         "org_deleting": "De werkruimte wordt verwijderd.",
         "agent_paused": "De agent is gepauzeerd.",
         "computer_busy": "De computer bleef bezig met andere taken.",
+        "computer_failed": "De computer liep tegen een probleem aan en stopte.",
+        "computer_timeout": "De computer deed er te lang over om te antwoorden.",
         "unknown": "Mislukt."
       }
     },

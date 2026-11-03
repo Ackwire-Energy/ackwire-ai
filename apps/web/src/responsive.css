@@ -171,7 +171,7 @@
   }
   /* The message padding above is 4px less, so the pair row's first face moves with it to stay over the reply's face. */
   .channel__messages .consult-pair {
-    padding-left: 9px;
+    padding-left: 11px;
   }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);

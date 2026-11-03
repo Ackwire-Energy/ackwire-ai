@@ -1038,3 +1038,64 @@ describe("the dialog opens by itself only when Jev is sure, for the author, once
     expect(option(key, /^Chave de API/).getAttribute("aria-pressed")).toBe("true");
   });
 });
+
+describe("Tentar de novo under my message an agent couldn't answer", () => {
+  const failed = (): Message => ({
+    id: "m-failed",
+    channelId: ENG_ID,
+    threadId: null,
+    author: { type: "person", id: "u-walter" },
+    body: "@ada resume o canal",
+    mentionedAgentIds: [ADA_ID],
+    agentRunId: null,
+    createdAt: new Date(NOW.getTime() - 1000).toISOString(),
+    receipts: {
+      seenBy: [ADA_ID],
+      pickedBy: [ADA_ID],
+      handled: [{ agentId: ADA_ID, runId: "r-failed", status: "failed" }],
+      blocked: [],
+    },
+  });
+
+  test("she answers the same message again: nothing is sent twice", async () => {
+    const state = seedState({ aiStatus: aiStatus(true) });
+    state.messages.push(failed());
+    state.answerNowRuns = [{ agentId: ADA_ID, runId: "r-again" }];
+    await open(state);
+    const receipt = receiptOf("resume o canal");
+    await click(within(receipt).getByRole("button", { name: "Tentar de novo" }));
+    expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-failed"]]);
+    expect(calls(state, "chat.post")).toEqual([]);
+  });
+
+  test("someone else's message says it failed, without a Tentar de novo they'd be refused", async () => {
+    const state = seedState({ aiStatus: aiStatus(true) });
+    state.messages.push({ ...failed(), author: { type: "person", id: "u-bia" } });
+    await open(state);
+    expect(within(receiptOf("resume o canal")).queryByRole("button", { name: "Tentar de novo" })).toBeNull();
+  });
+
+  test("her computer's error code is said in words, the code only on hover", async () => {
+    const { socket } = await open(seedState({ aiStatus: aiStatus(true) }));
+    await sendText("@ada e o login?");
+    const run = { threadId: null, runId: "r-ada", agentId: ADA_ID };
+    await push(socket, { type: "agent.thinking", ...run });
+    const failure = { status: "failed", error: "runner_error", errorCode: "run.computer_failed" };
+    await push(socket, { type: "agent.run", ...run, status: "failed", error: "runner_error" });
+    await push(socket, { type: "run.finished", ...run, ...failure, errorParams: { code: "runner_error" } });
+    await settle();
+    const line = document.querySelector(".ac-msg__error") as HTMLElement;
+    expect(line.textContent).toContain("Ada não conseguiu responder: o computador teve um problema e parou");
+    expect(line.textContent).not.toContain("runner_error");
+    expect(line.querySelector("[title]")?.getAttribute("title")).toBe("runner_error");
+  });
+
+  test("a run that had already done things can't start over: the words go again", async () => {
+    const state = seedState({ aiStatus: aiStatus(true) });
+    state.messages.push(failed());
+    state.answerNowError = new ApiError(409, "run.not_restartable", "already started");
+    await open(state);
+    await click(within(receiptOf("resume o canal")).getByRole("button", { name: "Tentar de novo" }));
+    expect(calls(state, "chat.post").map((c) => (c.args[2] as { body: string }).body)).toEqual(["@ada resume o canal"]);
+  });
+});

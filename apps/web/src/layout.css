@@ -368,10 +368,10 @@ p {
 }
 
 /* The pair row right before a reply whose agent asked others first: "Theo ⇄ Atlas · 2 min", 26px tall. Its first
-   face sits centred over the reply's 32px face (16px row padding + 7px, less the button's own 10px). */
+   face sits centred over the reply's 36px face (16px row padding + 9px, less the button's own 10px). */
 .consult-pair {
   margin: 6px 0 -6px;
-  padding: 0 16px 0 13px;
+  padding: 0 16px 0 15px;
   min-width: 0;
 }
 .consult-pair__row {

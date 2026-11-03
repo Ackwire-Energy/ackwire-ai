@@ -106,9 +106,9 @@ import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
-import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, restrictionLine, runErrorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { capitalize, dayLabel, formatFullDate, formatTime } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
@@ -3341,6 +3341,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
   const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
+  const failedWhy = liveFailed ? runErrorText(t, live?.errorCode, live?.errorParams) : null;
+  // After "couldn't answer:", the sentence goes on: no capital, no final period.
+  const failedReason = failedWhy && lowerFirst(failedWhy.replace(/\.$/, ""), i18n.language);
   // Refused by the workspace's standing: its own words, not the server's English.
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
@@ -3765,21 +3768,17 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             )}
             {liveFailed && (
-              <p className="ac-msg__error" role="alert">
-                <Icon name="alert" size={18} />
-                <span style={{ flex: 1 }}>
+              <p className="ac-msg__error ac-iconline" role="alert">
+                <Icon name="alert" size={16} />
+                {/* A known code is said in words; the stored error (a computer's code) only on hover. */}
+                <span style={{ flex: 1 }} title={!refusal && failedWhy ? live.error : undefined}>
                   {refusal
                     ? t("channel.runRefused", { agent: name, reason: refusal })
                     : live.errorCode === "run.computer_busy"
                       ? t("channel.runBusy", { agent: name })
-                      : live.errorCode === "run.budget_exceeded"
-                        ? t("channel.runFailed", {
-                            agent: name,
-                            reason: t("agentPage.activity.errors.budget_exceeded"),
-                          })
-                        : live.error
-                          ? t("channel.runFailed", { agent: name, reason: live.error })
-                          : t("channel.runFailedNoReason", { agent: name })}
+                      : failedWhy || live.error
+                        ? t("channel.runFailed", { agent: name, reason: failedReason || live.error })
+                        : t("channel.runFailedNoReason", { agent: name })}
                 </span>
                 <Button
                   variant="ghost"
@@ -3880,8 +3879,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             )}
             {local === "failed" && (
-              <p className="ac-msg__error" role="alert">
-                <Icon name="alert" size={18} />
+              <p className="ac-msg__error ac-iconline" role="alert">
+                <Icon name="alert" size={16} />
                 <span>{t("channel.notSent")}</span>
                 <span aria-hidden="true">·</span>
                 <button type="button" className="ac-link" onClick={() => actions?.retry(m)} style={inlineButton}>

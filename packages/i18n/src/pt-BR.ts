@@ -3487,6 +3487,9 @@ export const ptBR = {
         org_deleting: "O workspace está sendo apagado.",
         agent_paused: "O agente está pausado.",
         computer_busy: "O computador continuou ocupado com outras tarefas.",
+        /** A computer brain (Claude Code, Codex) stopped with an error code; the code shows only on hover. */
+        computer_failed: "O computador teve um problema e parou.",
+        computer_timeout: "O computador demorou demais para responder.",
         unknown: "Falhou.",
       },
     },

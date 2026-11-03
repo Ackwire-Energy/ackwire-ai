@@ -3652,6 +3652,8 @@
         "org_deleting": "L'espace de travail est en cours de suppression.",
         "agent_paused": "L'agent est en pause.",
         "computer_busy": "L'ordinateur est resté occupé par d'autres tâches.",
+        "computer_failed": "L'ordinateur a rencontré un problème et s'est arrêté.",
+        "computer_timeout": "L'ordinateur a mis trop de temps à répondre.",
         "unknown": "Échec."
       }
     },

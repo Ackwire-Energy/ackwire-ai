@@ -8620,6 +8620,12 @@
   "agentPage.activity.errors.computer_busy": {
     "value": "The computer stayed busy with other tasks."
   },
+  "agentPage.activity.errors.computer_failed": {
+    "value": "The computer ran into a problem and stopped."
+  },
+  "agentPage.activity.errors.computer_timeout": {
+    "value": "The computer took too long to answer."
+  },
   "agentPage.activity.errors.unknown": {
     "value": "Failed."
   },

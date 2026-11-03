@@ -3651,6 +3651,8 @@
         "org_deleting": "Lo spazio di lavoro è in fase di eliminazione.",
         "agent_paused": "L'agente è in pausa.",
         "computer_busy": "Il computer è rimasto occupato con altre attività.",
+        "computer_failed": "Il computer ha avuto un problema e si è fermato.",
+        "computer_timeout": "Il computer ha impiegato troppo tempo a rispondere.",
         "unknown": "Non riuscita."
       }
     },

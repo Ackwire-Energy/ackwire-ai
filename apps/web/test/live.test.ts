@@ -423,6 +423,17 @@ describe("receipts", () => {
     expect(receiptView(s.m1)).toMatchObject({ status: { kind: "handled", agents: ["ada"] }, done: true });
   });
 
+  test("Tentar de novo: the new run's claim on the same message replaces the failure at once", () => {
+    let s = seedReceipt({}, read([{ agentId: "ada", runId: "r1", status: "failed" }]));
+    expect(receiptView(s.m1).status).toEqual({ kind: "failed", agents: ["ada"] });
+    s = step(s, { type: "message.claimed", messageId: "m1", agentId: "ada", runId: "r2" });
+    expect(receiptView(s.m1).status).toEqual({ kind: "claimed", agents: ["ada"] });
+    // A late claim of the run it already follows never undoes its end.
+    s = step(s, { type: "message.handled", messageId: "m1", agentId: "ada", runId: "r2", status: "done" });
+    s = step(s, { type: "message.claimed", messageId: "m1", agentId: "ada", runId: "r2" });
+    expect(receiptView(s.m1).status?.kind).toBe("handled");
+  });
+
   test("a read nothing changed the receipt since it was asked for is taken as it is", () => {
     let s = seedReceipt({}, running());
     // She asked before the channel's events reached us.

@@ -5,20 +5,24 @@ import {
   type ReceiptView,
   receiptTicks,
   receiptView,
+  useApi,
   useModelLabel,
   useReactions,
   useSteerState,
 } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, PixelSpinner, Popover, ProviderLogo } from "@agenteschat/ui";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { FanOutStrip, QueuedWords } from "@/components/ComputerQueue";
 import { useConnectAi } from "@/components/ConnectAi";
 import { HelpLink } from "@/components/HelpLink";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useToast } from "@/lib/toast";
 import { useLive } from "@/realtime/context";
 import { CallAgentMenu, useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
@@ -84,9 +88,12 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
+  const api = useApi();
+  const toast = useToast();
   const connect = useConnectAi();
   const modelLabel = useModelLabel();
   const steerId = useId();
+  const [retrying, setRetrying] = useState(false);
   const receipt = useLive((s) => s.receipts[message.id]);
   // The pills' list (live through `message.reactions`), else the message's: an agent's reaction is its answer.
   const reactions = useReactions(org.id, message.id, false).data ?? message.reactions;
@@ -104,7 +111,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
     ) : null;
   // Nobody will answer, or every agent it was for ended without answering: a person can call one.
   const nobody = status?.kind === "nobody" || status?.kind === "passed";
-  // "Tentar de novo" sends the words again as mine: never an agent's.
+  // "Tentar de novo" answers my message again: never an agent's.
   const worded =
     status?.kind === "outage" ||
     status?.kind === "queued" ||
@@ -262,11 +269,24 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       {status?.kind === "failed" && actions && (
         <span className="ac-receipt__words">
           <span>{t("receipts.failedShort")}</span>
-          <ReceiptAction>
-            <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
-              {t("receipts.retry")}
-            </button>
-          </ReceiptAction>
+          {/* Only who asked: anyone else's click would be refused (`run.answer_forbidden`). */}
+          {message.author.id === me.user.id && (
+            <ReceiptAction>
+              <button
+                type="button"
+                className="ac-receipt__action"
+                disabled={retrying}
+                onClick={() => {
+                  setRetrying(true);
+                  void retryAnswer(api, org.id, message, () => actions.resend(message.body))
+                    .catch((error) => toast.show(errorText(t, error), "error"))
+                    .finally(() => setRetrying(false));
+                }}
+              >
+                {t("receipts.retry")}
+              </button>
+            </ReceiptAction>
+          )}
         </span>
       )}
       {status?.kind === "platform_cap" && (

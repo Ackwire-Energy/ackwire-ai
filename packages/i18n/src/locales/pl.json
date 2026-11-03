@@ -3756,6 +3756,8 @@
         "org_deleting": "Przestrzeń robocza jest usuwana.",
         "agent_paused": "Agent jest wstrzymany.",
         "computer_busy": "Komputer był zajęty innymi zadaniami.",
+        "computer_failed": "Komputer napotkał problem i się zatrzymał.",
+        "computer_timeout": "Komputer zbyt długo nie odpowiadał.",
         "unknown": "Błąd."
       }
     },

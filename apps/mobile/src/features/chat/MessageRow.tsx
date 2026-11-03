@@ -444,7 +444,7 @@ export const MessageRow = memo(function MessageRow({
           pressed && press && { backgroundColor: c.sunken },
         ]}
       >
-        <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
+        <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={34} live={false} />}</View>
         <View style={styles.body}>
           {grouped ? null : (
             <View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>
