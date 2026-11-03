@@ -554,7 +554,8 @@ export const approvals = pgTable(
  * "Aprovar sempre" (docs/adr/0015): a kind of call one agent makes without asking again, approved for good by
  * someone who decides its approvals. The kind is the connection, the server's own tool name and, for a tool that
  * runs other actions (Composio's executor), one wrapped action (`''`: the tool itself). Params are never part of
- * it. The Tool Gateway reads it fresh before every request it would make; it never grants access.
+ * it. The Tool Gateway reads it fresh before every request it would make; it never grants access. A command on
+ * the agent's computer has no connection: `tool` is `command` and `action` its kind (`gh issue create`).
  */
 export const approvalRules = pgTable(
   "approval_rules",
@@ -564,9 +565,7 @@ export const approvalRules = pgTable(
       .$defaultFn(() => Bun.randomUUIDv7()),
     orgId: uuid().notNull(),
     agentId: uuid().notNull(),
-    connectionId: uuid()
-      .notNull()
-      .references(() => connectorConnections.id, { onDelete: "cascade" }),
+    connectionId: uuid().references(() => connectorConnections.id, { onDelete: "cascade" }),
     tool: text().notNull(),
     action: text().notNull().default(""),
     createdByUserId: text(),
@@ -575,6 +574,7 @@ export const approvalRules = pgTable(
   (t) => [
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
     unique().on(t.agentId, t.connectionId, t.tool, t.action),
+    uniqueIndex("approval_rules_no_connection").on(t.agentId, t.tool, t.action).where(sql`${t.connectionId} is null`),
     index().on(t.connectionId),
   ],
 );
