@@ -8403,8 +8403,8 @@ html:not([data-pointer]) .ac-optcard > .ac-optrow:focus-visible {
   padding-left: 16px;
 }
 .ac-optrow__more--card {
-  gap: 22px;
-  padding: 18px 16px 16px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid var(--line);
 }
 /* The card's last band (a switch with what it does): full width under a hairline. */
