@@ -27,6 +27,8 @@ export class DatabaseError extends Error {
   constructor(
     message: string,
     readonly code: DatabaseErrorCode,
+    /** Postgres's SQLSTATE when it sent one (`3D000`: no such database, `42501`: no privilege). */
+    readonly sqlState?: string,
   ) {
     super(message);
     this.name = "DatabaseError";
@@ -81,10 +83,11 @@ export function databaseErrorOf(error: unknown): DatabaseError {
   const e = error as { code?: string; message?: string; errno?: string };
   const message = e?.message ?? String(error);
   const code = typeof e?.code === "string" ? e.code : "";
-  if (code.startsWith("28")) return new DatabaseError(message, "auth");
+  if (code.startsWith("28")) return new DatabaseError(message, "auth", code);
   if (code === "57014") return new DatabaseError("The query took too long and was cancelled.", "timeout");
   if (code === "55P03") return new DatabaseError("The query waited too long for a lock and was cancelled.", "timeout");
-  if (/^[0-9A-Z]{5}$/.test(code) && code !== "08006" && code !== "08001") return new DatabaseError(message, "query");
+  if (/^[0-9A-Z]{5}$/.test(code) && code !== "08006" && code !== "08001")
+    return new DatabaseError(message, "query", code);
   if (/ssl|tls|certificate/i.test(message)) return new DatabaseError(message, "tls");
   if (
     ["ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EHOSTUNREACH", "ENETUNREACH", "CONNECT_TIMEOUT", "ECONNRESET"].includes(
@@ -162,12 +165,14 @@ export interface FakeQueryable {
 /**
  * Tests: every target opens the same PGlite (one connection, calls in
  * order). `refuse` can fail a target (wrong password, unreachable…);
- * `opened` records each open.
+ * `opened` records each open; `answer` replies to a statement instead of
+ * PGlite (which has a single database: the list of a server's databases).
  */
 export function createFakeDatabaseDriver(o: {
   db: FakeQueryable;
   refuse?: (target: DatabaseTarget) => DatabaseError | null;
   opened?: DatabaseTarget[];
+  answer?: (text: string, params: unknown[], target: DatabaseTarget) => DatabaseRows | null;
 }): DatabaseDriver {
   let chain: Promise<unknown> = Promise.resolve();
   const serial = <T>(fn: () => Promise<T>): Promise<T> => {
@@ -189,6 +194,8 @@ export function createFakeDatabaseDriver(o: {
             try {
               for (const s of readOnlySettings(limits)) await o.db.exec(s);
               return await fn(async (text, params) => {
+                const answered = o.answer?.(text, params ?? [], target);
+                if (answered) return answered;
                 try {
                   const r = await o.db.query(text, params ?? [], { rowMode: "array" });
                   return {

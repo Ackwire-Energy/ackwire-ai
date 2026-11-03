@@ -24,7 +24,15 @@ export const dbConnections = pgTable(
     provider: text().notNull().default("other"),
     host: text().notNull(),
     port: integer().notNull().default(5432),
+    /**
+     * The database read; on a whole-server connection, where the list of databases is read and where the
+     * rules' tables and sensitive columns were found (the sample).
+     */
     database: text().notNull(),
+    /** Agents read every database on the server they can open, choosing one per call (`database` input). */
+    wholeServer: boolean().notNull().default(false),
+    /** Whole server only: just the databases whose names start with this; null = every one. */
+    databasePrefix: text(),
     username: text().notNull(),
     /** `require` (TLS, the default) or `disable` (an explicit choice, for test databases). */
     sslmode: text().notNull().default("require"),
@@ -63,7 +71,9 @@ export const dbAgentPolicies = pgTable(
       .references(() => dbConnections.id, { onDelete: "cascade" }),
     tables: text().array().notNull().default(sql`'{}'::text[]`),
     hiddenColumns: text().array().notNull().default(sql`'{}'::text[]`),
-    /** Queries per agent per database per day (UTC); null = no cap. */
+    /** Whole-server connections: the only databases this agent may read (exact names); empty = every one. */
+    databases: text().array().notNull().default(sql`'{}'::text[]`),
+    /** Queries per agent per connection per day (UTC), summed over its databases; null = no cap. */
     dailyQueryCap: integer(),
     timeoutSeconds: integer().notNull().default(15),
     updatedByUserId: text(),
@@ -85,8 +95,10 @@ export const dbQueries = pgTable(
       .notNull()
       .references(() => dbConnections.id, { onDelete: "cascade" }),
     runId: uuid(),
-    /** `query`, `list_tables` or `describe_table`. */
+    /** `query`, `list_tables`, `describe_table` or `list_databases`. */
     kind: text().notNull(),
+    /** Which database of a whole-server connection it read; null on single-database connections. */
+    database: text(),
     statement: text().notNull(),
     rowCount: integer(),
     durationMs: integer(),

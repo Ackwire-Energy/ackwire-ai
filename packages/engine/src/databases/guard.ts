@@ -84,6 +84,21 @@ const BLOCKED_RELATIONS = new Set([
   "pg_catalog.pg_user_mapping",
   "pg_catalog.pg_user_mappings",
 ]);
+/**
+ * A whole-server connection's role reaches every customer's database: what shows other databases' names or
+ * sessions (the SQL text of the same role's queries elsewhere) is never read there.
+ */
+const WHOLE_SERVER_BLOCKED_RELATIONS = new Set([
+  "pg_catalog.pg_stat_activity",
+  "pg_catalog.pg_database",
+  "pg_catalog.pg_stat_database",
+  "pg_catalog.pg_stat_database_conflicts",
+]);
+const WHOLE_SERVER_BLOCKED_FUNCTIONS = new Set([
+  "pg_stat_get_activity",
+  "pg_stat_statements",
+  "pg_stat_statements_info",
+]);
 const CATALOG_SCHEMAS = new Set(["pg_catalog", "information_schema"]);
 /**
  * Relations of `pg_catalog` that an unqualified name resolves to (Postgres searches `pg_catalog` before
@@ -173,8 +188,15 @@ function walk(value: unknown, visit: (key: string, node: Node) => void) {
   }
 }
 
-/** Checks one agent query; `rules` are the agent's tables and hidden columns there. */
-export async function guardSql(text: string, rules: SqlRules): Promise<GuardResult> {
+/**
+ * Checks one agent query; `rules` are the agent's tables and hidden columns there. `wholeServer`: the connection
+ * reads every database of its server (see `WHOLE_SERVER_BLOCKED_RELATIONS`).
+ */
+export async function guardSql(
+  text: string,
+  rules: SqlRules,
+  options: { wholeServer?: boolean } = {},
+): Promise<GuardResult> {
   const sqlText = text.trim();
   if (!sqlText) return { ok: false, reason: "The query is empty." };
   if (sqlText.length > 20_000) return { ok: false, reason: "The query is too long (at most 20,000 characters)." };
@@ -210,6 +232,7 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
   const problems: string[] = [];
   const ctes = new Set<string>();
   const relations: { schema: string | null; table: string; alias: string | null }[] = [];
+  let crossDatabase = false;
   const functions: string[] = [];
   const columnRefs: string[][] = [];
   let star = false;
@@ -223,6 +246,7 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
     }
     // The parser already folds unquoted names to lowercase and keeps quoted ones exact, as Postgres resolves them.
     if (key === "CommonTableExpr" && typeof node.ctename === "string") ctes.add(node.ctename);
+    if (key === "RangeVar" && typeof node.catalogname === "string") crossDatabase = true;
     if (key === "RangeVar" && typeof node.relname === "string") {
       const schema = typeof node.schemaname === "string" ? node.schemaname : null;
       const alias = isObject(node.alias) && typeof node.alias.aliasname === "string" ? node.alias.aliasname : null;
@@ -238,9 +262,20 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
     }
   });
   if (problems[0]) return { ok: false, reason: problems[0] };
+  if (crossDatabase)
+    return {
+      ok: false,
+      reason: options.wholeServer
+        ? "Name tables as schema.table: pass the database in `database`, one per query."
+        : "Name tables as schema.table, without a database name.",
+    };
 
   for (const fn of functions) {
-    if (BLOCKED_FUNCTIONS.has(fn) || BLOCKED_PREFIXES.some((p) => fn.startsWith(p)))
+    if (
+      BLOCKED_FUNCTIONS.has(fn) ||
+      BLOCKED_PREFIXES.some((p) => fn.startsWith(p)) ||
+      (options.wholeServer && WHOLE_SERVER_BLOCKED_FUNCTIONS.has(fn))
+    )
       return { ok: false, reason: `The function ${fn}() is not allowed here.` };
   }
 
@@ -255,6 +290,8 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
   const allowed = allowedRelations(rules.tables);
   for (const r of resolved) {
     if (BLOCKED_RELATIONS.has(r.name)) return { ok: false, reason: `${r.name} is not allowed (it holds data values).` };
+    if (options.wholeServer && (WHOLE_SERVER_BLOCKED_RELATIONS.has(r.name) || r.table.startsWith("pg_stat_statements")))
+      return { ok: false, reason: `${r.name} is not allowed here (it shows other databases of this server).` };
     if (CATALOG_SCHEMAS.has(r.schema)) continue;
     if (!relationAllowed(allowed, r.schema, r.table))
       return {
