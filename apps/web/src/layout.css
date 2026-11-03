@@ -8566,14 +8566,16 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
 .agp-hero__work {
   padding: 18px var(--agp-gutter) 0;
 }
+/* The name on its own line; the handle and role, then its chips ("Sem IA"), share the next one. */
 .agp-ident {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-2);
   padding: 12px var(--agp-gutter) 0;
 }
 .agp-name {
+  flex-basis: 100%;
   margin: 0;
   font-family: var(--font-display);
   font-size: 40px;
