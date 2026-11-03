@@ -494,7 +494,7 @@
     "otherLead": "Kamu masuk sebagai {{other}}. Masuk dengan email yang diundang dan kamu akan langsung ke {{org}}.",
     "switch": "Masuk sebagai {{email}}",
     "fullTitle": "{{org}} sedang tidak punya kursi kosong.",
-    "fullLead": "Undanganmu tetap berlaku. Saat ada kursi kosong, kamu bergabung lewat tautan yang sama ini.",
+    "fullLead": "Undanganmu tetap berlaku. Minta orang yang mengundangmu untuk membuka kursi, lalu kamu bergabung lewat tautan yang sama ini.",
     "fullFine": "Belum ada akun yang dibuat. Tidak ada yang perlu dilakukan sampai ada kursi kosong.",
     "usedTitle": "Kamu sudah ada di {{org}}.",
     "usedLead": "Undangan ini sudah dipakai pada {{date}}. Tinggal buka saja.",
@@ -9990,7 +9990,7 @@
     },
     "org": {
       "createInviteOnly": "Untuk saat ini, ruang kerja baru membutuhkan undangan.",
-      "membersFull": "Ruang kerja ini belum punya tempat untuk orang lain. Beri tahu orang yang mengundangmu.",
+      "membersFull": "Semua kursi di ruang kerja ini sedang terisi. Minta orang yang mengundangmu untuk membuka kursi.",
       "deleting": "Ruang kerja ini sedang dihapus.",
       "notRestorable": "Ruang kerja ini sudah tidak bisa dipulihkan."
     },
@@ -12381,6 +12381,7 @@
     "people": "Orang",
     "files": "File",
     "usedOf": "{{used}} dari {{limit}}",
+    "seatsPaid_other": "{{count}} kursi berbayar",
     "noLimit": "Tanpa batas",
     "ownBucket": "Di bucket milikmu sendiri, tanpa batas dari kami"
   },
@@ -12389,7 +12390,10 @@
       "full": "Ruang kerja ini berisi {{members}} dari {{limit}} orang.",
       "fullOne": "Paket agentes.chat ruang kerja ini hanya untuk 1 orang.",
       "fullAdmin": "Untuk mengajak lebih banyak orang, lihat pilihan paket agentes.chat.",
-      "fullMember": "Minta pengelola ruang kerja untuk memberi tempat."
+      "fullMember": "Minta pengelola ruang kerja untuk memberi tempat.",
+      "fullAddSeat": "Semua kursi berbayar sudah terisi. Tambahkan kursi di Paket dan tagihan.",
+      "fullTop": "Paket ini tidak bisa menampung lebih banyak orang. Ganti paket di Paket dan tagihan.",
+      "fullMemberSeat": "Minta pengelola ruang kerja untuk menambahkan kursi."
     },
     "storage": {
       "meter": "Kamu sudah memakai {{used}} dari {{limit}}.",

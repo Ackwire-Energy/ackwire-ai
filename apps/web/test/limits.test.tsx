@@ -64,6 +64,17 @@ describe("a workspace's limits (ADR 0079)", () => {
     expect(own.textContent).toContain("PessoasSem limite");
     expect(own.textContent).toContain("ArquivosNo seu próprio bucket, sem limite nosso");
     expect(within(own).queryAllByRole("meter")).toHaveLength(0);
+    cleanup();
+    // Against the plan's top, with the seats paid for under it; no such line when they are the same.
+    await go("settings/billing", { members: { used: 12, limit: 12, max: 15, canAddSeats: true } });
+    const top = screen().getByLabelText("Plano e cobrança");
+    expect(top.textContent).toContain("Pessoas12 de 15");
+    expect(top.textContent).toContain("12 vagas pagas");
+    cleanup();
+    await go("settings/billing", { members: { used: 1, limit: 1, max: 1, canAddSeats: false } });
+    const one = screen().getByLabelText("Plano e cobrança");
+    expect(one.textContent).toContain("Pessoas1 de 1");
+    expect(one.textContent).not.toContain("paga");
   });
 
   test("a full workspace: inviting waits, and owners see the plan's options; without a billing service, who to ask", async () => {
@@ -72,7 +83,7 @@ describe("a workspace's limits (ADR 0079)", () => {
     expect(invite().textContent).toContain("Este workspace está com 2 de 2 pessoas.");
     expect(invite().textContent).toContain("Para chamar mais gente, veja as opções do plano do agentes.chat.");
     expect(sendButton(invite()).hasAttribute("disabled")).toBe(true);
-    await click(within(invite()).getByRole("button", { name: "Ver opções" }));
+    await click(within(invite()).getByRole("button", { name: "Abrir plano e cobrança" }));
     await settle(4);
     expect(billingLinks()).toEqual(["invite_full"]);
     expect(left).toEqual([`${BILLING}/link?t=invite_full`]);
@@ -82,7 +93,19 @@ describe("a workspace's limits (ADR 0079)", () => {
     const plain = await inviteDialog();
     expect(plain().textContent).toContain("No plano do agentes.chat deste workspace cabe 1 pessoa.");
     expect(plain().textContent).toContain("Peça a quem administra o workspace para abrir espaço.");
-    expect(within(plain()).queryByRole("button", { name: "Ver opções" })).toBeNull();
+    expect(within(plain()).queryByRole("button", { name: "Abrir plano e cobrança" })).toBeNull();
+    cleanup();
+
+    // Below the plan's top: a seat to add; at it, another plan.
+    await go("settings/members", { members: { used: 12, limit: 12, max: 15, canAddSeats: true } });
+    expect((await inviteDialog())().textContent).toContain(
+      "Todas as vagas pagas estão ocupadas. Adicione uma vaga em Plano e cobrança.",
+    );
+    cleanup();
+    await go("settings/members", { members: { used: 15, limit: 15, max: 15, canAddSeats: false } });
+    expect((await inviteDialog())().textContent).toContain(
+      "O plano chegou ao máximo de pessoas. Mude de plano em Plano e cobrança.",
+    );
     cleanup();
 
     await go("settings/members", { members: { used: 2, limit: 3 } });
@@ -198,7 +221,7 @@ describe("a workspace's limits (ADR 0079)", () => {
     await click(screen().getByRole("button", { name: "Entrar na Acme" }));
     await settle(4);
     expect(screen().getByRole("alert").textContent).toBe(
-      "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
+      "Todas as vagas deste workspace estão ocupadas agora. Peça a quem convidou você para abrir uma vaga.",
     );
   });
 });

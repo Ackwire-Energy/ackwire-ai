@@ -501,7 +501,7 @@
     "otherLead": "{{other}} olarak giriş yaptınız. Davet edilen e-postayla giriş yapın, {{org}} çalışma alanına ulaşın.",
     "switch": "{{email}} olarak giriş yap",
     "fullTitle": "{{org}} çalışma alanında şu anda boş yer yok.",
-    "fullLead": "Davetiniz hâlâ geçerli. Bir yer açıldığında aynı bağlantıyla katılırsınız.",
+    "fullLead": "Davetiniz hâlâ geçerli. Sizi davet eden kişiden bir yer açmasını isteyin, aynı bağlantıyla katılırsınız.",
     "fullFine": "Hesap oluşturulmadı. Bir yer açılana kadar yapmanız gereken bir şey yok.",
     "usedTitle": "Zaten {{org}} çalışma alanındasınız.",
     "usedLead": "Bu davet {{date}} tarihinde kullanıldı. Açmanız yeterli.",
@@ -10246,7 +10246,7 @@
     },
     "org": {
       "createInviteOnly": "Yeni çalışma alanları şimdilik davet gerektiriyor.",
-      "membersFull": "Bu çalışma alanında şu anda daha fazla kişiye yer yok. Sizi davet eden kişiye haber verin.",
+      "membersFull": "Bu çalışma alanındaki tüm yerler şu anda dolu. Sizi davet eden kişiden bir yer açmasını isteyin.",
       "deleting": "Bu çalışma alanı siliniyor.",
       "notRestorable": "Bu çalışma alanı artık geri yüklenemez."
     },
@@ -12674,6 +12674,8 @@
     "people": "Kişiler",
     "files": "Dosyalar",
     "usedOf": "{{used}} / {{limit}}",
+    "seatsPaid_one": "{{count}} ücreti ödenmiş yer",
+    "seatsPaid_other": "{{count}} ücreti ödenmiş yer",
     "noLimit": "Sınırsız",
     "ownBucket": "Kendi depolama alanınızda, bizden bir sınır olmadan"
   },
@@ -12682,7 +12684,10 @@
       "full": "Bu çalışma alanında {{limit}} kişiden {{members}} kişi var.",
       "fullOne": "Bu çalışma alanının agentes.chat planı 1 kişiliktir.",
       "fullAdmin": "Daha fazla kişi eklemek için agentes.chat planının seçeneklerine bakın.",
-      "fullMember": "Yer açması için çalışma alanını yöneten kişiye sorun."
+      "fullMember": "Yer açması için çalışma alanını yöneten kişiye sorun.",
+      "fullAddSeat": "Ücreti ödenmiş tüm yerler dolu. Plan ve faturalandırma bölümünden bir yer ekleyin.",
+      "fullTop": "Bu plan daha fazla kişi alamıyor. Plan ve faturalandırma bölümünden planı değiştirin.",
+      "fullMemberSeat": "Çalışma alanını yöneten kişiden bir yer eklemesini isteyin."
     },
     "storage": {
       "meter": "{{limit}} alanın {{used}} kadarını kullandınız.",

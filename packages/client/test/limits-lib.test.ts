@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
 import type { WorkspaceLimits } from "../src/api/types";
 import { errorText, invitedErrorText } from "../src/lib/errors";
-import { membersFull, storageLevel } from "../src/lib/limits";
+import { membersFull, membersFullWho, storageLevel } from "../src/lib/limits";
 
 /** The key and its values, so a test sees which words were picked (the words themselves: packages/i18n). */
 const t = ((key: string, o?: Record<string, unknown>) =>
@@ -27,6 +27,23 @@ describe("a workspace's limits in words (ADR 0079)", () => {
     expect(membersFull(limits({ members: [9, 10] }))).toBeNull();
     expect(membersFull(limits({ members: [500, null] }))).toBeNull();
     expect(membersFull(undefined)).toBeNull();
+  });
+
+  test("who makes room: a seat below the plan's top, another plan at it; general words when no top is said", () => {
+    const seats = (limit: number, max: number | null) =>
+      ({
+        ...limits({ members: [limit, limit] }),
+        members: { used: limit, limit, max, canAddSeats: max !== null && limit < max },
+      }) satisfies WorkspaceLimits;
+    expect(membersFullWho(t, seats(12, 15), true)).toBe("limits.members.fullAddSeat");
+    expect(membersFullWho(t, seats(15, 15), true)).toBe("limits.members.fullTop");
+    expect(membersFullWho(t, seats(1, 1), true)).toBe("limits.members.fullTop");
+    expect(membersFullWho(t, seats(10, null), true)).toBe("limits.members.fullAdmin");
+    expect(membersFullWho(t, seats(12, 15), false)).toBe("limits.members.fullMemberSeat");
+    expect(membersFullWho(t, seats(15, 15), false)).toBe("limits.members.fullMember");
+    // A server older than the plan's top, or none at all.
+    expect(membersFullWho(t, limits({ members: [2, 2] }), true)).toBe("limits.members.fullAdmin");
+    expect(membersFullWho(t, undefined, false)).toBe("limits.members.fullMember");
   });
 
   test("files: near from 80%, full at the limit; nothing to say without a limit or on the workspace's own bucket", () => {

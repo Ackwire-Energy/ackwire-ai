@@ -113,7 +113,11 @@ export interface ErrorReportsConfig {
 
 /** A workspace's use against its limits (ADR 0079, `GET …/limits`), for any member; a null limit: none. */
 export interface WorkspaceLimits {
-  members: { used: number; limit: number | null };
+  /**
+   * `limit`: the seats paid for. `max`: the most the plan takes with seats added (null: not said), below which
+   * `canAddSeats`. Both absent from servers older than them.
+   */
+  members: { used: number; limit: number | null; max?: number | null; canAddSeats?: boolean };
   /** `ownStorage`: new files go to the workspace's own bucket, which no limit counts. */
   storage: { usedBytes: number; limitBytes: number | null; ownStorage: boolean };
   uploads: { usedBytes24h: number; limitBytesPerDay: number | null };

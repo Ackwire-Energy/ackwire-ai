@@ -500,9 +500,10 @@ export const ptBR = {
     otherTitle: "Este convite é para {{email}}.",
     otherLead: "Você está como {{other}}. Entre com o e-mail do convite e você já cai na {{org}}.",
     switch: "Entrar como {{email}}",
-    fullTitle: "A {{org}} está sem lugar agora.",
-    fullLead: "Seu convite continua valendo. Quando abrir um lugar, você entra por este mesmo link.",
-    fullFine: "Nenhuma conta foi criada. Você não precisa fazer nada até abrir um lugar.",
+    fullTitle: "A {{org}} está com todas as vagas ocupadas agora.",
+    fullLead:
+      "Seu convite continua valendo. Peça a quem convidou você para abrir uma vaga, e você entra por este mesmo link.",
+    fullFine: "Nenhuma conta foi criada. Você não precisa fazer nada até abrir uma vaga.",
     usedTitle: "Você já está na {{org}}.",
     usedLead: "Este convite já foi usado, em {{date}}. É só abrir.",
     open: "Abrir a {{org}}",
@@ -9922,7 +9923,8 @@ export const ptBR = {
     },
     org: {
       createInviteOnly: "Novos workspaces precisam de convite por enquanto.",
-      membersFull: "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
+      membersFull:
+        "Todas as vagas deste workspace estão ocupadas agora. Peça a quem convidou você para abrir uma vaga.",
       deleting: "Este workspace está sendo apagado.",
       notRestorable: "Este workspace não pode mais ser restaurado.",
     },
@@ -12502,6 +12504,9 @@ export const ptBR = {
     people: "Pessoas",
     files: "Arquivos",
     usedOf: "{{used}} de {{limit}}",
+    /** Under the people meter, when it counts against the plan's top rather than the seats paid for. */
+    seatsPaid_one: "{{count}} vaga paga",
+    seatsPaid_other: "{{count}} vagas pagas",
     noLimit: "Sem limite",
     ownBucket: "No seu próprio bucket, sem limite nosso",
   },
@@ -12512,6 +12517,12 @@ export const ptBR = {
       fullOne: "No plano do agentes.chat deste workspace cabe 1 pessoa.",
       fullAdmin: "Para chamar mais gente, veja as opções do plano do agentes.chat.",
       fullMember: "Peça a quem administra o workspace para abrir espaço.",
+      /** To whoever manages billing, below the plan's top. "Plano e cobrança" is the section in Settings. */
+      fullAddSeat: "Todas as vagas pagas estão ocupadas. Adicione uma vaga em Plano e cobrança.",
+      /** To whoever manages billing, at the plan's top. */
+      fullTop: "O plano chegou ao máximo de pessoas. Mude de plano em Plano e cobrança.",
+      /** To anyone else, below the plan's top. */
+      fullMemberSeat: "Peça a quem administra o workspace para adicionar uma vaga.",
     },
     storage: {
       meter: "Vocês usaram {{used}} de {{limit}}.",

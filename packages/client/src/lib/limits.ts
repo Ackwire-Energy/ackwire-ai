@@ -24,6 +24,18 @@ export const membersFullText = (t: TFunction, members: number, limit: number) =>
   limit === 1 ? t("limits.members.fullOne") : t("limits.members.full", { members, limit });
 
 /**
+ * Who makes room in a full workspace, and how. Whoever manages billing (`billing`: the permission, on a server with a
+ * billing service) adds a seat below the plan's top, or changes plans at it; anyone else asks them. When the billing
+ * service says no top, as a self-hosted server never does, the general words.
+ */
+export function membersFullWho(t: TFunction, limits: WorkspaceLimits | undefined, billing: boolean) {
+  const canAddSeats = limits?.members.canAddSeats === true;
+  if (!billing) return t(canAddSeats ? "limits.members.fullMemberSeat" : "limits.members.fullMember");
+  if (canAddSeats) return t("limits.members.fullAddSeat");
+  return t(limits?.members.max != null ? "limits.members.fullTop" : "limits.members.fullAdmin");
+}
+
+/**
  * The workspace's files against its storage limit: null without one, or on its own bucket (no limit counts
  * there). `level`: `near` from 80%, `full` at the limit.
  */

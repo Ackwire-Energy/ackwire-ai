@@ -501,7 +501,7 @@
     "otherLead": "Du bist als {{other}} angemeldet. Melde dich mit der eingeladenen E-Mail-Adresse an, dann landest du in {{org}}.",
     "switch": "Als {{email}} anmelden",
     "fullTitle": "In {{org}} ist gerade kein Platz frei.",
-    "fullLead": "Deine Einladung gilt weiterhin. Sobald ein Platz frei wird, trittst du über denselben Link bei.",
+    "fullLead": "Deine Einladung gilt weiterhin. Bitte die Person, die dich eingeladen hat, einen Platz freizumachen, dann trittst du über denselben Link bei.",
     "fullFine": "Es wurde kein Konto erstellt. Bis ein Platz frei wird, gibt es nichts zu tun.",
     "usedTitle": "Du bist schon in {{org}}.",
     "usedLead": "Diese Einladung wurde am {{date}} genutzt. Öffne einfach den Workspace.",
@@ -10309,7 +10309,7 @@
     },
     "org": {
       "createInviteOnly": "Neue Workspaces brauchen vorerst eine Einladung.",
-      "membersFull": "In diesem Workspace ist gerade kein Platz für weitere Personen. Sag der Person Bescheid, die dich eingeladen hat.",
+      "membersFull": "Alle Plätze in diesem Workspace sind gerade belegt. Bitte die Person, die dich eingeladen hat, einen Platz freizumachen.",
       "deleting": "Dieser Workspace wird gerade gelöscht.",
       "notRestorable": "Dieser Workspace kann nicht mehr wiederhergestellt werden."
     },
@@ -12743,6 +12743,8 @@
     "people": "Personen",
     "files": "Dateien",
     "usedOf": "{{used}} von {{limit}}",
+    "seatsPaid_one": "{{count}} bezahlter Platz",
+    "seatsPaid_other": "{{count}} bezahlte Plätze",
     "noLimit": "Kein Limit",
     "ownBucket": "In deinem eigenen Bucket, ohne Limit von uns"
   },
@@ -12751,7 +12753,10 @@
       "full": "Dieser Workspace hat {{members}} von {{limit}} Personen.",
       "fullOne": "Der agentes.chat-Tarif dieses Workspace reicht für 1 Person.",
       "fullAdmin": "Um mehr Personen dazuzuholen, sieh dir die Optionen des agentes.chat-Tarifs an.",
-      "fullMember": "Bitte die Person, die den Workspace verwaltet, Platz zu schaffen."
+      "fullMember": "Bitte die Person, die den Workspace verwaltet, Platz zu schaffen.",
+      "fullAddSeat": "Alle bezahlten Plätze sind belegt. Füge unter Tarif und Abrechnung einen Platz hinzu.",
+      "fullTop": "Dieser Tarif fasst keine weiteren Personen. Wechsle den Tarif unter Tarif und Abrechnung.",
+      "fullMemberSeat": "Bitte die Person, die den Workspace verwaltet, einen Platz hinzuzufügen."
     },
     "storage": {
       "meter": "Du hast {{used}} von {{limit}} genutzt.",

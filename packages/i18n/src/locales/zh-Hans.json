@@ -494,7 +494,7 @@
     "otherLead": "你已登录为 {{other}}。用受邀的邮箱登录，就会进入 {{org}}。",
     "switch": "以 {{email}} 登录",
     "fullTitle": "{{org}} 目前没有空余席位。",
-    "fullLead": "你的邀请仍然有效。有席位空出时，通过这个链接即可加入。",
+    "fullLead": "你的邀请仍然有效。请邀请你的人空出一个席位，之后通过这个链接即可加入。",
     "fullFine": "没有创建账号。在有席位空出之前，你什么都不用做。",
     "usedTitle": "你已经在 {{org}} 中了。",
     "usedLead": "此邀请已于 {{date}} 使用，直接打开即可。",
@@ -10000,7 +10000,7 @@
     },
     "org": {
       "createInviteOnly": "目前创建新工作区需要邀请。",
-      "membersFull": "这个工作区暂时无法容纳更多成员，请告知邀请你的人。",
+      "membersFull": "这个工作区的席位目前已全部占满。请邀请你的人空出一个席位。",
       "deleting": "这个工作区正在删除中。",
       "notRestorable": "这个工作区已无法恢复。"
     },
@@ -12444,6 +12444,7 @@
     "people": "成员",
     "files": "文件",
     "usedOf": "{{used}} / {{limit}}",
+    "seatsPaid_other": "已付费 {{count}} 个席位",
     "noLimit": "无限制",
     "ownBucket": "在你自己的存储桶上，我们不设限制"
   },
@@ -12452,7 +12453,10 @@
       "full": "此工作区已有 {{members}} 人，上限 {{limit}} 人。",
       "fullOne": "此工作区的 agentes.chat 套餐只容纳 1 人。",
       "fullAdmin": "要邀请更多人加入，请查看 agentes.chat 套餐的选项。",
-      "fullMember": "请联系工作区的负责人腾出名额。"
+      "fullMember": "请联系工作区的负责人腾出名额。",
+      "fullAddSeat": "已付费的席位都已占满。请在“套餐和账单”中添加席位。",
+      "fullTop": "当前套餐无法再容纳更多成员。请在“套餐和账单”中更换套餐。",
+      "fullMemberSeat": "请联系工作区的负责人添加一个席位。"
     },
     "storage": {
       "meter": "已使用 {{used}}，共 {{limit}}。",
