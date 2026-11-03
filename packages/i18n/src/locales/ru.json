@@ -11358,18 +11358,19 @@
       "address": "Адрес сервера",
       "open": "Открыть {{app}}",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "Другое приложение"
       },
       "clientText": {
         "claude": "claude.ai, приложение и телефон",
-        "claude_code": "В терминале",
-        "chatgpt": "chatgpt.com",
-        "cursor": "Редактор",
-        "other": "VS Code и другие"
+        "terminal": "В терминале",
+        "editor": "Редактор кода",
+        "extension": "Расширение редактора",
+        "desktop": "Приложение для компьютера",
+        "other": "Любое приложение с MCP"
+      },
+      "group": {
+        "chat": "Чат-приложения",
+        "code": "Редакторы и терминалы"
       },
       "waiting": "Ждём, когда приложение подключится",
       "connected": "Подключено: {{name}}",
@@ -11391,28 +11392,70 @@
         "step2": "В Claude Code введите <code>/mcp</code>, выберите agentes и Authenticate.",
         "scope": "Работает в любой папке. Только для текущей папки уберите <code>--scope user</code>."
       },
-      "chatgpt": {
-        "step1": "Откройте chatgpt.com/plugins.",
-        "step2": "Нажмите +, затем Add custom MCP server.",
-        "step3": "Вставьте адрес и подключитесь.",
-        "plans": "Доступно в платных тарифах ChatGPT."
-      },
       "cursor": {
         "add": "Добавить в Cursor",
         "manual": "Или вставьте в <code>~/.cursor/mcp.json</code>:",
         "signIn": "При первом использовании Cursor попросит вас войти."
       },
+      "vscode": {
+        "add": "Добавить в VS Code",
+        "manual": "Или вставьте в <code>.vscode/mcp.json</code>:"
+      },
+      "codex": {
+        "step": "Выполните в терминале. Codex откроет страницу для входа:"
+      },
+      "copilotIdes": {
+        "config": "В настройках GitHub Copilot в IDE откройте <code>mcp.json</code> и вставьте:"
+      },
       "other": {
-        "tabs": "Какое приложение",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "Любое приложение с MCP",
-        "vscodeAdd": "Добавить в VS Code",
-        "vscodeManual": "Или вставьте в <code>.vscode/mcp.json</code>:",
-        "codexStep": "Выполните в терминале. Codex откроет страницу для входа:",
         "anyStep": "Вставьте адрес в приложение. Оно откроет эту страницу для входа.",
         "anyToken": "Приложения без входа через OAuth используют личный токен в заголовке Authorization: Bearer.",
         "toTokens": "Создать личный токен"
+      },
+      "step": {
+        "open": "Откройте {{place}}.",
+        "click": "Нажмите {{button}}.",
+        "clickThen": "Нажмите {{button}}, затем {{next}}.",
+        "name": "Назовите его agentes.chat и вставьте адрес.",
+        "nameDescribe": "Назовите его agentes.chat и добавьте описание.",
+        "nameConnect": "Назовите его agentes.chat и нажмите {{button}}.",
+        "paste": "Вставьте адрес.",
+        "pasteIn": "Вставьте адрес в поле {{field}}.",
+        "choosePaste": "Выберите {{option}} и вставьте адрес.",
+        "emptySecret": "Оставьте client ID и secret пустыми и нажмите {{button}}.",
+        "choose": "Выберите {{option}}.",
+        "chooseThen": "Выберите {{option}}, нажмите {{button}}, затем {{next}}.",
+        "chooseConfig": "Выберите {{option}} и вставьте:",
+        "auth": "В способе входа выберите {{option}}.",
+        "tick": "Отметьте «{{box}}» и нажмите {{button}}.",
+        "run": "Выполните в терминале:",
+        "orRun": "Или выполните в терминале:",
+        "runCommand": "Запустите команду {{command}}.",
+        "file": "Вставьте в <code>{{file}}</code>:",
+        "orFile": "Или вставьте в <code>{{file}}</code>:",
+        "pasteConfig": "Вставьте:",
+        "mode": "В чате переключитесь в режим {{mode}}.",
+        "loginRun": "Чтобы войти, выполните <code>{{command}}</code>.",
+        "loginType": "Чтобы войти, введите в приложении <code>{{command}}</code>.",
+        "signIn": "Войдите с аккаунтом agentes.chat на открывшейся странице.",
+        "signInFirst": "При первом использовании приложение попросит вас войти.",
+        "signInBrowser": "Приложение откроет браузер, чтобы вы вошли.",
+        "token": "Создайте личный токен и вставьте его вместо {{placeholder}}.",
+        "install": "Добавить в {{app}}"
+      },
+      "note": {
+        "untested": "Мы ещё не проверяли вход из этого приложения. Если не получится, сообщите нам.",
+        "chatgptPlans": "В платных тарифах ChatGPT, кроме Free и Go. В Business добавить его могут только админы.",
+        "chatgptPhone": "Добавить его из приложения на телефоне нельзя. После добавления в веб-версии он появится и на компьютере, и на телефоне.",
+        "geminiPlans": "Только в веб-версии, с личным аккаунтом Google. Может понадобиться Google AI Pro или Ultra.",
+        "codex": "Нужен тариф ChatGPT с Codex. Приложение ChatGPT для компьютера, Codex CLI и расширение для IDE используют одну настройку.",
+        "copilotPolicy": "В Copilot Business и Enterprise админ должен включить политику MCP servers in Copilot, по умолчанию она выключена.",
+        "grokAdmin": "В Grok Business и Enterprise коннектор добавляет админ.",
+        "perplexityPlans": "В Perplexity Pro, Max и Enterprise.",
+        "leChatAdmin": "В тарифе Team коннектор добавляет админ.",
+        "raycastPro": "Только в Raycast Pro.",
+        "visualStudio": "Visual Studio 2022 17.14 или новее, с GitHub Copilot.",
+        "continueAgent": "Работает только в режиме Agent."
       }
     },
     "consent": {

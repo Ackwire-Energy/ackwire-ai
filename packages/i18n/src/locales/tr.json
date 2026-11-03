@@ -10593,18 +10593,19 @@
       "address": "Sunucu adresi",
       "open": "{{app}} aç",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "Başka uygulama"
       },
       "clientText": {
         "claude": "claude.ai, uygulama ve telefon",
-        "claude_code": "Terminalde",
-        "chatgpt": "chatgpt.com",
-        "cursor": "Düzenleyici",
-        "other": "VS Code ve diğerleri"
+        "terminal": "Terminalde",
+        "editor": "Kod düzenleyici",
+        "extension": "Düzenleyici eklentisi",
+        "desktop": "Masaüstü uygulaması",
+        "other": "Herhangi bir MCP uygulaması"
+      },
+      "group": {
+        "chat": "Sohbet uygulamaları",
+        "code": "Düzenleyiciler ve terminaller"
       },
       "waiting": "Uygulamanın bağlanması bekleniyor",
       "connected": "Bağlandı: {{name}}",
@@ -10626,28 +10627,70 @@
         "step2": "Claude Code'da <code>/mcp</code> yazın, agentes'i seçin ve Authenticate'e tıklayın.",
         "scope": "Her klasörde çalışır. Yalnızca geçerli klasör için <code>--scope user</code> kısmını çıkarın."
       },
-      "chatgpt": {
-        "step1": "chatgpt.com/plugins adresini açın.",
-        "step2": "+ simgesine, ardından Add custom MCP server'a tıklayın.",
-        "step3": "Adresi yapıştırın ve bağlanın.",
-        "plans": "Ücretli ChatGPT planlarında kullanılabilir."
-      },
       "cursor": {
         "add": "Cursor'a ekle",
         "manual": "Veya <code>~/.cursor/mcp.json</code> dosyasına yapıştırın:",
         "signIn": "Cursor, ilk kullandığınızda giriş yapmanızı ister."
       },
+      "vscode": {
+        "add": "VS Code'a ekle",
+        "manual": "Veya <code>.vscode/mcp.json</code> dosyasına yapıştırın:"
+      },
+      "codex": {
+        "step": "Terminalde çalıştırın. Codex, giriş yapmanız için sayfayı açar:"
+      },
+      "copilotIdes": {
+        "config": "IDE'deki GitHub Copilot ayarlarında <code>mcp.json</code> dosyasını açıp yapıştırın:"
+      },
       "other": {
-        "tabs": "Hangi uygulama",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "Herhangi bir MCP uygulaması",
-        "vscodeAdd": "VS Code'a ekle",
-        "vscodeManual": "Veya <code>.vscode/mcp.json</code> dosyasına yapıştırın:",
-        "codexStep": "Terminalde çalıştırın. Codex, giriş yapmanız için sayfayı açar:",
         "anyStep": "Adresi uygulamaya yapıştırın. Giriş yapmanız için bu sayfayı açar.",
         "anyToken": "OAuth girişi olmayan uygulamalar Authorization: Bearer başlığında kişisel bir token kullanır.",
         "toTokens": "Kişisel token oluştur"
+      },
+      "step": {
+        "open": "{{place}} bölümünü açın.",
+        "click": "{{button}} düğmesine tıklayın.",
+        "clickThen": "{{button}} düğmesine, ardından {{next}} düğmesine tıklayın.",
+        "name": "Adını agentes.chat koyup adresi yapıştırın.",
+        "nameDescribe": "Adını agentes.chat koyup bir açıklama yazın.",
+        "nameConnect": "Adını agentes.chat koyup {{button}} düğmesine tıklayın.",
+        "paste": "Adresi yapıştırın.",
+        "pasteIn": "Adresi {{field}} alanına yapıştırın.",
+        "choosePaste": "{{option}} seçeneğini seçip adresi yapıştırın.",
+        "emptySecret": "Client ID ve secret alanlarını boş bırakıp {{button}} düğmesine tıklayın.",
+        "choose": "{{option}} seçeneğini seçin.",
+        "chooseThen": "{{option}} seçeneğini seçin, {{button}} düğmesine, ardından {{next}} düğmesine tıklayın.",
+        "chooseConfig": "{{option}} seçeneğini seçip yapıştırın:",
+        "auth": "Kimlik doğrulamada {{option}} seçeneğini seçin.",
+        "tick": "“{{box}}” kutusunu işaretleyip {{button}} düğmesine tıklayın.",
+        "run": "Terminalde çalıştırın:",
+        "orRun": "Veya terminalde çalıştırın:",
+        "runCommand": "{{command}} komutunu çalıştırın.",
+        "file": "<code>{{file}}</code> dosyasına yapıştırın:",
+        "orFile": "Veya <code>{{file}}</code> dosyasına yapıştırın:",
+        "pasteConfig": "Yapıştırın:",
+        "mode": "Sohbette {{mode}} moduna geçin.",
+        "loginRun": "Giriş yapmak için <code>{{command}}</code> komutunu çalıştırın.",
+        "loginType": "Giriş yapmak için uygulamada <code>{{command}}</code> yazın.",
+        "signIn": "Açılan sayfada agentes.chat hesabınızla giriş yapın.",
+        "signInFirst": "Uygulama, ilk kullandığınızda giriş yapmanızı ister.",
+        "signInBrowser": "Uygulama, giriş yapmanız için tarayıcınızı açar.",
+        "token": "Kişisel bir token oluşturup {{placeholder}} yerine koyun.",
+        "install": "{{app}} uygulamasına ekle"
+      },
+      "note": {
+        "untested": "Bu uygulamadan girişi henüz test etmedik. Başarısız olursa bize haber verin.",
+        "chatgptPlans": "ChatGPT'nin ücretli planlarında, Free ve Go hariç. Business'ta yalnızca adminler ekleyebilir.",
+        "chatgptPhone": "Telefon uygulamasından eklenemez. Web'de eklendikten sonra masaüstünde ve telefonda da görünür.",
+        "geminiPlans": "Yalnızca web'de, kişisel bir Google hesabıyla. Google AI Pro veya Ultra gerekebilir.",
+        "codex": "Codex içeren bir ChatGPT planı gerekir. ChatGPT masaüstü uygulaması, Codex CLI ve IDE eklentisi bu ayarı paylaşır.",
+        "copilotPolicy": "Copilot Business ve Enterprise'da bir admin, varsayılan olarak kapalı olan MCP servers in Copilot politikasını açmalıdır.",
+        "grokAdmin": "Grok Business ve Enterprise'da bağlayıcıyı bir admin ekler.",
+        "perplexityPlans": "Perplexity Pro, Max ve Enterprise'da.",
+        "leChatAdmin": "Team planında bağlayıcıyı bir admin ekler.",
+        "raycastPro": "Yalnızca Raycast Pro'da.",
+        "visualStudio": "Visual Studio 2022 17.14 veya daha yenisi, GitHub Copilot ile.",
+        "continueAgent": "Yalnızca Agent modunda çalışır."
       }
     },
     "consent": {

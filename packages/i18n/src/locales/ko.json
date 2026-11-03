@@ -10246,18 +10246,19 @@
       "address": "서버 주소",
       "open": "{{app}} 열기",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "다른 앱"
       },
       "clientText": {
         "claude": "claude.ai, 앱, 휴대폰",
-        "claude_code": "터미널에서",
-        "chatgpt": "chatgpt.com",
-        "cursor": "에디터",
-        "other": "VS Code 등"
+        "terminal": "터미널에서",
+        "editor": "코드 편집기",
+        "extension": "편집기 확장 프로그램",
+        "desktop": "데스크톱 앱",
+        "other": "모든 MCP 앱"
+      },
+      "group": {
+        "chat": "채팅 앱",
+        "code": "편집기와 터미널"
       },
       "waiting": "앱 연결을 기다리는 중",
       "connected": "연결됨: {{name}}",
@@ -10279,28 +10280,70 @@
         "step2": "Claude Code에서 <code>/mcp</code>를 입력하고 agentes를 고른 다음 Authenticate를 선택하세요.",
         "scope": "모든 폴더에서 작동해요. 현재 폴더에서만 쓰려면 <code>--scope user</code>를 빼세요."
       },
-      "chatgpt": {
-        "step1": "chatgpt.com/plugins를 여세요.",
-        "step2": "+를 클릭한 다음 사용자 지정 MCP 서버 추가를 선택하세요.",
-        "step3": "주소를 붙여넣고 연결하세요.",
-        "plans": "ChatGPT 유료 요금제에서 사용할 수 있어요."
-      },
       "cursor": {
         "add": "Cursor에 추가",
         "manual": "또는 <code>~/.cursor/mcp.json</code>에 붙여넣으세요:",
         "signIn": "처음 사용할 때 Cursor가 로그인을 요청해요."
       },
+      "vscode": {
+        "add": "VS Code에 추가",
+        "manual": "또는 <code>.vscode/mcp.json</code>에 붙여넣으세요:"
+      },
+      "codex": {
+        "step": "터미널에서 실행하세요. Codex가 로그인 페이지를 열어 줘요:"
+      },
+      "copilotIdes": {
+        "config": "IDE의 GitHub Copilot 설정에서 <code>mcp.json</code>을 열고 붙여넣으세요:"
+      },
       "other": {
-        "tabs": "앱 선택",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "모든 MCP 앱",
-        "vscodeAdd": "VS Code에 추가",
-        "vscodeManual": "또는 <code>.vscode/mcp.json</code>에 붙여넣으세요:",
-        "codexStep": "터미널에서 실행하세요. Codex가 로그인 페이지를 열어 줘요:",
         "anyStep": "앱에 주소를 붙여넣으세요. 앱이 로그인할 수 있도록 이 페이지를 열어 줘요.",
         "anyToken": "OAuth 로그인이 없는 앱은 Authorization: Bearer 헤더에 개인 토큰을 사용해요.",
         "toTokens": "개인 토큰 만들기"
+      },
+      "step": {
+        "open": "{{place}} 화면을 여세요.",
+        "click": "{{button}} 버튼을 클릭하세요.",
+        "clickThen": "{{button}} 버튼을 클릭한 다음 {{next}} 버튼을 클릭하세요.",
+        "name": "이름을 agentes.chat으로 정하고 주소를 붙여넣으세요.",
+        "nameDescribe": "이름을 agentes.chat으로 정하고 설명을 쓰세요.",
+        "nameConnect": "이름을 agentes.chat으로 정하고 {{button}} 버튼을 클릭하세요.",
+        "paste": "주소를 붙여넣으세요.",
+        "pasteIn": "{{field}} 칸에 주소를 붙여넣으세요.",
+        "choosePaste": "{{option}} 항목을 고르고 주소를 붙여넣으세요.",
+        "emptySecret": "client ID와 secret은 비워 두고 {{button}} 버튼을 클릭하세요.",
+        "choose": "{{option}} 항목을 고르세요.",
+        "chooseThen": "{{option}} 항목을 고르고 {{button}} 버튼을 클릭한 다음 {{next}} 버튼을 클릭하세요.",
+        "chooseConfig": "{{option}} 항목을 고르고 붙여넣으세요:",
+        "auth": "인증에서 {{option}} 항목을 고르세요.",
+        "tick": "“{{box}}”에 체크하고 {{button}} 버튼을 클릭하세요.",
+        "run": "터미널에서 실행하세요:",
+        "orRun": "또는 터미널에서 실행하세요:",
+        "runCommand": "{{command}} 명령을 실행하세요.",
+        "file": "<code>{{file}}</code>에 붙여넣으세요:",
+        "orFile": "또는 <code>{{file}}</code>에 붙여넣으세요:",
+        "pasteConfig": "붙여넣으세요:",
+        "mode": "채팅에서 {{mode}} 모드로 바꾸세요.",
+        "loginRun": "로그인하려면 <code>{{command}}</code> 명령을 실행하세요.",
+        "loginType": "로그인하려면 앱에서 <code>{{command}}</code> 명령을 입력하세요.",
+        "signIn": "열린 페이지에서 agentes.chat 계정으로 로그인하세요.",
+        "signInFirst": "처음 사용할 때 앱이 로그인을 요청해요.",
+        "signInBrowser": "앱이 로그인할 수 있도록 브라우저를 열어 줘요.",
+        "token": "개인 토큰을 만들어 {{placeholder}} 자리에 넣으세요.",
+        "install": "{{app}}에 추가"
+      },
+      "note": {
+        "untested": "이 앱에서 로그인하는 것은 아직 테스트하지 않았어요. 안 되면 알려 주세요.",
+        "chatgptPlans": "ChatGPT 유료 요금제에서 쓸 수 있어요. Free와 Go는 제외예요. Business에서는 관리자만 추가할 수 있어요.",
+        "chatgptPhone": "휴대폰 앱에서는 추가할 수 없어요. 웹에서 추가하면 데스크톱과 휴대폰에도 표시돼요.",
+        "geminiPlans": "웹에서만, 개인 Google 계정으로 쓸 수 있어요. Google AI Pro 또는 Ultra가 필요할 수 있어요.",
+        "codex": "Codex가 포함된 ChatGPT 요금제가 필요해요. ChatGPT 데스크톱 앱, Codex CLI, IDE 확장 프로그램이 이 설정을 함께 써요.",
+        "copilotPolicy": "Copilot Business와 Enterprise에서는 관리자가 MCP servers in Copilot 정책을 켜야 해요. 기본값은 꺼짐이에요.",
+        "grokAdmin": "Grok Business와 Enterprise에서는 관리자가 커넥터를 추가해요.",
+        "perplexityPlans": "Perplexity Pro, Max, Enterprise에서 쓸 수 있어요.",
+        "leChatAdmin": "Team 요금제에서는 관리자가 커넥터를 추가해요.",
+        "raycastPro": "Raycast Pro에서만 돼요.",
+        "visualStudio": "Visual Studio 2022 17.14 이상과 GitHub Copilot이 필요해요.",
+        "continueAgent": "Agent 모드에서만 작동해요."
       }
     },
     "consent": {

@@ -447,6 +447,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Claude Code:** ejecuta `claude mcp add --transport http --scope user agentes <address>`, luego escribe `/mcp`, elige agentes y **Authenticate**. Solo para la carpeta actual, quita `--scope user`.",
               "**Cursor:** **Agregar a Cursor** en **Configuración › Apps de IA**, o la dirección en `~/.cursor/mcp.json`. Cursor te pide iniciar sesión la primera vez que lo usas.",
               '**VS Code:** **Agregar a VS Code**, o la dirección en `.vscode/mcp.json` con `"type": "http"`.',
+              "**Otras apps:** ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrains y más tienen cada una sus pasos en **Conectar una app**, con tu dirección ya puesta.",
             ],
           },
           "Cuando inicias sesión, agentes.chat muestra qué app pidió acceso y adónde vuelve. Continúa solo si acabas de iniciar la conexión.",
