@@ -423,8 +423,10 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   font-size: 15px;
   font-weight: 600;
 }
+/* The days stand on one line: each day's name at the bottom, its runs stacked up from it. */
 .routine-week__days {
   display: flex;
+  align-items: flex-end;
   gap: 10px;
 }
 .routine-week__day {
@@ -457,9 +459,10 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 /* "No ar": its state and what it means, the switch at the end. */
+/* The switch sits on the state's line (20px, its height): a line under it that wraps doesn't move it. */
 .issue-aside__item.routine-onair {
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   padding: 10px 12px;
@@ -473,6 +476,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 }
 .routine-onair__text b {
   font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
 }
 .routine-onair__text small {

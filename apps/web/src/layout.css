@@ -1432,7 +1432,10 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   color: var(--raised);
   font-size: 11.5px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  /* Its own line, the pill's height, so the number sits in the middle; proportional digits, so a lone "1" isn't set
+     in a "0"'s width off to one side. */
+  line-height: 18px;
+  font-variant-numeric: normal;
 }
 .sidebar__label-row {
   display: flex;
