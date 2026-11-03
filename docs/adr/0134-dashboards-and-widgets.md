@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-03
-- Extends: ADR 0053 (routines and unattended work: a widget is redone by a routine of its own), 0085 (roles and permissions: who sees a board), 0108 (Início: "My Home" is its board), 0113 (live blocks: what is pinned is a chart, not a live block), 0125 (an audience by role, the same model), 0071 (notifications: alerts and requests wait on the person)
+- Extends: ADR 0053 (routines and unattended work: a widget is redone by a routine of its own), 0085 (roles and permissions: who sees a board), 0108 (Home: "My Home" is its board), 0113 (live blocks: what is pinned is a chart, not a live block), 0125 (an audience by role, the same model), 0071 (notifications: alerts and requests wait on the person)
 - Code: `packages/db/src/schema/dashboards.ts` (`dashboards`, `dashboard_widgets`, `dashboard_widget_updates`), migration `0193_dashboards.sql`; `packages/ui/src/widgets/spec.ts` (`@agenteschat/ui/widgets/spec`: `WidgetSpec`, `validateWidgetSpec`, `chartBlockToWidgetSpec`, schedules, sizes, caps); `packages/engine/src/dashboards/*` (`access.ts`, `service.ts`, `pin.ts`, `cost.ts`, `suggestions.ts`, `refresh.ts`, `proposals.ts`, `tools.ts`, `events.ts`, `types.ts`), `routines.ts` and `routine-ledger.ts` (the `widget` target), `tools/run-policy.ts` (a widget's refresh run), `notifications.ts` (`widget_alert`, `widget_failed`, `dashboard_proposal`); server `routes/app/dashboards.ts`, `dashboard-schemas.ts`; client `packages/client/src/dashboards/*`; web `packages/ui/src/widgets/*`, `pages/HomePage.tsx` (the mural), `pages/DashboardsPage.tsx`, `pages/DashboardPage.tsx`, `components/dashboards/*`; phone `app/(app)/(tabs)/dashboards/*`, `src/features/dashboards/*`
 
 ## Context
@@ -46,7 +46,7 @@ people than asked.
    firing with `FOR UPDATE SKIP LOCKED`, one run at a time, a computer away, the ledger closed on every ending, the
    failure streak that pauses after five, the standing checks, the budget and plan pauses. Its background run works in
    the routine's own room; its `deliverTo` is its creator's DM with the agent, only for the rare card it may raise.
-   Widget routines show in Rotinas while they update on a schedule, tagged with their widget and opening it (their
+   Widget routines show in Routines while they update on a schedule, tagged with their widget and opening it (their
    schedule and instructions change from the widget), and don't count in the 20 active routines an agent may have: the workspace's cap on scheduled widgets
    holds them (§7). Deleting the routine leaves the widget updating only when asked. A dedicated scheduler was
    considered and dropped: it would have repeated the firing rules, the ledger and every pause and recovery path for
@@ -62,7 +62,9 @@ people than asked.
    may change the title, the kind and the standing instructions.
 6. **States, history, alerts.** A widget is `building` (its first run), `ok`, `updating` (a run is redoing it; the last
    data stays on screen) or `failed` (a human reason and "Resolve", which runs it again, takes the routine over when its
-   creator can no longer run it, and resumes it when failures paused it). Each update or failure is kept with what it
+   creator can no longer run it, and resumes it when it paused itself: failures, its creator gone or out of the board).
+   A routine a person paused on purpose in Routines stays paused: "Update now", "Resolve" and "Ask for a change" run
+   once, and only Resume in Routines brings the schedule back. Each update or failure is kept with what it
    showed (`dashboard_widget_updates`, the latest 20), shown in the widget's panel. When the alert is on and the agent
    says its condition was met, the person who set the alert hears it in "Waiting on you" (`widget_alert`, waiting, one
    row per widget merging while open); never in the chat. A widget that stops updating tells its creator once per
@@ -85,7 +87,7 @@ people than asked.
    speak to the workspace may show it something); a private one needs only membership. A `roles` board with no role
    left (a role deleted) is its owner's alone until shared again.
 9. **"My Home".** Every person has a home board (`kind` `home`, always private, made the first time it is read): the
-   widgets of their Início. On the web Início shows it as a mural of four columns where "Waiting on you" and "Working
+   widgets of their Home. On the web Home shows it as a mural of four columns where "Waiting on you" and "Working
    now" are fixed tiles among the widgets (`home_tiles`), moved and resized with them in Organize.
 10. **Agents make boards and widgets.** Built-in tools, listed for every agent like the chat's own: `list_dashboards`,
     `create_dashboard`, `create_widget` (on a board the person behind the run edits, by default the one they asked it
@@ -108,21 +110,26 @@ people than asked.
 13. **Live.** Ids only go out (`dashboard.changed`, `dashboard.widget` with the widget's status): a private or home
     board's events to its owner alone, any other's to the workspace, and a change that took a board away from people
     to everyone; the apps fetch what they may see again.
-14. **On the web.** Início shows "My Home" as the mural (§9) with "+ Widget" and Organize. A new fixed sidebar row
-    "Dashboards" after Início opens the Dashboards page: "My Home", then the boards grouped "Workspace", "Your roles"
+14. **On the web.** Home shows "My Home" as the mural (§9) with "+ Widget" and Organize. A new fixed sidebar row
+    "Dashboards" after Home opens the Dashboards page: "My Home", then the boards grouped "Workspace", "Your roles"
     and "Only yours", each with a dithered thumbnail of its widgets' tones, and "New dashboard". A board's page has its
     back link, title, Share, Organize and "+", a line with who sees it, who made it, how many widgets and when it was
     updated, an agent's request (§11), the grid and an empty state. A widget opens in a side panel: the widget big,
     how it updates (its routine and next run, its alert, what the agent reads), its latest updates, remove, and a
     composer to ask its agent for a change. Charts in messages get "Pin".
-15. **On the phone.** A "Dashboards" tab between Conversas and Threads. Its root lists "My Home" first, then the same
+15. **On the phone.** A "Dashboards" tab between Chats and Threads. Its root lists "My Home" first, then the same
     groups. Everything else is a pushed screen with a back button, never a sheet: a board (two columns, a 2-wide
     widget across the row), a widget (big, how it updates, history, remove, ask for a change), a new widget (preview on
-    top, text and suggestions, agent, format, schedule, alert, board), share and a new board.
+    top, text and suggestions, agent, format, schedule, alert, board), share and a new board. The tab bar then holds
+    six tabs with search, and a system bar holds five at most (Android's bottom navigation throws on a sixth, an
+    iPhone's folds the rest into "More"; `BAR_TABS_MAX`). iOS 26 draws search apart from the bar, so it keeps its own
+    button there; on Android and on iOS before 26 search leaves the bar for a header button that pushes the search
+    screen (`/find`), and links to search open that screen (`barTabs`, `searchInBar` in `apps/mobile/src/lib/nav.ts`,
+    `searchHref`).
 
 ## Consequences
 
-- One more kind of routine: Rotinas lists widget routines with their widget, and the routine code paths branch on the
+- One more kind of routine: Routines lists widget routines with their widget, and the routine code paths branch on the
   `widget` target in a few places (firing, the ledger's end, the agent's routine tools, which refuse to change them).
 - A widget's refresh costs the agent's budget like any routine run; the cap of 60 scheduled widgets per workspace and
   the 30-minute floor bound it, and the dialog says the cost before anything is made.

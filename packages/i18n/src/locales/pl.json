@@ -2700,6 +2700,7 @@
     },
     "working": {
       "title": "Pracuje teraz",
+      "none": "Teraz nie pracuje żaden agent.",
       "dm": "W rozmowie z tobą",
       "in": "#{{channel}}",
       "mission": "Misja · {{done}} z {{total}}"
@@ -2915,7 +2916,8 @@
       "browser": "Przeglądarka",
       "members": "Członkowie",
       "usage": "Użycie",
-      "connectors": "Konektory"
+      "connectors": "Konektory",
+      "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} reakcja",
     "reactions_few": "{{count}} reakcje",
@@ -5228,13 +5230,18 @@
     "subtitle": "Co agenci robią sami, według harmonogramu albo gdy coś się wydarzy.",
     "new": "Nowa rutyna",
     "deliversTo": "{{agent}} · dostarcza do: {{target}}",
+    "widgetLine": "{{agent}} · aktualizuje swój widżet, bez wiadomości",
+    "widgetChip": "Widżet dashboardu",
+    "widgetFixed": "To, co pokazuje, kiedy się aktualizuje i kto się nim zajmuje, zmieniasz w jego widżecie.",
     "target": {
       "forum": "Temat na forum",
       "forumShort": "Forum",
       "dm": "Moja wiadomość bezpośrednia z agentem",
       "artifact": "Dokument na Drive",
       "dmShort": "Wiadomość bezpośrednia",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "Widżet dashboardu",
+      "widgetNamed": "Widżet „{{title}}”"
     },
     "active": "Aktywna",
     "activeLabel": "Aktywna: {{name}}",
@@ -5333,7 +5340,8 @@
         "channel": "Widzą to wszyscy na kanale",
         "dm": "Widzisz to tylko ty",
         "forum": "Agenci dyskutują w temacie na forum",
-        "artifact": "Staje się dokumentem na Drive"
+        "artifact": "Staje się dokumentem na Drive",
+        "widget": "Aktualizuje swój widżet, bez wiadomości"
       },
       "ahead": "Przygotowane na później",
       "ownActions": "Robi sama",
@@ -13849,6 +13857,357 @@
         "done": "Zrobione dzisiaj"
       },
       "none": "{{name}} nie ma teraz zadań."
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "Automatycznie",
+      "kpi": "Liczba",
+      "goal": "Cel",
+      "bars": "Słupki",
+      "line": "Linia",
+      "list": "Lista",
+      "text": "Podsumowanie"
+    },
+    "schedules": {
+      "half": "Co 30 minut",
+      "hour": "Co godzinę",
+      "day": "Codziennie o 8:00",
+      "week": "W każdy poniedziałek o 8:00",
+      "manual": "Tylko na twoją prośbę"
+    },
+    "schedulesShort": {
+      "half": "30 minut",
+      "hour": "Co godzinę",
+      "day": "Codziennie · 8:00",
+      "week": "Co poniedziałek",
+      "manual": "Na prośbę"
+    },
+    "schedulesInline": {
+      "half": "co 30 minut",
+      "hour": "co godzinę",
+      "day": "codziennie o 8:00",
+      "week": "w każdy poniedziałek o 8:00",
+      "manual": "na prośbę"
+    },
+    "sizes": {
+      "label": "Rozmiar",
+      "s": "S",
+      "m": "M",
+      "l": "L"
+    },
+    "status": {
+      "building": "{{name}} tworzy widżet i rutynę, która będzie go aktualizować…",
+      "updating": "{{name}} aktualizuje…",
+      "failed": "Nie zaktualizowano"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "Rozwiąż",
+      "agent_reported": "{{detail}}",
+      "no_update": "Ostatnia aktualizacja skończyła się bez danych.",
+      "error": "Ostatnia aktualizacja się nie powiodła.",
+      "budget_exceeded": "Budżet agenta {{name}} na ten miesiąc został wykorzystany.",
+      "waiting_computer": "Komputer agenta {{name}} jest niedostępny.",
+      "waiting_plan": "Plan agenta {{name}} jest na limicie.",
+      "waiting_budget": "Budżet agenta {{name}} jest na limicie.",
+      "creator_left": "Osoba, która go skonfigurowała, opuściła przestrzeń roboczą.",
+      "creator_no_access": "Osoba, która go skonfigurowała, nie może już z niego korzystać.",
+      "agent_archived": "Agent {{name}} został zarchiwizowany.",
+      "audience": "Osoba, która go skonfigurowała, nie może już rozmawiać z agentem {{name}}.",
+      "failing": "Kilka razy z rzędu się nie udało, więc zatrzymano.",
+      "stopped": "Aktualizacja została zatrzymana.",
+      "missing_credential": "{{name}} nie ma klucza AI ani planu do pracy.",
+      "timeout": "Aktualizacja trwała za długo.",
+      "invalid_data": "Agentowi {{name}} nie udało się ułożyć danych w tym formacie."
+    },
+    "menu": {
+      "label": "Więcej",
+      "open": "Otwórz",
+      "refresh": "Zaktualizuj teraz",
+      "change": "Poproś agenta {{name}} o zmianę",
+      "schedule": "Zmień, kiedy się aktualizuje",
+      "removeHome": "Usuń ze Startu",
+      "removeBoard": "Usuń z dashboardu"
+    },
+    "organize": {
+      "start": "Uporządkuj",
+      "done": "Gotowe",
+      "size": "Rozmiar",
+      "remove": "Usuń",
+      "drag": "Przeciągnij, aby przenieść",
+      "fixed": "Stały"
+    },
+    "add": {
+      "tile": "Widżet",
+      "label": "Dodaj widżet"
+    },
+    "alert": {
+      "label": "Daj znać, gdy coś jest nie tak",
+      "hint": "Alert trafia do „Czeka na ciebie”, razem z tym, co się zmieniło.",
+      "condition": "Alert, jeśli",
+      "placeholder": "coś jest nie tak",
+      "line": "Alert, jeśli {{condition}}",
+      "lineAny": "Alert, gdy coś jest nie tak",
+      "where": "W „Czeka na ciebie”",
+      "none": "Bez alertów"
+    },
+    "cost": {
+      "day": "≈ {{amount}} dziennie z budżetu agenta {{name}}",
+      "week": "≈ {{amount}} tygodniowo z budżetu agenta {{name}}",
+      "manual": "Kosztuje tylko wtedy, gdy prosisz o aktualizację",
+      "plan": "Korzysta z planu agenta {{name}}",
+      "unknown": "Każda aktualizacja korzysta z budżetu agenta {{name}}"
+    },
+    "exposure": "Kto widzi dashboard, widzi to, co przynieśli agenci, nawet bez dostępu do kont, z których to pochodzi. Agenci też tworzą dashboardy. Zanim pokażą któryś większej liczbie osób niż ta, która o niego prosiła, najpierw pytają w „Czeka na ciebie”.",
+    "panel": {
+      "caresFor": "{{name}} zajmuje się tym widżetem",
+      "caresForOn": "{{name}} zajmuje się tym widżetem · {{board}}",
+      "how": "Jak się aktualizuje",
+      "next": "Rutyna agenta {{name}} · następna {{when}}",
+      "noRoutine": "Nie aktualizuje się sam",
+      "askAnytime": "O aktualizację możesz poprosić w menu",
+      "editRoutine": "Edytuj rutynę",
+      "changeAlert": "Zmień",
+      "reads": "Co {{name}} czyta, żeby go zbudować",
+      "history": "Ostatnie aktualizacje",
+      "noHistory": "Jeszcze nie ma aktualizacji.",
+      "alerted": "alert: {{text}}",
+      "changed": "Zmieniono: {{text}}",
+      "ask": "Poproś o zmianę",
+      "askPlaceholder": "Np.: podziel według kanału albo porównaj z tym samym tygodniem w zeszłym roku",
+      "askTo": "do: {{name}}",
+      "send": "Wyślij",
+      "sent": "{{name}} tworzy widżet od nowa.",
+      "updated": "Zaktualizowano"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b> zgłasza alert: „{{title}}”",
+      "failed": "„{{title}}” nie aktualizuje się już",
+      "proposal": "<b>{{name}}</b> chce opublikować dashboard",
+      "proposalWorkspace": "„{{title}}” dla całej przestrzeni roboczej · dziś widzisz go tylko ty",
+      "proposalRoles": "„{{title}}” dla: {{roles}} · dziś widzisz go tylko ty",
+      "openBoard": "Zobacz dashboard",
+      "openWidget": "Otwórz widżet",
+      "resolving": "Ponowna aktualizacja „{{title}}”"
+    },
+    "example": {
+      "days": {
+        "d1": "śr",
+        "d2": "czw",
+        "d3": "pt",
+        "d4": "sob",
+        "d5": "ndz",
+        "d6": "pon",
+        "d7": "wt"
+      },
+      "vsYesterday": "w porównaniu z wczoraj",
+      "goalLine": "48 ze 100",
+      "goalNote": "W tym tempie cel zostanie osiągnięty 29.",
+      "lineNote": "40 wczoraj · +48% w tym tygodniu",
+      "row1": "Pierwsza pozycja",
+      "row2": "Druga pozycja",
+      "row3": "Trzecia pozycja",
+      "meta1": "teraz",
+      "meta2": "1 godz. temu",
+      "meta3": "wczoraj",
+      "item1": "Krótkie podsumowanie tego, co się zmieniło.",
+      "item2": "Agent pisze je od nowa przy każdej aktualizacji."
+    },
+    "preview": {
+      "label": "Podgląd",
+      "example": "przykładowe dane"
+    },
+    "pin": {
+      "action": "Przypnij",
+      "label": "Przypnij do dashboardu",
+      "done": "Przypięto: {{where}}",
+      "doneUpdating": "Przypięto: {{where}} · {{name}} odświeża go {{schedule}}",
+      "subtitle": "Zachowuje dane wykresu. Jego agent może też dbać o to, by był aktualny.",
+      "open": "Otwórz"
+    },
+    "home": "Mój Start",
+    "updatedAgo": "zaktualizowano {{when}}",
+    "removed": {
+      "home": "Usunięto „{{title}}” ze Startu, a rutyna agenta {{name}} się zatrzymała",
+      "board": "Usunięto „{{title}}” z dashboardu, a rutyna agenta {{name}} się zatrzymała"
+    }
+  },
+  "dashboards": {
+    "title": "Dashboardy",
+    "subtitle": "Liczby i wykresy, które agenci utrzymują w aktualności, dla całej przestrzeni roboczej albo tylko niektórych ról.",
+    "sidebar": "Dashboardy",
+    "new": "Nowy dashboard",
+    "back": "Dashboardy",
+    "home": "Mój Start",
+    "groups": {
+      "workspace": "Przestrzeń robocza",
+      "workspaceHint": "widzą wszyscy",
+      "roles": "Twoje role",
+      "rolesHint": "należysz do: {{roles}}",
+      "mine": "Tylko twoje",
+      "mineHint": "nikt inny ich nie widzi"
+    },
+    "audience": {
+      "label": "Kto widzi",
+      "workspace": "Cała przestrzeń robocza",
+      "workspaceHint_one": "{{count}} członek widzi go i znajduje w sekcji Dashboardy",
+      "workspaceHint_few": "Wszyscy {{count}} członkowie widzą go i znajdują w sekcji Dashboardy",
+      "workspaceHint_many": "Wszystkich {{count}} członków widzi go i znajduje w sekcji Dashboardy",
+      "workspaceHint_other": "Wszyscy członkowie ({{count}}) widzą go i znajdują w sekcji Dashboardy",
+      "roles": "Role",
+      "rolesHint": "Tylko osoby z jedną z wybranych ról",
+      "private": "Tylko ty",
+      "privateHint": "Nikt inny go nie widzi, dopóki go nie udostępnisz",
+      "noRoles": "Przestrzeń robocza nie ma jeszcze ról.",
+      "people_one": "{{count}} osoba",
+      "people_few": "{{count}} osoby",
+      "people_many": "{{count}} osób",
+      "people_other": "{{count}} osoby"
+    },
+    "edit": {
+      "label": "Kto edytuje",
+      "viewers": "Każdy, kto go widzi",
+      "owner": "Tylko ty i administratorzy"
+    },
+    "meta": {
+      "by": "Twórca: {{name}}",
+      "byYou": "Utworzony przez ciebie",
+      "widgets_one": "{{count}} widżet",
+      "widgets_few": "{{count}} widżety",
+      "widgets_many": "{{count}} widżetów",
+      "widgets_other": "{{count}} widżetu",
+      "updated": "zaktualizowano {{when}}"
+    },
+    "share": {
+      "action": "Udostępnij",
+      "title": "Udostępnij „{{title}}”",
+      "access": "Kto ma dostęp",
+      "you": "{{name}} (ty)",
+      "owner": "Właściciel przestrzeni roboczej",
+      "edits": "Edytuje",
+      "sees": "Widzi",
+      "none": "Nie widzi",
+      "copyLink": "Kopiuj link",
+      "copied": "Skopiowano link",
+      "save": "Zapisz",
+      "nowWorkspace": "„{{title}}” należy teraz do przestrzeni roboczej",
+      "nowPrivate": "Tylko ty widzisz „{{title}}”",
+      "nowRoles": "„{{title}}” widzą teraz: {{roles}}"
+    },
+    "proposal": {
+      "title": "Dashboard przygotowany dla ciebie przez agenta {{name}}",
+      "workspace": "I proponuje opublikować go w całej przestrzeni roboczej. Dziś widzisz go tylko ty.",
+      "roles": "I proponuje pokazać go rolom: {{roles}}. Dziś widzisz go tylko ty.",
+      "keep": "Zostaw tylko dla mnie",
+      "publishWorkspace": "Opublikuj w przestrzeni roboczej",
+      "publishRoles": "Pokaż rolom: {{roles}}",
+      "published": "Opublikowano „{{title}}”",
+      "kept": "Tylko ty widzisz „{{title}}”"
+    },
+    "empty": {
+      "title": "Pusty dashboard",
+      "text": "Dodaj widżety: poproś agenta albo przypnij blok z czatu.",
+      "noneTitle": "Nie ma jeszcze dashboardów",
+      "none": "Liczby i wykresy, które agenci utrzymują w aktualności, dla ciebie albo dla zespołu."
+    },
+    "create": {
+      "title": "Nowy dashboard",
+      "subtitle": "Widżety razem na jednej stronie, dla ciebie albo dla zespołu.",
+      "name": "Nazwa",
+      "namePlaceholder": "Np.: Sprzedaż, Black Friday, Cele kwartalne",
+      "start": "Jak zacząć",
+      "blank": "Pusty",
+      "blankHint": "Sam dodajesz widżety",
+      "agent": "Poproś agenta",
+      "agentHint": "Agent tworzy widżety i rutyny",
+      "briefPlaceholder": "Np.: co muszę widzieć każdego ranka o sprzedaży",
+      "submit": "Utwórz dashboard",
+      "created": "Utworzono „{{title}}”",
+      "started": "{{name}} tworzy „{{title}}” w waszej rozmowie",
+      "openChat": "Otwórz rozmowę",
+      "brief": "Co {{name}} ma zbudować"
+    },
+    "newWidget": {
+      "title": "Nowy widżet",
+      "subtitle": "Liczba, wykres albo lista, które agent utrzymuje w aktualności.",
+      "tabAsk": "Poproś agenta",
+      "tabPin": "Przypnij z czatu",
+      "what": "Co chcesz śledzić?",
+      "whatPlaceholder": "Np.: dzisiejsza sprzedaż w porównaniu z wczorajszą",
+      "who": "Kto się nim zajmuje",
+      "reads": "{{role}} · czyta: {{sources}}",
+      "format": "Forma",
+      "autoHint": "{{name}} wybiera formę, która najlepiej pokazuje to, o co prosisz.",
+      "updates": "Aktualizacja",
+      "destination": "Dodaj do",
+      "create": "Utwórz widżet",
+      "pin": "Przypnij",
+      "fromChat": "Bloki, które agenci wysłali na czacie",
+      "pinHint": "Możesz też przypiąć prosto z wiadomości: „Przypnij” na bloku.",
+      "keepUpdated": "Utrzymuj aktualny",
+      "onlyPin": "Nie, tylko przypnij",
+      "emptyPreview": "Napisz, co chcesz śledzić, a {{name}} pokaże tutaj, jak to będzie wyglądać.",
+      "pickBlock": "Wybierz blok z czatu.",
+      "noBlocks": "W twoich rozmowach nie ma jeszcze wykresów.",
+      "suggestions": "Sugestie",
+      "theAgent": "Agent",
+      "noAgents": "Nie ma jeszcze agenta, z którym możesz rozmawiać.",
+      "place": {
+        "channel": "{{name}} w #{{channel}} · {{when}}",
+        "thread": "{{name}} w wątku w #{{channel}} · {{when}}",
+        "dm": "{{name}} w waszej rozmowie · {{when}}",
+        "unnamed": "{{name}} w rozmowie · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}} tworzy go teraz, na prawdziwych danych",
+        "reads": "Czyta: {{sources}}",
+        "routine": "Tworzy rutynę „{{title}}”",
+        "routineHint": "{{schedule}} · widoczna w Rutynach",
+        "noRoutine": "Bez rutyny: aktualizuje się na twoją prośbę",
+        "alert": "Alert w „Czeka na ciebie”, jeśli {{condition}}",
+        "alertHint": "W przeciwnym razie tylko aktualizuje widżet, bez wiadomości",
+        "noAlert": "Bez alertów",
+        "noAlertHint": "Tylko aktualizuje widżet, bez wiadomości",
+        "pinAsIs": "Przypina blok w takiej postaci, jak na czacie",
+        "redoes": "{{name}} odświeża go {{schedule}}",
+        "redoesHint": "Przez rutynę, bez wiadomości na czacie",
+        "noRedo": "Nie aktualizuje się sam",
+        "noRedoHint": "O aktualizację możesz poprosić w menu"
+      },
+      "created": "Dodano widżet: {{where}}"
+    },
+    "pinTop": "Przypnij na górze",
+    "unpin": "Odepnij",
+    "rename": "Zmień nazwę",
+    "about": "Opis",
+    "aboutPlaceholder": "Do czego służy ten dashboard",
+    "delete": {
+      "action": "Usuń dashboard",
+      "title": "Usunąć „{{title}}”?",
+      "text": "Jego widżety i ich rutyny też zostaną usunięte.",
+      "confirm": "Usuń",
+      "done": "Usunięto „{{title}}”"
+    },
+    "errors": {
+      "notFound": "Ten dashboard nie istnieje albo go nie widzisz.",
+      "forbidden": "Może to zrobić tylko ktoś, kto edytuje ten dashboard.",
+      "homeFixed": "Twojego Startu nie można udostępnić ani usunąć.",
+      "rolesRequired": "Wybierz co najmniej jedną rolę.",
+      "roleUnknown": "Jednej z tych ról nie ma już w przestrzeni roboczej.",
+      "titleRequired": "Nadaj dashboardowi nazwę.",
+      "tooMany": "Przestrzeń robocza ma już tyle dashboardów, ile może. Najpierw usuń jeden.",
+      "publishForbidden": "Twoje role nie pozwalają pokazywać dashboardów innym.",
+      "proposalNone": "W tej sprawie już zdecydowano.",
+      "proposalNotYours": "Decyduje tylko osoba, którą zapytał agent.",
+      "widgetNotFound": "Tego widżetu już nie ma.",
+      "widgetTooMany": "Ten dashboard jest pełny. Usuń widżet albo użyj innego dashboardu.",
+      "scheduledCap": "Przestrzeń robocza utrzymuje już {{max}} widżetów aktualizowanych według harmonogramu. Ustaw jeden tak, by aktualizował się tylko na prośbę, albo jeden usuń.",
+      "agentUnreachable": "Nie możesz rozmawiać z tym agentem.",
+      "agentArchived": "Ten agent został zarchiwizowany.",
+      "blockNotFound": "Tego wykresu nie ma już w wiadomości.",
+      "notAgentMessage": "Przypiąć można tylko wykres agenta.",
+      "promptRequired": "Napisz, co ma pokazywać widżet."
     }
   }
 }

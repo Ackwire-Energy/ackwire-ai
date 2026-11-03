@@ -2633,6 +2633,7 @@
     },
     "working": {
       "title": "Al lavoro ora",
+      "none": "Nessun agente sta lavorando adesso.",
       "dm": "Nella tua conversazione",
       "in": "#{{channel}}",
       "mission": "Missione · {{done}} di {{total}}"
@@ -2839,7 +2840,8 @@
       "browser": "Browser",
       "members": "Membri",
       "usage": "Utilizzo",
-      "connectors": "Connettori"
+      "connectors": "Connettori",
+      "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} reazione",
     "reactions_many": "{{count}} reazioni",
@@ -5116,13 +5118,18 @@
     "subtitle": "Ciò che gli agenti fanno da soli, a orari stabiliti o quando succede qualcosa.",
     "new": "Nuova routine",
     "deliversTo": "{{agent}} · consegna in {{target}}",
+    "widgetLine": "{{agent}} · aggiorna il suo widget, senza messaggi",
+    "widgetChip": "Widget della dashboard",
+    "widgetFixed": "Cosa mostra, quando si aggiorna e chi se ne occupa si cambiano dal suo widget.",
     "target": {
       "forum": "Un argomento del forum",
       "forumShort": "Forum",
       "dm": "Il mio messaggio diretto con l'agente",
       "artifact": "Un documento nel Drive",
       "dmShort": "Messaggio diretto",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "Un widget della dashboard",
+      "widgetNamed": "Il widget “{{title}}”"
     },
     "active": "Attiva",
     "activeLabel": "Attiva: {{name}}",
@@ -5219,7 +5226,8 @@
         "channel": "Lo vedono tutti nel canale",
         "dm": "Lo vedi solo tu",
         "forum": "Gli agenti ne discutono in un argomento del forum",
-        "artifact": "Diventa un documento nel Drive"
+        "artifact": "Diventa un documento nel Drive",
+        "widget": "Aggiorna il suo widget, senza messaggi"
       },
       "ahead": "Preparate per dopo",
       "ownActions": "Fa da sola",
@@ -13548,6 +13556,354 @@
         "done": "Concluse oggi"
       },
       "none": "{{name}} ora è disponibile."
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "Automatico",
+      "kpi": "Numero",
+      "goal": "Obiettivo",
+      "bars": "Barre",
+      "line": "Linea",
+      "list": "Elenco",
+      "text": "Riepilogo"
+    },
+    "schedules": {
+      "half": "Ogni 30 minuti",
+      "hour": "Ogni ora",
+      "day": "Ogni giorno alle 8:00",
+      "week": "Ogni lunedì alle 8:00",
+      "manual": "Solo quando lo chiedi"
+    },
+    "schedulesShort": {
+      "half": "30 minuti",
+      "hour": "Ogni ora",
+      "day": "Ogni giorno · 8:00",
+      "week": "Ogni lunedì",
+      "manual": "Su richiesta"
+    },
+    "schedulesInline": {
+      "half": "ogni 30 minuti",
+      "hour": "ogni ora",
+      "day": "ogni giorno alle 8:00",
+      "week": "ogni lunedì alle 8:00",
+      "manual": "su richiesta"
+    },
+    "sizes": {
+      "label": "Dimensione",
+      "s": "P",
+      "m": "M",
+      "l": "G"
+    },
+    "status": {
+      "building": "{{name}} sta creando il widget e la routine che lo aggiornerà…",
+      "updating": "{{name}} sta aggiornando…",
+      "failed": "Non aggiornato"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "Risolvi",
+      "agent_reported": "{{detail}}",
+      "no_update": "L'ultimo aggiornamento è finito senza dati.",
+      "error": "L'ultimo aggiornamento non è riuscito.",
+      "budget_exceeded": "{{name}} ha raggiunto il budget del mese.",
+      "waiting_computer": "Il computer di {{name}} non è disponibile.",
+      "waiting_plan": "Il piano di {{name}} è al limite.",
+      "waiting_budget": "Il budget di {{name}} è al limite.",
+      "creator_left": "Chi l'ha configurato ha lasciato lo spazio di lavoro.",
+      "creator_no_access": "Chi l'ha configurato non può più usarlo.",
+      "agent_archived": "{{name}} è stato archiviato.",
+      "audience": "Chi l'ha configurato non può più parlare con {{name}}.",
+      "failing": "Non è riuscito più volte di fila e si è fermato.",
+      "stopped": "L'aggiornamento è stato fermato.",
+      "missing_credential": "{{name}} non ha una chiave o un piano di IA con cui lavorare.",
+      "timeout": "L'aggiornamento ha richiesto troppo tempo.",
+      "invalid_data": "{{name}} non è riuscito a mettere i dati in questo formato."
+    },
+    "menu": {
+      "label": "Altro",
+      "open": "Apri",
+      "refresh": "Aggiorna ora",
+      "change": "Chiedi una modifica a {{name}}",
+      "schedule": "Cambia quando si aggiorna",
+      "removeHome": "Rimuovi dalla Home",
+      "removeBoard": "Rimuovi dalla dashboard"
+    },
+    "organize": {
+      "start": "Organizza",
+      "done": "Fatto",
+      "size": "Dimensione",
+      "remove": "Rimuovi",
+      "drag": "Trascina per spostare",
+      "fixed": "Fisso"
+    },
+    "add": {
+      "tile": "Widget",
+      "label": "Aggiungi widget"
+    },
+    "alert": {
+      "label": "Avvisami quando qualcosa non va",
+      "hint": "L'avviso arriva in “Ti aspetta”, con quello che è cambiato.",
+      "condition": "Avvisa se",
+      "placeholder": "qualcosa non va",
+      "line": "Avvisa se {{condition}}",
+      "lineAny": "Avvisa quando qualcosa non va",
+      "where": "In “Ti aspetta”",
+      "none": "Nessun avviso"
+    },
+    "cost": {
+      "day": "≈ {{amount}} al giorno dal budget di {{name}}",
+      "week": "≈ {{amount}} a settimana dal budget di {{name}}",
+      "manual": "Spende solo quando chiedi un aggiornamento",
+      "plan": "Usa il piano di {{name}}",
+      "unknown": "Ogni aggiornamento usa il budget di {{name}}"
+    },
+    "exposure": "Chi vede la dashboard vede quello che hanno portato gli agenti, anche senza accesso agli account da cui viene. Anche gli agenti creano dashboard. Per mostrarne una a più persone di chi l'ha chiesta, prima chiedono, in “Ti aspetta”.",
+    "panel": {
+      "caresFor": "{{name}} si occupa di questo widget",
+      "caresForOn": "{{name}} si occupa di questo widget · {{board}}",
+      "how": "Come si aggiorna",
+      "next": "Routine di {{name}} · prossima {{when}}",
+      "noRoutine": "Non si aggiorna da solo",
+      "askAnytime": "Puoi chiedere un aggiornamento dal menu",
+      "editRoutine": "Modifica routine",
+      "changeAlert": "Cambia",
+      "reads": "Cosa legge {{name}} per crearlo",
+      "history": "Ultimi aggiornamenti",
+      "noHistory": "Ancora nessun aggiornamento.",
+      "alerted": "ha avvisato: {{text}}",
+      "changed": "Modificato: {{text}}",
+      "ask": "Chiedi una modifica",
+      "askPlaceholder": "Es.: dividilo per canale, o confrontalo con la stessa settimana dell'anno scorso",
+      "askTo": "a {{name}}",
+      "send": "Invia",
+      "sent": "{{name}} sta rifacendo il widget.",
+      "updated": "Aggiornato"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b> ha segnalato “{{title}}”",
+      "failed": "“{{title}}” non si aggiorna più",
+      "proposal": "<b>{{name}}</b> vuole pubblicare una dashboard",
+      "proposalWorkspace": "“{{title}}” per tutto lo spazio di lavoro · oggi la vedi solo tu",
+      "proposalRoles": "“{{title}}” per {{roles}} · oggi la vedi solo tu",
+      "openBoard": "Vedi dashboard",
+      "openWidget": "Apri widget",
+      "resolving": "Di nuovo in aggiornamento: “{{title}}”"
+    },
+    "example": {
+      "days": {
+        "d1": "mer",
+        "d2": "gio",
+        "d3": "ven",
+        "d4": "sab",
+        "d5": "dom",
+        "d6": "lun",
+        "d7": "mar"
+      },
+      "vsYesterday": "rispetto a ieri",
+      "goalLine": "48 su 100",
+      "goalNote": "A questo ritmo, si raggiunge il 29.",
+      "lineNote": "40 ieri · +48% questa settimana",
+      "row1": "Primo elemento",
+      "row2": "Secondo elemento",
+      "row3": "Terzo elemento",
+      "meta1": "ora",
+      "meta2": "1 h fa",
+      "meta3": "ieri",
+      "item1": "Un breve riepilogo di cosa è cambiato.",
+      "item2": "L'agente lo riscrive a ogni aggiornamento."
+    },
+    "preview": {
+      "label": "Anteprima",
+      "example": "dati di esempio"
+    },
+    "pin": {
+      "action": "Fissa",
+      "label": "Fissa su una dashboard",
+      "done": "Fissato su {{where}}",
+      "doneUpdating": "Fissato su {{where}} · {{name}} lo rifà {{schedule}}",
+      "subtitle": "Mantiene i dati del grafico. Il suo agente può anche tenerlo aggiornato.",
+      "open": "Apri"
+    },
+    "home": "La mia Home",
+    "updatedAgo": "aggiornato {{when}}",
+    "removed": {
+      "home": "“{{title}}” è uscito dalla Home e la routine di {{name}} si è fermata",
+      "board": "“{{title}}” è uscito dalla dashboard e la routine di {{name}} si è fermata"
+    }
+  },
+  "dashboards": {
+    "title": "Dashboard",
+    "subtitle": "Numeri e grafici che gli agenti tengono aggiornati, per lo spazio di lavoro o solo per alcuni ruoli.",
+    "sidebar": "Dashboard",
+    "new": "Nuova dashboard",
+    "back": "Dashboard",
+    "home": "La mia Home",
+    "groups": {
+      "workspace": "Spazio di lavoro",
+      "workspaceHint": "la vedono tutti",
+      "roles": "I tuoi ruoli",
+      "rolesHint": "sei in {{roles}}",
+      "mine": "Solo tue",
+      "mineHint": "non le vede nessun altro"
+    },
+    "audience": {
+      "label": "Chi la vede",
+      "workspace": "Tutto lo spazio di lavoro",
+      "workspaceHint_one": "{{count}} membro la vede e la trova in Dashboard",
+      "workspaceHint_many": "Tutti i {{count}} membri la vedono e la trovano in Dashboard",
+      "workspaceHint_other": "Tutti i {{count}} membri la vedono e la trovano in Dashboard",
+      "roles": "Ruoli",
+      "rolesHint": "Solo le persone con uno dei ruoli scelti",
+      "private": "Solo tu",
+      "privateHint": "Nessun altro la vede finché non la condividi",
+      "noRoles": "Lo spazio di lavoro non ha ancora ruoli.",
+      "people_one": "{{count}} persona",
+      "people_many": "{{count}} persone",
+      "people_other": "{{count}} persone"
+    },
+    "edit": {
+      "label": "Chi la modifica",
+      "viewers": "Chi la vede",
+      "owner": "Solo tu e gli admin"
+    },
+    "meta": {
+      "by": "Creata da {{name}}",
+      "byYou": "Creata da te",
+      "widgets_one": "{{count}} widget",
+      "widgets_many": "{{count}} widget",
+      "widgets_other": "{{count}} widget",
+      "updated": "aggiornata {{when}}"
+    },
+    "share": {
+      "action": "Condividi",
+      "title": "Condividi “{{title}}”",
+      "access": "Chi ha accesso",
+      "you": "{{name}} (tu)",
+      "owner": "Proprietario dello spazio di lavoro",
+      "edits": "Modifica",
+      "sees": "Vede",
+      "none": "Non vede",
+      "copyLink": "Copia link",
+      "copied": "Link copiato",
+      "save": "Salva",
+      "nowWorkspace": "“{{title}}” ora è dello spazio di lavoro",
+      "nowPrivate": "Solo tu vedi “{{title}}”",
+      "nowRoles": "{{roles}} vedono “{{title}}”"
+    },
+    "proposal": {
+      "title": "{{name}} ha creato questa dashboard per te",
+      "workspace": "E propone di pubblicarla per tutto lo spazio di lavoro. Oggi la vedi solo tu.",
+      "roles": "E propone di mostrarla a {{roles}}. Oggi la vedi solo tu.",
+      "keep": "Tienila solo per me",
+      "publishWorkspace": "Pubblica nello spazio di lavoro",
+      "publishRoles": "Mostra a {{roles}}",
+      "published": "“{{title}}” è pubblicata",
+      "kept": "Solo tu vedi “{{title}}”"
+    },
+    "empty": {
+      "title": "Dashboard vuota",
+      "text": "Aggiungi widget: chiedi a un agente o fissa un blocco dalla chat.",
+      "noneTitle": "Ancora nessuna dashboard",
+      "none": "Numeri e grafici che gli agenti tengono aggiornati, per te o per il team."
+    },
+    "create": {
+      "title": "Nuova dashboard",
+      "subtitle": "Widget riuniti in una pagina, per te o per il team.",
+      "name": "Nome",
+      "namePlaceholder": "Es.: Vendite, Black Friday, Obiettivi del trimestre",
+      "start": "Come iniziare",
+      "blank": "Vuota",
+      "blankHint": "Aggiungi tu i widget",
+      "agent": "Chiedi a un agente",
+      "agentHint": "Crea i widget e le routine",
+      "briefPlaceholder": "Es.: cosa mi serve vedere ogni mattina sulle vendite",
+      "submit": "Crea dashboard",
+      "created": "“{{title}}” creata",
+      "started": "{{name}} sta creando “{{title}}” nella vostra conversazione",
+      "openChat": "Apri la conversazione",
+      "brief": "Cosa deve creare {{name}}"
+    },
+    "newWidget": {
+      "title": "Nuovo widget",
+      "subtitle": "Un numero, un grafico o un elenco che un agente tiene aggiornato.",
+      "tabAsk": "Chiedi a un agente",
+      "tabPin": "Fissa dalla chat",
+      "what": "Cosa vuoi seguire?",
+      "whatPlaceholder": "Es.: le vendite di oggi rispetto a ieri",
+      "who": "Chi se ne occupa",
+      "reads": "{{role}} · legge {{sources}}",
+      "format": "Formato",
+      "autoHint": "{{name}} sceglie il formato che mostra meglio quello che hai chiesto.",
+      "updates": "Aggiornamento",
+      "destination": "Aggiungi a",
+      "create": "Crea widget",
+      "pin": "Fissa",
+      "fromChat": "Blocchi che gli agenti hanno inviato in chat",
+      "pinHint": "Puoi anche fissarlo direttamente dal messaggio: “Fissa” sul blocco.",
+      "keepUpdated": "Tienilo aggiornato",
+      "onlyPin": "No, fissalo e basta",
+      "emptyPreview": "Di' cosa vuoi seguire e {{name}} ti mostra qui come sarà.",
+      "pickBlock": "Scegli un blocco dalla chat.",
+      "noBlocks": "Ancora nessun grafico nelle tue conversazioni.",
+      "suggestions": "Suggerimenti",
+      "theAgent": "L'agente",
+      "noAgents": "Ancora nessun agente con cui puoi parlare.",
+      "place": {
+        "channel": "{{name}} in #{{channel}} · {{when}}",
+        "thread": "{{name}} in un thread di #{{channel}} · {{when}}",
+        "dm": "{{name}} nella vostra conversazione · {{when}}",
+        "unnamed": "{{name}} in una conversazione · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}} lo crea adesso, con dati reali",
+        "reads": "Legge {{sources}}",
+        "routine": "Crea la routine “{{title}}”",
+        "routineHint": "{{schedule}} · compare in Routine",
+        "noRoutine": "Nessuna routine: si aggiorna quando lo chiedi",
+        "alert": "Avvisa in “Ti aspetta” se {{condition}}",
+        "alertHint": "Altrimenti aggiorna solo il widget, senza messaggi",
+        "noAlert": "Nessun avviso",
+        "noAlertHint": "Aggiorna solo il widget, senza messaggi",
+        "pinAsIs": "Fissa il blocco così com'è in chat",
+        "redoes": "{{name}} lo rifà {{schedule}}",
+        "redoesHint": "Con una routine, senza messaggi in chat",
+        "noRedo": "Non si aggiorna da solo",
+        "noRedoHint": "Puoi chiedere un aggiornamento dal menu"
+      },
+      "created": "Widget aggiunto a {{where}}"
+    },
+    "pinTop": "Fissa in alto",
+    "unpin": "Rimuovi dai fissati",
+    "rename": "Rinomina",
+    "about": "Descrizione",
+    "aboutPlaceholder": "A cosa serve questa dashboard",
+    "delete": {
+      "action": "Elimina dashboard",
+      "title": "Eliminare “{{title}}”?",
+      "text": "Anche i suoi widget e le loro routine vengono eliminati.",
+      "confirm": "Elimina",
+      "done": "“{{title}}” eliminata"
+    },
+    "errors": {
+      "notFound": "Questa dashboard non esiste, o non puoi vederla.",
+      "forbidden": "Solo chi modifica questa dashboard può farlo.",
+      "homeFixed": "La tua Home non si condivide né si elimina.",
+      "rolesRequired": "Scegli almeno un ruolo.",
+      "roleUnknown": "Uno di questi ruoli non c'è più nello spazio di lavoro.",
+      "titleRequired": "Dai un nome alla dashboard.",
+      "tooMany": "Lo spazio di lavoro ha già tutte le dashboard che può avere. Prima eliminane una.",
+      "publishForbidden": "I tuoi ruoli non ti permettono di mostrare dashboard ad altri.",
+      "proposalNone": "Su questa richiesta si è già deciso.",
+      "proposalNotYours": "Decide solo la persona a cui l'agente l'ha chiesto.",
+      "widgetNotFound": "Questo widget non c'è più.",
+      "widgetTooMany": "Questa dashboard è piena. Rimuovi un widget o usa un'altra dashboard.",
+      "scheduledCap": "Lo spazio di lavoro tiene già {{max}} widget aggiornati a orari fissi. Impostane uno perché si aggiorni solo su richiesta, o rimuovine uno.",
+      "agentUnreachable": "Non puoi parlare con questo agente.",
+      "agentArchived": "Questo agente è stato archiviato.",
+      "blockNotFound": "Quel grafico non è più nel messaggio.",
+      "notAgentMessage": "Si può fissare solo il grafico di un agente.",
+      "promptRequired": "Di' cosa deve mostrare il widget."
     }
   }
 }

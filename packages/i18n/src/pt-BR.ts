@@ -2549,6 +2549,7 @@ export const ptBR = {
     waiting: { title: "Esperando você" },
     working: {
       title: "Trabalhando agora",
+      none: "Nenhum agente trabalhando agora.",
       dm: "Na conversa com você",
       in: "#{{channel}}",
       mission: "Missão · {{done}} de {{total}}",
@@ -2719,6 +2720,7 @@ export const ptBR = {
       members: "Membros",
       usage: "Uso",
       connectors: "Conectores",
+      dashboard: "Painel",
     },
     reactions_one: "{{count}} reação",
     reactions_other: "{{count}} reações",
@@ -4890,6 +4892,9 @@ export const ptBR = {
     subtitle: "O que os agentes fazem sozinhos, num horário ou quando algo acontece.",
     new: "Nova rotina",
     deliversTo: "{{agent}} · entrega em {{target}}",
+    widgetLine: "{{agent}} · atualiza o widget, sem mensagem",
+    widgetChip: "Widget de painel",
+    widgetFixed: "O que mostra, quando atualiza e quem cuida mudam pelo widget.",
     target: {
       forum: "Um tópico no fórum",
       forumShort: "Fórum",
@@ -4897,6 +4902,8 @@ export const ptBR = {
       artifact: "Um documento no Drive",
       dmShort: "DM",
       artifactShort: "Drive",
+      widget: "Um widget de painel",
+      widgetNamed: "O widget “{{title}}”",
     },
     active: "Ativa",
     activeLabel: "Ativa: {{name}}",
@@ -12803,6 +12810,9 @@ export const ptBR = {
       audience: "Quem criou não pode mais falar com {{name}}.",
       failing: "Falhou várias vezes seguidas e parou.",
       stopped: "A atualização foi parada.",
+      missing_credential: "{{name}} está sem chave ou plano de IA para trabalhar.",
+      timeout: "A atualização demorou demais.",
+      invalid_data: "{{name}} não conseguiu montar os dados neste formato.",
     },
     menu: {
       label: "Mais",
@@ -12813,7 +12823,14 @@ export const ptBR = {
       removeHome: "Tirar do Início",
       removeBoard: "Tirar do painel",
     },
-    organize: { start: "Organizar", done: "Pronto", size: "Tamanho", remove: "Tirar", drag: "Arraste para mover" },
+    organize: {
+      start: "Organizar",
+      done: "Pronto",
+      size: "Tamanho",
+      remove: "Tirar",
+      drag: "Arraste para mover",
+      fixed: "Fixo",
+    },
     add: { tile: "Widget", label: "Adicionar widget" },
     alert: {
       label: "Me avisar quando algo fugir do normal",
@@ -12833,7 +12850,7 @@ export const ptBR = {
       unknown: "Cada atualização usa o orçamento de {{name}}",
     },
     exposure:
-      "Quem vê o painel vê o que os agentes trouxeram, mesmo sem acesso às contas de onde veio. Agentes também criam painéis; para mostrar a mais gente do que quem pediu, eles pedem antes, em Esperando você.",
+      "Quem vê o painel vê o que os agentes trouxeram, mesmo sem acesso às contas de onde veio. Agentes também criam painéis. Para mostrar a mais gente do que quem pediu, eles pedem antes, em Esperando você.",
     panel: {
       caresFor: "{{name}} cuida deste widget",
       caresForOn: "{{name}} cuida deste widget · {{board}}",
@@ -12853,6 +12870,7 @@ export const ptBR = {
       askTo: "para {{name}}",
       send: "Enviar",
       sent: "{{name}} está refazendo o widget.",
+      updated: "Atualizado",
     },
     notice: {
       alert: "<b>{{name}}</b> avisou sobre “{{title}}”",
@@ -12862,6 +12880,7 @@ export const ptBR = {
       proposalRoles: "“{{title}}” para {{roles}} · hoje só você vê",
       openBoard: "Ver painel",
       openWidget: "Abrir widget",
+      resolving: "Atualizando “{{title}}” de novo",
     },
     example: {
       days: { d1: "qua", d2: "qui", d3: "sex", d4: "sáb", d5: "dom", d6: "seg", d7: "ter" },
@@ -12884,9 +12903,15 @@ export const ptBR = {
       label: "Fixar num painel",
       done: "Fixado em {{where}}",
       doneUpdating: "Fixado em {{where}} · {{name}} refaz {{schedule}}",
+      subtitle: "Guarda os dados do gráfico. O agente também pode mantê-lo atualizado.",
+      open: "Abrir",
     },
     home: "Meu Início",
     updatedAgo: "atualizado {{when}}",
+    removed: {
+      home: "“{{title}}” saiu do Início e a rotina de {{name}} parou",
+      board: "“{{title}}” saiu do painel e a rotina de {{name}} parou",
+    },
     // end of widgets
   },
   // Painéis (ADR 0134).
@@ -12913,7 +12938,8 @@ export const ptBR = {
       roles: "Papéis",
       rolesHint: "Só quem tem um dos papéis escolhidos",
       private: "Só você",
-      privateHint: "Ninguém mais vê; dá para abrir depois",
+      privateHint: "Ninguém mais vê até você compartilhar",
+      noRoles: "O workspace ainda não tem papéis.",
       people_one: "{{count}} pessoa",
       people_other: "{{count}} pessoas",
     },
@@ -12970,6 +12996,9 @@ export const ptBR = {
       briefPlaceholder: "Ex.: o que eu preciso ver toda manhã sobre vendas",
       submit: "Criar painel",
       created: "“{{title}}” criado",
+      started: "{{name}} está montando “{{title}}” na conversa com você",
+      openChat: "Abrir a conversa",
+      brief: "O que {{name}} deve montar",
     },
     newWidget: {
       title: "Novo widget",
@@ -12990,9 +13019,18 @@ export const ptBR = {
       pinHint: "Também dá para fixar direto da mensagem: “Fixar” no bloco.",
       keepUpdated: "Manter atualizado",
       onlyPin: "Não, só fixar",
-      emptyPreview: "Diga o que quer acompanhar; {{name}} mostra aqui como vai ficar.",
+      emptyPreview: "Diga o que quer acompanhar e {{name}} mostra aqui como vai ficar.",
       pickBlock: "Escolha um bloco do chat.",
       noBlocks: "Nenhum gráfico nas suas conversas ainda.",
+      suggestions: "Sugestões",
+      theAgent: "O agente",
+      noAgents: "Nenhum agente com quem você possa falar ainda.",
+      place: {
+        channel: "{{name}} em #{{channel}} · {{when}}",
+        thread: "{{name}} numa thread em #{{channel}} · {{when}}",
+        dm: "{{name}} na conversa com você · {{when}}",
+        unnamed: "{{name}} numa conversa · {{when}}",
+      },
       steps: {
         builds: "{{name}} monta agora, com os dados de verdade",
         reads: "Lê {{sources}}",

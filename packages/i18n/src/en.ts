@@ -2507,6 +2507,7 @@ export const en = {
     waiting: { title: "Waiting on you" },
     working: {
       title: "Working now",
+      none: "No agent is working right now.",
       dm: "In your conversation",
       in: "#{{channel}}",
       mission: "Mission · {{done}} of {{total}}",
@@ -2676,6 +2677,7 @@ export const en = {
       members: "Members",
       usage: "Usage",
       connectors: "Connectors",
+      dashboard: "Dashboard",
     },
     reactions_one: "{{count}} reaction",
     reactions_other: "{{count}} reactions",
@@ -4761,6 +4763,10 @@ export const en = {
     subtitle: "What the agents do on their own, on a schedule or when something happens.",
     new: "New routine",
     deliversTo: "{{agent}} · delivers to {{target}}",
+    /** A widget's routine (ADR 0134) in the list: it redoes its widget and posts nothing. */
+    widgetLine: "{{agent}} · updates its widget, with no message",
+    widgetChip: "Dashboard widget",
+    widgetFixed: "What it shows, when it updates and who looks after it change from its widget.",
     target: {
       forum: "A forum topic",
       forumShort: "Forum",
@@ -4768,6 +4774,8 @@ export const en = {
       artifact: "A document in Drive",
       dmShort: "DM",
       artifactShort: "Drive",
+      widget: "A dashboard widget",
+      widgetNamed: "The widget “{{title}}”",
     },
     active: "Active",
     activeLabel: "Active: {{name}}",
@@ -12459,6 +12467,9 @@ export const en = {
       audience: "Whoever set it up can no longer talk to {{name}}.",
       failing: "It failed several times in a row and stopped.",
       stopped: "The update was stopped.",
+      missing_credential: "{{name}} has no AI key or plan to work with.",
+      timeout: "The update took too long.",
+      invalid_data: "{{name}} couldn't put the data in this format.",
     },
     menu: {
       label: "More",
@@ -12469,7 +12480,14 @@ export const en = {
       removeHome: "Remove from Home",
       removeBoard: "Remove from dashboard",
     },
-    organize: { start: "Organize", done: "Done", size: "Size", remove: "Remove", drag: "Drag to move" },
+    organize: {
+      start: "Organize",
+      done: "Done",
+      size: "Size",
+      remove: "Remove",
+      drag: "Drag to move",
+      fixed: "Fixed",
+    },
     add: { tile: "Widget", label: "Add widget" },
     alert: {
       label: "Tell me when something is off",
@@ -12489,7 +12507,7 @@ export const en = {
       unknown: "Each update uses {{name}}'s budget",
     },
     exposure:
-      "Whoever sees the dashboard sees what the agents brought, even without access to the accounts it came from. Agents create dashboards too; to show one to more people than whoever asked, they ask first, in Waiting on you.",
+      "Whoever sees the dashboard sees what the agents brought, even without access to the accounts it came from. Agents create dashboards too. To show one to more people than whoever asked, they ask first, in Waiting on you.",
     panel: {
       caresFor: "{{name}} looks after this widget",
       caresForOn: "{{name}} looks after this widget · {{board}}",
@@ -12509,6 +12527,7 @@ export const en = {
       askTo: "to {{name}}",
       send: "Send",
       sent: "{{name}} is redoing the widget.",
+      updated: "Updated",
     },
     notice: {
       alert: "<b>{{name}}</b> flagged “{{title}}”",
@@ -12518,6 +12537,7 @@ export const en = {
       proposalRoles: "“{{title}}” for {{roles}} · only you see it today",
       openBoard: "View dashboard",
       openWidget: "Open widget",
+      resolving: "Updating “{{title}}” again",
     },
     example: {
       days: { d1: "Wed", d2: "Thu", d3: "Fri", d4: "Sat", d5: "Sun", d6: "Mon", d7: "Tue" },
@@ -12540,9 +12560,15 @@ export const en = {
       label: "Pin to a dashboard",
       done: "Pinned to {{where}}",
       doneUpdating: "Pinned to {{where}} · {{name}} redoes it {{schedule}}",
+      subtitle: "It keeps the chart's data. Its agent can also keep it up to date.",
+      open: "Open",
     },
     home: "My Home",
     updatedAgo: "updated {{when}}",
+    removed: {
+      home: "“{{title}}” left Home and {{name}}'s routine stopped",
+      board: "“{{title}}” left the dashboard and {{name}}'s routine stopped",
+    },
     // end of widgets
   },
   // Dashboards (ADR 0134): the boards' page, a board, its dialogs. The web and the phone add their own keys here.
@@ -12569,7 +12595,8 @@ export const en = {
       roles: "Roles",
       rolesHint: "Only people with one of the chosen roles",
       private: "Only you",
-      privateHint: "Nobody else sees it; you can open it later",
+      privateHint: "Nobody else sees it until you share it",
+      noRoles: "The workspace has no roles yet.",
       people_one: "{{count}} person",
       people_other: "{{count}} people",
     },
@@ -12626,6 +12653,10 @@ export const en = {
       briefPlaceholder: "E.g.: what I need to see every morning about sales",
       submit: "Create dashboard",
       created: "“{{title}}” created",
+      /** "Ask an agent": the brief went to the agent's DM, where it builds the widgets. */
+      started: "{{name}} is building “{{title}}” in your conversation",
+      openChat: "Open the conversation",
+      brief: "What {{name}} should build",
     },
     newWidget: {
       title: "New widget",
@@ -12646,9 +12677,19 @@ export const en = {
       pinHint: "You can also pin straight from the message: “Pin” on the block.",
       keepUpdated: "Keep it updated",
       onlyPin: "No, just pin",
-      emptyPreview: "Say what you want to follow; {{name}} shows here how it will look.",
+      emptyPreview: "Say what you want to follow and {{name}} shows here how it will look.",
       pickBlock: "Pick a block from the chat.",
       noBlocks: "No charts in your conversations yet.",
+      suggestions: "Suggestions",
+      theAgent: "The agent",
+      noAgents: "No agent you can talk to yet.",
+      /** Where an agent sent a chart that can be pinned, and when ("Nina in #support · yesterday"). */
+      place: {
+        channel: "{{name}} in #{{channel}} · {{when}}",
+        thread: "{{name}} in a thread in #{{channel}} · {{when}}",
+        dm: "{{name}} in your conversation · {{when}}",
+        unnamed: "{{name}} in a conversation · {{when}}",
+      },
       steps: {
         builds: "{{name}} builds it now, with real data",
         reads: "Reads {{sources}}",
