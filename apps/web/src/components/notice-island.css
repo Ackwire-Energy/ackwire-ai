@@ -68,8 +68,9 @@
   white-space: nowrap;
   border-radius: inherit;
 }
-.ni__pill:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--ink);
+html:not([data-pointer]) .ni__pill:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .ni__pill > *:not(.ni__line) {
   animation: ni-fade 0.3s 0.18s both;
@@ -231,9 +232,12 @@
   background: rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
-.ni__choice:hover,
-.ni__choice:focus-visible {
+.ni__choice:hover {
   box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+html:not([data-pointer]) .ni__choice:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .ni__choice:disabled {
   opacity: 0.5;
