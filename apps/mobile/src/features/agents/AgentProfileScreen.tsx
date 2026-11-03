@@ -277,14 +277,6 @@ function Profile({ id }: { id: string }) {
               {ownerLine}
             </Text>
           ) : null}
-          {agent?.coordinator ? (
-            <View style={styles.coordinates}>
-              <Icon name="flag" size={14} color={c.muted} />
-              <Text variant="small" tone="muted">
-                {t("coordinator.chip")}
-              </Text>
-            </View>
-          ) : null}
           {status ? (
             <Text variant="small" tone="muted" style={styles.center}>
               {status.line}
@@ -805,7 +797,6 @@ const styles = StyleSheet.create({
   foot: { paddingHorizontal: 4, marginTop: 8 },
   playbook: { paddingHorizontal: 4, marginTop: 16, fontWeight: "600" },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
-  coordinates: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   spend: { padding: 14, gap: 10 },
   spendHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   warn: { flexDirection: "row", alignItems: "center", gap: 6 },

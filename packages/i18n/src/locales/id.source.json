@@ -3592,9 +3592,6 @@
   "channel.autoReplyChip": {
     "value": "answers without a mention"
   },
-  "channel.coordinatorChip": {
-    "value": "coordinates the team"
-  },
   "channel.more": {
     "value": "More message actions"
   },
@@ -4024,36 +4021,224 @@
   "receipts.by.follow_up": {
     "value": "Follows the talk with {{name}}"
   },
-  "receipts.by.coordinator": {
-    "value": "{{name}} coordinates the team"
-  },
   "receipts.by.default": {
     "value": "Nobody was called, so {{name}} answered"
   },
-  "coordinator.chip": {
-    "value": "Coordinates the team"
+  "rightHand.label": {
+    "value": "your right hand"
   },
-  "coordinator.help": {
-    "value": "Takes the messages that need an agent when no other agent took them, and hands the work to whoever knows it. Works in channels where he answers on his own.",
-    "female": "Takes the messages that need an agent when no other agent took them, and hands the work to whoever knows it. Works in channels where she answers on her own."
+  "rightHand.newDot": {
+    "value": "New"
   },
-  "coordinator.one": {
-    "value": "One agent coordinates at a time."
+  "rightHand.callWith": {
+    "value": "call with @{{handle}}"
   },
-  "coordinator.current": {
-    "value": "{{name}} coordinates the team now."
+  "rightHand.role": {
+    "value": "Workspace assistant"
   },
-  "coordinator.none": {
-    "value": "Nobody coordinates the team now."
+  "rightHand.actsAsYou": {
+    "value": "acts with your permissions"
   },
-  "coordinator.archive": {
-    "value": "{{name}} coordinates the team. After this, nobody does until someone picks another agent."
+  "rightHand.composerHint": {
+    "value": "nothing changes without you"
   },
-  "coordinator.yes": {
-    "value": "Yes"
+  "rightHand.profile.how": {
+    "value": "How it works"
   },
-  "coordinator.no": {
-    "value": "No"
+  "rightHand.profile.permissions": {
+    "value": "Acts with your permissions"
+  },
+  "rightHand.profile.private": {
+    "value": "Talks only with you in your DM"
+  },
+  "rightHand.profile.channels": {
+    "value": "Replies in channels when called"
+  },
+  "rightHand.profile.model": {
+    "value": "Model"
+  },
+  "rightHand.profile.message": {
+    "value": "Message"
+  },
+  "rightHand.profile.configure": {
+    "value": "Configure"
+  },
+  "rightHand.settings.name": {
+    "value": "Name and look"
+  },
+  "rightHand.settings.nameHelp": {
+    "value": "In the sidebar it always shows as “{{label}}”."
+  },
+  "rightHand.settings.changeLook": {
+    "value": "Change look"
+  },
+  "rightHand.settings.ai": {
+    "value": "AI and model"
+  },
+  "rightHand.settings.aiHelp": {
+    "value": "Automatic picks the cheapest model that does the job."
+  },
+  "rightHand.settings.budget": {
+    "value": "Monthly budget"
+  },
+  "rightHand.settings.perMonth": {
+    "value": "/month"
+  },
+  "rightHand.settings.budgetHelp": {
+    "value": "When it reaches the limit, it stops and tells you, like any agent."
+  },
+  "rightHand.settings.audience": {
+    "value": "Who can use it"
+  },
+  "rightHand.settings.audienceHelp": {
+    "value": "Outside it, a person doesn't see {{name}} in the sidebar."
+  },
+  "rightHand.settings.lock": {
+    "value": "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it."
+  },
+  "rightHand.settings.audit": {
+    "value": "See what {{name}} did"
+  },
+  "rightHand.card.settings": {
+    "value": "{{name}} · Settings"
+  },
+  "rightHand.card.apply": {
+    "value": "Apply"
+  },
+  "rightHand.card.dismiss": {
+    "value": "Dismiss"
+  },
+  "rightHand.card.decline": {
+    "value": "Decline"
+  },
+  "rightHand.card.askAdmin": {
+    "value": "Ask an admin"
+  },
+  "rightHand.card.sentTo": {
+    "value": "Sent to {{names}} · {{when}}"
+  },
+  "rightHand.card.sentToAny": {
+    "value": "Sent to whoever decides · {{when}}"
+  },
+  "rightHand.card.appliedBy": {
+    "value": "Applied by {{name}}"
+  },
+  "rightHand.card.appliedByYou": {
+    "value": "Applied by you"
+  },
+  "rightHand.card.declinedBy": {
+    "value": "Declined by {{name}}"
+  },
+  "rightHand.card.declinedByYou": {
+    "value": "Declined by you"
+  },
+  "rightHand.card.undo": {
+    "value": "Undo"
+  },
+  "rightHand.card.undone": {
+    "value": "Undone"
+  },
+  "rightHand.card.stale": {
+    "value": "Out of date"
+  },
+  "rightHand.card.staleHelp": {
+    "value": "{{name}} changed since this card. Nothing was applied."
+  },
+  "rightHand.card.redo": {
+    "value": "Redo"
+  },
+  "rightHand.card.redoMessage": {
+    "value": "Redo the card for {{name}} with today's values"
+  },
+  "rightHand.card.createTest": {
+    "value": "Create and try it"
+  },
+  "rightHand.card.editFirst": {
+    "value": "Edit first"
+  },
+  "rightHand.card.superseded": {
+    "value": "Replaced by the newer proposal"
+  },
+  "rightHand.card.onlyCreators": {
+    "value": "Only admins create agents"
+  },
+  "rightHand.card.only.model": {
+    "value": "Only admins change an agent's model"
+  },
+  "rightHand.card.only.budget": {
+    "value": "Only admins change an agent's budget"
+  },
+  "rightHand.card.only.owner": {
+    "value": "Only admins change who owns an agent"
+  },
+  "rightHand.card.only.archive": {
+    "value": "Only admins archive an agent"
+  },
+  "rightHand.card.only.audience": {
+    "value": "Only admins and its owner change who talks to it"
+  },
+  "rightHand.card.only.channels": {
+    "value": "Only admins and its owner change its channels"
+  },
+  "rightHand.card.only.ai_account": {
+    "value": "Only the account's owner gives it"
+  },
+  "rightHand.card.only.many": {
+    "value": "Only admins make these changes"
+  },
+  "rightHand.field.model": {
+    "value": "Model"
+  },
+  "rightHand.field.ai_account": {
+    "value": "AI account"
+  },
+  "rightHand.field.budget": {
+    "value": "Monthly budget"
+  },
+  "rightHand.field.owner": {
+    "value": "Owner"
+  },
+  "rightHand.field.audience": {
+    "value": "Who can talk"
+  },
+  "rightHand.field.archive": {
+    "value": "Status"
+  },
+  "rightHand.field.channel": {
+    "value": "Channel"
+  },
+  "rightHand.value.none": {
+    "value": "None"
+  },
+  "rightHand.value.budgetDefault": {
+    "value": "Workspace default"
+  },
+  "rightHand.value.anAccount": {
+    "value": "An AI account"
+  },
+  "rightHand.value.everyone": {
+    "value": "Everyone"
+  },
+  "rightHand.value.ownerOnly": {
+    "value": "Only its owner"
+  },
+  "rightHand.value.somePeople": {
+    "value": "Some people"
+  },
+  "rightHand.value.active": {
+    "value": "Active"
+  },
+  "rightHand.value.archived": {
+    "value": "Archived"
+  },
+  "rightHand.value.notIn": {
+    "value": "Not in it"
+  },
+  "rightHand.value.withoutMention": {
+    "value": "Answers without a mention"
+  },
+  "rightHand.value.mentionOnly": {
+    "value": "Only when mentioned"
   },
   "routing.title": {
     "value": "Who picks the agents"
@@ -5292,9 +5477,6 @@
   "channelMembers.aloneLine": {
     "value": "Joins the conversation on his own",
     "female": "Joins the conversation on her own"
-  },
-  "channelMembers.coordinatorLine": {
-    "value": "Coordinates the team: takes what nobody took"
   },
   "channelMembers.mentionLine": {
     "value": "Waits for someone to write @{{handle}}"
@@ -6648,6 +6830,12 @@
   },
   "notifications.what.joinSuggestion": {
     "value": "<b>{{by}}</b> suggested <b>{{name}}</b>"
+  },
+  "notifications.what.changeRequest": {
+    "value": "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>"
+  },
+  "notifications.what.changeRequestAgent": {
+    "value": "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>"
   },
   "notifications.what.invitationAccepted": {
     "value": "<b>{{name}}</b> accepted your invitation and joined {{org}}"
@@ -8138,9 +8326,6 @@
   "agentPage.fields.handle": {
     "value": "Mentions"
   },
-  "agentPage.fields.coordinator": {
-    "value": "Coordinates the team"
-  },
   "agentPage.lines.added": {
     "value": {
       "one": "{{count}} new line",
@@ -9107,6 +9292,9 @@
   "proposals.targetRole": {
     "value": "{{name}}'s role"
   },
+  "proposals.targetSettings": {
+    "value": "{{name}}'s settings"
+  },
   "proposals.targetAccess": {
     "value": "{{name}}'s access"
   },
@@ -9241,6 +9429,9 @@
   },
   "proposals.titleAccess": {
     "value": "Change {{name}}'s access"
+  },
+  "proposals.titleSettings": {
+    "value": "Change {{name}}'s settings"
   },
   "proposals.titleSkill": {
     "value": "Fix the skill {{skill}}"
@@ -26638,6 +26829,9 @@
   "settings.section.general": {
     "value": "General"
   },
+  "settings.section.right_hand": {
+    "value": "Right hand"
+  },
   "settings.section.members": {
     "value": "Members and invitations"
   },
@@ -26691,6 +26885,9 @@
   },
   "settings.sectionText.general": {
     "value": "Name, time zone and what every agent knows about the workspace."
+  },
+  "settings.sectionText.right_hand": {
+    "value": "The assistant that builds the team with each person, in their DM and with their permissions."
   },
   "settings.sectionText.members": {
     "value": "Who is in the workspace, and invitations."
@@ -28631,6 +28828,9 @@
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"
+  },
+  "chat.body.settings_proposal": {
+    "value": "Proposed a change to {{names}}"
   },
   "chat.body.approval_request": {
     "value": "Approval request: {{title}}"

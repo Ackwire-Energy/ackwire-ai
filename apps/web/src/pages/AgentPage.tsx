@@ -22,8 +22,8 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agenteschat/client/lib/repos";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import {
-  type AgentAppearance,
   Button,
   colorKey,
   cx,
@@ -46,6 +46,7 @@ import { DEFAULT_KEY, keyOptions, NO_OWNER, usd } from "@/components/AgentFields
 import { DeleteAgentDialog } from "@/components/DeleteAgentDialog";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { RightHandSettingsSection } from "@/components/RightHandSettings";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
 import {
@@ -67,8 +68,8 @@ import {
   thisMonth,
   type Viewer,
 } from "@/lib/agent-edit";
-import { lookOf } from "@/lib/look";
-import { BLANK_LOOK, handleAfterRename, handleProblemText, readBudget, takenHandles } from "@/lib/new-agent";
+import { fullLook, lookOf } from "@/lib/look";
+import { handleAfterRename, handleProblemText, readBudget, takenHandles } from "@/lib/new-agent";
 import { useToast } from "@/lib/toast";
 import { AccessTab } from "./agent/AccessTab";
 import { ActivityTab } from "./agent/ActivityTab";
@@ -86,11 +87,6 @@ import { SettingsTab } from "./agent/SettingsTab";
 import { UsageTab } from "./agent/UsageTab";
 import { type WorkDialog, WorkDialogs } from "./agent/Work";
 
-const fullLook = (a: AgentAppearance | undefined): Look => ({
-  color: a?.color ?? BLANK_LOOK.color,
-  eyes: a?.eyes ?? BLANK_LOOK.eyes,
-  accessory: a?.accessory ?? BLANK_LOOK.accessory,
-});
 const sortIds = (ids: string[]) => [...ids].sort();
 
 export interface AgentPageProps {
@@ -125,7 +121,19 @@ export function AgentPage(props: AgentPageProps) {
       </div>
     );
   }
-  if (!seesDetails(agent)) return <AgentPublicCard agent={agent} onClose={props.onClose} />;
+  // The right hand (ADR 0134) has no tabs: its instructions are the product's. Admins get its short form here too.
+  if (isRightHand(agent) && can(org, "manage_agents")) {
+    return (
+      <div className="page page--full">
+        <header className="page__header">
+          <h1 className="page-title">{agent.name}</h1>
+          <p className="muted">{t("settings.sectionText.right_hand")}</p>
+        </header>
+        <RightHandSettingsSection />
+      </div>
+    );
+  }
+  if (!seesDetails(agent) || isRightHand(agent)) return <AgentPublicCard agent={agent} onClose={props.onClose} />;
   return <AgentProfile key={agent.id} agent={agent} {...props} />;
 }
 
@@ -192,7 +200,6 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       channels:
         d && visible.ready ? sortIds(d.channels.map((c) => c.id).filter((id) => visibleIds.has(id))) : undefined,
       group: groups.data ? (groupOf(groups.data, agent.id)?.id ?? NO_GROUP) : undefined,
-      coordinator: agent.coordinator === true,
     };
   }, [agent, admin, detail.data, settings.data, access.data, repos.data, library.data, visible, groups.data]);
 
@@ -218,7 +225,6 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     skills: edits.skills ?? saved.skills,
     channels: edits.channels ?? saved.channels,
     group: edits.group ?? saved.group,
-    coordinator: edits.coordinator ?? saved.coordinator,
   };
 
   /* ---------- What changed, said in words ---------- */
@@ -346,13 +352,6 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         };
       case "group":
         return { ...base, label: label("group"), was: groupText(saved.group), now: groupText(draft.group) };
-      case "coordinator":
-        return {
-          ...base,
-          label: label("coordinator"),
-          was: t(saved.coordinator ? "coordinator.yes" : "coordinator.no"),
-          now: t(draft.coordinator ? "coordinator.yes" : "coordinator.no"),
-        };
       default:
         // The computer and who thinks are saved by their own dialogs (the sentence under the name).
         return { ...base, label: label(field), was: "", now: "" };
@@ -440,15 +439,12 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       put("audience", "audience", audiencePatch(draft.audience));
     }
     if (fields.has("look")) put("look", "appearance", normalizeAppearance(draft.look));
-    if (fields.has("coordinator")) put("coordinator", "coordinator", draft.coordinator);
     if (patchFields.length > 0) {
       try {
         const next = await update.mutateAsync(patch);
-        // Show the saved values at once (the lists refetch behind); one agent coordinates at a time.
+        // Show the saved values at once (the lists refetch behind).
         qc.setQueryData<Agent[]>(keys.agents(org.id), (list) =>
-          list?.map((a) =>
-            a.id === agent.id ? { ...a, ...next } : next.coordinator ? { ...a, coordinator: false } : a,
-          ),
+          list?.map((a) => (a.id === agent.id ? { ...a, ...next } : a)),
         );
         if (patch.credentialId !== undefined || patch.monthlyBudgetUsd !== undefined) {
           qc.setQueryData<AgentDetail>(keys.agentDetail(org.id, agent.id), (old) =>
@@ -760,11 +756,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         open={archiving}
         onOpenChange={setArchiving}
         title={t("agentPage.archive.title", g)}
-        description={
-          agent.coordinator
-            ? t("common.joinSentences", { a: t("agentPage.archive.text", g), b: t("coordinator.archive", g) })
-            : t("agentPage.archive.text", g)
-        }
+        description={t("agentPage.archive.text", g)}
         closeLabel={t("common.close")}
         width={440}
       >

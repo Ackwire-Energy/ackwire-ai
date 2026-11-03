@@ -36,12 +36,11 @@ export function receiptIcon(view: ReceiptView, receipt: MessageReceipt | undefin
   return TICK_ICON[receiptTicks(receipt)];
 }
 
-/** A rule's line leads with what it follows: the reply, the one person with the agent, the talk, the coordinator. */
-const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> = {
+/** A rule's line leads with what it follows: the reply, the one person with the agent, the talk. */
+const RULE_ICON: Record<Exclude<Extract<DecidedBy, { step: "rule" }>["rule"], "coordinator">, IconName> = {
   reply: "reply",
   only_agent: "person",
   follow_up: "thread",
-  coordinator: "flag",
   default: "check",
 };
 

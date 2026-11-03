@@ -245,15 +245,14 @@ describe("the agents' receipt line under a person's message", () => {
     const pt = await translator("pt-BR");
     const reply = receiptView(routed({}, { decidedBy: { step: "rule", rule: "reply" } }).m1);
     expect(deciderOf(pt, reply, names)?.text).toBe("Uma resposta para a Ada");
-    // Nobody else took it, so the team's coordinator did (ADR 0093).
+    // A decision stored before the team's coordinator was retired (ADR 0134) reads as the default rule's line.
     const coordinated = receiptView(
       routed({}, { pickedBy: ["theo"], decidedBy: { step: "rule", rule: "coordinator" } }).m1,
     );
     expect(deciderOf(pt, coordinated, names)).toEqual({
-      mark: { rule: "coordinator" },
-      text: "O Theo coordena o time",
+      mark: { rule: "default" },
+      text: "Ninguém foi chamado, então o Theo respondeu",
     });
-    expect(deciderOf(en, coordinated, names)?.text).toBe("Theo coordinates the team");
   });
 
   test("no AI: the receipt's words and Connect, even when nobody was asked", () => {

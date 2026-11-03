@@ -36,8 +36,6 @@ interface Who {
   email: string;
   autoReply: boolean;
   setsReply: boolean;
-  /** It coordinates the team (ADR 0093). */
-  coordinator: boolean;
 }
 
 /** Refreshes who is in the channel after a change (the header's faces, the "@" picker, this list). */
@@ -57,9 +55,7 @@ const lineOf = (t: TFunction, w: Who, routing: AiRouting | undefined) =>
       ? t("channelMembers.mentionLine", { handle: w.handle })
       : !picksForMe(routing)
         ? t(replyAloneKey(routing), agentGrammar(w.name))
-        : w.coordinator
-          ? t("channelMembers.coordinatorLine")
-          : t("channelMembers.aloneLine", agentGrammar(w.name))
+        : t("channelMembers.aloneLine", agentGrammar(w.name))
     : w.email;
 
 /**
@@ -88,7 +84,6 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
     email: m.type === "agent" ? "" : (dir.memberById.get(m.id)?.email ?? ""),
     autoReply: Boolean(m.autoReply),
     setsReply: m.type === "agent" && setsAutoReply(channel, dir.agentById.get(m.id), meId, org),
-    coordinator: m.type === "agent" && dir.agentById.get(m.id)?.coordinator === true,
   }));
   const needle = q.trim().toLowerCase();
   const shown = all.filter((w) => !needle || `${w.name} ${w.handle} ${w.email}`.toLowerCase().includes(needle));

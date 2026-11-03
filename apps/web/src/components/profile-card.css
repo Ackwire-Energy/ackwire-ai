@@ -202,3 +202,22 @@ html:not([data-pointer]) .mcard__emoji:focus-visible {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* The right hand's "Como funciona" (ADR 0134): a fact a line, its icon muted. */
+.mcard__facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.mcard__facts .ac-icon {
+  color: var(--muted);
+}
+/* Two buttons sharing the card's width. */
+.profile-card__actions--split > .ac-btn {
+  flex: 1 1 0;
+}

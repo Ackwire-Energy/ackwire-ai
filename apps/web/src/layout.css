@@ -1091,6 +1091,31 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   color: var(--ink-muted);
 }
 /* A lock when not everyone can talk to the agent (the tooltip says who). */
+/* The right hand's row (ADR 0134) above the tools: its label never pushes the name out; the label gives way first. */
+.sidebar__pin-row .sidebar__item-label {
+  flex: 0 0 auto;
+  max-width: 60%;
+}
+.sidebar__pin-row .sidebar__item-meta {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+  text-align: right;
+}
+/* Its one-time "Novo": a small dot in the info tone before the word. */
+.sidebar__new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--ink2);
+}
+.sidebar__new-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--info);
+}
 .sidebar__item-meta--audience {
   display: inline-flex;
   align-items: center;
@@ -10617,15 +10642,6 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
-/* "Coordena o time", after the look and its same hairline. */
-.agp-coord {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
 /* Each part's name above its choices, all starting on the same left edge. */
 .agp-look__row {
   display: flex;
@@ -12398,5 +12414,51 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
 @media (max-width: 560px) {
   .tool-change__row {
     flex-wrap: wrap;
+  }
+}
+
+/* Configurações › Lodi (ADR 0134): the face, the name and "Mudar visual" on one line; the other controls as wide as a
+   picker; the audience under its head on the card's own padding. */
+.rh-set__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.rh-set__name .ac-input {
+  width: 200px;
+}
+.rh-set__model {
+  width: 280px;
+  max-width: 100%;
+}
+.rh-set__budget {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.rh-set__budget .ac-input-affix {
+  width: 140px;
+}
+.rh-set__audience {
+  margin-top: 16px;
+}
+.rh-set__face {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.rh-set__acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+@media (max-width: 640px) {
+  .rh-set__name {
+    flex-wrap: wrap;
+  }
+  .rh-set__name .ac-input,
+  .rh-set__model {
+    width: 100%;
   }
 }

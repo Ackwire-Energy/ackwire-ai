@@ -4493,9 +4493,7 @@ function ChannelDetails({
                     ? t("channelMembers.mentionLine", { handle: r.handle })
                     : !picksForMe(routing)
                       ? t(replyAloneKey(routing), agentGrammar(r.name))
-                      : dir.agentById.get(r.id)?.coordinator
-                        ? t("channelMembers.coordinatorLine")
-                        : t("channelMembers.aloneLine", agentGrammar(r.name))}
+                      : t("channelMembers.aloneLine", agentGrammar(r.name))}
                 </span>
               </span>
               {r.setsReply && (

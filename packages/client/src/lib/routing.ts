@@ -38,7 +38,7 @@ export function routingLineOf(status: AiStatus | undefined, modelLabel: (id: str
 
 /** Who picked the agents, as the receipt's last line: Jev's, the model's or the plan's mark, or the rule it followed. */
 export interface Decider {
-  mark: { logo: string } | { rule: Extract<DecidedBy, { step: "rule" }>["rule"] };
+  mark: { logo: string } | { rule: Exclude<Extract<DecidedBy, { step: "rule" }>["rule"], "coordinator"> };
   text: string;
 }
 
@@ -76,5 +76,6 @@ export function deciderOf(
         : t("receipts.by.planOf", { brand, person: names.person(by.ownerId) });
     return { mark: { logo: planMark(by.brand) }, text };
   }
-  return { mark: { rule: by.rule }, text: t(`receipts.by.${by.rule}`, agentGrammar(names.agent(first))) };
+  const rule = by.rule === "coordinator" ? "default" : by.rule;
+  return { mark: { rule }, text: t(`receipts.by.${rule}`, agentGrammar(names.agent(first))) };
 }

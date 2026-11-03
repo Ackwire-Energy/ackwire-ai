@@ -106,15 +106,18 @@ export function ProposalCard({ message: m }: { message: Message }) {
                       label={t("newAgent.create", { name: draft.name })}
                       disabled={busy}
                       onPress={() =>
-                        create.mutate(m.id, {
-                          onSuccess: ({ agent, ai }) => {
-                            asks?.settle(m.id);
-                            // Nothing to think with yet (the tapper's accounts decide, not the suggestion): it is
-                            // created all the same, and Connect opens for it here.
-                            if (ai === "none") openConnectAi({ agentId: agent.id });
+                        create.mutate(
+                          { messageId: m.id },
+                          {
+                            onSuccess: ({ agent, ai }) => {
+                              asks?.settle(m.id);
+                              // Nothing to think with yet (the tapper's accounts decide, not the suggestion): it is
+                              // created all the same, and Connect opens for it here.
+                              if (ai === "none") openConnectAi({ agentId: agent.id });
+                            },
+                            onError: failed,
                           },
-                          onError: failed,
-                        })
+                        )
                       }
                     />
                   }

@@ -2,6 +2,7 @@ import type { AgentDraft, AgentProposalCard, Message } from "@agenteschat/client
 import {
   useAiStatus,
   useAllInvitations,
+  useAskAgentProposal,
   useCatalog,
   useChannels,
   useConnections,
@@ -11,6 +12,7 @@ import {
   useDenyAgentProposal,
   useMailAccounts,
   useMembers,
+  useRoles,
 } from "@agenteschat/client";
 import {
   actionCardOf,
@@ -27,13 +29,15 @@ import {
 } from "@agenteschat/client/lib/action-cards";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { joinNames, whenAt } from "@agenteschat/client/lib/format";
+import { formatTime, joinNames, whenAt } from "@agenteschat/client/lib/format";
 import { hostOf } from "@agenteschat/client/lib/import/shared";
 import { choiceOf } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { holdersOf } from "@agenteschat/client/lib/roles";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import { Button, Dialog, Icon, Spinner } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { lazy, type ReactNode, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useConnectedById } from "@/components/AccessLevels";
@@ -47,6 +51,7 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
+import { SettingsProposalCardView } from "@/components/RightHandCards";
 import { StretchCardView } from "@/components/StretchCard";
 import { UsagePauseCardView } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -77,7 +82,16 @@ export function ActionCard({ message }: { message: Message }) {
   const connect = useConnectAi();
   const card = actionCardOf(message.meta);
   if (!card) return null;
-  if (card.kind === "agent_proposal") return <AgentProposalCardView message={message} card={card} />;
+  if (card.kind === "agent_proposal")
+    return (
+      <AgentProposalCardView
+        messageId={message.id}
+        proposerId={message.author.id}
+        sentAt={message.createdAt}
+        card={card}
+      />
+    );
+  if (card.kind === "settings_proposal") return <SettingsProposalCardView message={message} card={card} />;
   if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
   if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
   if (card.kind === "connect_app") return <ConnectAppCardView card={card} />;
@@ -226,11 +240,31 @@ function InviteCardView({ card }: { card: InviteCard }) {
  * opens "Criar agente" filled in with it over the conversation; Recusar says no; all three for who may create agents.
  * Then one line says what was decided, the draft and what it got behind "Ver detalhes"; created, it links to the agent
  * there.
+ *
+ * The right hand's (ADR 0134) reads Criar e testar when it comes with a first task (created, the task goes from the
+ * clicker in their DM with it, which opens), Editar antes and Descartar; a newer one for the same agent greys it out;
+ * and a person who can't create agents sends it to whoever may (Pedir a um admin), then reads whom it went to. In
+ * their inbox it is the same card (`ChangeRequestCard`).
  */
-function AgentProposalCardView({ message, card }: { message: Message; card: AgentProposalCard }) {
+export function AgentProposalCardView({
+  messageId,
+  proposerId,
+  sentAt,
+  card,
+}: {
+  messageId: string;
+  proposerId: string | null;
+  /** When the card was posted: the fuse burns from it to the expiry. */
+  sentAt: string;
+  card: AgentProposalCard;
+}) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
+  const navigate = useNavigate();
+  const ask = useAskAgentProposal(org.id);
+  const members = useMembers(org.id).data ?? [];
+  const roles = useRoles(org.id).data?.roles ?? [];
   const create = useCreateProposedAgent(org.id);
   const makeRoutine = useCreateProposedRoutine(org.id);
   const connect = useConnectAi();
@@ -243,24 +277,58 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
   // Open until it expires: drawn again at that moment, even before the server's event says so.
   useExpired(status === "open" ? card.expiresAt : null);
   const decides = status === "open" && can(org, "create_agents");
-  const agent = message.author.id ? dir.anyAgent(message.author.id) : undefined;
+  const agent = proposerId ? dir.anyAgent(proposerId) : undefined;
+  const rightHand = isRightHand(agent);
+  // The person it is for, who can't create agents: they send it on (the right hand's cards only).
+  const asks = status === "open" && rightHand && !decides && card.forUserId === me.user.id;
   const proposer = agent?.name || t("channel.unknownAgent");
   const title = t("actionCard.agentProposal.title", { agent: proposer });
   const lines = proposalLines(card, { userId: me.user.id, admin: can(org, "manage_agents") });
   const failed = (error: unknown) => toast.show(errorText(t, error), "error");
   const busy = create.isPending || deny.isPending;
+  const test = rightHand && Boolean(card.params.firstTask);
+  const sent =
+    asks && card.askedAt
+      ? (() => {
+          const names = holdersOf(members, roles, "create_agents").map((m) => m.name);
+          const when = formatTime(i18n.language, card.askedAt);
+          return names.length
+            ? t("rightHand.card.sentTo", { names: joinNames(names, t), when })
+            : t("rightHand.card.sentToAny", { when });
+        })()
+      : null;
+  if (status === "superseded") {
+    return (
+      <RequestCard
+        id={messageId}
+        kind="agent"
+        agent={agent}
+        label={title}
+        mine={false}
+        muted
+        waitingFor={t("rightHand.card.superseded")}
+        lead={why || title}
+        object={{
+          logo: <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />,
+          title: draft.name,
+          detail: [`@${draft.handle}`, draft.role, suggestedAiText(t, draft.ai)].filter(Boolean).join(" · "),
+        }}
+        what={draft.name}
+      />
+    );
+  }
   if (status === "open") {
     const end = Date.parse(card.expiresAt);
-    const span = Math.max(1, end - Date.parse(message.createdAt) || DAY_MS);
+    const span = Math.max(1, end - Date.parse(sentAt) || DAY_MS);
     return (
       <>
         <RequestCard
-          id={message.id}
+          id={messageId}
           kind="agent"
           agent={agent}
           label={title}
           mine={decides}
-          waitingFor={t("proposals.waitingAdmin")}
+          waitingFor={t(asks && !card.askedAt ? "rightHand.card.onlyCreators" : "proposals.waitingAdmin")}
           lead={why || title}
           object={{
             logo: <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />,
@@ -277,30 +345,56 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
                   variant="primary"
                   loading={create.isPending}
                   disabled={deny.isPending}
+                  icon={test ? "bolt" : undefined}
                   onClick={() =>
-                    create.mutate(message.id, {
-                      // Nothing to think with yet (the clicker's accounts decide, not the suggestion): it is
-                      // created all the same, and Connect opens for it.
-                      onSuccess: ({ agent: made, ai }) =>
-                        ai === "none" && connect?.open({ agentId: made.id, agentIds: [made.id] }),
-                      onError: failed,
-                    })
+                    create.mutate(
+                      { messageId, test },
+                      {
+                        // Nothing to think with yet (the clicker's accounts decide, not the suggestion): it is
+                        // created all the same, and Connect opens for it. Tried: its DM, with the task in it.
+                        onSuccess: ({ agent: made, ai, testChannelId }) => {
+                          if (ai === "none") connect?.open({ agentId: made.id, agentIds: [made.id] });
+                          else if (testChannelId)
+                            void navigate({
+                              to: "/org/$orgId/dm/agent/$agentId",
+                              params: { orgId: org.id, agentId: made.id },
+                            });
+                        },
+                        onError: failed,
+                      },
+                    )
                   }
                 >
-                  {t("newAgent.create", { name: draft.name })}
+                  {test ? t("rightHand.card.createTest") : t("newAgent.create", { name: draft.name })}
                 </Button>
                 <Button size="sm" disabled={busy} onClick={() => setReviewing(true)}>
-                  {t("actionCard.agentProposal.review")}
+                  {t(rightHand ? "rightHand.card.editFirst" : "actionCard.agentProposal.review")}
                 </Button>
                 <Button
                   size="sm"
+                  variant={rightHand ? "ghost" : undefined}
                   loading={deny.isPending}
                   disabled={create.isPending}
-                  onClick={() => deny.mutate(message.id, { onError: failed })}
+                  onClick={() => deny.mutate(messageId, { onError: failed })}
                 >
-                  {t("approval.refuse")}
+                  {t(rightHand ? "rightHand.card.dismiss" : "approval.refuse")}
                 </Button>
               </>
+            ) : sent ? (
+              <span className="rq__sent ac-iconline">
+                <Icon name="arrowUp" size={14} />
+                <span>{sent}</span>
+              </span>
+            ) : asks ? (
+              <Button
+                size="sm"
+                variant="primary"
+                icon="arrowUp"
+                loading={ask.isPending}
+                onClick={() => ask.mutate(messageId, { onError: failed })}
+              >
+                {t("rightHand.card.askAdmin")}
+              </Button>
             ) : undefined
           }
           end={<RequestFuse left={Math.max(0, end - Date.now()) / span} agent={agent} text={expiryText(t, card)} />}
@@ -318,7 +412,7 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
             className="newag-dialog"
           >
             <Suspense fallback={<Spinner />}>
-              <NewAgentPage proposalId={message.id} onClose={() => setReviewing(false)} />
+              <NewAgentPage proposalId={messageId} onClose={() => setReviewing(false)} />
             </Suspense>
           </Dialog>
         )}
@@ -366,7 +460,7 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
               size="sm"
               variant="ghost"
               loading={makeRoutine.isPending}
-              onClick={() => makeRoutine.mutate(message.id, { onError: failed })}
+              onClick={() => makeRoutine.mutate(messageId, { onError: failed })}
             >
               {t("newAgent.routineKeep", { name: draft.routine?.name })}
             </Button>

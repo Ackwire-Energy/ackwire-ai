@@ -152,6 +152,8 @@ type WhatKey =
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
+  | "changeRequest"
+  | "changeRequestAgent"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -258,5 +260,7 @@ export function Headline({
         : k("invitationAcceptedAny", { name: joinerOf(t, dir, n) });
     case "reaction":
       return k("reaction", { names, count });
+    case "change_request":
+      return k(n.source.proposalId ? "changeRequest" : "changeRequestAgent", { name, agent: n.source.label ?? "" });
   }
 }

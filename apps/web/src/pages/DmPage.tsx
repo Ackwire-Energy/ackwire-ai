@@ -3,8 +3,10 @@ import { keys, useModels } from "@agenteschat/client";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
+import { capitalize } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { apiProviderOf, isAuto } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { Avatar, BrainIcon, Button, ProviderLogo } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -23,7 +25,7 @@ import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
 export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMessageId?: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -69,6 +71,8 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   // The API's maker when it thinks through a key.
   const thinksMark = thinks?.mark ?? (agent ? apiProviderOf(agent.model, models.data?.models ?? []) : undefined);
   const role = agent ? agent.role || `@${agent.handle}` : "";
+  // The right hand (ADR 0134) says what it is and whose permissions it acts with, never an owner.
+  const rightHand = isRightHand(agent);
   const header = (
     <header className="channel__header">
       <NavToggle />
@@ -80,7 +84,11 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
         </h1>
         {agent && (
           <span className="channel__topic">
-            {owner ? t("dm.subtitle", { role, owner: owner.name }) : t("dm.subtitleNoOwner", { role })}
+            {rightHand
+              ? `${capitalize(t("rightHand.label"), i18n.language)} · ${t("rightHand.actsAsYou")}`
+              : owner
+                ? t("dm.subtitle", { role, owner: owner.name })
+                : t("dm.subtitleNoOwner", { role })}
             {thinks?.text && (
               <>
                 {" · "}
@@ -96,7 +104,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
       </div>
       {/* Its tasks (ADR 0128), while it has any: they open in the side panel. */}
       {agent && <AgentTasksPill />}
-      {agent && <ComputerButton agent={agent} />}
+      {agent && !rightHand && <ComputerButton agent={agent} />}
       {agent && <ProfileButton agentId={agent.id} />}
       {/* Search stays the last on the right, as in a channel. */}
       <SearchHereButton channelId={dm.data.channelId} />
@@ -117,6 +125,9 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
       chrome={{
         header,
         composerTarget: name,
+        ...(rightHand
+          ? { composerLabel: `${t("channel.composerDm", { name })} · ${t("rightHand.composerHint")}` }
+          : {}),
         dmAgentId: agent?.id,
         dmPersonId: person?.userId,
         locked:

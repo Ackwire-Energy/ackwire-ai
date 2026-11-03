@@ -867,7 +867,8 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       [{ step: "rule", rule: "reply" }, "Uma resposta para a Ada", null],
       [{ step: "rule", rule: "only_agent" }, "Só a Ada responde aqui sem menção", null],
       [{ step: "rule", rule: "follow_up" }, "Segue a conversa com a Ada", null],
-      [{ step: "rule", rule: "coordinator" }, "A Ada coordena o time", null],
+      // Stored before the team's coordinator was retired (ADR 0134): the default rule's line.
+      [{ step: "rule", rule: "coordinator" }, "Ninguém foi chamado, então a Ada respondeu", null],
     ];
     for (const [i, [decidedBy, words, mark]] of cases.entries()) {
       const text = `pergunta ${i + 1}`;
@@ -887,9 +888,6 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       expect(by.className).toContain("ac-iconline");
       if (mark) expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe(mark);
       else expect(by.firstElementChild?.classList.contains("ac-icon")).toBe(true);
-      // The coordinator's line leads with its flag.
-      if ((decidedBy as { rule?: string }).rule === "coordinator")
-        expect(by.querySelector("path")?.getAttribute("d")).toBe("M5 17V3.5M5 3.5h9l-1.7 3.3L14 10H5");
       await closePopover(pop);
     }
     for (const [text, routed] of [

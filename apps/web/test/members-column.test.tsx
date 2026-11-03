@@ -8,7 +8,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { COMPACT_QUERY, DESKTOP_QUERY } from "@/components/NavDrawer";
 import { TABLET_QUERY } from "@/components/Sidebar";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 let media: { mockRestore: () => void } | null = null;
@@ -351,27 +351,6 @@ describe("answering without a mention, as true for my own messages as who picks 
       line: "Entra na conversa por conta própria",
       option: "Responde quando o assunto pede, sem precisar de @",
     });
-  });
-});
-
-describe("the team's coordinator here (ADR 0093)", () => {
-  test("its chip says it coordinates the team, and its line in the details what that means", async () => {
-    widthIs(DESKTOP_QUERY);
-    const state = seedState();
-    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
-    if (atlas) atlas.coordinator = true;
-    await open(state);
-    const agents = within(column() as HTMLElement).getByRole("region", { name: "Agentes" });
-    const chips = [...agents.querySelectorAll(".members-side__chip")];
-    expect(chips.map((c) => c.textContent).sort()).toEqual(["coordena o time", "responde sem menção"]);
-    await act(async () =>
-      fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
-    );
-    await settle(3);
-    const row = within(screen().getByRole("dialog", { name: /eng/ }))
-      .getByText("Atlas")
-      .closest(".member-row") as HTMLElement;
-    expect(row.querySelector(".small")?.textContent).toBe("Coordena o time: pega o que ninguém pegou");
   });
 });
 

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import {
   handleAfterRename,
@@ -80,14 +79,12 @@ describe("editing an agent", () => {
     role: "Atendimento",
     instructions: "Responde clientes.",
     look: { color: "teal", eyes: "happy", accessory: "headset" },
-    coordinator: false,
     audience: { mode: "people", userIds: ["u-bia"], roleIds: [], consultable: true },
   };
 
   test("admins change everything, its person only the look, others nothing", () => {
     expect([...editableFields({ admin: true, owner: false })].sort()).toEqual([
       "consultable",
-      "coordinator",
       "instructions",
       "look",
       "name",
@@ -118,23 +115,6 @@ describe("editing an agent", () => {
     expect(agentChanges(saved, off, editableFields({ admin: false, owner: false }))).toBeNull();
   });
 
-  test("who coordinates the team (ADR 0093): admins switch it, its person can't; the line says who does now", async () => {
-    const turnedOn = { ...saved, coordinator: true };
-    expect(agentChanges(saved, turnedOn, editableFields({ admin: true, owner: false }))).toEqual({ coordinator: true });
-    expect(agentChanges(saved, turnedOn, editableFields({ admin: false, owner: true }))).toBeNull();
-    const pt = await translator("pt-BR");
-    const en = await translator("en");
-    const nina = { id: "nina", name: "Nina", coordinator: false };
-    const team = [nina, { id: "theo", name: "Theo", coordinator: true }];
-    expect(coordinatorNote(pt, team, "nina", false)).toBe("Hoje quem coordena é o Theo.");
-    expect(coordinatorNote(pt, team, "nina", true)).toBe("Hoje quem coordena é o Theo. Só um agente coordena por vez.");
-    expect(coordinatorNote(en, team, "nina", true)).toBe(
-      "Theo coordinates the team now. One agent coordinates at a time.",
-    );
-    expect(coordinatorNote(pt, team, "theo", true)).toBeNull();
-    expect(coordinatorNote(pt, [nina], "nina", false)).toBe("Ninguém coordena o time agora.");
-  });
-
   test("Editar hints the role the way Criar agente does, not with a one-word example", () => {
     const src = (f: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", "agents", f), "utf8");
     for (const screen of ["AgentEditScreen.tsx", "NewAgentScreen.tsx"]) {
@@ -150,7 +130,6 @@ describe("renaming an agent on the phone", () => {
     role: "Dev",
     instructions: "",
     look: fullLook(undefined),
-    coordinator: false,
     audience: { mode: "everyone", userIds: [], roleIds: [], consultable: true },
   };
   const all = editableFields({ admin: true, owner: false });

@@ -120,10 +120,21 @@ export interface InviteCard {
   why: string;
 }
 
+/**
+ * The right hand's card of a teammate's settings (ADR 0134): one card, a row per agent and decider
+ * (`proposals.list({ ids })` reads them).
+ */
+export interface SettingsProposalCard {
+  kind: "settings_proposal";
+  forUserId: string | null;
+  proposalIds: string[];
+}
+
 export type ActionCard =
   | ConnectAiCard
   | ConnectAppCard
   | InviteCard
+  | SettingsProposalCard
   | AgentProposalCard
   | StretchCard
   | UsagePauseCard
@@ -189,9 +200,15 @@ export function agentProposalOf(meta: Record<string, unknown> | null | undefined
     : null;
 }
 
-/** Where a proposal stands: waiting for a person (also while someone creates it), expired, created or denied. */
-export function proposalStatus(card: AgentProposalCard, now = Date.now()): "open" | "expired" | "created" | "denied" {
-  if (card.state === "created" || card.state === "denied") return card.state;
+/**
+ * Where a proposal stands: waiting for a person (also while someone creates it), expired, created, denied, or
+ * superseded by a newer card for the same agent.
+ */
+export function proposalStatus(
+  card: AgentProposalCard,
+  now = Date.now(),
+): "open" | "expired" | "created" | "denied" | "superseded" {
+  if (card.state === "created" || card.state === "denied" || card.state === "superseded") return card.state;
   return Date.parse(card.expiresAt) <= now ? "expired" : "open";
 }
 
@@ -290,6 +307,15 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;
+  if ((raw as { kind?: unknown }).kind === "settings_proposal") {
+    const r = raw as { forUserId?: unknown; proposalIds?: unknown };
+    const proposalIds = Array.isArray(r.proposalIds)
+      ? r.proposalIds.filter((id): id is string => typeof id === "string")
+      : [];
+    return proposalIds.length > 0
+      ? { kind: "settings_proposal", forUserId: typeof r.forUserId === "string" ? r.forUserId : null, proposalIds }
+      : null;
+  }
   const card = raw as { kind?: unknown; forUserId?: unknown; params?: unknown };
   if (!card.params || typeof card.params !== "object") return null;
   const p = card.params as Record<string, unknown>;

@@ -607,13 +607,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
       denyProposal: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
-      createProposed: (orgId, messageId) =>
-        request<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"] }>(
+      createProposed: (orgId, messageId, options) =>
+        request<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"]; testChannelId?: string | null }>(
           `${org(orgId)}/agent-proposals/${enc(messageId)}/create`,
-          {
-            json: {},
-          },
+          { json: options?.test ? { test: true } : {} },
         ),
+      askProposal: (orgId, messageId) =>
+        request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/ask`, { json: {} }),
       decideCostly: (orgId, signalId, decision) =>
         request<{ state: CostlyDecision }>(`${org(orgId)}/autonomy-proposals/${enc(signalId)}`, {
           json: { decision },
@@ -1493,6 +1493,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       accept: (orgId, id, text) =>
         request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/accept`, { json: text === undefined ? {} : { text } }),
       refuse: (orgId, id) => request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/refuse`, { json: {} }),
+      ask: (orgId, id) => request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/ask`, { json: {} }),
     },
     repositories: {
       get: async (orgId, agentId) =>

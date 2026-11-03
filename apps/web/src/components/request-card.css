@@ -413,3 +413,46 @@ html:not([data-pointer]) .rq__more:focus-visible {
   line-height: 18px;
   color: var(--muted);
 }
+
+/* A card a newer one replaced: still readable, plainly not the one to act on. */
+.rq--muted {
+  opacity: 0.6;
+}
+/* A settings card's lines (ADR 0134): the setting, then what it was struck through, an arrow and what it becomes. */
+.rq__settings {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 24px;
+  margin: 16px 0 0;
+}
+.rq__setting {
+  display: contents;
+}
+.rq__setting dt {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.rq__setting dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.rq__setting s {
+  color: var(--muted);
+}
+.rq__setting dd .ac-icon {
+  color: var(--muted);
+}
+/* Sent to whoever decides: where the decision would be, quiet. */
+.rq__sent {
+  font-size: 13px;
+  color: var(--muted);
+}
