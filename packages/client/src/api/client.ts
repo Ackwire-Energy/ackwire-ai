@@ -152,6 +152,7 @@ import type {
   Member,
   Memory,
   Message,
+  MessageCard,
   MessagePin,
   Mission,
   MissionBrain,
@@ -655,6 +656,8 @@ export interface ApiClient {
     join(orgId: string, channelId: string): Promise<void>;
     /** A `#channel` link's card; 404 for a channel I can't see (private and not mine). Archived ones too. */
     card(orgId: string, channelId: string): Promise<ChannelCard>;
+    /** A pasted message link's pill; 404 for a message I can't see (a private channel's, a DM I'm not in). */
+    messageCard(orgId: string, messageId: string): Promise<MessageCard>;
     update(orgId: string, channelId: string, input: ChannelInput & { name?: string }): Promise<Channel>;
     /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
     archive(orgId: string, channelId: string): Promise<void>;

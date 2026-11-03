@@ -2472,6 +2472,25 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           agents: members.filter((m) => m.type === "agent").length,
         };
       },
+      messageCard: async (_orgId, messageId) => {
+        const m = state.messages.find((x) => x.id === messageId);
+        const channel = state.channels.find((c) => c.id === m?.channelId);
+        const dm = state.dms.find((d) => d.channelId === m?.channelId);
+        if (!m || (!dm && (!channel || (channel.visibility === "private" && !channel.isMember))))
+          throw new ApiError(404, "not_found", "Message not found");
+        const author =
+          m.author.type === "agent"
+            ? state.agents.find((a) => a.id === m.author.id)?.name
+            : state.members.find((p) => p.userId === m.author.id)?.name;
+        return {
+          id: m.id,
+          channelId: m.channelId,
+          threadId: m.threadId && m.threadId !== m.id ? m.threadId : null,
+          kind: dm ? "dm" : "channel",
+          name: dm ? dm.with.name : (channel?.name ?? ""),
+          author: author ?? "",
+        };
+      },
       members: async (_orgId, channelId) => state.channelMembers[channelId] ?? [],
       archive: async (orgId, channelId) => {
         log("chat.archive", orgId, channelId);

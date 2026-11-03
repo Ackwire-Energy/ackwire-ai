@@ -2475,6 +2475,15 @@
     "join": "Rejoindre",
     "open": "Ouvrir"
   },
+  "messageRefs": {
+    "copy": "Copier le lien du message",
+    "message": "Message",
+    "thread": "Fil",
+    "label": "Message de {{author}} dans #{{name}}",
+    "threadLabel": "Message de {{author}} dans un fil de #{{name}}",
+    "dmLabel": "Message de {{author}} en message direct avec {{name}}",
+    "noAccess": "Message inaccessible"
+  },
   "secret": {
     "group": "Demande de secret de {{agent}}",
     "chip": "En attente",
@@ -7069,8 +7078,8 @@
       "savedEveryone": "{{name}} répond maintenant aux autres personnes.",
       "savedEveryone_female": "{{name}} répond maintenant aux autres personnes.",
       "savedOwner": "{{name}} ne répond plus qu'à vous.",
-      "savedOwnerOf": "{{name}} ne répond plus qu'à {{owner}}.",
       "savedOwner_female": "{{name}} ne répond plus qu'à vous.",
+      "savedOwnerOf": "{{name}} ne répond plus qu'à {{owner}}.",
       "backOnApi": "{{name}} est de retour sur l'API et ne répond toujours qu'à vous.",
       "backOnApi_female": "{{name}} est de retour sur l'API et ne répond toujours qu'à vous.",
       "letEveryone": "Laisser {{name}} répondre à tout le monde",

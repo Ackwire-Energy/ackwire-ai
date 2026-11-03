@@ -2963,6 +2963,27 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   color: var(--ink-muted);
   text-decoration: line-through;
 }
+/* A message's link (MessageRef): the #channel pill with its parts in a row, "# general › 💬". */
+.message-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+.message-ref .ac-icon {
+  flex: none;
+}
+.message-ref__sep {
+  color: var(--ink-muted);
+}
+.message-ref--none {
+  border-radius: var(--radius-cut);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+  font-weight: 600;
+}
 .channel-card__head {
   display: flex;
   align-items: center;

@@ -84,7 +84,7 @@ describe("message action bars", () => {
       "Adicionar reação",
       "Responder",
       "Copiar texto",
-      "Copiar link",
+      "Copiar link da mensagem",
       "Fixar mensagem",
       "Salvar na wiki",
     ]);
@@ -105,7 +105,7 @@ describe("message action bars", () => {
     expect(within(menu).getByRole("menuitem", { name: "Fixar mensagem" })).toBeTruthy();
   });
 
-  test("Copiar link copies the message's address", async () => {
+  test("Copiar link da mensagem copies the message's address", async () => {
     const copied: string[] = [];
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -115,7 +115,7 @@ describe("message action bars", () => {
     await settle(8);
     const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de João" });
     const menu = await openMenu(within(bar).getByRole("button", { name: "Mais ações da mensagem" }));
-    await click(within(menu).getByRole("menuitem", { name: "Copiar link" }));
+    await click(within(menu).getByRole("menuitem", { name: "Copiar link da mensagem" }));
     await settle(2);
     expect(copied[0]).toBe(messageLink(window.location.origin, ORG_ID, { id: "m-1", channelId: ENG_ID }));
     expect(document.body.textContent).toContain("Link copiado.");
@@ -283,7 +283,13 @@ describe("message action bars", () => {
           .filter((i) => !i.classList.contains("ac-menu__reaction"))
           .map((i) => i.textContent);
       // What the bar and its "…" have, as the desktop app's right click lists it.
-      expect(items(menu)).toEqual(["Responder", "Copiar texto", "Copiar link", "Fixar mensagem", "Salvar na wiki"]);
+      expect(items(menu)).toEqual([
+        "Responder",
+        "Copiar texto",
+        "Copiar link da mensagem",
+        "Fixar mensagem",
+        "Salvar na wiki",
+      ]);
       expect(document.querySelector('article[data-message-id="m-1"]')?.getAttribute("data-menu-open")).toBe("true");
       await click(within(reactions).getByRole("menuitem", { name: "Adicionar reação" }));
       await settle(1);
@@ -297,7 +303,7 @@ describe("message action bars", () => {
       // No words: nothing to copy or to save, as on the phone app.
       expect(items(screen().getByRole("menu", { name: "Ações da mensagem de João" }))).toEqual([
         "Responder",
-        "Copiar link",
+        "Copiar link da mensagem",
         "Fixar mensagem",
       ]);
       await act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
@@ -309,7 +315,7 @@ describe("message action bars", () => {
         "Não ajudou",
         "Corrigir resposta",
         "Copiar texto",
-        "Copiar link",
+        "Copiar link da mensagem",
         "Fixar mensagem",
         "Salvar na wiki",
       ]);

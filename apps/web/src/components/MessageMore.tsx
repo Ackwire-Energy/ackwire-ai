@@ -1,4 +1,5 @@
 import { type Message, usePinMessage } from "@agenteschat/client";
+import { messagePath } from "@agenteschat/client/lib/message-links";
 import { can } from "@agenteschat/client/lib/permissions";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { Button, EmojiPickerPopover, Menu } from "@agenteschat/ui";
@@ -20,9 +21,12 @@ import { CorrectionDialog } from "./MessageFeedback";
 import { DOWN, ReactButton, reactionOf, useEmojiLabels, useMessageReactions } from "./Reactions";
 import { SaveToWikiDialog } from "./SaveToWiki";
 
-/** A message's address: the channel with `?m=` (the timeline scrolls to it). */
-export const messageLink = (origin: string, orgId: string, m: Pick<Message, "id" | "channelId">) =>
-  `${origin}/org/${orgId}/c/${m.channelId}?m=${m.id}`;
+/** A message's address (`messagePath`): its conversation, or a reply's thread, with `?m=` (it scrolls to it). */
+export const messageLink = (
+  origin: string,
+  orgId: string,
+  m: Pick<Message, "id" | "channelId"> & { threadId?: string | null },
+) => `${origin}${messagePath(orgId, m)}`;
 
 /** "…" on any message: the same list as its right click (`useMessageMenu`'s `more`). */
 export function MessageMoreMenu({ entries }: { entries: MenuEntry[] }) {
@@ -125,7 +129,7 @@ export function useMessageMenu(
     const copyLink: MenuEntry = {
       kind: "item",
       id: "copy-link",
-      label: t("contextMenu.copyLink"),
+      label: t("messageRefs.copy"),
       icon: "link",
       run: () =>
         void copyText(messageLink(window.location.origin, org.id, message), () =>

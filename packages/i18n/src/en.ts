@@ -2358,6 +2358,16 @@ export const en = {
     join: "Join",
     open: "Open",
   },
+  /** A message's permalink pasted in a message: a pill like a #channel's (ADR 0135). */
+  messageRefs: {
+    copy: "Copy message link",
+    message: "Message",
+    thread: "Thread",
+    label: "Message from {{author}} in #{{name}}",
+    threadLabel: "Message from {{author}} in a thread in #{{name}}",
+    dmLabel: "Message from {{author}} in the DM with {{name}}",
+    noAccess: "Message you can't see",
+  },
   secret: {
     group: "Secret request from {{agent}}",
     chip: "Waiting",

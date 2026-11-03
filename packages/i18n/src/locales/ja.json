@@ -2320,6 +2320,15 @@
     "join": "参加",
     "open": "開く"
   },
+  "messageRefs": {
+    "copy": "メッセージのリンクをコピー",
+    "message": "メッセージ",
+    "thread": "スレッド",
+    "label": "#{{name}} での {{author}} のメッセージ",
+    "threadLabel": "#{{name}} のスレッドでの {{author}} のメッセージ",
+    "dmLabel": "{{name}}とのDMでの {{author}} のメッセージ",
+    "noAccess": "アクセスできないメッセージ"
+  },
   "secret": {
     "group": "{{agent}}からのシークレットのリクエスト",
     "chip": "待機中",

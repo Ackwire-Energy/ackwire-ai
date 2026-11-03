@@ -2401,6 +2401,15 @@
     "join": "Lid worden",
     "open": "Openen"
   },
+  "messageRefs": {
+    "copy": "Link naar bericht kopiëren",
+    "message": "Bericht",
+    "thread": "Thread",
+    "label": "Bericht van {{author}} in #{{name}}",
+    "threadLabel": "Bericht van {{author}} in een thread in #{{name}}",
+    "dmLabel": "Bericht van {{author}} in het DM met {{name}}",
+    "noAccess": "Bericht zonder toegang"
+  },
   "secret": {
     "group": "Geheim verzoek van {{agent}}",
     "chip": "Wacht",
@@ -6838,8 +6847,8 @@
       "savedEveryone": "{{name}} antwoordt nu ook andere mensen.",
       "savedEveryone_female": "{{name}} antwoordt nu ook andere mensen.",
       "savedOwner": "{{name}} antwoordt nu alleen jou.",
-      "savedOwnerOf": "{{name}} antwoordt nu alleen {{owner}}.",
       "savedOwner_female": "{{name}} antwoordt nu alleen jou.",
+      "savedOwnerOf": "{{name}} antwoordt nu alleen {{owner}}.",
       "backOnApi": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
       "backOnApi_female": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
       "letEveryone": "Laat {{name}} iedereen antwoorden",

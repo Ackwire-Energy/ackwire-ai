@@ -50,6 +50,7 @@ import {
   useChannelThreads,
   useCreateMission,
   useDmReads,
+  useDms,
   useHeldPlaces,
   useJoinChannel,
   useMarkChannelRead,
@@ -187,7 +188,7 @@ import {
   type VoiceNotice,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import {
   Children,
   createContext,
@@ -528,10 +529,32 @@ export function ChannelPage({
   const { org } = useOrg();
   const channels = useChannels(org.id);
   const channel = channels.data?.find((c) => c.id === channelId) ?? fallback;
+  // A DM's link (a message link copied there) names its channel: the DM's own page opens it, at the message.
+  const dms = useDms(org.id);
+  const dm = channel ? undefined : dms.data?.find((d) => d.channelId === channelId);
   // "#loja · Acme": the window's name in the app (Window menu, Mission Control), the tab's in a browser.
   useDocumentTitle(channel && !fallback && !thread ? `#${channel.name} · ${org.name}` : undefined);
 
   if (channels.isPending && !fallback) return <ChannelSkeleton />;
+  if (dm) {
+    const search = focusMessageId ? { m: focusMessageId } : {};
+    return dm.with.type === "agent" ? (
+      <Navigate
+        to="/org/$orgId/dm/agent/$agentId"
+        params={{ orgId: org.id, agentId: dm.with.id }}
+        search={search}
+        replace
+      />
+    ) : (
+      <Navigate
+        to="/org/$orgId/dm/person/$userId"
+        params={{ orgId: org.id, userId: dm.with.id }}
+        search={search}
+        replace
+      />
+    );
+  }
+  if (!channel && dms.isPending) return <ChannelSkeleton />;
   if (!channel) {
     return (
       <main className="shell__main">

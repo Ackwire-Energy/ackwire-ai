@@ -5835,6 +5835,27 @@
   "channelRefs.open": {
     "value": "Open"
   },
+  "messageRefs.copy": {
+    "value": "Copy message link"
+  },
+  "messageRefs.message": {
+    "value": "Message"
+  },
+  "messageRefs.thread": {
+    "value": "Thread"
+  },
+  "messageRefs.label": {
+    "value": "Message from {{author}} in #{{name}}"
+  },
+  "messageRefs.threadLabel": {
+    "value": "Message from {{author}} in a thread in #{{name}}"
+  },
+  "messageRefs.dmLabel": {
+    "value": "Message from {{author}} in the DM with {{name}}"
+  },
+  "messageRefs.noAccess": {
+    "value": "Message you can't see"
+  },
   "secret.group": {
     "value": "Secret request from {{agent}}"
   },

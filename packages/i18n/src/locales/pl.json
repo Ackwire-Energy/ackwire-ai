@@ -2538,6 +2538,15 @@
     "join": "Dołącz",
     "open": "Otwórz"
   },
+  "messageRefs": {
+    "copy": "Kopiuj link do wiadomości",
+    "message": "Wiadomość",
+    "thread": "Wątek",
+    "label": "Wiadomość od {{author}} w #{{name}}",
+    "threadLabel": "Wiadomość od {{author}} w wątku na #{{name}}",
+    "dmLabel": "Wiadomość od {{author}} w wiadomości bezpośredniej z {{name}}",
+    "noAccess": "Wiadomość bez dostępu"
+  },
   "secret": {
     "group": "Prośba o sekret od {{agent}}",
     "chip": "Czeka",
@@ -7281,8 +7290,8 @@
       "savedEveryone": "{{name}} odpowiada teraz innym osobom.",
       "savedEveryone_female": "{{name}} odpowiada teraz innym osobom.",
       "savedOwner": "{{name}} odpowiada teraz tylko tobie.",
-      "savedOwnerOf": "{{name}} odpowiada teraz tylko {{owner}}.",
       "savedOwner_female": "{{name}} odpowiada teraz tylko tobie.",
+      "savedOwnerOf": "{{name}} odpowiada teraz tylko {{owner}}.",
       "backOnApi": "{{name}} wrócił na API i nadal odpowiada tylko tobie.",
       "backOnApi_female": "{{name}} wróciła na API i nadal odpowiada tylko tobie.",
       "letEveryone": "Pozwól agentowi {{name}} odpowiadać wszystkim",

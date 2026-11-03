@@ -2322,6 +2322,15 @@
     "join": "加入",
     "open": "打开"
   },
+  "messageRefs": {
+    "copy": "复制消息链接",
+    "message": "消息",
+    "thread": "话题",
+    "label": "{{author}} 在 #{{name}} 的消息",
+    "threadLabel": "{{author}} 在 #{{name}} 话题中的消息",
+    "dmLabel": "{{author}} 在与 {{name}} 的私信中的消息",
+    "noAccess": "无权查看的消息"
+  },
   "secret": {
     "group": "来自 {{agent}} 的密钥请求",
     "chip": "等待中",
@@ -6555,8 +6564,8 @@
       "savedEveryone": "{{name}} 现在会回复其他成员。",
       "savedEveryone_female": "{{name}} 现在会回复其他成员。",
       "savedOwner": "{{name}} 现在只回复你。",
-      "savedOwnerOf": "{{name}} 现在只回复 {{owner}}。",
       "savedOwner_female": "{{name}} 现在只回复你。",
+      "savedOwnerOf": "{{name}} 现在只回复 {{owner}}。",
       "backOnApi": "{{name}} 已改回使用 API，仍然只回复你。",
       "backOnApi_female": "{{name}} 已改回使用 API，仍然只回复你。",
       "letEveryone": "让 {{name}} 回复所有人",

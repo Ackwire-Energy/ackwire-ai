@@ -2318,6 +2318,15 @@
     "join": "참여",
     "open": "열기"
   },
+  "messageRefs": {
+    "copy": "메시지 링크 복사",
+    "message": "메시지",
+    "thread": "스레드",
+    "label": "#{{name}}의 {{author}} 메시지",
+    "threadLabel": "#{{name}} 스레드의 {{author}} 메시지",
+    "dmLabel": "{{name}}과(와)의 DM에 있는 {{author}} 메시지",
+    "noAccess": "볼 수 없는 메시지"
+  },
   "secret": {
     "group": "{{agent}}의 비밀 정보 요청",
     "chip": "대기 중",
