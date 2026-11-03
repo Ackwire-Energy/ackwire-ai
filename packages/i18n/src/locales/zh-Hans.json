@@ -12811,7 +12811,6 @@
       "canceled": "“{{title}}”回到了原位。"
     },
     "add": {
-      "tile": "小组件",
       "label": "添加小组件"
     },
     "alert": {
@@ -12906,12 +12905,19 @@
     "removed": {
       "home": "“{{title}}”已移出首页，{{name}} 的例行工作已停止",
       "board": "“{{title}}”已移出仪表盘，{{name}} 的例行工作已停止"
+    },
+    "removeConfirm": {
+      "title": "移除“{{title}}”？",
+      "textRoutine": "负责更新它的 {{name}} 的例行工作会停止，更新历史也会一起移除。",
+      "textManual": "更新历史也会一起移除。",
+      "confirm": "移除"
     }
   },
   "dashboards": {
     "title": "仪表盘",
     "subtitle": "智能体保持更新的数字和图表，面向整个工作区或仅部分角色。",
     "sidebar": "仪表盘",
+    "navWhat": "智能体保持更新的数字和图表",
     "new": "新建仪表盘",
     "back": "仪表盘",
     "home": "我的首页",
@@ -12937,7 +12943,13 @@
     "edit": {
       "label": "谁能编辑",
       "viewers": "能看到的人",
-      "owner": "仅你和管理员"
+      "owner": "仅你和管理员",
+      "roles": "或拥有这些角色的人",
+      "twoRoles": "{{first}}和{{second}}",
+      "manyRoles_other": "{{count}} 个角色",
+      "cantSee": "看不到这个仪表盘",
+      "someRoles": "部分角色…",
+      "rolesNote": "拥有这些角色的人在也能看到仪表盘时可以编辑。你和管理员始终可以编辑。"
     },
     "meta": {
       "by": "由 {{name}} 创建",
@@ -12973,26 +12985,17 @@
     },
     "empty": {
       "title": "空仪表盘",
-      "text": "添加小组件：请智能体创建，或从聊天中固定一个区块。",
-      "noneTitle": "还没有仪表盘",
-      "none": "智能体保持更新的数字和图表，给你自己或给团队。"
+      "text": "添加小组件：请智能体创建，或从聊天中固定一个区块。"
     },
+    "onlyHome": "用“新建仪表盘”为工作区或部分角色创建仪表盘。",
     "create": {
       "title": "新建仪表盘",
       "subtitle": "把小组件放在同一页上，给你自己或给团队。",
       "name": "名称",
       "namePlaceholder": "例如：销售、黑色星期五、季度目标",
-      "start": "如何开始",
-      "blank": "空白",
-      "blankHint": "由你添加小组件",
-      "agent": "请智能体创建",
-      "agentHint": "它会创建小组件和例行工作",
-      "briefPlaceholder": "例如：我每天早上需要看的销售情况",
+      "askHint": "你也可以在聊天中请智能体帮你搭建一个。",
       "submit": "创建仪表盘",
-      "created": "已创建“{{title}}”",
-      "started": "{{name}} 正在你们的对话中创建“{{title}}”",
-      "openChat": "打开对话",
-      "brief": "{{name}} 要创建的内容"
+      "created": "已创建“{{title}}”"
     },
     "newWidget": {
       "title": "新建小组件",

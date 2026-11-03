@@ -39,7 +39,6 @@ import {
   CreateDashboardBody,
   CreateWidgetBody,
   Dashboard,
-  DashboardCreated,
   DashboardLayoutBody,
   DashboardList,
   DashboardParams,
@@ -66,8 +65,8 @@ const tags = ["Dashboards"];
  * Dashboards and widgets (ADR 0134): boards of widgets agents keep up to date, who sees and edits them, "My Home",
  * an agent's request to show a board to more people, and what "+ Widget" needs (cost, suggestions, charts to pin).
  * Every check is the engine's (`packages/engine/src/dashboards/*`): a board the caller can't see is 404, one they see
- * but may not change is 403. Anything that queues a widget's run (or an agent's, for "Ask an agent") wakes the
- * workers so it starts without waiting for their poll.
+ * but may not change is 403. Anything that queues a widget's run wakes the workers so it starts without waiting for
+ * their poll.
  */
 export function dashboardRoutes(deps: AppDeps) {
   const app = createAppRouter(deps);
@@ -96,18 +95,14 @@ export function dashboardRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/dashboards",
       tags,
       security,
-      summary: "New dashboard; with `start`, an agent builds it from a brief in my DM with it",
+      summary: "New dashboard, empty (an agent builds one when asked in a chat)",
       description:
         "Showing it to others (`workspace`, `roles`) needs `post`. Whoever sees a board sees what its agents fetched with their own connections (ADR 0134 §12).",
       request: { params: OrgParams, body: body(CreateDashboardBody) },
-      responses: { 201: json(DashboardCreated, "Created"), ...errors },
+      responses: { 201: json(Dashboard, "Created"), ...errors },
     }),
-    async (c) => {
-      const input = c.req.valid("json");
-      const created = await createDashboard(boards, c.get("user").id, c.req.valid("param").orgId, input);
-      if (input.start) wake();
-      return c.json(created, 201);
-    },
+    async (c) =>
+      c.json(await createDashboard(boards, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json")), 201),
   );
 
   // Before `/dashboards/{dashboardId}`: `home` is not a board's id.

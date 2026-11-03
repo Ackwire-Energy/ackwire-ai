@@ -6,10 +6,28 @@ import type {
   Member,
   OrgRole,
 } from "@agenteschat/client";
-import { useMembers, useRoles } from "@agenteschat/client";
+import {
+  editorsSummary,
+  editorsText,
+  fitEditRoles,
+  roleSeesBoard,
+  toggleEditRole,
+  useMembers,
+  useRoles,
+} from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
-import { Icon, type IconName, Radio, RadioGroup, RoleMark, Segmented } from "@agenteschat/ui";
+import {
+  Icon,
+  type IconName,
+  Menu,
+  MenuCheckboxItem,
+  MenuHeading,
+  MenuSeparator,
+  Radio,
+  RadioGroup,
+  RoleMark,
+} from "@agenteschat/ui";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
@@ -20,6 +38,8 @@ export interface BoardAudience {
   audience: DashboardAudience;
   roleIds: string[];
   editPolicy: DashboardEditPolicy;
+  /** With `editPolicy` `roles`. */
+  editRoleIds: string[];
 }
 
 /** A `roles` audience needs at least one role (the server's `dashboard.roles_required`). */
@@ -105,7 +125,8 @@ const AUDIENCE_ICON: Record<DashboardAudience, IconName> = {
 /**
  * "Who sees" (the whole workspace, roles with their chips and how many hold each, or only you), "Who edits" and the
  * note on what whoever sees a board sees (ADR 0134 §8, §12). Showing a board to others needs `post`: without it the
- * wider choices are shown but can't be picked, unless the board already has one.
+ * wider choices are shown but can't be picked, unless the board already has one. Narrowing who sees drops the edit
+ * roles that no longer see the board (`fitEditRoles`).
  */
 export function AudienceFields({
   value,
@@ -152,10 +173,14 @@ export function AudienceFields({
     );
   };
   const toggleRole = (roleId: string) =>
-    onChange({
-      ...value,
-      roleIds: value.roleIds.includes(roleId) ? value.roleIds.filter((r) => r !== roleId) : [...value.roleIds, roleId],
-    });
+    onChange(
+      fitEditRoles({
+        ...value,
+        roleIds: value.roleIds.includes(roleId)
+          ? value.roleIds.filter((r) => r !== roleId)
+          : [...value.roleIds, roleId],
+      }),
+    );
   return (
     <>
       <div className="db-f">
@@ -166,7 +191,7 @@ export function AudienceFields({
           className="db-opts"
           aria-labelledby={`${id}-sees`}
           value={value.audience}
-          onValueChange={(audience: DashboardAudience) => onChange({ ...value, audience })}
+          onValueChange={(audience: DashboardAudience) => onChange(fitEditRoles({ ...value, audience }))}
         >
           {option("workspace")}
           {option("roles")}
@@ -192,19 +217,92 @@ export function AudienceFields({
           {option("private")}
         </RadioGroup>
       </div>
-      <div className="db-f">
-        <span className="db-lbl">{t("dashboards.edit.label")}</span>
-        <Segmented
-          label={t("dashboards.edit.label")}
-          value={value.editPolicy}
-          onValueChange={(editPolicy) => onChange({ ...value, editPolicy })}
-          options={(["viewers", "owner"] as const).map((v) => ({ value: v, label: t(`dashboards.edit.${v}`) }))}
-        />
-      </div>
+      <EditorsField value={value} onChange={onChange} roles={roles} />
       <p className="db-note">
         <Icon name="shield" size={16} />
         <span>{t("widgets.exposure")}</span>
       </p>
     </>
+  );
+}
+
+/**
+ * "Who edits" (ADR 0134 §8): a dropdown with "Whoever sees it", "Only you and admins", then the workspace's roles to
+ * check (with `roles`, people holding one of them who see the board edit it). A role whose people don't see the board
+ * is shown but can't be checked, with why: editing isn't seeing, so it would give them nothing. The trigger says what
+ * is picked ("Sales and Board", "3 roles").
+ */
+function EditorsField({
+  value,
+  onChange,
+  roles,
+}: {
+  value: BoardAudience;
+  onChange: (next: BoardAudience) => void;
+  roles: readonly OrgRole[];
+}) {
+  const { t } = useTranslation();
+  const id = useId();
+  const label = t("dashboards.edit.label");
+  const picked = value.editPolicy === "roles" ? value.editRoleIds : [];
+  return (
+    <div className="db-f">
+      <span className="db-lbl" id={`${id}-edits`}>
+        {label}
+      </span>
+      <div className="ac-select">
+        <Menu
+          label={label}
+          trigger={
+            <button type="button" className="ac-select__trigger" aria-labelledby={`${id}-edits ${id}-value`}>
+              <span className="ac-select__value" id={`${id}-value`}>
+                {editorsText(t, editorsSummary(value, roles))}
+              </span>
+              <svg className="ac-select__chev" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m6 8 4 4 4-4" />
+              </svg>
+            </button>
+          }
+        >
+          <MenuCheckboxItem
+            icon="eye"
+            closes
+            checked={value.editPolicy === "viewers"}
+            onCheckedChange={() => onChange({ ...value, editPolicy: "viewers", editRoleIds: [] })}
+          >
+            {t("dashboards.edit.viewers")}
+          </MenuCheckboxItem>
+          <MenuCheckboxItem
+            icon="lock"
+            closes
+            checked={value.editPolicy === "owner"}
+            onCheckedChange={() => onChange({ ...value, editPolicy: "owner", editRoleIds: [] })}
+          >
+            {t("dashboards.edit.owner")}
+          </MenuCheckboxItem>
+          {roles.length > 0 && (
+            <>
+              <MenuSeparator />
+              <MenuHeading>{t("dashboards.edit.roles")}</MenuHeading>
+              {roles.map((r) => {
+                const sees = roleSeesBoard(value, r.id);
+                return (
+                  <MenuCheckboxItem
+                    key={r.id}
+                    leading={<RoleMark color={r.color} icon={r.icon} size={16} />}
+                    checked={picked.includes(r.id)}
+                    disabled={!sees}
+                    description={sees ? undefined : t("dashboards.edit.cantSee")}
+                    onCheckedChange={() => onChange(toggleEditRole(value, r.id))}
+                  >
+                    {r.name}
+                  </MenuCheckboxItem>
+                );
+              })}
+            </>
+          )}
+        </Menu>
+      </div>
+    </div>
   );
 }

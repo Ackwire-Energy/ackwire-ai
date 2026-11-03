@@ -13,8 +13,9 @@ const { dashboards, dashboardWidgets } = schema;
  *   `roles` when the viewer holds one of `audience_role_ids` at the time (`organization_member_roles`, as
  *   `channelAudienceSql`) or is an admin. A `private` board and a `home` board are their owner's alone, admins
  *   included. A `roles` board with no role left is its owner's (and admins') alone.
- * - **Edits** (title, about, widgets, layout, refresh, change requests): who sees it, when `edit_policy` is
- *   `viewers`; else its owner and admins. A home board: its owner only.
+ * - **Edits** (title, about, widgets, layout, refresh, change requests): its owner and admins, and who sees it when
+ *   `edit_policy` is `viewers`, or who sees it and holds one of `edit_role_ids` at the time when it is `roles` (seeing
+ *   comes first: an edit role whose holders don't see the board gives them nothing). A home board: its owner only.
  * - **Manages** (share, delete, pin): its owner and admins; never for a home board but by its owner (no share or
  *   delete at all for a home board).
  * - **Admin**: `can(membership, "administrator")` (owners hold it too).
@@ -50,7 +51,7 @@ export function viewerOf(membership: Membership, userId = ""): DashboardViewer {
 
 type RightsFields = Pick<
   DashboardRow,
-  "kind" | "audience" | "audienceRoleIds" | "editPolicy" | "ownerUserId" | "deletedAt"
+  "kind" | "audience" | "audienceRoleIds" | "editPolicy" | "editRoleIds" | "ownerUserId" | "deletedAt"
 >;
 
 const NO_RIGHTS: DashboardRights = { see: false, edit: false, manage: false };
@@ -67,7 +68,12 @@ export function dashboardRights(board: RightsFields, viewer: DashboardViewer): D
         (viewer.admin || board.audienceRoleIds.some((id) => viewer.roleIds.includes(id)))));
   if (!owner && !shared) return NO_RIGHTS;
   if (board.kind === "home") return { see: true, edit: owner, manage: owner };
-  return { see: true, edit: owner || viewer.admin || board.editPolicy === "viewers", manage: owner || viewer.admin };
+  const edit =
+    owner ||
+    viewer.admin ||
+    board.editPolicy === "viewers" ||
+    (board.editPolicy === "roles" && board.editRoleIds.some((id) => viewer.roleIds.includes(id)));
+  return { see: true, edit, manage: owner || viewer.admin };
 }
 
 const asSql = (v: SQL | string): SQL => (typeof v === "string" ? sql`${v}` : v);
@@ -210,7 +216,7 @@ export function countViewers(board: AudienceFields, members: readonly AudienceMe
   let n = 0;
   for (const m of members) {
     const viewer: DashboardViewer = { userId: m.userId, roleIds: m.roleIds, admin: m.admin, mayPublish: false };
-    if (dashboardRights({ ...board, editPolicy: "owner", deletedAt: null }, viewer).see) n++;
+    if (dashboardRights({ ...board, editPolicy: "owner", editRoleIds: [], deletedAt: null }, viewer).see) n++;
   }
   return n;
 }

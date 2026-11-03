@@ -1722,6 +1722,7 @@ export const featureKeysPtBR = {
   dashboards: {
     homeRow: "Só você · seus próprios widgets",
     loadFailed: "Não deu para carregar os painéis.",
+    onlyHome: "Os painéis do workspace ou dos seus papéis aparecem aqui.",
     create: "Criar",
     routineTarget: "o widget dela",
     pin: {
@@ -1751,8 +1752,6 @@ export const featureKeysPtBR = {
       refreshing: "{{name}} está atualizando.",
       scheduleSaved: "Agora atualiza {{schedule}}",
       alertSaved: "Aviso salvo",
-      removeTitle: "Tirar “{{title}}”?",
-      removeText: "A rotina dele para, e o que ele mostra vai junto.",
       removed: "Widget tirado. A rotina parou.",
       routine: "A rotina dele",
       onBoard: "Onde está",

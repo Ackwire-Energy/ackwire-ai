@@ -1881,6 +1881,7 @@
   "dashboards": {
     "homeRow": "Tylko ty · twoje własne widżety",
     "loadFailed": "Nie udało się wczytać dashboardów.",
+    "onlyHome": "Tu pojawią się dashboardy przestrzeni roboczej albo twoich ról.",
     "create": "Utwórz",
     "routineTarget": "jego widżet",
     "pin": {
@@ -1909,8 +1910,6 @@
       "refreshing": "{{name}} go aktualizuje.",
       "scheduleSaved": "Teraz aktualizuje się {{schedule}}",
       "alertSaved": "Zapisano alert",
-      "removeTitle": "Usunąć „{{title}}”?",
-      "removeText": "Jego rutyna się zatrzyma, a to, co pokazuje, zniknie razem z nim.",
       "removed": "Usunięto widżet. Jego rutyna się zatrzymała.",
       "routine": "Jego rutyna",
       "onBoard": "Gdzie jest",

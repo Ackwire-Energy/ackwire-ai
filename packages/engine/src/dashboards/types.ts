@@ -30,9 +30,12 @@ export const DASHBOARD_KINDS: readonly DashboardKind[] = ["board", "home"];
 export type DashboardAudience = "workspace" | "roles" | "private";
 export const DASHBOARD_AUDIENCES: readonly DashboardAudience[] = ["workspace", "roles", "private"];
 
-/** Who edits it: whoever sees it, or only its owner (and admins). */
-export type DashboardEditPolicy = "viewers" | "owner";
-export const DASHBOARD_EDIT_POLICIES: readonly DashboardEditPolicy[] = ["viewers", "owner"];
+/**
+ * Who edits it: whoever sees it, only its owner (and admins), or whoever sees it and holds one of its edit roles
+ * (`editRoleIds`; its owner and admins too).
+ */
+export type DashboardEditPolicy = "viewers" | "owner" | "roles";
+export const DASHBOARD_EDIT_POLICIES: readonly DashboardEditPolicy[] = ["viewers", "owner", "roles"];
 
 /** A home board's fixed tiles. */
 export type HomeTileKey = "waiting" | "working";
@@ -72,7 +75,7 @@ export const DASHBOARD_ERRORS = {
   forbidden: "dashboard.forbidden",
   /** 400: a home board is never shared, deleted or renamed. */
   homeFixed: "dashboard.home_fixed",
-  /** 400: `roles` without any role. */
+  /** 400: `roles` (who sees, or who edits) without any role. */
   rolesRequired: "dashboard.roles_required",
   /** 400: a role that isn't one of the workspace's custom roles. */
   roleUnknown: "dashboard.role_unknown",
@@ -157,6 +160,8 @@ export interface DashboardSummaryView {
   audience: DashboardAudience;
   roleIds: string[];
   editPolicy: DashboardEditPolicy;
+  /** With `editPolicy` `roles`: the roles whose holders edit it when they see it; else empty. */
+  editRoleIds: string[];
   pinned: boolean;
   position: number;
   owner: DashboardOwnerView | null;
@@ -217,11 +222,6 @@ export interface DashboardView extends DashboardSummaryView {
   widgets: WidgetView[];
   /** Home only: the fixed tiles; empty for a board. */
   tiles: HomeTile[];
-}
-
-/** A new board, and where its agent started building it when asked to. */
-export interface DashboardCreatedView extends DashboardView {
-  startedIn: { channelId: string } | null;
 }
 
 export interface WidgetUpdateView {
@@ -296,8 +296,8 @@ export interface CreateDashboardInput {
   audience: DashboardAudience;
   roleIds?: string[];
   editPolicy: DashboardEditPolicy;
-  /** "Ask an agent": its brief goes to the agent in the person's DM with it, which builds the widgets. */
-  start?: { agentId: string; brief: string };
+  /** With `editPolicy` `roles`: 1 to `DASHBOARD_ROLES_MAX` custom roles. */
+  editRoleIds?: string[];
 }
 
 export interface UpdateDashboardInput {
@@ -310,6 +310,8 @@ export interface ShareDashboardInput {
   audience: DashboardAudience;
   roleIds: string[];
   editPolicy: DashboardEditPolicy;
+  /** With `editPolicy` `roles`: 1 to `DASHBOARD_ROLES_MAX` custom roles. */
+  editRoleIds?: string[];
 }
 
 export interface DashboardLayoutInput {

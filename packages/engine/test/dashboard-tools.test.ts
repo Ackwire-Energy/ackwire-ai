@@ -178,7 +178,8 @@ describe("the person decides", () => {
 });
 
 describe("create_widget", () => {
-  test("on the board the person asked to build, with data at once; without data its first build is queued", async () => {
+  test("on the board it is given, with data at once; without data its first build is queued", async () => {
+    let boardId = "";
     const results = await setupAgent((req) => {
       const said = JSON.stringify(req.messages);
       if (!said.includes("vendas")) return [];
@@ -186,6 +187,7 @@ describe("create_widget", () => {
         {
           name: "create_widget",
           input: {
+            dashboard_id: boardId,
             title: "Vendas hoje",
             prompt: "Quanto vendemos hoje contra ontem",
             schedule: "hour",
@@ -196,6 +198,7 @@ describe("create_widget", () => {
         {
           name: "create_widget",
           input: {
+            dashboard_id: boardId,
             title: "Pedidos atrasados",
             prompt: "Pedidos atrasados por canal",
             kind: "list",
@@ -208,9 +211,9 @@ describe("create_widget", () => {
       title: "Loja",
       audience: "private",
       editPolicy: "owner",
-      start: { agentId: f.agent.id, brief: "Quero acompanhar as vendas da loja" },
     });
-    await drainOutbox(f.db, f.handlers);
+    boardId = created.id;
+    await ask("quero acompanhar as vendas da loja no painel Loja");
     const [shown, building] = await widgets();
     expect(shown).toMatchObject({
       dashboardId: created.id,
@@ -238,7 +241,7 @@ describe("create_widget", () => {
     expect(results.some((r) => r.includes("It shows your data now"))).toBe(true);
   });
 
-  test("without a board asked for, it goes on the person's Home; a board they can't edit is refused", async () => {
+  test("without a board, it goes on the person's Home; a board they can't edit is refused", async () => {
     const results: string[] = [];
     let other = "";
     await setupAgent((req) => {
@@ -331,6 +334,46 @@ describe("share_dashboard and list_dashboards", () => {
     await ask("quais painéis eu tenho?");
     expect(results.at(-1)).toContain(boardId);
     expect(results.at(-1)).toContain("Home has no widgets yet");
+  });
+
+  test("who edits: by roles on create; share_dashboard changes it at once, alone, never a request", async () => {
+    let boardId = "";
+    let step = "";
+    const results = await setupAgent(() => {
+      if (step === "create") {
+        const input = { title: "Pipeline", edit: "roles", edit_roles: ["vendas"] };
+        return [{ name: "create_dashboard", input }];
+      }
+      if (step === "nobody") {
+        const input = { dashboard_id: boardId, edit: "roles", edit_roles: ["Marketing"] };
+        return [{ name: "share_dashboard", input }];
+      }
+      if (step === "viewers") return [{ name: "share_dashboard", input: { dashboard_id: boardId, edit: "viewers" } }];
+      return [];
+    });
+    const sales = await roleFor(f.owner.id);
+    step = "create";
+    await ask("cria um painel do pipeline que o time de vendas edita");
+    const [made] = await boards();
+    boardId = made?.id ?? "";
+    expect(made).toMatchObject({ audience: "private", editPolicy: "roles", editRoleIds: [sales.id], proposal: null });
+    expect(results.at(-1)).toContain("people with the role Vendas who see it");
+
+    step = "nobody";
+    await ask("deixa o marketing editar");
+    expect((await boards())[0]).toMatchObject({ editPolicy: "roles", editRoleIds: [sales.id] });
+    expect(results.at(-1)).toContain("No role matched Marketing");
+
+    step = "viewers";
+    await ask("quem vê pode editar");
+    expect((await boards())[0]).toMatchObject({
+      audience: "private",
+      editPolicy: "viewers",
+      editRoleIds: [],
+      proposal: null,
+    });
+    expect(results.at(-1)).toContain("edited by whoever sees it");
+    expect(await notificationsOf(f, "dashboard_proposal")).toHaveLength(0);
   });
 
   test("a routine's run never widens a board: it only asks", async () => {

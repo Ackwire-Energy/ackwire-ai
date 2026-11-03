@@ -132,8 +132,9 @@ describe("My Home as a mural (ADR 0134)", () => {
     const failed = widget("Tempo de build");
     expect(failed.getAttribute("data-state")).toBe("failed");
     expect(failed.textContent).toContain("A última atualização terminou sem dados.");
-    // "+ Widget" ends the board.
-    expect(within(mural()).getByRole("button", { name: "Adicionar widget" }).textContent).toBe("Widget");
+    // A widget is added from the header's "+": the board itself has no add tile.
+    expect(within(mural()).getAllByRole("button", { name: "Adicionar widget" })).toHaveLength(1);
+    expect(mural().querySelector(".wgrid")?.querySelector("button[aria-label='Adicionar widget']")).toBeNull();
   });
 
   test("Resolve runs a failed widget again; Update now runs any", async () => {
@@ -156,7 +157,6 @@ describe("My Home as a mural (ADR 0134)", () => {
     // The fixed tiles say so; widgets show their size, remove and grip instead of their actions.
     expect(within(mural()).getAllByText("Fixo")).toHaveLength(2);
     expect(within(widget("Vendas hoje")).queryByRole("button", { name: "Atualizar agora" })).toBeNull();
-    expect(within(mural()).queryByRole("button", { name: "Adicionar widget" })).toBeNull();
 
     // S → M.
     await click(within(widget("Vendas hoje")).getByRole("button", { name: "Tamanho: P" }));
@@ -204,15 +204,42 @@ describe("My Home as a mural (ADR 0134)", () => {
     expect(savedWidgets(state).find((w) => w.id === builds.id)?.position).toBe(2);
     await pause(80);
 
-    // Remove: it leaves, and its routine with it.
+    // Remove asks first (its agent's routine stops, its history goes), then it leaves, and its routine with it.
     await click(within(widget("Pedidos por status")).getByRole("button", { name: "Tirar do Início" }));
     await settle(3);
+    const confirm = screen().getByRole("dialog", { name: "Tirar “Pedidos por status”?" });
+    expect(confirm.textContent).toContain("A rotina de Ada que o atualiza para");
+    expect(calls(state, "dashboards.removeWidget")).toHaveLength(0);
+    await click(within(confirm).getByRole("button", { name: "Tirar" }));
+    await settle(4);
     expect(last(state, "dashboards.removeWidget")).toEqual([ORG_ID, orders.id]);
+    expect(screen().queryByRole("dialog", { name: "Tirar “Pedidos por status”?" })).toBeNull();
     expect(within(mural()).queryByRole("article", { name: "Pedidos por status" })).toBeNull();
     expect(document.body.textContent).toContain("“Pedidos por status” saiu do Início e a rotina de Ada parou");
 
     await click(within(mural()).getByRole("button", { name: "Pronto" }));
-    expect(within(mural()).getByRole("button", { name: "Adicionar widget" })).toBeTruthy();
+    expect(within(mural()).getByRole("button", { name: "Organizar" })).toBeTruthy();
+  });
+
+  test("Remove from a card's menu asks first; Cancel keeps the widget", async () => {
+    const { state } = await open(`/org/${ORG_ID}/home`);
+    await act(async () =>
+      fireEvent.pointerDown(within(widget("Tempo de build")).getByRole("button", { name: "Mais" }), {
+        button: 0,
+        ctrlKey: false,
+      }),
+    );
+    await settle(2);
+    const menu = screen().getByRole("menu", { name: "Mais" });
+    await click(within(menu).getByRole("menuitem", { name: "Tirar do Início" }));
+    await settle(3);
+    const confirm = screen().getByRole("dialog", { name: "Tirar “Tempo de build”?" });
+    expect(confirm.textContent).toContain("A rotina de Ada que o atualiza para");
+    await click(within(confirm).getByRole("button", { name: "Cancelar" }));
+    await settle(3);
+    expect(screen().queryByRole("dialog", { name: "Tirar “Tempo de build”?" })).toBeNull();
+    expect(calls(state, "dashboards.removeWidget")).toHaveLength(0);
+    expect(widget("Tempo de build")).toBeTruthy();
   });
 
   test("Organize with the keys: Space picks a widget up, the arrows carry it, Enter drops it and saves", async () => {
@@ -378,8 +405,13 @@ describe("a widget's side panel", () => {
     const { state } = await open(`/org/${ORG_ID}/home?widget=${s.orders.id}`, s);
     const panel = screen().getByRole("dialog", { name: "Pedidos por status" });
     await click(within(panel).getByRole("button", { name: "Tirar do Início" }));
+    await settle(3);
+    expect(calls(state, "dashboards.removeWidget")).toHaveLength(0);
+    const confirm = screen().getByRole("dialog", { name: "Tirar “Pedidos por status”?" });
+    await click(within(confirm).getByRole("button", { name: "Tirar" }));
     await settle(4);
     expect(last(state, "dashboards.removeWidget")).toEqual([ORG_ID, s.orders.id]);
+    expect(screen().queryByRole("dialog", { name: "Tirar “Pedidos por status”?" })).toBeNull();
     expect(screen().queryByRole("dialog", { name: "Pedidos por status" })).toBeNull();
   });
 });

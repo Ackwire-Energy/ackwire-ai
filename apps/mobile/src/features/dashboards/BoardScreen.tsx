@@ -2,9 +2,9 @@ import { busyWidgets, type Widget } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, Icon, IconButton, Text, useTheme } from "@/ui";
+import { Button, IconButton, Text, useTheme } from "@/ui";
 import { widgetHref } from "../links/logic";
 import { usePullRefresh } from "../shared/hooks";
 import { FocusLive, PushedHeader } from "../shared/parts";
@@ -23,7 +23,7 @@ export const newWidgetHref = (dashboardId: string) => `/widget-new?dashboardId=$
 
 /**
  * A dashboard, pushed (ADR 0134): its widgets on two columns (a 2-wide one takes the whole row, a 2-high one draws
- * its data big), who sees it and how many widgets, an agent's request to publish it, and "+ Widget" at the end.
+ * its data big), who sees it and how many widgets, an agent's request to publish it (empty: "Add widget").
  * Share (the globe or the lock), "+" and "…" (Organize, Rename, Pin, Delete) in the bar. `id` is `home` for My Home,
  * made the first time it is opened.
  */
@@ -117,7 +117,7 @@ function Board({ id }: { id: string }) {
                 {t("dashboards.empty.text")}
               </Text>
               {board.canEdit ? (
-                <Button variant="primary" size="sm" icon="plus" label={t("widgets.add.tile")} onPress={add} />
+                <Button variant="primary" size="sm" icon="plus" label={t("widgets.add.label")} onPress={add} />
               ) : null}
             </View>
           ) : (
@@ -144,19 +144,6 @@ function Board({ id }: { id: string }) {
                   ))}
                 </View>
               ))}
-              {board.canEdit ? (
-                <Pressable
-                  onPress={add}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("widgets.add.label")}
-                  style={({ pressed }) => [styles.add, { borderColor: c.line2 }, pressed ? styles.pressed : null]}
-                >
-                  <Icon name="plus" size={18} color={c.faint} />
-                  <Text variant="subhead" tone="faint" style={styles.semibold}>
-                    {t("widgets.add.tile")}
-                  </Text>
-                </Pressable>
-              ) : null}
             </View>
           )}
         </ScrollView>
@@ -185,18 +172,4 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1.5,
   },
-  add: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: 52,
-    borderWidth: 1.5,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
-    borderBottomLeftRadius: 6,
-  },
-  pressed: { opacity: 0.6 },
-  semibold: { fontWeight: "600" },
 });

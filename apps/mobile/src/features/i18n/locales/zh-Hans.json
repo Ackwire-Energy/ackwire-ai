@@ -1635,6 +1635,7 @@
   "dashboards": {
     "homeRow": "仅你自己 · 你自己的小组件",
     "loadFailed": "无法加载仪表盘。",
+    "onlyHome": "工作区或你的角色的仪表盘会显示在这里。",
     "create": "创建",
     "routineTarget": "它的小组件",
     "pin": {
@@ -1663,8 +1664,6 @@
       "refreshing": "{{name}} 正在更新。",
       "scheduleSaved": "现在{{schedule}}更新",
       "alertSaved": "提醒已保存",
-      "removeTitle": "移除“{{title}}”？",
-      "removeText": "它的例行工作会停止，显示的内容也会一起移除。",
       "removed": "小组件已移除。它的例行工作已停止。",
       "routine": "它的例行工作",
       "onBoard": "所在位置",

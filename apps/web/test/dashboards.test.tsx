@@ -46,19 +46,37 @@ const open = async (path: string, prepare?: (fake: FakeDashboards) => void) => {
 };
 const section = (name: string) => screen().getByRole("region", { name });
 
-describe("Dashboards: the sidebar row and the list (ADR 0134 §14)", () => {
-  test("a fixed row Dashboards right after Home opens the Dashboards page", async () => {
-    const { router } = await open(`/org/${ORG_ID}/home`);
+describe("Dashboards: in the sidebar's More, and the list (ADR 0134 §14)", () => {
+  test("More opens the Dashboards page, which then shows under More, on a board's page too", async () => {
+    const { router } = await open(`/org/${ORG_ID}/home`, (fake) => {
+      fake.addBoard({ id: "dash-m", title: "Metas", audience: "workspace" });
+    });
     const tools = [...nav().querySelectorAll(".sidebar__tools > a.sidebar__item .sidebar__item-label")].map(
       (l) => l.textContent,
     );
-    expect(tools.slice(0, 2)).toEqual(["Início", "Painéis"]);
-    const row = within(nav()).getByRole("link", { name: "Painéis" });
+    expect(tools).not.toContain("Painéis");
+    const active = () =>
+      [...nav().querySelectorAll('.sidebar__more-active > [data-status="active"] .sidebar__item-label')].map(
+        (l) => l.textContent,
+      );
+    expect(active()).toEqual([]);
+    await click(within(nav()).getByRole("button", { name: "Mais" }));
+    await settle(3);
+    const more = screen().getByRole("dialog", { name: "Mais" });
+    const row = within(more).getByRole("link", { name: /Painéis/ });
     expect(row.getAttribute("href")).toBe(`/org/${ORG_ID}/dashboards`);
+    expect(row.textContent).toContain("Números e gráficos que os agentes mantêm em dia");
     await click(row);
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dashboards`);
     expect(screen().getByRole("heading", { name: "Painéis", level: 1 })).toBeTruthy();
+    expect(active()).toEqual(["Painéis"]);
+    await act(() =>
+      router.navigate({ to: "/org/$orgId/dashboards/$dashboardId", params: { orgId: ORG_ID, dashboardId: "dash-m" } }),
+    );
+    await settle(6);
+    expect(screen().getByRole("heading", { name: "Metas", level: 1 })).toBeTruthy();
+    expect(active()).toEqual(["Painéis"]);
   });
 
   test("My Home first, then the workspace's, the roles' and only mine, each card with who made it", async () => {
@@ -94,13 +112,19 @@ describe("Dashboards: the sidebar row and the list (ADR 0134 §14)", () => {
     const tiles = mine.querySelectorAll(".db-thumb__tile");
     expect(tiles).toHaveLength(1);
     expect((tiles[0] as HTMLElement).style.gridColumn).toBe("span 2");
-    expect(screen().queryByText("Nenhum painel ainda")).toBeNull();
+    expect(document.querySelector(".db-group__only")).toBeNull();
   });
 
-  test("no boards yet: the empty state offers New dashboard", async () => {
-    await open(`/org/${ORG_ID}/dashboards`);
-    expect(screen().getByText("Nenhum painel ainda")).toBeTruthy();
-    expect(screen().getAllByRole("button", { name: "Novo painel" }).length).toBeGreaterThan(0);
+  test("only My Home: no empty state saying there are none, a line under it pointing at New dashboard", async () => {
+    await open(`/org/${ORG_ID}/dashboards`, (fake) => {
+      fake.addBoard({ kind: "home" });
+    });
+    const home = section("Meu Início");
+    expect(within(home).getByRole("link", { name: /Meu Início/ })).toBeTruthy();
+    expect(home.textContent).toContain("Crie um painel para o workspace ou para alguns papéis em “Novo painel”.");
+    expect(document.querySelector(".ac-empty")).toBeNull();
+    // The page's own button is the one way to make one.
+    expect(screen().getAllByRole("button", { name: "Novo painel" })).toHaveLength(1);
   });
 });
 

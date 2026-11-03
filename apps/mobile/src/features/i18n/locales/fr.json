@@ -1799,6 +1799,7 @@
   "dashboards": {
     "homeRow": "Vous seul · vos propres widgets",
     "loadFailed": "Impossible de charger les tableaux de bord.",
+    "onlyHome": "Les tableaux de bord de l'espace de travail ou de vos rôles apparaissent ici.",
     "create": "Créer",
     "routineTarget": "son widget",
     "pin": {
@@ -1827,8 +1828,6 @@
       "refreshing": "{{name}} le met à jour.",
       "scheduleSaved": "Il se met maintenant à jour {{schedule}}",
       "alertSaved": "Alerte enregistrée",
-      "removeTitle": "Retirer « {{title}} » ?",
-      "removeText": "Sa routine s'arrête, et ce qu'il affiche part avec lui.",
       "removed": "Widget retiré. Sa routine s'est arrêtée.",
       "routine": "Sa routine",
       "onBoard": "Où il se trouve",

@@ -27,8 +27,9 @@ export const WidgetStatus = z.enum(WIDGET_STATUSES).openapi("WidgetStatus");
 export const DashboardAudience = z.enum(["workspace", "roles", "private"]).openapi("DashboardAudience", {
   description: "Every member, whoever holds one of `roleIds` at the time, or only its owner.",
 });
-export const DashboardEditPolicy = z.enum(["viewers", "owner"]).openapi("DashboardEditPolicy", {
-  description: "Whoever sees it, or only its owner and admins.",
+export const DashboardEditPolicy = z.enum(["viewers", "owner", "roles"]).openapi("DashboardEditPolicy", {
+  description:
+    "Whoever sees it; only its owner and admins; or, besides them, whoever sees it and holds one of `editRoleIds`.",
 });
 
 const Span = z.union([z.literal(1), z.literal(2)]);
@@ -103,6 +104,9 @@ export const DashboardSummary = z
     audience: DashboardAudience,
     roleIds: z.array(z.uuid()),
     editPolicy: DashboardEditPolicy,
+    editRoleIds: z
+      .array(z.uuid())
+      .openapi({ description: "With `editPolicy` `roles`: the roles whose holders edit it when they see it." }),
     pinned: z.boolean(),
     position: z.number(),
     owner: DashboardOwner.nullable().openapi({ description: "The agent that made it, else the person who owns it." }),
@@ -171,13 +175,6 @@ export const Dashboard = DashboardSummary.extend({
   tiles: z.array(HomeTile),
 }).openapi("Dashboard");
 
-export const DashboardCreated = Dashboard.extend({
-  startedIn: z
-    .object({ channelId: z.uuid() })
-    .nullable()
-    .openapi({ description: "“Ask an agent”: the DM where it started building the board." }),
-}).openapi("DashboardCreated");
-
 export const WidgetUpdate = z
   .object({
     id: z.uuid(),
@@ -243,10 +240,7 @@ export const CreateDashboardBody = z
     audience: DashboardAudience,
     roleIds: z.array(z.uuid()).max(100).optional(),
     editPolicy: DashboardEditPolicy,
-    start: z
-      .object({ agentId: z.uuid(), brief: z.string().trim().min(1).max(2000) })
-      .optional()
-      .openapi({ description: "“Ask an agent”: it builds the widgets from this brief in the caller's DM with it." }),
+    editRoleIds: z.array(z.uuid()).max(100).optional(),
   })
   .openapi("CreateDashboard");
 
@@ -259,7 +253,12 @@ export const UpdateDashboardBody = z
   .openapi("UpdateDashboard");
 
 export const ShareDashboardBody = z
-  .object({ audience: DashboardAudience, roleIds: z.array(z.uuid()).max(100), editPolicy: DashboardEditPolicy })
+  .object({
+    audience: DashboardAudience,
+    roleIds: z.array(z.uuid()).max(100),
+    editPolicy: DashboardEditPolicy,
+    editRoleIds: z.array(z.uuid()).max(100).optional(),
+  })
   .openapi("ShareDashboard");
 
 export const DashboardLayoutBody = z

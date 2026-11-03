@@ -13250,7 +13250,6 @@
       "canceled": "“{{title}}” staat weer op zijn plek."
     },
     "add": {
-      "tile": "Widget",
       "label": "Widget toevoegen"
     },
     "alert": {
@@ -13345,12 +13344,19 @@
     "removed": {
       "home": "“{{title}}” staat niet meer op Start en de routine van {{name}} is gestopt",
       "board": "“{{title}}” staat niet meer op het dashboard en de routine van {{name}} is gestopt"
+    },
+    "removeConfirm": {
+      "title": "“{{title}}” verwijderen?",
+      "textRoutine": "De routine van {{name}} die hem bijwerkt stopt, en zijn updategeschiedenis gaat mee.",
+      "textManual": "Zijn updategeschiedenis gaat mee.",
+      "confirm": "Verwijderen"
     }
   },
   "dashboards": {
     "title": "Dashboards",
     "subtitle": "Getallen en grafieken die de agents actueel houden, voor de werkruimte of alleen voor sommige rollen.",
     "sidebar": "Dashboards",
+    "navWhat": "Getallen en grafieken die de agents actueel houden",
     "new": "Nieuw dashboard",
     "back": "Dashboards",
     "home": "Mijn start",
@@ -13378,7 +13384,14 @@
     "edit": {
       "label": "Wie bewerkt",
       "viewers": "Wie het ziet",
-      "owner": "Alleen jij en beheerders"
+      "owner": "Alleen jij en beheerders",
+      "roles": "Of mensen met deze rollen",
+      "twoRoles": "{{first}} en {{second}}",
+      "manyRoles_one": "{{count}} rol",
+      "manyRoles_other": "{{count}} rollen",
+      "cantSee": "Ziet dit dashboard niet",
+      "someRoles": "Enkele rollen…",
+      "rolesNote": "Mensen met deze rollen bewerken het als ze het ook zien. Jij en beheerders altijd."
     },
     "meta": {
       "by": "Gemaakt door {{name}}",
@@ -13415,26 +13428,17 @@
     },
     "empty": {
       "title": "Leeg dashboard",
-      "text": "Voeg widgets toe: vraag het een agent of zet een blok uit de chat vast.",
-      "noneTitle": "Nog geen dashboards",
-      "none": "Getallen en grafieken die agents actueel houden, voor jou of voor het team."
+      "text": "Voeg widgets toe: vraag het een agent of zet een blok uit de chat vast."
     },
+    "onlyHome": "Maak met “Nieuw dashboard” een dashboard voor de werkruimte of voor sommige rollen.",
     "create": {
       "title": "Nieuw dashboard",
       "subtitle": "Widgets samen op één pagina, voor jou of voor het team.",
       "name": "Naam",
       "namePlaceholder": "Bijv.: Verkoop, Black Friday, Kwartaaldoelen",
-      "start": "Hoe je begint",
-      "blank": "Leeg",
-      "blankHint": "Jij voegt de widgets toe",
-      "agent": "Een agent vragen",
-      "agentHint": "Die bouwt de widgets en de routines",
-      "briefPlaceholder": "Bijv.: wat ik elke ochtend over de verkoop moet zien",
+      "askHint": "Je kunt ook in een chat een agent vragen er een te maken.",
       "submit": "Dashboard maken",
-      "created": "“{{title}}” gemaakt",
-      "started": "{{name}} bouwt “{{title}}” in jullie gesprek",
-      "openChat": "Gesprek openen",
-      "brief": "Wat {{name}} moet bouwen"
+      "created": "“{{title}}” gemaakt"
     },
     "newWidget": {
       "title": "Nieuwe widget",

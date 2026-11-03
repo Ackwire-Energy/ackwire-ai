@@ -1635,6 +1635,7 @@
   "dashboards": {
     "homeRow": "나만 · 내 위젯",
     "loadFailed": "대시보드를 불러오지 못했어요.",
+    "onlyHome": "워크스페이스나 내 역할의 대시보드가 여기에 표시돼요.",
     "create": "만들기",
     "routineTarget": "해당 위젯",
     "pin": {
@@ -1663,8 +1664,6 @@
       "refreshing": "{{name}}이(가) 업데이트하고 있어요.",
       "scheduleSaved": "이제 {{schedule}} 업데이트해요",
       "alertSaved": "알림을 저장했어요",
-      "removeTitle": "“{{title}}”을(를) 제거할까요?",
-      "removeText": "루틴이 멈추고, 보여 주던 내용도 함께 사라져요.",
       "removed": "위젯을 제거했어요. 루틴이 멈췄어요.",
       "routine": "루틴",
       "onBoard": "위치",

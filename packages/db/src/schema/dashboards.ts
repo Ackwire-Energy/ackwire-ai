@@ -46,8 +46,9 @@ export interface DashboardProposalRow {
  * Dashboards (ADR 0134): a board of widgets that agents keep up to date. `kind` `home` is a person's own board on
  * Home (one per person, always private); `board` is any other. Who sees it: `audience` `workspace` (every
  * member), `roles` (whoever holds one of `audience_role_ids` at the time, ADR 0085, as a channel's audience, ADR
- * 0125) or `private` (its owner only). Who edits: `edit_policy` `viewers` (whoever sees it) or `owner` (its owner
- * and admins). An agent that made it is `owner_agent_id` ("created by"); the person it made it for owns it.
+ * 0125) or `private` (its owner only). Who edits: `edit_policy` `viewers` (whoever sees it), `owner` (its owner
+ * and admins) or `roles` (whoever sees it and holds one of `edit_role_ids`, besides its owner and admins). An agent
+ * that made it is `owner_agent_id` ("created by"); the person it made it for owns it.
  */
 export const dashboards = pgTable(
   "dashboards",
@@ -72,8 +73,10 @@ export const dashboards = pgTable(
     /** `workspace` | `roles` | `private`. */
     audience: text().notNull().default("private"),
     audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
-    /** `viewers` | `owner`. */
+    /** `viewers` | `owner` | `roles`. */
     editPolicy: text().notNull().default("owner"),
+    /** With `roles`: the roles whose holders edit it, when they also see it (ADR 0134 §8); else empty. */
+    editRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** Shown first in the list (its owner or an admin sets it). */
     pinned: boolean().notNull().default(false),
     /** Order in the list among the pinned or the rest, lowest first. */

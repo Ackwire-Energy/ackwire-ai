@@ -13057,7 +13057,6 @@
       "canceled": "„{{title}}“ ist wieder an seinem Platz."
     },
     "add": {
-      "tile": "Widget",
       "label": "Widget hinzufügen"
     },
     "alert": {
@@ -13152,12 +13151,19 @@
     "removed": {
       "home": "„{{title}}“ ist nicht mehr auf Start und die Routine von {{name}} wurde gestoppt",
       "board": "„{{title}}“ ist nicht mehr auf dem Dashboard und die Routine von {{name}} wurde gestoppt"
+    },
+    "removeConfirm": {
+      "title": "„{{title}}“ entfernen?",
+      "textRoutine": "Die Routine von {{name}}, die es aktualisiert, stoppt, und sein Aktualisierungsverlauf verschwindet mit ihm.",
+      "textManual": "Sein Aktualisierungsverlauf verschwindet mit ihm.",
+      "confirm": "Entfernen"
     }
   },
   "dashboards": {
     "title": "Dashboards",
     "subtitle": "Zahlen und Diagramme, die die Agenten aktuell halten, für den Workspace oder nur für einige Rollen.",
     "sidebar": "Dashboards",
+    "navWhat": "Zahlen und Diagramme, die die Agenten aktuell halten",
     "new": "Neues Dashboard",
     "back": "Dashboards",
     "home": "Mein Start",
@@ -13185,7 +13191,14 @@
     "edit": {
       "label": "Wer bearbeitet",
       "viewers": "Wer es sieht",
-      "owner": "Nur du und Admins"
+      "owner": "Nur du und Admins",
+      "roles": "Oder Personen mit diesen Rollen",
+      "twoRoles": "{{first}} und {{second}}",
+      "manyRoles_one": "{{count}} Rolle",
+      "manyRoles_other": "{{count}} Rollen",
+      "cantSee": "Sieht dieses Dashboard nicht",
+      "someRoles": "Einige Rollen…",
+      "rolesNote": "Personen mit diesen Rollen bearbeiten es, wenn sie es auch sehen. Du und Admins immer."
     },
     "meta": {
       "by": "Erstellt von {{name}}",
@@ -13222,26 +13235,17 @@
     },
     "empty": {
       "title": "Leeres Dashboard",
-      "text": "Füge Widgets hinzu: Bitte einen Agenten darum oder hefte einen Block aus dem Chat an.",
-      "noneTitle": "Noch keine Dashboards",
-      "none": "Zahlen und Diagramme, die Agenten aktuell halten, für dich oder fürs Team."
+      "text": "Füge Widgets hinzu: Bitte einen Agenten darum oder hefte einen Block aus dem Chat an."
     },
+    "onlyHome": "Erstelle mit „Neues Dashboard“ ein Dashboard für den Workspace oder einige Rollen.",
     "create": {
       "title": "Neues Dashboard",
       "subtitle": "Widgets zusammen auf einer Seite, für dich oder fürs Team.",
       "name": "Name",
       "namePlaceholder": "Z. B.: Vertrieb, Black Friday, Quartalsziele",
-      "start": "Wie du anfängst",
-      "blank": "Leer",
-      "blankHint": "Du fügst die Widgets hinzu",
-      "agent": "Einen Agenten fragen",
-      "agentHint": "Er baut die Widgets und die Routinen",
-      "briefPlaceholder": "Z. B.: was ich jeden Morgen zum Vertrieb sehen muss",
+      "askHint": "Du kannst auch einen Agenten in einem Chat bitten, eins zu bauen.",
       "submit": "Dashboard erstellen",
-      "created": "„{{title}}“ erstellt",
-      "started": "{{name}} baut „{{title}}“ in eurer Unterhaltung",
-      "openChat": "Unterhaltung öffnen",
-      "brief": "Was {{name}} bauen soll"
+      "created": "„{{title}}“ erstellt"
     },
     "newWidget": {
       "title": "Neues Widget",

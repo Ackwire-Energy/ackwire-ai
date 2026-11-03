@@ -3909,9 +3909,6 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 .ac-btn--loading > :not(.ac-btn__spinner) {
   visibility: hidden;
 }
-.ac-btn--loading {
-  color: transparent;
-}
 .ac-btn--loading .ac-btn__spinner {
   position: absolute;
   inset: 0;
@@ -3922,7 +3919,6 @@ html:not([data-pointer]) .ac-switch:focus-visible {
   color: var(--on-action);
 }
 .ac-btn--loading[disabled] {
-  color: transparent;
   cursor: progress;
   border-color: var(--line-strong);
   background: var(--surface-raised);
@@ -4276,6 +4272,20 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   display: inline-flex;
   gap: 3px;
   margin-left: 2px;
+}
+/*
+ * Loading: the label's text keeps its width but never shows under the spinner, whatever color a variant, a surface
+ * or the disabled state gives the button (those rules come later or weigh more, so the text fill is cleared too).
+ * The spinner is a canvas that reads `color`, so it keeps its own.
+ */
+.ac-btn.ac-btn--loading,
+.ac-btn.ac-btn--loading[disabled],
+.ac-btn.ac-btn--loading[aria-disabled="true"] {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.ac-btn.ac-btn--loading .ac-btn__spinner {
+  -webkit-text-fill-color: currentColor;
 }
 .ac-btn--loading[disabled] {
   background: var(--raised);

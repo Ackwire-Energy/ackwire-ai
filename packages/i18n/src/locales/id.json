@@ -12735,7 +12735,6 @@
       "canceled": "“{{title}}” kembali ke tempatnya."
     },
     "add": {
-      "tile": "Widget",
       "label": "Tambah widget"
     },
     "alert": {
@@ -12830,12 +12829,19 @@
     "removed": {
       "home": "“{{title}}” keluar dari Beranda dan rutinitas {{name}} berhenti",
       "board": "“{{title}}” keluar dari dasbor dan rutinitas {{name}} berhenti"
+    },
+    "removeConfirm": {
+      "title": "Hapus “{{title}}”?",
+      "textRoutine": "Rutinitas {{name}} yang memperbaruinya berhenti, dan riwayat pembaruannya ikut hilang.",
+      "textManual": "Riwayat pembaruannya ikut hilang.",
+      "confirm": "Hapus"
     }
   },
   "dashboards": {
     "title": "Dasbor",
     "subtitle": "Angka dan grafik yang dijaga tetap terbaru oleh agen, untuk ruang kerja atau hanya beberapa peran.",
     "sidebar": "Dasbor",
+    "navWhat": "Angka dan grafik yang dijaga tetap terbaru oleh agen",
     "new": "Dasbor baru",
     "back": "Dasbor",
     "home": "Berandaku",
@@ -12861,7 +12867,13 @@
     "edit": {
       "label": "Siapa yang mengedit",
       "viewers": "Siapa pun yang melihatnya",
-      "owner": "Hanya kamu dan admin"
+      "owner": "Hanya kamu dan admin",
+      "roles": "Atau orang dengan peran ini",
+      "twoRoles": "{{first}} dan {{second}}",
+      "manyRoles_other": "{{count}} peran",
+      "cantSee": "Tidak melihat dasbor ini",
+      "someRoles": "Beberapa peran…",
+      "rolesNote": "Orang dengan peran ini bisa mengeditnya jika mereka juga melihatnya. Kamu dan admin selalu bisa."
     },
     "meta": {
       "by": "Dibuat oleh {{name}}",
@@ -12897,26 +12909,17 @@
     },
     "empty": {
       "title": "Dasbor kosong",
-      "text": "Tambahkan widget: minta ke agen atau sematkan blok dari chat.",
-      "noneTitle": "Belum ada dasbor",
-      "none": "Angka dan grafik yang dijaga tetap terbaru oleh agen, untukmu atau untuk tim."
+      "text": "Tambahkan widget: minta ke agen atau sematkan blok dari chat."
     },
+    "onlyHome": "Buat dasbor untuk ruang kerja atau beberapa peran dengan “Dasbor baru”.",
     "create": {
       "title": "Dasbor baru",
       "subtitle": "Widget berkumpul di satu halaman, untukmu atau untuk tim.",
       "name": "Nama",
       "namePlaceholder": "Mis.: Penjualan, Black Friday, Target kuartal",
-      "start": "Cara memulai",
-      "blank": "Kosong",
-      "blankHint": "Kamu menambahkan widget-nya sendiri",
-      "agent": "Minta ke agen",
-      "agentHint": "Agen membuat widget dan rutinitasnya",
-      "briefPlaceholder": "Mis.: apa yang perlu saya lihat setiap pagi soal penjualan",
+      "askHint": "Kamu juga bisa meminta agen di obrolan untuk membuatnya.",
       "submit": "Buat dasbor",
-      "created": "“{{title}}” dibuat",
-      "started": "{{name}} sedang membuat “{{title}}” di percakapanmu",
-      "openChat": "Buka percakapan",
-      "brief": "Yang harus dibuat {{name}}"
+      "created": "“{{title}}” dibuat"
     },
     "newWidget": {
       "title": "Widget baru",

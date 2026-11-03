@@ -1,10 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import type { OrgRole } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, fakeDashboardsOf, NOW, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  ADMIN_ROLE_ID,
+  createFakeApi,
+  ENG_ID,
+  type FakeState,
+  fakeDashboardsOf,
+  NOW,
+  ORG_ID,
+  seedRoles,
+  seedState,
+} from "./fake-api";
 import type { FakeDashboards } from "./fakes/dashboards";
 import { pick } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
@@ -16,8 +28,13 @@ const type = (el: Element, value: string) => act(async () => fireEvent.change(el
 const tab = (dialog: HTMLElement, name: string) =>
   act(async () => fireEvent.mouseDown(within(dialog).getByRole("tab", { name }), { button: 0 }));
 
-const open = async (path: string, prepare?: (fake: FakeDashboards) => void) => {
+const open = async (
+  path: string,
+  prepare?: (fake: FakeDashboards) => void,
+  prepareState?: (state: FakeState) => void,
+) => {
   const state = seedState();
+  prepareState?.(state);
   const api = createFakeApi(state);
   const fake = fakeDashboardsOf.get(api) as FakeDashboards;
   prepare?.(fake);
@@ -34,20 +51,53 @@ const segment = (dialog: HTMLElement, group: string, name: string | RegExp) =>
   within(within(dialog).getByRole("radiogroup", { name: group })).getByRole("radio", { name });
 const myBoard = (fake: FakeDashboards) =>
   fake.addBoard({ id: "dash-m", title: "Metas", owner: { kind: "person", id: "u-walter", name: "Walter" } });
+const SALES_ROLE_ID = "role-sales";
+/** A second role, "Vendas", and Lia, who holds it. */
+const withSales = (state: FakeState) => {
+  const [admin, everyone] = seedRoles() as [OrgRole, OrgRole];
+  const sales: OrgRole = { ...admin, id: SALES_ROLE_ID, name: "Vendas", color: "amber", position: 1, permissions: [] };
+  state.roles = [admin, { ...sales, hoist: false }, { ...everyone, position: 2 }];
+  state.members.push({
+    userId: "u-lia",
+    name: "Lia",
+    email: "lia@acme.com.br",
+    image: null,
+    role: "member",
+    roleIds: [SALES_ROLE_ID],
+    joinedAt: NOW.toISOString(),
+    handle: "lia",
+    timezone: "America/Sao_Paulo",
+  });
+};
+/** "Who edits": its dropdown, opened from the keys. */
+const openEditors = async (dialog: HTMLElement) => {
+  const trigger = within(dialog).getByRole("button", { name: /^Quem edita/ });
+  trigger.focus();
+  await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+  return screen().getByRole("menu");
+};
+const closeMenu = () => act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
+const editorsShown = (dialog: HTMLElement) =>
+  within(dialog).getByRole("button", { name: /^Quem edita/ }).querySelector(".ac-select__value")?.textContent;
 
 describe("New dashboard (ADR 0134 §8, §10)", () => {
-  const start = async () => {
-    const opened = await open(`/org/${ORG_ID}/dashboards`);
+  const start = async (prepareState?: (state: FakeState) => void) => {
+    const opened = await open(`/org/${ORG_ID}/dashboards`, undefined, prepareState);
     await click(screen().getAllByRole("button", { name: "Novo painel" })[0] as Element);
     await settle(4);
     return { ...opened, dialog: screen().getByRole("dialog", { name: "Novo painel" }) };
   };
 
-  test("blank and only for me by default: Create dashboard makes it and opens it", async () => {
+  test("a name, only for me by default: Create dashboard makes it empty and opens it", async () => {
     const { state, router, dialog } = await start();
     const create = within(dialog).getByRole("button", { name: "Criar painel" }) as HTMLButtonElement;
     expect(create.disabled).toBe(true);
     expect(within(dialog).getByRole("radio", { name: /^Só você/ }).getAttribute("aria-checked")).toBe("true");
+    // No "How to start": an agent builds a dashboard when asked in a chat, as the line under the name says.
+    expect(dialog.textContent).not.toContain("Como começar");
+    expect(dialog.textContent).not.toContain("Pedir a um agente");
+    expect(dialog.textContent).toContain("Você também pode pedir a um agente, numa conversa, que monte um.");
+    expect(editorsShown(dialog)).toBe("Só você e a administração");
     // What whoever sees it sees, said where the audience is chosen (ADR 0134 §12).
     expect(dialog.textContent).toContain("Quem vê o painel vê o que os agentes trouxeram");
     await type(within(dialog).getByLabelText("Nome"), "Metas do trimestre");
@@ -58,14 +108,15 @@ describe("New dashboard (ADR 0134 §8, §10)", () => {
       audience: "private",
       roleIds: [],
       editPolicy: "owner",
+      editRoleIds: [],
     });
     expect(router.state.location.pathname).toMatch(new RegExp(`^/org/${ORG_ID}/dashboards/.+`));
     expect(screen().getByRole("heading", { name: "Metas do trimestre", level: 1 })).toBeTruthy();
     expect(screen().getByText("“Metas do trimestre” criado")).toBeTruthy();
   });
 
-  test("for roles: each role with its people; at least one before it can be made", async () => {
-    const { state, dialog } = await start();
+  test("for roles: each role with its people; who edits offers only the roles that see it", async () => {
+    const { state, dialog } = await start(withSales);
     await type(within(dialog).getByLabelText("Nome"), "Diretoria");
     await click(within(dialog).getByRole("radio", { name: /^Papéis/ }));
     await settle(2);
@@ -75,42 +126,59 @@ describe("New dashboard (ADR 0134 §8, §10)", () => {
     const create = within(dialog).getByRole("button", { name: "Criar painel" }) as HTMLButtonElement;
     expect(create.disabled).toBe(true);
     await click(admin);
-    await click(within(dialog).getByRole("radio", { name: "Quem vê" }));
     expect(create.disabled).toBe(false);
+
+    // Whoever sees it, only you and admins, then the roles: Vendas doesn't see the board, so it can't edit it.
+    let menu = await openEditors(dialog);
+    const items = within(menu).getAllByRole("menuitemcheckbox");
+    expect(items.map((i) => i.textContent)).toEqual([
+      "Quem vê",
+      "Só você e a administração",
+      "Admin",
+      "VendasNão vê este painel",
+    ]);
+    expect(items[1]?.getAttribute("aria-checked")).toBe("true");
+    expect(items[3]?.getAttribute("aria-disabled")).toBe("true");
+    await click(within(menu).getByRole("menuitemcheckbox", { name: /^Admin/ }));
+    await closeMenu();
+    expect(editorsShown(dialog)).toBe("Admin");
+
+    // Admin leaves who sees: it leaves who edits too, back to you and admins.
+    await click(admin);
+    expect(editorsShown(dialog)).toBe("Só você e a administração");
+    await click(admin);
+    menu = await openEditors(dialog);
+    await click(within(menu).getByRole("menuitemcheckbox", { name: /^Admin/ }));
+    await closeMenu();
     await click(create);
     await settle(6);
     expect(callOf(state, "dashboards.create")?.args[1]).toEqual({
       title: "Diretoria",
       audience: "roles",
       roleIds: [ADMIN_ROLE_ID],
-      editPolicy: "viewers",
+      editPolicy: "roles",
+      editRoleIds: [ADMIN_ROLE_ID],
     });
   });
 
-  test("asking an agent: the brief goes to its DM, where it builds the widgets", async () => {
+  test("whoever sees it closes the menu and edits", async () => {
     const { state, dialog } = await start();
-    await type(within(dialog).getByLabelText("Nome"), "Black Friday");
-    await click(within(dialog).getByRole("radio", { name: /^Pedir a um agente/ }));
+    await type(within(dialog).getByLabelText("Nome"), "Comercial");
+    await click(within(dialog).getByRole("radio", { name: /^Todo o workspace/ }));
+    const menu = await openEditors(dialog);
+    await click(within(menu).getByRole("menuitemcheckbox", { name: "Quem vê" }));
     await settle(2);
-    const agents = within(dialog).getByRole("group", { name: "Quem cuida" });
-    expect(within(agents).getByRole("button", { name: "Ada" }).getAttribute("aria-pressed")).toBe("true");
-    const create = within(dialog).getByRole("button", { name: "Criar painel" }) as HTMLButtonElement;
-    expect(create.disabled).toBe(true);
-    await type(within(dialog).getByLabelText("O que Ada deve montar"), "Vendas e estoque da semana");
-    await click(create);
+    expect(screen().queryByRole("menu")).toBeNull();
+    expect(editorsShown(dialog)).toBe("Quem vê");
+    await click(within(dialog).getByRole("button", { name: "Criar painel" }));
     await settle(6);
-    expect(callOf(state, "dashboards.create")?.args[1]).toMatchObject({
-      title: "Black Friday",
-      start: { agentId: ADA_ID, brief: "Vendas e estoque da semana" },
-    });
-    expect(screen().getByText("Ada está montando “Black Friday” na conversa com você")).toBeTruthy();
-    expect(screen().getByRole("button", { name: "Abrir a conversa" })).toBeTruthy();
+    expect(callOf(state, "dashboards.create")?.args[1]).toMatchObject({ editPolicy: "viewers", editRoleIds: [] });
   });
 });
 
 describe("Share (ADR 0134 §8, §12)", () => {
-  test("who has access follows the choice on screen; Save sends it", async () => {
-    const { state } = await open(`/org/${ORG_ID}/dashboards/dash-m`, myBoard);
+  const share = async () => {
+    const opened = await open(`/org/${ORG_ID}/dashboards/dash-m`, myBoard, withSales);
     await click(screen().getByRole("button", { name: "Compartilhar" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Compartilhar “Metas”" });
@@ -119,6 +187,11 @@ describe("Share (ADR 0134 §8, §12)", () => {
       within(people())
         .getAllByRole("listitem")
         .find((li) => name.test(li.textContent ?? "")) as HTMLElement;
+    return { ...opened, dialog, row };
+  };
+
+  test("who has access follows the choice on screen; Save sends it", async () => {
+    const { state, dialog, row } = await share();
     expect(row(/Walter \(você\)/).textContent).toContain("Edita");
     expect(row(/João/).textContent).toContain("Não vê");
     await click(within(dialog).getByRole("radio", { name: /^Todo o workspace/ }));
@@ -126,15 +199,35 @@ describe("Share (ADR 0134 §8, §12)", () => {
     // João holds Admin: admins see every board but private ones, and edit what they see.
     expect(row(/João/).textContent).toContain("Edita");
     expect(row(/João/).textContent).toContain("Admin");
+    expect(row(/Lia/).textContent).toContain("Vê");
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(6);
     expect(callOf(state, "dashboards.share")?.args).toEqual([
       ORG_ID,
       "dash-m",
-      { audience: "workspace", roleIds: [], editPolicy: "owner" },
+      { audience: "workspace", roleIds: [], editPolicy: "owner", editRoleIds: [] },
     ]);
     expect(screen().getByText("“Metas” agora é do workspace")).toBeTruthy();
     expect((document.querySelector(".db-meta") as HTMLElement).textContent).toContain("Todo o workspace");
+  });
+
+  test("who edits by roles: their people edit, the dropdown names them, Save sends them", async () => {
+    const { state, dialog, row } = await share();
+    await click(within(dialog).getByRole("radio", { name: /^Todo o workspace/ }));
+    const menu = await openEditors(dialog);
+    await click(within(menu).getByRole("menuitemcheckbox", { name: "Vendas" }));
+    expect(screen().getByRole("menu")).toBeTruthy();
+    await click(within(menu).getByRole("menuitemcheckbox", { name: "Admin" }));
+    await closeMenu();
+    expect(editorsShown(dialog)).toBe("Admin e Vendas");
+    expect(row(/Lia/).textContent).toContain("Edita");
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(6);
+    expect(callOf(state, "dashboards.share")?.args).toEqual([
+      ORG_ID,
+      "dash-m",
+      { audience: "workspace", roleIds: [], editPolicy: "roles", editRoleIds: [SALES_ROLE_ID, ADMIN_ROLE_ID] },
+    ]);
   });
 });
 

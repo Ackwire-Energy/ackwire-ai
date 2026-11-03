@@ -1717,6 +1717,7 @@
   "dashboards": {
     "homeRow": "Nur du · deine eigenen Widgets",
     "loadFailed": "Die Dashboards konnten nicht geladen werden.",
+    "onlyHome": "Dashboards für den Workspace oder deine Rollen erscheinen hier.",
     "create": "Erstellen",
     "routineTarget": "sein Widget",
     "pin": {
@@ -1745,8 +1746,6 @@
       "refreshing": "{{name}} aktualisiert es.",
       "scheduleSaved": "Es aktualisiert sich jetzt {{schedule}}",
       "alertSaved": "Alarm gespeichert",
-      "removeTitle": "„{{title}}“ entfernen?",
-      "removeText": "Seine Routine stoppt, und was es zeigt, verschwindet mit ihm.",
       "removed": "Widget entfernt. Seine Routine wurde gestoppt.",
       "routine": "Seine Routine",
       "onBoard": "Wo es ist",

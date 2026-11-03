@@ -24,7 +24,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { GroupedFooter, haptics, IconButton, Segmented, Text, useReducedMotion, useTheme, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
-import { useOrgId } from "../shared/hooks";
+import { useDirectory, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic, useSurface } from "../shared/parts";
 import { useBoard } from "./hooks";
 import { layoutChanged, moveWidgetItem, shownWidgetTitle, widgetPlace } from "./logic";
@@ -80,6 +80,7 @@ function Arrange({ board }: { board: Dashboard }) {
   const reduced = useReducedMotion();
   const save = useSaveLayout(orgId);
   const remove = useRemoveWidget(orgId);
+  const dir = useDirectory();
   const [before] = useState(() => boardItems(board.widgets, board.tiles));
   const [items, setItems] = useState<BoardItem[]>(before);
   const home = board.kind === "home";
@@ -147,16 +148,21 @@ function Arrange({ board }: { board: Dashboard }) {
       },
     );
   };
+  // The same words as the web's confirmation (ADR 0134): its routine stops and its history goes.
   const confirmRemove = (item: Extract<BoardItem, { type: "widget" }>) =>
     Alert.alert(
-      t("mobile.dashboards.widget.removeTitle", {
+      t("widgets.removeConfirm.title", {
         title: shownWidgetTitle(item.widget.title, item.widget.kind, (k) => t(k)),
       }),
-      t("mobile.dashboards.widget.removeText"),
+      item.widget.schedule === "manual"
+        ? t("widgets.removeConfirm.textManual")
+        : t("widgets.removeConfirm.textRoutine", {
+            name: dir.anyAgent(item.widget.agentId)?.name ?? t("channel.unknownAgent"),
+          }),
       [
         { text: t("mobile.common.cancel"), style: "cancel" },
         {
-          text: t("widgets.organize.remove"),
+          text: t("widgets.removeConfirm.confirm"),
           style: "destructive",
           onPress: () =>
             remove.mutate(item.id, {

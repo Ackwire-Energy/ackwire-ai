@@ -210,7 +210,6 @@ function Board({
           orgId={org.id}
           board={board}
           arranging={arranging}
-          onAdd={() => setAdding(true)}
           onOpen={(id) => onWidget(id)}
           onChangeSchedule={(id) => onWidget(id)}
         />

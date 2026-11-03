@@ -1717,6 +1717,7 @@
   "dashboards": {
     "homeRow": "Yalnızca siz · kendi widget'larınız",
     "loadFailed": "Panolar yüklenemedi.",
+    "onlyHome": "Çalışma alanının ya da rollerinizin panoları burada görünür.",
     "create": "Oluştur",
     "routineTarget": "widget'ı",
     "pin": {
@@ -1745,8 +1746,6 @@
       "refreshing": "{{name}} onu güncelliyor.",
       "scheduleSaved": "Artık {{schedule}} güncelleniyor",
       "alertSaved": "Uyarı kaydedildi",
-      "removeTitle": "“{{title}}” kaldırılsın mı?",
-      "removeText": "Rutini durur ve gösterdikleri de onunla birlikte gider.",
       "removed": "Widget kaldırıldı. Rutini durdu.",
       "routine": "Rutini",
       "onBoard": "Bulunduğu yer",

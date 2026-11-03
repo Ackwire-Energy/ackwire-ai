@@ -5,16 +5,24 @@ import {
   boardItems,
   createHttpApi,
   type Dashboard,
+  type DashboardEditPolicy,
   type DashboardSummary,
   dashboardAccessOf,
   dashboardGroups,
+  editorsInput,
+  editorsSummary,
+  editorsText,
+  fitEditRoles,
   keys,
   layoutOf,
   moveItem,
   resizeItem,
+  roleSeesBoard,
+  toggleEditRole,
   type Widget,
   widgetCostLine,
   widgetFailureKey,
+  withEditRoles,
 } from "../src/index";
 
 const summary = (over: Partial<DashboardSummary>): DashboardSummary => ({
@@ -25,6 +33,7 @@ const summary = (over: Partial<DashboardSummary>): DashboardSummary => ({
   audience: "workspace",
   roleIds: [],
   editPolicy: "viewers",
+  editRoleIds: [],
   pinned: false,
   position: 0,
   owner: null,
@@ -104,6 +113,76 @@ describe("who has access", () => {
     expect(dashboardAccessOf(lia, { ...board, audience: "workspace", editPolicy: "viewers" })).toBe("edits");
     expect(dashboardAccessOf(theo, { ...board, audience: "private" })).toBe("none");
   });
+  test("with roles, a holder of an edit role who sees the board edits; one who doesn't see it gets nothing", () => {
+    const byRoles = { ...board, roleIds: ["sales", "board"], editPolicy: "roles" as const, editRoleIds: ["board"] };
+    expect(dashboardAccessOf({ userId: "lia", roleIds: ["board"], admin: false }, byRoles)).toBe("edits");
+    expect(dashboardAccessOf({ userId: "ada", roleIds: ["sales"], admin: false }, byRoles)).toBe("sees");
+    // Seeing comes first: an edit role outside the audience gives nothing.
+    const outside = { ...byRoles, roleIds: ["sales"], editRoleIds: ["board"] };
+    expect(dashboardAccessOf({ userId: "lia", roleIds: ["board"], admin: false }, outside)).toBe("none");
+    // On a workspace board any member sees it; only the edit roles' holders edit.
+    const everyone = { ...byRoles, audience: "workspace" as const, roleIds: [] };
+    expect(dashboardAccessOf({ userId: "ada", roleIds: ["sales"], admin: false }, everyone)).toBe("sees");
+    expect(dashboardAccessOf({ userId: "lia", roleIds: ["board"], admin: false }, everyone)).toBe("edits");
+  });
+});
+
+describe("who edits", () => {
+  const draft = {
+    audience: "roles" as const,
+    roleIds: ["sales", "board"],
+    editPolicy: "owner" as DashboardEditPolicy,
+    editRoleIds: [] as string[],
+  };
+  test("a role sees a workspace board, a roles board when it is one of them, never a private one", () => {
+    expect(roleSeesBoard({ audience: "workspace", roleIds: [] }, "sales")).toBe(true);
+    expect(roleSeesBoard({ audience: "roles", roleIds: ["sales"] }, "sales")).toBe(true);
+    expect(roleSeesBoard({ audience: "roles", roleIds: ["sales"] }, "board")).toBe(false);
+    expect(roleSeesBoard({ audience: "private", roleIds: [] }, "sales")).toBe(false);
+  });
+  test("checking roles sets `roles`; unchecking the last one goes back to you and admins", () => {
+    const one = toggleEditRole(draft, "sales");
+    expect(one).toMatchObject({ editPolicy: "roles", editRoleIds: ["sales"] });
+    expect(toggleEditRole(one, "board")).toMatchObject({ editPolicy: "roles", editRoleIds: ["sales", "board"] });
+    expect(toggleEditRole(one, "sales")).toMatchObject({ editPolicy: "owner", editRoleIds: [] });
+    expect(withEditRoles({ ...draft, editPolicy: "viewers" }, ["board", "board"])).toMatchObject({
+      editPolicy: "roles",
+      editRoleIds: ["board"],
+    });
+  });
+  test("narrowing who sees drops the edit roles that no longer see it, never widening who edits", () => {
+    const picked = withEditRoles(draft, ["sales", "board"]);
+    expect(fitEditRoles({ ...picked, roleIds: ["board"] })).toMatchObject({
+      editPolicy: "roles",
+      editRoleIds: ["board"],
+    });
+    expect(fitEditRoles({ ...picked, audience: "private" as const, roleIds: [] })).toMatchObject({
+      editPolicy: "owner",
+      editRoleIds: [],
+    });
+    const everyone = { ...picked, audience: "workspace" as const, roleIds: [] };
+    expect(fitEditRoles(everyone)).toBe(everyone);
+    expect(editorsInput({ editPolicy: "viewers", editRoleIds: ["sales"] })).toEqual({
+      editPolicy: "viewers",
+      editRoleIds: [],
+    });
+  });
+  test("the summary names one or two roles and counts more; gone roles read as you and admins", () => {
+    const roles = [
+      { id: "sales", name: "Sales" },
+      { id: "board", name: "Board" },
+      { id: "ops", name: "Ops" },
+    ];
+    const t = ((key: string, o?: Record<string, unknown>) => `${key}${o ? JSON.stringify(o) : ""}`) as never;
+    const text = (editRoleIds: string[], editPolicy: "viewers" | "owner" | "roles" = "roles") =>
+      editorsText(t, editorsSummary({ editPolicy, editRoleIds }, roles));
+    expect(text([], "viewers")).toBe("dashboards.edit.viewers");
+    expect(text([], "owner")).toBe("dashboards.edit.owner");
+    expect(text(["board"])).toBe("Board");
+    expect(text(["board", "sales"])).toBe('dashboards.edit.twoRoles{"first":"Sales","second":"Board"}');
+    expect(text(["ops", "board", "sales"])).toBe('dashboards.edit.manyRoles{"count":3}');
+    expect(editorsSummary({ editPolicy: "roles", editRoleIds: ["gone"] }, roles)).toEqual({ kind: "owner" });
+  });
 });
 
 describe("board layout", () => {
@@ -181,7 +260,12 @@ describe("dashboards API", () => {
     const org = "/api/app/organizations/o1";
     await api.dashboards.list("o1");
     await api.dashboards.home("o1");
-    await api.dashboards.share("o1", "d1", { audience: "roles", roleIds: ["r1"], editPolicy: "owner" });
+    await api.dashboards.share("o1", "d1", {
+      audience: "roles",
+      roleIds: ["r1"],
+      editPolicy: "roles",
+      editRoleIds: ["r1"],
+    });
     await api.dashboards.saveLayout("o1", "d1", { widgets: [{ id: "w1", position: 0, w: 2, h: 1 }] });
     await api.dashboards.decideProposal("o1", "d1", "publish");
     await api.dashboards.pinWidget("o1", "d1", { messageId: "m1", block: "{}", schedule: "manual" });

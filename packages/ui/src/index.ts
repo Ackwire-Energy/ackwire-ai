@@ -466,5 +466,5 @@ export { DitherLine, fillEnds, paintCells, paintLineArea, useElementWidth } from
 export { formatWidgetNumber, formatWithUnit, useCountUp, widgetDigits } from "./widgets/format";
 export { ditherTile, WIDGET_CELL, widgetTileVars, widgetTones } from "./widgets/tiles";
 export { BuildingDither, WidgetBody, type WidgetBodyProps } from "./widgets/WidgetBody";
-export { WidgetAddTile, WidgetCard, type WidgetCardProps, type WidgetOrganize } from "./widgets/WidgetCard";
+export { WidgetCard, type WidgetCardProps, type WidgetOrganize } from "./widgets/WidgetCard";
 export { WidgetGlyph } from "./widgets/WidgetGlyph";

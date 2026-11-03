@@ -1,5 +1,5 @@
 import type { DashboardSummary } from "@agenteschat/client";
-import { dashboardAccessOf, useMembers, useShareDashboard } from "@agenteschat/client";
+import { dashboardAccessOf, editorsInput, useMembers, useShareDashboard } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { Button, Dialog, DialogBody, DialogFooter } from "@agenteschat/ui";
 import { useState } from "react";
@@ -16,9 +16,9 @@ export const dashboardUrl = (orgId: string, dashboardId: string) =>
   `${window.location.origin}/org/${orgId}/dashboards/${dashboardId}`;
 
 /**
- * Share (ADR 0134 §8, §12): who sees the board and who edits it, as in New dashboard, then who has access with the
- * choice on screen (each member: edits, sees, or doesn't see, by the server's own rule), Copy link and Save. Only
- * the board's owner and admins open it (`canManage`).
+ * Share (ADR 0134 §8, §12): who sees the board and who edits it (anyone who sees it, only you and admins, or some
+ * roles), as in New dashboard, then who has access with the choice on screen (each member: edits, sees, or doesn't
+ * see, by the server's own rule), Copy link and Save. Only the board's owner and admins open it (`canManage`).
  */
 export function ShareDashboardDialog({
   board,
@@ -55,13 +55,19 @@ function ShareBody({ board, onClose }: { board: DashboardSummary; onClose: () =>
     audience: board.audience,
     roleIds: board.roleIds,
     editPolicy: board.editPolicy,
+    editRoleIds: board.editRoleIds ?? [],
   });
   const people = [...(members.data ?? [])].sort(
     (a, b) => Number(b.userId === me.user.id) - Number(a.userId === me.user.id) || a.name.localeCompare(b.name),
   );
   const save = () =>
     share.mutate(
-      { dashboardId: board.id, ...draft, roleIds: draft.audience === "roles" ? draft.roleIds : [] },
+      {
+        dashboardId: board.id,
+        audience: draft.audience,
+        roleIds: draft.audience === "roles" ? draft.roleIds : [],
+        ...editorsInput(draft),
+      },
       {
         onSuccess: (saved) => {
           toast.show(

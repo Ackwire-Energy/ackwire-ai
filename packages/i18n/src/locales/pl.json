@@ -13945,7 +13945,6 @@
       "canceled": "Widżet „{{title}}” wrócił na miejsce."
     },
     "add": {
-      "tile": "Widżet",
       "label": "Dodaj widżet"
     },
     "alert": {
@@ -14040,12 +14039,19 @@
     "removed": {
       "home": "Usunięto „{{title}}” ze Startu, a rutyna agenta {{name}} się zatrzymała",
       "board": "Usunięto „{{title}}” z dashboardu, a rutyna agenta {{name}} się zatrzymała"
+    },
+    "removeConfirm": {
+      "title": "Usunąć „{{title}}”?",
+      "textRoutine": "Rutyna agenta {{name}}, która go aktualizuje, się zatrzyma, a jego historia aktualizacji zniknie razem z nim.",
+      "textManual": "Jego historia aktualizacji zniknie razem z nim.",
+      "confirm": "Usuń"
     }
   },
   "dashboards": {
     "title": "Dashboardy",
     "subtitle": "Liczby i wykresy, które agenci utrzymują w aktualności, dla całej przestrzeni roboczej albo tylko niektórych ról.",
     "sidebar": "Dashboardy",
+    "navWhat": "Liczby i wykresy, które agenci utrzymują w aktualności",
     "new": "Nowy dashboard",
     "back": "Dashboardy",
     "home": "Mój Start",
@@ -14077,7 +14083,16 @@
     "edit": {
       "label": "Kto edytuje",
       "viewers": "Każdy, kto go widzi",
-      "owner": "Tylko ty i administratorzy"
+      "owner": "Tylko ty i administratorzy",
+      "roles": "Lub osoby z tymi rolami",
+      "twoRoles": "{{first}} i {{second}}",
+      "manyRoles_one": "{{count}} rola",
+      "manyRoles_few": "{{count}} role",
+      "manyRoles_many": "{{count}} ról",
+      "manyRoles_other": "{{count}} roli",
+      "cantSee": "Nie widzi tego dashboardu",
+      "someRoles": "Niektóre role…",
+      "rolesNote": "Osoby z tymi rolami edytują go, jeśli też go widzą. Ty i administratorzy zawsze."
     },
     "meta": {
       "by": "Twórca: {{name}}",
@@ -14116,26 +14131,17 @@
     },
     "empty": {
       "title": "Pusty dashboard",
-      "text": "Dodaj widżety: poproś agenta albo przypnij blok z czatu.",
-      "noneTitle": "Nie ma jeszcze dashboardów",
-      "none": "Liczby i wykresy, które agenci utrzymują w aktualności, dla ciebie albo dla zespołu."
+      "text": "Dodaj widżety: poproś agenta albo przypnij blok z czatu."
     },
+    "onlyHome": "Utwórz dashboard dla przestrzeni roboczej albo niektórych ról przyciskiem „Nowy dashboard”.",
     "create": {
       "title": "Nowy dashboard",
       "subtitle": "Widżety razem na jednej stronie, dla ciebie albo dla zespołu.",
       "name": "Nazwa",
       "namePlaceholder": "Np.: Sprzedaż, Black Friday, Cele kwartalne",
-      "start": "Jak zacząć",
-      "blank": "Pusty",
-      "blankHint": "Sam dodajesz widżety",
-      "agent": "Poproś agenta",
-      "agentHint": "Agent tworzy widżety i rutyny",
-      "briefPlaceholder": "Np.: co muszę widzieć każdego ranka o sprzedaży",
+      "askHint": "Możesz też poprosić agenta na czacie, żeby go zbudował.",
       "submit": "Utwórz dashboard",
-      "created": "Utworzono „{{title}}”",
-      "started": "{{name}} tworzy „{{title}}” w waszej rozmowie",
-      "openChat": "Otwórz rozmowę",
-      "brief": "Co {{name}} ma zbudować"
+      "created": "Utworzono „{{title}}”"
     },
     "newWidget": {
       "title": "Nowy widżet",

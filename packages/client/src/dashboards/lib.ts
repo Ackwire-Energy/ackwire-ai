@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type {
   DashboardAudience,
   DashboardEditPolicy,
@@ -37,7 +38,8 @@ export type DashboardAccess = "edits" | "sees" | "none";
 /**
  * What one person may do on a board with this audience (Share's "Who has access"), by the same rule as the server:
  * its owner edits; admins see every board but private ones and edit what they see; others see a `workspace` board,
- * or a `roles` one when they hold one of its roles, and edit it when `viewers` edit.
+ * or a `roles` one when they hold one of its roles, and edit it when `viewers` edit or, with `roles`, when they hold
+ * one of its edit roles (seeing comes first).
  */
 export function dashboardAccessOf(
   person: { userId: string; roleIds: readonly string[]; admin: boolean },
@@ -46,6 +48,7 @@ export function dashboardAccessOf(
     audience: DashboardAudience;
     roleIds: readonly string[];
     editPolicy: DashboardEditPolicy;
+    editRoleIds?: readonly string[];
     ownerUserId: string | null;
   },
 ): DashboardAccess {
@@ -54,7 +57,82 @@ export function dashboardAccessOf(
   const sees =
     board.audience === "workspace" || person.admin || board.roleIds.some((id) => person.roleIds.includes(id));
   if (!sees) return "none";
-  return person.admin || board.editPolicy === "viewers" ? "edits" : "sees";
+  if (person.admin || board.editPolicy === "viewers") return "edits";
+  const byRole = board.editPolicy === "roles" && (board.editRoleIds ?? []).some((id) => person.roleIds.includes(id));
+  return byRole ? "edits" : "sees";
+}
+
+// ── Who edits ────────────────────────────────────────────────────────────────
+
+/** Who edits a board as New dashboard and Share draft it: the policy and, with `roles`, the roles. */
+export interface DashboardEditors {
+  editPolicy: DashboardEditPolicy;
+  editRoleIds: string[];
+}
+
+/**
+ * Whether the holders of a role see a board with this audience: only they can edit it through that role (editing
+ * isn't seeing, ADR 0134 §8), so "Who edits" offers the others disabled.
+ */
+export function roleSeesBoard(
+  board: { audience: DashboardAudience; roleIds: readonly string[] },
+  roleId: string,
+): boolean {
+  return board.audience === "workspace" || (board.audience === "roles" && board.roleIds.includes(roleId));
+}
+
+/** Who edits once these roles are picked: `roles` with them, or `owner` (you and admins) when none is left. */
+export function withEditRoles<T extends DashboardEditors>(draft: T, roleIds: readonly string[]): T {
+  const ids = [...new Set(roleIds)];
+  return ids.length > 0
+    ? { ...draft, editPolicy: "roles", editRoleIds: ids }
+    : { ...draft, editPolicy: "owner", editRoleIds: [] };
+}
+
+/** A role checked or unchecked in "Who edits" (checking one while `viewers` or `owner` starts the roles' list). */
+export function toggleEditRole<T extends DashboardEditors>(draft: T, roleId: string): T {
+  const now = draft.editPolicy === "roles" ? draft.editRoleIds : [];
+  return withEditRoles(draft, now.includes(roleId) ? now.filter((id) => id !== roleId) : [...now, roleId]);
+}
+
+/**
+ * The draft after "Who sees" changed: edit roles whose holders no longer see the board are dropped, and with none
+ * left it is edited by you and admins (`owner`), never by more people than before.
+ */
+export function fitEditRoles<T extends DashboardEditors & { audience: DashboardAudience; roleIds: string[] }>(
+  draft: T,
+): T {
+  if (draft.editPolicy !== "roles") return draft;
+  const kept = draft.editRoleIds.filter((id) => roleSeesBoard(draft, id));
+  return kept.length === draft.editRoleIds.length ? draft : withEditRoles(draft, kept);
+}
+
+/** What New dashboard and Share send for who edits: the roles only with `roles`. */
+export function editorsInput(draft: DashboardEditors): DashboardEditors {
+  return { editPolicy: draft.editPolicy, editRoleIds: draft.editPolicy === "roles" ? draft.editRoleIds : [] };
+}
+
+/** "Who edits" in a few words, as the web's dropdown and the phone's row show it. */
+export type EditorsSummary = { kind: "viewers" } | { kind: "owner" } | { kind: "roles"; names: string[] };
+
+/** The summary of who edits; roles gone from the workspace are left out (none left reads as `owner`). */
+export function editorsSummary(
+  draft: DashboardEditors,
+  roles: readonly { id: string; name: string }[],
+): EditorsSummary {
+  if (draft.editPolicy === "viewers") return { kind: "viewers" };
+  const names = roles.filter((r) => draft.editRoleIds.includes(r.id)).map((r) => r.name);
+  if (draft.editPolicy !== "roles" || names.length === 0) return { kind: "owner" };
+  return { kind: "roles", names };
+}
+
+/** The summary as text: "Everyone who sees it", "Only you and admins", "Sales", "Sales and Board" or "3 roles". */
+export function editorsText(t: TFunction, summary: EditorsSummary): string {
+  if (summary.kind !== "roles") return t(`dashboards.edit.${summary.kind}`);
+  const [first = "", second = ""] = summary.names;
+  if (summary.names.length === 1) return first;
+  if (summary.names.length === 2) return t("dashboards.edit.twoRoles", { first, second });
+  return t("dashboards.edit.manyRoles", { count: summary.names.length });
 }
 
 /** One cell of a board: a widget, or a home board's fixed tile. */

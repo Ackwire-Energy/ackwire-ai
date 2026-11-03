@@ -13500,7 +13500,6 @@
       "canceled": "“{{title}}” volvió a su lugar."
     },
     "add": {
-      "tile": "Widget",
       "label": "Agregar widget"
     },
     "alert": {
@@ -13595,12 +13594,19 @@
     "removed": {
       "home": "“{{title}}” salió de Inicio y la rutina de {{name}} se detuvo",
       "board": "“{{title}}” salió del panel y la rutina de {{name}} se detuvo"
+    },
+    "removeConfirm": {
+      "title": "¿Quitar “{{title}}”?",
+      "textRoutine": "La rutina de {{name}} que lo actualiza se detiene, y su historial de actualizaciones se va con él.",
+      "textManual": "Su historial de actualizaciones se va con él.",
+      "confirm": "Quitar"
     }
   },
   "dashboards": {
     "title": "Paneles",
     "subtitle": "Números y gráficos que los agentes mantienen al día, para el espacio de trabajo o solo para algunos roles.",
     "sidebar": "Paneles",
+    "navWhat": "Números y gráficos que los agentes mantienen al día",
     "new": "Nuevo panel",
     "back": "Paneles",
     "home": "Mi inicio",
@@ -13630,7 +13636,15 @@
     "edit": {
       "label": "Quién edita",
       "viewers": "Quien lo ve",
-      "owner": "Solo tú y los admins"
+      "owner": "Solo tú y los admins",
+      "roles": "O quienes tengan estos roles",
+      "twoRoles": "{{first}} y {{second}}",
+      "manyRoles_one": "{{count}} rol",
+      "manyRoles_many": "{{count}} roles",
+      "manyRoles_other": "{{count}} roles",
+      "cantSee": "No ve este panel",
+      "someRoles": "Algunos roles…",
+      "rolesNote": "Quienes tienen estos roles lo editan si también lo ven. Tú y los admins siempre."
     },
     "meta": {
       "by": "Creado por {{name}}",
@@ -13668,26 +13682,17 @@
     },
     "empty": {
       "title": "Panel vacío",
-      "text": "Agrega widgets: pídeselos a un agente o fija un bloque del chat.",
-      "noneTitle": "Aún no hay paneles",
-      "none": "Números y gráficos que los agentes mantienen al día, para ti o para el equipo."
+      "text": "Agrega widgets: pídeselos a un agente o fija un bloque del chat."
     },
+    "onlyHome": "Crea un panel para el espacio de trabajo o para algunos roles con “Nuevo panel”.",
     "create": {
       "title": "Nuevo panel",
       "subtitle": "Widgets juntos en una página, para ti o para el equipo.",
       "name": "Nombre",
       "namePlaceholder": "Ej.: Ventas, Black Friday, Metas del trimestre",
-      "start": "Cómo empezar",
-      "blank": "En blanco",
-      "blankHint": "Tú agregas los widgets",
-      "agent": "Pedir a un agente",
-      "agentHint": "Crea los widgets y las rutinas",
-      "briefPlaceholder": "Ej.: lo que necesito ver cada mañana sobre ventas",
+      "askHint": "También puedes pedirle a un agente en un chat que arme uno.",
       "submit": "Crear panel",
-      "created": "“{{title}}” creado",
-      "started": "{{name}} está armando “{{title}}” en tu conversación",
-      "openChat": "Abrir la conversación",
-      "brief": "Lo que {{name}} debe armar"
+      "created": "“{{title}}” creado"
     },
     "newWidget": {
       "title": "Nuevo widget",

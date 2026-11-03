@@ -2,7 +2,7 @@ import { dashboardGroups, type DashboardSummary, useDashboards } from "@agentesc
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
-import { Button, EmptyState, GroupedHeader, GroupedList, LargeTitleScreen, Text, useTheme } from "@/ui";
+import { Button, GroupedFooter, GroupedHeader, GroupedList, LargeTitleScreen, Text, useTheme } from "@/ui";
 import { boardHref } from "../links/logic";
 import { useOrgId, usePullRefresh } from "../shared/hooks";
 import { useSearchAction, useTabHeader } from "../shared/tabHeader";
@@ -15,7 +15,8 @@ export const openNewBoard = () => router.push("/board-new");
 /**
  * Dashboards, a tab between Chats and Threads (ADR 0134): My Home on top (the person's own widgets), then the boards
  * of the whole workspace, of the person's roles and only theirs, each with a thumbnail of its widgets. A row pushes
- * the board; "+" in the bar makes a new one.
+ * the board; "+" in the bar makes a new one. With only My Home, a line under it says where the others will be (no
+ * empty state: My Home is a board).
  */
 export function DashboardsScreen() {
   const { t } = useTranslation();
@@ -88,16 +89,9 @@ export function DashboardsScreen() {
             {group(t("dashboards.groups.roles"), groups.roles)}
             {group(t("dashboards.groups.mine"), groups.mine)}
           </>
-        ) : (
-          <EmptyState
-            icon="chart"
-            title={t("dashboards.empty.noneTitle")}
-            subtitle={t("dashboards.empty.none")}
-            action={
-              <Button variant="primary" size="sm" icon="plus" label={t("dashboards.new")} onPress={openNewBoard} />
-            }
-          />
-        )}
+        ) : list.data ? (
+          <GroupedFooter>{t("mobile.dashboards.onlyHome")}</GroupedFooter>
+        ) : null}
       </View>
     </LargeTitleScreen>
   );

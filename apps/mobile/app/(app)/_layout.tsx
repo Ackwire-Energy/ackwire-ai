@@ -122,6 +122,7 @@ function AppStack() {
       <Stack.Screen name="board-share/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="board-organize/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="board-edit/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-edit-roles" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget-new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="widget-pin" options={{ ...pushed, ...scrollUnder }} />

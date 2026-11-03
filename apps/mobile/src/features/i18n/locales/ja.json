@@ -1635,6 +1635,7 @@
   "dashboards": {
     "homeRow": "あなただけ · 自分のウィジェット",
     "loadFailed": "ダッシュボードを読み込めませんでした。",
+    "onlyHome": "ワークスペースやあなたのロールのダッシュボードがここに表示されます。",
     "create": "作成",
     "routineTarget": "そのウィジェット",
     "pin": {
@@ -1663,8 +1664,6 @@
       "refreshing": "{{name}}が更新しています。",
       "scheduleSaved": "{{schedule}}更新するようにしました",
       "alertSaved": "アラートを保存しました",
-      "removeTitle": "「{{title}}」を削除しますか？",
-      "removeText": "ルーティンが停止し、表示している内容も消えます。",
       "removed": "ウィジェットを削除しました。ルーティンは停止しました。",
       "routine": "ルーティン",
       "onBoard": "配置場所",

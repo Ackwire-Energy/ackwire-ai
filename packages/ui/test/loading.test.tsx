@@ -82,6 +82,48 @@ describe("Button loading", () => {
     expect(clicks).toBe(0);
   });
 
+  test("the label's text never shows under the spinner, disabled or not, whatever the variant", async () => {
+    const css = (
+      await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m, i) => ({
+      i,
+      selectors: (m[1] ?? "").split(",").map((s) => s.replace(/\s+/g, " ").trim()),
+      body: m[2] ?? "",
+    }));
+    const sets = (body: string, prop: string, value?: string) =>
+      new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*${value ?? "[^;]+"}\\s*(?:;|$)`).test(body);
+    const hides = rules.filter(
+      (r) => sets(r.body, "color", "transparent") && sets(r.body, "-webkit-text-fill-color", "transparent"),
+    );
+    expect(hides.flatMap((r) => r.selectors)).toEqual(
+      expect.arrayContaining([
+        ".ac-btn.ac-btn--loading",
+        ".ac-btn.ac-btn--loading[disabled]",
+        '.ac-btn.ac-btn--loading[aria-disabled="true"]',
+      ]),
+    );
+    // After every rule that colors a disabled button, so that gray never wins at the same weight; the text fill
+    // covers heavier ones (a ghost on a dark surface, the composer's send button).
+    const disabledColors = rules.filter(
+      (r) =>
+        r.selectors.some((s) => /^\.ac-btn\[(?:disabled|aria-disabled="true")\]$/.test(s)) && sets(r.body, "color"),
+    );
+    expect(disabledColors.length).toBeGreaterThan(0);
+    expect(Math.min(...hides.map((r) => r.i))).toBeGreaterThan(Math.max(...disabledColors.map((r) => r.i)));
+    // The spinner (a canvas that reads `color`) keeps its own color.
+    expect(
+      rules.some(
+        (r) =>
+          r.selectors.includes(".ac-btn.ac-btn--loading .ac-btn__spinner") &&
+          sets(r.body, "-webkit-text-fill-color", "currentColor"),
+      ),
+    ).toBe(true);
+    expect(rules.some((r) => r.selectors.includes(".ac-btn--loading .ac-btn__spinner") && sets(r.body, "color"))).toBe(
+      true,
+    );
+  });
+
   test("not loading: no spinner, no aria-busy", () => {
     render(<Button>Salvar</Button>);
     const button = body().getByRole("button", { name: "Salvar" });

@@ -313,6 +313,15 @@ export async function deleteRole(
       .where(
         and(eq(schema.dashboards.orgId, orgId), sql`${role.id}::uuid = any(${schema.dashboards.audienceRoleIds})`),
       );
+    // And who edits them: a board edited by roles with none left is edited by its owner and admins (`owner`).
+    await tx
+      .update(schema.dashboards)
+      .set({
+        editRoleIds: sql`array_remove(${schema.dashboards.editRoleIds}, ${role.id}::uuid)`,
+        editPolicy: sql`case when cardinality(array_remove(${schema.dashboards.editRoleIds}, ${role.id}::uuid)) = 0
+          and ${schema.dashboards.editPolicy} = 'roles' then 'owner' else ${schema.dashboards.editPolicy} end`,
+      })
+      .where(and(eq(schema.dashboards.orgId, orgId), sql`${role.id}::uuid = any(${schema.dashboards.editRoleIds})`));
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: actorId },

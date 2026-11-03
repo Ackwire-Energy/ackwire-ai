@@ -15,6 +15,7 @@ import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
 import { useMeId, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
+import { SheetHostProvider } from "../shared/SheetHost";
 import {
   accessPerson,
   audienceChanged,
@@ -27,8 +28,9 @@ import {
 import { AudienceFields } from "./parts";
 
 /**
- * Share a dashboard, pushed (ADR 0134): who sees it (the whole workspace, some roles, only you), who edits it, what
- * showing it exposes, and who has access with these choices, person by person. "Save" in the bar.
+ * Share a dashboard, pushed (ADR 0134): who sees it (the whole workspace, some roles, only you), who edits it (whoever
+ * sees it, only you and admins, or some roles), what showing it exposes, and who has access with these choices,
+ * person by person. "Save" in the bar.
  */
 export function ShareScreen({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -50,7 +52,11 @@ export function ShareScreen({ id }: { id: string }) {
       </View>
     );
   }
-  return <Form key={q.data.id} board={q.data} />;
+  return (
+    <SheetHostProvider>
+      <Form key={q.data.id} board={q.data} />
+    </SheetHostProvider>
+  );
 }
 
 function Form({ board }: { board: Dashboard }) {
@@ -77,6 +83,7 @@ function Form({ board }: { board: Dashboard }) {
         audience: draft.audience,
         roleIds: draft.roleIds,
         editPolicy: draft.editPolicy,
+        editRoleIds: draft.editRoleIds,
         ownerUserId: board.ownerUserId,
       }),
     }));

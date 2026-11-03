@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-11-03
 - Extends: ADR 0053 (routines and unattended work: a widget is redone by a routine of its own), 0085 (roles and permissions: who sees a board), 0108 (Home: "My Home" is its board), 0113 (live blocks: what is pinned is a chart, not a live block), 0125 (an audience by role, the same model), 0071 (notifications: alerts and requests wait on the person)
-- Code: `packages/db/src/schema/dashboards.ts` (`dashboards`, `dashboard_widgets`, `dashboard_widget_updates`), migration `0193_dashboards.sql`; `packages/ui/src/widgets/spec.ts` (`@agenteschat/ui/widgets/spec`: `WidgetSpec`, `validateWidgetSpec`, `chartBlockToWidgetSpec`, schedules, sizes, caps); `packages/engine/src/dashboards/*` (`access.ts`, `service.ts`, `pin.ts`, `cost.ts`, `suggestions.ts`, `refresh.ts`, `proposals.ts`, `tools.ts`, `events.ts`, `types.ts`), `routines.ts` and `routine-ledger.ts` (the `widget` target), `tools/run-policy.ts` (a widget's refresh run), `notifications.ts` (`widget_alert`, `widget_failed`, `dashboard_proposal`); server `routes/app/dashboards.ts`, `dashboard-schemas.ts`; client `packages/client/src/dashboards/*`; web `packages/ui/src/widgets/*`, `pages/HomePage.tsx` (the mural), `pages/DashboardsPage.tsx`, `pages/DashboardPage.tsx`, `components/dashboards/*`; phone `app/(app)/(tabs)/dashboards/*`, `src/features/dashboards/*`
+- Code: `packages/db/src/schema/dashboards.ts` (`dashboards`, `dashboard_widgets`, `dashboard_widget_updates`), migrations `0193_dashboards.sql`, `0194_widget_drafts.sql`, `0195_dashboard_edit_roles.sql`; `packages/ui/src/widgets/spec.ts` (`@agenteschat/ui/widgets/spec`: `WidgetSpec`, `validateWidgetSpec`, `chartBlockToWidgetSpec`, schedules, sizes, caps); `packages/engine/src/dashboards/*` (`access.ts`, `service.ts`, `pin.ts`, `cost.ts`, `suggestions.ts`, `refresh.ts`, `proposals.ts`, `tools.ts`, `events.ts`, `types.ts`), `routines.ts` and `routine-ledger.ts` (the `widget` target), `tools/run-policy.ts` (a widget's refresh run), `notifications.ts` (`widget_alert`, `widget_failed`, `dashboard_proposal`); server `routes/app/dashboards.ts`, `dashboard-schemas.ts`; client `packages/client/src/dashboards/*`; web `packages/ui/src/widgets/*`, `pages/HomePage.tsx` (the mural), `pages/DashboardsPage.tsx`, `pages/DashboardPage.tsx`, `components/dashboards/*`; phone `app/(app)/(tabs)/dashboards/*`, `src/features/dashboards/*`
 
 ## Context
 
@@ -80,13 +80,19 @@ people than asked.
    The Model Gateway's budget check still holds every run, and usage is recorded with the agent and the workspace as
    for any run.
 8. **Who sees and who edits a board.** `workspace` (every member), `roles` (whoever holds one of its roles at the time,
-   ADR 0085, the model of ADR 0125) or `private` (its owner alone). Admins (`administrator`) see every board but
-   private ones, and may edit, share, pin and delete what they see; a private board and a home board are their
-   owner's alone, admins included. Who edits: `viewers` (whoever sees it) or `owner` (its owner and admins). Editing
-   is the board's title and description, its widgets, their order and sizes, refreshing them and asking for changes;
-   sharing, pinning first and deleting are its owner's and admins'. Showing a board to others needs `post` (who may
-   speak to the workspace may show it something); a private one needs only membership. A `roles` board with no role
-   left (a role deleted) is its owner's alone until shared again.
+   ADR 0085, the model of ADR 0125) or `private` (its owner alone). Admins (`administrator`) see every board but private
+   ones, and may edit, share, pin and delete what they see; a private board and a home board are their owner's alone,
+   admins included. Who edits (`edit_policy`): `viewers` (whoever sees it), `owner` (its owner and admins) or `roles`
+   (besides its owner and admins, whoever sees it and holds one of `edit_role_ids` at the time, ADR 0085). Editing isn't
+   seeing: an edit role whose people don't see the board gives them nothing, so the apps offer such a role disabled
+   ("Doesn't see this dashboard"), and narrowing who sees it drops the edit roles that no longer see it (none left:
+   `owner`). Edit roles are checked like the audience's (1 to 100 custom roles), a deleted role leaves them as it leaves
+   the audience (none left: `owner`), and choosing who edits never needs `post`. The apps pick it from one dropdown (the
+   web) or a row with a pick menu and a pushed screen for the roles (the phone), named by what is picked ("Sales and
+   Board", "3 roles"). Editing is the board's title and description, its widgets, their order and sizes, refreshing them
+   and asking for changes; sharing, pinning first and deleting are its owner's and admins'. Showing a board to others
+   needs `post` (who may speak to the workspace may show it something); a private one needs only membership. A `roles`
+   board with no role left (a role deleted) is its owner's alone until shared again.
 9. **"My Home".** Every person has a home board (`kind` `home`, always private, made the first time it is read): the
    widgets of their Home. On the web Home shows it as a mural of four columns where "Waiting on you" and "Working
    now" are fixed tiles among the widgets (`home_tiles`), moved and resized with them in Organize.
@@ -94,8 +100,9 @@ people than asked.
     `create_dashboard`, `create_widget` (on a board the person behind the run edits, by default the one they asked it
     to build or their home, with data at once when the agent has it) and `share_dashboard`. A board an agent makes is
     owned by the person it is for (the person behind the run, else the routine's creator or the agent's owner), shown
-    as "created by <agent>", and starts private. "New dashboard › Ask an agent" sends the brief to the agent in the
-    person's DM with it, where it builds the widgets with these tools and tells them.
+    as "created by <agent>", and starts private. `create_dashboard` and `share_dashboard` also set who edits (`edit`,
+    `edit_roles` by name), at once: editing isn't seeing, so it never waits on the person (§11). New dashboard makes
+    an empty board and says an agent builds one when asked in a chat: asking happens there, not in the dialog.
 11. **An agent never shows a board to more people by itself.** When it would show a board to more people than whoever
     asked (a wider audience on `create_dashboard` or `share_dashboard`, any widening by a routine's or an unattended
     run), the board keeps its audience and the request waits on the person it was made for: a banner on the board and
@@ -111,13 +118,16 @@ people than asked.
 13. **Live.** Ids only go out (`dashboard.changed`, `dashboard.widget` with the widget's status): a private or home
     board's events to its owner alone, any other's to the workspace, and a change that took a board away from people
     to everyone; the apps fetch what they may see again.
-14. **On the web.** Home shows "My Home" as the mural (§9) with "+ Widget" and Organize. A new fixed sidebar row
-    "Dashboards" after Home opens the Dashboards page: "My Home", then the boards grouped "Workspace", "Your roles"
-    and "Only yours", each with a dithered thumbnail of its widgets' tones, and "New dashboard". A board's page has its
-    back link, title, Share, Organize and "+", a line with who sees it, who made it, how many widgets and when it was
-    updated, an agent's request (§11), the grid and an empty state. A widget opens in a side panel: the widget big,
-    how it updates (its routine and next run, its alert, what the agent reads), its latest updates, remove, and a
-    composer to ask its agent for a change. Charts in messages get "Pin".
+14. **On the web.** Home shows "My Home" as the mural (§9) with Organize and "+" (a new widget) in its header; a
+    board has no add tile of its own. "Dashboards" is always in the sidebar's "More" menu, like the task manager (no
+    fixed row; the open page shows under "More" while you are on it), and in ⌘K; it opens the Dashboards page: "My
+    Home", then the boards grouped "Workspace", "Your roles" and "Only yours", each with a dithered thumbnail of its
+    widgets' tones, and "New dashboard" (with only "My Home", a line under it points there instead of an empty
+    state). A board's page has its back link, title, Share, Organize and "+", a line with who sees it, who made it,
+    how many widgets and when it was updated, an agent's request (§11), the grid and an empty state with "Add
+    widget". A widget opens in a side panel: the widget big, how it updates (its routine and next run, its alert,
+    what the agent reads), its latest updates, remove, and a composer to ask its agent for a change. Removing a
+    widget, from anywhere, asks first: its routine stops and its history goes. Charts in messages get "Pin".
 15. **On the phone.** A "Dashboards" tab between Chats and Threads. Its root lists "My Home" first, then the same
     groups. Everything else is a pushed screen with a back button, never a sheet: a board (two columns, a 2-wide
     widget across the row), a widget (big, how it updates, history, remove, ask for a change), a new widget (preview on
@@ -162,7 +172,7 @@ people than asked.
   boards others see stay, and admins manage them. Widget routines whose creator left pause (`creator_left`) until an
   editor presses Resolve.
 - Migration 0193 adds the three tables; notifications gain three kinds. Migration 0194 adds `draft` and
-  `title_set_by_user` to widgets (§16, §17).
+  `title_set_by_user` to widgets (§16, §17). Migration 0195 adds `edit_role_ids` to dashboards (§8).
 - Live blocks (ADR 0113) are not pinnable: they are for using now, and run code a board shouldn't keep running.
 
 ## Alternatives considered

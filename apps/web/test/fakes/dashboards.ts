@@ -147,6 +147,7 @@ export function createFakeDashboards(
     audience: "private",
     roleIds: [],
     editPolicy: "owner",
+    editRoleIds: [],
     pinned: false,
     position: fake.boards.length,
     owner: null,
@@ -260,9 +261,10 @@ export function createFakeDashboards(
           audience: input.audience,
           roleIds: input.roleIds ?? [],
           editPolicy: input.editPolicy,
+          editRoleIds: input.editRoleIds ?? [],
         });
         fake.boards.push(d);
-        return { ...clone(d), startedIn: input.start ? { channelId: mockId("dm") } : null };
+        return clone(d);
       },
       update: async (orgId, dashboardId, patch) => {
         log("dashboards.update", orgId, dashboardId, patch);
@@ -273,8 +275,8 @@ export function createFakeDashboards(
       share: async (orgId, dashboardId, input) => {
         log("dashboards.share", orgId, dashboardId, input);
         const d = board(dashboardId);
-        const { audience, roleIds, editPolicy } = input;
-        Object.assign(d, { audience, roleIds, editPolicy, proposal: null });
+        const { audience, roleIds, editPolicy, editRoleIds = [] } = input;
+        Object.assign(d, { audience, roleIds, editPolicy, editRoleIds, proposal: null });
         return touch(d);
       },
       remove: async (orgId, dashboardId) => {

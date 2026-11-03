@@ -13,6 +13,7 @@ import {
   dashboardWaitingCard,
   destinationsOf,
   ditherCells,
+  editorsChoices,
   exampleWordsOf,
   formatWidgetNumber,
   formatWithUnit,
@@ -37,12 +38,15 @@ import {
   testKeyOf,
   testPhase,
   thumbRects,
+  toggledEditRoles,
   toggleRole,
   topRoundedPath,
   widgetPlace,
   widgetPreview,
   widgetsInOrder,
   widgetTones,
+  withAudience,
+  withEditors,
 } from "../../src/features/dashboards/logic";
 import { appLinkFromUrl, searchHref } from "../../src/features/links/app-links";
 import {
@@ -305,23 +309,62 @@ describe("dashboards on the phone (ADR 0134)", () => {
 
   test("Share's draft: roles need one picked, only a roles audience sends them, and what changed", () => {
     const fresh = audienceDraftOf(null);
-    expect(fresh).toEqual({ audience: "workspace", roleIds: [], editPolicy: "viewers" });
+    expect(fresh).toEqual({ audience: "workspace", roleIds: [], editPolicy: "viewers", editRoleIds: [] });
     const roles = { ...fresh, audience: "roles" as const };
     expect(audienceReady(roles)).toBe(false);
     const picked = toggleRole(roles, "r1");
     expect(audienceReady(picked)).toBe(true);
     expect(toggleRole(picked, "r1").roleIds).toEqual([]);
-    expect(shareInputOf(picked)).toEqual({ audience: "roles", roleIds: ["r1"], editPolicy: "viewers" });
+    expect(shareInputOf(picked)).toEqual({
+      audience: "roles",
+      roleIds: ["r1"],
+      editPolicy: "viewers",
+      editRoleIds: [],
+    });
     expect(shareInputOf({ ...picked, audience: "private" })).toEqual({
       audience: "private",
       roleIds: [],
       editPolicy: "viewers",
+      editRoleIds: [],
     });
     const saved = board({ id: "b", audience: "roles", roleIds: ["r2", "r1"], editPolicy: "owner" });
     expect(audienceChanged(saved, audienceDraftOf(saved))).toBe(false);
     expect(audienceChanged(saved, { ...audienceDraftOf(saved), roleIds: ["r1", "r2"] })).toBe(false);
     expect(audienceChanged(saved, { ...audienceDraftOf(saved), roleIds: ["r1"] })).toBe(true);
     expect(audienceChanged(saved, { ...audienceDraftOf(saved), editPolicy: "viewers" })).toBe(true);
+  });
+
+  test("Who edits: its menu, some roles checked on their screen, and roles that stop seeing it leave", () => {
+    expect(editorsChoices(0)).toEqual(["viewers", "owner"]);
+    expect(editorsChoices(2)).toEqual(["viewers", "owner", "roles"]);
+    expect(toggledEditRoles([], "r1")).toEqual(["r1"]);
+    expect(toggledEditRoles(["r1", "r2"], "r1")).toEqual(["r2"]);
+
+    const saved = board({
+      id: "b",
+      audience: "roles",
+      roleIds: ["r1", "r2"],
+      editPolicy: "roles",
+      editRoleIds: ["r2"],
+    });
+    const draft = audienceDraftOf(saved);
+    expect(draft).toEqual({ audience: "roles", roleIds: ["r1", "r2"], editPolicy: "roles", editRoleIds: ["r2"] });
+    expect(audienceChanged(saved, draft)).toBe(false);
+    expect(audienceChanged(saved, { ...draft, editRoleIds: ["r1"] })).toBe(true);
+    expect(shareInputOf(draft)).toEqual({
+      audience: "roles",
+      roleIds: ["r1", "r2"],
+      editPolicy: "roles",
+      editRoleIds: ["r2"],
+    });
+    // A role out of who sees it leaves who edits; none left: only you and admins.
+    expect(toggleRole(draft, "r2")).toMatchObject({ roleIds: ["r1"], editPolicy: "owner", editRoleIds: [] });
+    expect(toggleRole(draft, "r1")).toMatchObject({ roleIds: ["r2"], editPolicy: "roles", editRoleIds: ["r2"] });
+    expect(withAudience(draft, "private")).toMatchObject({ editPolicy: "owner", editRoleIds: [] });
+    expect(withAudience(draft, "workspace")).toMatchObject({ editPolicy: "roles", editRoleIds: ["r2"] });
+    expect(withEditors(draft, "viewers")).toMatchObject({ editPolicy: "viewers", editRoleIds: [] });
+    // Another policy's leftover roles are never read as edit roles.
+    expect(audienceDraftOf({ ...saved, editPolicy: "owner" }).editRoleIds).toEqual([]);
   });
 
   test("who is an admin for Share's access list: an owner or someone with an administrator role", () => {

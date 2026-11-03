@@ -1799,6 +1799,7 @@
   "dashboards": {
     "homeRow": "Solo tú · tus propios widgets",
     "loadFailed": "No se pudieron cargar los paneles.",
+    "onlyHome": "Los paneles del espacio de trabajo o de tus roles aparecen aquí.",
     "create": "Crear",
     "routineTarget": "su widget",
     "pin": {
@@ -1827,8 +1828,6 @@
       "refreshing": "{{name}} lo está actualizando.",
       "scheduleSaved": "Ahora se actualiza {{schedule}}",
       "alertSaved": "Alerta guardada",
-      "removeTitle": "¿Quitar “{{title}}”?",
-      "removeText": "Su rutina se detiene, y lo que muestra se va con él.",
       "removed": "Widget quitado. Su rutina se detuvo.",
       "routine": "Su rutina",
       "onBoard": "Dónde está",

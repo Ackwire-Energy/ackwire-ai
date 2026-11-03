@@ -25,8 +25,8 @@ const DEFAULT_TILES: HomeTile[] = [
 
 /**
  * Home as a mural (ADR 0134, on ADR 0108): "Waiting on you" and "Working now" are fixed tiles of the person's home
- * board, among their widgets, in its 4 columns. "Organize" drags and resizes; "+ Widget" asks an agent for one or
- * pins a chart from the chat; a widget opens in its side panel (`?widget=<id>`).
+ * board, among their widgets, in its 4 columns. "Organize" drags and resizes; the header's "+" asks an agent for a
+ * widget or pins a chart from the chat; a widget opens in its side panel (`?widget=<id>`).
  */
 export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting: MuralTile; working: MuralTile }) {
   const { t } = useTranslation();
@@ -74,7 +74,6 @@ export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting:
         arranging={arranging && editable}
         tiles={{ waiting: tile(waiting), working: tile(working) }}
         tileNames={{ waiting: waiting.title, working: working.title }}
-        onAdd={() => setAdding(true)}
         onOpen={(id) => setWidgetId(id)}
       />
       <WidgetPanel orgId={orgId} widgetId={widgetId} onClose={() => setWidgetId(null)} />

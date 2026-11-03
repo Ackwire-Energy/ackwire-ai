@@ -1,5 +1,5 @@
 import type { WidgetDetail, WidgetSchedule, WidgetUpdate } from "@agenteschat/client";
-import { useAskWidgetChange, useRefreshWidget, useRemoveWidget, useUpdateWidget, useWidget } from "@agenteschat/client";
+import { useAskWidgetChange, useRefreshWidget, useUpdateWidget, useWidget } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { upcomingAt, whenAt } from "@agenteschat/client/lib/format";
 import {
@@ -23,6 +23,7 @@ import { useFocusAtEnd, useSent } from "@/components/EditInPlace";
 import { useNow } from "@/hooks/useNow";
 import { useToast } from "@/lib/toast";
 import { failureText, useWidgetAgent, WidgetFoot, widgetTitle } from "./parts";
+import { RemoveWidgetDialog } from "./RemoveWidgetDialog";
 import "./widgets.css";
 
 /**
@@ -173,7 +174,7 @@ function PanelBody({ orgId, widget, onClose }: { orgId: string; widget: WidgetDe
   const now = useNow(60_000);
   const { name, color } = useWidgetAgent(widget.agentId);
   const refresh = useRefreshWidget(orgId);
-  const remove = useRemoveWidget(orgId);
+  const [removing, setRemoving] = useState(false);
   const say = (e: unknown) => toast.show(errorText(t, e, i18n.language), "error");
   const removeLabel = t(widget.dashboard.kind === "home" ? "widgets.menu.removeHome" : "widgets.menu.removeBoard");
   return (
@@ -214,31 +215,18 @@ function PanelBody({ orgId, widget, onClose }: { orgId: string; widget: WidgetDe
       {widget.canEdit && <AskChange orgId={orgId} widget={widget} name={name} />}
       {widget.canEdit && (
         <div className="wd__end">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon="trash"
-            className="wd__remove"
-            loading={remove.isPending}
-            onClick={() =>
-              remove.mutate(widget.id, {
-                onSuccess: () => {
-                  toast.show(
-                    t(widget.dashboard.kind === "home" ? "widgets.removed.home" : "widgets.removed.board", {
-                      title: widgetTitle(t, widget),
-                      name,
-                    }),
-                  );
-                  onClose();
-                },
-                onError: say,
-              })
-            }
-          >
+          <Button variant="ghost" size="sm" icon="trash" className="wd__remove" onClick={() => setRemoving(true)}>
             {removeLabel}
           </Button>
         </div>
       )}
+      <RemoveWidgetDialog
+        orgId={orgId}
+        widget={removing ? widget : null}
+        boardKind={widget.dashboard.kind}
+        onClose={() => setRemoving(false)}
+        onRemoved={onClose}
+      />
     </>
   );
 }

@@ -5,11 +5,10 @@ import {
   layoutOf,
   resizeItem,
   useRefreshWidget,
-  useRemoveWidget,
   useSaveLayout,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button, Card, cx, Icon, Menu, MenuItem, MenuSeparator, WidgetAddTile, WidgetCard } from "@agenteschat/ui";
+import { Button, Card, cx, Icon, Menu, MenuItem, MenuSeparator, WidgetCard } from "@agenteschat/ui";
 import { layoutToSize, nextSize, sizeToLayout } from "@agenteschat/ui/widgets/spec";
 import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +16,7 @@ import { useNow } from "@/hooks/useNow";
 import { type GridMove, useGridDrag } from "@/lib/grid-drag";
 import { useToast } from "@/lib/toast";
 import { useWidgetAgent, WidgetFoot, widgetTitle } from "./parts";
+import { RemoveWidgetDialog } from "./RemoveWidgetDialog";
 import "./widgets.css";
 
 /** The grip of a card in Organize: the board's drag on it (Space or Enter picks the card up, the arrows move it). */
@@ -41,7 +41,6 @@ export interface WidgetBoardProps {
   tiles?: Partial<Record<TileKey, BoardTileSlot>>;
   /** The fixed tiles' names, for what a screen reader hears while one moves. */
   tileNames?: Partial<Record<TileKey, string>>;
-  onAdd: () => void;
   onOpen: (widgetId: string) => void;
   /** "Change when it updates" (else it opens the widget, whose panel changes it). */
   onChangeSchedule?: (widgetId: string) => void;
@@ -49,10 +48,11 @@ export interface WidgetBoardProps {
 
 /**
  * A board's grid (ADR 0134): 4 columns, each widget S (1×1), M (2×1) or L (2×2), a home board's fixed tiles among
- * them, and "+ Widget" last. Each card has Update now and its menu (Open, Update now, Ask for a change, Change when
- * it updates, Remove), a failure's Resolve, and in Organize: drag with a mouse or a finger (`useGridDrag`: the card
- * lifts, the others slide out of its way, a pixel well marks where it lands), the grip's keys, the size button,
- * remove. Every change is saved at once (`useSaveLayout`, optimistic) and the cells slide to their new places.
+ * them; a widget is added from the header's "+", not from a tile on the board. Each card has Update now and its
+ * menu (Open, Update now, Ask for a change, Change when it updates, Remove), a failure's Resolve, and in Organize:
+ * drag with a mouse or a finger (`useGridDrag`: the card lifts, the others slide out of its way, a pixel well marks
+ * where it lands), the grip's keys, the size button, remove. Every change is saved at once (`useSaveLayout`,
+ * optimistic) and the cells slide to their new places; a remove asks first (`RemoveWidgetDialog`).
  */
 export function WidgetBoard({
   orgId,
@@ -60,14 +60,13 @@ export function WidgetBoard({
   arranging,
   tiles,
   tileNames,
-  onAdd,
   onOpen,
   onChangeSchedule,
 }: WidgetBoardProps) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const save = useSaveLayout(orgId);
-  const remove = useRemoveWidget(orgId);
+  const [removing, setRemoving] = useState<Widget | null>(null);
   const now = useNow(60_000);
   const helpId = useId();
   const items = boardItems(board.widgets, board.kind === "home" ? board.tiles.filter((x) => tiles?.[x.key]) : []);
@@ -106,19 +105,6 @@ export function WidgetBoard({
     "aria-describedby": helpId,
     "aria-roledescription": t("widgets.organize.role"),
   });
-  const removeWidget = (w: Widget, name: string) => {
-    grid.animateNext();
-    remove.mutate(w.id, {
-      onSuccess: () =>
-        toast.show(
-          t(board.kind === "home" ? "widgets.removed.home" : "widgets.removed.board", {
-            title: widgetTitle(t, w),
-            name,
-          }),
-        ),
-      onError: (e) => toast.show(errorText(t, e, i18n.language), "error"),
-    });
-  };
 
   const cell = (item: BoardItem, state: "hidden" | "landing" | "picked" | undefined, child: ReactNode) => (
     <div
@@ -191,14 +177,18 @@ export function WidgetBoard({
                 grid.animateNext();
                 commit(resizeItem(shown, item.id, sizeToLayout(nextSize(layoutToSize({ w: item.w, h: item.h })))));
               }}
-              onRemove={(name) => removeWidget(item.widget, name)}
+              onRemove={() => setRemoving(item.widget)}
             />,
           );
         })}
-        {editable && !organizing && (
-          <WidgetAddTile text={t("widgets.add.tile")} label={t("widgets.add.label")} onClick={onAdd} />
-        )}
       </div>
+      <RemoveWidgetDialog
+        orgId={orgId}
+        widget={removing}
+        boardKind={board.kind}
+        onClose={() => setRemoving(null)}
+        onRemoving={() => grid.animateNext()}
+      />
     </>
   );
 }
@@ -229,7 +219,7 @@ function BoardWidget({
   onOpen: () => void;
   onChangeSchedule: () => void;
   onSize: () => void;
-  onRemove: (name: string) => void;
+  onRemove: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -310,7 +300,7 @@ function BoardWidget({
             )}
             {editable && <MenuSeparator />}
             {editable && (
-              <MenuItem icon="trash" danger onSelect={() => onRemove(name)}>
+              <MenuItem icon="trash" danger onSelect={onRemove}>
                 {removeLabel}
               </MenuItem>
             )}
@@ -325,7 +315,7 @@ function BoardWidget({
               removeLabel,
               dragLabel: t("widgets.organize.drag"),
               onSize,
-              onRemove: () => onRemove(name),
+              onRemove,
               grip,
             }
           : null

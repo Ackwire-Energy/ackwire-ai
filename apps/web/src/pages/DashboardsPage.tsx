@@ -1,7 +1,7 @@
 import type { DashboardSummary } from "@agenteschat/client";
 import { dashboardGroups, useDashboards, useMembers } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Button, EmptyState, Icon } from "@agenteschat/ui";
+import { Button, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,7 +16,8 @@ import "./dashboards.css";
 /**
  * Dashboards (ADR 0134 §14): "My Home" first, then the boards the person sees, grouped as the workspace's, their
  * roles' and only theirs, each a card with its widgets' thumbnail, who made it, how many widgets and when it was
- * updated; "New dashboard" makes one.
+ * updated; "New dashboard" makes one. With only "My Home", a line under it says so (no empty state: there is a
+ * board, and the header already has "New dashboard").
  */
 export function DashboardsPage() {
   const { t } = useTranslation();
@@ -28,12 +29,7 @@ export function DashboardsPage() {
   const groups = dashboardGroups(list.data?.dashboards ?? []);
   const myRoleIds = members.data?.find((m) => m.userId === me.user.id)?.roleIds ?? [];
   const myRoles = roleNames(roles, myRoleIds);
-  const none = groups.workspace.length + groups.roles.length + groups.mine.length === 0;
-  const newButton = (
-    <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
-      {t("dashboards.new")}
-    </Button>
-  );
+  const onlyHome = groups.workspace.length + groups.roles.length + groups.mine.length === 0;
   return (
     <div className="page page--list dashboards">
       <header className="list-head">
@@ -41,7 +37,9 @@ export function DashboardsPage() {
           <h1>{t("dashboards.title")}</h1>
           <p className="list-head__sub">{t("dashboards.subtitle")}</p>
         </div>
-        {newButton}
+        <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+          {t("dashboards.new")}
+        </Button>
       </header>
       {list.isLoading && <LoadingCards count={3} />}
       {list.isError && !list.data && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
@@ -62,6 +60,7 @@ export function DashboardsPage() {
                 </span>
               </Link>
             </div>
+            {onlyHome && <p className="db-group__only">{t("dashboards.onlyHome")}</p>}
           </section>
           <BoardGroup
             title={t("dashboards.groups.workspace")}
@@ -74,11 +73,6 @@ export function DashboardsPage() {
             boards={groups.roles}
           />
           <BoardGroup title={t("dashboards.groups.mine")} hint={t("dashboards.groups.mineHint")} boards={groups.mine} />
-          {none && (
-            <EmptyState sky title={t("dashboards.empty.noneTitle")} actions={newButton}>
-              {t("dashboards.empty.none")}
-            </EmptyState>
-          )}
         </>
       )}
       <NewDashboardDialog open={creating} onClose={() => setCreating(false)} />

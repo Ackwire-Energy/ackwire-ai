@@ -1,14 +1,17 @@
 import {
-  type Agent,
   type Dashboard,
   type DashboardSummary,
+  editorsSummary,
+  editorsText,
   useDecideDashboardProposal,
   type WidgetFormat,
   type WidgetSchedule,
+  withEditRoles,
 } from "@agenteschat/client";
 import { WIDGET_SCHEDULES, WIDGET_SIZES, type WidgetSize } from "@agenteschat/ui/widgets/spec";
 import { Canvas } from "@shopify/react-native-skia";
-import type { ReactNode } from "react";
+import { router } from "expo-router";
+import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
@@ -31,8 +34,20 @@ import { useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { successHaptic, useSurface } from "../shared/parts";
 import { DitherShape } from "./Dither";
+import { closeEditRoles, openEditRoles } from "./edit-roles";
 import { useAgentLook, useCustomRoles } from "./hooks";
-import { type AudienceDraft, roleNamesOf, roundRectPath, thumbRects, toggleRole, widgetTones } from "./logic";
+import {
+  type AudienceDraft,
+  editorsChoices,
+  roleNamesOf,
+  roundRectPath,
+  thumbRects,
+  toggleRole,
+  widgetTones,
+  withAudience,
+  withEditors,
+} from "./logic";
+import { usePickMenu } from "./menu";
 
 /** Pieces the dashboards' screens share (ADR 0134). */
 
@@ -129,7 +144,7 @@ export function BoardRow({
 }
 
 /** A role's small mark: a square of dither in its color (the web's role chips). */
-function RoleMark({ color }: { color: string }) {
+export function RoleMark({ color }: { color: string }) {
   const { scheme } = useTheme();
   const tones = widgetTones(color, scheme === "dark");
   return (
@@ -367,55 +382,10 @@ export function SizeChoice({ value, onChange }: { value: WidgetSize; onChange: (
   );
 }
 
-/** Who looks after a widget: the agents as tiles (face, name, what it does), in a row that scrolls sideways. */
-export function AgentPicker({
-  agents,
-  value,
-  onChange,
-}: {
-  agents: readonly Agent[];
-  value: string | null;
-  onChange: (agentId: string) => void;
-}) {
-  const { colors: c } = useTheme();
-  const surface = useSurface();
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.agents}
-    >
-      {agents.map((a) => {
-        const on = a.id === value;
-        return (
-          <Pressable
-            key={a.id}
-            onPress={() => onChange(a.id)}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: on }}
-            accessibilityLabel={[a.name, a.role].filter(Boolean).join(", ")}
-            style={[styles.agent, surface, on ? { borderColor: c.ink } : { borderColor: "transparent" }]}
-          >
-            <AgentFace agentId={a.id} size={36} live={false} />
-            <Text variant="subhead" tone="ink" numberOfLines={1} style={styles.semibold}>
-              {a.name}
-            </Text>
-            {a.role ? (
-              <Text variant="caption" tone="faint" numberOfLines={1}>
-                {a.role}
-              </Text>
-            ) : null}
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
 /**
  * Who sees and who edits a board (Share and New dashboard): the whole workspace, some roles (picked as chips), or only
- * you; whoever sees it, or only you and admins. Under it, what showing a board exposes.
+ * you; then, unless it's only yours, who edits it: a row saying who that opens a pick menu (whoever sees it, only you
+ * and admins, or "Some roles…", a pushed screen to check them). Under it, what showing a board exposes.
  */
 export function AudienceFields({
   draft,
@@ -430,7 +400,29 @@ export function AudienceFields({
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const roles = useCustomRoles();
-  const pick = (audience: AudienceDraft["audience"]) => onChange({ ...draft, audience });
+  const pickMenu = usePickMenu();
+  const pick = (audience: AudienceDraft["audience"]) => onChange(withAudience(draft, audience));
+  // The roles' screen writes back here while it is open; leaving the form ends it.
+  useEffect(() => () => closeEditRoles(), []);
+  const openRoles = () => {
+    openEditRoles({
+      audience: draft.audience,
+      roleIds: draft.roleIds,
+      editRoleIds: draft.editPolicy === "roles" ? draft.editRoleIds : [],
+      apply: (ids) => onChange(withEditRoles(draft, ids)),
+    });
+    router.push("/board-edit-roles");
+  };
+  const openEditors = () =>
+    pickMenu(
+      t("dashboards.edit.label"),
+      editorsChoices(roles.length).map((key) => ({
+        key,
+        label: key === "roles" ? t("dashboards.edit.someRoles") : t(`dashboards.edit.${key}`),
+      })),
+      draft.editPolicy,
+      (key) => (key === "roles" ? openRoles() : onChange(withEditors(draft, key))),
+    );
   return (
     <>
       <GroupedHeader>{t("dashboards.audience.label")}</GroupedHeader>
@@ -494,14 +486,10 @@ export function AudienceFields({
           <GroupedHeader>{t("dashboards.edit.label")}</GroupedHeader>
           <GroupedList>
             <GroupedRow
-              label={t("dashboards.edit.viewers")}
-              checked={draft.editPolicy === "viewers"}
-              onPress={() => onChange({ ...draft, editPolicy: "viewers" })}
-            />
-            <GroupedRow
-              label={t("dashboards.edit.owner")}
-              checked={draft.editPolicy === "owner"}
-              onPress={() => onChange({ ...draft, editPolicy: "owner" })}
+              icon={draft.editPolicy === "viewers" ? "eye" : draft.editPolicy === "owner" ? "lock" : "members"}
+              label={editorsText(t, editorsSummary(draft, roles))}
+              chevron
+              onPress={openEditors}
             />
           </GroupedList>
         </>
@@ -539,16 +527,6 @@ const styles = StyleSheet.create({
   chips: { gap: 6, paddingHorizontal: 16 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 17 },
   segments: { paddingHorizontal: 16 },
-  agents: { gap: 8, paddingHorizontal: 16, paddingVertical: 2 },
-  agent: {
-    width: 92,
-    alignItems: "center",
-    gap: 3,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 16,
-    borderWidth: 2,
-  },
   roles: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 54, paddingRight: 14, paddingBottom: 12 },
   roleChip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 16 },
   faded: { opacity: 0.35 },

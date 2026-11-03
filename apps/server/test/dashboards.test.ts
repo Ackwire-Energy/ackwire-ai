@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { orgTopic, userTopic } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { insertMessage, notify, proposeDashboardAudience } from "@agenteschat/engine";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -42,6 +42,7 @@ type Board = {
   audience: string;
   roleIds: string[];
   editPolicy: string;
+  editRoleIds: string[];
   pinned: boolean;
   owner: { kind: string; id: string; name: string } | null;
   mine: boolean;
@@ -51,7 +52,6 @@ type Board = {
   proposal: Proposal | null;
   widgets: Widget[];
   tiles: Tile[];
-  startedIn?: { channelId: string } | null;
 };
 type List = { home: Board | null; dashboards: Board[] };
 type Detail = Widget & {
@@ -163,7 +163,7 @@ test("a workspace board: every member sees it; with edit policy owner, its owner
     widgets: [],
     tiles: [],
     proposal: null,
-    startedIn: null,
+    editRoleIds: [],
     owner: { kind: "person", id: s.ownerId },
   });
 
@@ -794,35 +794,53 @@ test("+ Widget's cost line and suggestions, for an agent the person may talk to"
   expect(await codeOf(hidden)).toBe("widget.agent_unreachable");
 });
 
-test("New dashboard › Ask an agent sends the brief to the agent in the person's DM with it", async () => {
+test("who edits by roles: the role's people who see the board edit it; checked as the audience's roles", async () => {
   const s = await start();
-  const brief = "Sales, orders and the top products, every hour";
-  const created = await read<Board>(
-    await s.api(s.ana, "/dashboards", {
-      json: {
-        title: "Black Friday",
-        audience: "private",
-        editPolicy: "owner",
-        start: { agentId: s.agentId, brief },
-      },
-    }),
-    201,
-  );
-  expect(created).toMatchObject({ title: "Black Friday", audience: "private", mine: true });
-  const channelId = created.startedIn?.channelId ?? "";
-  expect(channelId).not.toBe("");
-  const sent = await t.db
-    .select({ body: schema.messages.body, meta: schema.messages.meta, author: schema.messages.authorUserId })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.orgId, s.orgId), eq(schema.messages.channelId, channelId)));
-  const message = sent.find((m) => m.body.includes(brief));
-  expect(message?.author).toBe(s.anaId);
-  expect(message?.meta).toMatchObject({ dashboard: { id: created.id, title: "Black Friday" } });
+  const finance = await read<{ id: string }>(await s.api(s.owner, "/roles", { json: { name: "Finance" } }), 201);
+  const given = await s.api(s.owner, `/members/${s.anaId}/roles`, { method: "PUT", json: { roleIds: [finance.id] } });
+  expect(given.status).toBe(200);
+  const cash = await s.newBoard(s.owner, { title: "Cash", editPolicy: "roles", editRoleIds: [finance.id] });
+  expect(cash).toMatchObject({ audience: "workspace", editPolicy: "roles", editRoleIds: [finance.id] });
 
-  const noBrief = await s.api(s.ana, "/dashboards", {
-    json: { title: "Empty", audience: "private", editPolicy: "owner", start: { agentId: s.agentId, brief: " " } },
+  // Ana holds Finance and sees it: she edits. Bia only sees it.
+  expect(await read<Board>(await s.board(s.ana, cash.id))).toMatchObject({ canEdit: true, canManage: false });
+  expect(await read<Board>(await s.board(s.bia, cash.id))).toMatchObject({ canEdit: false });
+  const renamed = await s.api(s.ana, `/dashboards/${cash.id}`, { method: "PATCH", json: { about: "Daily" } });
+  expect(renamed.status).toBe(200);
+  const refused = await s.api(s.bia, `/dashboards/${cash.id}`, { method: "PATCH", json: { about: "Mine" } });
+  expect(refused.status).toBe(403);
+  expect(await codeOf(refused)).toBe("dashboard.forbidden");
+
+  // Editing isn't seeing: made private, Finance's people neither see nor edit it.
+  const narrowed = await read<Board>(
+    await s.api(s.owner, `/dashboards/${cash.id}/share`, {
+      method: "PUT",
+      json: { audience: "private", roleIds: [], editPolicy: "roles", editRoleIds: [finance.id] },
+    }),
+  );
+  expect(narrowed).toMatchObject({ audience: "private", editPolicy: "roles", editRoleIds: [finance.id] });
+  expect((await s.board(s.ana, cash.id)).status).toBe(404);
+
+  const none = await s.api(s.owner, `/dashboards/${cash.id}/share`, {
+    method: "PUT",
+    json: { audience: "workspace", roleIds: [], editPolicy: "roles", editRoleIds: [] },
   });
-  expect(noBrief.status).toBe(400);
+  expect(none.status).toBe(400);
+  expect(await codeOf(none)).toBe("dashboard.roles_required");
+  const unknown = await s.api(s.owner, "/dashboards", {
+    json: { title: "Nobody", audience: "workspace", editPolicy: "roles", editRoleIds: [crypto.randomUUID()] },
+  });
+  expect(unknown.status).toBe(400);
+  expect(await codeOf(unknown)).toBe("dashboard.role_unknown");
+
+  // A deleted role leaves who edits; with none left, its owner and admins edit.
+  await s.api(s.owner, `/dashboards/${cash.id}/share`, {
+    method: "PUT",
+    json: { audience: "workspace", roleIds: [], editPolicy: "roles", editRoleIds: [finance.id] },
+  });
+  expect((await s.api(s.owner, `/roles/${finance.id}`, { method: "DELETE" })).status).toBeLessThan(300);
+  expect(await read<Board>(await s.board(s.owner, cash.id))).toMatchObject({ editPolicy: "owner", editRoleIds: [] });
+  expect(await read<Board>(await s.board(s.ana, cash.id))).toMatchObject({ canEdit: false });
 });
 
 test("a widget's routine shows in Routines with its widget; notifications carry the board and the widget", async () => {

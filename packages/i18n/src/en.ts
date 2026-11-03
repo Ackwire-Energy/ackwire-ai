@@ -12495,7 +12495,7 @@ export const en = {
       dropped: "You dropped “{{title}}” at position {{position}} of {{total}}.",
       canceled: "“{{title}}” went back to its place.",
     },
-    add: { tile: "Widget", label: "Add widget" },
+    add: { label: "Add widget" },
     alert: {
       label: "Tell me when something is off",
       hint: "The alert goes to Waiting on you, with what changed.",
@@ -12580,6 +12580,13 @@ export const en = {
       home: "“{{title}}” left Home and {{name}}'s routine stopped",
       board: "“{{title}}” left the dashboard and {{name}}'s routine stopped",
     },
+    /** Asked before a widget goes, from its card's menu, Organize or its panel. */
+    removeConfirm: {
+      title: "Remove “{{title}}”?",
+      textRoutine: "{{name}}'s routine that updates it stops, and its update history goes with it.",
+      textManual: "Its update history goes with it.",
+      confirm: "Remove",
+    },
     // end of widgets
   },
   // Dashboards (ADR 0134): the boards' page, a board, its dialogs. The web and the phone add their own keys here.
@@ -12587,6 +12594,8 @@ export const en = {
     title: "Dashboards",
     subtitle: "Numbers and charts the agents keep up to date, for the workspace or only some roles.",
     sidebar: "Dashboards",
+    /** Its line in the sidebar's More menu. */
+    navWhat: "Numbers and charts the agents keep up to date",
     new: "New dashboard",
     back: "Dashboards",
     home: "My Home",
@@ -12611,7 +12620,23 @@ export const en = {
       people_one: "{{count}} person",
       people_other: "{{count}} people",
     },
-    edit: { label: "Who edits", viewers: "Whoever sees it", owner: "Only you and admins" },
+    edit: {
+      label: "Who edits",
+      viewers: "Whoever sees it",
+      owner: "Only you and admins",
+      /** Heading over the workspace's roles in the "Who edits" dropdown. */
+      roles: "Or people with these roles",
+      /** "Who edits" with two roles picked: "Sales and Board". */
+      twoRoles: "{{first}} and {{second}}",
+      /** "Who edits" with three roles or more picked. */
+      manyRoles_one: "{{count}} role",
+      manyRoles_other: "{{count}} roles",
+      /** Beside a role whose people don't see the dashboard: they can't edit it either. */
+      cantSee: "Doesn't see this dashboard",
+      /** Phone: the last choice of the "Who edits" menu, which opens the list of roles. */
+      someRoles: "Some roles…",
+      rolesNote: "People with these roles edit it when they also see it. You and admins always do.",
+    },
     meta: {
       by: "Created by {{name}}",
       byYou: "Created by you",
@@ -12648,26 +12673,18 @@ export const en = {
     empty: {
       title: "Empty dashboard",
       text: "Add widgets: ask an agent or pin a block from the chat.",
-      noneTitle: "No dashboards yet",
-      none: "Numbers and charts agents keep up to date, for you or for the team.",
     },
+    /** Under "My Home" when the person sees no other board; "New dashboard" is the page's button. */
+    onlyHome: "Make a dashboard for the workspace or some roles with “New dashboard”.",
     create: {
       title: "New dashboard",
       subtitle: "Widgets together on one page, for you or for the team.",
       name: "Name",
       namePlaceholder: "E.g.: Sales, Black Friday, Quarter goals",
-      start: "How to start",
-      blank: "Blank",
-      blankHint: "You add the widgets",
-      agent: "Ask an agent",
-      agentHint: "It builds the widgets and the routines",
-      briefPlaceholder: "E.g.: what I need to see every morning about sales",
+      /** Under the name: an agent builds a dashboard when asked in a chat. */
+      askHint: "You can also ask an agent in a chat to build one.",
       submit: "Create dashboard",
       created: "“{{title}}” created",
-      /** "Ask an agent": the brief went to the agent's DM, where it builds the widgets. */
-      started: "{{name}} is building “{{title}}” in your conversation",
-      openChat: "Open the conversation",
-      brief: "What {{name}} should build",
     },
     newWidget: {
       title: "New widget",

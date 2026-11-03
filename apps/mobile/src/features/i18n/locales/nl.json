@@ -1717,6 +1717,7 @@
   "dashboards": {
     "homeRow": "Alleen jij · je eigen widgets",
     "loadFailed": "De dashboards konden niet worden geladen.",
+    "onlyHome": "Dashboards van de werkruimte of jouw rollen verschijnen hier.",
     "create": "Maken",
     "routineTarget": "zijn widget",
     "pin": {
@@ -1745,8 +1746,6 @@
       "refreshing": "{{name}} werkt hem bij.",
       "scheduleSaved": "Hij werkt nu {{schedule}} bij",
       "alertSaved": "Melding opgeslagen",
-      "removeTitle": "“{{title}}” verwijderen?",
-      "removeText": "Zijn routine stopt, en wat hij toont, gaat mee.",
       "removed": "Widget verwijderd. Zijn routine is gestopt.",
       "routine": "Zijn routine",
       "onBoard": "Waar hij staat",

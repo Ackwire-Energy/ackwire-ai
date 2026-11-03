@@ -31142,9 +31142,6 @@
   "widgets.organize.canceled": {
     "value": "“{{title}}” went back to its place."
   },
-  "widgets.add.tile": {
-    "value": "Widget"
-  },
   "widgets.add.label": {
     "value": "Add widget"
   },
@@ -31373,6 +31370,18 @@
   "widgets.removed.board": {
     "value": "“{{title}}” left the dashboard and {{name}}'s routine stopped"
   },
+  "widgets.removeConfirm.title": {
+    "value": "Remove “{{title}}”?"
+  },
+  "widgets.removeConfirm.textRoutine": {
+    "value": "{{name}}'s routine that updates it stops, and its update history goes with it."
+  },
+  "widgets.removeConfirm.textManual": {
+    "value": "Its update history goes with it."
+  },
+  "widgets.removeConfirm.confirm": {
+    "value": "Remove"
+  },
   "dashboards.title": {
     "value": "Dashboards"
   },
@@ -31381,6 +31390,9 @@
   },
   "dashboards.sidebar": {
     "value": "Dashboards"
+  },
+  "dashboards.navWhat": {
+    "value": "Numbers and charts the agents keep up to date"
   },
   "dashboards.new": {
     "value": "New dashboard"
@@ -31450,6 +31462,27 @@
   },
   "dashboards.edit.owner": {
     "value": "Only you and admins"
+  },
+  "dashboards.edit.roles": {
+    "value": "Or people with these roles"
+  },
+  "dashboards.edit.twoRoles": {
+    "value": "{{first}} and {{second}}"
+  },
+  "dashboards.edit.manyRoles": {
+    "value": {
+      "one": "{{count}} role",
+      "other": "{{count}} roles"
+    }
+  },
+  "dashboards.edit.cantSee": {
+    "value": "Doesn't see this dashboard"
+  },
+  "dashboards.edit.someRoles": {
+    "value": "Some roles…"
+  },
+  "dashboards.edit.rolesNote": {
+    "value": "People with these roles edit it when they also see it. You and admins always do."
   },
   "dashboards.meta.by": {
     "value": "Created by {{name}}"
@@ -31538,11 +31571,8 @@
   "dashboards.empty.text": {
     "value": "Add widgets: ask an agent or pin a block from the chat."
   },
-  "dashboards.empty.noneTitle": {
-    "value": "No dashboards yet"
-  },
-  "dashboards.empty.none": {
-    "value": "Numbers and charts agents keep up to date, for you or for the team."
+  "dashboards.onlyHome": {
+    "value": "Make a dashboard for the workspace or some roles with “New dashboard”."
   },
   "dashboards.create.title": {
     "value": "New dashboard"
@@ -31556,38 +31586,14 @@
   "dashboards.create.namePlaceholder": {
     "value": "E.g.: Sales, Black Friday, Quarter goals"
   },
-  "dashboards.create.start": {
-    "value": "How to start"
-  },
-  "dashboards.create.blank": {
-    "value": "Blank"
-  },
-  "dashboards.create.blankHint": {
-    "value": "You add the widgets"
-  },
-  "dashboards.create.agent": {
-    "value": "Ask an agent"
-  },
-  "dashboards.create.agentHint": {
-    "value": "It builds the widgets and the routines"
-  },
-  "dashboards.create.briefPlaceholder": {
-    "value": "E.g.: what I need to see every morning about sales"
+  "dashboards.create.askHint": {
+    "value": "You can also ask an agent in a chat to build one."
   },
   "dashboards.create.submit": {
     "value": "Create dashboard"
   },
   "dashboards.create.created": {
     "value": "“{{title}}” created"
-  },
-  "dashboards.create.started": {
-    "value": "{{name}} is building “{{title}}” in your conversation"
-  },
-  "dashboards.create.openChat": {
-    "value": "Open the conversation"
-  },
-  "dashboards.create.brief": {
-    "value": "What {{name}} should build"
   },
   "dashboards.newWidget.title": {
     "value": "New widget"

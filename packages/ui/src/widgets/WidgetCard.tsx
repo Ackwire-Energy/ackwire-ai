@@ -180,13 +180,3 @@ function useFlash(spec: WidgetSpec | null): boolean {
   }, [key]);
   return on;
 }
-
-/** The board's last cell: "+ Widget", a dashed tile with the cut corner (`label` names it for screen readers). */
-export function WidgetAddTile({ text, label, onClick }: { text: string; label: string; onClick: () => void }) {
-  return (
-    <button type="button" className="wg-add" aria-label={label} title={label} onClick={onClick}>
-      <Icon name="plus" size={18} />
-      {text}
-    </button>
-  );
-}

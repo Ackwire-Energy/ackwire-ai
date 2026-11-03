@@ -152,14 +152,17 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
         onError: failed,
       },
     );
+  // The same words as the web's confirmation (ADR 0134): its routine stops and its history goes.
   const confirmRemove = () =>
     Alert.alert(
-      t("mobile.dashboards.widget.removeTitle", { title: shown }),
-      t("mobile.dashboards.widget.removeText"),
+      t("widgets.removeConfirm.title", { title: shown }),
+      w.schedule === "manual"
+        ? t("widgets.removeConfirm.textManual")
+        : t("widgets.removeConfirm.textRoutine", { name: look.name || t("channel.unknownAgent") }),
       [
         { text: t("mobile.common.cancel"), style: "cancel" },
         {
-          text: home ? t("widgets.menu.removeHome") : t("widgets.menu.removeBoard"),
+          text: t("widgets.removeConfirm.confirm"),
           style: "destructive",
           onPress: () =>
             remove.mutate(w.id, {

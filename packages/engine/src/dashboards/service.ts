@@ -17,9 +17,7 @@ import {
 } from "@agenteschat/ui/widgets/spec";
 import { type Agent, getAgent } from "../agents";
 import { canTalkTo, speakerOf } from "../audience";
-import { openDm } from "../dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
-import { postPersonMessage } from "../messages";
 import { resolveDashboardProposal, resolveWidgetNotices } from "../notification-producers";
 import { getMembership, type Membership, requireActiveMembership } from "../organizations";
 import {
@@ -48,7 +46,6 @@ import {
   DASHBOARD_ROLES_MAX,
   DASHBOARD_TITLE_MAX,
   type DashboardAudience,
-  type DashboardCreatedView,
   type DashboardDeps,
   type DashboardEditPolicy,
   type DashboardLayoutInput,
@@ -122,6 +119,25 @@ export async function dashboardRoleIds(
   roleIds: readonly string[] | undefined,
 ): Promise<string[]> {
   if (audience !== "roles") return [];
+  return customRoleIds(db, orgId, roleIds);
+}
+
+/**
+ * The roles that edit a board whose `edit_policy` is `roles`, checked as its audience's roles (1 to
+ * `DASHBOARD_ROLES_MAX` custom roles). They may name roles that don't see the board: seeing comes first (`access.ts`),
+ * so those holders edit nothing until the board is shown to them. Any other policy takes none.
+ */
+export async function dashboardEditRoleIds(
+  db: Executor,
+  orgId: string,
+  editPolicy: DashboardEditPolicy,
+  roleIds: readonly string[] | undefined,
+): Promise<string[]> {
+  if (editPolicy !== "roles") return [];
+  return customRoleIds(db, orgId, roleIds);
+}
+
+async function customRoleIds(db: Executor, orgId: string, roleIds: readonly string[] | undefined): Promise<string[]> {
   const wanted = [...new Set(roleIds ?? [])];
   if (wanted.length === 0) throw new ValidationError("Pick at least one role", DASHBOARD_ERRORS.rolesRequired);
   if (wanted.length > DASHBOARD_ROLES_MAX) {
@@ -343,7 +359,7 @@ async function summarize(
   const orgId = boards[0]?.orgId ?? "";
   const agentIds = [...new Set(boards.flatMap((b) => (b.ownerAgentId ? [b.ownerAgentId] : [])))];
   const userIds = [...new Set(boards.flatMap((b) => (b.ownerUserId ? [b.ownerUserId] : [])))];
-  const roleIds = [...new Set(boards.flatMap((b) => b.audienceRoleIds))];
+  const roleIds = [...new Set(boards.flatMap((b) => [...b.audienceRoleIds, ...b.editRoleIds]))];
   const [agentRows, userRows, roleRows] = await Promise.all([
     agentIds.length
       ? db.select({ id: agents.id, name: agents.name }).from(agents).where(inArray(agents.id, agentIds))
@@ -389,7 +405,10 @@ async function summarize(
         ? (b.audience as DashboardAudience)
         : "private",
       roleIds: b.audienceRoleIds.filter((id) => liveRoles.has(id)),
-      editPolicy: b.editPolicy === "viewers" ? "viewers" : "owner",
+      editPolicy: DASHBOARD_EDIT_POLICIES.includes(b.editPolicy as DashboardEditPolicy)
+        ? (b.editPolicy as DashboardEditPolicy)
+        : "owner",
+      editRoleIds: b.editPolicy === "roles" ? b.editRoleIds.filter((id) => liveRoles.has(id)) : [],
       pinned: b.pinned,
       position: b.position,
       owner:
@@ -563,17 +582,16 @@ export async function getOrCreateHome(deps: DashboardDeps, actorId: string, orgI
 }
 
 /**
- * A new board owned by the person. A wider audience than `private` needs `post`; `roles` needs 1 to
- * `DASHBOARD_ROLES_MAX` custom roles. At most `DASHBOARDS_MAX` boards per workspace. With `start`, the brief is posted
- * as the person's message in their DM with that agent (`meta.dashboard: { id, title }`), which builds the widgets
- * with its tools; `startedIn` says where.
+ * A new board owned by the person, empty (an agent builds one when asked in a chat, with its tools). A wider audience
+ * than `private` needs `post`; `roles` (who sees, or who edits) needs 1 to `DASHBOARD_ROLES_MAX` custom roles. At
+ * most `DASHBOARDS_MAX` boards per workspace.
  */
 export async function createDashboard(
   deps: DashboardDeps,
   actorId: string,
   orgId: string,
   input: CreateDashboardInput,
-): Promise<DashboardCreatedView> {
+): Promise<DashboardView> {
   const membership = await requireActiveMembership(deps.db, actorId, orgId);
   const viewer = viewerOf(membership, actorId);
   const title = boardTitle(input.title);
@@ -583,11 +601,7 @@ export async function createDashboard(
     throw publishForbidden();
   }
   const roleIds = await dashboardRoleIds(deps.db, orgId, audience, input.roleIds);
-  const brief = input.start ? input.start.brief.trim().slice(0, WIDGET_PROMPT_MAX).trim() : "";
-  if (input.start) {
-    if (!brief) throw new ValidationError("Say what the dashboard should show", DASHBOARD_ERRORS.promptRequired);
-    await requireReachableAgent(deps.db, orgId, input.start.agentId, actorId, membership);
-  }
+  const editRoleIds = await dashboardEditRoleIds(deps.db, orgId, editPolicy, input.editRoleIds);
   await assertBoardRoom(deps.db, orgId);
   const [board] = await deps.db
     .insert(dashboards)
@@ -600,22 +614,13 @@ export async function createDashboard(
       audience,
       audienceRoleIds: roleIds,
       editPolicy,
+      editRoleIds,
       position: await nextBoardPosition(deps.db, orgId),
     })
     .returning();
   if (!board) throw new Error("dashboard insert failed");
   await publishDashboardChanged(deps.pubsub, board);
-  let startedIn: DashboardCreatedView["startedIn"] = null;
-  if (input.start) {
-    // "Ask an agent" (ADR 0134 §10): the brief goes to the agent in the person's DM, where it builds the widgets.
-    const dm = await openDm(deps.db, actorId, orgId, { agentId: input.start.agentId });
-    await postPersonMessage({ db: deps.db, pubsub: deps.pubsub, judge: deps.context?.judge }, actorId, orgId, dm.id, {
-      body: brief,
-      meta: { dashboard: { id: board.id, title: board.title } },
-    });
-    startedIn = { channelId: dm.id };
-  }
-  return { ...(await dashboardView(deps.db, board, viewer)), startedIn };
+  return dashboardView(deps.db, board, viewer);
 }
 
 /** Title and about (editors; never a home board's title), pinned (managers). */
@@ -646,7 +651,10 @@ export async function updateDashboard(
   return dashboardView(deps.db, next, viewer);
 }
 
-/** Who sees and who edits (managers; never a home board). A pending agent request is dropped (and its notice). */
+/**
+ * Who sees and who edits (managers; never a home board). Who edits never needs `post`: editing isn't seeing (ADR
+ * 0134 §8). A pending agent request is dropped (and its notice).
+ */
 export async function shareDashboard(
   deps: DashboardDeps,
   actorId: string,
@@ -659,6 +667,7 @@ export async function shareDashboard(
   const audience = audienceOf(input.audience);
   const editPolicy = editPolicyOf(input.editPolicy);
   const roleIds = await dashboardRoleIds(deps.db, orgId, audience, input.roleIds);
+  const editRoleIds = await dashboardEditRoleIds(deps.db, orgId, editPolicy, input.editRoleIds);
   if (
     widensDashboardAudience({ audience: board.audience, roleIds: board.audienceRoleIds }, { audience, roleIds }) &&
     !viewer.mayPublish
@@ -667,7 +676,7 @@ export async function shareDashboard(
   }
   const [updated] = await deps.db
     .update(dashboards)
-    .set({ audience, audienceRoleIds: roleIds, editPolicy, proposal: null, updatedAt: nowOf(deps) })
+    .set({ audience, audienceRoleIds: roleIds, editPolicy, editRoleIds, proposal: null, updatedAt: nowOf(deps) })
     .where(eq(dashboards.id, board.id))
     .returning();
   const next = updated ?? board;
@@ -1286,9 +1295,11 @@ export async function insertDashboard(
   deps: DashboardDeps,
   orgId: string,
   maker: AgentMaker,
-  input: { title: string; about?: string; editPolicy?: DashboardEditPolicy },
+  input: { title: string; about?: string; editPolicy?: DashboardEditPolicy; editRoleIds?: string[] },
 ): Promise<DashboardRow> {
   const title = boardTitle(input.title);
+  const editPolicy = input.editPolicy ? editPolicyOf(input.editPolicy) : "owner";
+  const editRoleIds = await dashboardEditRoleIds(deps.db, orgId, editPolicy, input.editRoleIds);
   await assertBoardRoom(deps.db, orgId);
   const [board] = await deps.db
     .insert(dashboards)
@@ -1301,13 +1312,39 @@ export async function insertDashboard(
       ownerAgentId: maker.agentId,
       createdByRunId: maker.runId,
       audience: "private",
-      editPolicy: input.editPolicy ? editPolicyOf(input.editPolicy) : "owner",
+      editPolicy,
+      editRoleIds,
       position: await nextBoardPosition(deps.db, orgId),
     })
     .returning();
   if (!board) throw new Error("dashboard insert failed");
   await publishDashboardChanged(deps.pubsub, board);
   return board;
+}
+
+/**
+ * Who edits a board, set by an agent's `share_dashboard` for the person it works for (no permission check: the tool
+ * checked it; `editRoleIds` are the workspace's custom roles, matched by name). Editing isn't seeing, so it never
+ * waits on a decision (ADR 0134 §8, §11).
+ */
+export async function setDashboardEditors(
+  deps: DashboardDeps,
+  board: DashboardRow,
+  editPolicy: DashboardEditPolicy,
+  editRoleIds: string[],
+): Promise<DashboardRow> {
+  const [updated] = await deps.db
+    .update(dashboards)
+    .set({
+      editPolicy: editPolicyOf(editPolicy),
+      editRoleIds: editPolicy === "roles" ? [...new Set(editRoleIds)] : [],
+      updatedAt: nowOf(deps),
+    })
+    .where(eq(dashboards.id, board.id))
+    .returning();
+  const next = updated ?? board;
+  await publishDashboardChanged(deps.pubsub, next);
+  return next;
 }
 
 /** A board's audience set by a decision (a proposal published): no permission check, publishes `wide` events. */

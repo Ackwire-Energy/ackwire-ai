@@ -8,7 +8,6 @@ import {
   ditherTile,
   formatWidgetNumber,
   formatWithUnit,
-  WidgetAddTile,
   WidgetBody,
   WidgetCard,
   WidgetGlyph,
@@ -241,14 +240,6 @@ describe("Organize on a widget", () => {
     expect(calls).toEqual(["size", "remove", "move 1", "move -1"]);
     // The title doesn't open while organizing.
     expect(view.queryByRole("button", { name: "Vendas hoje" })).toBeNull();
-  });
-
-  test("the add tile names itself", () => {
-    let added = 0;
-    const view = render(<WidgetAddTile text="Widget" label="Adicionar widget" onClick={() => added++} />);
-    fireEvent.click(view.getByRole("button", { name: "Adicionar widget" }));
-    expect(added).toBe(1);
-    expect(view.container.textContent).toBe("Widget");
   });
 });
 

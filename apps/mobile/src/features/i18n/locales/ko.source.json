@@ -4177,6 +4177,9 @@
   "dashboards.loadFailed": {
     "value": "Couldn't load the dashboards."
   },
+  "dashboards.onlyHome": {
+    "value": "Dashboards for the workspace or your roles show up here."
+  },
   "dashboards.create": {
     "value": "Create"
   },
@@ -4233,12 +4236,6 @@
   },
   "dashboards.widget.alertSaved": {
     "value": "Alert saved"
-  },
-  "dashboards.widget.removeTitle": {
-    "value": "Remove “{{title}}”?"
-  },
-  "dashboards.widget.removeText": {
-    "value": "Its routine stops, and what it shows goes with it."
   },
   "dashboards.widget.removed": {
     "value": "Widget removed. Its routine stopped."

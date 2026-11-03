@@ -13644,7 +13644,6 @@
       "canceled": "“{{title}}” è tornato al suo posto."
     },
     "add": {
-      "tile": "Widget",
       "label": "Aggiungi widget"
     },
     "alert": {
@@ -13739,12 +13738,19 @@
     "removed": {
       "home": "“{{title}}” è uscito dalla Home e la routine di {{name}} si è fermata",
       "board": "“{{title}}” è uscito dalla dashboard e la routine di {{name}} si è fermata"
+    },
+    "removeConfirm": {
+      "title": "Rimuovere “{{title}}”?",
+      "textRoutine": "La routine di {{name}} che lo aggiorna si ferma, e la sua cronologia degli aggiornamenti se ne va con lui.",
+      "textManual": "La sua cronologia degli aggiornamenti se ne va con lui.",
+      "confirm": "Rimuovi"
     }
   },
   "dashboards": {
     "title": "Dashboard",
     "subtitle": "Numeri e grafici che gli agenti tengono aggiornati, per lo spazio di lavoro o solo per alcuni ruoli.",
     "sidebar": "Dashboard",
+    "navWhat": "Numeri e grafici che gli agenti tengono aggiornati",
     "new": "Nuova dashboard",
     "back": "Dashboard",
     "home": "La mia Home",
@@ -13774,7 +13780,15 @@
     "edit": {
       "label": "Chi la modifica",
       "viewers": "Chi la vede",
-      "owner": "Solo tu e gli admin"
+      "owner": "Solo tu e gli admin",
+      "roles": "Oppure chi ha questi ruoli",
+      "twoRoles": "{{first}} e {{second}}",
+      "manyRoles_one": "{{count}} ruolo",
+      "manyRoles_many": "{{count}} ruoli",
+      "manyRoles_other": "{{count}} ruoli",
+      "cantSee": "Non vede questa dashboard",
+      "someRoles": "Alcuni ruoli…",
+      "rolesNote": "Chi ha questi ruoli la modifica se la vede anche. Tu e gli admin sempre."
     },
     "meta": {
       "by": "Creata da {{name}}",
@@ -13812,26 +13826,17 @@
     },
     "empty": {
       "title": "Dashboard vuota",
-      "text": "Aggiungi widget: chiedi a un agente o fissa un blocco dalla chat.",
-      "noneTitle": "Ancora nessuna dashboard",
-      "none": "Numeri e grafici che gli agenti tengono aggiornati, per te o per il team."
+      "text": "Aggiungi widget: chiedi a un agente o fissa un blocco dalla chat."
     },
+    "onlyHome": "Crea una dashboard per lo spazio di lavoro o per alcuni ruoli con “Nuova dashboard”.",
     "create": {
       "title": "Nuova dashboard",
       "subtitle": "Widget riuniti in una pagina, per te o per il team.",
       "name": "Nome",
       "namePlaceholder": "Es.: Vendite, Black Friday, Obiettivi del trimestre",
-      "start": "Come iniziare",
-      "blank": "Vuota",
-      "blankHint": "Aggiungi tu i widget",
-      "agent": "Chiedi a un agente",
-      "agentHint": "Crea i widget e le routine",
-      "briefPlaceholder": "Es.: cosa mi serve vedere ogni mattina sulle vendite",
+      "askHint": "Puoi anche chiedere a un agente in una chat di crearne una.",
       "submit": "Crea dashboard",
-      "created": "“{{title}}” creata",
-      "started": "{{name}} sta creando “{{title}}” nella vostra conversazione",
-      "openChat": "Apri la conversazione",
-      "brief": "Cosa deve creare {{name}}"
+      "created": "“{{title}}” creata"
     },
     "newWidget": {
       "title": "Nuovo widget",

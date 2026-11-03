@@ -12989,7 +12989,6 @@
       "canceled": "“{{title}}” yerine döndü."
     },
     "add": {
-      "tile": "Widget",
       "label": "Widget ekle"
     },
     "alert": {
@@ -13084,12 +13083,19 @@
     "removed": {
       "home": "“{{title}}” ana sayfadan çıktı ve {{name}} rutini durdu",
       "board": "“{{title}}” panodan çıktı ve {{name}} rutini durdu"
+    },
+    "removeConfirm": {
+      "title": "“{{title}}” kaldırılsın mı?",
+      "textRoutine": "Onu güncelleyen {{name}} rutini durur ve güncelleme geçmişi de onunla birlikte gider.",
+      "textManual": "Güncelleme geçmişi de onunla birlikte gider.",
+      "confirm": "Kaldır"
     }
   },
   "dashboards": {
     "title": "Panolar",
     "subtitle": "Ajanların güncel tuttuğu sayılar ve grafikler. Tüm çalışma alanı ya da yalnızca bazı roller için.",
     "sidebar": "Panolar",
+    "navWhat": "Ajanların güncel tuttuğu sayılar ve grafikler",
     "new": "Yeni pano",
     "back": "Panolar",
     "home": "Ana sayfam",
@@ -13117,7 +13123,14 @@
     "edit": {
       "label": "Kimler düzenler",
       "viewers": "Görebilen herkes",
-      "owner": "Yalnızca siz ve yöneticiler"
+      "owner": "Yalnızca siz ve yöneticiler",
+      "roles": "Ya da bu rollere sahip kişiler",
+      "twoRoles": "{{first}} ve {{second}}",
+      "manyRoles_one": "{{count}} rol",
+      "manyRoles_other": "{{count}} rol",
+      "cantSee": "Bu panoyu görmez",
+      "someRoles": "Bazı roller…",
+      "rolesNote": "Bu rollere sahip kişiler panoyu da görüyorsa düzenler. Siz ve yöneticiler her zaman düzenler."
     },
     "meta": {
       "by": "{{name}} oluşturdu",
@@ -13154,26 +13167,17 @@
     },
     "empty": {
       "title": "Boş pano",
-      "text": "Widget ekleyin: bir ajandan isteyin ya da sohbetten bir blok sabitleyin.",
-      "noneTitle": "Henüz pano yok",
-      "none": "Ajanların güncel tuttuğu sayılar ve grafikler. Sizin için ya da ekip için."
+      "text": "Widget ekleyin: bir ajandan isteyin ya da sohbetten bir blok sabitleyin."
     },
+    "onlyHome": "“Yeni pano” ile çalışma alanı ya da bazı roller için bir pano oluşturun.",
     "create": {
       "title": "Yeni pano",
       "subtitle": "Widget'lar tek sayfada bir arada. Sizin için ya da ekip için.",
       "name": "Ad",
       "namePlaceholder": "Örn.: Satışlar, Black Friday, Çeyrek hedefleri",
-      "start": "Nasıl başlanır",
-      "blank": "Boş",
-      "blankHint": "Widget'ları siz eklersiniz",
-      "agent": "Bir ajandan iste",
-      "agentHint": "Widget'ları ve rutinleri o oluşturur",
-      "briefPlaceholder": "Örn.: her sabah satışlarla ilgili görmem gerekenler",
+      "askHint": "Bir sohbette bir ajandan da pano oluşturmasını isteyebilirsiniz.",
       "submit": "Pano oluştur",
-      "created": "“{{title}}” oluşturuldu",
-      "started": "{{name}}, konuşmanızda “{{title}}” panosunu hazırlıyor",
-      "openChat": "Konuşmayı aç",
-      "brief": "{{name}} ne hazırlamalı"
+      "created": "“{{title}}” oluşturuldu"
     },
     "newWidget": {
       "title": "Yeni widget",

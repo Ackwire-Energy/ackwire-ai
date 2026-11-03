@@ -1,18 +1,20 @@
-import type {
-  AppNotification,
-  Dashboard,
-  DashboardAudience,
-  DashboardEditPolicy,
-  DashboardList,
-  DashboardSummary,
-  Member,
-  NotificationKind,
-  OrgRole,
-  ShareDashboardInput,
-  Widget,
-  WidgetFormat,
-  WidgetKind,
-  WidgetSpec,
+import {
+  type AppNotification,
+  type Dashboard,
+  type DashboardAudience,
+  type DashboardEditPolicy,
+  type DashboardList,
+  type DashboardSummary,
+  editorsInput,
+  fitEditRoles,
+  type Member,
+  type NotificationKind,
+  type OrgRole,
+  type ShareDashboardInput,
+  type Widget,
+  type WidgetFormat,
+  type WidgetKind,
+  type WidgetSpec,
 } from "@agenteschat/client";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { chartAreaTones, chartInk } from "@agenteschat/ui/sky/chart";
@@ -409,20 +411,48 @@ export interface AudienceDraft {
   audience: DashboardAudience;
   roleIds: string[];
   editPolicy: DashboardEditPolicy;
+  /** With `editPolicy` `roles`. */
+  editRoleIds: string[];
 }
 
 /** Share's starting point: the board as it is (a new board starts for the whole workspace, edited by who sees it). */
 export function audienceDraftOf(
-  board?: Pick<DashboardSummary, "audience" | "roleIds" | "editPolicy"> | null,
+  board?: Pick<DashboardSummary, "audience" | "roleIds" | "editPolicy" | "editRoleIds"> | null,
 ): AudienceDraft {
-  if (!board) return { audience: "workspace", roleIds: [], editPolicy: "viewers" };
-  return { audience: board.audience, roleIds: [...board.roleIds], editPolicy: board.editPolicy };
+  if (!board) return { audience: "workspace", roleIds: [], editPolicy: "viewers", editRoleIds: [] };
+  return {
+    audience: board.audience,
+    roleIds: [...board.roleIds],
+    editPolicy: board.editPolicy,
+    editRoleIds: board.editPolicy === "roles" ? [...(board.editRoleIds ?? [])] : [],
+  };
 }
 
-/** A role chip tapped: in or out of the draft. */
-export const toggleRole = (draft: AudienceDraft, roleId: string): AudienceDraft => ({
+/** Who sees changed: edit roles whose people no longer see the board leave who edits too (`fitEditRoles`). */
+export const withAudience = (draft: AudienceDraft, audience: DashboardAudience): AudienceDraft =>
+  fitEditRoles({ ...draft, audience });
+
+/** A role chip tapped: in or out of who sees it (and, when out, out of who edits it). */
+export const toggleRole = (draft: AudienceDraft, roleId: string): AudienceDraft =>
+  fitEditRoles({
+    ...draft,
+    roleIds: draft.roleIds.includes(roleId) ? draft.roleIds.filter((r) => r !== roleId) : [...draft.roleIds, roleId],
+  });
+
+/** The "Who edits" menu: anyone who sees it, only you and admins, and (with roles to pick) "Some roles…". */
+export type EditorsChoice = "viewers" | "owner" | "roles";
+export const editorsChoices = (roleCount: number): EditorsChoice[] =>
+  roleCount > 0 ? ["viewers", "owner", "roles"] : ["viewers", "owner"];
+
+/** A role checked or unchecked on the "Some roles…" screen. */
+export const toggledEditRoles = (editRoleIds: readonly string[], roleId: string): string[] =>
+  editRoleIds.includes(roleId) ? editRoleIds.filter((id) => id !== roleId) : [...editRoleIds, roleId];
+
+/** A choice of the "Who edits" menu other than "Some roles…" (which opens the roles' screen). */
+export const withEditors = (draft: AudienceDraft, choice: "viewers" | "owner"): AudienceDraft => ({
   ...draft,
-  roleIds: draft.roleIds.includes(roleId) ? draft.roleIds.filter((r) => r !== roleId) : [...draft.roleIds, roleId],
+  editPolicy: choice,
+  editRoleIds: [],
 });
 
 /** Roles need at least one picked. */
@@ -432,19 +462,20 @@ export const audienceReady = (draft: AudienceDraft) => draft.audience !== "roles
 export const shareInputOf = (draft: AudienceDraft): ShareDashboardInput => ({
   audience: draft.audience,
   roleIds: draft.audience === "roles" ? draft.roleIds : [],
-  editPolicy: draft.editPolicy,
+  ...editorsInput(draft),
 });
 
 /** Whether the draft changes who sees or edits the board. */
 export function audienceChanged(
-  board: Pick<Dashboard, "audience" | "roleIds" | "editPolicy">,
+  board: Pick<Dashboard, "audience" | "roleIds" | "editPolicy" | "editRoleIds">,
   draft: AudienceDraft,
 ): boolean {
   const roles = (ids: readonly string[]) => [...ids].sort().join(",");
   return (
     board.audience !== draft.audience ||
     board.editPolicy !== draft.editPolicy ||
-    (draft.audience === "roles" && roles(board.roleIds) !== roles(draft.roleIds))
+    (draft.audience === "roles" && roles(board.roleIds) !== roles(draft.roleIds)) ||
+    (draft.editPolicy === "roles" && roles(board.editRoleIds ?? []) !== roles(draft.editRoleIds))
   );
 }
 

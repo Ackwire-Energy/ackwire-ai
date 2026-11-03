@@ -65,8 +65,8 @@ export type WidgetSpec =
 export type DashboardKind = "board" | "home";
 /** Every member, whoever holds one of its roles (ADR 0085), or only its owner. */
 export type DashboardAudience = "workspace" | "roles" | "private";
-/** Whoever sees it, or only its owner and admins. */
-export type DashboardEditPolicy = "viewers" | "owner";
+/** Whoever sees it, only its owner and admins, or (besides them) whoever sees it and holds one of its edit roles. */
+export type DashboardEditPolicy = "viewers" | "owner" | "roles";
 
 export interface HomeTile {
   key: "waiting" | "working";
@@ -100,6 +100,8 @@ export interface DashboardSummary {
   audience: DashboardAudience;
   roleIds: string[];
   editPolicy: DashboardEditPolicy;
+  /** With `editPolicy` `roles`: the roles whose holders edit it when they see it (absent reads as none). */
+  editRoleIds?: string[];
   pinned: boolean;
   position: number;
   owner: DashboardOwner | null;
@@ -161,11 +163,6 @@ export interface Dashboard extends DashboardSummary {
   widgets: Widget[];
   /** Home only. */
   tiles: HomeTile[];
-}
-
-export interface DashboardCreated extends Dashboard {
-  /** "Ask an agent": the DM where it started building. */
-  startedIn: { channelId: string } | null;
 }
 
 export interface WidgetUpdate {
@@ -230,7 +227,8 @@ export interface CreateDashboardInput {
   audience: DashboardAudience;
   roleIds?: string[];
   editPolicy: DashboardEditPolicy;
-  start?: { agentId: string; brief: string };
+  /** With `editPolicy` `roles`. */
+  editRoleIds?: string[];
 }
 
 export interface UpdateDashboardInput {
@@ -243,6 +241,8 @@ export interface ShareDashboardInput {
   audience: DashboardAudience;
   roleIds: string[];
   editPolicy: DashboardEditPolicy;
+  /** With `editPolicy` `roles`. */
+  editRoleIds?: string[];
 }
 
 export interface DashboardLayoutInput {

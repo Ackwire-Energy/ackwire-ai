@@ -614,37 +614,6 @@ html:not([data-pointer]) :is(.wg__size, .wg__grip):focus-visible {
   color: var(--muted);
 }
 
-/* "+ Widget": the board's last cell. */
-.wg-add {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 156px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
-  background: none;
-  box-shadow: inset 0 0 0 1.5px var(--line);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-  transition:
-    box-shadow 0.15s,
-    color 0.15s;
-}
-.wg-add:hover {
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1.5px var(--line-strong);
-}
-html:not([data-pointer]) .wg-add:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
 /* ── A preview (New widget, Pin): the card alone, at the size chosen ───── */
 .wg--preview {
   width: 100%;

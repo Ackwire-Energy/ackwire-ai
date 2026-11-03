@@ -4,7 +4,6 @@ import type {
   CreateDashboardInput,
   CreateWidgetInput,
   Dashboard,
-  DashboardCreated,
   DashboardLayoutInput,
   DashboardList,
   DashboardProposalDecision,
@@ -27,8 +26,8 @@ export interface DashboardsApi {
   get(orgId: string, dashboardId: string): Promise<Dashboard>;
   /** My home board, made on first use. */
   home(orgId: string): Promise<Dashboard>;
-  /** "New dashboard"; with `start`, the agent starts building it in my DM with it (`startedIn`). */
-  create(orgId: string, input: CreateDashboardInput): Promise<DashboardCreated>;
+  /** "New dashboard": an empty board (an agent builds one when asked in a chat). */
+  create(orgId: string, input: CreateDashboardInput): Promise<Dashboard>;
   /** Title, about, pinned. */
   update(orgId: string, dashboardId: string, patch: UpdateDashboardInput): Promise<Dashboard>;
   /** "Share": who sees and who edits. */
@@ -73,7 +72,7 @@ export function createDashboardsApi(request: Requester): DashboardsApi {
     list: (orgId) => request<DashboardList>(`${org(orgId)}/dashboards`),
     get: (orgId, dashboardId) => request<Dashboard>(board(orgId, dashboardId)),
     home: (orgId) => request<Dashboard>(`${org(orgId)}/dashboards/home`),
-    create: (orgId, input) => request<DashboardCreated>(`${org(orgId)}/dashboards`, { json: input }),
+    create: (orgId, input) => request<Dashboard>(`${org(orgId)}/dashboards`, { json: input }),
     update: (orgId, dashboardId, patch) =>
       request<Dashboard>(board(orgId, dashboardId), { method: "PATCH", json: patch }),
     share: (orgId, dashboardId, input) =>

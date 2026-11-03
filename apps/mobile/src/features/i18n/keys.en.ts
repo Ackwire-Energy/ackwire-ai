@@ -1717,6 +1717,8 @@ export const featureKeysEn = {
   dashboards: {
     homeRow: "Only you · your own widgets",
     loadFailed: "Couldn't load the dashboards.",
+    /** Under "My Home" when the person sees no other board; "+" in the bar makes one. */
+    onlyHome: "Dashboards for the workspace or your roles show up here.",
     create: "Create",
     routineTarget: "its widget",
     pin: {
@@ -1746,8 +1748,6 @@ export const featureKeysEn = {
       refreshing: "{{name}} is updating it.",
       scheduleSaved: "It updates {{schedule}} now",
       alertSaved: "Alert saved",
-      removeTitle: "Remove “{{title}}”?",
-      removeText: "Its routine stops, and what it shows goes with it.",
       removed: "Widget removed. Its routine stopped.",
       routine: "Its routine",
       onBoard: "Where it is",

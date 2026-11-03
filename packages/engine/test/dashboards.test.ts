@@ -12,6 +12,7 @@ import {
   dashboardRights,
   dashboardViewerCount,
   deleteDashboard,
+  deleteRole,
   getDashboard,
   getOrCreateHome,
   getWidget,
@@ -151,6 +152,7 @@ describe("who sees a board (ADR 0134 §8)", () => {
       audience: "roles",
       audienceRoleIds: ["r1"],
       editPolicy: "owner",
+      editRoleIds: [] as string[],
       ownerUserId: "u-nina",
       deletedAt: null,
     } satisfies Parameters<typeof dashboardRights>[0];
@@ -166,6 +168,12 @@ describe("who sees a board (ADR 0134 §8)", () => {
     expect(dashboardRights(row, viewer({ admin: true }))).toEqual({ see: true, edit: true, manage: true });
     expect(dashboardRights(row, viewer({ userId: "u-nina" }))).toEqual({ see: true, edit: true, manage: true });
     expect(dashboardRights({ ...row, editPolicy: "viewers" }, viewer({ roleIds: ["r1"] })).edit).toBe(true);
+    // Edit roles: who sees it and holds one edits; one who only holds it, without seeing, gets nothing.
+    const byRoles = { ...row, audienceRoleIds: ["r1", "r2"], editPolicy: "roles", editRoleIds: ["r2", "r3"] };
+    expect(dashboardRights(byRoles, viewer({ roleIds: ["r2"] }))).toEqual({ see: true, edit: true, manage: false });
+    expect(dashboardRights(byRoles, viewer({ roleIds: ["r1"] }))).toEqual({ see: true, edit: false, manage: false });
+    expect(dashboardRights(byRoles, viewer({ roleIds: ["r3"] }))).toEqual({ see: false, edit: false, manage: false });
+    expect(dashboardRights({ ...byRoles, audience: "workspace" }, viewer({ roleIds: ["r3"] })).edit).toBe(true);
     expect(dashboardRights({ ...row, deletedAt: new Date() }, viewer({ userId: "u-nina" })).see).toBe(false);
     // A role board with no role left: its owner and admins.
     expect(dashboardRights({ ...row, audienceRoleIds: [] }, viewer({ roleIds: ["r1"] })).see).toBe(false);
@@ -347,32 +355,62 @@ describe("boards", () => {
     expect((await getDashboard(deps, f.owner.id, f.org.id, row.id)).audience).toBe("workspace");
   });
 
-  test("New dashboard › Ask an agent: the brief goes to the agent in the person's DM", async () => {
-    const made = await board(f.owner.id, {
-      title: "Black Friday",
-      audience: "private",
-      start: { agentId: f.agent.id, brief: "Sales per hour and the top products" },
+  test("who edits by roles: the roles' people who see it edit; checked like the audience's roles", async () => {
+    const sales = await role("Sales");
+    const boardRole = await role("Board");
+    const nina = await addMember(f.db, f.org.id, "member", "nina");
+    const theo = await addMember(f.db, f.org.id, "member", "theo");
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await setMemberRoles(f.db, f.owner.id, f.org.id, theo.id, [sales.id]);
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [boardRole.id]);
+    const made = await board(nina.id, { title: "Pipeline", editPolicy: "roles", editRoleIds: [sales.id] });
+    expect(made).toMatchObject({ editPolicy: "roles", editRoleIds: [sales.id] });
+    expect((await getDashboard(deps, theo.id, f.org.id, made.id)).canEdit).toBe(true);
+    expect((await getDashboard(deps, bia.id, f.org.id, made.id)).canEdit).toBe(false);
+    await updateDashboard(deps, theo.id, f.org.id, made.id, { about: "By Sales" });
+    await expect(updateDashboard(deps, bia.id, f.org.id, made.id, { about: "x" })).rejects.toMatchObject({
+      code: "dashboard.forbidden",
     });
-    expect(made.startedIn).not.toBeNull();
-    const channelId = made.startedIn?.channelId ?? "";
-    const [dm] = await f.db.select().from(schema.channels).where(eq(schema.channels.id, channelId));
-    expect(dm?.kind).toBe("dm");
-    const posted = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, channelId));
-    expect(posted).toHaveLength(1);
-    expect(posted[0]).toMatchObject({
-      authorUserId: f.owner.id,
-      body: "Sales per hour and the top products",
-      meta: { dashboard: { id: made.id, title: "Black Friday" } },
+    // Editing isn't seeing: shown only to Board, Sales' people don't see it, so they edit nothing.
+    const shared = await shareDashboard(deps, nina.id, f.org.id, made.id, {
+      audience: "roles",
+      roleIds: [boardRole.id],
+      editPolicy: "roles",
+      editRoleIds: [sales.id, boardRole.id],
     });
+    expect(shared.editRoleIds.sort()).toEqual([sales.id, boardRole.id].sort());
+    await expect(getDashboard(deps, theo.id, f.org.id, made.id)).rejects.toMatchObject({
+      code: "dashboard.not_found",
+    });
+    expect((await getDashboard(deps, bia.id, f.org.id, made.id)).canEdit).toBe(true);
+    // Another policy keeps no roles.
+    const owner = await shareDashboard(deps, nina.id, f.org.id, made.id, {
+      audience: "workspace",
+      roleIds: [],
+      editPolicy: "owner",
+      editRoleIds: [sales.id],
+    });
+    expect(owner).toMatchObject({ editPolicy: "owner", editRoleIds: [] });
+    // `roles` needs a role of the workspace.
+    await expect(board(nina.id, { title: "None", editPolicy: "roles", editRoleIds: [] })).rejects.toMatchObject({
+      code: "dashboard.roles_required",
+    });
+    await expect(
+      board(nina.id, { title: "Unknown", editPolicy: "roles", editRoleIds: [crypto.randomUUID()] }),
+    ).rejects.toMatchObject({ code: "dashboard.role_unknown" });
   });
 
-  test("asking an agent the person can't talk to makes nothing", async () => {
+  test("a deleted role leaves who edits; with none left, its owner and admins edit", async () => {
+    const sales = await role("Sales");
+    const ops = await role("Ops");
     const nina = await addMember(f.db, f.org.id, "member", "nina");
-    await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, f.agent.id));
-    await expect(
-      board(nina.id, { audience: "private", start: { agentId: f.agent.id, brief: "Sales" } }),
-    ).rejects.toMatchObject({ code: "widget.agent_unreachable" });
-    expect(await titles(nina.id)).toEqual([]);
+    const two = await board(nina.id, { title: "Two", editPolicy: "roles", editRoleIds: [sales.id, ops.id] });
+    const one = await board(nina.id, { title: "One", editPolicy: "roles", editRoleIds: [sales.id] });
+    await deleteRole(f.db, f.owner.id, f.org.id, sales.id);
+    const rows = await f.db.select().from(schema.dashboards).where(eq(schema.dashboards.orgId, f.org.id));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(two.id)).toMatchObject({ editPolicy: "roles", editRoleIds: [ops.id] });
+    expect(byId.get(one.id)).toMatchObject({ editPolicy: "owner", editRoleIds: [] });
   });
 });
 

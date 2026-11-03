@@ -13644,7 +13644,6 @@
       "canceled": "« {{title}} » est revenu à sa place."
     },
     "add": {
-      "tile": "Widget",
       "label": "Ajouter un widget"
     },
     "alert": {
@@ -13739,12 +13738,19 @@
     "removed": {
       "home": "« {{title}} » a quitté l'Accueil et la routine de {{name}} s'est arrêtée",
       "board": "« {{title}} » a quitté le tableau de bord et la routine de {{name}} s'est arrêtée"
+    },
+    "removeConfirm": {
+      "title": "Retirer « {{title}} » ?",
+      "textRoutine": "La routine de {{name}} qui le met à jour s'arrête, et son historique de mises à jour part avec lui.",
+      "textManual": "Son historique de mises à jour part avec lui.",
+      "confirm": "Retirer"
     }
   },
   "dashboards": {
     "title": "Tableaux de bord",
     "subtitle": "Des chiffres et des graphiques que les agents tiennent à jour, pour l'espace de travail ou seulement certains rôles.",
     "sidebar": "Tableaux de bord",
+    "navWhat": "Des chiffres et des graphiques que les agents tiennent à jour",
     "new": "Nouveau tableau de bord",
     "back": "Tableaux de bord",
     "home": "Mon accueil",
@@ -13774,7 +13780,15 @@
     "edit": {
       "label": "Qui le modifie",
       "viewers": "Qui le voit",
-      "owner": "Vous et les admins seulement"
+      "owner": "Vous et les admins seulement",
+      "roles": "Ou les personnes ayant ces rôles",
+      "twoRoles": "{{first}} et {{second}}",
+      "manyRoles_one": "{{count}} rôle",
+      "manyRoles_many": "{{count}} rôles",
+      "manyRoles_other": "{{count}} rôles",
+      "cantSee": "Ne voit pas ce tableau de bord",
+      "someRoles": "Certains rôles…",
+      "rolesNote": "Les personnes ayant ces rôles le modifient si elles le voient aussi. Vous et les admins, toujours."
     },
     "meta": {
       "by": "Créé par {{name}}",
@@ -13812,26 +13826,17 @@
     },
     "empty": {
       "title": "Tableau de bord vide",
-      "text": "Ajoutez des widgets : demandez à un agent ou épinglez un bloc du chat.",
-      "noneTitle": "Aucun tableau de bord pour l'instant",
-      "none": "Des chiffres et des graphiques que les agents tiennent à jour, pour vous ou pour l'équipe."
+      "text": "Ajoutez des widgets : demandez à un agent ou épinglez un bloc du chat."
     },
+    "onlyHome": "Créez un tableau de bord pour l'espace de travail ou certains rôles avec « Nouveau tableau de bord ».",
     "create": {
       "title": "Nouveau tableau de bord",
       "subtitle": "Des widgets réunis sur une page, pour vous ou pour l'équipe.",
       "name": "Nom",
       "namePlaceholder": "Ex. : Ventes, Black Friday, Objectifs du trimestre",
-      "start": "Comment commencer",
-      "blank": "Vide",
-      "blankHint": "Vous ajoutez les widgets",
-      "agent": "Demander à un agent",
-      "agentHint": "Il crée les widgets et les routines",
-      "briefPlaceholder": "Ex. : ce que j'ai besoin de voir chaque matin sur les ventes",
+      "askHint": "Vous pouvez aussi demander à un agent, dans une discussion, d'en créer un.",
       "submit": "Créer le tableau de bord",
-      "created": "« {{title}} » créé",
-      "started": "{{name}} crée « {{title}} » dans votre conversation",
-      "openChat": "Ouvrir la conversation",
-      "brief": "Ce que {{name}} doit créer"
+      "created": "« {{title}} » créé"
     },
     "newWidget": {
       "title": "Nouveau widget",

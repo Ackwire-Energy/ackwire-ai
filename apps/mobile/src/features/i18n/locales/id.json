@@ -1635,6 +1635,7 @@
   "dashboards": {
     "homeRow": "Hanya kamu · widget milikmu sendiri",
     "loadFailed": "Dasbor tidak bisa dimuat.",
+    "onlyHome": "Dasbor untuk ruang kerja atau peranmu muncul di sini.",
     "create": "Buat",
     "routineTarget": "widget-nya",
     "pin": {
@@ -1663,8 +1664,6 @@
       "refreshing": "{{name}} sedang memperbaruinya.",
       "scheduleSaved": "Sekarang diperbarui {{schedule}}",
       "alertSaved": "Peringatan disimpan",
-      "removeTitle": "Hapus “{{title}}”?",
-      "removeText": "Rutinitasnya berhenti, dan yang ditampilkannya ikut hilang.",
       "removed": "Widget dihapus. Rutinitasnya berhenti.",
       "routine": "Rutinitasnya",
       "onBoard": "Lokasinya",
