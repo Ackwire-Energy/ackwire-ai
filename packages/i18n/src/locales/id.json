@@ -3927,13 +3927,18 @@
     },
     "dialog": {
       "title": "Undang ke {{org}}",
-      "sub": "Lewat email, mereka langsung bergabung. Lewat tautan, mereka meminta dan kamu menyetujui.",
-      "subLink": "Siapa pun yang membuka tautan akan meminta bergabung, dan kamu menyetujui tiap orang.",
+      "stepOf": "Langkah {{n}} dari {{total}} · {{step}}",
+      "steps": {
+        "who": "Siapa",
+        "role": "Peran",
+        "where": "Mulai di mana",
+        "note": "Catatan"
+      },
       "emails": "Email",
       "moreEmails": "Email lainnya…",
-      "help": "Tiap orang menerima email dan langsung bergabung, dengan peran yang kamu pilih. Undangan berlaku 7 hari.",
       "checkMarked": "Periksa email yang ditandai: mereka tidak akan menerima undangan.",
-      "channelsAndNote": "Kanal dan catatan",
+      "pasteHelp": "Tempel daftar kalau mau: koma, spasi, atau satu per baris.",
+      "leftOut": "Yang sudah ada atau sudah diundang tidak ikut.",
       "withNote": "dengan catatan",
       "alsoJoin": "Mereka juga bergabung ke",
       "generalAlways": "Semua orang bergabung ke #{{channel}}",
@@ -3941,10 +3946,78 @@
       "optional": "(opsional)",
       "notePlaceholder": "Hai. Ayo bergabung ke {{org}}: tim dan agen semuanya ada di sini.",
       "or": "atau kirim tautannya",
+      "continueWith": "Lanjutkan dengan {{count}}",
       "send_other": "Undang {{count}} orang",
       "sent": "Undangan terkirim ke {{email}}.",
       "sentMany": "{{count}} undangan terkirim.",
-      "alsoIn": "Mereka juga bergabung ke {{channels}}."
+      "alsoIn": "Mereka juga bergabung ke {{channels}}.",
+      "who": {
+        "title": "Siapa yang ingin kamu ajak?",
+        "lead": "Kasih tahu email mereka. Tiap orang menerima undangan dan langsung bergabung."
+      },
+      "orLink": {
+        "title": "Lebih suka kirim tautan?",
+        "text": "Yang membukanya meminta bergabung, dan kamu menyetujui.",
+        "open": "Lihat tautan"
+      },
+      "role": {
+        "titleOne": "{{name}} bergabung dengan peran apa?",
+        "titleMany": "Mereka bergabung dengan peran apa?",
+        "lead": "Peran menentukan apa yang bisa dilakukan tiap orang. Bisa diubah nanti.",
+        "each": "Satu peran untuk tiap orang",
+        "same": "Peran yang sama untuk semua"
+      },
+      "where": {
+        "titleOne": "{{name}} langsung bergabung ke kanal mana saja?",
+        "titleMany": "Mereka langsung bergabung ke kanal mana saja?",
+        "lead": "Semua orang mulai di #{{channel}}. Kanal lainnya kamu yang pilih.",
+        "label": "Kanal",
+        "everyone": "Semua orang bergabung",
+        "private": "Privat · kamu ada di sini",
+        "people_other": "{{count}} orang",
+        "fromChannel": "#{{channel}} sudah dicentang: kamu mengundang dari sana."
+      },
+      "noteStep": {
+        "title": "Mau aku tulis sesuatu di undangan?",
+        "lead": "Ikut di email. Kalau tidak, aku kirim apa adanya."
+      },
+      "mailFor": "Begini yang diterima {{names}}",
+      "mail": {
+        "from": "agentes.chat · ke {{to}}",
+        "toMany": "{{email}} dan {{count}} lainnya",
+        "subject": "Kamu diundang ke ruang kerja di agentes.chat",
+        "headline": "Kamu diundang ke ruang kerja",
+        "body": "<b>{{name}}</b> ({{email}}) mengundangmu bergabung ke <b>{{org}}</b> sebagai anggota.",
+        "noteFrom": "<b>{{name}}:</b> “{{note}}”",
+        "what": "agentes.chat adalah tempat orang dan agen AI bekerja bersama.",
+        "button": "Terima undangan",
+        "small": "Undangan berlaku 7 hari. Terima dengan alamat email ini."
+      },
+      "done": {
+        "title": "Beres, undangan sudah aku kirim ke {{names}}.",
+        "leadOne": "Saat {{name}} bergabung, aku sambut di {{channels}} dan kabari kamu.",
+        "leadMany": "Setiap ada yang bergabung, aku sambut di {{channels}} dan kabari kamu.",
+        "none": "Kali ini tidak ada undangan yang terkirim.",
+        "noneLead": "Alasan untuk tiap alamat ada di bawah."
+      },
+      "result": {
+        "invited": "Terkirim",
+        "already_member": "sudah ada di {{org}}",
+        "already_invited": "sudah punya undangan",
+        "invalid_email": "email tidak valid"
+      },
+      "again": "Undang orang lain",
+      "finish": "Selesai",
+      "linkStep": {
+        "title": "Ini tautan {{org}}.",
+        "lead": "Yang membukanya meminta bergabung. Aku tunjukkan tiap permintaan, dan kamu menyetujui.",
+        "how1": "Orang itu membuka tautan dan menyebutkan siapa dirinya.",
+        "how2": "Permintaan sampai ke yang bisa mengundang, di sini dan di ponsel.",
+        "how3": "Kamu menyetujui dan memilih peran orang itu saat bergabung.",
+        "waiting_other": "{{count}} permintaan menunggumu",
+        "seeRequests": "Lihat permintaan",
+        "byEmail": "Undang lewat email"
+      }
     },
     "invitations": {
       "title": "Undangan terkirim",

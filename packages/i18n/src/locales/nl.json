@@ -4099,13 +4099,18 @@
     },
     "dialog": {
       "title": "Uitnodigen voor {{org}}",
-      "sub": "Via e-mail doen ze direct mee. Via de link vragen ze het aan en keur jij het goed.",
-      "subLink": "Wie de link opent vraagt om mee te doen, en jij keurt elke persoon goed.",
+      "stepOf": "Stap {{n}} van {{total}} · {{step}}",
+      "steps": {
+        "who": "Wie",
+        "role": "Rol",
+        "where": "Waar ze beginnen",
+        "note": "Notitie"
+      },
       "emails": "E-mailadressen",
       "moreEmails": "Meer e-mailadressen…",
-      "help": "Elke persoon krijgt een e-mail en doet direct mee, met de rol die je kiest. De uitnodiging werkt 7 dagen.",
       "checkMarked": "Controleer de gemarkeerde e-mailadressen: die krijgen geen uitnodiging.",
-      "channelsAndNote": "Kanalen en notitie",
+      "pasteHelp": "Plak een lijst als je wilt: komma's, spaties of één per regel.",
+      "leftOut": "Wie er al is of al is uitgenodigd, valt erbuiten.",
       "withNote": "met een notitie",
       "alsoJoin": "Ze komen ook in",
       "generalAlways": "Iedereen komt in #{{channel}}",
@@ -4113,11 +4118,81 @@
       "optional": "(optioneel)",
       "notePlaceholder": "Hoi. Kom erbij in {{org}}: het team en de agents zijn er allemaal.",
       "or": "of stuur de link",
+      "continueWith": "Doorgaan met {{count}}",
       "send_one": "{{count}} persoon uitnodigen",
       "send_other": "{{count}} mensen uitnodigen",
       "sent": "Uitnodiging verstuurd naar {{email}}.",
       "sentMany": "{{count}} uitnodigingen verstuurd.",
-      "alsoIn": "Ze komen ook in {{channels}}."
+      "alsoIn": "Ze komen ook in {{channels}}.",
+      "who": {
+        "title": "Wie wil je erbij halen?",
+        "lead": "Geef me de e-mailadressen. Elke persoon krijgt een uitnodiging en doet direct mee."
+      },
+      "orLink": {
+        "title": "Liever een link sturen?",
+        "text": "Wie hem opent vraagt om mee te doen, en jij keurt het goed.",
+        "open": "Link bekijken"
+      },
+      "role": {
+        "titleOne": "Met welke rol komt {{name}} erbij?",
+        "titleMany": "Met welke rol komen deze mensen erbij?",
+        "lead": "De rol bepaalt wat elke persoon kan doen. Je kunt hem later wijzigen.",
+        "each": "Een rol per persoon",
+        "same": "Dezelfde rol voor iedereen"
+      },
+      "where": {
+        "titleOne": "In welke kanalen komt {{name}} meteen?",
+        "titleMany": "In welke kanalen komen deze mensen meteen?",
+        "lead": "Iedereen begint in #{{channel}}. De andere kies jij.",
+        "label": "Kanalen",
+        "everyone": "Iedereen komt erin",
+        "private": "Privé · jij zit erin",
+        "people_one": "{{count}} persoon",
+        "people_other": "{{count}} mensen",
+        "fromChannel": "#{{channel}} staat al aangevinkt: je nodigde vanuit dat kanaal uit."
+      },
+      "noteStep": {
+        "title": "Zal ik iets in de uitnodiging zeggen?",
+        "lead": "Het gaat mee in de e-mail. Zo niet, dan stuur ik hem zo."
+      },
+      "mailFor": "Zo komt het aan bij {{names}}",
+      "mail": {
+        "from": "agentes.chat · aan {{to}}",
+        "toMany": "{{email}} en {{count}} meer",
+        "subject": "Je bent uitgenodigd voor een werkruimte op agentes.chat",
+        "headline": "Je bent uitgenodigd voor een werkruimte",
+        "body": "<b>{{name}}</b> ({{email}}) nodigt je uit om lid te worden van <b>{{org}}</b> als lid.",
+        "noteFrom": "<b>{{name}}:</b> ‘{{note}}’",
+        "what": "Op agentes.chat werken mensen en AI-agents samen.",
+        "button": "Uitnodiging accepteren",
+        "small": "De uitnodiging werkt 7 dagen. Accepteer haar met dit e-mailadres."
+      },
+      "done": {
+        "title": "Klaar, ik heb de uitnodiging naar {{names}} gestuurd.",
+        "leadOne": "Als {{name}} erbij komt, verwelkom ik die persoon in {{channels}} en laat ik het je weten.",
+        "leadMany": "Als iemand erbij komt, verwelkom ik die persoon in {{channels}} en laat ik het je weten.",
+        "none": "Deze keer is er geen uitnodiging verstuurd.",
+        "noneLead": "Hieronder staat de reden per adres."
+      },
+      "result": {
+        "invited": "Verstuurd",
+        "already_member": "zit al in {{org}}",
+        "already_invited": "had al een uitnodiging",
+        "invalid_email": "ongeldig e-mailadres"
+      },
+      "again": "Meer mensen uitnodigen",
+      "finish": "Klaar",
+      "linkStep": {
+        "title": "Dit is de link van {{org}}.",
+        "lead": "Wie hem opent, vraagt om mee te doen. Ik laat je elk verzoek zien, en jij keurt het goed.",
+        "how1": "De persoon opent de link en zegt wie die is.",
+        "how2": "Het verzoek komt bij wie uitnodigt, hier en op de telefoon.",
+        "how3": "Jij keurt het goed en kiest met welke rol de persoon meedoet.",
+        "waiting_one": "Eén verzoek wacht op je",
+        "waiting_other": "{{count}} verzoeken wachten op je",
+        "seeRequests": "Verzoeken bekijken",
+        "byEmail": "Uitnodigen via e-mail"
+      }
     },
     "invitations": {
       "title": "Verstuurde uitnodigingen",

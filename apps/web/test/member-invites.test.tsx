@@ -78,7 +78,91 @@ const invitation = (
 });
 
 describe("the invite dialog", () => {
-  test("a pasted address book: a role per address, channels and a note for all; who's in or invited already stays out", async () => {
+  /** The line under the dialog's title ("Passo 2 de 4 · Papel"), and what the host asks in its bubble. */
+  const stepOf = () => dialog().querySelector(".ac-dialog__sub")?.textContent ?? null;
+  const asked = () => dialog().querySelector(".auth__title")?.textContent;
+  const press = (name: string | RegExp) => click(within(dialog()).getByRole("button", { name }));
+  const option = (name: RegExp) => within(dialog()).getByRole("button", { name });
+  const box = (name: string) => within(dialog()).getByRole("checkbox", { name });
+
+  test("a step at a time, the host asking each: Quem, Papel, Onde começam, Recado; Voltar keeps what was chosen", async () => {
+    await members();
+    const invite = await openInvite();
+    expect(stepOf()).toBe("Passo 1 de 4 · Quem");
+    expect(asked()).toBe("Quem você quer trazer?");
+    expect(invite.querySelectorAll(".ac-steps__bar")).toHaveLength(4);
+    expect(invite.querySelectorAll('.ac-steps__bar[data-done="true"]')).toHaveLength(1);
+    // The host is the workspace's first agent, as on the invitation page.
+    expect(invite.querySelector(".invite-host .ac-avatar")?.getAttribute("data-kind")).toBe("agent");
+    // Nothing to invite yet: Cancelar on the left, Continuar waits.
+    expect(within(invite).getByRole("button", { name: "Cancelar" })).toBeTruthy();
+    expect(within(invite).getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
+    const emails = within(invite).getByLabelText("E-mails");
+    await type(emails, "Nova@Acme.com");
+    // An address typed and not a chip yet already counts.
+    expect(within(invite).getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(false);
+    await act(async () => fireEvent.keyDown(emails, { key: "," }));
+    await type(emails, "outra@acme.com");
+    await act(async () => fireEvent.blur(emails));
+    expect(chipsIn(invite)).toEqual(["nova@acme.com", "outra@acme.com"]);
+    expect(invite.textContent).toContain("Cole uma lista, se quiser: vírgula, espaço ou uma por linha.");
+    expect(within(invite).getByRole("button", { name: "Continuar com 2" })).toBeTruthy();
+    // Enter on nothing goes on.
+    await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
+    await settle(2);
+
+    expect(stepOf()).toBe("Passo 2 de 4 · Papel");
+    expect(asked()).toBe("Com que papel essas pessoas entram?");
+    expect(dialog().querySelectorAll('.ac-steps__bar[data-done="true"]')).toHaveLength(2);
+    expect(option(/^Membro/).getAttribute("aria-pressed")).toBe("true");
+    expect(option(/^Membro/).textContent).toContain("O que todos podem");
+    // Each role with its mark and what it gives.
+    expect(option(/^Admin/).querySelector(".ac-rolemark")).toBeTruthy();
+    expect(option(/^Admin/).textContent).toContain("Pode tudo, menos o que é só do dono.");
+    await click(option(/^Admin/));
+    expect(option(/^Admin/).getAttribute("aria-pressed")).toBe("true");
+    await press("Voltar");
+    expect(stepOf()).toBe("Passo 1 de 4 · Quem");
+    expect(chipsIn(dialog())).toEqual(["nova@acme.com", "outra@acme.com"]);
+    await press("Continuar com 2");
+    expect(option(/^Admin/).getAttribute("aria-pressed")).toBe("true");
+    await press("Continuar");
+    await settle(4);
+
+    expect(stepOf()).toBe("Passo 3 de 4 · Onde começam");
+    expect(asked()).toBe("Em que canais essas pessoas já entram?");
+    // #general first, always on; the others with who is there, the agents by face and name.
+    const [first] = within(dialog()).getAllByRole("checkbox");
+    expect(first).toBe(box("#general"));
+    expect(box("#general").getAttribute("aria-checked")).toBe("true");
+    expect(box("#general").hasAttribute("disabled")).toBe(true);
+    expect(dialog().textContent).toContain("Todo mundo entra");
+    expect(box("#eng").getAttribute("aria-checked")).toBe("false");
+    const eng = box("#eng").closest(".invite-chan") as HTMLElement;
+    expect(eng.querySelector(".invite-chan__sub")?.textContent).toBe("2 pessoas · Ada e Atlas");
+    expect(eng.querySelectorAll(".invite-chan__faces .ac-avatar")).toHaveLength(2);
+    await click(box("#eng"));
+    expect(box("#eng").getAttribute("aria-checked")).toBe("true");
+    await press("Continuar");
+
+    expect(stepOf()).toBe("Passo 4 de 4 · Recado");
+    expect(asked()).toBe("Quer que eu diga algo no convite?");
+    await type(within(dialog()).getByLabelText("Recado no e-mail"), "Vem para a Acme");
+    // The email as it arrives, in the server's own words.
+    const mail = dialog().querySelector(".invite-mail-fig") as HTMLElement;
+    expect(mail.textContent).toContain("Assim chega para Nova e Outra");
+    expect(mail.textContent).toContain("agentes.chat · para nova@acme.com e mais 1");
+    expect(mail.textContent).toContain("Você recebeu um convite para um workspace no agentes.chat");
+    expect(mail.textContent).toContain("Walter (walter@acme.com.br) convidou você para entrar na Acme como membro.");
+    expect(mail.textContent).toContain("Walter: “Vem para a Acme”");
+    expect(mail.textContent).toContain("Aceitar convite");
+    expect(within(dialog()).getByRole("button", { name: "Convidar 2 pessoas" })).toBeTruthy();
+    await press("Voltar");
+    expect(stepOf()).toBe("Passo 3 de 4 · Onde começam");
+    expect(box("#eng").getAttribute("aria-checked")).toBe("true");
+  });
+
+  test("a pasted address book, a role per person, then what became of each address, in place of the toasts", async () => {
     const state = seedState();
     state.invitations.push(
       invitation({ id: "inv-bia", email: "bia@acme.com" }),
@@ -99,37 +183,36 @@ describe("the invite dialog", () => {
     const chip = (email: string) => within(invite).getByText(email).closest(".email-chip") as HTMLElement;
     // Someone in already, someone with an invitation waiting, an address to check: said, and not sent.
     expect(chip("joao@acme.com.br").textContent).toContain("já está na Acme");
+    expect(chip("joao@acme.com.br").hasAttribute("data-soft")).toBe(true);
     expect(chip("bia@acme.com").textContent).toContain("já convidado");
     expect(chip("x@y").textContent).toContain("confira");
     expect(chip("x@y").getAttribute("data-invalid")).toBe("true");
+    // No role inside a chip any more: that's the next step.
+    expect(within(invite).queryByRole("combobox")).toBeNull();
     expect(invite.textContent).toContain("Confira os e-mails marcados: eles não recebem convite.");
     // An expired invitation can be sent again: rafa counts.
-    expect(within(invite).getByRole("button", { name: "Convidar 2 pessoas" })).toBeTruthy();
+    await press("Continuar com 2");
 
-    // Each address with its role: Membro, or a role this person may give.
-    const role = within(invite).getByRole("combobox", { name: "Papel de ana@acme.com" });
-    expect(role.textContent).toContain("Membro");
-    await openFrom(role);
+    // A role for each person: each its own select, Membro to start.
+    await press("Um papel para cada pessoa");
+    const ana = within(dialog()).getByRole("combobox", { name: "Papel de ana@acme.com" });
+    const rafa = within(dialog()).getByRole("combobox", { name: "Papel de rafa@acme.com" });
+    expect(ana.textContent).toContain("Membro");
+    await openFrom(ana);
     await click(screen().getByRole("option", { name: /^Admin/ }));
     await settle(2);
-    expect(role.textContent).toContain("Admin");
-
-    // Channels and a note, folded until wanted. #general always, and never sent: everyone joins it.
-    await click(within(invite).getByRole("button", { name: /^Canais e recado/ }));
-    const chans = within(invite).getByRole("group", { name: "Entram também em" });
-    const general = within(chans).getByRole("button", { name: "#general" });
-    expect(general.getAttribute("aria-pressed")).toBe("true");
-    expect(general.hasAttribute("disabled")).toBe(true);
-    const eng = within(chans).getByRole("button", { name: "#eng" });
-    expect(eng.getAttribute("aria-pressed")).toBe("false");
-    await click(eng);
-    expect(eng.getAttribute("aria-pressed")).toBe("true");
-    await type(within(invite).getByLabelText("Recado no e-mail (opcional)"), "  Vem para a Acme  ");
-    // Folded again, the choices say themselves beside it.
-    await click(within(invite).getByRole("button", { name: /^Canais e recado/ }));
-    expect(invite.querySelector(".invite-more__sum")?.textContent).toBe("· #eng · com recado");
-
-    await click(within(invite).getByRole("button", { name: "Convidar 2 pessoas" }));
+    expect(ana.textContent).toContain("Admin");
+    expect(rafa.textContent).toContain("Membro");
+    // The same role for everyone again, and back: each one's choice is still there.
+    await press("O mesmo papel para todo mundo");
+    expect(within(dialog()).queryByRole("combobox")).toBeNull();
+    await press("Um papel para cada pessoa");
+    expect(within(dialog()).getByRole("combobox", { name: "Papel de ana@acme.com" }).textContent).toContain("Admin");
+    await press("Continuar");
+    await settle(4);
+    await press("Continuar");
+    await type(within(dialog()).getByLabelText("Recado no e-mail"), "  Vem para a Acme  ");
+    await press("Convidar 2 pessoas");
     await settle(6);
     expect(state.calls.find((c) => c.method === "orgs.inviteMany")?.args).toEqual([
       ORG_ID,
@@ -138,19 +221,33 @@ describe("the invite dialog", () => {
           { email: "ana@acme.com", roleIds: [ADMIN_ROLE_ID] },
           { email: "rafa@acme.com", roleIds: [] },
         ],
-        channelIds: [ENG_ID],
+        channelIds: [],
         note: "Vem para a Acme",
       },
     ]);
-    // Each outcome said: the one sent (and where else they go), and the one the server answers is invited already.
-    expect(text()).toContain("Convite enviado para ana@acme.com.");
-    expect(text()).toContain("Entram também em #eng.");
-    expect(text()).toContain("rafa@acme.com já tem um convite pendente. Use Reenviar.");
-    // Only what's left to fix stays; nothing to fix closes it.
-    expect(chipsIn(dialog())).toEqual(["x@y"]);
-    await click(within(dialog()).getByRole("button", { name: "Remover x@y" }));
-    expect(within(dialog()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
-    await click(within(dialog()).getByRole("button", { name: "Cancelar" }));
+
+    // Enviados: every address with what became of it, the host's answer above them; no step any more.
+    expect(stepOf()).toBeNull();
+    expect(dialog().querySelector(".ac-steps")).toBeNull();
+    expect(asked()).toBe("Pronto, mandei o convite para Ana.");
+    expect(dialog().textContent).toContain("Quando Ana entrar, eu recebo no #general e te aviso.");
+    const rows = [...dialog().querySelectorAll(".invite-person")].map((r) => r.textContent);
+    expect(rows).toEqual([
+      "Aana@acme.com · AdminEnviado",
+      "Bbia@acme.comjá tinha convite",
+      "Jjoao@acme.com.brjá está na Acme",
+      // The server answers that one has an invitation still.
+      "Rrafa@acme.comjá tinha convite",
+      "Xx@ye-mail inválido",
+    ]);
+    // The sent one in the ok color, its check drawn in CSS; the others quiet.
+    const sentRow = dialog().querySelector('.invite-person[data-ok="true"]') as HTMLElement;
+    expect(sentRow.querySelector(".invite-state svg")).toBeTruthy();
+    expect(sentRow.querySelector(".invite-state")?.hasAttribute("data-skip")).toBe(false);
+    // This screen says it: no toasts.
+    expect(text()).not.toContain("Convite enviado para ana@acme.com.");
+    expect(text()).not.toContain("rafa@acme.com já tem um convite pendente.");
+    await press("Concluir");
     await settle(2);
     expect(screen().queryByRole("dialog", { name: "Convidar para a Acme" })).toBeNull();
     const list = screen().getByRole("region", { name: "Convites enviados" });
@@ -159,7 +256,35 @@ describe("the invite dialog", () => {
     expect(sent.textContent).toMatch(/Expira em \d dias/);
   });
 
-  test("typed: Enter, a comma or leaving the field makes chips; Backspace takes the last back; Enter on nothing sends", async () => {
+  test("an address the server reads as none goes back to the first step, marked, with the rest said sent", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const many = api.orgs.inviteMany;
+    api.orgs.inviteMany = async (orgId, input) =>
+      (await many(orgId, input)).map((r) =>
+        r.email === "ruim@acme.com" ? { email: r.email, status: "invalid_email" as const } : r,
+      );
+    await renderApp(`/org/${ORG_ID}/settings/members`, { api });
+    await settle(6);
+    await openInvite();
+    const emails = within(dialog()).getByLabelText("E-mails");
+    await act(async () =>
+      fireEvent.paste(emails, { clipboardData: { getData: () => "nova@acme.com, ruim@acme.com" } }),
+    );
+    await press("Continuar com 2");
+    await press("Continuar");
+    await settle(4);
+    await press("Continuar");
+    await press("Convidar 2 pessoas");
+    await settle(6);
+    expect(stepOf()).toBe("Passo 1 de 4 · Quem");
+    expect(chipsIn(dialog())).toEqual(["ruim@acme.com"]);
+    expect(dialog().textContent).toContain("Confira os e-mails marcados: eles não recebem convite.");
+    expect(text()).toContain("Convite enviado para nova@acme.com.");
+    expect(text()).toContain("ruim@acme.com não parece um e-mail válido.");
+  });
+
+  test("typed: Enter, a comma or leaving the field makes chips; Backspace takes the last back; Convidar mais pessoas starts over", async () => {
     const { state } = await members();
     const invite = await openInvite();
     const emails = within(invite).getByLabelText("E-mails");
@@ -171,14 +296,25 @@ describe("the invite dialog", () => {
     expect(emails.getAttribute("placeholder")).toBe("Mais e-mails…");
     await act(async () => fireEvent.keyDown(emails, { key: "Backspace" }));
     expect(chipsIn(invite)).toEqual(["nova@acme.com"]);
+    // One person: the host names them.
     await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
+    expect(asked()).toBe("Com que papel Nova entra?");
+    await press("Continuar");
+    await settle(4);
+    expect(asked()).toBe("Em que canais Nova já entra?");
+    await press("Continuar");
+    expect(dialog().querySelector(".invite-mail-label")?.textContent).toBe("Assim chega para Nova");
+    await press("Convidar 1 pessoa");
     await settle(6);
     expect(state.calls.find((c) => c.method === "orgs.inviteMany")?.args[1]).toEqual({
       invites: [{ email: "nova@acme.com", roleIds: [] }],
       channelIds: [],
     });
-    expect(text()).toContain("Convite enviado para nova@acme.com.");
-    expect(screen().queryByRole("dialog", { name: "Convidar para a Acme" })).toBeNull();
+    expect(asked()).toBe("Pronto, mandei o convite para Nova.");
+    // More people: the first step again, empty.
+    await press("Convidar mais pessoas");
+    expect(stepOf()).toBe("Passo 1 de 4 · Quem");
+    expect(chipsIn(dialog())).toEqual([]);
   });
 
   test("one dialog from everywhere: the workspace menu and ⌘K open it over the page; who may not invite has neither", async () => {
@@ -220,7 +356,7 @@ describe("the invite dialog", () => {
     expect(screen().queryByRole("option", { name: /Convidar pessoas/ })).toBeNull();
   });
 
-  test("a channel's Adicionar: an address nobody here has invites them to the workspace and that channel", async () => {
+  test("a channel's Adicionar: the address and that channel come chosen; Convidar mais pessoas keeps the channel", async () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
@@ -239,16 +375,28 @@ describe("the invite dialog", () => {
     // The invite dialog takes over: Adicionar and the channel's details close, so neither opens again over it.
     expect(screen().queryByRole("dialog", { name: "Adicionar a #eng" })).toBeNull();
     expect(screen().queryByRole("dialog", { name: "#eng" })).toBeNull();
-    // The dialog opens with that address and that channel chosen.
-    const invite = dialog();
-    expect(chipsIn(invite)).toEqual(["nova@estudio.com"]);
-    expect(invite.querySelector(".invite-more__sum")?.textContent).toBe("· #eng");
-    await click(within(invite).getByRole("button", { name: "Convidar 1 pessoa" }));
+    // The dialog opens with that address, and the channel comes checked, saying why.
+    expect(chipsIn(dialog())).toEqual(["nova@estudio.com"]);
+    await press("Continuar");
+    await press("Continuar");
+    await settle(4);
+    expect(box("#eng").getAttribute("aria-checked")).toBe("true");
+    expect(dialog().textContent).toContain("O #eng já vem marcado: você convidou de lá.");
+    await press("Continuar");
+    await press("Convidar 1 pessoa");
     await settle(6);
     expect(state.calls.find((c) => c.method === "orgs.inviteMany")?.args[1]).toEqual({
       invites: [{ email: "nova@estudio.com", roleIds: [] }],
       channelIds: [ENG_ID],
     });
+    expect(dialog().textContent).toContain("Quando Nova entrar, eu recebo no #general e #eng e te aviso.");
+    // More people go to the same channels.
+    await press("Convidar mais pessoas");
+    await type(within(dialog()).getByLabelText("E-mails"), "outra@estudio.com");
+    await press("Continuar");
+    await press("Continuar");
+    await settle(4);
+    expect(box("#eng").getAttribute("aria-checked")).toBe("true");
   });
 });
 

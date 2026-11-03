@@ -3929,16 +3929,18 @@ export const en = {
       member: "already in {{org}}",
       invited: "already invited",
     },
-    // The invite dialog, opened from Members, the workspace menu, ⌘K and a channel (ADR 0090).
+    // The invite dialog, opened from Members, the workspace menu, ⌘K and a channel (ADR 0090): a step at a time, the
+    // workspace's first agent asking each one in its bubble; the link on a screen of its own.
     dialog: {
       title: "Invite to {{org}}",
-      sub: "By email they join directly. Through the link, they ask and you approve.",
-      subLink: "Whoever opens the link asks to join, and you approve each person.",
+      /** Under the title: the step out of four, and its name. */
+      stepOf: "Step {{n}} of {{total}} · {{step}}",
+      steps: { who: "Who", role: "Role", where: "Where they start", note: "Note" },
       emails: "Emails",
       moreEmails: "More emails…",
-      help: "Each person gets an email and joins directly, in the role you pick. The invitation works for 7 days.",
       checkMarked: "Check the marked emails: they won't get an invitation.",
-      channelsAndNote: "Channels and note",
+      pasteHelp: "Paste a list if you like: commas, spaces or one per line.",
+      leftOut: "Whoever is already in or already invited stays out.",
       withNote: "with a note",
       alsoJoin: "They also join",
       generalAlways: "Everyone joins #{{channel}}",
@@ -3946,11 +3948,89 @@ export const en = {
       optional: "(optional)",
       notePlaceholder: "Hi. Come join {{org}}: the team and the agents are all here.",
       or: "or send the link",
+      /** The first step's button with more than one address (with one, "Continue"). */
+      continueWith: "Continue with {{count}}",
       send_one: "Invite {{count}} person",
       send_other: "Invite {{count}} people",
       sent: "Invitation sent to {{email}}.",
       sentMany: "{{count}} invitations sent.",
       alsoIn: "They also join {{channels}}.",
+      // What the host asks on each step. `name`: the address's first word, capitalized ("Julia" from julia.m@…), so
+      // nothing here may need to know the person's gender.
+      who: {
+        title: "Who do you want to bring in?",
+        lead: "Give me their emails. Each person gets an invitation and joins directly.",
+      },
+      orLink: {
+        title: "Rather send a link?",
+        text: "Whoever opens it asks to join, and you approve.",
+        open: "See the link",
+      },
+      role: {
+        titleOne: "What role does {{name}} join with?",
+        titleMany: "What role do these people join with?",
+        lead: "The role says what each person can do. You can change it later.",
+        each: "A role for each person",
+        same: "The same role for everyone",
+      },
+      where: {
+        titleOne: "Which channels does {{name}} join right away?",
+        titleMany: "Which channels do these people join right away?",
+        lead: "Everyone starts in #{{channel}}. You pick the others.",
+        label: "Channels",
+        everyone: "Everyone joins",
+        private: "Private · you're in it",
+        people_one: "{{count}} person",
+        people_other: "{{count}} people",
+        fromChannel: "#{{channel}} comes checked: you invited from there.",
+      },
+      noteStep: {
+        title: "Want me to say something in the invitation?",
+        lead: "It goes in the email. If not, I'll send it as it is.",
+      },
+      /** Over the email as it arrives: the first names it goes to. */
+      mailFor: "This is how it reaches {{names}}",
+      // The invitation email in the words the server sends it in (packages/engine/src/email/words): keep them alike.
+      mail: {
+        from: "agentes.chat · to {{to}}",
+        toMany: "{{email}} and {{count}} more",
+        subject: "You're invited to a workspace on agentes.chat",
+        headline: "You're invited to a workspace",
+        body: "<b>{{name}}</b> ({{email}}) invited you to join <b>{{org}}</b> as a member.",
+        noteFrom: "<b>{{name}}:</b> “{{note}}”",
+        what: "agentes.chat is where people and AI agents work together.",
+        button: "Accept invitation",
+        small: "The invitation works for 7 days. Accept it with this email address.",
+      },
+      // The host's answer once the invitations went: `channels` is where they start ("#general and #eng").
+      done: {
+        title: "Done, I sent the invitation to {{names}}.",
+        leadOne: "When {{name}} joins, I'll greet them in {{channels}} and let you know.",
+        leadMany: "When each person joins, I'll greet them in {{channels}} and let you know.",
+        none: "No invitation went out this time.",
+        noneLead: "Each address's reason is below.",
+      },
+      /** Each address after the send: sent, or why not (as `members.batch` says it). */
+      result: {
+        invited: "Sent",
+        already_member: "already in {{org}}",
+        already_invited: "already had an invitation",
+        invalid_email: "invalid email",
+      },
+      again: "Invite more people",
+      finish: "Done",
+      // The link's own screen (ADR 0068).
+      linkStep: {
+        title: "This is {{org}}'s link.",
+        lead: "Whoever opens it asks to join. I'll show you each request, and you approve.",
+        how1: "The person opens the link and says who they are.",
+        how2: "The request reaches whoever invites, here and on the phone.",
+        how3: "You approve and pick the role they join with.",
+        waiting_one: "One request waiting for you",
+        waiting_other: "{{count}} requests waiting for you",
+        seeRequests: "See requests",
+        byEmail: "Invite by email",
+      },
     },
     // Sent invitations: each one's link at any time, sent again with the same link, its role, cancel (ADR 0090).
     invitations: {

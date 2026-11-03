@@ -3942,13 +3942,18 @@
     },
     "dialog": {
       "title": "邀请加入 {{org}}",
-      "sub": "通过邮件邀请的人会直接加入。通过链接加入的人需要申请，由你批准。",
-      "subLink": "打开链接的人会申请加入，由你逐一批准。",
+      "stepOf": "第 {{n}} 步，共 {{total}} 步 · {{step}}",
+      "steps": {
+        "who": "邀请谁",
+        "role": "角色",
+        "where": "加入频道",
+        "note": "留言"
+      },
       "emails": "邮箱",
       "moreEmails": "更多邮箱…",
-      "help": "每个人都会收到一封邮件，并以你选择的角色直接加入。邀请 7 天内有效。",
       "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
-      "channelsAndNote": "频道和留言",
+      "pasteHelp": "也可以粘贴一个列表：用逗号、空格分隔，或每行一个。",
+      "leftOut": "已经在这里或已被邀请的人不会再收到邀请。",
       "withNote": "附带留言",
       "alsoJoin": "同时加入",
       "generalAlways": "所有人都会加入 #{{channel}}",
@@ -3956,10 +3961,78 @@
       "optional": "（可选）",
       "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
       "or": "或发送链接",
+      "continueWith": "继续（{{count}} 人）",
       "send_other": "邀请 {{count}} 人",
       "sent": "已向 {{email}} 发送邀请。",
       "sentMany": "已发送 {{count}} 份邀请。",
-      "alsoIn": "他们也会加入 {{channels}}。"
+      "alsoIn": "他们也会加入 {{channels}}。",
+      "who": {
+        "title": "你想邀请谁？",
+        "lead": "把邮箱告诉我。每个人都会收到邀请，并直接加入。"
+      },
+      "orLink": {
+        "title": "想改发链接？",
+        "text": "打开链接的人会申请加入，由你批准。",
+        "open": "查看链接"
+      },
+      "role": {
+        "titleOne": "{{name}} 以什么角色加入？",
+        "titleMany": "这些人以什么角色加入？",
+        "lead": "角色决定每个人能做什么。之后可以修改。",
+        "each": "为每个人分别选角色",
+        "same": "所有人用同一个角色"
+      },
+      "where": {
+        "titleOne": "{{name}} 一开始加入哪些频道？",
+        "titleMany": "这些人一开始加入哪些频道？",
+        "lead": "所有人都从 #{{channel}} 开始。其他频道由你选择。",
+        "label": "频道",
+        "everyone": "所有人都会加入",
+        "private": "私密 · 你在其中",
+        "people_other": "{{count}} 人",
+        "fromChannel": "你是从 #{{channel}} 发起邀请的，所以它已勾选。"
+      },
+      "noteStep": {
+        "title": "要我在邀请里说点什么吗？",
+        "lead": "会随邮件一起发出。不写也没关系，我照样发送。"
+      },
+      "mailFor": "{{names}} 收到的样子",
+      "mail": {
+        "from": "agentes.chat · 收件人：{{to}}",
+        "toMany": "{{email}} 和另外 {{count}} 人",
+        "subject": "你受邀加入 agentes.chat 上的一个工作区",
+        "headline": "你受邀加入一个工作区",
+        "body": "<b>{{name}}</b> ({{email}}) 邀请你以成员身份加入 <b>{{org}}</b>。",
+        "noteFrom": "<b>{{name}}：</b>“{{note}}”",
+        "what": "agentes.chat 是成员和 AI 智能体一起工作的地方。",
+        "button": "接受邀请",
+        "small": "邀请 7 天内有效。请用这个邮箱地址接受。"
+      },
+      "done": {
+        "title": "好了，我已把邀请发给 {{names}}。",
+        "leadOne": "{{name}} 加入后，我会在 {{channels}} 迎接，并通知你。",
+        "leadMany": "每有一人加入，我都会在 {{channels}} 迎接，并通知你。",
+        "none": "这次没有发出任何邀请。",
+        "noneLead": "每个地址的原因见下方。"
+      },
+      "result": {
+        "invited": "已发送",
+        "already_member": "已在 {{org}} 中",
+        "already_invited": "已有邀请",
+        "invalid_email": "邮箱无效"
+      },
+      "again": "邀请更多人",
+      "finish": "完成",
+      "linkStep": {
+        "title": "这是 {{org}} 的链接。",
+        "lead": "打开链接的人会申请加入。我会把每个申请展示给你，由你批准。",
+        "how1": "对方打开链接，说明自己是谁。",
+        "how2": "申请会发给能邀请的人，在这里和手机上都能看到。",
+        "how3": "你批准时，选择对方以什么角色加入。",
+        "waiting_other": "{{count}} 个申请在等你处理",
+        "seeRequests": "查看申请",
+        "byEmail": "通过邮件邀请"
+      }
     },
     "invitations": {
       "title": "已发送的邀请",

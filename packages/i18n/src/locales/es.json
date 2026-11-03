@@ -4175,13 +4175,18 @@
     },
     "dialog": {
       "title": "Invitar a {{org}}",
-      "sub": "Por correo entran directamente. Con el enlace, piden entrar y tú apruebas.",
-      "subLink": "Quien abra el enlace pide entrar, y tú apruebas a cada persona.",
+      "stepOf": "Paso {{n}} de {{total}} · {{step}}",
+      "steps": {
+        "who": "Quién",
+        "role": "Rol",
+        "where": "Dónde empiezan",
+        "note": "Nota"
+      },
       "emails": "Correos",
       "moreEmails": "Más correos…",
-      "help": "Cada persona recibe un correo y entra directamente, con el rol que elijas. La invitación vale por 7 días.",
       "checkMarked": "Revisa los correos marcados: no recibirán invitación.",
-      "channelsAndNote": "Canales y nota",
+      "pasteHelp": "Pega una lista, si quieres: comas, espacios o una por línea.",
+      "leftOut": "Quien ya está o ya tiene invitación queda fuera.",
       "withNote": "con una nota",
       "alsoJoin": "También entran en",
       "generalAlways": "Todos entran en #{{channel}}",
@@ -4189,12 +4194,84 @@
       "optional": "(opcional)",
       "notePlaceholder": "Hola. Únete a {{org}}: el equipo y los agentes están todos aquí.",
       "or": "o envía el enlace",
+      "continueWith": "Continuar con {{count}}",
       "send_one": "Invitar a {{count}} persona",
       "send_many": "Invitar a {{count}} personas",
       "send_other": "Invitar a {{count}} personas",
       "sent": "Invitación enviada a {{email}}.",
       "sentMany": "{{count}} invitaciones enviadas.",
-      "alsoIn": "También entran en {{channels}}."
+      "alsoIn": "También entran en {{channels}}.",
+      "who": {
+        "title": "¿A quién quieres traer?",
+        "lead": "Pásame los correos. Cada persona recibe una invitación y entra directamente."
+      },
+      "orLink": {
+        "title": "¿Prefieres enviar un enlace?",
+        "text": "Quien lo abra pide entrar, y tú apruebas.",
+        "open": "Ver el enlace"
+      },
+      "role": {
+        "titleOne": "¿Con qué rol entra {{name}}?",
+        "titleMany": "¿Con qué rol entran estas personas?",
+        "lead": "El rol dice lo que cada persona puede hacer. Puedes cambiarlo después.",
+        "each": "Un rol para cada persona",
+        "same": "El mismo rol para todas las personas"
+      },
+      "where": {
+        "titleOne": "¿En qué canales entra {{name}} desde ya?",
+        "titleMany": "¿En qué canales entran estas personas desde ya?",
+        "lead": "Todo el mundo empieza en #{{channel}}. Los demás los eliges tú.",
+        "label": "Canales",
+        "everyone": "Todo el mundo entra",
+        "private": "Privado · estás en él",
+        "people_one": "{{count}} persona",
+        "people_many": "{{count}} personas",
+        "people_other": "{{count}} personas",
+        "fromChannel": "#{{channel}} ya viene marcado: invitaste desde ahí."
+      },
+      "noteStep": {
+        "title": "¿Quieres que diga algo en la invitación?",
+        "lead": "Va en el correo. Si no, la envío así."
+      },
+      "mailFor": "Así le llega a {{names}}",
+      "mail": {
+        "from": "agentes.chat · para {{to}}",
+        "toMany": "{{email}} y {{count}} más",
+        "subject": "Te invitaron a un espacio de trabajo en agentes.chat",
+        "headline": "Te invitaron a un espacio de trabajo",
+        "body": "<b>{{name}}</b> ({{email}}) te invitó a unirte a <b>{{org}}</b> como miembro.",
+        "noteFrom": "<b>{{name}}:</b> “{{note}}”",
+        "what": "agentes.chat es donde personas y agentes de IA trabajan juntos.",
+        "button": "Aceptar invitación",
+        "small": "La invitación es válida por 7 días. Acéptala con esta dirección de correo."
+      },
+      "done": {
+        "title": "Listo, envié la invitación a {{names}}.",
+        "leadOne": "Cuando {{name}} entre, le doy la bienvenida en {{channels}} y te aviso.",
+        "leadMany": "Cuando cada persona entre, le doy la bienvenida en {{channels}} y te aviso.",
+        "none": "Esta vez no salió ninguna invitación.",
+        "noneLead": "Abajo está el motivo de cada dirección."
+      },
+      "result": {
+        "invited": "Enviada",
+        "already_member": "ya está en {{org}}",
+        "already_invited": "ya tenía invitación",
+        "invalid_email": "correo no válido"
+      },
+      "again": "Invitar a más personas",
+      "finish": "Terminar",
+      "linkStep": {
+        "title": "Este es el enlace de {{org}}.",
+        "lead": "Quien lo abra pide entrar. Te muestro cada solicitud, y tú apruebas.",
+        "how1": "La persona abre el enlace y dice quién es.",
+        "how2": "La solicitud le llega a quien invita, aquí y en el celular.",
+        "how3": "Tú apruebas y eliges con qué rol entra la persona.",
+        "waiting_one": "Una solicitud te espera",
+        "waiting_many": "{{count}} solicitudes te esperan",
+        "waiting_other": "{{count}} solicitudes te esperan",
+        "seeRequests": "Ver solicitudes",
+        "byEmail": "Invitar por correo"
+      }
     },
     "invitations": {
       "title": "Invitaciones enviadas",
