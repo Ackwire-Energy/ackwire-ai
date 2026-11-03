@@ -8,7 +8,8 @@ import { systemText } from "./Text";
 import { type Theme, useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost";
+/** `text`: the ghost's words with no side padding, so its icon starts where the text above does (under a message). */
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "text";
 
 export interface ButtonProps {
   variant: ButtonVariant;
@@ -63,7 +64,7 @@ export function Button({
   const s = BUTTON_SIZES[size];
   const primary = variant === "primary";
   const look = primaryLook(theme);
-  const textColor = primary ? look.text : variant === "ghost" ? colors.muted : colors.ink;
+  const textColor = primary ? look.text : variant === "ghost" || variant === "text" ? colors.muted : colors.ink;
   return (
     <PressScale
       onPress={onPress}
@@ -85,7 +86,7 @@ export function Button({
       <View
         style={[
           styles.face,
-          { minHeight: s.height, borderRadius: s.radius, paddingHorizontal: s.padding },
+          { minHeight: s.height, borderRadius: s.radius, paddingHorizontal: variant === "text" ? 0 : s.padding },
           variant === "secondary" ? { backgroundColor: colors.raised } : null,
         ]}
       >

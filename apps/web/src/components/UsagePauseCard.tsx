@@ -45,18 +45,19 @@ function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
   const { t } = useTranslation();
   const dontRun = useDontRun(runId);
   if (!runId) return null;
+  // A text button, no plate: under the message its icon starts where the words above do.
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      icon="stop"
-      loading={dontRun.pending}
-      disabled={!may}
+    <button
+      type="button"
+      className="ac-link ac-link--muted ac-iconline waitcard__textbtn"
+      disabled={!may || dontRun.pending}
+      aria-busy={dontRun.pending || undefined}
       title={t(may ? "usageCard.dontRunHint" : "usageCard.dontRunForbidden")}
       onClick={dontRun.run}
     >
-      {t("usageCard.dontRun")}
-    </Button>
+      <Icon name="stop" size={16} />
+      <span>{t("usageCard.dontRun")}</span>
+    </button>
   );
 }
 
