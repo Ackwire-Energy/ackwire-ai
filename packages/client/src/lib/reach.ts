@@ -45,6 +45,13 @@ export const reachByAccess = (e: ReachEntry) => e.reason === "routine_creator_re
 /** Whether the line opens the hand-off beside it: not for an agent consulted for someone outside its audience (its words are the agents'). */
 export const reachOpens = (e: ReachEntry) => !!e.consultationId && e.reason === "not_in_channel";
 
+/**
+ * The hand-offs by direct message a message's reach lines show as the two agents' pair row (`reachOpens`): the
+ * reply's own pair row leaves them out, so none shows twice.
+ */
+export const reachHandoffs = (meta: Record<string, unknown> | null | undefined): ReadonlySet<string> =>
+  new Set(reachOf(meta).flatMap((e) => (reachOpens(e) && e.consultationId ? [e.consultationId] : [])));
+
 /** The line's text key: handed (or consulted for someone outside its audience), a routine's message, no AI, kept private, the routine only looks, or who couldn't call it. */
 export const reachKey = (e: ReachEntry) =>
   e.consultationId

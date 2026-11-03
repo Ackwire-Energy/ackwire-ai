@@ -305,6 +305,16 @@ describe("a pushed notification that can't be read", () => {
       to: "/org/$orgId/c/$channelId",
       params: { channelId: "d1" },
     });
+    // At the message the push named, and the request itself.
+    expect(fallbackTarget(data({ kind: "mention", channelId: "c1", messageId: "m1" }))).toEqual({
+      to: "/org/$orgId/c/$channelId",
+      params: { channelId: "c1" },
+      search: { m: "m1" },
+    });
+    expect(fallbackTarget(data({ kind: "approval", approvalId: "a1" }))).toEqual({
+      to: "/org/$orgId/approvals",
+      search: { open: "a1" },
+    });
     expect(fallbackTarget(data({ kind: "mission_stopped", missionId: "x1" }))).toEqual({
       to: "/org/$orgId/threads",
       search: { tab: "missions" },

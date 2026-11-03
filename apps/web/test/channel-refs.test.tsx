@@ -116,6 +116,19 @@ describe("#channel links in messages", () => {
     expect(within(card).queryByRole("button", { name: "Entrar" })).toBeNull();
   });
 
+  test("a click on the link opens the channel, also while its hover card shows", async () => {
+    const { router } = await go(`c/${GENERAL_ID}`, withMessage("veja #eng"));
+    const link = screen().getByRole("link", { name: "Canal #eng" });
+    await act(async () => fireEvent.pointerEnter(link, { pointerType: "mouse" }));
+    await wait(450);
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Sobre #eng" })).toBeTruthy();
+    await act(async () => fireEvent.click(link, { button: 0 }));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(screen().queryByRole("dialog", { name: "Sobre #eng" })).toBeNull();
+  });
+
   test("from the keyboard: focus shows the card, ArrowDown moves into it and Tab reaches Open", async () => {
     await go(`c/${GENERAL_ID}`, withMessage("veja #eng"));
     const link = screen().getByRole("link", { name: "Canal #eng" });

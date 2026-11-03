@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
+import { typingTopic } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
 import { consolidateItem } from "@agenteschat/engine";
 import { parseClientFrame } from "../src/realtime/ws";
@@ -56,6 +57,11 @@ test("typing frames fan out to subscribers of the channel (throttled), never to 
   await b.until((f) => f.type === "subscribed");
   a.send({ type: "subscribe", channelId });
   await a.until((f) => f.type === "subscribed");
+  // The server hears them too, for an agent's quiet window, whoever subscribed (ADR 0112).
+  const heard: unknown[] = [];
+  t.adapters.pubsub.subscribe(typingTopic, (e) => heard.push(e));
+  // Three in a row: two get through (one every 3 s from the apps, one more on a new message's first keystroke).
+  a.send({ type: "typing", channelId });
   a.send({ type: "typing", channelId });
   a.send({ type: "typing", channelId });
   const typing = await b.until((f) => f.type === "event" && (f.event as { type: string }).type === "user.typing");
@@ -63,7 +69,9 @@ test("typing frames fan out to subscribers of the channel (throttled), never to 
   await Bun.sleep(100);
   expect(
     b.frames.filter((f) => f.type === "event" && (f.event as { type: string }).type === "user.typing"),
-  ).toHaveLength(1);
+  ).toHaveLength(2);
+  expect(heard).toHaveLength(2);
+  expect(heard[0]).toMatchObject({ type: "user.typing", channelId, threadId: null });
   // Typed in a thread: the frame says which, so only that thread's view shows it.
   const threadId = "0193a2b4-0000-7000-8000-0000000000aa";
   b.send({ type: "typing", channelId, threadId });

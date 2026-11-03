@@ -1,5 +1,14 @@
 import type { TFunction } from "i18next";
-import type { Agent, AgentDraft, AgentProposalCard, AiStatus, ProposedRoutine, SuggestedAi } from "../api/types";
+import type {
+  Agent,
+  AgentDraft,
+  AgentProposalCard,
+  AiStatus,
+  CostKind,
+  CostlyDecision,
+  ProposedRoutine,
+  SuggestedAi,
+} from "../api/types";
 import type { Level } from "./access-levels";
 import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
@@ -89,7 +98,59 @@ export const mayContinueStretch = (
   admin: boolean,
 ) => admin || (meId !== null && (card.forUserId === meId || card.agentIds.some((id) => ownerOf(id) === meId)));
 
-export type ActionCard = ConnectAiCard | AgentProposalCard | StretchCard | UsagePauseCard;
+export type ActionCard = ConnectAiCard | AgentProposalCard | StretchCard | UsagePauseCard | CostlyProposalCard;
+
+/**
+ * An agent asks before costly work nobody asked for directly (ADR 0131 §3): opening a PR, installing packages, a long
+ * job. Its person (or the agent's owner, or who manages agents) says go for this time, always, not now, or never for
+ * this kind; the card keeps what they said.
+ */
+export interface CostlyProposalCard {
+  kind: "autonomy_proposal";
+  signalId: string;
+  agentId: string;
+  cost: CostKind;
+  /** What it wants to run or call, as the agent would (a command, a tool). */
+  what: string;
+  forUserId: string | null;
+  state: "open" | CostlyDecision;
+  decidedByUserId: string | null;
+}
+
+/** The costly-work proposal on a message, or null. */
+export function costlyProposalOf(meta: Record<string, unknown> | null | undefined): CostlyProposalCard | null {
+  const raw = meta?.actionCard as Partial<CostlyProposalCard> | undefined;
+  if (raw?.kind !== "autonomy_proposal" || typeof raw.signalId !== "string" || typeof raw.agentId !== "string")
+    return null;
+  const cost: CostKind = raw.cost === "install" || raw.cost === "long" ? raw.cost : "pr";
+  const states = ["go", "not_now", "never", "always"] as const;
+  return {
+    kind: "autonomy_proposal",
+    signalId: raw.signalId,
+    agentId: raw.agentId,
+    cost,
+    what: typeof raw.what === "string" ? raw.what : "",
+    forUserId: typeof raw.forUserId === "string" ? raw.forUserId : null,
+    state: states.find((s) => s === raw.state) ?? "open",
+    decidedByUserId: typeof raw.decidedByUserId === "string" ? raw.decidedByUserId : null,
+  };
+}
+
+/** Who may decide it: the person it is for, the agent's owner, or someone who manages agents. */
+export const mayDecideCostly = (
+  card: CostlyProposalCard,
+  userId: string,
+  ownerOf: (agentId: string) => string | null | undefined,
+  managesAgents: boolean,
+) => card.forUserId === userId || mayRememberCostly(card, userId, ownerOf, managesAgents);
+
+/** Who may answer it for every time ("Sempre", "Nunca"), which changes the agent: its owner or who manages agents. */
+export const mayRememberCostly = (
+  card: CostlyProposalCard,
+  userId: string,
+  ownerOf: (agentId: string) => string | null | undefined,
+  managesAgents: boolean,
+) => ownerOf(card.agentId) === userId || managesAgents;
 
 /** An agent's proposal of a new agent (ADR 0081), or null. Unlike the Connect card, it keeps its state. */
 export function agentProposalOf(meta: Record<string, unknown> | null | undefined): AgentProposalCard | null {
@@ -196,7 +257,7 @@ function routineLine(
 }
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
-  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta) ?? usagePauseCardOf(meta);
+  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta) ?? usagePauseCardOf(meta) ?? costlyProposalOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;

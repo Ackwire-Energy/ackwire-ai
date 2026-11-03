@@ -325,21 +325,57 @@ describe("the pair row before the reply that asked (ConsultPairRow)", () => {
     expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
   });
 
-  test("the answer far below its question: one line where it arrived, 'Ver' opens the conversation", async () => {
+  test("the answer far below its question: the same pair row where it arrived, opening the conversation", async () => {
     const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
     await open(talkAfter(withTalk(withAsk([c], true), c), 3));
-    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
-    const line = [...document.querySelectorAll(".cn-line")].find((l) =>
-      l.textContent?.includes("Atlas respondeu à pergunta da Ada"),
-    ) as HTMLElement;
-    expect(line).toBeTruthy();
-    // Each agent with its face before its name.
-    expect([...line.querySelectorAll(".ac-who b")].map((b) => b.textContent)).toEqual(["Atlas", "Ada"]);
-    await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Ver" })));
+    const rows = [...document.querySelectorAll(".consult-pair")] as HTMLElement[];
+    expect(rows).toHaveLength(2);
+    const far = rows.find((r) => r.parentElement?.getAttribute("data-message-id") === "msg-notice") as HTMLElement;
+    expect([...far.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(far.textContent).not.toContain("subiu 6 pb");
+    expect(document.body.textContent).not.toContain("respondeu à pergunta");
+    await act(async () => fireEvent.click(far.querySelector("button") as HTMLElement));
     await settle(3);
     // The two agents' conversation over the channel: the question and the whole answer.
     expect(panel()?.textContent).toContain(QUESTION);
     expect(panel()?.textContent).toContain("subiu 6 pb");
+  });
+
+  test("an agent @named outside the conversation got it by direct message: the pair row on the reach line, no 'Entregue ao', not twice", async () => {
+    const relayed = `[@ada mentioned you in #engenharia, where you aren't a member, so it reaches you here]\n\n${QUESTION}`;
+    const c = consultation({ kind: "note", question: relayed });
+    const state = withTalk(withAsk([c]), c);
+    const ask = state.messages.find((m) => m.id === "msg-asked");
+    if (ask)
+      ask.meta = { reach: [{ agentId: ATLAS_ID, handle: "atlas", reason: "not_in_channel", consultationId: "q1" }] };
+    await open(state);
+    expect(document.body.textContent).not.toContain("Entregue ao");
+    // The reply's own row leaves it to the reach line: one row for the hand-off.
+    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
+    const reach = screen().getByRole("group", { name: "Quem a mensagem não chamou direto" });
+    const r = reach.querySelector(".consult-pair") as HTMLElement;
+    expect([...r.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(r.querySelector(".consult-pair__word")?.textContent).toBe("trabalhando");
+    await act(async () => fireEvent.click(r.querySelector("button") as HTMLElement));
+    await settle(3);
+    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
+    expect(panel()?.textContent).not.toContain("mentioned you");
+  });
+
+  test("a hand-off older than the conversation's list goes back is still the pair row, never 'Entregue ao'", async () => {
+    const c = consultation({ kind: "note", status: "answered", answer: ANSWER, answeredAt: ago(5) });
+    // The list holds only the latest questions: this one is loaded on its own.
+    const state = withTalk(withAsk([]), c);
+    const ask = state.messages.find((m) => m.id === "msg-asked");
+    if (ask)
+      ask.meta = { reach: [{ agentId: ATLAS_ID, handle: "atlas", reason: "not_in_channel", consultationId: "q1" }] };
+    await open(state);
+    await settle(3);
+    expect(document.body.textContent).not.toContain("Entregue ao");
+    const reach = screen().getByRole("group", { name: "Quem a mensagem não chamou direto" });
+    const r = reach.querySelector(".consult-pair") as HTMLElement;
+    expect([...r.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
   });
 
   test("without questions the reply has no row before it; the notice draws its own, with no answer in it", async () => {

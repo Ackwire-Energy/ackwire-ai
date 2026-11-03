@@ -168,6 +168,31 @@ export const AgentAudience = z
   })
   .openapi("AgentAudience");
 
+/** An agent's autonomy brakes (ADR 0131): what it may start that nobody asked for directly, and whom it may call. */
+export const AgentBrakes = z
+  .object({
+    costly: z.enum(["ask", "go"]).openapi({
+      description:
+        "Costly work nobody asked for directly (opening a PR, installing packages, a long job): `ask` proposes it to a person first, `go` does it.",
+    }),
+    go: z.array(z.enum(["pr", "install", "long"])).openapi({ description: "Kinds a person said always to." }),
+    never: z.array(z.enum(["pr", "install", "long"])).openapi({ description: "Kinds a person said never to." }),
+    maxUnrequested: z.number().int().min(1).max(20).openapi({ description: "Unrequested jobs it may run at once." }),
+    maxPrsPerHour: z
+      .number()
+      .int()
+      .min(0)
+      .max(50)
+      .openapi({ description: "PRs its unrequested work may open in an hour." }),
+    callAgents: z.enum(["all", "some", "none"]).openapi({ description: "Which agents it may wake or hand work to." }),
+    callAgentIds: z.array(z.uuid()).max(200).openapi({ description: "With `some`: those agents." }),
+    project: z.string().max(80).openapi({
+      description: "Its project (a repository, a product): agents of different projects don't call each other.",
+    }),
+    otherProjects: z.boolean().openapi({ description: "It may call agents of other projects too." }),
+  })
+  .openapi("AgentBrakes");
+
 export const AgentAppearance = z
   .object({
     color: z.union([
@@ -264,9 +289,10 @@ export const Agent = z
       description:
         "It coordinates the team (ADR 0093): a message that needs an agent and that no other agent took goes to it, in the channels where it answers on its own. One per workspace.",
     }),
+    brakes: AgentBrakes,
     brain: z
       .object({
-        kind: z.enum(["model", "claude_code", "codex", "cursor"]),
+        kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode"]),
         model: z
           .string()
           .nullable()
@@ -597,7 +623,7 @@ export const Model = z
   .openapi("Model");
 
 /** ADR 0032: who thinks for an agent. */
-export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor"]).openapi("BrainKind");
+export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor", "opencode"]).openapi("BrainKind");
 
 export const BrainOption = z
   .object({
@@ -607,7 +633,6 @@ export const BrainOption = z
       .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
       .optional()
       .openapi({ description: "Why it can't be chosen now (computer brains)." }),
-    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex and Cursor.' }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),
@@ -623,6 +648,10 @@ export const BrainOption = z
           .boolean()
           .optional()
           .openapi({ description: "Cursor: its CLI said the person's plan includes it (others cost API prices)." }),
+        free: z
+          .boolean()
+          .optional()
+          .openapi({ description: "OpenCode: a model of OpenCode's free tier (no key, no cost)." }),
       }),
     ),
     defaultModel: z.string().nullable(),

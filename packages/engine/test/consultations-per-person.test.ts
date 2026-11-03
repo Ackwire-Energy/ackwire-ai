@@ -122,6 +122,25 @@ describe("tell_agent", () => {
     expect(await notes()).toHaveLength(2);
   });
 
+  test("each routine run is a new event: its note goes out again, and repeats within that run are still dropped", async () => {
+    f = await setup({ askAgent: true });
+    await addInfra();
+    const routineRun = async () => {
+      const ctx = await devRunFor(f.owner.id, "Webhook called: ask @infra to post works in #general");
+      await f.db.update(schema.agentRuns).set({ background: true }).where(eq(schema.agentRuns.id, ctx.runId));
+      return { ...ctx, background: true };
+    };
+    const tell = (ctx: ToolContext) =>
+      invoke(ctx, "tell_agent", { agent: "@infra", message: "Post works in #general." });
+    const first = await routineRun();
+    expect(await tell(first)).toMatchObject({ output: { content: expect.stringContaining("Handed to @infra") } });
+    const second = await routineRun();
+    expect(await tell(second)).toMatchObject({ output: { content: expect.stringContaining("Handed to @infra") } });
+    expect(await tell(second)).toMatchObject({ output: { data: { agentNote: { duplicate: true } } } });
+    const notes = await f.db.select().from(schema.messages).where(sql`${schema.messages.meta} ? 'agentNote'`);
+    expect(notes).toHaveLength(2);
+  });
+
   test("the same note again after it couldn't be done or was never worked on goes out; one still out doesn't", async () => {
     f = await setup({ askAgent: true });
     await addInfra();

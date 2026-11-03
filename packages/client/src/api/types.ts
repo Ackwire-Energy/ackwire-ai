@@ -559,7 +559,39 @@ export interface Agent {
    * workspace allows. Absent: on (the default).
    */
   mediaReplies?: boolean;
+  /** Its autonomy brakes (ADR 0131); absent from an older server (the defaults). */
+  brakes?: AgentBrakes;
 }
+
+/** A costly step unrequested work needs a person's go for (ADR 0131 §3). */
+export type CostKind = "pr" | "install" | "long";
+
+/** What an agent may start that nobody asked for directly, and which agents it may call (ADR 0131). */
+export interface AgentBrakes {
+  /** Costly work nobody asked for: `ask` proposes it first, `go` does it. */
+  costly: "ask" | "go";
+  go: CostKind[];
+  never: CostKind[];
+  maxUnrequested: number;
+  maxPrsPerHour: number;
+  callAgents: "all" | "some" | "none";
+  callAgentIds: string[];
+  project: string;
+  otherProjects: boolean;
+}
+
+/** The brakes an agent has when none were set (`autonomySettings`' defaults on the server). */
+export const BRAKES_DEFAULTS: AgentBrakes = {
+  costly: "ask",
+  go: [],
+  never: [],
+  maxUnrequested: 2,
+  maxPrsPerHour: 3,
+  callAgents: "all",
+  callAgentIds: [],
+  project: "",
+  otherProjects: false,
+};
 
 /** An agent no longer in the team (archived or deleted): what its messages and reports still show. */
 export interface FormerAgent {
@@ -654,14 +686,25 @@ export interface AgentInput {
   mediaReplies?: boolean;
   /** The Autonomia it starts with (the last setup's, ADR 0094): only an admin or its own owner sends it. */
   autonomy?: CommandApproval;
+  /** Editing only: its autonomy brakes (ADR 0131); the fields given change. */
+  brakes?: Partial<AgentBrakes>;
 }
+
+/** A person's answer to an agent's proposal of costly work nobody asked for (ADR 0131 §3). */
+export type CostlyDecision = "go" | "not_now" | "never" | "always";
 
 /**
  * The AI a proposed agent starts with (ADR 0081): an account of the person it was proposed for that thinks for
  * no agent, else the workspace's model (it has a key), else none (connected after it is created).
  */
 export type SuggestedAi =
-  | { kind: "account"; brain: "claude_code" | "codex" | "cursor"; machineId: string; accountId: string; label: string }
+  | {
+      kind: "account";
+      brain: "claude_code" | "codex" | "cursor" | "opencode";
+      machineId: string;
+      accountId: string;
+      label: string;
+    }
   | { kind: "model" }
   | { kind: "none" };
 
@@ -1618,6 +1661,10 @@ export interface Memory {
   learned?: boolean;
   /** A how-to it worked out. */
   howTo?: boolean;
+  /** One plain line to show first; `text` holds the detail. */
+  summary?: string | null;
+  /** Its own how-tos, lessons and notes ("Como ela trabalha"): no receipt in the chat. */
+  playbook?: boolean;
   /** Another memory says otherwise, until a person decides. */
   disputed?: boolean;
   /** Where it was learned. */
@@ -2071,6 +2118,8 @@ export interface CustomServer {
   /** Why its tools couldn't be read the last time they were listed (short); null or absent when they were. */
   toolsError?: string | null;
   tools: CustomTool[];
+  /** What routines can wait on from it (ADR 0130). Older servers leave it out. */
+  events?: RoutineConnectorTrigger["event"][];
   /** Last time an admin saved the classification; null = never (nothing exposed). */
   reviewedAt: string | null;
   createdAt: string;
@@ -2904,7 +2953,22 @@ export type RoutineTrigger =
   /** A one-off (reminders, "amanhã às 9h"): fires once at `at`, then the routine is inactive. */
   | { type: "once"; at: string; timezone: string; description: string }
   | RoutineEmailTrigger
-  | RoutineWebhookTrigger;
+  | RoutineWebhookTrigger
+  | RoutineConnectorTrigger;
+
+/** A connector's event (ADR 0130): "Quando chegar um e-mail no MillionSend", from an inbox or all of them. */
+export interface RoutineConnectorTrigger {
+  type: "connector";
+  connectionId: string;
+  event: "millionsend.email.received";
+  /** Null: every inbox of the team. */
+  inboxId: string | null;
+  /** `to`: the inbox's address ("Quando chegar um e-mail em vendas@…"). */
+  filter: Pick<RoutineEmailFilter, "from" | "subject"> & { to?: string };
+  /** `error`: the service refused the webhook (`lastError`); saving the routine again retries. */
+  status: "active" | "error";
+  lastError: string | null;
+}
 
 /**
  * "Quando o webhook for chamado" (ADR 0106): a call to the routine's own address starts it. `url` only for who may
@@ -2914,7 +2978,12 @@ export interface RoutineWebhookTrigger {
   type: "webhook";
   url: string | null;
   signed: boolean;
+  /** The HTTP methods its address answers (POST by default; GET passes its query string as the run's data). */
+  methods: RoutineHookMethod[];
 }
+
+export const ROUTINE_HOOK_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
+export type RoutineHookMethod = (typeof ROUTINE_HOOK_METHODS)[number];
 
 /** How a call to a routine's address ended: `duplicate` repeated an idempotency key within 24 hours. */
 export type RoutineHookOutcome = "accepted" | "duplicate" | "bad_signature" | "too_large" | "rate_limited";
@@ -2936,6 +3005,7 @@ export interface RoutineHookCall {
 export interface RoutineHook {
   url: string;
   signed: boolean;
+  methods: RoutineHookMethod[];
   calls: RoutineHookCall[];
 }
 
@@ -3125,7 +3195,8 @@ export interface RoutineInput {
     | { type: "event"; event: RoutineEvent }
     | { type: "once"; at: string; timezone?: string }
     | Omit<RoutineEmailTrigger, "status">
-    | { type: "webhook" };
+    | { type: "webhook"; methods?: RoutineHookMethod[] }
+    | Omit<RoutineConnectorTrigger, "status" | "lastError">;
   /** Ignored: every routine acts (ADR 0109). */
   access?: RoutineAccess;
   /** Default `when_new` ("Só quando tiver novidade"). */
@@ -3534,7 +3605,7 @@ export interface MachinePause {
 }
 
 /** A tool the person turns on or off on the machine. */
-export type MachineToolName = "claude" | "codex" | "cursor" | "commands";
+export type MachineToolName = "claude" | "codex" | "cursor" | "opencode" | "commands";
 
 /** A folder allowed on the machine and the agents (ids) that may use it; empty: allowed, no agent yet. */
 export interface MachineFolderGrant {
@@ -3549,9 +3620,11 @@ export interface MachineAccess {
    * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
    * `terminal` (ADR 0058): the agents' desktops and terminals; absent before protocol 18 (off).
    */
-  tools: Record<Exclude<MachineToolName, "cursor">, boolean> & {
+  tools: Record<Exclude<MachineToolName, "cursor" | "opencode">, boolean> & {
     /** Protocol 36 (ADR 0114): Cursor's CLI; absent on older runners, where it follows Codex's. */
     cursor?: boolean;
+    /** Protocol 39 (ADR 0132): OpenCode's CLI; absent on older runners, where it follows Codex's. */
+    opencode?: boolean;
     browser?: boolean;
     desktop?: boolean;
     terminal?: boolean;
@@ -3596,7 +3669,7 @@ export interface DesktopRelease {
 }
 
 /** A computer brain that runs on a connected machine. */
-export type ComputerBrain = "claude_code" | "codex" | "cursor";
+export type ComputerBrain = "claude_code" | "codex" | "cursor" | "opencode";
 
 /** An agent waiting for an offline computer, and what it has waiting. */
 export interface OutageAgent {
@@ -4535,7 +4608,7 @@ export interface PlanItem {
   note?: string;
 }
 
-/** Who programs a mission: Claude Code, Codex (experimental) or the agent itself with its own tools. */
+/** Who programs a mission: Claude Code, Codex or the agent itself with its own tools. */
 export type MissionExecutor = "claude" | "codex" | "agent";
 
 /**
@@ -4726,7 +4799,7 @@ export interface MissionSettings {
 }
 
 /** "Quem pensa" (ADR 0032): the API, or Claude Code / Codex on the agent's computer with a person's plan. */
-export type BrainKind = "model" | "claude_code" | "codex" | "cursor";
+export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode";
 
 /** Why a computer brain can't be chosen now. */
 export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
@@ -4741,14 +4814,14 @@ export interface BrainModelOption {
   contextWindow?: number;
   /** Cursor (ADR 0114): its CLI said the person's plan includes it; absent: it didn't say. */
   inPlan?: boolean;
+  /** OpenCode (ADR 0132): a model of OpenCode's free tier (no key, no cost). */
+  free?: boolean;
 }
 
 export interface BrainOption {
   kind: BrainKind;
   available: boolean;
   reason?: BrainUnavailable;
-  /** "Em teste" (Codex). */
-  experimental: boolean;
   models: BrainModelOption[];
   defaultModel: string | null;
 }
@@ -4809,7 +4882,7 @@ export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** A level, or "Automático" (each run picks low, medium or high with the model). */
 export type BrainEffortSetting = BrainEffort | "auto";
 
-export type MachineAccountKind = "claude_code" | "codex" | "cursor";
+export type MachineAccountKind = "claude_code" | "codex" | "cursor" | "opencode";
 
 /** ADR 0041 §3, ADR 0059: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {
@@ -4857,9 +4930,9 @@ export interface AiComputer {
   /** Its runner takes coding plans' keys. */
   keys: boolean;
   /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
-  shares?: { claude_code: boolean; codex: boolean; cursor?: boolean; key: boolean };
+  shares?: { claude_code: boolean; codex: boolean; cursor?: boolean; opencode?: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
-  brains: { claude_code: boolean; codex: boolean; cursor?: boolean };
+  brains: { claude_code: boolean; codex: boolean; cursor?: boolean; opencode?: boolean };
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the viewer connected (absent: a server
    * too old to say). Its plan and usage when the computer reported them.

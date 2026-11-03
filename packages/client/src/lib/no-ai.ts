@@ -50,7 +50,10 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
   const o = raw as Record<string, unknown>;
   if (typeof o.agentId !== "string") return null;
   const signedOut = o.reason === "not_signed_in";
-  const own = signedOut && (o.own === "claude_code" || o.own === "codex" || o.own === "cursor") ? o.own : null;
+  const own =
+    signedOut && (o.own === "claude_code" || o.own === "codex" || o.own === "cursor" || o.own === "opencode")
+      ? o.own
+      : null;
   return {
     agentId: o.agentId,
     forUserId: typeof o.forUserId === "string" ? o.forUserId : null,
@@ -68,15 +71,19 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
 export const opensByItself = (x: { intent?: string; autoOpen?: boolean }) =>
   x.autoOpen === true && (x.intent === "claude" || x.intent === "chatgpt" || x.intent === "api_key");
 
-/** The brain a plan thinks with, on the agent's computer: a Claude plan through Claude Code, ChatGPT's through Codex. */
-export const PLAN_BRAIN: Record<"claude" | "chatgpt" | "cursor", MachineAccountKind> = {
+/**
+ * The brain a plan thinks with, on the agent's computer: a Claude plan through Claude Code, ChatGPT's through Codex,
+ * OpenCode's (`zen`: its free tier or an OpenCode key, ADR 0132) through OpenCode's CLI.
+ */
+export const PLAN_BRAIN: Record<"claude" | "chatgpt" | "cursor" | "zen", MachineAccountKind> = {
   claude: "claude_code",
   chatgpt: "codex",
   cursor: "cursor",
+  zen: "opencode",
 };
 /** The plan a CLI signs in to by itself (`PLAN_BRAIN` the other way): ChatGPT's for Codex, Claude's for Claude Code. */
-export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" | "cursor" =>
-  kind === "codex" ? "chatgpt" : kind === "cursor" ? "cursor" : "claude";
+export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" | "cursor" | "zen" =>
+  kind === "codex" ? "chatgpt" : kind === "cursor" ? "cursor" : kind === "opencode" ? "zen" : "claude";
 
 type AiState = AiStatus["agents"][number]["state"];
 
@@ -86,16 +93,16 @@ export const aiStateOf = (status: AiStatus | undefined, agentId: string): AiStat
 
 /**
  * A plan a person signs in with, on the agent's computer: Claude's, ChatGPT's, Cursor's (a sign-in or its API key,
- * ADR 0114), or a coding plan's key.
+ * ADR 0114), OpenCode's (`zen`, its free tier or an OpenCode key, ADR 0132), or a coding plan's key.
  */
-export type PlanChoice = "claude" | "chatgpt" | "cursor" | PlanId;
+export type PlanChoice = "claude" | "chatgpt" | "cursor" | "zen" | PlanId;
 /** What the picker offers: a plan, or the workspace's API key. */
 export type AiChoice = PlanChoice | "key";
-/** Every picker's order: Claude (chosen first), ChatGPT, Cursor, then the coding plans. */
-export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", "cursor", ...PLAN_IDS];
-/** The account a plan signs in as: ChatGPT's through Codex, Cursor's through its CLI; the rest through Claude Code. */
+/** Every picker's order: Claude (chosen first), ChatGPT, Cursor, OpenCode, then the coding plans. */
+export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", "cursor", "zen", ...PLAN_IDS];
+/** The account a plan signs in as: ChatGPT's through Codex, Cursor's and OpenCode's through their CLIs; the rest through Claude Code. */
 export const kindOf = (choice: PlanChoice): MachineAccountKind =>
-  choice === "chatgpt" || choice === "cursor" ? PLAN_BRAIN[choice] : PLAN_BRAIN.claude;
+  choice === "chatgpt" || choice === "cursor" || choice === "zen" ? PLAN_BRAIN[choice] : PLAN_BRAIN.claude;
 /** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, Cursor's, else Claude's. */
 export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
   isPlanId(a.provider) ? a.provider : planOfKind(a.kind);
@@ -118,8 +125,9 @@ export interface ExistingSignIn {
   again?: string;
   email?: string | null;
 }
-/** A plan's maker mark (a `ProviderLogo` id): ChatGPT's is OpenAI's. */
-export const planMark = (choice: PlanChoice) => (choice === "chatgpt" ? "openai" : choice);
+/** A plan's maker mark (a `ProviderLogo` id): ChatGPT's is OpenAI's, OpenCode's CLI OpenCode's. */
+export const planMark = (choice: PlanChoice) =>
+  choice === "chatgpt" ? "openai" : choice === "zen" ? "opencode" : choice;
 /** A plan's short name, as its tile and its accounts say it: "Claude", "ChatGPT", "GLM Coding"… */
 export const planLabel = (t: TFunction, choice: PlanChoice) =>
   isPlanId(choice) ? CODING_PLANS[choice].label : t(`aiAccounts.connect.${kindOf(choice)}`);
@@ -219,7 +227,9 @@ export const firstAgent = <A extends { id: string }>(
 ) => agents.find((a) => a.id === asked) ?? agents.find((a) => !hasAi(a.id)) ?? agents[0];
 
 /** A plan signs in once per agent with the same account (`LOGIN_PER_AGENT`), so it can think for all of them. */
-export const signsInPerAgent = (choice: PlanChoice) => loginPerAgent(kindOf(choice), isPlanId(choice) ? choice : null);
+export const signsInPerAgent = (choice: PlanChoice) =>
+  // OpenCode's account is its key alone (`zen`), like a coding plan's.
+  loginPerAgent(kindOf(choice), isPlanId(choice) || choice === "zen" ? choice : null);
 
 /** A plan's row in a computer's `shares` (`AiComputer`): Claude's and ChatGPT's sign-ins, or a coding plan's key. */
 export const shareOf = (choice: PlanChoice): keyof NonNullable<AiComputer["shares"]> =>
@@ -237,6 +247,7 @@ export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState 
   const brain = agent?.brain;
   if (brain?.kind === "codex") return "chatgpt";
   if (brain?.kind === "cursor") return "cursor";
+  if (brain?.kind === "opencode") return "zen";
   if (brain?.kind === "claude_code") return isPlanId(brain.provider) ? brain.provider : "claude";
   return state === undefined || state === "no_ai" ? null : "key";
 }

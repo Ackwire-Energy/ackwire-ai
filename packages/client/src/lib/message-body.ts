@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
-import { autoUpdateText, workEndBody } from "./long-work";
+import { autoUpdateText, talkerStatusText, workEndBody } from "./long-work";
 import { mediaKindOf, mediaWord } from "./media";
 import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
@@ -67,7 +67,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
   const own =
-    signedOut && (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor") ? noAi.own : null;
+    signedOut &&
+    (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor" || noAi?.own === "opencode")
+      ? noAi.own
+      : null;
   if (own) {
     const brain = brainName(own);
     return t("chat.body.no_ai_not_signed_in", { brain, defaultValue: body });
@@ -87,6 +90,17 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   }
   // Long work's own update of a silent work (ADR 0121): what it does now, in the reader's words.
   if (code === "work_auto_update") return autoUpdateText(t, params);
+  // The autonomy brakes (ADR 0131): a working agent's status line, a proposal of costly work, the noise digest.
+  if (code === "talker_status") return talkerStatusText(t, params);
+  if (code === "autonomy_proposal")
+    return t(
+      `chat.body.autonomy_proposal.${params.cost === "install" || params.cost === "long" ? params.cost : "pr"}`,
+      {
+        defaultValue: body,
+      },
+    );
+  if (code === "autonomy_digest")
+    return `${t("chat.body.autonomy_digest", { count: Number(params.count) || 0, defaultValue: body })}\n${typeof params.lines === "string" ? params.lines : ""}`;
   // A work that didn't finish or was stopped: why or by whom, and its last update.
   if (code === "work_end_failed" || code === "work_end_canceled") return workEndBody(t, code, params, m.workEnd, body);
   // An older note about a plan's limit (sent as the computer brain being unavailable): the plan's words.

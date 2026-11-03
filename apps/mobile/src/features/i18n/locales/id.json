@@ -1064,6 +1064,7 @@
     "uses_other": "Dipakai {{count}} kali",
     "confirmed": "Dikonfirmasi oleh seseorang",
     "unconfirmed": "Belum dikonfirmasi",
+    "details": "Detail teknis",
     "before": "Sebelumnya tertulis: {{text}}",
     "fix": "Perbaiki",
     "forgetTitle": "Lupakan memori ini?",

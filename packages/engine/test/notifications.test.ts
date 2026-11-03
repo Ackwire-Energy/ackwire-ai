@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { type RealtimeEvent, userTopic } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   addAgentReaction,
   addChannelMember,
@@ -309,6 +309,43 @@ test("Concluídas lists what the person marked done for 30 days, the latest firs
   await markNotificationDone(at(31 * day), bia.id, f.org.id, ids.b ?? "", false);
   expect((await done()).items.map((n) => n.latest.text)).toEqual(["a"]);
   expect((await inbox(bia.id)).items.map((n) => n.latest.text)).toEqual(["b"]);
+});
+
+test("the backfill puts in Concluídas the kinds only a person closes, done before done_by_user", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const ago = (days: number) => new Date(Date.now() - days * 24 * 3600_000);
+  const rows: [string, string, Date | null][] = [
+    ["mention", "mention", ago(2)],
+    ["reaction", "reaction", ago(3)],
+    ["thread_reply", "thread", ago(1)],
+    ["dm", "dm", ago(4)],
+    ["mention", "old", ago(31)],
+    ["mention", "open", null],
+    // Auto-resolved kinds stay out: the person never marked them done.
+    ["agent_question", "answered", ago(1)],
+    ["agent_reply", "seen", ago(1)],
+  ];
+  for (const [kind, text, doneAt] of rows)
+    await f.db.insert(schema.notifications).values({
+      orgId: f.org.id,
+      userId: bia.id,
+      kind,
+      groupKey: `${kind}:${text}`,
+      latest: { text },
+      doneAt,
+      readAt: doneAt,
+    });
+
+  const file = await Bun.file(
+    new URL("../../db/migrations/0187_notifications_done_backfill.sql", import.meta.url),
+  ).text();
+  await f.db.execute(sql.raw(file));
+  await f.db.execute(sql.raw(file));
+
+  const done = await listNotifications(deps(), bia.id, f.org.id, { filter: "done" });
+  expect(done.items.map((n) => n.latest.text)).toEqual(["thread", "mention", "reaction", "dm"]);
+  expect((await inbox(bia.id)).items.map((n) => n.latest.text)).toEqual(["open"]);
 });
 
 test("Mover de volta while a newer unread row of the same thread is open brings it back read", async () => {

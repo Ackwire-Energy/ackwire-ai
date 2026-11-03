@@ -123,9 +123,26 @@ const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
 };
 
 describe("Notificações", () => {
+  test("how many are unread is on the title's row from the first paint, before the list arrives", async () => {
+    const state = seedState({
+      notifications: [notification({ id: "n-a", kind: "mention" }), notification({ id: "n-b", kind: "mention" })],
+    });
+    const api = createFakeApi(state);
+    // The list never answers: only the count the sidebar loads at start is there.
+    api.notifications.list = () => new Promise(() => {});
+    await renderApp(`/org/${ORG_ID}/notifications`, { api });
+    await settle(4);
+    const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
+    expect(title.parentElement?.className).toBe("nt-title");
+    expect(title.nextElementSibling?.textContent).toContain("2 não lidas");
+  });
+
   test("waiting on top with the agent looking up, the rest by day, filters with counts, the badge and the tab title", async () => {
     await go();
-    expect(screen().getByRole("heading", { level: 1, name: "Notificações" })).toBeTruthy();
+    const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
+    // How many are unread: on the title's row, right after it.
+    expect(title.parentElement?.className).toBe("nt-title");
+    expect(title.nextElementSibling?.textContent).toContain("3 não lidas");
     const waiting = screen().getByRole("region", { name: "Esperando você" });
     expect(waiting.textContent).toContain("Ada está parada até você responder.");
     expect(waiting.textContent).toContain(question.text);
@@ -576,7 +593,7 @@ describe("its computer is ready: what comes next", () => {
     expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
   });
 
-  test("a plain click opens Connect an AI while no agent has one; then it picks the row, its actions in reach", async () => {
+  test("a plain click opens Connect an AI while no agent has one; then the computer's page, and on a phone it picks the row first", async () => {
     const ready = () => notification({ id: "n-ready", kind: "computer_ready", source: { machineId: "m-9" } });
     const noAi = { any: false, agents: [{ agentId: ADA_ID, state: "no_ai" as const, reason: "no_key" as const }] };
     const state = seedState({ notifications: [ready()], aiStatus: noAi });
@@ -595,20 +612,36 @@ describe("its computer is ready: what comes next", () => {
     ]);
     cleanup();
 
-    // An agent thinks already: the click picks the row as any row's does, so Feito and Lembrar depois (shown by that
-    // tap on a phone) stay one tap away; Abrir still goes to the computer's page.
-    const other = await go(seedState({ notifications: [ready()] }));
+    // An agent thinks already: on a wide screen the click opens the computer's page, as Abrir does.
+    const wide = await go(seedState({ notifications: [ready()] }));
     await click(row());
     await settle(4);
-    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
-    expect(row().classList.contains("is-cur")).toBe(true);
-    expect(other.state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args)).toEqual([
-      [ORG_ID, "n-ready", true],
-    ]);
-    for (const name of ["Feito", "Lembrar depois"]) expect(within(row()).getByRole("button", { name })).toBeTruthy();
-    await click(within(row()).getByRole("button", { name: "Abrir" }));
-    await settle(4);
-    expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    expect(wide.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    cleanup();
+
+    // On a phone the first tap picks the row as any row's does, so Feito and Lembrar depois (shown by that tap) stay
+    // in reach; Abrir still goes to the computer's page.
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      query === "(max-width: 720px)"
+        ? ({ matches: true, media: query } as MediaQueryList)
+        : matchMedia.call(window, query)) as typeof window.matchMedia;
+    try {
+      const other = await go(seedState({ notifications: [ready()] }));
+      await click(row());
+      await settle(4);
+      expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+      expect(row().classList.contains("is-cur")).toBe(true);
+      expect(other.state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args)).toEqual([
+        [ORG_ID, "n-ready", true],
+      ]);
+      for (const name of ["Feito", "Lembrar depois"]) expect(within(row()).getByRole("button", { name })).toBeTruthy();
+      await click(within(row()).getByRole("button", { name: "Abrir" }));
+      await settle(4);
+      expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
+    } finally {
+      window.matchMedia = matchMedia;
+    }
   });
 
   test("its face's top is its headline's line's, and a headline alone sits in the middle of the face", async () => {

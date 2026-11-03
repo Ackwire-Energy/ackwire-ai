@@ -12,7 +12,8 @@ afterEach(() => cleanup());
 
 const EXECUTOR = "COMPOSIO_MULTI_EXECUTE_TOOL";
 const TITLE = "Composio: GITHUB_CREATE_AN_ISSUE_COMMENT";
-const HINT = "Aprova este e os próximos iguais da Ada: Criar comentário da issue (Github), com qualquer valor.";
+const HINT =
+  "Cobre Criar comentário da issue (Github), de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.";
 
 /** The seed's first request (Ada's card in #eng) as one through Composio's executor, which offers "Aprovar sempre". */
 function withComposio(state = seedState()) {
@@ -33,21 +34,27 @@ const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
   await settle(4);
 };
-/** In the conversation, "Aprovar sempre" and what it covers live behind the request card's "Ver detalhes". */
 const seeDetails = (card: HTMLElement) => click(within(card).getByRole("button", { name: "Ver detalhes" }));
 const approveCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "approvals.approve").map((c) => c.args);
 
 describe("Aprovar sempre on a request", () => {
-  test("in the conversation: the button and what it covers; it approves for good and says where to undo", async () => {
+  test("in the conversation, on the card's face: the button, what it covers and where to undo it", async () => {
     const state = withComposio();
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
-    expect(card.textContent).not.toContain(HINT);
-    await seeDetails(card);
+    // Beside Aprovar and Agora não, without opening Ver detalhes.
+    expect(card.querySelector(".rq__details")).toBeNull();
     expect(card.textContent).toContain(HINT);
     expect(card.querySelector(".ap-always")?.getAttribute("title")).toBe("GITHUB_CREATE_AN_ISSUE_COMMENT");
+    // One row under the text, in this order, and what it covers on its own line under them.
+    const foot = card.querySelector(".rq__foot") as HTMLElement;
+    expect([...foot.querySelectorAll(":scope > button")].map((b) => b.textContent).slice(1)).toEqual([
+      "Aprovar sempre",
+      "Agora não",
+    ]);
+    expect(foot.querySelector(":scope > .ap-always")).not.toBeNull();
     await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
     expect(screen().getByRole("group", { name: "Aprovação concluída" })).toBeTruthy();
@@ -63,6 +70,30 @@ describe("Aprovar sempre on a request", () => {
         .getByRole("tab", { name: /^Ferramentas e acesso/ })
         .getAttribute("aria-selected"),
     ).toBe("true");
+  });
+
+  test("a SQL read: Aprovar sempre leituras on the face, for that project's reads only", async () => {
+    const state = seedState();
+    const first = state.approvals[0];
+    if (!first) throw new Error("no approval");
+    Object.assign(first, {
+      tool: "supabase_execute_sql",
+      scope: "custom:conn-db:approval",
+      title: "Supabase: Execute sql",
+      detail: "execute_sql · project_id=proj-a · query=select count(*) from orders",
+      connector: "custom:conn-db",
+      params: { project_id: "proj-a", query: "select count(*) from orders" },
+      approveAlways: { tool: "execute_sql", actions: ["sql-read:project_id=proj-a"] },
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(4);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.textContent).toContain(
+      "Cobre só leituras de Executar sql, neste projeto (project_id=proj-a), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da Ada.",
+    );
+    expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
+    await click(within(card).getByRole("button", { name: "Aprovar sempre leituras" }));
+    expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
   });
 
   test("a request that doesn't offer it shows no button, and approving it once stays as it was", async () => {
@@ -85,7 +116,11 @@ describe("Aprovar sempre on a request", () => {
     await settle(4);
     const card = screen().getByRole("article", { name: TITLE });
     expect(card.textContent).toContain(HINT);
-    expect(within(card).getByRole("button", { name: "Aprovar sempre" })).toBeTruthy();
+    expect(
+      [...(card.querySelector(".ap-card__actions")?.querySelectorAll(":scope > button") ?? [])]
+        .map((b) => b.textContent)
+        .slice(1),
+    ).toEqual(["Aprovar sempre", "Recusar", "Detalhes"]);
     const risky = screen().getByRole("article", { name: "Run deploy workflow" });
     expect(within(risky).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     await click(within(card).getByRole("button", { name: "Detalhes" }));
@@ -93,6 +128,26 @@ describe("Aprovar sempre on a request", () => {
     expect(dialog.textContent).toContain(HINT);
     await click(within(dialog).getByRole("button", { name: "Aprovar sempre" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
+  });
+
+  test("on a run: approves the like ones waiting beside it, never the same tool on another connection", async () => {
+    const state = withComposio();
+    const [first] = state.approvals;
+    if (!first) throw new Error("no approval");
+    const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+    state.approvals.splice(
+      0,
+      1,
+      { ...first, id: "ap-c1", createdAt: at(4) },
+      { ...first, id: "ap-c2", createdAt: at(3) },
+      { ...first, id: "ap-c3", tool: `composio2_${EXECUTOR}`, createdAt: at(2) },
+    );
+    await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(state) });
+    await settle(4);
+    const run = document.querySelector(".ap-run") as HTMLElement;
+    await click(within(run).getByRole("button", { name: "Aprovar sempre" }));
+    expect(approveCalls(state)).toEqual([[ORG_ID, "ap-c1", undefined, true]]);
+    expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([ORG_ID, ["ap-c2"], "approve"]);
   });
 });
 
@@ -206,8 +261,9 @@ describe("git requests", () => {
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.textContent).toContain("Enviar para ana/fix em acme/app (24 h, sem force push)");
-    await seeDetails(card);
-    expect(card.textContent).toContain("Aprova este e os próximos iguais da Ada: enviar para ana/fix em acme/app.");
+    expect(card.textContent).toContain(
+      "Cobre enviar para ana/fix em acme/app, de agora em diante. Para desfazer: Ferramentas e acesso, na página da Ada.",
+    );
     expect(card.textContent).not.toContain("com qualquer valor");
     await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);

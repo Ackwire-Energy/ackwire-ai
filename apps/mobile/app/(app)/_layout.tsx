@@ -177,6 +177,7 @@ function AppStack() {
       />
       {/* A bare link to a browser request: finds its conversation and replaces itself with it. */}
       <Stack.Screen name="handoff/[id]" options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }} />
+      <Stack.Screen name="link" options={{ animation: "none", contentStyle: { backgroundColor: colors.bg } }} />
       <Stack.Screen
         name="file/[id]"
         options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}

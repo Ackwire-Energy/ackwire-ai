@@ -226,6 +226,49 @@ export function openEnded(slug: string): boolean {
 }
 
 /**
+ * Servers known to run Postgres, by their preset (`presets.ts`), each with its tool that runs the SQL in one
+ * argument. `provenReadOnly` reads SQL as Postgres does: another engine reads it otherwise (MySQL runs what Postgres
+ * takes for a `/*!…` comment, and a backslash in a string ends it there), so only Postgres is ever offered.
+ */
+const POSTGRES_SQL_TOOLS: Record<string, Record<string, string>> = {
+  supabase: { execute_sql: "query" },
+  "supabase-readonly": { execute_sql: "query" },
+  neon: { run_sql: "sql" },
+};
+/** A custom server's tools that run SQL by their usual names (the reference Postgres server's `query`). */
+const SQL_TOOLS: Record<string, string> = { execute_sql: "query", run_sql: "sql", query: "sql" };
+const POSTGRES = /postgres/i;
+const OTHER_ENGINES =
+  /mysql|maria|sql ?server|mssql|t-sql|sqlite|oracle|bigquery|snowflake|clickhouse|duckdb|redshift|databricks|trino|presto|athena|cockroach|tidb|spanner/i;
+
+/**
+ * The argument holding the SQL a server's tool runs on Postgres (Supabase's `execute_sql`: `query`), or null: a
+ * preset's tool from `POSTGRES_SQL_TOOLS`; on a custom server, a tool whose own description says Postgres and names
+ * no other engine, known by name (`SQL_TOOLS`) or whose name says SQL (or ends in query, GraphQL aside), with one
+ * string argument named `sql` or `query`.
+ */
+export function sqlArgOf(
+  tool: { name: string; description?: string; inputSchema?: { properties?: unknown } },
+  preset?: string | null,
+): string | null {
+  const props = (tool.inputSchema?.properties ?? {}) as Record<string, { type?: unknown } | undefined>;
+  const isText = (arg: string | undefined): arg is string => arg !== undefined && props[arg]?.type === "string";
+  if (preset) {
+    const arg = POSTGRES_SQL_TOOLS[preset]?.[tool.name];
+    return isText(arg) ? arg : null;
+  }
+  const said = tool.description ?? "";
+  if (!POSTGRES.test(said) || OTHER_ENGINES.test(said)) return null;
+  const known = SQL_TOOLS[tool.name];
+  if (known) return isText(known) ? known : null;
+  const words = nameWords(tool.name);
+  const graph = words.some((w) => w === "graph" || w === "ql" || w === "graphql");
+  if (!words.includes("sql") && (words.at(-1) !== "query" || graph)) return null;
+  const args = ["sql", "query"].filter(isText);
+  return args.length === 1 ? (args[0] ?? null) : null;
+}
+
+/**
  * What an action named by its slug does (`GITHUB_LIST_PULL_REQUESTS`), when a tool runs it for us (Composio's
  * executor), by every word rather than the first verb: `sensitive` when any word sends, deletes or pays, in any
  * form (`SLACK_DELETES_A_MESSAGE_FROM_A_CHAT`); `read` only when the verb right after the app reads, no other word

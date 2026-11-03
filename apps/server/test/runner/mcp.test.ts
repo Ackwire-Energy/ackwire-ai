@@ -13,6 +13,7 @@ import {
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import {
+  ALWAYS_LOADED,
   claudeMcpConfig,
   claudePermissionSettings,
   cleanRules,
@@ -627,6 +628,7 @@ test("MCP JSON-RPC with the bridge's list: tools/list is the run's; a name it la
   const tools = [
     { name: "github_get_pr", description: "Read a PR", inputSchema: { type: "object", properties: {} } },
     { name: "get_context", description: "Search", inputSchema: { type: "object", properties: {} } },
+    { name: "react", description: "React", inputSchema: { type: "object", properties: {} } },
   ];
   const list = async () => tools;
   const init = await handleMcpMessage(
@@ -639,8 +641,32 @@ test("MCP JSON-RPC with the bridge's list: tools/list is the run's; a name it la
   const listed = (await handleMcpMessage({ jsonrpc: "2.0", id: 2, method: "tools/list" }, call, undefined, list)) as {
     result: { tools: { name: string; annotations?: unknown }[] };
   };
-  expect(listed.result.tools.map((t) => t.name)).toEqual(["github_get_pr", "get_context"]);
+  expect(listed.result.tools.map((t) => t.name)).toEqual(["github_get_pr", "get_context", "react"]);
   expect(listed.result.tools[1]?.annotations).toEqual({ readOnlyHint: true });
+  // Claude Code lists what agents reach for on their own; the rest wait behind its ToolSearch (token-trim B6).
+  const meta = listed.result.tools.map((t) => (t as { _meta?: unknown })._meta);
+  expect(meta).toEqual([undefined, undefined, { "anthropic/alwaysLoad": true }]);
+  // What an API brain never loads on demand either (token-trim B3): learning, skills, the wiki, teammates.
+  for (const name of [
+    "react",
+    "ask_user",
+    "remember",
+    "update_memory",
+    "forget",
+    "save_how_to",
+    "update_skill",
+    "load_skill",
+    "read_wiki_page",
+    "search_wiki",
+    "ask_agent",
+    "tell_agent",
+    "follow_up",
+    "work_in_background",
+    "web_search",
+    "find_tools",
+  ])
+    expect(ALWAYS_LOADED.has(name)).toBe(true);
+  for (const name of ["send_sticker", "set_status", "github_get_pr"]) expect(ALWAYS_LOADED.has(name)).toBe(false);
   const ran = await handleMcpMessage(
     { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "github_get_pr", arguments: {} } },
     call,

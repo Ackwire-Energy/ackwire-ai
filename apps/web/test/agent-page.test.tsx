@@ -682,7 +682,7 @@ describe("agent page: memory and proposals", () => {
   test("the side column is one link to how memory works", async () => {
     await go("?tab=memory");
     const link = screen().getByRole("link", { name: "Como a memória funciona" });
-    expect(link.getAttribute("href")).toBe("https://app.agentes.chat/help/memory?lang=pt-BR");
+    expect(link.getAttribute("href")).toBe("https://agentes.chat/pt/docs/memory");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     expect(link.closest(".agp-col")?.textContent).toBe("Como a memória funciona");
     const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
@@ -722,6 +722,29 @@ describe("agent page: memory and proposals", () => {
     expect(row.textContent).toContain("Não verificado");
     await click(within(row).getByRole("button", { name: "Esquecer" }));
     expect(state.memories.find((m) => m.id === mine.id)?.archived).toBe(true);
+  });
+
+  test("its own how-tos sit under how it works: the plain summary first, the technical text folded", async () => {
+    const state = seedState();
+    const mine = state.memories.find((m) => m.agentId === ADA_ID && !m.archived);
+    if (!mine) throw new Error("no memory");
+    Object.assign(mine, {
+      learned: true,
+      howTo: true,
+      playbook: true,
+      summary: "Como gravar senhas no Supabase sem expô-las",
+      text: "supabase secrets set KEY=… then read Deno.env.get in supabase/functions/_shared/env.ts",
+    });
+    await go("?tab=memory", state);
+    await click(
+      within(screen().getByRole("radiogroup", { name: "Tipo" })).getByRole("radio", { name: /Aprendizados/ }),
+    );
+    const list = screen().getByRole("list", { name: "Como a Ada trabalha" });
+    const row = within(list).getByText("Como gravar senhas no Supabase sem expô-las").closest("li") as HTMLElement;
+    const details = row.querySelector("details") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")?.textContent).toBe("Detalhes técnicos");
+    expect(details.textContent).toContain("supabase/functions/_shared/env.ts");
   });
 });
 

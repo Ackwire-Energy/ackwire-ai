@@ -4000,6 +4000,9 @@
   "noAi.notSignedIn.cursor": {
     "value": "Cursor isn't signed in on this computer. Connect a Cursor account on {{name}}'s page."
   },
+  "noAi.notSignedIn.opencode": {
+    "value": "OpenCode can't think on this computer. Connect an OpenCode key on {{name}}'s page."
+  },
   "noAi.card.connected": {
     "value": "Done: {{name}} has an AI now."
   },
@@ -4039,6 +4042,9 @@
   "connectAi.title.cursor": {
     "value": "Connect your Cursor plan"
   },
+  "connectAi.title.zen": {
+    "value": "Connect OpenCode"
+  },
   "connectAi.title.api_key": {
     "value": "Add an API key"
   },
@@ -4074,6 +4080,12 @@
   },
   "connectAi.plan.cursor.tiers": {
     "value": "Pro, Pro+, Ultra or Teams, or a Cursor API key"
+  },
+  "connectAi.plan.zen.title": {
+    "value": "OpenCode"
+  },
+  "connectAi.plan.zen.tiers": {
+    "value": "Free models, or your OpenCode key"
   },
   "connectAi.plan.zai.tiers": {
     "value": "Lite, Pro or Max"
@@ -4222,6 +4234,9 @@
   "connectAi.otherAccount.cursor": {
     "value": "Cursor signed in as {{email}}, not {{account}}. Sign out on Cursor's page and try again."
   },
+  "connectAi.otherAccount.opencode": {
+    "value": "OpenCode signed in as {{email}}, not {{account}}. Try again with the right key."
+  },
   "connectAi.useAnyway": {
     "value": "Use {{email}}"
   },
@@ -4263,6 +4278,117 @@
   },
   "keyGuard.send": {
     "value": "Send anyway"
+  },
+  "costlyCard.go": {
+    "value": "Go ahead"
+  },
+  "costlyCard.always": {
+    "value": "Always"
+  },
+  "costlyCard.notNow": {
+    "value": "Not now"
+  },
+  "costlyCard.never": {
+    "value": "Never"
+  },
+  "costlyCard.waiting": {
+    "value": "Waiting for the person responsible"
+  },
+  "costlyCard.you": {
+    "value": "You"
+  },
+  "costlyCard.decided.go": {
+    "value": "{{name}} said go ahead"
+  },
+  "costlyCard.decided.always": {
+    "value": "{{name}} said always for this"
+  },
+  "costlyCard.decided.not_now": {
+    "value": "{{name}} said not now"
+  },
+  "costlyCard.decided.never": {
+    "value": "{{name}} said never for this"
+  },
+  "brakes.title": {
+    "value": "Work nobody asked for"
+  },
+  "brakes.subtitle": {
+    "value": "What it starts on its own, from a routine, an alert or another agent. What a person asks is never held."
+  },
+  "brakes.costly": {
+    "value": "Ask before costly work"
+  },
+  "brakes.costlyHelp": {
+    "value": "Before opening a pull request, installing packages or a long job, it asks the person responsible."
+  },
+  "brakes.costlyAsk": {
+    "value": "Ask first"
+  },
+  "brakes.costlyGo": {
+    "value": "Just do it"
+  },
+  "brakes.cost.pr": {
+    "value": "opening pull requests"
+  },
+  "brakes.cost.install": {
+    "value": "installing packages"
+  },
+  "brakes.cost.long": {
+    "value": "long jobs"
+  },
+  "brakes.rememberedGo": {
+    "value": "Always: {{what}}"
+  },
+  "brakes.rememberedNever": {
+    "value": "Never: {{what}}"
+  },
+  "brakes.forget": {
+    "value": "Forget these answers"
+  },
+  "brakes.atOnce": {
+    "value": "Jobs at once"
+  },
+  "brakes.atOnceHelp": {
+    "value": "How many jobs nobody asked for it runs at the same time. The others wait their turn."
+  },
+  "brakes.prs": {
+    "value": "Pull requests an hour"
+  },
+  "brakes.prsHelp": {
+    "value": "The most its own work opens in an hour."
+  },
+  "brakes.call": {
+    "value": "Agents it may call"
+  },
+  "brakes.callHelp": {
+    "value": "Who it may mention or hand work to."
+  },
+  "brakes.callAll": {
+    "value": "All"
+  },
+  "brakes.callSome": {
+    "value": "Only these"
+  },
+  "brakes.callNone": {
+    "value": "None"
+  },
+  "brakes.project": {
+    "value": "Project"
+  },
+  "brakes.projectHelp": {
+    "value": "Agents of different projects don't call each other."
+  },
+  "brakes.projectPlaceholder": {
+    "value": "Mobile app"
+  },
+  "brakes.otherProjects": {
+    "value": "May call agents of other projects"
+  },
+  "brakes.peopleNote": {
+    "value": "These limits never hold what a person asks for."
+  },
+  "brakes.failed": {
+    "value": "Couldn't save. Try again."
   },
   "stretchCard.continued": {
     "value": "{{name}} let them go on · {{time}}"
@@ -4477,9 +4603,6 @@
   "reach.routine": {
     "value": "Routine {{name}}"
   },
-  "reach.see": {
-    "value": "See"
-  },
   "reach.add": {
     "value": "Add to channel"
   },
@@ -4585,6 +4708,9 @@
   },
   "agentActions.other": {
     "value": "Made a change"
+  },
+  "agentActions.copyWebhook": {
+    "value": "Copy webhook address"
   },
   "agentActions.issueFields.title": {
     "value": "the title"
@@ -5638,14 +5764,38 @@
       "other": "{{count}} waiting"
     }
   },
+  "approval.run.head": {
+    "value": {
+      "one": "{{count}} request from {{name}} to {{what}}",
+      "other": "{{count}} requests from {{name}} to {{what}}"
+    }
+  },
+  "approval.run.approve": {
+    "value": "Approve all"
+  },
+  "approval.run.show": {
+    "value": "See each one"
+  },
   "approval.always.button": {
     "value": "Always approve"
   },
-  "approval.always.hint": {
-    "value": "Approves this one and the next ones like it from {{name}}: {{actions}}, with any values."
+  "approval.always.reads": {
+    "value": "Always approve reads"
   },
-  "approval.always.hintTarget": {
-    "value": "Approves this one and the next ones like it from {{name}}: {{actions}}."
+  "approval.always.note": {
+    "value": "Covers {{actions}} from now on, with any values. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.noteTarget": {
+    "value": "Covers {{actions}} from now on. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.noteReads": {
+    "value": "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.noteReadsAll": {
+    "value": "Covers only reads by {{actions}} on this connection from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.readsRule": {
+    "value": "Reads by {{tool}}"
   },
   "approval.always.pushTo": {
     "value": "push to {{branch}} in {{repo}}"
@@ -7489,6 +7639,9 @@
   "agentPage.work.brain.add.title.cursor": {
     "value": "Add a Cursor account"
   },
+  "agentPage.work.brain.add.title.opencode": {
+    "value": "Add an OpenCode key"
+  },
   "agentPage.work.brain.add.stepOne.claude_code": {
     "value": "The account with your plan"
   },
@@ -7509,6 +7662,9 @@
   },
   "agentPage.work.brain.add.open.cursor": {
     "value": "Sign in with Cursor"
+  },
+  "agentPage.work.brain.add.opencodeFree": {
+    "value": "No key needed for OpenCode's free models. A key from OpenCode's console adds its paid ones."
   },
   "agentPage.work.brain.add.cursorFinish": {
     "value": "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself."
@@ -7569,6 +7725,9 @@
   },
   "agentPage.work.brain.add.duplicate.cursor": {
     "value": "Cursor signed in as {{account}}, an account you already connected. To use another, sign out on Cursor's page and try again."
+  },
+  "agentPage.work.brain.add.duplicate.opencode": {
+    "value": "That OpenCode key is already connected as {{account}}."
   },
   "agentPage.work.brain.add.startFailed": {
     "value": "No answer from {{computer}}. Try again in a moment."
@@ -8189,6 +8348,15 @@
   },
   "agentPage.memory.saved": {
     "value": "Saved. It counts as verified now."
+  },
+  "agentPage.memory.playbook": {
+    "value": "How {{name}} works"
+  },
+  "agentPage.memory.playbookNote": {
+    "value": "Ways of working it keeps for itself. They don't show in the chat. What it picked up from outside and never used again leaves on its own and stays in Archived."
+  },
+  "agentPage.memory.details": {
+    "value": "Technical details"
   },
   "agentPage.memory.skills": {
     "value": "Skills it made"
@@ -11061,6 +11229,15 @@
   "routines.webhook.hidden": {
     "value": "Only who can change the routine sees its address."
   },
+  "routines.webhook.methods": {
+    "value": "Accepted methods"
+  },
+  "routines.webhook.methodsHelp": {
+    "value": "The address answers only the methods checked. With GET, the URL's query parameters are the call's data."
+  },
+  "routines.webhook.methodsLine": {
+    "value": "Accepts {{methods}}."
+  },
   "routines.webhook.address": {
     "value": "Address"
   },
@@ -11092,7 +11269,7 @@
     "value": "On: only calls signed with the secret get through."
   },
   "routines.webhook.signedHelp": {
-    "value": "Send the HMAC-SHA256 of the body in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too."
+    "value": "Send the HMAC-SHA256 of the body (of a GET call: its query string, without the ?) in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too."
   },
   "routines.webhook.addSecret": {
     "value": "Require a signature"
@@ -12101,10 +12278,10 @@
     "value": "Claude Code plans and codes on the computer. {{name}} follows and relays."
   },
   "missions.executor.codex": {
-    "value": "Codex (experimental)"
+    "value": "Codex"
   },
   "missions.executor.codexText": {
-    "value": "Codex codes on the computer. Still being tested."
+    "value": "Codex codes on the computer."
   },
   "missions.executor.agent": {
     "value": "{{name}} (the agent itself)"
@@ -13485,9 +13662,6 @@
   "missions.settings.executor.agentText": {
     "value": "{{name}} does it, with his own tools.",
     "female": "{{name}} does it, with her own tools."
-  },
-  "missions.settings.executor.testing": {
-    "value": "Testing"
   },
   "missions.settings.executor.locked": {
     "value": "It can't change once the mission has started."
@@ -15421,6 +15595,9 @@
   "aiAccounts.connect.cursor": {
     "value": "Cursor"
   },
+  "aiAccounts.connect.opencode": {
+    "value": "OpenCode"
+  },
   "aiAccounts.connect.needs.keys": {
     "value": "Update agentes on the computer to use a plan's key"
   },
@@ -15437,6 +15614,9 @@
     "value": "Not ready on {{computer}} yet"
   },
   "aiAccounts.connect.needsCloud.cursor": {
+    "value": "Not ready on {{computer}} yet"
+  },
+  "aiAccounts.connect.needsCloud.opencode": {
     "value": "Not ready on {{computer}} yet"
   },
   "aiAccounts.connect.needsCloud.online": {
@@ -18934,6 +19114,9 @@
   "brain.line.cursor": {
     "value": "{{model}} on the Cursor plan"
   },
+  "brain.line.zen": {
+    "value": "{{model}} on OpenCode"
+  },
   "brain.line.coding": {
     "value": "{{model}} on {{plan}}"
   },
@@ -18945,6 +19128,9 @@
   },
   "brain.line.cursorOf": {
     "value": "{{model}} on {{owner}}'s Cursor plan"
+  },
+  "brain.line.zenOf": {
+    "value": "{{model}} on {{owner}}'s OpenCode"
   },
   "brain.line.codingOf": {
     "value": "{{model}} on {{owner}}'s {{plan}}"
@@ -18958,6 +19144,9 @@
   "brain.line.cursorAuto": {
     "value": "Cursor plan"
   },
+  "brain.line.zenAuto": {
+    "value": "OpenCode"
+  },
   "brain.line.codingAuto": {
     "value": "{{plan}}"
   },
@@ -18969,6 +19158,9 @@
   },
   "brain.line.cursorAutoOf": {
     "value": "{{owner}}'s Cursor plan"
+  },
+  "brain.line.zenAutoOf": {
+    "value": "{{owner}}'s OpenCode"
   },
   "brain.line.codingAutoOf": {
     "value": "{{owner}}'s {{plan}}"
@@ -18994,6 +19186,9 @@
   "brain.card.cursor": {
     "value": "Cursor"
   },
+  "brain.card.opencode": {
+    "value": "OpenCode"
+  },
   "brain.foot.api": {
     "value": "Through the API"
   },
@@ -19015,14 +19210,14 @@
   "brain.cursorText": {
     "value": "Uses the Cursor plan of whoever connected the computer."
   },
+  "brain.opencodeText": {
+    "value": "OpenCode's free models, or the OpenCode key of whoever connected the computer."
+  },
   "brain.cursorModel.inPlan": {
     "value": "In your Cursor plan"
   },
   "brain.cursorModel.apiPrice": {
     "value": "Billed by Cursor at API prices"
-  },
-  "brain.testing": {
-    "value": "Testing"
   },
   "brain.reasons.no_computer": {
     "value": "Choose a connected computer under Computer to use it."
@@ -19110,6 +19305,9 @@
   },
   "brain.summary.cursor": {
     "value": "Cursor · {{model}}"
+  },
+  "brain.summary.opencode": {
+    "value": "OpenCode · {{model}}"
   },
   "brain.summary.noFallback": {
     "value": "{{brain}}, no API fallback"
@@ -24403,6 +24601,9 @@
   "machines.access.tool.cursor": {
     "value": "Cursor"
   },
+  "machines.access.tool.opencode": {
+    "value": "OpenCode"
+  },
   "machines.access.tool.commands": {
     "value": "Commands"
   },
@@ -24417,6 +24618,9 @@
   },
   "machines.access.toolText.cursor": {
     "value": "Like Claude Code, with a Cursor account. Only in the allowed folders."
+  },
+  "machines.access.toolText.opencode": {
+    "value": "Like Claude Code, with OpenCode's free models or an OpenCode key. Only in the allowed folders."
   },
   "machines.access.toolText.commands": {
     "value": "Runs Terminal commands, like tests and builds."
@@ -26590,6 +26794,9 @@
   "work.autoUpdateNow": {
     "value": "Now: {{now}}."
   },
+  "work.statusReply": {
+    "value": "Still on it ({{duration}}). I'll read your message after this step."
+  },
   "work.status.one": {
     "value": "Working on: {{subject}}"
   },
@@ -26736,15 +26943,6 @@
   },
   "chat.consultGroup.waitingAgents": {
     "value": "{{name}} handed part of it on and is waiting to hear back"
-  },
-  "chat.consultGroup.answeredFar": {
-    "value": "{{to}} answered {{from}}'s question"
-  },
-  "chat.consultGroup.answeredRequestFar": {
-    "value": "{{to}} answered {{from}}'s request"
-  },
-  "chat.consultGroup.see": {
-    "value": "See"
   },
   "chat.consultPair.asking": {
     "value": "asking"
@@ -27002,6 +27200,15 @@
   },
   "chat.work.answered": {
     "value": "answered"
+  },
+  "chat.work.autoApproved": {
+    "value": "Approved automatically (always approved by {{name}})"
+  },
+  "chat.work.autoApprovedReads": {
+    "value": "Approved automatically (read always approved by {{name}})"
+  },
+  "chat.work.autoApprovedNobody": {
+    "value": "Approved automatically"
   },
   "chat.work.error": {
     "value": "error"
@@ -27554,6 +27761,24 @@
   },
   "chat.issueWork.agent": {
     "value": "With {{name}}"
+  },
+  "chat.body.autonomy_proposal.pr": {
+    "value": "Nobody asked for this directly. May I open a pull request?"
+  },
+  "chat.body.autonomy_proposal.install": {
+    "value": "Nobody asked for this directly. May I install these packages?"
+  },
+  "chat.body.autonomy_proposal.long": {
+    "value": "This is taking many steps, and nobody asked for it directly. May I keep going?"
+  },
+  "chat.body.autonomy_digest": {
+    "value": {
+      "one": "{{count}} alert looked known or harmless, so I didn't work on it:",
+      "other": "{{count}} alerts looked known or harmless, so I didn't work on them:"
+    }
+  },
+  "chat.body.autonomy_loop": {
+    "value": "I stopped working on this on my own. It came back {{count}} times in a day ({{title}}). Tell me how you want it handled."
   },
   "chat.body.mission_plan": {
     "value": "Plan for “{{title}}” on {{computer}}"
@@ -30004,6 +30229,18 @@
   },
   "agentComputer.phone.chooseOnWeb": {
     "value": "Choose it on agentes.chat, in Settings › Computers."
+  },
+  "routines.form.kind.connector": {
+    "value": "MillionSend email"
+  },
+  "mail.routine.whenMillionSend": {
+    "value": "When an email arrives in MillionSend"
+  },
+  "mail.routine.inboxAddress": {
+    "value": "Inbox address"
+  },
+  "mail.routine.inboxAddressHelp": {
+    "value": "Empty = any MillionSend inbox."
   },
   "taskManager.title": {
     "value": "Task manager"

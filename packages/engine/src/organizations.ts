@@ -18,6 +18,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type AppLocale, appLocale, isAppLocale, LOCALE_CODES } from "@agenteschat/i18n/locale";
+import { dropAgentRules } from "./approval-rules";
 import { revokeMemberApps } from "./apps/revoke";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
@@ -1115,6 +1116,12 @@ export async function removeMember(
           .where(and(eq(agents.orgId, orgId), eq(agents.ownerUserId, targetUserId)))
           .returning()
       : [];
+    await dropAgentRules(
+      tx,
+      orgId,
+      handed.map((a) => a.id),
+      { type: "person", id: actorId },
+    );
     const action = actorId === targetUserId ? "member.left" : "member.removed";
     await auditMember(tx, orgId, actorId, action, targetUserId, {
       role: target.role,

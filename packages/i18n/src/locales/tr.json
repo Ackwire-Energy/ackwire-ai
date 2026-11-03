@@ -1613,7 +1613,8 @@
     "notSignedIn": {
       "claude_code": "Claude Code bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Claude hesabı bağlayın.",
       "codex": "Codex bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir ChatGPT hesabı bağlayın.",
-      "cursor": "Cursor bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Cursor hesabı bağlayın."
+      "cursor": "Cursor bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Cursor hesabı bağlayın.",
+      "opencode": "OpenCode bu bilgisayarda düşünemiyor. {{name}} sayfasından bir OpenCode anahtarı bağlayın."
     },
     "card": {
       "connected": "Tamam: {{name}} artık bir yapay zekaya sahip.",
@@ -1633,6 +1634,7 @@
       "claude": "Claude planınızı bağlayın",
       "chatgpt": "ChatGPT planınızı bağlayın",
       "cursor": "Cursor planınızı bağlayın",
+      "zen": "OpenCode'u bağlayın",
       "api_key": "API anahtarı ekleyin"
     },
     "titleFor": "{{name}} için bir yapay zeka bağlayın",
@@ -1654,6 +1656,10 @@
       "cursor": {
         "title": "Cursor planınız",
         "tiers": "Pro, Pro+, Ultra veya Teams ya da bir Cursor API anahtarı"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "Ücretsiz modeller veya OpenCode anahtarınız"
       },
       "zai": {
         "tiers": "Lite, Pro veya Max"
@@ -1725,7 +1731,8 @@
     "otherAccount": {
       "claude_code": "Claude'da {{account}} değil, {{email}} ile giriş yapılmış. Claude sayfasında çıkış yapıp tekrar deneyin.",
       "codex": "ChatGPT'de {{account}} değil, {{email}} ile giriş yapılmış. ChatGPT sayfasında çıkış yapıp tekrar deneyin.",
-      "cursor": "Cursor'da {{account}} değil, {{email}} ile giriş yapılmış. Cursor sayfasında çıkış yapıp tekrar deneyin."
+      "cursor": "Cursor'da {{account}} değil, {{email}} ile giriş yapılmış. Cursor sayfasında çıkış yapıp tekrar deneyin.",
+      "opencode": "OpenCode {{account}} değil, {{email}} olarak oturum açtı. Doğru anahtarla tekrar deneyin."
     },
     "useAnyway": "{{email}} kullan",
     "assignFailed": "{{label}} hesabı bağlandı ama {{agent}} bu hesaba geçemedi.",
@@ -1743,6 +1750,51 @@
     "save": "Anahtar olarak kaydet",
     "remove": "Kaldır",
     "send": "Yine de gönder"
+  },
+  "costlyCard": {
+    "go": "Devam et",
+    "always": "Her zaman",
+    "notNow": "Şimdi değil",
+    "never": "Asla",
+    "waiting": "Sorumlu kişiyi bekliyor",
+    "you": "Sen",
+    "decided": {
+      "go": "{{name}} devam et dedi",
+      "always": "{{name}} bunun için her zaman dedi",
+      "not_now": "{{name}} şimdi değil dedi",
+      "never": "{{name}} bunun için asla dedi"
+    }
+  },
+  "brakes": {
+    "title": "Kimsenin istemediği iş",
+    "subtitle": "Bir rutin, bir uyarı veya başka bir ajan üzerine kendi başına başlattığı şeyler. Bir kişinin istediği hiçbir zaman bekletilmez.",
+    "costly": "Maliyetli işten önce sor",
+    "costlyHelp": "Pull request açmadan, paket kurmadan veya uzun bir işe başlamadan önce sorumlu kişiye sorar.",
+    "costlyAsk": "Önce sor",
+    "costlyGo": "Doğrudan yap",
+    "cost": {
+      "pr": "pull request açmak",
+      "install": "paket kurmak",
+      "long": "uzun işler"
+    },
+    "rememberedGo": "Her zaman: {{what}}",
+    "rememberedNever": "Asla: {{what}}",
+    "forget": "Bu cevapları unut",
+    "atOnce": "Aynı anda iş",
+    "atOnceHelp": "Kimsenin istemediği kaç işi aynı anda yapacağı. Diğerleri sırasını bekler.",
+    "prs": "Saatte pull request",
+    "prsHelp": "Kendi işinin bir saatte açabileceği en fazla sayı.",
+    "call": "Çağırabileceği ajanlar",
+    "callHelp": "Kimden bahsedebileceği veya kime iş devredebileceği.",
+    "callAll": "Hepsi",
+    "callSome": "Sadece bunlar",
+    "callNone": "Hiçbiri",
+    "project": "Proje",
+    "projectHelp": "Farklı projelerin ajanları birbirini çağırmaz.",
+    "projectPlaceholder": "Mobil uygulama",
+    "otherProjects": "Diğer projelerin ajanlarını çağırabilir",
+    "peopleNote": "Bu sınırlar bir kişinin istediğini asla bekletmez.",
+    "failed": "Kaydedilemedi. Tekrar dene."
   },
   "stretchCard": {
     "continued": "{{name}} devam etmelerine izin verdi · {{time}}",
@@ -1836,7 +1888,6 @@
     "routinePost": "<b>{{name}}</b> çağrılmadı: yalnızca bakıp haber veren bir rutin kimseyi uyandırmaz",
     "outside": "{{place}} değil",
     "routine": "{{name}} rutini",
-    "see": "Gör",
     "add": "Kanala ekle",
     "added": "{{name}} kanala katıldı.",
     "allow": "{{person}} onunla konuşabilsin",
@@ -1891,6 +1942,7 @@
       "updated": "<b>{{name}}</b> becerisini düzelttim"
     },
     "other": "Bir değişiklik yaptım",
+    "copyWebhook": "Webhook adresini kopyala",
     "issueFields": {
       "title": "başlığı",
       "description": "açıklamayı",
@@ -2299,10 +2351,20 @@
       "waitingCount_one": "{{count}} bekliyor",
       "waitingCount_other": "{{count}} bekliyor"
     },
+    "run": {
+      "head_one": "{{name}} adlı ajandan {{count}} istek: {{what}}",
+      "head_other": "{{name}} adlı ajandan {{count}} istek: {{what}}",
+      "approve": "Tümünü onayla",
+      "show": "Tek tek gör"
+    },
     "always": {
       "button": "Her zaman onayla",
-      "hint": "Bunu ve {{name}} ajanından gelecek benzerlerini onaylar: {{actions}}, hangi değerlerle olursa olsun.",
-      "hintTarget": "Bunu ve {{name}} ajanından gelecek benzerlerini onaylar: {{actions}}.",
+      "reads": "Okumaları her zaman onayla",
+      "note": "Bundan sonra {{actions}} için, her değerle geçerli. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "noteTarget": "Bundan sonra {{actions}} için geçerli. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "noteReads": "Bundan sonra yalnızca bu projede ({{target}}) {{actions}} ile yapılan okumalar için geçerli. Veriyi değiştiren her şey yine onay ister. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "noteReadsAll": "Bundan sonra yalnızca bu bağlantıda {{actions}} ile yapılan okumalar için geçerli. Veriyi değiştiren her şey yine onay ister. Geri almak için: {{name}} sayfasındaki Araçlar ve erişim.",
+      "readsRule": "{{tool}} okumaları",
       "pushTo": "{{repo}} içinde {{branch}} dalına gönder",
       "done": "Onaylandı. {{name}} bunu bir daha sormayacak.",
       "undoHere": "Geri almak için {{name}} sayfasındaki Araçlar ve erişim bölümüne gidin.",
@@ -3037,7 +3099,8 @@
           "title": {
             "claude_code": "Claude hesabı ekle",
             "codex": "ChatGPT hesabı ekle",
-            "cursor": "Cursor hesabı ekle"
+            "cursor": "Cursor hesabı ekle",
+            "opencode": "OpenCode anahtarı ekleyin"
           },
           "stepOne": {
             "claude_code": "Planınızın olduğu hesap",
@@ -3050,6 +3113,7 @@
             "codex": "ChatGPT ile giriş yap",
             "cursor": "Cursor ile giriş yap"
           },
+          "opencodeFree": "OpenCode'un ücretsiz modelleri anahtar istemez. OpenCode konsolundan bir anahtar ücretli modelleri de ekler.",
           "cursorFinish": "Cursor sayfasında giriş yapın, giriş {{computer}} üzerinde kendiliğinden tamamlanır.",
           "cursorKey": "Bunun yerine Cursor API anahtarı kullan",
           "openAgain": "Yeniden aç",
@@ -3070,7 +3134,8 @@
           "duplicate": {
             "claude_code": "Claude, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Claude sayfasında çıkış yapıp tekrar deneyin.",
             "codex": "ChatGPT, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için ChatGPT sayfasında çıkış yapıp tekrar deneyin.",
-            "cursor": "Cursor, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Cursor sayfasında çıkış yapıp tekrar deneyin."
+            "cursor": "Cursor, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Cursor sayfasında çıkış yapıp tekrar deneyin.",
+            "opencode": "Bu OpenCode anahtarı zaten {{account}} olarak bağlı."
           },
           "startFailed": "{{computer}} yanıt vermedi. Birazdan tekrar deneyin.",
           "sendFailed": "Kod gönderilemedi. Kontrol edip tekrar deneyin.",
@@ -3319,6 +3384,9 @@
       "cancel": "İptal",
       "forgotten": "Unutuldu. Geri isterseniz Arşivlenenler bölümünde.",
       "saved": "Kaydedildi. Artık doğrulanmış sayılıyor.",
+      "playbook": "{{name}} nasıl çalışır",
+      "playbookNote": "Kendisi için sakladığı çalışma yolları. Sohbette görünmezler. Dışarıdan edinip bir daha kullanmadığı kendiliğinden çıkar ve Arşivlenenler'de kalır.",
+      "details": "Teknik ayrıntılar",
       "skills": "Oluşturduğu beceriler",
       "skillUses_one": "bir kez yüklendi",
       "skillUses_other": "{{count}} kez yüklendi",
@@ -4555,6 +4623,9 @@
       "every": "Her çağrıda çalışır. Birlikte gelen çağrılar tek bir çalıştırma olur.",
       "newNote": "Rutinin kendine ait bir adresi olur. Bu adrese yapılan her POST, ajanı gönderilen içerikle başlatır. Adres, rutin kaydedildikten sonra rutinin sayfasında görünür.",
       "hidden": "Adresini yalnızca rutini değiştirebilenler görür.",
+      "methods": "Kabul edilen yöntemler",
+      "methodsHelp": "Adres yalnızca işaretli yöntemlere yanıt verir. GET ile URL'nin sorgu parametreleri çağrının verisi olur.",
+      "methodsLine": "{{methods}} kabul eder.",
       "address": "Adres",
       "addressHelp": "Adrese sahip olan herkes ajanı başlatabilir. Onu bir şifre gibi saklayın ve sızarsa yenisini oluşturun.",
       "copied": "Adres kopyalandı.",
@@ -4565,7 +4636,7 @@
       "signature": "İmza",
       "signedOff": "Kapalı: ajan, adrese yapılan her çağrıyı alır.",
       "signedOn": "Açık: yalnızca gizli anahtarla imzalanan çağrılar geçer.",
-      "signedHelp": "Gövdenin HMAC-SHA256 değerini X-Agentes-Signature başlığında (sha256=…) gönderin. GitHub'ın X-Hub-Signature-256 başlığı da çalışır.",
+      "signedHelp": "Gövdenin (GET çağrısında: ? olmadan sorgu dizesinin) HMAC-SHA256 değerini X-Agentes-Signature başlığında (sha256=…) gönderin. GitHub'ın X-Hub-Signature-256 başlığı da çalışır.",
       "addSecret": "İmza iste",
       "newSecret": "Yeni gizli anahtar",
       "newSecretTitle": "Yeni bir gizli anahtar oluşturulsun mu?",
@@ -4781,7 +4852,8 @@
         "schedule": "Saat",
         "event": "Olay",
         "email": "E-posta",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend e-postası"
       },
       "frequency": "Sıklık",
       "frequencyPlaceholder": "Örn.: her pazartesi saat 9'da",
@@ -4978,8 +5050,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code bilgisayarda planlar ve kod yazar. {{name}} takip eder ve aktarır.",
-      "codex": "Codex (deneysel)",
-      "codexText": "Codex bilgisayarda kod yazar. Hâlâ test ediliyor.",
+      "codex": "Codex",
+      "codexText": "Codex bilgisayarda kod yazar.",
       "agent": "{{name}} (ajanın kendisi)",
       "agentText": "{{name}} kendi araçlarıyla doğrudan bilgisayarda kod yazar.",
       "agentText_female": "{{name}} kendi araçlarıyla doğrudan bilgisayarda kod yazar."
@@ -5529,7 +5601,6 @@
         "codexText": "Bilgisayarda yapar.",
         "agentText": "{{name}} kendi araçlarıyla yapar.",
         "agentText_female": "{{name}} kendi araçlarıyla yapar.",
-        "testing": "Test aşamasında",
         "locked": "Misyon başladıktan sonra değiştirilemez.",
         "open": "Misyon başlayana kadar değiştirilebilir.",
         "saved": "İşi yapan: {{name}}",
@@ -6320,6 +6391,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "Plan anahtarı kullanmak için bilgisayardaki agentes uygulamasını güncelleyin"
       },
@@ -6329,6 +6401,7 @@
         "claude_code": "{{computer}} üzerinde henüz hazır değil",
         "codex": "{{computer}} üzerinde henüz hazır değil",
         "cursor": "{{computer}} üzerinde henüz hazır değil",
+        "opencode": "{{computer}} üzerinde henüz hazır değil",
         "online": "{{computer}} şu anda yanıt vermiyor. İlgileniyoruz."
       }
     },
@@ -7699,18 +7772,22 @@
       "claude": "Claude planında {{model}}",
       "chatgpt": "ChatGPT planında {{model}}",
       "cursor": "Cursor planında {{model}}",
+      "zen": "OpenCode ile {{model}}",
       "coding": "{{plan}} üzerinde {{model}}",
       "claudeOf": "{{owner}} kişisinin Claude planında {{model}}",
       "chatgptOf": "{{owner}} kişisinin ChatGPT planında {{model}}",
       "cursorOf": "{{owner}} kişisinin Cursor planında {{model}}",
+      "zenOf": "{{owner}} adlı kişinin OpenCode'u ile {{model}}",
       "codingOf": "{{owner}} kişisinin {{plan}} planında {{model}}",
       "claudeAuto": "Claude planı",
       "chatgptAuto": "ChatGPT planı",
       "cursorAuto": "Cursor planı",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}} kişisinin Claude planı",
       "chatgptAutoOf": "{{owner}} kişisinin ChatGPT planı",
       "cursorAutoOf": "{{owner}} kişisinin Cursor planı",
+      "zenAutoOf": "{{owner}} adlı kişinin OpenCode'u",
       "codingAutoOf": "{{owner}} kişisinin {{plan}} planı",
       "on": "{{computer}} üzerinde {{line}}"
     },
@@ -7720,7 +7797,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "API üzerinden",
@@ -7731,11 +7809,11 @@
     "claude_codeText": "Bilgisayarı bağlayan kişinin Claude planını kullanır.",
     "codexText": "Bilgisayarı bağlayan kişinin ChatGPT planını kullanır.",
     "cursorText": "Bilgisayarı bağlayan kişinin Cursor planını kullanır.",
+    "opencodeText": "OpenCode'un ücretsiz modelleri veya bilgisayarı bağlayan kişinin OpenCode anahtarı.",
     "cursorModel": {
       "inPlan": "Cursor planınıza dahil",
       "apiPrice": "Cursor tarafından API fiyatlarıyla faturalanır"
     },
-    "testing": "Test ediliyor",
     "reasons": {
       "no_computer": "Kullanmak için Bilgisayar bölümünden bağlı bir bilgisayar seçin.",
       "exec_off": "Bilgisayar, program çalıştırma izni olmadan bağlandı.",
@@ -7774,6 +7852,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, API yedeği yok"
     },
     "mission": {
@@ -9575,6 +9654,9 @@
       "openConnectors": "Bağlayıcıları aç",
       "when": "{{address}} adresine bir e-posta geldiğinde",
       "whenFolder": "{{address}} adresine ({{folder}}) bir e-posta geldiğinde",
+      "whenMillionSend": "MillionSend'e bir e-posta geldiğinde",
+      "inboxAddress": "Posta kutusu adresi",
+      "inboxAddressHelp": "Boş = herhangi bir MillionSend posta kutusu.",
       "unknownMailbox": "bir posta kutusu",
       "waiting": "E-posta bekleniyor",
       "thisWeek_one": "Bu hafta {{count}} e-posta",
@@ -10021,6 +10103,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "Komutlar",
         "browser": "Tarayıcı"
       },
@@ -10028,6 +10111,7 @@
         "claude": "Dosya yazar ve değiştirir, yalnızca izin verilen klasörlerde.",
         "codex": "Claude Code gibi, bir ChatGPT hesabıyla. Yalnızca izin verilen klasörlerde.",
         "cursor": "Claude Code gibi, bir Cursor hesabıyla. Yalnızca izin verilen klasörlerde.",
+        "opencode": "Claude Code gibi, OpenCode'un ücretsiz modelleri veya bir OpenCode anahtarıyla. Yalnızca izin verilen klasörlerde.",
         "commands": "Test ve derleme gibi Terminal komutları çalıştırır."
       },
       "commandsWarn": "Komutlar yalnızca izin verilen klasörlere değil, bilgisayarın başka yerlerine de erişebilir.",
@@ -10904,6 +10988,7 @@
     "stopFailed": "Durdurulamadı. Yalnızca isteyen kişi, ajanın sahibi ya da bir yönetici durdurabilir.",
     "autoUpdate": "Hâlâ üzerinde çalışıyor ({{duration}}).",
     "autoUpdateNow": "Şimdi: {{now}}.",
+    "statusReply": "Hâlâ üzerinde çalışıyorum ({{duration}}). Mesajını bu adımdan sonra okuyacağım.",
     "status": {
       "one": "Üzerinde çalışıyor: {{subject}}",
       "oneUntitled": "Arka planda çalışıyor",
@@ -10969,10 +11054,7 @@
       "waitingInput": "{{name}} bir yanıt bekliyor",
       "waitingComputer": "{{name}} bilgisayarı bekliyor",
       "waitingProvider": "{{name}}: yapay zeka sağlayıcısı çalışmıyor · kendiliğinden yeniden dener",
-      "waitingAgents": "{{name}} işin bir kısmını devretti ve yanıt bekliyor",
-      "answeredFar": "{{to}}, {{from}} ajanının sorusunu yanıtladı",
-      "answeredRequestFar": "{{to}}, {{from}} ajanının isteğini yanıtladı",
-      "see": "Gör"
+      "waitingAgents": "{{name}} işin bir kısmını devretti ve yanıt bekliyor"
     },
     "consultPair": {
       "asking": "soruyor",
@@ -11074,6 +11156,9 @@
       },
       "gave": "verildi",
       "answered": "yanıtlandı",
+      "autoApproved": "Otomatik onaylandı (her zaman onaylayan: {{name}})",
+      "autoApprovedReads": "Otomatik onaylandı (okumayı her zaman onaylayan: {{name}})",
+      "autoApprovedNobody": "Otomatik onaylandı",
       "error": "hata",
       "seconds": "{{n}} sn",
       "minutes": "{{n}} dk",
@@ -11268,6 +11353,14 @@
       "agent": "{{name}} ile"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Bunu kimse doğrudan istemedi. Bir pull request açabilir miyim?",
+        "install": "Bunu kimse doğrudan istemedi. Bu paketleri kurabilir miyim?",
+        "long": "Bu çok adım sürüyor ve kimse doğrudan istemedi. Devam edebilir miyim?"
+      },
+      "autonomy_digest_one": "{{count}} uyarı bilinen veya zararsız görünüyordu, bu yüzden üzerinde çalışmadım:",
+      "autonomy_digest_other": "{{count}} uyarı bilinen veya zararsız görünüyordu, bu yüzden üzerinde çalışmadım:",
+      "autonomy_loop": "Bu konuda kendi başıma çalışmayı bıraktım. Bir günde {{count}} kez geri geldi ({{title}}). Nasıl ele almamı istediğini söyle.",
       "mission_plan": "{{computer}} üzerinde “{{title}}” için plan",
       "mission_planNoComputer": "“{{title}}” için plan",
       "mission_decision": "Karar: {{question}}",

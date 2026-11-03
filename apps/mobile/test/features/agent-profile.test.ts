@@ -3,6 +3,7 @@ import type { AgentAccess, AgentForYouItem, Memory, PlanUsage } from "@agentesch
 import { planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { planLine } from "@agenteschat/ui/plan-state";
 import {
+  byPlaybook,
   canEditMemories,
   dayWord,
   didLines,
@@ -175,6 +176,17 @@ describe("Perfil: memórias", () => {
     ]);
     expect(list.map((m) => m.id)).toEqual(["pin", "new", "old"]);
     expect(knownAboutMe(undefined)).toEqual([]);
+  });
+
+  test("its playbook apart from what matters to people, in the same order", () => {
+    const { people, playbook } = byPlaybook([
+      mem({ id: "pref" }),
+      mem({ id: "howto", playbook: true }),
+      mem({ id: "fact", playbook: false }),
+      mem({ id: "lesson", playbook: true }),
+    ]);
+    expect(people.map((m) => m.id)).toEqual(["pref", "fact"]);
+    expect(playbook.map((m) => m.id)).toEqual(["howto", "lesson"]);
   });
 
   test("today, yesterday or the date", () => {

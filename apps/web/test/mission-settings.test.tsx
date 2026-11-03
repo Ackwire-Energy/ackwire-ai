@@ -144,7 +144,7 @@ describe("Configurações da missão", () => {
       expect.stringContaining("Codex"),
       expect.stringContaining("Ada"),
     ]);
-    expect(within(who).getAllByRole("radio")[1]?.textContent).toContain("Em teste");
+    expect(within(who).getAllByRole("radio")[1]?.textContent).not.toContain("Em teste");
     expect(within(who).getAllByRole("radio")[0]?.hasAttribute("disabled")).toBe(true);
     expect(dialog.textContent).toContain("Não dá para trocar depois que a missão começa.");
     expect(dialog.textContent).toContain("MacBook");

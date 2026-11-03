@@ -1,7 +1,7 @@
 import type { BrainEffort } from "@agenteschat/adapters";
 import type { CodeSetup } from "../git/machine";
 
-export type BrainKind = "model" | "claude_code" | "codex" | "cursor";
+export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode";
 
 /** A brain that runs on the agent's computer with a person's plan (ADR 0114 adds Cursor). */
 export type ComputerBrainKind = Exclude<BrainKind, "model">;
@@ -11,6 +11,7 @@ export const BRAIN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
   claude_code: "Claude Code",
   codex: "Codex",
   cursor: "Cursor",
+  opencode: "OpenCode",
 };
 
 /** The plan each computer brain thinks with, as people buy it. */
@@ -18,11 +19,12 @@ export const BRAIN_PLAN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
   claude_code: "Claude",
   codex: "ChatGPT",
   cursor: "Cursor",
+  opencode: "OpenCode",
 };
 
 /** Brains that run on the agent's computer with a person's plan. */
 export const isComputerBrain = (v: unknown): v is ComputerBrainKind =>
-  v === "claude_code" || v === "codex" || v === "cursor";
+  v === "claude_code" || v === "codex" || v === "cursor" || v === "opencode";
 
 /** The account a computer brain runs with (ADR 0041): a folder on the agent's machine. */
 export interface BrainAccount {

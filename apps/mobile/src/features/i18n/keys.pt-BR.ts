@@ -1129,6 +1129,7 @@ export const featureKeysPtBR = {
     uses_other: "Usada {{count}} vezes",
     confirmed: "Confirmada por uma pessoa",
     unconfirmed: "Ainda sem confirmação",
+    details: "Detalhes técnicos",
     before: "Antes dizia: {{text}}",
     fix: "Corrigir",
     forgetTitle: "Esquecer esta lembrança?",

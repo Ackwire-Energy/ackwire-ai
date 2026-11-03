@@ -1,5 +1,5 @@
 import type { AgentAction, Message } from "@agenteschat/client";
-import { ApiError, useAgentActions } from "@agenteschat/client";
+import { ApiError, useAgentActions, useApi } from "@agenteschat/client";
 import {
   actionErrorKey,
   actionPhase,
@@ -8,6 +8,7 @@ import {
   actionTimeLeft,
   canUndoAction,
   formatTimeLeft,
+  hookToCopy,
   undoableNow,
 } from "@agenteschat/client/lib/actions";
 import { relativeTime, toYmd } from "@agenteschat/client/lib/format";
@@ -21,6 +22,7 @@ import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useChannelActions } from "@/components/channel-actions";
 import { useInPlace } from "@/components/InPlace";
 import { useDirectory } from "@/hooks/useDirectory";
+import { copyText } from "@/lib/context-menu";
 import { inPlaceClick } from "@/lib/navigate";
 import { fromApiRule, ruleSentence } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
@@ -266,6 +268,7 @@ function Receipt({
           />
         </span>
         {undoneBy && <span className="ag-rc__by">{t("agentActions.undoneBy", { name: undoneBy })}</span>}
+        <CopyHookButton action={a} />
       </span>
       {hadButton.current && (
         <span className="ag-rc__act">
@@ -281,6 +284,39 @@ function Receipt({
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * A webhook routine the agent just made: its address, a secret kept out of the message text, is copied from here by
+ * who may manage the routine (the person who asked, admins; the server checks again).
+ */
+function CopyHookButton({ action: a }: { action: AgentAction }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const routineId = hookToCopy(a, { userId: me.user.id, managesRoutines: can(org, "manage_routines") });
+  if (!routineId) return null;
+  const copy = async () => {
+    setBusy(true);
+    try {
+      const hook = await api.routines.hook(org.id, routineId);
+      await copyText(hook.url, () => toast.show(t("routines.webhookCopied")));
+    } catch (error) {
+      toast.show(errorMessage(t, error), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className="ag-rc__extra">
+      <button type="button" className="ag-rc__btn" disabled={busy} onClick={() => void copy()}>
+        <Icon name="copy" size={14} />
+        {t("agentActions.copyWebhook")}
+      </button>
+    </span>
   );
 }
 

@@ -200,6 +200,8 @@ export type LiveWork =
       refusal?: string;
       /** A permission check waiting on a person: its request, which the person's answer names. */
       requestId?: string;
+      /** A rule ("Aprovar sempre") let it run without asking: whose person, a reads one or not. */
+      autoApproved?: { by: string | null; reads: boolean };
     };
 
 /** The narration lines of a run (what it said between tool calls). */
@@ -280,6 +282,8 @@ export interface AgentToolEvent {
   failed?: boolean;
   /** On the end: it didn't run, it waits on a person. */
   held?: boolean;
+  /** On the end: a rule ("Aprovar sempre") let it run without asking. */
+  autoApproved?: { by: string | null; reads: boolean } | null;
   /** On the end of a permission check that refused its command: the policy's reason, and its code. */
   why?: string | null;
   refusal?: string | null;
@@ -521,7 +525,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       if (said) work = say(work, said, current?.turn);
       const end = (
         w: Extract<LiveWork, { kind: "call" }>,
-        how: Pick<AgentToolEvent, "failed" | "held" | "why" | "refusal" | "requestId"> = {},
+        how: Pick<AgentToolEvent, "failed" | "held" | "why" | "refusal" | "requestId" | "autoApproved"> = {},
       ) => ({
         ...w,
         running: false,
@@ -531,6 +535,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         ...(how.why ? { why: how.why } : {}),
         ...(how.refusal ? { refusal: how.refusal } : {}),
         ...(how.requestId ? { requestId: how.requestId } : {}),
+        ...(how.autoApproved ? { autoApproved: how.autoApproved } : {}),
       });
       if (!newCall && event.requestId && !event.toolUseId) {
         // A person's answer to a command that waited on them: the line that waited ends as they decided.

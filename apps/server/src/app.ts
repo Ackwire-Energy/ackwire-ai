@@ -1,3 +1,6 @@
+import { requestLocale } from "@agenteschat/engine";
+import { helpDocsUrl } from "@agenteschat/i18n/help";
+import { appLocale } from "@agenteschat/i18n/locale";
 import type { AgentesModule, Edition, ModuleContext } from "@agenteschat/modules";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
@@ -106,7 +109,7 @@ export interface AppOptions {
  * - `/api/machines/*`     connected computers' runner: device-code connection, uploads, install.sh (ADR 0025, 0036)
  * - `/api/desktop/*`      public: the desktop app's latest build and its download (ADR 0036)
  * - `/api/native/*`       public: the packages that run agentes.chat without Docker, for the installer (ADR 0060)
- * - `/api/hooks/*`        public: a webhook routine's own address (POST, ADR 0106)
+ * - `/api/hooks/*`        public: a webhook routine's own address (its chosen methods, ADR 0106)
  * - `/api/waitlist`       public: join the waiting list and confirm the email (the landing page, only with LANDING_URL)
  * - `/api/oauth/*`        public: the OAuth 2.1 authorization server for AI apps (ADR 0119)
  * - `/mcp`                AI apps' MCP endpoint, bearer tokens only (ADR 0119); `/.well-known/oauth-*` its discovery
@@ -302,6 +305,16 @@ export function createApp(options: AppOptions) {
     app.get(path, (c) =>
       c.body(installScript, 200, { "content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store" }),
     );
+  }
+  // The help pages moved to the public docs site: old links (`?lang=` or the browser's language) land on the same
+  // page there; the browser keeps the #section across the redirect. Vary: a 301 is cached, by browsers and by a CDN
+  // in front, and without `?lang=` the target is the browser's language.
+  for (const path of ["/help", "/help/", "/help/:slug"]) {
+    app.get(path, (c) => {
+      c.header("vary", "accept-language");
+      const locale = appLocale([c.req.query("lang")], true) ?? requestLocale(c.req.header("accept-language")) ?? "en";
+      return c.redirect(helpDocsUrl(c.req.param("slug"), locale), 301);
+    });
   }
   // The setup downloads it into a folder that has none: this release's, from any instance.
   app.get("/install/docker-compose.yml", (c) =>

@@ -1608,6 +1608,10 @@ export const ptBR = {
       cursor: "O Cursor está sem login neste computador. Conecte uma conta do Cursor na página do\u00a0{{name}}.",
       cursor_female:
         "O Cursor está sem login neste computador. Conecte uma conta do Cursor na página da\u00a0{{name}}.",
+      opencode:
+        "O OpenCode não consegue pensar neste computador. Conecte uma chave do OpenCode na página do\u00a0{{name}}.",
+      opencode_female:
+        "O OpenCode não consegue pensar neste computador. Conecte uma chave do OpenCode na página da\u00a0{{name}}.",
     },
     card: {
       connected: "Pronto: {{name}} já tem uma IA.",
@@ -1628,6 +1632,7 @@ export const ptBR = {
       claude: "Conectar o seu plano do Claude",
       chatgpt: "Conectar o seu plano do ChatGPT",
       cursor: "Conectar o seu plano do Cursor",
+      zen: "Conectar o OpenCode",
       api_key: "Adicionar uma chave de API",
     },
     titleFor: "Conectar uma IA para o {{name}}",
@@ -1644,6 +1649,7 @@ export const ptBR = {
       claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Ultra, Team ou Enterprise" },
       chatgpt: { title: "Seu plano do ChatGPT", tiers: "Plus, Pro, Business ou Enterprise" },
       cursor: { title: "Seu plano do Cursor", tiers: "Pro, Pro+, Ultra ou Teams, ou uma chave de API do Cursor" },
+      zen: { title: "OpenCode", tiers: "Modelos grátis, ou a sua chave do OpenCode" },
       zai: { tiers: "Lite, Pro ou Max" },
       kimi: { tiers: "Plus, Pro, Max ou Ultra" },
       minimax: { tiers: "Go, Explore ou Build" },
@@ -1709,6 +1715,7 @@ export const ptBR = {
       claude_code: "O Claude entrou como {{email}}, não como {{account}}. Saia na página do Claude e tente de novo.",
       codex: "O ChatGPT entrou como {{email}}, não como {{account}}. Saia na página do ChatGPT e tente de novo.",
       cursor: "O Cursor entrou como {{email}}, não como {{account}}. Saia na página do Cursor e tente de novo.",
+      opencode: "O OpenCode entrou como {{email}}, não como {{account}}. Tente de novo com a chave certa.",
     },
     useAnyway: "Usar {{email}}",
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
@@ -1730,6 +1737,51 @@ export const ptBR = {
   },
   /** An agent's card whose button opens the app's own dialog, filled in (`meta.actionCard`). */
   /** A stretch's pause card once someone pressed Continuar (ADR 0089). */
+  /** A proposta de um agente de trabalho caro que ninguém pediu diretamente (ADR 0131): os botões do card e quem decidiu. */
+  costlyCard: {
+    go: "Pode fazer",
+    always: "Sempre",
+    notNow: "Agora não",
+    never: "Nunca",
+    waiting: "Aguardando a pessoa responsável",
+    you: "Você",
+    decided: {
+      go: "{{name}} disse pode fazer",
+      always: "{{name}} disse sempre para isso",
+      not_now: "{{name}} disse agora não",
+      never: "{{name}} disse nunca para isso",
+    },
+  },
+  /** Configurações do agente: o que ele pode começar sem ninguém pedir diretamente, e quais agentes pode chamar (ADR 0131). */
+  brakes: {
+    title: "Trabalho que ninguém pediu",
+    subtitle:
+      "O que ele começa sozinho, a partir de uma rotina, um alerta ou outro agente. O que uma pessoa pede nunca fica preso.",
+    costly: "Pedir antes de trabalho caro",
+    costlyHelp:
+      "Antes de abrir um pull request, instalar pacotes ou um trabalho longo, ele pergunta à pessoa responsável.",
+    costlyAsk: "Pedir antes",
+    costlyGo: "Fazer direto",
+    cost: { pr: "abrir pull requests", install: "instalar pacotes", long: "trabalhos longos" },
+    rememberedGo: "Sempre: {{what}}",
+    rememberedNever: "Nunca: {{what}}",
+    forget: "Esquecer essas respostas",
+    atOnce: "Trabalhos ao mesmo tempo",
+    atOnceHelp: "Quantos trabalhos que ninguém pediu ele faz ao mesmo tempo. Os outros esperam a vez.",
+    prs: "Pull requests por hora",
+    prsHelp: "O máximo que o próprio trabalho dele abre em uma hora.",
+    call: "Agentes que pode chamar",
+    callHelp: "Quem ele pode mencionar ou para quem pode passar trabalho.",
+    callAll: "Todos",
+    callSome: "Só estes",
+    callNone: "Nenhum",
+    project: "Projeto",
+    projectHelp: "Agentes de projetos diferentes não chamam uns aos outros.",
+    projectPlaceholder: "App mobile",
+    otherProjects: "Pode chamar agentes de outros projetos",
+    peopleNote: "Esses limites nunca seguram o que uma pessoa pede.",
+    failed: "Não deu para salvar. Tente de novo.",
+  },
   stretchCard: {
     continued: "{{name}} deixou continuar · {{time}}",
     continuedByYou: "Você deixou continuar · {{time}}",
@@ -1826,7 +1878,6 @@ export const ptBR = {
     routinePost_female: "Não chamei a <b>{{name}}</b>: uma rotina que só olha e conta não acorda ninguém",
     outside: "Não está {{place}}",
     routine: "Rotina {{name}}",
-    see: "Ver",
     add: "Adicionar ao canal",
     added: "{{name}} entrou no canal.",
     allow: "Deixar {{person}} falar com ele",
@@ -1882,6 +1933,8 @@ export const ptBR = {
     },
     /** A kind this app doesn't know yet (a newer server's). */
     other: "Fiz uma mudança",
+    /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */
+    copyWebhook: "Copiar endereço do webhook",
     issueFields: {
       title: "o título",
       description: "a descrição",
@@ -2288,13 +2341,35 @@ export const ptBR = {
       waitingCount_one: "{{count}} esperando",
       waitingCount_other: "{{count}} esperando",
     },
+    /** Vários pedidos esperando do mesmo tipo em sequência, num só: "3 pedidos de Ada para Executar sql". */
+    run: {
+      head_one: "{{count}} pedido de {{name}} para {{what}}",
+      head_other: "{{count}} pedidos de {{name}} para {{what}}",
+      approve: "Aprovar todos",
+      show: "Ver cada um",
+    },
     /** "Aprovar sempre": the agent's next calls of this kind run without asking. */
     always: {
       button: "Aprovar sempre",
-      hint: "Aprova este e os próximos iguais do {{name}}: {{actions}}, com qualquer valor.",
-      hint_female: "Aprova este e os próximos iguais da {{name}}: {{actions}}, com qualquer valor.",
-      hintTarget: "Aprova este e os próximos iguais do {{name}}: {{actions}}.",
-      hintTarget_female: "Aprova este e os próximos iguais da {{name}}: {{actions}}.",
+      /** The SQL tool's reads of one project only (anything else it runs still asks). */
+      reads: "Aprovar sempre leituras",
+      note: "Cobre {{actions}}, de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      note_female:
+        "Cobre {{actions}}, de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      noteTarget: "Cobre {{actions}}, de agora em diante. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      noteTarget_female:
+        "Cobre {{actions}}, de agora em diante. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      /** `target`: the call's other arguments, as `project_id=abc`. */
+      noteReads:
+        "Cobre só leituras de {{actions}}, neste projeto ({{target}}), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      noteReadsAll:
+        "Cobre só leituras de {{actions}}, nesta conexão, de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      noteReads_female:
+        "Cobre só leituras de {{actions}}, neste projeto ({{target}}), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      noteReadsAll_female:
+        "Cobre só leituras de {{actions}}, nesta conexão, de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      /** A remembered SQL reads rule in Tools and access. */
+      readsRule: "Leituras de {{tool}}",
       pushTo: "enviar para {{branch}} em {{repo}}",
       done: "Aprovado. {{name}} não pede mais para isso.",
       undoHere: "Para desfazer, vá em Ferramentas e acesso, na página do {{name}}.",
@@ -3023,6 +3098,7 @@ export const ptBR = {
             claude_code: "Adicionar conta do Claude",
             codex: "Adicionar conta do ChatGPT",
             cursor: "Adicionar conta do Cursor",
+            opencode: "Adicionar chave do OpenCode",
           },
           stepOne: {
             claude_code: "A conta com o seu plano",
@@ -3033,6 +3109,8 @@ export const ptBR = {
           stepOneHint:
             "Conta errada? Saia de lá e tente de novo. A conta fica só no {{computer}}. Você digita a senha na\u00a0página\u00a0do\u00a0{{brand}}.",
           open: { claude_code: "Entrar com Claude", codex: "Entrar com ChatGPT", cursor: "Entrar com Cursor" },
+          opencodeFree:
+            "Os modelos grátis do OpenCode não pedem chave. Uma chave do console do OpenCode libera os pagos.",
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Entre na página do Cursor. O {{computer}} termina sozinho.",
           cursorKey: "Usar uma chave de API do Cursor",
@@ -3059,6 +3137,7 @@ export const ptBR = {
               "O ChatGPT entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do ChatGPT e tente de novo.",
             cursor:
               "O Cursor entrou como {{account}}, uma conta que você já conectou. Para usar outra, saia na página do Cursor e tente de novo.",
+            opencode: "Essa chave do OpenCode já está conectada como {{account}}.",
           },
           startFailed: "O {{computer}} não respondeu. Tente de novo em instantes.",
           sendFailed: "Não deu para enviar o código. Confira e tente de novo.",
@@ -3313,6 +3392,11 @@ export const ptBR = {
       cancel: "Cancelar",
       forgotten: "Esquecido. Fica em Arquivadas se quiser de volta.",
       saved: "Salvo. Agora conta como verificado.",
+      playbook: "Como o {{name}} trabalha",
+      playbook_female: "Como a {{name}} trabalha",
+      playbookNote:
+        "Jeitos de trabalhar que guardou para si. Não aparecem na conversa. O que pegou de fora e não voltou a usar sai sozinho e fica em Arquivadas.",
+      details: "Detalhes técnicos",
       skills: "Skills que criou",
       skillUses_zero: "nunca carregada",
       skillUses_one: "carregada uma vez",
@@ -4546,6 +4630,11 @@ export const ptBR = {
       newNote:
         "A rotina ganha um endereço só dela. Cada POST que chegar nele aciona o agente com o que foi enviado. O endereço aparece na página da rotina assim que ela for salva.",
       hidden: "Só quem pode mudar a rotina vê o endereço.",
+      methods: "Métodos aceitos",
+      methodsHelp:
+        "O endereço só responde aos métodos marcados. Num GET, os parâmetros da URL viram os dados da chamada.",
+      /** After "Roda a cada chamada…" on the routine's page: `methods` are HTTP methods ("GET, POST"). */
+      methodsLine: "Aceita {{methods}}.",
       address: "Endereço",
       addressHelp: "Quem tiver o endereço aciona o agente. Guarde como uma senha e gere outro se vazar.",
       copied: "Endereço copiado.",
@@ -4557,7 +4646,7 @@ export const ptBR = {
       signedOff: "Desligada: o agente recebe qualquer chamada ao endereço.",
       signedOn: "Ligada: só passam as chamadas assinadas com o segredo.",
       signedHelp:
-        "Mande o HMAC-SHA256 do corpo em X-Agentes-Signature (sha256=…). O X-Hub-Signature-256 do GitHub também vale.",
+        "Mande o HMAC-SHA256 do corpo (numa chamada GET, da query string, sem o ?) em X-Agentes-Signature (sha256=…). O X-Hub-Signature-256 do GitHub também vale.",
       addSecret: "Exigir assinatura",
       newSecret: "Gerar novo segredo",
       newSecretTitle: "Gerar um novo segredo?",
@@ -4750,7 +4839,13 @@ export const ptBR = {
       whatPlaceholder: "Ex.: Resuma o que aconteceu na semana nos canais #eng e #produto.",
       name: "Nome (opcional)",
       when: "Quando",
-      kind: { schedule: "Horário", event: "Evento", email: "Email", webhook: "Webhook" },
+      kind: {
+        schedule: "Horário",
+        event: "Evento",
+        email: "Email",
+        webhook: "Webhook",
+        connector: "Email no MillionSend",
+      },
       frequency: "Frequência",
       frequencyPlaceholder: "Ex.: toda segunda às 9h",
       timezone: "Fuso horário",
@@ -4952,8 +5047,8 @@ export const ptBR = {
     executor: {
       claude: "Claude Code",
       claudeText: "O Claude Code planeja e programa no computador. {{name}} acompanha e repassa.",
-      codex: "Codex (experimental)",
-      codexText: "O Codex programa no computador. Ainda em teste.",
+      codex: "Codex",
+      codexText: "O Codex programa no computador.",
       agent: "{{name}} (o próprio agente)",
       agentText: "{{name}} programa direto no computador, com as próprias ferramentas.",
     },
@@ -5502,7 +5597,6 @@ export const ptBR = {
         codexText: "Faz no computador.",
         agentText: "O {{name}} faz, com as próprias ferramentas.",
         agentText_female: "A {{name}} faz, com as próprias ferramentas.",
-        testing: "Em teste",
         locked: "Não dá para trocar depois que a missão começa.",
         open: "Dá para trocar até a missão começar.",
         saved: "Quem faz o trabalho: {{name}}",
@@ -6230,6 +6324,7 @@ export const ptBR = {
       claude_code: "Claude",
       codex: "ChatGPT",
       cursor: "Cursor",
+      opencode: "OpenCode",
       needs: {
         keys: "Atualize o agentes no computador para usar a chave de um plano",
       },
@@ -6239,6 +6334,7 @@ export const ptBR = {
         claude_code: "Ainda não está pronto no {{computer}}",
         codex: "Ainda não está pronto no {{computer}}",
         cursor: "Ainda não está pronto no {{computer}}",
+        opencode: "Ainda não está pronto no {{computer}}",
         online: "O {{computer}} não está respondendo agora. Já estamos cuidando.",
       },
     },
@@ -7612,18 +7708,22 @@ export const ptBR = {
       claude: "{{model}} pelo plano do Claude",
       chatgpt: "{{model}} pelo plano do ChatGPT",
       cursor: "{{model}} pelo plano do Cursor",
+      zen: "{{model}} pelo OpenCode",
       coding: "{{model}} pelo {{plan}}",
       claudeOf: "{{model}} pelo plano do Claude de {{owner}}",
       chatgptOf: "{{model}} pelo plano do ChatGPT de {{owner}}",
       cursorOf: "{{model}} pelo plano do Cursor de {{owner}}",
+      zenOf: "{{model}} pelo OpenCode de {{owner}}",
       codingOf: "{{model}} pelo {{plan}} de {{owner}}",
       claudeAuto: "Plano do Claude",
       chatgptAuto: "Plano do ChatGPT",
       cursorAuto: "Plano do Cursor",
+      zenAuto: "OpenCode",
       codingAuto: "{{plan}}",
       claudeAutoOf: "Plano do Claude de {{owner}}",
       chatgptAutoOf: "Plano do ChatGPT de {{owner}}",
       cursorAutoOf: "Plano do Cursor de {{owner}}",
+      zenAutoOf: "OpenCode de {{owner}}",
       codingAutoOf: "{{plan}} de {{owner}}",
       on: "{{line}} no {{computer}}",
     },
@@ -7631,7 +7731,7 @@ export const ptBR = {
     modelText: "Um modelo de IA pela API, com uma chave do workspace.",
     countsBudget: "Conta no orçamento do {{name}}.",
     countsBudget_female: "Conta no orçamento da {{name}}.",
-    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor" },
+    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" },
     foot: {
       api: "Pela API",
       noComputer: "Sem computador",
@@ -7641,9 +7741,9 @@ export const ptBR = {
     claude_codeText: "Usa o plano do Claude de quem conectou o computador.",
     codexText: "Usa o plano do ChatGPT de quem conectou o computador.",
     cursorText: "Usa o plano do Cursor de quem conectou o computador.",
+    opencodeText: "Os modelos grátis do OpenCode, ou a chave do OpenCode de quem conectou o computador.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "No seu plano do Cursor", apiPrice: "O Cursor cobra pelo preço da API" },
-    testing: "Em teste",
     reasons: {
       no_computer: "Escolha um computador conectado em Computador para usar.",
       exec_off: "O computador foi conectado sem permissão para rodar programas.",
@@ -7686,6 +7786,7 @@ export const ptBR = {
       claude_code: "Claude Code · {{model}}",
       codex: "Codex · {{model}}",
       cursor: "Cursor · {{model}}",
+      opencode: "OpenCode · {{model}}",
       noFallback: "{{brain}}, sem reserva pela API",
     },
     mission: {
@@ -9235,6 +9336,10 @@ export const ptBR = {
       openConnectors: "Abrir Conectores",
       when: "Quando chegar um email em {{address}}",
       whenFolder: "Quando chegar um email em {{address}} ({{folder}})",
+      /** A routine on MillionSend's received email (ADR 0130) that names no inbox. */
+      whenMillionSend: "Quando chegar um email no MillionSend",
+      inboxAddress: "Endereço da caixa",
+      inboxAddressHelp: "Vazio = qualquer caixa do MillionSend.",
       unknownMailbox: "uma caixa de email",
       waiting: "Esperando um email",
       thisWeek_one: "{{count}} email esta semana",
@@ -9654,12 +9759,20 @@ export const ptBR = {
       removed: "{{folder}} foi removida.",
       removedAgent: "{{name}} não usa mais {{folder}}.",
       tools: "Ferramentas",
-      tool: { claude: "Claude Code", codex: "Codex", cursor: "Cursor", commands: "Comandos", browser: "Navegador" },
+      tool: {
+        claude: "Claude Code",
+        codex: "Codex",
+        cursor: "Cursor",
+        opencode: "OpenCode",
+        commands: "Comandos",
+        browser: "Navegador",
+      },
       /** Each tool's ⓘ. */
       toolText: {
         claude: "Escreve e muda arquivos, só nas pastas liberadas.",
         codex: "Como o Claude Code, com uma conta do ChatGPT. Só nas pastas liberadas.",
         cursor: "Como o Claude Code, com uma conta do Cursor. Só nas pastas liberadas.",
+        opencode: "Como o Claude Code, com os modelos grátis do OpenCode ou uma chave dele. Só nas pastas liberadas.",
         commands: "Roda comandos do Terminal, como testes e builds.",
       },
       commandsWarn: "Comandos podem chegar a outras partes do computador, não só às pastas liberadas.",
@@ -10548,6 +10661,8 @@ export const ptBR = {
     stopFailed: "Não deu para parar. Só quem pediu, o dono do agente ou um admin pode.",
     autoUpdate: "Ainda trabalhando nisso ({{duration}}).",
     autoUpdateNow: "Agora: {{now}}.",
+    /** A linha do próprio servidor quando uma pessoa escreve a um agente trabalhando e a resposta rápida não sai (ADR 0131). */
+    statusReply: "Ainda trabalhando nisso ({{duration}}). Leio sua mensagem depois deste passo.",
     status: {
       one: "Trabalhando em: {{subject}}",
       oneUntitled: "Trabalhando em segundo plano",
@@ -10628,12 +10743,6 @@ export const ptBR = {
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "O {{name}} passou uma parte adiante e espera o retorno",
       waitingAgents_female: "A {{name}} passou uma parte adiante e espera o retorno",
-      /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
-      answeredFar: "{{to}} respondeu à pergunta do {{from}}",
-      answeredFar_female: "{{to}} respondeu à pergunta da {{from}}",
-      answeredRequestFar: "{{to}} respondeu ao pedido do {{from}}",
-      answeredRequestFar_female: "{{to}} respondeu ao pedido da {{from}}",
-      see: "Ver",
     },
     /**
      * The slim row before a reply whose agent asked others first ("Theo ⇄ Atlas · 2 min"): the short word after the
@@ -10758,6 +10867,10 @@ export const ptBR = {
       },
       gave: "recebeu",
       answered: "devolveu",
+      /** A call that ran without asking under "Aprovar sempre": who approved it for good. */
+      autoApproved: "Aprovado automaticamente (sempre aprovado por {{name}})",
+      autoApprovedReads: "Aprovado automaticamente (leitura sempre aprovada por {{name}})",
+      autoApprovedNobody: "Aprovado automaticamente",
       error: "erro",
       seconds: "{{n}} s",
       minutes: "{{n}} min",
@@ -10954,6 +11067,16 @@ export const ptBR = {
       agent: "Com {{name}}",
     },
     body: {
+      /** Os freios da autonomia (ADR 0131): o agente pede antes de trabalho caro que ninguém pediu, o resumo de ruído, a parada de repetição. */
+      autonomy_proposal: {
+        pr: "Ninguém pediu isso diretamente. Posso abrir um pull request?",
+        install: "Ninguém pediu isso diretamente. Posso instalar esses pacotes?",
+        long: "Isso está levando muitos passos e ninguém pediu diretamente. Posso continuar?",
+      },
+      autonomy_digest_one: "{{count}} alerta parecia conhecido ou inofensivo, então não trabalhei nele:",
+      autonomy_digest_other: "{{count}} alertas pareciam conhecidos ou inofensivos, então não trabalhei neles:",
+      autonomy_loop:
+        "Parei de trabalhar nisso por conta própria. Voltou {{count}} vezes em um dia ({{title}}). Me diz como você quer que eu trate.",
       mission_plan: "Plano para “{{title}}” no {{computer}}",
       mission_planNoComputer: "Plano para “{{title}}”",
       mission_decision: "Decisão: {{question}}",

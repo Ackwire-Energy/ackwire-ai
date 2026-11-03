@@ -1,7 +1,16 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { EventEmitter } from "node:events";
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -122,6 +131,11 @@ export const brainKey = (agentId: string, session: string) => `${agentId}:${sess
 
 export const BRAIN_IDLE_MS = 3 * 60_000;
 export const BRAIN_MAX_PROCESSES = 1;
+/**
+ * How long a session's first system text is kept after its last use: Claude Code's prompt cache lives 1 hour
+ * (subscriptions, and `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` on keys), plus a margin.
+ */
+export const SESSION_SYSTEM_KEEP_MS = 75 * 60_000;
 /** `reclaimIdle`: how long it waits for the closed process to exit (its memory is free only then). */
 export const RECLAIM_EXIT_MS = 2_000;
 /** Text deltas are sent at most this often (batched). */
@@ -520,17 +534,24 @@ export interface ClaudeLaunch {
   settingSources?: string;
   /** Claude Code's own tools the agent gets (`--tools`); the rest aren't described on every step. */
   builtinTools?: readonly string[];
+  /** Claude Code's own tools taken away (`--disallowedTools`), where `builtinTools` can't be set. */
+  disallowedTools?: readonly string[];
   /** No `--fallback-model` (a plan's aliases may all be one model). */
   noFallback?: boolean;
 }
 
 /**
- * Claude Code's own tools a brain keeps: reading, searching, editing and running code in its folder,
- * and the web. Ours come through MCP. Names Claude Code doesn't know are ignored by it.
+ * Claude Code's own tools a brain keeps: reading, searching, editing and running code in its folder, and ToolSearch,
+ * which loads our MCP tools that aren't always listed (`ALWAYS_LOADED` in mcp.ts; without it in `--tools` Claude Code
+ * lists them all, measured on 2.1.316). Ours come through MCP, the web included: our `web_search` and `web_fetch` mark
+ * what they read as outside content (ADR 0117), so Claude Code's WebFetch and WebSearch are left out
+ * (`WEB_BUILTIN_TOOLS`). Names Claude Code doesn't know are ignored by it.
  */
-export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
-/** A plan turn's own tools (ADR 0053 §3, 0109): reading, the web and a shell our prompt tool keeps read-only; no edits. */
-export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
+export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "ToolSearch"] as const;
+/** A plan turn's own tools (ADR 0053 §3, 0109): reading, a shell our prompt tool keeps read-only, ToolSearch; no edits. */
+export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep", "ToolSearch"] as const;
+/** Claude Code's web tools, which ours replace on a brain turn. */
+export const WEB_BUILTIN_TOOLS = ["WebFetch", "WebSearch"] as const;
 
 /** Most of a checkout's CLAUDE.md and AGENTS.md a turn reads: room for real instructions, not for a dump. */
 export const REPO_INSTRUCTIONS_MAX = 20_000;
@@ -566,7 +587,10 @@ export function repoInstructions(cwd: string): string {
 export function brainProfileLaunch(
   mode: "plan" | "work",
   personalMcp: boolean,
-): Pick<ClaudeLaunch, "strictMcp" | "promptTool" | "permissionMode" | "settingSources" | "builtinTools"> {
+): Pick<
+  ClaudeLaunch,
+  "strictMcp" | "promptTool" | "permissionMode" | "settingSources" | "builtinTools" | "disallowedTools"
+> {
   if (mode === "plan") {
     return {
       strictMcp: true,
@@ -580,8 +604,10 @@ export function brainProfileLaunch(
     strictMcp: !personalMcp,
     promptTool: true,
     permissionMode: "acceptEdits",
-    // With the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code.
-    ...(personalMcp ? {} : { settingSources: "", builtinTools: BRAIN_BUILTIN_TOOLS }),
+    // With the owner's own MCP servers the owner's settings stay, and so does every tool of Claude Code but the web.
+    ...(personalMcp
+      ? { disallowedTools: WEB_BUILTIN_TOOLS }
+      : { settingSources: "", builtinTools: BRAIN_BUILTIN_TOOLS }),
   };
 }
 
@@ -614,6 +640,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.addDirs ?? []).flatMap((d) => ["--add-dir", d]),
     ...(l.settingSources !== undefined ? ["--setting-sources", l.settingSources] : []),
     ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
+    ...(l.disallowedTools?.length ? ["--disallowedTools", l.disallowedTools.join(",")] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
@@ -1135,6 +1162,8 @@ interface Live {
   sig: string;
   /** What `ran` remembers for it: the session, in its account. */
   ranKey: string;
+  /** Where its session's first system text is kept (`sessionSystem`). */
+  keptSystem: string;
   busy: boolean;
   lastUsed: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
@@ -1581,7 +1610,14 @@ export class BrainManager {
     const mode = req.permissions?.mode === "plan" ? "plan" : "work";
     const launch = brainProfileLaunch(mode, req.personalMcp === true);
     const system = typeof req.system === "string" ? req.system : "";
-    writeFileSync(systemFile, launch.settingSources === "" ? system + repoInstructions(cwd) : system, { mode: 0o600 });
+    const ranKey = ranKeyOf(req, session);
+    const withRepo = launch.settingSources === "";
+    const keptSystem = this.keptSystemFile(ctx.agent.id, ranKey, cwd, withRepo);
+    writeFileSync(
+      systemFile,
+      this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system)),
+      { mode: 0o600 },
+    );
     let mcpConfigFile: string | undefined;
     const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
     // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
@@ -1604,8 +1640,8 @@ export class BrainManager {
             token,
             cwd,
             folders: [...new Set([cwd, ctx.folder])],
-            // Our tools always loaded (no ToolSearch call before each one; the list is short since ADR 0043).
-            alwaysLoad: true,
+            // Our tools behind Claude Code's ToolSearch, but those it reaches for on its own (`ALWAYS_LOADED`).
+            alwaysLoad: false,
             // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
             profile: mode,
             ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}),
@@ -1681,7 +1717,8 @@ export class BrainManager {
       proc,
       account: ctx.accountHome && typeof req.account === "string" ? req.account : null,
       sig,
-      ranKey: ranKeyOf(req, session),
+      ranKey,
+      keptSystem,
       busy: false,
       lastUsed: Date.now(),
       idleTimer: null,
@@ -1696,6 +1733,53 @@ export class BrainManager {
       `[${ctx.agent.handle}] brain ${persistent ? "process" : "one-shot"} for ${session.slice(0, 8)} (${resume ? "resume" : "new"})`,
     );
     return live;
+  }
+
+  /**
+   * Where a session's first system text is kept (out of the per-process folders `drop` removes). Per folder and
+   * launch shape too: another `cwd` (a checkout cloned meanwhile) or one where Claude Code reads `CLAUDE.md` itself
+   * breaks the cached prefix anyway, and needs that folder's instructions in, or out of, the text.
+   */
+  private keptSystemFile(agentId: string, ranKey: string, cwd: string, withRepo: boolean) {
+    const name = createHash("sha256")
+      .update(JSON.stringify([agentId, ranKey, cwd, withRepo]))
+      .digest("hex")
+      .slice(0, 32);
+    return path.join(this.opts.root, "sessions", `${name}.txt`);
+  }
+
+  /**
+   * A session's appended system text stays the one it began with, as on a warm process: Claude Code builds its
+   * prompt from it, so a resume with other bytes would write the whole cached prefix again instead of reading it.
+   * Kept per agent, account, session and folder; dropped `SESSION_SYSTEM_KEEP_MS` after its last use (the cache is gone).
+   */
+  private sessionSystem(file: string, resume: boolean, fresh: () => string): string {
+    const dir = path.dirname(file);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const now = Date.now();
+    // A process warm for longer than that still uses its text: `drop` dates it from its close.
+    const live = new Set([...this.live.values()].map((l) => l.keptSystem));
+    for (const name of readdirSync(dir)) {
+      const f = path.join(dir, name);
+      if (live.has(f)) continue;
+      try {
+        if (now - statSync(f).mtimeMs > SESSION_SYSTEM_KEEP_MS) rmSync(f, { force: true });
+      } catch {
+        // gone meanwhile
+      }
+    }
+    if (resume) {
+      try {
+        const kept = readFileSync(file, "utf8");
+        utimesSync(file, now / 1000, now / 1000);
+        return kept;
+      } catch {
+        // not kept (a new runner, or past the cache): this text becomes the session's
+      }
+    }
+    const text = fresh();
+    writeFileSync(file, text, { mode: 0o600 });
+    return text;
   }
 
   private armIdle(live: Live) {
@@ -1775,6 +1859,13 @@ export class BrainManager {
     if (this.live.get(live.key) === live) this.live.delete(live.key);
     if (!live.proc.exited) live.proc.close();
     this.bridge.delete(live.id);
+    // Its last turn just used the cache: kept for an hour from now.
+    try {
+      const now = Date.now() / 1000;
+      utimesSync(live.keptSystem, now, now);
+    } catch {
+      // nothing kept
+    }
     const dir = path.join(this.opts.root, live.id);
     // The process may still read its files while it exits.
     const cleanup = () => rmSync(dir, { recursive: true, force: true });

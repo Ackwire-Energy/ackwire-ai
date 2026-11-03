@@ -3,7 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { localeInfo } from "@agenteschat/i18n/locale";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { detectedLocale } from "@/i18n";
 import { setNavigateAway } from "@/lib/navigate";
 import { pick, rowMenu } from "./catalog";
 import { createFakeApi, OPENROUTER_KEY, OPENROUTER_MODELS, ORG_ID, seedState } from "./fake-api";
@@ -755,6 +757,23 @@ describe("Buscar no workspace", () => {
     await settle(4);
     expect(document.body.textContent).toContain("Nada encontrado com “nada-disso”.");
   });
+});
+
+test("the language picker: no 'Automático', the language on screen chosen while the person never picked", async () => {
+  localStorage.removeItem("agentes.locale");
+  // The page is in Portuguese (as after the landing's cookie) while the browser says English.
+  expect(detectedLocale()).toBe("en");
+  await go(seedState(), "settings/account");
+  const box = screen().getByRole("combobox", { name: "Idioma" });
+  expect(box.textContent).toContain(localeInfo("pt-BR").native);
+  box.focus();
+  await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+  const options = screen().getAllByRole("option");
+  expect(options.some((o) => /Autom/.test(o.textContent ?? ""))).toBe(false);
+  expect(options.find((o) => o.getAttribute("aria-selected") === "true")?.textContent).toContain(
+    localeInfo("pt-BR").native,
+  );
+  await act(async () => fireEvent.keyDown(document.activeElement ?? box, { key: "Escape" }));
 });
 
 test("changing Settings language saves the account before updating the local language", async () => {

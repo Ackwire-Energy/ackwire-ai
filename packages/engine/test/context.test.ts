@@ -207,6 +207,9 @@ test("a new top-level message reads the replies shown under earlier messages, no
 test("history is capped at maxMessages, keeping the most recent", async () => {
   for (let i = 0; i < 5; i++) {
     await f.db.insert(schema.messages).values({
+      // No id is an anchor (`historyStart`), so the cap alone decides what is kept: a random anchor at m4 would drop
+      // m3, and one at m3 would hide a cap that kept older messages.
+      id: `${crypto.randomUUID().slice(0, -6)}000001`,
       orgId: f.org.id,
       channelId: f.general.id,
       authorType: "person",

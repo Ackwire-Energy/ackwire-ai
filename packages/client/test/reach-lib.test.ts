@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Agent } from "../src/api/types";
 import { audienceWith, consultableLocked, offersConsultable } from "../src/lib/audience";
-import { reachByAccess, reachKey, reachOf, reachOpens, routineReachWarnings } from "../src/lib/reach";
+import { reachByAccess, reachHandoffs, reachKey, reachOf, reachOpens, routineReachWarnings } from "../src/lib/reach";
 
 const agent = (id: string, handle: string, extra: Partial<Agent> = {}) => ({ id, handle, ...extra }) as Agent;
 const gil = agent("a-gil", "gil", { canTalk: false, audience: { mode: "owner", userIds: [] } });
@@ -115,4 +115,16 @@ describe("Outros agentes podem consultar", () => {
     expect(consultableLocked(off, { owner: false, onPlan: false })).toBe(false);
     expect(consultableLocked({ ...off, consultable: true }, { owner: false, onPlan: true })).toBe(false);
   });
+});
+
+test("reachHandoffs: the hand-offs by direct message its reach lines show, not a private consult or a blocked one", () => {
+  const meta = {
+    reach: [
+      { agentId: "a", handle: "a", reason: "not_in_channel", consultationId: "c1" },
+      { agentId: "b", handle: "b", reason: "audience", consultationId: "c2" },
+      { agentId: "c", handle: "c", reason: "audience" },
+    ],
+  };
+  expect([...reachHandoffs(meta)]).toEqual(["c1"]);
+  expect(reachHandoffs(undefined).size).toBe(0);
 });

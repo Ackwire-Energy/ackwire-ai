@@ -759,7 +759,8 @@ html:not([data-pointer]) .routine-preset:focus-visible {
 .routine-hook__part p {
   margin: 0;
 }
-.routine-hook__actions {
+.routine-hook__actions,
+.routine-hook__methods {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

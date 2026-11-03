@@ -1590,6 +1590,7 @@ export const en = {
       claude_code: "Claude Code isn't signed in on this computer. Connect a Claude account on {{name}}'s\u00a0page.",
       codex: "Codex isn't signed in on this computer. Connect a ChatGPT account on {{name}}'s\u00a0page.",
       cursor: "Cursor isn't signed in on this computer. Connect a Cursor account on {{name}}'s\u00a0page.",
+      opencode: "OpenCode can't think on this computer. Connect an OpenCode key on {{name}}'s\u00a0page.",
     },
     card: {
       connected: "Done: {{name}} has an AI now.",
@@ -1609,6 +1610,7 @@ export const en = {
       claude: "Connect your Claude plan",
       chatgpt: "Connect your ChatGPT plan",
       cursor: "Connect your Cursor plan",
+      zen: "Connect OpenCode",
       api_key: "Add an API key",
     },
     titleFor: "Connect an AI for {{name}}",
@@ -1623,6 +1625,8 @@ export const en = {
       claude: { title: "Your Claude plan", tiers: "Pro, Max, Ultra, Team or Enterprise" },
       chatgpt: { title: "Your ChatGPT plan", tiers: "Plus, Pro, Business or Enterprise" },
       cursor: { title: "Your Cursor plan", tiers: "Pro, Pro+, Ultra or Teams, or a Cursor API key" },
+      /** OpenCode's CLI (ADR 0132): its free models with no sign-in, or a key from OpenCode's console. */
+      zen: { title: "OpenCode", tiers: "Free models, or your OpenCode key" },
       zai: { tiers: "Lite, Pro or Max" },
       kimi: { tiers: "Plus, Pro, Max or Ultra" },
       minimax: { tiers: "Go, Explore or Build" },
@@ -1684,6 +1688,7 @@ export const en = {
       claude_code: "Claude signed in as {{email}}, not {{account}}. Sign out on Claude's page and try again.",
       codex: "ChatGPT signed in as {{email}}, not {{account}}. Sign out on ChatGPT's page and try again.",
       cursor: "Cursor signed in as {{email}}, not {{account}}. Sign out on Cursor's page and try again.",
+      opencode: "OpenCode signed in as {{email}}, not {{account}}. Try again with the right key.",
     },
     useAnyway: "Use {{email}}",
     assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
@@ -1701,6 +1706,49 @@ export const en = {
     save: "Save as a key",
     remove: "Remove it",
     send: "Send anyway",
+  },
+  /** An agent's proposal of costly work nobody asked for directly (ADR 0131): the card's buttons and who decided. */
+  costlyCard: {
+    go: "Go ahead",
+    always: "Always",
+    notNow: "Not now",
+    never: "Never",
+    waiting: "Waiting for the person responsible",
+    you: "You",
+    decided: {
+      go: "{{name}} said go ahead",
+      always: "{{name}} said always for this",
+      not_now: "{{name}} said not now",
+      never: "{{name}} said never for this",
+    },
+  },
+  /** Agent settings: what it may start that nobody asked for directly, and which agents it may call (ADR 0131). */
+  brakes: {
+    title: "Work nobody asked for",
+    subtitle: "What it starts on its own, from a routine, an alert or another agent. What a person asks is never held.",
+    costly: "Ask before costly work",
+    costlyHelp: "Before opening a pull request, installing packages or a long job, it asks the person responsible.",
+    costlyAsk: "Ask first",
+    costlyGo: "Just do it",
+    cost: { pr: "opening pull requests", install: "installing packages", long: "long jobs" },
+    rememberedGo: "Always: {{what}}",
+    rememberedNever: "Never: {{what}}",
+    forget: "Forget these answers",
+    atOnce: "Jobs at once",
+    atOnceHelp: "How many jobs nobody asked for it runs at the same time. The others wait their turn.",
+    prs: "Pull requests an hour",
+    prsHelp: "The most its own work opens in an hour.",
+    call: "Agents it may call",
+    callHelp: "Who it may mention or hand work to.",
+    callAll: "All",
+    callSome: "Only these",
+    callNone: "None",
+    project: "Project",
+    projectHelp: "Agents of different projects don't call each other.",
+    projectPlaceholder: "Mobile app",
+    otherProjects: "May call agents of other projects",
+    peopleNote: "These limits never hold what a person asks for.",
+    failed: "Couldn't save. Try again.",
   },
   stretchCard: {
     continued: "{{name}} let them go on · {{time}}",
@@ -1796,7 +1844,6 @@ export const en = {
     routinePost: "Didn't call <b>{{name}}</b>: a routine that only looks and tells wakes nobody",
     outside: "Not {{place}}",
     routine: "Routine {{name}}",
-    see: "See",
     add: "Add to channel",
     added: "{{name}} joined the channel.",
     allow: "Let {{person}} talk to him",
@@ -1851,6 +1898,8 @@ export const en = {
       updated: "Fixed the skill <b>{{name}}</b>",
     },
     other: "Made a change",
+    /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */
+    copyWebhook: "Copy webhook address",
     issueFields: {
       title: "the title",
       description: "the description",
@@ -2259,10 +2308,27 @@ export const en = {
       waitingCount_one: "{{count}} waiting",
       waitingCount_other: "{{count}} waiting",
     },
+    /** Several waiting requests of one kind in a row, folded into one: "3 requests from Ada to Run sql". */
+    run: {
+      head_one: "{{count}} request from {{name}} to {{what}}",
+      head_other: "{{count}} requests from {{name}} to {{what}}",
+      approve: "Approve all",
+      /** Unfolds the run into its requests, each with its own decision. */
+      show: "See each one",
+    },
     always: {
       button: "Always approve",
-      hint: "Approves this one and the next ones like it from {{name}}: {{actions}}, with any values.",
-      hintTarget: "Approves this one and the next ones like it from {{name}}: {{actions}}.",
+      /** The SQL tool's reads of one project only (anything else it runs still asks). */
+      reads: "Always approve reads",
+      note: "Covers {{actions}} from now on, with any values. To undo: Tools and access, on {{name}}'s page.",
+      noteTarget: "Covers {{actions}} from now on. To undo: Tools and access, on {{name}}'s page.",
+      /** `target`: the call's other arguments, as `project_id=abc`. */
+      noteReads:
+        "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page.",
+      noteReadsAll:
+        "Covers only reads by {{actions}} on this connection from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page.",
+      /** A remembered SQL reads rule in Tools and access. */
+      readsRule: "Reads by {{tool}}",
       pushTo: "push to {{branch}} in {{repo}}",
       done: "Approved. {{name}} won't ask for this again.",
       undoHere: "To undo it, go to Tools and access, on {{name}}'s page.",
@@ -2961,6 +3027,7 @@ export const en = {
             claude_code: "Add a Claude account",
             codex: "Add a ChatGPT account",
             cursor: "Add a Cursor account",
+            opencode: "Add an OpenCode key",
           },
           stepOne: {
             claude_code: "The account with your plan",
@@ -2970,6 +3037,8 @@ export const en = {
           stepOneHint:
             "Wrong account? Sign out there and try again. The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
           open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT", cursor: "Sign in with Cursor" },
+          /** OpenCode thinks with its free models without any key: the key is for its paid models. */
+          opencodeFree: "No key needed for OpenCode's free models. A key from OpenCode's console adds its paid ones.",
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself.",
           cursorKey: "Use a Cursor API key instead",
@@ -2995,6 +3064,7 @@ export const en = {
               "ChatGPT signed in as {{account}}, an account you already connected. To use another, sign out on ChatGPT's page and try again.",
             cursor:
               "Cursor signed in as {{account}}, an account you already connected. To use another, sign out on Cursor's page and try again.",
+            opencode: "That OpenCode key is already connected as {{account}}.",
           },
           startFailed: "No answer from {{computer}}. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
@@ -3237,6 +3307,12 @@ export const en = {
       cancel: "Cancel",
       forgotten: "Forgotten. It's in Archived if you want it back.",
       saved: "Saved. It counts as verified now.",
+      /** The agent's own how-tos, lessons and notes, apart from what it learned about people. */
+      playbook: "How {{name}} works",
+      playbookNote:
+        "Ways of working it keeps for itself. They don't show in the chat. What it picked up from outside and never used again leaves on its own and stays in Archived.",
+      /** Folds the technical text under a learned item's plain summary. */
+      details: "Technical details",
       skills: "Skills it made",
       skillUses_zero: "never loaded",
       skillUses_one: "loaded once",
@@ -4410,6 +4486,11 @@ export const en = {
       newNote:
         "The routine gets an address of its own. Every POST to it starts the agent with what was sent. The address shows on the routine's page once it is saved.",
       hidden: "Only who can change the routine sees its address.",
+      methods: "Accepted methods",
+      methodsHelp:
+        "The address answers only the methods checked. With GET, the URL's query parameters are the call's data.",
+      /** After "Runs on every call…" on the routine's page: `methods` are HTTP methods ("GET, POST"). */
+      methodsLine: "Accepts {{methods}}.",
       address: "Address",
       addressHelp:
         "Anyone with the address can start the agent. Keep it like a password and make a new one if it leaks.",
@@ -4422,7 +4503,7 @@ export const en = {
       signedOff: "Off: the agent gets any call to the address.",
       signedOn: "On: only calls signed with the secret get through.",
       signedHelp:
-        "Send the HMAC-SHA256 of the body in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too.",
+        "Send the HMAC-SHA256 of the body (of a GET call: its query string, without the ?) in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too.",
       addSecret: "Require a signature",
       newSecret: "New secret",
       newSecretTitle: "Make a new secret?",
@@ -4612,7 +4693,7 @@ export const en = {
       whatPlaceholder: "E.g.: Summarize what happened this week in #eng and #product.",
       name: "Name (optional)",
       when: "When",
-      kind: { schedule: "Time", event: "Event", email: "Email", webhook: "Webhook" },
+      kind: { schedule: "Time", event: "Event", email: "Email", webhook: "Webhook", connector: "MillionSend email" },
       frequency: "Frequency",
       frequencyPlaceholder: "E.g.: every Monday at 9am",
       timezone: "Time zone",
@@ -4814,8 +4895,8 @@ export const en = {
     executor: {
       claude: "Claude Code",
       claudeText: "Claude Code plans and codes on the computer. {{name}} follows and relays.",
-      codex: "Codex (experimental)",
-      codexText: "Codex codes on the computer. Still being tested.",
+      codex: "Codex",
+      codexText: "Codex codes on the computer.",
       agent: "{{name}} (the agent itself)",
       agentText: "{{name}} codes straight on the computer, with his own tools.",
       agentText_female: "{{name}} codes straight on the computer, with her own tools.",
@@ -5354,7 +5435,6 @@ export const en = {
         codexText: "Does it on the computer.",
         agentText: "{{name}} does it, with his own tools.",
         agentText_female: "{{name}} does it, with her own tools.",
-        testing: "Testing",
         locked: "It can't change once the mission has started.",
         open: "It can change until the mission starts.",
         saved: "Who does the work: {{name}}",
@@ -6064,6 +6144,7 @@ export const en = {
       claude_code: "Claude",
       codex: "ChatGPT",
       cursor: "Cursor",
+      opencode: "OpenCode",
       needs: {
         keys: "Update agentes on the computer to use a plan's key",
       },
@@ -6073,6 +6154,7 @@ export const en = {
         claude_code: "Not ready on {{computer}} yet",
         codex: "Not ready on {{computer}} yet",
         cursor: "Not ready on {{computer}} yet",
+        opencode: "Not ready on {{computer}} yet",
         online: "{{computer}} isn't answering right now. We're on it.",
       },
     },
@@ -7405,25 +7487,29 @@ export const en = {
       claude: "{{model}} on the Claude plan",
       chatgpt: "{{model}} on the ChatGPT plan",
       cursor: "{{model}} on the Cursor plan",
+      zen: "{{model}} on OpenCode",
       coding: "{{model}} on {{plan}}",
       claudeOf: "{{model}} on {{owner}}'s Claude plan",
       chatgptOf: "{{model}} on {{owner}}'s ChatGPT plan",
       cursorOf: "{{model}} on {{owner}}'s Cursor plan",
+      zenOf: "{{model}} on {{owner}}'s OpenCode",
       codingOf: "{{model}} on {{owner}}'s {{plan}}",
       claudeAuto: "Claude plan",
       chatgptAuto: "ChatGPT plan",
       cursorAuto: "Cursor plan",
+      zenAuto: "OpenCode",
       codingAuto: "{{plan}}",
       claudeAutoOf: "{{owner}}'s Claude plan",
       chatgptAutoOf: "{{owner}}'s ChatGPT plan",
       cursorAutoOf: "{{owner}}'s Cursor plan",
+      zenAutoOf: "{{owner}}'s OpenCode",
       codingAutoOf: "{{owner}}'s {{plan}}",
       on: "{{line}} on {{computer}}",
     },
     model: "Model (API)",
     modelText: "An AI model through the API, with a workspace key.",
     countsBudget: "Counts against {{name}}'s budget.",
-    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor" },
+    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" },
     foot: {
       api: "Through the API",
       noComputer: "No computer",
@@ -7433,9 +7519,9 @@ export const en = {
     claude_codeText: "Uses the Claude plan of whoever connected the computer.",
     codexText: "Uses the ChatGPT plan of whoever connected the computer.",
     cursorText: "Uses the Cursor plan of whoever connected the computer.",
+    opencodeText: "OpenCode's free models, or the OpenCode key of whoever connected the computer.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "In your Cursor plan", apiPrice: "Billed by Cursor at API prices" },
-    testing: "Testing",
     reasons: {
       no_computer: "Choose a connected computer under Computer to use it.",
       exec_off: "The computer was connected without permission to run programs.",
@@ -7480,6 +7566,7 @@ export const en = {
       claude_code: "Claude Code · {{model}}",
       codex: "Codex · {{model}}",
       cursor: "Cursor · {{model}}",
+      opencode: "OpenCode · {{model}}",
       noFallback: "{{brain}}, no API fallback",
     },
     mission: {
@@ -9037,6 +9124,10 @@ export const en = {
       openConnectors: "Open Connectors",
       when: "When an email arrives at {{address}}",
       whenFolder: "When an email arrives at {{address}} ({{folder}})",
+      /** A routine on MillionSend's received email (ADR 0130) that names no inbox. */
+      whenMillionSend: "When an email arrives in MillionSend",
+      inboxAddress: "Inbox address",
+      inboxAddressHelp: "Empty = any MillionSend inbox.",
       unknownMailbox: "a mailbox",
       waiting: "Waiting for an email",
       thisWeek_one: "{{count}} email this week",
@@ -9455,11 +9546,19 @@ export const en = {
       removed: "{{folder}} was removed.",
       removedAgent: "{{name}} no longer uses {{folder}}.",
       tools: "Tools",
-      tool: { claude: "Claude Code", codex: "Codex", cursor: "Cursor", commands: "Commands", browser: "Browser" },
+      tool: {
+        claude: "Claude Code",
+        codex: "Codex",
+        cursor: "Cursor",
+        opencode: "OpenCode",
+        commands: "Commands",
+        browser: "Browser",
+      },
       toolText: {
         claude: "Writes and changes files, only in the allowed folders.",
         codex: "Like Claude Code, with a ChatGPT account. Only in the allowed folders.",
         cursor: "Like Claude Code, with a Cursor account. Only in the allowed folders.",
+        opencode: "Like Claude Code, with OpenCode's free models or an OpenCode key. Only in the allowed folders.",
         commands: "Runs Terminal commands, like tests and builds.",
       },
       commandsWarn: "Commands can reach other parts of the computer, not only the allowed folders.",
@@ -10331,6 +10430,8 @@ export const en = {
     stopFailed: "Couldn't stop it. Only who asked, the agent's owner or an admin can.",
     autoUpdate: "Still on it ({{duration}}).",
     autoUpdateNow: "Now: {{now}}.",
+    /** The server's own line when a person writes to a working agent and the quick reply can't be written (ADR 0131). */
+    statusReply: "Still on it ({{duration}}). I'll read your message after this step.",
     status: {
       one: "Working on: {{subject}}",
       oneUntitled: "Working in the background",
@@ -10402,10 +10503,6 @@ export const en = {
       waitingProvider: "{{name}}: the AI provider is down · retries by itself",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{name}} handed part of it on and is waiting to hear back",
-      /** An answer whose question is in a reply farther up: one line where it arrived, "See" goes to that reply. */
-      answeredFar: "{{to}} answered {{from}}'s question",
-      answeredRequestFar: "{{to}} answered {{from}}'s request",
-      see: "See",
     },
     /**
      * The slim row before a reply whose agent asked others first ("Theo ⇄ Atlas · 2 min"): the short word after the
@@ -10523,6 +10620,10 @@ export const en = {
       },
       gave: "given",
       answered: "answered",
+      /** A call that ran without asking under "Always approve": who approved it for good. */
+      autoApproved: "Approved automatically (always approved by {{name}})",
+      autoApprovedReads: "Approved automatically (read always approved by {{name}})",
+      autoApprovedNobody: "Approved automatically",
       error: "error",
       seconds: "{{n}} s",
       minutes: "{{n}} min",
@@ -10718,6 +10819,16 @@ export const en = {
       agent: "With {{name}}",
     },
     body: {
+      /** The autonomy brakes (ADR 0131): an agent asks before costly work nobody asked for, the noise digest, a loop stop. */
+      autonomy_proposal: {
+        pr: "Nobody asked for this directly. May I open a pull request?",
+        install: "Nobody asked for this directly. May I install these packages?",
+        long: "This is taking many steps, and nobody asked for it directly. May I keep going?",
+      },
+      autonomy_digest_one: "{{count}} alert looked known or harmless, so I didn't work on it:",
+      autonomy_digest_other: "{{count}} alerts looked known or harmless, so I didn't work on them:",
+      autonomy_loop:
+        "I stopped working on this on my own. It came back {{count}} times in a day ({{title}}). Tell me how you want it handled.",
       mission_plan: "Plan for “{{title}}” on {{computer}}",
       mission_planNoComputer: "Plan for “{{title}}”",
       mission_decision: "Decision: {{question}}",

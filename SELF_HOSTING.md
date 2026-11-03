@@ -719,7 +719,8 @@ ones a self-hosted instance usually touches:
 | `OWNER_CLAIM_SHA256` | | While no account exists, only the owner link made with it creates the first one (Sign-up, below). `OWNER_KEY_SHA256` is the desktop app's. |
 | `TRUSTED_PROXIES` | | Proxies in front of your proxy (see nginx above). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Sign in with Google", redirect URI `{PUBLIC_URL}/api/auth/callback/google`. `GITHUB_*` and `APPLE_*` work the same way. |
-| `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens and the help pages when both are set. `/terms` and `/privacy` on this server go to them, or say it has none. |
+| `APPLE_TEAM_ID` + `APPLE_APP_BUNDLE_ID`, `ANDROID_APP_PACKAGE` + `ANDROID_APP_CERT_SHA256` | | For a phone app you build yourself with `EXPO_PUBLIC_API_URL` set to this server: links to its pages (a conversation, a message, a thread, an agent, a task, a routine, an approval, the inbox, settings, invitations, password resets) open in the app instead of the browser. The server then publishes `/.well-known/apple-app-site-association` (also at `/apple-app-site-association`) and `/.well-known/assetlinks.json`; your proxy must pass them through as they are, with no redirect. Several bundle ids or packages are comma-separated. The fingerprints are the SHA-256 of Google Play's app signing key and of your upload key. Without them, links open the website, as before. |
+| `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens when both are set. `/terms` and `/privacy` on this server go to them, or say it has none. |
 | `LANDING_URL` | | The agentes.chat landing page's address, which turns on its waiting list. Leave it unset. |
 | `SMTP_URL` | | Email through your SMTP server: `smtps://user:password@smtp.example.com:465`, or `smtp://` for STARTTLS on 587, which is then required (`?requireTLS=false` at the end allows a relay without TLS on a trusted network). |
 | `MILLIONSEND_API_KEY`, `MILLIONSEND_API_URL` | `https://api.millionsend.com` for the URL | Email through a Resend-compatible API instead: MillionSend, your own MillionSend, or Resend (`https://api.resend.com`). |
@@ -895,6 +896,12 @@ one, `https://app.agentes.chat/api/desktop/update` (its version and package type
 for its newest version from the browser (Connect a computer, above, says what that request carries).
 The instance itself downloads nothing from agentes.chat.
 
+**Help pages.** The app's help links ("How computers work", "About this computer") open the public docs at
+`https://agentes.chat/docs`, in the reader's language (`/pt/docs`, `/zh/docs`, `/fr/docs`…), the same pages for
+every server. They open in a new tab with no referrer and carry only the page, the language and the section, never
+your server's address. An old link to `/help/<page>` on your server answers 301 to that page on the docs site
+(`?lang=`, else the browser's language, else English), and the browser keeps the `#section`.
+
 An agents' computer, this server's own included, downloads Bun from GitHub when it is set up, Chrome
 for Testing from Google the first time an agent opens the browser there, and, on Linux, the packages
 agents' screens and browsers need from the system's own package sources.
@@ -978,16 +985,19 @@ your organization. Then it installs a background service
 no commands) and `--no-service`.
 
 That computer runs the commands agents execute, the browser they drive (Chrome for Testing, which the
-runner installs as it starts once the browser is turned on there), and Claude Code, Codex or Cursor's
-CLI when an agent thinks with a subscription signed in there. Install the ones you want on that
-computer, as the user that runs the runner: Cursor's with `curl https://cursor.com/install -fsS | bash`
-(it lands in `~/.local/bin`, which the runner's PATH must include). A runner in system mode (each agent
+runner installs as it starts once the browser is turned on there), and Claude Code, Codex, Cursor's
+or OpenCode's CLI when an agent thinks with a subscription signed in there (OpenCode's free models need
+no sign-in at all). Install the ones you want on that computer, as the user that runs the runner:
+Cursor's with `curl https://cursor.com/install -fsS | bash` (it lands in `~/.local/bin`, which the
+runner's PATH must include), OpenCode's with `npm install -g opencode-ai@1.19.5`. A runner in system mode (each agent
 its own system user) needs the CLI where every agent's user can run it, not in one user's home: install it
 under a shared folder and link it into `/usr/local/bin`, for example
 `sudo env HOME=/opt/cursor sh -c 'curl https://cursor.com/install -fsS | bash'`, then
-`sudo chmod -R a+rX /opt/cursor` and `sudo ln -sf /opt/cursor/.local/bin/agent /usr/local/bin/agent`.
+`sudo chmod -R a+rX /opt/cursor` and `sudo ln -sf /opt/cursor/.local/bin/agent /usr/local/bin/agent`;
+OpenCode's release binary (`opencode-linux-x64.tar.gz` of github.com/anomalyco/opencode's `v1.19.5`)
+extracted to `/usr/local/bin/opencode`.
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
-`agentes-runner tools disable commands` (or `claude`, `codex` or `cursor`) turns a capability off on that
+`agentes-runner tools disable commands` (or `claude`, `codex`, `cursor` or `opencode`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
 
 On Linux, Chrome for Testing loads system libraries that a minimal server doesn't have. The
@@ -1237,7 +1247,7 @@ memory spots repeats said in other words, and agents find buttons from a descrip
 screenshots. The person who set up the server adds the key in **Settings → AI accounts** (the setup
 asks once), or puts it in `.env` as `TYPESAFE_API_KEY`, which wins. It is stored encrypted like
 provider keys and never sent back to a browser. TypeSafe bills your account: US$ 0.042 per million
-tokens read, about US$ 0.0001 per routed message. Without it, see https://app.agentes.chat/help/jev#without.
+tokens read, about US$ 0.0001 per routed message. Without it, see https://agentes.chat/docs/jev#without.
 
 **Plans.** An agent can think with a Claude or ChatGPT subscription instead of a key, on a connected
 computer: Claude Code or Codex signs in there with the provider's own flow. Each account is a folder

@@ -80,17 +80,26 @@ export function FileCardPreview({
   const api = useApi();
   const image = previewKind(content.contentType) === "image" && content.size <= MAX_THUMB_BYTES;
   const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, image);
+  // The tile keeps its loading size until the image is decoded: its size changes once, not to nothing and back.
+  const [decoded, setDecoded] = useState<string | null>(null);
   const download = () => fileSaver.save(api.artifacts.fileUrl(org.id, artifactId, { version }), content.name);
   if (image && !failed) {
     return (
       <button
         type="button"
         className="file-thumb"
-        data-loading={url ? undefined : "true"}
+        data-loading={url && decoded === url ? undefined : "true"}
         onClick={onOpen}
         aria-label={t("artifacts.open", { title })}
       >
-        {url && <img src={url} alt={t("files.imageAlt", { title })} />}
+        {url && (
+          <img
+            src={url}
+            alt={t("files.imageAlt", { title })}
+            onLoad={() => setDecoded(url)}
+            onError={() => setDecoded(url)}
+          />
+        )}
         <span className="file-thumb__caption small">
           <span className="file-thumb__name">{content.name}</span>
           <span className="tabular">{formatBytes(i18n.language, content.size)}</span>

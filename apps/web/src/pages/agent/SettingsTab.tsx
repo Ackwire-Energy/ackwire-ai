@@ -38,6 +38,7 @@ import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AGENT_SECTIONS, type AgentSection, type Field as EditField, FIELD_PLACE } from "@/lib/agent-edit";
 import { BLANK_LOOK, cleanHandle } from "@/lib/new-agent";
+import { BrakesCard } from "./BrakesCard";
 import { CardHead, useAgentEdit, WasLine } from "./context";
 import { ReadOnlyNote, useVisibleChannels } from "./pieces";
 
@@ -449,6 +450,8 @@ export function SettingsTab({
               </>
             )}
           </Section>
+
+          <BrakesCard />
 
           <Section
             id="channels"

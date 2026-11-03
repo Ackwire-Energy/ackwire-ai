@@ -219,11 +219,20 @@ describe("talker: fast replies while the task waits", () => {
     expect(await talkerMessages()).toHaveLength(2);
   });
 
-  test("the model passes, or answers too late: nothing is posted", async () => {
+  test("the model passes: nothing is posted", async () => {
     const pass = await waitingOnQuestion(() => ({ chunks: ['{"action":"pass","text":""}'] }));
     await pass.write("ok, valeu");
     expect(pass.decisions).toEqual(["pass"]);
     expect(await talkerMessages()).toHaveLength(0);
+    await f.close();
+
+    // A question it lets pass still gets the server's status line (ADR 0131 §2).
+    const ping = await waitingOnQuestion(() => ({ chunks: ['{"action":"pass","text":""}'] }));
+    await ping.write("??");
+    expect(ping.decisions).toEqual(["reply"]);
+    expect((await talkerMessages()).map((m) => (m.meta as Record<string, unknown>).bodyCode)).toEqual([
+      "talker_status",
+    ]);
     await f.close();
 
     const never = new Promise<void>(() => {});
@@ -233,8 +242,24 @@ describe("talker: fast replies while the task waits", () => {
     const started = Date.now();
     await late.write("já fez o deploy?");
     expect(Date.now() - started).toBeLessThan(2000);
-    expect(late.decisions).toEqual(["pass"]);
-    expect(await talkerMessages()).toHaveLength(0);
+    // Too late is no answer: the server's own status line goes instead (ADR 0131 §2).
+    expect(late.decisions).toEqual(["reply"]);
+    expect((await talkerMessages()).map((m) => (m.meta as Record<string, unknown>).bodyCode)).toEqual([
+      "talker_status",
+    ]);
+  });
+
+  test("the cheap model can't answer (no key, an outage): the person still hears what the task does", async () => {
+    const down = await waitingOnQuestion(() => {
+      throw new Error("no API key");
+    });
+    await down.write("ta fazendo oq ai?");
+    expect(down.decisions).toEqual(["reply"]);
+    const [line] = await talkerMessages();
+    const meta = line?.meta as { bodyCode?: string; bodyParams?: Record<string, string>; talker?: unknown };
+    expect(meta.bodyCode).toBe("talker_status");
+    expect(Number(meta.bodyParams?.minutes)).toBeGreaterThanOrEqual(1);
+    expect(line?.body).toContain("Still on it");
   });
 
   test("a model-brain run moving along reads the message itself: no model call", async () => {

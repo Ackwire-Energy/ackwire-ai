@@ -1,4 +1,4 @@
-import { type AppLocale, localeInfo } from "@agenteschat/i18n/locale";
+import type { AppLocale } from "@agenteschat/i18n/locale";
 import { Button, Dialog, DialogFooter, Input, Select, Switch } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -214,15 +214,13 @@ export function General() {
               id="language"
               size="sm"
               align="end"
-              value={language}
+              // Never picked: the system's language shows as the one chosen (and keeps following it until a pick).
+              value={language === "auto" ? detectedLocale() : language}
               onValueChange={(v) => {
                 setLanguage(v);
-                switchDesktopLocale(i18n, v === "auto" ? detectedLocale() : v, host.platform);
+                switchDesktopLocale(i18n, v, host.platform);
               }}
-              options={[
-                { value: "auto", label: t("shell.languageAuto", { language: localeInfo(detectedLocale()).native }) },
-                ...locales.map((l) => ({ value: l.code, label: l.label })),
-              ]}
+              options={locales.map((l) => ({ value: l.code, label: l.label }))}
             />
           }
         />

@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
+import { autonomyNoteFor, proposalCardOf } from "./brakes";
 import { threadFollowChoices } from "./follows";
 import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
@@ -178,7 +179,8 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   const card = message.authorType === "agent" ? stretchCardOf(meta) : null;
   const stoppedAt = card?.agentIds.at(-1);
   const owner = !behind && !card?.forUserId && stoppedAt ? await agentOwner(deps, stoppedAt) : null;
-  const asker = behind ?? card?.forUserId ?? owner;
+  // The autonomy brakes' proposal card, digest and loop stop (ADR 0131) are for the person they name.
+  const asker = behind ?? card?.forUserId ?? proposalCardOf(meta)?.forUserId ?? autonomyNoteFor(meta) ?? owner;
   const ownerSees =
     asker !== null &&
     asker === owner &&

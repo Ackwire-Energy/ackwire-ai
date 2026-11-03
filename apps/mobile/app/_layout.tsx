@@ -1,7 +1,7 @@
 import { keys, useApi } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { useQueryClient } from "@tanstack/react-query";
-import { ThemeProvider as NavigationThemeProvider, router, Stack, usePathname } from "expo-router";
+import { type Href, ThemeProvider as NavigationThemeProvider, router, Stack, usePathname } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -12,6 +12,7 @@ import { forgetInvite, loadPendingInvite, waitingAsk } from "@/features/auth/inv
 import { resumesAsk } from "@/features/auth/invite-steps";
 import { LaunchSplash } from "@/features/launch/LaunchSplash";
 import { markLaunched } from "@/features/launch/launched";
+import { takeLink } from "@/features/links/pending";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { ScreenError } from "@/features/shared/ScreenError";
@@ -105,7 +106,11 @@ function Gate() {
     if (session.pending) return;
     const before = wasSignedIn.current;
     wasSignedIn.current = signedIn;
+    // A web link opened while signed out opens now; one opened before signing out never does.
+    if (before === true && !signedIn) takeLink();
     if (before !== false || !signedIn) return;
+    const link = takeLink();
+    if (link) setTimeout(() => router.navigate(link as Href), 0);
     setWelcoming(true);
     setTimeout(() => setWelcoming(false), 1400);
   }, [signedIn, session.pending]);

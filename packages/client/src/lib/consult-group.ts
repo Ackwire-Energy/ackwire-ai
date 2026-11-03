@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import type { MessageConsultation, RunConsultation } from "../api/types";
 import { noticeOf } from "./notices";
 
@@ -76,10 +75,6 @@ export const consultOriginKey = (c: Pick<RunConsultation, "kind">, inChannel: bo
     : inChannel
       ? ("chat.consultPanel.origin" as const)
       : ("chat.consultPanel.originDm" as const);
-
-/** The quiet line of an answer whose reply is farther up. */
-export const consultFarKey = (c: Pick<RunConsultation, "kind">) =>
-  isNote(c) ? ("chat.consultGroup.answeredRequestFar" as const) : ("chat.consultGroup.answeredFar" as const);
 
 /** The conversation's questions by the run that asked them, each run's oldest first. */
 export function groupsByRun(list: readonly RunConsultation[]): Map<string, RunConsultation[]> {
@@ -387,58 +382,8 @@ export function consultsForLine<T extends { runId: string }>(live: T[], blocks: 
   return blocks.size === 0 ? live : live.filter((c) => !blocks.has(c.runId));
 }
 
-/**
- * "Ver" on an answer's line: the reply that asked opens its row at that answer. A request waits for the row
- * it names (the reply may not be drawn yet: the phone draws rows as they scroll in) and is used once.
- */
-export interface ConsultBlockRequest {
-  runId: string;
-  consultationId: string;
-  at: number;
-}
-
-/** A request older than this is stale (the reply never came into view): it opens nothing later. */
-export const CONSULT_REQUEST_FRESH_MS = 10_000;
-
-let pendingRequest: ConsultBlockRequest | null = null;
-const requestListeners = new Set<() => void>();
-
-export function requestConsultBlock(runId: string, consultationId: string, now = Date.now()) {
-  pendingRequest = { runId, consultationId, at: now };
-  for (const listener of requestListeners) listener();
-}
-
-/** The request waiting for this run's row, once (it is then used up); a stale one goes. */
-export function takeConsultBlockRequest(runId: string, now = Date.now()): ConsultBlockRequest | null {
-  const r = pendingRequest;
-  if (!r) return null;
-  if (now - r.at > CONSULT_REQUEST_FRESH_MS) {
-    pendingRequest = null;
-    return null;
-  }
-  if (r.runId !== runId) return null;
-  pendingRequest = null;
-  return r;
-}
-
-/** The last request for this run's row (it opens at that answer), else null. `runId` null: not listening. */
-export function useConsultBlockRequest(runId: string | null): ConsultBlockRequest | null {
-  const [hit, setHit] = useState<ConsultBlockRequest | null>(null);
-  useEffect(() => {
-    if (!runId) return;
-    const check = () => {
-      const r = takeConsultBlockRequest(runId);
-      if (r) setHit(r);
-    };
-    check();
-    requestListeners.add(check);
-    return () => {
-      requestListeners.delete(check);
-    };
-  }, [runId]);
-  // A row drawn again for another run keeps no request of the one before.
-  return hit?.runId === runId ? hit : null;
-}
+/** A stored card's id that opens the two agents' conversation: not the stand-in `consultationsOf` makes for none. */
+export const openableConsultation = (id: string | null | undefined) => (id && !id.includes(":") ? id : null);
 
 /** Seconds since the question went out (while open) or until it closed. */
 export function consultSeconds(c: RunConsultation, now: number): number {

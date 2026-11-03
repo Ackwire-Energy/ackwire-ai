@@ -3,6 +3,7 @@ import {
   type Message,
   type MessageConsultation,
   type RunConsultation,
+  useConsultationConversation,
   useConsultations,
 } from "@agenteschat/client";
 import {
@@ -12,26 +13,25 @@ import {
   type ConsultRow,
   consultAskedKey,
   consultBlocksNearEnd,
-  consultFarKey,
   consultLineKey,
   consultLineState,
   consultNoticeFolds,
   consultPair,
   groupsByRun,
+  openableConsultation,
   pairItemOf,
-  requestConsultBlock,
-  useConsultBlockRequest,
 } from "@agenteschat/client/lib/consult-group";
-import { formatTime, joinNames, namesText } from "@agenteschat/client/lib/format";
+import { withoutRelayLine } from "@agenteschat/client/lib/consultations";
+import { joinNames, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatLineTime } from "@agenteschat/client/lib/work";
 import { cx, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageBody } from "@/chat/MessageBody";
-import { AgentAvatar, withAgentFace, withAgentFaces } from "@/components/AgentAvatar";
+import { AgentAvatar, withAgentFace } from "@/components/AgentAvatar";
 import { useChannelActions } from "@/components/channel-actions";
 import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
@@ -119,19 +119,34 @@ const NO_ITEMS: ConsultPairItem[] = [];
 /**
  * The questions a reply's pair row stands for: its run's (`runId`, null: none) and those its `meta.consulted` names
  * that the list doesn't have. `saved`: a message the run posted while it still works, whose live row shows them.
+ * `reached`: hand-offs the message's reach lines show (`reachHandoffs`), left out here.
  */
 export function useReplyConsults(
   runId: string | null | undefined,
   consulted: readonly MessageConsultation[],
   saved: boolean,
+  reached: ReadonlySet<string>,
 ): ConsultPairItem[] {
   const groups = useContext(ConsultGroupsContext);
   return useMemo(() => {
     if (saved && runId && groups.live.has(runId)) return NO_ITEMS;
-    const run = (runId && groups.byRun.get(runId)) || NO_ITEMS;
-    const extra = consulted.filter((c) => !run.some((r) => r.id === c.consultationId)).map(pairItemOf);
+    const all = (runId && groups.byRun.get(runId)) || NO_ITEMS;
+    const run = reached.size === 0 ? all : all.filter((c) => !reached.has(c.id));
+    const extra = consulted.filter((c) => !all.some((r) => r.id === c.consultationId)).map(pairItemOf);
     return extra.length === 0 ? run : [...run, ...extra];
-  }, [groups.byRun, groups.live, runId, consulted, saved]);
+  }, [groups.byRun, groups.live, runId, consulted, saved, reached]);
+}
+
+/**
+ * The conversation's question with this id (a hand-off a reach line shows): from its list, or, older than the list
+ * goes back, on its own.
+ */
+export function useConsultById(channelId: string, id: string | undefined): RunConsultation | null {
+  const { org } = useOrg();
+  const list = useConsultations(org.id, channelId, Boolean(id));
+  const listed = useMemo(() => (id && list.data?.find((c) => c.id === id)) || null, [list.data, id]);
+  const alone = useConsultationConversation(org.id, channelId, id && list.isSuccess && !listed ? id : null);
+  return listed ?? alone.data?.consultation ?? null;
 }
 
 /**
@@ -139,32 +154,22 @@ export function useReplyConsults(
  * (`tell_agent`): the asker's face and name, ⇄, the consulted agent's (several fold into stacked faces, "Atlas e
  * mais 2"), then how long it took, or while it runs "perguntando 42 s", or "não respondeu". Never what they said: in a
  * channel or a DM a click opens the two agents' conversation in the panel; in a thread view and inside that panel
- * (no panel to open) the question and the answer open under the row.
+ * (no panel to open) the question and the answer open under the row. The same row stands for an answer whose reply
+ * is farther up or not here, and for a hand-off by direct message on a reach line.
  */
-export function ConsultPairRow({
-  runId,
-  askerId,
-  items,
-}: {
-  /** The asking run: "Ver" on an answer's line farther down opens this row in place. */
-  runId: string | null;
-  askerId: string;
-  items: readonly ConsultPairItem[];
-}) {
+export function ConsultPairRow({ askerId, items }: { askerId: string; items: readonly ConsultPairItem[] }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const openConsultation = useChannelActions()?.openConsultation;
+  const panel = useChannelActions()?.openConsultation;
   const openId = useOpenConsultation();
-  const asked = useConsultBlockRequest(openConsultation ? null : runId);
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (asked) setOpen(true);
-  }, [asked]);
   const live = items.some((c) => c.status === "open");
   const now = useNow(live);
   const pair = consultPair(items, now);
   if (!pair) return null;
+  // An old reply's question with no id of its own has no conversation to open: it opens in place.
+  const openConsultation = openableConsultation(pair.opens) ? panel : undefined;
   const nameOf = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const from = nameOf(askerId);
   const names = pair.faces.map((f) => nameOf(f.agentId));
@@ -243,7 +248,7 @@ function ConsultInPlace({
     <div className="ac-consult__body ac-consult__body--inline">
       <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askerId)}</small>
       <div className="ac-consult__text ac-consult__text--q">
-        <MessageBody body={c.question} resolveMention={dir.mentionName} />
+        <MessageBody body={withoutRelayLine(c.question)} resolveMention={dir.mentionName} />
       </div>
       <small>{t("chat.consultation.answerOf", { name: to.name, context: to.context })}</small>
       {state === "answered" ? (
@@ -262,10 +267,8 @@ function ConsultInPlace({
 }
 
 /**
- * An answer to a question asked in a reply farther up (`consultNoticeFolds`): one quiet line where the answer
- * arrived, "Atlas respondeu à pergunta da Ada · Ver", that opens the two agents' conversation over the channel (in
- * a thread view: goes to that reply, as a quote does, and opens its block at the answer). The words of the answer
- * stay there, not here.
+ * An answer to a question asked in a reply farther up (`consultNoticeFolds`): the same pair row where the answer
+ * arrived, opening the two agents' conversation. The words of the answer stay there, not here.
  */
 export function ConsultAnswerLine({
   message,
@@ -274,39 +277,10 @@ export function ConsultAnswerLine({
   message: Message;
   fold: Extract<ConsultNoticeFold, { fold: "line" }>;
 }) {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const actions = useChannelActions();
   const c = fold.consultation;
-  const from = agentGrammar(dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
-  const to = dir.agentById.get(c.consultedAgentId)?.name ?? t("channel.unknownAgent");
   return (
-    <div className="cn-line ac-iconline" data-message-id={message.id}>
-      <Icon name="agent" size={14} />
-      <span className="cn-line__text">
-        {withAgentFaces(t(consultFarKey(c), { to, from: from.name, context: from.context }), [
-          { name: to, agentId: c.consultedAgentId },
-          { name: from.name, agentId: c.agentId },
-        ])}{" "}
-        · {formatTime(i18n.language, message.createdAt)}
-        {" · "}
-        <button
-          type="button"
-          className="cn-line__toggle"
-          onClick={() => {
-            // In a channel: the two agents' conversation, beside it. In a thread view: the reply's block, there.
-            if (actions?.openConsultation) {
-              actions.openConsultation(c.id);
-              return;
-            }
-            requestConsultBlock(c.runId, c.id);
-            actions?.jumpTo?.(fold.messageId);
-          }}
-        >
-          {t("chat.consultGroup.see")}
-        </button>
-      </span>
+    <div data-message-id={message.id}>
+      <ConsultPairRow askerId={c.agentId} items={[c]} />
     </div>
   );
 }

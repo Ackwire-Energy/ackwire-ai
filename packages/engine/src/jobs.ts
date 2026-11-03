@@ -16,9 +16,12 @@ import type { ArtifactDeps } from "./artifacts";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
+import { type BrakeReport, brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
+import { typingLogFor } from "./burst";
 import { crowdedAgents, publishQueueChanged } from "./computer-queue";
 import type { ConnectorDeps } from "./connectors/connections";
+import { startNoteRun } from "./consultations";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
@@ -26,6 +29,7 @@ import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { reportDroppedMentions } from "./continuation";
+import { publishDelivery } from "./delivery";
 import {
   deferMentionReport,
   deliverParked,
@@ -82,6 +86,7 @@ import {
 import { createJevRouterStrategy, jevCostNanoUsd, routeChain } from "./router-jev";
 import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
+import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
@@ -168,6 +173,8 @@ export interface JobDeps extends RunExecutorDeps {
     plans?: { hub: Pick<MachineCaller, "call" | "status">; publicUrl: string };
     /** How long a person's message waits for their next one (`ROUTER_QUIET_MS` on a server); absent: no wait. */
     quietMs?: number;
+    /** The wait ends early when the person isn't typing (token-trim B11). */
+    quietByTyping?: boolean;
   };
 }
 
@@ -225,6 +232,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
     routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
     quietMs: router.quietMs,
+    quietByTyping: router.quietByTyping,
     pubsub: deps.pubsub,
     // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
     ...(jev ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
@@ -240,6 +248,8 @@ async function jevPicks(key: JevKeySource | undefined): Promise<boolean> {
 
 /** Every outbox job kind the core knows. Modules can add more through the server's worker options. */
 export function createJobHandlers(deps: JobDeps): JobHandlers {
+  // Listening from now on, so typing sent while a run reads its context (before its quiet window) counts.
+  if (deps.quietByTyping || deps.router?.quietByTyping) typingLogFor(deps.pubsub);
   const routing = messageRouter(deps);
 
   // An agent's @mention wakes the other agent unless the judge is sure it needs nothing from it.
@@ -340,6 +350,41 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       allowed,
       referenced: others.filter((t) => !allowed.includes(t.id) && !outside.includes(t.id)).map((t) => t.id),
     };
+  }
+
+  const brakeJudge = () => (deps.context ? judgeOf(deps.context) : null);
+
+  /**
+   * Of the agents an agent's message would wake or hand a note to, the ones its settings let it call (ADR 0131 §8);
+   * the run that wrote it hears once who was left out.
+   */
+  async function onlyCallable(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>, ids: string[]) {
+    if (!message.authorAgentId || ids.length === 0) return ids;
+    const ok = await callableAgents(deps.db, message.orgId, message.authorAgentId, ids);
+    const left = ids.filter((id) => !ok.has(id));
+    if (left.length > 0 && message.agentRunId) {
+      const [handles, [run]] = await Promise.all([
+        deps.db
+          .select({ handle: schema.agents.handle })
+          .from(schema.agents)
+          .where(and(eq(schema.agents.orgId, message.orgId), inArray(schema.agents.id, left))),
+        deps.db
+          .select()
+          .from(schema.agentRuns)
+          .where(and(eq(schema.agentRuns.orgId, message.orgId), eq(schema.agentRuns.id, message.agentRunId))),
+      ]);
+      if (run && !run.background) {
+        const delivered = await deps.db.transaction((tx) =>
+          deliverNoticeToRun(tx, run, {
+            kind: "wake_skipped",
+            text: notCallableText(handles.map((h) => `@${h.handle}`)),
+            refs: { runId: run.id, messageId: message.id },
+          }),
+        );
+        await publishDelivery(deps.pubsub, delivered).catch(() => {});
+      }
+    }
+    return ids.filter((id) => ok.has(id));
   }
 
   /** The agents a run handed something to (`ask_agent`, `tell_agent`). */
@@ -455,6 +500,26 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   };
 
   return {
+    // A wake the brakes deferred (its agent at its cap of unrequested work, or its computer full) looks again.
+    [LATER_JOB]: async (job) => {
+      const orgId = orgOf(job);
+      const message = await getMessage(deps.db, orgId, String(job.payload.messageId));
+      const agentId = String(job.payload.agentId);
+      if (!message) return;
+      const reportIn = job.payload.reportIn as BrakeReport | undefined;
+      const { wake } = await brakeWakes({ db: deps.db, pubsub: deps.pubsub, judge: null }, message, [agentId], {
+        look: Number(job.payload.look) || 0,
+        ...(reportIn ? { reportIn } : {}),
+      });
+      // A tell_agent note (agents' DM, no mention) starts its run itself.
+      if (wake.length > 0 && message.meta.agentNote) await startNoteRun(deps.db, message, agentId);
+      else if (wake.length > 0)
+        await dispatchMentions(
+          deps.db,
+          { orgId, messageId: message.id },
+          { maxHops: deps.maxHops, onlyAgentIds: wake },
+        );
+    },
     "message.posted": async (job) => {
       const input = { orgId: orgOf(job), messageId: String(job.payload.messageId) };
       const message = await getMessage(deps.db, input.orgId, input.messageId);
@@ -504,7 +569,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         if (where && isAgentOnlyDm(where)) return;
         // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
         // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
-        if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
+        // The brakes' digest and loop stop (ADR 0131) are for a person too.
+        if (message.meta.notice || message.meta.noAi || message.meta.actionCard || message.meta.autonomyNote) return;
         // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01): its mentions wake
         // the agents it names for its creator, like any agent's (the router stays out). With no creator left it
         // has nobody's reach and wakes nobody. Never silently: the agents it named and its run's tell_agent
@@ -543,13 +609,21 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           }
           const reportLater = await deferMentionReport(deps.db, message, allowed);
           if (reportLater) allowed = allowed.filter((id) => id !== reportLater);
+          // Only the agents its settings let it call (ADR 0131 §8), then the brakes on work nobody asked for.
+          allowed = await onlyCallable(message, allowed);
+          if (allowed.length > 0)
+            allowed = (await brakeWakes({ db: deps.db, pubsub: deps.pubsub, judge: brakeJudge() }, message, allowed))
+              .wake;
           const res = allowed.length
             ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
             : { runs: [] };
           const dropped = "dropped" in res ? (res.dropped ?? []) : [];
           // Never silent: who its mention didn't reach hears it as a note, or the people here read why not.
           const reach = await settleReach(deps, message, {
-            outside: handed.allowed.filter((id) => outside.includes(id)),
+            outside: await onlyCallable(
+              message,
+              handed.allowed.filter((id) => outside.includes(id)),
+            ),
             blocked: [
               ...new Set([...dropped.filter((d) => d.reason === "audience").map((d) => d.agentId), ...refused]),
             ],
@@ -574,7 +648,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         const reach = {
           outside:
             outside.length > 0
-              ? (await delegatedAgents(message, outside, { record: false, wakeAll: Boolean(actingRoutine) })).allowed
+              ? await onlyCallable(
+                  message,
+                  (await delegatedAgents(message, outside, { record: false, wakeAll: Boolean(actingRoutine) })).allowed,
+                )
               : [],
           blocked: refused,
         };

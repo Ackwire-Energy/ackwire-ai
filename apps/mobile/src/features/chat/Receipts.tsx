@@ -1,5 +1,18 @@
-import { type AgentAction, ApiError, cacheMessageActions, type Message, useAgentActions } from "@agenteschat/client";
-import { actionErrorKey, actionTextKey, actionTextValues, formatTimeLeft } from "@agenteschat/client/lib/actions";
+import {
+  type AgentAction,
+  ApiError,
+  cacheMessageActions,
+  type Message,
+  useAgentActions,
+  useApi,
+} from "@agenteschat/client";
+import {
+  actionErrorKey,
+  actionTextKey,
+  actionTextValues,
+  formatTimeLeft,
+  hookToCopy,
+} from "@agenteschat/client/lib/actions";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -11,7 +24,7 @@ import { Icon, PillButton, Text, useLivePaused, useTheme, useToast } from "@/ui"
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { tapHaptic } from "../shared/parts";
+import { copyText, tapHaptic } from "../shared/parts";
 import {
   anyLive,
   boldRuns,
@@ -114,7 +127,7 @@ function ReceiptList({
         <IconTile kind={a} />
         <View style={[styles.grow, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
-          {a.undoneAt ? <UndoneBy action={a} /> : null}
+          {a.undoneAt ? <UndoneBy action={a} /> : <CopyHook action={a} />}
         </View>
         <RowButton view={v} big onUndo={() => undo(a)} onRedo={() => redo(a)} />
       </View>
@@ -147,7 +160,7 @@ function ReceiptList({
           </View>
           <View style={styles.grow}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
-            {a.undoneAt ? <UndoneBy action={a} /> : null}
+            {a.undoneAt ? <UndoneBy action={a} /> : <CopyHook action={a} />}
           </View>
           <RowButton view={v} onUndo={() => undo(a)} onRedo={() => redo(a)} />
         </View>
@@ -212,6 +225,48 @@ function Sentence({
         ),
       )}
     </Text>
+  );
+}
+
+/**
+ * A webhook routine the agent just made: its address, kept out of the message text, copied from here by who may
+ * manage the routine (the person who asked, admins; the server checks again).
+ */
+function CopyHook({ action: a }: { action: AgentAction }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const orgId = useOrgId();
+  const meId = useMeId();
+  const manages = can(useOrg().org, "manage_routines");
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const routineId = hookToCopy(a, { userId: meId, managesRoutines: manages });
+  if (!routineId) return null;
+  const copy = async () => {
+    tapHaptic();
+    setBusy(true);
+    try {
+      const hook = await api.routines.hook(orgId, routineId);
+      const ok = await copyText(hook.url);
+      toast({ title: t(ok ? "routines.webhookCopied" : "agentActions.errors.generic"), icon: ok ? "check" : "x" });
+    } catch {
+      toast({ title: t("agentActions.errors.generic"), icon: "x" });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Pressable
+      onPress={() => void copy()}
+      disabled={busy}
+      accessibilityRole="button"
+      hitSlop={8}
+      style={styles.copyHook}
+    >
+      <Text variant="footnote" tone="ink" style={styles.bold}>
+        {t("agentActions.copyWebhook")}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -312,6 +367,7 @@ const styles = StyleSheet.create({
   oneText: { fontSize: 14.5, lineHeight: 19 },
   tile: { width: 24, height: 24, marginTop: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   undoneBy: { marginTop: 2 },
+  copyHook: { alignSelf: "flex-start", marginTop: 6, paddingVertical: 2 },
   room: { opacity: 0 },
   group: { marginTop: 12, overflow: "hidden" },
   hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, paddingHorizontal: 12 },

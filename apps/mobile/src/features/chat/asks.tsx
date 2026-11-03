@@ -372,8 +372,11 @@ export interface AskWell {
   tile: ReactNode;
   title: string;
   detail?: string | null;
-  /** "Ver o e-mail" / "Ver detalhes" / "Ver a mudança" / "Ver a tela" and what it opens. */
-  more?: { label: string; content: ReactNode } | null;
+  /**
+   * "Ver o e-mail" / "Ver detalhes" / "Ver a mudança" / "Ver a tela" and what it opens; `open` and `onToggle` when its
+   * owner keeps that state (a run of approvals, open still once its card reshapes).
+   */
+  more?: { label: string; content: ReactNode; open?: boolean; onToggle?: () => void } | null;
 }
 
 /**
@@ -407,7 +410,8 @@ export function AskCard({
   const reduced = useReducedMotion();
   const store = useAskStore();
   const slot = useRef<ComponentRef<typeof View>>(null);
-  const [open, setOpen] = useState(false);
+  const [openHere, setOpen] = useState(false);
+  const open = well?.more?.open ?? openHere;
   const color = agentLook(dir.agentById.get(agentId)).color;
   const label = t(`ask.kind.${kind}`);
   useLayoutEffect(() => {
@@ -450,11 +454,11 @@ export function AskCard({
           <View style={[styles.well, { backgroundColor: c.sunken }]}>
             <View style={styles.tile}>{well.tile}</View>
             <View style={styles.wellText}>
-              <Text variant="small" tone="ink" numberOfLines={1} style={styles.wellTitle}>
+              <Text variant="small" tone="ink" numberOfLines={2} style={styles.wellTitle}>
                 {well.title}
               </Text>
               {well.detail ? (
-                <Text variant="footnote" tone="muted" numberOfLines={1}>
+                <Text variant="footnote" tone="muted" numberOfLines={3}>
                   {well.detail}
                 </Text>
               ) : null}
@@ -463,7 +467,8 @@ export function AskCard({
                 <Pressable
                   onPress={() => {
                     tapHaptic();
-                    setOpen((o) => !o);
+                    if (well.more?.onToggle) well.more.onToggle();
+                    else setOpen((o) => !o);
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ expanded: open }}

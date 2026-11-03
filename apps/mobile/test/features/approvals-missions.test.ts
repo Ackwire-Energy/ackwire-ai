@@ -3,11 +3,14 @@ import type { MachineTask } from "@agenteschat/client";
 import {
   approvalCardItems,
   approvalCards,
+  approvalRuns,
   approveAllScope,
+  approveAlwaysAlso,
   approveAlwaysOn,
   asOfNow,
   cardDeadline,
   itemOwnWords,
+  runKeys,
 } from "@agenteschat/client/lib/approval-card";
 import { approvalRuleWords, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import {
@@ -17,6 +20,7 @@ import {
   approvalTable,
   approvalTraits,
   approveAlwaysHint,
+  approveAlwaysLabel,
   approveAlwaysOffered,
   approveAlwaysToast,
   waitingApprovals,
@@ -89,13 +93,43 @@ describe("Aprovar sempre on the phone", () => {
     expect(approveAlwaysOffered({ ...offered, tool: "deploy_production", scope: "vercel:deploy" })).toBe(false);
   });
 
-  test("under the button, before the tap: what it approves for good, with any values, in both languages", async () => {
+  test("under the button, before the tap: what it approves for good, with any values, and where to undo it", async () => {
     expect(approveAlwaysHint(await translator("pt-BR"), offered, "Ada")).toBe(
-      "Aprova este e os próximos iguais da Ada: Criar comentário da issue (Github), com qualquer valor.",
+      "Cobre Criar comentário da issue (Github), de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
     expect(approveAlwaysHint(await translator("en"), offered, "Theo")).toBe(
-      "Approves this one and the next ones like it from Theo: Create issue comment (Github), with any values.",
+      "Covers Create issue comment (Github) from now on, with any values. To undo: Tools and access, on Theo's page.",
     );
+  });
+
+  test("a SQL read: Aprovar sempre leituras, that project's reads only, in both languages", async () => {
+    const reads = {
+      ...offered,
+      tool: "db_execute_sql",
+      approveAlways: { tool: "execute_sql", actions: ["sql-read:project_id=p1"] },
+    };
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    expect(approveAlwaysLabel(pt, reads)).toBe("Aprovar sempre leituras");
+    expect(approveAlwaysLabel(en, offered)).toBe("Always approve");
+    expect(approveAlwaysHint(pt, reads, "Theo")).toBe(
+      "Cobre só leituras de Executar sql, neste projeto (project_id=p1), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do Theo.",
+    );
+    expect(approveAlwaysHint(en, reads, "Ada")).toBe(
+      "Covers only reads by Run sql in this project (project_id=p1) from now on. Anything that changes data still asks. To undo: Tools and access, on Ada's page.",
+    );
+    const rule = { tool: "execute_sql", action: "sql-read:project_id=p1", toolLabel: "Execute sql" };
+    expect(approvalRuleWords(pt, rule)).toBe("Leituras de Execute sql · project_id=p1");
+
+    // A tool that takes only the SQL (the reference Postgres server's query): the connection, no empty project.
+    const whole = { ...reads, approveAlways: { tool: "query", actions: ["sql-read:"] } };
+    expect(approveAlwaysHint(pt, whole, "Theo")).toBe(
+      "Cobre só leituras de Consultar, nesta conexão, de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do Theo.",
+    );
+    expect(approveAlwaysHint(en, whole, "Ada")).toBe(
+      "Covers only reads by Query on this connection from now on. Anything that changes data still asks. To undo: Tools and access, on Ada's page.",
+    );
+    expect(approvalRuleWords(pt, { tool: "query", action: "sql-read:", toolLabel: "Query" })).toBe("Leituras de Query");
   });
 
   test("its toast: it won't ask again, and where to undo it, in both languages", async () => {
@@ -144,10 +178,10 @@ describe("git requests on the phone", () => {
     expect(approvalTitle(pt, push)).toBe("Enviar para ana/fix em acme/app (24 h, sem force push)");
     expect(approvalTitle(en, push)).toBe("Push to ana/fix in acme/app (24 h, no force push)");
     expect(approveAlwaysHint(pt, push, "Ada")).toBe(
-      "Aprova este e os próximos iguais da Ada: enviar para ana/fix em acme/app.",
+      "Cobre enviar para ana/fix em acme/app, de agora em diante. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
     expect(approveAlwaysHint(en, push, "Theo")).toBe(
-      "Approves this one and the next ones like it from Theo: push to ana/fix in acme/app.",
+      "Covers push to ana/fix in acme/app from now on. To undo: Tools and access, on Theo's page.",
     );
     expect(approvalRuleWords(pt, rule)).toBe("enviar para ana/fix em acme/app");
     expect(approvalRuleWords(en, rule)).toBe("push to ana/fix in acme/app");
@@ -362,6 +396,54 @@ describe("several requests on one card", () => {
     expect(approvalCards(list).map((card) => card.map((a) => a.id))).toEqual([
       ["g1", "g22", "g333", "g4444"],
       ["other"],
+    ]);
+  });
+
+  test("waiting requests of one kind in a row come together as one run, and Aprovar sempre takes the run's like ones", () => {
+    const sql = { tool: "supabase_execute_sql", title: "Executar sql" };
+    const reads = { tool: "supabase_execute_sql", actions: ["sql-read:project_id=p1"] };
+    const items = [
+      goal("s1", { ...sql, approveAlways: reads }),
+      goal("s22", { ...sql, approveAlways: reads }),
+      goal("s333", { ...sql, approveAlways: null }),
+      goal("m4444"),
+      goal("s55555", { ...sql, status: "approved" }),
+      goal("s666666", sql),
+      goal("s7777777", { ...sql, agentId: "a2" }),
+    ];
+    // A decided one, another tool, another agent or another "Aprovar sempre" kind (the write among reads) ends the run.
+    expect(approvalRuns(items).map((run) => run.map((a) => a.id))).toEqual([
+      ["s1", "s22"],
+      ["s333"],
+      ["m4444"],
+      ["s55555"],
+      ["s666666"],
+      ["s7777777"],
+    ]);
+    expect(approvalRuns([])).toEqual([]);
+    // Only one of a run this person may decide: no "Aprovar todos" for one, each stands alone.
+    expect(
+      approvalRuns([goal("s1", sql), goal("s22", { ...sql, canDecide: false })]).map((run) => run.map((a) => a.id)),
+    ).toEqual([["s1"], ["s22"]]);
+    expect(
+      approvalRuns([goal("s1", { ...sql, canDecide: false }), goal("s22", { ...sql, canDecide: false })]),
+    ).toHaveLength(1);
+    // The write among the reads keeps asking; so do one this person can't decide and the same server tool on another
+    // connection (another agent tool name: the rule is per connection).
+    const card = [
+      ...items,
+      goal("s8", { ...sql, approveAlways: reads, canDecide: false }),
+      goal("s9", { ...sql, tool: "supabase_beta_execute_sql", approveAlways: reads }),
+    ];
+    expect(approveAlwaysAlso(card, card[0] ?? goal("x"))).toEqual(["s22"]);
+    expect(approveAlwaysAlso(card, card[2] ?? goal("x"))).toEqual([]);
+    // A run keeps its key while its requests are decided one by one, so it stays unfolded.
+    const three = [goal("t1", sql), goal("t22", sql), goal("t333", sql)];
+    const [kind] = runKeys(approvalRuns(three));
+    expect(kind).not.toBe("t1");
+    expect(runKeys(approvalRuns([goal("t1", { ...sql, status: "approved" }), ...three.slice(1)]))).toEqual([
+      "t1",
+      kind,
     ]);
   });
 

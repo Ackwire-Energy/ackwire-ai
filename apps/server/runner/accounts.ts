@@ -17,6 +17,7 @@ import {
   isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
   type MachineReplies,
+  OPENCODE_KEY_PROVIDER,
   OWN_USAGE_ID,
   type OwnPlanUsage,
   type PlanUsage,
@@ -35,7 +36,7 @@ import {
 } from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { CURSOR_BIN, claudeKeptPlan, claudePlan, claudeTier, resolveCommand } from "./executors";
+import { CURSOR_BIN, claudeKeptPlan, claudePlan, claudeTier, OPENCODE_BIN, resolveCommand } from "./executors";
 import { readSmallJson, writeJson } from "./json-file";
 import {
   codexUsage,
@@ -111,30 +112,46 @@ const MAX_CODE_CHARS = 2000;
 const OUTPUT_KEEP = 16_000;
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
 
-const LABEL: Record<AccountKind, string> = { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor" };
+const LABEL: Record<AccountKind, string> = {
+  claude_code: "Claude Code",
+  codex: "Codex",
+  cursor: "Cursor",
+  opencode: "OpenCode",
+};
 /** Cursor's CLI keeps its config in `CURSOR_CONFIG_DIR` (cursor.com/docs/cli/reference/configuration). */
 const ENV_VAR: Record<AccountKind, string> = {
   claude_code: "CLAUDE_CONFIG_DIR",
   codex: "CODEX_HOME",
   cursor: "CURSOR_CONFIG_DIR",
+  // OpenCode keeps its config, sessions and sign-ins under the XDG folders (`accountEnv` sets them all).
+  opencode: "XDG_DATA_HOME",
 };
 const LOGIN_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "login"],
   codex: ["login", "--device-auth"],
   cursor: ["login"],
+  // Never run: an OpenCode account is its key alone (`begin` refuses a sign-in without one).
+  opencode: ["auth", "login"],
 };
 const STATUS_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "status", "--json"],
   codex: ["login", "status"],
   cursor: ["status"],
+  opencode: ["auth", "list"],
 };
 const LOGOUT_ARGS: Record<AccountKind, string[]> = {
   claude_code: ["auth", "logout"],
   codex: ["logout"],
   cursor: ["logout"],
+  opencode: ["auth", "logout"],
 };
 /** Each CLI's executable (Cursor's was `cursor-agent` before it was renamed). */
-const COMMAND: Record<AccountKind, string> = { claude_code: "claude", codex: "codex", cursor: CURSOR_BIN };
+const COMMAND: Record<AccountKind, string> = {
+  claude_code: "claude",
+  codex: "codex",
+  cursor: CURSOR_BIN,
+  opencode: OPENCODE_BIN,
+};
 
 /** What a brain turn says when its account folder is gone (people read it). */
 export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
@@ -144,16 +161,24 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
     "The ChatGPT account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
   cursor:
     "The Cursor account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
+  opencode:
+    "The OpenCode account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
 /** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY)$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT)$/;
+
+/** `base` without any key, token, endpoint or cloud a CLI would think with instead of its own sign-in. */
+export function withoutSignIns(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(base)) if (!STRAY_SIGN_IN.test(k)) env[k] = v;
+  return env;
+}
 
 /** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
 export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {};
-  for (const [k, v] of Object.entries(base)) if (!STRAY_SIGN_IN.test(k)) env[k] = v;
+  const env = withoutSignIns(base);
   env[ENV_VAR[kind]] = dir;
   if (kind === "cursor") {
     // Linux keeps the sign-in under `$XDG_CONFIG_HOME/cursor`, macOS in the Keychain unless told to use a file: both
@@ -161,6 +186,12 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
     env.XDG_CONFIG_HOME = dir;
     env.AGENT_CLI_CREDENTIAL_STORE = "file";
     env.NO_OPEN_BROWSER = "1";
+  }
+  if (kind === "opencode") {
+    // Its config, its sessions, its caches: all in the account's folder, so two accounts never share a sign-in.
+    env.XDG_CONFIG_HOME = dir;
+    env.XDG_CACHE_HOME = dir;
+    env.XDG_STATE_HOME = dir;
   }
   return env;
 }
@@ -172,9 +203,28 @@ const CURSOR_KEY = /^[\x21-\x7e]{16,512}$/;
 
 /** A Cursor key account's key (`cursor-key.json`); null when the folder signs in instead. */
 export async function cursorKeyOf(dir: string): Promise<string | null> {
-  const o = readSmallJson(path.join(dir, CURSOR_KEY_FILE), 1000) as Record<string, unknown> | null;
+  return keyIn(dir, CURSOR_KEY_FILE);
+}
+
+/** An OpenCode account keeps its key here (600): an OpenCode key is its only sign-in (ADR 0132). */
+const OPENCODE_KEY_FILE = "opencode-key.json";
+
+/** An OpenCode account's key (`opencode-key.json`); null when it has none (yet). */
+export async function opencodeKeyOf(dir: string): Promise<string | null> {
+  return keyIn(dir, OPENCODE_KEY_FILE);
+}
+
+function keyIn(dir: string, file: string): string | null {
+  const o = readSmallJson(path.join(dir, file), 1000) as Record<string, unknown> | null;
   return typeof o?.key === "string" && CURSOR_KEY.test(o.key) ? o.key : null;
 }
+
+/** The key file and words of a CLI made with an API key alone (Cursor's, chosen; OpenCode's, its only sign-in). */
+const CLI_KEYS = {
+  [CURSOR_KEY_PROVIDER]: { file: CURSOR_KEY_FILE, label: "a Cursor API key" },
+  [OPENCODE_KEY_PROVIDER]: { file: OPENCODE_KEY_FILE, label: "an OpenCode API key" },
+} as const;
+type CliKeyProvider = keyof typeof CLI_KEYS;
 
 /**
  * How Claude Code gets a token root hands over: on descriptor 3, which it reads at its start, then closes, dropping
@@ -233,6 +283,8 @@ const LAST_OUTPUT_MS = 500;
 export type AccountGrant =
   | { kind: "token"; token: string }
   | { kind: "key"; provider: PlanId; key: string }
+  /** A ChatGPT sign-in for all agents: root's newest `auth.json`, refreshed copies coming back (`watchCodexAuth`). */
+  | { kind: "codex_auth"; auth: string }
   | { kind: "none" };
 
 /** A grant as the worker reads it off root's request frame; null when there is none or it isn't one. */
@@ -245,7 +297,91 @@ export function grantOf(v: unknown): AccountGrant | null {
   if (g?.kind === "key" && isPlanId(g.provider) && typeof g.key === "string" && g.key) {
     return { kind: "key", provider: g.provider, key: g.key };
   }
-  return null;
+  const auth = g?.kind === "codex_auth" ? codexAuthOf(g.auth) : null;
+  return auth ? { kind: "codex_auth", auth: auth.text } : null;
+}
+
+/** Codex keeps its ChatGPT sign-in here, in `CODEX_HOME`. */
+const CODEX_AUTH_FILE = "auth.json";
+const MAX_CODEX_AUTH_CHARS = 64_000;
+/** Codex refreshes a ChatGPT sign-in this old (its `TOKEN_REFRESH_INTERVAL`, 8 days; the access token lasts 10). */
+export const CODEX_REFRESH_AFTER_MS = 8 * 24 * 3600_000;
+/** How long a turn on a sign-in due for its refresh holds the others back, waiting for the refreshed copy. */
+export const CODEX_REFRESH_WAIT_MS = 60_000;
+/** How far ahead of root's clock a worker's `last_refresh` may be. */
+const CODEX_CLOCK_SKEW_MS = 5 * 60_000;
+
+export interface CodexAuth {
+  /** The whole file, as JSON. */
+  text: string;
+  /** Its `last_refresh` (0 when it has none). */
+  refreshedAt: number;
+  /** The ChatGPT account it signs in to (`tokens.account_id`). */
+  accountId: string;
+  refreshToken: string;
+}
+
+/** A Codex `auth.json` (its text) that signs in to ChatGPT: tokens with a refresh token. Null for anything else. */
+export function codexAuthOf(text: unknown): CodexAuth | null {
+  if (typeof text !== "string" || text.length > MAX_CODEX_AUTH_CHARS) return null;
+  let o: unknown;
+  try {
+    o = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const tokens = (o as { tokens?: Record<string, unknown> } | null)?.tokens;
+  if (typeof tokens?.access_token !== "string" || typeof tokens.refresh_token !== "string" || !tokens.refresh_token) {
+    return null;
+  }
+  const at = Date.parse(String((o as { last_refresh?: unknown }).last_refresh ?? ""));
+  return {
+    text: JSON.stringify(o),
+    refreshedAt: Number.isFinite(at) ? at : 0,
+    accountId: typeof tokens.account_id === "string" ? tokens.account_id : "",
+    refreshToken: tokens.refresh_token,
+  };
+}
+
+/** A folder's Codex sign-in; null when it has none. Never through a link or a pipe. */
+export function readCodexAuth(dir: string): CodexAuth | null {
+  const o = readSmallJson(path.join(dir, CODEX_AUTH_FILE), MAX_CODEX_AUTH_CHARS);
+  return o ? codexAuthOf(JSON.stringify(o)) : null;
+}
+
+/**
+ * In an agent's worker: root's copy of a sign-in for all agents goes into the agent's own Codex home, unless what is
+ * there is newer (a refresh this agent's Codex made, on its way back to root).
+ */
+export function placeCodexAuth(home: string, auth: string) {
+  const granted = codexAuthOf(auth);
+  if (!granted) return;
+  const here = readCodexAuth(home);
+  if (here && here.accountId === granted.accountId && here.refreshedAt >= granted.refreshedAt) return;
+  writeJson(path.join(home, CODEX_AUTH_FILE), JSON.parse(granted.text));
+}
+
+/**
+ * In an agent's worker, while a request runs on a sign-in root keeps: the agent's copy, each time its Codex
+ * refreshed it, goes back (`send`) so root hands the refreshed one to the next turn of any agent. A refresh rotates
+ * the refresh token, so the others need it soon. `stop` looks once more and stops looking.
+ */
+export function watchCodexAuth(home: string, granted: string, send: (auth: string) => void, everyMs = 2000) {
+  let last = codexAuthOf(granted)?.refreshedAt ?? 0;
+  const look = () => {
+    const now = readCodexAuth(home);
+    if (!now || now.refreshedAt <= last) return;
+    last = now.refreshedAt;
+    send(now.text);
+  };
+  const timer = setInterval(look, everyMs);
+  timer.unref?.();
+  return {
+    stop() {
+      clearInterval(timer);
+      look();
+    },
+  };
 }
 
 /** System mode: the account folders, outside root's home (its parents 711) so an agent's user reaches the one lent to it. */
@@ -304,6 +440,8 @@ export interface AccountFolders {
   accountDir(kind: AccountKind, id: string): string | null;
   /** System mode, in a worker (protocol 29): this agent's own folder for an account root keeps (`AccountGrant`). */
   agentHome?(kind: AccountKind, id: string): string | null;
+  /** System mode, in a worker: a refreshed ChatGPT sign-in root keeps goes back to root (`watchCodexAuth`). */
+  codexAuth?(id: string, auth: string): void;
 }
 
 /** What a CLI signs in with on an account: the folder that is its home, and what root handed over for it. */
@@ -313,6 +451,8 @@ export interface AccountSignIn {
   planKey?: { provider: PlanId; key: string };
   /** A token root keeps (protocol 29): on descriptor 3 only (`TOKEN_FD_ENV`), never in an env. */
   token?: string;
+  /** A ChatGPT sign-in root keeps: stops sending its refreshed copies back, once the turn or task ends. */
+  release?: () => void;
 }
 
 /** What a turn or task says when root has nothing to sign its account in with (signed out on the computer). */
@@ -332,9 +472,20 @@ export async function accountSignIn(
   if (grant?.kind === "none") return "signed_out";
   const home = grant ? folders?.agentHome?.(kind, id) : folders?.accountDir(kind, id);
   if (!home) return "missing";
+  let release: (() => void) | undefined;
+  if (grant?.kind === "codex_auth") {
+    placeCodexAuth(home, grant.auth);
+    const send = folders?.codexAuth?.bind(folders);
+    if (send) release = watchCodexAuth(home, grant.auth, (auth) => send(id, auth)).stop;
+  }
   const planKey =
     grant?.kind === "key" ? { provider: grant.provider, key: grant.key } : grant ? null : await planKeyOf(home);
-  return { home, ...(planKey ? { planKey } : {}), ...(grant?.kind === "token" ? { token: grant.token } : {}) };
+  return {
+    home,
+    ...(planKey ? { planKey } : {}),
+    ...(grant?.kind === "token" ? { token: grant.token } : {}),
+    ...(release ? { release } : {}),
+  };
 }
 
 /** The redaction of a CLI on an account also hides the key or token it got (an agent's shell could print a key). */
@@ -793,6 +944,8 @@ function runCli(command: string[], args: string[], env: NodeJS.ProcessEnv, timeo
 export interface AccountManagerOptions {
   /** `<runner home>/accounts`. */
   root: string;
+  /** Tests: the clock. */
+  now?: () => number;
   /** The organization this machine is paired with (a sealed code's AAD names it); unknown before pairing. */
   orgId?: () => string | undefined;
   /** How to start each CLI (tests: a fake script). Default `["claude"]` / `["codex"]`. */
@@ -835,8 +988,8 @@ interface Login {
   token?: string;
   /** System mode: made for all agents (`<id>.shared` once it signs in). */
   shared: boolean;
-  /** A key account's plan, or `cursor` for a Cursor API key. */
-  provider?: PlanId | typeof CURSOR_KEY_PROVIDER;
+  /** A key account's plan, `cursor` for a Cursor API key, or `zen` for an OpenCode key. */
+  provider?: PlanId | CliKeyProvider;
   state: AccountLoginState;
   output: string;
   /** Claude Code: the ephemeral key the pasted code is sealed to (in memory only). */
@@ -874,6 +1027,8 @@ export class AccountManager {
   private readonly probing = new Set<string>();
   private usageSent = 0;
   private usageTimer: ReturnType<typeof setTimeout> | null = null;
+  /** ChatGPT sign-ins for all agents a turn is refreshing now (`codexGrant`). */
+  private readonly refreshing = new Map<string, { at: number; done: Promise<void>; resolve: () => void }>();
 
   constructor(private readonly opts: AccountManagerOptions) {
     this.log = opts.log ?? (() => {});
@@ -940,7 +1095,7 @@ export class AccountManager {
    * the account to sign in to, as the CLI's login hint. `shared` (protocol 29,
    * system mode): a sign-in for every agent of its owner here, which root
    * keeps: Claude's through `claude setup-token` (no login hint there), a
-   * plan's key as it is. ChatGPT's still thinks for one agent there.
+   * plan's key as it is, ChatGPT's through `codex login` as root (`grant` hands its `auth.json` to each turn).
    */
   async begin(
     kind: AccountKind,
@@ -956,9 +1111,17 @@ export class AccountManager {
     if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
       throw new RunnerError("bad_request", "That email can't name the account to sign in to");
     }
-    const cursorKey = kind === "cursor" && provider === CURSOR_KEY_PROVIDER;
-    if (provider !== undefined && !cursorKey && (kind !== "claude_code" || !isPlanId(provider))) {
+    const cliKey: CliKeyProvider | null =
+      kind === "cursor" && provider === CURSOR_KEY_PROVIDER
+        ? CURSOR_KEY_PROVIDER
+        : kind === "opencode" && provider === OPENCODE_KEY_PROVIDER
+          ? OPENCODE_KEY_PROVIDER
+          : null;
+    if (provider !== undefined && !cliKey && (kind !== "claude_code" || !isPlanId(provider))) {
       throw new RunnerError("bad_request", "This computer doesn't know that plan");
+    }
+    if (kind === "opencode" && !cliKey) {
+      throw new RunnerError("bad_request", "OpenCode signs in with its API key");
     }
     if (this.logins.get(loginId)?.state === "waiting") {
       throw new RunnerError("bad_request", "This sign-in already exists");
@@ -972,7 +1135,7 @@ export class AccountManager {
       );
     }
     // Elsewhere every folder thinks for all of its owner's agents anyway.
-    const forAll = this.opts.lending !== undefined && shared && kind === "claude_code";
+    const forAll = this.opts.lending !== undefined && shared && (kind === "claude_code" || kind === "codex");
     const dir = this.dirOf(kind, loginId);
     if (again) {
       if (!existsSync(dir) || existsSync(path.join(dir, SIGNING_IN))) {
@@ -992,7 +1155,7 @@ export class AccountManager {
       }
     }
     // Claude Code: the key the browser seals the pasted code (or a plan's key) to; the private half stays in memory.
-    const pair = kind === "claude_code" || cursorKey ? await generateSecretKeyPair() : undefined;
+    const pair = kind === "claude_code" || cliKey ? await generateSecretKeyPair() : undefined;
     if (!again) {
       // System mode: agents' users pass through to the one folder lent to each, and list nothing.
       const parents = this.opts.lending ? 0o711 : 0o700;
@@ -1009,7 +1172,7 @@ export class AccountManager {
       // Until it signs in: a runner that dies mid sign-in leaves this behind, and the list skips (then clears) it.
       await writeFile(path.join(dir, SIGNING_IN), "", { mode: 0o600 });
     }
-    if (cursorKey && pair) return this.beginKey(kind, loginId, dir, CURSOR_KEY_PROVIDER, pair, again, false);
+    if (cliKey && pair) return this.beginKey(kind, loginId, dir, cliKey, pair, again, false);
     if (provider && pair) return this.beginKey(kind, loginId, dir, provider as PlanId, pair, again, forAll);
 
     const login: Login = {
@@ -1026,7 +1189,7 @@ export class AccountManager {
       again,
     };
     try {
-      if (forAll) this.spawnToken(login);
+      if (forAll && kind === "claude_code") this.spawnToken(login);
       else this.spawnLogin(login, email);
     } catch (err) {
       if (!again) await rm(dir, { recursive: true, force: true });
@@ -1188,7 +1351,7 @@ export class AccountManager {
     kind: AccountKind,
     loginId: string,
     dir: string,
-    provider: PlanId | typeof CURSOR_KEY_PROVIDER,
+    provider: PlanId | CliKeyProvider,
     pair: { publicKey: string; privateKey: string },
     again: boolean,
     shared: boolean,
@@ -1231,7 +1394,8 @@ export class AccountManager {
   /** The code the person pasted (Claude Code) or a plan's key, sealed to this sign-in's key: written to the CLI, or kept. */
   async code(loginId: string, aad: string, box: WireSecretBox): Promise<void> {
     const login = this.waiting(loginId);
-    if ((login.kind !== "claude_code" && login.provider !== CURSOR_KEY_PROVIDER) || !login.privateKey) {
+    const cliKey = login.provider === CURSOR_KEY_PROVIDER || login.provider === OPENCODE_KEY_PROVIDER;
+    if ((login.kind !== "claude_code" && !cliKey) || !login.privateKey) {
       throw new RunnerError("bad_request", "This sign-in doesn't take a code");
     }
     const org = this.opts.orgId?.();
@@ -1247,7 +1411,9 @@ export class AccountManager {
     } catch {
       throw new RunnerError("bad_request", "The code couldn't be opened (wrong key or altered on the way)");
     }
-    if (login.provider === CURSOR_KEY_PROVIDER) return this.keepCursorKey(login, code);
+    if (login.provider === CURSOR_KEY_PROVIDER || login.provider === OPENCODE_KEY_PROVIDER) {
+      return this.keepCliKey(login, login.provider, code);
+    }
     if (login.provider) return this.keepKey(login, login.provider, code);
     if (!code || code.length > MAX_CODE_CHARS || /[\r\n]/.test(code)) {
       throw new RunnerError("bad_request", "That doesn't look like a sign-in code");
@@ -1275,25 +1441,26 @@ export class AccountManager {
     return !this.opts.lending || this.isShared(kind, id) ? { shared: true } : {};
   }
 
-  /** A Cursor API key, kept in the folder (600, written whole): the account thinks with it. Never logged. */
-  private async keepCursorKey(login: Login, key: string) {
+  /** A Cursor or OpenCode API key, kept in the folder (600, written whole): the account thinks with it. Never logged. */
+  private async keepCliKey(login: Login, provider: CliKeyProvider, key: string) {
+    const { file, label } = CLI_KEYS[provider];
     if (!CURSOR_KEY.test(key))
-      throw new RunnerError("bad_request", "That doesn't look like a Cursor API key. Copy the whole key.");
-    writeJson(path.join(login.dir, CURSOR_KEY_FILE), { key });
+      throw new RunnerError("bad_request", `That doesn't look like ${label}. Copy the whole key.`);
+    writeJson(path.join(login.dir, file), { key });
     await rm(path.join(login.dir, SIGNING_IN), { force: true });
     await rm(this.marker(login.kind, login.id, "invalid"), { force: true });
     const info: RunnerAccountInfo = {
       id: login.id,
       kind: login.kind,
       loggedIn: true,
-      provider: CURSOR_KEY_PROVIDER,
+      provider,
       keyHint: key.slice(-4),
       ...this.sharedFlag(login.kind, login.id),
     };
     this.settle(login, "done");
     login.account = info;
     this.added(info);
-    this.log(`account ${login.id.slice(0, 8)} (cursor key) kept`);
+    this.log(`account ${login.id.slice(0, 8)} (${provider} key) kept`);
   }
 
   /** A plan's key, checked and kept in the folder (600, written whole): the account is signed in. Never logged. */
@@ -1389,6 +1556,11 @@ export class AccountManager {
         if (login.state !== "waiting") return;
         if (info.loggedIn) {
           await rm(path.join(login.dir, SIGNING_IN), { force: true }).catch(() => undefined);
+          // A ChatGPT sign-in for all agents: root's alone from now on (`grant`).
+          if (login.shared) {
+            await writeFile(this.marker(login.kind, login.id, "shared"), "", { mode: 0o600 });
+            info.shared = true;
+          }
           this.settle(login, "done");
           login.account = info;
           this.added(info);
@@ -1492,7 +1664,17 @@ export class AccountManager {
     if (cursorKey) {
       return { id, kind, loggedIn: !refused, provider: CURSOR_KEY_PROVIDER, keyHint: cursorKey.slice(-4), ...shared };
     }
-    if (this.isShared(kind, id)) return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
+    if (kind === "opencode") {
+      // Its key is its only sign-in: no key, signed out (its CLI is never asked).
+      const key = await opencodeKeyOf(dir);
+      return key
+        ? { id, kind, loggedIn: !refused, provider: OPENCODE_KEY_PROVIDER, keyHint: key.slice(-4), ...shared }
+        : { id, kind, loggedIn: false, ...shared };
+    }
+    // A ChatGPT one for all agents holds only what root wrote there (`keepCodexAuth`): its CLI says, below.
+    if (this.isShared(kind, id) && kind !== "codex") {
+      return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
+    }
     if (refused || this.lentTo(kind, id) !== null) {
       const kept = refused || kind !== "claude_code" ? undefined : claudeKeptPlan(dir);
       return { id, kind, loggedIn: !refused, ...(kept ? { plan: kept } : {}), ...shared };
@@ -1610,7 +1792,8 @@ export class AccountManager {
     else if (
       !this.isShared(kind, id) &&
       !(kind === "claude_code" && (await planKeyOf(dir))) &&
-      !(kind === "cursor" && (await cursorKeyOf(dir)))
+      !(kind === "cursor" && (await cursorKeyOf(dir))) &&
+      kind !== "opencode"
     ) {
       const r = await runCli(this.command(kind), LOGOUT_ARGS[kind], this.env(kind, dir), STATUS_TIMEOUT_MS);
       if (r.status !== 0) this.log(`account ${id.slice(0, 8)} (${kind}): sign-out didn't finish; removing it anyway`);
@@ -1670,10 +1853,57 @@ export class AccountManager {
     // Signing in again keeps what it has until the new one is kept: only a refusal, or nothing kept, is signed out.
     if (existsSync(this.marker(kind, id, "invalid"))) return { kind: "none" };
     const dir = this.dirOf(kind, id);
+    if (kind === "codex") return this.codexGrant(id, dir);
     const plan = await planKeyOf(dir);
     if (plan) return { kind: "key", provider: plan.provider, key: plan.key };
     const token = await tokenOf(dir);
     return token ? { kind: "token", token } : { kind: "none" };
+  }
+
+  /**
+   * Root's newest copy of a ChatGPT sign-in for all agents. Copies used at once are fine until one is due for its
+   * refresh, which rotates the refresh token and leaves the other copies' refresh refused: the first turn then takes
+   * it alone, and the others wait (at most `CODEX_REFRESH_WAIT_MS`) for its refreshed copy (`keepCodexAuth`).
+   */
+  private async codexGrant(id: string, dir: string): Promise<AccountGrant> {
+    const now = this.opts.now ?? Date.now;
+    let auth = readCodexAuth(dir);
+    if (auth && now() - auth.refreshedAt >= CODEX_REFRESH_AFTER_MS) {
+      const held = this.refreshing.get(id);
+      if (held && now() - held.at < CODEX_REFRESH_WAIT_MS) {
+        await Promise.race([held.done, sleep(Math.max(0, CODEX_REFRESH_WAIT_MS - (now() - held.at)))]);
+        auth = readCodexAuth(dir);
+      } else {
+        let resolve = () => {};
+        const done = new Promise<void>((r) => {
+          resolve = r;
+        });
+        this.refreshing.set(id, { at: now(), done, resolve });
+      }
+    }
+    return auth ? { kind: "codex_auth", auth: auth.text } : { kind: "none" };
+  }
+
+  /**
+   * A refreshed copy of a ChatGPT sign-in for all agents, from the worker of an agent whose turn thinks with it:
+   * kept when it signs in to the same ChatGPT account and looks like a refresh (a newer `last_refresh`, not in the
+   * future, with a rotated refresh token). The agent's shell writes that file too, so a copy dated years ahead would
+   * otherwise stick and refuse every genuine refresh after it. True when kept.
+   */
+  keepCodexAuth(id: string, text: unknown): boolean {
+    if (!isAccountId(id) || !this.isShared("codex", id)) return false;
+    const next = codexAuthOf(text);
+    const dir = this.dirOf("codex", id);
+    const now = readCodexAuth(dir);
+    if (!next || !now || next.accountId !== now.accountId || next.refreshedAt <= now.refreshedAt) return false;
+    if (next.refreshedAt > (this.opts.now ?? Date.now)() + CODEX_CLOCK_SKEW_MS) return false;
+    if (next.refreshToken === now.refreshToken) return false;
+    writeJson(path.join(dir, CODEX_AUTH_FILE), JSON.parse(next.text));
+    const held = this.refreshing.get(id);
+    this.refreshing.delete(id);
+    held?.resolve();
+    this.log(`account ${id.slice(0, 8)} (codex, for all agents) refreshed`);
+    return true;
   }
 
   /**
@@ -1841,7 +2071,8 @@ export class AccountManager {
     if (!own && (this.lentTo(target.kind, id) !== null || this.isShared(target.kind, id))) return null;
     const probe = { command: this.command(target.kind), cwd: target.cwd, env: target.env, ...limits };
     // Cursor's CLI reports no plan usage: its turns' `usage` is all there is.
-    if (target.kind === "cursor") return null;
+    // Nor does OpenCode's: its key's usage is on OpenCode's console.
+    if (target.kind === "cursor" || target.kind === "opencode") return null;
     return target.kind === "codex" ? probeCodexUsage(probe) : probeClaudeUsage(probe);
   }
 

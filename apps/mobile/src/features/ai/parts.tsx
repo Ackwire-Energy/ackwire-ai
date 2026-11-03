@@ -94,7 +94,7 @@ export function PlanReplies({
   onChange: (on: boolean) => void;
   /** The agent's name, for the line under the switch. */
   agent: string;
-  brain: "claude_code" | "codex" | "cursor";
+  brain: "claude_code" | "codex" | "cursor" | "opencode";
   /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
   plan?: string | null;
   /** A coding plan, named by the line, its maker's words behind the ⓘ. */
@@ -223,6 +223,14 @@ export function StepText({ children }: { children: ReactNode }) {
 /** Opens a maker's own page (a sign-in, its settings, where a key is made) in the in-app browser. */
 export function openPage(href: string) {
   void openBrowserAsync(href).catch(() => Linking.openURL(href));
+}
+
+/**
+ * One of our own website's pages the app was opened with but can't show: the in-app browser only. Handing it to the
+ * system (`openPage`'s fallback) would give a link the app is verified for back to the app, in a loop.
+ */
+export function openOwnPage(href: string) {
+  setTimeout(() => void openBrowserAsync(href).catch(() => undefined), 0);
 }
 
 /** The web's `OpenPage`: a small button with the external mark. */

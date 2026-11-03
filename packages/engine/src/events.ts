@@ -209,6 +209,8 @@ export type ChannelEvent =
       failed?: boolean;
       /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
       held?: boolean;
+      /** On the end: a rule ("Aprovar sempre") let it run without asking, whose person, a reads one or not. */
+      autoApproved?: { by: string | null; reads: boolean };
       /** On the end of a permission check it refused (`failed`): the policy's own reason, to the agent. */
       why?: string;
       /** With `why`: the refusal's code (`person`, `outside`…), which the apps say in the person's words. */
@@ -672,6 +674,13 @@ export async function publishOrgEvent(pubsub: PubSub | undefined, event: OrgEven
     // Best effort; access is still re-checked on every subscribe and HTTP request.
   }
 }
+
+/**
+ * A routine's runs changed (one was queued, started or ended): the apps that show its runs fetch them again. Only its
+ * id goes out; what each person may see of it stays behind the routines' own endpoints.
+ */
+export const publishRoutineRuns = (pubsub: PubSub | undefined, orgId: string, routineId: string) =>
+  publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "routine.runs", orgId, routineId } });
 
 /** An event for one person (forwarded to every connection they have open in that organization). */
 export type UserEvent = { type: string; [key: string]: unknown };

@@ -68,9 +68,17 @@ fn is_app_download(url: &str) -> bool {
     url.starts_with("https://app.agentes.chat/api/desktop/download/")
 }
 
-/// The help pages on agentes.chat ("Which one to choose?", "How folders work"), whichever server it opens.
+/// The help pages on the docs site ("Which one to choose?", "How folders work"), whichever server it opens:
+/// `https://agentes.chat/docs/<page>`, or under a language folder (`/pt/docs/<page>`).
 fn is_help_page(url: &str) -> bool {
-    url.starts_with("https://app.agentes.chat/help/")
+    let Some(path) = url.strip_prefix("https://agentes.chat/") else {
+        return false;
+    };
+    let path = match path.split_once('/') {
+        Some((lang, rest)) if lang.len() == 2 && lang.bytes().all(|b| b.is_ascii_lowercase()) => rest,
+        _ => path,
+    };
+    path.starts_with("docs/")
 }
 
 /// The windows that make the app "open" like any other: while one is showing, the app has a Dock icon
@@ -768,9 +776,13 @@ mod tests {
         assert!(is_app_download("https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
         assert!(!is_app_download("https://app.agentes.chat.evil.com/api/desktop/download/x"));
         assert!(!is_sign_in_url("https://claude.ai.evil.com/oauth/authorize?"));
-        assert!(is_help_page("https://app.agentes.chat/help/run-on-your-computer?lang=en#who"));
-        assert!(!is_help_page("https://app.agentes.chat.evil.com/help/x"));
-        assert!(!is_help_page("https://app.agentes.chat/helpdesk"));
+        assert!(is_help_page("https://agentes.chat/docs/run-on-your-computer#who"));
+        assert!(is_help_page("https://agentes.chat/pt/docs/computers#folders"));
+        assert!(!is_help_page("https://agentes.chat.evil.com/docs/x"));
+        assert!(!is_help_page("https://agentes.chat@evil.com/docs/x"));
+        assert!(!is_help_page("https://agentes.chat/docsx"));
+        assert!(!is_help_page("https://agentes.chat/pricing"));
+        assert!(!is_help_page("https://agentes.chat/a/b/docs/x"));
     }
 
     #[cfg(unix)]

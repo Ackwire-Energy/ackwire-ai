@@ -1127,6 +1127,7 @@
     "uses_other": "{{count}}-mal genutzt",
     "confirmed": "Von einer Person bestätigt",
     "unconfirmed": "Noch nicht bestätigt",
+    "details": "Technische Details",
     "before": "Vorher stand hier: {{text}}",
     "fix": "Korrigieren",
     "forgetTitle": "Diese Erinnerung vergessen?",

@@ -114,8 +114,8 @@ describe("accountChoices: an agent's account choice, one entry per account", () 
     // A login that thinks for nobody comes before a new one, a signed-in one before one signed out.
     expect(choice([theo, claude("f")], [null])).toEqual([["f", ["Theo"], false]]);
     expect(choice([claude("o", { status: "signed_out" }), claude("n")], [null])).toEqual([["n", [], false]]);
-    // ChatGPT stays one agent per account, and someone else's is never one to sign in to.
-    expect(choice([claude("c", { kind: "codex", usedBy: ["Theo"] })], [null])).toEqual([["c", ["Theo"], false]]);
+    // ChatGPT's like Claude's: one more login for this agent; someone else's is never one to sign in to.
+    expect(choice([claude("c", { kind: "codex", usedBy: ["Theo"] })], [null])).toEqual([["c", ["Theo"], true]]);
     expect(choice([claude("x", { mine: false, ownerId: "u_bia", email: null, usedBy: ["Theo"] })], [null])).toEqual([
       ["x", ["Theo"], false],
     ]);
@@ -173,17 +173,17 @@ describe("existingAi: what a person already has for an agent with no AI", () => 
     ).toEqual([
       ["use", "free"],
       ["also", "theo"],
-      ["move", "plus"],
+      ["also", "plus"],
       ["again", "out"],
       ["key", "k1"],
       ["locked", "bia"],
     ]);
   });
 
-  test("a signed-out login another agent thinks with is nobody's to use; a free login of an account comes first", () => {
+  test("a signed-out login another agent thinks with signs in again for this one; a free login of an account comes first", () => {
     expect(
       acts([claude("c", "walt@gmail.com", { kind: "codex", usedBy: ["Theo"], status: "signed_out" })], null),
-    ).toEqual([]);
+    ).toEqual([["also", "c"]]);
     expect(acts([claude("t", "walt@acme.com", { usedBy: ["Theo"] }), claude("f", "walt@acme.com")], null)).toEqual([
       ["use", "f"],
     ]);

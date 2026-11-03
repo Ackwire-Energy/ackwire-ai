@@ -48,7 +48,7 @@ The viewer's own plans' limits (`ownPlanLines`): the plans one of their agents t
 
 ### 6. The agent sees its own usage
 
-*Added 2026-10-31.* Asked "how is your usage limit?", an agent could only say it couldn't check. `get_my_usage` (`packages/engine/src/usage-tools.ts`) is a built-in tool with no scope: every agent has it in every run, listed from the first turn (the conversation group, ADR 0043). It reads the agent's own Uso tab as someone without `view_usage` sees it (`agentUsageFor` with no viewer, which also serves `GET …/agents/{agentId}/usage`):
+*Added 2026-10-31.* Asked "how is your usage limit?", an agent could only say it couldn't check. `get_my_usage` (`packages/engine/src/usage-tools.ts`) is a built-in tool with no scope: every agent has it in every run, with no grant, in the rarely used group `more` that `find_tools` loads on demand (ADR 0043). It reads the agent's own Uso tab as someone without `view_usage` sees it (`agentUsageFor` with no viewer, which also serves `GET …/agents/{agentId}/usage`):
 
 - the plan it thinks with (its name, maker, plan and owner), each window tightest first with its percentage, when it resets in the time zone of the person behind the run and the agent's estimated part (§2), and near or at the limit what the apps say (`planWindows`, `planState`);
 - its tokens this month, plans and API apart;

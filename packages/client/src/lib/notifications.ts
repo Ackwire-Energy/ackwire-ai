@@ -228,6 +228,15 @@ export function restrictionOf(n: Pick<AppNotification, "kind" | "latest">) {
   return { code: l.statusTo === "hold" ? "org.paused" : "org.suspended", facts: { reason: l.text, cloud: true } };
 }
 
+/**
+ * Whether an item's headline already names the place called `name` ("Theo replied in #general"), so nothing beside
+ * it says that again. The headline names its `source.label` for a reply, an agent's answer and a mention in a thread.
+ */
+export const headlineNames = (n: Pick<AppNotification, "kind" | "source">, name: string) =>
+  Boolean(name) &&
+  n.source.label === name &&
+  (n.kind === "thread_reply" || n.kind === "agent_reply" || (n.kind === "mention" && !!n.source.threadId));
+
 /** Grouped (several replies or comments, several agents' failures of one cause): it expands to show them. */
 export const isExpandable = (n: AppNotification) =>
   runFailedGroupOf(n) !== null ||
@@ -303,18 +312,21 @@ export function replyTarget(n: AppNotification): ReplyTarget | null {
 
 /** Where "Abrir" goes (the app's routes). */
 export type OpenTarget =
-  | { to: "/org/$orgId/threads/$threadId"; params: { threadId: string } }
+  | { to: "/org/$orgId/threads/$threadId"; params: { threadId: string }; search?: { m: string } }
   | { to: "/org/$orgId/c/$channelId"; params: { channelId: string }; search?: { m: string } }
-  | { to: "/org/$orgId/dm/agent/$agentId"; params: { agentId: string } }
+  | { to: "/org/$orgId/dm/agent/$agentId"; params: { agentId: string }; search?: { m: string } }
   | { to: "/org/$orgId/agents/$agentId"; params: { agentId: string } }
-  | { to: "/org/$orgId/dm/person/$userId"; params: { userId: string } }
+  | { to: "/org/$orgId/dm/person/$userId"; params: { userId: string }; search?: { m: string } }
   | { to: "/org/$orgId/issues/$number"; params: { number: string } }
   | { to: "/org/$orgId/forum/$topicId"; params: { topicId: string } }
-  | { to: "/org/$orgId/approvals" }
+  | { to: "/org/$orgId/approvals"; search?: { open: string } }
   | { to: "/org/$orgId/routines"; search?: { open: string } }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
-  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" | "members" | "usage" | "connectors" } };
+  | {
+      to: "/org/$orgId/settings/$section";
+      params: { section: "computers" | "members" | "usage" | "connectors" | "billing" };
+    };
 
 /** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
 export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
@@ -332,7 +344,10 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
  */
 export function openTarget(n: AppNotification): OpenTarget | null {
   const s = n.source;
-  if (n.kind === "approval") return { to: "/org/$orgId/approvals" };
+  // At the message itself: paged in, scrolled to and lit (`?m=`).
+  const at = s.messageId ? { search: { m: s.messageId } } : {};
+  if (n.kind === "approval")
+    return { to: "/org/$orgId/approvals", ...(s.approvalId ? { search: { open: s.approvalId } } : {}) };
   // Requests to join are answered in Members (ADR 0068).
   if (n.kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   // Someone accepted an invitation (ADR 0090): a conversation with them, to say hi.
@@ -362,32 +377,44 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (n.kind === "browser_profile_request")
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   // A routine couldn't call the agent: its page, where who talks to it is set (the report's room may be private).
-  if (n.kind === "agent_unreached" && s.agentId)
+  // An agent held on agentes.chat Cloud: its page too, where the hold shows.
+  if ((n.kind === "agent_unreached" || n.kind === "org_standing") && s.agentId)
     return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } };
+  // The workspace held for its payment: Cobrança, where it is paid.
+  if (n.kind === "org_standing" && n.latest.billingHold)
+    return { to: "/org/$orgId/settings/$section", params: { section: "billing" } };
   if (s.topicId) return { to: "/org/$orgId/forum/$topicId", params: { topicId: s.topicId } };
   if (s.issueNumber != null) return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) } };
   // A routine that failed, paused or waits for its computer: the routine in Rotinas (its state and fix).
   // What a routine found opens the agent's message in its conversation (below); without one, the routine.
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
     return s.routineId ? { to: "/org/$orgId/routines", search: { open: s.routineId } } : { to: "/org/$orgId/routines" };
-  // An agent's answer or request in my DM with it opens that DM (a DM has no channel page of its own).
-  if (s.dmId && n.actors[0]?.type === "agent" && (n.kind === "agent_reply" || !s.threadId))
-    return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: n.actors[0].id } };
-  if (n.kind === "dm") {
+  // An agent's answer or request in my DM with it opens that DM (a DM has no channel page of its own); one in a thread
+  // there opens the thread, the only place its message is.
+  if (s.dmId && n.actors[0]?.type === "agent" && !s.threadId)
+    return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: n.actors[0].id }, ...at };
+  if (n.kind === "dm" && !s.threadId) {
     const who = n.actors[0];
-    if (who?.type === "agent") return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: who.id } };
-    if (who) return { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id } };
+    if (who?.type === "agent") return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: who.id }, ...at };
+    if (who) return { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id }, ...at };
   }
-  if (s.threadId) return { to: "/org/$orgId/threads/$threadId", params: { threadId: s.threadId } };
+  if (s.threadId) return { to: "/org/$orgId/threads/$threadId", params: { threadId: s.threadId }, ...at };
   const channelId = channelOf(n);
-  if (channelId)
-    return {
-      to: "/org/$orgId/c/$channelId",
-      params: { channelId },
-      ...(s.messageId ? { search: { m: s.messageId } } : {}),
-    };
+  if (channelId) return { to: "/org/$orgId/c/$channelId", params: { channelId }, ...at };
   if (s.missionId) return { to: "/org/$orgId/threads", search: { tab: "missions" } };
   return null;
+}
+
+/**
+ * A target as the web's address (`/org/<id>/c/<id>?m=<id>`), for what opens it outside the web app's router (the
+ * phone, for a page it has no screen of its own for).
+ */
+export function targetPath(orgId: string, target: OpenTarget): string {
+  const params: Record<string, string> = { orgId, ...("params" in target ? target.params : {}) };
+  const path = target.to.replace(/\$(\w+)/g, (_, key: string) => encodeURIComponent(params[key] ?? ""));
+  const search = "search" in target && target.search ? Object.entries(target.search) : [];
+  const query = search.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
+  return query ? `${path}?${query}` : path;
 }
 
 /** A help request whose card is in a conversation I can't open: it opens on the agent's computer, in a dialog. */

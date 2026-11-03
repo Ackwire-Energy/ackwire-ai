@@ -158,7 +158,7 @@ export function NoticeLine({ message }: { message: Message }) {
   if (consulted)
     return (
       <div data-message-id={message.id}>
-        <ConsultPairRow runId={null} askerId={consulted.askerId} items={[pairItemOf(consulted.consultation)]} />
+        <ConsultPairRow askerId={consulted.askerId} items={[pairItemOf(consulted.consultation)]} />
       </div>
     );
   const nameOfHandle = (handle: string) => dir.agentByHandle.get(handle.toLowerCase())?.name ?? null;

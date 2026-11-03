@@ -41,6 +41,18 @@
   font-size: 8px;
 }
 
+/* The title, with how many are unread on its right (baseline to baseline). */
+.nt-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.nt-title__count {
+  margin: 0;
+  color: var(--muted);
+}
+
 /* ── Toolbar (the header is the shared .list-head) ──────────────────────── */
 .nt-tb {
   display: flex;

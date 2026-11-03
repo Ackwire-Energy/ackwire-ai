@@ -40,12 +40,7 @@ import {
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { runPosition } from "@agenteschat/client/lib/chat";
-import {
-  type ConsultNoticeFold,
-  consultBlocksNearEnd,
-  consultNoticeFolds,
-  consultsForLine,
-} from "@agenteschat/client/lib/consult-group";
+import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
@@ -103,7 +98,7 @@ import {
 import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";
 import { threadTitle } from "../chats/logic";
-import { chatHref, consultationHref } from "../links/logic";
+import { chatHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
 import { FanStrip } from "../queue/parts";
@@ -1048,12 +1043,6 @@ function Chat({
     void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
     return true;
   }, []);
-  // "Ver" on an answer's line: the two agents' conversation on its own screen, as the block's line opens it.
-  const seeConsult = useCallback(
-    (fold: Extract<ConsultNoticeFold, { fold: "line" }>) =>
-      router.push(consultationHref(fold.consultation.id, channelId)),
-    [channelId],
-  );
   const openMembers = () =>
     channel ? sheet.open(<ChannelMembersSheet channelId={channelId} channelName={channel.name} />) : undefined;
 
@@ -1515,7 +1504,7 @@ function Chat({
           // What reached an agent's conversation (a routine's report, another agent's answer) and a routine
           // that ran in the background: quiet lines, never a person's or the agent's own voice.
           if (isEventLine(item.message.meta))
-            return <EventLine message={item.message} fold={consultFolds.get(item.message.id)} onSee={seeConsult} />;
+            return <EventLine message={item.message} fold={consultFolds.get(item.message.id)} />;
           // An agent took an issue made from this conversation: one quiet line, not a voice.
           if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
           return (
@@ -1578,7 +1567,6 @@ function Chat({
       connectInline,
       onResend,
       consultFolds,
-      seeConsult,
       flashId,
       c.sunken,
       receipts,
@@ -1930,7 +1918,7 @@ function Chat({
                       <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
                     )
                   }
-                  onType={() => sendTyping(threadId)}
+                  onType={(text) => sendTyping(threadId, text)}
                   voice={voice}
                 />
               ) : (

@@ -19,6 +19,7 @@
     "@agenteschat/config": "workspace:*",
     "@agenteschat/db": "workspace:*",
     "@agenteschat/engine": "workspace:*",
+    "@agenteschat/i18n": "workspace:*",
     "@agenteschat/modules": "workspace:*",
     "@agenteschat/providers": "workspace:*",
     "@agenteschat/setup": "workspace:*",

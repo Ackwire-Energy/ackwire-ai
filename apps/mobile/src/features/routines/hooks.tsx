@@ -64,6 +64,10 @@ export function useWhenText() {
       }
       if (r.trigger.type === "event") return t(`routines.event.${r.trigger.event}`);
       if (r.trigger.type === "webhook") return t("routines.webhook.when");
+      if (r.trigger.type === "connector") {
+        const to = r.trigger.filter.to;
+        return to ? t("mail.routine.when", { address: to }) : t("mail.routine.whenMillionSend");
+      }
       const zone = r.trigger.timezone || "UTC";
       const zoneNote = zone !== myZone ? ` (${timezoneName(zone, i18n.language)})` : "";
       if (r.trigger.type === "once")

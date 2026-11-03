@@ -550,7 +550,13 @@ function AddAccountFlow({
         >
           <StepTitle
             title={t("aiAccounts.add.keyStep", { maker: plan.maker })}
-            hint={provider === "zai" ? t("connectAi.zaiTeam") : undefined}
+            hint={
+              provider === "zai"
+                ? t("connectAi.zaiTeam")
+                : kind === "opencode"
+                  ? t("agentPage.work.brain.add.opencodeFree")
+                  : undefined
+            }
           />
         </Step>
         <Step n={2} side={reads.includes("reconnecting") ? waiting : undefined}>

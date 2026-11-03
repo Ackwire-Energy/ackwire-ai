@@ -144,7 +144,7 @@ export function machineAccountRoutes(deps: AppDeps) {
             }),
             provider: z.string().max(20).optional().openapi({
               description:
-                "A coding plan on Claude Code (`zai`, `kimi`, `minimax`, `opencode`): a key account. The key is sent next like a code, sealed to the computer (`account.invalid_plan`; a runner without plans' keys: `account.runner_old`).",
+                "A coding plan on Claude Code (`zai`, `kimi`, `minimax`, `opencode`), `cursor` for a Cursor API key or `zen` for an OpenCode key: a key account. The key is sent next like a code, sealed to the computer (`account.invalid_plan`; a runner without plans' keys: `account.runner_old`).",
             }),
           }),
         ),
@@ -251,23 +251,37 @@ export function machineAccountRoutes(deps: AppDeps) {
                   }),
                   keys: z.boolean().openapi({ description: "Its runner takes coding plans' keys (protocol 20)." }),
                   shares: z
-                    .object({ claude_code: z.boolean(), codex: z.boolean(), cursor: z.boolean(), key: z.boolean() })
+                    .object({
+                      claude_code: z.boolean(),
+                      codex: z.boolean(),
+                      cursor: z.boolean(),
+                      opencode: z.boolean(),
+                      key: z.boolean(),
+                    })
                     .openapi({
                       description:
                         "A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's, a coding plan's key.",
                     }),
-                  brains: z.object({ claude_code: z.boolean(), codex: z.boolean(), cursor: z.boolean() }).openapi({
-                    description:
-                      "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",
-                  }),
+                  brains: z
+                    .object({
+                      claude_code: z.boolean(),
+                      codex: z.boolean(),
+                      cursor: z.boolean(),
+                      opencode: z.boolean(),
+                    })
+                    .openapi({
+                      description:
+                        "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",
+                    }),
                   own: z
                     .object({
                       claude_code: z.object({ plan: z.string().optional(), usage: PlanUsage.optional() }).optional(),
                       codex: z.object({ plan: z.string().optional(), usage: PlanUsage.optional() }).optional(),
+                      opencode: z.object({}).optional(),
                     })
                     .openapi({
                       description:
-                        "Each CLI's own sign-in there (\"this computer's account\"), on a computer the caller connected: its plan and usage when known.",
+                        "Each CLI's own sign-in there (\"this computer's account\"), on a computer the caller connected: its plan and usage when known. `opencode` also on a computer nobody connected: OpenCode's free tier thinks for anyone's agents (ADR 0132).",
                     }),
                 }),
               ),

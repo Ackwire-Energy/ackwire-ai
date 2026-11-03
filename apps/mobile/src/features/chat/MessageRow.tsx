@@ -32,6 +32,7 @@ import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
+import { reachHandoffs } from "@agenteschat/client/lib/reach";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
@@ -56,6 +57,7 @@ import {
 } from "@/ui";
 import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
+import { CostlyProposalCard } from "../ai/CostlyProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
 import { UsagePauseCard, UsageWaitCancel } from "../ai/UsagePauseCard";
@@ -218,11 +220,13 @@ export const MessageRow = memo(function MessageRow({
   const mediaAfter = isAgent && isMediaAfterReply(meta);
   // It asked other agents first: one row right before it (its run's questions on the run's first message here, and
   // the ones its `meta.consulted` names), so it shows its face and name again under that row.
+  const reached = useMemo(() => reachHandoffs(m.meta), [m.meta]);
   const consults = useRunConsults(
     isAgent && !m.local && !readOnly && !mediaAfter ? m.agentRunId : null,
     m,
     m.id,
     consulted,
+    reached,
   );
   const pair =
     isAgent && m.author.id && consults.length > 0 ? (
@@ -627,6 +631,7 @@ export const MessageRow = memo(function MessageRow({
           {/* What waits for a person's click comes last, after the words and the tools. */}
           {isAgent ? <NoAiCard message={m} /> : null}
           {isAgent ? <StretchCard message={m} /> : null}
+          {isAgent ? <CostlyProposalCard message={m} /> : null}
           {isAgent ? <UsagePauseCard message={m} /> : null}
           {isAgent ? <UsageWaitCancel message={m} /> : null}
           {isAgent ? <ProposalCard message={m} /> : null}

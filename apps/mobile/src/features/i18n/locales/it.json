@@ -1190,6 +1190,7 @@
     "uses_other": "Usato {{count}} volte",
     "confirmed": "Confermato da una persona",
     "unconfirmed": "Non ancora confermato",
+    "details": "Dettagli tecnici",
     "before": "Prima diceva: {{text}}",
     "fix": "Correggi",
     "forgetTitle": "Dimenticare questo ricordo?",

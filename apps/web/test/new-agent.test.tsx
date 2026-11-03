@@ -500,7 +500,7 @@ describe("Criar agente: what gets created", () => {
     kind,
     available,
     ...(available ? {} : { reason: "not_installed" as const }),
-    experimental: kind === "codex",
+
     models: [],
     defaultModel: null,
   });

@@ -159,6 +159,12 @@ export interface ToolDefinition {
    */
   rememberTarget?(input: Record<string, unknown>): string | null;
   /**
+   * A connected server's tool that runs the SQL in `arg` (Supabase's `execute_sql`), by the server's own name `tool`:
+   * "Aprovar sempre leituras" may cover its calls the Postgres guard proves read-only (`provenReadOnly`), one rule per
+   * set of other arguments (the project or database the call names). A call it can't prove still asks.
+   */
+  sqlReads?: { tool: string; arg: string };
+  /**
    * A call of it may be approved ahead for a routine's run (`schedule_action`): set by the connector source on a
    * connected app's own tools, never on one that runs anything its input says (a code workbench, a raw request).
    */

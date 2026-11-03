@@ -30,6 +30,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { CostlyProposalCardView } from "@/components/CostlyProposalCard";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
@@ -66,6 +67,7 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "agent_proposal") return <AgentProposalCardView message={message} card={card} />;
   if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
   if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
+  if (card.kind === "autonomy_proposal") return <CostlyProposalCardView message={message} card={card} />;
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
     card.agentIds.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),

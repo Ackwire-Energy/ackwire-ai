@@ -1127,6 +1127,7 @@
     "uses_other": "{{count}} keer gebruikt",
     "confirmed": "Bevestigd door een persoon",
     "unconfirmed": "Nog niet bevestigd",
+    "details": "Technische details",
     "before": "Eerder stond er: {{text}}",
     "fix": "Corrigeren",
     "forgetTitle": "Deze herinnering vergeten?",

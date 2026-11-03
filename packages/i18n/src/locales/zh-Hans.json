@@ -1557,7 +1557,8 @@
     "notSignedIn": {
       "claude_code": "这台电脑上的 Claude Code 未登录。请在 {{name}} 的页面上连接 Claude 账号。",
       "codex": "这台电脑上的 Codex 未登录。请在 {{name}} 的页面上连接 ChatGPT 账号。",
-      "cursor": "这台电脑上的 Cursor 未登录。请在 {{name}} 的页面上连接 Cursor 账号。"
+      "cursor": "这台电脑上的 Cursor 未登录。请在 {{name}} 的页面上连接 Cursor 账号。",
+      "opencode": "OpenCode 无法在这台电脑上思考。请在 {{name}} 的页面连接一个 OpenCode 密钥。"
     },
     "card": {
       "connected": "完成：{{name}} 现在有 AI 了。",
@@ -1577,6 +1578,7 @@
       "claude": "连接你的 Claude 套餐",
       "chatgpt": "连接你的 ChatGPT 套餐",
       "cursor": "连接你的 Cursor 套餐",
+      "zen": "连接 OpenCode",
       "api_key": "添加 API 密钥"
     },
     "titleFor": "为 {{name}} 连接 AI",
@@ -1600,6 +1602,10 @@
       "cursor": {
         "title": "你的 Cursor 套餐",
         "tiers": "Pro、Pro+、Ultra 或 Teams，或者 Cursor API 密钥"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "免费模型，或你的 OpenCode 密钥"
       },
       "zai": {
         "tiers": "Lite、Pro 或 Max"
@@ -1673,7 +1679,8 @@
     "otherAccount": {
       "claude_code": "Claude 登录的是 {{email}}，而不是 {{account}}。请在 Claude 页面退出登录后重试。",
       "codex": "ChatGPT 登录的是 {{email}}，而不是 {{account}}。请在 ChatGPT 页面退出登录后重试。",
-      "cursor": "Cursor 登录的是 {{email}}，而不是 {{account}}。请在 Cursor 页面退出登录后重试。"
+      "cursor": "Cursor 登录的是 {{email}}，而不是 {{account}}。请在 Cursor 页面退出登录后重试。",
+      "opencode": "OpenCode 登录的是 {{email}}，不是 {{account}}。请用正确的密钥重试。"
     },
     "useAnyway": "使用 {{email}}",
     "assignFailed": "{{label}} 账号已连接，但 {{agent}} 无法切换到它。",
@@ -1691,6 +1698,51 @@
     "save": "保存为密钥",
     "remove": "删掉它",
     "send": "仍然发送"
+  },
+  "costlyCard": {
+    "go": "可以做",
+    "always": "总是",
+    "notNow": "现在不要",
+    "never": "永不",
+    "waiting": "等待负责人",
+    "you": "你",
+    "decided": {
+      "go": "{{name}} 说可以做",
+      "always": "{{name}} 说这类总是可以",
+      "not_now": "{{name}} 说现在不要",
+      "never": "{{name}} 说这类永远不要"
+    }
+  },
+  "brakes": {
+    "title": "没人要求的工作",
+    "subtitle": "它因为例程、警报或其他智能体而自己开始的工作。人要求的事从不会被拦下。",
+    "costly": "做高成本工作前先问",
+    "costlyHelp": "在打开拉取请求、安装软件包或开始长时间任务之前，它会先问负责人。",
+    "costlyAsk": "先问",
+    "costlyGo": "直接做",
+    "cost": {
+      "pr": "打开拉取请求",
+      "install": "安装软件包",
+      "long": "长时间任务"
+    },
+    "rememberedGo": "总是：{{what}}",
+    "rememberedNever": "永不：{{what}}",
+    "forget": "忘记这些回答",
+    "atOnce": "同时进行的工作",
+    "atOnceHelp": "它同时进行多少项没人要求的工作。其余的排队等候。",
+    "prs": "每小时拉取请求数",
+    "prsHelp": "它自己的工作一小时内最多打开的数量。",
+    "call": "可以呼叫的智能体",
+    "callHelp": "它可以提及或交接工作的对象。",
+    "callAll": "全部",
+    "callSome": "仅这些",
+    "callNone": "无",
+    "project": "项目",
+    "projectHelp": "不同项目的智能体不会相互呼叫。",
+    "projectPlaceholder": "移动应用",
+    "otherProjects": "可以呼叫其他项目的智能体",
+    "peopleNote": "这些限制从不拦下人要求的事。",
+    "failed": "无法保存。请重试。"
   },
   "stretchCard": {
     "continued": "{{name}} 让它们继续了 · {{time}}",
@@ -1784,7 +1836,6 @@
     "routinePost": "没有呼叫 <b>{{name}}</b>：只查看和告知的例行工作不会唤醒任何人",
     "outside": "不在{{place}}",
     "routine": "例行工作 {{name}}",
-    "see": "查看",
     "add": "添加到频道",
     "added": "{{name}} 已加入频道。",
     "allow": "允许 {{person}} 与他对话",
@@ -1839,6 +1890,7 @@
       "updated": "修正了技能 <b>{{name}}</b>"
     },
     "other": "做了一项更改",
+    "copyWebhook": "复制 Webhook 地址",
     "issueFields": {
       "title": "标题",
       "description": "描述",
@@ -2236,12 +2288,19 @@
       "partialAdmin": "管理员",
       "waitingCount_other": "{{count}} 项等待中"
     },
+    "run": {
+      "head_other": "{{name}} 的 {{count}} 个{{what}}请求",
+      "approve": "全部批准",
+      "show": "逐个查看"
+    },
     "always": {
       "button": "始终批准",
-      "hint": "批准这一项，以及 {{name}} 之后的同类请求：{{actions}}，不限参数。",
-      "hint_female": "批准这一项，以及 {{name}} 之后的同类请求：{{actions}}，不限参数。",
-      "hintTarget": "批准这一项，以及 {{name}} 之后的同类请求：{{actions}}。",
-      "hintTarget_female": "批准这一项，以及 {{name}} 之后的同类请求：{{actions}}。",
+      "reads": "始终批准读取",
+      "note": "从现在起涵盖 {{actions}}，任何值都适用。如需撤销：{{name}} 页面的“工具和权限”。",
+      "noteTarget": "从现在起涵盖 {{actions}}。如需撤销：{{name}} 页面的“工具和权限”。",
+      "noteReads": "从现在起仅涵盖 {{actions}} 在此项目（{{target}}）中的读取。会更改数据的操作仍需批准。如需撤销：{{name}} 页面的“工具和权限”。",
+      "noteReadsAll": "从现在起仅涵盖 {{actions}} 在此连接中的读取。会更改数据的操作仍需批准。如需撤销：{{name}} 页面的“工具和权限”。",
+      "readsRule": "{{tool}} 的读取",
       "pushTo": "推送到 {{repo}} 的 {{branch}}",
       "done": "已批准。{{name}} 不会再询问这项操作。",
       "undoHere": "如需撤销，请前往 {{name}} 页面的“工具和权限”。",
@@ -2974,7 +3033,8 @@
           "title": {
             "claude_code": "添加 Claude 账号",
             "codex": "添加 ChatGPT 账号",
-            "cursor": "添加 Cursor 账号"
+            "cursor": "添加 Cursor 账号",
+            "opencode": "添加 OpenCode 密钥"
           },
           "stepOne": {
             "claude_code": "有你套餐的那个账号",
@@ -2987,6 +3047,7 @@
             "codex": "使用 ChatGPT 登录",
             "cursor": "使用 Cursor 登录"
           },
+          "opencodeFree": "OpenCode 的免费模型无需密钥。用 OpenCode 控制台的密钥还能使用付费模型。",
           "cursorFinish": "在 Cursor 的页面上登录后，{{computer}} 上的登录会自动完成。",
           "cursorKey": "改用 Cursor API 密钥",
           "openAgain": "再次打开",
@@ -3007,7 +3068,8 @@
           "duplicate": {
             "claude_code": "Claude 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Claude 的页面上退出登录后重试。",
             "codex": "ChatGPT 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 ChatGPT 的页面上退出登录后重试。",
-            "cursor": "Cursor 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Cursor 的页面上退出登录后重试。"
+            "cursor": "Cursor 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Cursor 的页面上退出登录后重试。",
+            "opencode": "这个 OpenCode 密钥已作为 {{account}} 连接。"
           },
           "startFailed": "{{computer}} 没有响应，请稍后重试。",
           "sendFailed": "无法发送代码，请检查后重试。",
@@ -3254,6 +3316,10 @@
       "cancel": "取消",
       "forgotten": "已忘记。如需恢复，可在“已归档”中找到。",
       "saved": "已保存，现在算作已验证。",
+      "playbook": "{{name}} 的工作方式",
+      "playbook_female": "{{name}} 的工作方式",
+      "playbookNote": "它为自己保留的工作方法。不会出现在聊天中。从外部获得且再也没用过的会自动移走，保留在“已归档”中。",
+      "details": "技术细节",
       "skills": "它创建的技能",
       "skillUses_other": "已加载 {{count}} 次",
       "view": "查看",
@@ -4480,6 +4546,9 @@
       "every": "每次调用都会运行。同时到达的调用会合并为一次运行。",
       "newNote": "例行工作会获得一个专属地址。每次向它发送 POST，都会带着发送的内容启动智能体。保存后，地址会显示在例行工作页面上。",
       "hidden": "只有能修改此例行工作的人才能看到它的地址。",
+      "methods": "接受的方法",
+      "methodsHelp": "该地址只响应勾选的方法。使用 GET 时，URL 的查询参数就是这次调用的数据。",
+      "methodsLine": "接受 {{methods}}。",
       "address": "地址",
       "addressHelp": "任何拥有此地址的人都能启动智能体。请像密码一样保管它，泄露后请生成新地址。",
       "copied": "地址已复制。",
@@ -4490,7 +4559,7 @@
       "signature": "签名",
       "signedOff": "关闭：智能体会接收发到此地址的所有调用。",
       "signedOn": "开启：只有用密钥签名的调用才能通过。",
-      "signedHelp": "在 X-Agentes-Signature 中发送请求体的 HMAC-SHA256（sha256=…）。GitHub 的 X-Hub-Signature-256 也可以。",
+      "signedHelp": "在 X-Agentes-Signature 中发送请求体（GET 调用则为其查询字符串，不含 ?）的 HMAC-SHA256（sha256=…）。GitHub 的 X-Hub-Signature-256 也可以。",
       "addSecret": "要求签名",
       "newSecret": "新密钥",
       "newSecretTitle": "生成新密钥？",
@@ -4704,7 +4773,8 @@
         "schedule": "时间",
         "event": "事件",
         "email": "邮件",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend 邮件"
       },
       "frequency": "频率",
       "frequencyPlaceholder": "例如：每周一上午 9 点",
@@ -4893,8 +4963,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code 在电脑上规划和编写代码。{{name}} 跟进并转达。",
-      "codex": "Codex（实验性）",
-      "codexText": "Codex 在电脑上编写代码。仍在测试中。",
+      "codex": "Codex",
+      "codexText": "Codex 在电脑上编写代码。",
       "agent": "{{name}}（智能体本身）",
       "agentText": "{{name}} 直接在电脑上用自己的工具编写代码。",
       "agentText_female": "{{name}} 直接在电脑上用自己的工具编写代码。"
@@ -5400,7 +5470,6 @@
         "codexText": "在电脑上执行。",
         "agentText": "{{name}} 用自己的工具来做。",
         "agentText_female": "{{name}} 用自己的工具来做。",
-        "testing": "测试中",
         "locked": "专项任务开始后无法更改。",
         "open": "专项任务开始前可以更改。",
         "saved": "由谁来做：{{name}}",
@@ -6155,6 +6224,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "在电脑上更新 agentes，即可使用套餐密钥"
       },
@@ -6164,6 +6234,7 @@
         "claude_code": "{{computer}} 上还没准备好",
         "codex": "{{computer}} 上还没准备好",
         "cursor": "{{computer}} 上还没准备好",
+        "opencode": "{{computer}} 上还没准备好",
         "online": "{{computer}} 目前无响应，我们正在处理。"
       }
     },
@@ -7515,18 +7586,22 @@
       "claude": "Claude 套餐上的 {{model}}",
       "chatgpt": "ChatGPT 套餐上的 {{model}}",
       "cursor": "Cursor 套餐上的 {{model}}",
+      "zen": "通过 OpenCode 使用 {{model}}",
       "coding": "{{plan}} 上的 {{model}}",
       "claudeOf": "{{owner}} 的 Claude 套餐上的 {{model}}",
       "chatgptOf": "{{owner}} 的 ChatGPT 套餐上的 {{model}}",
       "cursorOf": "{{owner}} 的 Cursor 套餐上的 {{model}}",
+      "zenOf": "通过 {{owner}} 的 OpenCode 使用 {{model}}",
       "codingOf": "{{owner}} 的 {{plan}} 上的 {{model}}",
       "claudeAuto": "Claude 套餐",
       "chatgptAuto": "ChatGPT 套餐",
       "cursorAuto": "Cursor 套餐",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}} 的 Claude 套餐",
       "chatgptAutoOf": "{{owner}} 的 ChatGPT 套餐",
       "cursorAutoOf": "{{owner}} 的 Cursor 套餐",
+      "zenAutoOf": "{{owner}} 的 OpenCode",
       "codingAutoOf": "{{owner}} 的 {{plan}}",
       "on": "{{computer}} 上的{{line}}"
     },
@@ -7537,7 +7612,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "通过 API",
@@ -7548,11 +7624,11 @@
     "claude_codeText": "使用连接这台电脑的人的 Claude 套餐。",
     "codexText": "使用连接这台电脑的人的 ChatGPT 套餐。",
     "cursorText": "使用连接这台电脑的人的 Cursor 套餐。",
+    "opencodeText": "使用 OpenCode 的免费模型，或连接这台电脑的人的 OpenCode 密钥。",
     "cursorModel": {
       "inPlan": "包含在你的 Cursor 套餐中",
       "apiPrice": "由 Cursor 按 API 价格计费"
     },
-    "testing": "测试中",
     "reasons": {
       "no_computer": "在“电脑”中选择一台已连接的电脑即可使用。",
       "exec_off": "这台电脑连接时没有授予运行程序的权限。",
@@ -7591,6 +7667,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}，不回退到 API"
     },
     "mission": {
@@ -9341,6 +9418,9 @@
       "openConnectors": "打开连接器",
       "when": "当 {{address}} 收到邮件时",
       "whenFolder": "当 {{address}}（{{folder}}）收到邮件时",
+      "whenMillionSend": "当 MillionSend 收到邮件时",
+      "inboxAddress": "邮箱地址",
+      "inboxAddressHelp": "留空 = 任意 MillionSend 邮箱。",
       "unknownMailbox": "某个邮箱",
       "waiting": "等待邮件中",
       "thisWeek_other": "本周 {{count}} 封邮件",
@@ -9783,6 +9863,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "命令",
         "browser": "浏览器"
       },
@@ -9790,6 +9871,7 @@
         "claude": "编写和修改文件，仅限允许的文件夹。",
         "codex": "类似 Claude Code，使用 ChatGPT 账号。仅限允许的文件夹。",
         "cursor": "类似 Claude Code，使用 Cursor 账号。仅限允许的文件夹。",
+        "opencode": "类似 Claude Code，使用 OpenCode 的免费模型或 OpenCode 密钥。仅限允许的文件夹。",
         "commands": "运行终端命令，比如测试和构建。"
       },
       "commandsWarn": "命令可能会访问这台电脑的其他部分，而不只是允许的文件夹。",
@@ -10638,6 +10720,7 @@
     "stopFailed": "无法停止。只有提出请求的人、智能体的负责人或管理员可以。",
     "autoUpdate": "仍在进行中（{{duration}}）。",
     "autoUpdateNow": "当前：{{now}}。",
+    "statusReply": "仍在处理中（{{duration}}）。完成这一步后我会读你的消息。",
     "status": {
       "one": "正在处理：{{subject}}",
       "oneUntitled": "正在后台工作",
@@ -10710,12 +10793,7 @@
       "waitingComputer_female": "{{name}} 正在等待电脑",
       "waitingProvider": "{{name}}：AI 服务商暂时不可用 · 会自动重试",
       "waitingAgents": "{{name}} 把部分工作交了出去，正在等待回复",
-      "waitingAgents_female": "{{name}} 把部分工作交了出去，正在等待回复",
-      "answeredFar": "{{to}} 回答了 {{from}} 的问题",
-      "answeredFar_female": "{{to}} 回答了 {{from}} 的问题",
-      "answeredRequestFar": "{{to}} 回应了 {{from}} 的请求",
-      "answeredRequestFar_female": "{{to}} 回应了 {{from}} 的请求",
-      "see": "查看"
+      "waitingAgents_female": "{{name}} 把部分工作交了出去，正在等待回复"
     },
     "consultPair": {
       "asking": "提问中",
@@ -10816,6 +10894,9 @@
       },
       "gave": "已提供",
       "answered": "已回答",
+      "autoApproved": "已自动批准（由 {{name}} 始终批准）",
+      "autoApprovedReads": "已自动批准（读取由 {{name}} 始终批准）",
+      "autoApprovedNobody": "已自动批准",
       "error": "错误",
       "seconds": "{{n}} 秒",
       "minutes": "{{n}} 分钟",
@@ -11011,6 +11092,13 @@
       "agent": "与 {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "没人直接要求这件事。我可以打开一个拉取请求吗？",
+        "install": "没人直接要求这件事。我可以安装这些软件包吗？",
+        "long": "这需要很多步骤，而且没人直接要求。我可以继续吗？"
+      },
+      "autonomy_digest_other": "{{count}} 条警报看起来是已知的或无害的，所以我没有处理：",
+      "autonomy_loop": "我已主动停止处理这件事。它一天内重复出现了 {{count}} 次（{{title}}）。告诉我你希望怎么处理。",
       "mission_plan": "在 {{computer}} 上执行“{{title}}”的计划",
       "mission_planNoComputer": "“{{title}}”的计划",
       "mission_decision": "决定：{{question}}",

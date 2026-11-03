@@ -573,11 +573,11 @@ export function createFakeMissions(
 }
 
 const FAKE_BRAIN_OPTIONS: BrainOption[] = [
-  { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
+  { kind: "model", available: true, models: [], defaultModel: null },
   {
     kind: "claude_code",
     available: true,
-    experimental: false,
+
     models: [
       { value: "opus", label: "Opus" },
       { value: "sonnet", label: "Sonnet", recommended: true },
@@ -588,7 +588,7 @@ const FAKE_BRAIN_OPTIONS: BrainOption[] = [
   {
     kind: "codex",
     available: true,
-    experimental: true,
+
     models: [
       { value: "gpt-6-sol", label: "GPT-6 Sol", recommended: true },
       { value: "gpt-6-luna", label: "GPT-6 Luna" },

@@ -3,7 +3,7 @@ import { relativeTime } from "@agenteschat/client/lib/format";
 import { router } from "expo-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, Chip, EmptyState, Filters, Row, SearchField, SectionHeader, Text, useToast } from "@/ui";
@@ -27,14 +27,14 @@ const openMemory = (id: string) => router.push(`/memory/${id}`);
  * Memória, pushed from Você: what the agents learned as a sky (each agent with its memories; pages live in the wiki's
  * own map), the search, a filter per agent, what they learned last and what they use most.
  */
-export function MemoryScreen() {
+export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
   const dir = useDirectory();
   const memories = useOrgMemories(orgId);
   const [q, setQ] = useState("");
-  const [agent, setAgent] = useState("all");
+  const [agent, setAgent] = useState(initialAgent || "all");
   const [picked, setPicked] = useState<string | null>(null);
   const search = useDeferredValue(q.trim());
   const shown = useMemo(() => inAgent(memories.data ?? [], agent), [memories.data, agent]);
@@ -46,7 +46,7 @@ export function MemoryScreen() {
       key={m.id}
       divider={i > 0}
       leading={<Face who={{ type: "agent", id: m.agentId }} size={36} live={false} />}
-      title={m.text}
+      title={m.summary ?? m.text}
       subtitle={`${dir.nameOf({ type: "agent", id: m.agentId })} · ${when(m.updatedAt)}`}
       chevron
       onPress={() => openMemory(m.id)}
@@ -156,6 +156,7 @@ function MemoryDetail({ id }: { id: string }) {
   const agent = dir.anyAgent(agentId);
   const name = dir.nameOf({ type: "agent", id: agentId });
   const editable = canEditMemories(agent, { id: meId, org });
+  const [details, setDetails] = useState(false);
   const around = useMemo(
     () => aroundStar(memoryMap(memories.data ?? [], dir.agents), agentId),
     [memories.data, dir.agents, agentId],
@@ -219,8 +220,26 @@ function MemoryDetail({ id }: { id: string }) {
             </Text>
           </View>
           <Text variant="title2" accessibilityRole="header">
-            {m.text}
+            {m.summary ?? m.text}
           </Text>
+          {m.summary ? (
+            <Pressable
+              onPress={() => setDetails((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: details }}
+              hitSlop={8}
+              style={styles.details}
+            >
+              <Text variant="subhead" tone="ink2" style={styles.bold}>
+                {t("mobile.memory.details")}
+              </Text>
+              {details ? (
+                <Text variant="subhead" tone="muted" selectable>
+                  {m.text}
+                </Text>
+              ) : null}
+            </Pressable>
+          ) : null}
           <View style={styles.chips}>
             <Chip
               icon={m.verified ? "check" : "sparkle"}
@@ -267,4 +286,6 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   before: { borderRadius: 14, paddingHorizontal: 13, paddingVertical: 11 },
   actions: { paddingHorizontal: 20, paddingTop: 18, gap: 8 },
+  details: { gap: 6 },
+  bold: { fontWeight: "600" },
 });

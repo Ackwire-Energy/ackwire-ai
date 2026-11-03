@@ -253,7 +253,7 @@ test("a run lists what the judge expects it to need, keeps it for the whole run,
   const [context] = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "context"));
   expect(context?.data.toolGroups).toMatchObject({ groups: [], source: "judge", scores: { issues: 0 } });
 
-  // Used in this channel in the last 6 hours: the next run lists it as it is, without asking.
+  // Used by the previous run here: the next run lists it as it is, without asking.
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev e as fechadas?",
   });
@@ -269,8 +269,12 @@ test("a run lists what the judge expects it to need, keeps it for the whole run,
   expect(contexts.filter((c) => c.data.toolGroups).at(-1)?.data.toolGroups).toMatchObject({
     groups: ["issues"],
     kept: ["issues"],
-    source: "none",
   });
+
+  // That run used no issue tool: the one after it goes without them (a greeting doesn't carry what was used before).
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev valeu" });
+  await drainOutbox(f.db, f.handlers);
+  expect((f.provider.calls.at(-1)?.request.tools ?? []).map((t) => t.name)).not.toContain("list_issues");
 });
 
 test("a reply counts its tools without the lookups: lookups alone leave no tools under it", async () => {
@@ -309,8 +313,8 @@ test("a group the judge expects goes in as it is, with no directory when nothing
     toolsOnDemand: true,
     issueTools: true,
     contextTools: true,
-    judge: (kind, _id, _state, q) =>
-      kind === "tool_groups" && JSON.stringify(q.instructions).includes("Issues") ? 0.9 : 0,
+    // Every group it could load (Issues, and the rarely used memory tools, token-trim B3).
+    judge: (kind) => (kind === "tool_groups" ? 0.9 : 0),
     reply: () => ({ chunks: ["ok"] }),
   });
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "issues:read" }]);
@@ -320,6 +324,7 @@ test("a group the judge expects goes in as it is, with no directory when nothing
   await drainOutbox(f.db, f.handlers);
   const names = (f.provider.calls[0]?.request.tools ?? []).map((t) => t.name);
   expect(names).toContain("list_issues");
+  expect(names).toContain("propose_instruction_change");
   expect(names).not.toContain("find_tools");
 });
 

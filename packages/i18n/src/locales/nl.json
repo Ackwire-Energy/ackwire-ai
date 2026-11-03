@@ -1621,7 +1621,9 @@
       "codex": "Codex is niet ingelogd op deze computer. Koppel een ChatGPT-account op de pagina van {{name}}.",
       "codex_female": "Codex is niet ingelogd op deze computer. Koppel een ChatGPT-account op de pagina van {{name}}.",
       "cursor": "Cursor is niet ingelogd op deze computer. Koppel een Cursor-account op de pagina van {{name}}.",
-      "cursor_female": "Cursor is niet ingelogd op deze computer. Koppel een Cursor-account op de pagina van {{name}}."
+      "cursor_female": "Cursor is niet ingelogd op deze computer. Koppel een Cursor-account op de pagina van {{name}}.",
+      "opencode": "OpenCode kan niet denken op deze computer. Koppel een OpenCode-sleutel op de pagina van {{name}}.",
+      "opencode_female": "OpenCode kan niet denken op deze computer. Koppel een OpenCode-sleutel op de pagina van {{name}}."
     },
     "card": {
       "connected": "Klaar: {{name}} heeft nu een AI.",
@@ -1641,6 +1643,7 @@
       "claude": "Koppel je Claude-abonnement",
       "chatgpt": "Koppel je ChatGPT-abonnement",
       "cursor": "Koppel je Cursor-abonnement",
+      "zen": "Koppel OpenCode",
       "api_key": "Een API-sleutel toevoegen"
     },
     "titleFor": "Een AI koppelen voor {{name}}",
@@ -1664,6 +1667,10 @@
       "cursor": {
         "title": "Je Cursor-abonnement",
         "tiers": "Pro, Pro+, Ultra of Teams, of een Cursor-API-sleutel"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "Gratis modellen, of je OpenCode-sleutel"
       },
       "zai": {
         "tiers": "Lite, Pro of Max"
@@ -1737,7 +1744,8 @@
     "otherAccount": {
       "claude_code": "Claude is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Claude en probeer het opnieuw.",
       "codex": "ChatGPT is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van ChatGPT en probeer het opnieuw.",
-      "cursor": "Cursor is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Cursor en probeer het opnieuw."
+      "cursor": "Cursor is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Cursor en probeer het opnieuw.",
+      "opencode": "OpenCode is ingelogd als {{email}}, niet als {{account}}. Probeer het opnieuw met de juiste sleutel."
     },
     "useAnyway": "{{email}} gebruiken",
     "assignFailed": "Het account {{label}} is gekoppeld, maar {{agent}} kon er niet naar overstappen.",
@@ -1755,6 +1763,51 @@
     "save": "Opslaan als sleutel",
     "remove": "Verwijderen",
     "send": "Toch versturen"
+  },
+  "costlyCard": {
+    "go": "Ga je gang",
+    "always": "Altijd",
+    "notNow": "Nu niet",
+    "never": "Nooit",
+    "waiting": "Wacht op de verantwoordelijke persoon",
+    "you": "Jij",
+    "decided": {
+      "go": "{{name}} zei ga je gang",
+      "always": "{{name}} zei altijd hiervoor",
+      "not_now": "{{name}} zei nu niet",
+      "never": "{{name}} zei nooit hiervoor"
+    }
+  },
+  "brakes": {
+    "title": "Werk waar niemand om vroeg",
+    "subtitle": "Wat hij zelf begint, na een routine, een melding of een andere agent. Waar een persoon om vraagt, wordt nooit tegengehouden.",
+    "costly": "Vragen voor duur werk",
+    "costlyHelp": "Voordat hij een pull request opent, pakketten installeert of aan een lange klus begint, vraagt hij het de verantwoordelijke persoon.",
+    "costlyAsk": "Eerst vragen",
+    "costlyGo": "Gewoon doen",
+    "cost": {
+      "pr": "pull requests openen",
+      "install": "pakketten installeren",
+      "long": "lange klussen"
+    },
+    "rememberedGo": "Altijd: {{what}}",
+    "rememberedNever": "Nooit: {{what}}",
+    "forget": "Deze antwoorden vergeten",
+    "atOnce": "Klussen tegelijk",
+    "atOnceHelp": "Hoeveel klussen waar niemand om vroeg hij tegelijk doet. De rest wacht op zijn beurt.",
+    "prs": "Pull requests per uur",
+    "prsHelp": "Het hoogste aantal dat zijn eigen werk in een uur opent.",
+    "call": "Agents die hij mag roepen",
+    "callHelp": "Wie hij mag noemen of aan wie hij werk mag doorgeven.",
+    "callAll": "Alle",
+    "callSome": "Alleen deze",
+    "callNone": "Geen",
+    "project": "Project",
+    "projectHelp": "Agents van verschillende projecten roepen elkaar niet.",
+    "projectPlaceholder": "Mobiele app",
+    "otherProjects": "Mag agents van andere projecten roepen",
+    "peopleNote": "Deze grenzen houden nooit tegen waar een persoon om vraagt.",
+    "failed": "Opslaan lukte niet. Probeer het opnieuw."
   },
   "stretchCard": {
     "continued": "{{name}} liet ze doorgaan · {{time}}",
@@ -1849,7 +1902,6 @@
     "routinePost": "<b>{{name}}</b> niet geroepen: een routine die alleen kijkt en meldt, wekt niemand",
     "outside": "Niet {{place}}",
     "routine": "Routine {{name}}",
-    "see": "Bekijken",
     "add": "Aan kanaal toevoegen",
     "added": "{{name}} is lid geworden van het kanaal.",
     "allow": "Laat {{person}} met hem praten",
@@ -1904,6 +1956,7 @@
       "updated": "Skill <b>{{name}}</b> verbeterd"
     },
     "other": "Iets gewijzigd",
+    "copyWebhook": "Webhookadres kopiëren",
     "issueFields": {
       "title": "de titel",
       "description": "de beschrijving",
@@ -2312,12 +2365,20 @@
       "waitingCount_one": "{{count}} wachtend",
       "waitingCount_other": "{{count}} wachtend"
     },
+    "run": {
+      "head_one": "{{count}} verzoek van {{name}} om {{what}}",
+      "head_other": "{{count}} verzoeken van {{name}} om {{what}}",
+      "approve": "Alles goedkeuren",
+      "show": "Elk bekijken"
+    },
     "always": {
       "button": "Altijd goedkeuren",
-      "hint": "Keurt dit goed en ook de volgende vergelijkbare van {{name}}: {{actions}}, met elke waarde.",
-      "hint_female": "Keurt dit goed en ook de volgende vergelijkbare van {{name}}: {{actions}}, met elke waarde.",
-      "hintTarget": "Keurt dit goed en ook de volgende vergelijkbare van {{name}}: {{actions}}.",
-      "hintTarget_female": "Keurt dit goed en ook de volgende vergelijkbare van {{name}}: {{actions}}.",
+      "reads": "Lezen altijd goedkeuren",
+      "note": "Geldt vanaf nu voor {{actions}}, met elke waarde. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
+      "noteTarget": "Geldt vanaf nu voor {{actions}}. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
+      "noteReads": "Geldt vanaf nu alleen voor lezen door {{actions}} in dit project ({{target}}). Wat gegevens wijzigt, blijft om goedkeuring vragen. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
+      "noteReadsAll": "Geldt vanaf nu alleen voor lezen door {{actions}} via deze verbinding. Wat gegevens wijzigt, blijft om goedkeuring vragen. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
+      "readsRule": "Lezen door {{tool}}",
       "pushTo": "pushen naar {{branch}} in {{repo}}",
       "done": "Goedgekeurd. {{name}} vraagt hier niet meer om.",
       "undoHere": "Ongedaan maken kan bij Tools en toegang, op de pagina van {{name}}.",
@@ -3078,7 +3139,8 @@
           "title": {
             "claude_code": "Claude-account toevoegen",
             "codex": "ChatGPT-account toevoegen",
-            "cursor": "Cursor-account toevoegen"
+            "cursor": "Cursor-account toevoegen",
+            "opencode": "Een OpenCode-sleutel toevoegen"
           },
           "stepOne": {
             "claude_code": "Het account met je abonnement",
@@ -3091,6 +3153,7 @@
             "codex": "Inloggen met ChatGPT",
             "cursor": "Inloggen met Cursor"
           },
+          "opencodeFree": "De gratis modellen van OpenCode hebben geen sleutel nodig. Een sleutel uit de OpenCode-console voegt de betaalde toe.",
           "cursorFinish": "Log in op de pagina van Cursor, dan rondt {{computer}} het inloggen vanzelf af.",
           "cursorKey": "Gebruik liever een Cursor-API-sleutel",
           "openAgain": "Opnieuw openen",
@@ -3111,7 +3174,8 @@
           "duplicate": {
             "claude_code": "Claude is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Claude en probeer het opnieuw.",
             "codex": "ChatGPT is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van ChatGPT en probeer het opnieuw.",
-            "cursor": "Cursor is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Cursor en probeer het opnieuw."
+            "cursor": "Cursor is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Cursor en probeer het opnieuw.",
+            "opencode": "Die OpenCode-sleutel is al gekoppeld als {{account}}."
           },
           "startFailed": "Geen antwoord van {{computer}}. Probeer het zo opnieuw.",
           "sendFailed": "Kon de code niet versturen. Controleer hem en probeer het opnieuw.",
@@ -3371,6 +3435,10 @@
       "cancel": "Annuleren",
       "forgotten": "Vergeten. Het staat in Gearchiveerd als je het terug wilt.",
       "saved": "Opgeslagen. Het telt nu als geverifieerd.",
+      "playbook": "Hoe {{name}} werkt",
+      "playbook_female": "Hoe {{name}} werkt",
+      "playbookNote": "Werkwijzen die het voor zichzelf bewaart. Ze verschijnen niet in de chat. Wat het van buitenaf oppikte en nooit opnieuw gebruikte, verdwijnt vanzelf en blijft in Gearchiveerd.",
+      "details": "Technische details",
       "skills": "Skills die hij maakte",
       "skillUses_one": "{{count}} keer geladen",
       "skillUses_other": "{{count}} keer geladen",
@@ -4646,6 +4714,9 @@
       "every": "Draait bij elke aanroep. Aanroepen die tegelijk binnenkomen, worden één run.",
       "newNote": "De routine krijgt een eigen adres. Elke POST ernaartoe start de agent met wat er werd gestuurd. Het adres verschijnt op de pagina van de routine zodra die is opgeslagen.",
       "hidden": "Alleen wie de routine kan wijzigen, ziet het adres.",
+      "methods": "Toegestane methoden",
+      "methodsHelp": "Het adres reageert alleen op de aangevinkte methoden. Bij GET zijn de queryparameters van de URL de gegevens van de aanroep.",
+      "methodsLine": "Accepteert {{methods}}.",
       "address": "Adres",
       "addressHelp": "Iedereen met het adres kan de agent starten. Bewaar het als een wachtwoord en maak een nieuw als het uitlekt.",
       "copied": "Adres gekopieerd.",
@@ -4656,7 +4727,7 @@
       "signature": "Handtekening",
       "signedOff": "Uit: de agent krijgt elke aanroep naar het adres.",
       "signedOn": "Aan: alleen aanroepen die met het geheim zijn ondertekend, komen door.",
-      "signedHelp": "Stuur de HMAC-SHA256 van de body in X-Agentes-Signature (sha256=…). X-Hub-Signature-256 van GitHub werkt ook.",
+      "signedHelp": "Stuur de HMAC-SHA256 van de body (bij een GET-aanroep: van de querystring, zonder het ?) in X-Agentes-Signature (sha256=…). X-Hub-Signature-256 van GitHub werkt ook.",
       "addSecret": "Handtekening vereisen",
       "newSecret": "Nieuw geheim",
       "newSecretTitle": "Een nieuw geheim maken?",
@@ -4872,7 +4943,8 @@
         "schedule": "Tijd",
         "event": "Gebeurtenis",
         "email": "E-mail",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend-mail"
       },
       "frequency": "Frequentie",
       "frequencyPlaceholder": "Bijv.: elke maandag om 9:00",
@@ -5069,8 +5141,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code plant en programmeert op de computer. {{name}} volgt het en geeft het door.",
-      "codex": "Codex (experimenteel)",
-      "codexText": "Codex programmeert op de computer. Wordt nog getest.",
+      "codex": "Codex",
+      "codexText": "Codex programmeert op de computer.",
       "agent": "{{name}} (de agent zelf)",
       "agentText": "{{name}} programmeert direct op de computer, met zijn eigen tools.",
       "agentText_female": "{{name}} programmeert direct op de computer, met haar eigen tools."
@@ -5631,7 +5703,6 @@
         "codexText": "Doet het op de computer.",
         "agentText": "{{name}} doet het, met zijn eigen tools.",
         "agentText_female": "{{name}} doet het, met haar eigen tools.",
-        "testing": "In test",
         "locked": "Dit kan niet meer veranderen zodra de missie is gestart.",
         "open": "Dit kan veranderen tot de missie start.",
         "saved": "Wie het werk doet: {{name}}",
@@ -6430,6 +6501,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "Werk agentes bij op de computer om de sleutel van een abonnement te gebruiken"
       },
@@ -6439,6 +6511,7 @@
         "claude_code": "Nog niet klaar op {{computer}}",
         "codex": "Nog niet klaar op {{computer}}",
         "cursor": "Nog niet klaar op {{computer}}",
+        "opencode": "Nog niet klaar op {{computer}}",
         "online": "{{computer}} reageert nu niet. We zijn ermee bezig."
       }
     },
@@ -7837,18 +7910,22 @@
       "claude": "{{model}} op het Claude-abonnement",
       "chatgpt": "{{model}} op het ChatGPT-abonnement",
       "cursor": "{{model}} op het Cursor-abonnement",
+      "zen": "{{model}} via OpenCode",
       "coding": "{{model}} op {{plan}}",
       "claudeOf": "{{model}} op het Claude-abonnement van {{owner}}",
       "chatgptOf": "{{model}} op het ChatGPT-abonnement van {{owner}}",
       "cursorOf": "{{model}} op het Cursor-abonnement van {{owner}}",
+      "zenOf": "{{model}} via de OpenCode van {{owner}}",
       "codingOf": "{{model}} op {{plan}} van {{owner}}",
       "claudeAuto": "Claude-abonnement",
       "chatgptAuto": "ChatGPT-abonnement",
       "cursorAuto": "Cursor-abonnement",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Claude-abonnement van {{owner}}",
       "chatgptAutoOf": "ChatGPT-abonnement van {{owner}}",
       "cursorAutoOf": "Cursor-abonnement van {{owner}}",
+      "zenAutoOf": "OpenCode van {{owner}}",
       "codingAutoOf": "{{plan}} van {{owner}}",
       "on": "{{line}} op {{computer}}"
     },
@@ -7859,7 +7936,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "Via de API",
@@ -7870,11 +7948,11 @@
     "claude_codeText": "Gebruikt het Claude-abonnement van wie de computer koppelde.",
     "codexText": "Gebruikt het ChatGPT-abonnement van wie de computer koppelde.",
     "cursorText": "Gebruikt het Cursor-abonnement van wie de computer koppelde.",
+    "opencodeText": "De gratis modellen van OpenCode, of de OpenCode-sleutel van wie de computer koppelde.",
     "cursorModel": {
       "inPlan": "In je Cursor-abonnement",
       "apiPrice": "Door Cursor gefactureerd tegen API-prijzen"
     },
-    "testing": "Testen",
     "reasons": {
       "no_computer": "Kies een gekoppelde computer bij Computer om dit te gebruiken.",
       "exec_off": "De computer is gekoppeld zonder toestemming om programma's uit te voeren.",
@@ -7913,6 +7991,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, zonder terugval op de API"
     },
     "mission": {
@@ -9715,6 +9794,9 @@
       "openConnectors": "Connectors openen",
       "when": "Als er een mail binnenkomt op {{address}}",
       "whenFolder": "Als er een mail binnenkomt op {{address}} ({{folder}})",
+      "whenMillionSend": "Als er een mail binnenkomt op MillionSend",
+      "inboxAddress": "Adres van de mailbox",
+      "inboxAddressHelp": "Leeg = elke MillionSend-mailbox.",
       "unknownMailbox": "een mailbox",
       "waiting": "Wachten op een mail",
       "thisWeek_one": "{{count}} mail deze week",
@@ -10161,6 +10243,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "Opdrachten",
         "browser": "Browser"
       },
@@ -10168,6 +10251,7 @@
         "claude": "Schrijft en wijzigt bestanden, alleen in de toegestane mappen.",
         "codex": "Zoals Claude Code, met een ChatGPT-account. Alleen in de toegestane mappen.",
         "cursor": "Zoals Claude Code, met een Cursor-account. Alleen in de toegestane mappen.",
+        "opencode": "Zoals Claude Code, met de gratis modellen van OpenCode of een OpenCode-sleutel. Alleen in de toegestane mappen.",
         "commands": "Voert Terminal-opdrachten uit, zoals tests en builds."
       },
       "commandsWarn": "Opdrachten kunnen ook andere delen van de computer bereiken, niet alleen de toegestane mappen.",
@@ -11044,6 +11128,7 @@
     "stopFailed": "Kon het niet stoppen. Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dat.",
     "autoUpdate": "Nog mee bezig ({{duration}}).",
     "autoUpdateNow": "Nu: {{now}}.",
+    "statusReply": "Ik ben er nog mee bezig ({{duration}}). Ik lees je bericht na deze stap.",
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",
@@ -11117,12 +11202,7 @@
       "waitingComputer_female": "{{name}} wacht op de computer",
       "waitingProvider": "{{name}}: de AI-aanbieder ligt eruit · probeert het vanzelf opnieuw",
       "waitingAgents": "{{name}} heeft een deel doorgegeven en wacht op antwoord",
-      "waitingAgents_female": "{{name}} heeft een deel doorgegeven en wacht op antwoord",
-      "answeredFar": "{{to}} beantwoordde de vraag van {{from}}",
-      "answeredFar_female": "{{to}} beantwoordde de vraag van {{from}}",
-      "answeredRequestFar": "{{to}} beantwoordde het verzoek van {{from}}",
-      "answeredRequestFar_female": "{{to}} beantwoordde het verzoek van {{from}}",
-      "see": "Bekijken"
+      "waitingAgents_female": "{{name}} heeft een deel doorgegeven en wacht op antwoord"
     },
     "consultPair": {
       "asking": "vraagt",
@@ -11227,6 +11307,9 @@
       },
       "gave": "gegeven",
       "answered": "beantwoord",
+      "autoApproved": "Automatisch goedgekeurd (altijd goedgekeurd door {{name}})",
+      "autoApprovedReads": "Automatisch goedgekeurd (lezen altijd goedgekeurd door {{name}})",
+      "autoApprovedNobody": "Automatisch goedgekeurd",
       "error": "fout",
       "seconds": "{{n}} s",
       "minutes": "{{n}} min",
@@ -11422,6 +11505,14 @@
       "agent": "Met {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Niemand vroeg hier direct om. Mag ik een pull request openen?",
+        "install": "Niemand vroeg hier direct om. Mag ik deze pakketten installeren?",
+        "long": "Dit kost veel stappen, en niemand vroeg er direct om. Mag ik doorgaan?"
+      },
+      "autonomy_digest_one": "{{count}} melding leek bekend of onschuldig, dus ik heb er niet aan gewerkt:",
+      "autonomy_digest_other": "{{count}} meldingen leken bekend of onschuldig, dus ik heb er niet aan gewerkt:",
+      "autonomy_loop": "Ik ben er uit mezelf mee gestopt. Het kwam {{count}} keer op een dag terug ({{title}}). Zeg me hoe je wilt dat ik ermee omga.",
       "mission_plan": "Plan voor “{{title}}” op {{computer}}",
       "mission_planNoComputer": "Plan voor “{{title}}”",
       "mission_decision": "Besluit: {{question}}",

@@ -76,6 +76,8 @@ export interface GatewayCall {
   effort?: ModelRequest["effort"];
   /** How long the stable prefix stays cached (`ModelRequest.cacheTtl`); absent: 5 minutes. */
   cacheTtl?: ModelRequest["cacheTtl"];
+  /** The per-turn notes, read after the history (`ModelRequest.notes`). */
+  notes?: ModelRequest["notes"];
   onDelta(text: string): void;
   signal?: AbortSignal;
 }
@@ -606,6 +608,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         tools: call.tools,
         ...(call.effort ? { effort: call.effort } : {}),
         ...(call.cacheTtl ? { cacheTtl: call.cacheTtl } : {}),
+        ...(call.notes ? { notes: call.notes } : {}),
         signal: call.signal,
       };
       // Conservative prompt estimate (3 chars/token) so the reservation is an upper bound in practice.

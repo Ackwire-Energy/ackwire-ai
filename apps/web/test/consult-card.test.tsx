@@ -134,6 +134,41 @@ describe("a reply's `meta.consulted`: the pair row before it", () => {
     expect(body.textContent).toContain("O Atlas não respondeu a tempo");
   });
 
+  test("an old reply's question with no id of its own: no conversation to open, it opens in place", async () => {
+    await open(
+      withReply({ consulted: [{ agentId: ATLAS_ID, status: "answered", question: QUESTION, answer: ANSWER }] }),
+    );
+    const pair = pairOf("Já subi o fix") as HTMLElement;
+    const button = pairButton(pair);
+    expect(button.getAttribute("aria-pressed")).toBeNull();
+    await act(async () => fireEvent.click(button));
+    expect(document.querySelector("aside.thread-panel")).toBeNull();
+    expect(pair.querySelector(".consult-pair__detail")?.textContent).toContain(QUESTION);
+  });
+
+  test("people never read the relay line the server opens a mention to an agent with", async () => {
+    const relayed = `[@ada mentioned you in #engenharia, where you aren't a member, so it reaches you here]\n\n${QUESTION}`;
+    await openInThread(
+      withReply({
+        consulted: [
+          {
+            agentId: ATLAS_ID,
+            consultationId: "k1",
+            kind: "note",
+            status: "answered",
+            question: relayed,
+            answer: ANSWER,
+          },
+        ],
+      }),
+    );
+    const pair = pairOf("Já subi o fix") as HTMLElement;
+    await act(async () => fireEvent.click(pairButton(pair)));
+    const body = pair.querySelector(".consult-pair__detail") as HTMLElement;
+    expect(body.textContent).toContain(QUESTION);
+    expect(body.textContent).not.toContain("mentioned you");
+  });
+
   test("two questions to one agent, one failed: one row, '1 de 2 responderam'", async () => {
     await open(
       withReply({

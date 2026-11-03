@@ -73,7 +73,8 @@ test("API brain: core tools first and cached for an hour whatever group loads; t
   expect((asking.tools ?? []).map((t) => t.name)).toContain("list_issues");
   expect((greeting.tools ?? []).map((t) => t.name)).not.toContain("list_issues");
 
-  // System: no breakpoint on the organization's block, one after the agent's, one after the last settled block.
+  // System: none on the rules, one after the organization's block (shared by its agents), one after the last settled
+  // block.
   const system = greeting.system as { text: string; cache?: boolean }[];
   const marked = system.flatMap((b, i) => (b.cache ? [i] : []));
   expect(system[0]?.cache).toBeUndefined();
@@ -90,7 +91,8 @@ test("API brain: core tools first and cached for an hour whatever group loads; t
     expect(at).toBe(stable(greeting).length - 1);
     expect(tools[at]?.cache_control).toEqual(hour);
     const marks = (body.system as Record<string, unknown>[]).filter((s) => s.cache_control);
-    expect(marks.map((s) => s.cache_control)).toEqual([hour, hour]);
+    // With history before the trigger (the second run), its end takes the organization's breakpoint (token-trim B8).
+    expect(marks.map((s) => s.cache_control)).toEqual(body === a ? [hour, hour] : [hour]);
     // The conversation's automatic breakpoint stays at 5 minutes: 4 in all.
     expect(body.cache_control).toEqual({ type: "ephemeral" });
   }

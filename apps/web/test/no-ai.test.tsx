@@ -583,7 +583,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(rows.slice(0, 5)).toEqual([
       "Claude Teamcontato@estudio.example",
       "Claude Pessoal · MaxTambém usada por Atlas",
-      "ChatGPT PlusEm uso por Atlas · Mover para cá",
+      "ChatGPT PlusTambém usada por Atlas",
       "Claude da AcmeClaude · termina em 7f2aPago por uso. Conta no orçamento da Ada.",
       "Claude",
     ]);

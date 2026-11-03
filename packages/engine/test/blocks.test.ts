@@ -7,6 +7,7 @@ import {
   buildRunContext,
   closePoll,
   createArtifact,
+  createBlockToolSource,
   drainOutbox,
   getArtifact,
   getPoll,
@@ -16,6 +17,7 @@ import {
   POLL_CLOSE_JOB,
   postPersonMessage,
   replyToBlock,
+  type ToolContext,
   toolKind,
   ValidationError,
   validateContent,
@@ -78,6 +80,19 @@ describe("the prompt", () => {
     for (const part of ["<ac-card", "<ac-result", "<ac-actions", "--s1", "--on-s"])
       expect(BLOCK_MANUAL).toContain(part);
     expect(BLOCK_MANUAL).toContain("Never write a color");
+  });
+
+  test("show_block is short and says to show one unprompted; the manual comes with a call without html", async () => {
+    f = await setup();
+    const tools = await createBlockToolSource(f.artifactDeps).tools({} as ToolContext);
+    const show = tools.find((t) => t.name === "show_block");
+    if (!show) throw new Error("no show_block");
+    expect(show.description.length).toBeLessThan(800);
+    expect(show.description).toContain("Use it on your own whenever using something beats reading about it");
+    expect(show.description).not.toContain("<ac-slider");
+    const manual = await show.execute({ title: "Planos" }, {} as ToolContext);
+    expect(manual.content).toBe(BLOCK_MANUAL);
+    expect(manual.isError).toBeUndefined();
   });
 
   test("says when to show a block only where the tools are, and never in a routine's run", async () => {

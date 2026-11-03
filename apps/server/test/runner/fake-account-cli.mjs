@@ -153,6 +153,20 @@ switch (args.replace(/^auth login --email \S+$/, "auth login")) {
       () => {
         if (mode === "fail") return end(1, "Error logging in: device code expired\n", process.stderr);
         writeFileSync(marker, "");
+        writeFileSync(
+          path.join(home, "auth.json"),
+          JSON.stringify({
+            auth_mode: "chatgpt",
+            OPENAI_API_KEY: null,
+            tokens: {
+              id_token: "fake-id",
+              access_token: "fake-access",
+              refresh_token: "fake-refresh-1",
+              account_id: "acct-fake",
+            },
+            last_refresh: process.env.FAKE_CODEX_REFRESHED ?? new Date().toISOString(),
+          }),
+        );
         end(0, "Successfully logged in\n", process.stderr);
       },
       Number(process.env.FAKE_CODEX_DELAY ?? 300),

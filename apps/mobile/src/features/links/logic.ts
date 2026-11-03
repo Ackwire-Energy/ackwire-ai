@@ -1,5 +1,5 @@
-import type { AiStatus, AppNotification } from "@agenteschat/client";
-import { ROUTINE_TROUBLE } from "@agenteschat/client/lib/notifications";
+import type { AiStatus, AppNotification, NotificationKind, NotificationSource } from "@agenteschat/client";
+import { openTarget, ROUTINE_TROUBLE, targetPath } from "@agenteschat/client/lib/notifications";
 import { isSafeId } from "../shared/logic";
 
 /**
@@ -25,6 +25,10 @@ export type AppHref =
   | `/settings/computers/${string}`
   | `/consultation/${string}?channel=${string}`
   | "/routines"
+  | "/issues"
+  | "/connectors"
+  | "/me/members"
+  | "/settings/computers"
   | "/activity"
   | "/threads"
   | "/join-requests"
@@ -61,19 +65,50 @@ export function handoffHref(handoffId: string, channelId?: unknown, threadId?: u
     : `/chat/${channelId}?handoff=${handoffId}`;
 }
 
-/** What a push carries for the deep link. */
+/** What a push carries for the deep link (the server's `PUSH_PLACE_KEYS`, packages/engine/src/push.ts). */
 export interface PushPayload {
   orgId?: unknown;
   kind?: unknown;
   notificationId?: unknown;
   channelId?: unknown;
   threadId?: unknown;
+  messageId?: unknown;
+  dmId?: unknown;
   approvalId?: unknown;
   missionId?: unknown;
   handoffId?: unknown;
+  routineId?: unknown;
+  agentId?: unknown;
+  machineId?: unknown;
+  topicId?: unknown;
+  issueNumber?: unknown;
 }
 
-const MISSION_KINDS = new Set(["mission_finished", "mission_stopped"]);
+const PUSH_IDS = [
+  "channelId",
+  "threadId",
+  "messageId",
+  "dmId",
+  "approvalId",
+  "missionId",
+  "handoffId",
+  "routineId",
+  "agentId",
+  "machineId",
+  "topicId",
+] as const;
+
+/** A push as the notification it names, from the ids it carried (checked), so it opens where its inbox row opens. */
+export function pushAsNotification(p: PushPayload): Pick<AppNotification, "kind" | "source" | "actors" | "latest"> {
+  const source: NotificationSource = {};
+  for (const key of PUSH_IDS) {
+    const v = p[key];
+    if (isSafeId(v)) source[key] = v;
+  }
+  const issue = Number(p.issueNumber);
+  if (Number.isSafeInteger(issue) && issue > 0) source.issueNumber = issue;
+  return { kind: (typeof p.kind === "string" ? p.kind : "") as NotificationKind, source, actors: [], latest: {} };
+}
 
 /**
  * Where "your workspace's computer is ready" opens (its push, its row in Atividade): Connect an AI, saying the
@@ -84,20 +119,17 @@ export const computerReadyHref = (ai: Pick<AiStatus, "any" | "agents"> | undefin
   ai !== undefined && !ai.any && ai.agents.length > 0 ? "/connect-ai?ready=1" : "/computer-setup";
 
 /**
- * The screen a push opens. A high-risk approval opens the request, and someone asking to join opens the requests
- * (neither is ever answered from the push). `ai`: the workspace's AI status, for the computer being ready.
+ * The screen a push opens: where its row in Atividade opens (`notificationHref`). A high-risk approval opens the
+ * request, and someone asking to join opens the requests (neither is ever answered from the push). `ai`: the
+ * workspace's AI status, for the computer being ready. Null: the app has no screen for it (`notificationWebPath`).
  */
-export function hrefForPush(p: PushPayload, ai?: Pick<AiStatus, "any" | "agents">): AppHref {
+export function hrefForPush(p: PushPayload, ai?: Pick<AiStatus, "any" | "agents">): AppHref | null {
   if (isSafeId(p.approvalId)) return `/approval/${p.approvalId}`;
-  if (p.kind === "join_request") return "/join-requests";
-  if (p.kind === "computer_ready") return computerReadyHref(ai);
-  // An agent needs a person in its browser: its conversation, with the request's card in control.
-  if (p.kind === "browser_handoff" && isSafeId(p.handoffId)) return handoffHref(p.handoffId, p.channelId, p.threadId);
-  if (isSafeId(p.missionId) && typeof p.kind === "string" && MISSION_KINDS.has(p.kind))
-    return `/mission/${p.missionId}`;
-  if (isSafeId(p.channelId)) return chatHref(p.channelId, isSafeId(p.threadId) ? p.threadId : null);
+  const n = pushAsNotification(p);
+  const href = notificationHref(n, ai);
+  if (href) return href;
   if (isSafeId(p.missionId)) return `/mission/${p.missionId}`;
-  return "/activity";
+  return notificationWebPath(n, "x") ? null : "/activity";
 }
 
 /**
@@ -178,6 +210,14 @@ export function notificationHref(
   if (n.kind === "app_created")
     return isSafeId(s.agentId) ? `/agent/${s.agentId}` : s.routineId ? routineHref(s.routineId) : null;
   if (n.kind === "join_request") return "/join-requests";
+  // Someone who joined: Membros, where they now are (the app has no "say hi" of its own for them).
+  if (n.kind === "invitation_accepted") return "/me/members";
+  // A server changed approved tools: accepted in Conectores.
+  if (n.kind === "connector_tool_changed") return "/connectors";
+  if (n.kind === "machine_connected")
+    return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : "/settings/computers";
+  // An agent held on agentes.chat Cloud: its page, where the hold shows. The workspace's own hold: the web's.
+  if (n.kind === "org_standing") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";
   // A computer's disk is almost full (ADR 0115): that computer, where its shared folder's size shows.
@@ -190,9 +230,25 @@ export function notificationHref(
   }
   if ((n.kind === "mission_finished" || n.kind === "mission_stopped") && isSafeId(s.missionId))
     return `/mission/${s.missionId}`;
-  if (s.topicId || s.issueId || s.issueNumber != null) return null;
+  // The forum has no screen in the app: the web's (`notificationWebPath`).
+  if (s.topicId) return null;
+  if (s.issueNumber != null && Number.isSafeInteger(s.issueNumber)) return `/issues/${s.issueNumber}`;
+  if (s.issueId) return "/issues";
   const channelId = s.channelId ?? s.dmId;
-  if (isSafeId(channelId)) return chatHref(channelId, isSafeId(s.threadId) ? s.threadId : null);
+  if (isSafeId(channelId))
+    return chatHref(channelId, isSafeId(s.threadId) ? s.threadId : null, isSafeId(s.messageId) ? s.messageId : null);
   if (isSafeId(s.missionId)) return `/mission/${s.missionId}`;
   return null;
+}
+
+/**
+ * The web page of an item the app has no screen for (a forum topic, the workspace's billing hold), opened in the
+ * browser so a tap is never a dead end; null when there is none either.
+ */
+export function notificationWebPath(
+  n: Pick<AppNotification, "kind" | "source" | "actors" | "latest">,
+  orgId: string,
+): string | null {
+  const target = openTarget(n as AppNotification);
+  return target ? targetPath(orgId, target) : null;
 }

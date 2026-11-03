@@ -1,4 +1,5 @@
 import {
+  CONNECTOR_EVENTS,
   cancelReminder,
   continueRoutineUsagePause,
   createReminderFromApp,
@@ -8,6 +9,7 @@ import {
   describeWhen,
   duplicateRoutine,
   getRoutineView,
+  HOOK_METHODS,
   HOOK_OUTCOMES,
   listMyReminders,
   listRoutineRuns,
@@ -49,12 +51,14 @@ import {
   noContent,
   OrgParams,
   requireSession,
+  routineConnectorDeps,
   routineHookDeps,
   security,
 } from "./context";
 
 const tags = ["Routines"];
 const Event = z.enum(ROUTINE_EVENTS);
+const HookMethodSchema = z.enum(HOOK_METHODS);
 /** New mail in a mailbox folder (ADR 0038): `from` takes addresses or `@domains`. */
 const MailFilterSchema = z
   .object({
@@ -192,6 +196,16 @@ const RoutineRun = z
     finishedAt: z.string().nullable(),
   })
   .openapi("RoutineRun");
+const ConnectorEvent = z.enum(CONNECTOR_EVENTS).openapi("RoutineConnectorEvent");
+
+const ConnectorFilterSchema = z
+  .object({
+    to: z.string().max(320).optional().openapi({ description: "The inbox's address the email was sent to." }),
+    from: z.array(z.string().max(320)).max(50).optional().openapi({ description: "Addresses or `@domains`." }),
+    subject: z.string().max(200).optional().openapi({ description: "Words the subject contains." }),
+  })
+  .openapi("RoutineConnectorFilter");
+
 const Routine = z
   .object({
     id: z.uuid(),
@@ -230,9 +244,22 @@ const Routine = z
       z.object({
         type: z.literal("webhook"),
         url: z.string().nullable().openapi({
-          description: "Its address (`POST` to start it); null unless you may manage the routine.",
+          description:
+            "Its address (called with one of `methods` to start it); null unless you may manage the routine.",
         }),
         signed: z.boolean().openapi({ description: "Calls must carry an HMAC-SHA256 signature of the body." }),
+        methods: z.array(HookMethodSchema).openapi({ description: "The HTTP methods its address answers." }),
+      }),
+      z.object({
+        type: z.literal("connector"),
+        connectionId: z.uuid(),
+        event: ConnectorEvent,
+        inboxId: z.string().nullable().openapi({ description: "MillionSend: the inbox; null: every inbox." }),
+        filter: ConnectorFilterSchema,
+        status: z.enum(["active", "error"]).openapi({
+          description: "`error`: the service refused the webhook (`lastError`); saving the routine tries again.",
+        }),
+        lastError: z.string().nullable(),
       }),
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
@@ -287,7 +314,7 @@ const Routine = z
           "Its run waits on its plan or budget (ADR 0118); Continuar agora is `POST …/continue` (not at the limit itself), Don't run it is `POST …/stop`.",
       }),
     brain: z.object({
-      kind: z.enum(["model", "claude_code", "codex", "cursor"]),
+      kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode"]),
       machineName: z.string().nullable().openapi({ description: "The computer a computer brain runs on." }),
     }),
     health: z
@@ -363,8 +390,25 @@ const TriggerInput = z.union([
     })
     .openapi({ description: "New mail in a mailbox the agent can read; `folder` default the inbox." }),
   z
-    .object({ type: z.literal("webhook") })
+    .object({
+      type: z.literal("webhook"),
+      methods: z.array(HookMethodSchema).min(1).max(HOOK_METHODS.length).optional().openapi({
+        description: "The HTTP methods its address answers (default POST; left out on a change, what it had).",
+      }),
+    })
     .openapi({ description: "A call to an address of its own (`GET …/hook` gives it to who manages the routine)." }),
+  z
+    .object({
+      type: z.literal("connector"),
+      connectionId: z.uuid(),
+      event: ConnectorEvent,
+      inboxId: z.uuid().nullable().optional(),
+      filter: ConnectorFilterSchema.optional(),
+    })
+    .openapi({
+      description:
+        "A connector's event (ADR 0130), from a connection the agent may read: the server registers the routine's address at the service.",
+    }),
 ]);
 
 const HookCall = z
@@ -385,6 +429,7 @@ const Hook = z
   .object({
     url: z.string(),
     signed: z.boolean(),
+    methods: z.array(HookMethodSchema),
     calls: z.array(HookCall).openapi({ description: "The latest calls, newest first (at most 20)." }),
   })
   .openapi("RoutineHook");
@@ -404,6 +449,7 @@ export function routineRoutes(deps: AppDeps) {
     artifacts: deps.extras?.artifacts,
     mail: adapters.mail,
     hooks,
+    connectors: routineConnectorDeps(deps),
   };
   const hookDeps = routineHookDeps(deps);
 

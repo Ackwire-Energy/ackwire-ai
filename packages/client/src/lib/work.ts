@@ -38,7 +38,31 @@ export interface WorkItem extends Activity {
   /** What it was given and what it answered, for its open line (shortened). */
   input?: string | null;
   result?: string | null;
+  /** It ran without asking under "Aprovar sempre" (`tool_result` step `autoApproved`). */
+  autoApproved?: AutoApproved | null;
 }
+
+/** A call a rule approved: the rule's person (null: unknown) and whether it was an "Aprovar sempre leituras" one. */
+export interface AutoApproved {
+  by: string | null;
+  reads: boolean;
+}
+
+function autoApprovedOf(value: unknown): AutoApproved | null {
+  const v = value as Partial<AutoApproved> | null | undefined;
+  if (!v || typeof v !== "object") return null;
+  return { by: typeof v.by === "string" ? v.by : null, reads: v.reads === true };
+}
+
+/** The quiet words after a call a rule approved: "Aprovado automaticamente (leitura sempre aprovada por Ana)". */
+export function autoApprovedWords(t: TFunction, a: AutoApproved): string {
+  if (!a.by) return t("chat.work.autoApprovedNobody");
+  return t(a.reads ? "chat.work.autoApprovedReads" : "chat.work.autoApproved", { name: a.by });
+}
+
+/** A line's grey words: none beside code, who approved it for good where a rule did, else its hint. */
+export const toolLineHint = (t: TFunction, l: Pick<ToolLine, "code" | "hint" | "autoApproved">) =>
+  l.code ? null : l.autoApproved ? autoApprovedWords(t, l.autoApproved) : l.hint;
 
 /** What the agent said before a model call's tools (`model_call` step: `narration`, `turn`). */
 export interface WorkNarration {
@@ -180,6 +204,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
     const failed = result?.data.isError === true || check?.refused === true;
     const why = !failed ? null : check?.refused ? check.why : firstLine(content);
     const held = !result || Boolean(check?.request);
+    const autoApproved = autoApprovedOf(result?.data.autoApproved);
     const ms = result ? Math.max(0, time(result.createdAt) - time(s.createdAt)) : null;
     // The same thing again, with nothing said in between, no code to show and both done: one line, not five. One
     // that failed or waits stays its own line, as in the live block (a later answer can still change it).
@@ -190,6 +215,8 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       !prev.code &&
       !prev.failed &&
       !prev.held &&
+      !prev.autoApproved &&
+      !autoApproved &&
       !failed &&
       !held &&
       sameActivity(prev, { ...a, tool: name }) &&
@@ -210,6 +237,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       why,
       ...(check?.code ? { refusal: check.code } : {}),
       ...(held ? { held: true } : {}),
+      ...(autoApproved ? { autoApproved } : {}),
       // A permission check opens on the whole command it checked (recorded masked), not on its JSON.
       input: source !== null ? null : typeof s.data.command === "string" ? s.data.command : shortJson(input),
       result: source === null && content && !check ? clip(content) : null,
@@ -259,7 +287,7 @@ export const workCalls = (w: Work) => w.steps.reduce((n, s) => n + s.count, 0);
  */
 export function foldLiveWork(work: LiveWork[]): LiveWork[] {
   const plain = (w: LiveWork | undefined) =>
-    w?.kind === "call" && !w.code && w.output.length === 0
+    w?.kind === "call" && !w.code && w.output.length === 0 && !w.autoApproved
       ? { ...toolActivity(w.tool, w.connector, w.detail, w), tool: w.tool }
       : null;
   return work.filter((w, i) => {
@@ -448,6 +476,7 @@ export interface ToolLine extends Activity {
   result: string | null;
   code?: LiveCode;
   output?: LiveOutput[];
+  autoApproved?: AutoApproved | null;
 }
 
 /** What the block lists, in order: its calls, what the agent said between them, and the messages it read. */
@@ -482,7 +511,15 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
     const state: ToolState = w.running ? (stopped ? "stop" : "run") : w.failed ? "fail" : w.held ? "stop" : "done";
     const hasCode = Boolean(w.code) || w.output.length > 0;
     const prev = items[items.length - 1];
-    if (prev?.kind === "call" && !hasCode && state !== "fail" && sameLine(prev.line, { ...a, tool: w.tool })) {
+    const autoApproved = w.autoApproved ?? null;
+    if (
+      prev?.kind === "call" &&
+      !hasCode &&
+      state !== "fail" &&
+      !autoApproved &&
+      !prev.line.autoApproved &&
+      sameLine(prev.line, { ...a, tool: w.tool })
+    ) {
       prev.line.count += 1;
       prev.line.state = state;
       prev.line.ms = prev.line.ms !== null && w.ms !== undefined ? prev.line.ms + w.ms : (prev.line.ms ?? w.ms ?? null);
@@ -503,6 +540,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
         refusal: w.refusal ?? null,
         input: w.command ?? null,
         result: null,
+        ...(autoApproved ? { autoApproved } : {}),
         ...(w.code ? { code: w.code } : {}),
         ...(w.output.length > 0 ? { output: w.output } : {}),
       },
@@ -533,6 +571,7 @@ export function toolItemsSaved(work: Work): ToolItem[] {
         refusal: s.refusal ?? null,
         input: s.input ?? null,
         result: s.result ?? null,
+        ...(s.autoApproved ? { autoApproved: s.autoApproved } : {}),
         ...(s.code ? { code: s.code, output: s.output ?? [] } : {}),
       },
     },

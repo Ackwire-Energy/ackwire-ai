@@ -11,7 +11,15 @@ import {
   usePostMessage,
   useRoles,
 } from "@agenteschat/client";
-import { approvalCards, approveAllScope } from "@agenteschat/client/lib/approval-card";
+import {
+  approvalCards,
+  approvalRuns,
+  approveAllScope,
+  approveAlwaysAlso,
+  approveAlwaysOn,
+  cardDeadline,
+  runKeys,
+} from "@agenteschat/client/lib/approval-card";
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
@@ -45,7 +53,7 @@ import {
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar, AgentWho } from "@/components/AgentAvatar";
 import {
@@ -175,6 +183,8 @@ export function ApprovalsPage() {
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useOpenParam();
   const [refusing, setRefusing] = useState<string | null>(null);
+  // Unfolded runs, by card and `runKeys`: here, not in the run's card, which remounts when its card regroups.
+  const [openRuns, setOpenRuns] = useState<ReadonlySet<string>>(new Set());
   const all = approvals.data ?? [];
   const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
   const query = q.trim().toLowerCase();
@@ -256,6 +266,14 @@ export function ApprovalsPage() {
         const i = current ? cards.indexOf(current) : -1;
         const next = cards[Math.max(0, Math.min(cards.length - 1, i + (key === "j" ? 1 : -1)))];
         next?.focus();
+      } else if (current && !current.dataset.id) {
+        if (e.key === "Enter" && el === current) {
+          e.preventDefault();
+          current.querySelector<HTMLElement>(".ap-card__actions [aria-expanded]")?.click();
+        } else if (key === "a") {
+          e.preventDefault();
+          current.querySelector<HTMLElement>('[data-approve^="all-"]')?.focus();
+        }
       } else if (e.key === "Enter" && current?.dataset.id && el === current) {
         e.preventDefault();
         setOpenId(current.dataset.id);
@@ -362,7 +380,8 @@ export function ApprovalsPage() {
         {shownOpen.length > 0 && (
           <section className="ap-cards" aria-label={t("approvals.filter.pending")}>
             {approvalCards(shownOpen).map((items) => {
-              const cards = items.map((a) => (
+              const always = approveAlwaysOn(items);
+              const card = (a: Approval) => (
                 <RequestCard
                   key={a.id}
                   approval={a}
@@ -371,13 +390,42 @@ export function ApprovalsPage() {
                   channel={channelName(a.channelId)}
                   selected={openId === a.id}
                   refusing={refusing === a.id && openId !== a.id}
+                  also={approveAlwaysAlso(items, a)}
                   onOpen={() => setOpenId(a.id)}
                   onRefuse={() => setRefusing(a.id)}
                   onCancelRefuse={() => setRefusing(null)}
                 />
-              ));
+              );
+              // Waiting requests of one kind in a row: one card that unfolds into them.
+              // Keyed by `runKeys`: an unfolded run stays open while its requests are decided one by one.
+              const runs = approvalRuns(items);
+              const keys = runKeys(runs).map((key) => `${items[0]?.messageId ?? ""}:${key}`);
+              const cards = runs.map((run, i) =>
+                run.length > 1 && run[0] ? (
+                  <RunCard
+                    key={keys[i]}
+                    open={openRuns.has(keys[i] ?? "")}
+                    onToggle={() =>
+                      setOpenRuns((o) => {
+                        const next = new Set(o);
+                        if (!next.delete(keys[i] ?? "")) next.add(keys[i] ?? "");
+                        return next;
+                      })
+                    }
+                    run={run}
+                    items={items}
+                    always={always}
+                    agent={dir.agentById.get(run[0].agentId)}
+                    channel={channelName(run[0].channelId)}
+                  >
+                    {run.map(card)}
+                  </RunCard>
+                ) : (
+                  run[0] && card(run[0])
+                ),
+              );
               const first = items[0];
-              if (!first || items.length < 2) return cards;
+              if (!first || runs.length < 2) return cards;
               // Requests sharing one card in the conversation: together, with "Aprovar tudo".
               const agent = dir.agentById.get(first.agentId);
               const partial = approveAllPartial(
@@ -751,9 +799,9 @@ export function HoldToApprove({
 /**
  * "Aprovar tudo" / "Agora não para todos" over one card's requests: exactly the ones listed now that this person
  * may decide (one joining during the click is never approved unseen). Held when any of them is high risk.
- * Nothing when fewer than two are theirs: each item's own buttons do.
+ * Nothing when fewer than two are theirs: each item's own buttons do. `children` sit between the two ("Aprovar sempre").
  */
-export function ApproveAll({ items }: { items: Approval[] }) {
+export function ApproveAll({ items, label, children }: { items: Approval[]; label?: string; children?: ReactNode }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const decide = useDecideApprovals(org.id);
@@ -763,7 +811,7 @@ export function ApproveAll({ items }: { items: Approval[] }) {
   return (
     <>
       <HoldToApprove
-        label={t("approval.all.approve")}
+        label={label ?? t("approval.all.approve")}
         high={high}
         id={`all-${ids[0]}`}
         pending={decide.isPending}
@@ -772,6 +820,7 @@ export function ApproveAll({ items }: { items: Approval[] }) {
           decide.mutate({ ids, decision: "approve" }, { onSuccess: burst });
         }}
       />
+      {children}
       <Button
         size="sm"
         disabled={decide.isPending}
@@ -864,6 +913,7 @@ function RequestCard({
   channel,
   selected,
   refusing,
+  also,
   onOpen,
   onRefuse,
   onCancelRefuse,
@@ -874,6 +924,8 @@ function RequestCard({
   channel: string;
   selected: boolean;
   refusing: boolean;
+  /** The requests "Aprovar sempre" approves with this one (`approveAlwaysAlso`). */
+  also: string[];
   onOpen: () => void;
   onRefuse: () => void;
   onCancelRefuse: () => void;
@@ -952,15 +1004,14 @@ function RequestCard({
         {!running && !refusing && a.canDecide && (
           <div className="ap-card__actions">
             <ApproveButton approval={a} />
+            <ApproveAlways approval={a} agent={agent} also={also} />
             <Button size="sm" onClick={onRefuse}>
               {t("approval.refuse")}
             </Button>
-            <ApproveAlways approval={a} agent={agent} />
-            <span className="ap-grow" />
-            {approvalRisk(a) === "high" && <span className="ap-card__hint">{t("approvals.highRisk")}</span>}
-            <Button variant="ghost" size="sm" aria-haspopup="dialog" onClick={onOpen}>
+            <Button size="sm" aria-haspopup="dialog" onClick={onOpen}>
               {t("approvals.details")}
             </Button>
+            {approvalRisk(a) === "high" && <span className="ap-card__hint">{t("approvals.highRisk")}</span>}
           </div>
         )}
       </div>
@@ -969,6 +1020,71 @@ function RequestCard({
       ) : (
         <ExpiryFuse left={Math.max(0, leftMs) / TTL_MS} color={colorOf(agent)} />
       )}
+    </article>
+  );
+}
+
+/**
+ * Several waiting requests of one kind in a row from one agent, on one card: "3 pedidos de Ada para Executar sql",
+ * "Aprovar todos", "Aprovar sempre" where its kind offers it, and "Ver cada um" unfolding each request's own card.
+ */
+function RunCard({
+  run,
+  items,
+  always,
+  agent,
+  channel,
+  open,
+  onToggle,
+  children,
+}: {
+  run: Approval[];
+  items: Approval[];
+  always: Set<string>;
+  agent: Agent | undefined;
+  channel: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const { t, i18n } = useTranslation();
+  const first = run[0];
+  if (!first) return null;
+  const name = agent?.name ?? t("channel.unknownAgent");
+  const head = t("approval.run.head", { count: run.length, name, what: approvalTitle(t, first) });
+  const lead = run.find((a) => always.has(a.id) && a.canDecide);
+  const deadline = cardDeadline(run) ?? first.expiresAt;
+  const leftMs = new Date(deadline).getTime() - Date.now();
+  return (
+    // No `data-id`: the keyboard's Enter, A and R act on one request; on a run, Enter unfolds and A goes to Aprovar todos.
+    <article className="ap-card ap-run" data-burst="" tabIndex={-1} aria-label={head}>
+      <span className="ap-card__face">
+        <AgentAvatar agentId={first.agentId} name={name} size="md" state="waiting" />
+      </span>
+      <div className="ap-card__meta">
+        <b>{name}</b>
+        <span>
+          · {channel ? `#${channel} · ` : ""}
+          {relativeTime(t, i18n.language, first.createdAt)}
+        </span>
+        <span className="ap-grow" />
+        <Chip icon="clock" tone={leftMs <= URGENT_MS ? "waiting" : "neutral"}>
+          {expiryText(t, { expiresAt: deadline })}
+        </Chip>
+      </div>
+      <h3 className="ap-card__title">{head}</h3>
+      <div className="ap-card__body">
+        <div className="ap-card__actions">
+          <ApproveAll items={run} label={t("approval.run.approve")}>
+            {lead && <ApproveAlways approval={lead} agent={agent} also={approveAlwaysAlso(items, lead)} />}
+          </ApproveAll>
+          <Button size="sm" aria-expanded={open} onClick={onToggle}>
+            {t("approval.run.show")}
+          </Button>
+        </div>
+        {open && <div className="ap-run__items">{children}</div>}
+      </div>
+      <ExpiryFuse left={Math.max(0, leftMs) / TTL_MS} color={colorOf(agent)} />
     </article>
   );
 }

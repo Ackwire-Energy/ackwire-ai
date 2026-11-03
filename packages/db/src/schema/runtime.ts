@@ -238,6 +238,42 @@ export const agentWorks = pgTable(
   ],
 );
 
+/**
+ * Autonomy brakes (ADR 0131): what an agent's unrequested work met. A wake on an item (`wake`, `linked` to open work
+ * on the same signature, `digest` held as noise for the next digest, `loop` stopped after repeated attempts, `later`
+ * deferred by a cap), a costly step it took (`pr`, `install`) and a proposal waiting for a person's go (`proposal`,
+ * `state` open → go / not_now / never / always).
+ */
+export const autonomySignals = pgTable(
+  "autonomy_signals",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    kind: text().notNull(),
+    /** The item's normalized fingerprint (`signatureOf`); null for steps that aren't about an item. */
+    signature: text(),
+    title: text().notNull().default(""),
+    channelId: uuid(),
+    runId: uuid(),
+    messageId: uuid(),
+    /** A proposal's: `open` | `go` | `not_now` | `never` | `always`. */
+    state: text(),
+    decidedByUserId: text(),
+    /** A digest item once posted in a digest; a proposal once decided. */
+    doneAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    index().on(t.orgId, t.agentId, t.signature, t.createdAt),
+    index().on(t.orgId, t.agentId, t.kind, t.createdAt),
+    index().on(t.kind).where(sql`${t.doneAt} is null`),
+  ],
+);
+
 export const agentRunStepKindEnum = pgEnum("agent_run_step_kind", [
   "context",
   "model_call",

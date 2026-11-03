@@ -131,6 +131,7 @@ import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
+import { reachHandoffs } from "@agenteschat/client/lib/reach";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
@@ -1186,8 +1187,15 @@ function ChannelView({
   useEffect(() => {
     const el = scroller.current;
     if (!el || typeof ResizeObserver === "undefined") return;
+    // What grew during a glide down (the activity bar opening as the message goes out, the first words) is
+    // followed once the glide ends: the glide stops at the end it was given, and nothing else may grow after it.
+    let later: ReturnType<typeof setTimeout> | undefined;
     const pin = () => {
-      if (stick.current && Date.now() >= autoScrollUntil.current) followRef.current();
+      if (!stick.current) return;
+      const wait = autoScrollUntil.current - Date.now();
+      clearTimeout(later);
+      if (wait > 0) later = setTimeout(pin, wait);
+      else followRef.current();
     };
     const ro = new ResizeObserver(pin);
     for (const child of Array.from(el.children)) ro.observe(child);
@@ -1201,6 +1209,7 @@ function ChannelView({
           });
     mo?.observe(el, { childList: true });
     return () => {
+      clearTimeout(later);
       ro.disconnect();
       mo?.disconnect();
     };
@@ -2157,7 +2166,7 @@ function ChannelView({
                         value={draft}
                         onChange={(v) => {
                           setDraft(v);
-                          if (v.trim()) sendTyping();
+                          if (v.trim()) sendTyping(v);
                         }}
                         onSend={onSend}
                         working={chrome?.locked ? null : working}
@@ -3490,14 +3499,16 @@ export const TimelineMessage = memo(function TimelineMessage({
   // It asked other agents before answering: one row right before the reply, its run's questions (on the run's last
   // message here, or on its live row while it works) and the ones its `meta.consulted` names.
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
+  const reached = useMemo(() => reachHandoffs(m.meta), [m.meta]);
   const consults = useReplyConsults(
     m.author.type !== "agent" || m.local ? null : live ? m.agentRunId : lastOfRun ? replyRun : null,
     consulted,
     !live,
+    reached,
   );
   const pair =
     m.author.type === "agent" && m.author.id && consults.length > 0 ? (
-      <ConsultPairRow runId={live ? m.agentRunId : replyRun} askerId={m.author.id} items={consults} />
+      <ConsultPairRow askerId={m.author.id} items={consults} />
     ) : null;
   // Nobody called it: it joined the conversation on its own (`meta.joined`).
   const joined = m.author.type === "agent" && meta.joined === true;
@@ -3704,8 +3715,9 @@ export const TimelineMessage = memo(function TimelineMessage({
         ) : live ? (
           <Parts resetKey={m}>
             {/* The first thing it said opens the block, above its tools; with nothing said, its words stream on top. */}
+            {/* Keyed like the saved message's parts: its text stays the same element when the message takes its place. */}
             {wordsOnTop && !liveFailed && revealed ? (
-              <MessageText>
+              <MessageText key="body">
                 <MessageBody
                   body={revealed}
                   resolveMention={dir.mentionName}
@@ -3715,14 +3727,14 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             ) : (
               opening.said && (
-                <MessageText>
+                <MessageText key="said">
                   <MessageBody body={opening.said} resolveMention={dir.mentionName} />
                 </MessageText>
               )
             )}
             {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
             {!liveFailed && revealed && !wordsOnTop && (
-              <MessageText>
+              <MessageText key="body">
                 <MessageBody
                   body={revealed}
                   resolveMention={dir.mentionName}
@@ -3780,7 +3792,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         ) : (
           <Parts resetKey={m}>
             {keptSaid?.kind === "say" && (
-              <MessageText>
+              <MessageText key="said">
                 <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
               </MessageText>
             )}
@@ -3801,7 +3813,7 @@ export const TimelineMessage = memo(function TimelineMessage({
               !voice &&
               !choiceReply &&
               (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
-                <MessageText style={workOver ? { opacity: 0.6 } : undefined}>
+                <MessageText key="body" style={workOver ? { opacity: 0.6 } : undefined}>
                   <MessageBody
                     body={talk ? talk.lead : body}
                     resolveMention={dir.mentionName}

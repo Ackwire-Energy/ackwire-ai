@@ -100,6 +100,26 @@ describe("Rotinas: started by a webhook", () => {
     expect(calls.textContent).toContain("Recebida · 74 bytes · Teste");
   });
 
+  test("its page: the methods the address answers, POST by default, at least one on; GET's example sends a query", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await open(webhookRoutine, api);
+    const page = await details("Pedidos pagos");
+    expect(page.textContent).toContain("Aceita POST.");
+    const pill = (m: string) => within(page).getByRole("checkbox", { name: m });
+    expect(pill("POST").getAttribute("aria-checked")).toBe("true");
+    expect(pill("POST").hasAttribute("disabled")).toBe(true);
+    await click(pill("GET"));
+    await settle(6);
+    const updates = () => state.calls.filter((c) => c.method === "routines.update").map((c) => c.args[1]);
+    expect(updates().at(-1)).toEqual({ trigger: { type: "webhook", methods: ["GET", "POST"] } });
+    expect(page.textContent).toContain("Aceita GET, POST.");
+    await click(pill("POST"));
+    await settle(6);
+    expect(updates().at(-1)).toEqual({ trigger: { type: "webhook", methods: ["GET"] } });
+    expect(page.textContent).toMatch(/curl 'https:\/\/app\.agentes\.test\/api\/hooks\/\S{43}\?text=hello'/);
+  });
+
   test("a new secret and turning the signature off say what stops working first", async () => {
     const state = seedState();
     const api = createFakeApi(state);
@@ -138,7 +158,11 @@ describe("Rotinas: started by a webhook", () => {
         list: async (orgId) =>
           (await base.routines.list(orgId)).map((r) =>
             r.name === "Pedidos pagos"
-              ? { ...r, canManage: false, trigger: { type: "webhook" as const, url: null, signed: false } }
+              ? {
+                  ...r,
+                  canManage: false,
+                  trigger: { type: "webhook" as const, url: null, signed: false, methods: ["POST" as const] },
+                }
               : r,
           ),
       },

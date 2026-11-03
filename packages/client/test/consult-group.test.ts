@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { RunConsultation } from "../src/api/types";
 import {
-  CONSULT_REQUEST_FRESH_MS,
   consultAskedKey,
   consultBlocksNearEnd,
-  consultFarKey,
   consultGroupSummary,
   consultLineKey,
   consultLineState,
@@ -18,9 +16,7 @@ import {
   foldsNotice,
   groupsByRun,
   pairItemOf,
-  requestConsultBlock,
   shownConsultations,
-  takeConsultBlockRequest,
 } from "../src/lib/consult-group";
 
 const T0 = Date.parse("2026-10-29T10:00:00Z");
@@ -85,15 +81,13 @@ describe("the words of a block, by what its run asked or handed off (ADR 0095)",
     expect(consultLineKey("failed", note())).toBe("chat.consultation.failedNote");
     expect(consultLineKey("failed", q())).toBe("chat.consultation.failed");
   });
-  test("what was asked or handed, where it came from, and the line of an answer farther up", () => {
+  test("what was asked or handed, and where it came from", () => {
     expect(consultAskedKey(note())).toBe("chat.consultation.wrote");
     expect(consultAskedKey(q())).toBe("chat.consultation.asked");
     expect(consultOriginKey(note(), true)).toBe("chat.consultPanel.originNote");
     expect(consultOriginKey(note(), false)).toBe("chat.consultPanel.originNoteDm");
     expect(consultOriginKey(q(), true)).toBe("chat.consultPanel.origin");
     expect(consultOriginKey(q(), false)).toBe("chat.consultPanel.originDm");
-    expect(consultFarKey(note())).toBe("chat.consultGroup.answeredRequestFar");
-    expect(consultFarKey(q())).toBe("chat.consultGroup.answeredFar");
   });
 });
 
@@ -288,18 +282,6 @@ describe("consultsForLine", () => {
     ];
     expect(consultsForLine(live, new Set(["r1"]))).toEqual([{ runId: "r2", agentId: "dev" }]);
     expect(consultsForLine(live, new Set())).toBe(live);
-  });
-});
-
-describe("requestConsultBlock ('Ver' on an answer's line)", () => {
-  test("waits for its run's block and is used once; a stale one opens nothing", () => {
-    requestConsultBlock("r1", "q1", T0);
-    expect(takeConsultBlockRequest("r2", T0 + 100)).toBeNull();
-    expect(takeConsultBlockRequest("r1", T0 + 100)).toEqual({ runId: "r1", consultationId: "q1", at: T0 });
-    expect(takeConsultBlockRequest("r1", T0 + 200)).toBeNull();
-    requestConsultBlock("r1", "q1", T0);
-    expect(takeConsultBlockRequest("r1", T0 + CONSULT_REQUEST_FRESH_MS + 1)).toBeNull();
-    expect(takeConsultBlockRequest("r1", T0)).toBeNull();
   });
 });
 

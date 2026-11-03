@@ -209,12 +209,17 @@ test("on the API: how much of its budget it used, for an admin and a member alik
   expect(member).not.toMatch(money);
 });
 
-test("every agent has it, with no grant and before any tool group is loaded", async () => {
+test("every agent has it, with no grant: before any tool group is loaded, find_tools gives it", async () => {
   f = await setup({ toolSources: [createUsageToolSource()] });
   await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.agentId, f.agent.id));
-  const ctx = await runFor(f.agent.id, f.owner.id);
-  const listed = await f.tools?.list({ ...ctx, loadedGroups: [] });
-  expect(listed?.map((t) => t.name)).toContain(USAGE_TOOL);
+  const ctx = { ...(await runFor(f.agent.id, f.owner.id)), loadedGroups: [] };
+  // A rarely used tool, loaded on demand (ADR 0043): reachable, never behind a permission.
+  const listed = await f.tools?.list(ctx);
+  expect(listed?.map((t) => t.name)).not.toContain(USAGE_TOOL);
+  const found = await f.tools?.invoke(ctx, { toolUseId: "tu_find", name: "find_tools", input: { query: "my usage" } });
+  const text = found?.type === "result" ? found.output.content : "";
+  expect(text).toContain(`- ${USAGE_TOOL}:`);
+  expect(text).not.toContain("request_permission");
   const routine = await f.tools?.list(await runFor(f.agent.id, f.owner.id, true));
   expect(routine?.map((t) => t.name)).toContain(USAGE_TOOL);
 });

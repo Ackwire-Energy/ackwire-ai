@@ -4,7 +4,7 @@ import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError } from "./errors";
 import { can, requirePermission } from "./organizations";
 
-const { approvalRules, connectorConnections, customTools } = schema;
+const { approvalRules, connectorConnections, customTools, users } = schema;
 
 /**
  * "Aprovar sempre" (docs/adr/0015): someone who decides an agent's approvals approves a kind of call for good, and
@@ -18,6 +18,24 @@ export interface RememberedKind {
   tool: string;
   /** The wrapped actions; none: the tool itself. */
   actions: string[];
+}
+
+/**
+ * The action of an "Aprovar sempre leituras" rule (`ToolDefinition.sqlReads`): the prefix, then the call's other
+ * arguments (`project_id=abc`). Mirrored in `@agenteschat/client` `lib/approval-kind.ts`.
+ */
+export const SQL_READS = "sql-read:";
+
+/** A SQL call's other arguments as one target (`project_id=abc · schema=public`): a rule covers only the same ones. */
+export function sqlReadsTarget(input: Record<string, unknown>, sqlArg: string): string {
+  return Object.keys(input)
+    .filter((k) => k !== sqlArg)
+    .sort()
+    .map((k) => {
+      const v = input[k];
+      return `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`;
+    })
+    .join(" · ");
 }
 
 export interface RuleScope {
@@ -61,6 +79,45 @@ export async function addApprovalRules(tx: Executor, at: RuleScope, kind: Rememb
     .insert(approvalRules)
     .values(actionsOf(kind).map((action) => ({ ...at, tool: kind.tool, action, createdByUserId })))
     .onConflictDoNothing();
+}
+
+/** Who made the first of these rules, by name, for the quiet line of a call they let run; null when unknown. */
+export async function rulesApprover(db: Executor, ruleIds: string[]): Promise<string | null> {
+  if (ruleIds.length === 0) return null;
+  const [row] = await db
+    .select({ name: users.name })
+    .from(approvalRules)
+    .innerJoin(users, eq(users.id, approvalRules.createdByUserId))
+    .where(inArray(approvalRules.id, ruleIds))
+    .orderBy(asc(approvalRules.createdAt))
+    .limit(1);
+  return row?.name ?? null;
+}
+
+/**
+ * Drops every rule of these agents (their owner changed): the new owner decides afresh. Each removal is audited as
+ * one removed by hand, so what the git proxy granted through a rule ends too (`pushGrants`).
+ */
+export async function dropAgentRules(
+  tx: Executor,
+  orgId: string,
+  agentIds: string[],
+  actor: { type: "person"; id: string },
+) {
+  if (agentIds.length === 0) return;
+  const gone = await tx
+    .delete(approvalRules)
+    .where(and(eq(approvalRules.orgId, orgId), inArray(approvalRules.agentId, agentIds)))
+    .returning();
+  for (const rule of gone) {
+    await recordAudit(tx, {
+      orgId,
+      actor,
+      action: RULE_REMOVED_AUDIT,
+      target: { type: "agent", id: rule.agentId },
+      details: { connectionId: rule.connectionId, tool: rule.tool, action: rule.action, reason: "owner_changed" },
+    });
+  }
 }
 
 export interface ApprovalRuleView {

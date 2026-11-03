@@ -242,6 +242,36 @@ test("follow_up: a line now; at its time the agent wakes in the same thread with
   expect(notified).toContain(answer?.id);
 });
 
+test("a follow-up a person asked for comes at its time even when the agent's last word was a side question", async () => {
+  f = await setup({
+    followUps: true,
+    reply: (_request, call) =>
+      call === 1
+        ? {
+            chunks: ["Combinado."],
+            toolUses: [{ name: FOLLOW_UP_TOOL, input: { minutes: 10, note: "Check the deploy.", about: "deploy" } }],
+          }
+        : call === 2
+          ? { chunks: ["Combinado, volto em 10 min. Quer que eu também rode os testes?"] }
+          : { chunks: ["Deploy ok."] },
+  });
+  await ask(f, "@dev confere o deploy em 10 min");
+  await drainOutbox(f.db, f.handlers);
+  const [job] = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, FOLLOW_UP_JOB));
+  await f.db
+    .update(schema.outbox)
+    .set({ nextAttemptAt: new Date() })
+    .where(eq(schema.outbox.id, job?.id ?? ""));
+  await drainOutbox(f.db, f.handlers);
+  expect((await f.db.select().from(schema.agentRuns)).length).toBe(2);
+  const [line] = (await f.db.select().from(schema.messages)).filter(
+    (m) =>
+      (m.meta.notice as { kind?: string } | undefined)?.kind === "follow_up" &&
+      !(m.meta.notice as { refs?: { wake?: string } }).refs?.wake,
+  );
+  expect(line?.meta.notice).toMatchObject({ refs: { state: "done" } });
+});
+
 test("follow_up bounds: a day ahead at most, two per run, three per conversation, none past the stretch's limit", async () => {
   f = await setup({ followUps: true });
   await ask(f, "@dev acompanha o deploy");

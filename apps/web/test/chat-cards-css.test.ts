@@ -99,3 +99,14 @@ test("a card's rows start under its title: a row's hover never covers it", () =>
   expect(value(".ac-card__head+.settings-rows", "margin-top")).toBe("0");
   expect(value(".ac-card__head+.settings-rows>.settings-row:first-child", "border-top")).toBe("1px solid var(--line)");
 });
+
+test("two agents talking is one pair row; on a reach line it sits with the rows, no reply face to line up with", () => {
+  expect(value(".consult-pair__row", "display")).toBe("inline-flex");
+  expect(value(".consult-pair__name", "text-overflow")).toBeUndefined();
+  expect(value(".ag-rcs .ag-rc--talk>.consult-pair", "padding")).toBe("0");
+  expect(value(".ag-rc--talk .consult-pair__detail", "padding-left")).toBe("0");
+});
+
+test("a select's list keeps room under its last row once scrolled to the bottom", () => {
+  expect(value(".ac-menu--select [data-radix-select-viewport]", "padding-block")).toBe("var(--space-1)");
+});

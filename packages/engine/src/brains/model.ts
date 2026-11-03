@@ -1,6 +1,7 @@
 import type { BrainEffort } from "@agenteschat/adapters";
-import type { ModelMessage, SystemBlock, ToolSpec } from "@agenteschat/providers";
+import { type ModelMessage, modelProvider, type SystemBlock, type ToolSpec } from "@agenteschat/providers";
 import type { Agent } from "../agents";
+import { turnNotes } from "../context";
 import type { GatewayResult, ModelGateway } from "../gateway";
 import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
 
@@ -15,6 +16,8 @@ import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
 export interface ModelConversation {
   system: SystemBlock[];
   messages: ModelMessage[];
+  /** The trigger's message: the per-turn notes follow its text there (`turnNotes`); absent: in the system. */
+  notesAt?: number;
 }
 
 export interface ModelBrainOptions {
@@ -56,31 +59,50 @@ export class ModelBrain implements Brain {
     return this.turn(turn, io);
   }
 
-  private async *turn(turn: BrainTurn, io: BrainIO): AsyncGenerator<BrainEvent> {
-    const { gateway, agent, maxOutputTokens } = this.options;
-    const { system, messages } = this.options.conversation();
-    this.last = null;
+  /** The gateway call a turn makes, as sent (a pre-warm sends the same with no output). */
+  private request(turn: BrainTurn) {
+    const { agent } = this.options;
+    const { system, messages, notesAt } = this.options.conversation();
+    const laid = turnNotes(system, notesAt, messages);
     const specs: ToolSpec[] = turn.tools.map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema,
       ...(t.stable ? { stable: true } : {}),
     }));
+    return {
+      orgId: turn.orgId,
+      agentId: turn.agentId,
+      agent,
+      runId: turn.runId,
+      system: laid.system,
+      messages: laid.messages ?? messages,
+      ...(laid.notes ? { notes: laid.notes } : {}),
+      tools: specs.length > 0 ? specs : undefined,
+      // Only "Automático" sets an effort for the API; the API takes low, medium and high.
+      ...(turn.effort ? { effort: apiEffort(turn.effort) } : {}),
+      // The prompt up to the conversation stays cached for an hour: a message after a pause reads it.
+      cacheTtl: "1h" as const,
+    };
+  }
+
+  /**
+   * Writes the first turn's prompt to the provider's cache while the run waits for the person's next message
+   * (token-trim B10): Claude's own API only, through the gateway (budget, usage and cost recorded), never failing.
+   */
+  async prewarm(turn: BrainTurn): Promise<void> {
+    if (modelProvider(this.options.agent.model) !== "anthropic") return;
+    await this.options.gateway.stream({ ...this.request(turn), maxTokens: 0, onDelta: () => {} }).catch(() => {});
+  }
+
+  private async *turn(turn: BrainTurn, io: BrainIO): AsyncGenerator<BrainEvent> {
+    const { gateway, maxOutputTokens } = this.options;
+    this.last = null;
     const deltas = eventQueue<BrainEvent>();
     const call = gateway
       .stream({
-        orgId: turn.orgId,
-        agentId: turn.agentId,
-        agent,
-        runId: turn.runId,
-        system,
-        messages,
+        ...this.request(turn),
         maxTokens: maxOutputTokens,
-        tools: specs.length > 0 ? specs : undefined,
-        // Only "Automático" sets an effort for the API; the API takes low, medium and high.
-        ...(turn.effort ? { effort: apiEffort(turn.effort) } : {}),
-        // The prompt up to the conversation stays cached for an hour: a message after a pause reads it.
-        cacheTtl: "1h",
         onDelta: (text) => deltas.push({ type: "text_delta", text }),
         signal: io.signal,
       })

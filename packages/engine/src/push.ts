@@ -278,6 +278,26 @@ async function sentMediaOf(
   return voiceOf(message?.meta) ? "voice" : (mediaOf(message?.meta)?.kind ?? null);
 }
 
+/**
+ * The ids a push carries so a tap opens the exact place without asking the server (ADR 0035 §4): the phone maps
+ * them to its screen (`apps/mobile/src/lib/push-payload.ts`), the web to its page (`apps/web/src/lib/push-open.ts`).
+ * Ids only, as strings: never a label or a snippet, which the visible text already carries.
+ */
+export const PUSH_PLACE_KEYS = [
+  "channelId",
+  "threadId",
+  "messageId",
+  "dmId",
+  "approvalId",
+  "missionId",
+  "handoffId",
+  "routineId",
+  "agentId",
+  "machineId",
+  "topicId",
+  "issueNumber",
+] as const;
+
 /** The in-app page a browser notification opens: the inbox, which opens the notification itself. */
 export function pushPagePath(orgId: string): string {
   return `/org/${orgId}/notifications`;
@@ -356,8 +376,8 @@ export async function deliverPush(
     highRisk = approval ? approvalIsHighRisk(approval) : true;
   }
   const data: Record<string, unknown> = { orgId: row.orgId, kind: row.kind, notificationId: row.id };
-  for (const key of ["channelId", "threadId", "approvalId", "missionId", "handoffId"] as const) {
-    if (source[key]) data[key] = source[key];
+  for (const key of PUSH_PLACE_KEYS) {
+    if (source[key] != null && source[key] !== "") data[key] = String(source[key]);
   }
   const text: PushTextInput = {
     kind: row.kind,

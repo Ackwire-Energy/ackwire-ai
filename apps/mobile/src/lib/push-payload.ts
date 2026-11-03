@@ -1,19 +1,9 @@
 /**
- * What a push carries for the deep link (ADR 0035 §4): `{ orgId, kind, notificationId, channelId?,
- * threadId?, approvalId?, missionId? }`. Pure: reads untrusted notification data into known string
- * fields (anything else is dropped), so the route mapping (`hrefForPush`) gets clean input.
+ * What a push carries for the deep link (ADR 0035 §4; the server's `PUSH_PLACE_KEYS` in packages/engine/src/push.ts):
+ * `{ orgId, kind, notificationId }` and the ids of where it happened. Pure: reads untrusted notification data into
+ * known string fields (anything else is dropped), so the route mapping (`hrefForPush`) gets clean input.
  */
-export interface PushData {
-  orgId?: string;
-  kind?: string;
-  notificationId?: string;
-  channelId?: string;
-  threadId?: string;
-  approvalId?: string;
-  missionId?: string;
-  /** An agent's browser handoff (ADR 0040): opens its live view. */
-  handoffId?: string;
-}
+export type PushData = Partial<Record<(typeof FIELDS)[number], string>>;
 
 const FIELDS = [
   "orgId",
@@ -21,9 +11,17 @@ const FIELDS = [
   "notificationId",
   "channelId",
   "threadId",
+  "messageId",
+  "dmId",
   "approvalId",
   "missionId",
+  // An agent's browser handoff (ADR 0040): opens its live view.
   "handoffId",
+  "routineId",
+  "agentId",
+  "machineId",
+  "topicId",
+  "issueNumber",
 ] as const;
 
 export function readPushData(data: unknown): PushData {

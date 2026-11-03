@@ -169,7 +169,7 @@ describe("Quem pensa (its dialog)", () => {
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
       "Chave de API",
       "Claude",
-      "ChatGPTEm teste",
+      "ChatGPT",
     ]);
     expect(rows.map((r) => r.querySelector(".ac-optrow__desc")?.textContent)).toEqual([
       "Pago por uso. Conta no orçamento da Ada.",
@@ -201,7 +201,6 @@ describe("Quem pensa (its dialog)", () => {
     const cursor = {
       kind: "cursor" as const,
       available: true,
-      experimental: true,
       models: [
         { value: "grok-5-code", label: "Grok 5 Code", inPlan: true },
         { value: "claude-opus-5-5", label: "Claude Opus 5.5" },
@@ -217,8 +216,8 @@ describe("Quem pensa (its dialog)", () => {
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
       "Chave de API",
       "Claude",
-      "ChatGPTEm teste",
-      "CursorEm teste",
+      "ChatGPT",
+      "Cursor",
     ]);
     expect(rows[3]?.querySelector(".ac-brand[data-mark='cursor']")).not.toBeNull();
     await act(async () => fireEvent.click(rows[3] as HTMLElement));
@@ -615,7 +614,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     ]);
   });
 
-  test("ChatGPT stays one agent per account: another agent's moves here", async () => {
+  test("ChatGPT like Claude: an account another agent thinks with signs in again for this one, never moved", async () => {
     const theo: MachineAccount = {
       ...work,
       id: "acct_theo",
@@ -625,18 +624,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       plan: "Plus",
       usedBy: ["Theo"],
     };
-    const { state } = await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [theo] });
+    await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [theo] });
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta" });
     account.focus();
     await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
     expect(screen().getByRole("option", { name: /^Pessoal · Plus/ }).textContent).toBe(
-      "Pessoal · PlusEm uso por Theo · Mover para cá",
+      "Pessoal · PlusTambém usada por Theo",
     );
     await click(screen().getByRole("option", { name: /^Pessoal · Plus/ }));
-    await click(within(d).getByRole("button", { name: "Usar" }));
-    await settle(6);
-    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_theo", moveAccount: true });
+    await settle(4);
+    expect(within(d).getByRole("region", { name: /^Adicionar conta/ })).toBeTruthy();
   });
 
   test("plan usage: the chosen account's meter; at the limit, its owner's free accounts, never another agent's", async () => {
@@ -1459,7 +1457,7 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
       "Chave de API",
       "Claude",
-      "ChatGPTEm teste",
+      "ChatGPT",
       "OpenCode Go",
     ]);
     const opencode = card(d, /^OpenCode Go/);

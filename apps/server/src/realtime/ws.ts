@@ -5,6 +5,7 @@ import {
   type Presence,
   type PubSub,
   type RateLimiter,
+  typingTopic,
   type Unsubscribe,
   userTopic,
 } from "@agenteschat/adapters";
@@ -48,7 +49,7 @@ import type { StreamSocketData, StreamSockets } from "./streams";
  *   (`requireChannelAccess`, the same check as the HTTP API) before
  *   forwarding the channel's events.
  * - `{"type":"typing","channelId","threadId"?}` (throttled by the client; the
- *   server keeps at most one every 2 s) fans out `user.typing` to the channel,
+ *   server keeps at most two every 2 s) fans out `user.typing` to the channel,
  *   valid for `ttlMs` (5 s).
  * - Server → client frames: `ready`, `subscribed`, `unsubscribed` (with a
  *   `reason` when the server dropped it: `revoked`, `archived`), `error`, and
@@ -518,22 +519,24 @@ export function createRealtime(deps: RealtimeDeps) {
 
         const { channelId } = frame;
         if (frame.type === "typing") {
-          // Only into channels this connection is subscribed to (already authorized); at most every 2 s.
+          // Only into channels this connection is subscribed to (already authorized); at most two every 2 s (the apps
+          // send one every 3 s, and one more when a new message starts).
           if (!ws.data.subscriptions.has(channelId)) return;
           const t = await deps.rateLimiter.consume(`typing:${ws.data.connectionId}:${channelId}`, {
-            limit: 1,
+            limit: 2,
             windowMs: 2000,
           });
           if (!t.allowed) return;
-          await deps.pubsub
-            .publish(channelTopic(channelId), {
-              type: "user.typing",
-              channelId,
-              threadId: frame.threadId,
-              userId: ws.data.user.id,
-              ttlMs: TYPING_TTL_MS,
-            })
-            .catch(() => {});
+          const typing = {
+            type: "user.typing",
+            channelId,
+            threadId: frame.threadId,
+            userId: ws.data.user.id,
+            ttlMs: TYPING_TTL_MS,
+          };
+          await Promise.all(
+            [channelTopic(channelId), typingTopic].map((topic) => deps.pubsub.publish(topic, typing).catch(() => {})),
+          );
           return;
         }
         if (frame.type === "unsubscribe") {

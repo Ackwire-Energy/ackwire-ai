@@ -7,6 +7,7 @@ import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./
 import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
 import { addChannelMember, CHANNEL_NAME_PATTERN, createChannel } from "./channels";
+import type { ConnectorTriggerDeps } from "./connector-triggers";
 import { addContextItemByPerson, editContextItem, holdsSecret, looksLikeSecret } from "./context/items";
 import { nextCronTime, zonedParts } from "./cron";
 import { sha256 } from "./crypto";
@@ -630,6 +631,8 @@ export interface ImportDeps {
   /** Skills keep their files in the blob store. */
   blobs: BlobStoreResolver;
   pubsub: PubSub;
+  /** An update that moves a connector routine (ADR 0130) to a schedule takes its webhook back at the provider. */
+  connectors?: ConnectorTriggerDeps;
 }
 
 const publicItem = ({ hash: _hash, work: _work, ...item }: PlannedItem): ImportItemResult => item;
@@ -673,7 +676,7 @@ export async function applyImport(
     );
   }
 
-  const routineDeps: RoutineDeps = { db, pubsub };
+  const routineDeps: RoutineDeps = { db, pubsub, connectors: deps.connectors };
   const ids: Record<ImportItemKind, Map<string, string>> = {
     agent: new Map(),
     skill: new Map(),

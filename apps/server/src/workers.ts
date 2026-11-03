@@ -24,6 +24,7 @@ import {
   type MailDeps,
   type OutboxJob,
   pollMailWatches,
+  postAutonomyDigests,
   pruneDeletionCodes,
   pruneJoinRequests,
   pruneMessageClientIds,
@@ -125,6 +126,8 @@ export const WORKER_INTERVALS_MS = {
   opsReport: 3600_000,
   /** AI apps' expired requests, tokens and unused registrations (ADR 0119). */
   apps: 3600_000,
+  /** Alerts the autonomy brakes held as noise, posted as one digest per agent and conversation (ADR 0131 §5). */
+  autonomyDigest: 10 * 60_000,
 };
 
 /**
@@ -258,6 +261,11 @@ export function startWorkers(deps: WorkerDeps) {
       if (purged > 0) log.info("deleted files purged", { versions: purged });
     });
   }
+
+  every("autonomyDigest", WORKER_INTERVALS_MS.autonomyDigest, async () => {
+    const posted = await postAutonomyDigests({ db, pubsub: deps.pubsub });
+    if (posted > 0) log.info("noise digests posted", { posted });
+  });
 
   const voice = deps.voice;
   if (voice) {

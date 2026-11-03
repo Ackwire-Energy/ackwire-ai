@@ -1557,7 +1557,8 @@
     "notSignedIn": {
       "claude_code": "このコンピューターでClaude Codeにログインしていません。{{name}}のページでClaudeアカウントを接続してください。",
       "codex": "このコンピューターでCodexにログインしていません。{{name}}のページでChatGPTアカウントを接続してください。",
-      "cursor": "このコンピューターでCursorにログインしていません。{{name}}のページでCursorアカウントを接続してください。"
+      "cursor": "このコンピューターでCursorにログインしていません。{{name}}のページでCursorアカウントを接続してください。",
+      "opencode": "このコンピューターではOpenCodeが動きません。{{name}}のページでOpenCodeのキーを接続してください。"
     },
     "card": {
       "connected": "完了しました。{{name}}にAIが接続されました。",
@@ -1577,6 +1578,7 @@
       "claude": "Claudeのプランを接続",
       "chatgpt": "ChatGPTのプランを接続",
       "cursor": "Cursorのプランを接続",
+      "zen": "OpenCodeを接続",
       "api_key": "APIキーを追加"
     },
     "titleFor": "{{name}}のAIを接続",
@@ -1598,6 +1600,10 @@
       "cursor": {
         "title": "あなたのCursorプラン",
         "tiers": "Pro、Pro+、Ultra、Teams、またはCursorのAPIキー"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "無料モデル、またはあなたのOpenCodeキー"
       },
       "zai": {
         "tiers": "Lite、Pro、Max"
@@ -1669,7 +1675,8 @@
     "otherAccount": {
       "claude_code": "Claudeは{{account}}ではなく{{email}}でログインしています。Claudeのページでログアウトして、もう一度お試しください。",
       "codex": "ChatGPTは{{account}}ではなく{{email}}でログインしています。ChatGPTのページでログアウトして、もう一度お試しください。",
-      "cursor": "Cursorは{{account}}ではなく{{email}}でログインしています。Cursorのページでログアウトして、もう一度お試しください。"
+      "cursor": "Cursorは{{account}}ではなく{{email}}でログインしています。Cursorのページでログアウトして、もう一度お試しください。",
+      "opencode": "OpenCodeは{{account}}ではなく{{email}}でログインしました。正しいキーでもう一度お試しください。"
     },
     "useAnyway": "{{email}}を使う",
     "assignFailed": "{{label}}のアカウントは接続されましたが、{{agent}}を切り替えられませんでした。",
@@ -1687,6 +1694,51 @@
     "save": "キーとして保存",
     "remove": "削除する",
     "send": "このまま送信"
+  },
+  "costlyCard": {
+    "go": "進めて",
+    "always": "常に",
+    "notNow": "今はしない",
+    "never": "しない",
+    "waiting": "担当者を待っています",
+    "you": "あなた",
+    "decided": {
+      "go": "{{name}}さんが進めてと答えました",
+      "always": "{{name}}さんがこれは常にと答えました",
+      "not_now": "{{name}}さんが今はしないと答えました",
+      "never": "{{name}}さんがこれはしないと答えました"
+    }
+  },
+  "brakes": {
+    "title": "誰も頼んでいない作業",
+    "subtitle": "ルーティン、アラート、ほかのエージェントをきっかけに自分で始める作業。人が頼んだことは止められません。",
+    "costly": "コストのかかる作業の前に確認する",
+    "costlyHelp": "プルリクエストを開く、パッケージを入れる、長い作業を始める前に、担当者に確認します。",
+    "costlyAsk": "先に確認",
+    "costlyGo": "そのまま実行",
+    "cost": {
+      "pr": "プルリクエストを開く",
+      "install": "パッケージを入れる",
+      "long": "長い作業"
+    },
+    "rememberedGo": "常に: {{what}}",
+    "rememberedNever": "しない: {{what}}",
+    "forget": "これらの回答を忘れる",
+    "atOnce": "同時に行う作業",
+    "atOnceHelp": "誰も頼んでいない作業を同時にいくつ行うか。ほかは順番を待ちます。",
+    "prs": "1時間あたりのプルリクエスト",
+    "prsHelp": "自分の作業が1時間に開ける最大数。",
+    "call": "呼び出せるエージェント",
+    "callHelp": "メンションしたり作業を渡したりできる相手。",
+    "callAll": "すべて",
+    "callSome": "これらのみ",
+    "callNone": "なし",
+    "project": "プロジェクト",
+    "projectHelp": "別のプロジェクトのエージェント同士は呼び合いません。",
+    "projectPlaceholder": "モバイルアプリ",
+    "otherProjects": "ほかのプロジェクトのエージェントも呼び出せる",
+    "peopleNote": "これらの上限が、人の頼んだことを止めることはありません。",
+    "failed": "保存できませんでした。もう一度お試しください。"
   },
   "stretchCard": {
     "continued": "{{name}}が続行を許可しました · {{time}}",
@@ -1782,7 +1834,6 @@
     "routinePost_female": "<b>{{name}}</b>は呼びませんでした。確認して伝えるだけのルーティンは誰も起こしません",
     "outside": "{{place}}にいません",
     "routine": "ルーティン「{{name}}」",
-    "see": "見る",
     "add": "チャンネルに追加",
     "added": "{{name}}がチャンネルに参加しました。",
     "allow": "{{person}}が話しかけられるようにする",
@@ -1837,6 +1888,7 @@
       "updated": "スキル<b>{{name}}</b>を修正しました"
     },
     "other": "変更を加えました",
+    "copyWebhook": "Webhook のアドレスをコピー",
     "issueFields": {
       "title": "タイトル",
       "description": "説明",
@@ -2235,10 +2287,19 @@
       "partialAdmin": "管理者",
       "waitingCount_other": "{{count}}件待機中"
     },
+    "run": {
+      "head_other": "{{name}} から {{what}} の依頼が {{count}} 件",
+      "approve": "すべて承認",
+      "show": "1 件ずつ見る"
+    },
     "always": {
       "button": "常に承認",
-      "hint": "これと、今後{{name}}からの同様のリクエストを承認します: {{actions}}（値にかかわらず）。",
-      "hintTarget": "これと、今後{{name}}からの同様のリクエストを承認します: {{actions}}。",
+      "reads": "読み取りを常に承認",
+      "note": "今後の{{actions}}を、どんな値でも対象にします。取り消すには{{name}}のページの「ツールとアクセス」へ。",
+      "noteTarget": "今後の{{actions}}を対象にします。取り消すには{{name}}のページの「ツールとアクセス」へ。",
+      "noteReads": "このプロジェクト（{{target}}）での{{actions}}の読み取りだけを、今後対象にします。データを変更するものは引き続き確認します。取り消すには{{name}}のページの「ツールとアクセス」へ。",
+      "noteReadsAll": "この接続での{{actions}}の読み取りだけを、今後対象にします。データを変更するものは引き続き確認します。取り消すには{{name}}のページの「ツールとアクセス」へ。",
+      "readsRule": "{{tool}}の読み取り",
       "pushTo": "{{repo}}の{{branch}}へのプッシュ",
       "done": "承認しました。{{name}}は今後これについて確認しません。",
       "undoHere": "取り消すには、{{name}}のページの「ツールとアクセス」を開いてください。",
@@ -2947,7 +3008,8 @@
           "title": {
             "claude_code": "Claudeアカウントを追加",
             "codex": "ChatGPTアカウントを追加",
-            "cursor": "Cursorアカウントを追加"
+            "cursor": "Cursorアカウントを追加",
+            "opencode": "OpenCodeのキーを追加"
           },
           "stepOne": {
             "claude_code": "プランを契約しているアカウント",
@@ -2960,6 +3022,7 @@
             "codex": "ChatGPTでログイン",
             "cursor": "Cursorでログイン"
           },
+          "opencodeFree": "OpenCodeの無料モデルにキーは不要です。OpenCodeのコンソールのキーで有料モデルも使えます。",
           "cursorFinish": "Cursorのページでログインすると、{{computer}}でのログインは自動で完了します。",
           "cursorKey": "代わりにCursorのAPIキーを使う",
           "openAgain": "もう一度開く",
@@ -2980,7 +3043,8 @@
           "duplicate": {
             "claude_code": "Claudeは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Claudeのページでログアウトしてからもう一度お試しください。",
             "codex": "ChatGPTは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、ChatGPTのページでログアウトしてからもう一度お試しください。",
-            "cursor": "Cursorは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Cursorのページでログアウトしてからもう一度お試しください。"
+            "cursor": "Cursorは{{account}}でログインしましたが、このアカウントはすでに接続済みです。別のアカウントを使うには、Cursorのページでログアウトしてからもう一度お試しください。",
+            "opencode": "そのOpenCodeキーは{{account}}としてすでに接続されています。"
           },
           "startFailed": "{{computer}}から応答がありません。少し待ってからもう一度お試しください。",
           "sendFailed": "コードを送信できませんでした。確認してもう一度お試しください。",
@@ -3216,6 +3280,9 @@
       "cancel": "キャンセル",
       "forgotten": "忘れました。元に戻したい場合は「アーカイブ済み」にあります。",
       "saved": "保存しました。確認済みとして扱われます。",
+      "playbook": "{{name}}の働き方",
+      "playbookNote": "自分のために覚えている仕事のやり方です。チャットには表示されません。外部から得て二度と使わなかったものは自動で外れ、アーカイブ済みに残ります。",
+      "details": "技術的な詳細",
       "skills": "作成したスキル",
       "skillUses_other": "{{count}}回読み込み",
       "view": "表示",
@@ -4427,6 +4494,9 @@
       "every": "呼び出しのたびに実行します。同時に届いた呼び出しは1回の実行にまとめられます。",
       "newNote": "ルーティンに専用のアドレスが割り当てられます。そこへのPOSTごとに、送信内容を受け取ってエージェントが動き始めます。アドレスは保存後にルーティンのページに表示されます。",
       "hidden": "アドレスはルーティンを変更できる人だけに表示されます。",
+      "methods": "受け付けるメソッド",
+      "methodsHelp": "このアドレスはチェックしたメソッドにだけ応答します。GET の場合は URL のクエリパラメータが呼び出しのデータになります。",
+      "methodsLine": "{{methods}} を受け付けます。",
       "address": "アドレス",
       "addressHelp": "アドレスを知っている人は誰でもエージェントを起動できます。パスワードのように扱い、漏れた場合は新しいアドレスを作成してください。",
       "copied": "アドレスをコピーしました。",
@@ -4437,7 +4507,7 @@
       "signature": "署名",
       "signedOff": "オフ: アドレスへのすべての呼び出しがエージェントに届きます。",
       "signedOn": "オン: シークレットで署名された呼び出しだけが届きます。",
-      "signedHelp": "本文のHMAC-SHA256をX-Agentes-Signature（sha256=…）で送ってください。GitHubのX-Hub-Signature-256も使えます。",
+      "signedHelp": "本文（GETの呼び出しではクエリ文字列、?を除く）のHMAC-SHA256をX-Agentes-Signature（sha256=…）で送ってください。GitHubのX-Hub-Signature-256も使えます。",
       "addSecret": "署名を必須にする",
       "newSecret": "新しいシークレット",
       "newSecretTitle": "新しいシークレットを作成しますか？",
@@ -4654,7 +4724,8 @@
         "schedule": "時刻",
         "event": "イベント",
         "email": "メール",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "MillionSend のメール"
       },
       "frequency": "頻度",
       "frequencyPlaceholder": "例: 毎週月曜の9時",
@@ -4843,8 +4914,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Codeがコンピューター上で計画を立ててコードを書きます。{{name}}は進行を見守り、伝えます。",
-      "codex": "Codex（試験運用）",
-      "codexText": "Codexがコンピューター上でコードを書きます。まだテスト中です。",
+      "codex": "Codex",
+      "codexText": "Codexがコンピューター上でコードを書きます。",
       "agent": "{{name}}（エージェント本人）",
       "agentText": "{{name}}が自分のツールで、コンピューター上で直接コードを書きます。",
       "agentText_female": "{{name}}が自分のツールで、コンピューター上で直接コードを書きます。"
@@ -5350,7 +5421,6 @@
         "codexText": "コンピューター上で実行します。",
         "agentText": "{{name}}が自分のツールで実行します。",
         "agentText_female": "{{name}}が自分のツールで実行します。",
-        "testing": "テスト中",
         "locked": "ミッション開始後は変更できません。",
         "open": "ミッションが始まるまで変更できます。",
         "saved": "作業する人: {{name}}",
@@ -6098,6 +6168,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "プランのキーを使うには、コンピューターのagentesをアップデートしてください"
       },
@@ -6107,6 +6178,7 @@
         "claude_code": "{{computer}}ではまだ準備ができていません",
         "codex": "{{computer}}ではまだ準備ができていません",
         "cursor": "{{computer}}ではまだ準備ができていません",
+        "opencode": "{{computer}}ではまだ準備できていません",
         "online": "{{computer}}は現在応答していません。対応中です。"
       }
     },
@@ -7435,18 +7507,22 @@
       "claude": "Claudeプランの{{model}}",
       "chatgpt": "ChatGPTプランの{{model}}",
       "cursor": "Cursorプランの{{model}}",
+      "zen": "OpenCodeの{{model}}",
       "coding": "{{plan}}の{{model}}",
       "claudeOf": "{{owner}}のClaudeプランの{{model}}",
       "chatgptOf": "{{owner}}のChatGPTプランの{{model}}",
       "cursorOf": "{{owner}}のCursorプランの{{model}}",
+      "zenOf": "{{owner}}のOpenCodeの{{model}}",
       "codingOf": "{{owner}}の{{plan}}の{{model}}",
       "claudeAuto": "Claudeプラン",
       "chatgptAuto": "ChatGPTプラン",
       "cursorAuto": "Cursorプラン",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}}のClaudeプラン",
       "chatgptAutoOf": "{{owner}}のChatGPTプラン",
       "cursorAutoOf": "{{owner}}のCursorプラン",
+      "zenAutoOf": "{{owner}}のOpenCode",
       "codingAutoOf": "{{owner}}の{{plan}}",
       "on": "{{computer}}上の{{line}}"
     },
@@ -7456,7 +7532,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "API経由",
@@ -7467,11 +7544,11 @@
     "claude_codeText": "コンピューターを接続した人のClaudeプランを使います。",
     "codexText": "コンピューターを接続した人のChatGPTプランを使います。",
     "cursorText": "コンピューターを接続した人のCursorプランを使います。",
+    "opencodeText": "OpenCodeの無料モデル、またはコンピューターを接続した人のOpenCodeキーを使います。",
     "cursorModel": {
       "inPlan": "Cursorプランに含まれます",
       "apiPrice": "CursorからAPI料金で請求されます"
     },
-    "testing": "テスト中",
     "reasons": {
       "no_computer": "使うには「コンピューター」で接続済みのコンピューターを選んでください。",
       "exec_off": "このコンピューターは、プログラムの実行を許可せずに接続されています。",
@@ -7510,6 +7587,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}、APIへの切り替えなし"
     },
     "mission": {
@@ -9263,6 +9341,9 @@
       "openConnectors": "コネクタを開く",
       "when": "{{address}}にメールが届いたとき",
       "whenFolder": "{{address}}（{{folder}}）にメールが届いたとき",
+      "whenMillionSend": "MillionSend にメールが届いたとき",
+      "inboxAddress": "メールボックスのアドレス",
+      "inboxAddressHelp": "空欄の場合は MillionSend のどのメールボックスでも。",
       "unknownMailbox": "メールボックス",
       "waiting": "メールを待っています",
       "thisWeek_other": "今週のメール {{count}}件",
@@ -9705,6 +9786,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "コマンド",
         "browser": "ブラウザ"
       },
@@ -9712,6 +9794,7 @@
         "claude": "許可されたフォルダ内でのみ、ファイルを作成・変更します。",
         "codex": "Claude Codeと同様で、ChatGPTアカウントを使います。許可されたフォルダ内のみです。",
         "cursor": "Claude Codeと同様で、Cursorアカウントを使います。許可されたフォルダ内のみです。",
+        "opencode": "Claude Codeと同様で、OpenCodeの無料モデルかOpenCodeキーを使います。許可されたフォルダ内のみです。",
         "commands": "テストやビルドなど、ターミナルのコマンドを実行します。"
       },
       "commandsWarn": "コマンドは、許可されたフォルダ以外の場所にも届く可能性があります。",
@@ -10566,6 +10649,7 @@
     "stopFailed": "停止できませんでした。停止できるのは、依頼した人、エージェントのオーナー、管理者だけです。",
     "autoUpdate": "まだ作業中です（{{duration}}）。",
     "autoUpdateNow": "現在: {{now}}。",
+    "statusReply": "まだ作業中です({{duration}})。このステップのあとでメッセージを読みます。",
     "status": {
       "one": "作業中: {{subject}}",
       "oneUntitled": "バックグラウンドで作業中",
@@ -10630,10 +10714,7 @@
       "waitingInput": "{{name}}は回答を待っています",
       "waitingComputer": "{{name}}はコンピューターを待っています",
       "waitingProvider": "{{name}}: AIプロバイダーが停止中 · 自動で再試行します",
-      "waitingAgents": "{{name}}は一部を引き継ぎ、返事を待っています",
-      "answeredFar": "{{to}}が{{from}}の質問に回答しました",
-      "answeredRequestFar": "{{to}}が{{from}}の依頼に回答しました",
-      "see": "見る"
+      "waitingAgents": "{{name}}は一部を引き継ぎ、返事を待っています"
     },
     "consultPair": {
       "asking": "質問中",
@@ -10731,6 +10812,9 @@
       },
       "gave": "提供",
       "answered": "回答",
+      "autoApproved": "自動で承認（{{name}}が常に承認）",
+      "autoApprovedReads": "自動で承認（読み取りを{{name}}が常に承認）",
+      "autoApprovedNobody": "自動で承認",
       "error": "エラー",
       "seconds": "{{n}}秒",
       "minutes": "{{n}}分",
@@ -10925,6 +11009,13 @@
       "agent": "担当: {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "誰も直接頼んでいません。プルリクエストを開いてもいいですか?",
+        "install": "誰も直接頼んでいません。これらのパッケージを入れてもいいですか?",
+        "long": "多くのステップがかかっていて、誰も直接頼んでいません。続けてもいいですか?"
+      },
+      "autonomy_digest_other": "{{count}}件のアラートは既知か無害に見えたので、作業しませんでした:",
+      "autonomy_loop": "この件は自分の判断で作業をやめました。1日に{{count}}回繰り返されました({{title}})。どう扱うか教えてください。",
       "mission_plan": "{{computer}}での「{{title}}」の計画",
       "mission_planNoComputer": "「{{title}}」の計画",
       "mission_decision": "判断: {{question}}",

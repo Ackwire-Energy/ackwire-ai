@@ -6,6 +6,7 @@ import {
   editContextItem,
   getAgent,
   isHowTo,
+  isPlaybook,
   itemVisibleIn,
   listAgentMemoryRows,
   listOrgMemoryRows,
@@ -56,6 +57,14 @@ const Memory = z
         'What the agent learned itself ("What it learned", ADR 0120): its own saves, its learning job\'s, and what a person said that it kept.',
     }),
     howTo: z.boolean().optional().openapi({ description: "A how-to the agent worked out (`save_how_to`)." }),
+    summary: z.string().nullable().optional().openapi({
+      description:
+        "One plain line to show first, written when it was saved; `text` holds the detail. Null when it has none.",
+    }),
+    playbook: z.boolean().optional().openapi({
+      description:
+        'The agent\'s own how-tos, lessons and notes ("How it works"): no receipt in the chat, listed only for its owner and who manages agents.',
+    }),
     disputed: z.boolean().optional().openapi({ description: "Another memory says otherwise, until a person decides." }),
     channelId: z.uuid().nullable().optional().openapi({ description: "Where it was learned." }),
     updatedAt: z.string(),
@@ -222,6 +231,8 @@ async function memoryViews(db: Database, items: ContextItem[], visible: readonly
       editedByUserId: i.createdByKind === "person" ? i.createdById : null,
       learned: i.createdByKind !== "person" || i.sourceIds.length > 0 || viaApp,
       howTo: isHowTo(i),
+      summary: i.title.trim() && i.title.trim() !== i.content.trim() ? i.title.trim() : null,
+      playbook: isPlaybook(i),
       disputed: i.disputed,
       channelId: i.channelIds[0] ?? null,
       updatedAt: i.updatedAt.toISOString(),

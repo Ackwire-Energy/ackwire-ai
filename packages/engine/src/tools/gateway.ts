@@ -1,14 +1,16 @@
-import { PERMISSION_TOOL } from "@agenteschat/adapters";
+import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
-import { coveringRules, type RememberedKind } from "../approval-rules";
+import { coveringRules, type RememberedKind, rulesApprover, SQL_READS, sqlReadsTarget } from "../approval-rules";
 import { fedByRoutine, type RunAuthority, runAuthorityById, UUID } from "../authority";
+import { type CostKind, costlyGate, costlyKind, LONG_STEPS, unrequested } from "../brakes";
 import { countToolCall } from "../connector-usage";
 import { actionLevel, nameWords, openEnded } from "../connectors/classify";
 import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { answersAgentsOnly, consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
+import { provenReadOnly } from "../databases/guard";
 import { cutText, pgSafeJson, pgSafeText } from "../format";
 import { recordRead } from "../outbound";
 import { routineCreatorOf } from "../requester";
@@ -44,7 +46,7 @@ import {
 } from "./scopes";
 import type { AheadOutcome, AheadRequest, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
-const { approvals, agents, routines } = schema;
+const { approvals, agents, agentRunSteps, routines } = schema;
 type AuditOutcome = schema.AuditOutcome;
 
 /** Merge, deploy and rollback always need a person, whatever a connector says. */
@@ -99,6 +101,24 @@ export function rememberable(
   if (!actions || actions.some((a) => actionLevel(a) === "sensitive")) return null;
   if ([tool.name, tool.rememberAs, tool.scope, ...actions].some(alwaysAsks)) return null;
   return { tool: tool.rememberAs, actions };
+}
+
+/**
+ * The kind "Aprovar sempre leituras" covers for a call of a tool that runs SQL (`sqlReads`), or null: the same runs
+ * as `rememberable`, and only SQL the Postgres guard proves read-only, kept by the call's other arguments (its
+ * project or database). A write is never offered and never covered: it asks every time.
+ */
+export async function rememberableSqlRead(
+  tool: ToolDefinition,
+  input: Record<string, unknown>,
+  authority: RunAuthority | null,
+  decision: PolicyDecision,
+): Promise<RememberedKind | null> {
+  if (!tool.sqlReads || !tool.connectionId || ALWAYS_SENSITIVE.test(tool.name)) return null;
+  if (!authority || authority.kind === "routine" || decision.action === "approve") return null;
+  const sql = input[tool.sqlReads.arg];
+  if (typeof sql !== "string" || !(await provenReadOnly(sql))) return null;
+  return { tool: tool.sqlReads.tool, actions: [`${SQL_READS}${sqlReadsTarget(input, tool.sqlReads.arg)}`] };
 }
 
 /**
@@ -230,6 +250,22 @@ function promptOutcome(prompt: { poll: string | null }, output: ToolOutput): Aud
   return output.isError ? "failed" : undefined;
 }
 
+/**
+ * A costly step of a run (ADR 0131 §3): the call's own (`costlyKind`), or a long run's (`LONG_STEPS` calls already),
+ * counted only for runs the brakes apply to.
+ */
+async function costOf(ctx: ToolContext, name: string, input: Record<string, unknown>): Promise<CostKind | null> {
+  const own = costlyKind(name, input);
+  if (own) return own;
+  // Polling a held prompt is no new step.
+  if (name === PERMISSION_TOOL && typeof input.request_id === "string") return null;
+  const [row] = await ctx.db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(agentRunSteps)
+    .where(and(eq(agentRunSteps.runId, ctx.runId), eq(agentRunSteps.kind, "tool_call")));
+  return Number(row?.n ?? 0) > LONG_STEPS ? "long" : null;
+}
+
 /** Who is behind the call's run (ADR 0053). Null for a mission task's call: no run, the mission's own gates. */
 const authorityOf = (ctx: ToolContext): Promise<RunAuthority | null> =>
   ctx.runId ? runAuthorityById(ctx.db, ctx.orgId, ctx.runId) : Promise.resolve(null);
@@ -256,8 +292,11 @@ export type ToolCall = { toolUseId: string; name: string; input: Record<string, 
 export type Approval = typeof approvals.$inferSelect;
 
 export type InvokeResult =
-  /** `ran`: the action approved ahead this call did, as it is now (its cards are told, `invokeWithChip`). */
-  | { type: "result"; output: ToolOutput; ran?: Approval }
+  /**
+   * `ran`: the action approved ahead this call did, as it is now (its cards are told, `invokeWithChip`).
+   * `autoApproved`: a rule ("Aprovar sempre") let it run, whose person and whether a reads one (its live line).
+   */
+  | { type: "result"; output: ToolOutput; ran?: Approval; autoApproved?: { by: string | null; reads: boolean } }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
   | { type: "question"; text: string; choices: string[] | null; why: string }
@@ -294,6 +333,8 @@ export function createToolGateway(deps: {
   now?: () => Date;
   /** What this server can connect: `find_tools` names each connector a search asks for that the agent lacks. */
   catalog?: ServerCatalog;
+  /** Live events (the autonomy brakes' proposal card, ADR 0131). */
+  pubsub?: PubSub;
 }) {
   const now = deps.now ?? (() => new Date());
 
@@ -728,6 +769,8 @@ export function createToolGateway(deps: {
       });
       /** The rules ("Aprovar sempre") this call ran under instead of asking. */
       let approvedBy: string[] | null = null;
+      /** What the call's line in the chat says of it: approved by a rule, whose person, a read-only SQL one or not. */
+      let autoApproved: { by: string | null; reads: boolean } | null = null;
       // The audit (agent-audit.ts): every call that matters, with how it ended. A routine's belongs where it
       // delivers, never to its room.
       const actionChannel =
@@ -772,9 +815,10 @@ export function createToolGateway(deps: {
           // `shown` drops the outside-content envelope; learning still needs to know the text came from outside.
           ...(tool?.external ? { external: true } : {}),
           ...(data ? { data } : {}),
+          ...(autoApproved ? { autoApproved } : {}),
         });
         if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });
-        return { type: "result" as const, output };
+        return { type: "result" as const, output, ...(autoApproved ? { autoApproved } : {}) };
       };
 
       if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });
@@ -844,11 +888,21 @@ export function createToolGateway(deps: {
       const check = await checkToolCall(tool, call.input, ctx);
       if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} }, "refused");
       // "Aprovar sempre": a call of a kind someone approved for good runs like an allowed one, why or not.
-      const remember = approves ? rememberable(tool, call.input, authority, decision) : null;
+      const remember = !approves
+        ? null
+        : tool.sqlReads
+          ? await rememberableSqlRead(tool, call.input, authority, decision)
+          : rememberable(tool, call.input, authority, decision);
       if (remember && tool.connectionId) {
         const at = { orgId: ctx.orgId, agentId: ctx.agentId, connectionId: tool.connectionId };
         approvedBy = await coveringRules(ctx.db, at, remember);
-        if (approvedBy) approves = false;
+        if (approvedBy) {
+          approves = false;
+          autoApproved = {
+            by: await rulesApprover(ctx.db, approvedBy),
+            reads: remember.actions.some((a) => a.startsWith(SQL_READS)),
+          };
+        }
       }
       // Approved ahead: the exact call a person approved for this routine run's slot runs like an allowed one, why
       // or not; the one they refused never runs.
@@ -870,6 +924,30 @@ export function createToolGateway(deps: {
       }
       if (whyMissing && !approvedBy && !ahead)
         return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
+      // Costly work nobody asked for directly (ADR 0131 §3): a person's go first, on every brain.
+      const isPrompt = tool.name === PERMISSION_TOOL && builtIn;
+      const cost = ctx.runId && unrequested(authority) ? await costOf(ctx, tool.name, call.input) : null;
+      if (cost) {
+        const refusal = await costlyGate(
+          { db: ctx.db, pubsub: deps.pubsub },
+          {
+            orgId: ctx.orgId,
+            agentId: ctx.agentId,
+            runId: ctx.runId,
+            channelId: ctx.channelId,
+            threadRootId: ctx.threadRootId,
+          },
+          authority,
+          cost,
+          toolCommand(call.name, call.input) ?? callTitle(tool, call.input) ?? tool.name,
+        );
+        if (refusal) {
+          const content = isPrompt
+            ? JSON.stringify({ behavior: "deny", message: refusal.message, code: "autonomy" })
+            : refusal.message;
+          return finish({ content, isError: !isPrompt, data: { code: refusal.code } }, "refused");
+        }
+      }
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 

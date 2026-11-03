@@ -3,6 +3,7 @@ import {
   type BrainEffort,
   CURSOR_PROTOCOL,
   isBrainEffort,
+  OPENCODE_PROTOCOL,
   type PlanUsage,
 } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
@@ -18,7 +19,7 @@ import { accountUnavailable, brainSessionId, claudeCodeAvailability, toolOff } f
 import { codexVersionOk } from "./codex";
 import { BRAIN_NAMES, BRAIN_PLAN_NAMES, type BrainAccount, type BrainKind, type BrainSession } from "./types";
 
-const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor"];
+const KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode"];
 const kindOf = (v: unknown): BrainKind => (KINDS.includes(v as BrainKind) ? (v as BrainKind) : "model");
 
 /** A mission's choice for a run in its thread (`missionTurnFor`). */
@@ -199,16 +200,18 @@ export function computerBrainUnavailable(
   if (kind === "model") return null;
   const name = BRAIN_NAMES[kind];
   if (!machineId) return { code: "no_computer", message: `The agent has no computer for ${name}.` };
+  // OpenCode's free tier on a computer nobody connected (ADR 0132): no sign-in, nobody's plan, any agent's.
+  const freeTier = kind === "opencode" && !account && status?.pairedByUserId === null;
   // The computer's own sign-in thinks only for agents of whoever connected the computer (ADR 0059 §3): on one
   // nobody connected, no person signs in at its terminal, so for its agents it isn't signed in.
-  if (!account && status?.pairedByUserId === null) {
+  if (!account && status?.pairedByUserId === null && !freeTier) {
     const plan = BRAIN_PLAN_NAMES[kind];
     return {
       code: "not_logged_in",
       message: `${name} isn't signed in on ${status.name}. Connect a ${plan} account on the agent's page.`,
     };
   }
-  if (!ownersPlan) {
+  if (!ownersPlan && !freeTier) {
     return {
       code: "plan_not_owner",
       message: `${name}${status ? ` on ${status.name}` : ""} would think with a plan that isn't the agent's owner's.`,
@@ -241,19 +244,19 @@ export function computerBrainUnavailable(
       ...pausedUntil,
     };
   }
-  if (kind === "cursor") {
-    const off = toolOff(status, "cursor");
+  if (kind === "cursor" || kind === "opencode") {
+    const off = toolOff(status, kind);
     if (off) return off;
-    if (status.protocol < CURSOR_PROTOCOL) {
+    if (status.protocol < (kind === "cursor" ? CURSOR_PROTOCOL : OPENCODE_PROTOCOL)) {
       return {
         code: "runner_outdated",
-        message: `The runner on ${status.name} is too old for Cursor agents. Update it.`,
+        message: `The runner on ${status.name} is too old for ${name} agents. Update it.`,
       };
     }
-    if (status.executors?.detectedAt && !status.executors.cursor) {
-      return { code: "cursor_missing", message: `Cursor's CLI is not installed on ${status.name}.` };
+    if (status.executors?.detectedAt && !status.executors[kind]) {
+      return { code: `${kind}_missing`, message: `${name}'s CLI is not installed on ${status.name}.` };
     }
-    return accountUnavailable(status, account, "cursor");
+    return accountUnavailable(status, account, kind);
   }
   const off = toolOff(status, "codex");
   if (off) return off;
@@ -288,6 +291,7 @@ export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   "codex_missing",
   "codex_too_old",
   "cursor_missing",
+  "opencode_missing",
   "plan_limit",
   "plan_not_owner",
 ]);
@@ -302,6 +306,7 @@ export const NO_AI_CODES: ReadonlySet<string> = new Set([
   "not_logged_in",
   "codex_missing",
   "cursor_missing",
+  "opencode_missing",
 ]);
 
 /** What the engine runs a turn with. */

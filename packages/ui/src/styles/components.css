@@ -1581,6 +1581,13 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
   min-width: var(--radix-select-trigger-width);
   max-height: min(280px, var(--radix-select-content-available-height));
 }
+/*
+ * A select's rows scroll in its viewport: the room at the ends goes inside it, so the last row keeps it once
+ * scrolled to the bottom (the menu's own padding, outside the scroll, reads as next to none there).
+ */
+.ac-menu--select [data-radix-select-viewport] {
+  padding-block: var(--space-1);
+}
 .ac-menu--dropdown {
   min-width: 200px;
   /* A dropdown shows all its actions; it scrolls only when the screen is short. */
@@ -8810,7 +8817,6 @@ html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
 .ac-consult__body.ac-consult__body--inline {
   padding: 0;
 }
-
 /* An agent's reply nobody asked for: a faint word next to the time; a glass tip on hover/focus says why */
 .ac-msg__note {
   position: relative;

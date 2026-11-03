@@ -223,7 +223,7 @@ export interface OwnSignInRow {
 export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefined): OwnSignInRow[] {
   const out: OwnSignInRow[] = [];
   for (const c of view?.computers ?? []) {
-    for (const kind of ["claude_code", "codex", "cursor"] as const) {
+    for (const kind of ["claude_code", "codex", "cursor", "opencode"] as const) {
       const own = c.own?.[kind];
       if (!own) continue;
       out.push({
@@ -261,9 +261,13 @@ export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
  */
 export const ownSignInReady = (
   brain: Pick<AgentBrain, "ownSignIn"> | undefined,
-  row: Pick<AiComputer, "own"> | undefined,
+  row: (Pick<AiComputer, "own"> & Partial<Pick<AiComputer, "mine">>) | undefined,
   kind: MachineAccountKind,
-) => brain?.ownSignIn === true && row?.own?.[kind] !== undefined;
+) =>
+  // OpenCode's free tier on a computer nobody connected thinks for anyone's agent (ADR 0132): the server lists it
+  // there, on a computer that isn't the viewer's.
+  (brain?.ownSignIn === true || (kind === "opencode" && brain !== undefined && row?.mine === false)) &&
+  row?.own?.[kind] !== undefined;
 
 /**
  * An agent's account choice lists the computer's own sign-in where it is ready (`ownSignInReady`), and while the

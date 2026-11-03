@@ -1562,7 +1562,9 @@
       "codex": "Codex belum masuk di komputer ini. Hubungkan akun ChatGPT di halaman {{name}}.",
       "codex_female": "Codex belum masuk di komputer ini. Hubungkan akun ChatGPT di halaman {{name}}.",
       "cursor": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}.",
-      "cursor_female": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}."
+      "cursor_female": "Cursor belum masuk di komputer ini. Hubungkan akun Cursor di halaman {{name}}.",
+      "opencode": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}.",
+      "opencode_female": "OpenCode tidak bisa berpikir di komputer ini. Hubungkan kunci OpenCode di halaman {{name}}."
     },
     "card": {
       "connected": "Beres: {{name}} sekarang punya AI.",
@@ -1582,6 +1584,7 @@
       "claude": "Hubungkan paket Claude-mu",
       "chatgpt": "Hubungkan paket ChatGPT-mu",
       "cursor": "Hubungkan paket Cursor-mu",
+      "zen": "Hubungkan OpenCode",
       "api_key": "Tambahkan kunci API"
     },
     "titleFor": "Hubungkan AI untuk {{name}}",
@@ -1605,6 +1608,10 @@
       "cursor": {
         "title": "Paket Cursor-mu",
         "tiers": "Pro, Pro+, Ultra, atau Teams, atau kunci API Cursor"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "Model gratis, atau kunci OpenCode-mu"
       },
       "zai": {
         "tiers": "Lite, Pro, atau Max"
@@ -1678,7 +1685,8 @@
     "otherAccount": {
       "claude_code": "Claude masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Claude lalu coba lagi.",
       "codex": "ChatGPT masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman ChatGPT lalu coba lagi.",
-      "cursor": "Cursor masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Cursor lalu coba lagi."
+      "cursor": "Cursor masuk sebagai {{email}}, bukan {{account}}. Keluar di halaman Cursor lalu coba lagi.",
+      "opencode": "OpenCode masuk sebagai {{email}}, bukan {{account}}. Coba lagi dengan kunci yang benar."
     },
     "useAnyway": "Pakai {{email}}",
     "assignFailed": "Akun {{label}} sudah terhubung, tapi {{agent}} tidak bisa beralih ke akun itu.",
@@ -1696,6 +1704,51 @@
     "save": "Simpan sebagai kunci",
     "remove": "Hapus",
     "send": "Tetap kirim"
+  },
+  "costlyCard": {
+    "go": "Lanjutkan",
+    "always": "Selalu",
+    "notNow": "Jangan sekarang",
+    "never": "Tidak pernah",
+    "waiting": "Menunggu orang yang bertanggung jawab",
+    "you": "Anda",
+    "decided": {
+      "go": "{{name}} bilang lanjutkan",
+      "always": "{{name}} bilang selalu untuk ini",
+      "not_now": "{{name}} bilang jangan sekarang",
+      "never": "{{name}} bilang tidak pernah untuk ini"
+    }
+  },
+  "brakes": {
+    "title": "Pekerjaan yang tidak diminta siapa pun",
+    "subtitle": "Apa yang dimulainya sendiri, dari rutinitas, peringatan, atau agen lain. Yang diminta seseorang tidak pernah ditahan.",
+    "costly": "Tanya sebelum pekerjaan mahal",
+    "costlyHelp": "Sebelum membuka pull request, memasang paket, atau pekerjaan panjang, ia bertanya kepada orang yang bertanggung jawab.",
+    "costlyAsk": "Tanya dulu",
+    "costlyGo": "Langsung kerjakan",
+    "cost": {
+      "pr": "membuka pull request",
+      "install": "memasang paket",
+      "long": "pekerjaan panjang"
+    },
+    "rememberedGo": "Selalu: {{what}}",
+    "rememberedNever": "Tidak pernah: {{what}}",
+    "forget": "Lupakan jawaban ini",
+    "atOnce": "Pekerjaan sekaligus",
+    "atOnceHelp": "Berapa banyak pekerjaan yang tidak diminta siapa pun yang dikerjakannya bersamaan. Sisanya menunggu giliran.",
+    "prs": "Pull request per jam",
+    "prsHelp": "Paling banyak yang dibuka pekerjaannya sendiri dalam satu jam.",
+    "call": "Agen yang boleh dipanggil",
+    "callHelp": "Siapa yang boleh disebut atau diberi pekerjaan.",
+    "callAll": "Semua",
+    "callSome": "Hanya ini",
+    "callNone": "Tidak ada",
+    "project": "Proyek",
+    "projectHelp": "Agen dari proyek berbeda tidak saling memanggil.",
+    "projectPlaceholder": "Aplikasi seluler",
+    "otherProjects": "Boleh memanggil agen dari proyek lain",
+    "peopleNote": "Batas ini tidak pernah menahan apa yang diminta seseorang.",
+    "failed": "Tidak bisa menyimpan. Coba lagi."
   },
   "stretchCard": {
     "continued": "{{name}} membiarkan mereka lanjut · {{time}}",
@@ -1792,7 +1845,6 @@
     "routinePost_female": "Tidak memanggil <b>{{name}}</b>: rutinitas yang hanya melihat dan memberi tahu tidak membangunkan siapa pun",
     "outside": "Tidak ada {{place}}",
     "routine": "Rutinitas {{name}}",
-    "see": "Lihat",
     "add": "Tambahkan ke kanal",
     "added": "{{name}} bergabung ke kanal.",
     "allow": "Izinkan {{person}} bicara dengannya",
@@ -1847,6 +1899,7 @@
       "updated": "Memperbaiki skill <b>{{name}}</b>"
     },
     "other": "Membuat perubahan",
+    "copyWebhook": "Salin alamat webhook",
     "issueFields": {
       "title": "judul",
       "description": "deskripsi",
@@ -2245,10 +2298,19 @@
       "partialAdmin": "admin",
       "waitingCount_other": "{{count}} menunggu"
     },
+    "run": {
+      "head_other": "{{count}} permintaan dari {{name}} untuk {{what}}",
+      "approve": "Setujui semua",
+      "show": "Lihat satu per satu"
+    },
     "always": {
       "button": "Selalu setujui",
-      "hint": "Menyetujui yang ini dan yang serupa berikutnya dari {{name}}: {{actions}}, dengan nilai apa pun.",
-      "hintTarget": "Menyetujui yang ini dan yang serupa berikutnya dari {{name}}: {{actions}}.",
+      "reads": "Selalu setujui pembacaan",
+      "note": "Mencakup {{actions}} mulai sekarang, dengan nilai apa pun. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "noteTarget": "Mencakup {{actions}} mulai sekarang. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "noteReads": "Hanya mencakup pembacaan oleh {{actions}} di proyek ini ({{target}}) mulai sekarang. Yang mengubah data tetap meminta persetujuan. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "noteReadsAll": "Hanya mencakup pembacaan oleh {{actions}} di koneksi ini mulai sekarang. Yang mengubah data tetap meminta persetujuan. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "readsRule": "Pembacaan oleh {{tool}}",
       "pushTo": "push ke {{branch}} di {{repo}}",
       "done": "Disetujui. {{name}} tidak akan meminta ini lagi.",
       "undoHere": "Untuk membatalkannya, buka Alat dan akses di halaman {{name}}.",
@@ -2961,7 +3023,8 @@
           "title": {
             "claude_code": "Tambah akun Claude",
             "codex": "Tambah akun ChatGPT",
-            "cursor": "Tambah akun Cursor"
+            "cursor": "Tambah akun Cursor",
+            "opencode": "Tambah kunci OpenCode"
           },
           "stepOne": {
             "claude_code": "Akun dengan paketmu",
@@ -2974,6 +3037,7 @@
             "codex": "Masuk dengan ChatGPT",
             "cursor": "Masuk dengan Cursor"
           },
+          "opencodeFree": "Model gratis OpenCode tidak perlu kunci. Kunci dari konsol OpenCode menambahkan model berbayarnya.",
           "cursorFinish": "Masuk di halaman Cursor, dan proses masuk selesai sendiri di {{computer}}.",
           "cursorKey": "Pakai kunci API Cursor saja",
           "openAgain": "Buka lagi",
@@ -2994,7 +3058,8 @@
           "duplicate": {
             "claude_code": "Claude masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Claude lalu coba lagi.",
             "codex": "ChatGPT masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman ChatGPT lalu coba lagi.",
-            "cursor": "Cursor masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Cursor lalu coba lagi."
+            "cursor": "Cursor masuk sebagai {{account}}, akun yang sudah kamu hubungkan. Untuk memakai akun lain, keluar di halaman Cursor lalu coba lagi.",
+            "opencode": "Kunci OpenCode itu sudah terhubung sebagai {{account}}."
           },
           "startFailed": "Tidak ada jawaban dari {{computer}}. Coba lagi sebentar lagi.",
           "sendFailed": "Tidak bisa mengirim kode. Periksa lalu coba lagi.",
@@ -3230,6 +3295,9 @@
       "cancel": "Batal",
       "forgotten": "Dilupakan. Ada di Arsip jika kamu ingin mengembalikannya.",
       "saved": "Tersimpan. Sekarang dihitung terverifikasi.",
+      "playbook": "Cara kerja {{name}}",
+      "playbookNote": "Cara kerja yang disimpannya untuk dirinya sendiri. Tidak muncul di obrolan. Yang didapatnya dari luar dan tidak pernah dipakai lagi hilang sendiri dan tetap ada di Diarsipkan.",
+      "details": "Detail teknis",
       "skills": "Skill yang dibuatnya",
       "skillUses_other": "dimuat {{count}} kali",
       "view": "Lihat",
@@ -4463,6 +4531,9 @@
       "every": "Berjalan di setiap panggilan. Panggilan yang datang bersamaan menjadi satu proses.",
       "newNote": "Rutinitas ini mendapat alamatnya sendiri. Setiap POST ke alamat itu memulai agen dengan data yang dikirim. Alamatnya muncul di halaman rutinitas setelah disimpan.",
       "hidden": "Hanya yang bisa mengubah rutinitas ini yang melihat alamatnya.",
+      "methods": "Metode yang diterima",
+      "methodsHelp": "Alamat ini hanya menjawab metode yang dicentang. Dengan GET, parameter kueri URL menjadi data panggilan.",
+      "methodsLine": "Menerima {{methods}}.",
       "address": "Alamat",
       "addressHelp": "Siapa pun yang punya alamat ini bisa memulai agen. Jaga seperti kata sandi dan buat yang baru kalau bocor.",
       "copied": "Alamat disalin.",
@@ -4473,7 +4544,7 @@
       "signature": "Tanda tangan",
       "signedOff": "Mati: agen menerima semua panggilan ke alamat ini.",
       "signedOn": "Aktif: hanya panggilan yang ditandatangani dengan rahasia yang diterima.",
-      "signedHelp": "Kirim HMAC-SHA256 dari body di X-Agentes-Signature (sha256=…). X-Hub-Signature-256 dari GitHub juga bisa.",
+      "signedHelp": "Kirim HMAC-SHA256 dari body (untuk panggilan GET: dari query string-nya, tanpa ?) di X-Agentes-Signature (sha256=…). X-Hub-Signature-256 dari GitHub juga bisa.",
       "addSecret": "Wajibkan tanda tangan",
       "newSecret": "Rahasia baru",
       "newSecretTitle": "Buat rahasia baru?",
@@ -4690,7 +4761,8 @@
         "schedule": "Waktu",
         "event": "Peristiwa",
         "email": "Email",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "Email MillionSend"
       },
       "frequency": "Frekuensi",
       "frequencyPlaceholder": "Misalnya: setiap Senin pukul 9 pagi",
@@ -4879,8 +4951,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code merencanakan dan menulis kode di komputer. {{name}} mengikuti dan meneruskan.",
-      "codex": "Codex (eksperimental)",
-      "codexText": "Codex menulis kode di komputer. Masih diuji.",
+      "codex": "Codex",
+      "codexText": "Codex menulis kode di komputer.",
       "agent": "{{name}} (agen itu sendiri)",
       "agentText": "{{name}} menulis kode langsung di komputer, dengan alatnya sendiri.",
       "agentText_female": "{{name}} menulis kode langsung di komputer, dengan alatnya sendiri."
@@ -5397,7 +5469,6 @@
         "codexText": "Mengerjakannya di komputer.",
         "agentText": "{{name}} yang mengerjakannya, dengan alatnya sendiri.",
         "agentText_female": "{{name}} yang mengerjakannya, dengan alatnya sendiri.",
-        "testing": "Uji coba",
         "locked": "Tidak bisa diubah setelah misi dimulai.",
         "open": "Bisa diubah sampai misi dimulai.",
         "saved": "Siapa yang mengerjakan: {{name}}",
@@ -6146,6 +6217,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "Perbarui agentes di komputer untuk memakai kunci paket"
       },
@@ -6155,6 +6227,7 @@
         "claude_code": "Belum siap di {{computer}}",
         "codex": "Belum siap di {{computer}}",
         "cursor": "Belum siap di {{computer}}",
+        "opencode": "Belum siap di {{computer}}",
         "online": "{{computer}} sedang tidak merespons. Kami sedang menanganinya."
       }
     },
@@ -7501,18 +7574,22 @@
       "claude": "{{model}} dengan paket Claude",
       "chatgpt": "{{model}} dengan paket ChatGPT",
       "cursor": "{{model}} dengan paket Cursor",
+      "zen": "{{model}} lewat OpenCode",
       "coding": "{{model}} dengan {{plan}}",
       "claudeOf": "{{model}} dengan paket Claude milik {{owner}}",
       "chatgptOf": "{{model}} dengan paket ChatGPT milik {{owner}}",
       "cursorOf": "{{model}} dengan paket Cursor milik {{owner}}",
+      "zenOf": "{{model}} lewat OpenCode milik {{owner}}",
       "codingOf": "{{model}} dengan {{plan}} milik {{owner}}",
       "claudeAuto": "Paket Claude",
       "chatgptAuto": "Paket ChatGPT",
       "cursorAuto": "Paket Cursor",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Paket Claude milik {{owner}}",
       "chatgptAutoOf": "Paket ChatGPT milik {{owner}}",
       "cursorAutoOf": "Paket Cursor milik {{owner}}",
+      "zenAutoOf": "OpenCode milik {{owner}}",
       "codingAutoOf": "{{plan}} milik {{owner}}",
       "on": "{{line}} di {{computer}}"
     },
@@ -7522,7 +7599,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "Lewat API",
@@ -7533,11 +7611,11 @@
     "claude_codeText": "Memakai paket Claude milik orang yang menghubungkan komputer.",
     "codexText": "Memakai paket ChatGPT milik orang yang menghubungkan komputer.",
     "cursorText": "Memakai paket Cursor milik orang yang menghubungkan komputer.",
+    "opencodeText": "Model gratis OpenCode, atau kunci OpenCode milik orang yang menghubungkan komputer.",
     "cursorModel": {
       "inPlan": "Termasuk dalam paket Cursor-mu",
       "apiPrice": "Ditagih oleh Cursor dengan harga API"
     },
-    "testing": "Menguji",
     "reasons": {
       "no_computer": "Pilih komputer yang terhubung di Komputer untuk memakainya.",
       "exec_off": "Komputer ini terhubung tanpa izin menjalankan program.",
@@ -7576,6 +7654,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, tanpa cadangan API"
     },
     "mission": {
@@ -9330,6 +9409,9 @@
       "openConnectors": "Buka Konektor",
       "when": "Saat email masuk ke {{address}}",
       "whenFolder": "Saat email masuk ke {{address}} ({{folder}})",
+      "whenMillionSend": "Saat email masuk ke MillionSend",
+      "inboxAddress": "Alamat kotak surat",
+      "inboxAddressHelp": "Kosong = kotak surat MillionSend mana pun.",
       "unknownMailbox": "sebuah kotak surat",
       "waiting": "Menunggu email",
       "thisWeek_other": "{{count}} email minggu ini",
@@ -9772,6 +9854,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "Perintah",
         "browser": "Browser"
       },
@@ -9779,6 +9862,7 @@
         "claude": "Menulis dan mengubah file, hanya di folder yang diizinkan.",
         "codex": "Seperti Claude Code, dengan akun ChatGPT. Hanya di folder yang diizinkan.",
         "cursor": "Seperti Claude Code, dengan akun Cursor. Hanya di folder yang diizinkan.",
+        "opencode": "Seperti Claude Code, dengan model gratis OpenCode atau kunci OpenCode. Hanya di folder yang diizinkan.",
         "commands": "Menjalankan perintah Terminal, seperti tes dan build."
       },
       "commandsWarn": "Perintah bisa menjangkau bagian lain komputer, tidak hanya folder yang diizinkan.",
@@ -10633,6 +10717,7 @@
     "stopFailed": "Tidak bisa dihentikan. Hanya yang meminta, pemilik agen, atau admin yang bisa.",
     "autoUpdate": "Masih dikerjakan ({{duration}}).",
     "autoUpdateNow": "Sekarang: {{now}}.",
+    "statusReply": "Masih mengerjakannya ({{duration}}). Saya baca pesan Anda setelah langkah ini.",
     "status": {
       "one": "Sedang mengerjakan: {{subject}}",
       "oneUntitled": "Bekerja di latar belakang",
@@ -10697,10 +10782,7 @@
       "waitingInput": "{{name}} sedang menunggu jawaban",
       "waitingComputer": "{{name}} sedang menunggu komputernya",
       "waitingProvider": "{{name}}: penyedia AI sedang down · mencoba lagi sendiri",
-      "waitingAgents": "{{name}} menyerahkan sebagian dan sedang menunggu kabar",
-      "answeredFar": "{{to}} menjawab pertanyaan {{from}}",
-      "answeredRequestFar": "{{to}} menjawab permintaan {{from}}",
-      "see": "Lihat"
+      "waitingAgents": "{{name}} menyerahkan sebagian dan sedang menunggu kabar"
     },
     "consultPair": {
       "asking": "bertanya",
@@ -10798,6 +10880,9 @@
       },
       "gave": "diberikan",
       "answered": "dijawab",
+      "autoApproved": "Disetujui otomatis (selalu disetujui oleh {{name}})",
+      "autoApprovedReads": "Disetujui otomatis (pembacaan selalu disetujui oleh {{name}})",
+      "autoApprovedNobody": "Disetujui otomatis",
       "error": "gagal",
       "seconds": "{{n}} dtk",
       "minutes": "{{n}} mnt",
@@ -10992,6 +11077,13 @@
       "agent": "Bersama {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Tidak ada yang memintanya langsung. Boleh saya buka pull request?",
+        "install": "Tidak ada yang memintanya langsung. Boleh saya pasang paket ini?",
+        "long": "Ini butuh banyak langkah, dan tidak ada yang memintanya langsung. Boleh saya lanjutkan?"
+      },
+      "autonomy_digest_other": "{{count}} peringatan tampak sudah dikenal atau tidak berbahaya, jadi tidak saya kerjakan:",
+      "autonomy_loop": "Saya berhenti mengerjakan ini atas inisiatif sendiri. Ini muncul lagi {{count}} kali dalam sehari ({{title}}). Beri tahu saya bagaimana Anda ingin menanganinya.",
       "mission_plan": "Rencana untuk “{{title}}” di {{computer}}",
       "mission_planNoComputer": "Rencana untuk “{{title}}”",
       "mission_decision": "Keputusan: {{question}}",

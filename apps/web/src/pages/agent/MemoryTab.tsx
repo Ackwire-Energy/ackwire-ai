@@ -149,7 +149,10 @@ function TrustChip({ m }: { m: Memory }) {
   );
 }
 
-/** One thing it learned (Aprendizados): what, where, how sure, how used; Editar (a person's version) or Esquecer. */
+/**
+ * One thing it learned (Aprendizados): its plain summary first, the technical detail folded under it; where, how
+ * sure, how used; Editar (a person's version) or Esquecer.
+ */
 function LearnedRow({ m }: { m: Memory }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -171,7 +174,17 @@ function LearnedRow({ m }: { m: Memory }) {
   return (
     <li className="agp-mem">
       {draft === null ? (
-        <span>{m.text}</span>
+        m.summary ? (
+          <>
+            <span>{m.summary}</span>
+            <details className="agp-mem__details">
+              <summary className="small muted">{t("agentPage.memory.details")}</summary>
+              <p className="small">{m.text}</p>
+            </details>
+          </>
+        ) : (
+          <span>{m.text}</span>
+        )
       ) : (
         <Field label={t("agentPage.memory.edit")} id={`learned-${m.id}`}>
           <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} />
@@ -302,11 +315,15 @@ function LearnedSkillRow({ s }: { s: LearnedSkill }) {
   );
 }
 
-/** What the agent learned on its own, newest first: its memories, then the skills it made. */
+/**
+ * What the agent learned on its own, newest first: what matters to people (preferences, facts, decisions), then how
+ * it works (its playbook: how-tos, lessons and notes it keeps for itself, none of them in the chat) and the skills it
+ * made.
+ */
 function LearnedList({ list }: { list: Memory[] }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const { agent } = useAgentEdit();
+  const { agent, g } = useAgentEdit();
   const skills = useLearnedSkills(org.id, agent.id).data ?? [];
   if (list.length === 0 && skills.length === 0)
     return (
@@ -314,13 +331,30 @@ function LearnedList({ list }: { list: Memory[] }) {
         <b>{t("agentPage.memory.learnedEmpty")}</b>
       </div>
     );
+  const people = list.filter((m) => !m.playbook);
+  const playbook = list.filter((m) => m.playbook);
   return (
     <>
-      <ul className="agp-list agp-mems">
-        {list.map((m) => (
-          <LearnedRow key={m.id} m={m} />
-        ))}
-      </ul>
+      {people.length > 0 && (
+        <ul className="agp-list agp-mems">
+          {people.map((m) => (
+            <LearnedRow key={m.id} m={m} />
+          ))}
+        </ul>
+      )}
+      {playbook.length + skills.length > 0 && (
+        <>
+          <h3 className="agp-subhead">{t("agentPage.memory.playbook", g)}</h3>
+          <p className="small muted">{t("agentPage.memory.playbookNote")}</p>
+        </>
+      )}
+      {playbook.length > 0 && (
+        <ul className="agp-list agp-mems" aria-label={t("agentPage.memory.playbook", g)}>
+          {playbook.map((m) => (
+            <LearnedRow key={m.id} m={m} />
+          ))}
+        </ul>
+      )}
       {skills.length > 0 && (
         <>
           <h3 className="agp-subhead">{t("agentPage.memory.skills")}</h3>
@@ -349,7 +383,12 @@ export function MemoryTab() {
     (p) => p.agentId === agent.id && p.status === "pending" && p.target.type === "agent_instructions",
   );
   const learned = list
-    .filter((m) => m.learned && !m.archived && (!q.trim() || m.text.toLowerCase().includes(q.trim().toLowerCase())))
+    .filter(
+      (m) =>
+        m.learned &&
+        !m.archived &&
+        (!q.trim() || `${m.summary ?? ""} ${m.text}`.toLowerCase().includes(q.trim().toLowerCase())),
+    )
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const count = (k: Kind | "learned") =>
     k === "learned" ? list.filter((m) => m.learned && !m.archived).length : filterMemories(list, k, "").length;

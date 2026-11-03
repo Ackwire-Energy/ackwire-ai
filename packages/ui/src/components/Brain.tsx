@@ -64,12 +64,15 @@ export function BrainPortrait({ kind, state = "idle", size = 48, agent, label, c
   );
 }
 
-/** A computer brain by its maker's official mark: Claude for Claude Code, OpenAI for Codex, Cursor's cube for Cursor. */
+/**
+ * A computer brain by its maker's official mark: Claude for Claude Code, OpenAI for Codex, Cursor's cube for Cursor,
+ * OpenCode's for OpenCode.
+ */
 export function BrainLogo({
   kind,
   ...rest
 }: {
-  kind: "claude_code" | "codex" | "cursor";
+  kind: "claude_code" | "codex" | "cursor" | "opencode";
   size?: "tile" | "sm";
   off?: boolean;
   label?: string;

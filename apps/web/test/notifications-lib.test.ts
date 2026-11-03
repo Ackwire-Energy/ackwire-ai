@@ -3,6 +3,7 @@ import type { AppNotification, NotificationPage } from "@agenteschat/client";
 import {
   dayGroupOf,
   groupByDay,
+  headlineNames,
   isExpandable,
   matchesFilter,
   type NotificationPages,
@@ -13,6 +14,7 @@ import {
   snoozeTimes,
   sortWaiting,
   stepCells,
+  targetPath,
   upsertInPages,
 } from "@agenteschat/client/lib/notifications";
 import { notification } from "./fakes/notifications";
@@ -189,7 +191,11 @@ describe("answering and opening", () => {
       actors: [{ type: "agent", id: "ada" }],
       source: { channelId: "d", dmId: "d", messageId: "h", handoffId: "h", agentId: "ada" },
     });
-    expect(openTarget(asked)).toEqual({ to: "/org/$orgId/dm/agent/$agentId", params: { agentId: "ada" } });
+    expect(openTarget(asked)).toEqual({
+      to: "/org/$orgId/dm/agent/$agentId",
+      params: { agentId: "ada" },
+      search: { m: "h" },
+    });
     expect(opensOnComputer(asked)).toBeNull();
     // One whose conversation I can't open names none: it opens on the agent's computer.
     expect(opensOnComputer({ ...asked, source: { handoffId: "h", agentId: "ada" } })).toBe("ada");
@@ -203,7 +209,69 @@ describe("answering and opening", () => {
     });
     expect(openTarget(notification({ id: "6", kind: "approval", source: { approvalId: "a" } }))).toEqual({
       to: "/org/$orgId/approvals",
+      search: { open: "a" },
     });
+  });
+
+  test("at the message itself: in a thread, a DM, a channel", () => {
+    expect(
+      openTarget(
+        notification({ id: "1", kind: "thread_reply", source: { channelId: "c", threadId: "r", messageId: "m" } }),
+      ),
+    ).toEqual({ to: "/org/$orgId/threads/$threadId", params: { threadId: "r" }, search: { m: "m" } });
+    expect(
+      openTarget(
+        notification({
+          id: "2",
+          kind: "dm",
+          actors: [{ type: "user", id: "u" }],
+          source: { dmId: "d", messageId: "m" },
+        }),
+      ),
+    ).toEqual({ to: "/org/$orgId/dm/person/$userId", params: { userId: "u" }, search: { m: "m" } });
+    // A reply in a thread of a DM is only in that thread: the thread opens at it, not the DM.
+    for (const kind of ["agent_reply", "dm"] as const)
+      expect(
+        openTarget(
+          notification({
+            id: "4",
+            kind,
+            actors: [{ type: "agent", id: "ada" }],
+            source: { dmId: "d", threadId: "r", messageId: "m" },
+          }),
+        ),
+      ).toEqual({ to: "/org/$orgId/threads/$threadId", params: { threadId: "r" }, search: { m: "m" } });
+    expect(openTarget(notification({ id: "3", kind: "reaction", source: { channelId: "c", messageId: "m" } }))).toEqual(
+      { to: "/org/$orgId/c/$channelId", params: { channelId: "c" }, search: { m: "m" } },
+    );
+  });
+
+  test("an agent's hold opens the agent; the workspace's billing hold, Cobrança", () => {
+    expect(openTarget(notification({ id: "1", kind: "org_standing", source: { agentId: "a" } }))).toEqual({
+      to: "/org/$orgId/agents/$agentId",
+      params: { agentId: "a" },
+    });
+    expect(
+      openTarget(notification({ id: "2", kind: "org_standing", source: {}, latest: { billingHold: "payment" } })),
+    ).toEqual({ to: "/org/$orgId/settings/$section", params: { section: "billing" } });
+  });
+
+  test("a target as the web's address", () => {
+    expect(targetPath("o", { to: "/org/$orgId/c/$channelId", params: { channelId: "c 1" }, search: { m: "m" } })).toBe(
+      "/org/o/c/c%201?m=m",
+    );
+    expect(targetPath("o", { to: "/org/$orgId/approvals" })).toBe("/org/o/approvals");
+  });
+
+  test("the headline names the place: nothing beside it says it again", () => {
+    const reply = notification({ id: "1", kind: "agent_reply", source: { channelId: "c", label: "general" } });
+    expect(headlineNames(reply, "general")).toBe(true);
+    expect(headlineNames(reply, "random")).toBe(false);
+    expect(headlineNames({ ...reply, kind: "mention" }, "general")).toBe(false);
+    expect(headlineNames({ ...reply, kind: "mention", source: { ...reply.source, threadId: "t" } }, "general")).toBe(
+      true,
+    );
+    expect(headlineNames({ ...reply, source: {} }, "")).toBe(false);
   });
 });
 

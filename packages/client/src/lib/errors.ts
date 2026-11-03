@@ -335,6 +335,18 @@ export const serverUnreachable = (error: unknown) =>
  */
 export const sendWaits = (error: unknown) => error instanceof TypeError || serverUnreachable(error);
 
+/**
+ * `promise`, or a `NetworkError` once `ms` pass with no answer: a request a dead connection holds (after a sleep, a
+ * proxy that went quiet) never settles on its own, and what waits on it would wait forever.
+ */
+export function answerWithin<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new NetworkError(new Error(`no answer in ${ms} ms`))), ms);
+  });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
+
 /** No answer from the server: none at all (`NetworkError`), or only the proxy's while it restarts or is down. */
 export const noAnswer = (error: unknown) => error instanceof NetworkError || serverUnreachable(error);
 

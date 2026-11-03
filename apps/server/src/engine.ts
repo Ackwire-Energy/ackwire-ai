@@ -84,6 +84,7 @@ import {
   messageRouter,
   missionTurnPermissions,
   notifyOwnerOnBudget,
+  OpencodeBrain,
   platformCapJudge,
   prepareAgentCode,
   queueBudgetEmail,
@@ -320,7 +321,11 @@ export function buildEngine(o: EngineOptions) {
       // The agent takes back a request for a person it no longer needs (listed while it has one open).
       createWithdrawRequestToolSource({ pubsub: adapters.pubsub }),
       // An agent with no AI connected is refused at once: its answer would never come.
-      createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
+      createAskAgentToolSource({
+        pubsub: adapters.pubsub,
+        ai: { gateway, machines: machineHub },
+        judge: context.judge,
+      }),
       createFindAgentToolSource({ machines: machineHub }),
       createUsageToolSource(),
       // What the agent says it is doing, next to its name (ADR 0084).
@@ -351,6 +356,7 @@ export function buildEngine(o: EngineOptions) {
         context,
         mail: adapters.mail,
         hooks: hookConfig(config),
+        connectors: connectorDeps,
       }),
       createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
@@ -409,6 +415,7 @@ export function buildEngine(o: EngineOptions) {
       ...(o.toolSources ?? []),
     ],
     catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
+    pubsub: adapters.pubsub,
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
@@ -502,6 +509,15 @@ export function buildEngine(o: EngineOptions) {
         permissions: turnPermissions,
         prepare: prepareCode,
       }),
+    // ADR 0132: OpenCode's CLI, one process per turn like Cursor's.
+    opencode: (_agent, _run, setup) =>
+      new OpencodeBrain({
+        link: brainLink,
+        mcp: async () => ({ token: setup.mcpToken() }),
+        agent: agentScope,
+        permissions: turnPermissions,
+        prepare: prepareCode,
+      }),
   };
   // Voice messages (ADR 0100): engines from the environment, and on any other server the one its owner sets.
   const speech = createSpeechSettings({
@@ -571,6 +587,9 @@ export function buildEngine(o: EngineOptions) {
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     // A run started on a person's message reads what they add in the next seconds with it (ADR 0112).
     quietMs: o.routerQuietMs ?? ROUTER_QUIET_MS,
+    // It ends early when the person isn't typing, and Claude's API reads the prompt into its cache meanwhile.
+    quietByTyping: true,
+    prewarm: true,
     // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,
     warmBrowser,
@@ -592,6 +611,7 @@ export function buildEngine(o: EngineOptions) {
       minScore: config.ROUTER_MIN_SCORE,
       mentionThreshold: config.ROUTER_MENTION_THRESHOLD,
       quietMs: o.routerQuietMs ?? ROUTER_QUIET_MS,
+      quietByTyping: true,
       // Jev first whenever the installation has its key, unless ROUTER_STRATEGY=llm.
       ...((config.ROUTER_STRATEGY ?? "jev") === "jev"
         ? { jev: { key: jevKey, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }

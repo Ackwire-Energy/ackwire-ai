@@ -1679,7 +1679,8 @@
     "notSignedIn": {
       "claude_code": "Claude Code no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Claude en la página de {{name}}.",
       "codex": "Codex no tiene la sesión iniciada en esta computadora. Conecta una cuenta de ChatGPT en la página de {{name}}.",
-      "cursor": "Cursor no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Cursor en la página de {{name}}."
+      "cursor": "Cursor no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Cursor en la página de {{name}}.",
+      "opencode": "OpenCode no puede pensar en esta computadora. Conecta una clave de OpenCode en la página de {{name}}."
     },
     "card": {
       "connected": "Listo: {{name}} ya tiene una IA.",
@@ -1699,6 +1700,7 @@
       "claude": "Conecta tu plan de Claude",
       "chatgpt": "Conecta tu plan de ChatGPT",
       "cursor": "Conecta tu plan de Cursor",
+      "zen": "Conectar OpenCode",
       "api_key": "Agrega una clave de API"
     },
     "titleFor": "Conecta una IA para {{name}}",
@@ -1722,6 +1724,10 @@
       "cursor": {
         "title": "Tu plan de Cursor",
         "tiers": "Pro, Pro+, Ultra o Teams, o una clave de API de Cursor"
+      },
+      "zen": {
+        "title": "OpenCode",
+        "tiers": "Modelos gratis, o tu clave de OpenCode"
       },
       "zai": {
         "tiers": "Lite, Pro o Max"
@@ -1795,7 +1801,8 @@
     "otherAccount": {
       "claude_code": "Claude inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Claude e intenta de nuevo.",
       "codex": "ChatGPT inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de ChatGPT e intenta de nuevo.",
-      "cursor": "Cursor inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Cursor e intenta de nuevo."
+      "cursor": "Cursor inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Cursor e intenta de nuevo.",
+      "opencode": "OpenCode inició sesión como {{email}}, no como {{account}}. Inténtalo de nuevo con la clave correcta."
     },
     "useAnyway": "Usar {{email}}",
     "assignFailed": "La cuenta de {{label}} está conectada, pero {{agent}} no pudo cambiarse a ella.",
@@ -1813,6 +1820,51 @@
     "save": "Guardar como clave",
     "remove": "Quitar la clave",
     "send": "Enviar de todos modos"
+  },
+  "costlyCard": {
+    "go": "Adelante",
+    "always": "Siempre",
+    "notNow": "Ahora no",
+    "never": "Nunca",
+    "waiting": "Esperando a la persona responsable",
+    "you": "Tú",
+    "decided": {
+      "go": "{{name}} dijo adelante",
+      "always": "{{name}} dijo siempre para esto",
+      "not_now": "{{name}} dijo ahora no",
+      "never": "{{name}} dijo nunca para esto"
+    }
+  },
+  "brakes": {
+    "title": "Trabajo que nadie pidió",
+    "subtitle": "Lo que empieza por su cuenta, a partir de una rutina, una alerta u otro agente. Lo que pide una persona nunca se detiene.",
+    "costly": "Preguntar antes del trabajo costoso",
+    "costlyHelp": "Antes de abrir un pull request, instalar paquetes o un trabajo largo, pregunta a la persona responsable.",
+    "costlyAsk": "Preguntar antes",
+    "costlyGo": "Hacerlo directo",
+    "cost": {
+      "pr": "abrir pull requests",
+      "install": "instalar paquetes",
+      "long": "trabajos largos"
+    },
+    "rememberedGo": "Siempre: {{what}}",
+    "rememberedNever": "Nunca: {{what}}",
+    "forget": "Olvidar estas respuestas",
+    "atOnce": "Trabajos a la vez",
+    "atOnceHelp": "Cuántos trabajos que nadie pidió hace al mismo tiempo. Los demás esperan su turno.",
+    "prs": "Pull requests por hora",
+    "prsHelp": "Lo máximo que su propio trabajo abre en una hora.",
+    "call": "Agentes a los que puede llamar",
+    "callHelp": "A quién puede mencionar o pasar trabajo.",
+    "callAll": "Todos",
+    "callSome": "Solo estos",
+    "callNone": "Ninguno",
+    "project": "Proyecto",
+    "projectHelp": "Los agentes de proyectos distintos no se llaman entre sí.",
+    "projectPlaceholder": "App móvil",
+    "otherProjects": "Puede llamar a agentes de otros proyectos",
+    "peopleNote": "Estos límites nunca detienen lo que pide una persona.",
+    "failed": "No se pudo guardar. Inténtalo de nuevo."
   },
   "stretchCard": {
     "continued": "{{name}} los dejó seguir · {{time}}",
@@ -1908,7 +1960,6 @@
     "routinePost_female": "No llamé a <b>{{name}}</b>: una rutina que solo mira y cuenta no despierta a nadie",
     "outside": "No está {{place}}",
     "routine": "Rutina {{name}}",
-    "see": "Ver",
     "add": "Agregar al canal",
     "added": "{{name}} se unió al canal.",
     "allow": "Dejar que {{person}} hable con él",
@@ -1963,6 +2014,7 @@
       "updated": "Corregí la habilidad <b>{{name}}</b>"
     },
     "other": "Hice un cambio",
+    "copyWebhook": "Copiar dirección del webhook",
     "issueFields": {
       "title": "el título",
       "description": "la descripción",
@@ -2383,10 +2435,21 @@
       "waitingCount_many": "{{count}} pendientes",
       "waitingCount_other": "{{count}} pendientes"
     },
+    "run": {
+      "head_one": "{{count}} pedido de {{name}} para {{what}}",
+      "head_many": "{{count}} pedidos de {{name}} para {{what}}",
+      "head_other": "{{count}} pedidos de {{name}} para {{what}}",
+      "approve": "Aprobar todos",
+      "show": "Ver cada uno"
+    },
     "always": {
       "button": "Aprobar siempre",
-      "hint": "Aprueba esta y las próximas iguales de {{name}}: {{actions}}, con cualquier valor.",
-      "hintTarget": "Aprueba esta y las próximas iguales de {{name}}: {{actions}}.",
+      "reads": "Aprobar siempre las lecturas",
+      "note": "Cubre {{actions}} de ahora en adelante, con cualquier valor. Para deshacerlo: Herramientas y acceso, en la página de {{name}}.",
+      "noteTarget": "Cubre {{actions}} de ahora en adelante. Para deshacerlo: Herramientas y acceso, en la página de {{name}}.",
+      "noteReads": "Cubre solo las lecturas de {{actions}} en este proyecto ({{target}}) de ahora en adelante. Lo que cambia datos sigue pidiendo. Para deshacerlo: Herramientas y acceso, en la página de {{name}}.",
+      "noteReadsAll": "Cubre solo las lecturas de {{actions}} en esta conexión de ahora en adelante. Lo que cambia datos sigue pidiendo. Para deshacerlo: Herramientas y acceso, en la página de {{name}}.",
+      "readsRule": "Lecturas de {{tool}}",
       "pushTo": "push a {{branch}} en {{repo}}",
       "done": "Aprobado. {{name}} no volverá a pedir esto.",
       "undoHere": "Para deshacerlo, ve a Herramientas y acceso, en la página de {{name}}.",
@@ -3149,7 +3212,8 @@
           "title": {
             "claude_code": "Agregar una cuenta de Claude",
             "codex": "Agregar una cuenta de ChatGPT",
-            "cursor": "Agregar una cuenta de Cursor"
+            "cursor": "Agregar una cuenta de Cursor",
+            "opencode": "Agregar una clave de OpenCode"
           },
           "stepOne": {
             "claude_code": "La cuenta con tu plan",
@@ -3162,6 +3226,7 @@
             "codex": "Iniciar sesión con ChatGPT",
             "cursor": "Iniciar sesión con Cursor"
           },
+          "opencodeFree": "Los modelos gratis de OpenCode no necesitan clave. Una clave de la consola de OpenCode suma los de pago.",
           "cursorFinish": "Inicia sesión en la página de Cursor y el inicio de sesión termina solo en {{computer}}.",
           "cursorKey": "Usar una clave de API de Cursor",
           "openAgain": "Abrir de nuevo",
@@ -3182,7 +3247,8 @@
           "duplicate": {
             "claude_code": "Claude inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Claude e inténtalo de nuevo.",
             "codex": "ChatGPT inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de ChatGPT e inténtalo de nuevo.",
-            "cursor": "Cursor inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Cursor e inténtalo de nuevo."
+            "cursor": "Cursor inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Cursor e inténtalo de nuevo.",
+            "opencode": "Esa clave de OpenCode ya está conectada como {{account}}."
           },
           "startFailed": "{{computer}} no respondió. Inténtalo de nuevo en un momento.",
           "sendFailed": "No se pudo enviar el código. Revísalo e inténtalo de nuevo.",
@@ -3444,6 +3510,9 @@
       "cancel": "Cancelar",
       "forgotten": "Olvidado. Está en Archivados si lo quieres recuperar.",
       "saved": "Guardado. Ahora cuenta como verificado.",
+      "playbook": "Cómo trabaja {{name}}",
+      "playbookNote": "Formas de trabajar que guarda para sí. No aparecen en el chat. Lo que tomó de fuera y no volvió a usar se va solo y queda en Archivado.",
+      "details": "Detalles técnicos",
       "skills": "Habilidades que creó",
       "skillUses_one": "cargada una vez",
       "skillUses_many": "cargada {{count}} veces",
@@ -4730,6 +4799,9 @@
       "every": "Se ejecuta en cada llamada. Las llamadas que llegan juntas se vuelven una sola ejecución.",
       "newNote": "La rutina recibe una dirección propia. Cada POST a ella inicia al agente con lo que se envió. La dirección aparece en la página de la rutina cuando se guarda.",
       "hidden": "Solo quien puede cambiar la rutina ve su dirección.",
+      "methods": "Métodos aceptados",
+      "methodsHelp": "La dirección solo responde a los métodos marcados. Con GET, los parámetros de la URL son los datos de la llamada.",
+      "methodsLine": "Acepta {{methods}}.",
       "address": "Dirección",
       "addressHelp": "Cualquiera con la dirección puede iniciar al agente. Guárdala como una contraseña y crea una nueva si se filtra.",
       "copied": "Dirección copiada.",
@@ -4740,7 +4812,7 @@
       "signature": "Firma",
       "signedOff": "Desactivada: el agente recibe cualquier llamada a la dirección.",
       "signedOn": "Activada: solo pasan las llamadas firmadas con el secreto.",
-      "signedHelp": "Envía el HMAC-SHA256 del cuerpo en X-Agentes-Signature (sha256=…). El X-Hub-Signature-256 de GitHub también funciona.",
+      "signedHelp": "Envía el HMAC-SHA256 del cuerpo (en una llamada GET: de su query string, sin el ?) en X-Agentes-Signature (sha256=…). El X-Hub-Signature-256 de GitHub también funciona.",
       "addSecret": "Exigir una firma",
       "newSecret": "Nuevo secreto",
       "newSecretTitle": "¿Crear un nuevo secreto?",
@@ -4961,7 +5033,8 @@
         "schedule": "Hora",
         "event": "Evento",
         "email": "Correo",
-        "webhook": "Webhook"
+        "webhook": "Webhook",
+        "connector": "Correo de MillionSend"
       },
       "frequency": "Frecuencia",
       "frequencyPlaceholder": "Ej.: cada lunes a las 9",
@@ -5166,8 +5239,8 @@
     "executor": {
       "claude": "Claude Code",
       "claudeText": "Claude Code planifica y programa en la computadora. {{name}} lo sigue y te cuenta.",
-      "codex": "Codex (experimental)",
-      "codexText": "Codex programa en la computadora. Todavía en pruebas.",
+      "codex": "Codex",
+      "codexText": "Codex programa en la computadora.",
       "agent": "{{name}} (el propio agente)",
       "agentText": "{{name}} programa directamente en la computadora, con sus propias herramientas.",
       "agentText_female": "{{name}} programa directamente en la computadora, con sus propias herramientas."
@@ -5761,7 +5834,6 @@
         "codexText": "Lo hace en la computadora.",
         "agentText": "{{name}} lo hace, con sus propias herramientas.",
         "agentText_female": "{{name}} lo hace, con sus propias herramientas.",
-        "testing": "En pruebas",
         "locked": "No se puede cambiar una vez que empezó la misión.",
         "open": "Se puede cambiar hasta que empiece la misión.",
         "saved": "Quién hace el trabajo: {{name}}",
@@ -6595,6 +6667,7 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "opencode": "OpenCode",
       "needs": {
         "keys": "Actualiza agentes en la computadora para usar la clave de un plan"
       },
@@ -6604,6 +6677,7 @@
         "claude_code": "Todavía no está listo en {{computer}}",
         "codex": "Todavía no está listo en {{computer}}",
         "cursor": "Todavía no está listo en {{computer}}",
+        "opencode": "Todavía no está listo en {{computer}}",
         "online": "{{computer}} no responde ahora. Ya estamos en eso."
       }
     },
@@ -8041,18 +8115,22 @@
       "claude": "{{model}} con el plan de Claude",
       "chatgpt": "{{model}} con el plan de ChatGPT",
       "cursor": "{{model}} con el plan de Cursor",
+      "zen": "{{model}} con OpenCode",
       "coding": "{{model}} con {{plan}}",
       "claudeOf": "{{model}} con el plan de Claude de {{owner}}",
       "chatgptOf": "{{model}} con el plan de ChatGPT de {{owner}}",
       "cursorOf": "{{model}} con el plan de Cursor de {{owner}}",
+      "zenOf": "{{model}} con el OpenCode de {{owner}}",
       "codingOf": "{{model}} con {{plan}} de {{owner}}",
       "claudeAuto": "Plan de Claude",
       "chatgptAuto": "Plan de ChatGPT",
       "cursorAuto": "Plan de Cursor",
+      "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Plan de Claude de {{owner}}",
       "chatgptAutoOf": "Plan de ChatGPT de {{owner}}",
       "cursorAutoOf": "Plan de Cursor de {{owner}}",
+      "zenAutoOf": "OpenCode de {{owner}}",
       "codingAutoOf": "{{plan}} de {{owner}}",
       "on": "{{line}} en {{computer}}"
     },
@@ -8062,7 +8140,8 @@
     "card": {
       "claude_code": "Claude Code",
       "codex": "Codex",
-      "cursor": "Cursor"
+      "cursor": "Cursor",
+      "opencode": "OpenCode"
     },
     "foot": {
       "api": "A través de la API",
@@ -8073,11 +8152,11 @@
     "claude_codeText": "Usa el plan de Claude de quien conectó la computadora.",
     "codexText": "Usa el plan de ChatGPT de quien conectó la computadora.",
     "cursorText": "Usa el plan de Cursor de quien conectó la computadora.",
+    "opencodeText": "Los modelos gratis de OpenCode, o la clave de OpenCode de quien conectó la computadora.",
     "cursorModel": {
       "inPlan": "Incluido en tu plan de Cursor",
       "apiPrice": "Cursor lo cobra a precios de API"
     },
-    "testing": "En prueba",
     "reasons": {
       "no_computer": "Elige una computadora conectada en Computadora para usarlo.",
       "exec_off": "La computadora se conectó sin permiso para ejecutar programas.",
@@ -8116,6 +8195,7 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, sin respaldo por API"
     },
     "mission": {
@@ -9968,6 +10048,9 @@
       "openConnectors": "Abrir Conectores",
       "when": "Cuando llega un correo a {{address}}",
       "whenFolder": "Cuando llega un correo a {{address}} ({{folder}})",
+      "whenMillionSend": "Cuando llega un correo a MillionSend",
+      "inboxAddress": "Dirección del buzón",
+      "inboxAddressHelp": "Vacío = cualquier buzón de MillionSend.",
       "unknownMailbox": "un buzón",
       "waiting": "Esperando un correo",
       "thisWeek_one": "{{count}} correo esta semana",
@@ -10418,6 +10501,7 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "opencode": "OpenCode",
         "commands": "Comandos",
         "browser": "Navegador"
       },
@@ -10425,6 +10509,7 @@
         "claude": "Escribe y cambia archivos, solo en las carpetas permitidas.",
         "codex": "Como Claude Code, con una cuenta de ChatGPT. Solo en las carpetas permitidas.",
         "cursor": "Como Claude Code, con una cuenta de Cursor. Solo en las carpetas permitidas.",
+        "opencode": "Como Claude Code, con los modelos gratis de OpenCode o una clave de OpenCode. Solo en las carpetas permitidas.",
         "commands": "Ejecuta comandos en la Terminal, como pruebas y builds."
       },
       "commandsWarn": "Los comandos pueden llegar a otras partes de la computadora, no solo a las carpetas permitidas.",
@@ -11335,6 +11420,7 @@
     "stopFailed": "No se pudo detener. Solo pueden quien lo pidió, el responsable del agente o un admin.",
     "autoUpdate": "Sigo en ello ({{duration}}).",
     "autoUpdateNow": "Ahora: {{now}}.",
+    "statusReply": "Sigo con esto ({{duration}}). Leo tu mensaje después de este paso.",
     "status": {
       "one": "Trabajando en: {{subject}}",
       "oneUntitled": "Trabajando en segundo plano",
@@ -11401,10 +11487,7 @@
       "waitingInput": "{{name}} está esperando una respuesta",
       "waitingComputer": "{{name}} está esperando a la computadora",
       "waitingProvider": "{{name}}: el proveedor de IA está caído · reintenta solo",
-      "waitingAgents": "{{name}} pasó parte del trabajo y espera noticias",
-      "answeredFar": "{{to}} respondió la pregunta de {{from}}",
-      "answeredRequestFar": "{{to}} respondió el pedido de {{from}}",
-      "see": "Ver"
+      "waitingAgents": "{{name}} pasó parte del trabajo y espera noticias"
     },
     "consultPair": {
       "asking": "preguntando",
@@ -11510,6 +11593,9 @@
       },
       "gave": "entregado",
       "answered": "respondido",
+      "autoApproved": "Aprobado automáticamente (siempre aprobado por {{name}})",
+      "autoApprovedReads": "Aprobado automáticamente (lectura siempre aprobada por {{name}})",
+      "autoApprovedNobody": "Aprobado automáticamente",
       "error": "error",
       "seconds": "{{n}} s",
       "minutes": "{{n}} min",
@@ -11704,6 +11790,15 @@
       "agent": "Con {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Nadie lo pidió directamente. ¿Puedo abrir un pull request?",
+        "install": "Nadie lo pidió directamente. ¿Puedo instalar estos paquetes?",
+        "long": "Esto está llevando muchos pasos y nadie lo pidió directamente. ¿Puedo seguir?"
+      },
+      "autonomy_digest_one": "{{count}} alerta parecía conocida o inofensiva, así que no trabajé en ella:",
+      "autonomy_digest_many": "{{count}} alertas parecían conocidas o inofensivas, así que no trabajé en ellas:",
+      "autonomy_digest_other": "{{count}} alertas parecían conocidas o inofensivas, así que no trabajé en ellas:",
+      "autonomy_loop": "Dejé de trabajar en esto por mi cuenta. Volvió {{count}} veces en un día ({{title}}). Dime cómo quieres que lo maneje.",
       "mission_plan": "Plan para “{{title}}” en {{computer}}",
       "mission_planNoComputer": "Plan para “{{title}}”",
       "mission_decision": "Decisión: {{question}}",

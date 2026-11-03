@@ -18,7 +18,7 @@ export {
   approvalTraits,
   approveAlwaysOffered,
 } from "@agenteschat/client/lib/approval-kind";
-export { approveAlwaysHint } from "@agenteschat/client/lib/approval-words";
+export { approveAlwaysHint, approveAlwaysLabel } from "@agenteschat/client/lib/approval-words";
 
 /** The toast after "Aprovar sempre": the agent won't ask for this again, and where to undo it (its profile). */
 export function approveAlwaysToast(t: TFunction, name: string) {
