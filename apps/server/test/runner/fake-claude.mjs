@@ -8,7 +8,7 @@
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
 // of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate,
-// "RATE" says the 5-hour window is at 84%, "PWTOOL" runs a shell call with $AGENT_PW in its command; "STEER…" and "BGSELF" below (live
+// "RATE" says the 5-hour window is at 84%, "COMPACT" compacts its history first (`compact_boundary`), "PWTOOL" runs a shell call with $AGENT_PW in its command; "STEER…" and "BGSELF" below (live
 // steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN and "ECHOTOKEN" with
 // the OAuth token it holds (as an agent's shell could print them), "ECHOSPLIT" with that token in two
 // deltas, each 150 ms before the next line, "KEY401" is refused by the endpoint and retries for good
@@ -289,6 +289,7 @@ async function answer(line) {
     process.exit(3);
   }
   if (prompt.includes("SLOW")) await sleep(300);
+  if (prompt.includes("COMPACT")) out({ type: "system", subtype: "compact_boundary", parent_tool_use_id: null });
   if (prompt.includes("RATE")) {
     out({
       type: "rate_limit_event",

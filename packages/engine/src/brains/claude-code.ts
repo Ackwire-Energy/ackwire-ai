@@ -7,6 +7,7 @@ import {
   type BrainTurnRequest,
   brainTopic,
   CONTEXT_LIMIT_PROTOCOL,
+  CONVERSATION_PROTOCOL,
   type PubSub,
   parseBrainEvent,
   STEER_PROTOCOL,
@@ -17,7 +18,7 @@ import { getAgentCached } from "../agents";
 import type { CodeSetup } from "../git/machine";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
-import { computerPrompt } from "./prompt";
+import { computerPrompt, systemWithConversation } from "./prompt";
 import {
   BRAIN_NAMES,
   BRAIN_PLAN_NAMES,
@@ -383,13 +384,17 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           return;
         }
         const code = await (turn.code ?? deps.prepare?.(turn, io.signal))?.catch(() => null);
+        // A runner that takes the conversation apart reads it at the start of the session: the system text stays the
+        // agent's, the same in each of its conversations (and its cached prefix with it).
+        const apart = (status?.protocol ?? 0) >= CONVERSATION_PROTOCOL;
         const request: BrainTurnRequest = {
           runId: turn.runId,
           kind: "claude_code",
           session: { id: session.id, resume: session.resume },
           cwd: code?.cwd || session.cwd,
           ...(turn.model ? { model: turn.model } : {}),
-          system: code?.prompt ? `${turn.system}\n\n${code.prompt}` : turn.system,
+          system: apart ? turn.system : systemWithConversation(turn, code?.prompt),
+          ...(apart ? { conversation: [turn.conversation, code?.prompt].filter(Boolean).join("\n\n") } : {}),
           prompt: computerPrompt(turn, code?.start),
           mcp: { token: deps.mcpToken?.(turn) ?? randomBytes(24).toString("base64url") },
           keepAlive: deps.keepAlive !== false,

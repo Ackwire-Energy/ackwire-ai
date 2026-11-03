@@ -37,6 +37,8 @@ export interface DirectoryRole {
   label: string;
   /** The prefix its names had before they followed the connector's own (`vega` for `vega_crm`): those still work. */
   legacy?: string;
+  /** The on-demand directory of a run that lists every tool (`EVERY_TOOL`): it only searches them. */
+  every?: boolean;
 }
 
 const roles = new WeakMap<ToolDefinition, DirectoryRole>();
@@ -298,6 +300,18 @@ export function presentTools(
   loaded?: readonly string[] | null,
   blocked?: BlockedTools,
 ): ToolDefinition[] {
+  if (loaded?.includes(EVERY_TOOL)) {
+    const shown = presentTools(
+      [...tools].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
+      sensitive,
+    );
+    const taken = new Set(shown.map((t) => t.name));
+    if (taken.has(ON_DEMAND_FIND) || taken.has(ON_DEMAND_USE)) return shown;
+    // A big connector's own tools stay behind its directory, and are found by `find_tools` too.
+    const behind = tools.filter((t) => !taken.has(t.name));
+    const groups = deferrableGroups(shown.flatMap((t) => directoryRole(t)?.tools ?? [t])).map((g) => g.label);
+    return [...shown, ...onDemandTools(behind, sensitive, shown, blocked, groups)];
+  }
   if (loaded) {
     const keep = new Set(loaded);
     const now = new Set(tools.filter((t) => isCore(t) || keep.has(toolGroupKey(t))));
@@ -432,6 +446,17 @@ export const ON_DEMAND_FIND = "find_tools";
 export const ON_DEMAND_USE = "use_tool";
 
 /**
+ * A run's tool groups that list every granted tool, sorted by name, with `find_tools` / `use_tool` after them
+ * (`presentTools`): a computer brain's harness defers our tools itself, so one list per agent keeps its cached prefix
+ * the same from run to run and session to session.
+ */
+export const EVERY_TOOL = "*";
+
+/** Whether the run lists every tool (`EVERY_TOOL`): tools that don't apply to it are listed anyway, and refuse. */
+export const listsEveryTool = (ctx: { loadedGroups?: readonly string[] | null }) =>
+  ctx.loadedGroups?.includes(EVERY_TOOL) === true;
+
+/**
  * The directory of a run's tools not loaded yet: `find_tools` searches them
  * (BM25, no model call) and `use_tool` runs one by its name, through the
  * gateway like any direct call. Its description names every group, so the
@@ -445,13 +470,17 @@ function onDemandTools(
   sensitive: IsSensitive,
   loaded: ToolDefinition[],
   blocked?: BlockedTools,
+  /** Every tool is listed (`EVERY_TOOL`): the groups the agent has, named the same in every run. */
+  every?: string[],
 ): ToolDefinition[] {
   const groups = deferrableGroups(tools);
   const areas = groups.map((g) => `${g.label} (${g.tools.length})`);
   const label = "other";
   const find: ToolDefinition = {
     name: ON_DEMAND_FIND,
-    description: `More tools you have, loaded when you need them: ${areas.join(", ")}. Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`${ON_DEMAND_USE}\`. It also tells which tools you aren't allowed to use yet and how to ask for them. Search before saying you can't do something.`,
+    description: every
+      ? `Search all your tools${every.length ? ` (the conversation's and ${every.join(", ")})` : ""} by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Call one directly, or with \`${ON_DEMAND_USE}\`. It also tells which tools you aren't allowed to use yet and how to ask for them. Search before saying you can't do something.`
+      : `More tools you have, loaded when you need them: ${areas.join(", ")}. Find them by what you need to do; returns the best matches with their exact names, what each needs (input) and whether it asks a person's approval. Then call one with \`${ON_DEMAND_USE}\`. It also tells which tools you aren't allowed to use yet and how to ask for them. Search before saying you can't do something.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -477,7 +506,7 @@ function onDemandTools(
         label,
         input,
         sensitive,
-        groups.map((g) => g.label),
+        every ?? groups.map((g) => g.label),
         ON_DEMAND_USE,
         loaded,
         await blocked?.(),
@@ -507,8 +536,9 @@ function onDemandTools(
     // Never runs itself: the gateway runs the real tool (`directoryRole`).
     execute: async () => ({ content: "Unknown tool", isError: true }),
   };
-  roles.set(find, { kind: "find", tools, prefix: "", label });
-  roles.set(use, { kind: "use", tools, prefix: "", label });
+  const all = every ? { every: true } : {};
+  roles.set(find, { kind: "find", tools, prefix: "", label, ...all });
+  roles.set(use, { kind: "use", tools, prefix: "", label, ...all });
   return [find, use];
 }
 

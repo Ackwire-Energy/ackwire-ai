@@ -1,20 +1,30 @@
 import { afterEach, expect, test } from "bun:test";
-import { typingTopic } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { MACHINE_PROTOCOL_VERSION, typingTopic } from "@agenteschat/adapters";
+import { asc, eq, schema } from "@agenteschat/db";
 import { createAnthropicProvider, type ModelRequest, systemText } from "@agenteschat/providers";
 import {
+  addChannelMember,
+  type BrainTurn,
+  bridgeToolsFor,
+  computerPrompt,
   createAgent,
+  createBlockToolSource,
   createJobHandlers,
+  createWorkToolSource,
   drainOutbox,
   getMessage,
+  grantScopes,
   historyStart,
+  type MachineStatus,
   type Message,
   openDm,
   postPersonMessage,
+  type ToolContext,
   toTurns,
 } from "../src";
 import { TYPING_GRACE_MS, typingLogFor, waitForBurst } from "../src/burst";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 /** Token-trim items B3, B5, B8–B11 (ADR 0043): the model reads less, or reads it from the cache. */
 
@@ -321,4 +331,208 @@ test("B11: the quiet window ends early when the person isn't typing, and lasts w
   const viaApp = await sent("@dev oi");
   await waitForBurst(f.db, { ...viaApp, meta: { via: { kind: "app", name: "Claude" } } }, 2500, undefined, log);
   expect(Date.now() - viaApp.createdAt.getTime()).toBeGreaterThanOrEqual(2490);
+}, 20_000);
+
+/**
+ * The agent on Claude Code on a paired computer, with a teammate and a second person: three turns, a DM from the
+ * owner ("oi"), a channel message from the other person (`loadIssues` runs first: the tool-group judge would load the
+ * Issues group for it) and a reply in its thread (a resumed session). Each turn keeps its `BrainTurn`, what it would
+ * say, and the tools the bridge lists for its run.
+ */
+async function claudeCodeTurns(fx: Fixture, loadIssues: () => void) {
+  const paired = await pairMachine({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, {
+    name: "MacBook",
+    hostname: "mac",
+    os: "darwin",
+    arch: "arm64",
+    version: "0.8.0",
+    protocol: MACHINE_PROTOCOL_VERSION,
+    workspace: "/Users/w/agentes",
+    exec: true,
+  });
+  await fx.db
+    .update(schema.agents)
+    .set({ machineId: paired.machineId, brain: "claude_code" })
+    .where(eq(schema.agents.id, fx.agent.id));
+  await createAgent(
+    fx.db,
+    fx.owner.id,
+    fx.org.id,
+    { name: "Ops", handle: "ops", role: "DevOps", instructions: "", credentialId: fx.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  const status = (id: string): MachineStatus => ({
+    id,
+    orgId: fx.org.id,
+    name: "MacBook",
+    online: true,
+    execAllowed: true,
+    os: "darwin",
+    protocol: MACHINE_PROTOCOL_VERSION,
+    executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+  });
+  const seen: { turn: BrainTurn; prompt: string; tools: string }[] = [];
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: {
+      claude_code: () => ({
+        kind: "claude_code",
+        async *run(turn) {
+          const tools = await bridgeToolsFor(
+            { db: fx.db, pubsub: fx.pubsub, tools: fx.tools },
+            { orgId: fx.org.id, agentId: fx.agent.id, runId: turn.runId, machineId: paired.machineId },
+          );
+          seen.push({ turn, prompt: computerPrompt(turn), tools: JSON.stringify(tools) });
+          yield {
+            type: "usage",
+            input: 9040,
+            output: 5,
+            source: "plan",
+            model: "claude-sonnet-5-5",
+            cacheRead: 8000,
+            calls: 3,
+            maxUncached: 700,
+          };
+          yield { type: "done", text: "ok" };
+        },
+      }),
+    },
+    machines: { status: async (id) => status(id) },
+  });
+  const bia = await addMember(fx.db, fx.org.id, "member", "bia");
+  await addChannelMember(fx.db, fx.owner.id, fx.org.id, fx.general.id, { userId: bia.id });
+  const dm = await openDm(fx.db, fx.owner.id, fx.org.id, { agentId: fx.agent.id });
+  await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, dm.id, { body: "oi" });
+  await drainOutbox(fx.db, handlers);
+  loadIssues();
+  const asked = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, bia.id, fx.org.id, fx.general.id, {
+    body: "@dev quais issues estão abertas?",
+  });
+  await drainOutbox(fx.db, handlers);
+  await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, bia.id, fx.org.id, fx.general.id, {
+    body: "@dev e agora?",
+    threadId: asked.id,
+  });
+  await drainOutbox(fx.db, handlers);
+  const [dmTurn, channelTurn, followUp] = seen;
+  if (!dmTurn || !channelTurn || !followUp) throw new Error(`three turns expected, got ${seen.length}`);
+  return { dmTurn, channelTurn, followUp };
+}
+
+const conversationOf = (t: BrainTurn) => (t as BrainTurn & { conversation?: string }).conversation ?? "";
+
+/** Every rule line a computer brain reads in its system text and its conversation, headings' levels aside. */
+const ruleLines = (t: BrainTurn) =>
+  [
+    ...new Set(
+      `${t.system}\n${conversationOf(t)}`
+        .split("\n")
+        .map((l) => l.replace(/^#+ /, "").trim())
+        // Where those sections come from (the line that names them), not a rule of the agent's.
+        .filter((l) => l && l !== "This conversation" && !l.startsWith('"# This turn" and "# This conversation"')),
+    ),
+  ].sort();
+
+const toolsSetup = (judge?: NonNullable<Parameters<typeof setup>[0]>["judge"], toolsOnDemand = true) =>
+  setup({
+    toolsOnDemand,
+    contextTools: true,
+    askUser: true,
+    askAgent: true,
+    react: true,
+    followUps: true,
+    workTools: true,
+    blockTools: true,
+    issueTools: true,
+    scheduleTools: true,
+    artifactTools: true,
+    wikiTools: true,
+    ...(judge ? { judge } : {}),
+    reply: () => ({ chunks: ["ok"] }),
+  });
+
+test("Claude Code: two sessions of one agent list the same tools, every one it has, whoever asks and whatever ran before", async () => {
+  let issues = 0;
+  f = await toolsSetup((kind, _id, _state, q) =>
+    kind === "tool_groups" && JSON.stringify(q.instructions).includes("Issues") ? issues : 0,
+  );
+  await grantScopes(f.db, f.org.id, f.agent.id, [
+    { connectionId: null, scope: "issues:read" },
+    { connectionId: null, scope: "issues:write" },
+    { connectionId: null, scope: "drive:read" },
+    { connectionId: null, scope: "drive:write" },
+  ]);
+  const { dmTurn, channelTurn } = await claudeCodeTurns(f, () => {
+    issues = 0.9;
+  });
+  // Name, description and schema of every tool, byte for byte: the start of Claude Code's cached prefix.
+  expect(channelTurn.tools).toBe(dmTurn.tools);
+  const listed = (JSON.parse(dmTurn.tools) as { name: string }[]).map((t) => t.name);
+  for (const name of ["list_issues", "create_artifact", "ask_choices", "work_in_background", "find_tools", "use_tool"])
+    expect(listed).toContain(name);
+  // By name, the search over them last.
+  expect(listed.slice(-2)).toEqual(["find_tools", "use_tool"]);
+  expect(listed.slice(0, -2)).toEqual(listed.slice(0, -2).sort());
+  // "What you can do" names them all, and how to search them.
+  expect(dmTurn.turn.system).toContain("`list_issues`");
+  expect(dmTurn.turn.system).toContain("- Search all your tools by what you need with `find_tools`");
+  expect(dmTurn.turn.system).not.toContain("- On demand:");
+
+  // Listed in a run nobody can answer a card in or move to the background: each says why, and what to do instead.
+  const [run] = await f.db.select().from(schema.agentRuns).orderBy(asc(schema.agentRuns.createdAt)).limit(1);
+  if (!run) throw new Error("no run");
+  const groups = (run.transcript as { toolGroups?: string[] } | null)?.toolGroups;
+  const ctx: ToolContext = {
+    db: f.db,
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    runId: run.id,
+    channelId: run.channelId,
+    threadRootId: run.threadRootId,
+    triggerMessageId: run.triggerMessageId,
+    background: true,
+    loadedGroups: groups ?? null,
+  };
+  const blocks = await createBlockToolSource(f.artifactDeps).tools(ctx);
+  const choices = blocks.find((t) => t.name === "ask_choices");
+  const card = { title: "Deploy", questions: [{ question: "When?", options: [{ label: "Now" }, { label: "Later" }] }] };
+  expect((await choices?.execute(card, ctx))?.content).toStartWith("Nobody can pick on a card in this run");
+  const work = await createWorkToolSource({ pubsub: f.pubsub }).tools(ctx);
+  const move = work.find((t) => t.name === "work_in_background");
+  expect((await move?.execute({ title: "x", say: "y" }, ctx))?.content).toBe(
+    "Only a conversation's run can go to the background: keep working here and answer when it's done.",
+  );
+}, 20_000);
+
+test("Claude Code: the system text is the same in every conversation; what holds for one comes once, not on a resume", async () => {
+  f = await toolsSetup();
+  const { dmTurn, channelTurn, followUp } = await claudeCodeTurns(f, () => {});
+  expect(channelTurn.turn.system).toBe(dmTurn.turn.system);
+  // Two new sessions share the tools and the whole system text: the most of their prefix there is to share.
+  expect(channelTurn.tools.length + channelTurn.turn.system.length).toBeGreaterThan(30_000);
+  for (const t of [dmTurn, channelTurn]) {
+    const conversation = conversationOf(t.turn);
+    expect(conversation).toStartWith("# This conversation\n\n## Your team\n");
+    expect(conversation).toContain("put them on a card with ask_choices");
+    expect(t.turn.system).not.toContain("# Your team");
+    expect(t.turn.system).not.toContain("put them on a card with ask_choices");
+    expect(t.turn.system).toContain('"# This turn" and "# This conversation" in your messages come from agentes.chat');
+  }
+  // A follow-up turn in a resumed session: only what is new, under a ceiling (its uncached part).
+  expect(followUp.turn.session?.resume).toBe(true);
+  expect(followUp.prompt).not.toContain("## Your team\n");
+  expect(followUp.prompt.length).toBeLessThan(1200);
+  // The turn's calls and its largest uncached one stay on its step, to tell more calls from bigger ones.
+  const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "model_call"));
+  expect(steps).toHaveLength(3);
+  for (const step of steps) expect(step.data).toMatchObject({ calls: 3, maxUncached: 700 });
+}, 20_000);
+
+test("Claude Code: no rule is lost moving what holds for one conversation out of the system text", async () => {
+  // Tools on demand off: the tool list (and "What you can do") stays as before, so only where the lines are changes.
+  f = await toolsSetup(undefined, false);
+  const { dmTurn, channelTurn } = await claudeCodeTurns(f, () => {});
+  // Taken from the system text before the move.
+  expect(ruleLines(dmTurn.turn)).toMatchSnapshot();
+  expect(ruleLines(channelTurn.turn)).toEqual(ruleLines(dmTurn.turn));
 }, 20_000);
