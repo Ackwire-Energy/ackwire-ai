@@ -114,9 +114,10 @@ describe("Issues (board and list)", () => {
         .map((o) => o.querySelector(".ac-menu__label")?.textContent),
     ).toEqual(["Eu", "Ada", "Atlas", "João", "Sem responsável", "Alta", "Normal", "Baixa"]);
     await pickIn(menu, "Ada");
+    // An open menu hides the rest of the page from the accessibility tree: read the board once it closes.
+    await closeMenu();
     expect(cardTitles(column("A fazer"))).toEqual(["Tabela de concorrentes atualizada"]);
     expect(cardTitles(column("Em andamento"))).toEqual(["Timeout no agendamento em horários de pico"]);
-    await closeMenu();
     // In use: a chip that reads it and opens the same menu; kept for me.
     expect(screen().getByRole("button", { name: "Responsável: Ada" })).toBeTruthy();
     expect(state.issuesView?.assignees).toEqual([`agent:${ADA_ID}`]);
@@ -131,10 +132,11 @@ describe("Issues (board and list)", () => {
     await pickIn(menu, "Eu");
     await pickIn(menu, "Alta");
     await closeMenu();
-    expect(screen().getAllByRole("link", { name: /^#\d+/ }).map((l) => l.getAttribute("aria-label"))).toEqual([
-      "#131 Confirmação do agendamento por WhatsApp",
-      "#128 Login devolve 401 depois do deploy das 9h",
-    ]);
+    expect(
+      screen()
+        .getAllByRole("link", { name: /^#\d+/ })
+        .map((l) => l.getAttribute("aria-label")),
+    ).toEqual(["#131 Confirmação do agendamento por WhatsApp", "#128 Login devolve 401 depois do deploy das 9h"]);
     await click(screen().getByRole("button", { name: "Limpar Alta" }));
     await settle(3);
     await type(screen().getByRole("searchbox", { name: "Buscar tarefas" }), "#128");
@@ -504,9 +506,7 @@ describe("Rotinas", () => {
     const details = screen().getByRole("dialog", { name: "Resumo da semana" });
     expect(details.textContent).toContain("Resuma o que");
     // The runs are their own tab (Radix tabs switch on mouse down).
-    await act(async () =>
-      fireEvent.mouseDown(within(details).getByRole("tab", { name: /^Execuções/ }), { button: 0 }),
-    );
+    await act(async () => fireEvent.mouseDown(within(details).getByRole("tab", { name: /^Execuções/ }), { button: 0 }));
     await settle(2);
     expect(details.textContent).toContain("Parada por");
     expect(details.textContent).toContain("O orçamento do mês acabou");

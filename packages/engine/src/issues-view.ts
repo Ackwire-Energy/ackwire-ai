@@ -92,12 +92,7 @@ export async function myIssuesView(db: Database, orgId: string, userId: string):
 }
 
 /** Saves how the person looks at Tarefas in this workspace, cleaned first; answers with what was kept. */
-export async function setMyIssuesView(
-  db: Database,
-  orgId: string,
-  userId: string,
-  view: unknown,
-): Promise<IssuesView> {
+export async function setMyIssuesView(db: Database, orgId: string, userId: string, view: unknown): Promise<IssuesView> {
   await requirePermission(db, userId, orgId, "read");
   const clean = issuesViewOf(view);
   await db.update(organizationMembers).set({ issuesView: clean }).where(mine(orgId, userId));

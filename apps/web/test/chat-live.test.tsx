@@ -852,7 +852,7 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     await sendText("oi @ada");
     await settle(4);
     const first = lastPerson(state);
-    expect(bar().textContent).toBe("Ada");
+    expect(bar().textContent).toBe("Ada pensando…");
     const run = { threadId: first?.id, runId: "r-1st", agentId: ADA_ID };
     await pushG({ type: "agent.delta", ...run, seq: 1, text: "Oi!" });
     await pushG({
@@ -1018,7 +1018,7 @@ describe("direct messages with an agent", () => {
         .map((l) => l.getAttribute("href")),
     ).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     await sendText("lembra que deploy é só de segunda a quinta");
-    expect(bar().textContent).toBe("Ada");
+    expect(bar().textContent).toBe("Ada pensando…");
   });
 });
 

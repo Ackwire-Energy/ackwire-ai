@@ -729,12 +729,12 @@ html:not([data-pointer]) .issue-list__row:focus-visible {
 }
 body.issues-dragging,
 body.issues-dragging * {
-  cursor: grabbing !important;
+  cursor: grabbing;
   -webkit-user-select: none;
   user-select: none;
 }
 .issues [data-slot][hidden] {
-  display: none !important;
+  display: none;
 }
 /* Sent back: hidden in its place until its copy lands there. */
 .issues [data-landing] {

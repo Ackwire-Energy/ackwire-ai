@@ -47,8 +47,8 @@ import {
   useState,
 } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
 import { OnlyYouNote } from "@/components/AgentAudience";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { MembersFull } from "@/components/Limits";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -666,7 +666,10 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
             disabled={screen === "who" && (full || (ready.length === 0 && !typed))}
             onClick={next}
           >
-            {ready.length > 1 ? t("members.dialog.continueWith", { count: ready.length }) : t("common.continue")}
+            {/* How many go: said where they are chosen, on the first step. */}
+            {screen === "who" && ready.length > 1
+              ? t("members.dialog.continueWith", { count: ready.length })
+              : t("common.continue")}
           </Button>
         )}
       </>

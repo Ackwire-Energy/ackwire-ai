@@ -340,7 +340,10 @@ function IssuesBody({
   const prioritize = (issue: Issue, priority: IssuePriority) => {
     const was = issue.priority;
     const back = () => patch({ ...issue, priority }, { priority: was }, { priority: was });
-    const text = t("issues.drag.prioritized", { number: issue.number, priority: t(`issues.priorityLower.${priority}`) });
+    const text = t("issues.drag.prioritized", {
+      number: issue.number,
+      priority: t(`issues.priorityLower.${priority}`),
+    });
     patch(issue, { priority }, { priority }, () => toast.show(text, "info", undo(back)));
   };
   const onDrop = ({ id, from, to, index }: CardMove): DropResult => {

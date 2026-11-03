@@ -153,7 +153,9 @@ function IdentityCard() {
             `@${draft.handle}`
           )}
         </span>
-        <span className="agp-id__dot" aria-hidden="true">·</span>
+        <span className="agp-id__dot" aria-hidden="true">
+          ·
+        </span>
         <RoleTag id="agp-role" value={draft.role} onChange={can("role") ? (v) => set("role", v) : undefined} />
       </div>
       {errors.name && (

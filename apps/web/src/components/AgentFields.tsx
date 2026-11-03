@@ -699,7 +699,11 @@ export function InPlaceText({
   if (typed !== null)
     return (
       <span className="agp-inplace__field">
-        {prefix && <span className="agp-inplace__prefix" aria-hidden="true">{prefix}</span>}
+        {prefix && (
+          <span className="agp-inplace__prefix" aria-hidden="true">
+            {prefix}
+          </span>
+        )}
         <input
           ref={edit.field}
           id={id}
@@ -822,7 +826,9 @@ export function RoleTag({
     return (
       <span id={id} className="agp-roletag" data-empty={!role || undefined}>
         <Icon name={iconIn(roles, role)} size={16} />
-        <span className="agp-roletag__text" title={role || undefined}>{text}</span>
+        <span className="agp-roletag__text" title={role || undefined}>
+          {text}
+        </span>
       </span>
     );
   if (typed === null)
@@ -842,7 +848,9 @@ export function RoleTag({
         }}
       >
         <Icon name={iconIn(roles, role)} size={16} />
-        <span className="agp-roletag__text" title={role || undefined}>{text}</span>
+        <span className="agp-roletag__text" title={role || undefined}>
+          {text}
+        </span>
         <span className="agp-roletag__pen">
           <Icon name="edit" size={14} />
         </span>

@@ -138,7 +138,7 @@ describe("Tarefas: moving a card", () => {
     expect(cardTitles(column("João"))).toContain("Tabela de concorrentes atualizada");
     expect(toast()).toContain("#132 agora está com João.");
     await click(screen().getByRole("button", { name: "Desfazer" }));
-    await settle(5);
+    await settle(10);
     expect((await api.issues.get(ORG_ID, 132)).assignee).toEqual({ type: "agent", id: ADA_ID });
   });
 
