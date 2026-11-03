@@ -2898,6 +2898,32 @@ test("network changes preserve an occupied worker and viewers, then retire it be
   await again;
 });
 
+test("a stopped worker whose new network can't be prepared doesn't hold the drain", async () => {
+  let fail = false;
+  let network: { networkMark?: number } = {};
+  const t = setup({
+    resolveNetwork: () => {
+      if (fail) throw new Error("Cannot inspect browser bind test ports: cgroupv2 path fails");
+      return network;
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const run = t.sup.run(exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const worker = t.last(ANA.id);
+  worker.hello();
+  const req = await requestOn(worker);
+  worker.send({ type: "result", ok: true, id: req.id, data: execDone });
+  await run;
+  worker.crash(0);
+  await worker.exited;
+  fail = true;
+  network = { networkMark: 0x08000000 };
+  t.sup.setNetwork(network);
+  expect(t.sup.drainNetwork()).toEqual([]);
+});
+
 test("a running background task delays network retirement until its acknowledged completion", async () => {
   const home = newHome();
   writeFileSync(
