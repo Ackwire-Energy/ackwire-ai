@@ -227,7 +227,7 @@ describe("agents, runs and usage", () => {
     await setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [], pub);
     await Bun.sleep(5);
     const seen = (list: { type: string }[]) =>
-      list.map((e) => [e.type, (e as unknown as { member: { id: string; autoReply?: boolean } }).member]);
+      list.map((e) => [e.type, (e as unknown as { member: { type: string; id: string; autoReply?: boolean } }).member]);
     expect(seen(inEng)).toEqual([
       ["channel.member_updated", { type: "agent", id: f.agent.id, autoReply: true }],
       ["channel.member_removed", { type: "agent", id: f.agent.id }],

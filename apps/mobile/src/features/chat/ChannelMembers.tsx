@@ -372,7 +372,7 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
         <Text variant="body" tone="muted">
           {needle
             ? t("channelMembers.addEmpty", { q: q.trim() })
-            : t("channelMembers.addEveryone", { org: org.name, channel: channelName })}
+            : t("channelMembers.addEveryone", { org: org?.name ?? "", channel: channelName })}
         </Text>
       ) : (
         <Card>
