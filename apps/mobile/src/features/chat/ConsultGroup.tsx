@@ -1,45 +1,39 @@
-import { keys, type Message, type RunConsultation, useConsultations } from "@agenteschat/client";
+import {
+  keys,
+  type Message,
+  type MessageConsultation,
+  type RunConsultation,
+  useConsultations,
+} from "@agenteschat/client";
 import {
   type ConsultLineState,
-  consultGroupKeys,
-  consultGroupSummary,
+  type ConsultPairItem,
   consultLineKey,
-  consultLineState,
-  consultProgress,
-  consultSeconds,
+  consultPair,
   firstOfRun,
   groupsByRun,
+  pairItemOf,
 } from "@agenteschat/client/lib/consult-group";
-import { previewOf } from "@agenteschat/client/lib/consultations";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { formatLineTime, type ToolState } from "@agenteschat/client/lib/work";
-import type { AgentColorName } from "@agenteschat/ui/agent/engine";
+import { namesText } from "@agenteschat/client/lib/format";
+import type { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { formatLineTime } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Icon, Text } from "@/ui";
 import { consultationHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
-import { useDirectory, useOrgId } from "../shared/hooks";
-import { type BlockItem, ToolBlock } from "./ToolCalls";
+import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { tapHaptic } from "../shared/parts";
 
-const BLOCK_STATE: Record<ConsultLineState, ToolState> = {
-  working: "run",
-  waiting: "run",
-  // Paused until its computer comes back, or on what it handed on, still out: the same mark as at work.
-  offline: "run",
-  handedOn: "run",
-  answered: "done",
-  failed: "fail",
-  expired: "fail",
-};
-
-/** A question's state in words, the same in the reply's block and on the conversation's screen. */
+/** A question's state in words, on the conversation's screen ("A Iris espera uma aprovação"). */
 export const consultLineLabel = (
   t: TFunction,
   state: ConsultLineState,
-  c: RunConsultation,
+  c: Pick<RunConsultation, "waiting" | "kind">,
   to: ReturnType<typeof agentGrammar>,
 ) => t(consultLineKey(state, c), { name: to.name, context: to.context });
 
@@ -55,77 +49,135 @@ function useTick(active: boolean) {
   return now;
 }
 
+const NO_ITEMS: ConsultPairItem[] = [];
+const NO_CONSULTED: MessageConsultation[] = [];
+
 /**
- * The questions the agent asked other agents in this turn, and the work it handed them, inside its reply, as on the
- * web (`ConsultGroup.tsx`): the tool block's card, "Perguntou a 3 colegas" or "Passou para 1 colega" (open while
- * answers are out), a line per agent that opens the two agents' conversation on a screen of its own, read only
- * (`ConsultationScreen`). The run's first message shows it when the run posted several.
+ * The questions a pair row stands for: those of run `runId` on the run's first message here (`messageId`; null: its
+ * live turn, which shows them until the run posts), and those a reply's `meta.consulted` names that the list
+ * doesn't have.
  */
-export function ConsultGroup({ message: m, color }: { message: Message; color: AgentColorName }) {
-  const { t, i18n } = useTranslation();
-  const dir = useDirectory();
+export function useRunConsults(
+  runId: string | null | undefined,
+  where: Pick<Message, "channelId" | "threadId">,
+  messageId: string | null,
+  consulted: readonly MessageConsultation[] = NO_CONSULTED,
+): ConsultPairItem[] {
   const orgId = useOrgId();
   const qc = useQueryClient();
-  const list = useConsultations(orgId, m.channelId, Boolean(m.agentRunId));
-  const runId = m.agentRunId ?? "";
-  const group = useMemo(() => groupsByRun(list.data ?? []).get(runId), [list.data, runId]);
-  const asks = Boolean(group && group.length > 0 && m.author.id);
-  const loaded = asks
-    ? [
-        ...(qc.getQueryData<Message[]>(keys.messages(orgId, m.channelId)) ?? []),
-        ...((m.threadId && qc.getQueryData<Message[]>(keys.thread(orgId, m.channelId, m.threadId))) || []),
-      ]
-    : [];
-  const first = asks ? firstOfRun(loaded, runId) : null;
-  const draws = asks && (!first || first === m.id);
-  const live = group?.some((c) => c.status === "open") ?? false;
+  const list = useConsultations(orgId, where.channelId, Boolean(runId));
+  const group = useMemo(() => (runId ? groupsByRun(list.data ?? []).get(runId) : undefined), [list.data, runId]);
+  const loaded =
+    group && runId
+      ? [
+          ...(qc.getQueryData<Message[]>(keys.messages(orgId, where.channelId)) ?? []),
+          ...((where.threadId && qc.getQueryData<Message[]>(keys.thread(orgId, where.channelId, where.threadId))) ||
+            []),
+        ]
+      : [];
+  const first = group && runId ? firstOfRun(loaded, runId) : null;
+  const draws = group !== undefined && (messageId === null ? first === null : !first || first === messageId);
+  return useMemo(() => {
+    const run = group ?? NO_ITEMS;
+    const extra = consulted.filter((c) => !run.some((r) => r.id === c.consultationId)).map(pairItemOf);
+    const mine = draws ? run : NO_ITEMS;
+    return extra.length === 0 ? mine : [...mine, ...extra];
+  }, [group, consulted, draws]);
+}
+
+/**
+ * The slim row right before a reply whose agent asked other agents first, as on the web (`ConsultGroup.tsx`): the
+ * asker's face and name, ⇄, the consulted agent's (several fold into stacked faces, "Atlas e mais 2"), then how long
+ * it took, or while it runs "perguntando 42 s", or "não respondeu". Never what they said: a tap opens the two agents'
+ * conversation on a screen of its own, read only (`ConsultationScreen`).
+ */
+export function ConsultPairRow({
+  askerId,
+  channelId,
+  items,
+}: {
+  askerId: string;
+  /** The conversation that asked: the screen opens from it. */
+  channelId: string;
+  items: readonly ConsultPairItem[];
+}) {
+  const { t, i18n } = useTranslation();
+  const dir = useDirectory();
+  const c = useColors();
+  const live = items.some((x) => x.status === "open");
   const now = useTick(live);
-  if (!draws || !group || !m.author.id) return null;
-  const summary = consultGroupSummary(group, now);
-  const words = consultGroupKeys(group);
-  const from = agentGrammar(dir.agentById.get(m.author.id)?.name ?? t("mobile.chat.someone"));
-  const items: BlockItem[] = group.map((c) => {
-    const state = consultLineState(c, now);
-    const to = agentGrammar(dir.agentById.get(c.consultedAgentId)?.name ?? t("mobile.chat.someone"));
-    const answer = state === "answered" ? (c.answer ?? "") : null;
-    const progress = consultProgress(c);
-    return {
-      kind: "line",
-      line: {
-        key: c.id,
-        state: BLOCK_STATE[state],
-        logo: <AgentFace agentId={c.consultedAgentId} size={18} mode={state === "working" ? "run" : "idle"} />,
-        label: consultLineLabel(t, state, c, to),
-        hint: null,
-        // The start of the answer, as the web shows it next to the phrase: no tap needed to know what came back.
-        preview: answer ? previewOf(answer) : progress ? t(progress.key, progress.values) : null,
-        time: formatLineTime(i18n.language, consultSeconds(c, now) * 1000),
-        onOpen: () => router.push(consultationHref(c.id, m.channelId)),
-      },
-    };
-  });
+  const pair = consultPair(items, now);
+  if (!pair) return null;
+  const nameOf = (id: string) => dir.agentById.get(id)?.name ?? t("mobile.chat.someone");
+  const from = nameOf(askerId);
+  const names = pair.faces.map((f) => nameOf(f.agentId));
+  const to = names.length === 1 ? (names[0] ?? "") : namesText(t, names, 1);
   return (
-    <ToolBlock
-      // Open while answers are out; it folds by itself once the last one is in (a tap opens it again).
-      key={summary.open ? "out" : "in"}
-      logos={group.map((c) => ({
-        key: c.id,
-        node: <AgentFace agentId={c.consultedAgentId} size={18} live={false} />,
-      }))}
-      head={{
-        // The phone's head has no room for a separate count: "Perguntou a 3 colegas · 1 de 3" in its words.
-        text: summary.open
-          ? `${t(words.head, { count: summary.total })} · ${t("chat.consultGroup.progress", { done: summary.closed, total: summary.total })}`
-          : t(words.head, { count: summary.total }),
-        textKey: `consult-${summary.closed}`,
-        state: summary.open ? "run" : undefined,
-      }}
-      items={items}
-      color={color}
-      label={t(words.label, { name: from.name, context: from.context })}
-      defaultOpen={summary.open}
-      // One question: its own line ("Atlas respondeu"), with no "Perguntou a 1 colega" to open.
-      one={group.length === 1}
-    />
+    <View style={styles.slot}>
+      <Pressable
+        onPress={() => {
+          tapHaptic();
+          router.push(consultationHref(pair.opens, channelId));
+        }}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plate }]}
+      >
+        <AgentFace agentId={askerId} size={18} live={false} />
+        <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1} ellipsizeMode="clip">
+          {from}
+        </Text>
+        <Icon name="swap" size={15} color={pair.tone === "live" ? c.agent : c.faint} />
+        <View style={styles.faces}>
+          {pair.faces.slice(0, 3).map((f, i) => (
+            <View key={f.agentId} style={[i > 0 && [styles.stacked, { borderColor: c.bg }], f.off && styles.off]}>
+              <AgentFace agentId={f.agentId} size={18} live={false} />
+            </View>
+          ))}
+        </View>
+        <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1} ellipsizeMode="clip">
+          {to}
+        </Text>
+        {pair.word || pair.seconds !== null ? (
+          <Text variant="footnote" tone="faint">
+            ·
+          </Text>
+        ) : null}
+        {pair.word ? (
+          <Text
+            variant="footnote"
+            style={[styles.word, { color: pair.tone === "bad" ? c.warn : c.agent }]}
+            numberOfLines={1}
+            ellipsizeMode="clip"
+          >
+            {t(pair.word.key, pair.word.values)}
+          </Text>
+        ) : null}
+        {pair.seconds !== null ? (
+          <Text variant="footnote" tone="faint" style={styles.time}>
+            {formatLineTime(i18n.language, pair.seconds * 1000)}
+          </Text>
+        ) : null}
+      </Pressable>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  // The first face centred over the reply's 34pt face column (MessageRow): 14 padding + 8 inset + 9 = 14 + 17.
+  slot: { flexDirection: "row", paddingLeft: 14, paddingRight: 16, marginTop: 6, marginBottom: -6 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 28,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    flexShrink: 1,
+  },
+  name: { fontWeight: "600", flexShrink: 1 },
+  faces: { flexDirection: "row", alignItems: "center" },
+  stacked: { marginLeft: -5, borderLeftWidth: 1.5, borderRadius: 6 },
+  off: { opacity: 0.45 },
+  word: { fontWeight: "600", flexShrink: 1 },
+  time: { fontVariant: ["tabular-nums"] },
+});

@@ -31,7 +31,7 @@ test("the cards in a message share one width: the tools, a lone call's line, eve
     ".ag-rcg",
     // A request, a memory change, a question to another agent, the older work line.
     ".ac-approval",
-    ".ac-consult",
+    ".consult-pair__detail",
     ".ac-work",
     // Files, a chart, the redo-or-explain ask, an issue's work card.
     ".artifact-cards",

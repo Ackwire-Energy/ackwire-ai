@@ -1,7 +1,6 @@
 import {
   type AgentQuestion,
   type Approval,
-  type MessageConsultation,
   type ThreadInfo,
   useApi,
   useApproval,
@@ -27,7 +26,6 @@ import {
   decisionOutcome,
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
-import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
@@ -47,10 +45,10 @@ import {
   useCancelAhead,
   useOriginShort,
 } from "../approvals/parts";
-import { chatHref, consultationHref } from "../links/logic";
-import { AgentFace, Face, withAgentFaces } from "../shared/Face";
+import { chatHref } from "../links/logic";
+import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { genderOf, previewOf } from "../shared/logic";
+import { genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
@@ -59,99 +57,9 @@ import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "
 import { markName, threadFaces } from "./logic";
 
 /**
- * The cards inside a message: the agent it consulted, the approval it asks for, an agent's question and a change
+ * The cards inside a message: the approval it asks for, an agent's question and a change
  * it proposes (each the request card, `asks.tsx`), and the link to its thread. Its tools are `ToolCalls.tsx`.
  */
-
-// ── Consultation ─────────────────────────────────────────────────────────────
-
-/**
- * "Infra respondeu": what the agent asked another agent before answering, in a private conversation. With the
- * conversation it was asked from (`channelId`), a tap opens the two agents' conversation on its own screen, as the
- * reply's block lines do: a long question or answer reads there, never stretching the chat. Without it (already
- * on that screen) it opens in place.
- */
-export function ConsultationCard({
-  askerId,
-  consultation: cs,
-  channelId,
-}: {
-  askerId: string;
-  consultation: MessageConsultation;
-  channelId?: string;
-}) {
-  const { t } = useTranslation();
-  const dir = useDirectory();
-  const c = useColors();
-  const surface = useSurface();
-  const [open, setOpen] = useState(false);
-  const asker = dir.agentById.get(askerId)?.name ?? "";
-  const name = dir.agentById.get(cs.agentId)?.name ?? "";
-  const ga = genderOf(asker);
-  const gn = genderOf(name);
-  const head =
-    cs.status === "answered"
-      ? t("mobile.chat.consult.answered", { name })
-      : cs.status === "expired"
-        ? t(`mobile.chat.consult.expired${gn}`, { name })
-        : cs.kind === "note"
-          ? t("chat.consultation.failedNote", { name, context: agentGrammar(name).context })
-          : t(`mobile.chat.consult.failed${gn}`, { name });
-  return (
-    <View style={[styles.box, styles.cs, surface]}>
-      <Pressable
-        onPress={
-          channelId
-            ? () => {
-                tapHaptic();
-                router.push(consultationHref(cs.consultationId, channelId));
-              }
-            : () => setOpen((v) => !v)
-        }
-        accessibilityRole="button"
-        accessibilityState={channelId ? undefined : { expanded: open }}
-        style={styles.head}
-      >
-        <AgentFace agentId={cs.agentId} size={18} live={false} />
-        <Text variant="small" tone="ink" style={styles.bold}>
-          {head}
-        </Text>
-        <Text variant="small" tone="faint" numberOfLines={1} style={[styles.grow, open && styles.hidden]}>
-          {cs.answer ? previewOf(cs.answer) : ""}
-        </Text>
-        {channelId ? (
-          <Icon name="right" size={16} color={c.faint} />
-        ) : (
-          <View style={open ? styles.flip : undefined}>
-            <Icon name="chev" size={16} color={c.faint} />
-          </View>
-        )}
-      </Pressable>
-      {open && !channelId ? (
-        <View style={styles.csBody}>
-          <Text variant="caption" tone="faint" style={styles.bold}>
-            {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}
-          </Text>
-          <Text variant="small" tone="muted">
-            {cs.question}
-          </Text>
-          <Text variant="caption" tone="faint" style={[styles.bold, styles.gap]}>
-            {t(`mobile.chat.consult.answerOf${gn}`, { name })}
-          </Text>
-          <Text variant="small" tone="ink2">
-            {cs.answer ?? t("mobile.chat.consult.noAnswer")}
-          </Text>
-          <View style={styles.foot}>
-            <Icon name="eyeoff" size={13} color={c.faint} />
-            <Text variant="caption" tone="faint" style={styles.grow}>
-              {t(`mobile.chat.consult.private${ga}${gn}`, { from: asker, to: name })}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-    </View>
-  );
-}
 
 // ── Approval ─────────────────────────────────────────────────────────────────
 
@@ -786,24 +694,9 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
 }
 
 const styles = StyleSheet.create({
-  box: { marginTop: 8, borderRadius: 14, overflow: "hidden" },
-  cs: { marginTop: 6, marginBottom: 8 },
-  head: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minHeight: 42,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  csBody: { paddingLeft: 40, paddingRight: 14, paddingBottom: 14, gap: 2 },
-  gap: { marginTop: 8 },
-  foot: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },
   bold: { fontWeight: "600" },
-  hidden: { opacity: 0 },
-  flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   // Requests sharing one card: each a well of its own, decided ones quieter.

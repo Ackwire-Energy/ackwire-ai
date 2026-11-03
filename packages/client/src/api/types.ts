@@ -1000,8 +1000,8 @@ export type ConsultationWait = "approval" | "input" | "computer" | "agents" | "o
 
 /**
  * A question an agent asked another agent from a conversation, or work it handed one (`GET
- * …/channels/{id}/consultations`): drawn inside the reply of the run that asked ("Perguntou a 3 colegas", "Passou
- * para 1 colega"), each with where it is and, once closed, the answer.
+ * …/channels/{id}/consultations`): drawn as one row before the reply of the run that asked ("Theo ⇄ Atlas · 2 min"),
+ * with where each is and, once closed, the answer (shown only when opened).
  */
 export interface RunConsultation {
   id: string;

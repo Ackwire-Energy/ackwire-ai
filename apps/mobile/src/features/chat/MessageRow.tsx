@@ -73,8 +73,8 @@ import { VoiceMessage } from "../voice/VoiceMessage";
 import { ReceiptMark } from "./AgentReceipts";
 import { secretRequestOf } from "./ask-store";
 import { ChatMedia } from "./ChatMedia";
-import { ConsultGroup } from "./ConsultGroup";
-import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
+import { ConsultPairRow, useRunConsults } from "./ConsultGroup";
+import { ApprovalInline, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
 import {
@@ -116,7 +116,7 @@ const TRAIL_RECENT_MS = 12 * 60 * 60_000;
  */
 export const MessageRow = memo(function MessageRow({
   message: m,
-  grouped,
+  grouped: groupedIn,
   meId,
   thread,
   onLongPress,
@@ -216,6 +216,19 @@ export const MessageRow = memo(function MessageRow({
   // The one an agent adds after its own reply carries the reply's run: the run's tools, questions and stop line
   // stay on the reply, never shown twice.
   const mediaAfter = isAgent && isMediaAfterReply(meta);
+  // It asked other agents first: one row right before it (its run's questions on the run's first message here, and
+  // the ones its `meta.consulted` names), so it shows its face and name again under that row.
+  const consults = useRunConsults(
+    isAgent && !m.local && !readOnly && !mediaAfter ? m.agentRunId : null,
+    m,
+    m.id,
+    consulted,
+  );
+  const pair =
+    isAgent && m.author.id && consults.length > 0 ? (
+      <ConsultPairRow askerId={m.author.id} channelId={m.channelId} items={consults} />
+    ) : null;
+  const grouped = groupedIn && !pair;
   // A question to another agent (in their DM) carries the asking run: its work shows on that run's reply.
   const ownWork = isAgent && Boolean(m.agentRunId) && !meta?.consultation && !mediaAfter;
   const steps = ownWork ? workStepsOf(meta) : null;
@@ -414,227 +427,219 @@ export const MessageRow = memo(function MessageRow({
   }
 
   return (
-    <Pressable
-      onLongPress={press}
-      delayLongPress={380}
-      accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
-      style={({ pressed }) => [
-        styles.msg,
-        grouped && styles.cont,
-        mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
-        pressed && press && { backgroundColor: c.sunken },
-      ]}
-    >
-      <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
-      <View style={styles.body}>
-        {grouped ? null : (
-          <View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>
-            <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
-              {name}
-            </Text>
-            {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
-            {via ? (
-              <Tag
-                icon="sparkle"
-                lead={viaMark ? <ProviderLogo id={viaMark} size="xs" /> : undefined}
-                label={t("apps.via", { name: via.name })}
-                hint={t("apps.viaTip", { person: name, name: via.name })}
-              />
-            ) : null}
-            {routine ? (
-              // The tag opens the routine (Rotinas, as on the web); "Ver relatório" beside it unfolds the report.
-              <Tag
-                icon="clock"
-                label={t("channel.routineTag", { name: routine.name })}
-                onPress={() => router.push(routineHref(routine.id))}
-                hint={t("channel.routineTagTip")}
-              />
-            ) : null}
-            {routine && report ? (
-              <Pressable
-                onPress={() => setReportOpen((o) => !o)}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: reportOpen }}
-                hitSlop={6}
-                style={styles.shrink}
-              >
-                <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
-                  {reportOpen ? t("channel.routineReportHide") : t("channel.routineReport")}
-                </Text>
-              </Pressable>
-            ) : null}
-            {talker ? (
-              <Text
-                variant="caption"
-                tone="faint"
-                numberOfLines={1}
-                style={styles.shrink}
-                accessibilityHint={t("chat.notice.talkerTip")}
-              >
-                {t("chat.notice.talker")}
+    <>
+      {pair}
+      <Pressable
+        onLongPress={press}
+        delayLongPress={380}
+        accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
+        style={({ pressed }) => [
+          styles.msg,
+          grouped && styles.cont,
+          mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
+          pressed && press && { backgroundColor: c.sunken },
+        ]}
+      >
+        <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
+        <View style={styles.body}>
+          {grouped ? null : (
+            <View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>
+              <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
+                {name}
               </Text>
-            ) : null}
-            {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}
-            {!reminder && !routine && !talker && !helping && agent?.role ? (
-              <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
-                {agent.role}
-              </Text>
-            ) : null}
-            <Text variant="footnote" tone="faint">
-              {when.time(m.createdAt)}
-            </Text>
-            {brainWait ? <AwayPill message={m} /> : null}
-            {m.pinned ? <PinMark /> : null}
-            {receipt && !m.local ? (
-              <View style={styles.whoMark}>
-                <ReceiptMark message={m} mine={false} receipt={receipt} />
-              </View>
-            ) : null}
-          </View>
-        )}
-        {grouped && m.pinned ? (
-          <View style={styles.pinLine}>
-            <PinMark />
-            <Text variant="caption" tone="faint">
-              {t("mobile.pins.mark")}
-            </Text>
-          </View>
-        ) : null}
-        {report && reportOpen ? (
-          <View style={[styles.report, { borderLeftColor: c.line }]}>
-            <MessageText body={report} />
-          </View>
-        ) : null}
-        {consulted.map((cs) => (
-          <ConsultationCard
-            key={cs.consultationId}
-            askerId={m.author.id ?? ""}
-            consultation={cs}
-            channelId={readOnly ? undefined : m.channelId}
-          />
-        ))}
-        {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
-        {brainWait ? (
-          <BrainWait
-            message={m}
-            fallback={
-              body ? (
-                <MessageText
-                  body={body}
-                  muted={m.local === "pending"}
-                  selectable={false}
-                  accent={accent}
-                  channelRefs={channelRefsOf(m.meta)}
+              {reminder ? <Tag icon="bell" label={t("channel.reminder")} /> : null}
+              {via ? (
+                <Tag
+                  icon="sparkle"
+                  lead={viaMark ? <ProviderLogo id={viaMark} size="xs" /> : undefined}
+                  label={t("apps.via", { name: via.name })}
+                  hint={t("apps.viaTip", { person: name, name: via.name })}
                 />
-              ) : null
-            }
-          />
-        ) : choiceReply ? (
-          choiceReply
-        ) : body ? (
-          <MessageText
-            body={talk ? talk.lead : body}
-            muted={m.local === "pending" || workOver}
-            selectable={false}
-            accent={accent}
-            channelRefs={channelRefsOf(m.meta)}
-          />
-        ) : null}
-        {talk && !brainWait ? (
-          <Pressable
-            onPress={() => {
-              tapHaptic();
-              router.push(chatHref(m.channelId, m.threadId ?? m.id));
-            }}
-            accessibilityRole="button"
-            hitSlop={8}
-            style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
-          >
-            <Text variant="footnote" tone="muted" style={styles.medium}>
-              {t("chat.talk.readAll")}
-            </Text>
-            <Text variant="footnote" tone="faint">
-              · {t("chat.talk.more", { count: talk.more })}
-            </Text>
-            <Icon name="right" size={14} color={c.faint} />
-          </Pressable>
-        ) : null}
-        {media ? <ChatMedia media={media} liveId={m.id} /> : null}
-        {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
-        {(stopped || atLimit || providerCut) && m.agentRunId ? (
-          <StoppedLine
-            message={m}
-            runId={m.agentRunId}
-            stopped={
-              stopped ?? {
-                byUserId: null,
-                continuedRunId: atLimit?.continuedRunId ?? providerCut?.continuedRunId ?? null,
+              ) : null}
+              {routine ? (
+                // The tag opens the routine (Rotinas, as on the web); "Ver relatório" beside it unfolds the report.
+                <Tag
+                  icon="clock"
+                  label={t("channel.routineTag", { name: routine.name })}
+                  onPress={() => router.push(routineHref(routine.id))}
+                  hint={t("channel.routineTagTip")}
+                />
+              ) : null}
+              {routine && report ? (
+                <Pressable
+                  onPress={() => setReportOpen((o) => !o)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: reportOpen }}
+                  hitSlop={6}
+                  style={styles.shrink}
+                >
+                  <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
+                    {reportOpen ? t("channel.routineReportHide") : t("channel.routineReport")}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {talker ? (
+                <Text
+                  variant="caption"
+                  tone="faint"
+                  numberOfLines={1}
+                  style={styles.shrink}
+                  accessibilityHint={t("chat.notice.talkerTip")}
+                >
+                  {t("chat.notice.talker")}
+                </Text>
+              ) : null}
+              {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}
+              {!reminder && !routine && !talker && !helping && agent?.role ? (
+                <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+                  {agent.role}
+                </Text>
+              ) : null}
+              <Text variant="footnote" tone="faint">
+                {when.time(m.createdAt)}
+              </Text>
+              {brainWait ? <AwayPill message={m} /> : null}
+              {m.pinned ? <PinMark /> : null}
+              {receipt && !m.local ? (
+                <View style={styles.whoMark}>
+                  <ReceiptMark message={m} mine={false} receipt={receipt} />
+                </View>
+              ) : null}
+            </View>
+          )}
+          {grouped && m.pinned ? (
+            <View style={styles.pinLine}>
+              <PinMark />
+              <Text variant="caption" tone="faint">
+                {t("mobile.pins.mark")}
+              </Text>
+            </View>
+          ) : null}
+          {report && reportOpen ? (
+            <View style={[styles.report, { borderLeftColor: c.line }]}>
+              <MessageText body={report} />
+            </View>
+          ) : null}
+          {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
+          {brainWait ? (
+            <BrainWait
+              message={m}
+              fallback={
+                body ? (
+                  <MessageText
+                    body={body}
+                    muted={m.local === "pending"}
+                    selectable={false}
+                    accent={accent}
+                    channelRefs={channelRefsOf(m.meta)}
+                  />
+                ) : null
               }
-            }
-            limit={providerCut ? "failed" : atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
-          />
-        ) : null}
-        {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
-        {isAgent ? <TeamChecks message={m} /> : null}
-        {isAgent ? <ReachLines message={m} /> : null}
-        {isAgent && m.longWork ? <MessageWorkLine message={m} threaded={Boolean(thread)} /> : null}
-        {files.length > 0 ? <MessageFiles files={files} /> : null}
-        {trails && m.author.id && trails.browser.length > 0 ? (
-          <TrailCard
-            agentId={m.author.id}
-            runId={m.agentRunId ?? null}
-            steps={trails.browser}
-            stopped={stopped}
-            recent={trails.recent}
-          />
-        ) : null}
-        {trails && m.author.id && trails.desktop.length > 0 ? (
-          <TrailCard
-            agentId={m.author.id}
-            runId={m.agentRunId ?? null}
-            steps={trails.desktop}
-            stopped={stopped}
-            screen="desktop"
-          />
-        ) : null}
-        {cards}
-        {/* Its tools after its words, what it changed and its cards: the same place live, kept and saved. */}
-        {isAgent && m.agentRunId && !m.local && !readOnly && !mediaAfter && consulted.length === 0 ? (
-          <ConsultGroup message={m} color={color} />
-        ) : null}
-        {kept ? (
-          <TurnTools
-            items={opened?.lines ?? kept.items}
-            agentName={agent?.name ?? name}
-            color={color}
-            quoteOf={(id) => kept.quotes[id]}
-            done
-            settled
-          />
-        ) : steps && m.agentRunId ? (
-          <SavedTools
-            runId={m.agentRunId}
-            meta={meta}
-            agentName={agent?.name ?? name}
-            color={color}
-            skipScreens={onCards}
-          />
-        ) : null}
-        {/* What waits for a person's click comes last, after the words and the tools. */}
-        {isAgent ? <NoAiCard message={m} /> : null}
-        {isAgent ? <StretchCard message={m} /> : null}
-        {isAgent ? <UsagePauseCard message={m} /> : null}
-        {isAgent ? <UsageWaitCancel message={m} /> : null}
-        {isAgent ? <ProposalCard message={m} /> : null}
-        {isAgent ? <InstructionProposals message={m} /> : null}
-        {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
-        {handoff ? <HandoffCard handoff={handoff} /> : null}
-        {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
-        {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
-        {missionDecision}
-        {foot}
-      </View>
-    </Pressable>
+            />
+          ) : choiceReply ? (
+            choiceReply
+          ) : body ? (
+            <MessageText
+              body={talk ? talk.lead : body}
+              muted={m.local === "pending" || workOver}
+              selectable={false}
+              accent={accent}
+              channelRefs={channelRefsOf(m.meta)}
+            />
+          ) : null}
+          {talk && !brainWait ? (
+            <Pressable
+              onPress={() => {
+                tapHaptic();
+                router.push(chatHref(m.channelId, m.threadId ?? m.id));
+              }}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
+            >
+              <Text variant="footnote" tone="muted" style={styles.medium}>
+                {t("chat.talk.readAll")}
+              </Text>
+              <Text variant="footnote" tone="faint">
+                · {t("chat.talk.more", { count: talk.more })}
+              </Text>
+              <Icon name="right" size={14} color={c.faint} />
+            </Pressable>
+          ) : null}
+          {media ? <ChatMedia media={media} liveId={m.id} /> : null}
+          {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
+          {(stopped || atLimit || providerCut) && m.agentRunId ? (
+            <StoppedLine
+              message={m}
+              runId={m.agentRunId}
+              stopped={
+                stopped ?? {
+                  byUserId: null,
+                  continuedRunId: atLimit?.continuedRunId ?? providerCut?.continuedRunId ?? null,
+                }
+              }
+              limit={providerCut ? "failed" : atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
+            />
+          ) : null}
+          {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
+          {isAgent ? <TeamChecks message={m} /> : null}
+          {isAgent ? <ReachLines message={m} /> : null}
+          {isAgent && m.longWork ? <MessageWorkLine message={m} threaded={Boolean(thread)} /> : null}
+          {files.length > 0 ? <MessageFiles files={files} /> : null}
+          {trails && m.author.id && trails.browser.length > 0 ? (
+            <TrailCard
+              agentId={m.author.id}
+              runId={m.agentRunId ?? null}
+              steps={trails.browser}
+              stopped={stopped}
+              recent={trails.recent}
+            />
+          ) : null}
+          {trails && m.author.id && trails.desktop.length > 0 ? (
+            <TrailCard
+              agentId={m.author.id}
+              runId={m.agentRunId ?? null}
+              steps={trails.desktop}
+              stopped={stopped}
+              screen="desktop"
+            />
+          ) : null}
+          {cards}
+          {/* Its tools after its words, what it changed and its cards: the same place live, kept and saved. */}
+          {kept ? (
+            <TurnTools
+              items={opened?.lines ?? kept.items}
+              agentName={agent?.name ?? name}
+              color={color}
+              quoteOf={(id) => kept.quotes[id]}
+              done
+              settled
+            />
+          ) : steps && m.agentRunId ? (
+            <SavedTools
+              runId={m.agentRunId}
+              meta={meta}
+              agentName={agent?.name ?? name}
+              color={color}
+              skipScreens={onCards}
+            />
+          ) : null}
+          {/* What waits for a person's click comes last, after the words and the tools. */}
+          {isAgent ? <NoAiCard message={m} /> : null}
+          {isAgent ? <StretchCard message={m} /> : null}
+          {isAgent ? <UsagePauseCard message={m} /> : null}
+          {isAgent ? <UsageWaitCancel message={m} /> : null}
+          {isAgent ? <ProposalCard message={m} /> : null}
+          {isAgent ? <InstructionProposals message={m} /> : null}
+          {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
+          {handoff ? <HandoffCard handoff={handoff} /> : null}
+          {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
+          {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
+          {missionDecision}
+          {foot}
+        </View>
+      </Pressable>
+    </>
   );
 });
 

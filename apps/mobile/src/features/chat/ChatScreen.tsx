@@ -571,21 +571,25 @@ function Chat({
     ];
   }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
   const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
-  // Questions agents asked other agents, inside the replies that asked (`ConsultGroup`): how each answer's notice
-  // draws (hidden under a reply close by, one line to one farther up), and the working line without the questions
-  // a reply near the end shows. A turn at work here doesn't show them yet: only saved replies count.
+  // Questions agents asked other agents, in the pair row before the replies that asked (`ConsultGroup`): how each
+  // answer's notice draws (hidden under a reply close by, one line to one farther up), and the working line without
+  // the questions a row near the end shows. A turn at work that posted nothing yet carries its row at the end.
   const consultList = useConsultations(orgId, channelId).data ?? NO_CONSULTATIONS;
+  const liveTurns = useMemo(
+    () => new Set(shownRuns.flatMap((r) => (shownMessages.some((m) => m.agentRunId === r.runId) ? [] : [r.runId]))),
+    [shownRuns, shownMessages],
+  );
   const foldsNow = useMemo(
-    () => consultNoticeFolds(shownMessages, consultList, undefined, "first"),
-    [shownMessages, consultList],
+    () => consultNoticeFolds(shownMessages, consultList, liveTurns, "first"),
+    [shownMessages, consultList, liveTurns],
   );
   // The rows redraw when a notice's fold changes, not on every message (the folds are rebuilt on each).
   const foldsKey = [...foldsNow].map(([id, f]) => `${id}:${f.fold === "line" ? f.messageId : f.fold}`).join(" ");
   // biome-ignore lint/correctness/useExhaustiveDependencies: `foldsKey` stands for the folds
   const consultFolds = useMemo(() => foldsNow, [foldsKey]);
   const lineConsults = useMemo(
-    () => consultsForLine(consults, consultBlocksNearEnd(shownMessages, consultList, undefined, "first")),
-    [consults, shownMessages, consultList],
+    () => consultsForLine(consults, consultBlocksNearEnd(shownMessages, consultList, liveTurns, "first")),
+    [consults, shownMessages, consultList, liveTurns],
   );
 
   // ── Following the end ──

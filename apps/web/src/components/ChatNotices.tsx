@@ -1,5 +1,6 @@
 import type { Message } from "@agenteschat/client";
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
+import { pairItemOf } from "@agenteschat/client/lib/consult-group";
 import { formatTime } from "@agenteschat/client/lib/format";
 import {
   consultationOfNotice,
@@ -18,7 +19,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { MessageBody } from "@/chat/MessageBody";
-import { ConsultationCard } from "@/components/ConsultationCard";
+import { ConsultPairRow } from "@/components/ConsultGroup";
 import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -143,13 +144,13 @@ export function NoticeLine({ message }: { message: Message }) {
   const dir = useDirectory(org.id);
   const notice = noticeOf(message.meta);
   if (!notice) return null;
-  // Another agent's answer with its consultation: the same card as a reply that waited for it (who asked
-  // whom, the question and the answer), not the text written for the asking agent.
+  // Another agent's answer with its consultation, its reply not here: the same pair row a reply has (who asked
+  // whom), never the text written for the asking agent; a click opens what they said.
   const consulted = consultationOfNotice(message.meta);
   if (consulted)
     return (
-      <div className="cn-line" data-message-id={message.id}>
-        <ConsultationCard consultation={consulted.consultation} askerId={consulted.askerId} />
+      <div data-message-id={message.id}>
+        <ConsultPairRow runId={null} askerId={consulted.askerId} items={[pairItemOf(consulted.consultation)]} />
       </div>
     );
   const nameOfHandle = (handle: string) => dir.agentByHandle.get(handle.toLowerCase())?.name ?? null;

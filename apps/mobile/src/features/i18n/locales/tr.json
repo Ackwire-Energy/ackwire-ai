@@ -348,20 +348,6 @@
       "back": "Yeniden bağlandı"
     },
     "longPressHint": "Tepki vermek ve diğer işlemleri görmek için basılı tutun",
-    "consult": {
-      "answered": "{{name}} yanıtladı",
-      "expiredF": "{{name}} zamanında yanıt vermedi",
-      "expiredM": "{{name}} zamanında yanıt vermedi",
-      "failedF": "{{name}} yanıt veremedi",
-      "failedM": "{{name}} yanıt veremedi",
-      "answerOfF": "{{name}} yanıtı",
-      "answerOfM": "{{name}} yanıtı",
-      "noAnswer": "Yanıt yok.",
-      "privateFF": "{{from}} ve {{to}} arasında özel sohbet",
-      "privateFM": "{{from}} ve {{to}} arasında özel sohbet",
-      "privateMF": "{{from}} ve {{to}} arasında özel sohbet",
-      "privateMM": "{{from}} ve {{to}} arasında özel sohbet"
-    },
     "file": "Dosya",
     "fileOpen": "Açmak için dokunun",
     "fileDeleted": "Dosya kaldırıldı",
