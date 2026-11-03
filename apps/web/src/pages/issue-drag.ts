@@ -591,10 +591,14 @@ function createEngine<T extends { id: string }>(ctx: EngineContext<T>) {
         if (!gesture) return;
         end(false);
         unswallow();
+        // Only the click that ends the drag, on the board or the list: a click elsewhere (the toast's Desfazer)
+        // goes through.
         const stop = (e: MouseEvent) => {
+          const on = e.target instanceof Element && e.target.closest(".issues-boardwrap, .issues-groups");
+          unswallow();
+          if (!on) return;
           e.preventDefault();
           e.stopPropagation();
-          unswallow();
         };
         swallow = stop;
         document.addEventListener("click", stop, true);
