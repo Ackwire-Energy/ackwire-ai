@@ -38,3 +38,13 @@ An agent that solved something by figuring it out (a new API, several tries, a k
 4. **Secrets on your computer**: the run's context lists the secrets delivered to the computer its tools act on (in a mission's thread, the mission's, ADR 0029) and not removed (name and where: an environment variable, a file, a site's password), never values, and says not to ask for them again unless one is refused or stopped working.
 
 Reflection was left as it is: the agent knows the exact details when it finishes, a background pass reading tool calls would be a second model call to rebuild them.
+
+## Addendum (2026-11-03): reading a conversation, and where an agent was asked
+
+ADR 0135 adds `read_conversation` (`context:read`, on demand): a message by id or link with those around it, or a
+channel's or thread's messages, each with who wrote it, where and its link, within the same channels as
+`search_context` (the run's channel and the agent's public channels; the agents' DM keeps its per-person rule).
+`search_context` message hits now name their author, place and link. One narrow exception: from a conversation where
+the agent sent a message because of another (`send_dm`'s `meta.agentDm`, `post_message`'s `meta.postedFrom`, with
+`fromMessageId`), that origin message alone may be read, quoted and linked when the person behind the run is in its
+conversation; otherwise its later runs learn only who asked, and the channel only when it is public.
