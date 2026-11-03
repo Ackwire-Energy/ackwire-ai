@@ -1295,6 +1295,10 @@
     "anyAgent": "Wszyscy agenci",
     "create": "Utwórz"
   },
+  "taskManager": {
+    "loadFailed": "Nie udało się wczytać zadań.",
+    "gone": "Tego zadania już tu nie ma."
+  },
   "homeNow": {
     "working_one": "{{count}} pracuje",
     "working_few": "{{count}} pracują",

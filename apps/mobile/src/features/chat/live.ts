@@ -240,8 +240,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "agent.run":
     case "run.finished":
-      // "Trabalhando agora" on Início.
+      // "Trabalhando agora" on Início, and the task manager (an agent's DM header counts its tasks here too).
       void qc.invalidateQueries({ queryKey: keys.working(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.taskManager(orgId) });
       break;
     case "message.reactions":
       cacheReactions(qc, orgId, channelId, event.messageId, event.reactions);

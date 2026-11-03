@@ -1,7 +1,7 @@
-import { and, desc, type Executor, eq, inArray, schema } from "@agenteschat/db";
+import { and, desc, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { cutText } from "./format";
 
-const { issues, issueActivity, users, agents } = schema;
+const { issues, issueActivity, users, agents, artifacts } = schema;
 
 /**
  * "Ask Ada to implement": the work conversation lives in the
@@ -68,6 +68,13 @@ export async function issueWorkBrief(db: Executor, orgId: string, issueId: strin
       : [],
   ]);
   const names = new Map([...people, ...bots].map((r) => [r.id, r.name]));
+  // Files attached when it was created, on comments or linked later: the agent opens them with `read_artifact`.
+  const files = issue.artifactIds.length
+    ? await db
+        .select({ id: artifacts.id, title: artifacts.title })
+        .from(artifacts)
+        .where(and(eq(artifacts.orgId, orgId), inArray(artifacts.id, issue.artifactIds), isNull(artifacts.deletedAt)))
+    : [];
   const criteria = issue.criteria.map((c, i) => `${i + 1}. [${c.done ? "x" : " "}] ${c.text}`).join("\n");
   const prs = issue.pullRequests.map((p) => `- #${p.number} ${p.url}`).join("\n");
   const lines = comments
@@ -82,6 +89,9 @@ export async function issueWorkBrief(db: Executor, orgId: string, issueId: strin
     issue.description.trim() ? `## Description\n${issue.description.trim()}` : "",
     criteria ? `## Acceptance criteria\n${criteria}` : "",
     prs ? `## Pull requests linked\n${prs}` : "",
+    files.length
+      ? `## Files attached to the issue\n${files.map((f) => `- ${f.title} (artifact ${f.id})`).join("\n")}\nOpen one with \`read_artifact\` when it helps.`
+      : "",
     lines.length ? `## Latest comments on the issue\n${lines.join("\n")}` : "",
     [
       "## How to work on it",

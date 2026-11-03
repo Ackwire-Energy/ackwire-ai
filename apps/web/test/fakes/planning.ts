@@ -489,6 +489,7 @@ export function createMockPlanning(
       create: async (orgId, input) => {
         const s = await store(orgId);
         const at = ctx.now().toISOString();
+        const author = await me();
         const issue: Issue = {
           id: mockId("iss"),
           number: Math.max(0, ...s.issues.map((i) => i.number)) + 1,
@@ -502,15 +503,24 @@ export function createMockPlanning(
           labels: input.labels ?? [],
           dueDate: input.dueDate ?? null,
           criteria: (input.criteria ?? []).map((text) => ({ id: mockId("crit"), text, done: false })),
-          createdBy: await me(),
+          createdBy: author,
           source: { type: "manual" },
           channelId: null,
           pullRequests: [],
-          artifacts: [],
+          // Files from the new-task box: linked, and kept on the "created" event (their Drive titles stand in as ids).
+          artifacts: (input.attachmentIds ?? []).map((id) => ({ id, title: id, createdBy: author })),
           createdAt: at,
           updatedAt: at,
         };
         s.issues.push(issue);
+        if (input.attachmentIds?.length)
+          await log(orgId, issue, {
+            kind: "event",
+            author,
+            event: "created",
+            text: "criou a tarefa",
+            attachments: input.attachmentIds.map((id) => ({ id, title: id })),
+          });
         return clone(issue);
       },
       update: async (orgId, id, patch) => {
@@ -561,8 +571,15 @@ export function createMockPlanning(
         return clone(i);
       },
       activity: async (orgId, id) => clone((await store(orgId)).activity.get(id) ?? []),
-      comment: async (orgId, id, text) =>
-        clone(await log(orgId, await findIssue(orgId, id), { kind: "comment", author: await me(), text: text.trim() })),
+      comment: async (orgId, id, text, attachmentIds) =>
+        clone(
+          await log(orgId, await findIssue(orgId, id), {
+            kind: "comment",
+            author: await me(),
+            text: text.trim(),
+            ...(attachmentIds?.length ? { attachments: attachmentIds.map((a) => ({ id: a, title: a })) } : {}),
+          }),
+        ),
       askAgent: async (orgId, id, agentId) => {
         const i = await findIssue(orgId, id);
         i.assignee = { type: "agent", id: agentId };

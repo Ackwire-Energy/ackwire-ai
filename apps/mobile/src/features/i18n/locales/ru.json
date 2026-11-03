@@ -1295,6 +1295,10 @@
     "anyAgent": "Все агенты",
     "create": "Создать"
   },
+  "taskManager": {
+    "loadFailed": "Не удалось загрузить задачи.",
+    "gone": "Этой задачи здесь больше нет."
+  },
   "homeNow": {
     "working_one": "{{count}} работает",
     "working_few": "{{count}} работают",

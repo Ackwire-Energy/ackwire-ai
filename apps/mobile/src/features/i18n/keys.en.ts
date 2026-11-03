@@ -1164,6 +1164,11 @@ export const featureKeysEn = {
     anyAgent: "All agents",
     create: "Create",
   },
+  // The task manager (ADR 0128; the rest of its words are shared, `taskManager.*`).
+  taskManager: {
+    loadFailed: "Couldn't load the tasks.",
+    gone: "This task is no longer here.",
+  },
   // intentional: chats/activity/ui
   homeNow: {
     working_one: "{{count}} working",

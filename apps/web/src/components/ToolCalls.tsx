@@ -1,4 +1,12 @@
-import { isScreenTool, type LiveWork, type ScreenKind, useCatalog, useRun } from "@agenteschat/client";
+import {
+  isScreenTool,
+  type LiveWork,
+  type Run,
+  type RunStep,
+  type ScreenKind,
+  useCatalog,
+  useRun,
+} from "@agenteschat/client";
 import type { Activity, ActivityKind } from "@agenteschat/client/lib/activity";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -113,8 +121,11 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   queryingDatabase: "database",
 };
 
-/** A call's logo: its service's mark as the connectors screens draw it (`callLogo`), or the icon of one of our tools. */
-function useLogo() {
+/**
+ * A call's logo: its service's mark as the connectors screens draw it (`callLogo`), or the icon of one of our tools.
+ * The task manager draws what a task uses now with the same logos.
+ */
+export function useCallLogo() {
   const catalog = useCatalog();
   return (a: Activity) => {
     const logo = callLogo(a, catalog.data?.connectors ?? []);
@@ -180,7 +191,7 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
 
 function useBlockItems(items: ToolItem[]): ToolBlockItem[] {
   const { t, i18n } = useTranslation();
-  const logo = useLogo();
+  const logo = useCallLogo();
   return items.flatMap((item): ToolBlockItem[] =>
     item.kind === "call"
       ? [{ kind: "line", line: blockLine(t, i18n.language, item.line, logo(item.line)) }]
@@ -216,7 +227,7 @@ export function LiveTools({
   const { org } = useOrg();
   const items = toolItemsLive(work, stopped);
   const blockItems = useBlockItems(items);
-  const logo = useLogo();
+  const logo = useCallLogo();
   const calls = toolCalls(items);
   const steers = items.flatMap((i) => (i.kind === "steer" ? [i] : []));
   // Done, its tools are the summary the person chose not to see (`showActivity`): what it read stays.
@@ -279,6 +290,58 @@ export function LiveTools({
 }
 
 /**
+ * A task's steps in the task manager's panel (ADR 0128): the same block and lines as a reply's, open, from the task's
+ * own steps (`useTaskSteps`). While it works, its last call still waiting for a result is the one running.
+ */
+export function TaskStepsBlock({
+  steps,
+  run,
+  working,
+  agentName,
+  color,
+}: {
+  steps: RunStep[];
+  run: Pick<Run, "createdAt" | "finishedAt">;
+  working: boolean;
+  agentName: string;
+  color?: AgentColor;
+}) {
+  const { t, i18n } = useTranslation();
+  const logo = useCallLogo();
+  const saved = toolItemsSaved(workFromSteps(steps, run));
+  const last = saved.findLastIndex((i) => i.kind === "call");
+  const items: ToolItem[] = saved.map((item, i) =>
+    working && i === last && item.kind === "call" && item.line.state === "stop"
+      ? { ...item, line: { ...item.line, state: "run" as const } }
+      : item,
+  );
+  const blockItems = useBlockItems(items);
+  const calls = toolCalls(items);
+  if (calls === 0) return null;
+  const now = toolNow(items);
+  const total = items.reduce((n, i) => n + (i.kind === "call" ? (i.line.ms ?? 0) : 0), 0);
+  const head =
+    working && now
+      ? {
+          text: blockLine(t, i18n.language, now, null).label,
+          textKey: `${now.key}-${now.state}`,
+          state: now.state,
+          count: t("chat.work.steps", { count: calls }),
+        }
+      : { text: t("chat.work.used", { count: calls }), time: total > 0 ? formatDuration(t, total) : undefined };
+  return (
+    <ToolBlock
+      defaultOpen
+      logos={toolApps(items).map((a) => <span key={appKey(a)}>{logo(a)}</span>)}
+      head={head}
+      items={blockItems}
+      color={color}
+      label={t("chat.work.block", agentGrammar(agentName))}
+    />
+  );
+}
+
+/**
  * The tools of a saved reply: closed, "Usou 4 ferramentas · 12 s" with the apps' logos from `meta.work`; its
  * steps load from `GET …/runs/{id}` only when opened (one request per opened message). A single call is its own
  * line from `meta.work` ("Criou uma rotina"), opening on what it was given and answered.
@@ -301,7 +364,7 @@ export function SavedTools({
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
   const run = useRun(org.id, open ? runId : null);
-  const logo = useLogo();
+  const logo = useCallLogo();
   const compact = workMeta(meta);
   const onCard = (name: unknown) => skipScreens.some((screen) => isScreenTool(String(name ?? ""), screen));
   const work = run.data

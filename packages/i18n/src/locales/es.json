@@ -4608,7 +4608,19 @@
       "criteriaFound_many": "{{count}} criterios de aceptación",
       "criteriaFound_other": "{{count}} criterios de aceptación",
       "agentStarts": "{{name}} empieza en cuanto se crea la tarea. Todo lo sensible pide tu aprobación.",
-      "agentStarts_female": "{{name}} empieza en cuanto se crea la tarea. Todo lo sensible pide tu aprobación."
+      "agentStarts_female": "{{name}} empieza en cuanto se crea la tarea. Todo lo sensible pide tu aprobación.",
+      "agentStartsAll": "{{name}} empieza en cuanto se crea la tarea, con la descripción, los criterios y los adjuntos. Todo lo sensible pide tu aprobación.",
+      "titleShort": "Título de la tarea",
+      "quickPlaceholder": "Describe lo que hace falta. Pega capturas, arrastra archivos. Las líneas que empiezan con “-” se convierten en criterios de aceptación.",
+      "pasteHint": "Pega una captura con {{keys}} o arrastra archivos aquí.",
+      "expand": "Abrir el formulario completo",
+      "collapse": "Volver al formulario rápido",
+      "another": "Crear otra",
+      "addCriterion": "Agregar un criterio",
+      "removeCriterion": "Quitar el criterio",
+      "drop": "Suelta para adjuntar a la tarea",
+      "dropText": "Fotos, videos, PDF, hojas de cálculo… hasta {{max}} MB cada uno.",
+      "createHint": "{{keys}} crea la tarea"
     },
     "back": "Tareas",
     "notFound": "Esta tarea no existe o no tienes acceso.",
@@ -4634,6 +4646,8 @@
     "asked_female": "Pedido enviado. {{name}} publica el avance aquí. Tu conversación se queda en tu mensaje directo.",
     "activity": "Actividad",
     "noActivity": "Nada todavía.",
+    "discussion": "Conversación",
+    "noComments": "Todavía no hay comentarios.",
     "comment": "Comentar la tarea",
     "commentPlaceholder": "Comenta · usa @ para llamar a un agente",
     "send": "Comentar",
@@ -4649,6 +4663,26 @@
     "noLinks": "Todavía no hay nada vinculado.",
     "openConversation": "Ver conversación",
     "labels": "Etiquetas",
+    "tabs": {
+      "label": "Partes de la tarea",
+      "details": "Detalles",
+      "files": "Adjuntos",
+      "history": "Historial"
+    },
+    "files": {
+      "title": "Adjuntos",
+      "add": "Agregar archivos",
+      "addHint": "o arrástralos aquí",
+      "grid": "Cuadrícula",
+      "empty": "Todavía no hay adjuntos. Arrastra archivos aquí o pega una captura.",
+      "fromCreation": "Al crearla · {{when}}",
+      "fromComment": "Comentario de {{name}} · {{when}}",
+      "linked": "Vinculado por {{name}}"
+    },
+    "history": {
+      "commented": "comentó",
+      "commentedFiles": "comentó con adjuntos"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "detuvo el trabajo en segundo plano",
@@ -12849,6 +12883,155 @@
       "upright": "Ponlo vertical",
       "message": "Escribirle a {{name}}",
       "chooseOnWeb": "Elígela en agentes.chat, en Configuración › Computadoras."
+    }
+  },
+  "taskManager": {
+    "title": "Gestor de tareas",
+    "nav": "Gestor de tareas",
+    "search": "Busca una tarea, agente o app",
+    "working_one": "{{count}} trabajando",
+    "working_many": "{{count}} trabajando",
+    "working_other": "{{count}} trabajando",
+    "waiting_one": "{{count}} te espera",
+    "waiting_many": "{{count}} te esperan",
+    "waiting_other": "{{count}} te esperan",
+    "all": "Todos",
+    "now": "Ahora",
+    "agentTasks": "Tareas de {{name}}",
+    "tasks_one": "{{count}} tarea",
+    "tasks_many": "{{count}} tareas",
+    "tasks_other": "{{count}} tareas",
+    "free": "Libre",
+    "columns": {
+      "task": "Tarea",
+      "state": "Estado",
+      "using": "Usando ahora",
+      "time": "Tiempo",
+      "computer": "Se ejecuta en"
+    },
+    "sections": {
+      "asked": "Pedidas por personas",
+      "background": "Rutinas en segundo plano"
+    },
+    "state": {
+      "working": "Trabajando",
+      "ok": "Espera tu ok",
+      "answer": "Espera una respuesta",
+      "computerBusy": "Espera lugar en la computadora",
+      "inLine": "En la fila · {{position}}.º",
+      "computerOffline": "Espera la computadora",
+      "plan": "Espera el plan",
+      "budget": "Espera el presupuesto",
+      "queued": "En cola",
+      "stopping": "Deteniendo…",
+      "stopped": "Detenida"
+    },
+    "where": {
+      "dm": "Conversación directa",
+      "routine": "Rutina «{{name}}»",
+      "background": "En segundo plano"
+    },
+    "askedBy": "Lo pidió {{name}}",
+    "askedByYou": "Lo pediste tú",
+    "servers": "Nuestros servidores",
+    "plan": "{{done}} de {{total}} hechos",
+    "program": {
+      "browser": "Navegador",
+      "screen": "Pantalla de la computadora",
+      "terminal": "Terminal",
+      "agentes": "agentes",
+      "thinking": "Pensando",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "Ver pasos",
+      "stop": "Detener",
+      "stopTask": "Detener tarea",
+      "stopAll": "Detener todas",
+      "stopAllOf": "Detener todo lo de {{name}}",
+      "open": "Abrir en la conversación",
+      "openManager": "Abrir en el gestor de tareas"
+    },
+    "confirm": {
+      "title_one": "¿Detener la tarea de {{name}}?",
+      "title_many": "¿Detener las {{count}} tareas de {{name}}?",
+      "title_other": "¿Detener las {{count}} tareas de {{name}}?",
+      "body": "Lo que ya se hizo se conserva, y {{name}} sabrá que lo detuviste.",
+      "short": "{{name}} sabrá que lo detuviste.",
+      "reason": "¿Por qué? (opcional)",
+      "stop_one": "Detener",
+      "stop_many": "Detener {{count}}",
+      "stop_other": "Detener {{count}}"
+    },
+    "ended": {
+      "title": "Terminadas hoy",
+      "done": "Terminada",
+      "stopped": "La detuviste",
+      "stoppedBy": "{{name}} la detuvo",
+      "failed": "No pudo terminar",
+      "none": "Todavía no terminó nada hoy."
+    },
+    "empty": {
+      "title": "Ningún agente está trabajando ahora",
+      "body": "Cuando un agente empiece una tarea, aparecerá aquí."
+    },
+    "strip": {
+      "tasks_one": "{{name}} en {{count}} tarea",
+      "tasks_many": "{{name}} en {{count}} tareas",
+      "tasks_other": "{{name}} en {{count}} tareas",
+      "waiting_one": "{{count}} te espera",
+      "waiting_many": "{{count}} te esperan",
+      "waiting_other": "{{count}} te esperan",
+      "see": "Ver",
+      "hide": "Cerrar",
+      "stopHere": "Detener esta",
+      "here": "aquí"
+    },
+    "stopped": {
+      "line": "Detuviste esta tarea",
+      "lineBy": "{{name}} detuvo esta tarea",
+      "told": "{{agent}} recibió el aviso y solo la retoma si alguien se lo pide.",
+      "reason": "Motivo: «{{reason}}»",
+      "sayWhy": "Decir por qué",
+      "whyPlaceholder": "¿Quieres decir por qué? (opcional)",
+      "send": "Enviar"
+    },
+    "activity": "Últimos 30 min",
+    "failed": "No se pudo detener. Inténtalo de nuevo.",
+    "queue": {
+      "see": "Ver la fila",
+      "full_one": "Llena · {{count}} en la fila",
+      "full_many": "Llena · {{count}} en la fila",
+      "full_other": "Llena · {{count}} en la fila",
+      "room": "Tiene espacio",
+      "computers": "Computadoras"
+    },
+    "navWhat": "Lo que cada agente está haciendo ahora, y detener lo que necesites",
+    "cards": {
+      "label": "Agentes",
+      "previous": "Agentes anteriores",
+      "next": "Más agentes"
+    },
+    "table": "Tareas",
+    "noResults": "Ninguna tarea coincide con esta búsqueda.",
+    "toggleAgent": "Mostrar u ocultar las tareas de {{name}}",
+    "using": "Usando {{names}}",
+    "activityOf": "Lo que hizo {{name}} en los últimos 30 min",
+    "activityAll": "Lo que hicieron los agentes en los últimos 30 min",
+    "panel": {
+      "steps": "Pasos",
+      "noSteps": "Todavía no hay pasos."
+    },
+    "agentPanel": {
+      "now_one": "{{count}} ahora",
+      "now_many": "{{count}} ahora",
+      "now_other": "{{count}} ahora",
+      "wells": {
+        "now": "Ahora",
+        "waiting": "Te esperan",
+        "done": "Hechas hoy"
+      },
+      "none": "{{name}} está libre ahora."
     }
   }
 }

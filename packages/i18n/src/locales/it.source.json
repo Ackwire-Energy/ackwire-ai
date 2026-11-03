@@ -30004,5 +30004,407 @@
   },
   "agentComputer.phone.chooseOnWeb": {
     "value": "Choose it on agentes.chat, in Settings › Computers."
+  },
+  "taskManager.title": {
+    "value": "Task manager"
+  },
+  "taskManager.nav": {
+    "value": "Task manager"
+  },
+  "taskManager.search": {
+    "value": "Search a task, agent or app"
+  },
+  "taskManager.working": {
+    "value": {
+      "one": "{{count}} working",
+      "other": "{{count}} working"
+    }
+  },
+  "taskManager.waiting": {
+    "value": {
+      "one": "{{count}} waits for you",
+      "other": "{{count}} wait for you"
+    }
+  },
+  "taskManager.all": {
+    "value": "All"
+  },
+  "taskManager.now": {
+    "value": "Now"
+  },
+  "taskManager.agentTasks": {
+    "value": "Tasks of {{name}}"
+  },
+  "taskManager.tasks": {
+    "value": {
+      "one": "{{count}} task",
+      "other": "{{count}} tasks"
+    }
+  },
+  "taskManager.free": {
+    "value": "Free"
+  },
+  "taskManager.columns.task": {
+    "value": "Task"
+  },
+  "taskManager.columns.state": {
+    "value": "State"
+  },
+  "taskManager.columns.using": {
+    "value": "Using now"
+  },
+  "taskManager.columns.time": {
+    "value": "Time"
+  },
+  "taskManager.columns.computer": {
+    "value": "Runs on"
+  },
+  "taskManager.sections.asked": {
+    "value": "Asked by people"
+  },
+  "taskManager.sections.background": {
+    "value": "Routines in the background"
+  },
+  "taskManager.state.working": {
+    "value": "Working"
+  },
+  "taskManager.state.ok": {
+    "value": "Waits for your ok"
+  },
+  "taskManager.state.answer": {
+    "value": "Waits for an answer"
+  },
+  "taskManager.state.computerBusy": {
+    "value": "Waits for room on the computer"
+  },
+  "taskManager.state.inLine": {
+    "value": "In line · #{{position}}"
+  },
+  "taskManager.state.computerOffline": {
+    "value": "Waits for the computer"
+  },
+  "taskManager.state.plan": {
+    "value": "Waits for the plan"
+  },
+  "taskManager.state.budget": {
+    "value": "Waits for the budget"
+  },
+  "taskManager.state.queued": {
+    "value": "Queued"
+  },
+  "taskManager.state.stopping": {
+    "value": "Stopping…"
+  },
+  "taskManager.state.stopped": {
+    "value": "Stopped"
+  },
+  "taskManager.where.dm": {
+    "value": "Direct conversation"
+  },
+  "taskManager.where.routine": {
+    "value": "Routine «{{name}}»"
+  },
+  "taskManager.where.background": {
+    "value": "In the background"
+  },
+  "taskManager.askedBy": {
+    "value": "{{name}} asked"
+  },
+  "taskManager.askedByYou": {
+    "value": "You asked"
+  },
+  "taskManager.servers": {
+    "value": "Our servers"
+  },
+  "taskManager.plan": {
+    "value": "{{done}} of {{total}} done"
+  },
+  "taskManager.program.browser": {
+    "value": "Browser"
+  },
+  "taskManager.program.screen": {
+    "value": "Computer screen"
+  },
+  "taskManager.program.terminal": {
+    "value": "Terminal"
+  },
+  "taskManager.program.agentes": {
+    "value": "agentes"
+  },
+  "taskManager.program.thinking": {
+    "value": "Thinking"
+  },
+  "taskManager.program.inside": {
+    "value": "{{program}} · {{detail}}"
+  },
+  "taskManager.actions.steps": {
+    "value": "See steps"
+  },
+  "taskManager.actions.stop": {
+    "value": "Stop"
+  },
+  "taskManager.actions.stopTask": {
+    "value": "Stop task"
+  },
+  "taskManager.actions.stopAll": {
+    "value": "Stop all"
+  },
+  "taskManager.actions.stopAllOf": {
+    "value": "Stop everything of {{name}}"
+  },
+  "taskManager.actions.open": {
+    "value": "Open in the conversation"
+  },
+  "taskManager.actions.openManager": {
+    "value": "Open in the task manager"
+  },
+  "taskManager.confirm.title": {
+    "value": {
+      "one": "Stop the task of {{name}}?",
+      "other": "Stop the {{count}} tasks of {{name}}?"
+    }
+  },
+  "taskManager.confirm.body": {
+    "value": "What was already done stays, and {{name}} is told that you stopped it."
+  },
+  "taskManager.confirm.short": {
+    "value": "{{name}} is told that you stopped it."
+  },
+  "taskManager.confirm.reason": {
+    "value": "Why? (optional)"
+  },
+  "taskManager.confirm.stop": {
+    "value": {
+      "one": "Stop",
+      "other": "Stop {{count}}"
+    }
+  },
+  "taskManager.ended.title": {
+    "value": "Ended today"
+  },
+  "taskManager.ended.done": {
+    "value": "Done"
+  },
+  "taskManager.ended.stopped": {
+    "value": "You stopped it"
+  },
+  "taskManager.ended.stoppedBy": {
+    "value": "{{name}} stopped it"
+  },
+  "taskManager.ended.failed": {
+    "value": "Couldn't finish"
+  },
+  "taskManager.ended.none": {
+    "value": "Nothing ended today yet."
+  },
+  "taskManager.empty.title": {
+    "value": "No agent is working now"
+  },
+  "taskManager.empty.body": {
+    "value": "When an agent starts a task, it shows up here."
+  },
+  "taskManager.strip.tasks": {
+    "value": {
+      "one": "{{name}} on {{count}} task",
+      "other": "{{name}} on {{count}} tasks"
+    }
+  },
+  "taskManager.strip.waiting": {
+    "value": {
+      "one": "{{count}} waits for you",
+      "other": "{{count}} wait for you"
+    }
+  },
+  "taskManager.strip.see": {
+    "value": "See"
+  },
+  "taskManager.strip.hide": {
+    "value": "Close"
+  },
+  "taskManager.strip.stopHere": {
+    "value": "Stop this one"
+  },
+  "taskManager.strip.here": {
+    "value": "here"
+  },
+  "taskManager.stopped.line": {
+    "value": "You stopped this task"
+  },
+  "taskManager.stopped.lineBy": {
+    "value": "{{name}} stopped this task"
+  },
+  "taskManager.stopped.told": {
+    "value": "{{agent}} was told and only picks it up again if someone asks."
+  },
+  "taskManager.stopped.reason": {
+    "value": "Reason: «{{reason}}»"
+  },
+  "taskManager.stopped.sayWhy": {
+    "value": "Say why"
+  },
+  "taskManager.stopped.whyPlaceholder": {
+    "value": "Want to say why? (optional)"
+  },
+  "taskManager.stopped.send": {
+    "value": "Send"
+  },
+  "taskManager.activity": {
+    "value": "Last 30 min"
+  },
+  "taskManager.failed": {
+    "value": "Couldn't stop it. Try again."
+  },
+  "taskManager.queue.see": {
+    "value": "See the line"
+  },
+  "taskManager.queue.full": {
+    "value": {
+      "one": "Full · {{count}} in line",
+      "other": "Full · {{count}} in line"
+    }
+  },
+  "taskManager.queue.room": {
+    "value": "Has room"
+  },
+  "taskManager.queue.computers": {
+    "value": "Computers"
+  },
+  "taskManager.navWhat": {
+    "value": "What each agent is doing now, and stopping what you need"
+  },
+  "taskManager.cards.label": {
+    "value": "Agents"
+  },
+  "taskManager.cards.previous": {
+    "value": "Previous agents"
+  },
+  "taskManager.cards.next": {
+    "value": "More agents"
+  },
+  "taskManager.table": {
+    "value": "Tasks"
+  },
+  "taskManager.noResults": {
+    "value": "No task matches this search."
+  },
+  "taskManager.toggleAgent": {
+    "value": "Show or hide the tasks of {{name}}"
+  },
+  "taskManager.using": {
+    "value": "Using {{names}}"
+  },
+  "taskManager.activityOf": {
+    "value": "What {{name}} did in the last 30 min"
+  },
+  "taskManager.activityAll": {
+    "value": "What the agents did in the last 30 min"
+  },
+  "taskManager.panel.steps": {
+    "value": "Steps"
+  },
+  "taskManager.panel.noSteps": {
+    "value": "No steps yet."
+  },
+  "taskManager.agentPanel.now": {
+    "value": {
+      "one": "{{count}} now",
+      "other": "{{count}} now"
+    }
+  },
+  "taskManager.agentPanel.wells.now": {
+    "value": "Now"
+  },
+  "taskManager.agentPanel.wells.waiting": {
+    "value": "Waiting for you"
+  },
+  "taskManager.agentPanel.wells.done": {
+    "value": "Done today"
+  },
+  "taskManager.agentPanel.none": {
+    "value": "{{name}} is free now."
+  },
+  "app.issues.form.agentStartsAll": {
+    "value": "{{name}} starts as soon as the task is created, with the description, the criteria and the attachments. Anything sensitive asks for your approval."
+  },
+  "app.issues.form.titleShort": {
+    "value": "Task title"
+  },
+  "app.issues.form.quickPlaceholder": {
+    "value": "Describe what's needed. Paste screenshots, drop files. Lines starting with “-” become acceptance criteria."
+  },
+  "app.issues.form.pasteHint": {
+    "value": "Paste a screenshot with {{keys}} or drop files here."
+  },
+  "app.issues.form.expand": {
+    "value": "Open the full form"
+  },
+  "app.issues.form.collapse": {
+    "value": "Back to the quick form"
+  },
+  "app.issues.form.another": {
+    "value": "Create another"
+  },
+  "app.issues.form.addCriterion": {
+    "value": "Add a criterion"
+  },
+  "app.issues.form.removeCriterion": {
+    "value": "Remove the criterion"
+  },
+  "app.issues.form.drop": {
+    "value": "Drop to attach to the task"
+  },
+  "app.issues.form.dropText": {
+    "value": "Photos, videos, PDFs, spreadsheets… up to {{max}} MB each."
+  },
+  "app.issues.form.createHint": {
+    "value": "{{keys}} creates the task"
+  },
+  "app.issues.discussion": {
+    "value": "Discussion"
+  },
+  "app.issues.noComments": {
+    "value": "No comments yet."
+  },
+  "app.issues.tabs.label": {
+    "value": "Task sections"
+  },
+  "app.issues.tabs.details": {
+    "value": "Details"
+  },
+  "app.issues.tabs.files": {
+    "value": "Attachments"
+  },
+  "app.issues.tabs.history": {
+    "value": "History"
+  },
+  "app.issues.files.title": {
+    "value": "Attachments"
+  },
+  "app.issues.files.add": {
+    "value": "Add files"
+  },
+  "app.issues.files.addHint": {
+    "value": "or drop them here"
+  },
+  "app.issues.files.grid": {
+    "value": "Grid"
+  },
+  "app.issues.files.empty": {
+    "value": "No attachments yet. Drop files here or paste a screenshot."
+  },
+  "app.issues.files.fromCreation": {
+    "value": "At creation · {{when}}"
+  },
+  "app.issues.files.fromComment": {
+    "value": "{{name}}'s comment · {{when}}"
+  },
+  "app.issues.files.linked": {
+    "value": "Linked by {{name}}"
+  },
+  "app.issues.history.commented": {
+    "value": "commented"
+  },
+  "app.issues.history.commentedFiles": {
+    "value": "commented with attachments"
   }
 }

@@ -4662,7 +4662,19 @@
       "criteriaFound_many": "{{count}} critères d'acceptation",
       "criteriaFound_other": "{{count}} critères d'acceptation",
       "agentStarts": "{{name}} commence dès que la tâche est créée. Tout ce qui est sensible demande votre approbation.",
-      "agentStarts_female": "{{name}} commence dès que la tâche est créée. Tout ce qui est sensible demande votre approbation."
+      "agentStarts_female": "{{name}} commence dès que la tâche est créée. Tout ce qui est sensible demande votre approbation.",
+      "agentStartsAll": "{{name}} commence dès que la tâche est créée, avec la description, les critères et les pièces jointes. Tout ce qui est sensible demande votre approbation.",
+      "titleShort": "Titre de la tâche",
+      "quickPlaceholder": "Décrivez le besoin. Collez des captures, glissez des fichiers. Les lignes commençant par « - » deviennent des critères d'acceptation.",
+      "pasteHint": "Collez une capture avec {{keys}} ou glissez des fichiers ici.",
+      "expand": "Ouvrir le formulaire complet",
+      "collapse": "Revenir au formulaire rapide",
+      "another": "En créer une autre",
+      "addCriterion": "Ajouter un critère",
+      "removeCriterion": "Retirer le critère",
+      "drop": "Déposez pour joindre à la tâche",
+      "dropText": "Photos, vidéos, PDF, tableurs… jusqu'à {{max}} Mo chacun.",
+      "createHint": "{{keys}} crée la tâche"
     },
     "back": "Tâches",
     "notFound": "Cette tâche n'existe pas ou vous n'y avez pas accès.",
@@ -4688,6 +4700,8 @@
     "asked_female": "Demande envoyée. {{name}} publie l'avancement ici. Votre conversation reste dans votre message direct.",
     "activity": "Activité",
     "noActivity": "Rien pour l'instant.",
+    "discussion": "Échanges",
+    "noComments": "Aucun commentaire pour l'instant.",
     "comment": "Commenter la tâche",
     "commentPlaceholder": "Commentaire · utilisez @ pour appeler un agent",
     "send": "Commenter",
@@ -4703,6 +4717,26 @@
     "noLinks": "Rien de lié pour l'instant.",
     "openConversation": "Voir la conversation",
     "labels": "Étiquettes",
+    "tabs": {
+      "label": "Parties de la tâche",
+      "details": "Détails",
+      "files": "Pièces jointes",
+      "history": "Historique"
+    },
+    "files": {
+      "title": "Pièces jointes",
+      "add": "Ajouter des fichiers",
+      "addHint": "ou glissez-les ici",
+      "grid": "Grille",
+      "empty": "Aucune pièce jointe pour l'instant. Glissez des fichiers ici ou collez une capture.",
+      "fromCreation": "À la création · {{when}}",
+      "fromComment": "Commentaire de {{name}} · {{when}}",
+      "linked": "Lié par {{name}}"
+    },
+    "history": {
+      "commented": "a commenté",
+      "commentedFiles": "a commenté avec des pièces jointes"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "a arrêté le travail en arrière-plan",
@@ -12996,6 +13030,155 @@
       "upright": "Tourner à la verticale",
       "message": "Écrire à {{name}}",
       "chooseOnWeb": "Choisissez-le sur agentes.chat, dans Paramètres › Ordinateurs."
+    }
+  },
+  "taskManager": {
+    "title": "Gestionnaire des tâches",
+    "nav": "Gestionnaire des tâches",
+    "search": "Rechercher une tâche, un agent ou une app",
+    "working_one": "{{count}} au travail",
+    "working_many": "{{count}} au travail",
+    "working_other": "{{count}} au travail",
+    "waiting_one": "{{count}} vous attend",
+    "waiting_many": "{{count}} vous attendent",
+    "waiting_other": "{{count}} vous attendent",
+    "all": "Tous",
+    "now": "En ce moment",
+    "agentTasks": "Tâches de {{name}}",
+    "tasks_one": "{{count}} tâche",
+    "tasks_many": "{{count}} tâches",
+    "tasks_other": "{{count}} tâches",
+    "free": "Libre",
+    "columns": {
+      "task": "Tâche",
+      "state": "État",
+      "using": "Utilise maintenant",
+      "time": "Durée",
+      "computer": "Tourne sur"
+    },
+    "sections": {
+      "asked": "Demandées par des personnes",
+      "background": "Routines en arrière-plan"
+    },
+    "state": {
+      "working": "Au travail",
+      "ok": "Attend votre accord",
+      "answer": "Attend une réponse",
+      "computerBusy": "Attend de la place sur l'ordinateur",
+      "inLine": "Dans la file · n° {{position}}",
+      "computerOffline": "Attend l'ordinateur",
+      "plan": "Attend l'abonnement",
+      "budget": "Attend le budget",
+      "queued": "En file d'attente",
+      "stopping": "Arrêt en cours…",
+      "stopped": "Arrêtée"
+    },
+    "where": {
+      "dm": "Conversation directe",
+      "routine": "Routine « {{name}} »",
+      "background": "En arrière-plan"
+    },
+    "askedBy": "Demande de {{name}}",
+    "askedByYou": "Votre demande",
+    "servers": "Nos serveurs",
+    "plan": "{{done}} sur {{total}} faits",
+    "program": {
+      "browser": "Navigateur",
+      "screen": "Écran de l'ordinateur",
+      "terminal": "Terminal",
+      "agentes": "agentes",
+      "thinking": "Réflexion",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "Voir les étapes",
+      "stop": "Arrêter",
+      "stopTask": "Arrêter la tâche",
+      "stopAll": "Tout arrêter",
+      "stopAllOf": "Tout arrêter pour {{name}}",
+      "open": "Ouvrir dans la conversation",
+      "openManager": "Ouvrir dans le gestionnaire des tâches"
+    },
+    "confirm": {
+      "title_one": "Arrêter la tâche de {{name}} ?",
+      "title_many": "Arrêter les {{count}} tâches de {{name}} ?",
+      "title_other": "Arrêter les {{count}} tâches de {{name}} ?",
+      "body": "Ce qui a déjà été fait est conservé, et {{name}} saura que vous avez arrêté.",
+      "short": "{{name}} saura que vous avez arrêté.",
+      "reason": "Pourquoi ? (facultatif)",
+      "stop_one": "Arrêter",
+      "stop_many": "Arrêter {{count}}",
+      "stop_other": "Arrêter {{count}}"
+    },
+    "ended": {
+      "title": "Terminées aujourd'hui",
+      "done": "Terminée",
+      "stopped": "Vous l'avez arrêtée",
+      "stoppedBy": "{{name}} l'a arrêtée",
+      "failed": "N'a pas abouti",
+      "none": "Rien n'est encore terminé aujourd'hui."
+    },
+    "empty": {
+      "title": "Aucun agent ne travaille en ce moment",
+      "body": "Quand un agent commence une tâche, elle apparaît ici."
+    },
+    "strip": {
+      "tasks_one": "{{name}} sur {{count}} tâche",
+      "tasks_many": "{{name}} sur {{count}} tâches",
+      "tasks_other": "{{name}} sur {{count}} tâches",
+      "waiting_one": "{{count}} vous attend",
+      "waiting_many": "{{count}} vous attendent",
+      "waiting_other": "{{count}} vous attendent",
+      "see": "Voir",
+      "hide": "Fermer",
+      "stopHere": "Arrêter celle-ci",
+      "here": "ici"
+    },
+    "stopped": {
+      "line": "Vous avez arrêté cette tâche",
+      "lineBy": "{{name}} a arrêté cette tâche",
+      "told": "{{agent}} a reçu l'avis et ne la reprend que si quelqu'un le demande.",
+      "reason": "Raison : « {{reason}} »",
+      "sayWhy": "Dire pourquoi",
+      "whyPlaceholder": "Vous voulez dire pourquoi ? (facultatif)",
+      "send": "Envoyer"
+    },
+    "activity": "30 dernières min",
+    "failed": "Impossible d'arrêter. Réessayez.",
+    "queue": {
+      "see": "Voir la file",
+      "full_one": "Plein · {{count}} dans la file",
+      "full_many": "Plein · {{count}} dans la file",
+      "full_other": "Plein · {{count}} dans la file",
+      "room": "A de la place",
+      "computers": "Ordinateurs"
+    },
+    "navWhat": "Ce que chaque agent fait en ce moment, et arrêter ce qu'il faut",
+    "cards": {
+      "label": "Agents",
+      "previous": "Agents précédents",
+      "next": "Plus d'agents"
+    },
+    "table": "Tâches",
+    "noResults": "Aucune tâche ne correspond à cette recherche.",
+    "toggleAgent": "Afficher ou masquer les tâches de {{name}}",
+    "using": "Utilise {{names}}",
+    "activityOf": "Ce que {{name}} a fait ces 30 dernières min",
+    "activityAll": "Ce que les agents ont fait ces 30 dernières min",
+    "panel": {
+      "steps": "Étapes",
+      "noSteps": "Aucune étape pour l'instant."
+    },
+    "agentPanel": {
+      "now_one": "{{count}} en cours",
+      "now_many": "{{count}} en cours",
+      "now_other": "{{count}} en cours",
+      "wells": {
+        "now": "En cours",
+        "waiting": "Vous attend",
+        "done": "Terminées aujourd'hui"
+      },
+      "none": "{{name}} est libre en ce moment."
     }
   }
 }

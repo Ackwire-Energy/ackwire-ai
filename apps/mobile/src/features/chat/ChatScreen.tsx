@@ -116,6 +116,8 @@ import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { useDmStatusLine, usePresenceWord } from "../status/hooks";
 import { PersonStatusCard } from "../status/StatusCard";
+import { AgentTasksButton, useDmAgentTasks } from "../task-manager/AgentTasksButton";
+import { agentTasksHref, tasksBadge } from "../task-manager/logic";
 import { useVoiceComposer } from "../voice/useVoiceComposer";
 import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
@@ -425,6 +427,8 @@ function Chat({
       },
     };
   }, [busyRuns, stoppable, stopRun, dir.agentById, t]);
+  // An agent's DM header counts its tasks, here and elsewhere (ADR 0128); a tap opens them, pushed like a thread.
+  const agentTasks = useDmAgentTasks(member && !isThread ? dmAgentId : null);
 
   // ── Agents' blocks ──
   // An agent at work in its browser: its card in the conversation, open on demand.
@@ -1314,7 +1318,7 @@ function Chat({
         subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
-        extraActions={(dmAgentId ? 1 : 0) + (queueShown ? 1 : 0)}
+        extraActions={(dmAgentId ? 1 : 0) + (queueShown ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
         label={
@@ -1357,12 +1361,23 @@ function Chat({
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
-  // An agent's DM also opens its computer (as the web's DM header), for whoever may watch it: one entry, the line
-  // while turns wait for the computer (the way on to it inside), else the computer.
+  // An agent's DM also opens its tasks while it has some (ADR 0128), pushed like a thread, and its computer (as the
+  // web's DM header) for whoever may watch it: one entry, the line while turns wait for the computer (the way on to
+  // it inside), else the computer.
   const dmComputer = dmAgentId && !isThread ? { agentId: dmAgentId, onOpen: leavePlace } : undefined;
   const right =
     (isThread && info) || dm || channel ? (
       <>
+        {dmAgentId && agentTasks ? (
+          <AgentTasksButton
+            agentId={dmAgentId}
+            view={agentTasks}
+            onPress={() => {
+              leavePlace();
+              router.push(agentTasksHref(dmAgentId, { channelId, threadId }));
+            }}
+          />
+        ) : null}
         {queueShown && barQueue && queueMachineId ? (
           dmComputer ? (
             <DmQueueButton

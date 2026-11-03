@@ -7,7 +7,7 @@ import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
-import { agentOnlyNoticeSql } from "./notices";
+import { quietNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
 import { getMembership, requirePermission } from "./organizations";
 
@@ -302,8 +302,8 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
           isNull(messages.deletedAt),
           // A routine's call is hidden in the chat (only the agent's answer shows), so not the preview either.
           sql`not (${messages.authorType} = 'person' and ${messages.meta}->'routine' is not null)`,
-          // Nor what only its agent reads.
-          sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
+          // Nor what only its agent reads, nor a receipt like a stopped task (ADR 0128).
+          sql`not ${quietNoticeSql(sql`${messages.meta}`)}`,
           // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: the reply is the preview.
           sql`${messages.meta}->>'mediaAfter' is null`,
         ),
@@ -322,7 +322,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
             eq(messages.channelId, id),
             isNull(messages.deletedAt),
             sql`(${messages.authorUserId} is null or ${messages.authorUserId} <> ${actorId})`,
-            sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
+            sql`not ${quietNoticeSql(sql`${messages.meta}`)}`,
             gt(messages.createdAt, readAt.get(id) ?? new Date(0)),
             // Nor one more unread (ADR 0091): it is silent.
             sql`${messages.meta}->>'mediaAfter' is null`,

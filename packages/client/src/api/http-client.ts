@@ -178,7 +178,9 @@ import type {
   StorageMigration,
   StorageTestResult,
   SuggestedAi,
+  TaskManagerView,
   TaskOutput,
+  TaskSteps,
   Team,
   ThreadFilters,
   ThreadFollow,
@@ -274,6 +276,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     working: {
       list: async (orgId) => (await request<{ runs: WorkingRun[] }>(`${org(orgId)}/active-runs`)).runs,
+      taskManager: (orgId, since) =>
+        request<TaskManagerView>(`${org(orgId)}/task-manager`, { query: since ? { since } : {} }),
+      taskSteps: (orgId, runId) => request<TaskSteps>(`${org(orgId)}/task-manager/${enc(runId)}/steps`),
     },
     mail: {
       providers: (orgId) => request<MailProviders>(`${org(orgId)}/mail/providers`),
@@ -649,7 +654,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       runs: async (orgId, filter = {}) =>
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
-      cancelRun: (orgId, runId) => request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, { json: {} }),
+      cancelRun: (orgId, runId, reason) =>
+        request<void>(`${org(orgId)}/runs/${enc(runId)}/cancel`, { json: reason ? { reason } : {} }),
+      stopReason: (orgId, runId, reason) =>
+        request<void>(`${org(orgId)}/runs/${enc(runId)}/stop-reason`, { json: { reason } }),
       continueRun: (orgId, runId) =>
         request<{ runId: string }>(`${org(orgId)}/runs/${enc(runId)}/continue`, { json: {} }),
       activeRuns: async (orgId, channelId) => {

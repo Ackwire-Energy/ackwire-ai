@@ -1230,6 +1230,10 @@
     "anyAgent": "Tous les agents",
     "create": "Créer"
   },
+  "taskManager": {
+    "loadFailed": "Impossible de charger les tâches.",
+    "gone": "Cette tâche n'est plus là."
+  },
   "homeNow": {
     "working_one": "{{count}} au travail",
     "working_many": "{{count}} au travail",

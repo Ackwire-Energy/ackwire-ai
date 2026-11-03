@@ -215,6 +215,11 @@ export function issueRoutes(deps: AppDeps) {
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
             parentIssueId: z.uuid().nullable().optional(),
+            attachmentIds: z
+              .array(z.uuid())
+              .max(10)
+              .optional()
+              .openapi({ description: "Drive files uploaded from the new-issue box (linked to the issue)." }),
           }),
         ),
       },
