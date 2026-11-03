@@ -4228,7 +4228,6 @@
       "on": "le {{date}}"
     },
     "waitingTitle": "Ils vous attendent",
-    "more": "Plus d'actions pour {{name}}",
     "remove": {
       "item": "Retirer de l'espace de travail",
       "leave": "Quitter l'espace de travail",

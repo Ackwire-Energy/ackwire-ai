@@ -4333,7 +4333,6 @@
       "on": "dnia {{date}}"
     },
     "waitingTitle": "Czeka na ciebie",
-    "more": "Więcej akcji: {{name}}",
     "remove": {
       "item": "Usuń z przestrzeni roboczej",
       "leave": "Opuść przestrzeń roboczą",

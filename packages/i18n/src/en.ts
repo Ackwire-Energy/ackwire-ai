@@ -3937,7 +3937,6 @@ export const en = {
     /** When something happened, after a verb: "Asked through the link on Oct 22". */
     when: { on: "on {{date}}" },
     waitingTitle: "Waiting for you",
-    more: "More actions for {{name}}",
     // Remove from workspace, or leaving it: the confirmation says what goes with the person, from the server's preview.
     remove: {
       item: "Remove from workspace",

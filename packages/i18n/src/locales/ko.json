@@ -3905,7 +3905,6 @@
       "on": "{{date}}"
     },
     "waitingTitle": "내 확인 대기",
-    "more": "{{name}}의 추가 작업",
     "remove": {
       "item": "워크스페이스에서 내보내기",
       "leave": "워크스페이스 나가기",

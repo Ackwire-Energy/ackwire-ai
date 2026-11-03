@@ -4023,7 +4023,6 @@
       "on": "{{date}} tarihinde"
     },
     "waitingTitle": "Sizi bekliyor",
-    "more": "{{name}} için diğer işlemler",
     "remove": {
       "item": "Çalışma alanından çıkar",
       "leave": "Çalışma alanından ayrıl",

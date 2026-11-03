@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Member } from "@agenteschat/client";
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, meAsAdmin, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -38,11 +38,20 @@ async function members(state = seedState()) {
   return { ...r, state };
 }
 
-/** The labels of a person's "…" menu. */
+/** A person's name on Members: it opens their card, and Shift+F10 on it (or a right click) opens their menu. */
+const nameOf = (name: string) => {
+  const found = screen()
+    .getAllByRole("button", { name: `Perfil de ${name}` })
+    .find((b) => !b.hasAttribute("aria-hidden") && b.closest(".members-person"));
+  if (!found) throw new Error(`no row for ${name}`);
+  return found;
+};
+
+/** The labels of a person's menu on their Members row. */
 async function menuOf(name: string) {
-  const trigger = screen().getByRole("button", { name: `Mais ações para ${name}` });
+  const trigger = nameOf(name);
   trigger.focus();
-  await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+  await act(async () => fireEvent.keyDown(trigger, { key: "F10", shiftKey: true }));
   await settle(2);
   const items = screen()
     .queryAllByRole("menuitem")
@@ -91,9 +100,9 @@ test("the confirmation says what goes with them; removing takes the row away", a
   const state = seedState();
   state.removalLosesPlan = { "u-joao": [{ id: ADA_ID, name: "Ada" }] };
   const { state: s } = await members(state);
-  const trigger = screen().getByRole("button", { name: "Mais ações para João" });
+  const trigger = nameOf("João");
   trigger.focus();
-  await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+  await act(async () => fireEvent.keyDown(trigger, { key: "F10", shiftKey: true }));
   await settle(2);
   await click(screen().getByRole("menuitem", { name: "Remover do workspace" }));
   await settle(4);
@@ -107,11 +116,33 @@ test("the confirmation says what goes with them; removing takes the row away", a
   await settle(6);
   expect(s.calls.some((c) => c.method === "orgs.removeMember" && c.args[1] === "u-joao")).toBe(true);
   expect(text()).toContain("João não faz mais parte da Acme.");
-  expect(screen().queryByRole("button", { name: "Mais ações para João" })).toBeNull();
+  expect(document.querySelector(".members-person")?.closest(".ac-list")?.textContent).not.toContain("João");
   expect(s.agents.filter((a) => a.id === ADA_ID || a.id === ATLAS_ID).map((a) => a.ownerUserId)).toEqual([
     "u-walter",
     "u-walter",
   ]);
+});
+
+test("the row: @handle beside the email, a DM button by when they were here, no … of its own", async () => {
+  const { router } = await members();
+  const row = nameOf("João").closest(".members-person") as HTMLElement;
+  expect(row.querySelector(".members-person__ids")?.textContent).toBe("@joaojoao@acme.com.br");
+  expect(within(row).queryByRole("button", { name: /^Mais ações/ })).toBeNull();
+  await click(within(row).getByRole("button", { name: "Mensagem para João" }));
+  await settle(4);
+  expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/person/u-joao`);
+});
+
+test("the card a name opens has Remover do workspace in its ⋯, with the same dialog", async () => {
+  await members();
+  await click(nameOf("João"));
+  await settle(4);
+  const card = screen().getByRole("dialog", { name: "Perfil" });
+  await act(async () => fireEvent.keyDown(within(card).getByRole("button", { name: "Mais" }), { key: "Enter" }));
+  await settle(2);
+  await click(screen().getByRole("menuitem", { name: "Remover do workspace" }));
+  await settle(4);
+  expect(screen().getByRole("dialog", { name: "Remover João da Acme?" })).toBeTruthy();
 });
 
 test("taken out while the workspace is open: a screen that says so, at once", async () => {

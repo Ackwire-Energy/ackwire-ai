@@ -9903,9 +9903,6 @@
   "members.waitingTitle": {
     "value": "Waiting for you"
   },
-  "members.more": {
-    "value": "More actions for {{name}}"
-  },
   "members.remove.item": {
     "value": "Remove from workspace"
   },

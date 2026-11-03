@@ -1,8 +1,17 @@
 import type { Agent, Channel } from "@agenteschat/client";
-import { keys, useArchiveChannel, useDms, useMarkChannelRead, useMuteChannel } from "@agenteschat/client";
+import {
+  keys,
+  useArchiveChannel,
+  useDms,
+  useMarkChannelRead,
+  useMuteChannel,
+  usePeople,
+  useRoles,
+} from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
+import { leaves, removes } from "@agenteschat/client/lib/roles";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -14,6 +23,7 @@ import { useLiveStore } from "@/realtime/context";
 import { useOpenAgentPanel } from "./agent-panel-context";
 import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
+import { useRemoveMemberDialog } from "./RemoveMember";
 import { isStoppable, useStopRun } from "./StopRun";
 
 /*
@@ -276,21 +286,28 @@ export function useAgentMenu() {
 }
 
 /**
- * A person (sidebar row, their face or name in a message, their card's ⋯): DM, their card (`openCard`), mention, copy @,
- * mark read, their id.
+ * A person (sidebar row, Members, their face or name in a message, their card's ⋯): DM, their card (`openCard`),
+ * mention, copy @, mark read, Remover do workspace for who may (Sair do workspace on one's own), their id.
  */
 export function usePersonMenu() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const navigate = useNavigate();
   const dms = useDms(org.id).data;
+  const people = usePeople(org.id).data ?? [];
+  const roles = useRoles(org.id).data?.roles ?? [];
+  const remove = useRemoveMemberDialog();
   const markRead = useMarkRead();
   const copyHandle = useCopyHandle();
   const copyId = useCopyId();
   const mention = useMention();
+  const viewer = { role: org.role, rank: org.rank, userId: me.user.id, permissions: org.permissions };
   return (p: { userId: string; name: string; handle?: string | null }, openCard?: () => void): MenuEntry[] => {
     const dm = dms?.find((d) => d.with.id === p.userId);
     const handle = p.handle ?? undefined;
+    const mine = p.userId === me.user.id;
+    const person = people.find((x) => x.userId === p.userId);
+    const out = remove && person && (mine ? leaves(org, people) : removes(viewer, person, roles));
     return [
       { kind: "header", label: p.name },
       ...(p.userId !== me.user.id
@@ -313,6 +330,19 @@ export function usePersonMenu() {
       ...mention(handle),
       ...copyHandle(handle),
       ...markRead(dm?.channelId, dm?.unread ?? 0),
+      ...(out
+        ? ([
+            { kind: "separator" },
+            {
+              kind: "item",
+              id: "remove",
+              label: mine ? t("members.remove.leave") : t("members.remove.item"),
+              icon: mine ? "arrowRight" : "trash",
+              danger: true,
+              run: () => remove(p),
+            },
+          ] satisfies MenuEntry[])
+        : []),
       ...copyId(p.userId),
     ];
   };

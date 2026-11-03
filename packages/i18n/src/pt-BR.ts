@@ -4062,7 +4062,6 @@ export const ptBR = {
     /** When something happened, after a verb: "Pediu pelo link em 22 out". */
     when: { on: "em {{date}}" },
     waitingTitle: "Esperando você",
-    more: "Mais ações para {{name}}",
     // Remover do workspace, or leaving it: the confirmation says what goes with the person, from the server's preview.
     remove: {
       item: "Remover do workspace",

@@ -3952,7 +3952,6 @@
       "on": "于 {{date}}"
     },
     "waitingTitle": "等你处理",
-    "more": "{{name}} 的更多操作",
     "remove": {
       "item": "从工作区移除",
       "leave": "离开工作区",

@@ -153,7 +153,7 @@ describe("a person's card", () => {
     const items = within(screen().getByRole("menu", { name: "Mais" }))
       .getAllByRole("menuitem")
       .map((i) => i.textContent);
-    expect(items).toEqual(["Mensagem direta", "Mencionar", "Copiar @joao", "Copiar ID"]);
+    expect(items).toEqual(["Mensagem direta", "Mencionar", "Copiar @joao", "Remover do workspace", "Copiar ID"]);
     await click(within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: "Copiar ID" }));
     expect(copied.at(-1)).toBe("u-joao");
   });

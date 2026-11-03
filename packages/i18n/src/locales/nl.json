@@ -4104,7 +4104,6 @@
       "on": "op {{date}}"
     },
     "waitingTitle": "Wacht op jou",
-    "more": "Meer acties voor {{name}}",
     "remove": {
       "item": "Uit de werkruimte verwijderen",
       "leave": "Werkruimte verlaten",

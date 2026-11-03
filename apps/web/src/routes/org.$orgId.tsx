@@ -19,6 +19,7 @@ import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
 import { PushOpens } from "@/components/NotificationOpen";
 import { OrgProvider } from "@/components/org-context";
+import { RemoveMemberProvider } from "@/components/RemoveMember";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
 import { DeletingScreen, HoldBanner, SuspendedScreen } from "@/components/Standing";
@@ -140,35 +141,37 @@ function OrgLayout() {
               {inDesktopApp() && <MenuBarActions orgId={membership.id} />}
               {/* One invite dialog for the workspace (ADR 0090): the menu, ⌘K, Members and a channel open it. */}
               <InviteDialogProvider>
-                <div className="shell">
-                  <RefetchBar />
-                  <CommandMenu />
-                  {!focused && (
-                    <>
-                      <NavScrim />
-                      <Sidebar />
-                      <ShellBar />
-                    </>
-                  )}
-                  {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
+                <RemoveMemberProvider>
+                  <div className="shell">
+                    <RefetchBar />
+                    <CommandMenu />
+                    {!focused && (
+                      <>
+                        <NavScrim />
+                        <Sidebar />
+                        <ShellBar />
+                      </>
+                    )}
+                    {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
                     the agents run on went offline), then the page. */}
-                  <div className="shell__work">
-                    {!focused && <HoldBanner />}
-                    {!focused && <ComputerSetupNotice />}
-                    {!focused && <OutageNotices />}
-                    <div className="shell__pages">
-                      <ConnectAiProvider>
-                        <ComputerDialogProvider>
-                          <DetailsHost>
-                            <PushOpens />
-                            <WebPushAsk />
-                            <Outlet />
-                          </DetailsHost>
-                        </ComputerDialogProvider>
-                      </ConnectAiProvider>
+                    <div className="shell__work">
+                      {!focused && <HoldBanner />}
+                      {!focused && <ComputerSetupNotice />}
+                      {!focused && <OutageNotices />}
+                      <div className="shell__pages">
+                        <ConnectAiProvider>
+                          <ComputerDialogProvider>
+                            <DetailsHost>
+                              <PushOpens />
+                              <WebPushAsk />
+                              <Outlet />
+                            </DetailsHost>
+                          </ComputerDialogProvider>
+                        </ConnectAiProvider>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </RemoveMemberProvider>
               </InviteDialogProvider>
             </NavDrawerProvider>
           </ArtifactViewerProvider>

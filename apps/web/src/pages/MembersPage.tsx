@@ -31,7 +31,7 @@ import {
 import { approvalNews, JOIN_NOTE_MAX, JOIN_REASON_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
-import { grants, leaves, removes, rolesOf } from "@agenteschat/client/lib/roles";
+import { grants, rolesOf } from "@agenteschat/client/lib/roles";
 import { isEmail } from "@agenteschat/client/lib/text";
 import {
   Alert,
@@ -57,12 +57,11 @@ import {
   PlanMeter,
   Textarea,
 } from "@agenteschat/ui";
-import { Link, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { MenuEntries } from "@/components/DesktopMenus";
 import { usePersonMenu } from "@/components/entity-menus";
 import { useFilterCopy } from "@/components/filters";
 import { useCopied } from "@/components/invite/copied";
@@ -70,11 +69,11 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MembersFull } from "@/components/Limits";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { RemoveMemberDialog } from "@/components/RemoveMember";
+import { ProfileTrigger } from "@/components/ProfileCard";
 import { RolesPicker } from "@/components/roles/RolesPicker";
 import { RoleChip } from "@/components/roles/RolesSection";
 import { useDirectory } from "@/hooks/useDirectory";
-import { copyText, type MenuEntry, tidy } from "@/lib/context-menu";
+import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { TOAST_MS, useToast } from "@/lib/toast";
@@ -134,30 +133,8 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const month = formatMonth(i18n.language, new Date());
   const [roles, setRoles] = useState<string[]>([]);
   const personEntries = usePersonMenu();
-  const [removing, setRemoving] = useState<Person | null>(null);
-  const viewer = { role: org.role, rank: org.rank, userId: me.user.id, permissions: org.permissions };
+  const navigate = useNavigate();
   const allPeople = peopleQuery.data ?? [];
-  // The person's menu (right click and "…"), and Remover do workspace for whoever may, or Sair on one's own row.
-  const entriesOf = (m: Person): MenuEntry[] => {
-    const mine = m.userId === me.user.id;
-    const out = mine ? leaves(org, allPeople) : removes(viewer, m, orgRoles);
-    return tidy([
-      ...personEntries(m),
-      { kind: "separator" },
-      ...(out
-        ? ([
-            {
-              kind: "item",
-              id: "remove",
-              label: mine ? t("members.remove.leave") : t("members.remove.item"),
-              icon: mine ? "arrowRight" : "trash",
-              danger: true,
-              run: () => setRemoving(m),
-            },
-          ] satisfies MenuEntry[])
-        : []),
-    ]);
-  };
   // `?request=…&do=approve|deny`: the admins' email opens that request here.
   const search = useSearch({ strict: false }) as { request?: string; do?: string };
   const filterCopy = useFilterCopy();
@@ -231,29 +208,58 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
             // The server says who is below whom; here the "+" shows when there's anything to give.
             const gives = manage && (m.role !== "owner" || org.role === "owner") && orgRoles.some((r) => r.givable);
             return (
-              <div key={m.userId} className="ac-list__row members-person" {...entityMenu(() => entriesOf(m))}>
-                <Avatar
-                  size="md"
-                  name={m.name}
-                  imageUrl={m.image}
-                  presence={m.presence}
-                  presenceLabel={t(`presence.${m.presence}`)}
-                />
+              <div key={m.userId} className="ac-list__row members-person" {...entityMenu(() => personEntries(m))}>
+                <ProfileTrigger
+                  actor={{ type: "person", id: m.userId }}
+                  label={t("profile.of", { name: m.name })}
+                  decorative
+                >
+                  <Avatar
+                    size="md"
+                    name={m.name}
+                    imageUrl={m.image}
+                    presence={m.presence}
+                    presenceLabel={t(`presence.${m.presence}`)}
+                  />
+                </ProfileTrigger>
                 <span className="list-col">
-                  <span style={{ fontWeight: 600 }}>
+                  <ProfileTrigger
+                    actor={{ type: "person", id: m.userId }}
+                    label={t("profile.of", { name: m.name })}
+                    className="profile-trigger--name members-person__name"
+                  >
                     {m.name}
                     {isMe ? t("common.youSuffix") : ""}
-                  </span>
-                  <span className="small muted" style={{ overflowWrap: "anywhere" }}>
-                    {m.email}
+                  </ProfileTrigger>
+                  <span className="small muted members-person__ids">
+                    {m.handle && <span>@{m.handle}</span>}
+                    <span>{m.email}</span>
                   </span>
                 </span>
-                <span className="small muted members-person__seen">
-                  {m.online
-                    ? t("members.activeNow")
-                    : m.lastSeenAt
-                      ? t("members.seen", { when: relativeTime(t, i18n.language, m.lastSeenAt) })
-                      : t("members.joined", { when: formatShortDate(i18n.language, m.joinedAt) })}
+                <span className="members-person__end">
+                  <span className="small muted members-person__seen">
+                    {m.online
+                      ? t("members.activeNow")
+                      : m.lastSeenAt
+                        ? t("members.seen", { when: relativeTime(t, i18n.language, m.lastSeenAt) })
+                        : t("members.joined", { when: formatShortDate(i18n.language, m.joinedAt) })}
+                  </span>
+                  {!isMe && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      iconOnly
+                      icon="message"
+                      aria-label={t("profile.messageTo", { name: m.name })}
+                      title={t("profile.messageTo", { name: m.name })}
+                      onClick={() =>
+                        void navigate({
+                          to: "/org/$orgId/dm/person/$userId",
+                          params: { orgId: org.id, userId: m.userId },
+                        })
+                      }
+                    />
+                  )}
                 </span>
                 <span className="members-roles">
                   {m.role === "owner" && (
@@ -287,26 +293,10 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                     />
                   )}
                 </span>
-                <Menu
-                  align="end"
-                  label={t("members.more", { name: m.name })}
-                  trigger={
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      iconOnly
-                      icon="more"
-                      aria-label={t("members.more", { name: m.name })}
-                    />
-                  }
-                >
-                  <MenuEntries entries={entriesOf(m)} />
-                </Menu>
               </div>
             );
           })}
         </List>
-        <RemoveMemberDialog person={removing} onClose={() => setRemoving(null)} />
       </section>
 
       <section aria-labelledby="sec-agents" className="section section--tight">

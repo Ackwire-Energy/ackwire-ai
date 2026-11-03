@@ -125,12 +125,12 @@ describe("an agent", () => {
 });
 
 describe("a person", () => {
-  test("their sidebar row: DM, copy @ and copy id", async () => {
+  test("their sidebar row: DM, copy @, remove (I may) and copy id", async () => {
     await go(undefined, withDms());
     const row = nav().querySelector('a[href$="/dm/person/u-joao"]');
     if (!row) throw new Error("no row for João");
     await rightClick(row);
-    expect(items()).toEqual(["Mensagem direta", "Copiar @joao", "Copiar ID"]);
+    expect(items()).toEqual(["Mensagem direta", "Copiar @joao", "Remover do workspace", "Copiar ID"]);
     await pick("Copiar ID");
     expect(copied.at(-1)).toBe("u-joao");
   });

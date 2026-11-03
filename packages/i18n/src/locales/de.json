@@ -4060,7 +4060,6 @@
       "on": "am {{date}}"
     },
     "waitingTitle": "Wartet auf dich",
-    "more": "Weitere Aktionen für {{name}}",
     "remove": {
       "item": "Aus dem Workspace entfernen",
       "leave": "Workspace verlassen",
