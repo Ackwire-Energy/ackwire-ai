@@ -19,6 +19,7 @@ import {
   getTeam,
   insertMessageWithRuns,
   inviteMany,
+  listAgents,
   listRoutines,
   NO_PERSON,
   NotFoundError,
@@ -32,6 +33,7 @@ import {
   setInvitationRoles,
   setMemberRoles,
   speakerFor,
+  updateAgent,
   ValidationError,
 } from "../src";
 import { addMember, addUser, type Fixture, makeAdmin, SECRET, setup } from "./fixtures";
@@ -58,6 +60,40 @@ const runsOf = async (messageId: string) =>
   (await f.db.select().from(schema.agentRuns)).filter((r) => r.triggerMessageId === messageId);
 
 describe("who can talk to the agent", () => {
+  test("an admin sees and manages another admin's agent kept to a role they don't hold; a member outside sees its card", async () => {
+    const { bia } = await world();
+    const walt = await addMember(f.db, f.org.id, "admin", "walt");
+    const caio = await addMember(f.db, f.org.id, "admin", "caio");
+    const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
+    await f.db.update(schema.agents).set({ ownerUserId: walt.id }).where(eq(schema.agents.id, f.agent.id));
+    await setAgentAudience(f.db, walt.id, f.org.id, f.agent.id, { mode: "people", userIds: [], roleIds: [support.id] });
+    const card = async (userId: string) =>
+      (await getTeam(f.db, userId, f.org.id)).agents.find((a) => a.id === f.agent.id);
+
+    for (const admin of [caio, f.owner]) {
+      expect((await listAgents(f.db, admin.id, f.org.id)).map((a) => a.id)).toContain(f.agent.id);
+      expect(await card(admin.id)).toMatchObject({ seesDetails: true, canTalk: false });
+      // Its conversation opens (the apps lock the composer and offer to let them in) instead of a refusal.
+      expect((await openDm(f.db, admin.id, f.org.id, { agentId: f.agent.id })).kind).toBe("dm");
+    }
+    expect((await updateAgent(f.db, caio.id, f.org.id, f.agent.id, { role: "Suporte nível 2" })).role).toBe(
+      "Suporte nível 2",
+    );
+    // Letting themselves in is theirs to do: then it answers them.
+    await setAgentAudience(f.db, caio.id, f.org.id, f.agent.id, {
+      mode: "people",
+      userIds: [caio.id],
+      roleIds: [support.id],
+    });
+    expect((await card(caio.id))?.canTalk).toBe(true);
+
+    // A member outside it: its public card, no conversation.
+    expect(await card(bia.id)).toMatchObject({ seesDetails: false, canTalk: false, capabilities: [] });
+    await expect(openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id })).rejects.toMatchObject({
+      code: "audience.only",
+    });
+  });
+
   test("default is everyone; owner or admins change it (members can't), audited; members must be in the org", async () => {
     const { bia } = await world();
     const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));

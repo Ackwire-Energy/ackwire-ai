@@ -2022,7 +2022,10 @@
     "added": "{{name}} è entrato nel canale.",
     "allow": "Permetti a {{person}} di parlare con lui",
     "allow_female": "Permetti a {{person}} di parlare con lei",
-    "allowed": "Fatto: ora {{person}} può parlare con {{name}}."
+    "allowed": "Fatto: ora {{person}} può parlare con {{name}}.",
+    "allowMe": "Voglio parlare con lui",
+    "allowMe_female": "Voglio parlare con lei",
+    "allowedMe": "Fatto: ora puoi parlare con {{name}}."
   },
   "teamChecks": {
     "group": "Cosa l'agente non ha ripetuto",

@@ -1946,7 +1946,10 @@
     "added": "{{name}} kanala katıldı.",
     "allow": "{{person}} onunla konuşabilsin",
     "allow_female": "{{person}} onunla konuşabilsin",
-    "allowed": "Tamam: {{person}} artık {{name}} ile konuşabilir."
+    "allowed": "Tamam: {{person}} artık {{name}} ile konuşabilir.",
+    "allowMe": "Onunla konuşmak istiyorum",
+    "allowMe_female": "Onunla konuşmak istiyorum",
+    "allowedMe": "Tamam: artık {{name}} ile konuşabilirsin."
   },
   "teamChecks": {
     "group": "Ajanın tekrarlamadıkları",

@@ -1,9 +1,9 @@
 import { type Agent, type Message, useAddChannelMember, useChannels, useUpdateAgent } from "@agenteschat/client";
-import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
+import { audienceWith, audienceWithMe, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
-import { Icon } from "@agenteschat/ui";
+import { Button, Icon } from "@agenteschat/ui";
 import { Trans, useTranslation } from "react-i18next";
 import { ConsultPairRow, useConsultById } from "@/components/ConsultGroup";
 import { useOrg } from "@/components/org-context";
@@ -140,5 +140,30 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
     >
       {t("reach.allow", { person, context: g.context })}
     </button>
+  );
+}
+
+/**
+ * "Quero falar com ele": who manages agents (or owns it) lets themselves into an agent that keeps them out. Nothing
+ * when it answers them already or is on someone else's plan, where only its owner lets more people in.
+ */
+export function LetMeTalkButton({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const toast = useToast();
+  const update = useUpdateAgent(org.id, agent.id);
+  const audience = audienceWithMe(org, agent, me.user.id);
+  if (!audience) return null;
+  const g = agentGrammar(agent.name);
+  return (
+    <Button
+      size="sm"
+      variant="primary"
+      icon="message"
+      disabled={update.isPending || update.isSuccess}
+      onClick={() => update.mutate({ audience }, { onSuccess: () => toast.show(t("reach.allowedMe", g)) })}
+    >
+      {t("reach.allowMe", g)}
+    </Button>
   );
 }

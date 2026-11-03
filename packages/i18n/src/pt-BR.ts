@@ -1938,6 +1938,9 @@ export const ptBR = {
     allow: "Deixar {{person}} falar com ele",
     allow_female: "Deixar {{person}} falar com ela",
     allowed: "Pronto: {{person}} já pode falar com {{name}}.",
+    allowMe: "Quero falar com ele",
+    allowMe_female: "Quero falar com ela",
+    allowedMe: "Pronto: você já pode falar com {{name}}.",
   },
   teamChecks: {
     group: "O que o agente não repetiu",

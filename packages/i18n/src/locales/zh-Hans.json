@@ -1891,7 +1891,10 @@
     "added": "{{name}} 已加入频道。",
     "allow": "允许 {{person}} 与他对话",
     "allow_female": "允许 {{person}} 与她对话",
-    "allowed": "完成：{{person}} 现在可以与 {{name}} 对话了。"
+    "allowed": "完成：{{person}} 现在可以与 {{name}} 对话了。",
+    "allowMe": "让我也能和他对话",
+    "allowMe_female": "让我也能和她对话",
+    "allowedMe": "好了：你现在可以和 {{name}} 对话了。"
   },
   "teamChecks": {
     "group": "智能体没有重复做的事",

@@ -2021,7 +2021,10 @@
     "added": "{{name}} se unió al canal.",
     "allow": "Dejar que {{person}} hable con él",
     "allow_female": "Dejar que {{person}} hable con ella",
-    "allowed": "Listo: {{person}} ya puede hablar con {{name}}."
+    "allowed": "Listo: {{person}} ya puede hablar con {{name}}.",
+    "allowMe": "Quiero hablar con él",
+    "allowMe_female": "Quiero hablar con ella",
+    "allowedMe": "Listo: ya puedes hablar con {{name}}."
   },
   "teamChecks": {
     "group": "Lo que el agente no repitió",

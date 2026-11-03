@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { Agent, OrgRole } from "../src/api/types";
-import { audienceBlocked, audienceLines, audiencePatch } from "../src/lib/audience";
+import type { Agent, OrgRole, OrgSummary } from "../src/api/types";
+import { audienceBlocked, audienceLines, audiencePatch, audienceWithMe } from "../src/lib/audience";
 import { agentWorkingIn, type StreamsState } from "../src/realtime/streams";
 
 const role = (id: string, position: number, kind: OrgRole["kind"] = "custom") =>
@@ -76,5 +76,24 @@ describe("agentWorkingIn", () => {
     } as unknown as StreamsState;
     expect(agentWorkingIn(state, "a-ada")).toBe("c-launch");
     expect(agentWorkingIn(state, "a-theo")).toBeNull();
+  });
+});
+
+describe("audienceWithMe", () => {
+  const admin = { permissions: ["manage_agents", "talk_to_agents"] } as unknown as OrgSummary;
+  const member = { permissions: ["talk_to_agents"] } as unknown as OrgSummary;
+  const kept = agent({ canTalk: false, audience: { mode: "people", userIds: [], roleIds: ["suporte"] } });
+  test("an admin it keeps out lets themselves in, its roles kept; a member outside can't", () => {
+    expect(audienceWithMe(admin, kept, "u-caio")).toEqual({
+      mode: "people",
+      userIds: ["u-caio"],
+      roleIds: ["suporte"],
+    });
+    expect(audienceWithMe(member, kept, "u-bia")).toBeNull();
+    expect(audienceWithMe(admin, { ...kept, canTalk: true }, "u-caio")).toBeNull();
+  });
+  test("on someone else's plan only its owner lets more people in", () => {
+    const onPlan = { ...kept, brain: { kind: "claude_code" } as Agent["brain"] };
+    expect(audienceWithMe(admin, onPlan, "u-caio")).toBeNull();
   });
 });

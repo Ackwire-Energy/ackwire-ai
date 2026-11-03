@@ -48,3 +48,29 @@ describe("an agent seen from outside its audience", () => {
     expect(within(card).queryByRole("link", { name: "Editar" })).toBeNull();
   });
 });
+
+describe("an agent that doesn't answer an admin", () => {
+  /** I (Walter) own the workspace; Ada is João's, kept to the Suporte role I don't hold. */
+  const keptOut = () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) {
+      ada.ownerUserId = "u-joao";
+      ada.audience = { mode: "people", userIds: [], roleIds: ["r-suporte"] };
+      ada.canTalk = false;
+      ada.seesDetails = true;
+    }
+    return state;
+  };
+
+  test("its conversation opens, says why the composer is off, and lets me in", async () => {
+    const state = keptOut();
+    await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const allow = screen().getByRole("button", { name: /Quero falar com/ });
+    await act(async () => fireEvent.click(allow));
+    await settle(2);
+    const update = state.calls.find((c) => c.method === "agents.update");
+    expect(update?.args[2]).toEqual({ audience: { mode: "people", userIds: ["u-walter"], roleIds: ["r-suporte"] } });
+  });
+});

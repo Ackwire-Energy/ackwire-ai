@@ -4748,6 +4748,13 @@
   "reach.allowed": {
     "value": "Done: {{person}} can now talk to {{name}}."
   },
+  "reach.allowMe": {
+    "value": "Let me talk to him",
+    "female": "Let me talk to her"
+  },
+  "reach.allowedMe": {
+    "value": "Done: you can now talk to {{name}}."
+  },
   "teamChecks.group": {
     "value": "What the agent didn't repeat"
   },

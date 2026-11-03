@@ -1889,7 +1889,10 @@
     "added": "{{name}}がチャンネルに参加しました。",
     "allow": "{{person}}が話しかけられるようにする",
     "allow_female": "{{person}}が話しかけられるようにする",
-    "allowed": "完了しました。{{person}}が{{name}}に話しかけられるようになりました。"
+    "allowed": "完了しました。{{person}}が{{name}}に話しかけられるようになりました。",
+    "allowMe": "自分も話せるようにする",
+    "allowMe_female": "自分も話せるようにする",
+    "allowedMe": "完了：{{name}}と話せるようになりました。"
   },
   "teamChecks": {
     "group": "エージェントが繰り返さなかったこと",

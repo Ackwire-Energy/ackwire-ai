@@ -1887,7 +1887,10 @@
     "added": "{{name}}이(가) 채널에 참여했어요.",
     "allow": "{{person}}이(가) 이 에이전트와 대화할 수 있게 허용",
     "allow_female": "{{person}}이(가) 이 에이전트와 대화할 수 있게 허용",
-    "allowed": "완료: 이제 {{person}}이(가) {{name}}와(과) 대화할 수 있어요."
+    "allowed": "완료: 이제 {{person}}이(가) {{name}}와(과) 대화할 수 있어요.",
+    "allowMe": "나도 대화할 수 있게 하기",
+    "allowMe_female": "나도 대화할 수 있게 하기",
+    "allowedMe": "완료: 이제 {{name}}와 대화할 수 있어요."
   },
   "teamChecks": {
     "group": "에이전트가 반복하지 않은 일",

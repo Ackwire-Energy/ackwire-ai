@@ -1900,7 +1900,10 @@
     "added": "{{name}} bergabung ke kanal.",
     "allow": "Izinkan {{person}} bicara dengannya",
     "allow_female": "Izinkan {{person}} bicara dengannya",
-    "allowed": "Beres: {{person}} sekarang bisa bicara dengan {{name}}."
+    "allowed": "Beres: {{person}} sekarang bisa bicara dengan {{name}}.",
+    "allowMe": "Izinkan saya bicara dengannya",
+    "allowMe_female": "Izinkan saya bicara dengannya",
+    "allowedMe": "Selesai: sekarang kamu bisa bicara dengan {{name}}."
   },
   "teamChecks": {
     "group": "Yang tidak diulangi agen",

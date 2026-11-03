@@ -17,6 +17,7 @@ import {
   audienceNotice,
   audienceOf,
   audiencePatch,
+  audienceWithMe,
   canEditAudience,
   canTalk,
   modeOf,
@@ -65,6 +66,7 @@ import { CoordinatorChip } from "@/components/CoordinatorChip";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
+import { LetMeTalkButton } from "@/components/ReachLines";
 import { useEmojiLabels } from "@/components/Reactions";
 import { RolesPicker } from "@/components/roles/RolesPicker";
 import { colorOf, ProfileSky } from "@/components/Sky";
@@ -583,7 +585,11 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         <>
           <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</p>
           <div className="profile-card__actions">
-            <AskAccessButton agent={agent} />
+            {audienceWithMe(org, agent, me.user.id) ? (
+              <LetMeTalkButton agent={agent} />
+            ) : (
+              <AskAccessButton agent={agent} />
+            )}
           </div>
         </>
       )}

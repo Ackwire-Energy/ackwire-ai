@@ -1906,6 +1906,9 @@ export const en = {
     allow: "Let {{person}} talk to him",
     allow_female: "Let {{person}} talk to her",
     allowed: "Done: {{person}} can now talk to {{name}}.",
+    allowMe: "Let me talk to him",
+    allowMe_female: "Let me talk to her",
+    allowedMe: "Done: you can now talk to {{name}}.",
   },
   teamChecks: {
     group: "What the agent didn't repeat",

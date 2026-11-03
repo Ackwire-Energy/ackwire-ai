@@ -2077,7 +2077,10 @@
     "added": "{{name}} dołącza do kanału.",
     "allow": "Pozwól {{person}} z nim rozmawiać",
     "allow_female": "Pozwól {{person}} z nią rozmawiać",
-    "allowed": "Gotowe: {{person}} może teraz rozmawiać z {{name}}."
+    "allowed": "Gotowe: {{person}} może teraz rozmawiać z {{name}}.",
+    "allowMe": "Chcę z nim rozmawiać",
+    "allowMe_female": "Chcę z nią rozmawiać",
+    "allowedMe": "Gotowe: możesz już rozmawiać z {{name}}."
   },
   "teamChecks": {
     "group": "Czego agent nie powtórzył",

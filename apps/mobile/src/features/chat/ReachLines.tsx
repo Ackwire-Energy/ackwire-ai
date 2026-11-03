@@ -1,5 +1,5 @@
 import { type Agent, type Message, useChannels, useUpdateAgent } from "@agenteschat/client";
-import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
+import { audienceWith, audienceWithMe, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
 import { useTranslation } from "react-i18next";
@@ -104,6 +104,32 @@ export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string 
           { audience },
           { onSuccess: () => toast({ title: t("reach.allowed", { person, name: g.name }) }) },
         );
+      }}
+    />
+  );
+}
+
+/**
+ * "Quero falar com ele": who manages agents (or owns it) lets themselves into an agent that keeps them out. Nothing
+ * when it answers them already or is on someone else's plan, where only its owner lets more people in.
+ */
+export function LetMeTalkPill({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const { org } = useOrg();
+  const me = useMeId();
+  const toast = useToast();
+  const update = useUpdateAgent(orgId, agent.id);
+  const audience = me ? audienceWithMe(org ?? undefined, agent, me) : null;
+  if (!audience) return null;
+  const g = agentGrammar(agent.name);
+  return (
+    <PillButton
+      label={t("reach.allowMe", g)}
+      onPress={() => {
+        if (update.isPending || update.isSuccess) return;
+        tapHaptic();
+        update.mutate({ audience }, { onSuccess: () => toast({ title: t("reach.allowedMe", g) }) });
       }}
     />
   );

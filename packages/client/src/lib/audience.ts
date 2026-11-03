@@ -118,6 +118,16 @@ export const audienceBlocked = (agent: Agent, next: AgentAudience, myUserId: str
   agent.ownerUserId !== myUserId &&
   audienceWidens(audienceOf(agent), next, agent.ownerUserId);
 
+/**
+ * "Let me talk to it": its audience with me let in, when it keeps me out and I may change it (its owner or who manages
+ * agents), I talk to agents at all, and it isn't on someone else's plan (`audienceBlocked`); null otherwise.
+ */
+export function audienceWithMe(org: OrgSummary | undefined, agent: Agent, myUserId: string): AgentAudience | null {
+  if (canTalk(agent) || !can(org, "talk_to_agents") || !canEditAudience(org, agent, myUserId)) return null;
+  const next = audienceWith(agent, myUserId);
+  return next && !audienceBlocked(agent, next, myUserId) ? next : null;
+}
+
 /** One line of "Quem pode falar": the whole workspace (its `everyone` role's mark), a role, or a person. */
 export type AudienceLine<P> =
   | { kind: "everyone"; role?: OrgRole }

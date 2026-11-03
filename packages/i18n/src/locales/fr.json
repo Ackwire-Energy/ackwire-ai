@@ -2024,7 +2024,10 @@
     "added": "{{name}} a rejoint le canal.",
     "allow": "Laisser {{person}} lui parler",
     "allow_female": "Laisser {{person}} lui parler",
-    "allowed": "C'est fait : {{person}} peut maintenant parler à {{name}}."
+    "allowed": "C'est fait : {{person}} peut maintenant parler à {{name}}.",
+    "allowMe": "Je veux lui parler",
+    "allowMe_female": "Je veux lui parler",
+    "allowedMe": "C'est fait : tu peux maintenant parler à {{name}}."
   },
   "teamChecks": {
     "group": "Ce que l'agent n'a pas refait",

@@ -1958,7 +1958,10 @@
     "added": "{{name}} ist dem Kanal beigetreten.",
     "allow": "{{person}} mit ihm sprechen lassen",
     "allow_female": "{{person}} mit ihr sprechen lassen",
-    "allowed": "Erledigt: {{person}} kann jetzt mit {{name}} sprechen."
+    "allowed": "Erledigt: {{person}} kann jetzt mit {{name}} sprechen.",
+    "allowMe": "Lass mich mit ihm sprechen",
+    "allowMe_female": "Lass mich mit ihr sprechen",
+    "allowedMe": "Erledigt: Du kannst jetzt mit {{name}} sprechen."
   },
   "teamChecks": {
     "group": "Was der Agent nicht wiederholt hat",

@@ -1960,7 +1960,10 @@
     "added": "{{name}} is lid geworden van het kanaal.",
     "allow": "Laat {{person}} met hem praten",
     "allow_female": "Laat {{person}} met haar praten",
-    "allowed": "Klaar: {{person}} kan nu met {{name}} praten."
+    "allowed": "Klaar: {{person}} kan nu met {{name}} praten.",
+    "allowMe": "Ik wil met hem praten",
+    "allowMe_female": "Ik wil met haar praten",
+    "allowedMe": "Klaar: je kunt nu met {{name}} praten."
   },
   "teamChecks": {
     "group": "Wat de agent niet herhaalde",
