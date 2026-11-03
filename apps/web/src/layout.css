@@ -1035,10 +1035,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   justify-content: flex-end;
   margin-top: 6px;
 }
-/*
- * A wide picture's tile is as wide as the picture's own size allows, while its thumbnail stops at 420px: the
- * thumbnail (or a file's row) keeps to the tile's right edge, under the bubble, instead of its left.
- */
+/* A tile wider than its thumbnail (or a file's row): the thumbnail keeps to its right edge, under the bubble. */
 .ac-msg--own .artifact-tile > :is(.file-thumb, .file-row) {
   margin-left: auto;
 }
@@ -5120,8 +5117,15 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   content-visibility: auto;
   contain-intrinsic-size: auto 56px;
 }
+/*
+ * The newest rows are never skipped either (the last three): a row that just came in starts skipped, at the 56px
+ * placeholder, until the next frame finds it on screen. The glide down to a message I sent reads the list's end in
+ * that state, stops short of the row's real height (a bubble and its time: ~72px), and the end is caught up with a
+ * jump once the glide is over: the whole list moved up a few pixels after every send.
+ */
 .channel__messages .ac-msg:is(:hover, :focus-within, .ac-msg--streaming),
-.channel__messages .ac-msg:has(.ac-msg__actions[data-open="true"], [aria-expanded="true"]) {
+.channel__messages .ac-msg:has(.ac-msg__actions[data-open="true"], [aria-expanded="true"]),
+.channel__messages > .ac-msg:nth-last-of-type(-n + 3) {
   content-visibility: visible;
 }
 .channel__messages {
@@ -6664,7 +6668,8 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   position: relative;
   display: block;
   height: 200px;
-  max-width: min(100%, 360px);
+  /* A length, not `min(100%, …)`: a percentage counts as no cap when my own row sizes to what it holds (`.ac-gif`). */
+  max-width: 360px;
   padding: 0;
   overflow: hidden;
   border: 0;
@@ -6684,7 +6689,7 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
 /* Alone on the message: the image at its own proportions, a bit taller. */
 .artifact-tile:only-child .file-thumb {
   height: auto;
-  max-width: min(100%, 420px);
+  max-width: 420px;
 }
 .artifact-tile:only-child .file-thumb img {
   height: auto;

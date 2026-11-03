@@ -6625,11 +6625,14 @@ html:not([data-pointer]) .ac-stickers__cell:focus-visible {
 /*
  * A GIF in a message: the picture in the cut-corner frame, as wide as it is up to 300px (`--gif-w`), its shape
  * held before it loads (`--gif-ar`); a small "GIF" mark on its corner and where it comes from on hover.
+ * The cap is a length, never `min(100%, …)`: a percentage counts as no cap when a box sizes to its content, so my own
+ * row (sized to what it holds) would take the file's full width and its bar would stand that far left of the GIF.
  */
 .ac-gif {
   position: relative;
   display: block;
-  width: min(100%, var(--gif-w, 300px));
+  width: var(--gif-w, 300px);
+  max-width: 100%;
   aspect-ratio: var(--gif-ar, 4 / 3);
   margin-top: 6px;
   overflow: hidden;

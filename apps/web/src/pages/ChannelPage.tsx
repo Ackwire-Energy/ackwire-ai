@@ -1212,16 +1212,22 @@ function ChannelView({
     const el = scroller.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     // What grew during a glide down (the activity bar opening as the message goes out, the first words) is
-    // followed once the glide ends: the glide stops at the end it was given, and nothing else may grow after it.
+    // followed once the glide ends: the glide stops at the end it was given. It glides on to the new end, never
+    // jumps there; what grows during that second glide (words streaming in) is caught up at once after it.
     let later: ReturnType<typeof setTimeout> | undefined;
-    const pin = () => {
+    // When the glide this observer started itself ends.
+    let ownGlide = 0;
+    const pin = (afterGlide = false) => {
       if (!stick.current) return;
       const wait = autoScrollUntil.current - Date.now();
       clearTimeout(later);
-      if (wait > 0) later = setTimeout(pin, wait);
-      else followRef.current();
+      if (wait > 0) later = setTimeout(() => pin(true), wait);
+      else if (afterGlide && autoScrollUntil.current !== ownGlide) {
+        followRef.current(true);
+        ownGlide = autoScrollUntil.current;
+      } else followRef.current();
     };
-    const ro = new ResizeObserver(pin);
+    const ro = new ResizeObserver(() => pin());
     for (const child of Array.from(el.children)) ro.observe(child);
     ro.observe(el);
     // Only rows that came in are watched (observing every row again on each change cost a pass per delta).
