@@ -17,6 +17,7 @@ import { InviteDialogProvider } from "@/components/invite/InviteDialog";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
+import { NoticeIsland } from "@/components/NoticeIsland";
 import { PushOpens } from "@/components/NotificationOpen";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
@@ -159,6 +160,8 @@ function OrgLayout() {
                       <ComputerDialogProvider>
                         <DetailsHost>
                           <PushOpens />
+                          {/* What reaches me while I'm here, at the top of the work area (ADR 0071 §9). */}
+                          {!focused && <NoticeIsland />}
                           <WebPushAsk />
                           <Outlet />
                         </DetailsHost>

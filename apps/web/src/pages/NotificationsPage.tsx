@@ -17,7 +17,6 @@ import {
 import { approvalCardItems, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
-import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
@@ -40,13 +39,11 @@ import {
   stepCells,
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
-import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
+import { routineNotificationWords } from "@agenteschat/client/lib/routine-view";
 import { secretNoticeLine } from "@agenteschat/client/lib/secret-requests";
 import {
-  Avatar,
   Button,
   Chip,
-  ComputerIcon,
   cx,
   ExpiryFuse,
   Icon,
@@ -76,18 +73,18 @@ import {
   useState,
 } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/ApprovalItem";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationHref, useNotificationOpener } from "@/components/NotificationOpen";
+import { type Dir, Face, Headline, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
 import { AllowTalkButton } from "@/components/ReachLines";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow } from "@/hooks/useMatchMedia";
 import { useWraps } from "@/hooks/useWraps";
-import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
 import { ApproveAll, ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
@@ -104,7 +101,6 @@ const URGENT_MS = 3 * 3_600_000;
 /** The exit: slide out, then fold the space (approvals use the same timing). */
 const LEAVE_MS = 450;
 
-type Dir = ReturnType<typeof useDirectory>;
 type SnoozeChoice = "hour" | "tomorrow" | "nextWeek";
 
 /** "agora", "há 25 min", "há 2 h", "ontem 18:02", "sex 14:20", "12 out". */
@@ -125,94 +121,6 @@ function durationText(t: TFunction, ms: number) {
   if (ms < 3_600_000) return t("format.inMinutes", { count: Math.max(1, Math.floor(ms / 60_000)) });
   if (ms < 2 * 86_400_000) return t("format.inHours", { count: Math.floor(ms / 3_600_000) });
   return t("format.inDays", { count: Math.floor(ms / 86_400_000) });
-}
-
-/** Words from the client's rules (a key and its values) in the person's language; `otherwise` for an unknown key. */
-function sayWords(t: TFunction, w: Words, otherwise = "") {
-  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
-  return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
-}
-
-const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
-  !a
-    ? ""
-    : a.type === "agent"
-      ? (dir.anyAgent(a.id)?.name ?? t("channel.unknownAgent"))
-      : (dir.memberById.get(a.id)?.name ?? t("channel.unknownPerson"));
-
-/**
- * Who an accepted invitation brought in (ADR 0090): the directory's name, else the one the notice carries, while
- * the members list catches up with someone who just joined.
- */
-const joinerOf = (t: TFunction, dir: Dir, n: AppNotification) => {
-  const a = n.actors[0];
-  return (a && dir.memberById.get(a.id)?.name) || n.latest.title || nameOf(t, dir, a);
-};
-
-/** A face for an actor: agents are the living symbol, people their photo or initials. */
-export function Face({
-  actor,
-  dir,
-  className,
-  size = "md",
-  state,
-  name: given,
-}: {
-  actor: NotificationActor | undefined;
-  dir: Dir;
-  className?: string;
-  size?: "sm" | "md";
-  state?: "idle" | "waiting" | "writing";
-  /** The name when the directory may not have it yet (`joinerOf`). */
-  name?: string;
-}) {
-  const { t } = useTranslation();
-  if (!actor) return null;
-  const name = given ?? nameOf(t, dir, actor);
-  if (actor.type === "agent")
-    return <AgentAvatar agentId={actor.id} name={name} size={size} state={state} className={className} labelled />;
-  return (
-    <ActorAvatar actor={{ type: "person", id: actor.id }} name={name} size={size} className={className} labelled />
-  );
-}
-
-/**
- * Nobody to show, the workspace itself telling (its computer, its standing): what it is about, as an icon. Someone
- * asking to join isn't a member yet: their initials.
- */
-export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
-  if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
-  if (n.kind === "computer_ready")
-    return (
-      <span className="nt-sys" aria-hidden="true">
-        <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
-      </span>
-    );
-  if (n.kind === "composio_limit" || n.kind === "connector_tool_changed")
-    return (
-      <span className="nt-sys" aria-hidden="true">
-        <Icon name="plug" size={16} />
-      </span>
-    );
-  if (n.kind === "computer_disk_full")
-    return (
-      <span className="nt-sys" aria-hidden="true">
-        <Icon name="drive" size={16} />
-      </span>
-    );
-  if (n.kind === "app_created")
-    return (
-      <span className="nt-sys" aria-hidden="true">
-        <Icon name="agent" size={16} />
-      </span>
-    );
-  if (n.kind !== "org_standing") return null;
-  const status = n.latest.statusTo;
-  return (
-    <span className="nt-sys" aria-hidden="true">
-      <Icon name={status === "active" ? "check" : status === "suspended" ? "block" : "pause"} size={16} />
-    </span>
-  );
 }
 
 /** A snippet with @mentions: mine highlighted, others in bold. */
@@ -305,155 +213,6 @@ function LeftChip({ n, className }: { n: AppNotification; className?: string }) 
       {urgent ? t("approvals.leftUrgent", { time: left }) : t("approvals.left", { time: left })}
     </Chip>
   );
-}
-
-type WhatKey =
-  | "mention"
-  | "mentionIn"
-  | "mentionComment"
-  | "replied"
-  | "repliedThread"
-  | "answered"
-  | "answeredIn"
-  | "dm"
-  | "question"
-  | "issueAssigned"
-  | "issueComment"
-  | "issueStatus"
-  | "issueDone"
-  | "forumTurn"
-  | "forumSynthesis"
-  | "approval"
-  | "missionFinished"
-  | "missionStopped"
-  | "routineFinished"
-  | "routineFailed"
-  | "runFailed"
-  | "runFailedMany"
-  | "runFailedManyAny"
-  | "routinePaused"
-  | "routineStalled"
-  | "agentUnreached"
-  | "routineWaitingPlan"
-  | "planResetUnknown"
-  | "machineConnected"
-  | "machineConnectedAny"
-  | "browserHandoff"
-  | "desktopHandoff"
-  | "secretRequest"
-  | "joinRequest"
-  | "joinRequestMany"
-  | "browserProfileRequest"
-  | "joinSuggestion"
-  | "invitationAccepted"
-  | "invitationAcceptedAny"
-  | "reaction";
-
-/** The line on top of a row: who did what, where. */
-export function Headline({
-  n,
-  dir,
-  channelName,
-}: {
-  n: AppNotification;
-  dir: Dir;
-  channelName: (id: string) => string;
-}) {
-  const { t } = useTranslation();
-  const name = nameOf(t, dir, n.actors[0]);
-  const names = namesText(
-    t,
-    n.actors.map((a) => nameOf(t, dir, a)),
-  );
-  const count = n.actors.length;
-  // A thread without a title is labelled with its channel: show it as "#canal".
-  const channel = channelOf(n);
-  const label =
-    n.source.label && channel && n.source.label === channelName(channel) ? `#${n.source.label}` : n.source.label;
-  // Names and titles are typed by people (someone asking to join is not even a member): text, never markup.
-  const k = (key: WhatKey, values: Record<string, unknown>) => (
-    <Trans i18nKey={`notifications.what.${key}`} values={values} components={{ b: <b /> }} {...TYPED_VALUES} />
-  );
-  const own = workspaceHeadline(n);
-  if (own) return t(own, { name: n.source.label });
-  if (n.kind === "app_created") return appCreatedLine(t, n);
-  switch (n.kind) {
-    case "mention":
-      if (n.source.issueId) return k("mentionComment", { name });
-      return n.source.threadId && label ? k("mentionIn", { name, label }) : k("mention", { name });
-    case "thread_reply":
-      return label ? k("replied", { names, label, count }) : k("repliedThread", { names, count });
-    case "dm":
-      return k("dm", { name });
-    case "agent_reply":
-      return label ? k("answeredIn", { name, label }) : k("answered", { name });
-    case "agent_question":
-      return k("question", { name });
-    case "issue_assigned":
-      return k("issueAssigned", { name });
-    case "issue_comment":
-      return k("issueComment", { names, count });
-    case "issue_status":
-      return n.latest.statusTo === "done" ? k("issueDone", { name }) : k("issueStatus", { name });
-    case "forum_turn":
-      return k("forumTurn", { name });
-    case "forum_synthesis":
-      return k("forumSynthesis", { name });
-    case "approval":
-      return k("approval", { name });
-    case "mission_finished":
-      return k("missionFinished", { name });
-    case "mission_stopped":
-      return k("missionStopped", { name });
-    case "routine_finished":
-      return k("routineFinished", { name });
-    case "routine_failed":
-      return k("routineFailed", { name });
-    case "run_failed": {
-      // Agents that failed for one cause close together: one line for all of them.
-      const group = runFailedGroupOf(n);
-      if (!group) return k("runFailed", { name });
-      return group.cause
-        ? k("runFailedMany", { count: group.agents, cause: sayWords(t, group.cause) })
-        : k("runFailedManyAny", { count: group.agents });
-    }
-    case "routine_paused":
-      return k("routinePaused", { name });
-    case "routine_stalled":
-      return k("routineStalled", { name });
-    case "agent_unreached":
-      return k("agentUnreached", { name });
-    case "browser_profile_request":
-      return k("browserProfileRequest", { name, agent: n.source.label ?? "" });
-    case "routine_waiting_plan":
-      return k("routineWaitingPlan", { name });
-    case "plan_reset_unknown":
-      return k("planResetUnknown", { name, plan: n.latest.title ?? "" });
-    case "machine_connected":
-      return n.source.label
-        ? k("machineConnected", { name, label: n.source.label })
-        : k("machineConnectedAny", { name });
-    case "browser_handoff":
-      return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
-    case "secret_request":
-      return k("secretRequest", { name });
-    case "join_request": {
-      // Merged while unread: the first ones to ask, by name, then how many more.
-      const asked = askersOf(n);
-      // A member's suggestion says who suggested it (ADR 0090); a merged row counts everyone as asking.
-      if (asked.total === 1 && n.latest.suggestedBy)
-        return k("joinSuggestion", { by: n.latest.suggestedBy, name: asked.names[0] });
-      return asked.total > 1
-        ? k("joinRequestMany", { names: namesText(t, asked.names, 2, asked.total) })
-        : k("joinRequest", { name: asked.names[0] });
-    }
-    case "invitation_accepted":
-      return n.source.label
-        ? k("invitationAccepted", { name: joinerOf(t, dir, n), org: n.source.label })
-        : k("invitationAcceptedAny", { name: joinerOf(t, dir, n) });
-    case "reaction":
-      return k("reaction", { names, count });
-  }
 }
 
 /** Issue statuses in the app's words (the raw value when unknown). */

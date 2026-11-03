@@ -13,17 +13,40 @@ import { readValue, STORED, writeValue } from "./storage";
  * server, and removes it on sign-out.
  */
 
+/** A conversation on screen: a channel or a DM, or one of its threads. */
+export interface OpenConversation {
+  orgId: string;
+  channelId: string;
+  threadId?: string | null;
+}
+
 /** The conversation on screen (the chat screen holds it while focused). */
-const openConversation = createHolder<{ orgId: string; channelId: string }>();
+const openConversation = createHolder<OpenConversation>();
 
 /** This screen's conversation is on screen; the returned release clears it only if no other screen took over. */
-export const holdOpenConversation = (open: { orgId: string; channelId: string }) => openConversation.hold(open);
+export const holdOpenConversation = (open: OpenConversation) => openConversation.hold(open);
 
-/** Notifications shown while the app is open: a banner, no sound; nothing for the conversation on screen. */
+/** The conversation on screen now, if any. */
+export const openConversationNow = () => openConversation.get();
+
+/**
+ * The island draws what arrives while the app is open (ADR 0071 §9): set while it is up, with the socket live. The
+ * system's banner then stays away, so nothing shows twice; with the socket down the banner is still there.
+ */
+let islandLive = false;
+export const setIslandLive = (live: boolean) => {
+  islandLive = live;
+};
+
+/**
+ * Notifications shown while the app is open: the island's, or else a banner with no sound; nothing for the
+ * conversation on screen.
+ */
 export function configureForegroundPush() {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
-      const quiet = quietWhileOpen(readPushData(notification.request.content.data), openConversation.get());
+      const quiet =
+        islandLive || quietWhileOpen(readPushData(notification.request.content.data), openConversation.get());
       return { shouldShowBanner: !quiet, shouldShowList: !quiet, shouldPlaySound: false, shouldSetBadge: false };
     },
   });

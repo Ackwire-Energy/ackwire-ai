@@ -15,6 +15,7 @@ import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds"
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { AppState } from "react-native";
+import { feedIsland, island } from "../island/island";
 import { useConnection, useOrgId } from "./hooks";
 
 /**
@@ -36,6 +37,8 @@ export function useUserEvents() {
       }
       if (isNotificationEvent(event)) {
         applyNotificationEvent(qc, orgId, event);
+        // The island at the top (ADR 0071 §9): what reaches me while the app is open, and what I settled elsewhere.
+        feedIsland(event);
         // Something new reached you somewhere: the conversation list's unread and last lines.
         if (event.type === "notification.upserted") {
           void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
@@ -82,6 +85,8 @@ export function useUserEvents() {
     return () => {
       offUser();
       offReconnect();
+      // In the background, or another workspace: its notices go (the inbox keeps them).
+      island.clear();
     };
   }, [connection, orgId, qc]);
 }

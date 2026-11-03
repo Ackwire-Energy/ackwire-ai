@@ -1069,6 +1069,23 @@ export const ptBR = {
     secret_request: "Um agente precisa de um segredo seu",
     waiting: "Tem algo esperando você",
   },
+  // The island at the top of the screen (ADR 0071 §9): what reaches me while the app is open.
+  island: {
+    label: "Notificações novas",
+    expand: "Ver notificações",
+    reply: "Responder",
+    otherAnswer: "Outra resposta",
+    review: "Revisar",
+    open: "Abrir",
+    dismiss: "Dispensar",
+    send: "Enviar",
+    placeholder: "Escreva sua resposta…",
+    sent: "Enviado",
+    answered: "Você respondeu: {{choice}}",
+    failed: "Não foi. Tente de novo.",
+    all: "Ver todas",
+    closes: "fecha",
+  },
   contextMenu: {
     label: "Ações",
     react: "Reagir",

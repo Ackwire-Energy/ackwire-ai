@@ -1,0 +1,322 @@
+/*
+ * The island (ADR 0071 §9): a dark pill at the top of the work area, in both themes (the dark tokens inside it,
+ * `data-theme="dark"`). The face sits 8px from the top, the bottom and the left, concentric with the pill's curve.
+ */
+.ni-wrap {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  z-index: var(--z-toast);
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+.ni {
+  pointer-events: auto;
+  max-width: min(560px, 100%);
+  background: #141413;
+  color: var(--ink);
+  border-radius: 24px;
+  box-shadow:
+    0 18px 40px -14px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  animation: ni-in 0.55s cubic-bezier(0.3, 1.25, 0.4, 1) both;
+}
+:root[data-theme="dark"] .ni {
+  background: #000;
+  box-shadow:
+    0 18px 40px -14px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+/* It grows out of a circle the size of the face, and folds back into it. */
+@keyframes ni-in {
+  from {
+    clip-path: inset(0 calc(50% - 24px) round 24px);
+    opacity: 0.4;
+  }
+  to {
+    clip-path: inset(0 0 round 24px);
+    opacity: 1;
+  }
+}
+.ni--leaving {
+  animation: ni-out 0.34s cubic-bezier(0.4, 0, 0.6, 1) both;
+  pointer-events: none;
+}
+@keyframes ni-out {
+  to {
+    clip-path: inset(0 calc(50% - 24px) round 24px);
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Closed: one line. */
+.ni__pill {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  max-width: 100%;
+  padding: 0 18px 0 8px;
+  white-space: nowrap;
+  border-radius: inherit;
+}
+.ni__pill:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.ni__pill > *:not(.ni__line) {
+  animation: ni-fade 0.3s 0.18s both;
+}
+@keyframes ni-fade {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+.ni__face {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+/* A person's face is round, concentric with the pill; an agent keeps its own shape. */
+.ni__pill > .ni__face:not(.ac-avatar--agent) {
+  border-radius: 50%;
+}
+.ni__head {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+.ni__head b {
+  color: var(--ink);
+  font-weight: 650;
+}
+.ni__line {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+.ni__faces {
+  display: flex;
+  flex: none;
+}
+.ni__mini {
+  width: 22px;
+  height: 22px;
+  margin-left: -6px;
+  box-shadow: 0 0 0 2px #141413;
+}
+.ni__count {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.ni__sys,
+.ni .nt-sys {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+}
+
+/* Small: only the requests waiting on me are left, shrunk. */
+.ni--small {
+  border-radius: 20px;
+}
+.ni--small .ni__pill {
+  height: 40px;
+  padding: 0 14px 0 6px;
+  gap: 10px;
+}
+.ni--small .ni__face {
+  width: 28px;
+  height: 28px;
+}
+.ni--small .ni__head {
+  max-width: none;
+}
+
+/* Open: each notice whole, with its answer. */
+.ni--open {
+  width: 440px;
+  border-radius: 26px;
+}
+.ni__list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 560px);
+  overflow: auto;
+}
+.ni__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  padding: 12px 12px 14px;
+  animation: ni-fade 0.3s both;
+}
+.ni__item + .ni__item {
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+.ni__item > .ni__face {
+  width: 34px;
+  height: 34px;
+}
+.ni__body {
+  min-width: 0;
+  padding-right: 26px;
+}
+.ni__title {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--ink-muted);
+}
+.ni__title b {
+  color: var(--ink);
+  font-weight: 650;
+}
+.ni__text {
+  display: -webkit-box;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.42;
+  color: var(--ink2);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ni__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ni__choice {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+}
+.ni__choice:hover,
+.ni__choice:focus-visible {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.ni__choice:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ni__reply {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 14px 14px 14px 4px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+}
+.ni__reply:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.ni__reply input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+.ni__reply input::placeholder {
+  color: var(--faint);
+}
+.ni__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--ok);
+}
+.ni__failed {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+.ni__x {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.ni__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 18px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+.ni__all {
+  color: var(--ink2);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ni__all:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.ni__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 720px) {
+  .ni--open {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ni,
+  .ni--leaving,
+  .ni__pill > *,
+  .ni__item {
+    animation: none;
+  }
+}

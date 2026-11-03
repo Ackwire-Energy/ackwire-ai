@@ -1063,6 +1063,22 @@
     "secret_request": "Bir ajanın sizden bir gizli bilgiye ihtiyacı var",
     "waiting": "Sizi bekleyen bir şey var"
   },
+  "island": {
+    "label": "Yeni bildirimler",
+    "expand": "Bildirimleri göster",
+    "reply": "Yanıtla",
+    "otherAnswer": "Başka bir yanıt",
+    "review": "İncele",
+    "open": "Aç",
+    "dismiss": "Kapat",
+    "send": "Gönder",
+    "placeholder": "Yanıtını yaz…",
+    "sent": "Gönderildi",
+    "answered": "Yanıtın: {{choice}}",
+    "failed": "Gönderilemedi. Tekrar dene.",
+    "all": "Tümünü gör",
+    "closes": "kapatır"
+  },
   "contextMenu": {
     "label": "İşlemler",
     "react": "Tepki ver",

@@ -1027,6 +1027,22 @@
     "secret_request": "エージェントがあなたにシークレットを求めています",
     "waiting": "あなたの対応を待っているものがあります"
   },
+  "island": {
+    "label": "新しい通知",
+    "expand": "通知を表示",
+    "reply": "返信",
+    "otherAnswer": "別の回答",
+    "review": "確認する",
+    "open": "開く",
+    "dismiss": "閉じる",
+    "send": "送信",
+    "placeholder": "回答を入力…",
+    "sent": "送信しました",
+    "answered": "あなたの回答: {{choice}}",
+    "failed": "送信できませんでした。もう一度お試しください。",
+    "all": "すべて見る",
+    "closes": "で閉じる"
+  },
   "contextMenu": {
     "label": "操作",
     "react": "リアクション",

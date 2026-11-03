@@ -2609,6 +2609,48 @@
   "desktopNotice.waiting": {
     "value": "Something is waiting for you"
   },
+  "island.label": {
+    "value": "New notifications"
+  },
+  "island.expand": {
+    "value": "Show notifications"
+  },
+  "island.reply": {
+    "value": "Reply"
+  },
+  "island.otherAnswer": {
+    "value": "Another answer"
+  },
+  "island.review": {
+    "value": "Review"
+  },
+  "island.open": {
+    "value": "Open"
+  },
+  "island.dismiss": {
+    "value": "Dismiss"
+  },
+  "island.send": {
+    "value": "Send"
+  },
+  "island.placeholder": {
+    "value": "Write your answer…"
+  },
+  "island.sent": {
+    "value": "Sent"
+  },
+  "island.answered": {
+    "value": "You answered: {{choice}}"
+  },
+  "island.failed": {
+    "value": "It didn't go through. Try again."
+  },
+  "island.all": {
+    "value": "See all"
+  },
+  "island.closes": {
+    "value": "closes"
+  },
   "contextMenu.label": {
     "value": "Actions"
   },

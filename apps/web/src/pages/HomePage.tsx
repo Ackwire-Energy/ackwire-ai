@@ -39,6 +39,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useMissionsWaitingYou } from "@/components/missions/MissionWaiting";
 import { useNotificationOpener } from "@/components/NotificationOpen";
+import { Face, Headline, SystemFace } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -46,8 +47,9 @@ import { useNow } from "@/hooks/useNow";
 import { agentLine, useAgentPresence } from "@/hooks/usePresence";
 import { TYPED_VALUES } from "@/i18n";
 import { firstStepsHidden, hideFirstSteps } from "@/lib/start";
-import { Face, Headline, SystemFace } from "./NotificationsPage";
 import "./home.css";
+// Its "Para você" draws the inbox's rows (Face, SystemFace, the calm card).
+import "./notifications.css";
 
 /*
  * Início (ADR 0108): what waits on me, what my agents are doing, what got done and what comes next, from the lists

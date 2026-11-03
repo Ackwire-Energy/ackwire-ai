@@ -1072,6 +1072,23 @@ export const en = {
     secret_request: "An agent needs a secret from you",
     waiting: "Something is waiting for you",
   },
+  // The island at the top of the screen (ADR 0071 §9): what reaches me while the app is open.
+  island: {
+    label: "New notifications",
+    expand: "Show notifications",
+    reply: "Reply",
+    otherAnswer: "Another answer",
+    review: "Review",
+    open: "Open",
+    dismiss: "Dismiss",
+    send: "Send",
+    placeholder: "Write your answer…",
+    sent: "Sent",
+    answered: "You answered: {{choice}}",
+    failed: "It didn't go through. Try again.",
+    all: "See all",
+    closes: "closes",
+  },
   contextMenu: {
     label: "Actions",
     react: "React",

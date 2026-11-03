@@ -1027,6 +1027,22 @@
     "secret_request": "Agen membutuhkan rahasia darimu",
     "waiting": "Ada yang menunggumu"
   },
+  "island": {
+    "label": "Notifikasi baru",
+    "expand": "Lihat notifikasi",
+    "reply": "Balas",
+    "otherAnswer": "Jawaban lain",
+    "review": "Tinjau",
+    "open": "Buka",
+    "dismiss": "Tutup",
+    "send": "Kirim",
+    "placeholder": "Tulis jawabanmu…",
+    "sent": "Terkirim",
+    "answered": "Jawabanmu: {{choice}}",
+    "failed": "Gagal terkirim. Coba lagi.",
+    "all": "Lihat semua",
+    "closes": "menutup"
+  },
   "contextMenu": {
     "label": "Tindakan",
     "react": "Beri reaksi",
