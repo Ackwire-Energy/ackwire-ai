@@ -385,11 +385,14 @@ describe("talkerPolicy", () => {
     expect(talkerPolicy({ ...base, brain: "claude_code", run: run(3000) })).toBe("reads_soon");
     expect(talkerPolicy({ ...base, brain: "codex", run: run(25_000) })).toBeNull();
   });
-  test("skips background work, stops, a wait the message ended, and replies too close", () => {
+  test("skips background work, a wait the message ended, and replies too close", () => {
     expect(talkerPolicy({ ...base, brain: "claude_code", run: { status: "running", background: true } })).toBe(
       "background",
     );
-    expect(talkerPolicy({ ...base, brain: "claude_code", message: { body: "Para!", createdAt: now } })).toBe("stop");
+    // A stop is the same in every language: no word list skips it, the model passes and the stop judge cancels.
+    for (const body of ["Para!", "Stop!", "止めて！", "Hör auf!"]) {
+      expect(talkerPolicy({ ...base, brain: "claude_code", message: { body, createdAt: now } })).toBeNull();
+    }
     expect(talkerPolicy({ ...base, waited: { waitKind: "browser_handoff", outcome: "resolved" } })).toBe("resolved");
     const waiting = { ...base, run: { status: "waiting_approval" as const, background: false } };
     expect(talkerPolicy({ ...waiting, lastReplyAt: new Date(now.getTime() - 10_000) })).toBe("rate_limited");

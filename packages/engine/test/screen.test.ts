@@ -10,6 +10,7 @@ import {
   findDismiss,
   findInPage,
   formatPlanReport,
+  type Judge,
   locateOnImage,
   observeSnapshot,
   pageKey,
@@ -154,6 +155,7 @@ describe("targets in words", () => {
     const judge = createFakeJudge((kind, id, _state, q) => {
       if (kind !== "screen_target") return undefined;
       if (id === "present") return 0.9;
+      if (id === "costly") return 0;
       // Only fields are offered for a fill.
       expect(Object.keys((q as { criteria: Record<string, string> }).criteria)).toEqual(["e3", "e4", "none"]);
       return { choice: "e4", probabilities: { e4: 0.88, e3: 0.1 } };
@@ -215,7 +217,7 @@ describe("targets in words", () => {
     expect(r.found ? [] : r.candidates.map((c) => c.ref)).toEqual(["e2", "e1"]);
   });
 
-  test("a costly element (delete, pay, send) needs a surer pick; else the agent picks by number", async () => {
+  test("an element the judge finds costly (delete, pay, send) needs a surer pick; else the agent picks by number", async () => {
     const page = observeSnapshot({
       text: '- row "Invoice 42"\n  - button "Edit" [ref=e1]\n  - button "Delete" [ref=e2]',
     });
@@ -223,7 +225,7 @@ describe("targets in words", () => {
       createFakeJudge((kind, id) =>
         kind !== "screen_target"
           ? undefined
-          : id === "present"
+          : id === "present" || id === "costly"
             ? 0.95
             : { choice: "e2", probabilities: { e2: p, e1: 1 - p } },
       );
@@ -247,7 +249,7 @@ describe("targets in words", () => {
     expect(await resolveTarget({ ...base, judge: edit, target: "the pencil one" })).toMatchObject({ ref: "e1" });
   });
 
-  test("a plain Yes inside a 'Delete …?' dialog is as costly as the dialog", async () => {
+  test("the judge is asked whether the target can't be undone; no answer counts as costly", async () => {
     const page = observeSnapshot({
       text: '- dialog "Delete project Acme?"\n  - button "Yes" [ref=e1]\n  - button "Keep it" [ref=e2]',
     });
@@ -258,8 +260,17 @@ describe("targets in words", () => {
           ? 0.95
           : { choice: "e1", probabilities: { e1: 0.8, e2: 0.2 } },
     );
-    const r = await resolveTarget({ judge, ...ids, observation: page, scope: "a", target: "confirm it", use: "click" });
-    expect(r).toMatchObject({ found: false, reason: "unsure" });
+    const silent: Judge = {
+      name: "silent",
+      async ask(request) {
+        const { costly: _costly, ...answers } = await judge.ask(request);
+        return answers;
+      },
+    };
+    const base = { ...ids, observation: page, scope: "a", target: "confirm it", use: "click" as const };
+    expect(await resolveTarget({ ...base, judge })).toMatchObject({ found: true, ref: "e1" });
+    expect(judge.calls[0]?.questions.costly).toMatchObject({ type: "noul" });
+    expect(await resolveTarget({ ...base, judge: silent })).toMatchObject({ found: false, reason: "unsure" });
   });
 
   test("the site memory finds a target again only in the same place, and never a costly one", async () => {
@@ -268,8 +279,14 @@ describe("targets in words", () => {
         text: `- table "Invoices"\n  - row\n    - cell "${first}" [ref=e1]\n    - cell "${action}" [ref=e2]\n      - button "${action}" [ref=e3]\n  - row\n    - cell "${second}" [ref=e4]\n    - cell "${action}" [ref=e5]\n      - button "${action}" [ref=e6]`,
         url: "https://app.acme.example/invoices",
       });
-    const judge = createFakeJudge((kind, id) =>
-      kind !== "screen_target" ? undefined : id === "present" ? 0.95 : { choice: "e6", probabilities: { e6: 0.95 } },
+    const judge = createFakeJudge((kind, id, state) =>
+      kind !== "screen_target"
+        ? undefined
+        : id === "present"
+          ? 0.95
+          : id === "costly"
+            ? Number(String(state.target).startsWith("delete"))
+            : { choice: "e6", probabilities: { e6: 0.95 } },
     );
     const cache = createTargetCache();
     const base = { judge, ...ids, scope: "a", cache, target: "edit invoice 42", use: "click" as const };

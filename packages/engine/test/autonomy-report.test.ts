@@ -120,7 +120,7 @@ async function run(r: {
   return row;
 }
 
-const decide = (messageId: string, selected: string[], error: string | null = null) =>
+const decide = (messageId: string, selected: string[], error: string | null = null, needsAgentScore?: number) =>
   f.db.insert(schema.routingDecisions).values({
     orgId: f.org.id,
     channelId: f.general.id,
@@ -129,6 +129,7 @@ const decide = (messageId: string, selected: string[], error: string | null = nu
     candidates: [],
     selectedAgentIds: selected,
     error,
+    needsAgentScore: needsAgentScore ?? null,
   });
 
 const posted: Step = ["message", { messageId: crypto.randomUUID() }];
@@ -293,6 +294,7 @@ async function seed() {
   await usage(quiet.id, { input: 1000, output: 200, cacheRead: 300, cost: 5_000_000 });
   await run({ at: at("20:05:00"), background: true });
   const ack = await message({ at: at("21:00:00"), channelId: ch.quiet, body: "Valeu! 🙏" });
+  await decide(ack.id, [], null, 0.05);
   const thanked = await run({ at: at("21:00:01"), triggerId: ack.id, steps: [posted] });
   await usage(thanked.id, { input: 500, output: 100, cost: 2_000_000 });
   const ask = await message({ at: at("21:10:00"), channelId: ch.quiet, body: "valeu, agora abre o PR" });
@@ -307,6 +309,7 @@ async function seed() {
   ] as const) {
     const trigger = await message({ at: at(time), by: ops, channelId: ch.agents, body: wake, mentions: [dev] });
     const answer = reply ? await message({ at: at(time), by: dev, channelId: ch.agents, body: reply }) : null;
+    if (answer) await decide(answer.id, [], null, reply?.startsWith("Ok") ? 0.05 : 0.9);
     await run({
       at: at(time),
       triggerId: trigger.id,
@@ -396,55 +399,41 @@ describe("one workspace's day", () => {
     expect(table).toContain("$0.01");
   });
 
-  test("a thanks, an ok or a sign-off in any script counts; a yes, a question, more words, a word only a phrase makes a thanks, or a file don't", async () => {
+  test("a thanks or an ok counts the same in every language: the router's low need on a few words, or emoji alone", async () => {
     const other = "2026-10-20";
-    const acks = [
-      "👍",
-      "ok obrigado!",
-      "Thanks a lot @dev",
-      "ありがとうございます",
-      "спасибо",
-      "Valeu, até amanhã",
-      "kkkk",
-      "Merci beaucoup",
-      "gracias!!",
-      "copy that",
-      "see ya",
-      "até mais",
-      "have a good day!",
-      "all right",
-      "show de bola",
-      "Bom dia!",
-      "de nada",
-      "tudo bem",
-      "got it",
-    ];
+    // The same short messages in Portuguese, English, Japanese and German.
+    const thanks = ["valeu, até amanhã", "thanks a lot @dev", "ありがとうございます", "Danke schön!"];
     const asks = [
-      "?",
-      "sim",
-      "pode fazer",
-      "ok, e o deploy?",
-      "ok fix the login bug",
-      "どうして",
-      "",
-      "спасибо, где логи",
-      "show it",
-      "copy it",
-      "mais",
-      "see all",
-      "have it",
-      "show all",
-      "amanhã",
-      "tudo",
+      "valeu, e o deploy?",
+      "thanks, where are the logs?",
+      "ありがとう、ログはどこ？",
+      "Danke, wo sind die Logs?",
+    ];
+    const long = [
+      "valeu, agora abre o PR do login",
+      "thanks, now open the login PR please",
+      "ありがとう 次は ログイン の PR を 開いて",
+      "danke, jetzt bitte den Login PR öffnen",
     ];
     let n = 0;
-    for (const body of [...acks, ...asks]) {
+    const replied = async (body: string, need?: number) => {
       const time = `10:${String(n++).padStart(2, "0")}:00`;
       const trigger = await message({ at: at(time, other), channelId: ch.quiet, body });
+      if (need !== undefined) await decide(trigger.id, [], null, need);
       await run({ at: at(time, other), triggerId: trigger.id, steps: [posted] });
-    }
-    const [day] = await autonomyRows(f.db, { from: other, days: 1 });
-    expect(day?.ackReplies).toBe(acks.length);
+    };
+    const acks = async () => (await autonomyRows(f.db, { from: other, days: 1 }))[0]?.ackReplies ?? 0;
+    // Heard as needing no agent: an ack. Heard as needing one, or never read by the router: not.
+    for (const body of thanks) await replied(body, 0.05);
+    expect(await acks()).toBe(4);
+    for (const body of thanks) await replied(body, 0.9);
+    for (const body of thanks) await replied(body);
+    // A question mark in any script, or more than a few words, is never one, whatever the router heard.
+    for (const body of [...asks, ...long]) await replied(body, 0.05);
+    expect(await acks()).toBe(4);
+    // Emoji alone needs no router.
+    await replied("👍🙏");
+    expect(await acks()).toBe(5);
   });
 
   test("after the nudge, a tool directory's search or a skill isn't doing it; a look-up is", async () => {
