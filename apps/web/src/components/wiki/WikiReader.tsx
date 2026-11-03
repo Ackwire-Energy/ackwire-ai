@@ -412,7 +412,7 @@ function Backlinks({ page }: { page: WikiPageData }) {
               key={`p:${b.slug}`}
               to="/org/$orgId/wiki/$slug"
               params={{ orgId: org.id, slug: b.slug }}
-              className="wiki-ref"
+              className="wiki-ref ac-iconline"
             >
               <Icon name="document" size={16} />
               <span>
@@ -433,7 +433,7 @@ function Backlinks({ page }: { page: WikiPageData }) {
               key={`m:${b.messageId}`}
               to="/org/$orgId/c/$channelId"
               params={{ orgId: org.id, channelId: b.channelId }}
-              className="wiki-ref"
+              className="wiki-ref ac-iconline"
             >
               {b.dm ? (
                 <AuthorAvatar a={{ type: b.dm.type === "agent" ? "agent" : "person", id: b.dm.id }} />
@@ -453,7 +453,7 @@ function Backlinks({ page }: { page: WikiPageData }) {
               key={`f:${b.topicId}`}
               to="/org/$orgId/forum/$topicId"
               params={{ orgId: org.id, topicId: b.topicId }}
-              className="wiki-ref"
+              className="wiki-ref ac-iconline"
             >
               <Icon name="message" size={16} />
               <span>
@@ -466,7 +466,7 @@ function Backlinks({ page }: { page: WikiPageData }) {
             key={`i:${b.number}`}
             to="/org/$orgId/issues/$number"
             params={{ orgId: org.id, number: String(b.number) }}
-            className="wiki-ref"
+            className="wiki-ref ac-iconline"
           >
             <Icon name="issues" size={16} />
             <span>

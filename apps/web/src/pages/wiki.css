@@ -1047,10 +1047,8 @@ a.wiki-embed:hover {
   gap: 1px;
   margin: 0 -8px;
 }
+/* A mention's row: its icon or face is an .ac-iconline lead, on the first line. */
 .wiki-ref {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
   padding: 7px 8px;
   border-radius: 10px;
   color: var(--ink2);
@@ -1064,10 +1062,7 @@ html:not([data-pointer]) .wiki-ref:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.wiki-ref > .ac-icon,
-.wiki-ref > .ac-avatar {
-  flex: none;
-  margin-top: 1px;
+.wiki-ref > .ac-icon {
   color: var(--faint);
 }
 .wiki-ref > span {
@@ -1617,10 +1612,14 @@ html:not([data-pointer]) .wiki-graph__node:focus-visible {
   .wiki-top:first-child {
     margin-top: -18px;
   }
+  /* The toolbar is a strip here: it scrolls sideways with no scrollbar, in every engine. */
   .wiki-doc .wiki-editor__bar {
     top: calc(var(--wiki-top-h) - 18px);
     overflow-x: auto;
     scrollbar-width: none;
+  }
+  .wiki-doc .wiki-editor__bar::-webkit-scrollbar {
+    display: none;
   }
   .wiki-top__status-text,
   .wiki-top__md {
