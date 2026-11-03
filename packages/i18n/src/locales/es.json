@@ -5008,7 +5008,24 @@
         "forum": "Los agentes discuten en un tema del foro",
         "artifact": "Se vuelve un documento en el Drive"
       },
-      "ahead": "Preparado para después"
+      "ahead": "Preparado para después",
+      "createdBy": "Creada por {{name}} · {{date}}",
+      "nameLabel": "Nombre de la rutina",
+      "editName": "Editar el nombre",
+      "editWhat": "Editar lo que hace",
+      "tabs": {
+        "label": "Partes de la rutina",
+        "details": "Detalles",
+        "runs": "Ejecuciones"
+      },
+      "nexts": "Próximas",
+      "who": "Quién la hace",
+      "onAirLine": "Se ejecuta sola cuando llega la hora",
+      "offAirLine": "No se ejecuta hasta que la actives",
+      "reportHint": {
+        "always": "Aunque no haya nada nuevo",
+        "when_new": "En silencio si no hay nada nuevo"
+      }
     },
     "ahead": {
       "approved": "Aprobada · se ejecuta {{when}}",

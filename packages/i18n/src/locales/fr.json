@@ -5061,7 +5061,24 @@
         "forum": "Les agents en discutent dans un sujet du forum",
         "artifact": "Devient un document dans le Drive"
       },
-      "ahead": "Préparé pour plus tard"
+      "ahead": "Préparé pour plus tard",
+      "createdBy": "Créée par {{name}} · {{date}}",
+      "nameLabel": "Nom de la routine",
+      "editName": "Modifier le nom",
+      "editWhat": "Modifier ce qu'elle fait",
+      "tabs": {
+        "label": "Parties de la routine",
+        "details": "Détails",
+        "runs": "Exécutions"
+      },
+      "nexts": "Prochaines exécutions",
+      "who": "Qui s'en charge",
+      "onAirLine": "S'exécute toute seule le moment venu",
+      "offAirLine": "Ne s'exécute pas tant que vous ne l'activez pas",
+      "reportHint": {
+        "always": "Même sans rien de nouveau",
+        "when_new": "Silencieuse quand il n'y a rien de nouveau"
+      }
     },
     "ahead": {
       "approved": "Approuvée · s'exécute {{when}}",

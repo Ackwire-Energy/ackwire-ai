@@ -4825,6 +4825,19 @@ export const ptBR = {
         artifact: "Vira um documento no Drive",
       },
       ahead: "Preparado para depois",
+      /** Above the name on the routine's page: `date` is a short day ("28 out"). */
+      createdBy: "Criada por {{name}} · {{date}}",
+      nameLabel: "Nome da rotina",
+      editName: "Editar o nome",
+      editWhat: "Editar o que ela faz",
+      tabs: { label: "Partes da rotina", details: "Detalhes", runs: "Execuções" },
+      nexts: "Próximas",
+      who: "Quem faz",
+      /** Under "No ar" / "Pausada" on the aside's switch. */
+      onAirLine: "Roda sozinha quando chega a hora",
+      offAirLine: "Não roda até você ligar",
+      /** Under each "Quando posta" answer. */
+      reportHint: { always: "Mesmo sem novidade", when_new: "Silêncio quando não há nada novo" },
     },
     /** Actions prepared for its runs (`schedule_action`), on its page. */
     ahead: {

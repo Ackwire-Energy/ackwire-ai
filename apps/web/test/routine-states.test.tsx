@@ -114,6 +114,13 @@ const details = async (name: string) => {
   await settle(4);
   return screen().getByRole("dialog", { name });
 };
+/** The details' aside: "No ar" and the fields that change at once. */
+const asideOf = (panel: HTMLElement) => within(panel).getByRole("complementary", { name: /^Detalhes: / });
+/** The details' "Execuções" tab (Radix tabs switch on mouse down). */
+const runsTab = async (panel: HTMLElement) => {
+  await act(async () => fireEvent.mouseDown(within(panel).getByRole("tab", { name: /^Execuções/ }), { button: 0 }));
+  await settle(2);
+};
 
 describe("Rotinas: each routine's state, with its one-tap fix", () => {
   test("paused because the agent left the channel: the reason and 'Adicionar agente ao canal'", async () => {
@@ -383,29 +390,36 @@ describe("Rotinas: a routine's details", () => {
   test("the week, where it runs, how it works and each run in plain words", async () => {
     await openOn([busy], ["MacBook do Walter", "Mac mini"], runs);
     const panel = await details("Revisar PRs");
-    const text = panel.textContent ?? "";
     const region = (name: string) => within(panel).getByRole("region", { name });
-    expect(text).toContain("12 de 14 OK esta semana · 2 puladas");
-    expect(text).toContain("14 execuções · 120 mil tokens do plano");
+    const aside = asideOf(panel);
+    // This week in its well: how many went right, then what else happened; the usage in the aside.
+    const week = panel.querySelector(".routine-week") as HTMLElement;
+    expect(week.querySelector("b")?.textContent).toBe("12 de 14 OK esta semana");
+    expect(week.textContent).toContain("2 puladas");
+    expect(aside.textContent).toContain("Uso esta semana14 execuções · 120 mil tokens do plano");
     // Two computers: where it runs is the computer, by its name alone.
-    expect(region("Onde roda").querySelector("p")?.textContent).toBe("MacBook do Walter");
-    expect(text).not.toContain("Claude Code no");
+    expect(aside.textContent).toContain("Onde rodaMacBook do Walter");
+    expect(panel.textContent).not.toContain("Claude Code no");
     // Hourly on someone's computer: how often it wakes it, with when it runs.
-    expect(region("Quando").textContent).toContain("Roda 24 vezes por dia no MacBook do Walter");
+    expect(region("Próximas").textContent).toContain("Roda 24 vezes por dia no MacBook do Walter");
     // Every routine does what its agent can (ADR 0109): no access section.
-    expect(text).not.toContain("Pode agir");
-    // When it posts: the answer, and what the choice means behind its ⓘ.
-    const posts = region("Quando posta");
+    expect(panel.textContent).not.toContain("Pode agir");
+    // When it posts: the answer with its line, and what the choice means behind its ⓘ.
+    const posts = within(aside).getByRole("combobox", { name: "Quando posta" });
     expect(posts.textContent).toContain("Toda vez");
-    const about = within(posts).getByRole("button", { name: "Sobre Quando posta" });
+    expect(posts.textContent).toContain("Mesmo sem novidade");
+    const about = within(aside).getByRole("button", { name: "Sobre Quando posta" });
     expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
       "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
     );
-    // Short sections two to a row when there's room: the week with where it delivers.
-    const pairs = [...panel.querySelectorAll(".routine-details__pair")].map((p) =>
-      [...p.querySelectorAll("section")].map((x) => x.getAttribute("aria-label")),
+    // Where it delivers, with who sees it.
+    expect(within(aside).getByRole("combobox", { name: "Onde entrega" }).textContent).toContain(
+      "Todo mundo do canal vê",
     );
-    expect(pairs).toEqual([["Esta semana", "Onde entrega"]]);
+    // The runs are their own tab.
+    expect(panel.textContent).not.toContain("Contou o que achou");
+    await runsTab(panel);
+    const text = panel.textContent ?? "";
     expect(text).toContain("Trabalhando agora");
     expect(text).toContain("Contou o que achou");
     expect(text).toContain("3 erros novos no checkout");
@@ -426,9 +440,9 @@ describe("Rotinas: a routine's details", () => {
   test("one computer says nothing about where it runs; the Cloud's, always on, no busy note either", async () => {
     const one = await openOn([structuredClone(busy)], ["MacBook do Walter"], runs);
     let panel = await details("Revisar PRs");
-    expect(within(panel).queryByRole("region", { name: "Onde roda" })).toBeNull();
+    expect(asideOf(panel).textContent).not.toContain("Onde roda");
     // Still someone's computer, which has to stay on: unnamed.
-    expect(within(panel).getByRole("region", { name: "Quando" }).textContent).toContain(
+    expect(within(panel).getByRole("region", { name: "Próximas" }).textContent).toContain(
       "Roda 24 vezes por dia no computador, que precisa ficar ligado.",
     );
     expect(panel.textContent).not.toContain("MacBook");
@@ -439,7 +453,7 @@ describe("Rotinas: a routine's details", () => {
     };
     await openOn([cloud], ["Computador da Acme"], runs, true);
     panel = await details("Revisar PRs");
-    expect(within(panel).queryByRole("region", { name: "Onde roda" })).toBeNull();
+    expect(asideOf(panel).textContent).not.toContain("Onde roda");
     expect(panel.textContent).not.toContain("Computador da Acme");
     expect(panel.textContent).not.toContain("Roda 24 vezes");
   });
@@ -462,14 +476,59 @@ describe("Rotinas: a routine's details", () => {
     expect(within(row).queryByRole("button", { name: "Rodar agora" })).toBeNull();
     const panel = await details("Caixa do suporte");
     expect(panel.textContent).toContain("Só quem criou, o dono do agente, admins e quem está na conversa veem isto.");
-    expect(panel.textContent).toContain("Contou o que achou");
     expect(within(panel).queryByRole("button", { name: "Editar" })).toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Editar o nome" })).toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Rodar agora" })).toBeNull();
     // Every routine does what its agent can (ADR 0109): no access section; when it posts: the answer, its meaning behind the ⓘ.
     expect(within(panel).queryByRole("region", { name: "O que pode fazer sozinha" })).toBeNull();
-    const section = within(panel).getByRole("region", { name: "Quando posta" });
-    expect(within(section).getByRole("button", { name: "Sobre Quando posta" })).toBeTruthy();
-    expect(section.querySelector(".small.muted")).toBeNull();
-    expect(section.querySelectorAll("p")).toHaveLength(1);
+    const aside = asideOf(panel);
+    expect(within(aside).queryByRole("switch")).toBeNull();
+    expect(within(aside).queryByRole("combobox")).toBeNull();
+    expect(within(aside).getByRole("button", { name: "Sobre Quando posta" })).toBeTruthy();
+    expect(aside.textContent).toContain("Só quando tiver novidade");
+    await runsTab(panel);
+    expect(panel.textContent).toContain("Contou o que achou");
+  });
+
+  test("who may see it but not change it: the values in the aside, the prompt as text, no pencils", async () => {
+    await open([routine({ id: "rt-ro", name: "Erros do dia", canManage: false })]);
+    const panel = await details("Erros do dia");
+    const aside = asideOf(panel);
+    expect(within(aside).queryByRole("switch")).toBeNull();
+    expect(within(aside).queryByRole("combobox")).toBeNull();
+    expect(within(aside).queryByRole("button", { name: "Quando" })).toBeNull();
+    expect(aside.textContent).toContain("No ar");
+    expect(aside.textContent).toContain("Quem faz");
+    expect(aside.textContent).toContain("Atlas");
+    expect(aside.textContent).toContain("#eng");
+    expect(aside.textContent).toContain("Todo mundo do canal vê");
+    expect(aside.textContent).toContain("Só quando tiver novidade");
+    expect(panel.textContent).toContain("Olhe os erros novos do Sentry e conte o que achar.");
+    expect(within(panel).queryByRole("button", { name: "Editar o nome" })).toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Editar o que ela faz" })).toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Rodar agora" })).toBeNull();
+  });
+
+  test("a routine made in a DM says only you see it there, not everyone in the channel", async () => {
+    const state = seedState({
+      dms: [{ channelId: "dm-jorge", with: { type: "person", id: "u-joao", name: "Jorge", handle: "jorge" } }],
+    });
+    await open(
+      [
+        routine({
+          id: "rt-dm",
+          name: "Lembrar do fornecedor",
+          target: { type: "conversation", channelId: "dm-jorge", threadId: null },
+        }),
+      ],
+      {},
+      state,
+    );
+    const panel = await details("Lembrar do fornecedor");
+    const where = within(asideOf(panel)).getByRole("combobox", { name: "Onde entrega" });
+    expect(where.textContent).toContain("Na DM com o Jorge");
+    expect(where.textContent).toContain("Só você vê");
+    expect(where.textContent).not.toContain("Todo mundo do canal vê");
   });
 });
 
@@ -649,7 +708,8 @@ describe("Chat: what a routine found", () => {
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
     const dialog = screen().getByRole("dialog", { name: "Sentry diário" });
-    expect(within(dialog).getByRole("button", { name: "Editar" })).toBeTruthy();
+    expect(within(dialog).getByRole("heading", { level: 1, name: "Sentry diário" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Editar o nome" })).toBeTruthy();
     await click(within(dialog).getByRole("button", { name: "Fechar detalhes" }));
     expect(screen().queryByRole("dialog", { name: "Sentry diário" })).toBeNull();
     expect(
@@ -691,6 +751,7 @@ describe("Chat: what a routine found", () => {
     await click(screen().getByRole("link", { name: "Rotina «Resumo da manhã»" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Resumo da manhã" });
+    await runsTab(dialog);
     await click(within(dialog).getByRole("link", { name: "Abrir na conversa" }));
     await settle(4);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);

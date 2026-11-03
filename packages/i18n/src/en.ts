@@ -4679,6 +4679,19 @@ export const en = {
         artifact: "Becomes a document in the Drive",
       },
       ahead: "Prepared for later",
+      /** Above the name on the routine's page: `date` is a short day ("28 out"). */
+      createdBy: "Created by {{name}} · {{date}}",
+      nameLabel: "Routine name",
+      editName: "Edit the name",
+      editWhat: "Edit what it does",
+      tabs: { label: "Parts of the routine", details: "Details", runs: "Runs" },
+      nexts: "Next runs",
+      who: "Who does it",
+      /** Under "No ar" / "Pausada" on the aside's switch. */
+      onAirLine: "Runs by itself when it's time",
+      offAirLine: "Doesn't run until you turn it on",
+      /** Under each "Quando posta" answer. */
+      reportHint: { always: "Even with nothing new", when_new: "Quiet when there's nothing new" },
     },
     ahead: {
       approved: "Approved · runs {{when}}",

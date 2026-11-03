@@ -384,14 +384,139 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   opacity: 0.5;
 }
 
-/* ── Details (in the shared details dialog) ─────────────────────────────── */
-.routine-details__actions {
+/* ── Details: the routine's page in the details dialog, laid out as a task's (`issue-layout`, `issue-aside`) ── */
+/* "Rotina" on the bar, with "✓ Salvo" (SavedNote) after a change. */
+.routine-details .ac-details__eyebrow {
+  display: inline-flex;
+  align-items: center;
+}
+/* Its agent, state and when, under the name. */
+.routine-page__line {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 6px 8px;
+  font-size: 14px;
 }
-.routine-details__actions > .ac-btn {
-  flex: 1 1 auto;
+.routine-page__dot {
+  color: var(--faint);
+}
+/* This week: the sentence beside the last seven days in pixels (RunMark), today last. */
+.routine-week {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-cut);
+  background: var(--card-well, var(--sunken));
+}
+.routine-week__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.routine-week__text b {
+  font-size: 15px;
+  font-weight: 600;
+}
+.routine-week__days {
+  display: flex;
+  gap: 10px;
+}
+.routine-week__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.routine-week__day small {
+  font-size: 11px;
+  color: var(--faint);
+}
+/* A day's runs stacked from the bottom; a day without any is a short dash on the line. */
+.routine-week__cells {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  gap: 2px;
+  min-height: 22px;
+}
+.routine-week__cells .ac-run-mark {
+  border-radius: 2px;
+}
+.routine-week__none {
+  display: block;
+  width: 8px;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+/* "No ar": its state and what it means, the switch at the end. */
+.issue-aside__item.routine-onair {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--card-well, var(--sunken));
+}
+.routine-onair__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.routine-onair__text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.routine-onair__text small {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+/* A field of the aside: its value with a short line under it, on a picker's trigger or read only. */
+.ac-select.routine-sel .ac-select__trigger {
+  height: auto;
+  min-height: 44px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.routine-sel__value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+}
+.routine-sel__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 18px;
+}
+.routine-sel__text b,
+.routine-sel__text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.routine-sel__text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.routine-sel__text small {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+/* What it does, being edited: the box is as tall as the text, from a few lines. */
+.routine-prompt__text {
+  min-height: 180px;
 }
 .routine-details__usage-pause {
   display: flex;
@@ -410,40 +535,13 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-details .ac-details__section p {
   margin: 0;
 }
-/* Two short sections side by side once the body is wide enough, one under the other below that (narrow windows,
-   phones). No column gap: their two top rules meet in one divider across the row, as a full-width section's. */
-.routine-details .ac-details__body {
-  container: routine-details / inline-size;
-}
-.routine-details__pair {
-  display: contents;
-}
-@container routine-details (min-width: 620px) {
-  .routine-details__pair {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .routine-details__pair > :first-child {
-    padding-right: 12px;
-  }
-  .routine-details__pair > :last-child {
-    padding-left: 12px;
-  }
-}
+/* What it does, as a task's description reads (edited in place). */
 .routine-details__prompt {
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--sunken);
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: var(--ink2);
+  font-size: 15px;
+  line-height: 23px;
+  color: var(--ink);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.routine-details__sentence {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
 }
 .routine-details__nexts {
   display: flex;

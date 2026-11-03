@@ -503,6 +503,11 @@ describe("Rotinas", () => {
     await settle(4);
     const details = screen().getByRole("dialog", { name: "Resumo da semana" });
     expect(details.textContent).toContain("Resuma o que");
+    // The runs are their own tab (Radix tabs switch on mouse down).
+    await act(async () =>
+      fireEvent.mouseDown(within(details).getByRole("tab", { name: /^Execuções/ }), { button: 0 }),
+    );
+    await settle(2);
     expect(details.textContent).toContain("Parada por");
     expect(details.textContent).toContain("O orçamento do mês acabou");
     expect(details.textContent).toContain("Contou o que achou");

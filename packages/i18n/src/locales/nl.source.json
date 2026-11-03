@@ -11748,6 +11748,45 @@
   "routines.panel.ahead": {
     "value": "Prepared for later"
   },
+  "routines.panel.createdBy": {
+    "value": "Created by {{name}} · {{date}}"
+  },
+  "routines.panel.nameLabel": {
+    "value": "Routine name"
+  },
+  "routines.panel.editName": {
+    "value": "Edit the name"
+  },
+  "routines.panel.editWhat": {
+    "value": "Edit what it does"
+  },
+  "routines.panel.tabs.label": {
+    "value": "Parts of the routine"
+  },
+  "routines.panel.tabs.details": {
+    "value": "Details"
+  },
+  "routines.panel.tabs.runs": {
+    "value": "Runs"
+  },
+  "routines.panel.nexts": {
+    "value": "Next runs"
+  },
+  "routines.panel.who": {
+    "value": "Who does it"
+  },
+  "routines.panel.onAirLine": {
+    "value": "Runs by itself when it's time"
+  },
+  "routines.panel.offAirLine": {
+    "value": "Doesn't run until you turn it on"
+  },
+  "routines.panel.reportHint.always": {
+    "value": "Even with nothing new"
+  },
+  "routines.panel.reportHint.when_new": {
+    "value": "Quiet when there's nothing new"
+  },
   "routines.ahead.approved": {
     "value": "Approved · runs {{when}}"
   },

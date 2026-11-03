@@ -40,13 +40,14 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, actorKey, useActors } from "@/components/actors";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
 import { IssueWorkBlock } from "@/components/BackgroundWork";
+import { EditInPlace, useFocusAtEnd, useSavedFlash, useSent } from "@/components/EditInPlace";
 import { IssueForumCard, NewTopicDialog } from "@/components/Forum";
 import { IssueFiles, useIssueFileEntries } from "@/components/IssueFiles";
 import { useOrg } from "@/components/org-context";
@@ -228,75 +229,6 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
         <Details issue={i} />
         <Links issue={i} />
       </aside>
-    </div>
-  );
-}
-
-/** "✓ Salvo" for a moment after a text edited in place is saved (as a channel's name and description show it). */
-function useSavedFlash() {
-  const [saved, setSaved] = useState(false);
-  useEffect(() => {
-    if (!saved) return;
-    const id = setTimeout(() => setSaved(false), 1800);
-    return () => clearTimeout(id);
-  }, [saved]);
-  return [saved, () => setSaved(true)] as const;
-}
-
-/**
- * What was just sent, shown while the task still has the value it replaced (the list refetches after each change,
- * so the old text would blink back for a moment); forgotten as soon as the task comes back changed.
- */
-function useSent<T>(fromServer: string) {
-  const [sent, setSent] = useState<{ value: T; was: string } | null>(null);
-  useEffect(() => {
-    if (sent && sent.was !== fromServer) setSent(null);
-  }, [sent, fromServer]);
-  return {
-    pending: sent && sent.was === fromServer ? sent.value : null,
-    send: (value: T) => setSent({ value, was: fromServer }),
-    clear: () => setSent(null),
-  };
-}
-
-/** Focuses a field when it opens, with the caret after its text (not before it, as autofocus leaves a textarea). */
-function useFocusAtEnd<T extends HTMLInputElement | HTMLTextAreaElement>(open: boolean) {
-  const ref = useRef<T>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!open || !el) return;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  }, [open]);
-  return ref;
-}
-
-/**
- * Text a person edits where it is: on hover the pencil shows; a press on the text (not on a link, a file or a
- * button in it) or on the pencil opens the field. The pencil is the keyboard's way in.
- */
-function EditInPlace({ label, onEdit, children }: { label: string; onEdit: () => void; children: ReactNode }) {
-  return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a pointer shortcut; the pencil is the keyboard way
-    <div
-      className="issue-inplace"
-      onClick={(e) => {
-        if (e.target instanceof Element && e.target.closest("a, button, input, label, .artifact-tile")) return;
-        if (window.getSelection()?.toString()) return;
-        onEdit();
-      }}
-    >
-      {children}
-      <Button
-        variant="ghost"
-        size="sm"
-        iconOnly
-        icon="edit"
-        aria-label={label}
-        title={label}
-        className="issue-inplace__pen"
-        onClick={onEdit}
-      />
     </div>
   );
 }

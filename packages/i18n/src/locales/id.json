@@ -4736,7 +4736,24 @@
         "forum": "Agen berdiskusi di topik forum",
         "artifact": "Menjadi dokumen di Drive"
       },
-      "ahead": "Disiapkan untuk nanti"
+      "ahead": "Disiapkan untuk nanti",
+      "createdBy": "Dibuat oleh {{name}} · {{date}}",
+      "nameLabel": "Nama rutinitas",
+      "editName": "Edit nama",
+      "editWhat": "Edit yang dilakukannya",
+      "tabs": {
+        "label": "Bagian rutinitas",
+        "details": "Rincian",
+        "runs": "Riwayat proses"
+      },
+      "nexts": "Berikutnya",
+      "who": "Siapa yang mengerjakan",
+      "onAirLine": "Jalan sendiri saat waktunya tiba",
+      "offAirLine": "Tidak jalan sampai kamu mengaktifkannya",
+      "reportHint": {
+        "always": "Meski tidak ada yang baru",
+        "when_new": "Diam kalau tidak ada yang baru"
+      }
     },
     "ahead": {
       "approved": "Disetujui · jalan {{when}}",

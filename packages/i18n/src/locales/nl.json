@@ -4918,7 +4918,24 @@
         "forum": "De agents overleggen in een forumonderwerp",
         "artifact": "Wordt een document in de Drive"
       },
-      "ahead": "Klaargezet voor later"
+      "ahead": "Klaargezet voor later",
+      "createdBy": "Gemaakt door {{name}} · {{date}}",
+      "nameLabel": "Naam van de routine",
+      "editName": "Naam bewerken",
+      "editWhat": "Bewerken wat hij doet",
+      "tabs": {
+        "label": "Onderdelen van de routine",
+        "details": "Gegevens",
+        "runs": "Uitvoeringen"
+      },
+      "nexts": "Volgende",
+      "who": "Wie het doet",
+      "onAirLine": "Draait vanzelf als het tijd is",
+      "offAirLine": "Draait niet tot je hem aanzet",
+      "reportHint": {
+        "always": "Ook als er niets nieuws is",
+        "when_new": "Stil als er niets nieuws is"
+      }
     },
     "ahead": {
       "approved": "Goedgekeurd · draait {{when}}",

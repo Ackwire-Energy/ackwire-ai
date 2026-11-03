@@ -4827,7 +4827,24 @@
         "forum": "Ajanlar bir forum konusunda tartışır",
         "artifact": "Drive'da bir belgeye dönüşür"
       },
-      "ahead": "Sonrası için hazırlandı"
+      "ahead": "Sonrası için hazırlandı",
+      "createdBy": "Oluşturan: {{name}} · {{date}}",
+      "nameLabel": "Rutinin adı",
+      "editName": "Adı düzenle",
+      "editWhat": "Ne yaptığını düzenle",
+      "tabs": {
+        "label": "Rutinin bölümleri",
+        "details": "Ayrıntılar",
+        "runs": "Çalıştırmalar"
+      },
+      "nexts": "Sonrakiler",
+      "who": "Kim yapıyor",
+      "onAirLine": "Zamanı gelince kendiliğinden çalışır",
+      "offAirLine": "Siz açana kadar çalışmaz",
+      "reportHint": {
+        "always": "Yeni bir şey olmasa da",
+        "when_new": "Yeni bir şey yoksa sessiz kalır"
+      }
     },
     "ahead": {
       "approved": "Onaylandı · {{when}} çalışır",

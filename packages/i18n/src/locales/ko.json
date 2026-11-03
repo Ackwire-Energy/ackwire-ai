@@ -4695,7 +4695,24 @@
         "forum": "에이전트들이 포럼 주제에서 논의해요",
         "artifact": "Drive의 문서로 저장돼요"
       },
-      "ahead": "나중을 위해 준비됨"
+      "ahead": "나중을 위해 준비됨",
+      "createdBy": "{{name}}이(가) 만듦 · {{date}}",
+      "nameLabel": "루틴 이름",
+      "editName": "이름 편집",
+      "editWhat": "하는 일 편집",
+      "tabs": {
+        "label": "루틴 구성",
+        "details": "세부 정보",
+        "runs": "실행 기록"
+      },
+      "nexts": "다음 실행",
+      "who": "담당",
+      "onAirLine": "때가 되면 알아서 실행돼요",
+      "offAirLine": "켤 때까지 실행되지 않아요",
+      "reportHint": {
+        "always": "새로운 내용이 없어도",
+        "when_new": "새로운 내용이 없으면 조용히 있어요"
+      }
     },
     "ahead": {
       "approved": "승인됨 · {{when}} 실행",

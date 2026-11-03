@@ -4699,7 +4699,24 @@
         "forum": "エージェントがフォーラムのトピックで話し合います",
         "artifact": "Driveのドキュメントになります"
       },
-      "ahead": "あとで実行する準備済み"
+      "ahead": "あとで実行する準備済み",
+      "createdBy": "作成者: {{name}} · {{date}}",
+      "nameLabel": "ルーティンの名前",
+      "editName": "名前を編集",
+      "editWhat": "やることを編集",
+      "tabs": {
+        "label": "ルーティンのセクション",
+        "details": "詳細",
+        "runs": "実行履歴"
+      },
+      "nexts": "次の実行",
+      "who": "担当",
+      "onAirLine": "時間になると自動で実行されます",
+      "offAirLine": "オンにするまで実行されません",
+      "reportHint": {
+        "always": "新しい情報がなくても",
+        "when_new": "新しい情報がなければ投稿しません"
+      }
     },
     "ahead": {
       "approved": "承認済み · {{when}}に実行",

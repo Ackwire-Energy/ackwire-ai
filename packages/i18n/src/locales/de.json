@@ -4868,7 +4868,24 @@
         "forum": "Die Agenten diskutieren in einem Forumsthema",
         "artifact": "Wird zu einem Dokument im Drive"
       },
-      "ahead": "Für später vorbereitet"
+      "ahead": "Für später vorbereitet",
+      "createdBy": "Erstellt von {{name}} · {{date}}",
+      "nameLabel": "Name der Routine",
+      "editName": "Namen bearbeiten",
+      "editWhat": "Bearbeiten, was sie tut",
+      "tabs": {
+        "label": "Bereiche der Routine",
+        "details": "Übersicht",
+        "runs": "Ausführungen"
+      },
+      "nexts": "Nächste Ausführungen",
+      "who": "Wer sie ausführt",
+      "onAirLine": "Läuft von selbst, wenn es so weit ist",
+      "offAirLine": "Läuft nicht, bis du sie einschaltest",
+      "reportHint": {
+        "always": "Auch wenn es nichts Neues gibt",
+        "when_new": "Still, wenn es nichts Neues gibt"
+      }
     },
     "ahead": {
       "approved": "Freigegeben · läuft {{when}}",

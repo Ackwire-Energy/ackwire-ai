@@ -4748,7 +4748,24 @@
         "forum": "智能体在论坛主题中讨论",
         "artifact": "生成 Drive 中的文档"
       },
-      "ahead": "为之后准备好的"
+      "ahead": "为之后准备好的",
+      "createdBy": "由 {{name}} 创建 · {{date}}",
+      "nameLabel": "例行工作名称",
+      "editName": "编辑名称",
+      "editWhat": "编辑要做的事",
+      "tabs": {
+        "label": "例行工作内容",
+        "details": "详情",
+        "runs": "运行记录"
+      },
+      "nexts": "接下来",
+      "who": "由谁来做",
+      "onAirLine": "到时间会自动运行",
+      "offAirLine": "在你开启之前不会运行",
+      "reportHint": {
+        "always": "即使没有新内容",
+        "when_new": "没有新内容时保持安静"
+      }
     },
     "ahead": {
       "approved": "已批准 · {{when}}运行",

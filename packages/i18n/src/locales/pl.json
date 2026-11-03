@@ -5171,7 +5171,24 @@
         "forum": "Agenci dyskutują w temacie na forum",
         "artifact": "Staje się dokumentem na Drive"
       },
-      "ahead": "Przygotowane na później"
+      "ahead": "Przygotowane na później",
+      "createdBy": "Utworzona przez: {{name}} · {{date}}",
+      "nameLabel": "Nazwa rutyny",
+      "editName": "Edytuj nazwę",
+      "editWhat": "Edytuj, co robi",
+      "tabs": {
+        "label": "Części rutyny",
+        "details": "Szczegóły",
+        "runs": "Uruchomienia"
+      },
+      "nexts": "Następne",
+      "who": "Kto ją wykonuje",
+      "onAirLine": "Uruchamia się sama, gdy przyjdzie pora",
+      "offAirLine": "Nie uruchomi się, dopóki jej nie włączysz",
+      "reportHint": {
+        "always": "Nawet gdy nie ma nic nowego",
+        "when_new": "Cisza, gdy nie ma nic nowego"
+      }
     },
     "ahead": {
       "approved": "Zatwierdzone · uruchomi się {{when}}",

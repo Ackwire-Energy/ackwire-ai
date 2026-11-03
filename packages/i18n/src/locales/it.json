@@ -5062,7 +5062,24 @@
         "forum": "Gli agenti ne discutono in un argomento del forum",
         "artifact": "Diventa un documento nel Drive"
       },
-      "ahead": "Preparate per dopo"
+      "ahead": "Preparate per dopo",
+      "createdBy": "Creata da {{name}} · {{date}}",
+      "nameLabel": "Nome della routine",
+      "editName": "Modifica il nome",
+      "editWhat": "Modifica cosa fa",
+      "tabs": {
+        "label": "Sezioni della routine",
+        "details": "Dettagli",
+        "runs": "Esecuzioni"
+      },
+      "nexts": "Prossime",
+      "who": "Chi la svolge",
+      "onAirLine": "Viene eseguita da sola quando è il momento",
+      "offAirLine": "Non viene eseguita finché non la attivi",
+      "reportHint": {
+        "always": "Anche senza novità",
+        "when_new": "In silenzio quando non c'è nulla di nuovo"
+      }
     },
     "ahead": {
       "approved": "Approvata · parte {{when}}",
