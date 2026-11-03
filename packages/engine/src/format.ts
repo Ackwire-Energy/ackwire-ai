@@ -10,6 +10,10 @@ export const cutTextEnd = (text: string, max: number) =>
   text.slice(Math.max(0, text.length - max)).replace(/^[\uDC00-\uDFFF]/, "");
 
 /** Postgres text and jsonb refuse NUL and lone UTF-16 surrogates: `text` without either. */
+/** The strings of an untrusted value: its string items when it is an array, else none. */
+export const stringsOf = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+
 export const pgSafeText = (text: string) =>
   text.replaceAll("\0", "").replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
 

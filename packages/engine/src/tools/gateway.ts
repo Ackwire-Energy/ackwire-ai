@@ -1,7 +1,7 @@
 import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
-import { coveringRules, type RememberedKind } from "../approval-rules";
+import { coveringRules, decidesAgentApprovals, type RememberedKind } from "../approval-rules";
 import { fedByRoutine, type RunAuthority, runAuthorityById, UUID } from "../authority";
 import { countToolCall } from "../connector-usage";
 import { actionLevel, nameWords, openEnded } from "../connectors/classify";
@@ -537,6 +537,40 @@ export function createToolGateway(deps: {
     return row ?? null;
   }
 
+  /**
+   * Whether a routine's run may do this call without a card (`routines.own_actions`, ADR 0053 §2 addendum of
+   * 2026-11-03: setting the routine up approved its job, so it doesn't ask every run). Every action the call runs is one its creator
+   * allowed for the routine, the call could be approved ahead at all (`aheadRefusal`: a connected app's own action,
+   * nothing that runs whatever its input says, never merge, deploy, rollback and the like), and the creator still
+   * decides this agent's approvals. Read fresh: a removed action or a creator who lost the right asks at once.
+   */
+  async function ownJobCovers(
+    ctx: ToolContext,
+    brief: RoutineBrief,
+    tool: ToolDefinition,
+    input: Record<string, unknown>,
+  ) {
+    if (!UUID.test(brief.routineId) || aheadRefusal(tool, input)) return false;
+    const names = tool.actions ? tool.actions(input) : [tool.name];
+    if (!names?.length) return false;
+    const [row] = await ctx.db
+      .select({ ownActions: routines.ownActions, creator: routines.createdByUserId, owner: agents.ownerUserId })
+      .from(routines)
+      .innerJoin(agents, and(eq(agents.id, routines.agentId), eq(agents.orgId, routines.orgId)))
+      .where(
+        and(
+          eq(routines.id, brief.routineId),
+          eq(routines.orgId, ctx.orgId),
+          eq(routines.agentId, ctx.agentId),
+          isNull(routines.deletedAt),
+        ),
+      );
+    if (!row?.creator || row.ownActions.length === 0) return false;
+    const own = new Set(row.ownActions.map((a) => a.toLowerCase()));
+    if (!names.every((n) => own.has(n.toLowerCase()))) return false;
+    return decidesAgentApprovals(ctx.db, ctx.orgId, row.creator, row.owner);
+  }
+
   /** The call an action approved ahead stores, by its id (`run_approved_action`), when it is this agent's. */
   async function storedAhead(ctx: ToolContext, id: unknown) {
     if (typeof id !== "string" || !UUID.test(id)) return null;
@@ -850,6 +884,12 @@ export function createToolGateway(deps: {
         approvedBy = await coveringRules(ctx.db, at, remember);
         if (approvedBy) approves = false;
       }
+      // The routine's own job: an action its creator allowed when they set it up runs like an allowed one, every run.
+      const ownJob =
+        approves && authority?.kind === "routine" && authority.brief
+          ? await ownJobCovers(ctx, authority.brief, tool, call.input)
+          : false;
+      if (ownJob) approves = false;
       // Approved ahead: the exact call a person approved for this routine run's slot runs like an allowed one, why
       // or not; the one they refused never runs.
       const ahead =
@@ -868,7 +908,7 @@ export function createToolGateway(deps: {
       if (ahead?.status === "refused") {
         return finish({ content: AHEAD_REFUSED, isError: true, data: { code: "approval.ahead_refused" } }, "refused");
       }
-      if (whyMissing && !approvedBy && !ahead)
+      if (whyMissing && !approvedBy && !ahead && !ownJob)
         return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;

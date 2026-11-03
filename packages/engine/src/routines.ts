@@ -16,6 +16,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
+import { decidesAgentApprovals } from "./approval-rules";
 import { cancelRoutineAhead, type RoutineAheadView, routinesAhead } from "./approvals";
 import type { ArtifactDeps } from "./artifacts";
 import { audienceError, canTalkTo, speakerFor, speakerOf } from "./audience";
@@ -77,6 +78,7 @@ import {
 } from "./rrule";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 import { standingRefusal } from "./standing";
+import { alwaysAsks } from "./tools/gateway";
 import {
   assertMayContinuePause,
   overrideUsagePause,
@@ -262,6 +264,8 @@ export interface RoutineView {
   createdAt: string;
   access: RoutineAccess;
   report: RoutineReport;
+  /** Connected-app actions its runs do without asking (`routines.own_actions`): the job its creator set it up for. */
+  ownActions: string[];
   /** Why it paused itself (a coded reason the app translates); null when a person paused it, or it runs. */
   pausedReason: string | null;
   failuresInRow: number;
@@ -317,6 +321,8 @@ export interface RoutineInput {
   access?: RoutineAccess;
   /** When it speaks (default `when_new`). */
   report?: RoutineReport;
+  /** Connected-app actions its job needs, done without asking (`ownActionsOf`); only who decides the agent's approvals sets them. */
+  ownActions?: string[];
   /** Created paused: no next run, so the active-routine cap doesn't apply. */
   paused?: boolean;
 }
@@ -912,6 +918,7 @@ async function views(
       createdAt: r.createdAt.toISOString(),
       access: routineAccessOf(r.access),
       report: routineReportOf(r.report),
+      ownActions: r.ownActions,
       pausedReason: r.active ? null : r.pausedReason,
       failuresInRow: r.failuresInRow,
       state,
@@ -1184,6 +1191,45 @@ async function checkRoutineCap(db: Database, orgId: string, agentId: string, exc
   }
 }
 
+/** How many connected-app actions a routine may do on its own. */
+export const MAX_OWN_ACTIONS = 20;
+const ACTION_NAME = /^[A-Za-z0-9_.:-]{1,128}$/;
+
+/**
+ * A routine's own actions as sent: trimmed and unique, each a tool name (or a Composio action's slug). Merge, deploy,
+ * rollback and the rest that always ask a person at the time are refused (`alwaysAsks`), so nobody thinks they're on.
+ */
+export function ownActionsOf(list: readonly string[]): string[] {
+  const out = [...new Set(list.map((a) => a.trim()).filter(Boolean))];
+  if (out.length > MAX_OWN_ACTIONS) {
+    throw new ValidationError(`At most ${MAX_OWN_ACTIONS} actions on its own`, "routine.too_many_actions", {
+      max: MAX_OWN_ACTIONS,
+    });
+  }
+  for (const action of out) {
+    if (!ACTION_NAME.test(action)) {
+      throw new ValidationError(`Not a tool name: ${action}`, "routine.action_invalid", { action });
+    }
+    if (alwaysAsks(action)) {
+      throw new ValidationError(
+        `${action} always asks a person at the time (merge, deploy, rollback and the like): leave it out`,
+        "routine.action_always_asks",
+        { action },
+      );
+    }
+  }
+  return out;
+}
+
+/** A routine acts on its own only by the word of someone who could approve those actions themselves. */
+async function requireActionApprover(db: Database, actorId: string, orgId: string, ownerUserId: string | null) {
+  if (await decidesAgentApprovals(db, orgId, actorId, ownerUserId)) return;
+  throw new ForbiddenError(
+    "Only the agent's owner or someone who approves its actions can let a routine act on its own",
+    "routine.actions_need_approver",
+  );
+}
+
 const emailWatch = (t: Extract<RoutineTriggerInput, { type: "email" }>) => ({
   accountId: t.accountId,
   folder: t.folder?.trim() || "INBOX",
@@ -1210,6 +1256,8 @@ export async function createRoutine(
   if (!input.paused && startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
   if (input.trigger.type === "email") await checkWatchable(db, orgId, agent.id, input.trigger.accountId);
   const hooks = input.trigger.type === "webhook" ? hooksOf(deps) : null;
+  const ownActions = ownActionsOf(input.ownActions ?? []);
+  if (ownActions.length > 0) await requireActionApprover(db, actorId, orgId, agent.ownerUserId);
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Routine";
   const [row] = await db
     .insert(routines)
@@ -1223,6 +1271,7 @@ export async function createRoutine(
       ...(input.paused ? { active: false, nextRunAt: null } : {}),
       access: routineAccessOf(input.access),
       report: routineReportOf(input.report),
+      ownActions,
       createdByUserId: actorId,
     })
     .returning();
@@ -1234,7 +1283,13 @@ export async function createRoutine(
     actor: { type: "person", id: actorId },
     action: "routine.created",
     target: { type: "routine", id: row.id },
-    details: { agentId: agent.id, trigger: input.trigger.type, access: row.access, report: row.report },
+    details: {
+      agentId: agent.id,
+      trigger: input.trigger.type,
+      access: row.access,
+      report: row.report,
+      ownActions: row.ownActions,
+    },
   });
   const [view] = await views(db, [row], actorId, deps.hooks);
   return view as RoutineView;
@@ -1359,6 +1414,8 @@ export interface RoutinePatch {
   active?: boolean;
   access?: RoutineAccess;
   report?: RoutineReport;
+  /** Replaces its own actions (`RoutineInput.ownActions`): only its creator, when they decide the agent's approvals. */
+  ownActions?: string[];
 }
 
 /**
@@ -1407,6 +1464,19 @@ export async function updateRoutine(
   }
   if (patch.access !== undefined) set.access = routineAccessOf(patch.access);
   if (patch.report !== undefined) set.report = routineReportOf(patch.report);
+  if (patch.ownActions !== undefined) {
+    const ownActions = ownActionsOf(patch.ownActions);
+    if (JSON.stringify(ownActions) !== JSON.stringify(current.ownActions)) {
+      if (actorId !== current.createdByUserId) {
+        throw new ForbiddenError(
+          "Take the routine over before changing what it does on its own",
+          "routine.act_take_over",
+        );
+      }
+      if (ownActions.length > 0) await requireActionApprover(db, actorId, orgId, agent.ownerUserId);
+      set.ownActions = ownActions;
+    }
+  }
   // A routine reaches what its creator reaches (their rooms, the agents they talk to), so only its
   // creator may decide what it does with that; anyone else takes it over first.
   if (

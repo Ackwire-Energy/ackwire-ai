@@ -13,6 +13,7 @@ import {
   listRoutineRuns,
   listRoutines,
   localDateTimeOf,
+  MAX_OWN_ACTIONS,
   managedWebhookRoutine,
   newRoutineHookAddress,
   newRoutineHookSecret,
@@ -146,6 +147,11 @@ const Report = z.enum(ROUTINE_REPORT).openapi({
   description: "When it speaks: `when_new` (only when there is something new) or `always` (a report every run).",
 });
 
+const OwnActions = z.array(z.string().min(1).max(128)).max(MAX_OWN_ACTIONS).openapi({
+  description:
+    "Connected-app actions its runs do without asking (tool names, or a Composio action's slug): the job its creator set it up for. Any other write to a connected app asks a person; merge, deploy, rollback and the like are refused here and always ask.",
+});
+
 const RoutineRun = z
   .object({
     id: z.uuid(),
@@ -240,6 +246,7 @@ const Routine = z
     createdAt: z.string(),
     access: Access,
     report: Report,
+    ownActions: OwnActions,
     pausedReason: z.string().nullable().openapi({
       description:
         "Why it paused itself (`creator_left`, `creator_no_access`, `agent_archived`, `agent_not_in_channel`, `audience`, `failing`); null when a person paused it.",
@@ -633,6 +640,7 @@ export function routineRoutes(deps: AppDeps) {
             trigger: TriggerInput,
             access: Access.optional().openapi({ description: "Ignored: every routine acts (ADR 0109)." }),
             report: Report.optional().openapi({ description: "Default `when_new`." }),
+            ownActions: OwnActions.optional(),
           }),
         ),
       },
@@ -671,6 +679,9 @@ export function routineRoutes(deps: AppDeps) {
             }),
             access: Access.optional(),
             report: Report.optional(),
+            ownActions: OwnActions.optional().openapi({
+              description: "Replaces the list; only its creator, when they decide the agent's approvals.",
+            }),
           }),
         ),
       },

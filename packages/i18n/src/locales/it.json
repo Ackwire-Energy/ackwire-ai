@@ -1940,6 +1940,7 @@
     "routine": {
       "created": "Ho creato la routine <b>{{name}}</b> · {{schedule}}",
       "created_bare": "Ho creato la routine <b>{{name}}</b>",
+      "ownActions": "Fa da sola, senza chiedere: {{actions}}",
       "updated": "Ho cambiato {{fields}} della routine <b>{{name}}</b>",
       "updated_paused": "Ho messo in pausa la routine <b>{{name}}</b>",
       "updated_resumed": "Ho ripreso la routine <b>{{name}}</b>",
@@ -4920,7 +4921,12 @@
         "forum": "Gli agenti ne discutono in un argomento del forum",
         "artifact": "Diventa un documento nel Drive"
       },
-      "ahead": "Preparate per dopo"
+      "ahead": "Preparate per dopo",
+      "ownActions": "Fa da sola"
+    },
+    "ownActions": {
+      "hint": "Ogni esecuzione fa queste azioni nelle tue app collegate senza chiedere. Qualsiasi altra azione lì chiede prima l’approvazione di una persona, e merge, deploy e rollback la chiedono sempre.",
+      "none": "Nelle app collegate chiede l’approvazione di una persona prima di ogni azione. Per farle fare il suo lavoro da sola, di’ all’agente in chat quali azioni può fare."
     },
     "ahead": {
       "approved": "Approvata · parte {{when}}",

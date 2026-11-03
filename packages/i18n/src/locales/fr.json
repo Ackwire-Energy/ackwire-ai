@@ -1943,6 +1943,7 @@
     "routine": {
       "created": "A créé la routine <b>{{name}}</b> · {{schedule}}",
       "created_bare": "A créé la routine <b>{{name}}</b>",
+      "ownActions": "Fait seule, sans demander : {{actions}}",
       "updated": "A modifié {{fields}} de la routine <b>{{name}}</b>",
       "updated_paused": "A mis en pause la routine <b>{{name}}</b>",
       "updated_resumed": "A relancé la routine <b>{{name}}</b>",
@@ -4920,7 +4921,12 @@
         "forum": "Les agents en discutent dans un sujet du forum",
         "artifact": "Devient un document dans le Drive"
       },
-      "ahead": "Préparé pour plus tard"
+      "ahead": "Préparé pour plus tard",
+      "ownActions": "Fait seule"
+    },
+    "ownActions": {
+      "hint": "Chaque exécution fait cela dans tes apps connectées sans demander. Toute autre action dans ces apps demande d’abord l’accord d’une personne, et merge, deploy et rollback le demandent toujours.",
+      "none": "Dans les apps connectées, elle demande l’accord d’une personne avant chaque action. Pour qu’elle fasse son travail seule, dis à l’agent dans le chat quelles actions elle peut faire."
     },
     "ahead": {
       "approved": "Approuvée · s'exécute {{when}}",

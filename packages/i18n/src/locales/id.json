@@ -1824,6 +1824,7 @@
     "routine": {
       "created": "Membuat rutinitas <b>{{name}}</b> · {{schedule}}",
       "created_bare": "Membuat rutinitas <b>{{name}}</b>",
+      "ownActions": "Dilakukan sendiri, tanpa bertanya: {{actions}}",
       "updated": "Mengubah {{fields}} di rutinitas <b>{{name}}</b>",
       "updated_paused": "Menjeda rutinitas <b>{{name}}</b>",
       "updated_resumed": "Melanjutkan rutinitas <b>{{name}}</b>",
@@ -4601,7 +4602,12 @@
         "forum": "Agen berdiskusi di topik forum",
         "artifact": "Menjadi dokumen di Drive"
       },
-      "ahead": "Disiapkan untuk nanti"
+      "ahead": "Disiapkan untuk nanti",
+      "ownActions": "Dilakukan sendiri"
+    },
+    "ownActions": {
+      "hint": "Setiap jalannya melakukan ini di aplikasi terhubung kamu tanpa bertanya. Tindakan lain di sana meminta persetujuan seseorang dulu, dan merge, deploy, serta rollback selalu meminta.",
+      "none": "Di aplikasi terhubung, rutinitas ini meminta persetujuan seseorang sebelum setiap tindakan. Agar bisa bekerja sendiri, beri tahu agen di chat tindakan apa saja yang boleh dilakukan."
     },
     "ahead": {
       "approved": "Disetujui · jalan {{when}}",

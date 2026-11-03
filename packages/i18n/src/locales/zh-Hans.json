@@ -1816,6 +1816,7 @@
     "routine": {
       "created": "创建了例行工作 <b>{{name}}</b> · {{schedule}}",
       "created_bare": "创建了例行工作 <b>{{name}}</b>",
+      "ownActions": "无需询问，自动执行：{{actions}}",
       "updated": "修改了例行工作 <b>{{name}}</b> 的{{fields}}",
       "updated_paused": "暂停了例行工作 <b>{{name}}</b>",
       "updated_resumed": "恢复了例行工作 <b>{{name}}</b>",
@@ -4615,7 +4616,12 @@
         "forum": "智能体在论坛主题中讨论",
         "artifact": "生成 Drive 中的文档"
       },
-      "ahead": "为之后准备好的"
+      "ahead": "为之后准备好的",
+      "ownActions": "自动执行"
+    },
+    "ownActions": {
+      "hint": "每次运行都会在你已连接的应用中直接执行这些操作，无需询问。其中的其他操作会先请人审批，合并、部署和回滚始终需要审批。",
+      "none": "在已连接的应用中，每个操作前都会先请人审批。若要让它自动完成工作，请在聊天中告诉智能体可以执行哪些操作。"
     },
     "ahead": {
       "approved": "已批准 · {{when}}运行",

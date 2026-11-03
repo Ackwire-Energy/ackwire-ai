@@ -1828,6 +1828,8 @@ export const en = {
     routine: {
       created: "Created the routine <b>{{name}}</b> · {{schedule}}",
       created_bare: "Created the routine <b>{{name}}</b>",
+      /** Under a created routine's receipt: the connected-app actions its runs do without asking (tool names). */
+      ownActions: "Does on its own, without asking: {{actions}}",
       updated: "Changed {{fields}} of the routine <b>{{name}}</b>",
       updated_paused: "Paused the routine <b>{{name}}</b>",
       updated_resumed: "Resumed the routine <b>{{name}}</b>",
@@ -4531,6 +4533,12 @@ export const en = {
         artifact: "Becomes a document in the Drive",
       },
       ahead: "Prepared for later",
+      ownActions: "Does on its own",
+    },
+    /** The connected-app actions a routine's runs do without asking: the job its creator set it up for. */
+    ownActions: {
+      hint: "Every run does these in your connected apps without asking. Any other action there asks a person first, and merge, deploy and rollback always ask.",
+      none: "In connected apps it asks a person before each action. To let it do its job on its own, tell the agent in the chat which actions it may do.",
     },
     ahead: {
       approved: "Approved · runs {{when}}",

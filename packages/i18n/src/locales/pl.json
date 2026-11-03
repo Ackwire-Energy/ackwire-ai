@@ -1993,6 +1993,7 @@
     "routine": {
       "created": "Utworzono rutynę <b>{{name}}</b> · {{schedule}}",
       "created_bare": "Utworzono rutynę <b>{{name}}</b>",
+      "ownActions": "Robi sama, bez pytania: {{actions}}",
       "updated": "Zmieniono {{fields}} w rutynie <b>{{name}}</b>",
       "updated_paused": "Wstrzymano rutynę <b>{{name}}</b>",
       "updated_resumed": "Wznowiono rutynę <b>{{name}}</b>",
@@ -5026,7 +5027,12 @@
         "forum": "Agenci dyskutują w temacie na forum",
         "artifact": "Staje się dokumentem na Drive"
       },
-      "ahead": "Przygotowane na później"
+      "ahead": "Przygotowane na później",
+      "ownActions": "Robi sama"
+    },
+    "ownActions": {
+      "hint": "Każde uruchomienie robi to w twoich połączonych aplikacjach bez pytania. Każda inna akcja w nich najpierw prosi osobę o zgodę, a merge, deploy i rollback zawsze o nią proszą.",
+      "none": "W połączonych aplikacjach przed każdą akcją prosi osobę o zgodę. Żeby wykonywała swoją pracę sama, powiedz agentowi na czacie, jakie akcje może wykonywać."
     },
     "ahead": {
       "approved": "Zatwierdzone · uruchomi się {{when}}",

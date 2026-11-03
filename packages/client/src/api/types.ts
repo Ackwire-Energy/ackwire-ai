@@ -3018,6 +3018,8 @@ export interface Routine {
   createdAt: string;
   access: RoutineAccess;
   report: RoutineReport;
+  /** Connected-app actions its runs do without asking: the job its creator set it up for. Absent from older servers. */
+  ownActions?: string[];
   /** A coded reason (`RoutinePausedReason`); anything else is shown as a plain pause. */
   pausedReason: string | null;
   failuresInRow: number;

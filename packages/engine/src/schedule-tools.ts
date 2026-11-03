@@ -9,7 +9,7 @@ import { consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
 import { schedulesOf } from "./context/summaries";
 import { isAgentOnlyDm } from "./dms";
-import { cutText } from "./format";
+import { cutText, stringsOf } from "./format";
 import { ROUTINE_REPORT, routineReportOf } from "./routine-brief";
 import {
   cancelReminder,
@@ -432,6 +432,21 @@ export const REPORT_SCHEMA = {
   description: '"when_new" (default): only when there is something new; "always": a report every run.',
 };
 
+/** `own_actions` of `create_routine` and `update_routine`. */
+const OWN_ACTIONS_SCHEMA = {
+  type: "array",
+  maxItems: 20,
+  items: { type: "string", minLength: 1, maxLength: 128 },
+  description:
+    "Connected-app actions the routine's job needs, which every run then does without asking a person: the exact tool names you call (for Composio's multi-execute tool, each action's slug, like SLACK_SEND_MESSAGE). Only what the person asked the routine to do (the Slack post, the email they want sent). Any other write to a connected app still asks, and merge, deploy, rollback and the like always ask, so never list them. Only the agent's owner or someone who approves its actions can set this. On update it replaces the list; [] makes every action ask again.",
+};
+
+/** What the routine does without asking, for the agent to tell the person. */
+const ownActionsText = (r: RoutineView) =>
+  r.ownActions.length > 0
+    ? ` On its own, without asking, every run may: ${r.ownActions.join(", ")}. Any other action in a connected app asks a person first; merge, deploy and rollback always ask. Tell the person exactly this.`
+    : " Every action in a connected app asks a person first.";
+
 /** A webhook routine's address is a secret the agent never sees: the person copies it from the routine's page. */
 const WEBHOOK_HINT =
   " Its webhook address is secret and only on the routine's page: never write an address in the chat. Tell the person to open the routine in Routines to copy it (and to turn on signed calls there if the sending service can sign them).";
@@ -515,7 +530,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "create_routine",
       description:
-        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people. It can do what you can (search the web, use your computer and browser, tell or ask other agents, post where the person can); changes in connected apps still ask a person first. That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again; "when another service calls it" or "by webhook" is a webhook trigger. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
+        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people. It can do what you can (search the web, use your computer and browser, tell or ask other agents, post where the person can); changes in connected apps ask a person first, except the ones its job needs that you list in `own_actions` (the person asked for them, so setting it up approves them). That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again; "when another service calls it" or "by webhook" is a webhook trigger. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -526,6 +541,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           title: { type: "string", maxLength: 120 },
           channel: { type: "string", maxLength: 100, description: "Report in this channel instead of here" },
           report: REPORT_SCHEMA,
+          own_actions: OWN_ACTIONS_SCHEMA,
         },
         required: ["prompt"],
         additionalProperties: false,
@@ -570,6 +586,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
                 : { type: "conversation", ...conv, reminder: false },
             trigger,
             report: routineReportOf(input.report),
+            ownActions: stringsOf(input.own_actions),
           });
           // Recorded right after (reading the schedule may call a model: no transaction held around it).
           const row = await routineRow(ctx.db, ctx.orgId, routine.id);
@@ -583,6 +600,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
                   active: routine.active,
                   access: routine.access,
                   report: routine.report,
+                  ownActions: routine.ownActions,
                   ...whenParams(routine.trigger),
                 },
                 after: routineSnapshot(row),
@@ -590,7 +608,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             ]);
           }
           return {
-            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.${needsText(routine)}${
+            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.${ownActionsText(routine)}${needsText(routine)}${
               routine.trigger.type === "webhook" ? WEBHOOK_HINT : ""
             }`,
             data: { routine: { id: routine.id } },
@@ -695,7 +713,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "update_routine",
       description:
-        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
+        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `own_actions` what it does in connected apps without asking, `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -707,6 +725,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           trigger: TRIGGER_SCHEMA,
           title: { type: "string", minLength: 1, maxLength: 120 },
           report: REPORT_SCHEMA,
+          own_actions: OWN_ACTIONS_SCHEMA,
           active: { type: "boolean" },
         },
         required: ["id"],
@@ -738,6 +757,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             ...(trigger ? { trigger } : {}),
             ...(input.report !== undefined ? { report: routineReportOf(input.report) } : {}),
             ...(typeof input.active === "boolean" ? { active: input.active } : {}),
+            ...(Array.isArray(input.own_actions) ? { ownActions: stringsOf(input.own_actions) } : {}),
           });
           const afterRow = await routineRow(ctx.db, ctx.orgId, id);
           if (afterRow) {
@@ -750,7 +770,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
                   fields.map((f) =>
                     ["triggerType", "phrase", "cron", "timezone", "description", "event", "rule"].includes(f)
                       ? "schedule"
-                      : f,
+                      : f === "ownActions"
+                        ? "access"
+                        : f,
                   ),
                 ),
               ];
@@ -774,9 +796,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             }
           }
           return {
-            content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.${needsText(routine)}${
-              trigger?.type === "webhook" ? WEBHOOK_HINT : ""
-            }`,
+            content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.${
+              Array.isArray(input.own_actions) ? ownActionsText(routine) : ""
+            }${needsText(routine)}${trigger?.type === "webhook" ? WEBHOOK_HINT : ""}`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {

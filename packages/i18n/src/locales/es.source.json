@@ -4544,6 +4544,9 @@
   "agentActions.routine.created_bare": {
     "value": "Created the routine <b>{{name}}</b>"
   },
+  "agentActions.routine.ownActions": {
+    "value": "Does on its own, without asking: {{actions}}"
+  },
   "agentActions.routine.updated": {
     "value": "Changed {{fields}} of the routine <b>{{name}}</b>"
   },
@@ -11411,6 +11414,15 @@
   },
   "routines.panel.ahead": {
     "value": "Prepared for later"
+  },
+  "routines.panel.ownActions": {
+    "value": "Does on its own"
+  },
+  "routines.ownActions.hint": {
+    "value": "Every run does these in your connected apps without asking. Any other action there asks a person first, and merge, deploy and rollback always ask."
+  },
+  "routines.ownActions.none": {
+    "value": "In connected apps it asks a person before each action. To let it do its job on its own, tell the agent in the chat which actions it may do."
   },
   "routines.ahead.approved": {
     "value": "Approved · runs {{when}}"

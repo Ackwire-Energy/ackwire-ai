@@ -160,6 +160,7 @@ const ROUTINE_FIELDS = [
   "active",
   "access",
   "report",
+  "ownActions",
 ] as const;
 
 /** The fields a routine change can touch (what undo restores). */

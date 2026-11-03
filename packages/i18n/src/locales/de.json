@@ -1879,6 +1879,7 @@
     "routine": {
       "created": "Routine <b>{{name}}</b> erstellt · {{schedule}}",
       "created_bare": "Routine <b>{{name}}</b> erstellt",
+      "ownActions": "Macht selbst, ohne zu fragen: {{actions}}",
       "updated": "{{fields}} der Routine <b>{{name}}</b> geändert",
       "updated_paused": "Routine <b>{{name}}</b> pausiert",
       "updated_resumed": "Routine <b>{{name}}</b> fortgesetzt",
@@ -4729,7 +4730,12 @@
         "forum": "Die Agenten diskutieren in einem Forumsthema",
         "artifact": "Wird zu einem Dokument im Drive"
       },
-      "ahead": "Für später vorbereitet"
+      "ahead": "Für später vorbereitet",
+      "ownActions": "Macht selbst"
+    },
+    "ownActions": {
+      "hint": "Jeder Lauf erledigt das in deinen verbundenen Apps, ohne zu fragen. Jede andere Aktion dort fragt zuerst eine Person, und Merge, Deploy und Rollback fragen immer.",
+      "none": "In verbundenen Apps fragt sie vor jeder Aktion eine Person. Damit sie ihre Aufgabe selbst erledigt, sag dem Agenten im Chat, welche Aktionen sie ausführen darf."
     },
     "ahead": {
       "approved": "Freigegeben · läuft {{when}}",

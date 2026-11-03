@@ -172,6 +172,12 @@ export const routines = pgTable(
      * and asks before any change in a connected app.
      */
     access: text().notNull().default("read"),
+    /**
+     * Connected-app actions its job needs (tool names, or a Composio action's slug), allowed by its creator when they
+     * set it up: its runs do them without a card while the creator may still decide the agent's approvals. Any other
+     * write to a connected app asks; merge, deploy, rollback and the like always ask (`aheadRefusal`).
+     */
+    ownActions: jsonb().$type<string[]>().notNull().default([]),
     /** When it speaks: `when_new` (only when there is news) or `always` (a report every time). */
     report: text().notNull().default("when_new"),
     /** Why it paused itself (a coded reason the app translates); cleared when a person resumes it. */

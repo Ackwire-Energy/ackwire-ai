@@ -1249,6 +1249,11 @@ function RoutineDetails({
           <p className="small muted">{t("routines.detailsHidden")}</p>
         )}
       </DetailsSection>
+      {r.canSeeDetails && (
+        <DetailsSection title={t("routines.panel.ownActions")}>
+          <OwnActions routine={r} />
+        </DetailsSection>
+      )}
       <DetailsSection title={t("routines.panel.when")}>
         <p className="routine-details__sentence">{when(r)}</p>
         {mailTrouble(r) && (
@@ -2151,6 +2156,10 @@ function RoutineDialog({
               options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
             />
           </div>
+          <div className="routine-kind">
+            <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
+            <OwnActions routine={routine} />
+          </div>
           <RoutineReachWarnings prompt={prompt} agentId={agentId || null} creatorUserId={routine?.createdByUserId} />
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">
@@ -2169,6 +2178,23 @@ function RoutineDialog({
         </DialogFooter>
       </form>
     </Dialog>
+  );
+}
+
+/** What a routine does in connected apps without asking (the job its creator set it up for), or that it asks for each. */
+function OwnActions({ routine }: { routine: Routine | undefined }) {
+  const { t } = useTranslation();
+  const own = routine?.ownActions ?? [];
+  if (own.length === 0) return <p className="small muted">{t("routines.ownActions.none")}</p>;
+  return (
+    <>
+      <ul className="routine-own" aria-label={t("routines.panel.ownActions")}>
+        {own.map((action) => (
+          <li key={action}>{action}</li>
+        ))}
+      </ul>
+      <p className="small muted">{t("routines.ownActions.hint")}</p>
+    </>
   );
 }
 
