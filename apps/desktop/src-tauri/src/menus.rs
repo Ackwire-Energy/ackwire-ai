@@ -200,7 +200,7 @@ fn build_app_menu(
     let about = AboutMetadataBuilder::new()
         .name(Some(app.package_info().name.clone()))
         .version(Some(app.package_info().version.to_string()))
-        // The license's required attribution (LICENSE, AGPL-3.0 section 7(b)); never removed.
+        // The license's required attribution (NOTICE, AGPL-3.0 section 7(b)); never removed.
         .copyright(Some(
             "Based on agentes.chat by Codari Global, LLC\n\
              Copyright © 2026 Codari Global, LLC and contributors\n\

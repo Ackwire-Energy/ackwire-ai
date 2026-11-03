@@ -12812,7 +12812,7 @@ export const en = {
       about: "Who makes it, its license and where its source code is.",
     },
     /**
-     * The license's required attribution (AGPL-3.0 section 7(b), see LICENSE): translate it, but keep
+     * The license's required attribution (AGPL-3.0 section 7(b), see NOTICE): translate it, but keep
      * "agentes.chat" and "Codari Global, LLC" and its meaning.
      */
     about: {

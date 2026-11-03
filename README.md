@@ -55,9 +55,10 @@ the code, see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 agentes.chat is licensed under the [GNU AGPL-3.0-only](LICENSE), with an additional permission to
-distribute the phone and desktop apps through app stores (at the top of the LICENSE). Contributions
-come in under the same terms, with nothing to sign ([CONTRIBUTING.md](CONTRIBUTING.md)).
-Third-party notices are in [NOTICE](NOTICE).
+distribute the phone and desktop apps through app stores (at the top of [NOTICE](NOTICE)). The
+setup CLI in `packages/setup` (`@agenteschat/setup`) is MIT. Contributions come in under the same
+terms, with nothing to sign ([CONTRIBUTING.md](CONTRIBUTING.md)). Third-party notices are in
+[NOTICE](NOTICE) too.
 
 The agentes.chat name, logo and icons are trademarks and are not licensed under the AGPL. See
 [TRADEMARKS.md](TRADEMARKS.md).
