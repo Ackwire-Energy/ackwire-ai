@@ -129,7 +129,7 @@ export async function loadReplyPolicy(
       background: agentRuns.background,
       answerOwed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'answerOwed')::boolean, false)`,
       passListed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'passListed')::boolean, false)`,
-      catchUp: sql<boolean>`(${agentRuns.transcript} -> 'catchUp') is not null`,
+      catchUp: sql<boolean>`coalesce((${agentRuns.transcript} -> 'catchUp' ->> 'mayPass')::boolean, false)`,
       authorType: messages.authorType,
       authorAgentId: messages.authorAgentId,
       meta: messages.meta,

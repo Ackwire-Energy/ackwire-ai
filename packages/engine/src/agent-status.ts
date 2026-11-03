@@ -253,7 +253,7 @@ export async function loadAgentStatuses(
     // stay. A conversation waiting on its plan or budget says so too (nothing could stand in for it), with how many
     // wait: one story for its status, its queue and its notes.
     const catchUps = runs.filter((r) => r.catchUp !== null && !r.background);
-    const out = outs.get(a.id) ?? catchUpOut(catchUps);
+    const out = outs.get(a.id) ?? catchUpOut(catchUps, now);
     const outNow =
       out &&
       !working.some((r) => r.status === "running") &&
@@ -283,14 +283,18 @@ const outLine = (out: OutOfOffice, waiting: number): AgentStatusLine => ({
   ...(waiting > 0 ? { count: waiting } : {}),
 });
 
-/** Out of office read from its conversations waiting on its plan or budget: the earliest reset they know. */
+/**
+ * Out of office read from its conversations waiting on its plan or budget: the earliest reset still ahead (one past
+ * while the line drains, 60 s apart, says no time rather than one gone by).
+ */
 function catchUpOut(
   list: { catchUp: "plan_limit" | "budget" | null; resetsAt: string | null }[],
+  now: Date,
 ): OutOfOffice | undefined {
   const first = list[0];
   if (!first) return undefined;
   const reason = list.some((r) => r.catchUp === "plan_limit") ? ("plan" as const) : ("budget" as const);
-  const resets = list.map((r) => Date.parse(r.resetsAt ?? "")).filter((t) => t > 0);
+  const resets = list.map((r) => Date.parse(r.resetsAt ?? "")).filter((t) => t > now.getTime());
   return { reason, until: resets.length > 0 ? new Date(Math.min(...resets)) : null };
 }
 

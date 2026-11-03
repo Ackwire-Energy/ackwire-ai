@@ -61,7 +61,20 @@ interface LineRow {
   workId: string | null;
   since: number;
   createdAt: Date;
+  /** The model its plan wait is on ("": the brain's default; null: stored without one, or a budget wait). */
+  model?: string | null;
 }
+
+/** A plan wait's model, as `LineRow.model`. */
+const waitModelSql = sql<string | null>`case when ${schema.agentRuns.transcript}->'waitingForBrain' ? 'model'
+  then coalesce(${schema.agentRuns.transcript}->'waitingForBrain'->>'model', '') end`;
+
+/**
+ * Two waits on one sign-in wait for the same reset unless they are on different models (a model's own weekly limit):
+ * those keep their own head and their own timers.
+ */
+const sameReset = (a: LineRow, model: string | null | undefined) =>
+  a.model == null || model == null || a.model === model;
 
 /** The order of a usage line: by group, then by when each first paused. Parking again never changes a place. */
 const inLineOrder = (a: LineRow, b: LineRow) =>
@@ -77,6 +90,7 @@ async function lineRows(db: Executor, orgId: string, key: string): Promise<LineR
       workId: agentRuns.workId,
       since: waitSinceSql,
       createdAt: agentRuns.createdAt,
+      model: waitModelSql,
     })
     .from(agentRuns)
     .where(
@@ -92,18 +106,28 @@ async function lineRows(db: Executor, orgId: string, key: string): Promise<LineR
 
 /**
  * This run's place in the line of `key` among the runs already waiting there (`inLineOrder`, `since`: when it first
- * paused), and the runs behind it, in order.
+ * paused), whether it heads the waits for its reset (`model`: its plan wait's, as `LineRow.model`), and the runs behind
+ * it that wait for that same reset, in order.
  */
 export async function usageWaitPlace(
   db: Executor,
   run: { id: string; orgId: string; background: boolean; workId?: string | null; createdAt: Date },
   key: string,
   since: number,
-): Promise<{ place: number; behind: string[] }> {
+  model?: string | null,
+): Promise<{ place: number; head: boolean; behind: string[] }> {
   const others = (await lineRows(db, run.orgId, key)).filter((r) => r.id !== run.id);
   const me: LineRow = { ...run, workId: run.workId ?? null, since };
   const place = others.filter((r) => inLineOrder(r, me) < 0).length;
-  return { place, behind: others.slice(place).map((r) => r.id) };
+  const mine = (r: LineRow) => sameReset(r, model);
+  return {
+    place,
+    head: !others.slice(0, place).some(mine),
+    behind: others
+      .slice(place)
+      .filter(mine)
+      .map((r) => r.id),
+  };
 }
 
 /**
@@ -128,27 +152,30 @@ export const LINE_SAFETY_MS = 24 * 3600_000;
  * the re-checks, or it would sleep on its safety timer.
  */
 export async function lineHeadLooks(db: Executor, orgId: string, key: string, now = Date.now()) {
-  const [head] = await lineRows(db, orgId, key);
-  if (!head) return;
+  // The head of each reset the line waits for (one per model with a limit of its own).
+  const heads: LineRow[] = [];
+  for (const r of await lineRows(db, orgId, key)) if (!heads.some((h) => sameReset(h, r.model))) heads.push(r);
   const { agentRuns } = schema;
-  const [row] = await db
-    .select({
-      waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
-      resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
-      until: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'until'`,
-    })
-    .from(agentRuns)
-    .where(eq(agentRuns.id, head.id));
   const soon = now + ladderDelay(0);
-  if (!row?.waitId || row.resetsAt || Date.parse(row.until ?? "") <= soon) return;
-  await enqueue(db, {
-    orgId,
-    kind: "agent_run.execute",
-    payload: { runId: head.id, wait: row.waitId },
-    dedupeKey: `agent_run.execute:${head.id}:head:${row.waitId}`,
-    runAt: new Date(soon),
-    maxAttempts: 4,
-  });
+  for (const head of heads) {
+    const [row] = await db
+      .select({
+        waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+        resetsAt: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'resetsAt'`,
+        until: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'until'`,
+      })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, head.id));
+    if (!row?.waitId || row.resetsAt || Date.parse(row.until ?? "") <= soon) continue;
+    await enqueue(db, {
+      orgId,
+      kind: "agent_run.execute",
+      payload: { runId: head.id, wait: row.waitId },
+      dedupeKey: `agent_run.execute:${head.id}:head:${row.waitId}`,
+      runAt: new Date(soon),
+      maxAttempts: 4,
+    });
+  }
 }
 
 /**

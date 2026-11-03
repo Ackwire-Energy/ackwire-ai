@@ -32,6 +32,7 @@ import {
   updateAgent,
   usageQueue,
   usageWaitKey,
+  usageWaitPlace,
   wakePlanWaits,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -1104,4 +1105,87 @@ test("the usage queue: rows in line order with what happened since, hidden rows 
     skipped: 0,
   });
   expect((await runs(f)).map((r) => r.status)).toEqual(["canceled", "canceled"]);
+});
+
+test("who asked stops only their own ask: someone else's that joined the catch-up still gets its answer", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt: later(3600_000).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const ana = await addMember(f.db, f.org.id, "member", "ana");
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  for (const u of [ana, bia]) await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: u.id });
+  await postPersonMessage(deps, ana.id, f.org.id, f.general.id, { body: "@dev oi" });
+  await drainOutbox(f.db, handlers);
+  const mine = await postPersonMessage(deps, ana.id, f.org.id, f.general.id, { body: "@dev e aí?" });
+  const theirs = await postPersonMessage(deps, bia.id, f.org.id, f.general.id, { body: "@dev e eu?" });
+  await drainOutbox(f.db, handlers);
+  const [a] = await runs(f);
+  expect(a?.pendingMessageIds).toEqual([mine.id, theirs.id]);
+
+  await cancelRun(deps, ana.id, f.org.id, a?.id ?? "");
+  await drainOutbox(f.db, handlers);
+  const [, b, ...more] = await runs(f);
+  expect(more).toHaveLength(0);
+  // Bia's ask waits in a run of its own; Ana's went with her stop.
+  expect(b).toMatchObject({ status: "waiting_input", triggerMessageId: theirs.id });
+  expect(b?.pendingMessageIds).not.toContain(mine.id);
+});
+
+test("a line holds one head per reset: a wait on another model's own limit keeps its own timers", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const key = "plan:m:claude_code:own";
+  const wait = (model: string | null, since: number) =>
+    ({ waitingForBrain: { code: "plan_limit", waitKey: key, model, since } }) as never;
+  const park = async (model: string | null, since: number) => {
+    // Each in a thread of its own: in the main timeline the next ask would join the waiting one.
+    const m = await post(f, "@dev oi", (await post(f, "assunto")).id);
+    const [r] = await f.db
+      .update(schema.agentRuns)
+      .set({ status: "waiting_input", transcript: wait(model, since) })
+      .where(eq(schema.agentRuns.triggerMessageId, m.id))
+      .returning();
+    return r as typeof schema.agentRuns.$inferSelect;
+  };
+  const opus = await park("opus", 1);
+  const sonnet = await park("", 2);
+  const late = await park("", 3);
+  // The default model's first wait heads its own reset, behind the Opus one in line; only its own kind is behind it.
+  expect(await usageWaitPlace(f.db, sonnet, key, 2, "")).toEqual({ place: 1, head: true, behind: [late.id] });
+  expect(await usageWaitPlace(f.db, late, key, 3, "")).toEqual({ place: 2, head: false, behind: [] });
+  expect(await usageWaitPlace(f.db, opus, key, 1, "opus")).toEqual({ place: 0, head: true, behind: [] });
+});
+
+test("a catch-up cut mid-work reads what it missed but owes what it started: no pass", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const { brain, seen } = scripted((n) =>
+    n === 0
+      ? [
+          { type: "limit", resetsAt: later(3600_000).toISOString() },
+          { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+        ]
+      : [{ type: "done", text: "Feito." }],
+  );
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev roda o deploy");
+  await drainOutbox(f.db, handlers);
+  const [run] = await runs(f);
+  const t = run?.transcript as { usageWait: { since: number }; executedCalls?: number };
+  t.usageWait.since = Date.now() - 3600_000;
+  t.executedCalls = 2;
+  await f.db
+    .update(schema.agentRuns)
+    .set({ transcript: t as never })
+    .where(eq(schema.agentRuns.id, run?.id ?? ""));
+  clearPlanLimits();
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+  const prompt = String(seen[1]?.trigger ?? "");
+  expect(prompt).toContain("# Catching up");
+  expect(prompt).not.toContain("call `pass`");
+  expect(await loadReplyPolicy(f.db, f.org.id, run?.id ?? "")).toMatchObject({ mayPass: false });
 });

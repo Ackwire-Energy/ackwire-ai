@@ -252,6 +252,7 @@ import {
   joinUsageNote,
   LINE_SAFETY_MS,
   ladderDelay,
+  lineHeadLooks,
   nextMonthStart,
   overrideHolds,
   type PlanReadingRef,
@@ -552,8 +553,8 @@ export interface Transcript {
   roomAsked?: boolean;
   /** When this run last sent a turn to its computer: agents' turns there are spaced (`roomGate`). */
   roomAsk?: { machineId: string; at: number };
-  /** Caught up after a long wait on its plan or budget (`catch-up.ts`): since when it paused; it may pass. */
-  catchUp?: { since: number };
+  /** Caught up after a long wait on its plan or budget (`catch-up.ts`): since when it paused; whether it may pass. */
+  catchUp?: { since: number; mayPass?: true };
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
   activeMs?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
@@ -900,6 +901,8 @@ async function executeRunInner(
   /** And since when, and on which plan in words, for its catch-up (`catch-up.ts`). */
   let waitedSince: number | undefined;
   let waitedPlan: string | undefined;
+  /** And the line it waited in (`usageWaitKey`). */
+  let waitedKey: string | undefined;
   const started = await transitionRun(db, runId, "queued", "running");
   if (started) {
     run = started;
@@ -934,6 +937,7 @@ async function executeRunInner(
       waitedOn = stored?.waitingForBrain?.code;
       waitedSince = stored?.usageWait?.since;
       waitedPlan = stored?.waitingForBrain?.plan;
+      waitedKey = stored?.waitingForBrain?.waitKey;
       // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
       // run instead of finding it no longer waiting and doing nothing.
       if (options.wait && options.jobId) {
@@ -1058,8 +1062,12 @@ async function executeRunInner(
     // Its line ends with the run (checked on read); the apps refresh now (ADR 0084 §11).
     await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
     // Back from its plan or budget and over: the turns its note took in still wait, so the note speaks on for them.
-    if (waitedOn && USAGE_WAIT_CODES.has(waitedOn) && status !== "waiting_input" && status !== "waiting_approval")
+    if (waitedOn && USAGE_WAIT_CODES.has(waitedOn) && status !== "waiting_input" && status !== "waiting_approval") {
       await usageNoteHandOn(deps, run).catch(() => {});
+      // It may have headed its line with no reset known and left without a turn through (failed, ended early, moved
+      // to another sign-in): the next one re-checks the plan now instead of sleeping on its safety timer.
+      if (waitedKey) await lineHeadLooks(db, run.orgId, waitedKey).catch(() => {});
+    }
     // It left its computer's "working now" (still in line, `brainUnavailable` already said so).
     if (transcript?.roomAsk && computer !== "queued")
       await publishQueueChanged(deps.pubsub, run.orgId, transcript.roomAsk.machineId);
@@ -1401,10 +1409,14 @@ async function executeRunInner(
   // Who must answer (reply-policy.ts): a run nobody called by name may pass; a background run never posts.
   /** Back from a wait on its plan or budget long enough to catch up (`catch-up.ts`): since when it paused. */
   const catchUpSince = isCatchUp(run, waitedOn, waitedSince) ? waitedSince : undefined;
+  const atClaim = run.transcript as unknown as Transcript | null;
+  /** Catching up before it did anything: what it was asked may have been handled meanwhile, so it may pass. A run
+   * cut mid-work still reads what it missed, but owes what it started. */
+  const catchUpMayPass = catchUpSince !== undefined && !atClaim?.executedCalls && !atClaim?.interruptedTurn;
   const policy = replyPolicyFor(run, triggerMessage, {
     followUp: await routedAsFollowUp(db, run).catch(() => false),
-    answerOwed: Boolean((run.transcript as unknown as Transcript | null)?.answerOwed),
-    catchUp: catchUpSince !== undefined,
+    answerOwed: Boolean(atClaim?.answerOwed),
+    catchUp: catchUpMayPass,
   });
   /** Whether this run read outside content (`runReadOutside`): sticky once true. */
   let readOutside = false;
@@ -2219,7 +2231,7 @@ async function executeRunInner(
     if (text) {
       if (!transcript.catchUp) appendUserText(transcript, text);
       if (plan.kind !== "model") nextPrompt = [nextPrompt ?? triggerText, text].join("\n\n");
-      transcript.catchUp = { since: catchUpSince };
+      transcript.catchUp = { since: catchUpSince, ...(catchUpMayPass ? { mayPass: true as const } : {}) };
       await saveTranscript(db, transcript);
     }
   }
@@ -2803,7 +2815,7 @@ async function executeRunInner(
       ? usageWaitKey({ code: "budget", agentId: agent.id })
       : usageWaitKey({ code: "plan_limit", machineId, kind: plan.kind, accountId: plan.account?.id });
     // Its place in line: by when its conversation first paused, so parking again never moves it back.
-    const line = await usageWaitPlace(db, run, key, wait.since);
+    const line = await usageWaitPlace(db, run, key, wait.since, budget ? null : (plan.model ?? ""));
     let at = budget ? (u.soon ? Number.NaN : nextMonthStart(now)) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
     if (!budget && !(at > now) && machineId) {
       const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null);
@@ -2812,7 +2824,7 @@ async function executeRunInner(
     const known = at > now;
     // An unknown reset: only the head of the line asks the plan again (one re-check an hour per plan, not one per
     // conversation). The others sleep on a safety timer and go on when the head gets through (`wakePlanWaits`).
-    const head = line.place === 0 || u.soon === true;
+    const head = line.head || u.soon === true;
     if (!known && head) {
       at = now + ladderDelay(wait.step);
       wait.step++;
