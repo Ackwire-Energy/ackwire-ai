@@ -253,16 +253,6 @@
     "chatSearch": "Zoek een persoon of een agent",
     "people": "Mensen",
     "nobody": "Nog niemand hier.",
-    "ask": {
-      "question": "Wat heb je nodig?",
-      "placeholder": "Bijv. de tekst van de prijspagina nakijken voor vrijdag",
-      "to": "Voor",
-      "sendF": "Vraag het {{name}}",
-      "sendM": "Vraag het {{name}}",
-      "more": "Of begin iets nieuws",
-      "person": "Gesprek met een persoon",
-      "noAgents": "Maak eerst je eigen agent aan om een agent iets te vragen."
-    },
     "agent": {
       "question": "Wat gaat hij doen?"
     }

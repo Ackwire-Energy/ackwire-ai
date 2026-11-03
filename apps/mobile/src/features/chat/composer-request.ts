@@ -2,8 +2,9 @@ import { useSyncExternalStore } from "react";
 
 /**
  * Text another screen hands to a conversation's composer: "Falar com o Theo" in two agents' conversation goes
- * back to the conversation that asked with "@theo " in its field. One at a time; the conversation's screen in
- * view takes it once (`takeComposerRequest`), so the one the person went back to gets it.
+ * back to the conversation that asked with "@theo " in its field; empty text only focuses the field (an agent tapped in
+ * "New" opens your conversation ready to type). One at a time; the conversation's screen in view takes it once
+ * (`takeComposerRequest`), so the one the person went back to gets it.
  */
 export interface ComposerRequest {
   channelId: string;

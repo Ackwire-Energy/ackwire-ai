@@ -17,7 +17,7 @@ const RING = 2;
 
 /**
  * The bar of the three tabs: on the left the workspace you are in (its logo, your photo small on its corner)
- * opens Você; "+" on the right opens "Novo" (agent, channel, a conversation with someone), in the native bar.
+ * opens Você; "+" on the right pushes "New" (start a conversation or create something), in the native bar.
  */
 export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
   const { t } = useTranslation();

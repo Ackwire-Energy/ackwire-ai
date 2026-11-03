@@ -244,16 +244,6 @@
     "chatSearch": "搜索成员或智能体",
     "people": "成员",
     "nobody": "这里还没有人。",
-    "ask": {
-      "question": "你需要什么？",
-      "placeholder": "例如：周五前审阅定价页的文案",
-      "to": "给",
-      "sendF": "请 {{name}} 处理",
-      "sendM": "请 {{name}} 处理",
-      "more": "或开始新的事",
-      "person": "和成员聊天",
-      "noAgents": "想让智能体帮你做事，先创建你的智能体。"
-    },
     "agent": {
       "question": "它要做什么？"
     }

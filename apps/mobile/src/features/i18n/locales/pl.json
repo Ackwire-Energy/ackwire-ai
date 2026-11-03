@@ -271,16 +271,6 @@
     "chatSearch": "Szukaj osoby albo agenta",
     "people": "Osoby",
     "nobody": "Nikogo tu jeszcze nie ma.",
-    "ask": {
-      "question": "Czego potrzebujesz?",
-      "placeholder": "Np. sprawdź teksty na stronie z cennikiem przed piątkiem",
-      "to": "Dla",
-      "sendF": "Zapytaj: {{name}}",
-      "sendM": "Zapytaj: {{name}}",
-      "more": "Albo zacznij coś nowego",
-      "person": "Czat z osobą",
-      "noAgents": "Żeby poprosić agenta o coś, najpierw utwórz własnego."
-    },
     "agent": {
       "question": "Czym będzie się zajmować?"
     }

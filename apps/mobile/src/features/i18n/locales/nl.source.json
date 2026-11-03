@@ -590,30 +590,6 @@
   "new.nobody": {
     "value": "Nobody here yet."
   },
-  "new.ask.question": {
-    "value": "What do you need?"
-  },
-  "new.ask.placeholder": {
-    "value": "E.g. review the pricing page copy before Friday"
-  },
-  "new.ask.to": {
-    "value": "For"
-  },
-  "new.ask.sendF": {
-    "value": "Ask {{name}}"
-  },
-  "new.ask.sendM": {
-    "value": "Ask {{name}}"
-  },
-  "new.ask.more": {
-    "value": "Or start something new"
-  },
-  "new.ask.person": {
-    "value": "Chat with a person"
-  },
-  "new.ask.noAgents": {
-    "value": "To ask an agent for something, start by creating yours."
-  },
   "new.agent.question": {
     "value": "What will it do?"
   },
