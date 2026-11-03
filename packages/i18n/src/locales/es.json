@@ -8513,6 +8513,7 @@
     "countsLabel": "{{added}} líneas agregadas, {{removed}} eliminadas",
     "htmlPreview": "Página interactiva. Ábrela para verla.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "sin canal",
     "download": "Descargar",
     "downloadCsv": "Descargar CSV",
@@ -10418,6 +10419,7 @@
     },
     "artifact": {
       "fileTooLarge": "El archivo supera los {{max}} MB, el límite por archivo.",
+      "notVersioned": "Una imagen, un video o una grabación no tiene versiones. Envíala como un archivo nuevo.",
       "fileRequired": "Elige un archivo para subir.",
       "fileNameRequired": "El archivo necesita un nombre.",
       "notFound": "Este archivo ya no existe o no tienes acceso."

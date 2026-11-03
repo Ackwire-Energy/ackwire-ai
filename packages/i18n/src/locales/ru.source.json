@@ -20089,6 +20089,9 @@
   "artifacts.subtitle": {
     "value": "{{kind}} · {{name}} · {{where}} · {{when}}"
   },
+  "artifacts.subtitleSize": {
+    "value": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}"
+  },
   "artifacts.noChannel": {
     "value": "no channel"
   },
@@ -24466,6 +24469,9 @@
   },
   "errors.artifact.fileTooLarge": {
     "value": "The file is over {{max}} MB, the limit per file."
+  },
+  "errors.artifact.notVersioned": {
+    "value": "An image, a video or a recording has no versions. Send it as a new file."
   },
   "errors.artifact.fileRequired": {
     "value": "Choose a file to upload."

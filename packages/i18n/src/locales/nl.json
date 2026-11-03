@@ -8299,6 +8299,7 @@
     "countsLabel": "{{added}} regels toegevoegd, {{removed}} verwijderd",
     "htmlPreview": "Interactieve pagina. Open hem om te bekijken.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "geen kanaal",
     "download": "Downloaden",
     "downloadCsv": "CSV downloaden",
@@ -10156,6 +10157,7 @@
     },
     "artifact": {
       "fileTooLarge": "Het bestand is groter dan {{max}} MB, de limiet per bestand.",
+      "notVersioned": "Een afbeelding, video of opname heeft geen versies. Stuur het als een nieuw bestand.",
       "fileRequired": "Kies een bestand om te uploaden.",
       "fileNameRequired": "Het bestand heeft een naam nodig.",
       "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang."

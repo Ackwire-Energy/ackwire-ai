@@ -8584,6 +8584,7 @@
     "countsLabel": "{{added}} lignes ajoutées, {{removed}} retirées",
     "htmlPreview": "Page interactive. Ouvrez-la pour la voir.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "aucun canal",
     "download": "Télécharger",
     "downloadCsv": "Télécharger en CSV",
@@ -10489,6 +10490,7 @@
     },
     "artifact": {
       "fileTooLarge": "Le fichier dépasse {{max}} Mo, la limite par fichier.",
+      "notVersioned": "Une image, une vidéo ou un enregistrement n’a pas de versions. Envoie-le comme un nouveau fichier.",
       "fileRequired": "Choisissez un fichier à importer.",
       "fileNameRequired": "Le fichier doit avoir un nom.",
       "notFound": "Ce fichier n'existe plus ou vous n'y avez pas accès."

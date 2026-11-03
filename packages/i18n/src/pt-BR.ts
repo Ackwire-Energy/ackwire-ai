@@ -8075,6 +8075,7 @@ export const ptBR = {
     countsLabel: "{{added}} linhas adicionadas, {{removed}} removidas",
     htmlPreview: "Página interativa. Abra para ver.",
     subtitle: "{{kind}} · {{name}} · {{where}} · {{when}}",
+    subtitleSize: "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     noChannel: "sem canal",
     download: "Baixar",
     downloadCsv: "Baixar CSV",
@@ -9677,6 +9678,7 @@ export const ptBR = {
     },
     artifact: {
       fileTooLarge: "O arquivo passa de {{max}} MB, o limite por arquivo.",
+      notVersioned: "Imagem, vídeo ou gravação não tem versões. Envie como um arquivo novo.",
       fileRequired: "Escolha um arquivo para enviar.",
       fileNameRequired: "O arquivo precisa de um nome.",
       notFound: "Este arquivo não existe mais ou você não tem acesso.",

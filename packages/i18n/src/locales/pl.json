@@ -8836,6 +8836,7 @@
     "countsLabel": "Dodane linie: {{added}}, usunięte: {{removed}}",
     "htmlPreview": "Strona interaktywna. Otwórz, żeby ją zobaczyć.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "bez kanału",
     "download": "Pobierz",
     "downloadCsv": "Pobierz CSV",
@@ -10781,6 +10782,7 @@
     },
     "artifact": {
       "fileTooLarge": "Plik przekracza {{max}} MB, czyli limit na plik.",
+      "notVersioned": "Obraz, wideo ani nagranie nie mają wersji. Wyślij jako nowy plik.",
       "fileRequired": "Wybierz plik do przesłania.",
       "fileNameRequired": "Plik musi mieć nazwę.",
       "notFound": "Ten plik już nie istnieje albo nie masz do niego dostępu."

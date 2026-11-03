@@ -261,17 +261,32 @@ describe("uploads", () => {
     await expect(completeUpload(uploadDeps(), up.id, { name: "again.pdf", bytes: PNG })).rejects.toThrow(ConflictError);
   });
 
-  test("a new version of the target file", async () => {
+  test("a new version of the target file; a picture is a snapshot, so none for it", async () => {
     f = await setup();
     const a = await createFileArtifact(f.artifactDeps, agentActor(), f.org.id, {
-      title: "Gráfico",
-      name: "g.png",
+      title: "Dados",
+      name: "dados.csv",
+      bytes: bytesOf("a,b\n1,2\n"),
+    });
+    expect(a.versioned).toBe(true);
+    const up = await newUpload({ targetArtifactId: a.id, path: "dados.csv" });
+    const { artifact } = await completeUpload(uploadDeps(), up.id, { name: "dados.csv", bytes: bytesOf("a,b\n") });
+    expect(artifact).toMatchObject({ id: a.id, version: 2, versioned: true, content: { size: 4 } });
+    expect(await uploadRow(up.id)).toMatchObject({ status: "done", artifactId: a.id, version: 2 });
+
+    const shot = await createFileArtifact(f.artifactDeps, agentActor(), f.org.id, {
+      title: "Tela",
+      name: "tela.png",
       bytes: PNG,
     });
-    const up = await newUpload({ targetArtifactId: a.id, path: "g.png" });
-    const { artifact } = await completeUpload(uploadDeps(), up.id, { name: "g.png", bytes: PNG.slice(0, 4) });
-    expect(artifact).toMatchObject({ id: a.id, version: 2, content: { size: 4 } });
-    expect(await uploadRow(up.id)).toMatchObject({ status: "done", artifactId: a.id, version: 2 });
+    expect(shot.versioned).toBe(false);
+    expect((await getArtifact(f.artifactDeps, person(), f.org.id, shot.id)).versioned).toBe(false);
+    const again = await newUpload({ targetArtifactId: shot.id, path: "tela.png" });
+    const e = await completeUpload(uploadDeps(), again.id, { name: "tela.png", bytes: PNG }).catch((x) => x);
+    expect(e).toBeInstanceOf(ValidationError);
+    expect(e.code).toBe("artifact.not_versioned");
+    expect(await uploadRow(again.id)).toMatchObject({ status: "failed" });
+    expect((await getArtifact(f.artifactDeps, person(), f.org.id, shot.id)).version).toBe(1);
   });
 
   test("refused: damaged, too large, expired; those fail the upload", async () => {
@@ -386,8 +401,17 @@ describe("upload_file", () => {
     expect(up).toMatchObject({ status: "done", path: "out/chart.png", runId: ctx.runId, artifactId: a?.id });
     expect(up?.computer).toBe(`machine:${paired.machineId}`);
 
+    // A picture has no versions: said before anything moves, so the agent shares it again as a new file.
     const v2 = await call(ctx, "upload_file", { path: "out/chart.png", artifact_id: a?.id, note: "cores" });
-    expect(v2.content).toContain("version 2");
+    expect(v2).toMatchObject({ isError: true });
+    expect(v2.content).toContain("without artifact_id");
+    runner.files.set("out/dados.csv", bytesOf("a,b\n"));
+    const csv = await call(ctx, "upload_file", { path: "out/dados.csv" });
+    const csvId = (csv.data as { artifact: { id: string } }).artifact.id;
+    runner.files.set("out/dados.csv", bytesOf("a,b\n1,2\n"));
+    expect((await call(ctx, "upload_file", { path: "out/dados.csv", artifact_id: csvId })).content).toContain(
+      "version 2",
+    );
 
     const read = await call(ctx, "read_artifact", { artifact_id: a?.id });
     expect(read.content).toContain(`File chart.png (image/png, ${PNG.byteLength} bytes`);

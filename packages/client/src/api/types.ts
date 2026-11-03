@@ -2779,6 +2779,8 @@ export interface ArtifactDetail extends Artifact {
   /** The version shown (may be older than `version`). */
   shownVersion: number;
   content: ArtifactContent;
+  /** It keeps versions (a history, "Enviar nova versão"): false for a snapshot such as a screenshot (ADR 0019). */
+  versioned?: boolean;
 }
 
 /** `message.meta.artifacts`: what the agent created or changed in that reply. */

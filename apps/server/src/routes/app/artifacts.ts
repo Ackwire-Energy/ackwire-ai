@@ -161,7 +161,13 @@ const Choices = z
   })
   .openapi("Choices");
 
-const ArtifactDetail = Artifact.extend({ shownVersion: z.number(), content: Content }).openapi("ArtifactDetail");
+const ArtifactDetail = Artifact.extend({
+  shownVersion: z.number(),
+  content: Content,
+  versioned: z.boolean().openapi({
+    description: "It keeps versions (a history, new versions): false for a snapshot such as a screenshot.",
+  }),
+}).openapi("ArtifactDetail");
 
 const ArtifactParams = OrgParams.extend({ artifactId: z.uuid() });
 const VersionQuery = z.object({ version: z.coerce.number().int().min(1).optional() });

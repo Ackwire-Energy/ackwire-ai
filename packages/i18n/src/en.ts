@@ -7869,6 +7869,7 @@ export const en = {
     countsLabel: "{{added}} lines added, {{removed}} removed",
     htmlPreview: "Interactive page. Open to see it.",
     subtitle: "{{kind}} · {{name}} · {{where}} · {{when}}",
+    subtitleSize: "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     noChannel: "no channel",
     download: "Download",
     downloadCsv: "Download CSV",
@@ -9469,6 +9470,7 @@ export const en = {
     },
     artifact: {
       fileTooLarge: "The file is over {{max}} MB, the limit per file.",
+      notVersioned: "An image, a video or a recording has no versions. Send it as a new file.",
       fileRequired: "Choose a file to upload.",
       fileNameRequired: "The file needs a name.",
       notFound: "This file no longer exists or you don't have access.",

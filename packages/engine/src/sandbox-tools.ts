@@ -758,6 +758,12 @@ export function createSandboxToolSource(
                 isError: true,
               };
             }
+            if (!target.versioned) {
+              return {
+                content: `Artifact ${target.id} is an image, a video or a recording, which has no versions: upload it again without artifact_id to share it as a new file.`,
+                isError: true,
+              };
+            }
           }
           const row = await run(ctx, async (c) => {
             await refuseSecretPath(ctx, c, path);

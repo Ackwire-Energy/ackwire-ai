@@ -27,6 +27,7 @@ const KNOWN = {
   "mail.owner_only": "errors.mail.ownerOnly",
   send_without_recipients: "mail.agent.saveError.send_without_recipients",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
+  "artifact.not_versioned": "errors.artifact.notVersioned",
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",
   "artifact.not_found": "errors.artifact.notFound",

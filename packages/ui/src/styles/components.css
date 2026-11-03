@@ -2770,6 +2770,9 @@ html:not([data-pointer]) .ac-back:focus-visible {
 .ac-details--lg {
   width: min(960px, calc(100% - 48px));
 }
+.ac-details--xl {
+  width: min(1440px, calc(100% - 96px));
+}
 /* "✓ Salvo" after a field saves on its own (SavedNote). */
 .ac-saved {
   display: inline-flex;
@@ -2824,6 +2827,14 @@ html:not([data-pointer]) .ac-back:focus-visible {
 /* An `.ac-acts` row: the close's icon on the head's padding line. */
 .ac-details__actions {
   flex: none;
+}
+/* The heading in the bar: the buttons on its title's first line, the title wrapping in what is left. */
+.ac-details__bar--titled {
+  align-items: flex-start;
+}
+.ac-details__bar--titled > .ac-details__heading {
+  flex: 1;
+  min-width: 0;
 }
 .ac-details__heading {
   display: flex;
@@ -8112,7 +8123,8 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 /* Details on a phone: a full-screen sheet, clear of the notch and the home bar. */
 @media (max-width: 640px) {
   .ac-details,
-  .ac-details--lg {
+  .ac-details--lg,
+  .ac-details--xl {
     inset: 0;
     transform: none;
     width: 100%;

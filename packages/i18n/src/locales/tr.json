@@ -8159,6 +8159,7 @@
     "countsLabel": "{{added}} satır eklendi, {{removed}} satır kaldırıldı",
     "htmlPreview": "Etkileşimli sayfa. Görmek için açın.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "kanal yok",
     "download": "İndir",
     "downloadCsv": "CSV indir",
@@ -10016,6 +10017,7 @@
     },
     "artifact": {
       "fileTooLarge": "Dosya, dosya başına sınır olan {{max}} MB'ı aşıyor.",
+      "notVersioned": "Bir görselin, videonun veya kaydın sürümü olmaz. Yeni bir dosya olarak gönder.",
       "fileRequired": "Yüklenecek bir dosya seçin.",
       "fileNameRequired": "Dosyanın bir adı olmalı.",
       "notFound": "Bu dosya artık yok ya da erişiminiz yok."

@@ -7959,6 +7959,7 @@
     "countsLabel": "新增 {{added}} 行，删除 {{removed}} 行",
     "htmlPreview": "交互式页面，打开即可查看。",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "无频道",
     "download": "下载",
     "downloadCsv": "下载 CSV",
@@ -9772,6 +9773,7 @@
     },
     "artifact": {
       "fileTooLarge": "文件超过 {{max}} MB，这是单个文件的上限。",
+      "notVersioned": "图片、视频或录音没有版本。请作为新文件发送。",
       "fileRequired": "请选择要上传的文件。",
       "fileNameRequired": "文件需要一个名称。",
       "notFound": "这个文件已不存在，或你无权访问。"

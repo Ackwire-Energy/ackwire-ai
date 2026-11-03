@@ -7871,6 +7871,7 @@
     "countsLabel": "{{added}}줄 추가, {{removed}}줄 삭제",
     "htmlPreview": "인터랙티브 페이지예요. 열어서 확인하세요.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "채널 없음",
     "download": "다운로드",
     "downloadCsv": "CSV 다운로드",
@@ -9688,6 +9689,7 @@
     },
     "artifact": {
       "fileTooLarge": "파일이 파일당 한도인 {{max}}MB를 넘어요.",
+      "notVersioned": "이미지, 동영상, 녹음에는 버전이 없어요. 새 파일로 보내 주세요.",
       "fileRequired": "업로드할 파일을 고르세요.",
       "fileNameRequired": "파일에 이름이 필요해요.",
       "notFound": "이 파일은 더 이상 없거나 접근 권한이 없어요."

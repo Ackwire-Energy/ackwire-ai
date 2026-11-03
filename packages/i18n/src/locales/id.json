@@ -7946,6 +7946,7 @@
     "countsLabel": "{{added}} baris ditambahkan, {{removed}} dihapus",
     "htmlPreview": "Halaman interaktif. Buka untuk melihatnya.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "tanpa kanal",
     "download": "Unduh",
     "downloadCsv": "Unduh CSV",
@@ -9763,6 +9764,7 @@
     },
     "artifact": {
       "fileTooLarge": "File melebihi {{max}} MB, batas per file.",
+      "notVersioned": "Gambar, video, atau rekaman tidak punya versi. Kirim sebagai file baru.",
       "fileRequired": "Pilih file untuk diunggah.",
       "fileNameRequired": "File harus punya nama.",
       "notFound": "File ini sudah tidak ada atau kamu tidak punya akses."

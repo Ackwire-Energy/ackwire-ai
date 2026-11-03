@@ -8802,6 +8802,7 @@
     "countsLabel": "Добавлено строк: {{added}}, удалено: {{removed}}",
     "htmlPreview": "Интерактивная страница. Откройте, чтобы посмотреть.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "без канала",
     "download": "Скачать",
     "downloadCsv": "Скачать CSV",
@@ -10747,6 +10748,7 @@
     },
     "artifact": {
       "fileTooLarge": "Файл больше {{max}} МБ, это лимит на файл.",
+      "notVersioned": "У изображения, видео или записи нет версий. Отправьте как новый файл.",
       "fileRequired": "Выберите файл для загрузки.",
       "fileNameRequired": "У файла должно быть имя.",
       "notFound": "Этого файла больше нет, или у вас нет к нему доступа."

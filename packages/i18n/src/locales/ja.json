@@ -7878,6 +7878,7 @@
     "countsLabel": "{{added}}行追加、{{removed}}行削除",
     "htmlPreview": "インタラクティブなページです。開いて表示してください。",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "チャンネルなし",
     "download": "ダウンロード",
     "downloadCsv": "CSVをダウンロード",
@@ -9695,6 +9696,7 @@
     },
     "artifact": {
       "fileTooLarge": "ファイルが1ファイルあたりの上限{{max}} MBを超えています。",
+      "notVersioned": "画像、動画、録音にはバージョンがありません。新しいファイルとして送ってください。",
       "fileRequired": "アップロードするファイルを選んでください。",
       "fileNameRequired": "ファイルには名前が必要です。",
       "notFound": "このファイルは存在しないか、アクセス権がありません。"

@@ -2,7 +2,7 @@ import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@agentesch
 import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "@agenteschat/client";
 import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { fileIcon } from "@agenteschat/client/lib/files";
+import { fileIcon, formatBytes } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { Alert, Button, Chip, DetailsDialog, Field, Icon, Input, Menu, MenuItem, Textarea } from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
@@ -95,7 +95,9 @@ export function ArtifactViewer({
   const download = () => save();
   const formats = a ? downloads.formats(a.kind) : [];
   const canEditNow = Boolean(a?.canEdit && !old && !editing && (a?.kind === "document" || a?.kind === "table"));
-  const canUploadVersion = Boolean(a?.canEdit && !old && a?.kind === "file");
+  // A snapshot (a screenshot, a photo) has no versions: no history beside it, no "Enviar nova versão" (ADR 0019).
+  const versioned = a?.versioned !== false;
+  const canUploadVersion = Boolean(a?.canEdit && !old && a?.kind === "file" && versioned);
   const actions = a && (
     <>
       {a.kind === "file" ? (
@@ -141,7 +143,11 @@ export function ArtifactViewer({
       )}
       <ArtifactMoreMenu
         artifact={a}
-        onVersions={() => document.querySelector<HTMLElement>(".artifact-viewer__versions button")?.focus()}
+        onVersions={
+          versioned
+            ? () => document.querySelector<HTMLElement>(".artifact-viewer__versions button")?.focus()
+            : undefined
+        }
         onDelete={() => remover.ask(a)}
       />
     </>
@@ -149,7 +155,7 @@ export function ArtifactViewer({
   return (
     <DetailsDialog
       open
-      size="lg"
+      size="xl"
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("artifacts.close")}
       className="artifact-sheet"
@@ -171,11 +177,12 @@ export function ArtifactViewer({
       }
       subtitle={
         a
-          ? t("artifacts.subtitle", {
+          ? t(a.content.kind === "file" ? "artifacts.subtitleSize" : "artifacts.subtitle", {
               kind: t(`artifacts.kind.${a.kind}`),
               name: authorName(a.createdBy),
               where: channel ? `#${channel.name}` : t("artifacts.noChannel"),
               when: relativeTime(t, i18n.language, a.updatedAt),
+              size: a.content.kind === "file" ? formatBytes(i18n.language, a.content.size) : "",
             })
           : undefined
       }
@@ -183,7 +190,7 @@ export function ArtifactViewer({
     >
       {query.isError && <Alert>{t("artifacts.notFound")}</Alert>}
       {a && (
-        <div className="artifact-viewer">
+        <div className={versioned ? "artifact-viewer" : "artifact-viewer artifact-viewer--single"}>
           <div className="artifact-viewer__main">
             {old && (
               <div className="row artifact-viewer__old" role="status">
@@ -209,7 +216,7 @@ export function ArtifactViewer({
               />
             )}
           </div>
-          <Versions artifact={a} onVersion={onVersion} />
+          {versioned && <Versions artifact={a} onVersion={onVersion} />}
         </div>
       )}
       {remover.dialog}
