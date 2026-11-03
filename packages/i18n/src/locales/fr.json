@@ -1603,6 +1603,7 @@
     "queued_other": "{{names}} sont dans la file de l'ordinateur",
     "away_one": "{{names}} attend l'ordinateur",
     "away_other": "{{names}} attendent l'ordinateur",
+    "queuedNext": "{{names}} est dans la file de l'ordinateur · passe ensuite",
     "nobody": "Aucun agent ne répondra",
     "status": {
       "seen": "A vu",
@@ -2043,6 +2044,9 @@
     "rolesNone": "Le workspace n'a pas encore de rôles.",
     "rolesNeeded": "Choisissez au moins un rôle.",
     "rolesLeave": "Qui perd le rôle quitte le canal.",
+    "rolesChoose": "Choisir des rôles",
+    "rolesChange": "Modifier les rôles",
+    "rolesDone": "Terminé",
     "publicTitle": "Rendre #{{channel}} public ?",
     "publicBody": "Tout le monde dans le workspace pourra le rejoindre et lire tous ses messages, y compris les anciens.",
     "publicConfirm": "Rendre public",
@@ -2964,6 +2968,7 @@
     "runsEmpty": "Aucune exécution ne correspond à « {{q}} ».",
     "runsNone": "Aucune exécution pour l'instant.",
     "runNoText": "Aucun texte",
+    "runPrivate": "Dans une conversation dont vous ne faites pas partie",
     "runTokens": "{{input}} en entrée · {{cached}} en cache · {{output}} en sortie",
     "runTokensTip": "{{input}} jetons d'entrée nouveaux, {{cached}} lus depuis le cache (moins chers), {{output}} en sortie",
     "budgetHelp": "À la limite, {{name}} s'arrête et le signale dans le canal. {{ownerNote}}",
@@ -6781,6 +6786,68 @@
       "symbols": "Symboles"
     }
   },
+  "voice": {
+    "word": "Message vocal",
+    "wordTime": "Message vocal · {{time}}",
+    "holdToRecord": "Maintenez pour enregistrer",
+    "slideToDelete": "Glissez pour supprimer",
+    "send": "Envoyer l'audio",
+    "delete": "Supprimer l'enregistrement",
+    "deleted": "Enregistrement supprimé.",
+    "pause": "Mettre en pause",
+    "resume": "Continuer l'enregistrement",
+    "listen": "Écouter votre enregistrement",
+    "play": "Lire",
+    "stop": "Arrêter",
+    "speed": "Vitesse",
+    "left": "{{seconds}} s restantes",
+    "tooShort": "Trop court. Dites-en un peu plus.",
+    "silent": "Rien entendu. Rien n'a été envoyé.",
+    "notSent": "Impossible d'envoyer l'audio.",
+    "limit": "Ça fait beaucoup d'audio pour aujourd'hui. Écrivez ici et réessayez demain.",
+    "micBlocked": "Le microphone est bloqué",
+    "micBlockedHint": "Autorisez le microphone dans les réglages de votre appareil pour enregistrer.",
+    "openSettings": "Ouvrir les réglages",
+    "notNow": "Pas maintenant",
+    "expired": "Audio expiré",
+    "showText": "Afficher le texte",
+    "hideText": "Masquer le texte",
+    "record": "Enregistrer un audio",
+    "recording": "Enregistrement audio en cours",
+    "discard": "Supprimer l'enregistrement",
+    "stopListening": "Arrêter l'écoute",
+    "keys": "Entrée envoie · Échap supprime",
+    "keysHold": "Relâchez pour envoyer · Échap supprime",
+    "keysPaused": "En pause · Espace écoute · Entrée envoie · Échap supprime",
+    "pausePlay": "Mettre en pause",
+    "seek": "Position dans l'audio",
+    "speedAt": "Vitesse {{speed}}×",
+    "waiting": "Part dès que vous êtes de nouveau en ligne",
+    "notUnderstood": "Impossible de comprendre l'audio. Rien n'a été envoyé.",
+    "refused": "L'audio n'a pas pu être envoyé dans cette conversation.",
+    "blockedMac": "Le microphone est bloqué. Sur un Mac : Réglages Système › Confidentialité et sécurité › Microphone.",
+    "blockedWeb": "Le microphone est bloqué. Autorisez-le depuis le cadenas à côté de l'adresse du site.",
+    "noMic": "Aucun microphone trouvé.",
+    "failed": "Impossible d'ouvrir le microphone. Réessayez.",
+    "noPlayback": "Lecture impossible pour le moment. Vous pouvez quand même l'envoyer ou continuer l'enregistrement.",
+    "settings": {
+      "title": "Messages vocaux",
+      "on": "Messages vocaux",
+      "onHelp": "Les personnes de cet espace de travail peuvent envoyer des audios dans les conversations.",
+      "noEngine": "Les messages vocaux ne sont pas encore disponibles ici.",
+      "engineTitle": "Ce qui transforme la voix en texte",
+      "own": "Votre propre serveur",
+      "ownHelp": "Whisper ou Parakeet sur votre machine. L'audio y reste.",
+      "address": "Adresse du serveur",
+      "key": "Clé {{name}}",
+      "keyPlaceholder": "Collez ici",
+      "test": "Tester",
+      "tested": "Ça marche. Tout le monde voit maintenant le microphone.",
+      "sealed": "Conservée chiffrée sur votre serveur et plus jamais affichée.",
+      "leaves": "L'audio des messages vocaux est envoyé à {{name}} pour devenir du texte.",
+      "invalid": "La clé enregistrée ne s'ouvre pas sur ce serveur. Collez-la à nouveau."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -8083,6 +8150,73 @@
       "noneText": "N'exécute pas de programmes et ne garde pas de fichiers"
     }
   },
+  "queue": {
+    "button_one": "Ordinateur · {{count}} en attente",
+    "button_other": "Ordinateur · {{count}} en attente",
+    "buttonIdle": "Ordinateur",
+    "see": "Voir la file",
+    "label": "File de {{name}}",
+    "full": "Plein",
+    "fullNext": "Plein · le prochain démarre dans environ {{n}} min",
+    "free": "Personne dans la file",
+    "workingNow": "Au travail · {{n}}",
+    "inLine": "Dans la file · {{n}}",
+    "allStarted": "tous démarrés dans ~{{n}} min",
+    "nothingWorking": "Rien ne tourne en ce moment",
+    "rule": "Les personnes passent en premier. Les agents mentionnés ensemble démarrent un par un.",
+    "youFirst": "Vous passez en premier",
+    "startsIn": "démarre dans ~{{n}} min",
+    "startsAfter": "démarre quand {{after}} aura fini",
+    "left": "encore ~{{n}} min",
+    "who": "{{name}}",
+    "away": "Absent depuis {{time}}",
+    "purpose": {
+      "you": "vous répond",
+      "person": "répond à {{name}}",
+      "someone": "répond à une personne",
+      "agent": "à la demande de {{name}}",
+      "someAgent": "à la demande d'un agent",
+      "routine": "une routine",
+      "work": "travail long"
+    },
+    "where": {
+      "yourDm": "votre DM",
+      "dm": "DM avec {{name}}",
+      "thread": "un fil dans #{{name}}",
+      "private": "une conversation privée"
+    },
+    "live": {
+      "nextEta": "En attente de l'ordinateur. Passe ensuite, dans environ {{n}} min",
+      "nextAfter": "En attente de l'ordinateur. Passe ensuite, quand {{after}} aura fini",
+      "next": "En attente de l'ordinateur. Passe ensuite",
+      "behind": "Dans la file, {{nth}}. Après {{names}}",
+      "position": "Dans la file, {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}er",
+      "two": "{{n}}e",
+      "few": "{{n}}e",
+      "other": "{{n}}e"
+    },
+    "fan": {
+      "called_one": "{{count}} agent appelé",
+      "called_other": "{{count}} agents appelés",
+      "answered_one": "{{count}} a répondu",
+      "answered_other": "{{count}} ont répondu",
+      "working_one": "{{count}} au travail",
+      "working_other": "{{count}} au travail",
+      "inLine_one": "{{count}} dans la file",
+      "inLine_other": "{{count}} dans la file",
+      "failed_one": "{{count}} n'a pas répondu",
+      "failed_other": "{{count}} n'ont pas répondu",
+      "chip": {
+        "answered": "a répondu",
+        "working": "au travail",
+        "inLine": "dans la file",
+        "failed": "pas de réponse"
+      }
+    }
+  },
   "access": {
     "matrixTitle": "Accès des agents",
     "matrixHint": "Les actions sensibles (merge, déploiement, partage, paiement) demandent toujours une approbation, quel que soit le niveau. Pour régler outil par outil, ouvrez les Outils du connecteur.",
@@ -9315,6 +9449,7 @@
     "clearSearch": "Effacer la recherche",
     "noMatch": "Rien trouvé pour « {{q}} ».",
     "noTools": "Le serveur n'a proposé aucun outil.",
+    "unreadable": "Impossible de lire les outils du connecteur : {{reason}}",
     "refresh": "Chercher de nouveaux outils",
     "decideTitle": "Votre décision est nécessaire · {{count}}",
     "decideHelp": "Leur nom ne dit pas ce qu'ils font. Confirmez la suggestion ou choisissez-en une autre.",
@@ -10154,6 +10289,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Le réseau change. Les sessions ouvertes de l’ordinateur redémarreront à {{when}}.",
+      "restart": "Les sessions de l’ordinateur redémarrent pour appliquer le réseau. Les nouvelles tâches attendent la fin.",
+      "line": "IP de sortie {{ip}}",
+      "hint": "L’adresse que voient les sites quand les agents naviguent. Elle change quand le réseau de l’ordinateur change."
+    },
     "online": "En ligne",
     "offline": "Hors ligne",
     "execOff": "Commandes désactivées",
@@ -10866,6 +11007,7 @@
       "import": "Importer et exporter",
       "billing": "Abonnement et facturation",
       "media": "GIF et stickers",
+      "voice": "Voix",
       "apps": "Applications d'IA"
     },
     "sectionText": {
@@ -10884,6 +11026,7 @@
       "import": "Faites venir des agents d'une autre application ou d'un autre espace de travail, et emportez celui-ci où vous voulez.",
       "billing": "L'abonnement agentes.chat, la carte et les factures de cet espace de travail sont sur une page à nous, hors de l'app.",
       "media": "Ce que les personnes peuvent envoyer dans une conversation, et quand les agents envoient un GIF ou un sticker.",
+      "voice": "Les messages vocaux dans les conversations, et qui transforme la voix en texte.",
       "apps": "Demandez des tâches aux agents de cet espace de travail depuis Claude, Cursor et d'autres applications."
     },
     "title": "Paramètres",
@@ -11082,13 +11225,16 @@
   "usageViews": {
     "signedOut": "Déconnecté",
     "whose": "De {{name}}",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "La limite s'affiche une fois que ce compte est de nouveau utilisé.",
     "unused": "Aucun agent n'utilise ce compte.",
     "usesNow": "l'utilise en ce moment",
     "monthTokens": "{{tokens}} jetons ce mois-ci",
     "tokens": "{{tokens}} jetons",
     "equivalent": "≈ {{amount}} via l'API",
+    "thisMonth": "Ce mois-ci",
+    "moreAgents_one": "+{{count}} autre agent",
+    "moreAgents_many": "+{{count}} autres agents",
+    "moreAgents_other": "+{{count}} autres agents",
     "paid": "{{amount}} payés",
     "budgetShare": "{{percent}} du budget",
     "estimate": "Les abonnements indiquent seulement combien le compte entier a utilisé. La part de chaque agent est une estimation, d'après ce que chacun y a dépensé.",
@@ -11304,6 +11450,12 @@
       "answeredRequestFar": "{{to}} a répondu à la demande de {{from}}",
       "answeredRequestFar_female": "{{to}} a répondu à la demande de {{from}}",
       "see": "Voir"
+    },
+    "talk": {
+      "readAll": "Tout lire",
+      "more_one": "{{count}} ligne de plus",
+      "more_many": "{{count}} lignes de plus",
+      "more_other": "{{count}} lignes de plus"
     },
     "consultPanel": {
       "label": "Conversation entre {{from}} et {{to}}",
@@ -11645,15 +11797,15 @@
       "issue_work_start": "Merci de faire la tâche #{{number}}.",
       "issue_taken": "A pris la tâche #{{number}}.",
       "done": "C'est fait.",
-      "stretch_paused_runs_one": "{{agents}} s'est arrêté pour faire le point avec vous · {{steps}} étapes sans vous depuis votre demande",
-      "stretch_paused_runs_many": "{{agents}} se sont arrêtés pour faire le point avec vous · {{steps}} étapes en autonomie depuis votre demande",
-      "stretch_paused_runs_other": "{{agents}} se sont arrêtés pour faire le point avec vous · {{steps}} étapes en autonomie depuis votre demande",
-      "stretch_paused_spend_one": "{{agents}} s'est arrêté pour faire le point avec vous · {{percent}} % du budget du mois utilisés là-dessus sans vous",
-      "stretch_paused_spend_many": "{{agents}} se sont arrêtés pour faire le point avec vous · chacun a utilisé {{percent}} % du budget du mois là-dessus sans vous",
-      "stretch_paused_spend_other": "{{agents}} se sont arrêtés pour faire le point avec vous · chacun a utilisé {{percent}} % du budget du mois là-dessus sans vous",
-      "stretch_paused_spend_cost_one": "{{agents}} s'est arrêté pour faire le point avec vous · {{amount}} utilisés ({{percent}} % du budget du mois) là-dessus sans vous",
-      "stretch_paused_spend_cost_many": "{{agents}} se sont arrêtés pour faire le point avec vous · chacun a utilisé {{amount}} ({{percent}} % du budget du mois) là-dessus sans vous",
-      "stretch_paused_spend_cost_other": "{{agents}} se sont arrêtés pour faire le point avec vous · chacun a utilisé {{amount}} ({{percent}} % du budget du mois) là-dessus sans vous",
+      "stretch_paused_runs_one": "{{agents}} s'est arrêté pour faire le point avec vous avant de continuer",
+      "stretch_paused_runs_many": "{{agents}} se sont arrêtés pour faire le point avec vous avant de continuer",
+      "stretch_paused_runs_other": "{{agents}} se sont arrêtés pour faire le point avec vous avant de continuer",
+      "stretch_paused_spend_one": "{{agents}} s'est arrêté pour faire le point avec vous · a utilisé {{percent}} % du budget du mois",
+      "stretch_paused_spend_many": "{{agents}} se sont arrêtés pour faire le point avec vous · chacun a utilisé {{percent}} % du budget du mois",
+      "stretch_paused_spend_other": "{{agents}} se sont arrêtés pour faire le point avec vous · chacun a utilisé {{percent}} % du budget du mois",
+      "stretch_paused_spend_cost_one": "{{agents}} s'est arrêté pour faire le point avec vous · a utilisé {{amount}} ({{percent}} % du budget du mois)",
+      "stretch_paused_spend_cost_many": "{{agents}} se sont arrêtés pour faire le point avec vous · chacun a utilisé {{amount}} ({{percent}} % du budget du mois)",
+      "stretch_paused_spend_cost_other": "{{agents}} se sont arrêtés pour faire le point avec vous · chacun a utilisé {{amount}} ({{percent}} % du budget du mois)",
       "memory": {
         "proposed": "Proposition créée : {{text}}",
         "forgot": "Mémoire mise à jour : « {{text}} » oublié.",
@@ -12643,6 +12795,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Vous regardez seulement.",
+      "title": "Prendre le contrôle ?",
+      "working": "{{name}} se met en pause pendant que vous avez le contrôle."
+    },
     "sub": {
       "control": "Vous avez le contrôle · {{name}} attend",
       "control_female": "Vous avez le contrôle · {{name}} attend",

@@ -48,7 +48,7 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 
 /** A run's error (and a routing decision's) when nobody could think: no AI connected. */
 export const NO_AI = "no_ai" as const;
-/** A run's error when its computer had no room for its turn for the whole wait (`COMPUTER_BUSY_WAIT_MS`). */
+/** An older run's error from when a run waited at most 30 minutes for room on its computer (still worded). */
 export const COMPUTER_BUSY = "computer_busy" as const;
 /** A run's error when it went in circles and its kind of run can't end with Continuar (a routine's, a forum's). */
 export const STUCK_ERROR = "stuck" as const;

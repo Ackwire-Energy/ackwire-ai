@@ -13,6 +13,7 @@ import {
   ProviderError,
   promptChars,
   type StopReason,
+  stableToolsFirst,
 } from "./types";
 
 /**
@@ -314,7 +315,7 @@ interface Chunk {
 }
 
 type Message =
-  | { role: "system"; content: { type: "text"; text: string; cache_control?: { type: "ephemeral" } }[] }
+  | { role: "system"; content: { type: "text"; text: string; cache_control?: { type: "ephemeral"; ttl?: "1h" } }[] }
   | { role: "user"; content: string }
   | { role: "tool"; tool_call_id: string; content: string }
   | {
@@ -350,8 +351,12 @@ function toMessages(request: ModelRequest, claude: boolean): Message[] {
     .map((b) => ({
       type: "text" as const,
       text: b.text,
-      // Claude caches only at its breakpoints; the others cache a prompt's prefix by themselves.
-      ...(claude && b.cache ? { cache_control: { type: "ephemeral" as const } } : {}),
+      // Claude caches only at its breakpoints (an hour with `cacheTtl`); the others cache a prompt's prefix by themselves.
+      ...(claude && b.cache
+        ? {
+            cache_control: { type: "ephemeral" as const, ...(request.cacheTtl === "1h" ? { ttl: "1h" as const } : {}) },
+          }
+        : {}),
     }));
   const out: Message[] = system.length > 0 ? [{ role: "system", content: system }] : [];
   for (const m of request.messages) {
@@ -394,12 +399,11 @@ function toBody(request: ModelRequest) {
     stream: true as const,
     ...(request.tools && request.tools.length > 0
       ? {
-          tools: [...request.tools]
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((t) => ({
-              type: "function" as const,
-              function: { name: t.name, description: t.description, parameters: t.inputSchema },
-            })),
+          // The stable tools first: every model's prefix cache keeps them when a tool group loads.
+          tools: stableToolsFirst(request.tools).map((t) => ({
+            type: "function" as const,
+            function: { name: t.name, description: t.description, parameters: t.inputSchema },
+          })),
         }
       : {}),
     ...(reasoning ? { reasoning } : {}),
@@ -469,9 +473,10 @@ function routerError(error: unknown): ProviderError {
 /**
  * OpenRouter over Chat Completions, streaming, through the OpenAI SDK.
  *
- * - System blocks as one system message; tool calls and results as `tool_calls` and `tool` messages; tools sorted by
- *   name and sent on every call. Claude's ids get cache breakpoints (its system blocks marked `cache`, and automatic
- *   caching on top); every other model caches a prompt's prefix by itself.
+ * - System blocks as one system message; tool calls and results as `tool_calls` and `tool` messages; tools (the
+ *   stable ones first, each part by name) sent on every call. Claude's ids get cache breakpoints (its system blocks
+ *   marked `cache`, an hour with `cacheTtl`, and automatic caching on top); every other model caches a prompt's prefix
+ *   by itself.
  * - `effort` → `reasoning` at the nearest effort the model takes; `none` turns thinking off only where it can be.
  *   Its `reasoning_details` come back as one `opaque` block, sent back unchanged in tool loops.
  * - `outputSchema` → `response_format` (strict JSON Schema), only to upstream providers that honor it.

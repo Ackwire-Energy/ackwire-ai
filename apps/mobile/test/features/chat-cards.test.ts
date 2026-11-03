@@ -19,7 +19,8 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(row, [
-          ") : body ? (\n          <MessageText\n            body={body}",
+          // A long message to another agent shows its first paragraph (`talk.lead`), the rest behind "Ler tudo".
+          ") : body ? (\n          <MessageText\n            body={talk ? talk.lead : body}",
           "<Receipts message={m} />",
           "{cards}\n        {/* Its tools after",
           "<ConsultGroup message={m} color={color} />",
@@ -143,5 +144,38 @@ describe("a shared approval card with actions approved ahead", () => {
     expect(group).toContain("<ApprovalAheadLine approval={a} />");
     expect(group).toContain('t("approval.ahead.scheduled"');
     expect(group).toContain("cancelAhead.cancel(a.id)");
+  });
+});
+
+describe("a stretch's pause card on the phone (ADR 0089)", () => {
+  test("once someone let them go on, one quiet line: who and when, no card and no Continuar", () => {
+    const card = source("../ai/StretchCard.tsx");
+    const [doneAt, cardAt] = at(card, ["if (continued) {", "<View style={[styles.card"]);
+    const done = card.slice(doneAt, cardAt);
+    expect(done).toContain("<AskDone");
+    expect(done).toContain('t("stretchCard.continuedByYou", { time })');
+    expect(done).not.toContain("<Button");
+    expect(card.slice(cardAt)).not.toContain("continued");
+  });
+});
+
+describe("a plan account's agents on the phone (Contas dos planos)", () => {
+  test("bars split by agent, then one list, then when it renews and how old, then the month", () => {
+    const screen = source("../usage/UsageScreen.tsx");
+    const block = screen.slice(...at(screen, ["function AccountBlock(", "function AgentShares("]));
+    expect(ascending(at(block, ["<PlanMeter usage={splitUsage(", "{list}", "usageViews.monthTokens"]))).toBe(true);
+    expect(block).not.toContain("account.agents.map");
+    const list = screen.slice(...at(screen, ["function AgentShares(", "/** The API per agent:"]));
+    expect(ascending(at(list, ["usageViews.thisMonth", "openAgentUsage(a.agentId)", "usageViews.moreAgents"]))).toBe(
+      true,
+    );
+    // "Usa agora" only for an agent using it now, never for the folded row.
+    expect(list).toContain("tokens(a.tokens, a.now)");
+    expect(list).toContain("tokens(shares.restTokens)");
+    // The renewal moves under the list, once.
+    const parts = source("../usage/parts.tsx");
+    expect(
+      ascending(at(parts, ["!children ? (", "{children}\n      {children && renews ?", "text.updated(usage.at)"])),
+    ).toBe(true);
   });
 });

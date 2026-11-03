@@ -89,10 +89,10 @@ interface Counts {
   cacheRead: number;
   cacheWrite: number;
 }
-const tokensOf = (u: Counts) => u.input + u.output + u.cacheRead + u.cacheWrite;
+export const tokensOf = (u: Counts) => u.input + u.output + u.cacheRead + u.cacheWrite;
 
 /** What these tokens (an hour's or a day's) would cost through the API, in nano-USD; null for a model without a price. */
-function apiNano(model: string | null, u: Counts): number | null {
+export function apiNano(model: string | null, u: Counts): number | null {
   const id = catalogModelOf(model);
   return id
     ? summedCostNanoUsd(id, {

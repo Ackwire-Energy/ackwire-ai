@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, gt, inArray, isNull, lte, or, schema } from "@agenteschat/db";
 import { mediaOf } from "./media";
+import { voiceOf } from "./message-preview";
 import { type NoticePrefs, noticeOn, readNoticePrefs } from "./notice-prefs";
 import type { NotificationActor, NotificationLatest, NotificationSource } from "./notifications";
 import { enqueue } from "./outbox";
@@ -265,16 +266,16 @@ async function sentMediaOf(
   kind: string,
   source: NotificationSource,
   latest: NotificationLatest,
-): Promise<"gif" | "sticker" | null> {
+): Promise<"gif" | "sticker" | "voice" | null> {
   if (!SAID_KINDS.has(kind) || latest.text?.trim()) return null;
   const carried = "media" in latest ? latest.media : undefined;
-  if (carried === "gif" || carried === "sticker") return carried;
+  if (carried === "gif" || carried === "sticker" || carried === "voice") return carried;
   if (!source.messageId) return null;
   const [message] = await db
     .select({ meta: schema.messages.meta })
     .from(schema.messages)
     .where(and(eq(schema.messages.orgId, orgId), eq(schema.messages.id, source.messageId)));
-  return mediaOf(message?.meta)?.kind ?? null;
+  return voiceOf(message?.meta) ? "voice" : (mediaOf(message?.meta)?.kind ?? null);
 }
 
 /** The in-app page a browser notification opens: the inbox, which opens the notification itself. */

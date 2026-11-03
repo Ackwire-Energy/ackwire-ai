@@ -928,14 +928,13 @@ export function createToolGateway(deps: {
           : ctx.runId
             ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId)
             : null;
-        const asked =
-          tool.approvers && !tool.connectionId
-            ? await tool.approvers(
-                call.input,
-                ctx,
-                authority ? (authority.personId ?? routineCreatorOf(authority)) : null,
-              )
-            : null;
+        const asked = tool.approvers
+          ? await tool.approvers(
+              call.input,
+              ctx,
+              authority ? (authority.personId ?? routineCreatorOf(authority)) : null,
+            )
+          : null;
         if (asked && !asked.ok) return finish({ content: asked.message, isError: true }, "refused");
         const described = tool.describe?.(call.input) ?? { title: `${tool.name}`, detail: canonicalJson(call.input) };
         const connectionId = tool.connectionId ?? null;

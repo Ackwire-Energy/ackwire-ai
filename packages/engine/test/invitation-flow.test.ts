@@ -6,7 +6,10 @@ import {
   approveJoinRequest,
   askToJoin,
   cancelSuggestion,
+  changeMemberRole,
   claimJoinRequest,
+  createInvitation,
+  createRole,
   denyJoinRequest,
   type EmailTemplate,
   holdsInvitation,
@@ -27,6 +30,7 @@ import {
   previewInvitation,
   pruneJoinRequests,
   queueInvitationEmail,
+  removeMember,
   renewInviteLink,
   resendInvitation,
   sendJoinCode,
@@ -595,6 +599,55 @@ describe("email invitations (ADR 0090)", () => {
     const piaIn = await accept("u_pia", "pia@example.com", pia);
     expect(piaIn).toContain(produto);
     expect(piaIn).not.toContain(diretoria);
+  });
+
+  test("an invitation gives only the roles its sender could still give, and none to someone already in", async () => {
+    await start();
+    const { db, org, owner } = fx();
+    const devs = await createRole(db, owner.id, org.id, { name: "Devs" });
+    const rolesOf = async (userId: string) => {
+      const rows = await db
+        .select({ role: schema.organizationMembers.role })
+        .from(schema.organizationMembers)
+        .where(and(eq(schema.organizationMembers.orgId, org.id), eq(schema.organizationMembers.userId, userId)));
+      const roleIds = await db
+        .select({ id: schema.organizationMemberRoles.roleId })
+        .from(schema.organizationMemberRoles)
+        .where(eq(schema.organizationMemberRoles.userId, userId));
+      return { role: rows[0]?.role, roleIds: roleIds.map((r) => r.id) };
+    };
+    const accept = async (id: string, email: string, token: string) => {
+      await db.insert(schema.users).values({ id, name: id, email }).onConflictDoNothing();
+      await acceptInvitation(db, { id, email }, token, NOW);
+      return rolesOf(id);
+    };
+
+    // Its sender was removed before it was accepted: the person comes in with no role from it.
+    const adm = await addMember(db, org.id, "admin", "adm");
+    const rita = await createInvitation(db, adm.id, org.id, { email: "rita@example.com", roleIds: [devs.id] }, NOW);
+    await removeMember(db, owner.id, org.id, adm.id);
+    expect((await previewInvitation(db, rita.token, NOW))?.invitedBy).toBeNull();
+    expect(await accept("u_rita", "rita@example.com", rita.token)).toEqual({ role: "member", roleIds: [] });
+
+    // An owner who invited an owner and was then made a member: the person comes in as a member.
+    const bob = await addMember(db, org.id, "owner", "bob");
+    const ze = await createInvitation(db, bob.id, org.id, { email: "ze@example.com", role: "owner" }, NOW);
+    expect((await previewInvitation(db, ze.token, NOW))?.role).toBe("owner");
+    await changeMemberRole(db, owner.id, org.id, bob.id, "member");
+    expect(await previewInvitation(db, ze.token, NOW)).toEqual(
+      expect.objectContaining({ role: "member", invitedBy: "bob" }),
+    );
+    expect(await accept("u_ze", "ze@example.com", ze.token)).toEqual({ role: "member", roleIds: [] });
+
+    // Someone who joined another way meanwhile gets no roles from an old invitation.
+    const lia = await createInvitation(db, owner.id, org.id, { email: "lia@example.com", roleIds: [devs.id] }, NOW);
+    await db.insert(schema.users).values({ id: "u_lia", name: "u_lia", email: "lia@example.com" });
+    await db.insert(schema.organizationMembers).values({ orgId: org.id, userId: "u_lia", role: "member" });
+    expect(await accept("u_lia", "lia@example.com", lia.token)).toEqual({ role: "member", roleIds: [] });
+
+    // A sender who still may give them: the roles go with it.
+    const theo = await createInvitation(db, owner.id, org.id, { email: "theo@example.com", roleIds: [devs.id] }, NOW);
+    expect(await accept("u_theo", "theo@example.com", theo.token)).toEqual({ role: "member", roleIds: [devs.id] });
   });
 
   test("only an invitation's own email proves the address: the sign-up skips confirming, accepting confirms", async () => {

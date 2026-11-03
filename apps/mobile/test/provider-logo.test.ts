@@ -124,6 +124,7 @@ describe("the marks as the phone draws them", () => {
       "image" in mark ? [{ id, image: mark.image }] : [],
     );
     expect(images).toEqual([
+      { id: "soniox", image: "/brands/soniox.png" },
       { id: "gemini", image: "/brands/gemini.png" },
       { id: "vscode", image: "/brands/vscode.png" },
     ]);

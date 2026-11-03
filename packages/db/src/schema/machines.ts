@@ -172,6 +172,9 @@ export const machines = pgTable(
     load: jsonb().$type<MachineLoadRecord>(),
     /** Its agents' browsers' last day of traffic, in bytes (protocol 23); null: unknown. */
     browserTraffic: jsonb().$type<MachineTrafficRecord>(),
+    /** The address an agent process observed, updated only when it changes. */
+    egress: jsonb().$type<{ ip: string | null; country?: string; at: string }>(),
+    networkTransition: jsonb().$type<{ state: "draining" | "restart_required"; deadline: string; agents: string[] }>(),
     /** A background task interrupted by the machine going away resumes by itself when it comes back (ADR 0029). */
     resumeTasks: boolean().notNull().default(true),
     /**

@@ -1515,6 +1515,8 @@ export const en = {
     queued_other: "{{names}} are in line for the computer",
     away_one: "{{names}} is waiting for the computer",
     away_other: "{{names}} are waiting for the computer",
+    /** One agent first in the computer's line. */
+    queuedNext: "{{names}} is in line for the computer · next",
     nobody: "No agent will answer",
     status: {
       seen: "Saw it",
@@ -1924,6 +1926,9 @@ export const en = {
     rolesNone: "The workspace has no roles yet.",
     rolesNeeded: "Pick at least one role.",
     rolesLeave: "Whoever loses the role leaves the channel.",
+    rolesChoose: "Choose roles",
+    rolesChange: "Change roles",
+    rolesDone: "Done",
     publicTitle: "Make #{{channel}} public?",
     publicBody: "Everyone in the workspace will be able to join it and read all its messages, past ones included.",
     publicConfirm: "Make public",
@@ -2775,6 +2780,7 @@ export const en = {
     runsEmpty: "No runs matching “{{q}}”.",
     runsNone: "No runs yet.",
     runNoText: "No text",
+    runPrivate: "In a conversation you're not in",
     runTokens: "{{input}} in · {{cached}} cached · {{output}} out",
     runTokensTip: "{{input}} new input tokens, {{cached}} read from the cache (cheaper), {{output}} output",
     budgetHelp: "At the limit, {{name}} stops and says so in the channel. {{ownerNote}}",
@@ -6174,6 +6180,68 @@ export const en = {
       symbols: "Symbols",
     },
   },
+  voice: {
+    word: "Voice message",
+    wordTime: "Voice message · {{time}}",
+    holdToRecord: "Hold to record",
+    slideToDelete: "Slide to delete",
+    send: "Send audio",
+    delete: "Delete recording",
+    deleted: "Recording deleted.",
+    pause: "Pause",
+    resume: "Keep recording",
+    listen: "Listen to your recording",
+    play: "Play",
+    stop: "Stop",
+    speed: "Speed",
+    left: "{{seconds}} s left",
+    tooShort: "Too short. Say a little more.",
+    silent: "Didn't hear anything. Nothing was sent.",
+    notSent: "Couldn't send the audio.",
+    limit: "That's a lot of audio for today. Write here and try again tomorrow.",
+    micBlocked: "The microphone is blocked",
+    micBlockedHint: "Allow the microphone in your device settings to record.",
+    openSettings: "Open settings",
+    notNow: "Not now",
+    expired: "Audio expired",
+    showText: "Show text",
+    hideText: "Hide text",
+    record: "Record audio",
+    recording: "Recording audio",
+    discard: "Delete recording",
+    stopListening: "Stop listening",
+    keys: "Enter sends · Esc deletes",
+    keysHold: "Release to send · Esc deletes",
+    keysPaused: "Paused · Space listens · Enter sends · Esc deletes",
+    pausePlay: "Pause",
+    seek: "Audio position",
+    speedAt: "Speed {{speed}}×",
+    waiting: "Goes as soon as you're back online",
+    notUnderstood: "Couldn't make out the audio. Nothing was sent.",
+    refused: "The audio couldn't be sent in this conversation.",
+    blockedMac: "The microphone is blocked. On a Mac: System Settings › Privacy › Microphone.",
+    blockedWeb: "The microphone is blocked. Allow it from the lock next to the site's address.",
+    noMic: "No microphone found.",
+    failed: "Couldn't open the microphone. Try again.",
+    noPlayback: "Can't play it right now. You can still send it or keep recording.",
+    settings: {
+      title: "Voice messages",
+      on: "Voice messages",
+      onHelp: "People in this workspace can send audio in conversations.",
+      noEngine: "Voice messages aren't available here yet.",
+      engineTitle: "What turns voice into text",
+      own: "Your own server",
+      ownHelp: "Whisper or Parakeet on your machine. The audio stays there.",
+      address: "Server address",
+      key: "{{name}} key",
+      keyPlaceholder: "Paste here",
+      test: "Test",
+      tested: "It works. Everyone now sees the microphone.",
+      sealed: "Kept encrypted on your server and never shown again.",
+      leaves: "Audio from voice messages goes to {{name}} to become text.",
+      invalid: "The saved key doesn't open on this server. Paste it again.",
+    },
+  },
   media: {
     word: { gif: "GIF", sticker: "Sticker" },
     gifMark: "GIF",
@@ -7380,6 +7448,84 @@ export const en = {
       noneText: "Doesn't run programs or keep files",
     },
   },
+  /** A shared computer's line: who works on it now, who waits, and estimates (never exact: "~"). */
+  queue: {
+    /** The conversation header's button. */
+    button_one: "Computer · {{count}} waiting",
+    button_other: "Computer · {{count}} waiting",
+    buttonIdle: "Computer",
+    see: "See queue",
+    /** The dialog's label for screen readers; the visible title is the computer's name. */
+    label: "Line for {{name}}",
+    full: "Full",
+    fullNext: "Full · next starts in about {{n}} min",
+    free: "Nobody in line",
+    workingNow: "Working now · {{n}}",
+    inLine: "In line · {{n}}",
+    allStarted: "all started in ~{{n}} min",
+    nothingWorking: "Nothing running right now",
+    rule: "People go first. Agents mentioned together start one at a time.",
+    youFirst: "You go first",
+    startsIn: "starts ~{{n}} min",
+    /** {{after}} is `queue.who`: the agent's name, with an article where the language needs one. */
+    startsAfter: "starts once {{after}} finishes",
+    left: "~{{n}} min left",
+    /** An agent's name inside a sentence ("once Ada finishes"). Keep {{name}}; add an article only if your language needs one. */
+    who: "{{name}}",
+    /** The outage card's pill beside the time, {{time}} like "3 min". */
+    away: "Away {{time}}",
+    /** What a turn is for: the row reads "Theo · answering you · your DM · 9 min". */
+    purpose: {
+      you: "answering you",
+      person: "answering {{name}}",
+      someone: "answering a person",
+      agent: "asked by {{name}}",
+      someAgent: "asked by an agent",
+      routine: "a routine",
+      work: "long work",
+    },
+    where: {
+      yourDm: "your DM",
+      dm: "DM with {{name}}",
+      thread: "a thread in #{{name}}",
+      private: "a private conversation",
+    },
+    /** The waiting agent's live row, where "thinking" shows otherwise. */
+    live: {
+      nextEta: "Waiting for the computer. Next up, in about {{n}} min",
+      nextAfter: "Waiting for the computer. Next up, once {{after}} finishes",
+      next: "Waiting for the computer. Next up",
+      /** {{nth}} is the place in line (`queue.nth`), {{names}} the agents ahead. */
+      behind: "In line, {{nth}}. After {{names}}",
+      position: "In line, {{nth}}",
+    },
+    /** Places in line by the language's ordinal rule (one: 1st, 21st; two: 2nd; few: 3rd; other: 4th). Same text in each when your language has one form. */
+    nth: {
+      one: "{{n}}st",
+      two: "{{n}}nd",
+      few: "{{n}}rd",
+      other: "{{n}}th",
+    },
+    /** The strip under a message that called several agents. */
+    fan: {
+      called_one: "{{count}} agent called",
+      called_other: "{{count}} agents called",
+      answered_one: "{{count}} answered",
+      answered_other: "{{count}} answered",
+      working_one: "{{count}} working",
+      working_other: "{{count}} working",
+      inLine_one: "{{count}} in line",
+      inLine_other: "{{count}} in line",
+      failed_one: "{{count}} didn't answer",
+      failed_other: "{{count}} didn't answer",
+      chip: {
+        answered: "answered",
+        working: "working",
+        inLine: "in line",
+        failed: "didn't answer",
+      },
+    },
+  },
   access: {
     matrixTitle: "Agent access",
     matrixHint:
@@ -8389,6 +8535,7 @@ export const en = {
     clearSearch: "Clear search",
     noMatch: "Nothing found for “{{q}}”.",
     noTools: "The server didn't offer any tools.",
+    unreadable: "Couldn't read the connector's tools: {{reason}}",
     refresh: "Look for new tools",
     decideTitle: "Need your decision · {{count}}",
     decideHelp: "Their names don't say what they do. Confirm the suggestion or pick another.",
@@ -9122,6 +9269,12 @@ export const en = {
     },
   },
   machines: {
+    egress: {
+      draining: "Network settings are changing. Open computer sessions will restart at {{when}}.",
+      restart: "Computer sessions are restarting to apply network settings. New work waits until this finishes.",
+      line: "Exit IP {{ip}}",
+      hint: "The address websites see when the agents browse. It updates when the computer’s network changes.",
+    },
     online: "Online",
     offline: "Offline",
     execOff: "Commands off",
@@ -9810,6 +9963,7 @@ export const en = {
       import: "Import and export",
       billing: "Plan and billing",
       media: "GIFs and stickers",
+      voice: "Voice",
       apps: "AI apps",
     },
     sectionText: {
@@ -9829,6 +9983,7 @@ export const en = {
       import: "Bring agents from another app or workspace, and take this one wherever you want.",
       billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
       media: "What people can send in a conversation, and when agents send a GIF or a sticker.",
+      voice: "Voice messages in conversations, and who turns voice into text.",
       apps: "Ask this workspace's agents for tasks from Claude, Cursor and other apps.",
     },
     title: "Settings",
@@ -10006,13 +10161,17 @@ export const en = {
   usageViews: {
     signedOut: "Signed out",
     whose: "{{name}}'s",
-    part: "{{name}} ≈ {{percent}}",
     noWindows: "The limit shows up after this account is used again.",
     unused: "No agent uses this account.",
     usesNow: "uses it now",
     monthTokens: "{{tokens}} tokens this month",
     tokens: "{{tokens}} tokens",
     equivalent: "≈ {{amount}} through the API",
+    /** The column of each agent's tokens in an account's list. */
+    thisMonth: "This month",
+    /** The row an account's list folds the rest of its agents into: how many (`percent`, their share, sits beside it). */
+    moreAgents_one: "+{{count}} agent",
+    moreAgents_other: "+{{count}} agents",
     paid: "{{amount}} paid",
     budgetShare: "{{percent}} of the budget",
     estimate:
@@ -10218,6 +10377,12 @@ export const en = {
       see: "See",
     },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
+    /** A long message from one agent to another, folded to its first paragraph: the whole opens in its thread. */
+    talk: {
+      readAll: "Read all",
+      more_one: "{{count}} more line",
+      more_other: "{{count}} more lines",
+    },
     consultPanel: {
       label: "Conversation between {{from}} and {{to}}",
       /** The phone's bar (the web draws the arrows as an icon between the names). */
@@ -10563,17 +10728,14 @@ export const en = {
       issue_work_start: "Please do task #{{number}}.",
       issue_taken: "Took task #{{number}}.",
       done: "Done.",
-      stretch_paused_runs_one: "{{agents}} stopped to check with you · {{steps}} steps without you since your request",
-      stretch_paused_runs_other:
-        "{{agents}} stopped to check with you · {{steps}} steps on their own since your request",
-      stretch_paused_spend_one:
-        "{{agents}} stopped to check with you · used {{percent}}% of the month's budget on this without you",
-      stretch_paused_spend_other:
-        "{{agents}} stopped to check with you · each used {{percent}}% of the month's budget on this without you",
+      stretch_paused_runs_one: "{{agents}} paused to check with you before going on",
+      stretch_paused_runs_other: "{{agents}} paused to check with you before going on",
+      stretch_paused_spend_one: "{{agents}} paused to check with you · used {{percent}}% of the month's budget",
+      stretch_paused_spend_other: "{{agents}} paused to check with you · each used {{percent}}% of the month's budget",
       stretch_paused_spend_cost_one:
-        "{{agents}} stopped to check with you · used {{amount}} ({{percent}}% of the month's budget) on this without you",
+        "{{agents}} paused to check with you · used {{amount}} ({{percent}}% of the month's budget)",
       stretch_paused_spend_cost_other:
-        "{{agents}} stopped to check with you · each used {{amount}} ({{percent}}% of the month's budget) on this without you",
+        "{{agents}} paused to check with you · each used {{amount}} ({{percent}}% of the month's budget)",
       memory: {
         proposed: "Proposal created: {{text}}",
         forgot: 'Memory updated: forgot "{{text}}".',
@@ -11518,6 +11680,11 @@ export const en = {
   },
   /** The agent's screen (ADR 0058): watching it and taking control. */
   desktop: {
+    ask: {
+      watching: "You're just watching.",
+      title: "Want to take control?",
+      working: "{{name}} pauses while you’re in control.",
+    },
     sub: {
       control: "You're in control · {{name}} waits",
       controlAsked: "You're in control · {{name}} asked",

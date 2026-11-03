@@ -1,7 +1,9 @@
+import { isIP } from "node:net";
 import { limitIp } from "@agenteschat/adapters";
 import {
   ARTIFACT_LIMITS,
   authenticateMachine,
+  computerQueue,
   computerSetup,
   confirmDeviceCode,
   currentOrgLogo,
@@ -152,6 +154,12 @@ export const Machine = z
         description:
           "Whether agents can use their own desktops there (protocol 21, ADR 0062): only where each agent works as its own OS user. Null when its runner doesn't report it.",
       }),
+    networkTransition: z
+      .object({ state: z.enum(["draining", "restart_required"]), deadline: z.string(), agents: z.array(z.string()) })
+      .nullable()
+      .optional(),
+    egress: z.object({ ip: z.string(), country: z.string().optional(), at: z.string() }).nullable().optional(),
+
     disk: z
       .object({
         freeGb: z.number().openapi({ description: "Free GB on the workspace's disk." }),
@@ -298,6 +306,55 @@ const OutageTarget = z
       .openapi({ description: "Why it can't take agents now: `offline`, `paused`; null when it can." }),
   })
   .openapi("OutageTarget");
+
+const QueuePurpose = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("person"), userId: z.string().nullable() }),
+    z.object({ kind: z.literal("agent"), agentId: z.uuid().nullable() }),
+    z.object({ kind: z.literal("routine") }),
+    z.object({ kind: z.literal("work") }),
+  ])
+  .openapi("QueuePurpose", {
+    description:
+      "What the turn is for, never its content: answering a person, asked by another agent, a routine, or long work. Ids are null when the author is gone.",
+  });
+
+const QueueWhere = z.object({ channelId: z.uuid(), threadId: z.uuid().nullable() });
+
+const ComputerQueue = z
+  .object({
+    machineId: z.uuid(),
+    name: z.string(),
+    working: z.array(
+      z.object({
+        runId: z.uuid(),
+        agentId: z.uuid(),
+        purpose: QueuePurpose,
+        where: QueueWhere,
+        startedAt: z.string().openapi({ description: "When this turn asked the computer." }),
+        estimatedEndAt: z.string().nullable().openapi({
+          description:
+            "Start plus the agent's median computer turn (else the workspace's), never sooner than 30 s from now; null with no basis.",
+        }),
+      }),
+    ),
+    waiting: z.array(
+      z.object({
+        runId: z.uuid(),
+        agentId: z.uuid(),
+        purpose: QueuePurpose,
+        where: QueueWhere,
+        people: z.boolean().openapi({ description: "A person waits on it: it goes first." }),
+        position: z.number().int().openapi({ description: "1 = next." }),
+        estimatedStartAt: z.string().nullable(),
+        after: z.array(z.uuid()).openapi({
+          description:
+            "Who it waits for: for the head, the running turn expected to end first; behind it, the agents ahead in line.",
+        }),
+      }),
+    ),
+  })
+  .openapi("ComputerQueue");
 
 const MoveTarget = z.object({ kind: z.literal("machine"), machineId: z.uuid() });
 
@@ -601,6 +658,24 @@ export function machineAppRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/machines/{machineId}/queue",
+      tags,
+      security,
+      summary: "A computer's line: the turns working on it and the runs waiting for room, in order (every member)",
+      description:
+        "Changes come as the `computer.queue` org event (`{ machineId }`): refetch. Estimates are typical durations, never exact.",
+      request: { params: MachineParams },
+      responses: { 200: json(ComputerQueue), ...errors },
+    }),
+    async (c) => {
+      const { orgId, machineId } = c.req.valid("param");
+      return c.json(await computerQueue(db, c.get("user").id, orgId, machineId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "post",
       path: "/organizations/{orgId}/machines/{machineId}/move-agents",
       tags,
@@ -729,6 +804,29 @@ const DEVICE_POLL_LIMIT = { limit: 60, windowMs: 60_000 };
  */
 export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
   const { db, config, adapters } = deps;
+  api.openapi(
+    createRoute({
+      method: "get",
+      path: "/machines/ip",
+      tags,
+      summary: "The address this computer uses to reach the server",
+      responses: {
+        200: json(z.object({ ip: z.string().nullable(), country: z.string().nullable() })),
+        429: errorResponse("Too many requests"),
+      },
+    }),
+    async (c) => {
+      c.header("Cache-Control", "no-store");
+      const ip = requestIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`machine-ip:${limitIp(ip)}`, { limit: 120, windowMs: 60_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Try again in a minute.");
+      const country = c.req.header("cf-ipcountry") ?? "";
+      return c.json(
+        { ip: isIP(ip) ? ip : null, country: /^[A-Z]{2}$/.test(country) && country !== "XX" ? country : null },
+        200,
+      );
+    },
+  );
 
   api.openapi(
     createRoute({

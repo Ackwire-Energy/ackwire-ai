@@ -20,6 +20,7 @@ const MACHINE_EVENTS = new Set([
   "machine.access",
   "machine.deleted",
   "machine.agents_moved",
+  "computer.queue",
 ]);
 const isMachineEvent = (type: string) => MACHINE_EVENTS.has(type);
 
@@ -86,9 +87,15 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     paused?: unknown;
     access?: unknown;
     accounts?: unknown;
+    egress?: unknown;
+    networkTransition?: unknown;
   };
   if (typeof e.machineId !== "string") return true;
   const machineId = e.machineId;
+  if (e.type === "computer.queue") {
+    void qc.invalidateQueries({ queryKey: keys.machineQueue(orgId, machineId) });
+    return true;
+  }
   const list = keys.machines(orgId);
   // Who waits for an offline computer changes when one comes back, goes away or its agents move.
   if (e.type === "machine.status" || e.type === "machine.deleted" || e.type === "machine.agents_moved") {
@@ -111,7 +118,9 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
       const online = e.online === true;
       const now = new Date().toISOString();
       qc.setQueryData<Machine[]>(list, (old) =>
-        old?.map((m) => (m.id === machineId ? { ...m, online, lastSeenAt: online ? now : m.lastSeenAt } : m)),
+        old?.map((m) =>
+          m.id === machineId ? { ...m, online, egress: null, lastSeenAt: online ? now : m.lastSeenAt } : m,
+        ),
       );
       patchTargets(qc, orgId, machineId, { online });
       // A machine we don't know yet (paired in another tab): fetch it.
@@ -128,13 +137,47 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     case "machine.access": {
       // A rename, a pause on the machine, or what it allows now (ADR 0036): patch what came, refetch otherwise.
       const patch: Partial<Machine> = {};
+      if (e.networkTransition === null) patch.networkTransition = null;
+      else if (
+        isObject(e.networkTransition) &&
+        (e.networkTransition.state === "draining" || e.networkTransition.state === "restart_required") &&
+        typeof e.networkTransition.deadline === "string" &&
+        Number.isFinite(Date.parse(e.networkTransition.deadline)) &&
+        Array.isArray(e.networkTransition.agents) &&
+        e.networkTransition.agents.every((id) => typeof id === "string")
+      ) {
+        patch.networkTransition = e.networkTransition as NonNullable<Machine["networkTransition"]>;
+      }
+      if (e.egress === null) patch.egress = null;
+      else if (
+        isObject(e.egress) &&
+        typeof e.egress.ip === "string" &&
+        e.egress.ip.length <= 45 &&
+        /^[0-9a-f:.]+$/i.test(e.egress.ip) &&
+        typeof e.egress.at === "string" &&
+        Number.isFinite(Date.parse(e.egress.at))
+      ) {
+        patch.egress = {
+          ip: e.egress.ip,
+          at: e.egress.at,
+          ...(typeof e.egress.country === "string" && /^[A-Z]{2}$/.test(e.egress.country)
+            ? { country: e.egress.country }
+            : {}),
+        };
+      }
       if (typeof e.name === "string") patch.name = e.name;
       const paused = pauseOf(e.paused);
       if (paused) patch.paused = paused;
       const access = accessOf(e.access);
       if (access !== undefined) patch.access = access;
       if (Object.keys(patch).length > 0) {
-        qc.setQueryData<Machine[]>(list, (old) => old?.map((m) => (m.id === machineId ? { ...m, ...patch } : m)));
+        qc.setQueryData<Machine[]>(list, (old) =>
+          old?.map((m) =>
+            m.id === machineId
+              ? { ...m, ...patch, ...(m.kind !== "managed" ? { egress: null, networkTransition: null } : {}) }
+              : m,
+          ),
+        );
         if (patch.name) patchTargets(qc, orgId, machineId, { name: patch.name });
       }
       // Nothing to patch, or `access: true` (it changed, and who may see it differs per person): refetch.

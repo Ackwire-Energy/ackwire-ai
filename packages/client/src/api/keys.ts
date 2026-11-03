@@ -8,6 +8,7 @@ export const keys = {
   jev: ["jev"] as const,
   /** The installation's GIPHY key (ADR 0091), not a workspace's: it stays when switching organizations. */
   gifKey: ["gif-key"] as const,
+  speechKey: ["speech-key"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
   accountDeletion: ["account-deletion"] as const,
@@ -119,6 +120,8 @@ export const keys = {
   hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
   machineOutages: (orgId: string) => ["org", orgId, "machines", "outages"] as const,
+  /** A computer's line (under `machines`); `computer.queue` org events refetch it. */
+  machineQueue: (orgId: string, machineId: string) => ["org", orgId, "machines", "queue", machineId] as const,
   /** The workspace's own computer on its way (ADR 0056 §10); `machine.provisioning` events set it. */
   computerSetup: (orgId: string) => ["org", orgId, "computer-setup"] as const,
   /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */

@@ -1541,6 +1541,7 @@
     "queued_other": "{{names}} stehen in der Warteschlange des Computers",
     "away_one": "{{names}} wartet auf den Computer",
     "away_other": "{{names}} warten auf den Computer",
+    "queuedNext": "{{names}} steht in der Warteschlange des Computers · als Nächstes dran",
     "nobody": "Kein Agent wird antworten",
     "status": {
       "seen": "Gesehen",
@@ -1976,6 +1977,9 @@
     "rolesNone": "Der Workspace hat noch keine Rollen.",
     "rolesNeeded": "Wähle mindestens eine Rolle.",
     "rolesLeave": "Wer die Rolle verliert, verlässt den Kanal.",
+    "rolesChoose": "Rollen wählen",
+    "rolesChange": "Rollen ändern",
+    "rolesDone": "Fertig",
     "publicTitle": "#{{channel}} öffentlich machen?",
     "publicBody": "Alle im Workspace können beitreten und alle Nachrichten lesen, auch die älteren.",
     "publicConfirm": "Öffentlich machen",
@@ -2861,6 +2865,7 @@
     "runsEmpty": "Keine Ausführungen zu „{{q}}“.",
     "runsNone": "Noch keine Ausführungen.",
     "runNoText": "Kein Text",
+    "runPrivate": "In einem Gespräch, an dem du nicht teilnimmst",
     "runTokens": "{{input}} rein · {{cached}} im Cache · {{output}} raus",
     "runTokensTip": "{{input}} neue Eingabe-Token, {{cached}} aus dem Cache gelesen (günstiger), {{output}} Ausgabe",
     "budgetHelp": "Am Limit hört {{name}} auf und sagt es im Kanal. {{ownerNote}}",
@@ -6484,6 +6489,68 @@
       "symbols": "Symbole"
     }
   },
+  "voice": {
+    "word": "Sprachnachricht",
+    "wordTime": "Sprachnachricht · {{time}}",
+    "holdToRecord": "Zum Aufnehmen gedrückt halten",
+    "slideToDelete": "Zum Löschen wischen",
+    "send": "Audio senden",
+    "delete": "Aufnahme löschen",
+    "deleted": "Aufnahme gelöscht.",
+    "pause": "Pausieren",
+    "resume": "Weiter aufnehmen",
+    "listen": "Deine Aufnahme anhören",
+    "play": "Abspielen",
+    "stop": "Stoppen",
+    "speed": "Geschwindigkeit",
+    "left": "Noch {{seconds}} s",
+    "tooShort": "Zu kurz. Sag noch etwas mehr.",
+    "silent": "Nichts gehört. Es wurde nichts gesendet.",
+    "notSent": "Das Audio konnte nicht gesendet werden.",
+    "limit": "Das ist viel Audio für heute. Schreib hier und versuch es morgen noch mal.",
+    "micBlocked": "Das Mikrofon ist blockiert",
+    "micBlockedHint": "Erlaube das Mikrofon in den Einstellungen deines Geräts, um aufzunehmen.",
+    "openSettings": "Einstellungen öffnen",
+    "notNow": "Nicht jetzt",
+    "expired": "Audio abgelaufen",
+    "showText": "Text anzeigen",
+    "hideText": "Text ausblenden",
+    "record": "Audio aufnehmen",
+    "recording": "Audio wird aufgenommen",
+    "discard": "Aufnahme löschen",
+    "stopListening": "Anhören beenden",
+    "keys": "Enter sendet · Esc löscht",
+    "keysHold": "Loslassen zum Senden · Esc löscht",
+    "keysPaused": "Pausiert · Leertaste hört an · Enter sendet · Esc löscht",
+    "pausePlay": "Pausieren",
+    "seek": "Position im Audio",
+    "speedAt": "Geschwindigkeit {{speed}}×",
+    "waiting": "Geht raus, sobald du wieder online bist",
+    "notUnderstood": "Das Audio war nicht zu verstehen. Es wurde nichts gesendet.",
+    "refused": "Das Audio konnte in dieser Unterhaltung nicht gesendet werden.",
+    "blockedMac": "Das Mikrofon ist blockiert. Auf dem Mac: Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon.",
+    "blockedWeb": "Das Mikrofon ist blockiert. Erlaube es über das Schloss neben der Adresse der Website.",
+    "noMic": "Kein Mikrofon gefunden.",
+    "failed": "Das Mikrofon ließ sich nicht öffnen. Versuch es noch mal.",
+    "noPlayback": "Gerade nicht abspielbar. Du kannst es trotzdem senden oder weiter aufnehmen.",
+    "settings": {
+      "title": "Sprachnachrichten",
+      "on": "Sprachnachrichten",
+      "onHelp": "Personen in diesem Workspace können in Unterhaltungen Audio senden.",
+      "noEngine": "Sprachnachrichten sind hier noch nicht verfügbar.",
+      "engineTitle": "Was Sprache in Text umwandelt",
+      "own": "Dein eigener Server",
+      "ownHelp": "Whisper oder Parakeet auf deinem Rechner. Das Audio bleibt dort.",
+      "address": "Serveradresse",
+      "key": "{{name}}-Schlüssel",
+      "keyPlaceholder": "Hier einfügen",
+      "test": "Testen",
+      "tested": "Es funktioniert. Jetzt sehen alle das Mikrofon.",
+      "sealed": "Verschlüsselt auf deinem Server gespeichert und nie wieder angezeigt.",
+      "leaves": "Audio aus Sprachnachrichten geht an {{name}}, um zu Text zu werden.",
+      "invalid": "Der gespeicherte Schlüssel lässt sich auf diesem Server nicht öffnen. Füge ihn noch mal ein."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -7728,6 +7795,73 @@
       "noneText": "Führt keine Programme aus und speichert keine Dateien"
     }
   },
+  "queue": {
+    "button_one": "Computer · {{count}} wartet",
+    "button_other": "Computer · {{count}} warten",
+    "buttonIdle": "Computer",
+    "see": "Warteschlange ansehen",
+    "label": "Warteschlange für {{name}}",
+    "full": "Voll",
+    "fullNext": "Voll · der Nächste startet in etwa {{n}} Min.",
+    "free": "Niemand wartet",
+    "workingNow": "Arbeitet gerade · {{n}}",
+    "inLine": "In der Warteschlange · {{n}}",
+    "allStarted": "alle gestartet in ~{{n}} Min.",
+    "nothingWorking": "Gerade läuft nichts",
+    "rule": "Menschen zuerst. Zusammen erwähnte Agenten starten nacheinander.",
+    "youFirst": "Du bist zuerst dran",
+    "startsIn": "startet in ~{{n}} Min.",
+    "startsAfter": "startet, sobald {{after}} fertig ist",
+    "left": "noch ~{{n}} Min.",
+    "who": "{{name}}",
+    "away": "Weg seit {{time}}",
+    "purpose": {
+      "you": "antwortet dir",
+      "person": "antwortet {{name}}",
+      "someone": "antwortet einer Person",
+      "agent": "im Auftrag von {{name}}",
+      "someAgent": "im Auftrag eines Agenten",
+      "routine": "eine Routine",
+      "work": "lange Arbeit"
+    },
+    "where": {
+      "yourDm": "deine DM",
+      "dm": "DM mit {{name}}",
+      "thread": "ein Thread in #{{name}}",
+      "private": "eine private Unterhaltung"
+    },
+    "live": {
+      "nextEta": "Wartet auf den Computer. Als Nächstes dran, in etwa {{n}} Min.",
+      "nextAfter": "Wartet auf den Computer. Als Nächstes dran, sobald {{after}} fertig ist",
+      "next": "Wartet auf den Computer. Als Nächstes dran",
+      "behind": "In der Warteschlange, {{nth}}. Nach {{names}}",
+      "position": "In der Warteschlange, {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}.",
+      "two": "{{n}}.",
+      "few": "{{n}}.",
+      "other": "{{n}}."
+    },
+    "fan": {
+      "called_one": "{{count}} Agent gerufen",
+      "called_other": "{{count}} Agenten gerufen",
+      "answered_one": "{{count}} hat geantwortet",
+      "answered_other": "{{count}} haben geantwortet",
+      "working_one": "{{count}} arbeitet",
+      "working_other": "{{count}} arbeiten",
+      "inLine_one": "{{count}} wartet",
+      "inLine_other": "{{count}} warten",
+      "failed_one": "{{count}} hat nicht geantwortet",
+      "failed_other": "{{count}} haben nicht geantwortet",
+      "chip": {
+        "answered": "hat geantwortet",
+        "working": "arbeitet",
+        "inLine": "wartet",
+        "failed": "nicht geantwortet"
+      }
+    }
+  },
   "access": {
     "matrixTitle": "Zugriff der Agenten",
     "matrixHint": "Sensible Aktionen (Merge, Deploy, Teilen, Bezahlen) fragen immer nach einer Freigabe, auf jeder Stufe. Um es pro Tool festzulegen, öffne die Tools des Konnektors.",
@@ -8933,6 +9067,7 @@
     "clearSearch": "Suche leeren",
     "noMatch": "Nichts gefunden zu „{{q}}“.",
     "noTools": "Der Server hat keine Tools angeboten.",
+    "unreadable": "Die Tools des Connectors konnten nicht gelesen werden: {{reason}}",
     "refresh": "Nach neuen Tools suchen",
     "decideTitle": "Brauchen deine Entscheidung · {{count}}",
     "decideHelp": "Ihre Namen verraten nicht, was sie tun. Bestätige den Vorschlag oder wähle etwas anderes.",
@@ -9749,6 +9884,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Das Netzwerk ändert sich. Offene Sitzungen des Computers starten um {{when}} neu.",
+      "restart": "Die Sitzungen des Computers starten neu, um das Netzwerk zu übernehmen. Neue Arbeit wartet, bis das fertig ist.",
+      "line": "Ausgangs-IP {{ip}}",
+      "hint": "Die Adresse, die Websites sehen, wenn die Agenten surfen. Sie ändert sich, wenn sich das Netzwerk des Computers ändert."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Befehle aus",
@@ -10447,6 +10588,7 @@
       "import": "Import und Export",
       "billing": "Tarif und Abrechnung",
       "media": "GIFs und Sticker",
+      "voice": "Sprachnachrichten",
       "apps": "KI-Apps"
     },
     "sectionText": {
@@ -10465,6 +10607,7 @@
       "import": "Hol Agenten aus einer anderen App oder einem anderen Workspace und nimm diesen mit, wohin du willst.",
       "billing": "Der agentes.chat-Tarif, die Karte und die Rechnungen dieses Workspace liegen auf einer eigenen Seite von uns, außerhalb der App.",
       "media": "Was Personen in einer Unterhaltung senden können und wann Agenten ein GIF oder einen Sticker senden.",
+      "voice": "Sprachnachrichten in Unterhaltungen und wer Sprache in Text umwandelt.",
       "apps": "Bitte die Agenten dieses Workspace aus Claude, Cursor und anderen Apps um Aufgaben."
     },
     "title": "Einstellungen",
@@ -10654,13 +10797,15 @@
   "usageViews": {
     "signedOut": "Abgemeldet",
     "whose": "von {{name}}",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "Das Limit erscheint, sobald dieses Konto wieder genutzt wird.",
     "unused": "Kein Agent nutzt dieses Konto.",
     "usesNow": "nutzt es gerade",
     "monthTokens": "{{tokens}} Tokens diesen Monat",
     "tokens": "{{tokens}} Tokens",
     "equivalent": "≈ {{amount}} über die API",
+    "thisMonth": "Dieser Monat",
+    "moreAgents_one": "+{{count}} Agent",
+    "moreAgents_other": "+{{count}} Agenten",
     "paid": "{{amount}} bezahlt",
     "budgetShare": "{{percent}} des Budgets",
     "estimate": "Abos zeigen nur, wie viel das ganze Konto verbraucht hat. Der Anteil jedes Agenten ist eine Schätzung, basierend auf dem, was er darüber verbraucht hat.",
@@ -10855,6 +11000,11 @@
       "answeredFar": "{{to}} hat die Frage von {{from}} beantwortet",
       "answeredRequestFar": "{{to}} hat die Anfrage von {{from}} beantwortet",
       "see": "Ansehen"
+    },
+    "talk": {
+      "readAll": "Alles lesen",
+      "more_one": "{{count}} weitere Zeile",
+      "more_other": "{{count}} weitere Zeilen"
     },
     "consultPanel": {
       "label": "Unterhaltung zwischen {{from}} und {{to}}",
@@ -11189,12 +11339,12 @@
       "issue_work_start": "Bitte erledige Aufgabe #{{number}}.",
       "issue_taken": "Aufgabe #{{number}} übernommen.",
       "done": "Fertig.",
-      "stretch_paused_runs_one": "{{agents}} hat angehalten, um sich mit dir abzustimmen · {{steps}} Schritte ohne dich seit deiner Anfrage",
-      "stretch_paused_runs_other": "{{agents}} haben angehalten, um sich mit dir abzustimmen · {{steps}} Schritte selbstständig seit deiner Anfrage",
-      "stretch_paused_spend_one": "{{agents}} hat angehalten, um sich mit dir abzustimmen · hat ohne dich {{percent}} % des Monatsbudgets dafür verbraucht",
-      "stretch_paused_spend_other": "{{agents}} haben angehalten, um sich mit dir abzustimmen · jeder hat ohne dich {{percent}} % des Monatsbudgets dafür verbraucht",
-      "stretch_paused_spend_cost_one": "{{agents}} hat angehalten, um sich mit dir abzustimmen · hat ohne dich {{amount}} ({{percent}} % des Monatsbudgets) dafür verbraucht",
-      "stretch_paused_spend_cost_other": "{{agents}} haben angehalten, um sich mit dir abzustimmen · jeder hat ohne dich {{amount}} ({{percent}} % des Monatsbudgets) dafür verbraucht",
+      "stretch_paused_runs_one": "{{agents}} hat kurz angehalten, um sich mit dir abzustimmen, bevor es weitergeht",
+      "stretch_paused_runs_other": "{{agents}} haben kurz angehalten, um sich mit dir abzustimmen, bevor es weitergeht",
+      "stretch_paused_spend_one": "{{agents}} hat angehalten, um sich mit dir abzustimmen · hat {{percent}} % des Monatsbudgets verbraucht",
+      "stretch_paused_spend_other": "{{agents}} haben angehalten, um sich mit dir abzustimmen · jeder hat {{percent}} % des Monatsbudgets verbraucht",
+      "stretch_paused_spend_cost_one": "{{agents}} hat angehalten, um sich mit dir abzustimmen · hat {{amount}} ({{percent}} % des Monatsbudgets) verbraucht",
+      "stretch_paused_spend_cost_other": "{{agents}} haben angehalten, um sich mit dir abzustimmen · jeder hat {{amount}} ({{percent}} % des Monatsbudgets) verbraucht",
       "memory": {
         "proposed": "Vorschlag erstellt: {{text}}",
         "forgot": "Gedächtnis aktualisiert: „{{text}}“ vergessen.",
@@ -12097,6 +12247,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Du schaust nur zu.",
+      "title": "Steuerung übernehmen?",
+      "working": "{{name}} pausiert, solange du die Steuerung hast."
+    },
     "sub": {
       "control": "Du hast die Steuerung · {{name}} wartet",
       "controlAsked": "Du hast die Steuerung · {{name}} hat gefragt",

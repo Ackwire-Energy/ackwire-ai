@@ -5,6 +5,7 @@ import { recordAudit } from "./audit";
 import { brainOf, brainOptions } from "./brain-settings";
 import type { ComputerBrainKind } from "./brains/types";
 import { isComputerBrain } from "./brains/types";
+import { publishQueueChanged } from "./computer-queue";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
@@ -342,6 +343,7 @@ export async function moveAgentsFromMachine(
       stillWaiting,
     },
   });
+  if (resumed > 0) await publishQueueChanged(deps.pubsub, orgId, from.id);
   if (moved.length > 0) {
     await publishOrgEvent(deps.pubsub, {
       type: "org.broadcast",

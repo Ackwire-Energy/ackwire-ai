@@ -15,10 +15,12 @@ import {
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
+import { foldTalk, TALK_LINE_CHARS, talksToAgent } from "@agenteschat/client/lib/agent-talk";
 import { APP_BRANDS } from "@agenteschat/client/lib/apps";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
 import { choiceReplyLine } from "@agenteschat/client/lib/choices";
+import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -32,10 +34,11 @@ import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notice
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { appVia } from "@agenteschat/client/lib/via";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { memo, type ReactNode, useEffect, useState } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
@@ -59,13 +62,14 @@ import { UsagePauseCard, UsageWaitCancel } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
-import { consultationHref, routineHref } from "../links/logic";
+import { chatHref, consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
-import { BrainWait } from "../outages/WaitCard";
+import { AwayPill, BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useMyHandle, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
+import { VoiceMessage } from "../voice/VoiceMessage";
 import { ReceiptMark } from "./AgentReceipts";
 import { secretRequestOf } from "./ask-store";
 import { ChatMedia } from "./ChatMedia";
@@ -120,6 +124,7 @@ export const MessageRow = memo(function MessageRow({
   receipt,
   seenBy,
   readOnly = false,
+  inThread = false,
   run: runAt = "solo",
   above,
   aboveThread = false,
@@ -143,6 +148,8 @@ export const MessageRow = memo(function MessageRow({
   seenBy?: string;
   /** Shown where the person can't act on it (two agents' conversation): no long press, reactions or block. */
   readOnly?: boolean;
+  /** On its thread's own screen: a long message between agents is read whole there. */
+  inThread?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
@@ -191,6 +198,19 @@ export const MessageRow = memo(function MessageRow({
   // The person's pick on a choice card (ADR 0124): one compact line, not a bubble.
   const choiceReply = meta?.choiceReply && body ? <ChoiceReply text={choiceReplyLine(body)} /> : null;
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
+  // A long message from one agent to another (ADR 0034): its first paragraph and "Ler tudo", which pushes its
+  // thread's screen with it whole. On that screen, and where it is read only, it stays whole.
+  const talk = useMemo(
+    () =>
+      isAgent &&
+      !inThread &&
+      !readOnly &&
+      !m.local &&
+      talksToAgent(m, (handle) => agentsByAnyHandle(dir.agents).get(handle)?.id)
+        ? foldTalk(body, TALK_LINE_CHARS.phone)
+        : null,
+    [isAgent, inThread, readOnly, m, body, dir.agents],
+  );
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
   const media = messageMediaOf(meta);
   // The one an agent adds after its own reply carries the reply's run: the run's tools, questions and stop line
@@ -316,8 +336,13 @@ export const MessageRow = memo(function MessageRow({
   );
 
   if (mine) {
-    // The bubble, or the GIF or sticker or the files of a message with no words, leads.
-    const lead = choiceReply ? (
+    // A voice message's player, a choice's answer, the bubble, or the GIF or sticker or the files of a message
+    // with no words, leads.
+    const lead = voiceOf(meta) ? (
+      <View style={styles.meFiles}>
+        <VoiceMessage message={m} />
+      </View>
+    ) : choiceReply ? (
       <View style={styles.meFiles}>{choiceReply}</View>
     ) : body ? (
       <View style={[styles.bubble, BUBBLE_RUN[run], { backgroundColor: c.bubble }]}>
@@ -458,6 +483,7 @@ export const MessageRow = memo(function MessageRow({
             <Text variant="footnote" tone="faint">
               {when.time(m.createdAt)}
             </Text>
+            {brainWait ? <AwayPill message={m} /> : null}
             {m.pinned ? <PinMark /> : null}
             {receipt && !m.local ? (
               <View style={styles.whoMark}>
@@ -480,7 +506,12 @@ export const MessageRow = memo(function MessageRow({
           </View>
         ) : null}
         {consulted.map((cs) => (
-          <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
+          <ConsultationCard
+            key={cs.consultationId}
+            askerId={m.author.id ?? ""}
+            consultation={cs}
+            channelId={readOnly ? undefined : m.channelId}
+          />
         ))}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
         {brainWait ? (
@@ -502,14 +533,34 @@ export const MessageRow = memo(function MessageRow({
           choiceReply
         ) : body ? (
           <MessageText
-            body={body}
+            body={talk ? talk.lead : body}
             muted={m.local === "pending" || workOver}
             selectable={false}
             accent={accent}
             channelRefs={channelRefsOf(m.meta)}
           />
         ) : null}
+        {talk && !brainWait ? (
+          <Pressable
+            onPress={() => {
+              tapHaptic();
+              router.push(chatHref(m.channelId, m.threadId ?? m.id));
+            }}
+            accessibilityRole="button"
+            hitSlop={8}
+            style={({ pressed }) => [styles.talkMore, pressed && styles.pressedDim]}
+          >
+            <Text variant="footnote" tone="muted" style={styles.medium}>
+              {t("chat.talk.readAll")}
+            </Text>
+            <Text variant="footnote" tone="faint">
+              · {t("chat.talk.more", { count: talk.more })}
+            </Text>
+            <Icon name="right" size={14} color={c.faint} />
+          </Pressable>
+        ) : null}
         {media ? <ChatMedia media={media} liveId={m.id} /> : null}
+        {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
         {(stopped || atLimit || providerCut) && m.agentRunId ? (
           <StoppedLine
             message={m}
@@ -914,6 +965,15 @@ const styles = StyleSheet.create({
   },
   continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
   medium: { fontWeight: "600" },
+  talkMore: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    marginTop: 6,
+    minHeight: 28,
+  },
+  pressedDim: { opacity: 0.6 },
   shrink: { flexShrink: 1 },
   // The chip's own shrink only works if what holds it can shrink too (a long routine name ends in "…").
   tagPress: { flexShrink: 1, maxWidth: "100%", alignSelf: "center" },

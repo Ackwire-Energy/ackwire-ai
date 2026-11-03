@@ -21,6 +21,7 @@ import {
   BrainManager,
   type BrainManagerOptions,
   type BrainTurnContext,
+  brainKey,
   brainProfileLaunch,
   ClaudeStreamParser,
   carryClaudeSession,
@@ -593,6 +594,105 @@ test.if(posix)("at most N processes: the least recently used idle one is closed 
   expect(m.process(AGENT.id, SESSION(1))).toBeUndefined();
   expect(m.process(AGENT.id, SESSION(3))).toBeDefined();
 });
+
+test.if(posix)(
+  "one kept, several at once: with every process busy a turn still gets its own (live messages too); the cap is back once they end",
+  async () => {
+    await withCli(NOW_CLI, async () => {
+      const { m, spawns, turn } = setup({ maxProcesses: 1 });
+      const other = { session: { id: SESSION(2), resume: false } };
+      const a = turn(1, "STEER first");
+      const b = turn(2, "STEER second", other);
+      await waitFor(() => spawns().length === 2 && m.size === 2);
+      const msg = (n: number) => [{ uuid: U(n), text: `more ${n}` }];
+      let ra = m.steer(AGENT.id, { runId: RUN(1), session: SESSION(1), messages: msg(1) });
+      let rb = m.steer(AGENT.id, { runId: RUN(2), session: SESSION(2), messages: msg(2) });
+      await waitFor(() => {
+        if (ra.status === "no_turn") ra = m.steer(AGENT.id, { runId: RUN(1), session: SESSION(1), messages: msg(1) });
+        if (rb.status === "no_turn") rb = m.steer(AGENT.id, { runId: RUN(2), session: SESSION(2), messages: msg(2) });
+        return ra.status !== "no_turn" && rb.status !== "no_turn";
+      });
+      expect([ra.status, rb.status]).toEqual(["accepted", "accepted"]);
+      const [fa, fb] = await Promise.all([a, b]);
+      expect(fa.final).toMatchObject({ type: "done", text: "echo 1: STEER first +next/human: more 1" });
+      expect(fb.final).toMatchObject({ type: "done", text: "echo 1: STEER second +next/human: more 2" });
+      // The one used last stays warm; the other closed with its turn.
+      expect(m.size).toBe(1);
+    });
+  },
+);
+
+test.if(posix)(
+  "a process holding a dev server is never closed: not as idle, not for room, not for the cap; once it stops, it is",
+  async () => {
+    const { m, spawns, turn } = setup({ maxProcesses: 1, idleMs: 60 });
+    expect((await turn(1, "SERVE the app")).final).toMatchObject({ type: "done" });
+    const server = m.process(AGENT.id, SESSION(1));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(server?.exited).toBe(false);
+    expect(server?.holdsWork).toBe(true);
+    expect(await m.reclaimIdle()).toBe(false);
+    // Another conversation still runs, on its own process, which closes after its turn (over the cap).
+    expect((await turn(2, "other", { session: { id: SESSION(2), resume: false } })).final).toMatchObject({
+      type: "done",
+    });
+    expect(spawns()).toHaveLength(2);
+    expect(m.process(AGENT.id, SESSION(2))).toBeUndefined();
+    expect(server?.exited).toBe(false);
+    // Its next turn is on the same process, with the server.
+    expect((await turn(3, "UNSERVE")).final).toMatchObject({ type: "done", text: "echo 2: UNSERVE" });
+    await waitFor(() => server?.exited === true, 4000);
+  },
+);
+
+test.if(posix)("reclaimIdle: the least recently used idle process closes, and resolves once it exited", async () => {
+  const { m, turn } = setup({ maxProcesses: 3 });
+  for (const n of [1, 2, 3]) await turn(n, `t${n}`, { session: { id: SESSION(n), resume: false } });
+  const oldest = m.process(AGENT.id, SESSION(1));
+  expect(m.size).toBe(3);
+  expect(await m.reclaimIdle()).toBe(true);
+  expect(oldest?.exited).toBe(true);
+  expect(m.process(AGENT.id, SESSION(1))).toBeUndefined();
+  expect(m.size).toBe(2);
+  // Mid-turn: never.
+  const busy = turn(4, "SLOW busy", { session: { id: SESSION(3), resume: false } });
+  await new Promise((r) => setTimeout(r, 100));
+  expect(await m.reclaimIdle()).toBe(true);
+  expect(m.process(AGENT.id, SESSION(2))).toBeUndefined();
+  expect(await m.reclaimIdle()).toBe(false);
+  await busy;
+});
+
+test.if(posix)(
+  "the cap is per agent; reclaimIdle closes the waiting turn's own session only when nothing else can",
+  async () => {
+    const { m, ws, turn } = setup({ maxProcesses: 1 });
+    const RIO = { id: "0193aaaa-bbbb-7ccc-8ddd-eeeeffff0001", handle: "rio" };
+    await turn(1, "nova");
+    await m.turn(
+      {
+        runId: RUN(2),
+        kind: "claude_code",
+        session: { id: SESSION(2), resume: false },
+        cwd: "",
+        system: "",
+        prompt: "rio",
+        mcp: { token: "t" },
+      },
+      { agent: RIO, folder: await agentWorkspace(ws, RIO), emit: () => {} },
+    );
+    // Rio's turn left the other agent's warm process alone.
+    expect(m.size).toBe(2);
+    const own = brainKey(AGENT.id, SESSION(1));
+    // Its own process is the oldest, but the turn waiting for room would start it again: Rio's goes.
+    expect(m.idleCandidate(own)).toMatchObject({ spare: false });
+    expect(await m.reclaimIdle(own)).toBe(true);
+    expect(m.process(RIO.id, SESSION(2))).toBeUndefined();
+    expect(m.idleCandidate(own)).toMatchObject({ spare: true });
+    expect(await m.reclaimIdle(own)).toBe(true);
+    expect(m.size).toBe(0);
+  },
+);
 
 test.if(posix)("a process that dies mid-turn: the same turn runs again one-shot, resuming the session", async () => {
   const { m, spawns, turn } = setup();
@@ -1205,6 +1305,7 @@ test.if(posix)(
     const homes: Record<string, string> = { [ACCOUNT]: tempDir("keep-a-"), [OTHER]: tempDir("keep-b-") };
     dirs.push(...Object.values(homes));
     const { m, turn } = setup({
+      maxProcesses: 3,
       accounts: {
         accountDir: () => null,
         agentHome: (kind, id) => (kind === "claude_code" ? (homes[id] ?? null) : null),
@@ -1245,6 +1346,23 @@ test("the pinned env without a plan", () => {
   expect(accountSettingsEnv(undefined, "opus", own, true)).toMatchObject({ ...own, CLAUDE_CODE_USE_BEDROCK: "" });
   expect(accountSettingsEnv(undefined, "opus", {}, true).ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
   expect(accountSettingsEnv(undefined, "opus", own).ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
+});
+
+test("the computer's own API key on Anthropic's API keeps its conversation cached for an hour", () => {
+  const key = { ANTHROPIC_API_KEY: "sk-ant-fake-key" };
+  expect(accountSettingsEnv(undefined, "opus", key, true).CLAUDE_CODE_PROMPT_CACHE_TTL).toBe("1h");
+  // Not for an account's sign-in, another endpoint or cloud, or a TTL its owner chose.
+  expect(accountSettingsEnv(undefined, "opus", key).CLAUDE_CODE_PROMPT_CACHE_TTL).toBeUndefined();
+  expect(accountSettingsEnv(undefined, "opus", {}, true).CLAUDE_CODE_PROMPT_CACHE_TTL).toBeUndefined();
+  for (const more of [
+    { ANTHROPIC_BASE_URL: "https://llm.corp.test" },
+    { CLAUDE_CODE_USE_BEDROCK: "1" },
+    { CLAUDE_CODE_PROMPT_CACHE_TTL: "5m" },
+    { FORCE_PROMPT_CACHING_5M: "1" },
+  ])
+    expect(
+      accountSettingsEnv(undefined, "opus", { ...key, ...more }, true).CLAUDE_CODE_PROMPT_CACHE_TTL,
+    ).toBeUndefined();
 });
 
 test.if(posix)("an account that isn't on the computer is account_missing, never another account", async () => {

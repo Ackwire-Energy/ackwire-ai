@@ -145,10 +145,11 @@ describe("arranging categories", () => {
     });
   });
 
-  test("a channel's creator or who manages channels may move it", () => {
+  test("a channel's creator still in it, or who manages channels, may move it", () => {
     const member = { role: "member" as const, permissions: ["read", "post"] };
     const manager = { role: "member" as const, permissions: ["read", "manage_channels"] };
-    expect(movesChannel({ createdByUserId: "u1" }, "u1", member)).toBe(true);
+    expect(movesChannel({ isMember: true, createdByUserId: "u1" }, "u1", member)).toBe(true);
+    expect(movesChannel({ isMember: false, createdByUserId: "u1" }, "u1", member)).toBe(false);
     expect(movesChannel({ createdByUserId: "u2" }, "u1", member)).toBe(false);
     expect(movesChannel({ createdByUserId: "u2" }, "u1", manager)).toBe(true);
     expect(movesChannel({ createdByUserId: null }, null, member)).toBe(false);

@@ -1,4 +1,4 @@
-import { keys, useChannels, useRoles } from "@agenteschat/client";
+import { keys, type OrgRole, useChannels, useRoles } from "@agenteschat/client";
 import {
   accessInput,
   accessValid,
@@ -7,7 +7,18 @@ import {
 } from "@agenteschat/client/lib/channel-access";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Input, RadioCard, RadioGroup } from "@agenteschat/ui";
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Field,
+  Input,
+  RoleMark,
+  Select,
+  Token,
+  TokenList,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -21,8 +32,9 @@ import { RoleChecklist } from "./roles/RoleChecklist";
 const ACCESS_MODES: ChannelAccessMode[] = ["public", "private", "roles"];
 
 /**
- * "Quem pode entrar": Público, Privado or Departamentos ou papéis (ADR 0125), with the workspace's roles to tick
- * under the third. Creating a channel and its details share it.
+ * "Quem pode entrar": Público, Privado or Departamentos ou papéis (ADR 0125). The third shows the roles picked, each
+ * removable, and "Escolher papéis", which ticks them in a dialog of their own (it opens by itself while none is
+ * picked). Creating a channel and its details share it.
  */
 export function ChannelAccessChoice({
   value,
@@ -40,56 +52,134 @@ export function ChannelAccessChoice({
   const { org } = useOrg();
   const roles = useRoles(org.id);
   const candidates = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
-  const picked = new Set(value.roleIds);
-  const legend = `${idPrefix}-vis`;
+  const [choosing, setChoosing] = useState(false);
+  const pickedRoles = candidates.filter((r) => value.roleIds.includes(r.id));
   return (
-    <fieldset style={{ margin: 0, padding: 0, border: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-      <legend className="ac-field__label" style={{ padding: 0, marginBottom: 8 }} id={legend}>
-        {t("newChannel.visibility")}
-      </legend>
-      <RadioGroup
-        value={value.mode}
-        onValueChange={(mode) => onChange({ ...value, mode: mode as ChannelAccessMode })}
-        aria-labelledby={legend}
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}
-      >
-        {ACCESS_MODES.map((mode) => (
-          <RadioCard
-            key={mode}
-            value={mode}
-            id={`${idPrefix}-${mode}`}
-            checked={value.mode === mode}
-            title={t(`newChannel.${mode}`)}
-            description={t(`newChannel.${mode}Desc`)}
-          />
-        ))}
-      </RadioGroup>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* A dropdown, as "Categoria" above it: three cards side by side broke their words in a narrow dialog. */}
+      <Field label={t("newChannel.visibility")} id={`${idPrefix}-vis`} help={t(`newChannel.${value.mode}Desc`)}>
+        <Select
+          value={value.mode}
+          onValueChange={(mode) => {
+            onChange({ ...value, mode });
+            if (mode === "roles" && value.roleIds.length === 0) setChoosing(true);
+          }}
+          options={ACCESS_MODES.map((mode) => ({
+            value: mode,
+            label: t(`newChannel.${mode}`),
+            description: t(`newChannel.${mode}Desc`),
+          }))}
+        />
+      </Field>
+      {value.mode === "roles" && pickedRoles.length > 0 && (
+        <TokenList label={t("newChannel.rolesPick")}>
+          {pickedRoles.map((r) => (
+            <li key={r.id}>
+              <Token
+                leading={<RoleMark color={r.color} icon={r.icon} size={18} />}
+                removeLabel={t("common.removeName", { name: r.name })}
+                onRemove={() => onChange({ ...value, roleIds: value.roleIds.filter((id) => id !== r.id) })}
+              >
+                {r.name}
+              </Token>
+            </li>
+          ))}
+        </TokenList>
+      )}
       {value.mode === "roles" && (
-        // biome-ignore lint/a11y/useSemanticElements: a scroll region inside the fieldset
-        <div className="people-picker__results" role="region" aria-label={t("newChannel.rolesPick")}>
-          {candidates.length === 0 && roles.isSuccess ? (
-            <p className="small muted">{t("newChannel.rolesNone")}</p>
-          ) : (
-            <RoleChecklist
-              roles={candidates}
-              picked={picked}
-              idPrefix={idPrefix}
-              onToggle={(id, on) =>
-                onChange({
-                  ...value,
-                  roleIds: on ? [...new Set([...value.roleIds, id])] : value.roleIds.filter((r) => r !== id),
-                })
-              }
-            />
-          )}
-        </div>
+        <span>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={pickedRoles.length > 0 ? "edit" : "plus"}
+            onClick={() => setChoosing(true)}
+          >
+            {pickedRoles.length > 0 ? t("newChannel.rolesChange") : t("newChannel.rolesChoose")}
+          </Button>
+        </span>
       )}
       {value.mode === "roles" && (
         <span className={`small ${showError && !accessValid(value) ? "ac-field__error" : "muted"}`}>
           {showError && !accessValid(value) ? t("newChannel.rolesNeeded") : t("newChannel.rolesLeave")}
         </span>
       )}
-    </fieldset>
+      {choosing && (
+        <ChannelRolesDialog
+          roles={candidates}
+          loaded={roles.isSuccess}
+          initial={value.roleIds}
+          idPrefix={idPrefix}
+          onPick={(roleIds) => onChange({ ...value, mode: "roles", roleIds })}
+          onClose={() => setChoosing(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** The roles a channel opens to, ticked in a dialog of their own: "Pronto" puts them on the field. */
+function ChannelRolesDialog({
+  roles,
+  loaded,
+  initial,
+  idPrefix,
+  onPick,
+  onClose,
+}: {
+  roles: readonly OrgRole[];
+  loaded: boolean;
+  initial: readonly string[];
+  idPrefix: string;
+  onPick: (roleIds: string[]) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<ReadonlySet<string>>(() => new Set(initial));
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={t("newChannel.rolesPick")}
+      description={t("newChannel.rolesDesc")}
+      closeLabel={t("common.close")}
+      width={440}
+    >
+      <DialogBody>
+        {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
+        <div className="people-picker__results" role="region" aria-label={t("newChannel.rolesPick")}>
+          {roles.length === 0 && loaded ? (
+            <p className="small muted">{t("newChannel.rolesNone")}</p>
+          ) : (
+            <RoleChecklist
+              roles={roles}
+              picked={draft}
+              idPrefix={`${idPrefix}-pick`}
+              onToggle={(id, on) =>
+                setDraft((d) => {
+                  const next = new Set(d);
+                  if (on) next.add(id);
+                  else next.delete(id);
+                  return next;
+                })
+              }
+            />
+          )}
+        </div>
+        <span className="small muted">{t("newChannel.rolesLeave")}</span>
+      </DialogBody>
+      <DialogFooter>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
+        <Button
+          variant="primary"
+          onClick={() => {
+            onPick([...draft]);
+            onClose();
+          }}
+        >
+          {t("newChannel.rolesDone")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
 

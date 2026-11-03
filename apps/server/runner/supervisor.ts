@@ -46,6 +46,7 @@ import { localCloneSlot } from "./git";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
+import { type NetworkConfig, networkConfig, networkKey } from "./network-state";
 import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
 import type { ScopeKind } from "./scope-gate";
 import { type ActivatedSecret, activatedSecret, handleSecret } from "./secrets";
@@ -108,6 +109,8 @@ const SCOPE_POLL_MS = 20;
 const SECRET_INSTALL_MS = 20_000;
 /** Clone slots one worker may hold or wait for at once. */
 const MAX_WORKER_SLOTS = 64;
+/** How long `reclaimBrains` waits for a worker's answer (a close waits up to `RECLAIM_EXIT_MS` for the CLI to exit). */
+const RECLAIM_REPLY_MS = 3_000;
 
 /** The broker is a child of the root runner home, never of an agent-owned home. */
 function secureSecretRoot(home: string, requireRoot = false): string {
@@ -134,6 +137,7 @@ const busctl = (args: string[]) =>
 
 /** What a worker must know about its computer, sent after each hello and when it changes. */
 export interface WorkerState {
+  privateNetwork?: boolean;
   access: RunnerAccess;
   paused: RunnerPause;
   limits: { maxConcurrentTasks: number; taskMaxSeconds: number; brainIdleMinutes: number; brainMaxProcesses: number };
@@ -171,6 +175,12 @@ function desktopUseOf(req: MachineRequest): WorkerDesktopUse | null {
 }
 
 /** The link's own frames, besides the machine protocol's. */
+/** A worker's answer to `brain.reclaim`. */
+export interface BrainReclaimed {
+  closed: boolean;
+  idle?: { since: number; spare: boolean };
+}
+
 export type WorkerLinkFrame =
   /** To the worker. */
   | ({ type: "worker.state" } & WorkerState)
@@ -193,6 +203,13 @@ export type WorkerLinkFrame =
     }
   /** From the worker: its agent's Chrome is in use on the agent's desktop (`BROWSER_LEASE_MS`). */
   | { type: "browser.desktop" }
+  /**
+   * To the worker: close its least recently used idle brain CLI (`BrainManager.reclaimIdle`), `spare` last; with
+   * `peek`, only say which it would (`idleCandidate`).
+   */
+  | { type: "brain.reclaim"; reclaimId: string; spare?: string; peek?: boolean }
+  /** From the worker: whether it closed one, or (`peek`) when the one it would close was last used. */
+  | ({ type: "brain.reclaimed"; reclaimId: string } & BrainReclaimed)
   /** To the worker: Browser was clicked on its agent's desktop (`BrowserManager.show`). */
   | { type: "browser.show"; showId: string; agent: AgentScope }
   /** From the worker: Chrome for Testing installs first. */
@@ -227,6 +244,8 @@ export type WorkerLinkFrame =
 
 /** A started worker (a process; tests: in-memory pipes). */
 export interface WorkerProcess {
+  /** Root-owned launch wrapper identity; real Linux processes only. */
+  pid?: number;
   stdin: Writable;
   stdout: Readable;
   stderr?: Readable;
@@ -242,6 +261,11 @@ export interface SupervisorOptions {
   home: string;
   /** Real system installation: refuse to start the broker without root. Tests use in-memory workers. */
   requireRootBroker?: boolean;
+  /** Root runtime configuration also applies to workers restored from the persisted user list. */
+  network?: Pick<AgentUser, "networkLauncher" | "networkMark" | "networkRevision">;
+  /** Root scopes can pin this UID to its old network until the desktop and terminals close. */
+  resolveNetwork?: (user: AgentUser) => NetworkConfig;
+  networkBusy?: (agentId: string) => boolean;
   /** The agent's OS user, made on its first request (`AgentUsers.ensure`). */
   user: (agent: AgentScope) => AgentUser;
   /** Starts an agent's worker (`launchWorker`). */
@@ -283,6 +307,8 @@ export interface SupervisorOptions {
   now?: () => number;
   /** Tests: how long a click on Browser waits for its worker (`SHOW_MS`). */
   showMs?: number;
+  /** Tests: `RECLAIM_REPLY_MS`. */
+  reclaimMs?: number;
   /** What root relayed, `relayed.json` (the live view of the agents' browsers is counted here). */
   relayed?: RelayCount;
   /** Tests: where processes are read (`/proc`), and how systemd is asked to move one. */
@@ -310,6 +336,9 @@ interface Worker {
   proc: WorkerProcess | null;
   /** Its current session said hello: frames and requests can go to it. */
   ready: boolean;
+  networkRetiring: boolean;
+  browserStreaming: boolean;
+  networkStopTimer: ReturnType<typeof setTimeout> | null;
   /** The `worker.state` line this session last got. */
   state: string;
   startedAt: number;
@@ -329,6 +358,8 @@ interface Worker {
   enters: number[];
   /** Its clone slots, by its id (`release` once it has one): a worker that stops gives them back. */
   slots: Map<string, { release?: () => void }>;
+  /** `brain.reclaim`s it hasn't answered, by this side's id. */
+  reclaims: Map<string, (reply: BrainReclaimed) => void>;
 }
 
 interface Show {
@@ -339,6 +370,7 @@ interface Show {
 
 export class Supervisor {
   private readonly workers = new Map<string, Worker>();
+  private network: NetworkConfig;
   private readonly owners = new Map<string, { agentId: string; startedAt: string }>();
   /** `mcp.call` / `mcp.list` in flight → the worker that asked. */
   private readonly calls = new Map<string, Worker>();
@@ -365,6 +397,7 @@ export class Supervisor {
   };
 
   constructor(private readonly opts: SupervisorOptions) {
+    this.network = networkConfig(opts.network ?? {});
     this.secretRoot = secureSecretRoot(opts.home, opts.requireRootBroker);
     const saved = readJson<Record<string, { agentId?: unknown; startedAt?: unknown } | null>>(this.ownersFile);
     const cutoff = Date.now() - TASK_OWNER_KEEP_MS;
@@ -386,7 +419,9 @@ export class Supervisor {
     this.opts.prepareExisting?.(users);
     for (const agentId of new Set([...this.owners.values()].map((o) => o.agentId))) {
       const user = users.find((u) => u.id === agentId);
-      if (user) this.launch(this.entry(user));
+      // A restored owner must not keep the machine offline while its old network drains. launch() owns
+      // resolution failures and retry/backoff; normal new requests still resolve eagerly in entry().
+      if (user) this.launch(this.entry(user, false));
     }
     this.pinger = setInterval(() => {
       for (const w of this.workers.values()) this.send(w, { type: "ping", at: Date.now() });
@@ -469,6 +504,8 @@ export class Supervisor {
     await this.ready(w, scope.signal);
     const secret = await activatedSecret(this.secretRoot, req.agent, req.requestId);
     if (!secret) throw new RunnerError("not_found", "This request has no activated secret");
+    // The file read can overlap an idle network transition: acquire the current worker again.
+    await this.ready(w, scope.signal);
     return this.install(w, req.agent, secret, scope.signal);
   }
 
@@ -552,6 +589,124 @@ export class Supervisor {
     if (w && this.online) this.send(w, frame);
   }
 
+  /**
+   * A brain turn found no room on the computer: one idle CLI closes, the least recently used across the workers
+   * (never one mid-turn or holding its agent's work; `spare`, the waiting turn's own session, last). Every worker
+   * says which it would close, then they are asked in that order until one did. A worker that doesn't answer in
+   * time counts as none.
+   */
+  async reclaimBrains(spare?: string): Promise<boolean> {
+    const workers = [...this.workers.values()].filter((w) => w.ready);
+    const peeks = await Promise.all(
+      workers.map(async (w) => ({ w, idle: (await this.askBrains(w, { spare, peek: true }))?.idle })),
+    );
+    const order = peeks
+      .flatMap(({ w, idle }) => (idle ? [{ w, idle }] : []))
+      .sort((a, b) => Number(a.idle.spare) - Number(b.idle.spare) || a.idle.since - b.idle.since);
+    for (const { w } of order) if ((await this.askBrains(w, { spare }))?.closed) return true;
+    return false;
+  }
+
+  private askBrains(w: Worker, ask: { spare?: string; peek?: boolean }): Promise<BrainReclaimed | null> {
+    const reclaimId = String(++this.seq);
+    return new Promise((resolve) => {
+      const late = setTimeout(() => {
+        w.reclaims.delete(reclaimId);
+        resolve(null);
+      }, this.opts.reclaimMs ?? RECLAIM_REPLY_MS);
+      w.reclaims.set(reclaimId, (reply) => {
+        clearTimeout(late);
+        w.reclaims.delete(reclaimId);
+        resolve(reply);
+      });
+      this.send(w, {
+        type: "brain.reclaim",
+        reclaimId,
+        ...(ask.spare ? { spare: ask.spare } : {}),
+        ...(ask.peek ? { peek: true } : {}),
+      });
+    });
+  }
+
+  /** New launches take the new network; occupied workers finish their work before retiring. */
+  setNetwork(value: NetworkConfig) {
+    this.network = networkConfig(value);
+    this.drainNetwork();
+  }
+
+  runningPid(agentId: string): number | undefined {
+    return this.workers.get(agentId)?.proc?.pid;
+  }
+
+  runningNetwork(agentId: string): NetworkConfig | null {
+    const w = this.workers.get(agentId);
+    return w?.proc ? networkConfig(w.user) : null;
+  }
+
+  private withNetwork(user: AgentUser): AgentUser {
+    const { networkLauncher: _launcher, networkMark: _mark, networkRevision: _revision, ...identity } = user;
+    return { ...identity, ...(this.opts.resolveNetwork?.(user) ?? this.network) };
+  }
+
+  /** Safe to call on a short timer: no active requests, tasks, handoffs or desktop viewers are interrupted. */
+  drainNetwork(): number[] {
+    const pending: number[] = [];
+    for (const w of this.workers.values()) {
+      if (networkKey(w.user) === networkKey(this.network)) continue;
+      if (!w.proc) {
+        try {
+          w.user = this.withNetwork(w.user);
+        } catch {
+          pending.push(w.user.uid);
+        }
+        continue;
+      }
+      pending.push(w.user.uid);
+      if (
+        w.networkRetiring ||
+        w.inflight.size ||
+        w.installs.size ||
+        w.shows.size ||
+        w.waiters.size ||
+        this.handoffs.has(w.user.id) ||
+        this.opts.networkBusy?.(w.user.id) ||
+        this.onDesktopInUse(w.user.id) ||
+        w.browserStreaming ||
+        (this.opts.desktopViewers?.(w.user.id) ?? 0) > 0 ||
+        [...this.owners.values()].some((o) => o.agentId === w.user.id) ||
+        [...this.calls.values()].includes(w)
+      )
+        continue;
+      const proc = w.proc;
+      w.networkRetiring = true;
+      w.ready = false;
+      this.opts.log(`[${w.user.user}] applying network settings after its work finished`);
+      proc.stdin.end();
+      w.networkStopTimer = setTimeout(() => {
+        if (w.proc === proc && w.networkRetiring) proc.kill();
+      }, 5000);
+      w.networkStopTimer.unref?.();
+    }
+    return [...new Set(pending)].sort((a, b) => a - b);
+  }
+
+  /** A root-configured drain deadline elapsed: end only this runner-owned worker and tell its callers why. */
+  retireNetworkAgent(agentId: string, why: string) {
+    const w = this.workers.get(agentId);
+    if (!w?.proc || w.networkRetiring) return;
+    const proc = w.proc;
+    w.networkRetiring = true;
+    w.ready = false;
+    this.endSession(w, why);
+    this.endShows(w, why);
+    for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", why));
+    proc.stdin.end();
+    w.networkStopTimer = setTimeout(() => {
+      if (w.proc === proc) proc.kill();
+    }, 5000);
+    w.networkStopTimer.unref?.();
+  }
+
   /** The computer's pause, access or limits, or who watches an agent's desktop, may have changed. */
   stateChanged() {
     for (const w of this.workers.values()) this.sendState(w);
@@ -612,6 +767,8 @@ export class Supervisor {
     const exits: Promise<unknown>[] = [];
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);
+      if (w.networkStopTimer) clearTimeout(w.networkStopTimer);
+      w.networkStopTimer = null;
       w.timer = null;
       for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", STOPPING));
       w.ready = false;
@@ -629,13 +786,16 @@ export class Supervisor {
 
   // ── Workers ────────────────────────────────────────────────────────────────
 
-  private entry(user: AgentUser): Worker {
+  private entry(user: AgentUser, resolveNetwork = true): Worker {
     let w = this.workers.get(user.id);
     if (!w) {
       w = {
-        user,
+        user: resolveNetwork ? this.withNetwork(user) : user,
         proc: null,
         ready: false,
+        networkRetiring: false,
+        browserStreaming: false,
+        networkStopTimer: null,
         state: "",
         startedAt: 0,
         attempt: 0,
@@ -648,6 +808,7 @@ export class Supervisor {
         browserLeaseAt: 0,
         enters: [],
         slots: new Map(),
+        reclaims: new Map(),
       };
       this.workers.set(user.id, w);
     }
@@ -699,6 +860,7 @@ export class Supervisor {
     w.startedAt = Date.now();
     let proc: WorkerProcess;
     try {
+      w.user = this.withNetwork(w.user);
       proc = this.opts.start(w.user);
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
@@ -747,9 +909,14 @@ export class Supervisor {
   /** The worker exited: what it ran fails, and it starts again after a backoff when it has tasks or requests waiting. */
   private stopped(w: Worker, proc: WorkerProcess | null, code?: unknown) {
     if (proc && w.proc !== proc) return;
+    const retired = w.networkRetiring;
+    if (w.networkStopTimer) clearTimeout(w.networkStopTimer);
+    w.networkStopTimer = null;
+    w.networkRetiring = false;
     w.proc = null;
     w.ready = false;
     w.browserLeaseAt = 0;
+    w.browserStreaming = false;
     this.endSession(
       w,
       "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
@@ -757,7 +924,7 @@ export class Supervisor {
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
     for (const slot of w.slots.values()) slot.release?.();
     w.slots.clear();
-    w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
+    w.attempt = retired || Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
     if (this.closed) return;
     this.opts.log(`[${w.user.user}] stopped${typeof code === "number" ? ` (exit ${code})` : ""}`);
@@ -821,6 +988,8 @@ export class Supervisor {
     const frame: WorkerLinkFrame = {
       type: "worker.state",
       ...s,
+      privateNetwork:
+        w.user.networkLauncher || w.user.networkMark ? true : s.privateNetwork === undefined ? undefined : false,
       access: { ...s.access, folders },
       ...(viewers > 0 ? { desktopViewers: viewers } : {}),
       ...(this.opts.account ? { account: this.opts.account(w.user.id) } : {}),
@@ -845,6 +1014,7 @@ export class Supervisor {
   }
 
   private frame(w: Worker, f: RunnerFrame, line: string) {
+    if (w.networkRetiring) return;
     if (f.type === "hello") return this.hello(w);
     if (!w.ready) return;
     switch (f.type) {
@@ -853,6 +1023,8 @@ export class Supervisor {
         if (!e) return;
         // Refused by the worker: that task never started.
         if (!f.ok && e.req.op === "task.start") this.disown(e.req.taskId);
+        if (f.ok && e.req.op === "browser.stream.start") w.browserStreaming = true;
+        if (f.ok && e.req.op === "browser.stream.stop") w.browserStreaming = false;
         e.settle(
           f.ok ? { ok: true, data: f.data } : { ok: false, error: new RunnerError(f.error.code, f.error.message) },
         );
@@ -891,6 +1063,7 @@ export class Supervisor {
       }
       case "browser.frame":
       case "browser.stream.ended":
+        if (f.agentId === w.user.id) w.browserStreaming = f.type === "browser.frame";
         if (f.agentId === w.user.id && this.opts.send(f) && f.type === "browser.frame" && this.opts.relayed) {
           this.opts.relayed.browserView.up += Buffer.byteLength(line);
         }
@@ -999,6 +1172,15 @@ export class Supervisor {
         this.traffic.up += f.up;
         this.traffic.down += f.down;
       }
+      return;
+    }
+    if (f?.type === "brain.reclaimed") {
+      const idle = f.idle as Partial<NonNullable<BrainReclaimed["idle"]>> | undefined;
+      const valid = typeof idle?.since === "number" && Number.isFinite(idle.since) && typeof idle.spare === "boolean";
+      w.reclaims.get(typeof f.reclaimId === "string" ? f.reclaimId : "")?.({
+        closed: f.closed === true,
+        ...(valid ? { idle: { since: idle.since as number, spare: idle.spare as boolean } } : {}),
+      });
       return;
     }
     if (f?.type === "secret.installed") {
@@ -1344,6 +1526,7 @@ export function launchWorker(runner: string[], policy: BindPolicyOptions, base =
       events.once("error", (err: Error) => resolve(err));
     });
     return {
+      pid: child.pid,
       stdin: child.stdin,
       stdout: child.stdout,
       stderr: child.stderr,

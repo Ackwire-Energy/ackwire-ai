@@ -315,7 +315,7 @@ export async function deleteRole(
     });
     return left;
   });
-  await announceChannelLeavers(options.pubsub, orgId, leavers);
+  await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, leavers);
   await announceRoles(options.pubsub, orgId);
 }
 
@@ -382,6 +382,24 @@ export async function givableRoleIds(db: Executor, actor: Membership, orgId: str
   return rows.map((r) => r.id);
 }
 
+/**
+ * The ids among `ids` that `actor` could still give today (`givableRoleIds`, by someone who may invite), the others
+ * left out: none when `actor` is no longer a member.
+ */
+export async function stillGivableRoleIds(
+  db: Executor,
+  actor: Membership | null,
+  orgId: string,
+  ids: readonly string[],
+) {
+  if (!actor || !can(actor, "invite_people") || ids.length === 0) return [];
+  const rows = await db
+    .select({ id: orgRoles.id, position: orgRoles.position, permissions: orgRoles.permissions })
+    .from(orgRoles)
+    .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, [...new Set(ids)])));
+  return rows.filter((r) => outranks(actor, r.position) && holdsAll(actor, r.permissions)).map((r) => r.id);
+}
+
 /** The ids among `ids` that are still custom roles of the workspace. */
 export async function rolesStillThere(db: Executor, orgId: string, ids: readonly string[]) {
   if (ids.length === 0) return [];
@@ -393,8 +411,15 @@ export async function rolesStillThere(db: Executor, orgId: string, ids: readonly
 }
 
 /** Adds roles to a member in the caller's transaction, skipping any no longer in the workspace. */
-export async function addMemberRolesInTx(tx: Executor, orgId: string, userId: string, roleIds: readonly string[]) {
+export async function addMemberRolesInTx(
+  tx: Executor,
+  orgId: string,
+  userId: string,
+  roleIds: readonly string[],
+  actorId = userId,
+) {
   if (roleIds.length === 0) return;
+  const before = await memberRoleIds(tx, orgId, userId);
   const there = await tx
     .select({ id: orgRoles.id })
     .from(orgRoles)
@@ -404,6 +429,10 @@ export async function addMemberRolesInTx(tx: Executor, orgId: string, userId: st
     .insert(organizationMemberRoles)
     .values(there.map((r) => ({ orgId, userId, roleId: r.id })))
     .onConflictDoNothing();
+  // Loaded here: audience builds on this module.
+  const { dropMailForNewRoleMember } = await import("./audience");
+  const added = there.map((r) => r.id).filter((id) => !before.includes(id));
+  await dropMailForNewRoleMember(tx, orgId, userId, before, added, actorId);
 }
 
 /** A member's roles (ids), not `everyone`. */
@@ -454,7 +483,7 @@ export async function setMemberRoles(
             inArray(organizationMemberRoles.roleId, removed),
           ),
         );
-    await addMemberRolesInTx(tx, orgId, targetUserId, added);
+    await addMemberRolesInTx(tx, orgId, targetUserId, added, actorId);
     // Channels limited to the roles taken away (ADR 0125) let them go, unless another of theirs still opens them.
     const left = await dropRoleLeavers(tx, orgId, { people: [targetUserId], roleIds: removed });
     const names = await tx
@@ -473,7 +502,7 @@ export async function setMemberRoles(
     return left;
   });
   if (changed) {
-    await announceChannelLeavers(options.pubsub, orgId, changed);
+    await announceChannelLeavers({ db, pubsub: options.pubsub }, orgId, changed);
     await announceMembers(options.pubsub, orgId);
   }
   return next;

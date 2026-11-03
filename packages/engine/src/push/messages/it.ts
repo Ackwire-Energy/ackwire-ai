@@ -46,4 +46,5 @@ export const strings: Partial<PushStrings> = {
   openBody: "Tocca per aprire.",
   sentGif: "Ha inviato una GIF",
   sentSticker: "Ha inviato uno sticker",
+  sentVoice: "Ha inviato un messaggio vocale",
 };

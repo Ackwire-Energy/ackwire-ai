@@ -28,6 +28,15 @@ export interface MeterWindow {
   resetsAt?: string;
   part?: number;
   note?: string;
+  segments?: MeterSegment[];
+}
+
+/** One agent's estimated piece of a window's bar, in its colours (`light` for the dark theme). */
+export interface MeterSegment {
+  key: string;
+  value: number;
+  light: string;
+  deep: string;
 }
 
 const WINDOW_NAMES = ["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly"] as const;
@@ -221,6 +230,65 @@ export function partedUsage(
       ...(agents && agents.length > 0 ? { note: note(agents) } : {}),
       ...(agents && focus ? { part: agents.find((a) => a.agentId === focus)?.percent ?? 0 } : {}),
     })),
+  };
+}
+
+/** How many agents an account's list shows before the rest fold into one row. */
+export const SHARES_SHOWN = 5;
+
+/** The rows a list shows before the fold; a single row left over shows as itself, its row costs the same. */
+const unfolded = <T>(rows: T[]) => (rows.length > SHARES_SHOWN + 1 ? rows.slice(0, SHARES_SHOWN) : rows);
+
+/**
+ * An account's windows with the bar split by agent: the biggest parts (as many as the list shows) each in its
+ * agent's colours (`tone`: light, deep), the rest of the use plain, so many small agents never fill more of the bar
+ * than they used. A window of unknown length has no parts.
+ */
+export function splitUsage(
+  usage: Omit<PlanUsage, "windows"> & { windows: PlanWindowParts[] },
+  tone: (agentId: string) => readonly [string, string],
+): Omit<PlanUsage, "windows"> & { windows: MeterWindow[] } {
+  return {
+    ...usage,
+    windows: usage.windows.map(({ agents, ...w }) =>
+      agents && agents.length > 0
+        ? {
+            ...w,
+            segments: unfolded([...agents].sort((a, b) => b.percent - a.percent)).map((a) => {
+              const [light, deep] = tone(a.agentId);
+              return { key: a.agentId, value: a.percent, light, deep };
+            }),
+          }
+        : w,
+    ),
+  };
+}
+
+/**
+ * An account's one list of agents: each one's estimated share of the window its bar splits (the week, else the
+ * first window with parts; null while none has them or it already renewed) and its tokens this month, biggest share
+ * first, then tokens. Past `SHARES_SHOWN` the rest fold into one row with their summed share and tokens; a single
+ * agent left over shows as itself, its row costs the same.
+ */
+export function accountShares(account: Pick<PlanAccountUsage, "usage" | "agents">, now = Date.now()) {
+  const windows = account.usage?.windows ?? [];
+  const parted = (w: PlanWindowParts) =>
+    (w.agents?.length ?? 0) > 0 && !(w.resetsAt !== undefined && Date.parse(w.resetsAt) <= now);
+  const window = windows.find((w) => w.kind === "seven_day" && parted(w)) ?? windows.find(parted) ?? null;
+  const partOf = new Map((window?.agents ?? []).map((a) => [a.agentId, a.percent]));
+  const rows = account.agents.map((a) => ({ ...a, share: partOf.get(a.agentId) ?? 0 }));
+  for (const a of window?.agents ?? [])
+    if (!rows.some((r) => r.agentId === a.agentId))
+      rows.push({ agentId: a.agentId, name: a.name, tokens: 0, now: false, share: a.percent });
+  rows.sort((a, b) => b.share - a.share || b.tokens - a.tokens);
+  const shown = unfolded(rows);
+  const rest = rows.slice(shown.length);
+  return {
+    window,
+    shown,
+    rest,
+    restShare: rest.reduce((sum, r) => sum + r.share, 0),
+    restTokens: rest.reduce((sum, r) => sum + r.tokens, 0),
   };
 }
 

@@ -356,3 +356,33 @@ test("the band is the browser pairs of the computer's range: the Cloud's leaves 
   );
   expect(() => checkEphemeralRange("nonsense", [10000, 11999])).toThrow("Cannot read");
 });
+
+test("routing exemptions precede both local-port hooks and retain cgroup ownership protection", () => {
+  expect(renderRuleset(base)).not.toContain("meta mark &");
+  const marked = renderRuleset({ ...base, networkMark: 0x08000000 });
+  const rule = "meta mark & 0x08000000 == 0x08000000 ct status != dnat fib daddr type != local return";
+  for (const hook of ["output", "input"]) {
+    const chain = marked.split(`chain ${hook} {`)[1]?.split("\t}")[0] ?? "";
+    expect(chain).toContain(rule);
+    expect(chain.indexOf(rule)).toBeLessThan(chain.indexOf(hook === "output" ? 'oif "lo"' : 'iif "lo"'));
+  }
+  expect(marked).not.toContain("fib daddr . mark");
+  expect(marked).toContain('socket cgroupv2 level 1 "agents.slice" goto refuse');
+  expect(() => renderRuleset({ ...base, networkMark: 0 })).toThrow("networkMark");
+});
+
+test("network mark reconciliation remains atomic and restores the previous setting on failure", () => {
+  let fail = false;
+  const pc = computer({ refuse: () => (fail ? "unavailable" : null) });
+  const g = pc.guard();
+  expect(g.reconcile()).toBe(true);
+  expect(g.setNetworkMark(0x08000000)).toBe(true);
+  const applied = pc.loaded.at(-1);
+  expect(applied).toContain("agentes network mark 134217728");
+  fail = true;
+  expect(g.setNetworkMark(0x10000000)).toBe(false);
+  expect(pc.loaded.at(-1)).toBe(applied);
+  fail = false;
+  expect(g.reconcile()).toBe(true);
+  expect(pc.loaded.at(-1)).toBe(applied);
+});

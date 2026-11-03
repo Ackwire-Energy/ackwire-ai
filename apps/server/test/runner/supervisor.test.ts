@@ -21,9 +21,11 @@ import { BrowserManager } from "../../runner/browser";
 import { writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
 import { RunnerDaemon } from "../../runner/daemon";
+import { DesktopSessions } from "../../runner/desktop-session";
 import { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { readLines } from "../../runner/lines";
+import { AgentNetworks } from "../../runner/network-state";
 import type { FetchLike } from "../../runner/push";
 import { agentSecrets } from "../../runner/secrets";
 import { RelayCount } from "../../runner/streams";
@@ -626,6 +628,83 @@ test("a cancel reaches only the worker that runs that request", async () => {
   const pending = handleRequest(t.ctx, exec(ANA, "late"), c.scope);
   c.ac.abort();
   expect(await errorCode(() => pending)).toBe("internal");
+});
+
+test("room for a turn: root closes one idle CLI, the least recently used across workers, the waiting session's last; a silent worker doesn't hold it", async () => {
+  const t = setup({ reclaimMs: 200 });
+  t.sup.boot();
+  t.sup.attach();
+  // No worker up: nothing to close.
+  expect(await t.sup.reclaimBrains()).toBe(false);
+  const runs = [ANA, BIA].map((a) => handleRequest(t.ctx, exec(a, "sleep 100"), scope().scope));
+  await waitFor(() => t.workers.length === 2);
+  for (const w of t.workers) w.hello();
+  const ana = t.last(ANA.id);
+  const bia = t.last(BIA.id);
+  const asks = (w: FakeWorker) => w.of("brain.reclaim");
+  const answer = (w: FakeWorker, n: number, reply: Record<string, unknown>) =>
+    w.send({ type: "brain.reclaimed", reclaimId: asks(w)[n]?.reclaimId, ...reply });
+
+  // Both have one idle: only Bia's, used longer ago, closes.
+  const oldest = t.sup.reclaimBrains("ana:s1");
+  await waitFor(() => asks(ana).length === 1 && asks(bia).length === 1);
+  expect(asks(ana)[0]).toMatchObject({ peek: true, spare: "ana:s1" });
+  ana.send({ type: "brain.reclaimed", reclaimId: "nope", closed: true });
+  answer(ana, 0, { closed: false, idle: { since: 200, spare: false } });
+  answer(bia, 0, { closed: false, idle: { since: 100, spare: false } });
+  await waitFor(() => asks(bia).length === 2);
+  expect(asks(bia)[1]?.peek).toBeUndefined();
+  answer(bia, 1, { closed: true });
+  expect(await oldest).toBe(true);
+  expect(asks(ana)).toHaveLength(1);
+
+  // The waiting session's own goes last, even if older; Bia's became busy meanwhile, so Ana's closes.
+  const spare = t.sup.reclaimBrains("ana:s1");
+  await waitFor(() => asks(ana).length === 2 && asks(bia).length === 3);
+  answer(ana, 1, { closed: false, idle: { since: 50, spare: true } });
+  answer(bia, 2, { closed: false, idle: { since: 100, spare: false } });
+  await waitFor(() => asks(bia).length === 4);
+  answer(bia, 3, { closed: false });
+  await waitFor(() => asks(ana).length === 3);
+  answer(ana, 2, { closed: true });
+  expect(await spare).toBe(true);
+
+  // Bia's worker says nothing, Ana has none idle: none, in time.
+  const silent = t.sup.reclaimBrains();
+  await waitFor(() => asks(ana).length === 4);
+  answer(ana, 3, { closed: false });
+  expect(await silent).toBe(false);
+  for (const [w, q] of [
+    [ana, await requestOn(ana)],
+    [bia, await requestOn(bia)],
+  ] as const)
+    w.send({ type: "result", id: q.id, ok: true, data: execDone });
+  await Promise.all(runs);
+
+  // The worker's end: it answers what it would close, or whether it closed one.
+  const fromRoot = new PassThrough();
+  const toRoot = new PassThrough();
+  const link = new WorkerLink(fromRoot, toRoot);
+  const said: Record<string, unknown>[] = [];
+  readLines(
+    toRoot,
+    1 << 20,
+    (line) => said.push(JSON.parse(line)),
+    () => {},
+  );
+  const heard: unknown[] = [];
+  link.onReclaim = async (ask) => {
+    heard.push(ask);
+    return ask.peek ? { closed: false, idle: { since: 5, spare: true } } : { closed: true };
+  };
+  fromRoot.write(`${JSON.stringify({ type: "brain.reclaim", reclaimId: "7", spare: "a:s", peek: true })}\n`);
+  fromRoot.write(`${JSON.stringify({ type: "brain.reclaim", reclaimId: "8" })}\n`);
+  await waitFor(() => said.length === 2);
+  expect(heard).toEqual([{ spare: "a:s", peek: true }, { peek: false }]);
+  expect(said).toEqual([
+    { type: "brain.reclaimed", reclaimId: "7", closed: false, idle: { since: 5, spare: true } },
+    { type: "brain.reclaimed", reclaimId: "8", closed: true },
+  ]);
 });
 
 test("frames from a worker go up only when they are its agent's", async () => {
@@ -2147,6 +2226,7 @@ test.if(posix)(
       return s;
     };
     const daemon = new RunnerDaemon({
+      probeEgress: async () => null,
       home,
       mode: "start",
       log: () => {},
@@ -2274,6 +2354,7 @@ test.if(posix)(
     // Root never installs a browser: the installer shares one with every agent, or each agent's worker installs its own.
     const prepared = spyOn(BrowserManager.prototype, "prepareInBackground").mockImplementation(async () => {});
     const daemon = new RunnerDaemon({
+      probeEgress: async () => null,
       home,
       mode: "start",
       log: () => {},
@@ -2347,6 +2428,7 @@ test.if(posix)(
     const prepared = spyOn(BrowserManager.prototype, "prepareInBackground").mockImplementation(async () => {});
     const sockets: FakeSocket[] = [];
     const daemon = new RunnerDaemon({
+      probeEgress: async () => null,
       home,
       mode: "start",
       log: () => {},
@@ -2573,6 +2655,537 @@ test("lines: split across chunks, UTF-8 kept whole, and a line too long is skipp
   await waitFor(() => lines.length === 5);
   expect(lines).toEqual(["olá", "a", "bc", "after", "end"]);
   expect(tooLong).toBe(2);
+});
+
+test.if(posix)("route changes discard in-flight egress observations and reconnect starts unknown", async () => {
+  const home = newHome();
+  const ws = tempDir("egress-ws-");
+  dirs.push(ws);
+  writeConfig(
+    {
+      server: "https://agentes.test",
+      machineId: "m1",
+      name: "box",
+      token: "agm_test_observation_only",
+      workspace: ws,
+      exec: false,
+      mode: "system",
+      agentUidRange: [21000, 21099],
+    },
+    home,
+  );
+  const probes: { uid: number | undefined; resolve: (v: unknown) => void }[] = [];
+  const sockets: FakeSocket[] = [];
+  const daemon = new RunnerDaemon({
+    home,
+    mode: "start",
+    log: () => {},
+    watch: false,
+    executors: () => ({}),
+    caffeinate: false,
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    fetch: async () => new Response("", { status: 404 }),
+    probeEgress: async (_server, user) => new Promise((resolve) => probes.push({ uid: user?.uid, resolve })),
+    workers: { user: userOf, start: (user) => new FakeWorker(user) },
+    dial: (_url, handlers) => {
+      const s = new FakeSocket(handlers);
+      sockets.push(s);
+      return s;
+    },
+  });
+  daemon.start();
+  try {
+    await waitFor(() => sockets.length === 1);
+    const s = sockets[0] as FakeSocket;
+    s.handlers.onOpen();
+    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
+    s.frame({ type: "agents", agents: [ANA] });
+    await waitFor(() => probes.length === 1);
+    expect(probes[0]?.uid).toBe(21000);
+    s.frame({ type: "agents", agents: [BIA] });
+    probes[0]?.resolve({ ip: "8.8.8.8", country: "US" });
+    await waitFor(() => probes.length === 2);
+    expect(probes[1]?.uid).toBe(21001);
+    probes[1]?.resolve({ ip: "1.1.1.1" });
+    await waitFor(() => s.of("pong").some((f) => JSON.stringify(f.egress ?? null).includes("1.1.1.1")));
+    expect(s.of("pong").some((f) => JSON.stringify(f.egress ?? null).includes("8.8.8.8"))).toBe(false);
+    daemon.reconnect();
+    await waitFor(() => sockets.length === 2);
+    const next = sockets[1] as FakeSocket;
+    next.handlers.onOpen();
+    next.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
+    next.frame({ type: "ping", at: 1 });
+    expect(next.of("pong").at(-1)?.egress).toBeUndefined();
+    await waitFor(() => probes.length === 3);
+    probes[2]?.resolve({ ip: "9.9.9.9" });
+    await waitFor(() => next.of("pong").some((f) => JSON.stringify(f.egress ?? null).includes("9.9.9.9")));
+  } finally {
+    for (const p of probes) p.resolve(null);
+    await daemon.stop();
+  }
+});
+
+test.if(posix)("three idle samples clear the exit IP until an agent context resumes", async () => {
+  const home = newHome();
+  // This test supplies existing contexts through the lookup below, without a saved-user fallback.
+  writeFileSync(path.join(home, AGENT_USERS_FILE), "[]");
+  const ws = tempDir("idle-egress-");
+  dirs.push(ws);
+  writeConfig(
+    {
+      server: "https://agentes.test",
+      machineId: "m1",
+      name: "box",
+      token: "agm_test_idle_observation",
+      workspace: ws,
+      exec: false,
+      mode: "system",
+      agentUidRange: [21000, 21099],
+    },
+    home,
+  );
+  let context: AgentUser | undefined = userOf(ANA);
+  let answer = { ip: "8.8.8.8", country: "US" };
+  let probes = 0;
+  let workers = 0;
+  const sockets: FakeSocket[] = [];
+  const pageUpdates = spyOn(BrowserManager.prototype, "updateStartPages");
+  const daemon = new RunnerDaemon({
+    home,
+    mode: "start",
+    log: () => {},
+    watch: false,
+    executors: () => ({}),
+    caffeinate: false,
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    fetch: async () => new Response("", { status: 404 }),
+    probeEgress: async () => {
+      probes++;
+      return answer;
+    },
+    workers: {
+      // The test's existing-context lookup returns nothing once all agent contexts have drained.
+      user: () => context as AgentUser,
+      start: (user) => {
+        workers++;
+        return new FakeWorker(user);
+      },
+    },
+    dial: (_url, handlers) => {
+      const socket = new FakeSocket(handlers);
+      sockets.push(socket);
+      return socket;
+    },
+  });
+  // Drive the regular 30-second sampler without wall-clock waits or starting an agent for a probe.
+  const sample = () => (daemon as unknown as { sampleEgress(): Promise<void> }).sampleEgress();
+  daemon.start();
+  try {
+    await waitFor(() => sockets.length === 1);
+    const socket = sockets[0] as FakeSocket;
+    socket.handlers.onOpen();
+    socket.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
+    socket.frame({ type: "agents", agents: [ANA] });
+    await waitFor(() => socket.of("pong").some((frame) => JSON.stringify(frame.egress) === JSON.stringify(answer)));
+    const observed = socket.of("pong").length;
+    const sampled = probes;
+    context = undefined;
+    await sample();
+    await sample();
+    expect(socket.of("pong")).toHaveLength(observed);
+    const updated = pageUpdates.mock.calls.length;
+    await sample();
+    expect(socket.of("pong").at(-1)?.egress).toEqual({ ip: null });
+    expect(pageUpdates.mock.calls.length).toBeGreaterThan(updated);
+    expect(probes).toBe(sampled);
+    expect(workers).toBe(0);
+    await sample();
+    expect(socket.of("pong")).toHaveLength(observed + 1);
+
+    context = userOf(ANA);
+    answer = { ip: "1.1.1.1", country: "AU" };
+    await sample();
+    expect(socket.of("pong").at(-1)?.egress).toEqual(answer);
+    expect(probes).toBe(sampled + 1);
+    expect(workers).toBe(0);
+  } finally {
+    pageUpdates.mockRestore();
+    await daemon.stop();
+  }
+});
+
+test("workers restored before a server welcome inherit root network configuration", async () => {
+  const home = newHome();
+  writeFileSync(
+    path.join(home, "worker-tasks.json"),
+    JSON.stringify({
+      task1: { agentId: ANA.id, startedAt: new Date().toISOString() },
+    }),
+  );
+  const network = { networkLauncher: "/root/network-launcher", networkMark: 0x08000000 };
+  const t = setup({ network }, home);
+  t.sup.boot();
+  await waitFor(() => t.workers.length === 1);
+  expect(t.workers[0]?.user).toEqual({ ...(USERS[0] as AgentUser), ...network });
+  const stored = JSON.parse(readFileSync(path.join(home, AGENT_USERS_FILE), "utf8"));
+  expect(stored[0].networkLauncher).toBeUndefined();
+  expect(stored[0].networkMark).toBeUndefined();
+});
+
+test("network changes preserve an occupied worker and viewers, then retire it before the next launch", async () => {
+  let viewers = 1;
+  const t = setup({ desktopViewers: () => viewers });
+  t.sup.boot();
+  t.sup.attach();
+  const run = t.sup.run(exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const old = t.last(ANA.id);
+  old.hello();
+  const req = await requestOn(old);
+  const network = { networkLauncher: "/root/network-launcher", networkMark: 0x08000000 };
+  t.sup.setNetwork(network);
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  expect(old.stdin.writableEnded).toBe(false);
+  old.send({ type: "result", ok: true, id: req.id, data: execDone });
+  await run;
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  expect(old.stdin.writableEnded).toBe(false);
+  viewers = 0;
+  t.sup.drainNetwork();
+  await old.exited;
+  await waitFor(() => t.sup.drainNetwork().length === 0);
+  expect(old.killed).toBe(false);
+  const again = t.sup.run(exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 2);
+  const next = t.last(ANA.id);
+  expect(next.user).toMatchObject(network);
+  next.hello();
+  const nextReq = await requestOn(next);
+  next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
+  await again;
+});
+
+test("a running background task delays network retirement until its acknowledged completion", async () => {
+  const home = newHome();
+  writeFileSync(
+    path.join(home, WORKER_TASKS_FILE),
+    JSON.stringify({ task1: { agentId: ANA.id, startedAt: new Date().toISOString() } }),
+  );
+  const t = setup({}, home);
+  t.sup.boot();
+  t.sup.attach();
+  const worker = t.last(ANA.id);
+  worker.hello();
+  t.sup.setNetwork({ networkMark: 0x08000000 });
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  expect(worker.stdin.writableEnded).toBe(false);
+  t.sup.ack("task1");
+  t.sup.drainNetwork();
+  await worker.exited;
+  await waitFor(() => t.sup.drainNetwork().length === 0);
+  expect(worker.killed).toBe(false);
+});
+
+test.if(posix)("editing only network settings applies without reconnecting or interrupting a request", async () => {
+  const home = newHome();
+  const ws = tempDir("network-change-");
+  dirs.push(ws);
+  const config = {
+    server: "https://agentes.test",
+    machineId: "m1",
+    name: "box",
+    token: "agm_test_only",
+    workspace: ws,
+    exec: true,
+    mode: "system" as const,
+    agentUidRange: [21000, 21099] as [number, number],
+  };
+  writeConfig(config, home);
+  const workers: FakeWorker[] = [];
+  const sockets: FakeSocket[] = [];
+  const probed: AgentUser[] = [];
+  const daemon = new RunnerDaemon({
+    home,
+    mode: "start",
+    log: () => {},
+    watch: true,
+    executors: () => ({}),
+    caffeinate: false,
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    fetch: async () => new Response("", { status: 404 }),
+    probeEgress: async (_server, user) => {
+      if (user) probed.push(user);
+      return null;
+    },
+    workers: {
+      user: userOf,
+      start: (user) => {
+        const w = new FakeWorker(user);
+        workers.push(w);
+        return w;
+      },
+    },
+    dial: (_url, handlers) => {
+      const s = new FakeSocket(handlers);
+      sockets.push(s);
+      return s;
+    },
+  });
+  daemon.start();
+  try {
+    await waitFor(() => sockets.length === 1);
+    const socket = sockets[0] as FakeSocket;
+    socket.handlers.onOpen();
+    socket.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
+    socket.frame({ type: "agents", agents: [ANA] });
+    socket.frame({ type: "request", id: "work", ...exec(ANA) });
+    await waitFor(() => workers.length === 1);
+    const old = workers[0] as FakeWorker;
+    old.hello();
+    const req = await requestOn(old);
+    const network = { networkLauncher: "/root/network-launcher", networkMark: 0x08000000 };
+    await waitFor(() => probed.length > 0);
+    const before = probed.length;
+    writeConfig({ ...config, ...network }, home);
+    await waitFor(() => probed.length > before);
+    // A root-side probe (like a new desktop or terminal) retains the occupied worker's context.
+    expect(probed.at(-1)?.networkLauncher).toBeUndefined();
+    expect(old.of("worker.state").at(-1)?.privateNetwork).toBe(false);
+    expect(sockets).toHaveLength(1);
+    expect(old.stdin.writableEnded).toBe(false);
+    old.send({ type: "result", ok: true, id: req.id, data: execDone });
+    await waitFor(() => socket.of("result").some((x) => x.id === "work"));
+    await waitFor(() => old.stdin.writableEnded, 5000);
+    socket.frame({ type: "request", id: "next", ...exec(ANA) });
+    await waitFor(() => workers.length === 2);
+    const next = workers[1] as FakeWorker;
+    expect(next.user).toMatchObject(network);
+    next.hello();
+    const nextReq = await requestOn(next);
+    next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
+    await waitFor(() => socket.of("result").some((x) => x.id === "next"));
+    expect(sockets).toHaveLength(1);
+    expect(old.killed).toBe(false);
+  } finally {
+    await daemon.stop();
+  }
+});
+
+test("a retained desktop or terminal pins a new worker to the same old network until both drain", async () => {
+  const target = { networkLauncher: "/root/net", networkMark: 0x08000000 };
+  const pins = new AgentNetworks({}, [{ uid: 21000 }]);
+  pins.set(target);
+  let desktop = true;
+  let terminal = true;
+  const t = setup({
+    network: target,
+    networkBusy: () => desktop || terminal,
+    resolveNetwork: (user) => pins.resolve(user.uid, desktop || terminal || t.sup.runningNetwork(user.id) !== null),
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const run = t.sup.run(exec(ANA), scope().scope);
+  const old = t.last(ANA.id);
+  old.hello();
+  const req = await requestOn(old);
+  old.send({ type: "result", ok: true, id: req.id, data: execDone });
+  await run;
+  expect(old.user.networkLauncher).toBeUndefined();
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  desktop = false;
+  t.sup.drainNetwork();
+  expect(old.stdin.writableEnded).toBe(false);
+  terminal = false;
+  t.sup.drainNetwork();
+  await old.exited;
+  await waitFor(() => t.sup.drainNetwork().length === 0);
+  const nextRun = t.sup.run(exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 2);
+  const next = t.last(ANA.id);
+  expect(next.user).toMatchObject(target);
+  next.hello();
+  const nextReq = await requestOn(next);
+  next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
+  await nextRun;
+});
+
+test("browser stream and desktop leases prevent idle network retirement", async () => {
+  let now = 100000;
+  const t = setup({ now: () => now });
+  t.sup.boot();
+  t.sup.attach();
+  const stream = t.sup.run({ op: "browser.stream.start", mode: "watch", agent: ANA } as MachineRequest, scope().scope);
+  const worker = t.last(ANA.id);
+  worker.hello();
+  const req = await requestOn(worker);
+  worker.send({ type: "result", ok: true, id: req.id, data: { mode: "watch" } });
+  await stream;
+  t.sup.setNetwork({ networkMark: 0x08000000 });
+  expect(worker.stdin.writableEnded).toBe(false);
+  worker.send({ type: "browser.desktop", agentId: ANA.id, active: true });
+  worker.send({ type: "browser.stream.ended", agentId: ANA.id, reason: "stopped" });
+  await waitFor(() => t.sup.onDesktopInUse(ANA.id));
+  t.sup.drainNetwork();
+  expect(worker.stdin.writableEnded).toBe(false);
+  now += 120000;
+  t.sup.drainNetwork();
+  await worker.exited;
+  expect(worker.killed).toBe(false);
+});
+
+test("a late hello cannot reopen a retiring worker to a new request", async () => {
+  const t = setup();
+  t.sup.boot();
+  t.sup.attach();
+  const run = t.sup.run(exec(ANA), scope().scope);
+  const old = t.last(ANA.id);
+  old.hello();
+  const req = await requestOn(old);
+  old.send({ type: "result", ok: true, id: req.id, data: execDone });
+  await run;
+  old.stdin.removeAllListeners("end");
+  t.sup.setNetwork({ networkMark: 0x08000000 });
+  old.hello();
+  const nextRun = t.sup.run(exec(ANA), scope().scope);
+  await new Promise((r) => setTimeout(r, 10));
+  expect(old.of("request")).toHaveLength(1);
+  old.crash(0);
+  await waitFor(() => t.workers.length === 2);
+  const next = t.last(ANA.id);
+  expect(next.user.networkMark).toBe(0x08000000);
+  next.hello();
+  const nextReq = await requestOn(next);
+  next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
+  await nextRun;
+});
+
+test.if(posix)(
+  "a managed finite drain rejects new stale work and retries owned desktop retirement without a roster",
+  async () => {
+    const home = newHome();
+    const ws = tempDir("network-deadline-");
+    dirs.push(ws);
+    let now = Date.now();
+    const config = {
+      server: "https://agentes.test",
+      machineId: "m1",
+      name: "box",
+      token: "agm_test_only",
+      workspace: ws,
+      exec: true,
+      mode: "system" as const,
+      agentUidRange: [21000, 21099] as [number, number],
+      networkDrainSeconds: 60,
+    };
+    writeConfig(config, home);
+    const workers: FakeWorker[] = [];
+    const sockets: FakeSocket[] = [];
+    const daemon = new RunnerDaemon({
+      home,
+      mode: "start",
+      log: () => {},
+      watch: true,
+      now: () => now,
+      executors: () => ({}),
+      caffeinate: false,
+      self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+      fetch: async () => new Response("", { status: 404 }),
+      probeEgress: async () => null,
+      workers: {
+        user: userOf,
+        start: (user) => {
+          const worker = new FakeWorker(user);
+          workers.push(worker);
+          return worker;
+        },
+      },
+      dial: (_url, handlers) => {
+        const socket = new FakeSocket(handlers);
+        sockets.push(socket);
+        return socket;
+      },
+    });
+    let desktopStops = 0;
+    const stopDesktop = spyOn(DesktopSessions.prototype, "stop").mockImplementation(async (agent) => {
+      expect(agent.id).toBe(ANA.id);
+      if (++desktopStops === 1) throw new Error("Transient desktop stop failure");
+      return { stopped: true };
+    });
+    daemon.start();
+    try {
+      await waitFor(() => sockets.length === 1);
+      const socket = sockets[0] as FakeSocket;
+      socket.handlers.onOpen();
+      socket.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
+      // A restored owned desktop must close even if its agent is absent from the cached roster.
+      socket.frame({ type: "request", id: "active", ...exec(ANA) });
+      await waitFor(() => workers.length === 1);
+      const old = workers[0] as FakeWorker;
+      old.hello();
+      await requestOn(old);
+      const target = { networkLauncher: "/root/network-launcher", networkMark: 0x08000000 };
+      writeConfig({ ...config, ...target }, home);
+      await waitFor(() =>
+        socket.of("pong").some((p) => (p.networkTransition as { state?: string } | undefined)?.state === "draining"),
+      );
+      expect(old.stdin.writableEnded).toBe(false);
+      socket.frame({ type: "request", id: "new-work", ...exec(ANA) });
+      await waitFor(() => socket.of("result").some((r) => r.id === "new-work"));
+      expect(socket.of("result").find((r) => r.id === "new-work")?.ok).toBe(false);
+      // Keep the old UID alive until the failed desktop stop has been retried.
+      old.stdin.removeAllListeners("end");
+      now += 61_000;
+      await waitFor(() => old.stdin.writableEnded, 5000);
+      expect(
+        socket
+          .of("pong")
+          .some((p) => (p.networkTransition as { state?: string } | undefined)?.state === "restart_required"),
+      ).toBe(true);
+      expect(socket.of("result").find((r) => r.id === "active")?.ok).toBe(false);
+      await waitFor(() => desktopStops === 2, 5000);
+      old.crash(0);
+      await new Promise((r) => setTimeout(r, 10));
+      socket.frame({ type: "request", id: "fresh", ...exec(ANA) });
+      await waitFor(() => workers.length === 2);
+      expect(workers[1]?.user).toMatchObject(target);
+    } finally {
+      stopDesktop.mockRestore();
+      await daemon.stop();
+    }
+  },
+  15000,
+);
+
+test("a restored owner with a temporarily unavailable network does not prevent connection and retries after drain", async () => {
+  const home = newHome();
+  writeFileSync(
+    path.join(home, WORKER_TASKS_FILE),
+    JSON.stringify({ restored: { agentId: ANA.id, startedAt: new Date().toISOString() } }),
+  );
+  let blocked = true;
+  const target = { networkLauncher: "/root/net", networkMark: 0x08000000, networkRevision: 2 };
+  const t = setup(
+    {
+      network: target,
+      resolveNetwork: () => {
+        if (blocked) throw new Error("The prior UID context is draining");
+        return target;
+      },
+    },
+    home,
+  );
+  expect(() => t.sup.boot()).not.toThrow();
+  t.sup.attach();
+  expect(t.workers).toHaveLength(0);
+  expect(t.sup.list()).toMatchObject([{ taskId: "restored", agentId: ANA.id }]);
+  blocked = false;
+  t.sup.drainNetwork();
+  await waitFor(() => t.workers.length === 1, 5000);
+  const worker = t.last(ANA.id);
+  worker.hello();
+  await waitFor(() => worker.of("welcome").length === 1);
+  expect(worker.user).toMatchObject(target);
+  expect(t.sup.list()).toMatchObject([{ taskId: "restored", agentId: ANA.id }]);
 });
 
 test("clone slots are the computer's: two at once across every agent's worker; a stopped worker gives its back; the cache sees the worker's own uid", async () => {

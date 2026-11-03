@@ -29,6 +29,7 @@ afterEach(() => removeDirs(dirs));
 class FakeSocket implements Socket {
   readonly sent: Record<string, unknown>[] = [];
   closed = false;
+  bufferedAmount = 0;
   constructor(readonly handlers: SocketHandlers) {}
   send(data: string) {
     this.sent.push(JSON.parse(data) as Record<string, unknown>);
@@ -451,4 +452,160 @@ test("a brain turn starts only while the computer has room; recent ones count un
 
   runner.close();
   await Promise.all(running);
+});
+
+test("no room for a turn: idle warm CLIs close first, one at a time, before no_slot; never where memory isn't known", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  const sent: { id: string; ok: boolean; error?: { code: string; message: string } }[] = [];
+  let free: number | null = MIN_FREE_BYTES - 1;
+  /** Idle CLIs left, and what closing one gives back. */
+  let idle = 2;
+  let closes = 0;
+  const spares: string[] = [];
+  let release = () => {};
+  const held = new Promise<unknown>((r) => {
+    release = () => r({});
+  });
+  let slowClose: Promise<void> | null = null;
+  const runner = new RequestRunner(
+    {
+      workspaceReal: ws,
+      exec: true,
+      token: "agm_x",
+      reclaimBrains: async (spare) => {
+        closes++;
+        spares.push(spare);
+        if (slowClose) await slowClose;
+        if (idle === 0) return false;
+        idle--;
+        if (free !== null) free += 0.2e9;
+        return true;
+      },
+    },
+    (f) => sent.push(f as unknown as (typeof sent)[number]),
+    () => {},
+    async (_ctx, req) => ((req as unknown as { runId: string }).runId.startsWith("hold") ? held : {}),
+    { memAvailable: () => free, now: () => 1_000_000 },
+  );
+  const turn = (id: string) =>
+    runner.start(id, {
+      op: "brain.turn",
+      runId: id,
+      agent: { id: "a1", handle: "nova" },
+      session: { id: "s1" },
+    } as unknown as MachineRequest);
+  const outcome = (id: string) => {
+    const f = sent.find((x) => x.id === id);
+    return f?.ok ? "ok" : f?.error?.code;
+  };
+
+  // One closed CLI is enough: the turn runs. The turn's own session is the one spared last.
+  await turn("t1");
+  expect(outcome("t1")).toBe("ok");
+  expect(closes).toBe(1);
+  expect(spares[0]).toBe("a1:s1");
+  // Not enough left to close: refused once nothing more can close.
+  free = MIN_FREE_BYTES - 1e9;
+  await turn("t2");
+  expect(outcome("t2")).toBe("no_slot");
+  expect(closes).toBe(3);
+
+  // Canceled while it waits: nothing more closes for it, and it ends as canceled.
+  idle = 5;
+  closes = 0;
+  let opened = () => {};
+  slowClose = new Promise<void>((r) => {
+    opened = r;
+  });
+  const waiting = turn("t3");
+  await waitFor(() => closes === 1);
+  await turn("t3");
+  expect(sent.filter((f) => f.id === "t3").map((f) => f.error?.message)).toEqual(["Duplicate request id"]);
+  runner.cancel("t3");
+  opened();
+  await waiting;
+  slowClose = null;
+  expect(closes).toBe(1);
+  expect(sent.filter((f) => f.id === "t3").at(-1)?.error).toEqual({ code: "internal", message: "Canceled" });
+
+  // Memory not known: room is a count of turns, so at the count nothing is closed for one more.
+  free = null;
+  closes = 0;
+  const holding = Array.from({ length: TURNS_WITHOUT_MEMORY }, (_, i) => turn(`hold${i}`));
+  await turn("t4");
+  expect(outcome("t4")).toBe("no_slot");
+  expect(closes).toBe(0);
+  release();
+  await Promise.all(holding);
+  runner.close();
+});
+
+test("backpressure drops only browser pictures and observations are resent after reconnect", async () => {
+  const egress = { ip: "8.8.8.8", country: "US" };
+  const { sockets, connection } = setup({ egress: () => egress });
+  const done = connection.run();
+  await waitFor(() => sockets.length === 1);
+  const s = sock(sockets, 0);
+  s.handlers.onOpen();
+  s.frame({ type: "welcome", machineId: "m1", name: "Box", heartbeatMs: 25000, observeEgress: true });
+  s.frame({ type: "ping", at: 1 });
+  s.frame({ type: "ping", at: 2 });
+  expect(s.sent.filter((f) => f.type === "pong")).toEqual([
+    { type: "pong", at: 1, egress },
+    { type: "pong", at: 2 },
+  ]);
+  s.bufferedAmount = 3 * 1024 * 1024;
+  connection.send({
+    type: "browser.frame",
+    agentId: "a",
+    seq: 1,
+    data: "eA==",
+    metadata: { deviceWidth: 1, deviceHeight: 1 },
+  });
+  expect(s.sent.some((f) => f.type === "browser.frame")).toBe(false);
+  s.frame({ type: "ping", at: 3 });
+  expect(s.sent.at(-1)).toEqual({ type: "pong", at: 3 });
+  s.bufferedAmount = 0;
+  connection.send({
+    type: "browser.frame",
+    agentId: "a",
+    seq: 2,
+    data: "eA==",
+    metadata: { deviceWidth: 1, deviceHeight: 1 },
+  });
+  expect(s.sent.at(-1)?.type).toBe("browser.frame");
+  connection.reconnect();
+  await waitFor(() => sockets.length === 2);
+  const next = sock(sockets, 1);
+  next.handlers.onOpen();
+  next.frame({ type: "welcome", machineId: "m1", name: "Box", heartbeatMs: 25000, observeEgress: true });
+  next.frame({ type: "ping", at: 4 });
+  expect(next.sent.at(-1)).toEqual({ type: "pong", at: 4, egress });
+  connection.stop();
+  await done;
+});
+
+test("personal computers never read or emit egress, including direct out-of-band frames", async () => {
+  let samples = 0;
+  const { sockets, connection } = setup({
+    egress: () => {
+      samples++;
+      return { ip: "8.8.8.8" };
+    },
+  });
+  const done = connection.run();
+  await waitFor(() => sockets.length === 1);
+  const s = sock(sockets, 0);
+  s.handlers.onOpen();
+  s.frame({ type: "welcome", machineId: "m1", name: "Personal", heartbeatMs: 25000 });
+  s.frame({ type: "ping", at: 1 });
+  connection.send({ type: "pong", at: 2, egress: { ip: "8.8.8.8", country: "US" } });
+  expect(samples).toBe(0);
+  expect(s.sent.filter((f) => f.type === "pong")).toEqual([
+    { type: "pong", at: 1 },
+    { type: "pong", at: 2 },
+  ]);
+  connection.stop();
+  await done;
 });

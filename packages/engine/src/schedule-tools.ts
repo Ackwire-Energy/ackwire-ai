@@ -298,23 +298,17 @@ const isRoutine = (r: RoutineView) =>
   r.trigger.type !== "once" && !(r.target.type === "conversation" && r.target.reminder);
 
 /**
- * Conversations whose routines' instructions a reader may see: public
- * channels, and channels and DMs where this agent or the person it acts for
- * is a member. Everything else shows the routine without its instructions.
+ * Conversations whose routines' instructions a run nobody is behind may see: public
+ * channels, and channels and DMs where this agent is a member. Everything else
+ * shows the routine without its instructions.
  */
-async function readableChannels(ctx: ToolContext, channelIds: string[], person: string | null) {
+async function readableChannels(ctx: ToolContext, channelIds: string[]) {
   if (channelIds.length === 0) return new Set<string>();
   const { channels, channelMembers } = schema;
   const rows = await ctx.db
     .selectDistinct({ id: channels.id })
     .from(channels)
-    .leftJoin(
-      channelMembers,
-      and(
-        eq(channelMembers.channelId, channels.id),
-        or(eq(channelMembers.agentId, ctx.agentId), person ? eq(channelMembers.userId, person) : sql`false`),
-      ),
-    )
+    .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.agentId, ctx.agentId)))
     .where(
       and(
         eq(channels.orgId, ctx.orgId),
@@ -649,7 +643,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           }
           const mineOnly = agentId === ctx.agentId;
           const talks = await speakerFor(ctx.db, ctx.orgId, person);
-          const list = (await listOrgRoutines(ctx.db, ctx.orgId, agentId ? { agentId } : {})).filter(
+          const list = (await listOrgRoutines(ctx.db, ctx.orgId, { agentId, viewerId: person })).filter(
             (r) =>
               isRoutine(r) &&
               (!str(input.id) || r.id === str(input.id)) &&
@@ -671,13 +665,18 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           }
           const channelOf = (r: RoutineView) =>
             r.target.type === "channel" || r.target.type === "conversation" ? r.target.channelId : null;
-          const readable = await readableChannels(ctx, [...new Set(list.flatMap((r) => channelOf(r) ?? []))], person);
+          const readable = person
+            ? new Set<string>()
+            : await readableChannels(ctx, [...new Set(list.flatMap((r) => channelOf(r) ?? []))]);
           const lines = await Promise.all(
             list.map(async (r) => {
               const channelId = channelOf(r);
-              const visible =
-                r.agentId === ctx.agentId ||
-                (channelId ? readable.has(channelId) : r.target.type === "forum" || r.target.type === "artifact");
+              // A person behind the run sees what Settings › Rotinas shows them (`viewerId` above); the agent's own
+              // view only when nobody is.
+              const visible = person
+                ? r.prompt !== null
+                : r.agentId === ctx.agentId ||
+                  (channelId ? readable.has(channelId) : r.target.type === "forum" || r.target.type === "artifact");
               return routineLine(
                 r,
                 await whereOf(ctx, r),

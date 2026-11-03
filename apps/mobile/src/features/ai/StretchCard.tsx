@@ -7,13 +7,14 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, Text, useTheme } from "@/ui";
+import { AskDone } from "../chat/asks";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
 
 /**
  * The web's pause card of a stretch (ADR 0089) in place of its text: the agents did what they may do on their own
- * since a person last acted, and wait. Continuar lets them go on (who asked, the agents' owners or an admin); then
- * who did, and when. The phone says the budget share as a percentage only.
+ * since a person last acted, and wait. Continuar lets them go on (who asked, the agents' owners or an admin); then the
+ * card folds to one quiet line: who did, and when. The phone says the budget share as a percentage only.
  */
 export function StretchCard({ message: m }: { message: Message }) {
   const { t, i18n } = useTranslation();
@@ -41,21 +42,32 @@ export function StretchCard({ message: m }: { message: Message }) {
       setPending(false);
     }
   };
+  if (continued) {
+    return (
+      <View style={styles.done}>
+        <AskDone
+          done
+          words={
+            by === meId
+              ? t("stretchCard.continuedByYou", { time })
+              : t("stretchCard.continued", {
+                  name: (by && dir.memberById.get(by)?.name) ?? t("channel.unknownPerson"),
+                  time,
+                })
+          }
+        />
+      </View>
+    );
+  }
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.row}>
-        <Icon name={continued ? "check" : "pause"} size={16} color={colors.ink2} />
+        <Icon name="pause" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
           {stretchCardText(t, card, names)}
         </Text>
       </View>
-      {continued && by ? (
-        <Text variant="footnote" tone="faint">
-          {by === meId
-            ? t("stretchCard.continuedByYou", { time })
-            : t("stretchCard.continued", { name: dir.memberById.get(by)?.name ?? t("channel.unknownPerson"), time })}
-        </Text>
-      ) : !continued && may ? (
+      {may ? (
         <Button variant="primary" size="sm" label={t("run.continueRun")} disabled={pending} onPress={() => void go()} />
       ) : null}
     </View>
@@ -63,6 +75,7 @@ export function StretchCard({ message: m }: { message: Message }) {
 }
 
 const styles = StyleSheet.create({
+  done: { marginTop: 6 },
   card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },

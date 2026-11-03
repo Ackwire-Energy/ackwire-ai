@@ -124,3 +124,32 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* A first click while watching asks; the live picture remains readable. */
+.dsk-stage > .brw-dim.dsk-ask {
+  background: color-mix(in srgb, var(--bg) 30%, transparent);
+  backdrop-filter: none;
+  animation: dsk-ask-in 150ms ease-out;
+}
+@keyframes dsk-ask-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dsk-stage > .brw-dim.dsk-ask {
+    animation: none;
+  }
+}
+
+.dsk-egress {
+  margin-left: auto;
+  flex: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 720px) {
+  .dsk-egress {
+    display: none;
+  }
+}

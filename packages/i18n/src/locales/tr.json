@@ -1541,6 +1541,7 @@
     "queued_other": "{{names}} bilgisayar için sırada",
     "away_one": "{{names}} bilgisayarı bekliyor",
     "away_other": "{{names}} bilgisayarı bekliyor",
+    "queuedNext": "{{names}} bilgisayar sırasında · sıradaki",
     "nobody": "Hiçbir ajan yanıtlamayacak",
     "status": {
       "seen": "Gördü",
@@ -1965,6 +1966,9 @@
     "rolesNone": "Workspace'te henüz rol yok.",
     "rolesNeeded": "En az bir rol seç.",
     "rolesLeave": "Rolü kaybeden kanaldan çıkar.",
+    "rolesChoose": "Rolleri seç",
+    "rolesChange": "Rolleri değiştir",
+    "rolesDone": "Tamam",
     "publicTitle": "#{{channel}} herkese açık yapılsın mı?",
     "publicBody": "Çalışma alanındaki herkes katılabilecek ve eskiler dahil tüm mesajları okuyabilecek.",
     "publicConfirm": "Herkese açık yap",
@@ -2847,6 +2851,7 @@
     "runsEmpty": "“{{q}}” ile eşleşen çalıştırma yok.",
     "runsNone": "Henüz çalıştırma yok.",
     "runNoText": "Metin yok",
+    "runPrivate": "Dahil olmadığın bir konuşmada",
     "runTokens": "{{input}} giriş · {{cached}} önbellek · {{output}} çıkış",
     "runTokensTip": "{{input}} yeni giriş tokenı, önbellekten okunan {{cached}} (daha ucuz), {{output}} çıkış",
     "budgetHelp": "Sınıra ulaşınca {{name}} durur ve bunu kanalda söyler. {{ownerNote}}",
@@ -6432,6 +6437,68 @@
       "symbols": "Semboller"
     }
   },
+  "voice": {
+    "word": "Sesli mesaj",
+    "wordTime": "Sesli mesaj · {{time}}",
+    "holdToRecord": "Kaydetmek için basılı tutun",
+    "slideToDelete": "Silmek için kaydırın",
+    "send": "Sesi gönder",
+    "delete": "Kaydı sil",
+    "deleted": "Kayıt silindi.",
+    "pause": "Duraklat",
+    "resume": "Kayda devam et",
+    "listen": "Kaydınızı dinleyin",
+    "play": "Oynat",
+    "stop": "Durdur",
+    "speed": "Hız",
+    "left": "{{seconds}} sn kaldı",
+    "tooShort": "Çok kısa. Biraz daha konuşun.",
+    "silent": "Hiçbir şey duyulmadı. Hiçbir şey gönderilmedi.",
+    "notSent": "Ses gönderilemedi.",
+    "limit": "Bugün için epey ses oldu. Buraya yazın ve yarın tekrar deneyin.",
+    "micBlocked": "Mikrofon engellendi",
+    "micBlockedHint": "Kayıt yapmak için cihaz ayarlarınızdan mikrofona izin verin.",
+    "openSettings": "Ayarları aç",
+    "notNow": "Şimdi değil",
+    "expired": "Sesin süresi doldu",
+    "showText": "Metni göster",
+    "hideText": "Metni gizle",
+    "record": "Ses kaydet",
+    "recording": "Ses kaydediliyor",
+    "discard": "Kaydı sil",
+    "stopListening": "Dinlemeyi durdur",
+    "keys": "Enter gönderir · Esc siler",
+    "keysHold": "Göndermek için bırakın · Esc siler",
+    "keysPaused": "Duraklatıldı · Boşluk dinletir · Enter gönderir · Esc siler",
+    "pausePlay": "Duraklat",
+    "seek": "Ses konumu",
+    "speedAt": "Hız {{speed}}×",
+    "waiting": "Tekrar çevrimiçi olduğunuzda gider",
+    "notUnderstood": "Ses anlaşılamadı. Hiçbir şey gönderilmedi.",
+    "refused": "Ses bu konuşmada gönderilemedi.",
+    "blockedMac": "Mikrofon engellendi. Mac'te: Sistem Ayarları › Gizlilik ve Güvenlik › Mikrofon.",
+    "blockedWeb": "Mikrofon engellendi. Site adresinin yanındaki kilit simgesinden izin verin.",
+    "noMic": "Mikrofon bulunamadı.",
+    "failed": "Mikrofon açılamadı. Tekrar deneyin.",
+    "noPlayback": "Şu anda oynatılamıyor. Yine de gönderebilir veya kayda devam edebilirsiniz.",
+    "settings": {
+      "title": "Sesli mesajlar",
+      "on": "Sesli mesajlar",
+      "onHelp": "Bu çalışma alanındaki kişiler konuşmalarda ses gönderebilir.",
+      "noEngine": "Sesli mesajlar burada henüz kullanılamıyor.",
+      "engineTitle": "Sesi metne dönüştüren",
+      "own": "Kendi sunucunuz",
+      "ownHelp": "Makinenizdeki Whisper veya Parakeet. Ses orada kalır.",
+      "address": "Sunucu adresi",
+      "key": "{{name}} anahtarı",
+      "keyPlaceholder": "Buraya yapıştırın",
+      "test": "Test et",
+      "tested": "Çalışıyor. Artık herkes mikrofonu görüyor.",
+      "sealed": "Sunucunuzda şifreli olarak saklanır ve bir daha gösterilmez.",
+      "leaves": "Sesli mesajların sesi metne dönüşmek için {{name}} hizmetine gider.",
+      "invalid": "Kayıtlı anahtar bu sunucuda açılmıyor. Tekrar yapıştırın."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -7671,6 +7738,73 @@
       "noneText": "Program çalıştırmaz ve dosya tutmaz"
     }
   },
+  "queue": {
+    "button_one": "Bilgisayar · {{count}} bekliyor",
+    "button_other": "Bilgisayar · {{count}} bekliyor",
+    "buttonIdle": "Bilgisayar",
+    "see": "Sırayı gör",
+    "label": "{{name}} sırası",
+    "full": "Dolu",
+    "fullNext": "Dolu · sıradaki yaklaşık {{n}} dk sonra başlar",
+    "free": "Sırada kimse yok",
+    "workingNow": "Şu an çalışıyor · {{n}}",
+    "inLine": "Sırada · {{n}}",
+    "allStarted": "hepsi ~{{n}} dk içinde başlar",
+    "nothingWorking": "Şu an çalışan bir şey yok",
+    "rule": "Önce insanlar. Birlikte anılan ajanlar tek tek başlar.",
+    "youFirst": "Önce sen",
+    "startsIn": "~{{n}} dk sonra başlar",
+    "startsAfter": "{{after}} bitince başlar",
+    "left": "~{{n}} dk kaldı",
+    "who": "{{name}}",
+    "away": "{{time}} uzakta",
+    "purpose": {
+      "you": "sana yanıt veriyor",
+      "person": "{{name}} adlı kişiye yanıt veriyor",
+      "someone": "bir kişiye yanıt veriyor",
+      "agent": "{{name}} istedi",
+      "someAgent": "bir ajan istedi",
+      "routine": "bir rutin",
+      "work": "uzun iş"
+    },
+    "where": {
+      "yourDm": "DM'in",
+      "dm": "{{name}} ile DM",
+      "thread": "#{{name}} içinde bir konu",
+      "private": "özel bir konuşma"
+    },
+    "live": {
+      "nextEta": "Bilgisayarı bekliyor. Sıradaki o, yaklaşık {{n}} dk sonra",
+      "nextAfter": "Bilgisayarı bekliyor. {{after}} bitince sıradaki o",
+      "next": "Bilgisayarı bekliyor. Sıradaki o",
+      "behind": "Sırada, {{nth}}. {{names}} sonrasında",
+      "position": "Sırada, {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}.",
+      "two": "{{n}}.",
+      "few": "{{n}}.",
+      "other": "{{n}}."
+    },
+    "fan": {
+      "called_one": "{{count}} ajan çağrıldı",
+      "called_other": "{{count}} ajan çağrıldı",
+      "answered_one": "{{count}} yanıtladı",
+      "answered_other": "{{count}} yanıtladı",
+      "working_one": "{{count}} çalışıyor",
+      "working_other": "{{count}} çalışıyor",
+      "inLine_one": "{{count}} sırada",
+      "inLine_other": "{{count}} sırada",
+      "failed_one": "{{count}} yanıtlamadı",
+      "failed_other": "{{count}} yanıtlamadı",
+      "chip": {
+        "answered": "yanıtladı",
+        "working": "çalışıyor",
+        "inLine": "sırada",
+        "failed": "yanıtlamadı"
+      }
+    }
+  },
   "access": {
     "matrixTitle": "Ajan erişimi",
     "matrixHint": "Hassas işlemler (birleştirme, dağıtım, paylaşım, ödeme) hangi düzeyde olursa olsun her zaman onay ister. Araç araç ayarlamak için bağlayıcının Araçlar bölümünü açın.",
@@ -8872,6 +9006,7 @@
     "clearSearch": "Aramayı temizle",
     "noMatch": "“{{q}}” için bir şey bulunamadı.",
     "noTools": "Sunucu hiç araç sunmadı.",
+    "unreadable": "Bağlayıcının araçları okunamadı: {{reason}}",
     "refresh": "Yeni araçları ara",
     "decideTitle": "Kararınız gerekiyor · {{count}}",
     "decideHelp": "Adları ne yaptıklarını söylemiyor. Öneriyi onaylayın ya da başka birini seçin.",
@@ -9688,6 +9823,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Ağ değişiyor. Bilgisayarın açık oturumları {{when}} saatinde yeniden başlayacak.",
+      "restart": "Bilgisayar oturumları ağı uygulamak için yeniden başlıyor. Yeni işler bu bitene kadar bekler.",
+      "line": "Çıkış IP’si {{ip}}",
+      "hint": "Ajanlar gezinirken sitelerin gördüğü adres. Bilgisayarın ağı değişince güncellenir."
+    },
     "online": "Çevrimiçi",
     "offline": "Çevrimdışı",
     "execOff": "Komutlar kapalı",
@@ -10386,6 +10527,7 @@
       "import": "İçe ve dışa aktarma",
       "billing": "Plan ve faturalandırma",
       "media": "GIF'ler ve çıkartmalar",
+      "voice": "Ses",
       "apps": "Yapay zeka uygulamaları"
     },
     "sectionText": {
@@ -10404,6 +10546,7 @@
       "import": "Başka bir uygulamadan ya da çalışma alanından ajan getirin ve bu çalışma alanını istediğiniz yere götürün.",
       "billing": "Bu çalışma alanının agentes.chat planı, kartı ve faturaları uygulamanın dışında, bize ait bir sayfada.",
       "media": "Kişilerin bir konuşmada neler gönderebileceği ve ajanların ne zaman GIF ya da çıkartma göndereceği.",
+      "voice": "Konuşmalardaki sesli mesajlar ve sesi metne kimin dönüştürdüğü.",
       "apps": "Claude, Cursor ve diğer uygulamalardan bu çalışma alanının ajanlarına görev verin."
     },
     "title": "Ayarlar",
@@ -10593,13 +10736,15 @@
   "usageViews": {
     "signedOut": "Oturum kapatıldı",
     "whose": "{{name}} hesabı",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "Sınır, bu hesap yeniden kullanıldıktan sonra görünür.",
     "unused": "Bu hesabı kullanan ajan yok.",
     "usesNow": "şu anda kullanıyor",
     "monthTokens": "Bu ay {{tokens}} token",
     "tokens": "{{tokens}} token",
     "equivalent": "API üzerinden ≈ {{amount}}",
+    "thisMonth": "Bu ay",
+    "moreAgents_one": "+{{count}} ajan",
+    "moreAgents_other": "+{{count}} ajan",
     "paid": "{{amount}} ödendi",
     "budgetShare": "Bütçenin {{percent}} kadarı",
     "estimate": "Planlar yalnızca hesabın tamamının ne kadar kullandığını söyler. Her ajanın payı, her birinin harcadığına göre bir tahmindir.",
@@ -10788,6 +10933,11 @@
       "answeredFar": "{{to}}, {{from}} ajanının sorusunu yanıtladı",
       "answeredRequestFar": "{{to}}, {{from}} ajanının isteğini yanıtladı",
       "see": "Gör"
+    },
+    "talk": {
+      "readAll": "Tümünü oku",
+      "more_one": "{{count}} satır daha",
+      "more_other": "{{count}} satır daha"
     },
     "consultPanel": {
       "label": "{{from}} ile {{to}} arasındaki konuşma",
@@ -11122,12 +11272,12 @@
       "issue_work_start": "Lütfen #{{number}} görevini yap.",
       "issue_taken": "#{{number}} görevini aldım.",
       "done": "Bitti.",
-      "stretch_paused_runs_one": "{{agents}} size danışmak için durdu · isteğinizden beri sizsiz {{steps}} adım",
-      "stretch_paused_runs_other": "{{agents}} size danışmak için durdu · isteğinizden beri kendi başlarına {{steps}} adım",
-      "stretch_paused_spend_one": "{{agents}} size danışmak için durdu · bunun için sizsiz aylık bütçenin %{{percent}} kadarını kullandı",
-      "stretch_paused_spend_other": "{{agents}} size danışmak için durdu · her biri bunun için sizsiz aylık bütçenin %{{percent}} kadarını kullandı",
-      "stretch_paused_spend_cost_one": "{{agents}} size danışmak için durdu · bunun için sizsiz {{amount}} kullandı (aylık bütçenin %{{percent}} kadarı)",
-      "stretch_paused_spend_cost_other": "{{agents}} size danışmak için durdu · her biri bunun için sizsiz {{amount}} kullandı (aylık bütçenin %{{percent}} kadarı)",
+      "stretch_paused_runs_one": "{{agents}} devam etmeden önce size danışmak için durdu",
+      "stretch_paused_runs_other": "{{agents}} devam etmeden önce size danışmak için durdu",
+      "stretch_paused_spend_one": "{{agents}} size danışmak için durdu · aylık bütçenin %{{percent}} kadarını kullandı",
+      "stretch_paused_spend_other": "{{agents}} size danışmak için durdu · her biri aylık bütçenin %{{percent}} kadarını kullandı",
+      "stretch_paused_spend_cost_one": "{{agents}} size danışmak için durdu · {{amount}} kullandı (aylık bütçenin %{{percent}} kadarı)",
+      "stretch_paused_spend_cost_other": "{{agents}} size danışmak için durdu · her biri {{amount}} kullandı (aylık bütçenin %{{percent}} kadarı)",
       "memory": {
         "proposed": "Öneri oluşturuldu: {{text}}",
         "forgot": "Bellek güncellendi: \"{{text}}\" unutuldu.",
@@ -12030,6 +12180,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Yalnızca izliyorsunuz.",
+      "title": "Kontrolü almak ister misiniz?",
+      "working": "Kontrol sizdeyken {{name}} duraklar."
+    },
     "sub": {
       "control": "Kontrol sizde · {{name}} bekliyor",
       "controlAsked": "Kontrol sizde · {{name}} istedi",

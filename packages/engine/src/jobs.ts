@@ -17,6 +17,7 @@ import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
+import { crowdedAgents, publishQueueChanged } from "./computer-queue";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
@@ -25,7 +26,17 @@ import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { reportDroppedMentions } from "./continuation";
-import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
+import {
+  deferMentionReport,
+  deliverParked,
+  dispatchDm,
+  dispatchMentions,
+  INBOX_JOB,
+  MENTION_REPORT_JOB,
+  type RunTrigger,
+  reportMentionReplies,
+  requesterOf,
+} from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { type EmailArt, sendQueuedEmail } from "./email";
 import { forgetCodeEmail } from "./email-codes";
@@ -36,7 +47,7 @@ import { cutText } from "./format";
 import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import type { JevKey, JevKeySource } from "./jev-key";
-import { MENTION_WAKE_THRESHOLD, mentionNeedsNothing } from "./judge";
+import { DEEP_MENTION_THRESHOLD, DEEP_WAKE_HOP, MENTION_WAKE_THRESHOLD, mentionNeedsNothing } from "./judge";
 import { platformCapReached } from "./limits";
 import { wakeForAccessDecision } from "./machine-access";
 import type { MachineCaller } from "./machine-hub";
@@ -79,6 +90,7 @@ import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from ".
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
+import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 import { saveWaitlistContact } from "./waitlist";
 import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
 import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
@@ -118,6 +130,8 @@ export interface JobDeps extends RunExecutorDeps {
   gifs?: GifProvider | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
+  /** Voice messages (job `voice.transcribe`, ADR 0100). */
+  voice?: VoiceDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
   connectors?: ConnectorDeps;
   /** People's mailboxes: job `org.delete` has Composio forget a workspace's mailboxes before its rows go. */
@@ -292,7 +306,18 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // every agent named would let two agents thank each other in a loop while the judge is down.
     if (!options.wakeAll && (!judge || error !== null))
       for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
-    const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= mentionThreshold).map((t) => t.id);
+    // A deep chain needs a clear reason to wake an agent whose computer already has work waiting for room.
+    const crowded =
+      message.hop + 1 >= DEEP_WAKE_HOP
+        ? await crowdedAgents(
+            deps.db,
+            message.orgId,
+            others.map((t) => t.id),
+          )
+        : new Set<string>();
+    const bar = (id: string) =>
+      crowded.has(id) ? Math.max(mentionThreshold, DEEP_MENTION_THRESHOLD) : mentionThreshold;
+    const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= bar(t.id)).map((t) => t.id);
     // Not when the router still decides this message: its decision row is what it reads to skip (`already_routed`).
     if (options.record !== false)
       await deps.db
@@ -516,6 +541,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
               if (role !== "owner" && role !== "decide") allowed = allowed.filter((id) => id !== mission.agentId);
             }
           }
+          const reportLater = await deferMentionReport(deps.db, message, allowed);
+          if (reportLater) allowed = allowed.filter((id) => id !== reportLater);
           const res = allowed.length
             ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
             : { runs: [] };
@@ -539,7 +566,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
             seenBy: message.mentionedAgentIds,
             runs: res.runs,
             referenced: handed.referenced,
-            ...(allowed.length ? {} : { reason: "reference_only" }),
+            ...(allowed.length || reportLater ? {} : { reason: "reference_only" }),
           });
           return;
         }
@@ -623,11 +650,36 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "agent_run.execute": async (job, ctx) => {
       // Counted per run (statements per stage go into the run profile).
       const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
+      // It went to the front of its computer's line (`frontOfLine`): told here, once its move is committed.
+      if (typeof job.payload.line === "string")
+        await publishQueueChanged(deps.pubsub, orgOf(job), job.payload.line).catch(() => {});
+      const lineSince = typeof job.payload.lineSince === "number" ? job.payload.lineSince : undefined;
       await queryTrace.run({ count: 0 }, () =>
-        executeRun(deps, String(job.payload.runId), { ...ctx, jobId: job.id, ...(wait ? { wait } : {}) }),
+        executeRun(deps, String(job.payload.runId), {
+          ...ctx,
+          jobId: job.id,
+          ...(wait ? { wait } : {}),
+          ...(lineSince ? { lineSince } : {}),
+        }),
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
+    },
+    // An agent's wake waiting for its agent to leave the computer's line (ADR 0032 "Calm wakes").
+    [INBOX_JOB]: async (job) => {
+      const p = job.payload as {
+        messageId: string;
+        agentId: string;
+        trigger: RunTrigger;
+        look: number;
+        since?: number;
+      };
+      await deliverParked(deps.db, orgOf(job), p);
+    },
+    // Replies to an agent's message that woke several agents, reported to it once (ADR 0032 "Calm wakes").
+    [MENTION_REPORT_JOB]: async (job) => {
+      const p = job.payload as { replyId: string; triggerId: string; agentId: string; look: number };
+      await reportMentionReplies(deps.db, orgOf(job), p, { maxHops: deps.maxHops });
     },
     // A stretch's limit held a wake-up: its pause card, with Continuar (ADR 0089).
     [STRETCH_JOB]: async (job) => {
@@ -711,6 +763,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         { db: deps.db, pubsub: deps.pubsub, artifacts: deps.artifacts },
         String(job.payload.topicId),
       );
+    },
+    [VOICE_JOB]: async (job, ctx) => {
+      if (!deps.voice) throw new PermanentJobError("no voice engine configured");
+      await transcribeVoiceClip(deps.voice, String(job.payload.clipId), { finalAttempt: ctx.finalAttempt });
     },
     "storage.migrate": async (job) => {
       if (!deps.storage) throw new PermanentJobError("no storage configured");

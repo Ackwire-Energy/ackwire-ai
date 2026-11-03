@@ -146,7 +146,7 @@ Usage:
 Every command takes --home <dir> (default $AGENTES_RUNNER_HOME or ~/.agentes-runner).
 Config: <home>/config.json, mode 600. For background tasks, optional "maxConcurrentTasks" (default 3)
 and "taskMaxSeconds" (default 14400). For agents thinking with Claude Code, optional "brainIdleMinutes"
-(default 10) and "brainMaxProcesses" (default 3). Changes apply while it runs.
+(default 3) and "brainMaxProcesses" (default 1). Changes apply while it runs.
 Background tasks keep running when the runner restarts. Their logs are in tasks/.
 Commands run as the user that runs the runner. Consider a dedicated OS user.`;
 
@@ -983,7 +983,12 @@ async function desktopCheck(p: Parsed): Promise<number> {
   try {
     if (stored?.mode === "system") {
       const u = new AgentUsers({ home, range: stored.agentUidRange ?? DEFAULT_AGENT_UID_RANGE }).ensure(agent);
-      const launcher = systemLauncher(u);
+      const launcher = systemLauncher({
+        ...u,
+        networkLauncher: stored.networkLauncher,
+        networkMark: stored.networkMark,
+        networkRevision: stored.networkRevision,
+      });
       const desktop = await checkDesktop(
         report,
         home,

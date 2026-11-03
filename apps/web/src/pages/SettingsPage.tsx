@@ -82,6 +82,7 @@ import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
+import { VoiceSettingsSection } from "@/components/VoiceSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useOpenParam } from "@/lib/open-param";
@@ -194,6 +195,7 @@ export function SettingsPage({
         {current === "roles" && <RolesSection />}
         {current === "audit" && <AuditSection />}
         {current === "media" && <MediaSettingsSection />}
+        {current === "voice" && <VoiceSettingsSection />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && (
           <ConnectorsSection connected={connected} outcome={outcome} review={review} mail={mail} account={account} />
