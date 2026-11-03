@@ -20,6 +20,7 @@ import {
   type AiChoice,
   type ExistingSignIn,
   firstAgent,
+  freePlanAccount,
   gateDims,
   KEY_MARKS,
   kindOf,
@@ -139,11 +140,13 @@ export type PlanGates = ReturnType<typeof usePlanGates>;
 /** `usePlanGates` for a person who owns no agent yet: each plan's gate on the computer it would sign in on. */
 export function useGatesWithoutAgent(orgId: string, on: boolean) {
   const ai = useAiAccounts(orgId, on);
+  const machines = useMachines(orgId, on);
   const setupQ = useComputerSetup(orgId, on);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
-  const at = (choice: PlanChoice) => planGateWithoutAgent({ choice, edition, setup, computers: ai.data?.computers });
-  return { at, edition };
+  const at = (choice: PlanChoice) =>
+    planGateWithoutAgent({ choice, edition, setup, computers: ai.data?.computers, machines: machines.data });
+  return { at, edition, accounts: ai.data?.accounts };
 }
 
 type GatesWithoutAgent = ReturnType<typeof useGatesWithoutAgent>;
@@ -610,6 +613,7 @@ function PlanPage(
         <PlanWithoutAgent
           choice={choice}
           gates={props.bareGates}
+          mayAddKey={props.mayAddKey}
           onKey={() => onView({ page: "key" })}
           onComputer={props.onComputer}
           onDone={() => props.onAccount?.()}
@@ -660,12 +664,15 @@ function PlanPage(
 function PlanWithoutAgent({
   choice,
   gates,
+  mayAddKey,
   onKey,
   onComputer,
   onDone,
 }: {
   choice: PlanChoice;
   gates: GatesWithoutAgent;
+  /** Only an admin adds an API key: the way on from someone else's computer for them. */
+  mayAddKey: boolean;
   onKey: () => void;
   onComputer: () => void;
   onDone: () => void;
@@ -676,14 +683,18 @@ function PlanWithoutAgent({
   const [signingIn, setSigningIn] = useState(false);
   const [added, setAdded] = useState<MachineAccount | null>(null);
   const { gate, computer } = gates.at(choice);
+  // An account of this plan they already have (their agents deleted) thinks for the next one: no second sign-in.
+  const has = added ?? freePlanAccount(gates.accounts, choice);
   const cloud = gates.edition === "cloud";
   const managed = machines.data?.find((m) => m.kind === "managed");
   const name = cloud ? computerName(t, org?.name ?? "", managed) : (computer?.name ?? "");
   const steps = gate.state === "ready" || gate.state === "preparing" || (gate.state === "offline" && signingIn);
-  if (added) {
+  // Only whoever connected the computers there signs a plan in on them: a computer of their own is the way on.
+  const elsewhere = gate.state === "locked" && !cloud;
+  if (has) {
     return (
       <InfoCard icon="check" live>
-        {t("connectAi.forNewAgents", { label: added.label })}
+        {t("connectAi.forNewAgents", { label: has.label })}
       </InfoCard>
     );
   }
@@ -699,7 +710,10 @@ function PlanWithoutAgent({
         signingIn={signingIn}
         onComputer={onComputer}
       />
-      {offersKeyNow(gate, holdText(t, org?.standing) !== null) && !signingIn ? (
+      {elsewhere ? (
+        <Button variant="primary" wide label={t("aiAccounts.connect.addComputer")} onPress={onComputer} />
+      ) : null}
+      {(offersKeyNow(gate, holdText(t, org?.standing) !== null) || (elsewhere && mayAddKey)) && !signingIn ? (
         <Button variant="ghost" wide label={t("connectAi.wait.useKey")} onPress={onKey} />
       ) : null}
       {steps ? (

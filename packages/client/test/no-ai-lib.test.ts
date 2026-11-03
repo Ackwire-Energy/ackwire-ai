@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { Agent, AgentAudience, AgentBrain, AiComputer, ComputerSetup } from "../src/api/types";
+import type { Agent, AgentAudience, AgentBrain, AiComputer, ComputerSetup, MachineAccount } from "../src/api/types";
 import { setupView } from "../src/lib/computer";
 import { serverBody } from "../src/lib/message-body";
 import {
@@ -14,6 +14,7 @@ import {
   defaultChoice,
   defaultTarget,
   firstAgent,
+  freePlanAccount,
   gateDims,
   kindOf,
   noAiCardOf,
@@ -221,11 +222,65 @@ describe("planGateWithoutAgent: a plan connected before its owner has any agent"
       reason: "keys",
     });
     // Someone else's computer: only they sign a plan in there. Theirs on a runner without accounts: too old.
-    expect(at({ computers: [{ ...SERVER, mine: false, canAdd: false }] }).gate).toEqual({
+    const theirs = { id: "m2", pairedBy: { id: "u-ana", name: "Ana" }, execAllowed: true };
+    expect(at({ computers: [{ ...SERVER, canAdd: false }], machines: [theirs] }).gate).toEqual({
       state: "locked",
       who: "computer",
     });
     expect(at({ computers: [{ ...MAC, canAdd: false }] }).gate).toEqual({ state: "unsupported", reason: "runner_old" });
+    // One nobody connected (the server's own) is anyone's to add to: not adding there is its runner, never a lock.
+    const old = at({ computers: [{ ...SERVER, canAdd: false }], machines: [{ ...theirs, pairedBy: null }] });
+    expect(old).toEqual({
+      gate: { state: "unsupported", reason: "runner_old" },
+      computer: { ...SERVER, canAdd: false },
+    });
+  });
+
+  test("a program that can't run says why, as the computer's switches say it", () => {
+    const noClaude = { ...MAC, brains: { claude_code: false, codex: true } };
+    const mac = { id: "m1", pairedBy: null, execAllowed: true };
+    const tools = (claude: boolean) => ({ folders: [], tools: { claude, codex: true, commands: true } });
+    expect(at({ computers: [noClaude], machines: [{ ...mac, access: tools(false) }] }).gate).toEqual({
+      state: "unsupported",
+      reason: "tool_off",
+    });
+    expect(at({ computers: [noClaude], machines: [{ ...mac, access: tools(true) }] }).gate).toEqual({
+      state: "unsupported",
+      reason: "not_installed",
+    });
+    expect(at({ computers: [noClaude], machines: [{ ...mac, execAllowed: false }] }).gate).toEqual({
+      state: "unsupported",
+      reason: "exec_off",
+    });
+  });
+});
+
+describe("freePlanAccount: a plan account of theirs that thinks for one more agent", () => {
+  const account = (over: Partial<MachineAccount> = {}): MachineAccount => ({
+    id: "a1",
+    kind: "claude_code",
+    label: "Claude",
+    email: null,
+    plan: null,
+    status: "active",
+    ownerId: "u1",
+    ownerName: "Ana",
+    mine: true,
+    usedBy: [],
+    usage: null,
+    provider: null,
+    keyHint: null,
+    ...over,
+  });
+  test("theirs, signed in, free or shared, of that plan", () => {
+    expect(freePlanAccount([account()], "claude")?.id).toBe("a1");
+    expect(freePlanAccount([account({ usedBy: ["Lia"], shared: true })], "claude")?.id).toBe("a1");
+    expect(freePlanAccount([account({ usedBy: ["Lia"] })], "claude")).toBeUndefined();
+    expect(freePlanAccount([account({ status: "signed_out" })], "claude")).toBeUndefined();
+    expect(freePlanAccount([account({ mine: false })], "claude")).toBeUndefined();
+    expect(freePlanAccount([account()], "chatgpt")).toBeUndefined();
+    expect(freePlanAccount([account({ provider: "zai" })], "claude")).toBeUndefined();
+    expect(freePlanAccount(undefined, "claude")).toBeUndefined();
   });
 });
 

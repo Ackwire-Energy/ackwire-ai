@@ -1,6 +1,6 @@
-import { type ConnectIntent, keys, useAiStatus, useApi } from "@agenteschat/client";
+import { type ConnectIntent, keys, useAiAccounts, useAiStatus, useApi } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, choiceOfIntent, PLAN_CHOICES } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, choiceOfIntent, freePlanAccount, PLAN_CHOICES } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { keyLooksValid, type ProviderId, providerGuess, providerOf } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
@@ -104,6 +104,9 @@ export function ConnectAiSheet() {
   // No agent of theirs yet, and it isn't opened for someone else's: a plan signs in for the agents they create.
   const bare = !named && agents.length === 0;
   const [accountAdded, setAccountAdded] = useState(false);
+  // Or one of that plan they already have, which the plan's page says is connected.
+  const ai = useAiAccounts(orgId, bare);
+  const hasPlan = bare && view.page === "plan" && freePlanAccount(ai.data?.accounts, view.choice) !== undefined;
   // Someone else's agent: who connects a plan instead.
   const owner = one?.ownerUserId ? dir.memberById.get(one.ownerUserId)?.name : undefined;
   const locked =
@@ -154,7 +157,7 @@ export function ConnectAiSheet() {
           }}
         />
       )}
-      {keySaved || linked.length > 0 || accountAdded ? (
+      {keySaved || linked.length > 0 || accountAdded || hasPlan ? (
         <View style={styles.done}>
           <Button variant="primary" wide label={t("connectAi.done")} onPress={close} />
         </View>

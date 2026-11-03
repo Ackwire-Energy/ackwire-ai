@@ -33,6 +33,7 @@ import {
   type AiChoice,
   ALL_AGENTS,
   type ExistingSignIn,
+  freePlanAccount,
   gateDims,
   KEY_MARKS,
   kindOf,
@@ -496,11 +497,13 @@ export interface PlanPanelProps {
 /** `usePlanGates` for a person who owns no agent yet: each plan's gate on the computer it would sign in on. */
 export function useGatesWithoutAgent(orgId: string, on: boolean) {
   const ai = useAiAccounts(orgId, on);
+  const machines = useMachines(orgId, on);
   const setupQ = useComputerSetup(orgId);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
-  const at = (choice: PlanChoice) => planGateWithoutAgent({ choice, edition, setup, computers: ai.data?.computers });
-  return { at, edition };
+  const at = (choice: PlanChoice) =>
+    planGateWithoutAgent({ choice, edition, setup, computers: ai.data?.computers, machines: machines.data });
+  return { at, edition, accounts: ai.data?.accounts };
 }
 
 export type GatesWithoutAgent = ReturnType<typeof useGatesWithoutAgent>;
@@ -512,12 +515,15 @@ export type GatesWithoutAgent = ReturnType<typeof useGatesWithoutAgent>;
 export function PlanWithoutAgent({
   choice,
   gates,
+  mayAddKey,
   onKey,
   onComputer,
   onDone,
 }: {
   choice: PlanChoice;
   gates: GatesWithoutAgent;
+  /** Only an admin adds an API key: the way on from someone else's computer for them. */
+  mayAddKey: boolean;
   onKey: () => void;
   onComputer: () => void;
   onDone: (account: MachineAccount) => void;
@@ -528,10 +534,14 @@ export function PlanWithoutAgent({
   const [signingIn, setSigningIn] = useState(false);
   const [added, setAdded] = useState<MachineAccount | null>(null);
   const { gate, computer } = gates.at(choice);
+  // An account of this plan they already have (their agents deleted) thinks for the next one: no second sign-in.
+  const has = added ?? freePlanAccount(gates.accounts, choice);
   const title = planTitle(t, choice);
   const cloud = gates.edition === "cloud";
   const name = cloud ? computerName(t, org.name, managedOf(machines.data)) : (computer?.name ?? "");
   const steps = gate.state === "ready" || gate.state === "preparing" || (gate.state === "offline" && signingIn);
+  // Only whoever connected the computers there signs a plan in on them: a computer of their own is the way on.
+  const elsewhere = gate.state === "locked" && !cloud;
   return (
     <Card as="section" className="ai-panel ai-panel--plan" aria-label={title}>
       <PanelHead
@@ -539,9 +549,9 @@ export function PlanWithoutAgent({
         title={title}
         sub={t(`connectAi.plan.${choice}.tiers`)}
       />
-      {added ? (
+      {has ? (
         <SettingNote icon="check" live>
-          {t("connectAi.forNewAgents", { label: added.label })}
+          {t("connectAi.forNewAgents", { label: has.label })}
         </SettingNote>
       ) : (
         <>
@@ -557,6 +567,20 @@ export function PlanWithoutAgent({
             onKey={onKey}
             onComputer={onComputer}
           />
+          {elsewhere && (
+            <span>
+              <Button size="sm" variant="primary" onClick={onComputer}>
+                {t("aiAccounts.connect.addComputer")}
+              </Button>
+            </span>
+          )}
+          {elsewhere && mayAddKey && (
+            <span>
+              <Button size="sm" onClick={onKey}>
+                {t("connectAi.wait.useKey")}
+              </Button>
+            </span>
+          )}
           {steps && (
             <AddAccount
               machineId={computer?.machineId ?? ""}

@@ -20,6 +20,7 @@ import {
   defaultChoice,
   defaultTarget,
   type ExistingSignIn,
+  freePlanAccount,
   gateDims,
   type PlanChoice,
   type PlanGate,
@@ -78,6 +79,12 @@ export interface ConnectAiRequest {
   auto?: boolean;
   /** Opened because the workspace's computer just got ready (its email, its notification): a plan's panel says so. */
   ready?: boolean;
+  /**
+   * Opened from the create-agent step for an agent of the person's own still being made: a plan signs in for the
+   * agents they create (as with no agent yet), never for one they have, and a computer opens in a new tab (the draft
+   * stays).
+   */
+  forNewAgent?: boolean;
 }
 
 /** How "Responder agora" went for a message, in this tab. */
@@ -173,7 +180,7 @@ function ConnectAiDialog({
   const named = request.agentIds?.length ? request.agentIds : null;
   const only = named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
   const one = only ? dir.agentById.get(only) : undefined;
-  const pool = one ? [one.id] : named;
+  const pool = request.forNewAgent ? [] : one ? [one.id] : named;
   const agents = (pool ? mine.filter((a) => pool.includes(a.id)) : mine).map((a) => ({
     id: a.id,
     name: a.name,
@@ -232,7 +239,7 @@ function ConnectAiDialog({
     defaultChoice({
       intent: request.intent,
       // With no agent in the workspace, a plan helps as much as a key: Claude first, as everywhere.
-      ownsAgents: agents.length > 0 || dir.agents.length === 0,
+      ownsAgents: agents.length > 0 || dir.agents.length === 0 || request.forNewAgent === true,
       mayAddKey,
       claudeGate: gateOf("claude"),
       // Signing in on Claude's panel would move a Codex agent onto Claude Code: one agent opens on its own plan.
@@ -275,6 +282,10 @@ function ConnectAiDialog({
       ? t("noAi.lockedAdmins")
       : undefined;
   const toComputers = () => {
+    if (request.forNewAgent) {
+      window.open(`/org/${org.id}/settings/computers`, "_blank", "noopener");
+      return;
+    }
     onClose();
     void navigate({
       to: "/org/$orgId/settings/$section",
@@ -353,6 +364,7 @@ function ConnectAiDialog({
                   key={choice}
                   choice={choice}
                   gates={bareGates}
+                  mayAddKey={mayAddKey}
                   onKey={() => setPicked("key")}
                   onComputer={toComputers}
                   onDone={() => {
@@ -396,7 +408,7 @@ function ConnectAiDialog({
           />
         )}
       </DialogBody>
-      {connected && (
+      {(connected || (bare && choice !== "key" && freePlanAccount(bareGates.accounts, choice))) && (
         <DialogFooter>
           <Button variant="primary" onClick={onClose}>
             {t("connectAi.done")}

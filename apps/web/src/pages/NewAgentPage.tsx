@@ -36,6 +36,7 @@ import {
   brainPickOptions,
   brainPickValue,
   needsOwnSignIn,
+  planAccountOption,
 } from "@agenteschat/client/lib/brain-picker";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { errorText as failureText } from "@agenteschat/client/lib/errors";
@@ -414,18 +415,20 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText || null;
   // With nothing to think with yet, the agent is created all the same (ADR 0061 §6), and Connect opens for it after.
   const connectAfter = plan === null && connectPlan === null && usable.size === 0;
-  // A plan connected in place from the model step, with nothing else to think with: the agent thinks with it.
-  const connectedPlan = connectAfter
-    ? brainOptions.find((o) => !o.disabled && "accountId" in o.pick && o.pick.accountId && o.pick.model === AUTO)
-    : undefined;
+  // A plan account of mine that can think for it (one connected in place from the model step, or before I had any
+  // agent), with nothing else to think with or no last setup to start from: the agent thinks with it. A default, not
+  // a pick: another owner drops it.
+  const ownPlan =
+    connectAfter || (!aiPicked && plan === null && connectPlan === null && startOf(me.user.id) === null)
+      ? planAccountOption(brainOptions)
+      : undefined;
   // biome-ignore lint/correctness/useExhaustiveDependencies: once an account shows up, after what it starts with
   useEffect(() => {
-    const p = connectedPlan?.pick;
+    const p = ownPlan?.pick;
     if (!startsReady || !started.current || !p || !("accountId" in p) || !p.accountId) return;
-    setAiPicked(true);
     setModel(AUTO);
     setPlan({ kind: p.kind, machineId: p.machineId, accountId: p.accountId, label: p.account, model: AUTO });
-  }, [connectedPlan?.value, startsReady]);
+  }, [ownPlan?.value, startsReady]);
   const check: DraftCheck = {
     role,
     name,
@@ -1364,9 +1367,14 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
           {connectAfter && (
             <>
               <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>
-              {connect && (
+              {connect && (ownerId === me.user.id || can(org, "manage_credentials")) && (
                 <span>
-                  <Button size="sm" variant="primary" onClick={() => connect.open({})}>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    // A plan thinks only for its owner's agents: for someone else's, the workspace's key.
+                    onClick={() => connect.open(ownerId === me.user.id ? { forNewAgent: true } : { intent: "api_key" })}
+                  >
                     {t("connectAi.title.any")}
                   </Button>
                 </span>

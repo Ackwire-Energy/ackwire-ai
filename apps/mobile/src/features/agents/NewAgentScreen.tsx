@@ -21,7 +21,7 @@ import {
 import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, draftMailLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
-import { type BrainPickOption, brainPickOptions } from "@agenteschat/client/lib/brain-picker";
+import { type BrainPickOption, brainPickOptions, planAccountOption } from "@agenteschat/client/lib/brain-picker";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { defaultPolicy, toMailLevel } from "@agenteschat/client/lib/mail";
@@ -192,8 +192,10 @@ function NewAgentForm({
   });
   const [picked, setPicked] = useState<BrainPickOption | null>(null);
   const [picking, setPicking] = useState(false);
-  const thinks = picked
-    ? pickedAi(picked.pick, aiAccounts.data?.computers)
+  // No last setup to start from: a plan account of mine that can think for it (one connected before I had an agent).
+  const chosen = picked ?? (proposed || start ? null : (planAccountOption(brainOptions) ?? null));
+  const thinks = chosen
+    ? pickedAi(chosen.pick, aiAccounts.data?.computers)
     : newAgentAi(start && useLast ? start : null);
   const startText = start
     ? newAgentStartText(t, i18n.language, start, {
@@ -635,8 +637,8 @@ function NewAgentForm({
             <Row
               title={t("brain.title")}
               subtitle={
-                picked
-                  ? picked.title
+                chosen
+                  ? chosen.title
                   : start && useLast
                     ? t("newAgent.lastSetup", { setup: startText })
                     : t("brain.auto.label")
@@ -673,7 +675,7 @@ function NewAgentForm({
           open={picking}
           onClose={() => setPicking(false)}
           options={brainOptions}
-          value={picked?.value ?? (start && useLast ? undefined : AUTO)}
+          value={chosen?.value ?? (start && useLast ? undefined : AUTO)}
           onPick={(o) => {
             setPicked(o);
             setUseLast(false);

@@ -104,6 +104,10 @@ export function apiPickOptions(t: TFunction, locale: string, choices: [string, M
   );
 }
 
+/** The first of the person's plan accounts "Quem pensa" offers, on Automático: what a new agent of theirs defaults to. */
+export const planAccountOption = (options: readonly BrainPickOption[]) =>
+  options.find((o) => !o.disabled && "accountId" in o.pick && Boolean(o.pick.accountId) && o.pick.model === AUTO);
+
 export function brainPickOptions(
   t: TFunction,
   locale: string,

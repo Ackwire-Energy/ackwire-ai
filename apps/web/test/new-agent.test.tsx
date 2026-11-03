@@ -597,6 +597,25 @@ describe("Criar agente: what gets created", () => {
     await click(screen().getByRole("button", { name: "Conectar uma IA" }));
     await settle(6);
     const box = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    // A plan for the agent being made (never one of theirs): a computer to connect opens beside the draft.
+    await click(
+      within(within(box).getByRole("group", { name: "Qual IA eles vão usar?" })).getByRole("button", {
+        name: "Claude",
+      }),
+    );
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    const opened: unknown[][] = [];
+    const realOpen = window.open;
+    window.open = ((...args: unknown[]) => {
+      opened.push(args);
+      return null;
+    }) as typeof window.open;
+    try {
+      await click(within(panel).getByRole("button", { name: "Conectar um computador" }));
+    } finally {
+      window.open = realOpen;
+    }
+    expect(opened).toEqual([[`/org/${ORG_ID}/settings/computers`, "_blank", "noopener"]]);
     await click(within(box).getByRole("button", { name: /^Chave de API/ }));
     await act(async () =>
       fireEvent.change(within(box).getByLabelText("Cole aqui"), {
@@ -617,6 +636,34 @@ describe("Criar agente: what gets created", () => {
     await settle(8);
     expect(createdWith(state)).toMatchObject({ name: "Lia", model: "auto", monthlyBudgetUsd: 12 });
     expect(screen().queryByRole("dialog", { name: /^Conectar uma IA/ })).toBeNull();
+  });
+
+  test("no AI yet: the plan connected in place is for the agent being made, never one they already have", async () => {
+    const state = noAi();
+    for (const a of state.agents) a.ownerUserId = "u-walter";
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [],
+      computers: [
+        {
+          machineId: "machine_mini",
+          name: "Mac mini",
+          online: true,
+          mine: true,
+          canAdd: true,
+          keys: true,
+          brains: { claude_code: true, codex: false },
+        },
+      ],
+    });
+    await open(state, api);
+    await startAs("Assistente");
+    await proceed(4);
+    await click(screen().getByRole("button", { name: "Conectar uma IA" }));
+    await settle(6);
+    const box = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("Os agentes que você criar pensam com ele.");
   });
 
   test("no AI yet: the agent is created all the same, and Connect opens for it", async () => {
@@ -674,6 +721,49 @@ describe("Criar agente: what gets created", () => {
     await proceed(4);
     expect(brainBox().textContent).toStartWith("Plano do Claude");
     expect(screen().queryByText(NO_AI)).toBeNull();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code", account: "acct_1" },
+    ]);
+  });
+
+  test("a plan account of theirs and no last setup: it thinks with their plan, over the workspace's key", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      { machineId: "machine_mini", name: "Mac mini", online: true, options: [plan("claude_code", true)] },
+    ];
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [
+        {
+          id: "acct_1",
+          kind: "claude_code",
+          label: "Claude",
+          email: "walter@acme.com.br",
+          plan: "max",
+          status: "active",
+          ownerId: "u-walter",
+          ownerName: "Walter",
+          mine: true,
+          usedBy: [],
+          usage: null,
+          provider: null,
+          keyHint: null,
+          machineId: "machine_mini",
+          computer: "Mac mini",
+        },
+      ],
+      computers: [],
+    });
+    await open(state, api);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(brainBox().textContent).toStartWith("Plano do Claude");
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);
