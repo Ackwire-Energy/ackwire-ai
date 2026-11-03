@@ -1955,6 +1955,12 @@
       "other": "A computer's disk is almost full"
     }
   },
+  "activity.kind.computer_no_chrome": {
+    "value": {
+      "one": "A computer needs Google Chrome. Get it at google.com/chrome",
+      "other": "Computers need Google Chrome. Get it at google.com/chrome"
+    }
+  },
   "activity.kind.app_created": {
     "value": {
       "one": "An AI app created things for you",

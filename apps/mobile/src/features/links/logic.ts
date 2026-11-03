@@ -181,7 +181,8 @@ export function notificationHref(
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";
   // A computer's disk is almost full (ADR 0115): that computer, where its shared folder's size shows.
-  if (n.kind === "computer_disk_full") return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : null;
+  if (n.kind === "computer_disk_full" || n.kind === "computer_no_chrome")
+    return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : null;
   // An agent's browser handoff (ADR 0040): its conversation, with the request's card in control.
   if (n.kind === "browser_handoff" && isSafeId(s.handoffId)) {
     // Sent to someone who can't open its conversation (it names none): the agent's computer, the request there.

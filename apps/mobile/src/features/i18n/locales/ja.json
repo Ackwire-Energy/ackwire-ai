@@ -749,6 +749,7 @@
       "browser_profile_request_other": "{{names}}がブラウザプロフィールの追加を求めています",
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
+      "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
       "app_created_other": "AIアプリがあなたのために作成しました"
     },
     "markRead": "既読にする",

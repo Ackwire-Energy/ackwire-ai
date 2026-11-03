@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame, sealSecret, secretAad } from "@agenteschat/adapters";
+import {
+  createFakeErrorReporter,
+  MACHINE_PROTOCOL_VERSION,
+  orgTopic,
+  type ServerFrame,
+  sealSecret,
+  secretAad,
+} from "@agenteschat/adapters";
 import { and, eq, isNull, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
@@ -452,6 +459,61 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     await runner.frame({ type: "pong", at: 8, load: { ...base, diskFreeGb: 30, diskUse: 0.7 } });
     await runner.frame({ type: "pong", at: 9, load: { ...base, diskFreeGb: 5, diskUse: 0.95 } });
     expect(await warnings()).toHaveLength(2);
+  });
+
+  test("a computer without Google Chrome tells who connected it once each time it goes missing; the Cloud's is reported", async () => {
+    f = await setup();
+    const errors = createFakeErrorReporter();
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, errors });
+    hubs.push(hub);
+    const paired = await pair();
+    const notices = async () =>
+      (await listNotifications({ db: f.db }, f.owner.id, f.org.id, { limit: 50 })).items.filter(
+        (n) => n.kind === "computer_no_chrome",
+      );
+    const browserOn = { folders: [], tools: { claude: true, codex: false, commands: true, browser: true } };
+    const missing = { available: true, version: "0.39.1", chromeMissing: true };
+    const hello = async (extra: Record<string, unknown>) => {
+      const runner = fakeRunner(hub);
+      await runner.hello(paired.token, extra);
+      runner.disconnect();
+    };
+
+    // The browser switched off here: nobody needs Chrome yet.
+    await hello({ browser: missing, access: { ...browserOn, tools: { ...browserOn.tools, browser: false } } });
+    expect(await notices()).toEqual([]);
+    await hello({ browser: { available: true, chrome: "Google Chrome 156.0.8078.79" }, access: browserOn });
+    expect(await notices()).toEqual([]);
+
+    // A runner that updated itself and found no Chrome: once, however often it connects again.
+    await hello({ browser: missing, access: browserOn });
+    await hello({ browser: missing, access: browserOn });
+    const [notice] = await notices();
+    expect(await notices()).toHaveLength(1);
+    expect(notice?.source).toMatchObject({ machineId: paired.machineId, label: "Build box" });
+    expect((await listMachines(f.db, f.owner.id, f.org.id))[0]?.browser).toMatchObject({
+      available: true,
+      chrome: null,
+    });
+    // Installed, then gone again: a new notice.
+    await hello({ browser: { available: true, chrome: "Google Chrome 156.0.8078.79" }, access: browserOn });
+    await hello({ browser: missing, access: browserOn });
+    expect(await notices()).toHaveLength(2);
+    expect(errors.reports).toEqual([]);
+
+    // The Cloud's computers are the operators' to fix: an error report, nobody in the workspace told.
+    await f.db.update(schema.machines).set({ kind: "managed" }).where(eq(schema.machines.id, paired.machineId));
+    await hello({ browser: { available: true, chrome: "Google Chrome 156.0.8078.79" }, access: browserOn });
+    await hello({ browser: missing, access: browserOn });
+    expect(await notices()).toHaveLength(2);
+    expect(errors.reports).toHaveLength(1);
+    expect(String(errors.reports[0]?.error)).toContain("Google Chrome failed an agent's browser (missing)");
+    expect(errors.reports[0]?.tags).toMatchObject({
+      org_id: f.org.id,
+      machine_id: paired.machineId,
+      os: "linux",
+      browser_failure: "missing",
+    });
   });
 
   test("a tool switched on the machine holds now (exec on the row) and wakes what waited for it", async () => {

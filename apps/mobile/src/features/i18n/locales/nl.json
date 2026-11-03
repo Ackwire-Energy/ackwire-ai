@@ -805,6 +805,8 @@
       "connector_tool_changed_other": "Gekoppelde servers hebben tools gewijzigd die je hebt goedgekeurd",
       "computer_disk_full_one": "De schijf van een computer is bijna vol",
       "computer_disk_full_other": "Schijven van computers zijn bijna vol",
+      "computer_no_chrome_one": "Een computer heeft Google Chrome nodig. Download het op google.com/chrome",
+      "computer_no_chrome_other": "Computers hebben Google Chrome nodig. Download het op google.com/chrome",
       "app_created_one": "Een AI-app heeft dingen voor je aangemaakt",
       "app_created_other": "AI-apps hebben dingen voor je aangemaakt"
     },

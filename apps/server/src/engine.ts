@@ -273,6 +273,7 @@ export function buildEngine(o: EngineOptions) {
     pubsub: adapters.pubsub,
     replicaId: o.replicaId,
     readyEmail: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, gateway } : null,
+    errors: o.errors,
   });
   const sandbox: SandboxDeps = {
     db,

@@ -9634,6 +9634,7 @@ export const ptBR = {
       measuring: "Tamanho ainda não medido",
       diskFullNotice: "O disco de {{name}} está quase cheio",
     },
+    chromeMissingNotice: "{{name}} precisa do Google Chrome para o navegador dos agentes. Baixe em google.com/chrome",
     access: {
       folders: "Pastas liberadas",
       ownFolder: "Pasta de cada agente",

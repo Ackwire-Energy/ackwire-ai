@@ -43,7 +43,7 @@ export interface MachineExecutors {
   /** Cursor's CLI (protocol 36, ADR 0114) and the models its sign-in lists; `inPlan`: the CLI said the plan includes it. */
   cursor?: { version: string; models?: { id: string; label?: string; inPlan?: boolean }[] };
   /** `hello.browser` (ADR 0040): whether the agent browser can run there; absent = not reported. */
-  browser?: { available: boolean; version?: string; chrome?: string; reason?: string };
+  browser?: { available: boolean; version?: string; chrome?: string; reason?: string; chromeMissing?: true };
   /** `hello.desktop` (ADR 0058): whether the agents' desktops can run there; absent = not reported. */
   desktop?: { available: boolean; reason?: string; width?: number; height?: number };
   /** `hello.terminal` (ADR 0058): whether people can open a terminal there; absent = not reported. */

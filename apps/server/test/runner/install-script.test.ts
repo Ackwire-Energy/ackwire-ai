@@ -14,11 +14,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION } from "@agenteschat/adapters/machine-protocol";
+import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, CHROME_NEEDED } from "@agenteschat/adapters/machine-protocol";
 import { lastLine } from "@agenteschat/setup/src/lib";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import {
   GOOGLE_APT,
+  GOOGLE_CHROME_LINUX,
   installScript,
   RUNNER_BUN_SHA256,
   RUNNER_BUN_VERSION,
@@ -182,6 +183,29 @@ test.skipIf(process.platform === "win32")(
     expect(r.runtime).toBeUndefined();
   },
   // Six whole installs, each a shell running real tools: seconds on a busy computer.
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "as a person (no root to install it): a computer without Google Chrome is told where to get it, one with it isn't",
+  () => {
+    const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) }, "Darwin");
+    // The computer's own standard paths stay out of it: only the fake home's ~/Applications can have a Chrome.
+    const script = installScript("https://x.test")
+      .replace(`CHROME_EXE='${GOOGLE_CHROME_LINUX}'`, `CHROME_EXE='${pc.home}/none/chrome'`)
+      .replace('"/Applications/Google Chrome.app', `"${pc.home}/none/Google Chrome.app`);
+    const r = pc.install(script);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain(CHROME_NEEDED);
+    expect(r.out).toContain("https://www.google.com/chrome/");
+    expect(r.log).not.toContain("apt-get");
+    const app = path.join(pc.home, "Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
+    mkdirSync(path.dirname(app), { recursive: true });
+    writeFileSync(app, "#!/bin/sh\n", { mode: 0o755 });
+    const again = pc.install(script);
+    expect(again.status).toBe(0);
+    expect(again.out).not.toContain(CHROME_NEEDED);
+  },
   30_000,
 );
 

@@ -1354,12 +1354,11 @@ export class BrowserManager {
         reason: `The agent browser doesn't run on this system (${process.platform} ${process.arch})`,
       };
     }
-    if (recent) return { available: false, version: AGENT_BROWSER_VERSION, reason: recent.reason };
-    return {
-      available: true,
-      version: AGENT_BROWSER_VERSION,
-      ...(this.chrome() ? { chrome: version ? `Google Chrome ${version}` : "Google Chrome" } : {}),
-    };
+    const chrome = this.chrome()
+      ? { chrome: version ? `Google Chrome ${version}` : "Google Chrome" }
+      : { chromeMissing: true as const };
+    if (recent) return { available: false, version: AGENT_BROWSER_VERSION, reason: recent.reason, ...chrome };
+    return { available: true, version: AGENT_BROWSER_VERSION, ...chrome };
   }
 
   /** The desktop app's sidecar next to the runner, if there is one. */

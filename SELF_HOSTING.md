@@ -998,6 +998,9 @@ systemd timer (`agentes-chrome-update.timer`) that upgrades it, and nothing else
 above, install Google Chrome yourself (on Debian and Ubuntu, the `.deb` from google.com/chrome adds
 Google's repository). Computers that ran Chrome for Testing for their agents move to Google Chrome when
 the installer runs again (or the runner updates, outside `--system`), and the agents stay signed in.
+Without root nothing installs Chrome for you: `agentes-runner update` and the installer say so, with
+where to get it, and when a computer's runner connects without a Chrome, whoever connected it gets a
+notification once (with the browser switched on there).
 
 **Desktops and terminal (Linux).** On a Linux computer each agent can have a desktop of its own, with
 its browser on it, that people watch live from the agent's page and take control of when it needs a

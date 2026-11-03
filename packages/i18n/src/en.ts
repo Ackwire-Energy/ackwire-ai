@@ -9435,6 +9435,8 @@ export const en = {
       measuring: "Size not measured yet",
       diskFullNotice: "The disk of {{name}} is almost full",
     },
+    /** A notice row's headline: the computer's runner found no Google Chrome, which agents' browsers now run on. */
+    chromeMissingNotice: "{{name}} needs Google Chrome for the agents' browser. Get it at google.com/chrome",
     access: {
       folders: "Allowed folders",
       ownFolder: "Each agent's folder",

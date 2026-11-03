@@ -614,6 +614,12 @@ export const BROWSER_LIMITS = {
   message: 500,
 } as const;
 
+/** Where people get Google Chrome, which agents' browsers run on (ADR 0133). */
+export const CHROME_DOWNLOAD_URL = "https://www.google.com/chrome/";
+
+/** What a runner's update or install says on a computer without Google Chrome (no root to install it). */
+export const CHROME_NEEDED = `The agents' browser needs Google Chrome, which this computer doesn't have: install it from ${CHROME_DOWNLOAD_URL}`;
+
 /**
  * What the agent is told, in plain words, when the computer's Google Chrome fails it (a `browser_unavailable` error,
  * whose message starts with one of these): missing (`missingServer` where root installs it), not starting (more may
@@ -652,6 +658,11 @@ export interface RunnerBrowserInfo {
   chrome?: string;
   /** Why it isn't available, for people ("Chrome's libraries are missing: run …"). */
   reason?: string;
+  /**
+   * The computer has no Google Chrome at its standard path: the server tells the person once (or reports it, on a
+   * computer of the Cloud's). Absent from runners before ADR 0133, which fetched Chrome for Testing themselves.
+   */
+  chromeMissing?: true;
 }
 
 /** `hello.desktop` (protocol 18): whether this machine can run the agents' desktops. */
@@ -2903,6 +2914,7 @@ export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo 
     ...(version !== undefined ? { version } : {}),
     ...(chrome !== undefined ? { chrome } : {}),
     ...(reason !== undefined ? { reason } : {}),
+    ...(v.chromeMissing === true ? { chromeMissing: true as const } : {}),
   };
 }
 

@@ -9759,6 +9759,7 @@
       "measuring": "尚未计算大小",
       "diskFullNotice": "{{name}} 的磁盘快满了"
     },
+    "chromeMissingNotice": "{{name}} 需要 Google Chrome 才能运行代理的浏览器。请在 google.com/chrome 下载",
     "access": {
       "folders": "允许的文件夹",
       "ownFolder": "每个智能体的文件夹",

@@ -1076,6 +1076,26 @@ export async function notifyComputerDiskFull(
 }
 
 /**
+ * A computer said it has no Google Chrome for its agents' browsers (ADR 0133: a runner that updated itself drives the
+ * computer's own Chrome): who connected it hears it, since it is theirs to install, else who configures the workspace.
+ * Once each time it goes missing (the caller compares with the last `hello`).
+ */
+export async function notifyComputerNoChrome(
+  deps: NotificationDeps,
+  machine: { id: string; orgId: string; name: string; pairedByUserId: string | null },
+  at: Date,
+) {
+  await notify(deps, {
+    orgId: machine.orgId,
+    userIds: machine.pairedByUserId ? [machine.pairedByUserId] : await adminsOf(deps, machine.orgId, "configure"),
+    kind: "computer_no_chrome",
+    groupKey: `computer_no_chrome:${machine.id}:${at.getTime()}`,
+    source: { machineId: machine.id, label: machine.name },
+    latest: { title: machine.name },
+  });
+}
+
+/**
  * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
  * from seconds to an approval hours later. One row each time it gets ready.
  */

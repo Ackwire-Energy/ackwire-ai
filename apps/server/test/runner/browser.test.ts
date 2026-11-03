@@ -1677,11 +1677,13 @@ test.if(posix)(
     // No Chrome for Testing fallback: agent-browser is never asked to install one, and no Chrome started.
     expect(t.logged().some((l) => l.args.includes("install"))).toBe(false);
     expect(t.chromes).toHaveLength(0);
-    // The computer says it can browse (so the agent tries, and tells), without a Chrome to name.
-    expect(t.manager.info()).toEqual({ available: true, version: AGENT_BROWSER_VERSION });
+    // The computer says it can browse (so the agent tries, and tells), and that Chrome is missing (the server tells
+    // the person once).
+    expect(t.manager.info()).toEqual({ available: true, version: AGENT_BROWSER_VERSION, chromeMissing: true });
     installed = true;
     expect(await open()).toMatchObject({ success: true });
     expect(t.manager.info()).toMatchObject({ available: true, chrome: `Google Chrome ${CHROME_VERSION}` });
+    expect(t.manager.info().chromeMissing).toBeUndefined();
     // In system mode root installs Chrome: the installer is what to run again.
     const root = setup({ chrome: () => null, installedByRoot: true });
     expect(await errorCode(() => root.act("open", ["https://a/"]))).toBe("browser_unavailable");

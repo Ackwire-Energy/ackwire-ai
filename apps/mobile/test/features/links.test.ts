@@ -141,6 +141,8 @@ describe("inbox items", () => {
     });
     expect(notificationHref(n)).toBe("/settings/computers/m1");
     expect(notificationHref({ ...n, source: { label: "Build box" } })).toBeNull();
+    // A computer without Google Chrome (ADR 0133) opens it too.
+    expect(notificationHref({ ...n, kind: "computer_no_chrome" })).toBe("/settings/computers/m1");
   });
 });
 

@@ -817,6 +817,8 @@ export const featureKeysEn = {
       connector_tool_changed_other: "A connected server changed tools you approved",
       computer_disk_full_one: "A computer's disk is almost full",
       computer_disk_full_other: "A computer's disk is almost full",
+      computer_no_chrome_one: "A computer needs Google Chrome. Get it at google.com/chrome",
+      computer_no_chrome_other: "Computers need Google Chrome. Get it at google.com/chrome",
       app_created_one: "An AI app created things for you",
       app_created_other: "An AI app created things for you",
     },

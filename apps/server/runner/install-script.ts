@@ -1,4 +1,9 @@
-import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, agentBrowserUrl } from "@agenteschat/adapters/machine-protocol";
+import {
+  AGENT_BROWSER_SHA256,
+  AGENT_BROWSER_VERSION,
+  agentBrowserUrl,
+  CHROME_NEEDED,
+} from "@agenteschat/adapters/machine-protocol";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import { DEFAULT_AGENT_UID_RANGE, SYSTEM_RUNNER_HOME } from "./config";
 
@@ -188,6 +193,7 @@ CHROME_SOURCES=${shQuote(GOOGLE_APT.sources)}
 CHROME_URI=${shQuote(GOOGLE_APT.uri)}
 CHROME_UPDATES=${shQuote(GOOGLE_APT.updates)}
 CHROME_DESKTOP=${shQuote(GOOGLE_APT.desktopEntry)}
+CHROME_NEEDED=${shQuote(CHROME_NEEDED)}
 
 DIR=""
 NAME=""
@@ -527,6 +533,16 @@ get_chrome() {
   fi
 }
 
+# Without root nothing installs Chrome: a runner that updates here says what the agents' browser needs (the paths
+# findChrome looks at, but Windows, which has no sh installer).
+chrome_or_warn() {
+  for EXE in "$CHROME_EXE" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; do
+    if [ -x "$EXE" ]; then return 0; fi
+  done
+  t_warn "$CHROME_NEEDED"
+}
+
 # Chrome for Testing, which runners before Google Chrome used: removed once the runner restarted without it.
 forget_testing_chrome() { rm -rf "$BROWSER_DIR"/chrome-* "$BROWSER_DIR"/.chrome-*; }
 
@@ -643,6 +659,7 @@ install_user() {
   fi
 
   get_runner
+  chrome_or_warn
   if [ -n "$HOST_TOKEN_FILE" ]; then
     chmod 600 "$HOST_TOKEN_FILE"
     set -- service install --host --server "$SERVER" --token-file "$HOST_TOKEN_FILE"

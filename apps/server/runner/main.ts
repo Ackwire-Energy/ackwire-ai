@@ -10,7 +10,12 @@ import { mkdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { type AgentScope, MACHINE_PROTOCOL_VERSION, type RunnerTools } from "@agenteschat/adapters/machine-protocol";
+import {
+  type AgentScope,
+  CHROME_NEEDED,
+  MACHINE_PROTOCOL_VERSION,
+  type RunnerTools,
+} from "@agenteschat/adapters/machine-protocol";
 import { createTerm, type Spinner, type Term } from "@agenteschat/setup/src/term";
 import {
   addFolder,
@@ -23,6 +28,7 @@ import {
   TOOL_NAMES,
 } from "./access";
 import { type AgentUser, AgentUsers, agentGid, denySchedulers, systemLauncher } from "./agent-users";
+import { findChrome } from "./browser";
 import {
   POLICY_NOT_IN_FORCE_EXIT,
   PolicyNotInForce,
@@ -641,9 +647,15 @@ function installHost(p: Parsed, print: (line: string) => void): number {
 /**
  * What the service functions print, drawn: the first line ◇ (■ when it failed), the rest quiet, and the lines
  * they indent as commands. Inside the installer's frame it draws on its line; by hand, in a frame of its own.
- * `done` is a step that went well before `run`.
+ * `done` is a step that went well before `run`, `warning` what went less well after it.
  */
-function printed(term: Term, title: string, run: (print: (line: string) => void) => number, done?: string): number {
+function printed(
+  term: Term,
+  title: string,
+  run: (print: (line: string) => void) => number,
+  done?: string,
+  warning?: string,
+): number {
   term.intro(title, false);
   if (done) term.step(done);
   const lines: string[] = [];
@@ -657,6 +669,7 @@ function printed(term: Term, title: string, run: (print: (line: string) => void)
     if (line.startsWith("  ")) term.command(line.trim());
     else term.text(line, true);
   }
+  if (warning) term.warn(warning);
   if (!term.inherited) {
     if (code !== 0) term.stop();
     else {
@@ -703,14 +716,22 @@ async function update(): Promise<number> {
   }
   writeFileSync(`${script}.new`, text, { mode: 0o755 });
   renameSync(`${script}.new`, script);
+  // Runners from ADR 0133 on drive the computer's own Google Chrome, which this user can't install.
+  const chrome = findChrome() ? undefined : CHROME_NEEDED;
   if (!serviceStatus()) {
-    return printed(term, "update", (print) => {
-      print(`Updated ${script}.`);
-      print("Restart the runner (agentes-runner start) to use it.");
-      return 0;
-    });
+    return printed(
+      term,
+      "update",
+      (print) => {
+        print(`Updated ${script}.`);
+        print("Restart the runner (agentes-runner start) to use it.");
+        return 0;
+      },
+      undefined,
+      chrome,
+    );
   }
-  return printed(term, "update", (print) => installService({ print }), `Updated ${script}.`);
+  return printed(term, "update", (print) => installService({ print }), `Updated ${script}.`, chrome);
 }
 
 function status(): number {
