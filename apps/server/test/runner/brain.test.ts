@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
@@ -28,6 +28,7 @@ import {
   claudeBrainArgs,
   claudeCapabilities,
   fallbackModelFor,
+  SESSION_SYSTEM_KEEP_MS,
   STEER_CAPABILITY,
   STEER_NOW_CAPABILITY,
   steerSupport,
@@ -624,6 +625,33 @@ test.if(posix)(
     expect(all.map((x) => x.args.at(-2))).toEqual(["--session-id", "--session-id", "--resume", "--resume"]);
     expect(resumedArgs(home, all[2]?.args ?? [])).toEqual(resumedArgs(home, all[0]?.args ?? []));
     expect(resumedArgs(home, all[3]?.args ?? [])).toEqual(resumedArgs(home, all[1]?.args ?? []));
+  },
+);
+
+test.if(posix)(
+  "a resume in another folder, or after the kept text expired, starts with the turn's own system text",
+  async () => {
+    const { m, home, ws, spawns, turn } = setup({ idleMs: 50 });
+    const closed = async () => {
+      const proc = m.process(AGENT.id, SESSION(1));
+      await waitFor(() => m.size === 0 && proc?.exited === true, 4000);
+    };
+    const app = path.join(await agentWorkspace(ws, AGENT), "repos", "acme", "app");
+    mkdirSync(app, { recursive: true });
+    writeFileSync(path.join(app, "CLAUDE.md"), "app rules");
+    await turn(1, "hi", { system: "S1" });
+    await closed();
+    // Cloned meanwhile: the checkout's own instructions, not the first folder's text.
+    await turn(2, "there", { system: "S2", cwd: "repos/acme/app" });
+    await closed();
+    const kept = path.join(home, "brains", "sessions");
+    const old = new Date(Date.now() - SESSION_SYSTEM_KEEP_MS - 60_000);
+    for (const f of readdirSync(kept)) utimesSync(path.join(kept, f), old, old);
+    await turn(3, "later", { system: "S3", cwd: "repos/acme/app" });
+    const all = spawns();
+    expect(all.map((x) => x.args.at(-2))).toEqual(["--session-id", "--resume", "--resume"]);
+    expect(all.map((x) => x.system?.split("\n")[0])).toEqual(["S1", "S2", "S3"]);
+    expect(all[2]?.system).toContain("app rules");
   },
 );
 

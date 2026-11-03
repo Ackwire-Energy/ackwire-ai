@@ -1162,6 +1162,8 @@ interface Live {
   sig: string;
   /** What `ran` remembers for it: the session, in its account. */
   ranKey: string;
+  /** Where its session's first system text is kept (`sessionSystem`). */
+  keptSystem: string;
   busy: boolean;
   lastUsed: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
@@ -1609,11 +1611,11 @@ export class BrainManager {
     const launch = brainProfileLaunch(mode, req.personalMcp === true);
     const system = typeof req.system === "string" ? req.system : "";
     const ranKey = ranKeyOf(req, session);
+    const withRepo = launch.settingSources === "";
+    const keptSystem = this.keptSystemFile(ctx.agent.id, ranKey, cwd, withRepo);
     writeFileSync(
       systemFile,
-      this.sessionSystem(ctx.agent.id, ranKey, resume, () =>
-        launch.settingSources === "" ? system + repoInstructions(cwd) : system,
-      ),
+      this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system)),
       { mode: 0o600 },
     );
     let mcpConfigFile: string | undefined;
@@ -1716,6 +1718,7 @@ export class BrainManager {
       account: ctx.accountHome && typeof req.account === "string" ? req.account : null,
       sig,
       ranKey,
+      keptSystem,
       busy: false,
       lastUsed: Date.now(),
       idleTimer: null,
@@ -1732,24 +1735,33 @@ export class BrainManager {
     return live;
   }
 
-  /** Where a session's first system text is kept (out of the per-process folders `drop` removes). */
-  private keptSystemFile(agentId: string, ranKey: string) {
-    const name = createHash("sha256").update(brainKey(agentId, ranKey)).digest("hex").slice(0, 32);
+  /**
+   * Where a session's first system text is kept (out of the per-process folders `drop` removes). Per folder and
+   * launch shape too: another `cwd` (a checkout cloned meanwhile) or one where Claude Code reads `CLAUDE.md` itself
+   * breaks the cached prefix anyway, and needs that folder's instructions in, or out of, the text.
+   */
+  private keptSystemFile(agentId: string, ranKey: string, cwd: string, withRepo: boolean) {
+    const name = createHash("sha256")
+      .update(JSON.stringify([agentId, ranKey, cwd, withRepo]))
+      .digest("hex")
+      .slice(0, 32);
     return path.join(this.opts.root, "sessions", `${name}.txt`);
   }
 
   /**
    * A session's appended system text stays the one it began with, as on a warm process: Claude Code builds its
    * prompt from it, so a resume with other bytes would write the whole cached prefix again instead of reading it.
-   * Kept per agent, account and session; dropped `SESSION_SYSTEM_KEEP_MS` after its last use (the cache is gone).
+   * Kept per agent, account, session and folder; dropped `SESSION_SYSTEM_KEEP_MS` after its last use (the cache is gone).
    */
-  private sessionSystem(agentId: string, ranKey: string, resume: boolean, fresh: () => string): string {
-    const file = this.keptSystemFile(agentId, ranKey);
+  private sessionSystem(file: string, resume: boolean, fresh: () => string): string {
     const dir = path.dirname(file);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const now = Date.now();
+    // A process warm for longer than that still uses its text: `drop` dates it from its close.
+    const live = new Set([...this.live.values()].map((l) => l.keptSystem));
     for (const name of readdirSync(dir)) {
       const f = path.join(dir, name);
+      if (live.has(f)) continue;
       try {
         if (now - statSync(f).mtimeMs > SESSION_SYSTEM_KEEP_MS) rmSync(f, { force: true });
       } catch {
@@ -1850,7 +1862,7 @@ export class BrainManager {
     // Its last turn just used the cache: kept for an hour from now.
     try {
       const now = Date.now() / 1000;
-      utimesSync(this.keptSystemFile(live.agentId, live.ranKey), now, now);
+      utimesSync(live.keptSystem, now, now);
     } catch {
       // nothing kept
     }
