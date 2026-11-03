@@ -296,6 +296,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
                       variant="ghost"
                       iconOnly
                       icon="more"
+                      className="members-person__more"
                       aria-label={t("members.more", { name: m.name })}
                     />
                   }
