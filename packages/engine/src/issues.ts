@@ -147,6 +147,11 @@ export type IssuePatch = Partial<{
   assignee: WorkActor | null;
   dueDate: string | null;
   labels: string[];
+  /**
+   * The whole list of acceptance criteria, in order: an `id` keeps that criterion (and whether it is checked), one
+   * without is new, and a criterion left out is removed.
+   */
+  criteria: { id?: string; text: string }[];
 }>;
 
 /** Who acts: a person, or an agent during a run (it sees what its channel lets it see). */
@@ -474,6 +479,7 @@ function eventDetail(event: string | null, data: Record<string, unknown>) {
     case "created":
     case "renamed":
     case "description_changed":
+    case "criteria_changed":
     case "artifact_linked":
       return out(event);
     case "status_changed":
@@ -849,6 +855,16 @@ export async function updateIssue(
     });
   }
   if (patch.labels !== undefined) set.labels = cleanLabels(patch.labels) ?? [];
+  if (patch.criteria !== undefined) {
+    const criteria = editedCriteria(current.criteria, patch.criteria);
+    const same =
+      criteria.length === current.criteria.length &&
+      criteria.every((c, k) => c.id === current.criteria[k]?.id && c.text === current.criteria[k]?.text);
+    if (!same) {
+      set.criteria = criteria;
+      events.push({ text: "edited the acceptance criteria", event: "criteria_changed" });
+    }
+  }
   if (patch.addPullRequest) {
     // People open this link from the issue page: only an https address, never javascript:, data: or the like.
     if (!isHttpsUrl(patch.addPullRequest.url))
@@ -901,6 +917,27 @@ export async function updateIssue(
 }
 
 const reload = async (db: Database, row: IssueRow) => (await db.select().from(issues).where(eq(issues.id, row.id)))[0];
+
+/**
+ * The criteria a person edited in place: a kept one keeps its id and its check (and who checked it), a new one
+ * starts unchecked; the same limits as at creation (500 characters each, 50 in all, empty lines dropped).
+ */
+function editedCriteria(current: IssueRow["criteria"], next: { id?: string; text: string }[]): IssueRow["criteria"] {
+  const byId = new Map(current.map((c) => [c.id, c]));
+  const seen = new Set<string>();
+  return next
+    .map((c) => ({ id: c.id, text: c.text.trim().slice(0, 500) }))
+    .filter((c) => c.text)
+    .slice(0, 50)
+    .map((c) => {
+      const kept = c.id && !seen.has(c.id) ? byId.get(c.id) : undefined;
+      if (kept) {
+        seen.add(kept.id);
+        return { ...kept, text: c.text };
+      }
+      return { id: Bun.randomUUIDv7(), text: c.text, done: false };
+    });
+}
 
 /**
  * An agent's run touched this issue (an issue tool, or "implement" asked):

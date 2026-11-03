@@ -101,6 +101,51 @@ describe("issues", () => {
     expect(hits.map((h) => h.sourceId)).toContain(first.id);
   });
 
+  test("title, description and criteria edited in place: a kept criterion keeps its check", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const ana = person(f.owner.id);
+    const issue = await createIssue(deps, ana, f.org.id, {
+      title: "Botão some no iPhone",
+      criteria: ["Aparece com o teclado", "Funciona no SE", "Nada muda no Android"],
+    });
+    const [keep, drop, rename] = issue.criteria;
+    await setCriterion(deps, ana, f.org.id, issue.id, keep?.id ?? "", true);
+    const edited = await updateIssue(deps, ana, f.org.id, issue.id, {
+      title: "Botão Pagar some no iPhone SE",
+      description: "O teclado cobre o botão.",
+      criteria: [
+        { id: keep?.id, text: "Aparece com o teclado" },
+        { id: rename?.id, text: "Nada muda no Android nem na web" },
+        { text: "  Testado no iPhone 15  " },
+        { text: "   " },
+      ],
+    });
+    expect(edited.title).toBe("Botão Pagar some no iPhone SE");
+    expect(edited.description).toBe("O teclado cobre o botão.");
+    expect(edited.criteria.map((c) => [c.text, c.done])).toEqual([
+      ["Aparece com o teclado", true],
+      ["Nada muda no Android nem na web", false],
+      ["Testado no iPhone 15", false],
+    ]);
+    expect(edited.criteria[0]?.id).toBe(keep?.id ?? "");
+    expect(edited.criteria[1]?.id).toBe(rename?.id ?? "");
+    expect(edited.criteria.some((c) => c.id === drop?.id)).toBe(false);
+    // The same list again changes nothing and logs nothing.
+    await updateIssue(deps, ana, f.org.id, issue.id, {
+      criteria: edited.criteria.map((c) => ({ id: c.id, text: c.text })),
+    });
+    const activity = await listIssueActivity(f.db, ana, f.org.id, issue.id);
+    expect(activity.map((a) => a.event)).toEqual([
+      "created",
+      "criterion_checked",
+      "renamed",
+      "description_changed",
+      "criteria_changed",
+    ]);
+    expect(activity.at(-1)).toMatchObject({ text: "edited the acceptance criteria", textCode: "criteria_changed" });
+  });
+
   test('"Transformar em issue" keeps the visibility of a private channel', async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };

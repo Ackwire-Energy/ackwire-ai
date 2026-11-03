@@ -32,6 +32,7 @@ import {
   Icon,
   Message,
   MessageText,
+  SavedNote,
   Select,
   TabPanel,
   Tabs,
@@ -39,7 +40,7 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
@@ -118,27 +119,30 @@ function useIssueSource(i: Issue) {
 }
 
 /**
- * An issue opened from the board or the list: the shared details dialog
- * ("#131", the title, who made it and from where; "abrir em página própria").
+ * An issue opened from the board or the list: the task's own page inside the shared details dialog ("#131" on its
+ * bar, "abrir em página própria"), wide and always full height so changing tabs never makes it jump.
  */
 export function IssueDialog({ issue: i, onClose }: { issue: Issue; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const actors = useActors();
-  const from = useIssueSource(i);
   return (
     <DetailsDialog
       open
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("issues.close")}
+      size="lg"
+      fill
+      titleHidden
       eyebrow={<span className="tabular">#{i.number}</span>}
       title={i.title}
-      subtitle={
-        <span>
-          {t("issues.createdByShort", { name: actors.name(i.createdBy) })}
-          {from && <> {from}</>}
-        </span>
-      }
+      // Esc in a text being edited in place saves it and stays: the dialog closes on the next Esc.
+      onEscapeKeyDown={(e) => {
+        const el = document.activeElement;
+        if (el instanceof HTMLElement && el.closest("[data-inplace]")) {
+          e.preventDefault();
+          el.blur();
+        }
+      }}
       page={{
         label: t("issues.openPage"),
         render: (props) => (
@@ -152,19 +156,15 @@ export function IssueDialog({ issue: i, onClose }: { issue: Issue; onClose: () =
 }
 
 /**
- * An issue's details: source, status and who, the agent's
- * work (live steps, or "stalled" with "Pedir para continuar"), "Pedir a um
- * agente", description, criteria (who checked them), links and activity.
- * The page has its own header and aside; the dialog shows the fields on top.
+ * An issue's details, the same on its page and in the dialog: who made it and from where, the title, then tabs
+ * (the agent's work, live steps or "stalled" with "Pedir para continuar"; "Pedir a um agente"; description,
+ * criteria and who checked them; forum; discussion), and the aside with its fields and links. The title, the
+ * description and the criteria are edited where they are, saved on leaving the field ("Salvo" by the source line).
  */
 export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "page" | "dialog" }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
-  const wikiLink = useWikiLinkRenderer();
-  const action = useIssueAction(org.id);
-  const color = useAssigneeColor();
-  const done = i.criteria.filter((c) => c.done).length;
   const from = useIssueSource(i);
   const activity = useIssueActivity(org.id, i.id);
   // Comments, files and events arrive live while it's open (every tab reads this one list).
@@ -172,105 +172,369 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
   const list = activity.data ?? [];
   const [tab, setTab] = useState<"details" | "files" | "history">("details");
   const files = useIssueFileEntries(i, list);
+  const [saved, flashSaved] = useSavedFlash();
   // The files it was created with show under the description (prints, logs): the rest are in "Anexos".
   const createdFiles = list.find((a) => a.event === "created")?.attachments ?? [];
-  const main = (
-    <>
-      {variant === "page" && (
-        <header className="issue-details__head">
-          <span className="small muted tabular">
-            {t("issues.createdBy", { number: i.number, name: actors.name(i.createdBy) })}
-            {from && <> {from}</>}
-          </span>
-          <h1 className="issue-details__title">{i.title}</h1>
-        </header>
-      )}
-      {variant === "dialog" && <Details issue={i} />}
-      <Tabs
-        value={tab}
-        onValueChange={setTab}
-        label={t("issues.tabs.label")}
-        items={[
-          { value: "details", label: t("issues.tabs.details") },
-          { value: "files", label: t("issues.tabs.files"), count: files.length || undefined },
-          { value: "history", label: t("issues.tabs.history") },
-        ]}
-      >
-        <TabPanel value="details">
-          <WorkBox issue={i} />
-          <IssueWorkBlock issue={i} />
-          {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
-          <DetailsSection title={t("issues.description")}>
-            {i.description ? (
-              <div className="issue-description">
-                <Markdown source={i.description} variant="message" wikiLink={wikiLink} />
-              </div>
-            ) : (
-              createdFiles.length === 0 && <p className="small muted">{t("issues.noDescription")}</p>
-            )}
-            {createdFiles.length > 0 && (
-              <div className="artifact-cards issue-description__files">
-                {createdFiles.map((f) => (
-                  <ArtifactCard key={f.id} artifact={{ id: f.id }} />
-                ))}
-              </div>
-            )}
-          </DetailsSection>
-          <DetailsSection
-            title={t("issues.criteria")}
-            actions={
-              i.criteria.length > 0 ? (
-                <span className="issue-details__count tabular">
-                  {t("issues.criteriaCount", { done, total: i.criteria.length })}
-                </span>
-              ) : undefined
-            }
-          >
-            {i.criteria.length === 0 && <p className="small muted">{t("issues.noCriteria")}</p>}
-            {i.criteria.length > 0 && <CriteriaPixels done={i.criteria.map((c) => c.done)} color={color(i)} />}
-            {i.criteria.map((c) => (
-              <div key={c.id} className="issue-criterion" data-done={c.done || undefined}>
-                <Checkbox
-                  id={`crit-${c.id}`}
-                  checked={c.done}
-                  onCheckedChange={(v) => action.mutate({ type: "criterion", id: i.id, criterionId: c.id, done: v })}
-                />
-                <label htmlFor={`crit-${c.id}`}>{c.text}</label>
-                {c.done && c.doneBy?.type === "agent" && (
-                  <span className="issue-criterion__by" title={t("issues.checkedBy", { name: actors.name(c.doneBy) })}>
-                    <ActorAvatar actor={c.doneBy} name={actors.name(c.doneBy)} size="xs" />
-                    {actors.name(c.doneBy)}
-                  </span>
-                )}
-              </div>
-            ))}
-          </DetailsSection>
-          <IssueForum issue={i} />
-          {variant === "dialog" && (
-            <DetailsSection title={t("issues.links")}>
-              <Links issue={i} bare />
-            </DetailsSection>
-          )}
-          <Discussion issue={i} activity={list} loaded={activity.isSuccess} />
-        </TabPanel>
-        <TabPanel value="files">
-          <IssueFiles issue={i} activity={list} />
-        </TabPanel>
-        <TabPanel value="history">
-          <History activity={list} loaded={activity.isSuccess} />
-        </TabPanel>
-      </Tabs>
-    </>
-  );
-  if (variant === "dialog") return main;
   return (
     <div className="issue-layout">
-      <div className="issue-details issue-layout__main">{main}</div>
+      <div className="issue-details issue-layout__main">
+        <header className="issue-details__head">
+          <span className="small muted tabular">
+            {variant === "page"
+              ? t("issues.createdBy", { number: i.number, name: actors.name(i.createdBy) })
+              : t("issues.createdByShort", { name: actors.name(i.createdBy) })}
+            {from && <> {from}</>}
+            <SavedNote shown={saved} label={t("common.saved")} className="issue-details__saved" />
+          </span>
+          <IssueTitle issue={i} onSaved={flashSaved} />
+        </header>
+        <Tabs
+          value={tab}
+          onValueChange={setTab}
+          label={t("issues.tabs.label")}
+          items={[
+            { value: "details", label: t("issues.tabs.details") },
+            { value: "files", label: t("issues.tabs.files"), count: files.length || undefined },
+            { value: "history", label: t("issues.tabs.history") },
+          ]}
+        >
+          <TabPanel value="details">
+            <WorkBox issue={i} />
+            <IssueWorkBlock issue={i} />
+            {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
+            <DetailsSection title={t("issues.description")}>
+              <IssueDescription issue={i} hasFiles={createdFiles.length > 0} onSaved={flashSaved} />
+              {createdFiles.length > 0 && (
+                <div className="artifact-cards issue-description__files">
+                  {createdFiles.map((f) => (
+                    <ArtifactCard key={f.id} artifact={{ id: f.id }} />
+                  ))}
+                </div>
+              )}
+            </DetailsSection>
+            <IssueCriteria issue={i} onSaved={flashSaved} />
+            <IssueForum issue={i} />
+            <Discussion issue={i} activity={list} loaded={activity.isSuccess} />
+          </TabPanel>
+          <TabPanel value="files">
+            <IssueFiles issue={i} activity={list} />
+          </TabPanel>
+          <TabPanel value="history">
+            <History activity={list} loaded={activity.isSuccess} />
+          </TabPanel>
+        </Tabs>
+      </div>
       <aside aria-label={t("issues.details")} className="issue-aside">
-        <Details issue={i} bare />
+        <Details issue={i} />
         <Links issue={i} />
       </aside>
     </div>
+  );
+}
+
+/** "✓ Salvo" for a moment after a text edited in place is saved (as a channel's name and description show it). */
+function useSavedFlash() {
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    if (!saved) return;
+    const id = setTimeout(() => setSaved(false), 1800);
+    return () => clearTimeout(id);
+  }, [saved]);
+  return [saved, () => setSaved(true)] as const;
+}
+
+/**
+ * What was just sent, shown while the task still has the value it replaced (the list refetches after each change,
+ * so the old text would blink back for a moment); forgotten as soon as the task comes back changed.
+ */
+function useSent<T>(fromServer: string) {
+  const [sent, setSent] = useState<{ value: T; was: string } | null>(null);
+  useEffect(() => {
+    if (sent && sent.was !== fromServer) setSent(null);
+  }, [sent, fromServer]);
+  return {
+    pending: sent && sent.was === fromServer ? sent.value : null,
+    send: (value: T) => setSent({ value, was: fromServer }),
+    clear: () => setSent(null),
+  };
+}
+
+/** Focuses a field when it opens, with the caret after its text (not before it, as autofocus leaves a textarea). */
+function useFocusAtEnd<T extends HTMLInputElement | HTMLTextAreaElement>(open: boolean) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!open || !el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [open]);
+  return ref;
+}
+
+/**
+ * Text a person edits where it is: on hover the pencil shows; a press on the text (not on a link, a file or a
+ * button in it) or on the pencil opens the field. The pencil is the keyboard's way in.
+ */
+function EditInPlace({ label, onEdit, children }: { label: string; onEdit: () => void; children: ReactNode }) {
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a pointer shortcut; the pencil is the keyboard way
+    <div
+      className="issue-inplace"
+      onClick={(e) => {
+        if (e.target instanceof Element && e.target.closest("a, button, input, label, .artifact-tile")) return;
+        if (window.getSelection()?.toString()) return;
+        onEdit();
+      }}
+    >
+      {children}
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        icon="edit"
+        aria-label={label}
+        title={label}
+        className="issue-inplace__pen"
+        onClick={onEdit}
+      />
+    </div>
+  );
+}
+
+/** The title, edited in place: Enter, Esc or leaving the field saves it (an empty one keeps the old title). */
+function IssueTitle({ issue: i, onSaved }: { issue: Issue; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useIssueAction(org.id);
+  const [draft, setDraft] = useState<string | null>(null);
+  const sent = useSent<string>(i.title);
+  const title = sent.pending ?? i.title;
+  const ref = useFocusAtEnd<HTMLInputElement>(draft !== null);
+  const save = () => {
+    if (draft === null) return;
+    const next = draft.trim();
+    setDraft(null);
+    if (!next || next === title) return;
+    sent.send(next);
+    action.mutate({ type: "update", id: i.id, patch: { title: next } }, { onSuccess: onSaved, onError: sent.clear });
+  };
+  if (draft !== null)
+    return (
+      <input
+        ref={ref}
+        className="issue-inplace__title"
+        value={draft}
+        maxLength={300}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== "Escape") return;
+          e.preventDefault();
+          e.currentTarget.blur();
+        }}
+        aria-label={t("issues.form.title")}
+        data-inplace=""
+      />
+    );
+  return (
+    <EditInPlace label={t("issues.edit.title")} onEdit={() => setDraft(title)}>
+      <h1 className="issue-details__title">{title}</h1>
+    </EditInPlace>
+  );
+}
+
+/** The description, edited in place in the creation's box: leaving it, Esc or ⌘↵ saves it. */
+function IssueDescription({ issue: i, hasFiles, onSaved }: { issue: Issue; hasFiles: boolean; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useIssueAction(org.id);
+  const wikiLink = useWikiLinkRenderer();
+  const [draft, setDraft] = useState<string | null>(null);
+  const sent = useSent<string>(i.description);
+  const description = sent.pending ?? i.description;
+  const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
+  const save = () => {
+    if (draft === null) return;
+    const next = draft.trim();
+    setDraft(null);
+    if (next === description.trim()) return;
+    sent.send(next);
+    action.mutate(
+      { type: "update", id: i.id, patch: { description: next } },
+      { onSuccess: onSaved, onError: sent.clear },
+    );
+  };
+  if (draft !== null)
+    return (
+      <>
+        <div className="issue-new__editor" data-inplace="">
+          <textarea
+            ref={ref}
+            className="issue-new__text"
+            rows={4}
+            value={draft}
+            maxLength={50_000}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={save}
+            onKeyDown={(e) => {
+              if (e.key !== "Escape" && !(e.key === "Enter" && (e.metaKey || e.ctrlKey))) return;
+              e.preventDefault();
+              e.currentTarget.blur();
+            }}
+            placeholder={t("issues.form.descriptionPlaceholder")}
+            aria-label={t("issues.description")}
+          />
+        </div>
+        <p className="issue-new__hint small muted">{t("issues.edit.hint")}</p>
+      </>
+    );
+  return (
+    <EditInPlace label={t("issues.edit.description")} onEdit={() => setDraft(description)}>
+      {description ? (
+        <div className="issue-description">
+          <Markdown source={description} variant="message" wikiLink={wikiLink} />
+        </div>
+      ) : (
+        // With the files it was created with and no text, the files say it all; the pencil still opens the box.
+        !hasFiles && <p className="small muted">{t("issues.noDescription")}</p>
+      )}
+    </EditInPlace>
+  );
+}
+
+/**
+ * Acceptance criteria: checked as before, and edited where they are: the pencil on a row turns it into a field
+ * (an empty one removes it), "Adicionar critério" at the end adds one. The whole list goes to the server at once.
+ */
+function IssueCriteria({ issue: i, onSaved }: { issue: Issue; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const actors = useActors();
+  const action = useIssueAction(org.id);
+  const color = useAssigneeColor();
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [adding, setAdding] = useState("");
+  const ref = useFocusAtEnd<HTMLInputElement>(editing !== null);
+  // What was just sent shows until the task comes back with it; a new one has no id yet.
+  const sent = useSent<{ id?: string; text: string }[]>(i.criteria.map((c) => `${c.id}:${c.text}`).join("\n"));
+  const shown = sent.pending
+    ? sent.pending.map((c, k) => {
+        const kept = i.criteria.find((x) => x.id === c.id);
+        return { id: c.id ?? `new-${k}`, text: c.text, done: kept?.done ?? false, doneBy: kept?.doneBy ?? null };
+      })
+    : i.criteria;
+  const done = shown.filter((c) => c.done).length;
+  const saveList = (list: { id?: string; text: string }[]) => {
+    sent.send(list);
+    action.mutate({ type: "update", id: i.id, patch: { criteria: list } }, { onSuccess: onSaved, onError: sent.clear });
+  };
+  const current = shown.map((c) => (c.id.startsWith("new-") ? { text: c.text } : { id: c.id, text: c.text }));
+  const commit = () => {
+    if (!editing) return;
+    const { id, text } = editing;
+    setEditing(null);
+    const next = text.trim();
+    if (next === shown.find((c) => c.id === id)?.text) return;
+    saveList(next ? current.map((c) => (c.id === id ? { id, text: next } : c)) : current.filter((c) => c.id !== id));
+  };
+  const remove = (id: string) => {
+    setEditing(null);
+    saveList(current.filter((c) => c.id !== id));
+  };
+  const add = () => {
+    const text = adding.trim();
+    if (!text) return;
+    setAdding("");
+    saveList([...current, { text }]);
+  };
+  return (
+    <DetailsSection
+      title={t("issues.criteria")}
+      actions={
+        shown.length > 0 ? (
+          <span className="issue-details__count tabular">
+            {t("issues.criteriaCount", { done, total: shown.length })}
+          </span>
+        ) : undefined
+      }
+    >
+      {shown.length > 0 && <CriteriaPixels done={shown.map((c) => c.done)} color={color(i)} />}
+      {shown.map((c) =>
+        editing?.id === c.id ? (
+          <div key={c.id} className="issue-new__criterion issue-criterion--edit" data-inplace="">
+            <span className="issue-new__box" aria-hidden="true" />
+            <input
+              ref={ref}
+              value={editing.text}
+              maxLength={500}
+              onChange={(e) => setEditing({ id: c.id, text: e.target.value })}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== "Escape") return;
+                e.preventDefault();
+                e.currentTarget.blur();
+              }}
+              aria-label={t("issues.criteria")}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon="close"
+              aria-label={t("issues.form.removeCriterion")}
+              title={t("issues.form.removeCriterion")}
+              // Keeps the field focused, so leaving it doesn't save the row first.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => remove(c.id)}
+            />
+          </div>
+        ) : (
+          <div key={c.id} className="issue-criterion" data-done={c.done || undefined}>
+            <Checkbox
+              id={`crit-${c.id}`}
+              checked={c.done}
+              disabled={c.id.startsWith("new-")}
+              onCheckedChange={(v) => action.mutate({ type: "criterion", id: i.id, criterionId: c.id, done: v })}
+            />
+            <label htmlFor={`crit-${c.id}`}>{c.text}</label>
+            {c.done && c.doneBy?.type === "agent" && (
+              <span className="issue-criterion__by" title={t("issues.checkedBy", { name: actors.name(c.doneBy) })}>
+                <ActorAvatar actor={c.doneBy} name={actors.name(c.doneBy)} size="xs" />
+                {actors.name(c.doneBy)}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon="edit"
+              aria-label={t("issues.edit.criterion", { text: c.text })}
+              title={t("issues.edit.criterionShort")}
+              className="issue-criterion__pen"
+              disabled={c.id.startsWith("new-")}
+              onClick={() => setEditing({ id: c.id, text: c.text })}
+            />
+          </div>
+        ),
+      )}
+      <div className="issue-new__criterion issue-new__criterion--add" data-inplace="">
+        <Icon name="plus" size={16} />
+        <input
+          value={adding}
+          maxLength={500}
+          onChange={(e) => setAdding(e.target.value)}
+          onBlur={add}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") e.currentTarget.blur();
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            add();
+          }}
+          placeholder={t("issues.form.addCriterion")}
+          aria-label={t("issues.form.addCriterion")}
+        />
+      </div>
+    </DetailsSection>
   );
 }
 
@@ -666,8 +930,8 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
   );
 }
 
-/** Status, who, priority and due date (the page's aside; at the top of the panel). */
-function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
+/** Column, who, priority and due date, at the top of the aside (on the page and in the dialog). */
+function Details({ issue: i }: { issue: Issue }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const actors = useActors();
@@ -684,7 +948,7 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
       leading: <Icon name={STATUS_ICON[s]} size={16} />,
     })),
   );
-  const fields = (
+  return (
     <>
       <Field label={t("issues.column")} id={`is-col-${i.id}`}>
         <Select
@@ -736,22 +1000,16 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
       <p className="issue-flow-hint">{t("issues.flowHint")}</p>
     </>
   );
-  if (bare) return fields;
-  return (
-    <aside aria-label={t("issues.details")} className="issue-props">
-      {fields}
-    </aside>
-  );
 }
 
-/** Pull requests and labels (files are in "Anexos"). `bare`: inside a section that already says "Links". */
-function Links({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
+/** Pull requests and labels (files are in "Anexos"). */
+function Links({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
   const actors = useActors();
   return (
     <>
       <div className="issue-aside__item">
-        {!bare && <span className="ac-field__label">{t("issues.links")}</span>}
+        <span className="ac-field__label">{t("issues.links")}</span>
         {i.pullRequests.length === 0 && <span className="small muted">{t("issues.noLinks")}</span>}
         {i.pullRequests.map((pr) => (
           <a key={pr.number} href={webUrl(pr.url)} target="_blank" rel="noopener noreferrer" className="issue-link">

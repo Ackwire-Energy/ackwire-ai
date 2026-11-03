@@ -4399,6 +4399,13 @@ export const en = {
     criteria: "Acceptance criteria",
     criteriaCount: "{{done}} of {{total}}",
     noCriteria: "No acceptance criteria yet.",
+    edit: {
+      title: "Edit the title",
+      description: "Edit the description",
+      criterion: 'Edit the criterion "{{text}}"',
+      criterionShort: "Edit the criterion",
+      hint: "Saves when you leave the field or press Esc.",
+    },
     askTitle: "Ask {{name}} to do this task",
     askText:
       "{{name}} reads what he needs, comments the plan here and does it. Anything sensitive, like publishing, asks for your approval.",
@@ -4445,6 +4452,7 @@ export const en = {
       created: "created the task",
       renamed: "renamed the task",
       description_changed: "edited the description",
+      criteria_changed: "edited the acceptance criteria",
       status_changed: "changed the status to {{status}}",
       priority_changed: "changed the priority to {{priority}}",
       assigned: "assigned the task",

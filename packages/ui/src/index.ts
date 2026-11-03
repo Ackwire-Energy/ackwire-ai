@@ -286,6 +286,7 @@ export {
   STRIP_CELL,
   WorkSweep,
 } from "./components/RunPixels";
+export { SavedNote } from "./components/SavedNote";
 export { AgentSearching } from "./components/SearchPixels";
 export { SearchSelect, type SearchSelectLabels, type SearchSelectProps } from "./components/SearchSelect";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
