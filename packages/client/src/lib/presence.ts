@@ -18,7 +18,7 @@ import { usageWhen } from "./plan-usage";
  */
 
 /** What a person picks, in the order the apps list them. */
-export const AVAILABILITIES: readonly Availability[] = ["auto", "away", "busy", "hidden"];
+export const AVAILABILITIES: readonly Availability[] = ["auto", "away", "busy", "out", "hidden"];
 
 /** How you appear for what you picked (to yourself: hidden stays hidden). */
 export const presenceOfAvailability = (a: Availability): MemberPresence => (a === "auto" ? "online" : a);
@@ -35,7 +35,7 @@ export const STATUS_SUGGESTIONS = [
   { key: "lunch", emoji: "🍽️", until: "m30", availability: "away" },
   { key: "focus", emoji: "🎧", until: "h2", availability: "busy" },
   { key: "sick", emoji: "🤒", until: "today", availability: "away" },
-  { key: "vacation", emoji: "🏖️", until: "week", availability: "away" },
+  { key: "vacation", emoji: "🏖️", until: "week", availability: "out" },
 ] as const satisfies readonly { key: string; emoji: string; until: UntilChoice; availability: Availability }[];
 
 /** When a status picked with `choice` at `now` clears (ISO), or null; "today"/"week" end at local midnight. */

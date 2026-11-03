@@ -2318,6 +2318,7 @@
       "auto": "En ligne tant qu'agentes.chat est ouvert.",
       "away": "Parti un moment : les autres savent que les réponses peuvent tarder.",
       "busy": "Tout le monde voit qu'il vaut mieux ne pas vous déranger pour l'instant.",
+      "out": "Loin du travail (vacances, jour de congé) : tout le monde le voit jusqu’à ce que ton statut disparaisse.",
       "hidden": "Vous apparaissez hors ligne pour tous, et pouvez tout utiliser quand même."
     },
     "suggest": {

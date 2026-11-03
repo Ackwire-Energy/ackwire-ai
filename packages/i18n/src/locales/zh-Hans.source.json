@@ -31285,5 +31285,8 @@
   },
   "presence.agentWhy.out": {
     "value": "Out of limit for now · answers after the reset"
+  },
+  "presence.help.out": {
+    "value": "Away from work (vacation, a day off): everyone sees it until your status clears."
   }
 }

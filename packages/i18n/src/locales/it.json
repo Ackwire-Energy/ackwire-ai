@@ -2316,6 +2316,7 @@
       "auto": "Online mentre agentes.chat è aperto.",
       "away": "Via per un po': gli altri sanno che le risposte possono tardare.",
       "busy": "Tutti vedono che è meglio non interromperti ora.",
+      "out": "Lontano dal lavoro (ferie, giorno libero): tutti lo vedono finché il tuo stato non sparisce.",
       "hidden": "Appari offline a tutti, ma puoi comunque usare tutto."
     },
     "suggest": {

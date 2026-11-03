@@ -10,7 +10,7 @@ import type { TFunction } from "i18next";
 
 /** What you picked, read back from how you appear to yourself (connected or not, "auto" is online). */
 export function availabilityOf(presence: MemberPresence | undefined): Availability {
-  return presence === "away" || presence === "busy" || presence === "hidden" ? presence : "auto";
+  return presence === "away" || presence === "busy" || presence === "out" || presence === "hidden" ? presence : "auto";
 }
 
 /** When the line clears: a choice made now, or the end the saved status already has (null: never). */

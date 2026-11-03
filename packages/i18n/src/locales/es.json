@@ -2315,6 +2315,7 @@
       "auto": "En línea mientras agentes.chat está abierto.",
       "away": "Fuera un rato: los demás saben que las respuestas pueden tardar.",
       "busy": "Todos ven que mejor no interrumpir ahora.",
+      "out": "Fuera del trabajo (vacaciones, día libre): todos lo ven hasta que tu estado desaparezca.",
       "hidden": "Apareces desconectado para todos y puedes seguir usando todo."
     },
     "suggest": {

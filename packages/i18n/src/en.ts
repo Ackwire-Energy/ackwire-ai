@@ -2196,6 +2196,7 @@ export const en = {
       auto: "Online while agentes.chat is open.",
       away: "Out for a while: people know answers may take time.",
       busy: "Everyone sees it's better not to interrupt right now.",
+      out: "Away from work (vacation, a day off): everyone sees it until your status clears.",
       hidden: "You show as offline to everyone, and can still use everything.",
     },
     suggest: {

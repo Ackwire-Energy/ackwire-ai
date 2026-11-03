@@ -2233,6 +2233,7 @@
       "auto": "agentes.chat açıkken çevrimiçi.",
       "away": "Bir süreliğine dışarıdasınız: kişiler yanıtların gecikebileceğini bilir.",
       "busy": "Herkes şu anda rahatsız etmemenin daha iyi olduğunu görür.",
+      "out": "İşten uzakta (tatil, izin günü): durumun kaybolana kadar herkes görür.",
       "hidden": "Herkese çevrimdışı görünürsünüz ve yine her şeyi kullanabilirsiniz."
     },
     "suggest": {

@@ -2247,6 +2247,7 @@
       "auto": "Online zolang agentes.chat open is.",
       "away": "Even weg: mensen weten dat antwoorden wat langer kunnen duren.",
       "busy": "Iedereen ziet dat je nu liever niet gestoord wordt.",
+      "out": "Niet aan het werk (vakantie, vrije dag): iedereen ziet het tot je status verdwijnt.",
       "hidden": "Je bent voor iedereen offline en kunt toch alles gebruiken."
     },
     "suggest": {

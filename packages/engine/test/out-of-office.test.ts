@@ -1,17 +1,21 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
+  availabilityNow,
   clearPlanLimits,
   createAgent,
   createSetStatusToolSource,
   DEFAULT_ROUTER_POLICY,
   insertMessage,
+  listMembers,
   loadAgentStatuses,
+  memberPresence,
   monthStartUtc,
   notePlanLimit,
   outOfOfficeIds,
   type RouterStrategy,
   routeMessage,
+  setMyStatus,
 } from "../src";
 import type { ToolContext } from "../src/tools/types";
 import { type Fixture, setup } from "./fixtures";
@@ -148,4 +152,30 @@ test("the router leaves an agent out of office out of a message nobody mentioned
   );
   expect(seen).toEqual([["theo"]]);
   expect(routed.selected).toEqual([theo.id]);
+});
+
+test("a person out of office shows it to everyone, connected or not, until their line's end", () => {
+  const now = new Date("2026-11-03T12:00:00Z");
+  const back = new Date("2026-11-10T12:00:00Z");
+  const out = { availability: "out" as const, statusUntil: back };
+  expect(memberPresence(out, false, false, now)).toBe("out");
+  expect(memberPresence(out, true, true, now)).toBe("out");
+  expect(memberPresence({ availability: "out" as const }, false, false, now)).toBe("out");
+  // Back: online while connected again, offline otherwise, and the picker reads "auto".
+  const later = new Date("2026-11-10T12:00:01Z");
+  expect(memberPresence(out, true, false, later)).toBe("online");
+  expect(memberPresence(out, false, false, later)).toBe("offline");
+  expect(availabilityNow(out, later)).toBe("auto");
+});
+
+test("a person picks out of office with a line that ends when they are back", async () => {
+  f = await setup();
+  const until = new Date(Date.now() + 7 * 86_400_000).toISOString();
+  await setMyStatus({ db: f.db }, f.owner.id, f.org.id, {
+    availability: "out",
+    status: { text: "De férias", emoji: "🏖️", until },
+  });
+  const me = (await listMembers(f.db, f.org.id)).find((m) => m.userId === f.owner.id);
+  expect(me).toMatchObject({ availability: "out", statusText: "De férias" });
+  expect(memberPresence(me as NonNullable<typeof me>, false, false)).toBe("out");
 });

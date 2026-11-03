@@ -2245,6 +2245,7 @@
       "auto": "Online, solange agentes.chat offen ist.",
       "away": "Eine Weile weg: Alle wissen, dass Antworten dauern können.",
       "busy": "Alle sehen, dass du gerade lieber nicht gestört wirst.",
+      "out": "Nicht bei der Arbeit (Urlaub, freier Tag): alle sehen es, bis dein Status verschwindet.",
       "hidden": "Für alle bist du offline und kannst trotzdem alles nutzen."
     },
     "suggest": {

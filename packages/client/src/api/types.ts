@@ -1809,9 +1809,9 @@ export interface Person {
 }
 
 /** A person as others see them (ADR 0084). */
-export type MemberPresence = "online" | "away" | "busy" | "hidden" | "offline";
+export type MemberPresence = "online" | "away" | "busy" | "out" | "hidden" | "offline";
 /** What a person picks: `auto` = online while connected, `away`, `busy`, or `hidden` (offline to everyone else). */
-export type Availability = "auto" | "away" | "busy" | "hidden";
+export type Availability = "auto" | "away" | "busy" | "out" | "hidden";
 
 export interface MemberStatus {
   text: string;

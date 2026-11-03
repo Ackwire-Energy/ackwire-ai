@@ -2180,6 +2180,7 @@
       "auto": "Online selama agentes.chat terbuka.",
       "away": "Pergi sebentar: orang tahu balasanmu mungkin butuh waktu.",
       "busy": "Semua orang tahu sebaiknya kamu tidak diganggu dulu.",
+      "out": "Sedang tidak bekerja (liburan, cuti): semua orang melihatnya sampai statusmu hilang.",
       "hidden": "Kamu tampil offline bagi semua orang, tapi tetap bisa memakai semuanya."
     },
     "suggest": {

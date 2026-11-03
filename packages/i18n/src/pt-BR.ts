@@ -2226,6 +2226,7 @@ export const ptBR = {
       auto: "Online enquanto o agentes.chat estiver aberto.",
       away: "Fora por um tempo: as pessoas sabem que a resposta pode demorar.",
       busy: "Todo mundo vê que é melhor não interromper agora.",
+      out: "Longe do trabalho (férias, folga): todo mundo vê até o seu status sumir.",
       hidden: "Você aparece offline para todo mundo, mas continua usando tudo.",
     },
     suggest: {
