@@ -4,9 +4,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Message } from "@agenteschat/client";
-import { cleanup, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
-import { renderApp, settle } from "./render";
+import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -30,6 +30,18 @@ async function open(messages: Message[]) {
   await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState({ messages })) });
   await settle(10);
 }
+
+/** The kit's rules, by selector: their bodies joined. */
+const rules = async () => {
+  const css = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text()).replace(/\/\*[\s\S]*?\*\//g, "");
+  const out = new Map<string, string>();
+  for (const [, list = "", body = ""] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g))
+    for (const raw of list.split(",")) {
+      const selector = raw.trim().replace(/\s+/g, " ");
+      out.set(selector, `${out.get(selector) ?? ""}${body}`);
+    }
+  return out;
+};
 
 const row = (id: string) => {
   const el = document.querySelector<HTMLElement>(`article[data-message-id="${id}"]`);
@@ -153,20 +165,6 @@ describe("my own messages sit on the right", () => {
 });
 
 describe("own message styles", () => {
-  const rules = async () => {
-    const css = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text()).replace(
-      /\/\*[\s\S]*?\*\//g,
-      "",
-    );
-    const out = new Map<string, string>();
-    for (const [, list = "", body = ""] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g))
-      for (const raw of list.split(",")) {
-        const selector = raw.trim().replace(/\s+/g, " ");
-        out.set(selector, `${out.get(selector) ?? ""}${body}`);
-      }
-    return out;
-  };
-
   test("the bar stands left of the bubble, never over my words; the check ends the time's line, always on screen", async () => {
     const r = await rules();
     const css = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
@@ -313,5 +311,118 @@ describe("code, tables and reactions on my bubble", () => {
       }),
     ]);
     for (const id of ["j1", "w1"]) expect(row(id).querySelector(".ac-reacts .ac-react--add")).toBeTruthy();
+  });
+});
+
+describe("the bar hugs my message, a GIF or a picture too", () => {
+  const GIF = { kind: "gif", provider: "giphy", id: "gif-party", title: "party cat", width: 498, height: 280 };
+  /** What takes room in a row's body: its hidden head, the bar (which floats) and empty parts left out. */
+  const taking = (el: HTMLElement) =>
+    [...(el.querySelector(".ac-msg__body")?.children ?? [])]
+      .filter((c) => !c.matches(".ac-visually-hidden, .ac-msg__actions") && c.childNodes.length > 0)
+      .map((c) => c.className);
+
+  test("my GIF's row holds the GIF and its time only, the bar beside them; someone else's row keeps its bar", async () => {
+    await open([
+      said("j1", "u-joao", "", 9, { meta: { media: GIF } }),
+      said("w1", "u-walter", "nao ne amigao", 8),
+      said("j2", "u-joao", "ok", 7),
+      said("w2", "u-walter", "", 6, { meta: { media: GIF } }),
+    ]);
+    for (const id of ["w1", "w2"]) {
+      // Off touch the bar stands at `right: calc(100% + 2px)` of the body: the body is the bubble's (or GIF's) width.
+      expect(row(id).querySelector(".ac-msg__body > .ac-msg__actions")?.getAttribute("role")).toBe("toolbar");
+    }
+    expect(taking(row("w1"))).toEqual(["ac-msg__text", "ac-msg__own-foot"]);
+    expect(taking(row("w2"))).toEqual(["ac-gif", "ac-msg__own-foot"]);
+    expect((row("w2").querySelector(".ac-gif") as HTMLElement).style.getPropertyValue("--gif-w")).toBe("300px");
+    // Someone else's GIF: their face and the bar on the row's right, as before.
+    expect(row("j1").classList.contains("ac-msg--own")).toBe(false);
+    expect(row("j1").querySelector(".ac-msg__avatar")).toBeTruthy();
+    expect(row("j1").querySelector(".ac-msg__body > .ac-msg__actions")).toBeTruthy();
+  });
+
+  test("a GIF and a picture cap their width with a length, so a row sized to what it holds is no wider than they are", async () => {
+    const r = await rules();
+    // A percentage (`min(100%, 300px)`) counts as no cap while a box sizes to its content: my row would take the
+    // file's whole width (498px here) and its bar would stand that far left of a 300px GIF.
+    const gif = r.get(".ac-gif") ?? "";
+    expect(gif).toContain("width: var(--gif-w, 300px);");
+    expect(gif).toContain("max-width: 100%;");
+    expect(gif).not.toContain("min(100%");
+    const app = (await Bun.file(`${ROOT}apps/web/src/layout.css`).text()).replace(/\/\*[\s\S]*?\*\//g, "");
+    const block = (selector: string) => app.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(block(".file-thumb")).toContain("max-width: 360px;");
+    expect(block(".artifact-tile:only-child .file-thumb")).toContain("max-width: 420px;");
+    for (const sel of [".file-thumb", ".artifact-tile:only-child .file-thumb"])
+      expect(block(sel)).not.toContain("min(100%");
+    // Others' rows keep their bar on the row's right, a keyboard's focus shows it too.
+    expect(r.get(".ac-msg__actions")).toContain("right: 12px");
+    expect(r.get(".ac-msg:focus-within .ac-msg__actions")).toContain("transform: translateY(-50%)");
+  });
+});
+
+describe("a message I send keeps its size when the server has it", () => {
+  /** Everything about a row that sets its size: its classes but the sending ones, its place in the run, its parts. */
+  const shape = (el: HTMLElement) => ({
+    row: [...el.classList].filter((c) => c !== "ac-msg--local" && c !== "ac-msg--pending").sort(),
+    run: el.dataset.run,
+    parts: [...(el.querySelector(".ac-msg__body")?.children ?? [])]
+      .filter((c) => !c.matches(".ac-msg__actions") && c.childNodes.length > 0)
+      .map((c) => c.className),
+  });
+  const rowWith = (text: string) =>
+    [...document.querySelectorAll<HTMLElement>("article")].find((a) => a.textContent?.includes(text)) as HTMLElement;
+
+  test("sending and sent: the same row, the same parts, the time in the sending state's box; nothing scrolls", async () => {
+    let release = () => {};
+    const state = seedState({ messages: [said("j1", "u-joao", "Bom dia!", 10)] });
+    state.holdPosts = new Promise<void>((r) => {
+      release = r;
+    });
+    const api = createFakeApi(state);
+    // The server writes them in the order they came, a moment apart.
+    const post = api.chat.post;
+    let sent = 0;
+    api.chat.post = async (...args: Parameters<typeof post>) => {
+      const later = sent++ * 5;
+      await state.holdPosts;
+      await new Promise((r) => setTimeout(r, later));
+      return post(...args);
+    };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const composer = screen().getByRole("combobox", { name: /Mensagem para/ });
+    // Two quick ones: the first is still on its way when the second goes (a run's first row and its last).
+    for (const text of ["primeira", "segunda"]) {
+      await act(async () => fireEvent.change(composer, { target: { value: text } }));
+      await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
+    }
+    await settle(2);
+    const [first, last] = [rowWith("primeira"), rowWith("segunda")];
+    expect(last.classList.contains("ac-msg--pending")).toBe(true);
+    const before = [shape(first), shape(last)];
+    expect(before.map((s) => s.run)).toEqual(["start", "end"]);
+    // The run's first row has no line under its bubble while it sends either (its state is read in its hidden head).
+    expect(before[0]?.parts).toEqual(["ac-visually-hidden", "ac-msg__text"]);
+    expect(first.querySelector(".ac-visually-hidden")?.textContent).toContain("enviando");
+    expect(before[1]?.parts).toEqual(["ac-visually-hidden", "ac-msg__text", "ac-msg__own-foot"]);
+    const foot = last.querySelector(".ac-msg__own-foot");
+    expect(foot?.querySelector(".ac-msg__status")?.textContent).toContain("enviando");
+    const list = screen().getByRole("region", { name: "Mensagens" });
+    const scrolled: unknown[] = [];
+    list.scrollTo = ((opts: ScrollToOptions) => scrolled.push(opts)) as typeof list.scrollTo;
+    const top = list.scrollTop;
+    await act(async () => release());
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    await settle(4);
+    expect(rowWith("segunda")).toBe(last);
+    expect(last.classList.contains("ac-msg--pending")).toBe(false);
+    expect([shape(first), shape(last)]).toEqual(before);
+    // The time took the sending state's place in the same box.
+    expect(last.querySelector(".ac-msg__own-foot") === foot).toBe(true);
+    expect(foot?.querySelector(".ac-msg__own-time")?.textContent).toMatch(/\d/);
+    expect(scrolled).toEqual([]);
+    expect(list.scrollTop).toBe(top);
   });
 });

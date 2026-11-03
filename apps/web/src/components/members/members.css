@@ -1,0 +1,261 @@
+/* A channel's members on the right (Discord's member list): the sidebar's surface, its own scroll. The thread, search
+   and agent panels float over it. */
+.members-side {
+  flex: 0 0 264px;
+  width: 264px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 18px 10px 24px 12px;
+  box-sizing: border-box;
+  background: var(--side);
+  box-shadow: inset 1px 0 0 var(--line);
+  --presence-ring: var(--side);
+}
+[data-theme="dark"] .members-side {
+  box-shadow: inset 1px 0 0 var(--line2);
+}
+.members-side__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.members-side__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.members-side__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 8px 6px;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+/* Last in the list, for who manages the channel: the channel details' add flow (the plus tile is theirs too). */
+.members-side__add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 5px 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--control-r-md);
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.members-side__add:hover {
+  background: var(--side-hover);
+  color: var(--ink);
+}
+html:not([data-pointer]) .members-side__add:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.members-side__row.profile-trigger {
+  display: flex;
+  width: 100%;
+  border-radius: var(--control-r-md);
+  text-align: left;
+}
+.members-side__inner {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 5px 8px;
+  box-sizing: border-box;
+  border-radius: inherit;
+  overflow: hidden;
+}
+.members-side__row.profile-trigger:hover {
+  background: var(--side-hover);
+}
+/* The row whose card is open keeps its plate. */
+.members-side__row.profile-trigger[data-state="open"] {
+  background: var(--side-chosen);
+}
+html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.members-side__inner .sidebar__trail {
+  z-index: -1;
+  opacity: 0.9;
+}
+.members-side__inner > .ac-avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+}
+.members-side__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.members-side__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 19px;
+  color: var(--ink);
+}
+.members-side__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.members-side__you {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+/* What someone is doing wraps (two lines in practice) instead of being cut. */
+.members-side__line {
+  display: block;
+  font-size: 12.5px;
+  line-height: 16px;
+  color: var(--muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.members-side__line.status-line {
+  display: flex;
+}
+.members-side__work {
+  color: var(--ink2);
+}
+.members-side__inner[data-presence="offline"] {
+  opacity: 0.45;
+}
+.members-side__inner[data-presence="offline"] .members-side__name {
+  font-weight: 500;
+}
+.members-side__crown {
+  flex: none;
+  display: inline-flex;
+  color: var(--warn);
+}
+.members-side__chip {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--side-chosen);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--ink2);
+}
+.members-side__more.ac-btn {
+  align-self: flex-start;
+  margin: 2px 0 0 4px;
+}
+
+/* At tablet widths the column takes room from the chat only when someone opens it; on a phone it is a sheet. */
+@media (max-width: 760px) {
+  .members-side {
+    display: none;
+  }
+}
+
+/* The phone's sheet: from the right over the channel, as Discord's app. */
+.members-sheet__scrim {
+  position: fixed;
+  z-index: 39;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: var(--scrim);
+}
+.members-sheet {
+  position: fixed;
+  z-index: 40;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 86%;
+  display: flex;
+  flex-direction: column;
+  background: var(--side);
+  --presence-ring: var(--side);
+  box-shadow: var(--e3);
+  border-radius: var(--radius-section) 0 0 var(--radius-section);
+  overflow: hidden;
+  animation: members-sheet-in 0.24s var(--out);
+}
+@keyframes members-sheet-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .members-sheet {
+    animation: none;
+  }
+}
+.members-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px 6px 18px;
+}
+.members-sheet__title {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 17px;
+  font-weight: 650;
+}
+.members-sheet__title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.members-sheet__title .ac-icon {
+  flex: none;
+  color: var(--faint);
+}
+.members-sheet__acts {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.members-sheet__find {
+  padding: 4px 14px 8px;
+}
+.members-sheet__find .ac-searchfield {
+  width: 100%;
+}
+.members-sheet__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
+.members-sheet__list .members-side__groups {
+  gap: 16px;
+}

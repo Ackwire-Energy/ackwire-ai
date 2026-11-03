@@ -59,7 +59,7 @@ interface TalkerCase {
   /** The task's state when the person writes. */
   state: "approval" | "long_step";
   message: string;
-  expect: "reply" | "pass" | "stop";
+  expect: "reply" | "pass";
   /** The reply must match each (case-insensitive). */
   says?: RegExp[];
   /** The reply must match none (invented results, promises). */
@@ -114,10 +114,28 @@ const TALKER_CASES: TalkerCase[] = [
     expect: "pass",
   },
   {
-    id: "long-step-stop",
+    id: "long-step-stop-pt",
     state: "long_step",
     message: "para",
-    expect: "stop",
+    expect: "pass",
+  },
+  {
+    id: "long-step-stop-en",
+    state: "long_step",
+    message: "stop",
+    expect: "pass",
+  },
+  {
+    id: "long-step-stop-ja",
+    state: "long_step",
+    message: "止めて",
+    expect: "pass",
+  },
+  {
+    id: "long-step-stop-de",
+    state: "long_step",
+    message: "hör auf",
+    expect: "pass",
   },
 ];
 
@@ -191,7 +209,8 @@ async function talkerCase(c: TalkerCase) {
     const text = replies.map((m) => m.body).join("\n");
     const outcome = decisions.at(-1) ?? "none";
     const problems: string[] = [];
-    const got = outcome === "reply" ? "reply" : outcome === "pass" ? "pass" : outcome;
+    // A stop is no word list: the model passes, or the stop judge ended the run before the reply posted.
+    const got = outcome === "ended" ? "pass" : outcome;
     if (got !== c.expect) problems.push(`expected ${c.expect}, got ${got}`);
     if (c.expect === "reply") {
       for (const r of c.says ?? []) if (!r.test(text)) problems.push(`doesn't say ${r}`);

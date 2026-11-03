@@ -360,7 +360,7 @@ describe("the invite dialog", () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
-    await click(screen().getByRole("button", { name: "Detalhes do canal" }));
+    await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
     await settle(3);
     const details = screen().getByRole("dialog", { name: "#eng" });
     await click(within(details).getByRole("button", { name: "Adicionar pessoa ou agente" }));

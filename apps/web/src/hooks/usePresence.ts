@@ -58,6 +58,23 @@ export function usePersonPresence(userId: string | null | undefined): PersonPres
   return { presence: person.presence, status: live(person.status), person };
 }
 
+const presenceMap = (list: Person[]) => new Map(list.map((p) => [p.userId, p.presence]));
+
+/** Everyone's presence in the workspace by user id (empty while the people load). */
+export function usePresences(): Map<string, MemberPresence> {
+  const { org } = useOrg();
+  const api = useApi();
+  return (
+    useQuery({
+      queryKey: keys.people(org.id),
+      queryFn: () => api.orgs.people(org.id),
+      staleTime: 30_000,
+      select: presenceMap,
+    }).data ?? EMPTY_PRESENCES
+  );
+}
+const EMPTY_PRESENCES = new Map<string, MemberPresence>();
+
 export interface AgentShown {
   presence: AgentPresence;
   line: AgentStatusLine | null;

@@ -121,6 +121,8 @@
     "color": "色",
     "colorDesc": "ロールのマークの色です。",
     "colorOf": "{{color}}色",
+    "hoist": "メンバーリストで別に表示",
+    "hoistDesc": "このロールを持つ人は、メンバー欄で専用のグループに表示されます。",
     "icon": "アイコン",
     "iconDesc": "名前の横に表示されます。",
     "more": "その他のオプション",
@@ -1054,9 +1056,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "システム",
     "markRead": "既読にする",
+    "muteChannel": "チャンネルをミュート",
+    "unmuteChannel": "ミュートを解除",
     "mention": "メンション",
     "copyHandle": "@{{handle}}をコピー",
     "handleCopied": "@をコピーしました。",
+    "copyId": "IDをコピー",
+    "idCopied": "IDをコピーしました。",
     "editAgent": "エージェントを編集",
     "openPage": "ページ全体を開く",
     "moveUp": "上へ移動",
@@ -1165,9 +1171,8 @@
     "sidebarMenu": {
       "title": "サイドバー",
       "newChannel": "新しいチャンネル",
-      "newAgentGroup": "新しいエージェントグループ",
       "addToChannels": "新しいチャンネルまたはカテゴリ",
-      "addToAgents": "エージェントまたはグループを作成",
+      "addToDms": "新しいメッセージまたはエージェント",
       "newMessage": "新しいメッセージ",
       "addMembers": "人またはエージェントを追加",
       "channelSettings": "チャンネルの設定",
@@ -1261,6 +1266,9 @@
     "pendingApprovals_other": "{{count}}件の承認待ち",
     "home": "ホーム",
     "notifications": "通知",
+    "unreadMark": "未読",
+    "unreadMentions_other": "あなたへのメンション {{count}} 件",
+    "unreadThreads_other": "スレッド: 未読の返信あり {{count}} 件",
     "unreadNotifications_other": "{{count}}件の未読の通知"
   },
   "agentGroups": {
@@ -1293,6 +1301,9 @@
   },
   "team": {
     "title": "チーム",
+    "groups": {
+      "title": "エージェントグループ"
+    },
     "subtitle_other": "{{count}}体のエージェントを、担当者ごとにまとめています。",
     "working_other": "{{count}}体が作業中です。",
     "skyLabel": "担当者ごとにまとめたエージェント。エージェントをタップすると、何をしているかが見られます。",
@@ -1368,10 +1379,15 @@
       "button_other": "ピン留めしたメッセージ（{{count}}）",
       "label": "#{{channel}}のピン留めしたメッセージ",
       "in": "#{{channel}}にピン留め",
-      "unpin": "{{name}}のメッセージのピン留めを外す"
+      "unpin": "{{name}}のメッセージのピン留めを外す",
+      "empty": "まだ何もピン留めされていません"
+    },
+    "header": {
+      "pins": "ピン留めしたメッセージ",
+      "showMembers": "メンバーを表示",
+      "hideMembers": "メンバーを隠す"
     },
     "membersButton_other": "チャンネルのメンバー（{{count}}）",
-    "membersPeople": "人",
     "membersAgents": "エージェント",
     "you": "あなた",
     "agentState": {
@@ -1381,7 +1397,6 @@
     },
     "autoReplyChip": "メンションなしで返信",
     "coordinatorChip": "チームのまとめ役",
-    "seeDetails": "チャンネルの詳細を見る",
     "more": "メッセージのその他の操作",
     "copyLink": "リンクをコピー",
     "linkCopied": "リンクをコピーしました。",
@@ -1403,7 +1418,6 @@
     "messages": "メッセージ",
     "members": "メンバー: {{names}}",
     "details": "チャンネルの詳細",
-    "agentsAnswer_other": "{{names}}がここで返信します",
     "composerLabel": "#{{channel}}へのメッセージ",
     "composerDm": "{{name}}へのメッセージ",
     "composerPlaceholder": "#{{channel}}へのメッセージ · @でエージェントを呼べます",
@@ -1436,6 +1450,13 @@
     "generalName": "#generalの名前は変更できません。",
     "archive": "チャンネルをアーカイブ",
     "archived": "#{{channel}}をアーカイブしました。会話は残ります。",
+    "delete": "チャンネルを削除",
+    "deleteTitle": "#{{channel}} を完全に削除しますか？",
+    "deleteGoes": "すぐに消えるもの: メッセージ、スレッド、ファイル、ピン留め、エージェントがこのチャンネルから覚えたこと、ここに投稿するルーティン。",
+    "deleteIssues": "このチャンネルのメンバーしか見られなかったため、タスクも削除されます。",
+    "deleteOrArchive": "会話を残したい場合は、削除せずにアーカイブしてください。",
+    "deleteTypeName": "確認のため {{channel}} と入力してください",
+    "deleteDone": "#{{channel}} を削除しました。",
     "detailsSub": "{{category}} · {{visibility}}",
     "visibilityPublic": "公開",
     "visibilityPrivate": "非公開",
@@ -1475,6 +1496,7 @@
     "claimed_other": "{{names}}が回答中",
     "waiting_other": "{{names}}が承認待ち",
     "handled_other": "{{names}}が回答しました",
+    "passed_other": "誰も回答しませんでした",
     "failed_other": "{{names}}は回答できませんでした",
     "asking_other": "{{names}}があなたの回答を待っています",
     "outage_other": "{{names}}: AIプロバイダーが停止中 · 自動で再試行します",
@@ -1494,6 +1516,7 @@
       "handled": "回答済み",
       "failed": "失敗",
       "referenced": "メンションのみ",
+      "passed": "回答しませんでした",
       "reacted": "リアクションしました"
     },
     "failedShort": "回答できませんでした",
@@ -1680,7 +1703,8 @@
     },
     "useAnyway": "{{email}}を使う",
     "assignFailed": "{{label}}のアカウントは接続されましたが、{{agent}}を切り替えられませんでした。",
-    "noAgents": "プランが使えるのは持ち主のエージェントだけですが、まだエージェントがいません。",
+    "forNewAgents": "{{label}}を接続しました。これから作るエージェントはこれで動きます。",
+    "forNewAgentsHint": "これから作るエージェントはこれで動きます。",
     "done": "完了",
     "agent": "どのエージェント用か",
     "keyLocked": "APIキーを追加できるのは管理者だけです。",
@@ -1777,6 +1801,17 @@
     },
     "connect": "接続",
     "connected": "接続済み",
+    "connect_app": {
+      "title": "{{name}}を接続",
+      "mcp": "MCPサーバーを追加",
+      "adminOnly": "管理者が接続します"
+    },
+    "invite": {
+      "title_other": "{{count}}人を招待",
+      "open": "招待",
+      "done": "招待を送信済み",
+      "adminOnly": "招待できる人が送信します"
+    },
     "agentProposal": {
       "title": "{{agent}}が新しいエージェントを提案しています",
       "review": "確認する",
@@ -1865,6 +1900,7 @@
     "routine": {
       "created": "ルーティン<b>{{name}}</b>を作成しました · {{schedule}}",
       "created_bare": "ルーティン<b>{{name}}</b>を作成しました",
+      "ownActions": "確認なしで自動実行: {{actions}}",
       "updated": "ルーティン<b>{{name}}</b>の{{fields}}を変更しました",
       "updated_paused": "ルーティン<b>{{name}}</b>を一時停止しました",
       "updated_resumed": "ルーティン<b>{{name}}</b>を再開しました",
@@ -2056,6 +2092,12 @@
   "profile": {
     "audience": "話しかけられる人",
     "cardLabel": "プロフィール",
+    "roles": "ロール",
+    "memberSince": "参加日",
+    "messageTo": "{{name}}へのメッセージ",
+    "audienceEdit": "編集",
+    "nowIn": "現在 #{{channel}} で作業中",
+    "more": "その他",
     "of": "{{name}}のプロフィール",
     "presence": "ステータス",
     "offline": "まだ参加していません",
@@ -2812,14 +2854,6 @@
     "nameLabel": "名前",
     "roleLabel": "役割",
     "roleHelp": "チームのために何をするか。例: メールとカレンダーのアシスタント",
-    "editName": "名前を編集: {{name}}",
-    "editHandle": "メンションを編集: @{{handle}}",
-    "editRole": "役割を編集: {{role}}",
-    "noRole": "役割なし",
-    "rolePlaceholder": "例: サポート",
-    "roleList": "役割の一覧",
-    "roleUse": "「{{role}}」を使う",
-    "roleCurrent": "現在",
     "edit": "編集",
     "chat": "チャット",
     "moreActions": "その他の操作",
@@ -2864,7 +2898,15 @@
     "budgetDefaultHelp": "空欄: ワークスペースのデフォルト。",
     "budgetDefaultHelpAmount": "空欄: ワークスペースのデフォルト（{{amount}}）。",
     "budgetInvalid": "0より大きい値を入力してください。",
-    "notFound": "このエージェントは存在しないか、アーカイブされています。"
+    "notFound": "このエージェントは存在しないか、アーカイブされています。",
+    "editName": "名前を編集: {{name}}",
+    "editHandle": "メンションを編集: @{{handle}}",
+    "editRole": "役割を編集: {{role}}",
+    "noRole": "役割なし",
+    "rolePlaceholder": "例: サポート",
+    "roleList": "役割の一覧",
+    "roleUse": "「{{role}}」を使う",
+    "roleCurrent": "現在"
   },
   "agentPage": {
     "work": {
@@ -3358,6 +3400,8 @@
         "org_deleting": "ワークスペースは削除中です。",
         "agent_paused": "エージェントは一時停止中です。",
         "computer_busy": "コンピューターが他のタスクで埋まっていました。",
+        "computer_failed": "コンピューターで問題が起きて停止しました。",
+        "computer_timeout": "コンピューターの応答に時間がかかりすぎました。",
         "unknown": "失敗しました。"
       }
     },
@@ -3719,6 +3763,7 @@
       "handleTaken": "@{{handle}}はすでにほかのエージェントか人が使っています。@{{suggestion}}はいかがですか？",
       "modelUnavailable": "ワークスペースで使えるモデルを選んでください。"
     },
+    "noAi": "このワークスペースにはまだAIがありません。今すぐ接続するか、エージェントを作ってから接続してください。",
     "instructions": "指示",
     "instructionsPlaceholder": "例: ドキュメントをもとに#supportで顧客の質問に答えます。わからないときはチームの誰かを呼びます。",
     "startedFrom": "{{role}}のテキストから開始",
@@ -3850,6 +3895,13 @@
     "routineNotMade": "ルーティンは作成されませんでした: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} のメンバー",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "ワークスペースのオーナー",
+      "more": "さらに {{count}} 件表示",
+      "find": "人とエージェントを検索"
+    },
     "agentsOnlyYou": "あなたのエージェントは、あなたにだけ返信します。",
     "agentsOnlyYouHint": "プランがあれば、エージェントのページでほかの人にも返信できるよう設定できます。",
     "filters": "人を絞り込む",
@@ -3872,7 +3924,6 @@
       "on": "{{date}}"
     },
     "waitingTitle": "あなたの対応待ち",
-    "more": "{{name}}のその他の操作",
     "remove": {
       "item": "ワークスペースから削除",
       "leave": "ワークスペースを退出",
@@ -3907,18 +3958,9 @@
     },
     "dialog": {
       "title": "{{org}}に招待",
-      "stepOf": "ステップ {{n}}/{{total}} · {{step}}",
-      "steps": {
-        "who": "招待する人",
-        "role": "ロール",
-        "where": "参加チャンネル",
-        "note": "メッセージ"
-      },
       "emails": "メールアドレス",
       "moreEmails": "メールアドレスを追加…",
       "checkMarked": "マークされたメールアドレスを確認してください。招待は届きません。",
-      "pasteHelp": "リストを貼り付けることもできます。カンマ、スペース、または1行に1件で区切ってください。",
-      "leftOut": "すでに参加している人や招待済みの人は除かれます。",
       "withNote": "メッセージ付き",
       "alsoJoin": "あわせて参加するチャンネル",
       "generalAlways": "全員が#{{channel}}に参加します",
@@ -3926,11 +3968,20 @@
       "optional": "（任意）",
       "notePlaceholder": "こんにちは。{{org}}に参加しませんか。チームもエージェントもみんなここにいます。",
       "or": "またはリンクを送信",
-      "continueWith": "{{count}}人で続ける",
       "send_other": "{{count}}人を招待",
       "sent": "{{email}}に招待を送信しました。",
       "sentMany": "{{count}}件の招待を送信しました。",
       "alsoIn": "{{channels}}にもあわせて参加します。",
+      "stepOf": "ステップ {{n}}/{{total}} · {{step}}",
+      "steps": {
+        "who": "招待する人",
+        "role": "ロール",
+        "where": "参加チャンネル",
+        "note": "メッセージ"
+      },
+      "pasteHelp": "リストを貼り付けることもできます。カンマ、スペース、または1行に1件で区切ってください。",
+      "leftOut": "すでに参加している人や招待済みの人は除かれます。",
+      "continueWith": "{{count}}人で続ける",
       "who": {
         "title": "だれを招待しますか？",
         "lead": "メールアドレスを教えてください。それぞれに招待が届き、そのまま参加できます。"
@@ -4270,7 +4321,7 @@
     },
     "setup_write": {
       "label": "ワークスペースを設定",
-      "description": "人がクリックするカードでAIの接続を提案したり、依頼した人のためにチャンネルを作成したりします（元に戻せます）。"
+      "description": "人がクリックするカードでAI、アプリ、MCPサーバーの接続やメンバーの招待を提案したり、依頼した人のためにチャンネルを作成したりします（元に戻せます）。"
     },
     "github_git_read": {
       "label": "リポジトリをクローン（git）",
@@ -4314,54 +4365,6 @@
     "flowHint": "タスクは各段階の最初の列へ自動で移動します。エージェントが始めると「進行中」、確認の準備ができると「レビュー中」、あなたが承認すると「完了」へ。",
     "moreOptions": "その他のオプション",
     "showCanceled": "キャンセル済みを表示",
-    "filterButton": "フィルター",
-    "filterValue": "{{filter}}：{{value}}",
-    "me": "自分",
-    "display": {
-      "title": "表示設定",
-      "label": "表示設定：{{layout}} · {{group}}",
-      "layout": "レイアウト",
-      "group": "グループ化",
-      "sort": "並べ替え",
-      "fields": "カードに表示",
-      "saved": "このワークスペースであなた用に保存されます",
-      "reset": "デフォルトに戻す",
-      "by": {
-        "stage": "段階",
-        "assignee": "担当者",
-        "priority": "優先度"
-      },
-      "order": {
-        "manual": "手動",
-        "priority": "優先度",
-        "due": "期日"
-      },
-      "field": {
-        "assignee": "担当者",
-        "priority": "優先度",
-        "due": "期日",
-        "criteria": "条件",
-        "pullRequest": "プルリクエスト",
-        "label": "ラベル"
-      }
-    },
-    "drop": {
-      "stage": "{{name}}にドロップ",
-      "assignee": "ドロップして{{name}}に渡す",
-      "unassign": "ドロップして担当者を外す",
-      "priority": "ドロップして優先度を{{priority}}にする"
-    },
-    "drag": {
-      "role": "ドラッグできるタスク",
-      "help": "スペースでタスクを持ち上げ、矢印キーで移動し、スペースで置き、Escでキャンセルします。",
-      "picked": "#{{number}}を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
-      "moved": "#{{number}}：{{group}}、{{total}}件中{{position}}番目。",
-      "dropped": "#{{number}}を{{group}}に置きました。",
-      "canceled": "#{{number}}は元の場所に戻りました。",
-      "assigned": "#{{number}}の担当は{{name}}になりました。",
-      "unassigned": "#{{number}}の担当者がいなくなりました。",
-      "prioritized": "#{{number}}の優先度は{{priority}}になりました。"
-    },
     "canceledColumn": "キャンセル済み",
     "columns": {
       "add": "列を追加",
@@ -4595,6 +4598,54 @@
       "agent_asked": "{{name}}に作業を頼みました",
       "forum_opened": "フォーラムに持ち込みました: {{title}}",
       "forum_evaluated": "フォーラムの結果を戻しました: {{title}}"
+    },
+    "filterButton": "フィルター",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "自分",
+    "display": {
+      "title": "表示設定",
+      "label": "表示設定：{{layout}} · {{group}}",
+      "layout": "レイアウト",
+      "group": "グループ化",
+      "sort": "並べ替え",
+      "fields": "カードに表示",
+      "saved": "このワークスペースであなた用に保存されます",
+      "reset": "デフォルトに戻す",
+      "by": {
+        "stage": "段階",
+        "assignee": "担当者",
+        "priority": "優先度"
+      },
+      "order": {
+        "manual": "手動",
+        "priority": "優先度",
+        "due": "期日"
+      },
+      "field": {
+        "assignee": "担当者",
+        "priority": "優先度",
+        "due": "期日",
+        "criteria": "条件",
+        "pullRequest": "プルリクエスト",
+        "label": "ラベル"
+      }
+    },
+    "drop": {
+      "stage": "{{name}}にドロップ",
+      "assignee": "ドロップして{{name}}に渡す",
+      "unassign": "ドロップして担当者を外す",
+      "priority": "ドロップして優先度を{{priority}}にする"
+    },
+    "drag": {
+      "role": "ドラッグできるタスク",
+      "help": "スペースでタスクを持ち上げ、矢印キーで移動し、スペースで置き、Escでキャンセルします。",
+      "picked": "#{{number}}を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
+      "moved": "#{{number}}：{{group}}、{{total}}件中{{position}}番目。",
+      "dropped": "#{{number}}を{{group}}に置きました。",
+      "canceled": "#{{number}}は元の場所に戻りました。",
+      "assigned": "#{{number}}の担当は{{name}}になりました。",
+      "unassigned": "#{{number}}の担当者がいなくなりました。",
+      "prioritized": "#{{number}}の優先度は{{priority}}になりました。"
     }
   },
   "routines": {
@@ -4781,6 +4832,7 @@
         "artifact": "Driveのドキュメントになります"
       },
       "ahead": "あとで実行する準備済み",
+      "ownActions": "自動で行うこと",
       "createdBy": "作成者: {{name}} · {{date}}",
       "nameLabel": "ルーティンの名前",
       "editName": "名前を編集",
@@ -4798,6 +4850,10 @@
         "always": "新しい情報がなくても",
         "when_new": "新しい情報がなければ投稿しません"
       }
+    },
+    "ownActions": {
+      "hint": "毎回の実行で、接続済みアプリでこれらを確認なしで行います。それ以外の操作は先に人の承認を求め、マージ、デプロイ、ロールバックは常に承認を求めます。",
+      "none": "接続済みアプリでは、操作のたびに人の承認を求めます。自動で仕事をさせるには、チャットでエージェントにどの操作をしてよいか伝えてください。"
     },
     "ahead": {
       "approved": "承認済み · {{when}}に実行",
@@ -6188,9 +6244,10 @@
     "bodyHelp": "SKILL.mdの本文。",
     "writeMissing": "名前、使うタイミング、指示を入力してください。",
     "files": "ファイル",
-    "needsSandbox": "サンドボックスが必要",
+    "needsSandbox": "保存されていません",
+    "assetLimit": "スキルに保存できる画像などのファイルは最大 {{max}} MB です。",
     "runsOnPc": "エージェントのPCで実行",
-    "reinstall": "スクリプトを使うには再インストールしてください。",
+    "reinstall": "エージェントがこのファイルを使えるように、スキルを再インストールしてください。",
     "edit": "編集",
     "save": "保存",
     "saved": "{{name}}を保存しました。",
@@ -8296,6 +8353,12 @@
   "connectors": {
     "title": "コネクタ",
     "add": "コネクタを追加",
+    "mcp": {
+      "title": "MCP",
+      "add": "MCPを追加",
+      "list": "接続済みのMCPサーバー",
+      "none": "アドレスで接続したMCPサーバーがここに表示されます。"
+    },
     "addTitle": "コネクタを追加",
     "catalogText": "{{org}}で一度接続すれば、各エージェントが何を使えるかを選べます。",
     "catalog": "利用できるコネクタ",
@@ -9575,6 +9638,27 @@
       "relevance": "関連度順"
     },
     "searchHere": "この会話を検索",
+    "optionHint": {
+      "from": "名前",
+      "in": "チャンネル",
+      "has": "リンク、ファイル、画像、カード",
+      "mentions": "名前"
+    },
+    "moreFiltersHint": "日付、エージェントのみ、ピン留め",
+    "clearRecentAll": "最近の検索を消去",
+    "header": {
+      "placeholder": "{{org}}を検索",
+      "clear": "検索をクリア"
+    },
+    "panel": {
+      "label": "検索結果",
+      "count_other": "{{count}}件の結果",
+      "filters": "フィルター",
+      "filtersCount_other": "フィルター（{{count}}）",
+      "jump": "移動",
+      "jumpLabel": "{{name}} のメッセージに移動",
+      "threadIn": "#{{channel}}のスレッド"
+    },
     "dm": "{{name}}とのDM"
   },
   "files": {
@@ -9907,6 +9991,7 @@
       "measuring": "サイズはまだ測定されていません",
       "diskFullNotice": "{{name}}のディスクがもうすぐいっぱいです"
     },
+    "chromeMissingNotice": "{{name}}でエージェントのブラウザを使うにはGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
     "access": {
       "folders": "許可されたフォルダ",
       "ownFolder": "各エージェントのフォルダ",
@@ -10387,6 +10472,7 @@
         "wiki": "Wikiページ",
         "mission": "ミッション",
         "thread": "スレッド",
+        "channel": "チャンネル",
         "forum": "フォーラムのトピック",
         "artifact": "Driveのファイル",
         "agent": "エージェント",
@@ -10470,7 +10556,7 @@
       "members": "メンバーと招待",
       "roles": "ロールと権限",
       "access": "エージェントとアクセス",
-      "connectors": "コネクタ",
+      "connectors": "コネクタとMCP",
       "skills": "スキル",
       "keys": "AIアカウント",
       "storage": "ストレージ",
@@ -10490,7 +10576,7 @@
       "members": "ワークスペースのメンバーと招待。",
       "roles": "各メンバーができること。ロールの権限は合算されます。",
       "access": "各エージェントが使えるもの。コネクタごとに1つのレベル。",
-      "connectors": "ワークスペース全体で一度だけ接続するサービス。",
+      "connectors": "ワークスペース全体で一度だけ接続するサービスとMCPサーバー。",
       "skills": "エージェントが必要なときに開くMarkdownの指示。",
       "keys": "あなたのプランと、ワークスペースのAPIキー。",
       "storage": "ワークスペースのファイルの保存先。",
@@ -11020,6 +11106,8 @@
         "readingForum": "フォーラムを読みました",
         "creatingChannel": "チャンネルを作成しました",
         "offeringConnectAi": "AIの接続を提案しました",
+        "offeringConnectApp": "アプリの接続を提案しました",
+        "offeringInvites": "メンバーの招待を提案しました",
         "proposingAgent": "エージェントを提案しました",
         "askingAgent": "別のエージェントに質問しました",
         "tellingAgent": "別のエージェントに伝えました",
@@ -11102,6 +11190,8 @@
       "readingForum": "フォーラムを読み込み中",
       "creatingChannel": "チャンネルを作成中",
       "offeringConnectAi": "AIの接続を準備中",
+      "offeringConnectApp": "アプリの接続を準備中",
+      "offeringInvites": "招待を準備中",
       "proposingAgent": "エージェントを提案中",
       "askingAgent": "別のエージェントに質問中",
       "tellingAgent": "別のエージェントに連絡中",
@@ -11207,6 +11297,9 @@
       "no_ai_signed_out": "まだ返信できません。AIがログアウトされています。",
       "no_ai_not_signed_in": "まだ返信できません。私のコンピューターで{{brain}}にログインしていません。",
       "action_connect_ai": "AIを接続",
+      "action_connect_app": "{{name}}を接続",
+      "action_add_mcp": "MCPサーバーを追加",
+      "action_invite_people": "メンバーを招待",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
       "approval_request": "承認リクエスト: {{title}}",
       "secret_request": "{{agent}}がキーを求めました: {{name}}",
@@ -11403,6 +11496,14 @@
     "offer_connect_ai": {
       "label": "AIの接続を提案",
       "description": "プランやAPIキーを接続するダイアログを開くボタン付きのカードを投稿します。"
+    },
+    "offer_connect_app": {
+      "label": "アプリやMCPの接続を提案",
+      "description": "アプリやMCPサーバーをアドレスで接続するダイアログを開くボタン付きのカードを投稿します。"
+    },
+    "offer_invites": {
+      "label": "メンバーの招待を提案",
+      "description": "アドレスが入力済みの招待ダイアログを開くボタン付きのカードを投稿します。"
     },
     "propose_agent": {
       "label": "エージェントを提案",

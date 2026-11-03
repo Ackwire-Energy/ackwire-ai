@@ -9,9 +9,11 @@ import {
   canUndoAction,
   formatTimeLeft,
   hookToCopy,
+  routineOwnActions,
   undoableNow,
 } from "@agenteschat/client/lib/actions";
-import { relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { ownActionName } from "@agenteschat/client/lib/approval-words";
+import { joinNames, relativeTime, toYmd } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { cx, Icon, type IconName, onScreenNow } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -245,6 +247,7 @@ function Receipt({
     schedule: (rule) => ruleSentence(t, i18n.language, fromApiRule(rule, toYmd(new Date())), new Date()),
   });
   const struck = Boolean(a.undoneAt);
+  const ownActions = routineOwnActions(a);
   // Once it had a button, its room stays: Desfazer turning into Refazer, or leaving when its time is up, never
   // rewraps the sentence.
   const hadButton = useRef(false);
@@ -267,6 +270,16 @@ function Receipt({
             components={{ b: <ReceiptTarget action={a} /> }}
           />
         </span>
+        {ownActions.length > 0 && (
+          <span className="ag-rc__by">
+            {t("agentActions.routine.ownActions", {
+              actions: joinNames(
+                ownActions.map((name) => ownActionName(t, name)),
+                t,
+              ),
+            })}
+          </span>
+        )}
         {undoneBy && <span className="ag-rc__by">{t("agentActions.undoneBy", { name: undoneBy })}</span>}
         <CopyHookButton action={a} />
       </span>

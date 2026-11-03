@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { CHROME_NEEDED } from "@agenteschat/adapters/machine-protocol";
+import { findChrome } from "../../runner/browser";
 import {
   type DeviceCode,
   devicePair,
@@ -386,6 +388,9 @@ test("update: the new runner is a step done, and a service that won't start is t
     const lines = stdout.trimEnd().split("\n");
     expect(lines.slice(0, 2)).toEqual(["agentes.chat update", `◇  Updated ${script}.`]);
     expect(lines[2]).toMatch(/^■ {2}(systemctl --user daemon-reload failed|launchctl couldn't load)/);
+    // The new runner drives the computer's own Google Chrome: one without it is told where to get it.
+    if (findChrome(dir)) expect(stdout).not.toContain(CHROME_NEEDED);
+    else expect(`${stdout}${await new Response(proc.stderr).text()}`).toContain(CHROME_NEEDED);
   } finally {
     server.stop(true);
   }

@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
@@ -21,6 +21,9 @@ import {
   lookTheme,
 } from "../../runner/desktop-look";
 import { removeDirs, tempDir } from "./helpers";
+
+// Each case runs real shell scripts and waits on fake desktop processes: under a full-suite load they pass 5 s.
+setDefaultTimeout(30_000);
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));

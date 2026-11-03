@@ -347,7 +347,7 @@ export async function composioFailure(
     await markComposioBroken(deps.db, connection, error.message);
     return fail(
       "connector.needs_reconnect",
-      `The ${connection.label} account stopped working (its sign-in expired or was removed). Someone who manages connectors must reconnect it in Settings › Connectors.`,
+      `The ${connection.label} account stopped working (its sign-in expired or was removed). Someone who manages connectors must reconnect it in Settings › Connectors and MCPs.`,
     );
   }
   if (error instanceof ComposioKeyError) {

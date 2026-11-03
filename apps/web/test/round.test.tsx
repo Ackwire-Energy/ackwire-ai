@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { modelChoices } from "@agenteschat/client/lib/providers";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { channelNameError, toChannelName } from "@/components/NewChannelDialog";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -42,14 +42,11 @@ describe("receipt on the right of the header line", () => {
 });
 
 describe("sidebar: no agent twice", () => {
-  test("agents open their DM (with unread); 'Mensagens diretas' lists only people", async () => {
+  test("an agent's DM is one row among the people's under 'Mensagens diretas', with its unread", async () => {
     const state = seedState();
-    state.dms.push({ channelId: "dm-ada", with: { type: "agent", id: ADA_ID, name: "Ada", handle: "ada" } });
-    state.dms.push({ channelId: "dm-joao", with: { type: "person", id: "u-joao", name: "João", handle: null } });
-    const api = createFakeApi(state);
-    const list = api.dms.list;
-    api.dms.list = async (o) => (await list(o)).map((d) => ({ ...d, unread: d.with.id === ADA_ID ? 3 : 1 }));
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    seedDm(state, { type: "agent", id: ADA_ID }, { ago: 1, unread: 3 });
+    seedDm(state, { type: "person", id: "u-joao" }, { ago: 5, unread: 1 });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
     const adaLinks = within(nav())
       .getAllByRole("link")
@@ -58,11 +55,7 @@ describe("sidebar: no agent twice", () => {
     expect(adaLinks[0]?.getAttribute("href")).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     expect(within(adaLinks[0] as HTMLElement).getByLabelText("3 mensagens não lidas").textContent).toBe("3");
     const dmsGroup = within(nav()).getByText("Mensagens diretas").closest(".sidebar__group") as HTMLElement;
-    expect(
-      within(dmsGroup)
-        .getAllByRole("link")
-        .map((l) => l.textContent),
-    ).toEqual(["JJoão1"]);
+    expect([...dmsGroup.querySelectorAll("a .sidebar__item-label")].map((l) => l.textContent)).toEqual(["Ada", "João"]);
   });
 });
 
@@ -185,7 +178,7 @@ describe("Criar canal", () => {
 
 describe("Detalhes do canal: membros", () => {
   const openDetails = async () => {
-    await click(screen().getByRole("button", { name: "Detalhes do canal" }));
+    await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
     await settle(3);
     return screen().getByRole("dialog", { name: "#eng" });
   };

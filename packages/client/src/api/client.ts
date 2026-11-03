@@ -415,6 +415,10 @@ export interface ApiClient {
     issuesView(orgId: string): Promise<IssuesView>;
     /** Keeps how I look at Tarefas here; answers with what the server kept. */
     setIssuesView(orgId: string, view: IssuesView): Promise<IssuesView>;
+    /** The sidebar's tools in my order here (every tool; its place says list or More). */
+    sidebarToolOrder(orgId: string): Promise<SidebarItem[]>;
+    /** Saves my order of the tools here (`null`: the default). */
+    setSidebarToolOrder(orgId: string, order: SidebarItem[] | null): Promise<SidebarItem[]>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
@@ -648,6 +652,8 @@ export interface ApiClient {
     archive(orgId: string, channelId: string): Promise<void>;
     /** "Desfazer" right after archiving. */
     unarchive(orgId: string, channelId: string): Promise<void>;
+    /** Owners and admins, never #general: the channel and what it held go for good. `name`: typed to confirm. */
+    deleteChannel(orgId: string, channelId: string, name: string): Promise<void>;
     /** Members with names; agents carry `autoReply`. */
     roster(orgId: string, channelId: string): Promise<RosterMember[]>;
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;
@@ -1410,6 +1416,13 @@ export interface ApiClient {
   threadFollows?: {
     follow(orgId: string, threadId: string): Promise<ThreadFollow>;
     unfollow(orgId: string, threadId: string): Promise<ThreadFollow>;
+  };
+  /** Unread marks: muting a conversation, reading a thread, the threads with unread replies. */
+  reads?: {
+    mute(orgId: string, channelId: string, muted: boolean): Promise<void>;
+    markThreadRead(orgId: string, threadId: string): Promise<void>;
+    /** How many threads I follow have a reply I haven't read (at most 100). */
+    unreadThreads(orgId: string): Promise<number>;
   };
   /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
   working?: {

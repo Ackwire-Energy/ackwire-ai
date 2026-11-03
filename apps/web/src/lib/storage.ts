@@ -52,6 +52,8 @@ export const STORAGE_KEYS = {
   sidebarCollapsed: "agentes.sidebar.collapsed",
   /** Prefix (`.<user id>.<org id>`): the sidebar categories that person closed in that workspace (JSON array of ids). */
   sidebarSections: "agentes.sidebar.sections",
+  /** Prefix (`.<user id>.<org id>`): "1" or "0", the person opened or closed a channel's members column there. */
+  membersColumn: "agentes.members.column",
   /** Offline-computer notices the person closed (`machineId@offlineSince`), until that computer comes back. */
   outagesDismissed: "agentes.outages.dismissed",
   /** The workspace computer's notice the person closed (`setupNoticeKey`), until its state changes. */

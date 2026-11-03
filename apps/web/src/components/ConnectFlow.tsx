@@ -64,9 +64,10 @@ import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "./
 export type FlowState =
   /**
    * Step 1: a catalog entry, or `null` for any MCP server by address. `add`: another account of `item`'s server
-   * (an MCP server takes several); `reconnect`: a new sign-in for `item`, whose name, tools and agents stay.
+   * (an MCP server takes several); `reconnect`: a new sign-in for `item`, whose name, tools and agents stay. `url`: the
+   * address already typed in (an agent's card).
    */
-  | { step: 0; def: ConnectorDef | null; mode?: "add" | "reconnect"; item?: ConnectedItem }
+  | { step: 0; def: ConnectorDef | null; mode?: "add" | "reconnect"; item?: ConnectedItem; url?: string }
   /** `naming`: a new account the provider didn't name ("Stripe 2"): its name comes first, above its tools. */
   | { step: 1 | 2; item: ConnectedItem; naming?: boolean };
 
@@ -144,6 +145,7 @@ export function ConnectFlow({
           returnTo={returnTo}
           mode={flow.mode}
           item={flow.item}
+          initialUrl={flow.url}
           onConnected={(item, naming) => onChange({ step: 1, item, naming })}
           onClose={onClose}
         />
@@ -179,6 +181,7 @@ function ConnectStep({
   returnTo,
   mode,
   item,
+  initialUrl,
   onConnected,
   onClose,
 }: {
@@ -186,6 +189,7 @@ function ConnectStep({
   returnTo?: string;
   mode?: "add" | "reconnect";
   item?: ConnectedItem;
+  initialUrl?: string;
   /** `naming`: another account of a server the provider didn't name ("Stripe 2"). */
   onConnected: (item: ConnectedItem, naming: boolean) => void;
   onClose: () => void;
@@ -199,7 +203,7 @@ function ConnectStep({
   const { connect } = useCustomServerAction(org.id);
   const withKey = useConnectWithKey(org.id);
   const oauth = useStartOAuth(org.id);
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl ?? "");
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [keyOpen, setKeyOpen] = useState(false);

@@ -1,4 +1,4 @@
-import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
+import { channelTopic, chatActivityTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
 import { modelProvider } from "@agenteschat/providers";
 import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
@@ -281,6 +281,8 @@ export type ChannelEvent =
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
+      passed?: true;
       error?: string;
       errorCode?: string;
       errorParams?: Record<string, string>;
@@ -426,6 +428,8 @@ export type ChannelEvent =
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** It ended without answering: passed and posted nothing, or canceled before it ran. */
+      passed?: true;
     }
   /** An agent changed its memory because a person asked (with an undo). */
   | {
@@ -495,7 +499,7 @@ export type ChannelEvent =
       change: ThreadChange;
       state?: ThreadState;
       /** Without `following` (each person reads their own from the API). */
-      thread?: Omit<ThreadInfo, "following">;
+      thread?: Omit<ThreadInfo, "following" | "unread">;
       messageIds?: string[];
     }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
@@ -599,6 +603,17 @@ export async function publishMessageCreated(pubsub: PubSub, message: MessageView
     messageId: message.id,
     ...(inline ? { message } : {}),
   });
+  try {
+    await pubsub.publish(chatActivityTopic, {
+      type: "channel.activity",
+      channelId: message.channelId,
+      threadId: message.threadId,
+      authorUserId: message.author.type === "person" ? message.author.id : null,
+      mentionedUserIds: message.mentionedUserIds,
+    });
+  } catch {
+    // Best effort: the lists catch up when they're read again.
+  }
 }
 
 /** Receipts of a routed message (`message.routed`), then "thinking" for each run it started, where the message is. */

@@ -790,11 +790,8 @@ html:not([data-pointer]) .cal-mini__day:focus-visible {
   gap: 2px;
 }
 /* Series prompt and the event form */
-.cal-series {
-  display: flex;
-  flex-direction: column;
+.ac-dialog__body.cal-series {
   gap: 8px;
-  padding: 4px 24px 8px;
 }
 .cal-form__switch {
   display: inline-flex;

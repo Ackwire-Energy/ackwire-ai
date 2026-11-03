@@ -14,11 +14,16 @@ const outsideCode = (text: string) => text.replace(/&#?\w+;/g, "").replace(/`[^`
 /** A help page's code block. A key merely named `code` ("Code from the email") is words. */
 const CODE_BLOCK = /\.blocks\.\d+\.code$/;
 
+/** Keys allowed a mark, each with its reason. */
+export const MARKS_ALLOWED: Readonly<Record<string, string>> = {
+  "members.column.group": "owner-approved Discord-style group header",
+};
+
 /** A string tree's leaves that break the rule, as "key: text", for one readable failure. */
 export const unplainLeaves = (tree: unknown) =>
   leaves(tree)
     .filter((leaf): leaf is [string, string] => typeof leaf[1] === "string")
-    .filter(([key, text]) => !CODE_BLOCK.test(key) && MARKS.test(outsideCode(text)))
+    .filter(([key, text]) => !CODE_BLOCK.test(key) && !(key in MARKS_ALLOWED) && MARKS.test(outsideCode(text)))
     .map(([key, text]) => `${key}: ${text}`);
 
 /**

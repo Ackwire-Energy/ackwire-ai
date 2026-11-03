@@ -5,8 +5,9 @@
  * "Ajustar trecho" selection (neutral: ink and gray only; blue is for agents).
  * `--thread-indent` lines quiet rows up with the messages' text column.
  */
+/* The messages' side padding, 36px face and gap (`.ac-msg`). */
 .channel__messages {
-  --thread-indent: 56px;
+  --thread-indent: 64px;
 }
 
 /* ── In the channel ────────────────────────────────────────────────────── */
@@ -224,10 +225,8 @@ html:not([data-pointer]) .thread-pop__row:focus-visible {
   background: var(--sunken);
   color: var(--ink2);
 }
-@media (max-width: 720px) {
-  .thread-pop__label {
-    display: none;
-  }
+/* Where the messages' side padding narrows to 12px (`responsive.css`). */
+@media (max-width: 760px) {
   .channel__messages {
     --thread-indent: 58px;
   }
@@ -253,7 +252,7 @@ html:not([data-pointer]) .thread-pop__row:focus-visible {
 }
 /* The answer on its own, when the consulted agent's words in the DM are left out: under the messages, at their text. */
 .consult-answer {
-  margin: 4px 12px 8px var(--thread-indent, 56px);
+  margin: 4px 12px 8px var(--thread-indent, 64px);
 }
 /* Who is in it, in front of the title (the generic thread mark only when nobody is known). */
 .thread-head__who {

@@ -72,6 +72,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SidebarItem,
   SidebarItems,
   SidebarSection,
   SignInOptions,
@@ -89,6 +90,7 @@ import { ISSUES_VIEW_DEFAULT } from "@agenteschat/client/lib/issues-view";
 import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
+import { SIDEBAR_ITEMS } from "@agenteschat/client/lib/sidebar-items";
 import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
 import { createFakeApps, type FakeApps } from "./fakes/apps";
@@ -181,6 +183,8 @@ export interface FakeState {
   answeredElsewhere?: Set<string>;
   /** Answers to questions wait for this before the server replies (a slow network). */
   answerHold?: Promise<void>;
+  /** Threads I follow with an unread reply (`reads.unreadThreads`). */
+  unreadThreads?: number;
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
@@ -240,7 +244,12 @@ export interface FakeState {
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
   autoReply: Record<string, boolean>;
-  dms: { channelId: string; with: { type: "person" | "agent"; id: string; name: string; handle: string | null } }[];
+  /** `unread`: its count (0 when unset); the last message is the channel's latest in `messages`. */
+  dms: {
+    channelId: string;
+    with: { type: "person" | "agent"; id: string; name: string; handle: string | null };
+    unread?: number;
+  }[];
   calls: { method: string; args: unknown[] }[];
   context?: string;
   defaultCredentialId?: string | null;
@@ -285,6 +294,8 @@ export interface FakeState {
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
   answerNowError?: ApiError;
+  /** What `chat.answerNow` says answers the message (default none). */
+  answerNowRuns?: { agentId: string; runId: string }[];
   /** `system.health`'s edition; unset = the Cloud. */
   edition?: Edition;
   /** Overrides `system.instance` (default: agentes.chat Cloud). */
@@ -369,6 +380,8 @@ export interface FakeState {
   sidebarOrder?: SidebarSection[];
   /** How I look at Tarefas (`orgs.issuesView`); unset = never changed (the default). */
   issuesView?: IssuesView;
+  /** The sidebar's tools in my order (`orgs.sidebarToolOrder`); unset = the default. */
+  sidebarToolOrder?: SidebarItem[];
   /**
    * The task manager (ADR 0128, `working.taskManager`); unset = a server without it (no `working` part). Stopping a
    * task (`agents.cancelRun`) moves it to `ended`, stopped by me.
@@ -394,6 +407,7 @@ export function seedRoles(): OrgRole[] {
       color: "indigo",
       position: 0,
       permissions: ["administrator"],
+      hoist: true,
     },
     {
       ...role,
@@ -565,6 +579,37 @@ function mediaSettings(state: FakeState): Pick<OrgSettings, MediaSetting> {
 }
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
+/**
+ * A DM of mine with a message in it, so the sidebar's "Mensagens diretas" lists it (`ago`: minutes since that
+ * message). The person's are from the seed's members, the agent's from its agents.
+ */
+export function seedDm(
+  state: FakeState,
+  partner: { type: "person" | "agent"; id: string },
+  { ago = 5, unread = 0, body = "Oi" }: { ago?: number; unread?: number; body?: string } = {},
+) {
+  const agent = partner.type === "agent" ? state.agents.find((a) => a.id === partner.id) : undefined;
+  const person = partner.type === "person" ? state.members.find((m) => m.userId === partner.id) : undefined;
+  const channelId = `dm-${partner.id}`;
+  state.dms.push({
+    channelId,
+    with: { ...partner, name: agent?.name ?? person?.name ?? "", handle: agent?.handle ?? null },
+    unread,
+  });
+  state.channelMembers[channelId] = [{ type: "person", id: state.me?.user.id ?? "" }, partner];
+  state.messages.push({
+    id: `m-${channelId}`,
+    channelId,
+    threadId: null,
+    author: partner,
+    body,
+    mentionedAgentIds: [],
+    agentRunId: null,
+    createdAt: minutesAgo(ago),
+  });
+  return channelId;
+}
+
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
   const walter: Member = {
     userId: "u-walter",
@@ -1489,6 +1534,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.issuesView = structuredClone(view);
         return structuredClone(view);
       },
+      sidebarToolOrder: async () => [...(state.sidebarToolOrder ?? SIDEBAR_ITEMS)],
+      setSidebarToolOrder: async (orgId, order) => {
+        log("orgs.setSidebarToolOrder", orgId, order);
+        state.sidebarToolOrder = order ? [...order] : undefined;
+        return [...(order ?? SIDEBAR_ITEMS)];
+      },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
         const m = state.members.find((x) => x.userId === state.me?.user.id);
@@ -1978,7 +2029,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           ...(state.extraModels ?? []),
         ],
       }),
-      credentials: async () => state.credentials,
+      credentials: async () => [...state.credentials],
       addCredential: async (orgId, input) => {
         log("agents.addCredential", orgId, { ...input, apiKey: "[redacted]" });
         if (state.keyRefusal) throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.");
@@ -2415,6 +2466,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       unarchive: async (orgId, channelId) => {
         log("chat.unarchive", orgId, channelId);
       },
+      deleteChannel: async (orgId, channelId, name) => {
+        log("chat.deleteChannel", orgId, channelId, name);
+        const c = state.channels.find((x) => x.id === channelId);
+        if (!c || c.name !== name.trim().replace(/^#/, "").toLowerCase())
+          throw new ApiError(400, "channel.delete_name", "Type the channel's name to delete it");
+        state.channels = state.channels.filter((x) => x.id !== channelId);
+      },
       update: async (orgId, channelId, input) => {
         log("chat.update", orgId, channelId, input);
         const c = state.channels.find((x) => x.id === channelId);
@@ -2451,7 +2509,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       answerNow: async (orgId, messageId) => {
         log("chat.answerNow", orgId, messageId);
         if (state.answerNowError) throw state.answerNowError;
-        return { runs: [] };
+        return { runs: state.answerNowRuns ?? [] };
       },
       cancelFollowUp: async (orgId, messageId) => {
         log("chat.cancelFollowUp", orgId, messageId);
@@ -2754,6 +2812,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
               createdAt: m.createdAt,
               messageId: m.id,
               threadId: m.threadId,
+              threadTitle:
+                m.threadId && m.threadId !== m.id
+                  ? (state.messages.find((r) => r.id === m.threadId)?.body.split("\n")[0] ?? null)
+                  : null,
               author: m.author.id ? { type: m.author.type, id: m.author.id, name } : null,
             };
           });
@@ -2784,7 +2846,19 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     dms: {
-      list: async () => state.dms.map((d) => ({ ...d, lastMessage: null, unread: 0 })),
+      list: async () =>
+        state.dms.map((d) => {
+          const last = state.messages
+            .filter((m) => m.channelId === d.channelId && !m.threadId)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+          return {
+            ...d,
+            lastMessage: last
+              ? { id: last.id, body: last.body, createdAt: last.createdAt, authorType: last.author.type }
+              : null,
+            unread: d.unread ?? 0,
+          };
+        }),
       open: async (orgId, target) => {
         log("dms.open", orgId, target);
         const existing = state.dms.find((d) =>
@@ -2808,6 +2882,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
       markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
       reads: async () => [],
+    },
+    reads: {
+      mute: async (orgId, channelId, muted) => {
+        log("reads.mute", orgId, channelId, muted);
+        const c = state.channels.find((x) => x.id === channelId);
+        if (c) c.muted = muted;
+      },
+      markThreadRead: async (orgId, threadId) => log("reads.markThreadRead", orgId, threadId),
+      unreadThreads: async () => state.unreadThreads ?? 0,
     },
     questions: {
       // Same rules as the server: the choice must be one of the options; answering twice is 409.

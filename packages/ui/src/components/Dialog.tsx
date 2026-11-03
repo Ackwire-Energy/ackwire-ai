@@ -1,5 +1,5 @@
 import { Dialog as RDialog } from "radix-ui";
-import { type CSSProperties, type ReactNode, type RefObject, useEffect, useRef } from "react";
+import { Children, type CSSProperties, type ReactNode, type RefObject, useEffect, useRef } from "react";
 import { cx } from "../cx";
 import { lastTabbable } from "../device";
 import { Button } from "./Button";
@@ -187,6 +187,8 @@ export function DialogFooter({
   className?: string;
   children?: ReactNode;
 }) {
+  // An empty footer would only stack its padding under the content: the body or list above keeps the edge instead.
+  if (note == null && Children.toArray(children).length === 0) return null;
   return (
     <div className={cx("ac-dialog__foot", bar && "ac-dialog__foot--bar", className)}>
       {note !== undefined && <span className="ac-dialog__foot-note">{note}</span>}

@@ -148,6 +148,8 @@ export const keys = {
   threads: (orgId: string) => ["org", orgId, "threads"] as const,
   threadList: (orgId: string, filters: object) => ["org", orgId, "threads", "list", filters] as const,
   threadInfo: (orgId: string, threadId: string) => ["org", orgId, "threads", "one", threadId] as const,
+  /** How many threads I follow have an unread reply (the Threads entry's mark). */
+  unreadThreads: (orgId: string) => ["org", orgId, "threads", "unread"] as const,
   channelThreads: (orgId: string, channelId: string, tab: string) =>
     ["org", orgId, "threads", "channel", channelId, tab] as const,
   /** The messages of a thread's context range (another channel's, or this one's). */
@@ -183,6 +185,7 @@ export const keys = {
   sidebarItems: (orgId: string) => ["org", orgId, "sidebar-items"] as const,
   sidebarOrder: (orgId: string) => ["org", orgId, "sidebar-order"] as const,
   issuesView: (orgId: string) => ["org", orgId, "issues-view"] as const,
+  sidebarToolOrder: (orgId: string) => ["org", orgId, "sidebar-tool-order"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,

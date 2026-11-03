@@ -368,10 +368,10 @@ p {
 }
 
 /* The pair row right before a reply whose agent asked others first: "Theo ⇄ Atlas · 2 min", 26px tall. Its first
-   face sits centred over the reply's 32px face (16px row padding + 7px, less the button's own 10px). */
+   face sits centred over the reply's 36px face (16px row padding + 9px, less the button's own 10px). */
 .consult-pair {
   margin: 6px 0 -6px;
-  padding: 0 16px 0 13px;
+  padding: 0 16px 0 15px;
   min-width: 0;
 }
 .consult-pair__row {
@@ -737,10 +737,6 @@ html:not([data-pointer]) .sidebar__item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.sidebar__item[data-status="active"] {
-  background: var(--surface-raised);
-  font-weight: 600;
-}
 .sidebar__item-label {
   flex: 1;
   min-width: 0;
@@ -1039,10 +1035,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   justify-content: flex-end;
   margin-top: 6px;
 }
-/*
- * A wide picture's tile is as wide as the picture's own size allows, while its thumbnail stops at 420px: the
- * thumbnail (or a file's row) keeps to the tile's right edge, under the bubble, instead of its left.
- */
+/* A tile wider than its thumbnail (or a file's row): the thumbnail keeps to its right edge, under the bubble. */
 .ac-msg--own .artifact-tile > :is(.file-thumb, .file-row) {
   margin-left: auto;
 }
@@ -1205,7 +1198,8 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .member-row--add:hover {
   color: var(--ink);
 }
-.ac-dialog__list:has(> .member-row--add:last-child) {
+/* Above a footer's line, the add row keeps its air (last in the dialog, the list's own edge does). */
+.ac-dialog__list:not(:last-child):has(> .member-row--add:last-child) {
   padding-bottom: 16px;
 }
 html:not([data-pointer]) .member-row--add:focus-visible {
@@ -1421,21 +1415,22 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   bottom: 8px;
 }
 
-/* Unread: bold label + neutral count (attention amber is only for what waits on a person) */
+/* Unread: a bold label. A row's number only for what calls on me (a mention of me in a channel, a DM's unread),
+   Discord's red pill. */
 .sidebar__item[data-unread="true"] .sidebar__item-label {
   font-weight: 600;
 }
 .sidebar__unread {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   box-sizing: border-box;
   display: inline-grid;
   place-items: center;
   border-radius: var(--radius-full);
-  background: var(--action);
-  color: var(--on-action);
-  font-size: 12px;
+  background: var(--danger);
+  color: var(--raised);
+  font-size: 11.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1973,11 +1968,10 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 }
 .code-viewer .ac-dialog__head {
   border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
 }
 .code-viewer__body.ac-dialog__body {
   flex: 1 1 auto;
-  padding: 12px 0 20px;
+  padding: 12px 0 var(--dialog-pad);
 }
 .code-viewer__code {
   font-size: 13px;
@@ -2073,7 +2067,7 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 }
 .chart-viewer__body.ac-dialog__body {
   gap: 20px;
-  padding: 16px 24px 24px;
+  padding-top: 16px;
 }
 .chart-cells {
   display: block;
@@ -3646,9 +3640,10 @@ html:not([data-pointer]) .settings-tile:focus-visible {
  */
 .ac-dialog.catalog {
   height: min(740px, calc(100dvh - 48px));
+  --dialog-pad: 28px;
 }
 .catalog .ac-dialog__head {
-  padding: 24px 28px 14px;
+  padding-bottom: 14px;
   /* For its title's type (30px on 33px, 24px at phone width), measured as the app's 18/24 one is (styles.css). */
   --title-cap-mid: 0.88px;
 }
@@ -3664,7 +3659,7 @@ html:not([data-pointer]) .settings-tile:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 0 28px 18px;
+  padding: 0 var(--dialog-pad) 18px;
 }
 .catalog__search {
   max-width: 360px;
@@ -3747,7 +3742,7 @@ html:not([data-pointer]) .catalog__cat:focus-visible {
 .catalog__list {
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 28px 32px;
+  padding: 24px var(--dialog-pad) var(--dialog-pad);
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -3939,6 +3934,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
  */
 .ac-dialog.catalog-svc {
   overflow: hidden;
+  --dialog-pad: 24px;
 }
 /* Behind the head (z-index -1 inside the dialog's own stacking context): the head's icon overlaps its edge. */
 .catalog-svc .catalog-feat__sky {
@@ -3953,7 +3949,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   align-items: flex-start;
   gap: 14px;
   margin-top: -36px;
-  padding: 0 24px 4px;
+  padding: 0 var(--dialog-pad) 4px;
 }
 /*
  * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
@@ -3963,8 +3959,8 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
  */
 .catalog-svc .ac-dialog__acts {
   position: absolute;
-  top: 24px;
-  right: 24px;
+  top: var(--dialog-pad);
+  right: var(--dialog-pad);
   /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
   translate: none;
 }
@@ -3991,7 +3987,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   letter-spacing: -0.025em;
 }
 .catalog-svc .ac-dialog__desc {
-  padding: 0 24px;
+  padding: 0 var(--dialog-pad);
   color: var(--ink2);
 }
 .catalog-svc__body {
@@ -4001,7 +3997,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 20px 24px 24px;
+  padding: 20px var(--dialog-pad) var(--dialog-pad);
 }
 .catalog-svc__part {
   padding: 14px 16px;
@@ -4044,7 +4040,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   align-items: center;
   justify-content: flex-end;
   gap: 16px;
-  padding: 16px 24px 20px;
+  padding: 16px var(--dialog-pad) var(--dialog-pad);
   border-top: 1px solid var(--line);
 }
 .catalog-svc__how {
@@ -4068,13 +4064,11 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
     align-self: flex-start;
     max-width: 100%;
   }
-  .catalog__tools,
-  .catalog__list {
-    padding-left: 16px;
-    padding-right: 16px;
+  .ac-dialog.catalog {
+    --dialog-pad: 16px;
   }
   .catalog .ac-dialog__head {
-    padding: 20px 16px 12px;
+    padding-bottom: 12px;
     --title-cap-mid: 0.51px;
   }
   .catalog .ac-dialog__title {
@@ -5123,8 +5117,15 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   content-visibility: auto;
   contain-intrinsic-size: auto 56px;
 }
+/*
+ * The newest rows are never skipped either (the last three): a row that just came in starts skipped, at the 56px
+ * placeholder, until the next frame finds it on screen. The glide down to a message I sent reads the list's end in
+ * that state, stops short of the row's real height (a bubble and its time: ~72px), and the end is caught up with a
+ * jump once the glide is over: the whole list moved up a few pixels after every send.
+ */
 .channel__messages .ac-msg:is(:hover, :focus-within, .ac-msg--streaming),
-.channel__messages .ac-msg:has(.ac-msg__actions[data-open="true"], [aria-expanded="true"]) {
+.channel__messages .ac-msg:has(.ac-msg__actions[data-open="true"], [aria-expanded="true"]),
+.channel__messages > .ac-msg:nth-last-of-type(-n + 3) {
   content-visibility: visible;
 }
 .channel__messages {
@@ -5210,7 +5211,7 @@ html:not([data-pointer]) .tr-ok:focus-visible {
     color 0.15s;
 }
 .sidebar__item:hover {
-  background: var(--plate);
+  background: var(--side-hover);
 }
 /* A row that failed to draw (Sidebar.tsx, UnshownRow): quiet, and nothing to open. */
 .sidebar__item--unshown,
@@ -5219,71 +5220,67 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   color: var(--faint);
   cursor: default;
 }
-/* The chosen item: a frame of dithered sky rising from the right (an agent's row in its color) around one
-   plate of the item's own white, 3px in with the item's corner less 3px, so the frame keeps an even width round
-   the corners and the role, lock or state at the end sits on the plate like the label. A hairline outside keeps
-   the left edge, where the sky fades out. */
+/* The chosen item: one solid plate (Discord's), no sky and no glow. */
 .sidebar__item[data-status="active"],
 .sidebar__item[data-status="active"]:hover {
-  position: relative;
-  isolation: isolate;
-  background-color: var(--side-active);
-  background-image: var(--sel-sky, none);
-  background-position: right center;
-  background-size: auto 100%;
-  background-repeat: no-repeat;
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--side-chosen);
   font-weight: 600;
   transition: none;
-}
-[data-theme="dark"] .sidebar__item[data-status="active"] {
-  background-image: var(--sel-sky-dark, none);
-}
-.sidebar__item[data-status="active"]::before {
-  content: "";
-  position: absolute;
-  inset: 3px;
-  z-index: -1;
-  border-radius: calc(var(--item-r) - 3px);
-  background: var(--side-active);
-  pointer-events: none;
 }
 .sidebar__item[data-status="active"] > .sidebar__item-meta {
   color: var(--ink2);
 }
-/* The open channel, tool, person or agent: on the plate, a glow from the right edge inward that reads at a glance
-   (like a chosen row's raised fill) and fades out over the row's last 45%, light enough under a long name to keep its
-   contrast; the accent's, or an agent's own color (`--sel-glow-color`). */
-.sidebar__item[data-status="active"]::before {
-  background:
-    linear-gradient(
-      to left,
-      color-mix(in srgb, var(--sel-glow-color, var(--agent)) var(--sel-glow, 24%), transparent),
-      transparent var(--sel-glow-reach, 45%)
-    ),
-    var(--side-active);
+/* Channels, Discord's way: read ones rest gray, unread ones are full ink and bold with a pill at the sidebar's edge
+   (in the list's side padding), the open one full ink on its plate. A muted channel never looks unread. */
+.sidebar__item[data-kind="channel"] {
+  position: relative;
 }
-[data-theme="dark"] .sidebar__item[data-status="active"] {
-  --sel-glow: 30%;
+.sidebar__item[data-kind="channel"] .sidebar__item-label {
+  color: var(--faint);
+  font-weight: 500;
 }
-
-/* The icon rail is too narrow for a frame. */
-.sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
-  background-image: none;
+.sidebar__item[data-kind="channel"] > .sidebar__channel-icon {
+  opacity: 0.8;
 }
-.sidebar[data-rail="true"] .sidebar__item[data-status="active"]::before {
-  content: none;
+.sidebar .sidebar__item[data-kind="channel"]:is([data-unread="true"], [data-status="active"]) > .sidebar__channel-icon {
+  color: var(--ink2);
+  opacity: 1;
+}
+.sidebar__item[data-kind="channel"][data-unread="true"] .sidebar__item-label {
+  color: var(--ink);
+  font-weight: 650;
+}
+.sidebar__item[data-kind="channel"][data-status="active"] .sidebar__item-label {
+  color: var(--ink);
+  font-weight: 600;
+}
+.sidebar__item[data-kind="channel"][data-unread="true"]::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 4px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--ink);
+  pointer-events: none;
+}
+.sidebar__item[data-kind="channel"][data-muted="true"]:not([data-status="active"]) {
+  opacity: 0.6;
+}
+/* The open channel's own buttons (add people, settings) stay in sight on it, like Discord's. */
+.sidebar__row:has(> [data-status="active"]) > .sidebar__row-acts {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sidebar__row[data-acts]:has(> [data-status="active"]) > .sidebar__item {
+  padding-right: var(--acts-room, 32px);
 }
 .sidebar__label {
   font-size: 11.5px;
   letter-spacing: 0.08em;
   color: var(--faint);
-}
-.sidebar__unread {
-  background: none;
-  color: var(--muted);
-  box-shadow: none;
-  font-weight: 650;
 }
 /* The workspace header: the org's name, no card (a soft fill on hover). */
 .sidebar__org {
@@ -6183,11 +6180,6 @@ html:not([data-pointer]) .run-continue:focus-visible {
   font-size: 10px;
   line-height: 16px;
 }
-/* Over a tile's or a face's corner a bare number reads as an exponent: the rail's other counts' plate. */
-.sidebar[data-rail="true"] .sidebar__unread {
-  background: var(--sunken);
-  color: var(--ink2);
-}
 .sidebar[data-rail="true"] .sidebar__top,
 .sidebar[data-rail="true"] .sidebar__scroll,
 .sidebar[data-rail="true"] .sidebar__foot {
@@ -6324,106 +6316,6 @@ html:not([data-pointer]) .run-continue:focus-visible {
   .channel-topic {
     padding: 0 16px 12px;
   }
-}
-/* Channel header: the members stack and its glass list */
-.members-stack {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px 2px 2px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--ink2);
-  font: inherit;
-  cursor: pointer;
-}
-.members-stack:hover {
-  background: var(--plate-soft);
-}
-/* In a row of actions its faces are what shows: its plate reaches into the gap, as a ghost button's does. */
-.ac-acts > .members-stack {
-  padding-right: var(--ghost-plate);
-  margin-right: calc(-1 * var(--ghost-plate));
-}
-html:not([data-pointer]) .members-stack:focus-visible {
-  outline: none;
-  box-shadow: var(--field-ring);
-}
-.members-stack__more {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.members-pop.ac-popover {
-  width: min(320px, 92vw);
-  padding: 8px;
-}
-.members-pop__body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: min(420px, 70vh);
-  overflow-y: auto;
-}
-.members-pop__title {
-  margin: 4px 8px 2px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.members-pop__row.profile-trigger {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: var(--radius-item);
-  text-align: left;
-}
-.members-pop__row.profile-trigger:hover,
-html:not([data-pointer]) .members-pop__row.profile-trigger:focus-visible {
-  background: var(--plate);
-  outline: none;
-}
-.members-pop__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-.members-pop__name {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.members-pop__you {
-  font-weight: 400;
-  color: var(--muted);
-}
-.members-pop__meta {
-  font-size: 12px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.members-pop__chip {
-  flex: none;
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  background: var(--sunken);
-  font-size: 11px;
-  color: var(--ink2);
-}
-.members-pop__foot {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
-  border-top: 1px solid var(--line);
 }
 /* Artifact viewer header: the title (wraps at the dialog's width) with its meta; Baixar ▾, Editar, … and × on the bar. */
 .artifact-sheet__title {
@@ -6762,7 +6654,8 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   position: relative;
   display: block;
   height: 200px;
-  max-width: min(100%, 360px);
+  /* A length, not `min(100%, …)`: a percentage counts as no cap when my own row sizes to what it holds (`.ac-gif`). */
+  max-width: 360px;
   padding: 0;
   overflow: hidden;
   border: 0;
@@ -6782,7 +6675,7 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
 /* Alone on the message: the image at its own proportions, a bit taller. */
 .artifact-tile:only-child .file-thumb {
   height: auto;
-  max-width: min(100%, 420px);
+  max-width: 420px;
 }
 .artifact-tile:only-child .file-thumb img {
   height: auto;
@@ -7968,6 +7861,11 @@ html:not([data-pointer]) .onb__step:focus-visible {
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
+}
+/* "Sem responsável" among the people of a picker: as big as their faces. */
+.ac-menu--select .ac-menu__leading > .newag__ib {
+  width: 32px;
+  height: 32px;
 }
 /* The role step: "Do zero" first (its Cargo field right under it, one card's gap apart), then the groups of presets
    under small headings. */
@@ -10111,7 +10009,7 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-/* Deleting an agent: what goes and what stays, over the name to type. */
+/* Deleting an agent or a channel: what goes and what stays, over the name to type. */
 .agp-delete {
   display: flex;
   flex-direction: column;
@@ -10957,6 +10855,23 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section--part .sidebar__section-toggle:hover .sidebar__label {
   color: var(--muted);
 }
+/* Channel categories: small and gray, quieter than any unread channel (Discord's), the chevron after the name. */
+.sidebar__section--category .sidebar__section-toggle {
+  gap: 2px;
+  color: var(--faint);
+}
+.sidebar__section--category .sidebar__section-chevron {
+  order: 1;
+}
+.sidebar__section--category .sidebar__section-head .sidebar__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--faint);
+}
+.sidebar__section--category .sidebar__section-head:hover .sidebar__label {
+  color: var(--muted);
+}
 .sidebar__section-body {
   display: flex;
   flex-direction: column;
@@ -11002,7 +10917,7 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section-add[data-status="active"] {
   opacity: 1;
 }
-/* Equipe on the Agentes header: the page open, it stays in sight on the bell's plate. */
+/* Equipe on the Mensagens diretas header: the page open, it stays in sight on the bell's plate. */
 .sidebar__section-add.ac-btn[data-status="active"] {
   background: var(--plate);
   color: var(--ink);
@@ -11109,7 +11024,7 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
  * its own hover in its ink only, like Discord's: no square plate of its own over the row's.
  */
 .sidebar__row:hover > .sidebar__item:not([data-status="active"], .sidebar__item--unshown) {
-  background: var(--plate);
+  background: var(--side-hover);
 }
 .sidebar__row-acts .ac-btn--ghost {
   color: var(--ink-muted);

@@ -564,6 +564,32 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   color: var(--bg);
   font-weight: 600;
 }
+/* Not a .routine-kind: a statement of what it does on its own, not a question with answers. */
+.routine-own-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.routine-own {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routine-own li {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--sunken);
+  font-size: 12.5px;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
 .routine-details__where {
   display: flex;
   align-items: center;

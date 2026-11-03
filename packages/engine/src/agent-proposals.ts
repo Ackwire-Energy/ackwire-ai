@@ -20,7 +20,7 @@ import { setAgentChannels } from "./management";
 import { getMessage, type Message } from "./messages";
 import type { Notice } from "./notices";
 import { can, getMembership, requirePermission } from "./organizations";
-import { maySql } from "./permissions";
+import { maySql, type RolePermission } from "./permissions";
 import { type RoutineAccess, type RoutineReport, routineAccessOf, routineReportOf } from "./routine-brief";
 import { checkFrequency, createRoutine, routineTimezone } from "./routines";
 import type { ScheduleRule } from "./rrule";
@@ -514,11 +514,16 @@ export async function mayCreateAgents(db: Database, orgId: string, userId: strin
 }
 
 /**
- * Whether someone who may create agents can open this conversation, and so decide a card in it (the decision
- * routes read it as `requireChannelAccess` does): any of them in a public channel, which they may join, or a
- * forum; in a DM or a private channel, only one of its members.
+ * Whether someone who holds `permission` (by default, may create agents) can open this conversation, and so act on a
+ * card in it (the decision routes read it as `requireChannelAccess` does): any of them in a public channel, which they
+ * may join, or a forum; in a DM or a private channel, only one of its members.
  */
-export async function deciderCanOpen(db: Database, orgId: string, channelId: string) {
+export async function deciderCanOpen(
+  db: Database,
+  orgId: string,
+  channelId: string,
+  permission: RolePermission = "create_agents",
+) {
   const [channel] = await db
     .select({ kind: channels.kind, visibility: channels.visibility, dmKey: channels.dmKey })
     .from(channels)
@@ -528,7 +533,7 @@ export async function deciderCanOpen(db: Database, orgId: string, channelId: str
     return true;
   }
   const members = await db
-    .select({ may: maySql(orgId, channelMembers.userId, "create_agents") })
+    .select({ may: maySql(orgId, channelMembers.userId, permission) })
     .from(channelMembers)
     .innerJoin(
       organizationMembers,

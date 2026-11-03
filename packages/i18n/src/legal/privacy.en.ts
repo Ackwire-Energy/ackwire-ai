@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyEn: LegalDocument = {
   title: "Privacy Policy",
   summary: "What we collect, what agents send where, who can see your workspace, and the rights you have.",
-  updated: "2026-11-02",
+  updated: "2026-11-03",
   sections: [
     {
       id: "overview",
@@ -28,7 +28,7 @@ export const privacyEn: LegalDocument = {
             "**Workspace data:** the workspace's name, members, roles and invitations.",
             "**Billing data:** for a workspace with an agentes.chat plan, the name, email address, billing address and tax ID of the person who pays, the plan, and its invoices and payments. Payments are processed by Stripe, which handles the card details: they never reach us.",
             "**Usage and log data:** IP addresses, browser and device, sign-in sessions, security events, API requests, and the record of each model call (model, tokens and cost, with the workspace and agent it belongs to), which we keep to enforce budgets and show usage. When something breaks, we record the error, without message content, to fix it.",
-            "**Devices:** for the phone app, the push notification token of each device you sign in on; for connected computers and the Mac app, the computer's name, operating system and app version.",
+            "**Devices:** for the phone app, the push notification token of each device you sign in on. For connected computers and the Mac app, the computer's name, operating system and app version.",
             "**Waiting list:** the email address and language you give us on agentes.chat, and whether you confirmed it.",
             "**Site analytics:** on agentes.chat (the public site, not the workspace), the pages viewed, the referring site, the device type and an approximate location derived from the IP address, collected with Himetrica.",
           ],
@@ -47,7 +47,7 @@ export const privacyEn: LegalDocument = {
       id: "workspace-content",
       heading: "4. Workspace Content, processed on behalf of workspaces",
       blocks: [
-        "Workspace Content includes messages in channels, threads and direct messages; files in the Drive; wiki pages; tasks, forum topics, routines and calendar events; approvals; the instructions, settings and memory of agents; what agents write and do; and the data agents read through the connectors, databases and computers the workspace connects. We process it only to run the workspace and its agents as the workspace configures them, to show it to the workspace's members, to send the notifications they ask for, and to provide support.",
+        "Workspace Content includes messages in channels, threads and direct messages, files in the Drive and wiki pages. It also includes tasks, forum topics, routines, calendar events and approvals, the instructions, settings and memory of agents, what agents write and do, and the data agents read through the connectors, databases and computers the workspace connects. We process it only to run the workspace and its agents as the workspace configures them, to show it to the workspace's members, to send the notifications they ask for, and to provide support.",
         "Workspace Content belongs to the workspace: members see what its channels and permissions allow, and its owners and admins manage it. Messages you posted stay in the workspace after you leave it or delete your account, unless the workspace deletes them.",
       ],
     },
@@ -64,8 +64,8 @@ export const privacyEn: LegalDocument = {
             "**Memory.** Agents keep memory from conversations (summaries, facts and lessons) so they improve over time. Some judgments about memory (whether something is worth keeping, or conflicts with what an agent already knows) are made by TypeSafe. Memory can be seen and removed in the agent's page, and it is deleted with the workspace.",
             "**Search.** To find related messages and documents, text may be turned into vectors (embeddings) by Voyage AI.",
             "**Connectors.** When the workspace connects a service (such as GitHub, Google, Linear, Sentry, an email inbox or any MCP server), we store its access tokens encrypted and read or write that service only within the scopes the workspace gave each agent. The connected service processes that data under its own terms. Connections to Gmail and Outlook inboxes, and to Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox and Square, go through Composio, which processes what agents read and write there.",
-            "**Databases.** Database connections are read-only; credentials are stored encrypted and each query is checked before it runs.",
-            "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through Cloudflare and through our servers' memory, and is not recorded; a summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
+            "**Databases.** Database connections are read-only. Credentials are stored encrypted and each query is checked before it runs.",
+            "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through Cloudflare and through our servers' memory, and is not recorded. A summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
             "**The workspace's computer.** On agentes.chat Cloud, a workspace's agents work on a computer we run for that workspace, hosted by Contabo in the European Union. We count how much data each agent's browser, AI tools and other programs send and receive there, per day. The computer is wiped after the workspace's agentes.chat plan ends, as the Terms of Use describe.",
           ],
         },
@@ -84,7 +84,7 @@ export const privacyEn: LegalDocument = {
             "**When the law requires it.**",
           ],
         },
-        "The people who operate our infrastructure can reach the servers and databases that store Workspace Content; they use that access only to keep the Service running, such as diagnosing faults and restoring backups, or to meet a legal obligation. None of these paths is used to build profiles, advertising or training data.",
+        "The people who operate our infrastructure can reach the servers and databases that store Workspace Content. They use that access only to keep the Service running, such as diagnosing faults and restoring backups, or to meet a legal obligation. None of these paths is used to build profiles, advertising or training data.",
       ],
     },
     {
@@ -121,14 +121,14 @@ export const privacyEn: LegalDocument = {
       id: "apps",
       heading: "10. Phone and Mac apps",
       blocks: [
-        "The phone app sends notifications through Expo, Apple and Google; a notification may show the name of who wrote and the beginning of the message, and you choose which notifications you get. The Mac app and connected computers keep their sign-in on the device; deleting your account (also available in the apps) signs every device out.",
+        "The phone app sends notifications through Expo, Apple and Google. A notification may show the name of who wrote and the beginning of the message, and you choose which notifications you get. The Mac app and connected computers keep their sign-in on the device. Deleting your account (also available in the apps) signs every device out.",
       ],
     },
     {
       id: "gdpr",
       heading: "11. Your rights under the GDPR",
       blocks: [
-        "If you are in the EEA or the UK, you may request access, rectification, erasure, restriction and portability, and object to processing, and you may lodge a complaint with your supervisory authority. For account data, contact us directly; you can also correct your profile and delete your account yourself in the app. For personal data in Workspace Content, contact the owners or admins of the workspace, which controls it. We will refer requests we receive to that workspace and assist it as processor.",
+        "If you are in the EEA or the UK, you may request access, rectification, erasure, restriction and portability, and object to processing, and you may lodge a complaint with your supervisory authority. For account data, contact us directly. You can also correct your profile and delete your account yourself in the app. For personal data in Workspace Content, contact the owners or admins of the workspace, which controls it. We will refer requests we receive to that workspace and assist it as processor.",
       ],
     },
     {
@@ -163,7 +163,7 @@ export const privacyEn: LegalDocument = {
       id: "changes",
       heading: "16. Changes to this policy",
       blocks: [
-        "We may update this policy; material changes will be announced by email or in the app before they take effect. The current version always lives at this page. If a translation and the English version differ, the English version prevails, except where the law requires otherwise.",
+        "We may update this policy. Material changes will be announced by email or in the app before they take effect. The current version always lives at this page. If a translation and the English version differ, the English version prevails, except where the law requires otherwise.",
       ],
     },
     {

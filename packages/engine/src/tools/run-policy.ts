@@ -20,7 +20,8 @@ import type { ToolDefinition } from "./types";
  *   routines, events, forum, channels, secrets, permissions). It reports through `hand_off`. Otherwise it
  *   works as the agent (ADR 0109: one permission model, the agent's own): reads, the web and the browser,
  *   internal changes people can undo (issues, memory, wiki, Drive, its own branches and pull requests, its
- *   computer); every write to a connected app asks a person. It reaches other agents (`ask_agent`,
+ *   computer); every write to a connected app asks a person, except the actions its creator allowed for its job
+ *   (`routines.own_actions`: the gateway lets those through, `ownJobCovers`). It reaches other agents (`ask_agent`,
  *   `tell_agent`) and posts where its creator can post (`post_message`, `send_dm` to its creator): the
  *   tools hold it to its creator's rooms and agents (ADR 0053 §2, amended 2026-10-31).
  *
@@ -112,6 +113,8 @@ const HERE = new Set([
   "desktop_ask_person",
   "update_thread",
   "offer_connect_ai",
+  "offer_connect_app",
+  "offer_invites",
   "propose_agent",
   "follow_up",
   "cancel_follow_up",

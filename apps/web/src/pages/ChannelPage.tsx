@@ -53,6 +53,7 @@ import {
   useHeldPlaces,
   useJoinChannel,
   useMarkChannelRead,
+  useMarkThreadRead,
   useMessages,
   useMissionControl,
   useModels,
@@ -105,9 +106,9 @@ import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
-import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, restrictionLine, runErrorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { capitalize, dayLabel, formatFullDate, formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
@@ -238,11 +239,11 @@ import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { CategorySelect } from "@/components/ChannelCategoryDialogs";
-import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
+import { ChannelHeader } from "@/components/ChannelHeader";
 import { ChannelPinnedBar } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
-import { QueueButton, QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
+import { QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
   ConsultAnswerLine,
@@ -256,8 +257,9 @@ import {
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { DatePill, type DatePillHandle } from "@/components/DatePill";
+import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
-import { useArchiveChannelWithUndo, useChannelMenu } from "@/components/entity-menus";
+import { useArchiveChannelWithUndo } from "@/components/entity-menus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
@@ -273,6 +275,7 @@ import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, ReplyButton, useMessageMenu } from "@/components/MessageMore";
 import { MessageReceipts, SeenMark } from "@/components/MessageReceipts";
+import { MembersColumn, MembersSheet } from "@/components/members/MembersColumn";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
   AutoApprovedLine,
@@ -312,7 +315,7 @@ import {
 } from "@/components/RequestCard";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
-import { SearchHereButton } from "@/components/search/SearchHereButton";
+import { SearchResultsPanel } from "@/components/search/SearchResultsPanel";
 import { TeamChecks } from "@/components/TeamChecks";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { AgentTasksPanel } from "@/components/tasks/AgentTasksPanel";
@@ -320,7 +323,6 @@ import { AgentTasksContext } from "@/components/tasks/agent-tasks-context";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
-  ChannelThreadsButton,
   ChannelThreadsContext,
   type ChannelThreadsView,
   ClosedThreadLine,
@@ -334,6 +336,7 @@ import { BarAlsoTyping, BarPhrase, BarStep, ConsultClock, WaitLine, WorkingStack
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useMembersColumn } from "@/hooks/useMembersColumn";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
@@ -341,7 +344,6 @@ import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
-import { entityMenu } from "@/lib/entity-menu";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -685,6 +687,8 @@ function ChannelView({
   });
   // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
   const [panel, setPanel] = useState<{ id: string; reply: boolean; focus?: string } | null>(null);
+  // The header search's results, in the same panel (one panel at a time).
+  const [searchOpen, setSearchOpen] = useState(false);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
   // (its memory); one panel at a time.
   const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
@@ -704,6 +708,7 @@ function ChannelView({
   const outerPanel = useOpenAgentPanel();
   const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
     setPanel(null);
+    setSearchOpen(false);
     setConsultId(null);
     setProfile({ agentId, tab });
   }, []);
@@ -728,9 +733,15 @@ function ChannelView({
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const membersColumn = useMembersColumn();
   // Opened from a sidebar row's "Adicionar pessoas ou agentes": straight to adding, and closing that closes it all.
   const [addFirst, setAddFirst] = useState(false);
-  const channelEntries = useChannelMenu();
+  // The members column's "Adicionar pessoa ou agente": the details' add flow alone, as from a sidebar row.
+  const addsMembers = isMember && managesChannel(channel, me.user.id, org);
+  const addMembers = () => {
+    setAddFirst(true);
+    setDetailsOpen(true);
+  };
   // "Editar canal" from the sidebar's right click: the details open once this channel shows.
   useEffect(() => {
     if (chrome?.header) return;
@@ -852,6 +863,19 @@ function ChannelView({
     document.addEventListener("visibilitychange", mark);
     return () => document.removeEventListener("visibilitychange", mark);
   }, [markChannelRead, channel.id, isMember, lastId]);
+  // A thread open in view: its replies are read (its unread and the Threads mark clear, on every device).
+  const markThreadRead = useMarkThreadRead(org.id).mutate;
+  const threadId = thread?.id;
+  const lastReplyId = threadId ? threadMessages.data?.at(-1)?.id : undefined;
+  useEffect(() => {
+    if (!threadId || !isMember || !lastReplyId || lastReplyId.startsWith("local-")) return;
+    const mark = () => {
+      if (document.visibilityState === "visible") markThreadRead(threadId);
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
+  }, [markThreadRead, threadId, isMember, lastReplyId]);
 
   // The skeleton was on screen: the real messages fade in (once).
   const hadSkeleton = useRef(messages.isLoading);
@@ -1030,6 +1054,8 @@ function ChannelView({
   const lastScrollTop = useRef<number | null>(null);
   // A smooth scroll in progress: its intermediate positions don't mean "the person scrolled up".
   const autoScrollUntil = useRef(0);
+  // Where the last glide down was headed (its end then): the end moving past it is what the glide missed.
+  const glideEnd = useRef(0);
   // The last wheel/touch/key/pointer on the list: scroll events without one are layout, not the person.
   const lastGesture = useRef(0);
   const markGesture = () => {
@@ -1177,6 +1203,7 @@ function ChannelView({
     }
     if (smooth && !reducedMotionRef.current && typeof el.scrollTo === "function") {
       autoScrollUntil.current = Date.now() + 600;
+      glideEnd.current = el.scrollHeight - el.clientHeight;
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     } else el.scrollTop = el.scrollHeight;
     clearUnseen();
@@ -1191,16 +1218,28 @@ function ChannelView({
     const el = scroller.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     // What grew during a glide down (the activity bar opening as the message goes out, the first words) is
-    // followed once the glide ends: the glide stops at the end it was given, and nothing else may grow after it.
+    // followed once the glide ends: the glide stops at the end it was given. It glides on to the new end, never
+    // jumps there; what grows during that second glide (words streaming in) is caught up at once after it.
+    // Only when the end did move: new rows report their first size during every glide, and a second glide for
+    // nothing would hold what grows in its 600ms (the first words of a reply) for one jump at its end.
     let later: ReturnType<typeof setTimeout> | undefined;
-    const pin = () => {
+    // When the glide this observer started itself ends.
+    let ownGlide = 0;
+    const pin = (afterGlide = false) => {
       if (!stick.current) return;
       const wait = autoScrollUntil.current - Date.now();
       clearTimeout(later);
-      if (wait > 0) later = setTimeout(pin, wait);
-      else followRef.current();
+      if (wait > 0) later = setTimeout(() => pin(true), wait);
+      else if (
+        afterGlide &&
+        autoScrollUntil.current !== ownGlide &&
+        el.scrollHeight - el.clientHeight > glideEnd.current + 1
+      ) {
+        followRef.current(true);
+        ownGlide = autoScrollUntil.current;
+      } else followRef.current();
     };
-    const ro = new ResizeObserver(pin);
+    const ro = new ResizeObserver(() => pin());
     for (const child of Array.from(el.children)) ro.observe(child);
     ro.observe(el);
     // Only rows that came in are watched (observing every row again on each change cost a pass per delta).
@@ -1226,6 +1265,7 @@ function ChannelView({
     if (el) {
       if (smooth && !reducedMotion && typeof el.scrollTo === "function") {
         autoScrollUntil.current = Date.now() + 600;
+        glideEnd.current = el.scrollHeight - el.clientHeight;
         el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
       } else el.scrollTop = el.scrollHeight;
     }
@@ -1799,16 +1839,19 @@ function ChannelView({
       : (message) => {
           setProfile(null);
           setConsultId(null);
+          setSearchOpen(false);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
     openThread: (id, focus) => {
       setProfile(null);
       setConsultId(null);
+      setSearchOpen(false);
       setPanel({ id, reply: false, focus });
     },
     openConsultation: (id) => {
       setProfile(null);
       setPanel(null);
+      setSearchOpen(false);
       setConsultId(id);
     },
     requestCorrection: (message, text) => {
@@ -1854,16 +1897,6 @@ function ChannelView({
     [tasksAgentId, agentTasks, tasksOpen, toggleTasks],
   );
   const Tag = chrome?.panel ? "section" : "main";
-  const agentNames = joinNames(
-    channelAgents.map((a) => a.name),
-    t,
-  );
-  const subtitle = [
-    channel.topic,
-    channelAgents.length > 0 ? t("channel.agentsAnswer", { count: channelAgents.length, names: agentNames }) : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
 
   return (
     // A thread inside the panel opens profiles in its channel's panel, not inside itself.
@@ -1877,29 +1910,22 @@ function ChannelView({
             {chrome?.header ? (
               <AgentTasksContext.Provider value={tasksControl}>{chrome.header}</AgentTasksContext.Provider>
             ) : (
-              <header className="channel__header">
-                <NavToggle />
-                <div
-                  style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}
-                  {...entityMenu(() => channelEntries(channel))}
-                >
-                  <h1 className="channel__title"># {channel.name}</h1>
-                  {subtitle && <span className="channel__topic">{subtitle}</span>}
-                </div>
-                <div className="channel__acts ac-acts">
-                  <QueueButton machineId={queueMachine} />
-                  <ChannelMembersStack
-                    channelId={channel.id}
-                    people={channelPeople}
-                    agents={channelAgents}
-                    onDetails={() => setDetailsOpen(true)}
-                  />
-                  {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                  <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
-                  {/* Search stays the last on the right, in a DM too. */}
-                  {isMember && <SearchHereButton channelId={channel.id} />}
-                </div>
-              </header>
+              <ChannelHeader
+                channel={channel}
+                isMember={isMember}
+                queueMachine={queueMachine}
+                people={channelPeople}
+                agents={channelAgents}
+                membersOpen={membersColumn.open}
+                onMembers={membersColumn.toggle}
+                onDetails={() => setDetailsOpen(true)}
+                onSearch={() => {
+                  setPanel(null);
+                  setProfile(null);
+                  setConsultId(null);
+                  setSearchOpen(true);
+                }}
+              />
             )}
             {isMember && (
               <ChannelPinnedBar
@@ -2271,6 +2297,35 @@ function ChannelView({
               />
             )}
           </Tag>
+          {!chrome && membersColumn.column && (
+            <MembersColumn
+              channel={channel}
+              people={channelPeople}
+              agents={channelAgents}
+              {...(addsMembers ? { onAdd: addMembers } : {})}
+            />
+          )}
+          {!chrome && membersColumn.sheet && (
+            <MembersSheet
+              channel={channel}
+              isMember={isMember}
+              people={channelPeople}
+              agents={channelAgents}
+              onDetails={() => {
+                membersColumn.closeSheet();
+                setDetailsOpen(true);
+              }}
+              {...(addsMembers
+                ? {
+                    onAdd: () => {
+                      membersColumn.closeSheet();
+                      addMembers();
+                    },
+                  }
+                : {})}
+              onClose={membersColumn.closeSheet}
+            />
+          )}
           {panel && (
             <button
               type="button"
@@ -2291,6 +2346,7 @@ function ChannelView({
               />
             </aside>
           )}
+          {searchOpen && <SearchResultsPanel channelId={channel.id} onClose={() => setSearchOpen(false)} />}
           {profile && (
             <AgentPanel
               key={`${profile.agentId}:${profile.tab ?? ""}`}
@@ -3393,6 +3449,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
   const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
+  const failedWhy = liveFailed ? runErrorText(t, live?.errorCode, live?.errorParams) : null;
+  // After "couldn't answer:", the sentence goes on: no capital, no final period.
+  const failedReason = failedWhy && lowerFirst(failedWhy.replace(/\.$/, ""), i18n.language);
   // Refused by the workspace's standing: its own words, not the server's English.
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
@@ -3820,22 +3879,20 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             )}
             {liveFailed && (
-              <p className="ac-msg__error" role="alert">
-                <Icon name="alert" size={18} />
-                <span style={{ flex: 1 }}>
-                  {refusal
-                    ? t("channel.runRefused", { agent: name, reason: refusal })
-                    : live.errorCode === "run.computer_busy"
-                      ? t("channel.runBusy", { agent: name })
-                      : live.errorCode === "run.budget_exceeded"
-                        ? t("channel.runFailed", {
-                            agent: name,
-                            reason: t("agentPage.activity.errors.budget_exceeded"),
-                          })
-                        : live.error
-                          ? t("channel.runFailed", { agent: name, reason: live.error })
+              <div className="ac-msg__error-row" role="alert">
+                <p className="ac-msg__error ac-iconline">
+                  <Icon name="alert" size={16} />
+                  {/* A known code is said in words; the stored error (a computer's code) only on hover. */}
+                  <span title={!refusal && failedWhy ? live.error : undefined}>
+                    {refusal
+                      ? t("channel.runRefused", { agent: name, reason: refusal })
+                      : live.errorCode === "run.computer_busy"
+                        ? t("channel.runBusy", { agent: name })
+                        : failedWhy || live.error
+                          ? t("channel.runFailed", { agent: name, reason: failedReason || live.error })
                           : t("channel.runFailedNoReason", { agent: name })}
-                </span>
+                  </span>
+                </p>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -3844,7 +3901,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                   aria-label={t("common.close")}
                   onClick={() => dismissRun(live.runId)}
                 />
-              </p>
+              </div>
             )}
             {liveStopped ? (
               <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
@@ -3935,8 +3992,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             )}
             {local === "failed" && (
-              <p className="ac-msg__error" role="alert">
-                <Icon name="alert" size={18} />
+              <p className="ac-msg__error ac-iconline" role="alert">
+                <Icon name="alert" size={16} />
                 <span>{t("channel.notSent")}</span>
                 <span aria-hidden="true">·</span>
                 <button type="button" className="ac-link" onClick={() => actions?.retry(m)} style={inlineButton}>
@@ -4302,6 +4359,9 @@ function ChannelDetails({
       },
     );
   const archiveIt = () => archive.run(channel, () => onOpenChange(false));
+  // Deleting is for owners and admins, never #general; archiving is also for whoever made the channel.
+  const deletable = can(org, "manage_channels") && channel.name !== "general";
+  const [deleting, setDeleting] = useState(false);
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });
     void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
@@ -4344,7 +4404,7 @@ function ChannelDetails({
   return (
     <>
       <Dialog
-        open={open && !adding && !removing && !goingPublic}
+        open={open && !adding && !removing && !goingPublic && !deleting}
         onOpenChange={(o) => {
           if (!o) {
             saveTopic();
@@ -4549,11 +4609,30 @@ function ChannelDetails({
             >
               {t("channel.archive")}
             </Button>
+            {deletable && (
+              <Button
+                variant="ghost"
+                icon="trash"
+                className="channel-details__archive"
+                onClick={() => {
+                  saveTopic();
+                  saveName();
+                  setDeleting(true);
+                }}
+              >
+                {t("channel.delete")}
+              </Button>
+            )}
           </DialogFooter>
         ) : (
           <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
         )}
       </Dialog>
+      <DeleteChannelDialog
+        channel={open && deleting ? channel : null}
+        onClose={() => setDeleting(false)}
+        onDeleted={() => onOpenChange(false)}
+      />
       <Dialog
         open={open && Boolean(removing)}
         onOpenChange={(o) => !o && setRemoving(null)}

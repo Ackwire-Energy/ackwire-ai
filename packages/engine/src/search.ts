@@ -13,6 +13,7 @@ import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { mediaOf } from "./media";
 import { readableBody, voiceOf } from "./message-preview";
+import { replyExcerpt } from "./messages";
 import { isAgentOnlyNotice } from "./notices";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -317,6 +318,8 @@ export interface HitSource {
   /** Message hits: the message, its thread (null = main timeline) and its author. */
   messageId: string | null;
   threadId: string | null;
+  /** Message hits in a thread: its title, else its root message's first line; null on the main timeline. */
+  threadTitle: string | null;
   author: { type: "person" | "agent"; id: string; name: string } | null;
   /**
    * Message hits: a voice message (its snippet is empty: people hear it, ADR 0100), a GIF or a sticker (ADR 0091), so
@@ -324,6 +327,9 @@ export interface HitSource {
    */
   mediaKind?: "voice" | "gif" | "sticker";
 }
+
+/** A thread named by its root's first line: as long as a search result's heading holds. */
+const THREAD_TITLE_LENGTH = 80;
 
 /** Adds where a message hit lives and who wrote it (an action hit: the agent that did it), so the app can jump to it. */
 export async function describeHits<H extends SearchHit>(
@@ -350,6 +356,18 @@ export async function describeHits<H extends SearchHit>(
         .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids)))
     : [];
   const byId = new Map(rows.map((r) => [r.id, r]));
+  // Replies: their thread's title, else its root message's first line.
+  const rootIds = [...new Set(rows.flatMap((r) => (r.threadId && r.threadId !== r.id ? [r.threadId] : [])))];
+  const roots = rootIds.length
+    ? await db
+        .select({ id: messages.id, body: messages.body, meta: messages.meta, title: schema.threads.title })
+        .from(messages)
+        .leftJoin(schema.threads, and(eq(schema.threads.orgId, orgId), eq(schema.threads.rootMessageId, messages.id)))
+        .where(and(eq(messages.orgId, orgId), inArray(messages.id, rootIds)))
+    : [];
+  const threadTitles = new Map(
+    roots.map((r) => [r.id, r.title?.trim() || replyExcerpt(readableBody(r.body, r.meta), THREAD_TITLE_LENGTH)]),
+  );
   // The team's outside actions (ADR 0064): the agent that did it.
   const actionIds = hits.filter((h) => h.kind === "action").map((h) => h.sourceId);
   const actionRows = actionIds.length
@@ -367,11 +385,12 @@ export async function describeHits<H extends SearchHit>(
         ...h,
         messageId: null,
         threadId: null,
+        threadTitle: null,
         author: { type: "agent" as const, id: a.agentId, name: a.agentName ?? "" },
       };
     }
     const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
-    if (!m) return { ...h, messageId: null, threadId: null, author: null };
+    if (!m) return { ...h, messageId: null, threadId: null, threadTitle: null, author: null };
     // A voice message is found by its words, and shows as its audio (ADR 0100).
     const snippet = readableBody(h.snippet, m.meta);
     const media = mediaOf(m.meta);
@@ -382,6 +401,15 @@ export async function describeHits<H extends SearchHit>(
         : m.userId
           ? { type: "person" as const, id: m.userId, name: m.userName ?? "" }
           : null;
-    return { ...h, snippet, messageId: m.id, threadId: m.threadId, author, ...(mediaKind ? { mediaKind } : {}) };
+    const threadTitle = m.threadId && m.threadId !== m.id ? (threadTitles.get(m.threadId) ?? null) : null;
+    return {
+      ...h,
+      snippet,
+      messageId: m.id,
+      threadId: m.threadId,
+      threadTitle,
+      author,
+      ...(mediaKind ? { mediaKind } : {}),
+    };
   });
 }

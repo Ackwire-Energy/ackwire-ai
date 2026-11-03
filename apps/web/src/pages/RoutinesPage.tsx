@@ -25,7 +25,7 @@ import {
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
-import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { approvalTitle, ownActionName } from "@agenteschat/client/lib/approval-words";
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
@@ -1252,6 +1252,11 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
               <DetailsSection title={t("routines.panel.what", agentGrammar(name))}>
                 <RoutinePrompt routine={r} onSaved={flashSaved} />
               </DetailsSection>
+              {r.canSeeDetails && (
+                <DetailsSection title={t("routines.panel.ownActions")}>
+                  <OwnActions routine={r} />
+                </DetailsSection>
+              )}
               <DetailsSection title={t("routines.panel.nexts")}>
                 {mailTrouble(r) && (
                   <Chip icon="alert" tone="waiting">
@@ -2681,6 +2686,10 @@ function RoutineDialog({
                   }))}
                 />
               </div>
+              <div className="routine-own-actions">
+                <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
+                <OwnActions routine={routine} />
+              </div>
               <RoutineReachWarnings
                 prompt={prompt}
                 agentId={agentId || null}
@@ -2699,6 +2708,25 @@ function RoutineDialog({
         </DialogFooter>
       </form>
     </Dialog>
+  );
+}
+
+/** What a routine does in connected apps without asking (the job its creator set it up for), or that it asks for each. */
+function OwnActions({ routine }: { routine: Routine | undefined }) {
+  const { t } = useTranslation();
+  const own = routine?.ownActions ?? [];
+  if (own.length === 0) return <p className="small muted">{t("routines.ownActions.none")}</p>;
+  return (
+    <>
+      <ul className="routine-own" aria-label={t("routines.panel.ownActions")}>
+        {own.map((action) => (
+          <li key={action} title={action}>
+            {ownActionName(t, action)}
+          </li>
+        ))}
+      </ul>
+      <p className="small muted">{t("routines.ownActions.hint")}</p>
+    </>
   );
 }
 

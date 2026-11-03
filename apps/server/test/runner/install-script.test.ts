@@ -7,16 +7,19 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
   symlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
-import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, agentBrowserUrl } from "@agenteschat/adapters/machine-protocol";
+import { AGENT_BROWSER_SHA256, AGENT_BROWSER_VERSION, CHROME_NEEDED } from "@agenteschat/adapters/machine-protocol";
 import { lastLine } from "@agenteschat/setup/src/lib";
 import { TERM_SH } from "@agenteschat/setup/src/term-sh";
 import {
+  GOOGLE_APT,
+  GOOGLE_CHROME_LINUX,
   installScript,
   RUNNER_BUN_SHA256,
   RUNNER_BUN_VERSION,
@@ -180,6 +183,29 @@ test.skipIf(process.platform === "win32")(
     expect(r.runtime).toBeUndefined();
   },
   // Six whole installs, each a shell running real tools: seconds on a busy computer.
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "as a person (no root to install it): a computer without Google Chrome is told where to get it, one with it isn't",
+  () => {
+    const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) }, "Darwin");
+    // The computer's own standard paths stay out of it: only the fake home's ~/Applications can have a Chrome.
+    const script = installScript("https://x.test")
+      .replace(`CHROME_EXE='${GOOGLE_CHROME_LINUX}'`, `CHROME_EXE='${pc.home}/none/chrome'`)
+      .replace('"/Applications/Google Chrome.app', `"${pc.home}/none/Google Chrome.app`);
+    const r = pc.install(script);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain(CHROME_NEEDED);
+    expect(r.out).toContain("https://www.google.com/chrome/");
+    expect(r.log).not.toContain("apt-get");
+    const app = path.join(pc.home, "Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
+    mkdirSync(path.dirname(app), { recursive: true });
+    writeFileSync(app, "#!/bin/sh\n", { mode: 0o755 });
+    const again = pc.install(script);
+    expect(again.status).toBe(0);
+    expect(again.out).not.toContain(CHROME_NEEDED);
+  },
   30_000,
 );
 
@@ -430,7 +456,12 @@ function rootLinux() {
     .replaceAll(shQuote(SYSTEM_BROWSER_DIR), shQuote(at("opt/browser")))
     .replaceAll("'/opt/agentes-runner'", shQuote(at("opt")))
     .replaceAll("'/var/lib/agentes-runner'", shQuote(at("var")))
-    .replaceAll("'/usr/local/bin/agentes-runner'", shQuote(at("bin/agentes-runner")));
+    .replaceAll("'/usr/local/bin/agentes-runner'", shQuote(at("bin/agentes-runner")))
+    .replace(/^CHROME_EXE=.*$/m, `CHROME_EXE=${shQuote(at("google/chrome/chrome"))}`)
+    .replace(/^CHROME_KEYRING=.*$/m, `CHROME_KEYRING=${shQuote(at("keyrings/google-chrome.gpg"))}`)
+    .replace(/^CHROME_SOURCES=.*$/m, `CHROME_SOURCES=${shQuote(at("apt/sources.list.d/google-chrome.sources"))}`)
+    .replace(/^CHROME_UPDATES=.*$/m, `CHROME_UPDATES=${shQuote(at("systemd/agentes-chrome-update"))}`)
+    .replace(/^CHROME_DESKTOP=.*$/m, `CHROME_DESKTOP=${shQuote(at("applications/google-chrome.desktop"))}`);
   return { ...pc, at, script };
 }
 
@@ -470,171 +501,176 @@ test.skipIf(process.platform === "win32")(
   30_000,
 );
 
-/** What the fake downloads serve for agent-browser and for Chrome for Testing's zip. */
+/** What the fake downloads serve for agent-browser. */
 const FAKE_AB = "not really agent-browser";
-const FAKE_CHROME_ZIP = "not really Chrome for Testing";
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
-const CHROME = "156.0.7000.12";
 
 /**
- * Root on x86_64 Linux with its Bun already at the pinned version, a curl that serves agent-browser and Chrome for
- * Testing's zip, an unzip that lays Chrome out with the modes an archive may carry, and the installer pinned to what
- * those serve (`chrome: false`: no Chrome pinned).
+ * Root on x86_64 Linux with its Bun already at the pinned version, a curl that serves agent-browser, and apt with
+ * Google's repository: its `apt-get install google-chrome-stable` puts a Chrome (156.0.8078.79) where its package
+ * does, unless `aptFails` names a package it fails on; `systemctl` logs what it is asked; `gpg` reads Google's key with fingerprint `fingerprint`; the
+ * computer's default browser is Firefox.
  */
-function rootX64(chrome = true) {
+function rootX64(opts: { fingerprint?: string; aptFails?: string } = {}) {
   const pc = rootLinux();
-  writeFileSync(path.join(pc.fake, "uname"), '#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac\n', {
-    mode: 0o755,
-  });
+  const fake = (name: string, text: string) => writeFileSync(path.join(pc.fake, name), text, { mode: 0o755 });
+  fake("uname", '#!/bin/sh\ncase "$1" in -m) echo x86_64 ;; *) echo Linux ;; esac\n');
   mkdirSync(pc.at("opt/bin"), { recursive: true });
   writeFileSync(pc.at("opt/bin/bun"), fakeBun(RUNNER_BUN_VERSION, true), { mode: 0o755 });
-  writeFileSync(
-    path.join(pc.fake, "curl"),
+  fake(
+    "curl",
     `#!/bin/sh
 while [ $# -gt 0 ]; do case "$1" in -o) out=$2; shift 2 ;; -*) shift ;; *) url=$1; shift ;; esac; done
 echo "curl $url" >> "$LOG"
 case "$url" in
   *agent-browser*) printf '%s' '${FAKE_AB}' > "$out" ;;
-  *chrome-linux64.zip) printf '%s' '${FAKE_CHROME_ZIP}' > "$out" ;;
+  *linux_signing_key.pub) printf 'armored key' > "$out" ;;
   *) printf '#!/usr/bin/env node\\n' > "$out" ;;
 esac
 `,
-    { mode: 0o755 },
   );
-  writeFileSync(
-    path.join(pc.fake, "unzip"),
+  const chrome = pc.at("google/chrome/chrome");
+  fake(
+    "apt-get",
     `#!/bin/sh
-while [ $# -gt 0 ]; do case "$1" in -d) dir=$2; shift 2 ;; -*) shift ;; *) zip=$1; shift ;; esac; done
-echo "unzip $zip" >> "$LOG"
-mkdir -p "$dir/chrome-linux64/locales"
-printf chrome > "$dir/chrome-linux64/chrome" && chmod 775 "$dir/chrome-linux64/chrome"
-printf sandbox > "$dir/chrome-linux64/chrome_sandbox" && chmod 4755 "$dir/chrome-linux64/chrome_sandbox"
-printf icu > "$dir/chrome-linux64/icudtl.dat"
-printf pak > "$dir/chrome-linux64/locales/en-US.pak" && chmod 600 "$dir/chrome-linux64/locales/en-US.pak"
+echo "apt-get $*" >> "$LOG"
+case " $* " in *" ${opts.aptFails ?? "none"} "*) exit 100 ;; esac
+case "$*" in *google-chrome-stable*)
+  mkdir -p '${path.dirname(chrome)}'
+  printf '#!/bin/sh\\necho "Google Chrome 156.0.8078.79 "\\n' > '${chrome}' && chmod 755 '${chrome}' ;;
+esac
 `,
-    { mode: 0o755 },
+  );
+  fake("dpkg", '#!/bin/sh\n[ "$1" = --print-architecture ] && echo amd64\n');
+  fake(
+    "systemctl",
+    '#!/bin/sh\necho "systemctl $*" >> "$LOG"\necho "systemd 257 (257.9)"\necho "+PAM +BPF_FRAMEWORK"\n',
+  );
+  fake("dpkg-statoverride", '#!/bin/sh\n[ "$1" = --list ] && exit 1\necho "dpkg-statoverride $*" >> "$LOG"\n');
+  fake(
+    "gpg",
+    `#!/bin/sh
+echo "gpg $*" >> "$LOG"
+case " $* " in
+  *" --show-keys "*) printf 'pub:-:4096:1:7721F63BD38B4796:1460440619:::-:::scSC::::::23::0:\\nfpr:::::::::%s:\\n' '${opts.fingerprint ?? GOOGLE_APT.fingerprint}' ;;
+  *" --dearmor "*) while [ $# -gt 1 ]; do [ "$1" = -o ] && out=$2; shift; done; printf 'binary key' > "$out" ;;
+esac
+`,
+  );
+  fake(
+    "update-alternatives",
+    `#!/bin/sh
+case "$1" in
+  --query) [ "$2" = x-www-browser ] && printf 'Name: x-www-browser\\nStatus: auto\\nValue: /usr/bin/firefox\\n' ;;
+  *) echo "update-alternatives $*" >> "$LOG" ;;
+esac
+exit 0
+`,
   );
   for (const tool of ["ls", "head", "cat", "printf"]) {
     const real = Bun.which(tool);
     if (real && !existsSync(path.join(pc.sys, tool))) symlinkSync(real, path.join(pc.sys, tool));
   }
-  const script = pc.script
-    .replace(AGENT_BROWSER_SHA256["linux-x64"], sha256(FAKE_AB))
-    .replace(/^CHROME_VERSION=.*$/m, `CHROME_VERSION=${shQuote(chrome ? CHROME : "")}`)
-    .replace(/^CHROME_SHA256=.*$/m, `CHROME_SHA256=${shQuote(chrome ? sha256(FAKE_CHROME_ZIP) : "")}`);
+  const script = pc.script.replace(AGENT_BROWSER_SHA256["linux-x64"], sha256(FAKE_AB));
   const browser = (p = "") => pc.at(path.join("opt/browser", p));
-  const run = (text = script) => pc.install(text, ["--system", "--no-pair", "--no-start"]);
-  return { ...pc, script, browser, run };
+  const run = (text = script, more: string[] = ["--no-start"]) => pc.install(text, ["--system", "--no-pair", ...more]);
+  return { ...pc, script, browser, run, chrome };
 }
 
-test.skipIf(process.platform === "win32")(
-  "install.sh --system on x86_64: the agents' browser, shared, root's, the same under any umask, and fetched once",
-  () => {
-    const install = (umask: string) => {
-      const pc = rootX64();
-      mkdirSync(pc.at("bin"), { recursive: true, mode: 0o755 });
-      const r = pc.run(`umask ${umask}\n${pc.script}`);
-      expect(r.status).toBe(0);
-      const modes = Object.fromEntries(
-        readdirSync(pc.browser(), { recursive: true })
-          .map(String)
-          .map((p) => [p, (lstatSync(pc.browser(p)).mode & 0o7777).toString(8)]),
-      );
-      return { pc, r, modes };
-    };
-    const { pc, r, modes } = install("077");
-    expect(r.log).toContain(`curl ${agentBrowserUrl("linux-x64")}\n`);
-    expect(r.log).toContain(
-      `curl https://storage.googleapis.com/chrome-for-testing-public/${CHROME}/linux64/chrome-linux64.zip\n`,
-    );
-    expect(r.out).toContain(
-      `The agents' browser: agent-browser ${AGENT_BROWSER_VERSION} and Chrome for Testing ${CHROME} (SHA-256 checked)`,
-    );
-    // Every agent's user runs them; nobody but root changes them, nothing runs set-user or set-group.
-    const chrome = `chrome-${CHROME}`;
-    expect(modes).toEqual({
-      [`agent-browser-${AGENT_BROWSER_VERSION}`]: "755",
-      [chrome]: "755",
-      [`${chrome}/.sha256`]: "644",
-      [`${chrome}/chrome-linux64`]: "755",
-      [`${chrome}/chrome-linux64/chrome`]: "755",
-      [`${chrome}/chrome-linux64/chrome_sandbox`]: "755",
-      [`${chrome}/chrome-linux64/icudtl.dat`]: "644",
-      [`${chrome}/chrome-linux64/locales`]: "755",
-      [`${chrome}/chrome-linux64/locales/en-US.pak`]: "644",
-    });
-    expect(lstatSync(pc.browser()).mode & 0o777).toBe(0o755);
-    expect(readFileSync(pc.browser(`${chrome}/.sha256`), "utf8")).toBe(`${sha256(FAKE_CHROME_ZIP)}\n`);
-    expect(install("022").modes).toEqual(modes);
-    // Again: what is there at its checksum stays, nothing is downloaded.
-    const again = pc.run();
-    expect(again.status).toBe(0);
-    expect(again.log.split("chrome-linux64.zip").length).toBe(2);
-    expect(again.log.split("agent-browser-linux-x64").length).toBe(2);
-  },
-  30_000,
-);
+const read = (file: string) => readFileSync(file, "utf8");
 
 test.skipIf(process.platform === "win32")(
-  "install.sh --system: a browser download that isn't the pinned one installs nothing of it and stops the install",
+  "install.sh --system: Google Chrome stable from Google's apt repository, its key checked, updated like the rest",
   () => {
     const pc = rootX64();
-    const r = pc.run(pc.script.replace(sha256(FAKE_CHROME_ZIP), "0".repeat(64)));
+    const r = pc.run(pc.script, ["--desktop", "--no-start"]);
+    expect(r.status).toBe(0);
+    // Google's key, refused unless it is the one we know, into the keyring Chrome's own package writes.
+    expect(r.log).toContain(`curl ${GOOGLE_APT.key}\n`);
+    expect(r.log).toMatch(/gpg --batch --show-keys --with-colons \S+\/key\.asc\n/);
+    expect(read(pc.at("keyrings/google-chrome.gpg"))).toBe("binary key");
+    // The repository as the package itself sets it up, so its own setup rewrites it as it is.
+    expect(read(pc.at("apt/sources.list.d/google-chrome.sources"))).toBe(
+      [
+        "### THIS FILE IS AUTOMATICALLY CONFIGURED ###",
+        "# Changes to this file will not be preserved.",
+        "# This file will not be recreated if removed.",
+        "X-Repolib-Name: Google Chrome",
+        "Types: deb",
+        "URIs: https://dl.google.com/linux/chrome-stable/deb/",
+        "Suites: stable",
+        "Components: main",
+        "Architectures: amd64",
+        `Signed-By: ${pc.at("keyrings/google-chrome.gpg")}`,
+        "",
+      ].join("\n"),
+    );
+    expect(r.log).toContain(
+      "apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends google-chrome-stable\n",
+    );
+    // Its sandbox helper never set-user-id root, for this install and every upgrade, before the package lands.
+    expect(r.log).toContain(`dpkg-statoverride --add root root 0755 ${pc.at("google/chrome/chrome-sandbox")}\napt-get`);
+    // Upgraded every 6 hours by a timer of its own, whether or not the computer updates itself; never pinned.
+    expect(read(pc.at("systemd/agentes-chrome-update.timer"))).toContain("OnCalendar=00/6:00\nRandomizedDelaySec=1h\n");
+    expect(read(pc.at("systemd/agentes-chrome-update.service"))).toContain(
+      "install -y --only-upgrade --no-install-recommends google-chrome-stable'\n",
+    );
+    expect(r.log).toContain("systemctl enable --now agentes-chrome-update.timer\n");
+    // The computer's default browser stays its own.
+    expect(r.log).toContain("update-alternatives --set x-www-browser /usr/bin/firefox\n");
+    // The agents' menus offer no second Chrome on the default profile.
+    expect(read(pc.at("applications/google-chrome.desktop"))).toContain("NoDisplay=true\n");
+    expect(r.out).toContain("Google Chrome 156.0.8078.79, upgraded every 6 hours");
+    // No Chrome for Testing anywhere.
+    expect(r.log).not.toContain("chrome-for-testing");
+    expect(readdirSync(pc.browser())).toEqual([`agent-browser-${AGENT_BROWSER_VERSION}`]);
+    expect(existsSync(pc.at("opt/agentes-runner.mjs"))).toBe(true);
+
+    // Again, with Chrome there: nothing of it is installed or set again, whoever installed it.
+    rmSync(pc.at("systemd/agentes-chrome-update.timer"));
+    const again = pc.run();
+    expect(again.status).toBe(0);
+    expect(again.log.split("google-chrome-stable").length).toBe(2);
+    expect(again.out).toContain("Google Chrome 156.0.8078.79, updated by this computer's own updates");
+    expect(existsSync(pc.at("systemd/agentes-chrome-update.timer"))).toBe(false);
+  },
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "install.sh --system: a key that isn't Google's stops the install; apt failing only says so, and the install goes on",
+  () => {
+    const forged = rootX64({ fingerprint: "0".repeat(40) });
+    const r = forged.run();
     expect(r.status).toBe(1);
     expect(r.err.trimEnd().split("\n").pop()).toBe(
-      "■  the Chrome for Testing download didn't match its checksum, so it was not installed",
+      "■  Google's apt key didn't match its fingerprint, so Google Chrome was not installed",
     );
-    expect(r.log).not.toContain("unzip");
-    expect(readdirSync(pc.browser())).toEqual([`agent-browser-${AGENT_BROWSER_VERSION}`]);
+    expect(existsSync(forged.at("keyrings/google-chrome.gpg"))).toBe(false);
+    expect(existsSync(forged.at("apt/sources.list.d/google-chrome.sources"))).toBe(false);
+    expect(r.log).not.toContain("google-chrome-stable");
+    expect(existsSync(forged.at("opt/agentes-runner.mjs"))).toBe(false);
 
-    const ab = rootX64();
-    const refused = ab.run(ab.script.replace(sha256(FAKE_AB), "0".repeat(64)));
-    expect(refused.status).toBe(1);
-    expect(refused.err.trimEnd().split("\n").pop()).toBe(
-      "■  the agent-browser download didn't match its checksum, so it was not installed",
-    );
-    expect(readdirSync(ab.browser())).toEqual([]);
-    // The runner comes after: nothing of it changed either.
-    expect(existsSync(ab.at("opt/agentes-runner.mjs"))).toBe(false);
+    const failing = rootX64({ aptFails: "google-chrome-stable" });
+    const r2 = failing.run();
+    expect(r2.status).toBe(0);
+    expect(r2.out).toContain("Installing Google Chrome failed: run this installer again.");
+    expect(existsSync(failing.chrome)).toBe(false);
+    expect(existsSync(failing.at("opt/agentes-runner.mjs"))).toBe(true);
+    expect(r2.log).toContain("service install --system --no-start");
 
-    // No Chrome pinned: agent-browser alone, and each agent installs Chrome at its browser's first use.
-    const alone = rootX64(false);
-    const r3 = alone.run();
+    // No apt: the person installs Chrome, told so.
+    const noApt = rootX64();
+    rmSync(path.join(noApt.fake, "apt-get"));
+    const r3 = noApt.run();
     expect(r3.status).toBe(0);
-    expect(r3.out).toContain("each agent installs Chrome for Testing at its browser's first use");
-    expect(r3.log).not.toContain("chrome-linux64.zip");
-    expect(readdirSync(alone.browser())).toEqual([`agent-browser-${AGENT_BROWSER_VERSION}`]);
+    expect(r3.out).toContain("The agents' browser needs Google Chrome: install it (google.com/chrome)");
   },
   30_000,
 );
 
 test.skipIf(process.platform === "win32")(
-  "install.sh --system: a browser download that fails leaves it to each agent's first use, and the install goes on",
-  () => {
-    for (const [failing, kept] of [
-      ["agent-browser-linux-x64", []],
-      ["chrome-linux64.zip", [`agent-browser-${AGENT_BROWSER_VERSION}`]],
-    ] as const) {
-      const pc = rootX64();
-      const curl = path.join(pc.fake, "curl");
-      const logged = 'echo "curl $url" >> "$LOG"\n';
-      writeFileSync(
-        curl,
-        readFileSync(curl, "utf8").replace(logged, () => `${logged}case "$url" in *${failing}) exit 22 ;; esac\n`),
-      );
-      const r = pc.run();
-      expect(r.status).toBe(0);
-      expect(r.out).toContain("failed: each agent installs what's missing at its browser's first use");
-      expect(readdirSync(pc.browser())).toEqual([...kept]);
-      expect(existsSync(pc.at("opt/agentes-runner.mjs"))).toBe(true);
-      expect(r.log).toContain("service install --system --no-start");
-    }
-  },
-  30_000,
-);
-
-test.skipIf(process.platform === "win32")(
-  "install.sh --system: a new pin keeps the build installed last before it, for a runner not restarted yet; older ones go",
+  "install.sh --system: older agent-browsers go but the last one; Chrome for Testing goes once the runner restarted",
   () => {
     const pc = rootX64();
     const day = 86_400;
@@ -648,17 +684,56 @@ test.skipIf(process.platform === "win32")(
     mkdirSync(pc.browser(), { recursive: true });
     old("agent-browser-0.37.0", 2, false);
     old("agent-browser-0.38.0", 1, false);
-    old("chrome-150.0.1", 2);
-    old("chrome-155.0.1", 1);
-    old(".chrome-155.0.1.new", 1);
+    old("chrome-156.0.8078.80", 1);
+    old(".chrome-157.0.1.new", 1);
     old(".agent-browser-0.38.0.download", 1, false);
+    // Not restarted (--no-start): the running runner may still use Chrome for Testing, so it stays.
     expect(pc.run().status).toBe(0);
+    expect(readdirSync(pc.browser()).sort()).toEqual([
+      ".chrome-157.0.1.new",
+      "agent-browser-0.38.0",
+      `agent-browser-${AGENT_BROWSER_VERSION}`,
+      "chrome-156.0.8078.80",
+    ]);
+    // Restarted on Google Chrome: Chrome for Testing goes.
+    const started = pc.run(pc.script, []);
+    expect(started.status).toBe(0);
+    expect(started.log).toContain("service install --system\n");
     expect(readdirSync(pc.browser()).sort()).toEqual([
       "agent-browser-0.38.0",
       `agent-browser-${AGENT_BROWSER_VERSION}`,
-      "chrome-155.0.1",
-      `chrome-${CHROME}`,
     ]);
+  },
+  30_000,
+);
+
+test.skipIf(process.platform === "win32")(
+  "install.sh --system: an agent-browser download that isn't the pinned one stops the install; one that fails doesn't",
+  () => {
+    const ab = rootX64();
+    const refused = ab.run(ab.script.replace(sha256(FAKE_AB), "0".repeat(64)));
+    expect(refused.status).toBe(1);
+    expect(refused.err.trimEnd().split("\n").pop()).toBe(
+      "■  the agent-browser download didn't match its checksum, so it was not installed",
+    );
+    expect(readdirSync(ab.browser())).toEqual([]);
+    expect(existsSync(ab.at("opt/agentes-runner.mjs"))).toBe(false);
+
+    const pc = rootX64();
+    const curl = path.join(pc.fake, "curl");
+    const logged = 'echo "curl $url" >> "$LOG"\n';
+    writeFileSync(
+      curl,
+      readFileSync(curl, "utf8").replace(
+        logged,
+        () => `${logged}case "$url" in *agent-browser-linux-x64) exit 22 ;; esac\n`,
+      ),
+    );
+    const r = pc.run();
+    expect(r.status).toBe(0);
+    expect(r.out).toContain("failed: each agent installs what's missing at its browser's first use");
+    expect(readdirSync(pc.browser())).toEqual([]);
+    expect(existsSync(pc.at("opt/agentes-runner.mjs"))).toBe(true);
   },
   30_000,
 );

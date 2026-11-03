@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import type { RealtimeEvent } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
+import { ProviderError } from "@agenteschat/providers";
 import {
   addChannelMember,
   addRunStep,
@@ -455,4 +456,83 @@ test("Responder agora on a message nobody could route: 409, then it is routed ag
   // Again: the run that answers it, no second one.
   expect((await answerNow({ ...deps(), router }, f.owner.id, f.org.id, asked.id)).runs).toEqual(answered.runs);
   expect(await runs()).toHaveLength(1);
+});
+
+test("Tentar de novo on a person's message whose run failed: the same message, one new run, no second copy", async () => {
+  let broken = true;
+  f = await setup({
+    reply: () => (broken ? new ProviderError("provider rejected the request (400)", false, 400) : { chunks: ["ok"] }),
+  });
+  const asked = await post("@dev resume o canal");
+  await drainOutbox(f.db, f.handlers);
+  const [failed] = await runs();
+  expect(failed).toMatchObject({ status: "failed", triggerMessageId: asked.id });
+  const before = (await f.db.select().from(schema.messages)).length;
+
+  // Only who asked, the agent's owner or an admin.
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const other = await answerNow(deps(), bia.id, f.org.id, asked.id).catch((e) => e);
+  expect(other).toMatchObject({ name: "ForbiddenError", code: "run.answer_forbidden" });
+
+  broken = false;
+  const events = f.listen(f.general.id);
+  // A double click: the second call returns the run the first started, so the words never go again.
+  const [retried, twice] = await Promise.all([
+    answerNow(deps(), f.owner.id, f.org.id, asked.id),
+    answerNow(deps(), f.owner.id, f.org.id, asked.id),
+  ]);
+  expect(twice).toEqual(retried);
+  const runId = retried.runs[0]?.runId ?? "";
+  expect(retried.runs).toEqual([{ agentId: f.agent.id, runId }]);
+  expect(runId).not.toBe(failed?.id);
+  // The failed run is gone (its line clears in the apps once the new one thinks), the new one on the same message.
+  expect(await runs()).toMatchObject([{ id: runId, triggerMessageId: asked.id, status: "queued" }]);
+  expect(events).toContainEqual(expect.objectContaining({ type: "agent.thinking", runId }));
+  expect((await f.db.select().from(schema.messages)).length).toBe(before);
+  await drainOutbox(f.db, f.handlers);
+  expect(await runs()).toMatchObject([{ id: runId, status: "done" }]);
+  const [audit] = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "run.retried"));
+  expect(audit).toMatchObject({ actorId: f.owner.id, targetId: runId, details: { oldRunId: failed?.id } });
+  // Only the agent's reply is new.
+  const people = (await f.db.select().from(schema.messages)).filter((m) => m.authorType === "person");
+  expect(people.map((m) => m.id)).toEqual([asked.id]);
+});
+
+test("Tentar de novo on a failed run that already did something: 409, nothing deleted", async () => {
+  f = await setup({ reply: () => new ProviderError("provider rejected the request (400)", false, 400) });
+  const asked = await post("@dev resume o canal");
+  await drainOutbox(f.db, f.handlers);
+  const [failed] = await runs();
+  if (!failed) throw new Error("no run");
+  await addRunStep(f.db, failed, "tool_call", { name: "github_merge" });
+  const refused = await answerNow(deps(), f.owner.id, f.org.id, asked.id).catch((e) => e);
+  expect(refused).toMatchObject({ name: "ConflictError", code: "run.not_restartable" });
+  expect(await runs()).toMatchObject([{ id: failed.id, status: "failed" }]);
+});
+
+test("Tentar de novo where no run can start over: nothing failed comes back, so the apps send the words again", async () => {
+  f = await setup({ reply: () => new ProviderError("provider rejected the request (400)", false, 400) });
+  const asked = await post("@dev resume o canal");
+  await drainOutbox(f.db, f.handlers);
+  await f.db.update(schema.agentRuns).set({ background: true });
+  expect(await answerNow(deps(), f.owner.id, f.org.id, asked.id)).toEqual({ runs: [] });
+  expect(await runs()).toMatchObject([{ status: "failed" }]);
+});
+
+test("an agent's message: only a no_ai run starts again, never a run that failed otherwise (no fresh stretch)", async () => {
+  f = await setup({ reply: () => new ProviderError("provider rejected the request (400)", false, 400) });
+  const qa = await addAgent("qa");
+  const handed = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "agent", agentId: f.agent.id, runId: Bun.randomUUIDv7(), hop: 1 },
+    body: "@qa confere os números",
+  });
+  await f.db.transaction((tx) => createAgentRuns(tx, handed, [qa.id], "mention"));
+  await drainOutbox(f.db, f.handlers);
+  const [failed] = await runs();
+  expect(failed).toMatchObject({ agentId: qa.id, status: "failed" });
+  expect(await answerNow(deps(), f.owner.id, f.org.id, handed.id)).toEqual({ runs: [] });
+  expect(await runs()).toMatchObject([{ id: failed?.id, status: "failed" }]);
 });

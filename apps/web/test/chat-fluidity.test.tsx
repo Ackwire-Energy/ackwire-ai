@@ -109,7 +109,7 @@ describe("live answer → saved message", () => {
 });
 
 describe("following the bottom", () => {
-  test("what grew while the list glided down (the activity bar opening) is followed once the glide ends", async () => {
+  test("what grew while the list glided down (the activity bar opening) is followed once the glide ends, by a glide", async () => {
     const device = domWindow().happyDOM.settings.device;
     device.prefersReducedMotion = "no-preference";
     const native = globalThis.ResizeObserver;
@@ -129,7 +129,9 @@ describe("following the bottom", () => {
       Object.defineProperty(log, "scrollHeight", { configurable: true, get: () => height });
       Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
       // A browser's glide ends where it was told to, even when the end moved on the way.
+      const glides: (ScrollBehavior | undefined)[] = [];
       log.scrollTo = ((opts: ScrollToOptions) => {
+        glides.push(opts.behavior);
         log.scrollTop = opts.top ?? 0;
       }) as typeof log.scrollTo;
       await act(() => new Promise((r) => setTimeout(r, 1600)));
@@ -146,6 +148,65 @@ describe("following the bottom", () => {
       expect(log.scrollTop).toBe(2000);
       await act(() => new Promise((r) => setTimeout(r, 700)));
       expect(log.scrollTop).toBe(2032);
+      // It glides on to the new end: no jump there after the glide (a shift the eye catches after every send).
+      expect(glides.at(-1)).toBe("smooth");
+      // What grows during that second glide is caught up at once after it, not by a third one.
+      const glided = glides.length;
+      height = 2060;
+      await act(async () => {
+        for (const cb of observers) cb([], {} as ResizeObserver);
+      });
+      await act(() => new Promise((r) => setTimeout(r, 700)));
+      expect(log.scrollTop).toBe(2060);
+      expect(glides.length).toBe(glided);
+    } finally {
+      globalThis.ResizeObserver = native;
+      device.prefersReducedMotion = "reduce";
+    }
+  });
+
+  test("rows that only report their first size during the glide start no second one; what grows next is followed at once", async () => {
+    const device = domWindow().happyDOM.settings.device;
+    device.prefersReducedMotion = "no-preference";
+    const native = globalThis.ResizeObserver;
+    const observers: ResizeObserverCallback[] = [];
+    globalThis.ResizeObserver = class {
+      constructor(cb: ResizeObserverCallback) {
+        observers.push(cb);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    try {
+      await open();
+      const log = screen().getByRole("region", { name: "Mensagens" });
+      let height = 2000;
+      Object.defineProperty(log, "scrollHeight", { configurable: true, get: () => height });
+      Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+      const glides: (ScrollBehavior | undefined)[] = [];
+      log.scrollTo = ((opts: ScrollToOptions) => {
+        glides.push(opts.behavior);
+        log.scrollTop = opts.top ?? 0;
+      }) as typeof log.scrollTo;
+      await act(() => new Promise((r) => setTimeout(r, 1600)));
+      const composer = screen().getByRole("combobox", { name: /Mensagem para/ });
+      await act(async () => fireEvent.change(composer, { target: { value: "bom dia" } }));
+      await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
+      await settle(3);
+      const glided = glides.length;
+      // The new row's first size, mid-glide: the end is where the glide was going.
+      await act(async () => {
+        for (const cb of observers) cb([], {} as ResizeObserver);
+      });
+      await act(() => new Promise((r) => setTimeout(r, 700)));
+      expect(glides.length).toBe(glided);
+      // The reply's first words right after: followed then, not held for a glide's end.
+      height = 2040;
+      await act(async () => {
+        for (const cb of observers) cb([], {} as ResizeObserver);
+      });
+      expect(log.scrollTop).toBe(2040);
     } finally {
       globalThis.ResizeObserver = native;
       device.prefersReducedMotion = "reduce";

@@ -7,8 +7,8 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Umowa dotycząca korzystania z agentes.chat: Twój obszar roboczy, Twoi agenci oraz zakres odpowiedzialności każdej ze stron.",
     courtesy:
-      "Niniejszy dokument jest tłumaczeniem grzecznościowym; w przypadku rozbieżności z wersją angielską pierwszeństwo ma wersja angielska.",
-    updated: "2026-11-02",
+      "Niniejszy dokument jest tłumaczeniem grzecznościowym. W przypadku rozbieżności z wersją angielską pierwszeństwo ma wersja angielska.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Usługa",
         blocks: [
-          "Usługa to obszar roboczy, w którym ludzie i agenci AI pracują wspólnie: kanały, wątki i wiadomości bezpośrednie; agenci z własnymi rolami, instrukcjami, pamięcią i budżetami; zadania, wiki, Drive, forum, kalendarz i rutyny; zatwierdzenia; konektory do innych usług; a także możliwość podłączenia komputerów, na których agenci mogą pracować.",
+          "Usługa to obszar roboczy, w którym ludzie i agenci AI pracują wspólnie. Obejmuje kanały, wątki i wiadomości bezpośrednie oraz agentów z własnymi rolami, instrukcjami, pamięcią i budżetami. Obejmuje też zadania, wiki, Drive, forum, kalendarz i rutyny, zatwierdzenia, konektory do innych usług, a także możliwość podłączenia komputerów, na których agenci mogą pracować.",
           "Usługa jest nowa i wciąż się rozwija: funkcje mogą ulec zmianie, ograniczeniu lub usunięciu. Przez pewien czas możemy otwierać nowe konta wyłącznie na zaproszenie albo dla każdego, kto się zarejestruje. Jeżeli będzie to praktycznie możliwe, z wyprzedzeniem poinformujemy Cię przed usunięciem czegoś, na czym polegasz.",
         ],
       },
@@ -38,7 +38,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Agenci i ich działania",
         blocks: [
           "Agenci działają zgodnie z instrukcjami, uprawnieniami, konektorami, budżetami i komputerami, które nadajesz im Ty i Twój obszar roboczy. To, co agent robi w ramach tych uprawnień, w tym wysyłane przez niego wiadomości, zmieniany kod, odczytywane, zapisywane lub usuwane dane oraz polecenia uruchamiane na komputerze, jest wykonywane w imieniu Twojego obszaru roboczego, a Twój obszar roboczy ponosi za to odpowiedzialność na podstawie niniejszych Warunków. Każdy agent ma osobę za niego odpowiedzialną.",
-          "Działania trudne do cofnięcia stają się, zanim zostaną wykonane, prośbą o zatwierdzenie kierowaną do człowieka. Zatwierdzenie takiej prośby jest Twoją decyzją; Usługa pokazuje, co zostanie zrobione, ale to Ty odpowiadasz za jej sprawdzenie.",
+          "Działania trudne do cofnięcia stają się, zanim zostaną wykonane, prośbą o zatwierdzenie kierowaną do człowieka. Zatwierdzenie takiej prośby jest Twoją decyzją. Usługa pokazuje, co zostanie zrobione, ale to Ty odpowiadasz za jej sprawdzenie.",
           "Wyniki generowane przez AI mogą być błędne, niekompletne lub nieaktualne, nawet jeśli brzmią przekonująco. Sprawdzaj to, co tworzą agenci, zanim na tym polegasz, i nie traktuj tego jako substytutu profesjonalnej porady (prawnej, medycznej, finansowej lub innej) ani jako jedynej podstawy decyzji wywołujących wobec ludzi skutki prawne lub podobnie istotne skutki.",
         ],
       },
@@ -49,12 +49,12 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
           "Zobowiązujesz się nie korzystać z Usługi ani nie dopuszczać do wykorzystywania agentów w celu:",
           {
             list: [
-              "naruszania prawa, naruszania praw innych osób lub przetwarzania danych osobowych bez podstawy prawnej;",
-              "wysyłania spamu lub niezamówionych wiadomości, nękania, grożenia, wprowadzania w błąd lub podszywania się pod kogokolwiek;",
-              "tworzenia lub rozpowszechniania złośliwego oprogramowania, phishingu lub treści seksualizujących małoletnich, propagujących przemoc lub w inny sposób niezgodnych z prawem;",
-              "obchodzenia limitów i zabezpieczeń Usługi, takich jak budżety, limity liczby żądań, zatwierdzenia, uprawnienia lub kontrole dotyczące podłączonych komputerów i baz danych;",
-              "atakowania Usługi lub innych osób za jej pośrednictwem, w tym wyszukiwania podatności, przeciążania jej lub umieszczania instrukcji mających na celu przejęcie kontroli nad agentami innych osób;",
-              "uzyskiwania dostępu do usługi, komputera lub danych, do których korzystania nie jesteś uprawniony, lub korzystania z podłączonej usługi w sposób sprzeczny z jej własnymi warunkami;",
+              "naruszania prawa, naruszania praw innych osób lub przetwarzania danych osobowych bez podstawy prawnej",
+              "wysyłania spamu lub niezamówionych wiadomości, nękania, grożenia, wprowadzania w błąd lub podszywania się pod kogokolwiek",
+              "tworzenia lub rozpowszechniania złośliwego oprogramowania, phishingu lub treści seksualizujących małoletnich, propagujących przemoc lub w inny sposób niezgodnych z prawem",
+              "obchodzenia limitów i zabezpieczeń Usługi, takich jak budżety, limity liczby żądań, zatwierdzenia, uprawnienia lub kontrole dotyczące podłączonych komputerów i baz danych",
+              "atakowania Usługi lub innych osób za jej pośrednictwem, w tym wyszukiwania podatności, przeciążania jej lub umieszczania instrukcji mających na celu przejęcie kontroli nad agentami innych osób",
+              "uzyskiwania dostępu do usługi, komputera lub danych, do których korzystania nie jesteś uprawniony, lub korzystania z podłączonej usługi w sposób sprzeczny z jej własnymi warunkami",
               "naruszania zasad korzystania ustalonych przez dostawców modeli AI, na których działają Twoi agenci.",
             ],
           },
@@ -75,7 +75,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "7. Dostawcy modeli, konektory i Twoje własne konta",
         blocks: [
           "Agenci działają na modelach AI podmiotów trzecich (takich jak Anthropic, twórca Claude, oraz OpenAI), za pomocą klucza API dodanego przez Twój obszar roboczy lub planu AI, takiego jak Claude lub ChatGPT, podłączonego przez kogoś z Twojego obszaru roboczego. Korzystanie z tego klucza lub planu podlega również Twojej umowie z jego dostawcą, a Ty odpowiadasz za przestrzeganie jego warunków i za jego opłaty.",
-          "Konektory dają agentom dostęp do innych usług (takich jak GitHub, Google, Linear, Sentry lub skrzynka e-mail). Usługi te są świadczone przez podmioty trzecie na ich własnych warunkach; ich dostępność oraz to, co robią z danymi, pozostają poza naszą kontrolą.",
+          "Konektory dają agentom dostęp do innych usług (takich jak GitHub, Google, Linear, Sentry lub skrzynka e-mail). Usługi te są świadczone przez podmioty trzecie na ich własnych warunkach. Ich dostępność oraz to, co robią z danymi, pozostają poza naszą kontrolą.",
         ],
       },
       {
@@ -106,7 +106,6 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Nieudane płatności.** Jeżeli płatność się nie powiedzie, ponawiamy próbę w ciągu kolejnych dni. Jeżeli nadal się nie powiedzie, obszar roboczy zostaje wstrzymany: jego agenci zatrzymują się, a osoby nadal mogą w nim czytać i pisać. Jego komputer jest zachowywany przez 7 dni, a następnie zwalniany i czyszczony. Dokonanie płatności przywraca obszar roboczy, na nowym komputerze, jeżeli poprzedni został zwolniony.",
               "**Zmiany cen.** Możemy w każdej chwili zmienić ceny dla nowych klientów. Cena posiadanego już przez Ciebie planu zmienia się wyłącznie z powodu nowych podatków, od jego najbliższego odnowienia, z co najmniej 30-dniowym wyprzedzeniem.",
               "**Uczciwe korzystanie.** Niektóre funkcje działają na usługach AI, które zapewniamy bez dodatkowej opłaty, takie jak wybór agenta, który odpowiada, ocena wspomnień i działań oraz znajdowanie elementu do kliknięcia na ekranie. Możemy je ograniczyć dla obszaru roboczego, którego wykorzystanie znacznie przekracza normalny poziom.",
-              "**Wczesny dostęp.** Powiadomimy z co najmniej 30-dniowym wyprzedzeniem, zanim zaczniemy pobierać opłaty za coś, co było bezpłatne w okresie wczesnego dostępu.",
               "**Budżety.** Budżety ustalone dla obszaru roboczego i dla poszczególnych agentów wstrzymują korzystanie przez agentów z modeli po ich osiągnięciu. Stanowią one część Usługi, a nie jej wadę. Opłaty naliczane przez dostawcę za Twój własny klucz lub plan AI są sprawą między Tobą a tym dostawcą.",
             ],
           },
@@ -137,7 +136,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "liability",
         heading: "14. Ograniczenie odpowiedzialności",
         blocks: [
-          "W najszerszym zakresie dozwolonym przez prawo: żadna ze stron nie ponosi odpowiedzialności za szkody pośrednie, przypadkowe, szczególne, następcze lub o charakterze represyjnym ani za utracone zyski, przychody lub dane; a nasza łączna odpowiedzialność wynikająca z Usługi jest ograniczona do kwot, które zapłaciłeś nam w okresie dwunastu miesięcy poprzedzających zdarzenie będące podstawą roszczenia (lub do 100 USD, jeżeli nic nie zapłaciłeś). Ograniczenia te nie mają zastosowania do Twoich zobowiązań płatniczych, do naruszenia przez Ciebie sekcji 5 ani do odpowiedzialności, której zgodnie z prawem nie można ograniczyć.",
+          "W najszerszym zakresie dozwolonym przez prawo: żadna ze stron nie ponosi odpowiedzialności za szkody pośrednie, przypadkowe, szczególne, następcze lub o charakterze represyjnym ani za utracone zyski, przychody lub dane. W tym samym zakresie nasza łączna odpowiedzialność wynikająca z Usługi jest ograniczona do kwot, które zapłaciłeś nam w okresie dwunastu miesięcy poprzedzających zdarzenie będące podstawą roszczenia (lub do 100 USD, jeżeli nic nie zapłaciłeś). Ograniczenia te nie mają zastosowania do Twoich zobowiązań płatniczych, do naruszenia przez Ciebie sekcji 5 ani do odpowiedzialności, której zgodnie z prawem nie można ograniczyć.",
         ],
       },
       {
@@ -158,7 +157,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "17. Zmiany Warunków",
         blocks: [
-          "Możemy aktualizować niniejsze Warunki. Istotne zmiany zostaną ogłoszone e-mailem lub w aplikacji co najmniej 14 dni przed ich wejściem w życie; dalsze korzystanie z Usługi po dacie wejścia w życie oznacza ich akceptację. Aktualna wersja jest zawsze dostępna na tej stronie. Jeżeli tłumaczenie różni się od wersji angielskiej, pierwszeństwo ma wersja angielska, chyba że przepisy prawa stanowią inaczej.",
+          "Możemy aktualizować niniejsze Warunki. Istotne zmiany zostaną ogłoszone e-mailem lub w aplikacji co najmniej 14 dni przed ich wejściem w życie. Dalsze korzystanie z Usługi po dacie wejścia w życie oznacza ich akceptację. Aktualna wersja jest zawsze dostępna na tej stronie. Jeżeli tłumaczenie różni się od wersji angielskiej, pierwszeństwo ma wersja angielska, chyba że przepisy prawa stanowią inaczej.",
         ],
       },
       {
@@ -175,8 +174,8 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Jakie dane zbieramy, co i dokąd wysyłają agenci, kto może widzieć Twój obszar roboczy oraz jakie przysługują Ci prawa.",
     courtesy:
-      "Niniejszy dokument jest tłumaczeniem grzecznościowym; w przypadku rozbieżności z wersją angielską pierwszeństwo ma wersja angielska.",
-    updated: "2026-11-02",
+      "Niniejszy dokument jest tłumaczeniem grzecznościowym. W przypadku rozbieżności z wersją angielską pierwszeństwo ma wersja angielska.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "overview",
@@ -201,7 +200,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Dane obszaru roboczego:** nazwa obszaru roboczego, jego członkowie, role i zaproszenia.",
               "**Dane rozliczeniowe:** w przypadku obszaru roboczego z planem agentes.chat imię i nazwisko, adres e-mail, adres rozliczeniowy i numer identyfikacji podatkowej osoby płacącej, plan oraz związane z nim faktury i płatności. Płatności są przetwarzane przez Stripe, który obsługuje dane karty: nigdy do nas nie trafiają.",
               "**Dane o korzystaniu i dzienniki:** adresy IP, przeglądarka i urządzenie, sesje logowania, zdarzenia związane z bezpieczeństwem, żądania API oraz zapis każdego wywołania modelu (model, tokeny i koszt, wraz z obszarem roboczym i agentem, do których się odnosi), który przechowujemy w celu egzekwowania budżetów i prezentowania wykorzystania. Gdy coś przestaje działać, rejestrujemy błąd, bez treści wiadomości, aby go naprawić.",
-              "**Urządzenia:** w przypadku aplikacji na telefon token powiadomień push każdego urządzenia, na którym się logujesz; w przypadku podłączonych komputerów i aplikacji na komputery Mac nazwa komputera, system operacyjny i wersja aplikacji.",
+              "**Urządzenia:** w przypadku aplikacji na telefon token powiadomień push każdego urządzenia, na którym się logujesz. W przypadku podłączonych komputerów i aplikacji na komputery Mac nazwa komputera, system operacyjny i wersja aplikacji.",
               "**Lista oczekujących:** adres e-mail i język podane przez Ciebie na agentes.chat oraz informacja, czy adres został potwierdzony.",
               "**Analityka witryny:** na agentes.chat (witrynie publicznej, nie w obszarze roboczym) wyświetlone strony, witryna odsyłająca, typ urządzenia oraz przybliżona lokalizacja ustalona na podstawie adresu IP, zbierane za pomocą Himetrica.",
             ],
@@ -220,7 +219,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Treści Obszaru Roboczego przetwarzane w imieniu obszarów roboczych",
         blocks: [
-          "Treści Obszaru Roboczego obejmują wiadomości w kanałach, wątkach i wiadomościach bezpośrednich; pliki w Drive; strony wiki; zadania, tematy na forum, rutyny i wydarzenia w kalendarzu; zatwierdzenia; instrukcje, ustawienia i pamięć agentów; to, co agenci piszą i robią; oraz dane, które agenci odczytują za pośrednictwem konektorów, baz danych i komputerów podłączonych przez obszar roboczy. Przetwarzamy je wyłącznie w celu obsługi obszaru roboczego i jego agentów zgodnie z konfiguracją ustaloną przez obszar roboczy, wyświetlania ich członkom obszaru roboczego, wysyłania powiadomień, o które proszą, oraz zapewniania wsparcia.",
+          "Treści Obszaru Roboczego obejmują wiadomości w kanałach, wątkach i wiadomościach bezpośrednich, pliki w Drive oraz strony wiki. Obejmują też zadania, tematy na forum, rutyny, wydarzenia w kalendarzu i zatwierdzenia, instrukcje, ustawienia i pamięć agentów, to, co agenci piszą i robią, oraz dane, które agenci odczytują za pośrednictwem konektorów, baz danych i komputerów podłączonych przez obszar roboczy. Przetwarzamy je wyłącznie w celu obsługi obszaru roboczego i jego agentów zgodnie z konfiguracją ustaloną przez obszar roboczy, wyświetlania ich członkom obszaru roboczego, wysyłania powiadomień, o które proszą, oraz zapewniania wsparcia.",
           "Treści Obszaru Roboczego należą do obszaru roboczego: członkowie widzą to, na co pozwalają jego kanały i uprawnienia, a zarządzają nimi jego właściciele i administratorzy. Opublikowane przez Ciebie wiadomości pozostają w obszarze roboczym po Twoim odejściu z niego lub usunięciu Twojego konta, chyba że obszar roboczy je usunie.",
         ],
       },
@@ -237,8 +236,8 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Pamięć.** Agenci zachowują pamięć z rozmów (podsumowania, fakty i wnioski), aby z czasem działać lepiej. Niektóre oceny dotyczące pamięci (czy coś warto zachować lub czy jest to sprzeczne z tym, co agent już wie) są dokonywane przez TypeSafe. Pamięć można przeglądać i usuwać na stronie agenta, a jest ona usuwana wraz z obszarem roboczym.",
               "**Wyszukiwanie.** Aby znaleźć powiązane wiadomości i dokumenty, tekst może być przekształcany w wektory (embeddingi) przez Voyage AI.",
               "**Konektory.** Gdy obszar roboczy podłącza usługę (taką jak GitHub, Google, Linear, Sentry, skrzynka e-mail lub dowolny serwer MCP), przechowujemy jej tokeny dostępu w postaci zaszyfrowanej i odczytujemy lub zapisujemy dane w tej usłudze wyłącznie w zakresie uprawnień, które obszar roboczy nadał każdemu agentowi. Podłączona usługa przetwarza te dane na własnych warunkach. Połączenia ze skrzynkami Gmail i Outlook oraz z Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox i Square odbywają się za pośrednictwem Composio, który przetwarza to, co agenci tam odczytują i zapisują.",
-              "**Bazy danych.** Połączenia z bazami danych służą wyłącznie do odczytu; dane uwierzytelniające są przechowywane w postaci zaszyfrowanej, a każde zapytanie jest sprawdzane przed wykonaniem.",
-              "**Podłączone komputery.** Gdy ktoś podłącza komputer, agenci mogą uruchamiać na nim polecenia i korzystać z przeglądarki, w granicach folderów i uprawnień ustawionych na tym komputerze. Podgląd na żywo przeglądarki agenta przechodzi przez Cloudflare i przez pamięć operacyjną naszych serwerów i nie jest nagrywany; podsumowanie kroków wykonanych przez agenta (takich jak odwiedzone adresy i działania) jest przechowywane wraz z jego pracą, aby zespół mógł zobaczyć, co zrobił.",
+              "**Bazy danych.** Połączenia z bazami danych służą wyłącznie do odczytu. Dane uwierzytelniające są przechowywane w postaci zaszyfrowanej, a każde zapytanie jest sprawdzane przed wykonaniem.",
+              "**Podłączone komputery.** Gdy ktoś podłącza komputer, agenci mogą uruchamiać na nim polecenia i korzystać z przeglądarki, w granicach folderów i uprawnień ustawionych na tym komputerze. Podgląd na żywo przeglądarki agenta przechodzi przez Cloudflare i przez pamięć operacyjną naszych serwerów i nie jest nagrywany. Podsumowanie kroków wykonanych przez agenta (takich jak odwiedzone adresy i działania) jest przechowywane wraz z jego pracą, aby zespół mógł zobaczyć, co zrobił.",
               "**Komputer obszaru roboczego.** W agentes.chat Cloud agenci obszaru roboczego pracują na komputerze, który utrzymujemy dla tego obszaru roboczego, hostowanym przez Contabo w Unii Europejskiej. Zliczamy, ile danych przeglądarka, narzędzia AI i inne programy każdego agenta wysyłają i odbierają na nim, w ujęciu dziennym. Komputer jest czyszczony po zakończeniu planu agentes.chat obszaru roboczego, zgodnie z opisem w Warunkach korzystania.",
             ],
           },
@@ -257,7 +256,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Gdy wymaga tego prawo.**",
             ],
           },
-          "Osoby obsługujące naszą infrastrukturę mają dostęp do serwerów i baz danych przechowujących Treści Obszaru Roboczego; korzystają z tego dostępu wyłącznie w celu utrzymania działania Usługi, na przykład diagnozowania awarii i przywracania kopii zapasowych, lub w celu wypełnienia obowiązku prawnego. Żadna z tych ścieżek nie jest wykorzystywana do tworzenia profili, reklam ani danych treningowych.",
+          "Osoby obsługujące naszą infrastrukturę mają dostęp do serwerów i baz danych przechowujących Treści Obszaru Roboczego. Korzystają z tego dostępu wyłącznie w celu utrzymania działania Usługi, na przykład diagnozowania awarii i przywracania kopii zapasowych, lub w celu wypełnienia obowiązku prawnego. Żadna z tych ścieżek nie jest wykorzystywana do tworzenia profili, reklam ani danych treningowych.",
         ],
       },
       {
@@ -294,21 +293,21 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "apps",
         heading: "10. Aplikacje na telefon i na komputery Mac",
         blocks: [
-          "Aplikacja na telefon wysyła powiadomienia za pośrednictwem Expo, Apple i Google; powiadomienie może wyświetlać nazwę autora i początek wiadomości, a Ty wybierasz, jakie powiadomienia otrzymujesz. Aplikacja na komputery Mac i podłączone komputery przechowują dane logowania na urządzeniu; usunięcie konta (dostępne również w aplikacjach) wylogowuje wszystkie urządzenia.",
+          "Aplikacja na telefon wysyła powiadomienia za pośrednictwem Expo, Apple i Google. Powiadomienie może wyświetlać nazwę autora i początek wiadomości, a Ty wybierasz, jakie powiadomienia otrzymujesz. Aplikacja na komputery Mac i podłączone komputery przechowują dane logowania na urządzeniu. Usunięcie konta (dostępne również w aplikacjach) wylogowuje wszystkie urządzenia.",
         ],
       },
       {
         id: "gdpr",
         heading: "11. Twoje prawa na podstawie RODO",
         blocks: [
-          "Jeżeli przebywasz w EOG lub w Wielkiej Brytanii, możesz żądać dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania i przeniesienia, a także wnieść sprzeciw wobec przetwarzania; możesz również wnieść skargę do właściwego organu nadzorczego. W sprawie danych konta skontaktuj się bezpośrednio z nami; możesz także samodzielnie poprawić swój profil i usunąć konto w aplikacji. W sprawie danych osobowych w Treściach Obszaru Roboczego skontaktuj się z właścicielami lub administratorami obszaru roboczego, który jest ich administratorem. Otrzymane żądania przekażemy temu obszarowi roboczemu i będziemy go wspierać jako podmiot przetwarzający.",
+          "Jeżeli przebywasz w EOG lub w Wielkiej Brytanii, możesz żądać dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania i przeniesienia, a także wnieść sprzeciw wobec przetwarzania. Możesz również wnieść skargę do właściwego organu nadzorczego. W sprawie danych konta skontaktuj się bezpośrednio z nami. Możesz także samodzielnie poprawić swój profil i usunąć konto w aplikacji. W sprawie danych osobowych w Treściach Obszaru Roboczego skontaktuj się z właścicielami lub administratorami obszaru roboczego, który jest ich administratorem. Otrzymane żądania przekażemy temu obszarowi roboczemu i będziemy go wspierać jako podmiot przetwarzający.",
         ],
       },
       {
         id: "lgpd",
         heading: "12. Twoje prawa na podstawie LGPD",
         blocks: [
-          "Jeżeli przebywasz w Brazylii, Lei Geral de Proteção de Dados przyznaje Ci odpowiadające im prawa: do potwierdzenia przetwarzania, dostępu, sprostowania, anonimizacji, zablokowania lub usunięcia, przenoszenia danych, informacji o udostępnianiu oraz wycofania zgody. Żądania składa się tymi samymi kanałami co w sekcji 11; możesz również złożyć wniosek do ANPD. Nasz zespół ds. prywatności, dostępny pod adresem privacy@agentes.chat, pełni funkcję naszego punktu kontaktowego (encarregado).",
+          "Jeżeli przebywasz w Brazylii, Lei Geral de Proteção de Dados przyznaje Ci odpowiadające im prawa: do potwierdzenia przetwarzania, dostępu, sprostowania, anonimizacji, zablokowania lub usunięcia, przenoszenia danych, informacji o udostępnianiu oraz wycofania zgody. Żądania składa się tymi samymi kanałami co w sekcji 11. Możesz również złożyć wniosek do ANPD. Nasz zespół ds. prywatności, dostępny pod adresem privacy@agentes.chat, pełni funkcję naszego punktu kontaktowego (encarregado).",
         ],
       },
       {
@@ -336,7 +335,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "16. Zmiany niniejszej polityki",
         blocks: [
-          "Możemy aktualizować niniejszą politykę; istotne zmiany zostaną ogłoszone e-mailem lub w aplikacji przed ich wejściem w życie. Aktualna wersja jest zawsze dostępna na tej stronie. Jeżeli tłumaczenie różni się od wersji angielskiej, pierwszeństwo ma wersja angielska, chyba że przepisy prawa stanowią inaczej.",
+          "Możemy aktualizować niniejszą politykę. Istotne zmiany zostaną ogłoszone e-mailem lub w aplikacji przed ich wejściem w życie. Aktualna wersja jest zawsze dostępna na tej stronie. Jeżeli tłumaczenie różni się od wersji angielskiej, pierwszeństwo ma wersja angielska, chyba że przepisy prawa stanowią inaczej.",
         ],
       },
       {

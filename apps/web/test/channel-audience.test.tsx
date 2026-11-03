@@ -72,7 +72,7 @@ describe("a channel for departments or roles (ADR 0125)", () => {
 
   test("Detalhes do canal: changed later, saved once a role is ticked; back to Público drops the roles", async () => {
     const state = await go(ENG_ID);
-    await click(screen().getByRole("button", { name: "Detalhes do canal" }));
+    await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
     await access(dialog, /Departamentos ou papéis/);

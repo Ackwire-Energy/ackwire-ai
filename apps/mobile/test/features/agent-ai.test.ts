@@ -149,6 +149,20 @@ describe("the agent's AI", () => {
     ]);
   });
 
+  test("the new agent's AI step: Conectar uma IA opens the same sheet as Settings, for the agent being made", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const read = (path: string) => Bun.file(new URL(`../../src/features/${path}`, import.meta.url).pathname).text();
+    const [screen, sheet] = await Promise.all([read("agents/NewAgentScreen.tsx"), read("ai/ConnectAi.tsx")]);
+    expect(screen).toContain('label={t("aiAccounts.page.connect")}');
+    expect(screen).toContain('openConnectAi({ forNew: "1" });');
+    // The plan it connects is what the agent thinks with once it shows up, over a pick made before; nothing new keeps it.
+    expect(screen).toContain("newPlanAccountOption(brainOptions, optionsBefore)");
+    expect(screen).toContain("connectedHere ?? picked");
+    // For the agents I create: none of mine is offered, so a plan signs in for the new one.
+    expect(sheet).toContain('params.forNew === "1" ? []');
+    expect(sheet).toContain("queryKey: keys.brainMachines(orgId)");
+  });
+
   test("the agent's AI and a plan's page draw the same switch, line and ⓘ, and nothing asks to accept the terms", async () => {
     // The screens are components the tests can't render: what they wire in, as text.
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
@@ -860,6 +874,9 @@ describe("the agent's AI", () => {
     ).text();
     expect(screen).toContain("openConnectAi({ agentId: agent.id, plan: thinks.connect })");
     expect(screen).toContain("<BrainPickSheet");
+    // No last setup: a plan account of mine (one connected before I had an agent) thinks for it, as on the web.
+    expect(screen).toContain("(proposed || start ? null : (ownPlan ?? null))");
+    expect(screen).toContain("const ownPlan = planAccountOption(brainOptions);");
   });
 });
 

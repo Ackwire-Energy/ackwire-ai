@@ -70,14 +70,14 @@ export const questionCardMeta = (q: AgentQuestionRow, why: string) => ({
  * to the executor, which posts it in the thread and suspends the run
  * (`waiting_input`). A consulted agent asks from the agents' DM, which no
  * person reads: its card goes where the person behind it asked (ADR 0034).
- * With a judge, a question for something the run could find, or a secret asked in the chat, is held first
- * (`holdAsk`, ADR 0109 addendum).
+ * With a judge, a question for something the run could find, a secret asked in the chat, or one that asks for
+ * nothing the run needs, is held first (`holdAsk`, ADR 0109 addendum).
  */
 export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource {
   const tool: ToolDefinition = {
     name: ASK_USER_TOOL,
     description:
-      "Ask the person a short clarifying question and wait for the answer. Use it when the request is still ambiguous after you looked with your tools, for a decision that is really theirs, or before a sensitive or irreversible action. Don't use it for what you can just do: internal changes (issues, priorities, assignments, memories, routines) need no ok, the person can undo them. Not for choosing between fixes: recommend one yourself. The question shows as a card with its choices and your `why` (what you found and why you ask): never write the question or the choices in your text; after calling, write nothing else and end your turn. Offer 2 to 4 short choices when the answer is one of a few options.",
+      "Ask the person a short clarifying question and wait for the answer. Use it only when you can't go on without their answer: the request is still ambiguous after you looked with your tools, a decision is really theirs, or a sensitive or irreversible action is next. `question` is a question to them, never a status note: an offer of optional extra work, or a note that you need nothing, goes in your normal reply, and nobody waits on it. Don't use it for what you can just do: internal changes (issues, priorities, assignments, memories, routines) need no ok, the person can undo them. Not for choosing between fixes: recommend one yourself. The question shows as a card with its choices and your `why` (what you found and why you ask): never write the question or the choices in your text; after calling, write nothing else and end your turn. Offer 2 to 4 short choices when the answer is one of a few options.",
     scope: "",
     inputSchema: {
       type: "object",

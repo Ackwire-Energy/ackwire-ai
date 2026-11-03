@@ -39,6 +39,8 @@ describe("resolving permissions", () => {
       ["custom", "Admin"],
       ["everyone", "everyone"],
     ]);
+    // The Admin is listed apart in the members column; the base role never is.
+    expect(roles.map((r) => r.hoist)).toEqual([true, false]);
     const owner = await getMembership(f.db, f.owner.id, f.org.id);
     for (const k of [...AREA_PERMISSIONS, "administrator", "manage_owners", "read"] as const)
       expect(can(owner, k)).toBe(true);

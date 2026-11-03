@@ -187,6 +187,10 @@ export function actionName(t: TFunction, slug: string) {
   return name ? `${toolName(t, partsOf(name), name)} (${humanize(app)})` : humanize(slug);
 }
 
+/** One of a routine's own actions (`Routine.ownActions`) in words: a Composio slug (upper case) by its app, else the tool's name. */
+export const ownActionName = (t: TFunction, name: string) =>
+  /^[A-Z0-9_]+$/.test(name) ? actionName(t, name) : toolName(t, partsOf(name), name);
+
 /** A remembered push (`owner/repo:branch`) in words: "enviar para ana/fix em acme/app". */
 function pushWords(t: TFunction, target: string) {
   const at = target.indexOf(":");

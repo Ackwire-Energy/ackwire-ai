@@ -18,9 +18,10 @@ const where = (call: { questions: Record<string, unknown> } | undefined) =>
   (call?.questions.where as { instructions?: string } | undefined)?.instructions ?? "";
 
 /** Jev's Box: `full` on the whole screen, `close` on a close-up (the question says which). */
-function boxes(full: Answer, close?: Answer) {
+function boxes(full: Answer, close?: Answer, costly = 0) {
   return createFakeJudge((kind, id, _state, _q, request) => {
     if (kind !== "screen_locate") return undefined;
+    if (id === "costly") return costly;
     const a = where(request).includes("is a close-up") ? close : full;
     if (!a) return undefined;
     return id === "present" ? a.present : { box: a.box, confidence: 0.8 };
@@ -196,19 +197,24 @@ describe("a target on the screen image", () => {
     }
   });
 
-  test("words that can't be undone are never taken at a bare point, on any screen", async () => {
+  test("a target the judge finds can't be undone is never taken at a bare point, on any screen, in any language", async () => {
     const big: Answer = { box: { top: 0.4, bottom: 0.5, left: 0.4, right: 0.6 }, present: 0.95 };
     for (const kind of ["browser", "desktop"] as const) {
-      for (const target of ["the Delete button", "Move to Trash", "Não salvar"]) {
-        expect(await locateOnImage({ judge: boxes(big), ...ids, target, kind, image: screenImage() })).toMatchObject({
+      for (const target of ["o botão Excluir", "the Delete button", "削除ボタン", "die Löschen-Taste"]) {
+        const judge = boxes(big, undefined, 0.95);
+        expect(await locateOnImage({ judge, ...ids, target, kind, image: screenImage() })).toMatchObject({
           found: false,
           refused: true,
+        });
+        expect(judge.calls[0]?.questions.costly).toMatchObject({ type: "noul" });
+        expect(await locateOnImage({ judge: boxes(big), ...ids, target, kind, image: screenImage() })).toMatchObject({
+          found: true,
         });
       }
     }
     // On an element found there, it is as exact as its number.
     const onMark = await locateOnImage({
-      judge: boxes(big),
+      judge: boxes(big, undefined, 0.95),
       ...ids,
       target: "the Delete button",
       image: screenImage([{ ref: "e9", number: 9, role: "button", box: { x: 600, y: 350, width: 80, height: 100 } }]),
@@ -240,7 +246,7 @@ describe("plans with images", () => {
   });
 
   test("a costly target only on the image stops the plan and says why; nothing is clicked", async () => {
-    const judge = boxes({ box: { top: 0.4, bottom: 0.5, left: 0.4, right: 0.6 }, present: 0.95 });
+    const judge = boxes({ box: { top: 0.4, bottom: 0.5, left: 0.4, right: 0.6 }, present: 0.95 }, undefined, 0.95);
     const surface = fakeScreen(THUNAR, { capture: () => screenImage() });
     const report = await runPlan({ judge, ...ids, surface, scope: "a", vision: true }, [
       { do: "click", target: "Move to Trash" },

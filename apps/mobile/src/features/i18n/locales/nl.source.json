@@ -1955,6 +1955,12 @@
       "other": "A computer's disk is almost full"
     }
   },
+  "activity.kind.computer_no_chrome": {
+    "value": {
+      "one": "A computer needs Google Chrome. Get it at google.com/chrome",
+      "other": "Computers need Google Chrome. Get it at google.com/chrome"
+    }
+  },
   "activity.kind.app_created": {
     "value": {
       "one": "An AI app created things for you",
@@ -2187,7 +2193,7 @@
     "value": "Drive"
   },
   "me.connectors": {
-    "value": "Connectors"
+    "value": "Connectors and MCPs"
   },
   "me.usage": {
     "value": "Usage"
@@ -3645,19 +3651,22 @@
     "value": "The site blocked it"
   },
   "connectors.title": {
-    "value": "Connectors"
+    "value": "Connectors and MCPs"
   },
   "connectors.search": {
     "value": "Search a service"
   },
+  "connectors.mcps": {
+    "value": "MCPs"
+  },
+  "connectors.mcpsNone": {
+    "value": "MCP servers you connect by their address show up here."
+  },
+  "connectors.addMcp": {
+    "value": "Add MCP"
+  },
   "connectors.connected": {
     "value": "Connected"
-  },
-  "connectors.address": {
-    "value": "Address"
-  },
-  "connectors.byAddress": {
-    "value": "By address"
   },
   "connectors.suggested": {
     "value": "Suggested for {{org}}"

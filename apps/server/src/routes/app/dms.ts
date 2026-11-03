@@ -1,4 +1,4 @@
-import { dmReads, listDms, markChannelRead, openDm } from "@agenteschat/engine";
+import { dmReads, listDms, markChannelRead, openDm, setChannelMuted } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
@@ -109,6 +109,32 @@ export function dmRoutes(deps: AppDeps) {
       return c.body(null, 204);
     },
   );
+
+  for (const [method, muted] of [
+    ["put", true],
+    ["delete", false],
+  ] as const) {
+    app.openapi(
+      createRoute({
+        method,
+        path: "/organizations/{orgId}/channels/{channelId}/mute",
+        tags,
+        security,
+        summary: muted
+          ? "Mute a channel for you: it never looks unread (a mention of you still counts)"
+          : "Unmute a channel for you",
+        description:
+          "Members only, channels only (a DM gets 400). Your other devices hear `channel.muted` on your own topic.",
+        request: { params: OrgParams.extend({ channelId: z.uuid() }) },
+        responses: { 204: noContent[204], ...errors },
+      }),
+      async (c) => {
+        const { orgId, channelId } = c.req.valid("param");
+        await setChannelMuted(db, c.get("user").id, orgId, channelId, muted, adapters.pubsub);
+        return c.body(null, 204);
+      },
+    );
+  }
 
   app.openapi(
     createRoute({

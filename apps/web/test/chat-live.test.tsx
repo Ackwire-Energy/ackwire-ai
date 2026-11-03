@@ -676,6 +676,79 @@ describe("receipts: an agent's reaction is its answer", () => {
   });
 });
 
+describe("receipts: an agent the router picked that passed", () => {
+  test("'Não respondeu' on its row and 'Ninguém respondeu' with 'Chamar um agente', never 'Respondeu'", async () => {
+    const { socket, state } = await open();
+    await sendText("alguém sabe onde rodam os builds?");
+    await settle(4);
+    const root = lastPerson(state);
+    const run = { threadId: root?.id, runId: "r-pass", agentId: ADA_ID };
+    await push(socket, {
+      type: "message.routed",
+      messageId: root?.id,
+      seenBy: [ADA_ID],
+      pickedBy: [ADA_ID],
+      runs: [{ agentId: ADA_ID, runId: "r-pass" }],
+      strategy: "router",
+    });
+    // What the executor sends when it passes and posts nothing.
+    await push(socket, { type: "agent.run", ...run, status: "running" });
+    await push(socket, { type: "agent.passed", ...run });
+    await push(socket, { type: "agent.run", ...run, status: "done" });
+    await push(socket, { type: "run.finished", ...run, status: "done" });
+    await push(socket, {
+      type: "message.handled",
+      messageId: root?.id,
+      agentId: ADA_ID,
+      runId: "r-pass",
+      status: "done",
+      passed: true,
+    });
+    await settle();
+    const check = rowsWith("alguém sabe onde rodam os builds?")[0]?.querySelector(".ac-receipt__check") as HTMLElement;
+    expect(check.getAttribute("aria-label")).toContain("Ninguém respondeu");
+    expect(check.querySelector("path")?.getAttribute("d")).toBe("m2 10.5 3 3 6-7M10 12.5l1 1 7-8");
+    await act(async () => fireEvent.click(check));
+    const pop = screen().getByRole("dialog", { name: "Agentes" });
+    expect(pop.querySelector(".ac-popover__row-status")?.textContent).toBe("Não respondeu");
+    expect(pop.textContent).not.toContain("Respondeu");
+    expect(pop.querySelector(".who-by")?.textContent).toBe("Ninguém respondeu·Chamar um agente");
+    expect(within(pop).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
+  });
+
+  test("a run that only reacted reads 'Reagiu', not 'Respondeu'", async () => {
+    const { socket, state } = await open();
+    await sendText("bom dia, time");
+    await settle(4);
+    const root = lastPerson(state);
+    await push(socket, {
+      type: "message.routed",
+      messageId: root?.id,
+      seenBy: [ADA_ID],
+      pickedBy: [ADA_ID],
+      runs: [{ agentId: ADA_ID, runId: "r-react" }],
+      strategy: "router",
+    });
+    await push(socket, {
+      type: "message.reactions",
+      messageId: root?.id,
+      reactions: [{ reaction: "☀️", count: 1, userIds: [], agentIds: [ADA_ID] }],
+    });
+    await push(socket, {
+      type: "message.handled",
+      messageId: root?.id,
+      agentId: ADA_ID,
+      runId: "r-react",
+      status: "done",
+    });
+    await settle();
+    const check = rowsWith("bom dia, time")[0]?.querySelector(".ac-receipt__check") as HTMLElement;
+    await act(async () => fireEvent.click(check));
+    const pop = screen().getByRole("dialog", { name: "Agentes" });
+    expect(pop.querySelector(".ac-popover__row-status")?.textContent).toBe("Reagiu");
+  });
+});
+
 describe("receipts: the clock from the moment it is sent", () => {
   test("no mention in a channel with agents: the clock at once, before the server says anything, then the router's word", async () => {
     const { socket, state } = await open();
@@ -1009,16 +1082,19 @@ describe("direct messages with an agent", () => {
     expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
       "Peça para lembrar, esquecer ou trabalhar de outro jeito.",
     );
-    // The sidebar lists the DM under "Mensagens diretas".
+    // Empty, the DM isn't in "Mensagens diretas" yet: it lists conversations that have a message.
     await settle(4);
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
-    expect(
+    const dmLinks = () =>
       within(nav)
-        .getAllByRole("link", { name: /Ada/ })
-        .map((l) => l.getAttribute("href")),
-    ).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
+        .queryAllByRole("link", { name: /Ada/ })
+        .map((l) => l.getAttribute("href"));
+    expect(dmLinks()).not.toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     await sendText("lembra que deploy é só de segunda a quinta");
     expect(bar().textContent).toBe("Ada pensando…");
+    // With its first message, it is.
+    await settle(4);
+    expect(dmLinks()).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
   });
 });
 

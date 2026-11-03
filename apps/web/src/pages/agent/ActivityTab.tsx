@@ -1,5 +1,6 @@
 import type { Run } from "@agenteschat/client";
 import { useAgentDetail, useChannels, useRoutines, useRuns, useUsage } from "@agenteschat/client";
+import { runErrorText } from "@agenteschat/client/lib/errors";
 import {
   capitalize,
   dayLabel,
@@ -40,20 +41,12 @@ import { RunChip, runWhere } from "./pieces";
 /** How many runs show at first, and how many more each "Carregar mais". */
 export const RUNS_PAGE = 20;
 
-type TT = (key: string, options?: Record<string, unknown>) => string;
-
 /** Why a run failed, in the person's language (the server's code), else its own words. */
-function failure(t: TFunction, run: Run) {
-  const code = run.errorCode?.replace(/^run\./, "");
-  if (code && code !== "failed") {
-    const text = (t as unknown as TT)(`agentPage.activity.errors.${code}`, {
-      ...run.errorParams,
-      defaultValue: "",
-    });
-    if (text) return text;
-  }
-  return run.errorParams?.detail ?? run.error ?? t("agentPage.activity.errors.unknown");
-}
+const failure = (t: TFunction, run: Run) =>
+  runErrorText(t, run.errorCode, run.errorParams) ??
+  run.errorParams?.detail ??
+  run.error ??
+  t("agentPage.activity.errors.unknown");
 
 /**
  * The month on top of Atividade (NumerosAgente C): its runs per day in pixels, in the agent's tones, failures
@@ -320,7 +313,8 @@ export function ActivityTab() {
                           {r.status === "failed" && (
                             <span className="agp-run__fail ac-iconline">
                               <Icon name="alert" size={14} />
-                              {failure(t, r)}
+                              {/* A computer's own code, worded generically, only on hover (as in the chat). */}
+                              <span title={r.errorParams?.code}>{failure(t, r)}</span>
                             </span>
                           )}
                           {r.deniedRepo && saved.repos?.mode === "some" && !covers(saved.repos.list, r.deniedRepo) && (

@@ -6,7 +6,6 @@ setupDom();
 import { HOVER_CLOSE_MS, HOVER_SWITCH_MS } from "@agenteschat/ui";
 import { box, mouse, place, step, tick } from "@agenteschat/ui/testing";
 import { cleanup, fireEvent, within } from "@testing-library/react";
-import { MEMBERS_OPEN_MS } from "@/components/ChannelMembers";
 import { HOVER_OPEN_MS } from "@/components/ProfileCard";
 import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -128,73 +127,26 @@ describe("the profile card opened on hover", () => {
     expect(shown()).toEqual(["Ada"]);
   });
 
-  test("a member clicked in the member list hover opened: the list and their card stay while the pointer is on it", async () => {
+  test("a member's card opens from the members column and stays while the pointer goes over to it", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(6);
     jest.useFakeTimers();
-    const stack = screen().getByRole("button", { name: "Membros do canal (4)" });
-    const list = () => screen().queryByRole("dialog", { name: "Membros do canal (4)" });
-    place(stack, box(700, 20, 80, 28));
-    await enter(stack, 740, 30);
-    await tick(MEMBERS_OPEN_MS);
-    const members = list() as HTMLElement;
-    place(members, box(460, 54, 320, 300));
-    await leave(stack, 740, 48, members);
-    await enter(members, 740, 60);
-    const row = within(members).getByRole("button", { name: "Perfil de João" });
-    place(row, box(468, 120, 304, 40));
-    await enter(row, 600, 140);
-    await tick(100);
-    await step(() => fireEvent.click(row));
-    // His card under the row, over the list.
-    const card = cards()[0] as HTMLElement;
-    place(card, box(468, 166, 300, 220));
-    await leave(row, 600, 161, card);
-    await enter(card, 600, 170);
-    await move(card, 610, 200);
-    await tick(HOVER_CLOSE_MS * 3);
-    expect(list()).not.toBeNull();
-    expect(shown()).toEqual(["João"]);
-  });
-
-  test("a member's card opens beside the member list, which stays while the pointer goes there", async () => {
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
-    await settle(6);
-    jest.useFakeTimers();
-    const stack = screen().getByRole("button", { name: "Membros do canal (4)" });
-    const list = () => screen().queryByRole("dialog", { name: "Membros do canal (4)" });
-    place(stack, box(700, 20, 80, 28));
-    await enter(stack, 740, 30);
-    await tick(MEMBERS_OPEN_MS);
-    const members = list() as HTMLElement;
-    place(members, box(500, 54, 280, 300));
-    await leave(stack, 740, 48, members);
-    await enter(members, 740, 60);
-    const row = within(members).getByRole("button", { name: "Perfil de João" });
-    place(row, box(510, 120, 260, 40));
-    await enter(row, 600, 140);
+    const side = screen().getByRole("complementary", { name: "Membros de #eng" });
+    const row = within(side).getByRole("button", { name: "Perfil de João" });
+    place(row, box(1186, 300, 244, 46));
+    await enter(row, 1300, 320);
     await tick(HOVER_OPEN_MS);
-    expect(list()).not.toBeNull();
     expect(shown()).toEqual(["João"]);
-    // His card past the list's left edge: out of the row over the list, then out of the list, to the card.
+    // His card to the column's left: out of the row, to the card.
     const card = cards()[0] as HTMLElement;
-    place(card, box(180, 100, 300, 220));
-    await leave(row, 510, 140, members);
-    await move(members, 505, 150);
-    await tick(HOVER_CLOSE_MS - 50);
-    await leave(members, 499, 155);
-    await move(document.body, 490, 160);
-    await tick(HOVER_CLOSE_MS - 50);
-    expect(list()).not.toBeNull();
-    expect(shown()).toEqual(["João"]);
-    await enter(card, 470, 160);
+    place(card, box(880, 260, 300, 220));
+    await leave(row, 1186, 320, card);
+    await enter(card, 1170, 320);
     await tick(HOVER_CLOSE_MS * 3);
-    expect(list()).not.toBeNull();
     expect(shown()).toEqual(["João"]);
-    await leave(card, 100, 160);
-    await move(document.body, 90, 160);
+    await leave(card, 860, 320);
+    await move(document.body, 850, 320);
     await tick(HOVER_CLOSE_MS);
-    expect(list()).toBeNull();
     expect(shown()).toEqual([]);
   });
 });

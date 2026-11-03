@@ -1,10 +1,12 @@
 import {
   archiveThread,
   closeThread,
+  countUnreadThreads,
   createThreadFromRange,
   deleteThread,
   getThread,
   listThreads,
+  markThreadRead,
   moveContextIntoThread,
   reopenThread,
   returnContextToChannel,
@@ -79,6 +81,10 @@ const Thread = z
     following: z.boolean().openapi({
       description:
         "You follow it: notified of its replies, which count as unread in the channel. By default whoever started it or wrote in it; `PUT`/`DELETE …/follow` choose. Left out of `thread.updated` events.",
+    }),
+    unread: z.number().int().openapi({
+      description:
+        "Replies you haven't read in a thread you follow (0 otherwise), at most 100: not yours, not moved in from the channel, after your read of the thread (`POST …/read`, or your joining its channel). Left out of `thread.updated` events.",
     }),
     mission: z
       .object({
@@ -275,6 +281,40 @@ export function threadRoutes(deps: AppDeps) {
       },
     );
   }
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/threads/{threadId}/read",
+      tags,
+      security,
+      summary: "Mark a thread's replies read up to now",
+      description: "Whoever reads the thread's channel. Your other devices hear `thread.read` on your own topic.",
+      request: { params: ThreadParams, body: body(z.object({})) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, threadId } = c.req.valid("param");
+      await markThreadRead(threads(), c.get("user").id, orgId, threadId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/unread-threads",
+      tags,
+      security,
+      summary: "How many threads you follow have a reply you haven't read (at most 100)",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ count: z.number().int() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ count: await countUnreadThreads(db, c.get("user").id, orgId) }, 200);
+    },
+  );
 
   const Follow = z.object({ threadId: z.uuid(), channelId: z.uuid(), following: z.boolean() }).openapi("ThreadFollow");
   for (const [method, following] of [

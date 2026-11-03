@@ -831,6 +831,10 @@ export interface Channel {
    * thread you follow. At most 100 (show "99+"); 0 when not a member.
    */
   unreadCount?: number;
+  /** Channel list only: of `unreadCount`, the messages that mention you (counted even while muted). */
+  mentionCount?: number;
+  /** Channel list only: you muted it, so it never looks unread. */
+  muted?: boolean;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
 }
@@ -960,6 +964,8 @@ export interface MessageReceipts {
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
     computer?: "queued" | "away";
+    /** It ended without answering: passed and posted nothing, or canceled before it started. */
+    passed?: true;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person). */
   blocked?: string[];
@@ -1255,11 +1261,13 @@ export type ChannelEvent =
       threadId: string;
       agentId: string;
       runId: string;
-      status: "done" | "failed" | "waiting_approval" | "waiting_input";
+      status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
+      passed?: true;
       error?: string;
       /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
       errorCode?: string;
@@ -1343,13 +1351,15 @@ export type ChannelEvent =
       messageId: string;
       agentId: string;
       runId?: string;
-      status?: "done" | "failed" | "waiting_approval" | "waiting_input";
+      status?: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** It ended without answering: passed and posted nothing, or canceled before it started. */
+      passed?: true;
     }
   /** An agent asked a person something and waits (expected: `ask_user` tool; shape to confirm). */
   | {
@@ -2174,6 +2184,8 @@ export interface SearchHit {
   /** Message hits: the message (open it there) and its thread (null = the main timeline). */
   messageId?: string | null;
   threadId?: string | null;
+  /** Message hits in a thread: its title (else its root message's first line); null on the main timeline. */
+  threadTitle?: string | null;
   /** Message hits: a voice message (its snippet is empty, ADR 0100), a GIF or a sticker. `hitText` says which. */
   mediaKind?: MediaKind;
 }
@@ -3093,6 +3105,8 @@ export interface Routine {
   createdAt: string;
   access: RoutineAccess;
   report: RoutineReport;
+  /** Connected-app actions its runs do without asking: the job its creator set it up for. Absent from older servers. */
+  ownActions?: string[];
   /** A coded reason (`RoutinePausedReason`); anything else is shown as a plain pause. */
   pausedReason: string | null;
   failuresInRow: number;
@@ -3399,7 +3413,7 @@ export interface SkillFile {
   path: string;
   size: number;
   mime: string;
-  /** `script`: runs on the agent's PC; `ignored`: old imports whose scripts never run (reinstall to use them). */
+  /** `script`: runs on the agent's PC; `ignored`: listed only, past what a skill keeps or from an older import. */
   status: "stored" | "ignored" | "script";
 }
 
@@ -4535,6 +4549,11 @@ export interface ThreadInfo {
    * API; absent in `thread.updated` events (it is per person).
    */
   following?: boolean;
+  /**
+   * Replies you haven't read in a thread you follow (0 otherwise), at most 100. Always sent by the API; absent in
+   * `thread.updated` events (it is per person).
+   */
+  unread?: number;
   /** The thread's mission, in short (details: `GET …/threads/{id}/mission`). */
   mission?: ThreadMissionSummary | null;
   createdAt: string;
@@ -5446,6 +5465,8 @@ export type NotificationKind =
   | "connector_tool_changed"
   /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
   | "computer_disk_full"
+  /** ADR 0133: a computer has no Google Chrome for its agents' browsers (who connected it). `source.machineId`. */
+  | "computer_no_chrome"
   /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
@@ -5694,6 +5715,16 @@ export interface ThreadFollow {
   channelId: string;
   following: boolean;
 }
+
+/**
+ * Unread marks on my own topic: a message in a conversation I'm in (no content: the lists read again), and my
+ * reads and mutes from any device.
+ */
+export type UnreadEvent =
+  | { type: "channel.activity"; channelId: string; threadId: string | null; dm?: boolean }
+  | { type: "channel.read"; channelId: string; userId: string; lastReadAt: string }
+  | { type: "channel.muted"; channelId: string; muted: boolean }
+  | { type: "thread.read"; threadId: string; channelId: string; lastReadAt: string };
 
 /** A pinned message (`GET …/channels/{id}/pins`, newest pin first). */
 export interface MessagePin {

@@ -14,7 +14,7 @@ import { INVITE_NOTE_MAX, sendsEmail } from "@agenteschat/client/lib/join-reques
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { aiStateOf, onlyOwnerReplies } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
@@ -69,10 +69,14 @@ function InvitePeople() {
   const inviteMany = useInviteMany(orgId);
   const input = useRef<TextInputInstance | null>(null);
   const [typed, setTyped] = useState("");
+  // An agent's invite card opens it with its addresses (`?emails=a@x,b@y`).
+  const { emails } = useLocalSearchParams<{ emails?: string }>();
   useEffect(() => {
-    setInviteDraft(EMPTY_INVITE);
+    setInviteDraft(
+      emails ? { ...EMPTY_INVITE, addresses: withAddresses(EMPTY_INVITE.addresses, emails) } : EMPTY_INVITE,
+    );
     return () => setInviteDraft(null);
-  }, []);
+  }, [emails]);
   const draft = useInviteDraft() ?? EMPTY_INVITE;
 
   // Who is in already, and who has an invitation waiting: said on their row and left out of the send.

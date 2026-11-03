@@ -32,7 +32,7 @@ describe("finding the settings", () => {
     expect(within(menu).getAllByRole("menuitem").map(itemName)).toEqual([
       "Convidar pessoas",
       "Membros",
-      "Conectores",
+      "Conectores e MCPs",
       "Agentes e acesso",
       "Skills",
       "Configurações do workspace",
@@ -41,7 +41,7 @@ describe("finding the settings", () => {
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/connectors`);
     // The section's own title (the connectors card has a "Conectores" heading too).
-    expect(document.querySelector(".settings__body > .page__header h2")?.textContent).toBe("Conectores");
+    expect(document.querySelector(".settings__body > .page__header h2")?.textContent).toBe("Conectores e MCPs");
   });
 
   test("the workspace menu lists my workspaces (this one marked) and a digit opens an option", async () => {
@@ -83,7 +83,7 @@ describe("finding the settings", () => {
     const menu = await openMenu(screen().getByRole("button", { name: "Menu do workspace Acme" }));
     expect(within(menu).getAllByRole("menuitem").map(itemName)).toEqual([
       "Membros",
-      "Conectores",
+      "Conectores e MCPs",
       "Configurações do workspace",
     ]);
   });
@@ -100,7 +100,7 @@ describe("finding the settings", () => {
       ["general", "Geral"],
       ["members", "Membros e convites"],
       ["access", "Agentes e acesso"],
-      ["connectors", "Conectores"],
+      ["connectors", "Conectores e MCPs"],
       ["skills", "Skills"],
       ["keys", "Contas de IA"],
       ["storage", "Armazenamento"],

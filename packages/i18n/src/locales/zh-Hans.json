@@ -121,6 +121,8 @@
     "color": "颜色",
     "colorDesc": "角色标记的颜色。",
     "colorOf": "{{color}}色",
+    "hoist": "在成员列表中单独显示",
+    "hoistDesc": "拥有此角色的人会在成员栏中单独成组。",
     "icon": "图标",
     "iconDesc": "显示在名称旁边。",
     "more": "更多选项",
@@ -1054,9 +1056,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "系统",
     "markRead": "标为已读",
+    "muteChannel": "将频道设为静音",
+    "unmuteChannel": "取消频道静音",
     "mention": "提及",
     "copyHandle": "复制 @{{handle}}",
     "handleCopied": "@ 已复制。",
+    "copyId": "复制 ID",
+    "idCopied": "ID 已复制。",
     "editAgent": "编辑智能体",
     "openPage": "打开完整页面",
     "moveUp": "上移",
@@ -1165,9 +1171,8 @@
     "sidebarMenu": {
       "title": "侧边栏",
       "newChannel": "新建频道",
-      "newAgentGroup": "新建智能体分组",
       "addToChannels": "新建频道或分类",
-      "addToAgents": "创建智能体或分组",
+      "addToDms": "新消息或智能体",
       "newMessage": "新消息",
       "addMembers": "添加成员或智能体",
       "channelSettings": "频道设置",
@@ -1261,6 +1266,9 @@
     "pendingApprovals_other": "{{count}} 个待审批",
     "home": "首页",
     "notifications": "通知",
+    "unreadMark": "未读",
+    "unreadMentions_other": "{{count}} 条提及你的消息",
+    "unreadThreads_other": "话题：{{count}} 个有未读回复",
     "unreadNotifications_other": "{{count}} 条未读通知"
   },
   "agentGroups": {
@@ -1293,6 +1301,9 @@
   },
   "team": {
     "title": "团队",
+    "groups": {
+      "title": "智能体分组"
+    },
     "subtitle_other": "{{count}} 个智能体，按负责人分组。",
     "working_other": "{{count}} 个正在工作。",
     "skyLabel": "按负责人分组的智能体。点击智能体查看它做什么。",
@@ -1368,10 +1379,15 @@
       "button_other": "置顶消息（{{count}}）",
       "label": "#{{channel}} 中的置顶消息",
       "in": "置顶于 #{{channel}}",
-      "unpin": "取消置顶 {{name}} 的消息"
+      "unpin": "取消置顶 {{name}} 的消息",
+      "empty": "这里还没有置顶的内容"
+    },
+    "header": {
+      "pins": "置顶消息",
+      "showMembers": "显示成员",
+      "hideMembers": "隐藏成员"
     },
     "membersButton_other": "频道成员（{{count}}）",
-    "membersPeople": "成员",
     "membersAgents": "智能体",
     "you": "你",
     "agentState": {
@@ -1381,7 +1397,6 @@
     },
     "autoReplyChip": "无需提及即回复",
     "coordinatorChip": "协调团队",
-    "seeDetails": "查看频道详情",
     "more": "更多消息操作",
     "copyLink": "复制链接",
     "linkCopied": "链接已复制。",
@@ -1403,7 +1418,6 @@
     "messages": "消息",
     "members": "成员：{{names}}",
     "details": "频道详情",
-    "agentsAnswer_other": "{{names}} 在这里回复",
     "composerLabel": "在 #{{channel}} 中发消息",
     "composerDm": "给 {{name}} 发消息",
     "composerPlaceholder": "在 #{{channel}} 中发消息 · 用 @ 呼叫智能体",
@@ -1436,6 +1450,13 @@
     "generalName": "#general 的名称不能更改。",
     "archive": "归档频道",
     "archived": "#{{channel}} 已归档。对话会保留。",
+    "delete": "删除频道",
+    "deleteTitle": "要永久删除 #{{channel}} 吗？",
+    "deleteGoes": "立即删除：消息、话题、文件和置顶，智能体从这个频道记住的内容，以及在这里发帖的例行任务。",
+    "deleteIssues": "它的任务也会一并删除，因为只有频道成员能看到它们。",
+    "deleteOrArchive": "想保留对话的话，请归档频道而不是删除。",
+    "deleteTypeName": "输入 {{channel}} 以确认",
+    "deleteDone": "#{{channel}} 已删除。",
     "detailsSub": "{{category}} · {{visibility}}",
     "visibilityPublic": "公开",
     "visibilityPrivate": "私密",
@@ -1478,6 +1499,7 @@
     "claimed_other": "{{names}} 正在回答",
     "waiting_other": "{{names}} 正在等待审批",
     "handled_other": "{{names}} 已回答",
+    "passed_other": "没有人回答",
     "failed_other": "{{names}} 无法回答",
     "asking_other": "{{names}} 正在等你回答",
     "outage_other": "{{names}}：AI 服务商出现故障 · 会自动重试",
@@ -1497,6 +1519,7 @@
       "handled": "已回答",
       "failed": "失败",
       "referenced": "仅被提及",
+      "passed": "未回答",
       "reacted": "已回应"
     },
     "failedShort": "无法回答",
@@ -1684,7 +1707,8 @@
     },
     "useAnyway": "使用 {{email}}",
     "assignFailed": "{{label}} 账号已连接，但 {{agent}} 无法切换到它。",
-    "noAgents": "套餐只为其所有者的智能体思考，而你还没有智能体。",
+    "forNewAgents": "{{label}} 已连接。你创建的智能体会用它思考。",
+    "forNewAgentsHint": "你创建的智能体会用它思考。",
     "done": "完成",
     "agent": "用于哪个智能体",
     "keyLocked": "只有管理员可以添加 API 密钥。",
@@ -1781,6 +1805,17 @@
     },
     "connect": "连接",
     "connected": "已连接",
+    "connect_app": {
+      "title": "连接 {{name}}",
+      "mcp": "添加 MCP 服务器",
+      "adminOnly": "由管理员连接"
+    },
+    "invite": {
+      "title_other": "邀请 {{count}} 人",
+      "open": "邀请",
+      "done": "已发送邀请",
+      "adminOnly": "由有邀请权限的人发送"
+    },
     "agentProposal": {
       "title": "{{agent}} 提议创建一个新智能体",
       "review": "查看",
@@ -1867,6 +1902,7 @@
     "routine": {
       "created": "创建了例行工作 <b>{{name}}</b> · {{schedule}}",
       "created_bare": "创建了例行工作 <b>{{name}}</b>",
+      "ownActions": "无需询问，自动执行：{{actions}}",
       "updated": "修改了例行工作 <b>{{name}}</b> 的{{fields}}",
       "updated_paused": "暂停了例行工作 <b>{{name}}</b>",
       "updated_resumed": "恢复了例行工作 <b>{{name}}</b>",
@@ -2058,6 +2094,12 @@
   "profile": {
     "audience": "谁可以对话",
     "cardLabel": "个人资料",
+    "roles": "角色",
+    "memberSince": "加入时间",
+    "messageTo": "发给 {{name}} 的消息",
+    "audienceEdit": "编辑",
+    "nowIn": "正在 #{{channel}} 中",
+    "more": "更多",
     "of": "{{name}} 的个人资料",
     "presence": "在线状态",
     "offline": "尚未加入",
@@ -2820,14 +2862,6 @@
     "nameLabel": "名称",
     "roleLabel": "角色",
     "roleHelp": "它为团队做什么，例如：邮件和日历助理。",
-    "editName": "编辑名称：{{name}}",
-    "editHandle": "编辑提及：@{{handle}}",
-    "editRole": "编辑角色：{{role}}",
-    "noRole": "无角色",
-    "rolePlaceholder": "例如：客服",
-    "roleList": "角色列表",
-    "roleUse": "使用“{{role}}”",
-    "roleCurrent": "当前",
     "edit": "编辑",
     "chat": "聊天",
     "moreActions": "更多操作",
@@ -2876,7 +2910,15 @@
     "budgetDefaultHelp": "留空：使用工作区默认值。",
     "budgetDefaultHelpAmount": "留空：使用工作区默认值（{{amount}}）。",
     "budgetInvalid": "请输入大于零的值。",
-    "notFound": "该智能体不存在或已归档。"
+    "notFound": "该智能体不存在或已归档。",
+    "editName": "编辑名称：{{name}}",
+    "editHandle": "编辑提及：@{{handle}}",
+    "editRole": "编辑角色：{{role}}",
+    "noRole": "无角色",
+    "rolePlaceholder": "例如：客服",
+    "roleList": "角色列表",
+    "roleUse": "使用“{{role}}”",
+    "roleCurrent": "当前"
   },
   "agentPage": {
     "work": {
@@ -3395,6 +3437,8 @@
         "org_deleting": "工作区正在删除中。",
         "agent_paused": "该智能体已暂停。",
         "computer_busy": "电脑一直忙于其他任务。",
+        "computer_failed": "电脑遇到问题，已停止。",
+        "computer_timeout": "电脑响应时间过长。",
         "unknown": "失败。"
       }
     },
@@ -3762,6 +3806,7 @@
       "handleTaken": "@{{handle}} 已被其他智能体或成员使用。试试 @{{suggestion}}？",
       "modelUnavailable": "请选择工作区可以使用的模型。"
     },
+    "noAi": "工作区还没有 AI。现在连接一个，或者先创建智能体，之后再连接。",
     "instructions": "指令",
     "instructionsPlaceholder": "例如：根据文档在 #support 回答客户问题。不知道时，找团队里的人。",
     "startedFrom": "基于{{role}}的文本",
@@ -3893,6 +3938,13 @@
     "routineNotMade": "例行工作未创建：{{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} 的成员",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "工作区所有者",
+      "more": "再显示 {{count}} 个",
+      "find": "查找人员和智能体"
+    },
     "agentsOnlyYou": "你的智能体只回复你。",
     "agentsOnlyYouHint": "升级套餐后，你可以在每个智能体的页面上允许它回复其他人。",
     "filters": "筛选成员",
@@ -3915,7 +3967,6 @@
       "on": "于 {{date}}"
     },
     "waitingTitle": "等你处理",
-    "more": "{{name}} 的更多操作",
     "remove": {
       "item": "从工作区移除",
       "leave": "离开工作区",
@@ -3950,18 +4001,9 @@
     },
     "dialog": {
       "title": "邀请加入 {{org}}",
-      "stepOf": "第 {{n}} 步，共 {{total}} 步 · {{step}}",
-      "steps": {
-        "who": "邀请谁",
-        "role": "角色",
-        "where": "加入频道",
-        "note": "留言"
-      },
       "emails": "邮箱",
       "moreEmails": "更多邮箱…",
       "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
-      "pasteHelp": "也可以粘贴一个列表：用逗号、空格分隔，或每行一个。",
-      "leftOut": "已经在这里或已被邀请的人不会再收到邀请。",
       "withNote": "附带留言",
       "alsoJoin": "同时加入",
       "generalAlways": "所有人都会加入 #{{channel}}",
@@ -3969,11 +4011,20 @@
       "optional": "（可选）",
       "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
       "or": "或发送链接",
-      "continueWith": "继续（{{count}} 人）",
       "send_other": "邀请 {{count}} 人",
       "sent": "已向 {{email}} 发送邀请。",
       "sentMany": "已发送 {{count}} 份邀请。",
       "alsoIn": "他们也会加入 {{channels}}。",
+      "stepOf": "第 {{n}} 步，共 {{total}} 步 · {{step}}",
+      "steps": {
+        "who": "邀请谁",
+        "role": "角色",
+        "where": "加入频道",
+        "note": "留言"
+      },
+      "pasteHelp": "也可以粘贴一个列表：用逗号、空格分隔，或每行一个。",
+      "leftOut": "已经在这里或已被邀请的人不会再收到邀请。",
+      "continueWith": "继续（{{count}} 人）",
       "who": {
         "title": "你想邀请谁？",
         "lead": "把邮箱告诉我。每个人都会收到邀请，并直接加入。"
@@ -4313,7 +4364,7 @@
     },
     "setup_write": {
       "label": "设置工作区",
-      "description": "用一张由成员点击的卡片提议连接 AI，并为提出请求的人创建频道，可撤销。"
+      "description": "用一张由成员点击的卡片提议连接 AI、应用或 MCP 服务器，或邀请成员，并为提出请求的人创建频道，可撤销。"
     },
     "github_git_read": {
       "label": "克隆仓库（git）",
@@ -4357,54 +4408,6 @@
     "flowHint": "任务会自动移到每个阶段的第一列：智能体开始时移到“进行中”，可以检查时移到“审核中”，你批准后移到“已完成”。",
     "moreOptions": "更多选项",
     "showCanceled": "显示已取消",
-    "filterButton": "筛选",
-    "filterValue": "{{filter}}：{{value}}",
-    "me": "我",
-    "display": {
-      "title": "显示",
-      "label": "显示：{{layout}} · {{group}}",
-      "layout": "布局",
-      "group": "分组依据",
-      "sort": "排序依据",
-      "fields": "卡片上显示",
-      "saved": "已在此工作区为你保存",
-      "reset": "恢复默认",
-      "by": {
-        "stage": "阶段",
-        "assignee": "负责人",
-        "priority": "优先级"
-      },
-      "order": {
-        "manual": "手动",
-        "priority": "优先级",
-        "due": "截止日期"
-      },
-      "field": {
-        "assignee": "负责人",
-        "priority": "优先级",
-        "due": "截止日期",
-        "criteria": "标准",
-        "pullRequest": "拉取请求",
-        "label": "标签"
-      }
-    },
-    "drop": {
-      "stage": "放到{{name}}",
-      "assignee": "放下以交给{{name}}",
-      "unassign": "放下以移除负责人",
-      "priority": "放下以设为{{priority}}优先级"
-    },
-    "drag": {
-      "role": "可拖动的任务",
-      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
-      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
-      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
-      "dropped": "你把 #{{number}} 放到了{{group}}。",
-      "canceled": "#{{number}} 回到了原位。",
-      "assigned": "#{{number}} 现在由{{name}}负责。",
-      "unassigned": "#{{number}} 现在没有负责人。",
-      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
-    },
     "canceledColumn": "已取消",
     "columns": {
       "add": "添加列",
@@ -4647,6 +4650,54 @@
       "agent_asked": "请 {{name}} 来完成",
       "forum_opened": "将它提交到论坛：{{title}}",
       "forum_evaluated": "带回了论坛的结果：{{title}}"
+    },
+    "filterButton": "筛选",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "我",
+    "display": {
+      "title": "显示",
+      "label": "显示：{{layout}} · {{group}}",
+      "layout": "布局",
+      "group": "分组依据",
+      "sort": "排序依据",
+      "fields": "卡片上显示",
+      "saved": "已在此工作区为你保存",
+      "reset": "恢复默认",
+      "by": {
+        "stage": "阶段",
+        "assignee": "负责人",
+        "priority": "优先级"
+      },
+      "order": {
+        "manual": "手动",
+        "priority": "优先级",
+        "due": "截止日期"
+      },
+      "field": {
+        "assignee": "负责人",
+        "priority": "优先级",
+        "due": "截止日期",
+        "criteria": "标准",
+        "pullRequest": "拉取请求",
+        "label": "标签"
+      }
+    },
+    "drop": {
+      "stage": "放到{{name}}",
+      "assignee": "放下以交给{{name}}",
+      "unassign": "放下以移除负责人",
+      "priority": "放下以设为{{priority}}优先级"
+    },
+    "drag": {
+      "role": "可拖动的任务",
+      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
+      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
+      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
+      "dropped": "你把 #{{number}} 放到了{{group}}。",
+      "canceled": "#{{number}} 回到了原位。",
+      "assigned": "#{{number}} 现在由{{name}}负责。",
+      "unassigned": "#{{number}} 现在没有负责人。",
+      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
     }
   },
   "routines": {
@@ -4830,6 +4881,7 @@
         "artifact": "生成 Drive 中的文档"
       },
       "ahead": "为之后准备好的",
+      "ownActions": "自动执行",
       "createdBy": "由 {{name}} 创建 · {{date}}",
       "nameLabel": "例行工作名称",
       "editName": "编辑名称",
@@ -4847,6 +4899,10 @@
         "always": "即使没有新内容",
         "when_new": "没有新内容时保持安静"
       }
+    },
+    "ownActions": {
+      "hint": "每次运行都会在你已连接的应用中直接执行这些操作，无需询问。其中的其他操作会先请人审批，合并、部署和回滚始终需要审批。",
+      "none": "在已连接的应用中，每个操作前都会先请人审批。若要让它自动完成工作，请在聊天中告诉智能体可以执行哪些操作。"
     },
     "ahead": {
       "approved": "已批准 · {{when}}运行",
@@ -6237,9 +6293,10 @@
     "bodyHelp": "SKILL.md 的正文。",
     "writeMissing": "请填写名称、何时使用和指令。",
     "files": "文件",
-    "needsSandbox": "需要沙盒",
+    "needsSandbox": "未保存",
+    "assetLimit": "一个技能最多保存 {{max}} MB 的图片和其他文件。",
     "runsOnPc": "在智能体的电脑上运行",
-    "reinstall": "重新安装才能使用脚本。",
+    "reinstall": "重新安装该技能，智能体才能使用这个文件。",
     "edit": "编辑",
     "save": "保存",
     "saved": "已保存 {{name}}。",
@@ -8373,6 +8430,12 @@
   "connectors": {
     "title": "连接器",
     "add": "添加连接器",
+    "mcp": {
+      "title": "MCP",
+      "add": "添加 MCP",
+      "list": "已连接的 MCP 服务器",
+      "none": "通过地址连接的 MCP 服务器会显示在这里。"
+    },
     "addTitle": "添加连接器",
     "catalogText": "为 {{org}} 连接一次，然后选择每个智能体可以使用什么。",
     "catalog": "可用的连接器",
@@ -9652,6 +9715,27 @@
       "relevance": "最相关"
     },
     "searchHere": "在此对话中搜索",
+    "optionHint": {
+      "from": "名称",
+      "in": "频道",
+      "has": "链接、文件、图片或卡片",
+      "mentions": "名称"
+    },
+    "moreFiltersHint": "日期、仅代理、已置顶",
+    "clearRecentAll": "清除最近搜索",
+    "header": {
+      "placeholder": "在 {{org}} 中搜索",
+      "clear": "清除搜索"
+    },
+    "panel": {
+      "label": "搜索结果",
+      "count_other": "{{count}} 个结果",
+      "filters": "筛选",
+      "filtersCount_other": "筛选（{{count}}）",
+      "jump": "前往",
+      "jumpLabel": "前往 {{name}} 的消息",
+      "threadIn": "#{{channel}} 中的话题"
+    },
     "dm": "与 {{name}} 的私信"
   },
   "files": {
@@ -9984,6 +10068,7 @@
       "measuring": "尚未计算大小",
       "diskFullNotice": "{{name}} 的磁盘快满了"
     },
+    "chromeMissingNotice": "{{name}} 需要 Google Chrome 才能运行代理的浏览器。请在 google.com/chrome 下载",
     "access": {
       "folders": "允许的文件夹",
       "ownFolder": "每个智能体的文件夹",
@@ -10464,6 +10549,7 @@
         "wiki": "一个 Wiki 页面",
         "mission": "一项专项任务",
         "thread": "一个话题",
+        "channel": "一个频道",
         "forum": "一个论坛主题",
         "artifact": "一个 Drive 文件",
         "agent": "一个智能体",
@@ -10547,7 +10633,7 @@
       "members": "成员和邀请",
       "roles": "角色和权限",
       "access": "智能体和访问权限",
-      "connectors": "连接器",
+      "connectors": "连接器和 MCP",
       "skills": "技能",
       "keys": "AI 账号",
       "storage": "存储",
@@ -10567,7 +10653,7 @@
       "members": "工作区里有谁，以及邀请。",
       "roles": "每个人可以做什么。角色权限会叠加。",
       "access": "每个智能体可以使用什么：每个连接器一个级别。",
-      "connectors": "为整个工作区一次性连接的服务。",
+      "connectors": "为整个工作区一次性连接的服务和 MCP 服务器。",
       "skills": "智能体在需要时打开的 Markdown 指令。",
       "keys": "你的套餐和工作区的 API 密钥。",
       "storage": "工作区文件的存放位置。",
@@ -11102,6 +11188,8 @@
         "readingForum": "阅读了论坛",
         "creatingChannel": "创建了频道",
         "offeringConnectAi": "提议连接 AI",
+        "offeringConnectApp": "提议连接一个应用",
+        "offeringInvites": "提议邀请成员",
         "proposingAgent": "提议了智能体",
         "askingAgent": "询问了另一个智能体",
         "tellingAgent": "告知了另一个智能体",
@@ -11184,6 +11272,8 @@
       "readingForum": "阅读论坛",
       "creatingChannel": "创建频道",
       "offeringConnectAi": "准备连接 AI",
+      "offeringConnectApp": "准备连接应用",
+      "offeringInvites": "准备邀请",
       "proposingAgent": "提议智能体",
       "askingAgent": "询问另一个智能体",
       "tellingAgent": "告知另一个智能体",
@@ -11290,6 +11380,9 @@
       "no_ai_signed_out": "我暂时无法回答：我的 AI 已退出登录。",
       "no_ai_not_signed_in": "我暂时无法回答：{{brain}} 还没有在我的电脑上登录。",
       "action_connect_ai": "连接 AI",
+      "action_connect_app": "连接 {{name}}",
+      "action_add_mcp": "添加 MCP 服务器",
+      "action_invite_people": "邀请成员",
       "agent_proposal": "提议了一个新智能体：{{name}}",
       "approval_request": "审批请求：{{title}}",
       "secret_request": "{{agent}} 请求了一个密钥：{{name}}",
@@ -11486,6 +11579,14 @@
     "offer_connect_ai": {
       "label": "提议连接 AI",
       "description": "发布一张卡片，点击按钮即可打开连接套餐或 API 密钥的对话框。"
+    },
+    "offer_connect_app": {
+      "label": "提议连接应用或 MCP",
+      "description": "发布一张卡片，点击按钮即可打开按地址连接应用或 MCP 服务器的对话框。"
+    },
+    "offer_invites": {
+      "label": "提议邀请成员",
+      "description": "发布一张卡片，点击按钮即可打开已填好地址的邀请对话框。"
     },
     "propose_agent": {
       "label": "提议创建智能体",

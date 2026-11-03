@@ -121,6 +121,85 @@ describe("an agent's Connect card", () => {
   });
 });
 
+describe("an agent's card to connect an app or an MCP server, and to invite people", () => {
+  /** A card `offer_connect_app` / `offer_invites` posts as Atlas in #eng. */
+  const offer = (id: string, kind: string, params: Record<string, unknown>, minute = 0): Message => ({
+    ...card(id, {}, minute),
+    body: "server text",
+    meta: { bodyCode: "action_connect_app", actionCard: { kind, forUserId: "u-walter", params } },
+  });
+  const type = async (el: HTMLElement, value: string) => {
+    await act(async () => fireEvent.change(el, { target: { value } }));
+    await settle(2);
+  };
+
+  test("an MCP server's address: Conectar opens connecting by address with it filled in; once connected, one line", async () => {
+    const state = seedState();
+    state.messages.push(
+      offer("c-mcp", "connect_app", { url: "https://oauth.acme.example.com/mcp", why: "Você pediu o MCP da Acme." }),
+    );
+    await open(state);
+    const row = cardRow("Conectar oauth.acme.example.com");
+    expect(row.textContent).toContain("Você pediu o MCP da Acme.");
+    expect(row.textContent).not.toContain("server text");
+    await click(within(row).getByRole("button", { name: "Conectar" }));
+    const flow = dialog("Conectar servidor MCP") as HTMLElement;
+    expect((within(flow).getByLabelText("Endereço do servidor MCP") as HTMLInputElement).value).toBe(
+      "https://oauth.acme.example.com/mcp",
+    );
+    await type(within(flow).getByLabelText("Nome"), "Acme");
+    await click(within(flow).getByRole("button", { name: "Conectar" }), 8);
+    const done = cardRow("Conectar oauth.acme.example.com");
+    expect(done.querySelector(".waitcard")).toBeNull();
+    expect(done.textContent).toContain("Conectado");
+  });
+
+  test("a catalog service opens its own connect step; with no address, connecting by address asks for it", async () => {
+    const state = seedState({ connections: [] });
+    state.messages.push(
+      offer("c-linear", "connect_app", { connector: "linear", why: "Para ler as issues." }),
+      offer("c-any", "connect_app", { why: "Me passe o endereço no diálogo." }, 1),
+    );
+    await open(state);
+    await click(within(cardRow("Conectar Linear")).getByRole("button", { name: "Conectar" }));
+    expect(dialog("Conectar Linear")).toBeTruthy();
+    await click(within(dialog("Conectar Linear") as HTMLElement).getByRole("button", { name: "Fechar" }));
+    await click(within(cardRow("Adicionar um servidor MCP")).getByRole("button", { name: "Conectar" }));
+    const flow = dialog("Conectar servidor MCP") as HTMLElement;
+    expect((within(flow).getByLabelText("Endereço do servidor MCP") as HTMLInputElement).value).toBe("");
+  });
+
+  test("invites: Convidar opens the invite dialog with the addresses in it; done once they're invited", async () => {
+    const state = seedState();
+    state.messages.push(
+      offer("c-inv", "invite_people", { emails: ["ana@example.com", "bia@example.com"], why: "O time de design." }),
+    );
+    await open(state);
+    const row = cardRow("Convidar 2 pessoas");
+    expect(row.textContent).toContain("ana@example.com, bia@example.com");
+    await click(within(row).getByRole("button", { name: "Convidar" }));
+    const invite = dialog("Convidar para a Acme") as HTMLElement;
+    expect(invite.textContent).toContain("ana@example.com");
+    expect(invite.textContent).toContain("bia@example.com");
+    cleanup();
+
+    const sent = seedState();
+    sent.messages.push(offer("c-inv", "invite_people", { emails: ["ana@example.com"], why: "Design." }));
+    sent.invitations.push({
+      id: "i-ana",
+      email: "ana@example.com",
+      role: "member",
+      status: "pending",
+      expiresAt: NOW.toISOString(),
+      createdAt: NOW.toISOString(),
+    });
+    await open(sent);
+    const done = cardRow("ana@example.com");
+    expect(done.querySelector(".waitcard")).toBeNull();
+    expect(done.textContent).toContain("Convite enviado: ana@example.com");
+  });
+});
+
 describe("a stretch's pause card (ADR 0089)", () => {
   /** The card a stretch's limit posts as Atlas in #eng, for the agents it holds. */
   const pause = (id: string, actionCard: Record<string, unknown>, minute = 0): Message => ({

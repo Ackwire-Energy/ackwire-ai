@@ -255,13 +255,16 @@ async function holdUntried(deps: HandOffDeps, ctx: ToolContext, text: string): P
   return `Not posted yet. ${untriedNudge(means, tried)} Then call hand_off again: that one posts.`;
 }
 
-/** What a question to a person asks for (`askVerdict`): something the run could find, a secret, or a person's own. */
-export type AskVerdict = "findable" | "secret" | "person";
+/**
+ * What a question to a person asks for (`askVerdict`): something the run could find, a secret, a person's own, or
+ * nothing it needs to go on (`none`: a status note or an optional offer).
+ */
+export type AskVerdict = "findable" | "secret" | "person" | "none";
 
 /**
  * One judge call on an `ask_user` question (kind `ask_check`, recorded like every judgment): `secret` at p ≥ 0.5
- * and at least the others, `findable` at p ≥ 0.5 and at least p(person), otherwise `person`. A needless hold costs
- * one more call of the agent; a findable question asked costs the person a wait.
+ * and at least the others, then `none` and `findable` the same way, otherwise `person`. A needless hold costs
+ * one more call of the agent; a findable question asked, or one that asks nothing, costs the person a wait.
  */
 export async function askVerdict(
   judge: Judge,
@@ -273,6 +276,8 @@ export async function askVerdict(
     request: string;
     means: string[];
     tried: string[];
+    /** What the agent already wrote in this turn, before asking. */
+    reply?: string;
   },
 ): Promise<AskVerdict> {
   const answers = await judge.ask({
@@ -283,6 +288,7 @@ export async function askVerdict(
     state: {
       question: cutText(input.question, 1000),
       request: cutText(input.request, 2000),
+      ...(input.reply ? { reply: cutText(input.reply, 2000) } : {}),
       means: input.means,
       tried: input.tried.slice(-20).map(neutralizeUntrusted),
     },
@@ -290,21 +296,25 @@ export async function askVerdict(
       verdict: {
         type: "choice",
         instructions:
-          "An AI agent in a team chat was asked `request` and now wants to ask a person `question`, then wait for the answer. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). `tried`: each tool call it made in this run, with its argument and outcome. What does the question ask for?",
+          "An AI agent in a team chat was asked `request` and now wants to ask a person `question`, then wait for the answer. `reply`, when given: what it already wrote to them in this turn. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). `tried`: each tool call it made in this run, with its argument and outcome. What does the question ask for?",
         criteria: {
           findable:
             "Information the agent could find itself with `means` and hasn't really looked for in `tried`: an API's address or endpoints, a product's or a service's docs, what a name or a term the person used refers to (search the workspace and the web first), a public fact, something written in the workspace's messages or files.",
           secret: "A secret typed into the chat: a password, an API key, a token, a code, a private key.",
           person:
-            "Something only a person can give: a decision, a preference or a priority, an approval, a payment, an access or a sign-in, a test only they can run; or a request so ambiguous that what they meant can't be found anywhere; or `tried` already shows it searched where the answer would be.",
+            "Something only a person can give that the agent needs to go on: a decision, a preference or a priority, an approval, a payment, an access or a sign-in, a test only they can run; or a request so ambiguous that what they meant can't be found anywhere; or `tried` already shows it searched where the answer would be.",
+          none: "Nothing the agent needs to go on: `question` is a status note or an update that needs no answer, says it needs nothing from them, or only offers optional extra work the request doesn't need ('only if you want…', 'I can also…'); or `reply` already settles the request and `question` merely offers more. A note that describes something it still needs from them to finish the request (an access, a decision, a test) is not this, even when it asks no question.",
         },
       },
     },
   });
   const a = answers.verdict;
   const p = (k: AskVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
-  if (p("secret") >= 0.5 && p("secret") >= p("findable") && p("secret") >= p("person")) return "secret";
-  if (p("findable") >= 0.5 && p("findable") >= p("person")) return "findable";
+  const wins = (k: AskVerdict) =>
+    p(k) >= 0.5 && (["secret", "none", "findable", "person"] as const).every((o) => p(k) >= p(o));
+  if (wins("secret")) return "secret";
+  if (wins("none")) return "none";
+  if (wins("findable")) return "findable";
   return "person";
 }
 
@@ -312,14 +322,41 @@ export async function askVerdict(
 const NAMES_SECRET =
   /\b(api[ _-]?keys?|chaves?|tokens?|senhas?|passwords?|secrets?|segredos?|credenciais|credentials?)\b/i;
 
+/** What the run reads when its question asks the person for nothing it needs (`none`). */
+export const ASKS_NOTHING =
+  "Not asked: this asks the person for nothing you need to go on. Say it in your reply instead, as a plain offer if it is one, and end your turn: nobody waits on it.";
+
+/**
+ * What a model brain wrote in this turn before its tool calls: its `model_call` step is saved before they run. A
+ * computer brain's turn saves that step only when it ends, so the latest one is an earlier turn's.
+ */
+async function turnNarration(ctx: ToolContext) {
+  if (ctx.bridge) return "";
+  const [step] = await ctx.db
+    .select({ narration: sql<string | null>`${schema.agentRunSteps.data}->>'narration'` })
+    .from(schema.agentRunSteps)
+    .where(
+      and(
+        eq(schema.agentRunSteps.orgId, ctx.orgId),
+        eq(schema.agentRunSteps.runId, ctx.runId),
+        eq(schema.agentRunSteps.kind, "model_call"),
+      ),
+    )
+    .orderBy(sql`${schema.agentRunSteps.seq} desc`)
+    .limit(1);
+  return step?.narration ?? "";
+}
+
 /** What the run reads when it asked a person for a secret in a chat question. */
 const SECRET_IN_CHAT = "Not asked: a secret typed in the chat stays in the conversation in plain text.";
 
 /**
  * An `ask_user` question goes through the same resourcefulness check as giving up (ADR 0109 addendum): a question for
  * something the run could find with its means is held once (the tool answers with its means and what it tried, and
- * the next findable question is asked), and a secret asked as a chat question is refused every time and turned to
- * `request_secret` (on a judge error, a question naming a secret is refused too). Null: ask it.
+ * the next findable question is asked), a secret asked as a chat question is refused every time and turned to
+ * `request_secret` (on a judge error, a question naming a secret is refused too), and one that asks the person for
+ * nothing the run needs (a status note, an optional offer) is refused every time, so the run never waits on it (on a
+ * judge error it is asked). Null: ask it.
  */
 export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question: string): Promise<string | null> {
   if (!deps.judge) return null;
@@ -330,7 +367,10 @@ export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question:
     .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)));
   if (run?.status !== "running") return null;
   const held = await heldRules(ctx.db, run, "ask_user");
-  const { request, means, tried, names } = await runEvidence(deps, ctx, run);
+  const [{ request, means, tried, names }, reply] = await Promise.all([
+    runEvidence(deps, ctx, run),
+    turnNarration(ctx),
+  ]);
   const verdict = await askVerdict(deps.judge, {
     orgId: ctx.orgId,
     agentId: ctx.agentId,
@@ -339,6 +379,7 @@ export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question:
     request,
     means,
     tried,
+    reply,
   }).catch((): AskVerdict => (NAMES_SECRET.test(question) ? "secret" : "person"));
   if (verdict === "person" || (verdict === "findable" && held.includes("findable"))) return null;
   await addRunStep(ctx.db, run, "context", {
@@ -346,6 +387,7 @@ export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question:
     ...(verdict === "findable" ? { nudged: "untried" } : {}),
   });
   if (verdict === "findable") return findableNudge(means, tried);
+  if (verdict === "none") return ASKS_NOTHING;
   return names.has(REQUEST_SECRET_TOOL)
     ? `${SECRET_IN_CHAT} Ask for it with request_secret: the person types it into a secure card. Find everything else yourself first.`
     : `${SECRET_IN_CHAT} You have no secure way to receive it here: say which key you need and where it is set up, without asking for it in the chat.`;

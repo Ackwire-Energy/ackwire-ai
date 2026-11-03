@@ -31,6 +31,7 @@ import {
   myIssuesView,
   mySidebarItems,
   mySidebarOrder,
+  mySidebarToolOrder,
   orgOverview,
   pickerModels,
   queueInvitationEmail,
@@ -53,6 +54,7 @@ import {
   setMySidebarItem,
   setMySidebarItems,
   setMySidebarOrder,
+  setMySidebarToolOrder,
   setMyStatus,
   setShowActivity,
   setStartPage,
@@ -807,6 +809,52 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       return c.json({ order: await setMySidebarOrder(db, orgId, c.get("user").id, c.req.valid("json").order) }, 200);
+    },
+  );
+
+  const SidebarToolOrder = z
+    .array(z.enum(SIDEBAR_ITEMS))
+    .length(SIDEBAR_ITEMS.length)
+    .refine((order) => new Set(order).size === order.length, { message: "Each tool once" })
+    .openapi("SidebarToolOrder", {
+      description:
+        "The tools at the top of the sidebar in your order, every tool once. Where each shows (the list or More) is its place in `SidebarItems`.",
+    });
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/sidebar/tools",
+      tags: ["Members"],
+      security,
+      summary: "The order of the tools at the top of your sidebar in this workspace",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ order: SidebarToolOrder })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ order: await mySidebarToolOrder(db, orgId, c.get("user").id) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/sidebar/tools",
+      tags: ["Members"],
+      security,
+      summary: "Order the tools at the top of your sidebar in this workspace",
+      description:
+        "Yours alone, on every device. `order: null` goes back to the default; the tools' places and the sections' order stay.",
+      request: { params: OrgParams, body: body(z.object({ order: SidebarToolOrder.nullable() })) },
+      responses: { 200: json(z.object({ order: SidebarToolOrder })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(
+        { order: await setMySidebarToolOrder(db, orgId, c.get("user").id, c.req.valid("json").order) },
+        200,
+      );
     },
   );
 

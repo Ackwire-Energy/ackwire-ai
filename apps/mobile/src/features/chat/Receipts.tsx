@@ -12,7 +12,10 @@ import {
   actionTextValues,
   formatTimeLeft,
   hookToCopy,
+  routineOwnActions,
 } from "@agenteschat/client/lib/actions";
+import { ownActionName } from "@agenteschat/client/lib/approval-words";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -127,6 +130,7 @@ function ReceiptList({
         <IconTile kind={a} />
         <View style={[styles.grow, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
+          <OwnActions action={a} />
           {a.undoneAt ? <UndoneBy action={a} /> : <CopyHook action={a} />}
         </View>
         <RowButton view={v} big onUndo={() => undo(a)} onRedo={() => redo(a)} />
@@ -160,6 +164,7 @@ function ReceiptList({
           </View>
           <View style={styles.grow}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
+            <OwnActions action={a} />
             {a.undoneAt ? <UndoneBy action={a} /> : <CopyHook action={a} />}
           </View>
           <RowButton view={v} onUndo={() => undo(a)} onRedo={() => redo(a)} />
@@ -267,6 +272,23 @@ function CopyHook({ action: a }: { action: AgentAction }) {
         {t("agentActions.copyWebhook")}
       </Text>
     </Pressable>
+  );
+}
+
+/** Under a created routine: what it does in connected apps without asking. */
+function OwnActions({ action: a }: { action: AgentAction }) {
+  const { t } = useTranslation();
+  const own = routineOwnActions(a);
+  if (own.length === 0) return null;
+  return (
+    <Text variant="caption" tone="faint" style={styles.undoneBy}>
+      {t("agentActions.routine.ownActions", {
+        actions: joinNames(
+          own.map((name) => ownActionName(t, name)),
+          t,
+        ),
+      })}
+    </Text>
   );
 }
 

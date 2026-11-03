@@ -16,6 +16,7 @@ import {
   approvalValues,
   approvalWaitsFor,
   approveAlwaysWords,
+  ownActionName,
   requesterDecidesLine,
 } from "../src/lib/approval-words";
 import { knownErrorText } from "../src/lib/errors";
@@ -89,6 +90,8 @@ describe("Aprovar sempre in words", () => {
     );
     expect(approveAlwaysWords(t, { approveAlways: { tool: "close_ticket", actions: [] } })).toBe("Close ticket");
     expect(approveAlwaysWords(t, { approveAlways: null })).toBe("");
+    expect(ownActionName(t, "GITHUB_CREATE_AN_ISSUE_COMMENT")).toBe("Create issue comment (Github)");
+    expect(ownActionName(t, "close_ticket")).toBe("Close ticket");
     expect(approvalRuleWords(t, { tool: "close_ticket", action: "", toolLabel: "Fechar chamado" })).toBe(
       "Fechar chamado",
     );

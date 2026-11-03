@@ -5,7 +5,7 @@ setupDom();
 
 import { ACCESSORIES, AGENT_ACCESSORIES, Avatar, normalizeAppearance, randomAppearance } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -56,6 +56,7 @@ describe("the agent's look", () => {
 
   test("Configurações: pick color, eyes and accessory in place; the cover shows it; Salvar; the sidebar shows it", async () => {
     const state = seedState();
+    seedDm(state, { type: "agent", id: ADA_ID });
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings`, { api: createFakeApi(state) });
     await settle(8);
     // In place: the colors, then the eyes and what it wears as one sliding row each.

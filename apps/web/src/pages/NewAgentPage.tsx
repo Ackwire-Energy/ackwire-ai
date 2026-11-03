@@ -36,6 +36,8 @@ import {
   brainPickOptions,
   brainPickValue,
   needsOwnSignIn,
+  newPlanAccountOption,
+  planAccountOption,
 } from "@agenteschat/client/lib/brain-picker";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { errorText as failureText } from "@agenteschat/client/lib/errors";
@@ -412,8 +414,34 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const g = agentGrammar(displayName);
   const rolePreset = role ? ROLE_PRESETS[role] : null;
   const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText || null;
-  // A proposed agent with nothing to think with yet is created all the same, and Connect opens for it after.
-  const connectAfter = Boolean(from) && plan === null && connectPlan === null && usable.size === 0;
+  // With nothing to think with yet, the agent is created all the same (ADR 0061 §6), and Connect opens for it after.
+  const connectAfter = plan === null && connectPlan === null && usable.size === 0;
+  // "Conectar uma IA" from the model step: the same dialog as Settings › Contas de IA, for the agent being made when
+  // it is mine (a plan signs in for the agents I create), else the workspace's key (admins). A plan account that
+  // wasn't in "Quem pensa" when it opened is what the agent thinks with; closing it with nothing new keeps the pick.
+  const [optionsBefore, setOptionsBefore] = useState<ReadonlySet<string> | null>(null);
+  const connectsHere = connect && (ownerId === me.user.id || can(org, "manage_credentials"));
+  const connectHere = () => {
+    if (!connect) return;
+    setOptionsBefore(ownerId === me.user.id ? new Set(brainOptions.map((o) => o.value)) : null);
+    connect.open(ownerId === me.user.id ? { forNewAgent: true } : { intent: "api_key" });
+  };
+  const connectedHere = optionsBefore ? newPlanAccountOption(brainOptions, optionsBefore) : undefined;
+  // A plan account of mine that can think for it (one connected in place from the model step, or before I had any
+  // agent), with nothing else to think with or no last setup to start from: the agent thinks with it. A default, not
+  // a pick: another owner drops it.
+  const ownPlan =
+    connectedHere ??
+    (connectAfter || (!aiPicked && plan === null && connectPlan === null && startOf(me.user.id) === null)
+      ? planAccountOption(brainOptions)
+      : undefined);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once an account shows up, after what it starts with
+  useEffect(() => {
+    const p = ownPlan?.pick;
+    if (!startsReady || !started.current || !p || !("accountId" in p) || !p.accountId) return;
+    setModel(AUTO);
+    setPlan({ kind: p.kind, machineId: p.machineId, accountId: p.accountId, label: p.account, model: AUTO });
+  }, [ownPlan?.value, startsReady]);
   const check: DraftCheck = {
     role,
     name,
@@ -1347,6 +1375,14 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
                 ...g,
                 owner: ownerId === me.user.id ? t("common.you") : (ownerFirst ?? t("common.you")),
               })}
+            </span>
+          )}
+          {connectAfter && <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>}
+          {connectsHere && (
+            <span>
+              <Button size="sm" variant={connectAfter ? "primary" : "default"} icon="plus" onClick={connectHere}>
+                {t("aiAccounts.page.connect")}
+              </Button>
             </span>
           )}
           {errorLine(errorOf("model"))}

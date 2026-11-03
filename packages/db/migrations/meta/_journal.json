@@ -1307,8 +1307,36 @@
     {
       "idx": 187,
       "version": "7",
-      "when": 1793665409811,
-      "tag": "0188_member_issues_view",
+      "when": 1793705852784,
+      "tag": "0188_unread_states",
+      "breakpoints": true
+    },
+    {
+      "idx": 188,
+      "version": "7",
+      "when": 1793705854298,
+      "tag": "0189_admin_hoist",
+      "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1793706987308,
+      "tag": "0190_routine_own_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1793708447561,
+      "tag": "0191_channel_deleted",
+      "breakpoints": true
+    },
+    {
+      "idx": 191,
+      "version": "7",
+      "when": 1793708507561,
+      "tag": "0192_member_issues_view",
       "breakpoints": true
     }
   ]

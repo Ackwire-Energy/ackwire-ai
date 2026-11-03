@@ -200,6 +200,34 @@ export function AgentCover({
 }
 
 /**
+ * The banner of a profile card: an agent's cover sky in its color (faster while it works, no sprites in so short a
+ * band), or a person's soft sky fading into the card.
+ */
+export function ProfileSky({ color, person, busy = false }: { color: AgentColor; person?: boolean; busy?: boolean }) {
+  return (
+    <PixelSky
+      options={
+        person
+          ? {
+              pixel: 4,
+              surface: "--raised",
+              palette: (bg) => softTones(color, bg),
+              light: 0.04,
+              base: (u, v, tt) => Math.max(0, 1 - v * 0.9) * (0.5 + 0.3 * u + 0.06 * S(u * 7 + tt * 0.5)),
+            }
+          : {
+              pixel: 4,
+              palette: agentTones(color),
+              speed: busy ? 2.6 : 1,
+              light: 0,
+              base: (u, v, tt) => 0.86 - 0.22 * u - 0.46 * v + 0.06 * S(u * 5 + tt * 0.6),
+            }
+      }
+    />
+  );
+}
+
+/**
  * Behind an agent's computer while its screen opens: its sky, calm, filling the stage. `clear`: the words on it.
  * In light, its day sky. In dark, the window's surface rising into its color, as the app's other skies do there.
  */

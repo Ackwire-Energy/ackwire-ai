@@ -84,6 +84,33 @@ describe("the agents' receipt line under a person's message", () => {
     expect(line?.label.key).toBe("receipts.handled");
   });
 
+  test("the agent the router picked passed: two ticks that say no one replied, never that it answered", async () => {
+    const passed = applyReceiptEvent(routed({}), {
+      type: "message.handled",
+      channelId: "c1",
+      messageId: "m1",
+      agentId: "ada",
+      status: "done",
+      passed: true,
+    }).m1;
+    const line = receiptLine(passed);
+    expect(line?.mark).toBe("checks");
+    expect(line?.words).toBeNull();
+    expect(line?.label).toEqual({ key: "receipts.passed", agents: ["ada"] });
+    expect(markOf(null, null, passed)).toMatchObject({ kind: "agents", agentId: "ada", mark: "checks" });
+    expect(receiptRows(passed)).toContainEqual({ agentId: "ada", phase: "passed" });
+    const [en, pt] = await Promise.all([translator("en"), translator("pt-BR")]);
+    expect(pt("receipts.passed", { count: 1 })).toBe("Ninguém respondeu");
+    expect(en("receipts.passed", { count: 1 })).toBe("No one replied");
+    expect(pt(phaseKey("passed"))).toBe("Não respondeu");
+    expect(en(phaseKey("passed"))).toBe("Didn't reply");
+  });
+
+  test("a reaction that ended its run reads 'reacted' on its row, not 'answered'", () => {
+    const answered = handled(routed({}), "ada", "done").m1;
+    expect(receiptRows(answered, ["ada"])).toContainEqual({ agentId: "ada", phase: "reacted" });
+  });
+
   test("waiting for an approval: one tick (Ada is on it), and says so", () => {
     const line = receiptLine(handled(routed({}), "ada", "waiting_approval").m1);
     expect(line?.mark).toBe("check");

@@ -5,6 +5,7 @@ import {
   SIDEBAR_SECTIONS,
   type SidebarItem,
   sidebarPlaceAllowed,
+  sidebarToolOrderOf,
 } from "@agenteschat/engine";
 import {
   SIDEBAR_COUNTED as APP_COUNTED,
@@ -23,6 +24,15 @@ test("the sidebar's tools: the engine and the apps know the same ones, and the a
   expect([...APP_SECTIONS]).toEqual([...SIDEBAR_SECTIONS]);
   for (const [item, place] of Object.entries(SIDEBAR_DEFAULTS))
     expect(sidebarPlaceAllowed(item as SidebarItem, place)).toBe(true);
+});
+
+test("a stored tools' order is never trusted as is: unknown tools dropped, repeats once, new tools at the end", () => {
+  expect(sidebarToolOrderOf(["forum", "nope", "forum", "drive"])).toEqual([
+    "forum",
+    "drive",
+    ...SIDEBAR_ITEMS.filter((i) => i !== "forum" && i !== "drive"),
+  ]);
+  expect(sidebarToolOrderOf("drive")).toEqual([...SIDEBAR_ITEMS]);
 });
 
 /** A new workspace, set up (one still in its onboarding would come back instead of another). */
@@ -158,4 +168,48 @@ test("the sections' order: each person's own, per workspace, every section once,
   // "Restaurar ordem padrão".
   expect(await (await put({ order: null })).json()).toEqual({ order: ["tools", "channels", "agents", "people"] });
   expect(((await (await owner(sidebar)).json()) as { items: unknown }).items).toEqual({ drive: "more" });
+});
+
+test("the tools' order: each person's own, per workspace, every tool once, beside the places and the sections", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const orgId = await workspace(owner, "Acme");
+  const sidebar = `/api/app/organizations/${orgId}/me/sidebar`;
+  const order = async (b = owner) => ((await (await b(`${sidebar}/tools`)).json()) as { order: unknown }).order;
+  const put = (json: unknown, b = owner) => b(`${sidebar}/tools`, { method: "PUT", json });
+
+  expect(await order()).toEqual([...SIDEBAR_ITEMS]);
+  await owner(sidebar, { method: "PATCH", json: { item: "wiki", place: "always" } });
+  await owner(`${sidebar}/order`, { method: "PUT", json: { order: ["people", "tools", "channels", "agents"] } });
+
+  const driveFirst = ["drive", "approvals", "threads", "issues", "wiki", "routines", "calendar", "forum"];
+  const saved = await put({ order: driveFirst });
+  expect(saved.status).toBe(200);
+  expect(await saved.json()).toEqual({ order: driveFirst });
+  expect(await order()).toEqual(driveFirst);
+  // The places and the sections' order stay; a reset of the places, or one place moved, keeps the tools' order.
+  expect(((await (await owner(sidebar)).json()) as { items: unknown }).items).toEqual({ wiki: "always" });
+  await owner(sidebar, { method: "PUT", json: { items: {} } });
+  await owner(sidebar, { method: "PATCH", json: { item: "forum", place: "always" } });
+  expect(await order()).toEqual(driveFirst);
+  expect(((await (await owner(`${sidebar}/order`)).json()) as { order: unknown }).order).toEqual([
+    "people",
+    "tools",
+    "channels",
+    "agents",
+  ]);
+
+  // A tool missing, twice or unknown: refused, kept.
+  for (const bad of [driveFirst.slice(1), ["drive", ...driveFirst.slice(0, -1)], ["settings", ...driveFirst.slice(1)]])
+    expect((await put({ order: bad })).status).toBe(400);
+  expect(await order()).toEqual(driveFirst);
+
+  // Someone else keeps their own.
+  const member = await joinByInvitation(t, owner, orgId, "member@example.com");
+  expect(await order(member)).toEqual([...SIDEBAR_ITEMS]);
+
+  // Back to the default; the places stay.
+  expect(await (await put({ order: null })).json()).toEqual({ order: [...SIDEBAR_ITEMS] });
+  expect(((await (await owner(sidebar)).json()) as { items: unknown }).items).toEqual({ forum: "always" });
 });

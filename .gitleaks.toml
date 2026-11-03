@@ -71,3 +71,9 @@ targetRules = ["curl-auth-header"]
 condition = "AND"
 paths = ['''^packages/engine/test/autonomy/turn-end\.test\.ts$''']
 regexes = ['''^abcdef0123456789$''']
+
+# A keyboard-shortcut list named *_KEYS, not a credential.
+[[allowlists]]
+description = "Keyboard shortcut lists"
+targetRules = ["generic-api-key"]
+regexes = ['''^Alt\+Shift\+Arrow(Up|Down)( Alt\+Shift\+Arrow(Up|Down))*$''']

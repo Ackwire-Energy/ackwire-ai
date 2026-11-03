@@ -2,7 +2,10 @@ import { afterEach, expect, test } from "bun:test";
 import {
   BROWSER_FAST_PROTOCOL,
   BROWSER_WARM_PROTOCOL,
+  CHROME_FAILURES,
+  createFakeErrorReporter,
   DESKTOP_PROTOCOL,
+  type ErrorReporter,
   type MachineRequest,
   SECRET_ACTIVATE_PROTOCOL,
 } from "@agenteschat/adapters";
@@ -84,7 +87,9 @@ function fakeHub(state: { machineId: string; orgId: string }) {
   return { hub, calls, s };
 }
 
-async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: () => number } = {}) {
+async function browserSetup(
+  options: { judge?: Judge; vision?: boolean; now?: () => number; errors?: ErrorReporter } = {},
+) {
   const holder: { hub?: MachineCaller } = {};
   const source = createBrowserToolSource({
     machines: {
@@ -96,6 +101,7 @@ async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: ()
     ...(options.judge ? { judge: options.judge } : {}),
     ...(options.vision ? { vision: () => true } : {}),
     ...(options.now ? { now: options.now } : {}),
+    ...(options.errors ? { errors: options.errors } : {}),
     publicUrl: "http://localhost:3000",
   });
   f = await setup({ toolSources: [source] });
@@ -449,6 +455,44 @@ test("stale numbers, covered clicks and runner refusals reach the agent as plain
   expect((await b.call("browser_read", {})).content).toContain("Only the person at that computer");
   b.s.error = new MachineRequestError("browser_unavailable", "Chrome not found");
   expect((await b.call("browser_read", {})).content).toContain("Chrome not found");
+});
+
+test("a computer's Google Chrome failing: the agent tells the person plainly, and operators get one report", async () => {
+  const errors = createFakeErrorReporter();
+  const b = await browserSetup({ errors });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  b.s.status = {
+    executors: { browser: { available: true, version: "0.39.1", chrome: "Google Chrome 156.0.8078.79" } },
+  };
+  b.s.error = new MachineRequestError("browser_unavailable", CHROME_FAILURES.start);
+  const told = await b.call("browser_open", { url: "https://shop.example/" });
+  expect(told.isError).toBe(true);
+  expect(told.content).toContain(
+    "The browser isn't available on the computer MacBook: Google Chrome didn't start on this computer. Tell the person.",
+  );
+  expect(errors.reports).toHaveLength(1);
+  expect(String(errors.reports[0]?.error)).toContain("Google Chrome failed an agent's browser (start)");
+  expect(errors.reports[0]?.tags).toMatchObject({
+    org_id: f.org.id,
+    agent_id: f.agent.id,
+    machine_id: b.machineId,
+    os: "darwin",
+    chrome: "Google Chrome 156.0.8078.79",
+    browser_failure: "start",
+    reason: CHROME_FAILURES.start,
+  });
+  // The agent trying again isn't reported again for a while; another kind of failure is.
+  await b.call("browser_open", { url: "https://shop.example/" });
+  expect(errors.reports).toHaveLength(1);
+  b.s.error = new MachineRequestError("browser_unavailable", CHROME_FAILURES.missing);
+  expect((await b.call("browser_open", { url: "https://shop.example/" })).content).toContain(
+    "Install it from google.com/chrome, then try again. Tell the person.",
+  );
+  expect(errors.reports.map((r) => r.tags.browser_failure)).toEqual(["start", "missing"]);
+  // A busy computer isn't Chrome failing.
+  b.s.error = new MachineRequestError("browser_unavailable", "This computer already has 8 browsers open (its limit).");
+  await b.call("browser_open", { url: "https://shop.example/" });
+  expect(errors.reports).toHaveLength(2);
 });
 
 test("after a person had the browser, the agent must read the page before acting again", async () => {

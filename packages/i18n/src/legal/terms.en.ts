@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const termsEn: LegalDocument = {
   title: "Terms of Use",
   summary: "The agreement for using agentes.chat: your workspace, your agents, and what each side is responsible for.",
-  updated: "2026-11-02",
+  updated: "2026-11-03",
   sections: [
     {
       id: "agreement",
@@ -17,7 +17,7 @@ export const termsEn: LegalDocument = {
       id: "service",
       heading: "2. The Service",
       blocks: [
-        "The Service is a workspace where people and AI agents work together: channels, threads and direct messages; agents with their own roles, instructions, memory and budgets; tasks, wiki, Drive, forum, calendar and routines; approvals; connectors to other services; and the option to connect computers on which agents can work.",
+        "The Service is a workspace where people and AI agents work together. It includes channels, threads and direct messages, and agents with their own roles, instructions, memory and budgets. It also includes tasks, wiki, Drive, forum, calendar and routines, approvals, connectors to other services, and the option to connect computers on which agents can work.",
         "The Service is new and still evolving: features may change, be limited or be removed. We may open new accounts only by invitation for a time, or to anyone who signs up. We will tell you in advance before removing something you rely on, where practicable.",
       ],
     },
@@ -33,7 +33,7 @@ export const termsEn: LegalDocument = {
       heading: "4. Agents and what they do",
       blocks: [
         "Agents act on the instructions, permissions, connectors, budgets and computers that you and your workspace give them. What an agent does within those permissions, including messages it sends, code it changes, data it reads, writes or deletes, and commands it runs on a computer, is done on your workspace's behalf, and your workspace is responsible for it under these Terms. Each agent has a person responsible for it.",
-        "Actions that are hard to undo become an approval request for a person before they happen. Approving one is your decision; the Service shows what will be done, but you are responsible for reviewing it.",
+        "Actions that are hard to undo become an approval request for a person before they happen. Approving one is your decision. The Service shows what will be done, but you are responsible for reviewing it.",
         "AI output can be wrong, incomplete or out of date, even when it sounds confident. Review what agents produce before relying on it, and do not use it as a substitute for professional advice (legal, medical, financial or otherwise) or as the only basis for decisions with legal or similarly significant effects on people.",
       ],
     },
@@ -44,12 +44,12 @@ export const termsEn: LegalDocument = {
         "You agree not to use the Service, or let agents be used, to:",
         {
           list: [
-            "break the law, infringe others' rights, or process personal data without a lawful basis;",
-            "send spam or unsolicited messages, or harass, threaten, deceive or impersonate anyone;",
-            "create or distribute malware, phishing, or content that sexualizes minors, promotes violence or is otherwise unlawful;",
-            "get around the Service's limits and safeguards, such as budgets, rate limits, approvals, permissions, or the checks on connected computers and databases;",
-            "attack the Service or others through it, including probing for vulnerabilities, overloading it, or planting instructions meant to take over other people's agents;",
-            "access a service, computer or data you are not authorized to use, or use a connected service against its own terms;",
+            "break the law, infringe others' rights, or process personal data without a lawful basis",
+            "send spam or unsolicited messages, or harass, threaten, deceive or impersonate anyone",
+            "create or distribute malware, phishing, or content that sexualizes minors, promotes violence or is otherwise unlawful",
+            "get around the Service's limits and safeguards, such as budgets, rate limits, approvals, permissions, or the checks on connected computers and databases",
+            "attack the Service or others through it, including probing for vulnerabilities, overloading it, or planting instructions meant to take over other people's agents",
+            "access a service, computer or data you are not authorized to use, or use a connected service against its own terms",
             "violate the usage policies of the AI model providers that run your agents.",
           ],
         },
@@ -70,7 +70,7 @@ export const termsEn: LegalDocument = {
       heading: "7. Model providers, connectors and your own accounts",
       blocks: [
         "Agents run on AI models from third parties (such as Anthropic, which makes Claude, and OpenAI), through an API key your workspace adds or an AI plan, such as Claude or ChatGPT, that someone in your workspace connects. Using that key or plan is also governed by your agreement with its provider, and you are responsible for following its terms and for its charges.",
-        "Connectors give agents access to other services (such as GitHub, Google, Linear, Sentry or an email inbox). Those services are provided by third parties under their own terms; their availability and what they do with data are outside our control.",
+        "Connectors give agents access to other services (such as GitHub, Google, Linear, Sentry or an email inbox). Those services are provided by third parties under their own terms. Their availability and what they do with data are outside our control.",
       ],
     },
     {
@@ -101,7 +101,6 @@ export const termsEn: LegalDocument = {
             "**Failed payments.** If a payment fails, we try again over the following days. If it still fails, the workspace is put on hold: its agents stop, and people can still read and write in it. Its computer is kept for 7 days, then released and wiped. Paying brings the workspace back, on a new computer if the old one was released.",
             "**Price changes.** We may change prices for new customers at any time. The price of a plan you already have changes only because of new taxes, from its next renewal, with at least 30 days' notice.",
             "**Fair use.** Some features run on AI services we provide at no extra charge, such as choosing which agent answers, judging memories and actions, and finding what to click on a screen. We may limit them for a workspace whose use is far above normal.",
-            "**Early access.** We will give at least 30 days' notice before charging for something that was free during early access.",
             "**Budgets.** Budgets set per workspace and per agent stop agents' model usage when they are reached. They are part of the Service, not a defect of it. Charges a provider makes for your own key or AI plan are between you and that provider.",
           ],
         },
@@ -132,7 +131,7 @@ export const termsEn: LegalDocument = {
       id: "liability",
       heading: "14. Limitation of liability",
       blocks: [
-        "To the maximum extent permitted by law: neither party is liable for indirect, incidental, special, consequential or punitive damages, or for lost profits, revenue or data; and our aggregate liability arising out of the Service is limited to the amounts you paid us in the twelve months before the event giving rise to the claim (or USD 100 if you paid nothing). These limits do not apply to your payment obligations, your breach of Section 5, or liability that cannot be limited by law.",
+        "To the maximum extent permitted by law, neither party is liable for indirect, incidental, special, consequential or punitive damages, or for lost profits, revenue or data. To the same extent, our aggregate liability arising out of the Service is limited to the amounts you paid us in the twelve months before the event giving rise to the claim (or USD 100 if you paid nothing). These limits do not apply to your payment obligations, your breach of Section 5, or liability that cannot be limited by law.",
       ],
     },
     {
@@ -153,7 +152,7 @@ export const termsEn: LegalDocument = {
       id: "changes",
       heading: "17. Changes to these Terms",
       blocks: [
-        "We may update these Terms. Material changes will be announced by email or in the app at least 14 days before they take effect; continued use after the effective date is acceptance. The current version always lives at this page. If a translation and the English version differ, the English version prevails, except where the law requires otherwise.",
+        "We may update these Terms. Material changes will be announced by email or in the app at least 14 days before they take effect. Continued use after the effective date is acceptance. The current version always lives at this page. If a translation and the English version differ, the English version prevails, except where the law requires otherwise.",
       ],
     },
     {

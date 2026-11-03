@@ -35,6 +35,7 @@ import {
   reactionEmoji,
   reactionName,
   reactionPills,
+  readMark,
   rowStopOf,
   standsAlone,
   stoppableInLine,
@@ -1321,5 +1322,12 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     expect(secretValueProblem("é".repeat(8 * 1024 + 1))).toBe("secret.tooLarge");
     expect(secretValueProblem("hunter2")).toBeNull();
     expect(en("secret.tooLarge")).toBe("Too large (16 KB at most).");
+  });
+});
+
+describe("reading a conversation", () => {
+  test("a thread view marks only its thread read, never its channel", () => {
+    expect(readMark("c1", "t1")).toEqual({ kind: "thread", id: "t1" });
+    expect(readMark("c1", null)).toEqual({ kind: "channel", id: "c1" });
   });
 });

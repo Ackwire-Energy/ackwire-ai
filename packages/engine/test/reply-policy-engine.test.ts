@@ -9,6 +9,7 @@ import {
   createPassToolSource,
   drainOutbox,
   insertMessage,
+  listMessages,
   loadReplyPolicy,
   openDm,
   postPersonMessage,
@@ -143,9 +144,55 @@ describe("a run nobody called by name may stay quiet", () => {
       .select()
       .from(schema.agentRunSteps)
       .where(eq(schema.agentRunSteps.runId, run?.id ?? ""));
-    expect(steps.find((s) => s.data.passed)?.data.passed).toEqual({ how: "pass", reason: "Theo já respondeu" });
+    expect(steps.find((s) => s.data.passed)?.data.passed).toEqual({
+      how: "pass",
+      reason: "Theo já respondeu",
+      silent: true,
+    });
     await Bun.sleep(5);
     expect(events.find((e) => e.type === "agent.passed")).toMatchObject({ agentId: f.agent.id, runId: run?.id });
+    // Its receipt reads "didn't reply", live and after a reload, never "replied".
+    expect(events.find((e) => e.type === "message.handled")).toMatchObject({ status: "done", passed: true });
+    // On every message the run answers, a steered one too.
+    expect(events.find((e) => e.type === "run.finished")).toMatchObject({ status: "done", passed: true });
+    const [listed] = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(listed?.receipts?.handled).toEqual([
+      expect.objectContaining({ agentId: f.agent.id, status: "done", passed: true }),
+    ]);
+  });
+
+  test("it reacted, then passed: the reaction was its answer, so its receipt is no pass", async () => {
+    const react: ToolSource = {
+      name: "react",
+      tools: async () => [
+        {
+          name: "react",
+          description: "React.",
+          scope: "",
+          inputSchema: { type: "object", properties: {}, additionalProperties: false },
+          describe: () => ({ title: "React" }),
+          execute: async () => ({ content: "Reacted.", data: { reacted: { messageId: "m", reaction: "👍" } } }),
+        },
+      ],
+    };
+    let turn = 0;
+    f = await setup({
+      toolSources: [createPassToolSource(), react],
+      reply: () => ({
+        chunks: [],
+        toolUses: [turn++ === 0 ? { name: "react", input: {} } : { name: "pass", input: { reason: "já reagi" } }],
+      }),
+    });
+    const events = f.listen(f.general.id);
+    await routed("o deploy saiu!");
+
+    expect(await agentMessages()).toEqual([]);
+    expect((await runRow())?.status).toBe("done");
+    await Bun.sleep(5);
+    expect(events.some((e) => e.type === "agent.passed")).toBe(false);
+    expect(events.find((e) => e.type === "message.handled")).not.toHaveProperty("passed");
+    const [listed] = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(listed?.receipts?.handled[0]?.passed).toBeUndefined();
   });
 
   test("a person writing into it keeps `pass` listed, so its tools never change mid-run; the tool refuses", async () => {
@@ -185,6 +232,12 @@ describe("a run nobody called by name may stay quiet", () => {
     expect(second?.tools).toEqual(first?.tools);
     expect(second?.tools?.map((t) => t.name)).toContain("pass");
     expect(await agentMessages()).toEqual(["O staging está ok."]);
+    // It answered: its receipt is no pass.
+    const person = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).find(
+      (m) => m.body === "onde rodam os builds?",
+    );
+    expect(person?.receipts?.handled).toEqual([expect.objectContaining({ agentId: f.agent.id, status: "done" })]);
+    expect(person?.receipts?.handled[0]?.passed).toBeUndefined();
   });
 
   test("ending with only the word (or nothing) is a pass too", async () => {
