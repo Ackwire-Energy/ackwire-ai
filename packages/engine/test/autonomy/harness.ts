@@ -79,7 +79,7 @@ export interface JudgeTable {
   /** `note_reply`: whether a note's reply matters to its sender (default 0.9). */
   noteReply?: number;
   /** `ask_check`: what an `ask_user` question asks for (default: something only a person can give); "fail" errors. */
-  ask?: (state: Record<string, unknown>) => "findable" | "secret" | "person" | "fail";
+  ask?: (state: Record<string, unknown>) => "findable" | "secret" | "person" | "none" | "fail";
   /** `alert_triage` (ADR 0131 §5): whether an unrequested item is work now or noise for the digest (default work). */
   triage?: (state: Record<string, unknown>) => "work" | "noise";
 }
