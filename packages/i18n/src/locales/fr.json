@@ -2220,12 +2220,13 @@
     "editChannel": "Modifier le canal"
   },
   "channelMembers": {
-    "addRow": "Ajouter des personnes ou des agents",
+    "addRow": "Ajouter personnes ou agents",
     "invite": "Inviter {{email}} dans {{org}} et #{{channel}}",
     "inviteOrg": "Inviter {{email}} dans {{org}}",
     "addTitle": "Ajouter à #{{channel}}",
     "addSearch": "Rechercher des personnes ou des agents",
-    "addEmpty": "Tout le monde est déjà là, ou aucun résultat pour « {{q}} ».",
+    "addEmpty": "Personne hors du canal ne correspond à « {{q}} ».",
+    "addEveryone": "Tout le monde dans {{org}} est déjà dans #{{channel}}.",
     "addConfirm_one": "Ajouter {{count}}",
     "addConfirm_many": "Ajouter {{count}}",
     "addConfirm_other": "Ajouter {{count}}",
@@ -8741,6 +8742,7 @@
     "countsLabel": "{{added}} lignes ajoutées, {{removed}} retirées",
     "htmlPreview": "Page interactive. Ouvrez-la pour la voir.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "aucun canal",
     "download": "Télécharger",
     "downloadCsv": "Télécharger en CSV",
@@ -10646,6 +10648,7 @@
     },
     "artifact": {
       "fileTooLarge": "Le fichier dépasse {{max}} Mo, la limite par fichier.",
+      "notVersioned": "Une image, une vidéo ou un enregistrement n’a pas de versions. Envoie-le comme un nouveau fichier.",
       "fileRequired": "Choisissez un fichier à importer.",
       "fileNameRequired": "Le fichier doit avoir un nom.",
       "notFound": "Ce fichier n'existe plus ou vous n'y avez pas accès."

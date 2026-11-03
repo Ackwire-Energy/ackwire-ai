@@ -1,13 +1,16 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { keys } from "../api/keys";
 import type {
+  Agent,
   AgentComputer,
+  ChannelEvent,
   ComputerSetup,
   ComputerTarget,
   Machine,
   MachineAccess,
   MachinePause,
   Me,
+  Member,
   OrgDeletion,
   OrgStanding,
 } from "../api/types";
@@ -236,6 +239,42 @@ const SETUP_FIELDS = [
   "machineId",
 ] as const;
 
+/** Every channel's members and roster (the members column, the channel's details): read again. */
+const refreshChannelMembers = (qc: QueryClient, orgId: string, channelId?: string) =>
+  qc.invalidateQueries({
+    predicate: ({ queryKey: k }) =>
+      k[0] === "org" &&
+      k[1] === orgId &&
+      k[2] === "channel" &&
+      (channelId === undefined || k[3] === channelId) &&
+      (k[4] === "members" || k[4] === "roster") &&
+      k.length === 5,
+  });
+
+/**
+ * `channel.member_added` / `_removed` / `_updated`, from anyone: the channel's members column and details read their
+ * lists again, and someone the app doesn't know yet (an agent made a moment ago, a person who just joined) has the
+ * workspace's people or agents read too, so their row has a name and a face.
+ */
+export function applyMembershipEvent(qc: QueryClient, orgId: string, event: ChannelEvent): boolean {
+  if (
+    event.type !== "channel.member_added" &&
+    event.type !== "channel.member_removed" &&
+    event.type !== "channel.member_updated"
+  )
+    return false;
+  void refreshChannelMembers(qc, orgId, event.channelId);
+  if (event.type === "channel.member_added") {
+    const known =
+      event.member.type === "agent"
+        ? qc.getQueryData<Agent[]>(keys.agents(orgId))?.some((a) => a.id === event.member.id)
+        : qc.getQueryData<Member[]>(keys.members(orgId))?.some((m) => m.userId === event.member.id);
+    if (!known)
+      void qc.invalidateQueries({ queryKey: event.member.type === "agent" ? keys.agents(orgId) : keys.members(orgId) });
+  }
+  return true;
+}
+
 /**
  * The workspace's own computer, standing and limits (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
  * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
@@ -253,6 +292,8 @@ const SETUP_FIELDS = [
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "org.members") {
+    // Who is in which channel follows who is in the workspace (a newcomer joins #general and the invited channels).
+    void refreshChannelMembers(qc, orgId);
     // Roles decide whom an agent answers: its `canTalk` and the routines shown follow them.
     for (const key of [
       keys.people(orgId),

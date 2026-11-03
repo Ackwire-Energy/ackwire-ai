@@ -216,6 +216,15 @@ describe("Criar agente: steps", () => {
     });
   });
 
+  test("from a channel's Adicionar (?channel=): that channel stays picked beside the role's", async () => {
+    await renderApp(`/org/${ORG_ID}/agents/new?channel=${GENERAL_ID}`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    await startAs("QA");
+    await proceed(3);
+    expect(screen().getByRole("checkbox", { name: "#eng" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen().getByRole("checkbox", { name: "#general" }).getAttribute("aria-checked")).toBe("true");
+  });
+
   test("roles for any team, in groups (tech, customers, operations); Do zero first", async () => {
     await open();
     const step = screen().getByRole("group", { name: "Papel" });

@@ -86,10 +86,13 @@ import { useAgentImport } from "./useAgentImport";
 export function NewAgentScreen({
   initialWhat = "",
   proposalId = null,
+  channelId = null,
   startImport = false,
 }: {
   initialWhat?: string;
   proposalId?: string | null;
+  /** A channel's "Criar agente" (its Adicionar sheet): the agent starts in that channel. */
+  channelId?: string | null;
   /** Opens on bringing agents from another app (Configurações › Importar e exportar). */
   startImport?: boolean;
 }) {
@@ -119,16 +122,25 @@ export function NewAgentScreen({
       </View>
     );
   }
-  return <NewAgentForm initialWhat={initialWhat} from={opened.current ?? undefined} startImport={startImport} />;
+  return (
+    <NewAgentForm
+      initialWhat={initialWhat}
+      from={opened.current ?? undefined}
+      channelId={channelId}
+      startImport={startImport}
+    />
+  );
 }
 
 function NewAgentForm({
   initialWhat,
   from,
+  channelId,
   startImport,
 }: {
   initialWhat: string;
   from?: AgentProposal;
+  channelId: string | null;
   startImport: boolean;
 }) {
   const { t, i18n } = useTranslation();
@@ -171,7 +183,9 @@ function NewAgentForm({
   const [handleTouched, setHandleTouched] = useState(Boolean(proposed));
   const [look, setLook] = useState<FullLook>(fullLook(proposed?.appearance ?? ROLE_DEFAULTS.custom.look));
   const [instructions, setInstructions] = useState(proposed?.instructions ?? initialWhat);
-  const [channelIds, setChannelIds] = useState<Set<string>>(new Set(proposed?.channelIds));
+  // The channel it was asked for stays picked whatever role is chosen (the roles' presets add theirs).
+  const asked = channelId ? [channelId] : [];
+  const [channelIds, setChannelIds] = useState<Set<string>>(new Set(proposed?.channelIds ?? asked));
   // A proposal's levels are the reviewer's to change in Revisar; otherwise they come with the role.
   const [proposedLevels, setProposedLevels] = useState<Record<string, Level>>(() =>
     proposed && managesAgents ? draftLevels(proposed) : {},
@@ -292,7 +306,7 @@ function NewAgentForm({
       setHandleTouched(false);
       setLook(fullLook(ROLE_DEFAULTS[id].look));
       setInstructions(t(`newAgent.roles.${id}.instructions`));
-      setChannelIds(new Set(presetChannels(id, myChannels)));
+      setChannelIds(new Set([...asked, ...presetChannels(id, myChannels)]));
     }
     // A tap is the answer: on to the next step, or back to Revisar on a proposal.
     setTimeout(() => goTo(proposed ? total - 1 : 1), 180);

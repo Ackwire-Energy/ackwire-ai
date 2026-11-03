@@ -1,9 +1,8 @@
-/* A channel's members on the right (Discord's member list): the sidebar's surface, its own scroll. The thread, search
-   and agent panels float over it. */
+/* A channel's members on the right (Discord's member list): under the channel's header, the sidebar's surface, its
+   own scroll. The thread, search and agent panels float over it. */
 .members-side {
   flex: 0 0 264px;
   width: 264px;
-  height: 100%;
   overflow-y: auto;
   padding: 18px 10px 24px 12px;
   box-sizing: border-box;
@@ -37,23 +36,35 @@
   text-transform: uppercase;
   color: var(--faint);
 }
-/* Last in the list, for who manages the channel: the channel details' add flow (the plus tile is theirs too). */
+/* Last in the list, for who manages the channel: the channel details' add flow (the plus tile is theirs too).
+   A smaller tile and text than a member's row and less room on the right, so the label stays on one line in 264px
+   even beside the 8px scrollbar (German's, the longest, ~186px of the 190px left). */
 .members-side__add {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   min-height: 46px;
-  padding: 5px 8px;
+  padding: 5px 4px 5px 8px;
   box-sizing: border-box;
   border: 0;
   border-radius: var(--control-r-md);
   background: none;
   font: inherit;
+  font-size: 13px;
   font-weight: 500;
+  line-height: 18px;
   color: var(--ink-muted);
   text-align: left;
   cursor: pointer;
+}
+.members-side__add .member-row__plus {
+  width: 24px;
+  height: 24px;
+}
+.members-side__add .member-row__plus .ac-icon {
+  width: 14px;
+  height: 14px;
 }
 .members-side__add:hover {
   background: var(--side-hover);

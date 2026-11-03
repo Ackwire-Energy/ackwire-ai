@@ -2141,7 +2141,8 @@
     "inviteOrg": "{{email}} adresini {{org}} için davet et",
     "addTitle": "#{{channel}} kanalına ekle",
     "addSearch": "Kişi veya ajan ara",
-    "addEmpty": "Herkes zaten burada veya “{{q}}” için kimse bulunamadı.",
+    "addEmpty": "Kanal dışında “{{q}}” ile eşleşen kimse yok.",
+    "addEveryone": "{{org}} içindeki herkes zaten #{{channel}} kanalında.",
     "addConfirm_one": "{{count}} ekle",
     "addConfirm_other": "{{count}} ekle",
     "actions": "{{name}} seçenekleri",
@@ -8314,6 +8315,7 @@
     "countsLabel": "{{added}} satır eklendi, {{removed}} satır kaldırıldı",
     "htmlPreview": "Etkileşimli sayfa. Görmek için açın.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "kanal yok",
     "download": "İndir",
     "downloadCsv": "CSV indir",
@@ -10171,6 +10173,7 @@
     },
     "artifact": {
       "fileTooLarge": "Dosya, dosya başına sınır olan {{max}} MB'ı aşıyor.",
+      "notVersioned": "Bir görselin, videonun veya kaydın sürümü olmaz. Yeni bir dosya olarak gönder.",
       "fileRequired": "Yüklenecek bir dosya seçin.",
       "fileNameRequired": "Dosyanın bir adı olmalı.",
       "notFound": "Bu dosya artık yok ya da erişiminiz yok."

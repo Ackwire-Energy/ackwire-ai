@@ -2148,12 +2148,13 @@
     "editChannel": "Kanal bearbeiten"
   },
   "channelMembers": {
-    "addRow": "Personen oder Agenten hinzufügen",
+    "addRow": "Person oder Agent hinzufügen",
     "invite": "{{email}} zu {{org}} und #{{channel}} einladen",
     "inviteOrg": "{{email}} zu {{org}} einladen",
     "addTitle": "Zu #{{channel}} hinzufügen",
     "addSearch": "Personen oder Agenten suchen",
-    "addEmpty": "Alle sind schon hier, oder niemand gefunden für „{{q}}“.",
+    "addEmpty": "Niemand außerhalb des Kanals passt zu „{{q}}“.",
+    "addEveryone": "Alle aus {{org}} sind schon in #{{channel}}.",
     "addConfirm_one": "{{count}} hinzufügen",
     "addConfirm_other": "{{count}} hinzufügen",
     "actions": "Optionen für {{name}}",
@@ -8372,6 +8373,7 @@
     "countsLabel": "{{added}} Zeilen hinzugefügt, {{removed}} entfernt",
     "htmlPreview": "Interaktive Seite. Öffne sie, um sie zu sehen.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "kein Kanal",
     "download": "Herunterladen",
     "downloadCsv": "CSV herunterladen",
@@ -10233,6 +10235,7 @@
     },
     "artifact": {
       "fileTooLarge": "Die Datei ist größer als {{max}} MB, das Limit pro Datei.",
+      "notVersioned": "Ein Bild, ein Video oder eine Aufnahme hat keine Versionen. Sende es als neue Datei.",
       "fileRequired": "Wähl eine Datei zum Hochladen.",
       "fileNameRequired": "Die Datei braucht einen Namen.",
       "notFound": "Diese Datei gibt es nicht mehr, oder du hast keinen Zugriff."

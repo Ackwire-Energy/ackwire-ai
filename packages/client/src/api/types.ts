@@ -1105,6 +1105,12 @@ export interface ActiveRun {
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
 export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
+  /** Someone joined or left, or an agent's way of replying changed (agents carry `autoReply`). */
+  | {
+      type: "channel.member_added" | "channel.member_removed" | "channel.member_updated";
+      channelId: string;
+      member: { type: "person" | "agent"; id: string; autoReply?: boolean };
+    }
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
@@ -2779,6 +2785,8 @@ export interface ArtifactDetail extends Artifact {
   /** The version shown (may be older than `version`). */
   shownVersion: number;
   content: ArtifactContent;
+  /** It keeps versions (a history, "Enviar nova versão"): false for a snapshot such as a screenshot (ADR 0019). */
+  versioned?: boolean;
 }
 
 /** `message.meta.artifacts`: what the agent created or changed in that reply. */

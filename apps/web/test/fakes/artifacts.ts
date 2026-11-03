@@ -205,7 +205,11 @@ export function createMockArtifacts(
   const detail = async (orgId: string, s: Stored, version?: number): Promise<ArtifactDetail> => {
     const v = s.versions.find((x) => x.version === (version ?? s.meta.version));
     if (!v) throw new MockNotFoundError("Versão não encontrada.");
-    return { ...(await view(orgId, s)), shownVersion: v.version, content: clone(v.content) };
+    const content = clone(v.content);
+    // As the server's `keepsVersions` (ADR 0019): a picture, a clip or a recording keeps no versions.
+    const versioned =
+      content.kind !== "file" || s.meta.version > 1 || !/^(image|video|audio)\//i.test(content.contentType);
+    return { ...(await view(orgId, s)), shownVersion: v.version, content, versioned };
   };
   const me = async (): Promise<ArtifactAuthor> => ({ type: "person", id: (await ctx.lookup.me())?.user.id ?? "me" });
   return {

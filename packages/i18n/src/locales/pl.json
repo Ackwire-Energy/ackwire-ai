@@ -2284,7 +2284,8 @@
     "inviteOrg": "Zaproś {{email}} do {{org}}",
     "addTitle": "Dodaj do #{{channel}}",
     "addSearch": "Szukaj osób lub agentów",
-    "addEmpty": "Wszyscy już tu są albo nikogo nie znaleziono dla „{{q}}”.",
+    "addEmpty": "Nikt spoza kanału nie pasuje do „{{q}}”.",
+    "addEveryone": "Wszyscy z {{org}} są już w #{{channel}}.",
     "addConfirm_one": "Dodaj {{count}}",
     "addConfirm_few": "Dodaj {{count}}",
     "addConfirm_many": "Dodaj {{count}}",
@@ -8995,6 +8996,7 @@
     "countsLabel": "Dodane linie: {{added}}, usunięte: {{removed}}",
     "htmlPreview": "Strona interaktywna. Otwórz, żeby ją zobaczyć.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "bez kanału",
     "download": "Pobierz",
     "downloadCsv": "Pobierz CSV",
@@ -10940,6 +10942,7 @@
     },
     "artifact": {
       "fileTooLarge": "Plik przekracza {{max}} MB, czyli limit na plik.",
+      "notVersioned": "Obraz, wideo ani nagranie nie mają wersji. Wyślij jako nowy plik.",
       "fileRequired": "Wybierz plik do przesłania.",
       "fileNameRequired": "Plik musi mieć nazwę.",
       "notFound": "Ten plik już nie istnieje albo nie masz do niego dostępu."

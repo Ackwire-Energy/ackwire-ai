@@ -2076,7 +2076,8 @@
     "inviteOrg": "{{email}}을(를) {{org}}에 초대",
     "addTitle": "#{{channel}}에 추가",
     "addSearch": "사람 또는 에이전트 검색",
-    "addEmpty": "모두 이미 여기에 있거나 “{{q}}”에 해당하는 사람이 없어요.",
+    "addEmpty": "채널 밖에 “{{q}}”와 일치하는 사람이 없어요.",
+    "addEveryone": "{{org}}의 모두가 이미 #{{channel}}에 있어요.",
     "addConfirm_other": "{{count}}명 추가",
     "actions": "{{name}} 옵션",
     "remove": "채널에서 내보내기",
@@ -8024,6 +8025,7 @@
     "countsLabel": "{{added}}줄 추가, {{removed}}줄 삭제",
     "htmlPreview": "인터랙티브 페이지예요. 열어서 확인하세요.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "채널 없음",
     "download": "다운로드",
     "downloadCsv": "CSV 다운로드",
@@ -9841,6 +9843,7 @@
     },
     "artifact": {
       "fileTooLarge": "파일이 파일당 한도인 {{max}}MB를 넘어요.",
+      "notVersioned": "이미지, 동영상, 녹음에는 버전이 없어요. 새 파일로 보내 주세요.",
       "fileRequired": "업로드할 파일을 고르세요.",
       "fileNameRequired": "파일에 이름이 필요해요.",
       "notFound": "이 파일은 더 이상 없거나 접근 권한이 없어요."

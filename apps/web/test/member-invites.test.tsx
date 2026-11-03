@@ -368,7 +368,7 @@ describe("the invite dialog", () => {
     const search = within(add).getByRole("searchbox", { name: "Buscar pessoa ou agente" });
     // Someone in the workspace already: nothing to invite.
     await type(search, "joao@acme.com.br");
-    expect(within(add).queryByRole("button", { name: /^Convidar / })).toBeNull();
+    expect(within(add).queryByRole("button", { name: /^Convidar .*@/ })).toBeNull();
     await type(search, " Nova@Estudio.com ");
     await click(within(add).getByRole("button", { name: "Convidar nova@estudio.com para a Acme e para #eng" }));
     await settle(2);
@@ -397,6 +397,28 @@ describe("the invite dialog", () => {
     await press("Continuar");
     await settle(4);
     expect(box("#eng").getAttribute("aria-checked")).toBe("true");
+  });
+
+  test("a channel's Adicionar: nothing typed lists who can come in, a search says what it missed, invite and create there", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+    await settle(6);
+    await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
+    await settle(3);
+    await click(
+      within(screen().getByRole("dialog", { name: "#eng" })).getByRole("button", {
+        name: "Adicionar pessoa ou agente",
+      }),
+    );
+    const add = screen().getByRole("dialog", { name: "Adicionar a #eng" });
+    expect(add.textContent).not.toContain("Ninguém");
+    expect(add.textContent).not.toContain("“”");
+    expect(within(add).getByRole("button", { name: "Criar agente" })).toBeTruthy();
+    await type(within(add).getByRole("searchbox", { name: "Buscar pessoa ou agente" }), "zzz");
+    expect(add.textContent).toContain("Ninguém fora do canal com “zzz”.");
+    await click(within(add).getByRole("button", { name: "Convidar pessoas" }));
+    await settle(2);
+    expect(screen().queryByRole("dialog", { name: "Adicionar a #eng" })).toBeNull();
+    expect(dialog().querySelector(".invite-more__sum")?.textContent).toBe("· #eng");
   });
 });
 

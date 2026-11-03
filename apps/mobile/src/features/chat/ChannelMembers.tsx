@@ -9,9 +9,10 @@ import {
 } from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
+import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -333,6 +334,33 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
       toast({ title: t("mobile.app.failed"), icon: "x" });
     },
   });
+  // Someone not in the workspace yet, or an agent still to make: their own screens, the sheet closes for them.
+  const leaveFor = (path: string) => () => {
+    sheet.close();
+    router.push(path as never);
+  };
+  const elsewhere = [
+    ...(can(org, "invite_people")
+      ? [
+          {
+            key: "invite",
+            icon: "mail" as const,
+            label: t("shell.invite"),
+            onPress: leaveFor(`/invite-people?channel=${channelId}`),
+          },
+        ]
+      : []),
+    ...(can(org, "create_agents")
+      ? [
+          {
+            key: "agent",
+            icon: "plus" as const,
+            label: t("shell.createAgent"),
+            onPress: leaveFor(`/new-agent?channel=${channelId}`),
+          },
+        ]
+      : []),
+  ];
   const toggle = (key: string) => {
     tapHaptic();
     setSelected((prev) => {
@@ -349,7 +377,9 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
       <SearchField value={q} onChangeText={setQ} placeholder={t("channelMembers.addSearch")} autoCorrect={false} />
       {rows.length === 0 ? (
         <Text variant="body" tone="muted">
-          {t("channelMembers.addEmpty", { q })}
+          {needle
+            ? t("channelMembers.addEmpty", { q: q.trim() })
+            : t("channelMembers.addEveryone", { org: org?.name ?? "", channel: channelName })}
         </Text>
       ) : (
         <Card>
@@ -369,6 +399,7 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
           })}
         </Card>
       )}
+      {elsewhere.length > 0 ? <ActionList items={elsewhere} /> : null}
       <View style={styles.actions}>
         <Button variant="secondary" label={t("common.cancel")} onPress={back} />
         <View style={styles.grow}>

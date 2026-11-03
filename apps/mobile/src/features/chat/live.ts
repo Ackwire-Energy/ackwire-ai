@@ -4,6 +4,7 @@ import {
   applyBrowserHandoff,
   applyChannelEvent,
   applyConsultEvent,
+  applyMembershipEvent,
   applyReceiptEvent,
   applyTyping,
   type ChannelEvent,
@@ -390,6 +391,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       if (event.type === "user.typing" && event.userId === meRef.current) return;
       dispatch({ type: "event", event, at: Date.now() });
       applyToCache(qc, orgId, channelId, event);
+      applyMembershipEvent(qc, orgId, event);
     });
   }, [connection, enabled, orgId, channelId, qc]);
 

@@ -132,9 +132,9 @@ export function FileCardPreview({
 }
 
 /**
- * An uploaded file in the viewer: name, size and Baixar; an inline preview
- * only for raster images and PDF (a blob of exactly that type, never the
- * file's own origin), and the text of small text files, read-only.
+ * An uploaded file in the viewer (its name, size and Baixar are in the viewer's header): an inline preview only for
+ * raster images and PDF (a blob of exactly that type, never the file's own origin), and the text of small text files,
+ * read-only.
  */
 export function FileView({
   content,
@@ -148,21 +148,12 @@ export function FileView({
   title: string;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const api = useApi();
   const kind = previewKind(content.contentType);
   const canPreview = kind !== null && content.size <= MAX_PREVIEW_BYTES;
   const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, canPreview);
-  const download = () => fileSaver.save(api.artifacts.fileUrl(org.id, artifactId, { version }), content.name);
 
   return (
     <div className="file-view">
-      <div className="file-view__head">
-        <FileSummary content={content} />
-        <Button size="sm" icon="download" onClick={download}>
-          {t("artifacts.download")}
-        </Button>
-      </div>
       {canPreview && (
         <div className="file-view__preview">
           {failed ? (

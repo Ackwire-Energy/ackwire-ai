@@ -2078,7 +2078,8 @@
     "inviteOrg": "{{email}}を{{org}}に招待",
     "addTitle": "#{{channel}}に追加",
     "addSearch": "人またはエージェントを検索",
-    "addEmpty": "全員すでに参加しているか、「{{q}}」に該当する人がいません。",
+    "addEmpty": "チャンネル外に「{{q}}」に一致する人はいません。",
+    "addEveryone": "{{org}} の全員がすでに #{{channel}} にいます。",
     "addConfirm_other": "{{count}}件を追加",
     "actions": "{{name}}のオプション",
     "remove": "チャンネルから外す",
@@ -8031,6 +8032,7 @@
     "countsLabel": "{{added}}行追加、{{removed}}行削除",
     "htmlPreview": "インタラクティブなページです。開いて表示してください。",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "チャンネルなし",
     "download": "ダウンロード",
     "downloadCsv": "CSVをダウンロード",
@@ -9848,6 +9850,7 @@
     },
     "artifact": {
       "fileTooLarge": "ファイルが1ファイルあたりの上限{{max}} MBを超えています。",
+      "notVersioned": "画像、動画、録音にはバージョンがありません。新しいファイルとして送ってください。",
       "fileRequired": "アップロードするファイルを選んでください。",
       "fileNameRequired": "ファイルには名前が必要です。",
       "notFound": "このファイルは存在しないか、アクセス権がありません。"

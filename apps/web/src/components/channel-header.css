@@ -83,6 +83,8 @@
 html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
   box-shadow: var(--focus-ring);
 }
+/* An ink pill (the page's color on the ink), as the sidebar's red one but neutral: a count of threads, not a call on
+   me. The ring of the header's color cuts it from the glyph. */
 .channel__icon-count.ac-count {
   position: absolute;
   top: 3px;
@@ -91,9 +93,10 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
   height: 16px;
   padding: 0 4px;
   font-size: 10.5px;
+  font-weight: 700;
   line-height: 1;
-  color: var(--ink2);
-  background: var(--sunken);
+  color: var(--pane);
+  background: var(--ink2);
   box-shadow: 0 0 0 2px var(--pane);
 }
 .members-sheet .channel__icon-count.ac-count {

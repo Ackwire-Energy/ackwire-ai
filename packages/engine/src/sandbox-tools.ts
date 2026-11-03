@@ -731,7 +731,7 @@ export function createSandboxToolSource(
     },
     {
       name: "upload_file",
-      description: `Share a file from your computer in this conversation: it goes to the Drive as is and is attached to your reply, so people in the channel or chat see it. Send or attach any file this way (an image, a screenshot, a PDF, a zip, Office files, anything), up to ${ARTIFACT_LIMITS.fileBytes / 1024 / 1024} MB; a folder goes as a .zip. The bytes go straight to the Drive and never through you. With artifact_id, saves a new version of that uploaded file. The path is relative to your workspace; a file elsewhere on the machine must be copied into the workspace first (run_code, e.g. \`cp ~/x/report.pdf .\`). To turn a text file into a native document, table, page or diagram, use export_file instead.`,
+      description: `Share a file from your computer in this conversation: it goes to the Drive as is and is attached to your reply, so people in the channel or chat see it. Send or attach any file this way (an image, a screenshot, a PDF, a zip, Office files, anything), up to ${ARTIFACT_LIMITS.fileBytes / 1024 / 1024} MB; a folder goes as a .zip. The bytes go straight to the Drive and never through you. With artifact_id, saves a new version of that uploaded file (not of an image, a video or a recording, which have no versions: share a new one without artifact_id). The path is relative to your workspace; a file elsewhere on the machine must be copied into the workspace first (run_code, e.g. \`cp ~/x/report.pdf .\`). To turn a text file into a native document, table, page or diagram, use export_file instead.`,
       scope: SANDBOX_SCOPE,
       inputSchema: {
         type: "object",
@@ -755,6 +755,12 @@ export function createSandboxToolSource(
             if (target.kind !== "file") {
               return {
                 content: `Artifact ${target.id} is a ${target.kind}: upload_file adds versions to uploaded files only (use export_file for a ${target.kind}).`,
+                isError: true,
+              };
+            }
+            if (!target.versioned) {
+              return {
+                content: `Artifact ${target.id} is an image, a video or a recording, which has no versions: upload it again without artifact_id to share it as a new file.`,
                 isError: true,
               };
             }

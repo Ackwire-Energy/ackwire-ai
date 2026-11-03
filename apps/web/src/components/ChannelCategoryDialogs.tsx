@@ -300,7 +300,14 @@ export function CategorySelect({
           { value: NONE, label: t("channelCategories.noCategory"), description: t("channelCategories.noCategoryDesc") },
           ...(categories.data ?? []).map((c) => ({ value: c.id, label: c.name })),
           ...(canCreate
-            ? [{ value: NEW, label: t("channelCategories.newCategoryOption"), leading: <Icon name="plus" size={16} /> }]
+            ? [
+                {
+                  value: NEW,
+                  label: t("channelCategories.newCategoryOption"),
+                  leading: <Icon name="plus" size={16} />,
+                  action: true,
+                },
+              ]
             : []),
         ]}
       />
