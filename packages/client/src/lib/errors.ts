@@ -487,3 +487,14 @@ export function errorText(t: TFunction, error: unknown, locale?: string): string
   if (noAnswer(error)) return noAnswerText(t);
   return error instanceof ApiError ? untranslatedText(t, error) : t("common.unknownError");
 }
+
+/**
+ * A failed run's reason in the reader's words, from the server's code (`run.stuck`, `run.computer_failed`): null for
+ * an unknown code or a plain `run.failed`, whose own text is all there is.
+ */
+export function runErrorText(t: TFunction, code: string | null | undefined, params?: Record<string, unknown>) {
+  const key = code?.replace(/^run\./, "");
+  if (!key || key === "failed") return null;
+  const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
+  return say(`agentPage.activity.errors.${key}`, { ...params, defaultValue: "" }) || null;
+}

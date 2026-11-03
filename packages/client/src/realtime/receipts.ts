@@ -307,11 +307,13 @@ export function applyReceiptEvent(
       };
     }
     case "message.claimed":
+      // A run the receipt didn't follow yet (Tentar de novo starts a new one on the same message): it is the news.
       return set(
         linkRun(state, event.messageId, event.runId, event.agentId),
         event.messageId,
         event.agentId,
         "claimed",
+        state[event.messageId]?.runOf?.[event.agentId] !== event.runId,
       );
     case "message.handled":
       return set(

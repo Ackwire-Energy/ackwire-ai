@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AgentStatusLine, WorkView } from "../api/types";
+import { runErrorText } from "./errors";
 import { formatTime, lowerFirst } from "./format";
 
 /**
@@ -205,11 +206,7 @@ export function blockedText(
 function errorWords(t: TFunction, code: unknown, params?: unknown) {
   if (typeof code !== "string" || !code) return "";
   const values = params && typeof params === "object" ? (params as Record<string, unknown>) : {};
-  const why = loose(t)(`agentPage.activity.errors.${code.replace(/^run\./, "")}`, {
-    ...values,
-    defaultValue: "",
-  }).replace(/\.$/, "");
-  return lowerFirst(why);
+  return lowerFirst((runErrorText(t, code, values) ?? "").replace(/\.$/, ""));
 }
 
 /**

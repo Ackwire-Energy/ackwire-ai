@@ -130,7 +130,7 @@ export const TurnRow = memo(function TurnRow({
     return (
       <View style={styles.msg}>
         <View style={styles.avslot}>
-          <AgentFace agentId={run.agentId} size={32} mode="think" />
+          <AgentFace agentId={run.agentId} size={34} mode="think" />
         </View>
         <WaitLine work={run.work} color={color} />
       </View>
@@ -138,7 +138,7 @@ export const TurnRow = memo(function TurnRow({
   return (
     <View style={styles.msg}>
       <View style={styles.avslot}>
-        <AgentFace agentId={run.agentId} size={32} mode={live ? (phase === "writing" ? "run" : "think") : "idle"} />
+        <AgentFace agentId={run.agentId} size={34} mode={live ? (phase === "writing" ? "run" : "think") : "idle"} />
       </View>
       <View style={styles.body}>
         <View style={styles.who}>
@@ -607,8 +607,8 @@ const styles = StyleSheet.create({
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  // Centered on the 32px face (its slot starts 2px down); face, pixels and words one step apart.
-  wait: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 11, height: 32, marginTop: 2 },
+  // Centered on the 34px face (its slot starts 2px down); face, pixels and words one step apart.
+  wait: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 11, height: 34, marginTop: 2 },
   waitDots: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 },
   waitDot: { width: 4, height: 4 },
   who: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 3, minHeight: 19 },

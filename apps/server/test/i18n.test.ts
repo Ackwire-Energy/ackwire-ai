@@ -79,6 +79,12 @@ test("run failures, approvals and memory updates carry codes", async () => {
   expect(runErrorDetail("Interrompida por uma atualização do servidor")).toMatchObject({
     errorCode: "run.interrupted",
   });
+  // A computer brain's code reads as the computer's problem, the code kept as a detail.
+  expect(runErrorDetail("runner_error")).toEqual({
+    errorCode: "run.computer_failed",
+    errorParams: { code: "runner_error" },
+  });
+  expect(runErrorDetail("timeout")).toEqual({ errorCode: "run.computer_timeout", errorParams: { code: "timeout" } });
   expect(runErrorDetail(null)).toBeNull();
   expect(scalarParams({ owner: "acme", repo: "app", pullNumber: 42, body: { x: 1 } })).toEqual({
     owner: "acme",

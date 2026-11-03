@@ -3280,6 +3280,8 @@
         "org_deleting": "Ruang kerja sedang dihapus.",
         "agent_paused": "Agen sedang dijeda.",
         "computer_busy": "Komputer terus sibuk dengan tugas lain.",
+        "computer_failed": "Komputer mengalami masalah dan berhenti.",
+        "computer_timeout": "Komputer terlalu lama menjawab.",
         "unknown": "Gagal."
       }
     },

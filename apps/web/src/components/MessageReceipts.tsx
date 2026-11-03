@@ -5,11 +5,14 @@ import {
   type ReceiptView,
   receiptTicks,
   receiptView,
+  useApi,
   useModelLabel,
   useReactions,
   useSteerState,
 } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, PixelSpinner, Popover, ProviderLogo } from "@agenteschat/ui";
 import { type ReactNode, useId } from "react";
@@ -19,6 +22,7 @@ import { FanOutStrip, QueuedWords } from "@/components/ComputerQueue";
 import { useConnectAi } from "@/components/ConnectAi";
 import { HelpLink } from "@/components/HelpLink";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useToast } from "@/lib/toast";
 import { useLive } from "@/realtime/context";
 import { CallAgentMenu, useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
@@ -83,6 +87,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
+  const api = useApi();
+  const toast = useToast();
   const connect = useConnectAi();
   const modelLabel = useModelLabel();
   const steerId = useId();
@@ -102,7 +108,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       </ReceiptAction>
     ) : null;
   const nobody = status?.kind === "nobody";
-  // "Tentar de novo" sends the words again as mine: never an agent's.
+  // "Tentar de novo" answers my message again: never an agent's.
   const worded =
     status?.kind === "outage" ||
     status?.kind === "queued" ||
@@ -260,7 +266,15 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <span className="ac-receipt__words">
           <span>{t("receipts.failedShort")}</span>
           <ReceiptAction>
-            <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
+            <button
+              type="button"
+              className="ac-receipt__action"
+              onClick={() =>
+                void retryAnswer(api, org.id, message, () => actions.resend(message.body)).catch((error) =>
+                  toast.show(errorText(t, error), "error"),
+                )
+              }
+            >
               {t("receipts.retry")}
             </button>
           </ReceiptAction>

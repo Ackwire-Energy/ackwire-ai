@@ -3496,6 +3496,8 @@
         "org_deleting": "El espacio de trabajo se está eliminando.",
         "agent_paused": "El agente está en pausa.",
         "computer_busy": "La computadora siguió ocupada con otras tareas.",
+        "computer_failed": "La computadora tuvo un problema y se detuvo.",
+        "computer_timeout": "La computadora tardó demasiado en responder.",
         "unknown": "Falló."
       }
     },

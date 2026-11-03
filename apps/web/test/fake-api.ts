@@ -283,6 +283,8 @@ export interface FakeState {
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
   answerNowError?: ApiError;
+  /** What `chat.answerNow` says answers the message (default none). */
+  answerNowRuns?: { agentId: string; runId: string }[];
   /** `system.health`'s edition; unset = the Cloud. */
   edition?: Edition;
   /** Overrides `system.instance` (default: agentes.chat Cloud). */
@@ -2437,7 +2439,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       answerNow: async (orgId, messageId) => {
         log("chat.answerNow", orgId, messageId);
         if (state.answerNowError) throw state.answerNowError;
-        return { runs: [] };
+        return { runs: state.answerNowRuns ?? [] };
       },
       cancelFollowUp: async (orgId, messageId) => {
         log("chat.cancelFollowUp", orgId, messageId);

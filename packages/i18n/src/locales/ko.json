@@ -3264,6 +3264,8 @@
         "org_deleting": "워크스페이스를 삭제하는 중이에요.",
         "agent_paused": "에이전트가 일시 중지됐어요.",
         "computer_busy": "컴퓨터가 다른 작업으로 계속 바빴어요.",
+        "computer_failed": "컴퓨터에 문제가 생겨 멈췄어요.",
+        "computer_timeout": "컴퓨터가 응답하는 데 너무 오래 걸렸어요.",
         "unknown": "실패했어요."
       }
     },

@@ -949,11 +949,11 @@ textarea.ac-input {
   --surface-sunken: var(--msg-well);
   --card-well: var(--msg-well);
 }
-/* The face is 32px in the feed. */
+/* The face is 36px in the feed, the sidebar's size. */
 .ac-msg__avatar,
 .ac-msg__gutter {
-  flex: 0 0 32px;
-  width: 32px;
+  flex: 0 0 36px;
+  width: 36px;
   display: flex;
   justify-content: center;
 }
@@ -965,8 +965,8 @@ textarea.ac-input {
   align-self: flex-start;
 }
 .ac-msg__avatar .ac-avatar:not(.ac-avatar--xs) {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
 }
 .ac-msg__gutter-time {
   font-size: 11px;
@@ -1122,11 +1122,9 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   padding: 0;
   background: transparent;
 }
+/* With .ac-iconline: its icon-to-text gap and first-line centring. */
 .ac-msg__error {
   margin: 2px 0 0;
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
   color: var(--danger);
   font-size: 14px;
   line-height: 20px;

@@ -3370,6 +3370,8 @@
         "org_deleting": "Çalışma alanı siliniyor.",
         "agent_paused": "Ajan duraklatıldı.",
         "computer_busy": "Bilgisayar başka görevlerle meşgul kaldı.",
+        "computer_failed": "Bilgisayar bir sorunla karşılaştı ve durdu.",
+        "computer_timeout": "Bilgisayarın yanıt vermesi çok uzun sürdü.",
         "unknown": "Başarısız oldu."
       }
     },

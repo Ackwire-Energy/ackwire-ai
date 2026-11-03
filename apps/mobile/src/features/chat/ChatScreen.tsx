@@ -46,6 +46,7 @@ import {
   consultNoticeFolds,
   consultsForLine,
 } from "@agenteschat/client/lib/consult-group";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
@@ -59,6 +60,7 @@ import {
 import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { pinsIn } from "@agenteschat/client/lib/pins";
+import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { isIdHandle } from "@agenteschat/ui/names";
@@ -787,17 +789,20 @@ function Chat({
   const retryRef = useRef(retry);
   retryRef.current = retry;
   const onRetry = useCallback((m: Message) => retryRef.current(m), []);
-  // "Tentar de novo" under a message no agent could answer: the same words again, here (the web's `resend`).
+  // "Tentar de novo" under a message no agent could answer: the agent answers that same message again; only when it
+  // can't, the same words go again, here (the web's `resend`).
   const sendRef = useRef(send);
   sendRef.current = send;
   const onResend = useCallback(
     (m: Message) => {
-      // Sent again as text, a voice message's words would show: it is sent by recording it again.
-      if (voiceOf(m.meta)) return;
-      sendRef.current(m.body, threadId);
-      toEnd();
+      void retryAnswer(api, orgId, m, () => {
+        // Sent again as text, a voice message's words would show: it is sent by recording it again.
+        if (voiceOf(m.meta)) return;
+        sendRef.current(m.body, threadId);
+        toEnd();
+      }).catch((error) => toast({ title: errorText(t, error), icon: "x" }));
     },
-    [threadId, toEnd],
+    [api, orgId, threadId, toEnd, toast, t],
   );
   const realtime = useRealtime().status;
   const control = useMissionControl(orgId);

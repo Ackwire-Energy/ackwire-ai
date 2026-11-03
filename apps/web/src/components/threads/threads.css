@@ -5,8 +5,9 @@
  * "Ajustar trecho" selection (neutral: ink and gray only; blue is for agents).
  * `--thread-indent` lines quiet rows up with the messages' text column.
  */
+/* The messages' side padding, 36px face and gap (`.ac-msg`). */
 .channel__messages {
-  --thread-indent: 56px;
+  --thread-indent: 64px;
 }
 
 /* ── In the channel ────────────────────────────────────────────────────── */
