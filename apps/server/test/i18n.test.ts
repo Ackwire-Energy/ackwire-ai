@@ -84,6 +84,8 @@ test("run failures, approvals and memory updates carry codes", async () => {
     errorCode: "run.computer_failed",
     errorParams: { code: "runner_error" },
   });
+  // One that calls for its own step keeps its code.
+  expect(runErrorDetail("not_logged_in")).toMatchObject({ errorCode: "run.failed" });
   expect(runErrorDetail("timeout")).toEqual({ errorCode: "run.computer_timeout", errorParams: { code: "timeout" } });
   expect(runErrorDetail(null)).toBeNull();
   expect(scalarParams({ owner: "acme", repo: "app", pullNumber: 42, body: { x: 1 } })).toEqual({

@@ -941,6 +941,13 @@ describe("Tentar de novo under my message an agent couldn't answer", () => {
     expect(calls(state, "chat.post")).toEqual([]);
   });
 
+  test("someone else's message says it failed, without a Tentar de novo they'd be refused", async () => {
+    const state = seedState({ aiStatus: aiStatus(true) });
+    state.messages.push({ ...failed(), author: { type: "person", id: "u-bia" } });
+    await open(state);
+    expect(within(receiptOf("resume o canal")).queryByRole("button", { name: "Tentar de novo" })).toBeNull();
+  });
+
   test("her computer's error code is said in words, the code only on hover", async () => {
     const { socket } = await open(seedState({ aiStatus: aiStatus(true) }));
     await sendText("@ada e o login?");
@@ -951,7 +958,7 @@ describe("Tentar de novo under my message an agent couldn't answer", () => {
     await push(socket, { type: "run.finished", ...run, ...failure, errorParams: { code: "runner_error" } });
     await settle();
     const line = document.querySelector(".ac-msg__error") as HTMLElement;
-    expect(line.textContent).toContain("O computador teve um problema e parou.");
+    expect(line.textContent).toContain("Ada não conseguiu responder: o computador teve um problema e parou");
     expect(line.textContent).not.toContain("runner_error");
     expect(line.querySelector("[title]")?.getAttribute("title")).toBe("runner_error");
   });

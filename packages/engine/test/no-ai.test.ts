@@ -477,7 +477,12 @@ test("Tentar de novo on a person's message whose run failed: the same message, o
 
   broken = false;
   const events = f.listen(f.general.id);
-  const retried = await answerNow(deps(), f.owner.id, f.org.id, asked.id);
+  // A double click: the second call returns the run the first started, so the words never go again.
+  const [retried, twice] = await Promise.all([
+    answerNow(deps(), f.owner.id, f.org.id, asked.id),
+    answerNow(deps(), f.owner.id, f.org.id, asked.id),
+  ]);
+  expect(twice).toEqual(retried);
   const runId = retried.runs[0]?.runId ?? "";
   expect(retried.runs).toEqual([{ agentId: f.agent.id, runId }]);
   expect(runId).not.toBe(failed?.id);
@@ -504,4 +509,30 @@ test("Tentar de novo on a failed run that already did something: 409, nothing de
   const refused = await answerNow(deps(), f.owner.id, f.org.id, asked.id).catch((e) => e);
   expect(refused).toMatchObject({ name: "ConflictError", code: "run.not_restartable" });
   expect(await runs()).toMatchObject([{ id: failed.id, status: "failed" }]);
+});
+
+test("Tentar de novo where no run can start over: nothing failed comes back, so the apps send the words again", async () => {
+  f = await setup({ reply: () => new ProviderError("provider rejected the request (400)", false, 400) });
+  const asked = await post("@dev resume o canal");
+  await drainOutbox(f.db, f.handlers);
+  await f.db.update(schema.agentRuns).set({ background: true });
+  expect(await answerNow(deps(), f.owner.id, f.org.id, asked.id)).toEqual({ runs: [] });
+  expect(await runs()).toMatchObject([{ status: "failed" }]);
+});
+
+test("an agent's message: only a no_ai run starts again, never a run that failed otherwise (no fresh stretch)", async () => {
+  f = await setup({ reply: () => new ProviderError("provider rejected the request (400)", false, 400) });
+  const qa = await addAgent("qa");
+  const handed = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "agent", agentId: f.agent.id, runId: Bun.randomUUIDv7(), hop: 1 },
+    body: "@qa confere os números",
+  });
+  await f.db.transaction((tx) => createAgentRuns(tx, handed, [qa.id], "mention"));
+  await drainOutbox(f.db, f.handlers);
+  const [failed] = await runs();
+  expect(failed).toMatchObject({ agentId: qa.id, status: "failed" });
+  expect(await answerNow(deps(), f.owner.id, f.org.id, handed.id)).toEqual({ runs: [] });
+  expect(await runs()).toMatchObject([{ id: failed?.id, status: "failed" }]);
 });

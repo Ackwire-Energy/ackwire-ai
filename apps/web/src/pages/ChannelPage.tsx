@@ -107,7 +107,14 @@ import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine, runErrorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
+import {
+  capitalize,
+  dayLabel,
+  formatFullDate,
+  formatTime,
+  joinNames,
+  lowerFirst,
+} from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
@@ -3312,6 +3319,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
   const failedWhy = liveFailed ? runErrorText(t, live?.errorCode, live?.errorParams) : null;
+  // After "couldn't answer:", the sentence goes on: no capital, no final period.
+  const failedReason = failedWhy && lowerFirst(failedWhy.replace(/\.$/, ""), i18n.language);
   // Refused by the workspace's standing: its own words, not the server's English.
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
@@ -3729,7 +3738,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                   : live.errorCode === "run.computer_busy"
                     ? t("channel.runBusy", { agent: name })
                     : failedWhy || live.error
-                      ? t("channel.runFailed", { agent: name, reason: failedWhy ?? live.error })
+                      ? t("channel.runFailed", { agent: name, reason: failedReason || live.error })
                       : t("channel.runFailedNoReason", { agent: name })}
               </span>
               <Button

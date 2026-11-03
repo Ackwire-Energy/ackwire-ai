@@ -15,7 +15,7 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, PixelSpinner, Popover, ProviderLogo } from "@agenteschat/ui";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { FanOutStrip, QueuedWords } from "@/components/ComputerQueue";
@@ -92,6 +92,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const connect = useConnectAi();
   const modelLabel = useModelLabel();
   const steerId = useId();
+  const [retrying, setRetrying] = useState(false);
   const receipt = useLive((s) => s.receipts[message.id]);
   // The pills' list (live through `message.reactions`), else the message's: an agent's reaction is its answer.
   const reactions = useReactions(org.id, message.id, false).data ?? message.reactions;
@@ -265,19 +266,24 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       {status?.kind === "failed" && actions && (
         <span className="ac-receipt__words">
           <span>{t("receipts.failedShort")}</span>
-          <ReceiptAction>
-            <button
-              type="button"
-              className="ac-receipt__action"
-              onClick={() =>
-                void retryAnswer(api, org.id, message, () => actions.resend(message.body)).catch((error) =>
-                  toast.show(errorText(t, error), "error"),
-                )
-              }
-            >
-              {t("receipts.retry")}
-            </button>
-          </ReceiptAction>
+          {/* Only who asked: anyone else's click would be refused (`run.answer_forbidden`). */}
+          {message.author.id === me.user.id && (
+            <ReceiptAction>
+              <button
+                type="button"
+                className="ac-receipt__action"
+                disabled={retrying}
+                onClick={() => {
+                  setRetrying(true);
+                  void retryAnswer(api, org.id, message, () => actions.resend(message.body))
+                    .catch((error) => toast.show(errorText(t, error), "error"))
+                    .finally(() => setRetrying(false));
+                }}
+              >
+                {t("receipts.retry")}
+              </button>
+            </ReceiptAction>
+          )}
         </span>
       )}
       {status?.kind === "platform_cap" && (

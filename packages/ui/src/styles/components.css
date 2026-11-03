@@ -1122,8 +1122,10 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   padding: 0;
   background: transparent;
 }
-/* With .ac-iconline: its icon-to-text gap and first-line centring. */
+/* With .ac-iconline (first-line centring). The alert's circle leaves ~2px of air inside its box, so a 6px gap reads
+   as the 8px between text and the other lines' icons. */
 .ac-msg__error {
+  gap: 6px;
   margin: 2px 0 0;
   color: var(--danger);
   font-size: 14px;

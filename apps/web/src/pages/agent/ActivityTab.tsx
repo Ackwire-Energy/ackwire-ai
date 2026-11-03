@@ -313,7 +313,8 @@ export function ActivityTab() {
                           {r.status === "failed" && (
                             <span className="agp-run__fail ac-iconline">
                               <Icon name="alert" size={14} />
-                              {failure(t, r)}
+                              {/* A computer's own code, worded generically, only on hover (as in the chat). */}
+                              <span title={r.errorParams?.code}>{failure(t, r)}</span>
                             </span>
                           )}
                           {r.deniedRepo && saved.repos?.mode === "some" && !covers(saved.repos.list, r.deniedRepo) && (

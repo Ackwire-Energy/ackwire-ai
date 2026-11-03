@@ -57,27 +57,11 @@ export const STUCK_ERROR = "stuck" as const;
 export const INTERRUPTED_BY_RESTART = "Interrupted by a server restart";
 
 /**
- * A computer brain's failure codes a run stores as its error (`BrainFailure.code`, from the brains and the runner):
- * worded as the computer's problem, the code kept only as a detail.
+ * A computer brain's generic failure codes (`BrainFailure.code`, from the brains and the runner): worded as the
+ * computer's problem, the code kept only as a detail. The ones that call for a different step (signed out, outdated
+ * program, missing CLI, plan limit) keep their own code.
  */
-const COMPUTER_ERRORS = new Set([
-  "runner_error",
-  "runner_failed",
-  "claude_failed",
-  "bad_request",
-  "no_session",
-  "machine_offline",
-  "machine_paused",
-  "exec_disabled",
-  "runner_outdated",
-  "cli_missing",
-  "codex_missing",
-  "codex_too_old",
-  "cursor_missing",
-  "not_logged_in",
-  "plan_limit",
-  "busy",
-]);
+const COMPUTER_ERRORS = new Set(["runner_error", "runner_failed", "claude_failed", "bad_request"]);
 
 /** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
 const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
