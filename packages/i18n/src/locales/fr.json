@@ -13272,7 +13272,13 @@
       "fullMember": "Demandez à la personne qui gère l'espace de travail de faire de la place.",
       "fullAddSeat": "Toutes les places payées sont prises. Ajoutez une place dans Abonnement et facturation.",
       "fullTop": "Cet abonnement ne peut pas accueillir plus de personnes. Changez d'abonnement dans Abonnement et facturation.",
-      "fullMemberSeat": "Demandez à la personne qui gère l'espace de travail d'ajouter une place."
+      "fullMemberSeat": "Demandez à la personne qui gère l'espace de travail d'ajouter une place.",
+      "fullAskPayerSeat": "Demandez à {{payer}}, qui paie cet espace de travail, d'ajouter une place.",
+      "fullAskSeat": "Demandez à la personne qui paie cet espace de travail d'ajouter une place.",
+      "fullAskPayerTop": "Demandez à {{payer}}, qui paie cet espace de travail, de changer d'abonnement.",
+      "fullAskTop": "Demandez à la personne qui paie cet espace de travail de changer d'abonnement.",
+      "fullPhone": "Toutes les places payées sont prises. Adressez-vous à la personne qui paie cet espace de travail.",
+      "fullPhonePayer": "Toutes les places payées sont prises."
     },
     "storage": {
       "meter": "Vous avez utilisé {{used}} sur {{limit}}.",

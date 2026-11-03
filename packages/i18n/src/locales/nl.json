@@ -12887,7 +12887,13 @@
       "fullMember": "Vraag degene die de werkruimte beheert om ruimte te maken.",
       "fullAddSeat": "Alle betaalde plekken zijn bezet. Voeg een plek toe in Abonnement en facturatie.",
       "fullTop": "Dit abonnement heeft geen ruimte voor meer mensen. Kies een ander abonnement in Abonnement en facturatie.",
-      "fullMemberSeat": "Vraag degene die de werkruimte beheert om een plek toe te voegen."
+      "fullMemberSeat": "Vraag degene die de werkruimte beheert om een plek toe te voegen.",
+      "fullAskPayerSeat": "Vraag {{payer}}, die voor deze werkruimte betaalt, om een plek toe te voegen.",
+      "fullAskSeat": "Vraag degene die voor deze werkruimte betaalt om een plek toe te voegen.",
+      "fullAskPayerTop": "Vraag {{payer}}, die voor deze werkruimte betaalt, om een ander abonnement te kiezen.",
+      "fullAskTop": "Vraag degene die voor deze werkruimte betaalt om een ander abonnement te kiezen.",
+      "fullPhone": "Alle betaalde plekken zijn bezet. Neem contact op met degene die voor deze werkruimte betaalt.",
+      "fullPhonePayer": "Alle betaalde plekken zijn bezet."
     },
     "storage": {
       "meter": "Je hebt {{used}} van {{limit}} gebruikt.",

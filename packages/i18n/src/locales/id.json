@@ -12393,7 +12393,13 @@
       "fullMember": "Minta pengelola ruang kerja untuk memberi tempat.",
       "fullAddSeat": "Semua kursi berbayar sudah terisi. Tambahkan kursi di Paket dan tagihan.",
       "fullTop": "Paket ini tidak bisa menampung lebih banyak orang. Ganti paket di Paket dan tagihan.",
-      "fullMemberSeat": "Minta pengelola ruang kerja untuk menambahkan kursi."
+      "fullMemberSeat": "Minta pengelola ruang kerja untuk menambahkan kursi.",
+      "fullAskPayerSeat": "Minta {{payer}}, yang membayar ruang kerja ini, untuk menambahkan kursi.",
+      "fullAskSeat": "Minta orang yang membayar ruang kerja ini untuk menambahkan kursi.",
+      "fullAskPayerTop": "Minta {{payer}}, yang membayar ruang kerja ini, untuk mengganti paket.",
+      "fullAskTop": "Minta orang yang membayar ruang kerja ini untuk mengganti paket.",
+      "fullPhone": "Semua kursi berbayar sudah terisi. Hubungi orang yang membayar ruang kerja ini.",
+      "fullPhonePayer": "Semua kursi berbayar sudah terisi."
     },
     "storage": {
       "meter": "Kamu sudah memakai {{used}} dari {{limit}}.",

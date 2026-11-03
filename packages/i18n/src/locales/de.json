@@ -12756,7 +12756,13 @@
       "fullMember": "Bitte die Person, die den Workspace verwaltet, Platz zu schaffen.",
       "fullAddSeat": "Alle bezahlten Plätze sind belegt. Füge unter Tarif und Abrechnung einen Platz hinzu.",
       "fullTop": "Dieser Tarif fasst keine weiteren Personen. Wechsle den Tarif unter Tarif und Abrechnung.",
-      "fullMemberSeat": "Bitte die Person, die den Workspace verwaltet, einen Platz hinzuzufügen."
+      "fullMemberSeat": "Bitte die Person, die den Workspace verwaltet, einen Platz hinzuzufügen.",
+      "fullAskPayerSeat": "Bitte {{payer}}, die Person, die diesen Workspace bezahlt, einen Platz hinzuzufügen.",
+      "fullAskSeat": "Bitte die Person, die diesen Workspace bezahlt, einen Platz hinzuzufügen.",
+      "fullAskPayerTop": "Bitte {{payer}}, die Person, die diesen Workspace bezahlt, den Tarif zu wechseln.",
+      "fullAskTop": "Bitte die Person, die diesen Workspace bezahlt, den Tarif zu wechseln.",
+      "fullPhone": "Alle bezahlten Plätze sind belegt. Wende dich an die Person, die diesen Workspace bezahlt.",
+      "fullPhonePayer": "Alle bezahlten Plätze sind belegt."
     },
     "storage": {
       "meter": "Du hast {{used}} von {{limit}} genutzt.",

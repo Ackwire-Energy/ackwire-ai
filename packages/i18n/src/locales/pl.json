@@ -13607,7 +13607,13 @@
       "fullMember": "Poproś osobę, która zarządza przestrzenią roboczą, o zwolnienie miejsca.",
       "fullAddSeat": "Wszystkie opłacone miejsca są zajęte. Dodaj miejsce w sekcji Plan i płatności.",
       "fullTop": "Ten plan nie mieści więcej osób. Zmień plan w sekcji Plan i płatności.",
-      "fullMemberSeat": "Poproś osobę, która zarządza przestrzenią roboczą, o dodanie miejsca."
+      "fullMemberSeat": "Poproś osobę, która zarządza przestrzenią roboczą, o dodanie miejsca.",
+      "fullAskPayerSeat": "Poproś osobę płacącą za tę przestrzeń roboczą ({{payer}}) o dodanie miejsca.",
+      "fullAskSeat": "Poproś osobę płacącą za tę przestrzeń roboczą o dodanie miejsca.",
+      "fullAskPayerTop": "Poproś osobę płacącą za tę przestrzeń roboczą ({{payer}}) o zmianę planu.",
+      "fullAskTop": "Poproś osobę płacącą za tę przestrzeń roboczą o zmianę planu.",
+      "fullPhone": "Wszystkie opłacone miejsca są zajęte. Skontaktuj się z osobą płacącą za tę przestrzeń roboczą.",
+      "fullPhonePayer": "Wszystkie opłacone miejsca są zajęte."
     },
     "storage": {
       "meter": "Wykorzystano {{used}} z {{limit}}.",

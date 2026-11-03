@@ -12687,7 +12687,13 @@
       "fullMember": "Yer açması için çalışma alanını yöneten kişiye sorun.",
       "fullAddSeat": "Ücreti ödenmiş tüm yerler dolu. Plan ve faturalandırma bölümünden bir yer ekleyin.",
       "fullTop": "Bu plan daha fazla kişi alamıyor. Plan ve faturalandırma bölümünden planı değiştirin.",
-      "fullMemberSeat": "Çalışma alanını yöneten kişiden bir yer eklemesini isteyin."
+      "fullMemberSeat": "Çalışma alanını yöneten kişiden bir yer eklemesini isteyin.",
+      "fullAskPayerSeat": "Bu çalışma alanının ödemesini yapan kişiden ({{payer}}) bir yer eklemesini isteyin.",
+      "fullAskSeat": "Bu çalışma alanının ödemesini yapan kişiden bir yer eklemesini isteyin.",
+      "fullAskPayerTop": "Bu çalışma alanının ödemesini yapan kişiden ({{payer}}) planı değiştirmesini isteyin.",
+      "fullAskTop": "Bu çalışma alanının ödemesini yapan kişiden planı değiştirmesini isteyin.",
+      "fullPhone": "Ücreti ödenmiş tüm yerler dolu. Bu çalışma alanının ödemesini yapan kişiyle görüşün.",
+      "fullPhonePayer": "Ücreti ödenmiş tüm yerler dolu."
     },
     "storage": {
       "meter": "{{limit}} alanın {{used}} kadarını kullandınız.",

@@ -25,14 +25,30 @@ export const membersFullText = (t: TFunction, members: number, limit: number) =>
 
 /**
  * Who makes room in a full workspace, and how. Whoever manages billing (`billing`: the permission, on a server with a
- * billing service) adds a seat below the plan's top, or changes plans at it; anyone else asks them. When the billing
- * service says no top, as a self-hosted server never does, the general words.
+ * billing service) adds a seat below the plan's top, or changes plans at it; when the billing service says someone
+ * else pays, only the payer can, so they ask the payer, by name when they see it. Anyone else asks whoever runs the
+ * workspace. When the billing service says no top, as a self-hosted server never does, the general words.
  */
 export function membersFullWho(t: TFunction, limits: WorkspaceLimits | undefined, billing: boolean) {
   const canAddSeats = limits?.members.canAddSeats === true;
   if (!billing) return t(canAddSeats ? "limits.members.fullMemberSeat" : "limits.members.fullMember");
-  if (canAddSeats) return t("limits.members.fullAddSeat");
-  return t(limits?.members.max != null ? "limits.members.fullTop" : "limits.members.fullAdmin");
+  if (!canAddSeats && limits?.members.max == null) return t("limits.members.fullAdmin");
+  const payer = limits?.members.payer;
+  if (!payer || payer.you) return t(canAddSeats ? "limits.members.fullAddSeat" : "limits.members.fullTop");
+  if (payer.name) {
+    return t(canAddSeats ? "limits.members.fullAskPayerSeat" : "limits.members.fullAskPayerTop", { payer: payer.name });
+  }
+  return t(canAddSeats ? "limits.members.fullAskSeat" : "limits.members.fullAskTop");
+}
+
+/**
+ * The phone's words for who makes room (App Store 3.1.1: nothing to buy, no way to a purchase): on a server with a
+ * billing service, that the paid seats are taken and, to anyone but the payer, to talk to whoever pays. Without
+ * one, as everywhere.
+ */
+export function membersFullWhoPhone(t: TFunction, limits: WorkspaceLimits | undefined, billingService: boolean) {
+  if (!billingService) return membersFullWho(t, limits, false);
+  return t(limits?.members.payer?.you ? "limits.members.fullPhonePayer" : "limits.members.fullPhone");
 }
 
 /**

@@ -12456,7 +12456,13 @@
       "fullMember": "请联系工作区的负责人腾出名额。",
       "fullAddSeat": "已付费的席位都已占满。请在“套餐和账单”中添加席位。",
       "fullTop": "当前套餐无法再容纳更多成员。请在“套餐和账单”中更换套餐。",
-      "fullMemberSeat": "请联系工作区的负责人添加一个席位。"
+      "fullMemberSeat": "请联系工作区的负责人添加一个席位。",
+      "fullAskPayerSeat": "请联系为此工作区付费的{{payer}}添加一个席位。",
+      "fullAskSeat": "请联系为此工作区付费的人添加一个席位。",
+      "fullAskPayerTop": "请联系为此工作区付费的{{payer}}更换套餐。",
+      "fullAskTop": "请联系为此工作区付费的人更换套餐。",
+      "fullPhone": "已付费的席位都已占满。请联系为此工作区付费的人。",
+      "fullPhonePayer": "已付费的席位都已占满。"
     },
     "storage": {
       "meter": "已使用 {{used}}，共 {{limit}}。",

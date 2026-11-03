@@ -30837,6 +30837,24 @@
   "limits.members.fullMemberSeat": {
     "value": "Ask whoever runs the workspace to add a seat."
   },
+  "limits.members.fullAskPayerSeat": {
+    "value": "Ask {{payer}}, who pays for this workspace, to add a seat."
+  },
+  "limits.members.fullAskSeat": {
+    "value": "Ask whoever pays for this workspace to add a seat."
+  },
+  "limits.members.fullAskPayerTop": {
+    "value": "Ask {{payer}}, who pays for this workspace, to switch plans."
+  },
+  "limits.members.fullAskTop": {
+    "value": "Ask whoever pays for this workspace to switch plans."
+  },
+  "limits.members.fullPhone": {
+    "value": "Every paid seat is taken. Talk to whoever pays for this workspace."
+  },
+  "limits.members.fullPhonePayer": {
+    "value": "Every paid seat is taken."
+  },
   "limits.storage.meter": {
     "value": "You've used {{used}} of {{limit}}."
   },

@@ -13143,7 +13143,13 @@
       "fullMember": "Pide a quien administra el espacio de trabajo que haga lugar.",
       "fullAddSeat": "Todos los lugares pagados están ocupados. Agrega un lugar en Plan y facturación.",
       "fullTop": "Este plan no admite más personas. Cambia de plan en Plan y facturación.",
-      "fullMemberSeat": "Pide a quien administra el espacio de trabajo que agregue un lugar."
+      "fullMemberSeat": "Pide a quien administra el espacio de trabajo que agregue un lugar.",
+      "fullAskPayerSeat": "Pide a {{payer}}, que paga este espacio de trabajo, que agregue un lugar.",
+      "fullAskSeat": "Pide a quien paga este espacio de trabajo que agregue un lugar.",
+      "fullAskPayerTop": "Pide a {{payer}}, que paga este espacio de trabajo, que cambie de plan.",
+      "fullAskTop": "Pide a quien paga este espacio de trabajo que cambie de plan.",
+      "fullPhone": "Todos los lugares pagados están ocupados. Habla con quien paga este espacio de trabajo.",
+      "fullPhonePayer": "Todos los lugares pagados están ocupados."
     },
     "storage": {
       "meter": "Usaste {{used}} de {{limit}}.",

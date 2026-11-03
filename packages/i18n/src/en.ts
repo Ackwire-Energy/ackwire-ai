@@ -12256,6 +12256,16 @@ export const en = {
       fullTop: "This plan can't take more people. Switch plans in Plan and billing.",
       /** To anyone else, below the plan's top. */
       fullMemberSeat: "Ask whoever runs the workspace to add a seat.",
+      /** To whoever else manages billing, when someone else pays: only the payer adds seats or changes plans. */
+      fullAskPayerSeat: "Ask {{payer}}, who pays for this workspace, to add a seat.",
+      /** The same when the payer's name can't be shown. */
+      fullAskSeat: "Ask whoever pays for this workspace to add a seat.",
+      fullAskPayerTop: "Ask {{payer}}, who pays for this workspace, to switch plans.",
+      fullAskTop: "Ask whoever pays for this workspace to switch plans.",
+      /** On the phone, to everyone on a server with a billing service: no purchase and no way to one (App Store 3.1.1). */
+      fullPhone: "Every paid seat is taken. Talk to whoever pays for this workspace.",
+      /** On the phone, to the payer. */
+      fullPhonePayer: "Every paid seat is taken.",
     },
     storage: {
       meter: "You've used {{used}} of {{limit}}.",

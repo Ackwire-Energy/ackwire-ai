@@ -115,9 +115,16 @@ export interface ErrorReportsConfig {
 export interface WorkspaceLimits {
   /**
    * `limit`: the seats paid for. `max`: the most the plan takes with seats added (null: not said), below which
-   * `canAddSeats`. Both absent from servers older than them.
+   * `canAddSeats`. `payer`: who pays, the only one who adds seats or changes plans (null: not said); `name` only to
+   * anyone else who manages billing, while the payer is in the workspace. All absent from servers older than them.
    */
-  members: { used: number; limit: number | null; max?: number | null; canAddSeats?: boolean };
+  members: {
+    used: number;
+    limit: number | null;
+    max?: number | null;
+    canAddSeats?: boolean;
+    payer?: { you: boolean; name: string | null } | null;
+  };
   /** `ownStorage`: new files go to the workspace's own bucket, which no limit counts. */
   storage: { usedBytes: number; limitBytes: number | null; ownStorage: boolean };
   uploads: { usedBytes24h: number; limitBytesPerDay: number | null };

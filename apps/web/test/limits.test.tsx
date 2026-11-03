@@ -107,6 +107,21 @@ describe("a workspace's limits (ADR 0079)", () => {
       "O plano chegou ao máximo de pessoas. Mude de plano em Plano e cobrança.",
     );
     cleanup();
+    // Someone else pays: only they add seats, so an admin who doesn't pay asks them, by name when it is shown.
+    const ana = { you: false, name: "Ana" };
+    await go("settings/members", { members: { used: 12, limit: 12, max: 15, canAddSeats: true, payer: ana } });
+    expect((await inviteDialog())().textContent).toContain(
+      "Peça a Ana, que paga este workspace, para adicionar uma vaga.",
+    );
+    cleanup();
+    const unseen = { you: false, name: null };
+    await go("settings/members", { members: { used: 12, limit: 12, max: 15, canAddSeats: true, payer: unseen } });
+    expect((await inviteDialog())().textContent).toContain("Peça a quem paga este workspace para adicionar uma vaga.");
+    cleanup();
+    const you = { you: true, name: null };
+    await go("settings/members", { members: { used: 12, limit: 12, max: 15, canAddSeats: true, payer: you } });
+    expect((await inviteDialog())().textContent).toContain("Adicione uma vaga em Plano e cobrança.");
+    cleanup();
 
     await go("settings/members", { members: { used: 2, limit: 3 } });
     const room = await inviteDialog();
