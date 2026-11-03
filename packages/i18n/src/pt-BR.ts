@@ -1594,6 +1594,8 @@ export const ptBR = {
       follow_up_female: "Segue a conversa com a {{name}}",
       default: "Ninguém foi chamado, então o {{name}} respondeu",
       default_female: "Ninguém foi chamado, então a {{name}} respondeu",
+      alone: "Sem outras pessoas aqui, então o {{name}} respondeu",
+      alone_female: "Sem outras pessoas aqui, então a {{name}} respondeu",
     },
   },
   /**

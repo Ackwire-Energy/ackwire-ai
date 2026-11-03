@@ -240,6 +240,10 @@ describe("the agents' receipt line under a person's message", () => {
       mark: { rule: "only_agent" },
       text: "Only Ada answers here without a mention",
     });
+    expect(by({ step: "rule", rule: "alone" })).toEqual({
+      mark: { rule: "alone" },
+      text: "No other person here, so Ada answered",
+    });
     expect(by({ step: "jev" }, [])).toBeNull();
     expect(deciderOf(en, receiptView(routed({}).m1), names)).toBeNull();
     const pt = await translator("pt-BR");

@@ -1613,7 +1613,8 @@
       "reply": "{{name}} kişisine bir yanıt",
       "only_agent": "Burada bahsedilmeden yalnızca {{name}} yanıtlar",
       "follow_up": "{{name}} ile konuşmayı sürdürüyor",
-      "default": "Kimse çağrılmadı, bu yüzden {{name}} yanıtladı"
+      "default": "Kimse çağrılmadı, bu yüzden {{name}} yanıtladı",
+      "alone": "Burada başka kimse yok, bu yüzden {{name}} yanıtladı"
     }
   },
   "rightHand": {

@@ -4024,6 +4024,9 @@
   "receipts.by.default": {
     "value": "Nobody was called, so {{name}} answered"
   },
+  "receipts.by.alone": {
+    "value": "No other person here, so {{name}} answered"
+  },
   "rightHand.label": {
     "value": "your right hand"
   },

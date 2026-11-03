@@ -740,7 +740,8 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * one could do it too, and it doesn't clearly fit another agent better. A
  * person's message the policy gives to nobody goes to the agent it speaks to
  * when the step heard one, else to the best placed agent when it needs one
- * (R5; ADR 0134: also when the person is alone here with several agents).
+ * (R5). A person alone here with two or more agents gets the best placed one
+ * for what is left, a greeting included (ADR 0134 §5), but a thanks or an ok.
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
@@ -1100,7 +1101,10 @@ export async function routeMessage(
       if (m.routable && m.routedTo === null && !continued && !answeredBy) break;
       // A default pick (R5) is no talk, or one bad pick would pull every later message to that agent. Nor is one a
       // coordinator took (ADR 0093, before ADR 0134).
-      const routedTo = m.routedBy === "rule:coordinator" || m.routedBy === DEFAULT_STRATEGY ? [] : m.routedTo;
+      const routedTo =
+        m.routedBy === "rule:coordinator" || m.routedBy === DEFAULT_STRATEGY || m.routedBy === ALONE_STRATEGY
+          ? []
+          : m.routedTo;
       const routed = routedTo?.length === 1 ? routedTo.filter((id) => m.working || spoke.has(id)) : routedTo;
       const to =
         m.mentionedAgentIds.length > 0
@@ -1175,7 +1179,7 @@ export async function routeMessage(
           eq(routingDecisions.channelId, message.channelId),
           gt(routingDecisions.createdAt, new Date(Date.now() - 60 * 60_000)),
           // A coordinator's default (ADR 0093, before ADR 0134) within the hour still counts.
-          sql`(${routingDecisions.strategy} = ${DEFAULT_STRATEGY} or ${routingDecisions.reason} like 'coordinator; default%')`,
+          sql`(${inArray(routingDecisions.strategy, [DEFAULT_STRATEGY, ALONE_STRATEGY])} or ${routingDecisions.reason} like 'coordinator; default%')`,
         ),
       );
     return (row?.n ?? 0) >= DEFAULT_PICKS_PER_HOUR;
@@ -1206,13 +1210,16 @@ export async function routeMessage(
   // this person here, else, for a greeting or a congratulation to the room, the agent they talk with, else the best
   // placed agent; thanks, an ok or affection are always for someone, so nobody then. Never between people, never on an
   // agent's message.
+  const socialOf = (decided: RoutingResult | null) => {
+    const emoji = decided?.social ? (decided.social.react ? decided.social.emoji : "") : socialReaction(saidText);
+    return emoji ? normalizeReaction(emoji) : "";
+  };
   const reactToSocial = async (decided: RoutingResult | null): Promise<RouteResult["reacted"]> => {
     if (byAgent || toPerson || peopleTalking) return undefined;
-    const emoji = decided?.social ? (decided.social.react ? decided.social.emoji : "") : socialReaction(saidText);
-    const reaction = emoji ? normalizeReaction(emoji) : "";
+    const reaction = socialOf(decided);
     if (!isValidReaction(reaction)) return undefined;
     const named = address.filter((n) => n.agent && candidateIds.has(n.id));
-    const toRoom = !["+1", "🙏", "❤️", "❤"].includes(reaction);
+    const toRoom = !FOR_SOMEONE.has(reaction);
     const agentId =
       (decided?.addressee && candidateIds.has(decided.addressee) ? decided.addressee : null) ??
       (named.length === 1 ? named[0]?.id : null) ??
@@ -1237,8 +1244,9 @@ export async function routeMessage(
       () => undefined,
     );
   };
-  // Which default tier picked (R5): the agent the person talks with, the best placed agent.
-  let fallback: "talk" | "best" | null = null;
+  // Which default tier picked (R5): the agent the person talks with, the best placed agent; or the best placed
+  // agent for a person alone with the team.
+  let fallback: "talk" | "best" | "alone" | null = null;
   // A default pick the agent may pass on: one the router could not read, or an ack said alone with the team.
   let mayPass = false;
 
@@ -1400,8 +1408,8 @@ export async function routeMessage(
   // R5 (ADR 0074, "A message for the agents always gets one"): a person's message the policy gave nobody, that
   // is for the agents, gets one: never one for a person, one already answered, or an ack ("valeu"). The agent it
   // speaks to, as the step's own pick. Else, unless people talk among themselves: the agent they talk with, the
-  // best placed agent, at most `DEFAULT_PICKS_PER_HOUR` a channel. Alone with several agents it is the same (ADR 0134):
-  // the best placed answers what needs an agent, and a greeting that needs none wakes nobody.
+  // best placed agent, at most `DEFAULT_PICKS_PER_HOUR` a channel. Alone with several agents, what is left after
+  // this goes to the best placed one too (`ALONE_STRATEGY`, below).
   const needs = decided.needsAgent ?? 0;
   let chosen = selected;
   // Alone with the channel's one agent (R2), the strategy decided knowing it (`aloneWith`): its nobody stands.
@@ -1433,9 +1441,34 @@ export async function routeMessage(
       }
     }
   }
+  // Alone here with two or more agents (ADR 0134 §5), what nobody took still gets one: a greeting or small talk
+  // goes to the best placed agent, in a run it may pass on. Not what the step heard as a thanks, an ok or affection
+  // (an agent's reaction answers those), nor a few words right after an agent answered this person's own message
+  // ("valeu": it closes that exchange), one already answered, a reply in another person's thread, or past the
+  // hour's default picks.
+  if (
+    chosen.length === 0 &&
+    !byAgent &&
+    !onlyAgentId &&
+    !duplicate &&
+    !peopleTalking &&
+    !otherPerson(root?.authorUserId) &&
+    !FOR_SOMEONE.has(socialOf(decided)) &&
+    !(ack && thankedAgent()) &&
+    (await aloneHere()) &&
+    !(await defaultCapReached())
+  ) {
+    const agentId = bestPlaced(scoreOf, decided.best);
+    if (agentId) {
+      fallback = "alone";
+      chosen = [agentId];
+    }
+  }
   const stepName = decided.strategy ?? deps.strategy.name;
-  const strategy = fallback ? DEFAULT_STRATEGY : stepName;
-  const decidedBy: DecidedBy | undefined = fallback ? { step: "rule", rule: "default" } : decided.decidedBy;
+  const strategy = fallback === "alone" ? ALONE_STRATEGY : fallback ? DEFAULT_STRATEGY : stepName;
+  const decidedBy: DecidedBy | undefined = fallback
+    ? { step: "rule", rule: fallback === "alone" ? "alone" : "default" }
+    : decided.decidedBy;
   // Code's markers first: `reply-policy.ts` reads a leading "follow-up" as "addressed", and a step's own
   // words come only after its name, so no model can write a marker.
   const words = decided.reason ? `${decided.decidedBy?.step ?? stepName}: ${decided.reason}` : null;
@@ -1456,8 +1489,8 @@ export async function routeMessage(
         reason:
           [
             followUp || (fallback === "talk" && !mayPass) ? FOLLOW_UP : null,
-            fallback ? "default" : null,
-            fallback === "talk" ? "talking to" : fallback === "best" ? "best" : null,
+            fallback === "alone" ? "alone" : fallback ? "default" : null,
+            fallback === "talk" ? "talking to" : fallback ? "best" : null,
             followUp && resumes ? "last talked to" : null,
             duplicate ? "already answered by another agent" : null,
             words,
@@ -1491,6 +1524,12 @@ export const FOLLOW_UP = "follow-up";
 /** A default pick's `strategy` (R5). Decisions before ADR 0134 may also read `rule:coordinator` (reason `coordinator; default`). */
 export const DEFAULT_STRATEGY = "rule:default";
 
+/** The pick for a person alone with two or more agents that nobody took (ADR 0134 §5); it shares the default's cap. */
+export const ALONE_STRATEGY = "rule:alone";
+
+/** The social reactions that answer someone (thanks, an ok, affection), never the room. */
+const FOR_SOMEONE: ReadonlySet<string> = new Set(["+1", "🙏", "❤️", "❤"]);
+
 /** From this need-any-agent score, a person's message the policy gave nobody is for the agents (R5): half the pick bar. */
 export const DEFAULT_NEED = 0.25;
 /** The most words a thanks, an ok or a sign-off has ("ありがとうございます" is five). */
@@ -1499,7 +1538,7 @@ export const ACK_MAX_WORDS = 5;
 /** Another person's message this recent, right before, means people are talking among themselves (R5). */
 export const PEOPLE_WINDOW_MS = 5 * 60_000;
 
-/** At most this many default picks (R5) a channel in a rolling hour: a runaway, like a bot posting, stops there. */
+/** At most this many default picks (R5, and `ALONE_STRATEGY`'s) a channel in a rolling hour: a runaway, like a bot posting, stops there. */
 export const DEFAULT_PICKS_PER_HOUR = 6;
 
 /** No other person in the channel: R2 sends a message there to its one agent. */

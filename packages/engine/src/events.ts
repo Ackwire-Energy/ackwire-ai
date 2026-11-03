@@ -45,16 +45,17 @@ export type DecidedBy =
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
   /**
    * `default`: nobody was picked, so the agent the person talks with, or the best placed one, answered (ADR 0074,
-   * R5). `coordinator` is only read: decisions stored before ADR 0134 retired the team's coordinator (ADR 0093).
+   * R5). `alone`: nobody was picked and the person is alone here with two or more agents, so the best placed one
+   * answered (ADR 0134 §5). `coordinator` is only read: decisions stored before ADR 0134 retired the team's coordinator (ADR 0093).
    */
   | { step: "rule"; rule: RouterRule };
 
-type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "default";
+type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "default" | "alone";
 
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
-const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default"]);
+const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default", "alone"]);
 
 /**
  * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined

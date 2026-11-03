@@ -1681,7 +1681,9 @@
       "follow_up": "Suit la conversation avec {{name}}",
       "follow_up_female": "Suit la conversation avec {{name}}",
       "default": "Personne n'a été appelé, alors {{name}} a répondu",
-      "default_female": "Personne n'a été appelé, alors {{name}} a répondu"
+      "default_female": "Personne n'a été appelé, alors {{name}} a répondu",
+      "alone": "Personne d'autre ici, alors {{name}} a répondu",
+      "alone_female": "Personne d'autre ici, alors {{name}} a répondu"
     }
   },
   "rightHand": {

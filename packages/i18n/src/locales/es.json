@@ -1678,7 +1678,9 @@
       "follow_up": "Sigue la conversación con {{name}}",
       "follow_up_female": "Sigue la conversación con {{name}}",
       "default": "No se llamó a nadie, así que respondió {{name}}",
-      "default_female": "No se llamó a nadie, así que respondió {{name}}"
+      "default_female": "No se llamó a nadie, así que respondió {{name}}",
+      "alone": "No hay nadie más aquí, así que respondió {{name}}",
+      "alone_female": "No hay nadie más aquí, así que respondió {{name}}"
     }
   },
   "rightHand": {

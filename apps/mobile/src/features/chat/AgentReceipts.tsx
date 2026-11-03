@@ -236,6 +236,7 @@ const RULE_ICON: Record<Exclude<Extract<DecidedBy, { step: "rule" }>["rule"], "c
   only_agent: "person",
   follow_up: "reply",
   default: "check",
+  alone: "members",
 };
 
 /**

@@ -1554,7 +1554,9 @@
       "follow_up": "Melanjutkan obrolan dengan {{name}}",
       "follow_up_female": "Melanjutkan obrolan dengan {{name}}",
       "default": "Tidak ada yang dipanggil, jadi {{name}} yang menjawab",
-      "default_female": "Tidak ada yang dipanggil, jadi {{name}} yang menjawab"
+      "default_female": "Tidak ada yang dipanggil, jadi {{name}} yang menjawab",
+      "alone": "Tidak ada orang lain di sini, jadi {{name}} yang menjawab",
+      "alone_female": "Tidak ada orang lain di sini, jadi {{name}} yang menjawab"
     }
   },
   "rightHand": {

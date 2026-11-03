@@ -1742,7 +1742,8 @@
       "reply": "Odpowiedź do: {{name}}",
       "only_agent": "Tylko {{name}} odpowiada tutaj bez wzmianki",
       "follow_up": "Kontynuuje rozmowę z: {{name}}",
-      "default": "Nikogo nie wywołano, więc odpowiada {{name}}"
+      "default": "Nikogo nie wywołano, więc odpowiada {{name}}",
+      "alone": "Nikogo innego tu nie ma, więc odpowiada {{name}}"
     }
   },
   "rightHand": {

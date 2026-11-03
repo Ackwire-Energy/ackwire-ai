@@ -1553,7 +1553,8 @@
       "reply": "回复 {{name}}",
       "only_agent": "在这里只有 {{name}} 不用提及也会回答",
       "follow_up": "延续与 {{name}} 的对话",
-      "default": "没有人被呼叫，所以由 {{name}} 回答"
+      "default": "没有人被呼叫，所以由 {{name}} 回答",
+      "alone": "这里没有其他人，所以由 {{name}} 回答"
     }
   },
   "rightHand": {

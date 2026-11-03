@@ -6,6 +6,7 @@ import {
   createAgent,
   createJobHandlers,
   createLlmRouterStrategy,
+  DEFAULT_PICKS_PER_HOUR,
   DEFAULT_ROUTER_POLICY,
   decidedByOf,
   drainOutbox,
@@ -951,12 +952,48 @@ describe("a person alone with the team (R2, ADR 0134)", () => {
     expect(decidedByOf("rule:coordinator", null)).toEqual({ step: "rule", rule: "coordinator" });
   });
 
-  test("a greeting that needs no agent wakes nobody, and an ack neither", async () => {
-    await team();
+  const ALONE = { step: "rule", rule: "alone" } as const;
+  const greet = { needsAgent: 0.1, social: { react: true, emoji: "☀️" } };
+
+  test("a greeting nobody took wakes exactly one agent, the best scored, in a run it may pass on", async () => {
+    const { ada } = await team();
     const greeting = await post("bom dia!");
-    expect(await route(scored({}, { needsAgent: 0.1 }), greeting.id)).toMatchObject({ selected: [], runs: [] });
+    const result = await route(scored({ ada: 0.3, theo: 0.2 }, { ...greet, reason: "a greeting" }), greeting.id);
+    expect(result).toMatchObject({ selected: [ada.id], decidedBy: ALONE });
+    expect(result.runs).toHaveLength(1);
+    expect(result.reacted).toBeUndefined();
+    const [decision] = await f.db
+      .select()
+      .from(schema.routingDecisions)
+      .where(eq(schema.routingDecisions.messageId, greeting.id));
+    // No "follow-up" marker: the agent may pass.
+    expect(decision).toMatchObject({ strategy: "rule:alone", reason: "alone; best; fixed: a greeting" });
+    expect(decidedByOf("rule:alone", null)).toEqual(ALONE);
+  });
+
+  test("a thanks the step heard gets a reaction, not a run", async () => {
+    await team();
     const thanks = await post("valeu");
-    expect(await route(scored({}, { needsAgent: 0.05 }), thanks.id)).toMatchObject({ selected: [], runs: [] });
+    const thanked = scored({}, { needsAgent: 0.05, social: { react: true, emoji: "🙏" } });
+    expect(await route(thanked, thanks.id)).toMatchObject({ selected: [], runs: [] });
+  });
+
+  test("with another person here, a greeting still wakes nobody", async () => {
+    await team();
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    const greeting = await post("bom dia!");
+    expect(await route(scored({ ada: 0.3 }, greet), greeting.id)).toMatchObject({ selected: [], runs: [] });
+  });
+
+  test("the hour's default picks cap it", async () => {
+    const { ada } = await team();
+    for (let i = 0; i < DEFAULT_PICKS_PER_HOUR; i++) {
+      const greeting = await post(`bom dia ${i}`);
+      expect((await route(scored({ ada: 0.3 }, greet), greeting.id)).selected).toEqual([ada.id]);
+    }
+    const more = await post("bom dia de novo");
+    expect(await route(scored({ ada: 0.3 }, greet), more.id)).toMatchObject({ selected: [], runs: [] });
   });
 
   test("when no step can read it, the best placed agent answers, in a run it may pass on", async () => {

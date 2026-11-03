@@ -1617,7 +1617,9 @@
       "follow_up": "Setzt die Unterhaltung mit {{name}} fort",
       "follow_up_female": "Setzt das Gespräch mit {{name}} fort",
       "default": "Niemand wurde gerufen, also hat {{name}} geantwortet",
-      "default_female": "Niemand wurde gerufen, also hat {{name}} geantwortet"
+      "default_female": "Niemand wurde gerufen, also hat {{name}} geantwortet",
+      "alone": "Keine andere Person hier, also hat {{name}} geantwortet",
+      "alone_female": "Keine andere Person hier, also hat {{name}} geantwortet"
     }
   },
   "rightHand": {

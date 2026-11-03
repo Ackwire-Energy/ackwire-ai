@@ -1554,7 +1554,9 @@
       "follow_up": "{{name}}와(과)의 대화를 이어가요",
       "follow_up_female": "{{name}}와(과)의 대화를 이어가요",
       "default": "아무도 부르지 않아서 {{name}}이(가) 답했어요",
-      "default_female": "아무도 부르지 않아서 {{name}}이(가) 답했어요"
+      "default_female": "아무도 부르지 않아서 {{name}}이(가) 답했어요",
+      "alone": "여기에 다른 사람이 없어서 {{name}}이(가) 답했어요",
+      "alone_female": "여기에 다른 사람이 없어서 {{name}}이(가) 답했어요"
     }
   },
   "rightHand": {

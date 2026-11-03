@@ -1677,7 +1677,8 @@
       "reply": "Una risposta a {{name}}",
       "only_agent": "Qui solo {{name}} risponde senza menzione",
       "follow_up": "Prosegue la conversazione con {{name}}",
-      "default": "Nessuno è stato chiamato, quindi ha risposto {{name}}"
+      "default": "Nessuno è stato chiamato, quindi ha risposto {{name}}",
+      "alone": "Nessun altro qui, quindi ha risposto {{name}}"
     }
   },
   "rightHand": {

@@ -1554,7 +1554,9 @@
       "follow_up": "{{name}}との会話の続き",
       "follow_up_female": "{{name}}との会話の続き",
       "default": "誰も呼ばれなかったため、{{name}}が回答しました",
-      "default_female": "誰も呼ばれなかったため、{{name}}が回答しました"
+      "default_female": "誰も呼ばれなかったため、{{name}}が回答しました",
+      "alone": "ここには他に誰もいないため、{{name}}が回答しました",
+      "alone_female": "ここには他に誰もいないため、{{name}}が回答しました"
     }
   },
   "rightHand": {

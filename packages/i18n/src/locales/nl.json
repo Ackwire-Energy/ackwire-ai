@@ -1616,7 +1616,8 @@
       "reply": "Een antwoord aan {{name}}",
       "only_agent": "Alleen {{name}} antwoordt hier zonder vermelding",
       "follow_up": "Volgt het gesprek met {{name}}",
-      "default": "Niemand werd geroepen, dus {{name}} antwoordde"
+      "default": "Niemand werd geroepen, dus {{name}} antwoordde",
+      "alone": "Verder niemand hier, dus {{name}} antwoordde"
     }
   },
   "rightHand": {

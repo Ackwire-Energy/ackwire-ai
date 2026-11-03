@@ -867,6 +867,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       [{ step: "rule", rule: "reply" }, "Uma resposta para a Ada", null],
       [{ step: "rule", rule: "only_agent" }, "Só a Ada responde aqui sem menção", null],
       [{ step: "rule", rule: "follow_up" }, "Segue a conversa com a Ada", null],
+      [{ step: "rule", rule: "alone" }, "Sem outras pessoas aqui, então a Ada respondeu", null],
       // Stored before the team's coordinator was retired (ADR 0134): the default rule's line.
       [{ step: "rule", rule: "coordinator" }, "Ninguém foi chamado, então a Ada respondeu", null],
     ];

@@ -1591,6 +1591,7 @@ export const en = {
       only_agent: "Only {{name}} answers here without a mention",
       follow_up: "Follows the talk with {{name}}",
       default: "Nobody was called, so {{name}} answered",
+      alone: "No other person here, so {{name}} answered",
     },
   },
   /**

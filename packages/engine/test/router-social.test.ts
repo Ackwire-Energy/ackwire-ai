@@ -266,6 +266,8 @@ describe("an agent reacts to a purely social message nobody answers, with the em
   test("boa noite: the agent that answered the person reacts 🌙, not the one that posted last; no run", async () => {
     f = await setup({ reply: goodnight });
     const ops = await addOps();
+    // Bia is here too, silent: alone with the team, a greeting gets an answer instead (ADR 0134 §5).
+    await addBia();
     await said(f.owner.id, "why is the build failing?", minutesAgo(6));
     await answered(f.agent.id, "A missing env var in CI. Fixed it.", minutesAgo(5));
     await answered(ops.id, "Nightly report: 3 deploys, 0 incidents.", minutesAgo(2));
@@ -281,12 +283,24 @@ describe("an agent reacts to a purely social message nobody answers, with the em
   test("a goodnight to everyone gets exactly one agent's reaction", async () => {
     f = await setup({ reply: goodnight });
     await addOps();
+    await addBia();
     const night = await post(f.owner.id, "boa noite pessoal");
     await drainOutbox(f.db, handlersOf());
     const reactions = await reactionsOn(night.id);
     expect(reactions).toHaveLength(1);
     expect(reactions[0]?.reaction).toBe("🌙");
     expect(await runsOn(night.id)).toEqual([]);
+  });
+
+  test("alone with the team, a goodnight to everyone gets one agent's brief answer instead of a reaction", async () => {
+    f = await setup({ reply: goodnight });
+    await addOps();
+    const night = await post(f.owner.id, "boa noite pessoal");
+    await drainOutbox(f.db, handlersOf());
+    expect(await reactionsOn(night.id)).toEqual([]);
+    expect(await runsOn(night.id)).toHaveLength(1);
+    const replies = (await f.db.select().from(schema.messages)).filter((m) => m.authorAgentId);
+    expect(replies.map((m) => m.body)).toEqual(["Boa noite! Tô por aqui."]);
   });
 
   test("insisting after a greeting got no answer: an agent answers briefly instead of only reacting", async () => {
@@ -337,6 +351,7 @@ describe("an agent reacts to a purely social message nobody answers, with the em
   test("with no step's choice, an emoji alone to the room still gets one; words in any language get none", async () => {
     f = await setup();
     await addOps();
+    await addBia();
     const moon = await post(f.owner.id, "🌙");
     const result = await route(moon.id);
     expect(result.selected).toEqual([]);
@@ -352,6 +367,7 @@ describe("an agent reacts to a purely social message nobody answers, with the em
     const nights = ["boa noite pessoal", "good night everyone", "皆さんおやすみなさい", "gute Nacht zusammen"];
     f = await setup({ reply: routerSays((said) => (nights.includes(said) ? { react: "🌙" } : { needs: 0.05 })) });
     await addOps();
+    await addBia();
     for (const body of nights) {
       const night = await post(f.owner.id, body);
       await drainOutbox(f.db, handlersOf());
@@ -391,6 +407,7 @@ describe("the router's emoji is one of a few, and the agent the person talks wit
   test("a goodnight after the agent the person talks with asked something: that agent reacts, not the step's best", async () => {
     f = await setup();
     const ops = await addOps();
+    await addBia();
     const nightBestOps: RouterStrategy = {
       name: "fixed",
       async decide(input): Promise<RoutingResult> {

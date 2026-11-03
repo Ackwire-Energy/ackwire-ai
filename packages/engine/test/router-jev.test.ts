@@ -1315,6 +1315,9 @@ describe("Jev on a social message", () => {
       { model: "claude-sonnet-5-5" },
     );
     await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: qa.id });
+    // Bruno is here too, silent: alone with the team, the goodnight would get an answer (ADR 0134 §5).
+    const bruno = await addMember(f.db, f.org.id, "member", "Bruno");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bruno.id });
     const jev = fakeJev((state) =>
       JSON.stringify(state.latest_message).includes("alô???")
         ? { nouls: { "@dev": 0.3, "@qa": 0.2 }, needs: 0.7, best: "dev", social: { choice: "none", confidence: 0.9 } }
