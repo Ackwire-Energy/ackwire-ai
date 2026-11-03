@@ -27,6 +27,7 @@ import {
   askersOf,
   channelOf,
   groupByDay,
+  headlineNames,
   isExpandable,
   MENTION_RE,
   NOTIFICATION_FILTERS,
@@ -63,17 +64,27 @@ import {
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { approvalDoing, approvalReadsOnly, approvalValues } from "@/components/ApprovalItem";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
-import { useNotificationOpener } from "@/components/NotificationOpen";
+import { useNotificationHref, useNotificationOpener } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { AllowTalkButton } from "@/components/ReachLines";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { matchesNow } from "@/hooks/useMatchMedia";
 import { useWraps } from "@/hooks/useWraps";
 import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
@@ -82,6 +93,9 @@ import { ApproveAll, ApproveButton, ConnectorMark, RefuseBox } from "./Approvals
 import "./notifications.css";
 
 const TTL_MS = 24 * 3_600_000;
+/** Where an item's actions are a row under it, shown by a tap (notifications.css). */
+const NARROW = "(max-width: 720px)";
+
 /** An agent stopped this long on my answer is late (the chip turns to attention). */
 const LATE_MS = 20 * 60_000;
 /** An approval this close to expiring is urgent. */
@@ -223,7 +237,7 @@ function Snippet({ text, mine }: { text: string; mine: string | null }) {
   );
 }
 
-/** Where it happened, as a chip. */
+/** Where it happened, as a chip, unless the headline says it. */
 function SourceChip({
   n,
   channelName,
@@ -262,9 +276,12 @@ function SourceChip({
     const name = channel ? channelName(channel) : "";
     [icon, label] = [
       "thread",
-      name ? t("notifications.source.thread", { channel: name }) : t("notifications.source.threadOnly"),
+      name && !headlineNames(n, name)
+        ? t("notifications.source.thread", { channel: name })
+        : t("notifications.source.threadOnly"),
     ];
-  } else if (channel) [icon, label] = ["channel", t("notifications.source.channel", { name: channelName(channel) })];
+  } else if (channel && !headlineNames(n, channelName(channel)))
+    [icon, label] = ["channel", t("notifications.source.channel", { name: channelName(channel) })];
   if (!label) return null;
   return (
     <Chip icon={icon} className={className}>
@@ -628,6 +645,8 @@ interface RowHandlers {
   onDone: (n: AppNotification) => void;
   onSnooze: (n: AppNotification, choice: SnoozeChoice) => void;
   onOpen: (n: AppNotification) => void;
+  /** In a new tab (Cmd/Ctrl-click, a middle click, Cmd/Ctrl+Enter). */
+  onOpenNew: (n: AppNotification) => void;
   onToggle: (n: AppNotification) => void;
   onSend: (n: AppNotification, text: string, choice?: boolean) => void;
   onCancel: () => void;
@@ -644,6 +663,20 @@ interface RowState {
   fresh: boolean;
   pulse: boolean;
   leaving: boolean;
+}
+
+/**
+ * A click on an item, outside its own buttons, links and composer, opens where it happened: Cmd/Ctrl-click and a
+ * middle click in a new tab. Selecting its text is not a click. React bubbles clicks from portals (the Remind menu).
+ */
+function clickRow(e: MouseEvent<HTMLElement>, n: AppNotification, h: RowHandlers, open = h.onSelect) {
+  const target = e.target as Element;
+  if (!e.currentTarget.contains(target) || target.closest("button, a, textarea, input, .nt-cmp")) return;
+  if (window.getSelection()?.type === "Range") return;
+  if (e.button === 1 || (e.button === 0 && (e.metaKey || e.ctrlKey))) {
+    e.preventDefault();
+    h.onOpenNew(n);
+  } else if (e.button === 0) open(n);
 }
 
 /** The inline actions: a small floating bar on desktop (hover / focus), a row on phones (tap). */
@@ -818,10 +851,8 @@ function Row({
       tabIndex={0}
       data-n={n.id}
       aria-label={unread ? t("notifications.unreadItem", { name: label }) : label}
-      onClick={(e) => {
-        if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
-        h.onSelect(n);
-      }}
+      onClick={(e) => clickRow(e, n, h)}
+      onAuxClick={(e) => clickRow(e, n, h)}
       onKeyDown={() => {}}
     >
       <span className="nt-who">{face}</span>
@@ -1432,10 +1463,8 @@ function WaitCard({
       data-wait=""
       data-burst=""
       aria-label={label}
-      onClick={(e) => {
-        if ((e.target as Element).closest("button, a, textarea, input, .nt-cmp")) return;
-        h.onSelect(n);
-      }}
+      onClick={(e) => clickRow(e, n, h)}
+      onAuxClick={(e) => clickRow(e, n, h)}
       onKeyDown={() => {}}
     >
       <span className="nt-face">{face}</span>
@@ -1499,13 +1528,8 @@ function WaitRow({
       data-wait=""
       data-burst=""
       aria-label={unread ? t("notifications.unreadItem", { name: label }) : label}
-      onClick={(e) => {
-        const target = e.target as Element;
-        // The Remind menu renders in a portal, and React still bubbles its clicks up to here.
-        if (!e.currentTarget.contains(target) || target.closest("button, a")) return;
-        if (window.getSelection()?.type === "Range") return;
-        h.onOpen(n);
-      }}
+      onClick={(e) => clickRow(e, n, h, h.onOpen)}
+      onAuxClick={(e) => clickRow(e, n, h, h.onOpen)}
       onKeyDown={() => {}}
     >
       <span className="nt-face">{face}</span>
@@ -1715,6 +1739,7 @@ export function NotificationsPage() {
   const connect = useConnectAi();
   const aiStatus = useAiStatus(org.id);
   const openNotification = useNotificationOpener();
+  const notificationHref = useNotificationHref();
   // Its computer is ready and its agents have no AI yet: what comes next is connecting one.
   const connectsAi = (n: AppNotification) => connect !== null && opensConnectAi(n, aiStatus.data);
   /** "Abrir": the same place a click on its browser notification goes (`useNotificationOpener`). */
@@ -1829,14 +1854,15 @@ export function NotificationsPage() {
     markRead(n);
   };
 
+  /**
+   * A click on an item opens where it happened, as Open does. On a narrow screen the first tap on another item shows
+   * its actions (a row under it) and the next one opens it; connecting an AI, the one next step there is, opens at once.
+   */
   const select = (n: AppNotification) => {
+    const first = cur !== n.id;
     setCur(n.id);
-    // Connecting an AI is the one next step there is: a click opens it, as Open does. Any other row stays put, so
-    // its actions (on a phone, shown by that tap) stay in reach.
-    if (connectsAi(n)) return openItem(n);
-    markRead(n);
-    // A grouped item opens its replies on the first tap.
-    if (isExpandable(n) && !open.has(n.id) && !n.waiting) toggle(n);
+    if (first && matchesNow(NARROW) && !connectsAi(n)) return markRead(n);
+    openItem(n);
   };
 
   const handlers: RowHandlers = {
@@ -1845,6 +1871,10 @@ export function NotificationsPage() {
     onDone: done,
     onSnooze: snooze,
     onOpen: openItem,
+    onOpenNew: (n) => {
+      markRead(n);
+      window.open(notificationHref(n, org.id), "_blank", "noopener");
+    },
     onToggle: toggle,
     onSend: send,
     onCancel: cancelReply,
@@ -1863,7 +1893,9 @@ export function NotificationsPage() {
         return;
       }
       if (target?.closest("input, textarea, [contenteditable], [role=dialog], [role=menu], [role=listbox]")) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Cmd/Ctrl+Enter opens in a new tab; any other key with a modifier is the browser's.
+      const newTab = e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.altKey;
+      if ((e.metaKey || e.ctrlKey || e.altKey) && !newTab) return;
       if (target?.closest("button") && (e.key === "Enter" || e.key === " ")) return;
       const rows = [...document.querySelectorAll<HTMLElement>(".nt [data-n]")];
       const here = target?.closest<HTMLElement>("[data-n]") ?? (current ? element(current) : null);
@@ -1890,7 +1922,8 @@ export function NotificationsPage() {
         h.onReply(n);
       } else if (e.key === "Enter") {
         e.preventDefault();
-        h.onOpen(n);
+        if (newTab) h.onOpenNew(n);
+        else h.onOpen(n);
       }
     };
     window.addEventListener("keydown", onKey);

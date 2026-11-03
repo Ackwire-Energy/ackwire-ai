@@ -239,8 +239,8 @@ describe("Atividade: cards and what comes next", () => {
       expiresAt,
       action: "open",
     });
-    // Its conversation opens, at the thread it was asked in, where its card is.
-    expect(notificationHref(secret)).toBe(chatHref("c1", "t1"));
+    // Its conversation opens, at the thread it was asked in, at its card.
+    expect(notificationHref(secret)).toBe(chatHref("c1", "t1", "m1"));
     const question = notification({ id: "q", kind: "agent_question", waiting: true, updatedAt: at(1) });
     const approval = notification({ id: "a", kind: "approval", waiting: true, updatedAt: at(2) });
     expect(sortWaiting([approval, question, secret]).map((n) => n.id)).toEqual(["s", "q", "a"]);

@@ -44,6 +44,7 @@ import {
 } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
+import { listOf } from "./app-links";
 import { desktopSignIn, FRESH_SIGN_IN_MS } from "./desktop-sign-in";
 import { humanCheckRefusal } from "./http/human-check";
 import type { Logger } from "./logger";
@@ -725,6 +726,8 @@ const appleConfigured = (config: Config) =>
 export function appleSignIn(config: Config, now = Date.now()) {
   if (!appleConfigured(config)) return null;
   const clientId = config.APPLE_CLIENT_ID as string;
+  // Several bundle ids (the store's app and its preview builds, for app links): the first, the store's, signs in.
+  const [bundle] = listOf(config.APPLE_APP_BUNDLE_ID);
   return {
     clientId,
     clientSecret: appleClientSecret({
@@ -734,7 +737,7 @@ export function appleSignIn(config: Config, now = Date.now()) {
       privateKey: config.APPLE_PRIVATE_KEY as string,
       now,
     }),
-    ...(config.APPLE_APP_BUNDLE_ID ? { appBundleIdentifier: config.APPLE_APP_BUNDLE_ID } : {}),
+    ...(bundle ? { appBundleIdentifier: bundle } : {}),
   };
 }
 

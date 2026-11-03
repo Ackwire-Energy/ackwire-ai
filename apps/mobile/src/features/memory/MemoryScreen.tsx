@@ -27,14 +27,14 @@ const openMemory = (id: string) => router.push(`/memory/${id}`);
  * Memória, pushed from Você: what the agents learned as a sky (each agent with its memories; pages live in the wiki's
  * own map), the search, a filter per agent, what they learned last and what they use most.
  */
-export function MemoryScreen() {
+export function MemoryScreen({ agent: initialAgent }: { agent?: string } = {}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
   const dir = useDirectory();
   const memories = useOrgMemories(orgId);
   const [q, setQ] = useState("");
-  const [agent, setAgent] = useState("all");
+  const [agent, setAgent] = useState(initialAgent || "all");
   const [picked, setPicked] = useState<string | null>(null);
   const search = useDeferredValue(q.trim());
   const shown = useMemo(() => inAgent(memories.data ?? [], agent), [memories.data, agent]);

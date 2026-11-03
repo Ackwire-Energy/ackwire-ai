@@ -5,6 +5,8 @@ import {
   hrefForPush,
   hrefFromUrl,
   notificationHref,
+  notificationWebPath,
+  pushAsNotification,
   routineHref,
 } from "../../src/features/links/logic";
 import { notification } from "./fixtures";
@@ -64,6 +66,36 @@ describe("push payloads", () => {
     expect(hrefForPush({ kind: "forum_turn" })).toBe("/activity");
     expect(hrefForPush({ channelId: 5 })).toBe("/activity");
   });
+  test("each kind opens where its row in Atividade opens, at the message itself", () => {
+    const at = { orgId: "o1", notificationId: "n1" };
+    expect(hrefForPush({ ...at, kind: "mention", channelId: "c1", messageId: "m1" })).toBe("/chat/c1?m=m1");
+    expect(hrefForPush({ ...at, kind: "thread_reply", channelId: "c1", threadId: "t1", messageId: "m2" })).toBe(
+      "/chat/c1?thread=t1&m=m2",
+    );
+    expect(hrefForPush({ ...at, kind: "dm", channelId: "d1", dmId: "d1", messageId: "m3" })).toBe("/chat/d1?m=m3");
+    expect(hrefForPush({ ...at, kind: "agent_question", channelId: "c1", messageId: "q1" })).toBe("/chat/c1?m=q1");
+    expect(hrefForPush({ ...at, kind: "issue_assigned", issueNumber: "131" })).toBe("/issues/131");
+    expect(hrefForPush({ ...at, kind: "routine_failed", routineId: "r1", channelId: "c1" })).toBe("/routines/r1");
+    expect(hrefForPush({ ...at, kind: "agent_unreached", agentId: "a1", channelId: "c1" })).toBe("/agent/a1");
+    expect(hrefForPush({ ...at, kind: "computer_disk_full", machineId: "k1" })).toBe("/settings/computers/k1");
+    expect(hrefForPush({ ...at, kind: "machine_connected", machineId: "k1" })).toBe("/settings/computers/k1");
+    expect(hrefForPush({ ...at, kind: "browser_handoff", handoffId: "h1", channelId: "c1" })).toBe(
+      "/chat/c1?handoff=h1",
+    );
+    expect(hrefForPush({ ...at, kind: "mission_finished", missionId: "x1", channelId: "c1" })).toBe("/mission/x1");
+    // The forum has no screen in the app: null, its web page opens in the browser.
+    const forum = { ...at, kind: "forum_turn", topicId: "f1" };
+    expect(hrefForPush(forum)).toBeNull();
+    expect(notificationWebPath(pushAsNotification(forum), "o1")).toBe("/org/o1/forum/f1");
+  });
+  test("a push's ids are read checked: anything else is dropped", () => {
+    expect(pushAsNotification({ kind: "mention", channelId: "../x", messageId: "m1", issueNumber: "x" })).toEqual({
+      kind: "mention",
+      source: { messageId: "m1" },
+      actors: [],
+      latest: {},
+    });
+  });
 });
 
 describe("inbox items", () => {
@@ -83,11 +115,34 @@ describe("inbox items", () => {
     const n = notification({ id: "n", kind: "join_request", actors: [], count: 3, source: { label: "Alves Studio" } });
     expect(notificationHref({ ...n, latest: { title: "Ana Souza" } })).toBe("/join-requests");
   });
-  test("issues and the forum have no screen in the app", () => {
+  test("a task opens its screen; the forum has none in the app, its web page opens in the browser", () => {
+    expect(
+      notificationHref(notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", issueNumber: 7 } })),
+    ).toBe("/issues/7");
     expect(
       notificationHref(notification({ id: "n", kind: "issue_comment", source: { issueId: "i1", channelId: "c1" } })),
-    ).toBeNull();
-    expect(notificationHref(notification({ id: "n", kind: "forum_turn", source: { topicId: "f1" } }))).toBeNull();
+    ).toBe("/issues");
+    const forum = notification({ id: "n", kind: "forum_turn", source: { topicId: "f1" } });
+    expect(notificationHref(forum)).toBeNull();
+    expect(notificationWebPath(forum, "o1")).toBe("/org/o1/forum/f1");
+  });
+
+  test("people, connectors, computers and an agent's hold open their screens", () => {
+    const joined = notification({ id: "n", kind: "invitation_accepted", source: { label: "Acme" } });
+    expect(notificationHref(joined)).toBe("/me/members");
+    expect(notificationHref(notification({ id: "n", kind: "connector_tool_changed", source: {} }))).toBe("/connectors");
+    expect(notificationHref(notification({ id: "n", kind: "machine_connected", source: {} }))).toBe(
+      "/settings/computers",
+    );
+    expect(notificationHref(notification({ id: "n", kind: "org_standing", source: { agentId: "a1" } }))).toBe(
+      "/agent/a1",
+    );
+  });
+
+  test("a message opens at the message itself", () => {
+    const n = notification({ id: "n", kind: "mention", source: { channelId: "c1", messageId: "m1" } });
+    expect(notificationHref(n)).toBe("/chat/c1?m=m1");
+    expect(notificationHref({ ...n, kind: "reaction" })).toBe("/chat/c1?m=m1");
   });
 
   test("routines: what one found opens the agent's message; its trouble opens the routine (as on the web)", () => {
@@ -98,9 +153,9 @@ describe("inbox items", () => {
       actors: dev,
       source: { routineId: "r1", channelId: "c1", messageId: "m1" },
     });
-    expect(notificationHref(finished)).toBe("/chat/c1");
+    expect(notificationHref(finished)).toBe("/chat/c1?m=m1");
     expect(notificationHref({ ...finished, source: { ...finished.source, threadId: "t1" } })).toBe(
-      "/chat/c1?thread=t1",
+      "/chat/c1?thread=t1&m=m1",
     );
     // What it found without a message to open: the routine.
     expect(notificationHref({ ...finished, source: { routineId: "r1", channelId: "c1" } })).toBe("/routines/r1");

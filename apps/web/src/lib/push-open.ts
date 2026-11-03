@@ -19,10 +19,11 @@ export interface PushOpenData {
   approvalId?: string;
   missionId?: string;
   handoffId?: string;
+  messageId?: string;
 }
 
 /** The ids a push carries besides its notification's, as the server names them. */
-const PLACE_KEYS = ["channelId", "threadId", "approvalId", "missionId", "handoffId"] as const;
+const PLACE_KEYS = ["channelId", "threadId", "approvalId", "missionId", "handoffId", "messageId"] as const;
 
 /** An id that can go in a path as it is: what the server makes (UUIDs), never a slash, a dot or a query. */
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -103,7 +104,8 @@ export function pushOpenFrom(
  */
 export function fallbackTarget(data: PushOpenData): OpenTarget | null {
   const kind = data.kind;
-  if (kind === "approval") return { to: "/org/$orgId/approvals" };
+  if (kind === "approval")
+    return { to: "/org/$orgId/approvals", ...(data.approvalId ? { search: { open: data.approvalId } } : {}) };
   // Someone who joined by an invitation (ADR 0090) opens a conversation with them, from the notification
   // (`openTarget`); a push names no person to talk to, so without it, Members, where they now are.
   if (kind === "join_request" || kind === "invitation_accepted")
@@ -113,8 +115,9 @@ export function fallbackTarget(data: PushOpenData): OpenTarget | null {
   if (kind && ROUTINE_TROUBLE.has(kind as NotificationKind)) return { to: "/org/$orgId/routines" };
   // A help request's card may be in a DM, which a push can't tell from a channel (`/c/<dm id>` doesn't exist).
   if (kind === "browser_handoff") return null;
-  if (data.threadId) return { to: "/org/$orgId/threads/$threadId", params: { threadId: data.threadId } };
-  if (data.channelId) return { to: "/org/$orgId/c/$channelId", params: { channelId: data.channelId } };
+  const at = data.messageId ? { search: { m: data.messageId } } : {};
+  if (data.threadId) return { to: "/org/$orgId/threads/$threadId", params: { threadId: data.threadId }, ...at };
+  if (data.channelId) return { to: "/org/$orgId/c/$channelId", params: { channelId: data.channelId }, ...at };
   if (data.missionId) return { to: "/org/$orgId/threads", search: { tab: "missions" } };
   return null;
 }

@@ -225,6 +225,14 @@ export function openPage(href: string) {
   void openBrowserAsync(href).catch(() => Linking.openURL(href));
 }
 
+/**
+ * One of our own website's pages the app was opened with but can't show: the in-app browser only. Handing it to the
+ * system (`openPage`'s fallback) would give a link the app is verified for back to the app, in a loop.
+ */
+export function openOwnPage(href: string) {
+  setTimeout(() => void openBrowserAsync(href).catch(() => undefined), 0);
+}
+
 /** The web's `OpenPage`: a small button with the external mark. */
 export function OpenPage({
   href,
