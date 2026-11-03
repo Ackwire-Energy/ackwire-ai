@@ -31,7 +31,7 @@ import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
-import { SIDEBAR_DEFAULTS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
+import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import type { WikiAccess } from "../lib/wiki";
@@ -4222,6 +4222,36 @@ export function useSetSidebarOrder(orgId: string) {
     },
     onError: (_error, _order, context) => qc.setQueryData(keys.sidebarOrder(orgId), context?.before),
     onSuccess: (order) => qc.setQueryData(keys.sidebarOrder(orgId), order),
+  });
+}
+
+/** The sidebar's tools in my order in this workspace (the default until it loads). */
+export const useSidebarToolOrder = (orgId: string): SidebarItem[] => {
+  const api = useApi();
+  return (
+    useQuery({
+      queryKey: keys.sidebarToolOrder(orgId),
+      queryFn: () => api.orgs.sidebarToolOrder(orgId),
+      staleTime: 60_000,
+    }).data ?? [...SIDEBAR_ITEMS]
+  );
+};
+
+/** Saves my order of the tools (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
+export function useSetSidebarToolOrder(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    scope: { id: `sidebar-tool-order:${orgId}` },
+    mutationFn: (order: SidebarItem[] | null) => api.orgs.setSidebarToolOrder(orgId, order),
+    onMutate: async (order) => {
+      await qc.cancelQueries({ queryKey: keys.sidebarToolOrder(orgId) });
+      const before = qc.getQueryData<SidebarItem[]>(keys.sidebarToolOrder(orgId));
+      qc.setQueryData<SidebarItem[]>(keys.sidebarToolOrder(orgId), order ?? [...SIDEBAR_ITEMS]);
+      return { before };
+    },
+    onError: (_error, _order, context) => qc.setQueryData(keys.sidebarToolOrder(orgId), context?.before),
+    onSuccess: (order) => qc.setQueryData(keys.sidebarToolOrder(orgId), order),
   });
 }
 

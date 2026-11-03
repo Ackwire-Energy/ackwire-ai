@@ -167,6 +167,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SidebarItem,
   SidebarItems,
   SidebarSection,
   SignInOptions,
@@ -507,6 +508,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: { order },
           })
         ).order,
+      sidebarToolOrder: async (orgId) =>
+        (await request<{ order: SidebarItem[] }>(`${org(orgId)}/me/sidebar/tools`)).order,
+      setSidebarToolOrder: async (orgId, order) =>
+        (await request<{ order: SidebarItem[] }>(`${org(orgId)}/me/sidebar/tools`, { method: "PUT", json: { order } }))
+          .order,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>

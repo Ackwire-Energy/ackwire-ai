@@ -203,7 +203,6 @@ export function SkillsSection({ install, connected }: { install?: string; connec
             />
           ))}
         </DialogSearchList>
-        <DialogFooter />
       </Dialog>
       <InstallSkillDialog
         open={installing}

@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { ApiError } from "@agenteschat/client";
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";
@@ -228,6 +228,101 @@ describe("the tools on top", () => {
     expect(calls).toBe(2);
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
     expect(chosen(dialog, "Wiki")).toBe("Em Mais");
+  });
+
+  describe("one by one, in my order", () => {
+    const toolOrder = (state: State) =>
+      state.calls.filter((c) => c.method === "orgs.setSidebarToolOrder").map((c) => c.args[1]);
+    const tool = (name: string) =>
+      [...nav().querySelectorAll(".sidebar__tools > a.sidebar__item")].find(
+        (a) => a.querySelector(".sidebar__item-label")?.textContent === name,
+      ) as HTMLElement;
+    const dataTransfer = { setData: () => {}, getData: () => "", effectAllowed: "", dropEffect: "" };
+
+    test("the server's order: the same list on every device", async () => {
+      await go(
+        seedState({
+          sidebarToolOrder: ["drive", "issues", "approvals", "threads", "wiki", "routines", "calendar", "forum"],
+        }),
+      );
+      expect(listed()).toEqual(["Drive", "Tarefas", "Aprovações", "Threads"]);
+    });
+
+    test("Alt+Shift+↑/↓ moves a tool past its neighbour in the list, over the ones in More, and saves it", async () => {
+      const state = await go(seedState({ sidebarItems: { wiki: "more" } }));
+      expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
+      await act(async () => fireEvent.keyDown(tool("Drive"), { key: "ArrowUp", altKey: true, shiftKey: true }));
+      await settle(3);
+      // Wiki waits in More between Tarefas and Drive: one press is one step in the list.
+      expect(listed()).toEqual(["Aprovações", "Threads", "Drive", "Tarefas"]);
+      expect(toolOrder(state)).toEqual([
+        ["approvals", "threads", "drive", "issues", "wiki", "routines", "calendar", "forum"],
+      ]);
+      expect(tool("Drive").getAttribute("aria-keyshortcuts")).toBe("Alt+Shift+ArrowUp Alt+Shift+ArrowDown");
+      // At the top, up does nothing; an arrow alone is the page's.
+      await act(async () => fireEvent.keyDown(tool("Aprovações"), { key: "ArrowUp", altKey: true, shiftKey: true }));
+      await act(async () => fireEvent.keyDown(tool("Threads"), { key: "ArrowDown" }));
+      await settle(3);
+      expect(toolOrder(state)).toHaveLength(1);
+    });
+
+    test("a tool dragged onto another goes before or after it, and saves it", async () => {
+      const state = await go();
+      await act(async () => fireEvent.dragStart(tool("Drive"), { dataTransfer }));
+      const over = createEvent.dragOver(tool("Threads"), { dataTransfer });
+      // happy-dom's DragEvent is a plain Event: no clientY from the init (a 0-tall box: 0 is its top half).
+      Object.defineProperty(over, "clientY", { value: 0 });
+      await act(async () => fireEvent(tool("Threads"), over));
+      expect(tool("Threads").getAttribute("data-drop")).toBe("before");
+      await act(async () => fireEvent.drop(tool("Threads"), { dataTransfer }));
+      await settle(3);
+      expect(listed()).toEqual(["Aprovações", "Drive", "Threads", "Tarefas"]);
+      expect(tool("Threads").getAttribute("data-drop")).toBeNull();
+
+      for (let i = 0; i < 2; i++) {
+        await act(async () => fireEvent.keyDown(tool("Drive"), { key: "ArrowDown", altKey: true, shiftKey: true }));
+        await settle(3);
+      }
+      expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
+      // Moved down, its node is re-inserted: the focus comes back to it.
+      expect(document.activeElement).toBe(tool("Drive"));
+      // Wiki stays where the steps left it, in More: the order is Drive's own spot now, not the default's.
+      expect(toolOrder(state).at(-1)).toEqual([
+        "approvals",
+        "threads",
+        "issues",
+        "drive",
+        "wiki",
+        "routines",
+        "calendar",
+        "forum",
+      ]);
+    });
+
+    test("Personalizar lists the tools in my order, with Mover para cima / para baixo; Restaurar o padrão resets it", async () => {
+      const state = await go(noneWaiting());
+      const dialog = await openSetup();
+      const names = () =>
+        [...dialog.querySelectorAll(".sidebar-setup__row .sidebar-setup__name")].map((n) => n.textContent);
+      expect(names().slice(0, 3)).toEqual(["Aprovações", "Threads", "Tarefas"]);
+      expect(
+        (within(dialog).getByRole("button", { name: "Mover para cima: Aprovações" }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+      await click(within(dialog).getByRole("button", { name: "Mover para cima: Drive" }));
+      await click(within(dialog).getByRole("button", { name: "Mover para cima: Drive" }));
+      expect(names().slice(0, 4)).toEqual(["Aprovações", "Threads", "Drive", "Tarefas"]);
+      // At the top its up arrow turns off: the focus goes to the row's down arrow, not out of the dialog.
+      await click(within(dialog).getByRole("button", { name: "Mover para cima: Threads" }));
+      expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Mover para baixo: Threads" }));
+      await click(within(dialog).getByRole("button", { name: "Mover para baixo: Threads" }));
+      expect(listed()).toEqual(["Threads", "Drive", "Tarefas"]);
+      const reset = within(dialog).getByRole("button", { name: "Restaurar o padrão" }) as HTMLButtonElement;
+      expect(reset.disabled).toBe(false);
+      await click(reset);
+      expect(listed()).toEqual(["Threads", "Tarefas", "Drive"]);
+      expect(toolOrder(state).at(-1)).toBeNull();
+      expect(state.sidebarToolOrder).toBeUndefined();
+    });
   });
 });
 

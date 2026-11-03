@@ -184,6 +184,7 @@ export const keys = {
   noticePrefs: (orgId: string) => ["org", orgId, "notice-prefs"] as const,
   sidebarItems: (orgId: string) => ["org", orgId, "sidebar-items"] as const,
   sidebarOrder: (orgId: string) => ["org", orgId, "sidebar-order"] as const,
+  sidebarToolOrder: (orgId: string) => ["org", orgId, "sidebar-tool-order"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,

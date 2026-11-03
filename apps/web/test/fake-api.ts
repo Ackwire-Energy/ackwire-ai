@@ -71,6 +71,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SidebarItem,
   SidebarItems,
   SidebarSection,
   SignInOptions,
@@ -87,6 +88,7 @@ import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
+import { SIDEBAR_ITEMS } from "@agenteschat/client/lib/sidebar-items";
 import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
 import { createFakeApps, type FakeApps } from "./fakes/apps";
@@ -374,6 +376,8 @@ export interface FakeState {
   sidebarItemsError?: ApiError;
   /** The sidebar's sections in my order (`orgs.sidebarOrder`); unset = the default. */
   sidebarOrder?: SidebarSection[];
+  /** The sidebar's tools in my order (`orgs.sidebarToolOrder`); unset = the default. */
+  sidebarToolOrder?: SidebarItem[];
   /**
    * The task manager (ADR 0128, `working.taskManager`); unset = a server without it (no `working` part). Stopping a
    * task (`agents.cancelRun`) moves it to `ended`, stopped by me.
@@ -1519,6 +1523,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.setSidebarOrder", orgId, order);
         state.sidebarOrder = order ? [...order] : undefined;
         return [...(order ?? ["tools", "channels", "agents", "people"])];
+      },
+      sidebarToolOrder: async () => [...(state.sidebarToolOrder ?? SIDEBAR_ITEMS)],
+      setSidebarToolOrder: async (orgId, order) => {
+        log("orgs.setSidebarToolOrder", orgId, order);
+        state.sidebarToolOrder = order ? [...order] : undefined;
+        return [...(order ?? SIDEBAR_ITEMS)];
       },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
