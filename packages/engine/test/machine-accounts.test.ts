@@ -1463,6 +1463,37 @@ test("one sign-in for all agents (protocol 29): asked for, it thinks for two age
   expect([(await agentRow()).brainAccountId, (await agentRow(theo.id)).brainAccountId]).toEqual([null, null]);
 });
 
+test("a person with no agent signs a plan in for all agents, and the first agent they create thinks with it", async () => {
+  f = await setup();
+  const { machineId } = await sharedMachine();
+  // The workspace's own computer (the Cloud's): any member adds accounts there and gives it to their agents.
+  await f.db
+    .update(schema.machines)
+    .set({ protocol: SHARED_ACCOUNTS_PROTOCOL, kind: "managed" })
+    .where(eq(schema.machines.id, machineId));
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  expect(await f.db.select().from(schema.agents).where(eq(schema.agents.ownerUserId, caio.id))).toEqual([]);
+  const runner = signingRunner(
+    machineId,
+    () => ({ loggedIn: true, email: "caio@example.com", plan: "pro", shared: true }),
+    { protocol: SHARED_ACCOUNTS_PROTOCOL },
+  );
+  const { login, status } = await signIn(runner, caio.id, machineId);
+  expect(status).toMatchObject({ state: "done", account: { id: login.loginId, shared: true, usedBy: [] } });
+  expect((await listAiAccounts({ db: f.db }, caio.id, f.org.id)).accounts).toMatchObject([
+    { id: login.loginId, mine: true, status: "active", usedBy: [] },
+  ]);
+
+  const [lia] = await f.db
+    .insert(schema.agents)
+    .values({ orgId: f.org.id, name: "Lia", handle: "lia", model: "auto", ownerUserId: caio.id })
+    .returning();
+  if (!lia) throw new Error("no agent");
+  await setAgentComputerTarget({ db: f.db, pubsub: f.pubsub }, caio.id, f.org.id, lia.id, machineId);
+  await setAgentBrain({ db: f.db }, caio.id, f.org.id, lia.id, { brain: "claude_code", account: login.loginId });
+  expect((await agentRow(lia.id)).brainAccountId).toBe(login.loginId);
+});
+
 test("an account the runner no longer says is for all agents: the two agents on it let it go, then it thinks for one", async () => {
   f = await setup();
   const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);

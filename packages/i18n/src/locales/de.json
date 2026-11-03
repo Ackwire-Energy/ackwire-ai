@@ -1763,7 +1763,8 @@
     },
     "useAnyway": "{{email}} nutzen",
     "assignFailed": "Das Konto {{label}} ist verbunden, aber {{agent}} konnte nicht dorthin wechseln.",
-    "noAgents": "Ein Abo denkt nur für die Agenten seiner Inhaber, und du hast noch keine.",
+    "forNewAgents": "{{label}} ist verbunden. Die Agenten, die du erstellst, denken damit.",
+    "forNewAgentsHint": "Die Agenten, die du erstellst, denken damit.",
     "done": "Fertig",
     "agent": "Für welchen Agent",
     "keyLocked": "Nur ein Admin fügt einen API-Schlüssel hinzu.",
@@ -3872,6 +3873,7 @@
       "handleTaken": "@{{handle}} gehört schon einem anderen Agenten oder einer Person. Wie wäre es mit @{{suggestion}}?",
       "modelUnavailable": "Wähle ein Modell, das der Workspace nutzen kann."
     },
+    "noAi": "Der Workspace hat noch keine KI. Verbinde jetzt eine, oder erstelle den Agenten und verbinde sie danach.",
     "instructions": "Anweisungen",
     "instructionsPlaceholder": "Z. B. Beantwortet Kundenfragen in #support anhand der Doku. Wenn er etwas nicht weiß, ruft er jemanden aus dem Team.",
     "startedFrom": "Ausgehend vom Text für {{role}}",

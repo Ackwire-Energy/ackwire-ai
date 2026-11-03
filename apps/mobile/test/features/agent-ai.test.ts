@@ -860,6 +860,8 @@ describe("the agent's AI", () => {
     ).text();
     expect(screen).toContain("openConnectAi({ agentId: agent.id, plan: thinks.connect })");
     expect(screen).toContain("<BrainPickSheet");
+    // No last setup: a plan account of mine (one connected before I had an agent) thinks for it, as on the web.
+    expect(screen).toContain("(proposed || start ? null : (planAccountOption(brainOptions) ?? null))");
   });
 });
 

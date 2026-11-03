@@ -1,4 +1,4 @@
-import type { Credential, MachineAccount } from "@agenteschat/client";
+import type { Credential, Edition, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import {
   keys,
   useAgentBrain,
@@ -33,6 +33,7 @@ import {
   type AiChoice,
   ALL_AGENTS,
   type ExistingSignIn,
+  freePlanAccount,
   gateDims,
   KEY_MARKS,
   kindOf,
@@ -41,6 +42,7 @@ import {
   type PlanChoice,
   type PlanGate,
   planGate,
+  planGateWithoutAgent,
   planLabel,
   planMark,
   planOfAccount,
@@ -492,6 +494,115 @@ export interface PlanPanelProps {
   onStart?: () => void;
 }
 
+/** `usePlanGates` for a person who owns no agent yet: each plan's gate on the computer it would sign in on. */
+export function useGatesWithoutAgent(orgId: string, on: boolean) {
+  const ai = useAiAccounts(orgId, on);
+  const machines = useMachines(orgId, on);
+  const setupQ = useComputerSetup(orgId);
+  const edition = computerEdition(setupQ.data);
+  const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
+  const at = (choice: PlanChoice) =>
+    planGateWithoutAgent({ choice, edition, setup, computers: ai.data?.computers, machines: machines.data });
+  return { at, edition, accounts: ai.data?.accounts };
+}
+
+export type GatesWithoutAgent = ReturnType<typeof useGatesWithoutAgent>;
+
+/**
+ * A plan's panel for a person who owns no agent yet: it signs in on a computer they may add accounts to, waiting and
+ * saying why as `PlanPanel` does, and the account then thinks for the agents they create there.
+ */
+export function PlanWithoutAgent({
+  choice,
+  gates,
+  mayAddKey,
+  onKey,
+  onComputer,
+  onDone,
+}: {
+  choice: PlanChoice;
+  gates: GatesWithoutAgent;
+  /** Only an admin adds an API key: the way on from someone else's computer for them. */
+  mayAddKey: boolean;
+  onKey: () => void;
+  onComputer: () => void;
+  onDone: (account: MachineAccount) => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const machines = useMachines(org.id, gates.edition !== null);
+  const [signingIn, setSigningIn] = useState(false);
+  const [added, setAdded] = useState<MachineAccount | null>(null);
+  const { gate, computer } = gates.at(choice);
+  // An account of this plan they already have (their agents deleted) thinks for the next one: no second sign-in.
+  const has = added ?? freePlanAccount(gates.accounts, choice);
+  const title = planTitle(t, choice);
+  const cloud = gates.edition === "cloud";
+  const name = cloud ? computerName(t, org.name, managedOf(machines.data)) : (computer?.name ?? "");
+  const steps = gate.state === "ready" || gate.state === "preparing" || (gate.state === "offline" && signingIn);
+  // Only whoever connected the computers there signs a plan in on them: a computer of their own is the way on.
+  const elsewhere = gate.state === "locked" && !cloud;
+  return (
+    <Card as="section" className="ai-panel ai-panel--plan" aria-label={title}>
+      <PanelHead
+        lead={<ProviderLogo id={planMark(choice)} size="sm" />}
+        title={title}
+        sub={t(`connectAi.plan.${choice}.tiers`)}
+      />
+      {has ? (
+        <SettingNote icon="check" live>
+          {t("connectAi.forNewAgents", { label: has.label })}
+        </SettingNote>
+      ) : (
+        <>
+          <GateWait
+            gate={gate}
+            kind={kindOf(choice)}
+            coding={isPlanId(choice)}
+            machineId={computer?.machineId}
+            computer={name}
+            edition={gates.edition}
+            said={false}
+            signingIn={signingIn}
+            onKey={onKey}
+            onComputer={onComputer}
+          />
+          {elsewhere && (
+            <span>
+              <Button size="sm" variant="primary" onClick={onComputer}>
+                {t("aiAccounts.connect.addComputer")}
+              </Button>
+            </span>
+          )}
+          {elsewhere && mayAddKey && (
+            <span>
+              <Button size="sm" onClick={onKey}>
+                {t("connectAi.wait.useKey")}
+              </Button>
+            </span>
+          )}
+          {steps && (
+            <AddAccount
+              machineId={computer?.machineId ?? ""}
+              kind={kindOf(choice)}
+              computer={cloud ? t("connectAi.theComputer") : name}
+              {...(isPlanId(choice) ? { provider: choice } : {})}
+              local={computer?.mine}
+              ready={gate.state === "ready"}
+              onAdded={(a) => {
+                setAdded(a);
+                onDone(a);
+              }}
+              onSigningIn={setSigningIn}
+            />
+          )}
+          {steps && <p className="small muted">{t("connectAi.forNewAgentsHint")}</p>}
+        </>
+      )}
+    </Card>
+  );
+}
+
 /** A plan's panel: what it covers and for whom, its steps or what they wait for, then who the agents answer. */
 export function PlanPanel(props: PlanPanelProps) {
   const { t } = useTranslation();
@@ -594,7 +705,6 @@ function PlanSteps({
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
-  const reader = useWaitReader();
   const { view, edition } = gates;
   const gate = gates.gateOf(choice);
   const machines = useMachines(org.id, edition !== null);
@@ -633,8 +743,6 @@ function PlanSteps({
   useEffect(() => {
     if (gate.state === "preparing") markWaited();
   }, [gate.state, markWaited]);
-  const preparing = gate.state === "preparing" ? gate.view : null;
-  const { eta, email } = useSetupWait(preparing, reader.held);
 
   const computer =
     edition === "cloud" ? computerName(t, org.name, managedOf(machines.data)) : (view?.computer?.name ?? "");
@@ -804,117 +912,21 @@ function PlanSteps({
       </>
     );
 
-  const useKey = (
-    <span>
-      <Button size="sm" onClick={onKey}>
-        {t("connectAi.wait.useKey")}
-      </Button>
-    </span>
+  const wait = (
+    <GateWait
+      gate={gate}
+      kind={kind}
+      machineId={view?.computer?.machineId}
+      computer={computer}
+      coding={coding}
+      edition={edition}
+      said={said}
+      hostConnecting={hostConnecting}
+      signingIn={signingIn}
+      onKey={onKey}
+      onComputer={onComputer}
+    />
   );
-  const line = (lead: ReactNode, text: string) => (
-    <p className="setup-line ac-iconline" role="status">
-      {lead}
-      <span>{text}</span>
-    </p>
-  );
-  const hold = holdText(t, org.standing);
-  let wait: ReactNode = null;
-  if (gate.state === "loading") wait = <Spinner />;
-  else if (gate.state === "preparing") {
-    // The computer's wait in one well: how far it is and the time left, or why it waits (not where the rail beside it
-    // already says so), then when the step under it turns on, said once (the owner's email line says it for them). A
-    // hold decides when anything runs there: it speaks alone. The well's lines start on the panel's text edge, so none
-    // leads with an icon.
-    wait = (hold || preparing) && (
-      <div className="ai-panel__wait">
-        {hold ? (
-          <p className="setup-line" role="status">
-            {hold}
-          </p>
-        ) : (
-          <>
-            {preparing?.step ? (
-              <SetupProgress view={preparing} />
-            ) : (
-              preparing &&
-              !(said && statusRestatesChip(preparing)) && (
-                <p className="setup-line" role="status">
-                  {t(preparing.textKey)}
-                </p>
-              )
-            )}
-            {eta && (
-              <p className="setup-eta" aria-live="polite">
-                {etaLine(t, eta)}
-              </p>
-            )}
-            <p className="setup-line">
-              {t(
-                email && reader.owner
-                  ? "connectAi.wait.email"
-                  : coding
-                    ? "connectAi.wait.key"
-                    : "connectAi.wait.signIn",
-              )}
-            </p>
-          </>
-        )}
-      </div>
-    );
-  } else if (gate.state === "offline" && !signingIn) {
-    wait = hostConnecting ? (
-      line(<Spinner size={14} />, t("connectAi.wait.connecting"))
-    ) : (
-      <>
-        <SettingNote icon="alert">
-          {edition === "cloud"
-            ? t("aiAccounts.connect.needsCloud.online", { computer })
-            : t("brain.offline", { computer })}
-        </SettingNote>
-        {useKey}
-      </>
-    );
-  } else if (gate.state === "missing") {
-    wait = (
-      <>
-        <SettingNote icon="computer">{t("aiAccounts.connect.noComputer")}</SettingNote>
-        <span>
-          <Button size="sm" variant="primary" onClick={onComputer}>
-            {t("aiAccounts.connect.addComputer")}
-          </Button>
-        </span>
-      </>
-    );
-  } else if (gate.state === "unsupported") {
-    const off = toolOffReason(
-      machines.data?.find((m) => m.id === view?.computer?.machineId),
-      kind,
-    );
-    const program = t(`brain.card.${kind}`);
-    wait = (
-      <>
-        <SettingNote icon="alert">
-          {edition === "cloud"
-            ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
-            : gate.reason === "keys"
-              ? t("aiAccounts.connect.needs.keys")
-              : gate.reason === "tool_off"
-                ? t(off.key, { computer, command: off.command, program })
-                : t(`brain.reasons.${gate.reason}`, { computer, program })}
-        </SettingNote>
-        {useKey}
-      </>
-    );
-  } else if (gate.state === "locked") {
-    const pairer = machines.data?.find((m) => m.id === view?.computer?.machineId)?.pairedBy?.name.split(" ")[0];
-    wait = (
-      <SettingNote icon="lock">
-        {gate.who === "computer"
-          ? t("connectAi.accountsLocked", { name: pairer ?? "", computer })
-          : t("noAi.lockedAdmins")}
-      </SettingNote>
-    );
-  }
 
   // The steps stay in view while they wait (their computer actions off); a reason alone otherwise.
   const steps = ready || gate.state === "preparing" || (gate.state === "offline" && (hostConnecting || signingIn));
@@ -1065,6 +1077,158 @@ function PlanSteps({
       {(steps || ownable) && foot}
     </>
   );
+}
+
+/**
+ * Why a plan's panel waits or can't sign in there (`PlanGate`), with the way on: the computer's wait, a key now, a
+ * computer to connect. Nothing once it's ready.
+ */
+function GateWait({
+  gate,
+  kind,
+  coding,
+  machineId,
+  computer,
+  edition,
+  said,
+  hostConnecting,
+  signingIn,
+  onKey,
+  onComputer,
+}: {
+  gate: PlanGate;
+  kind: MachineAccountKind;
+  coding: boolean;
+  /** The computer the gate is about. */
+  machineId: string | undefined;
+  /** Its name, as the panel says it. */
+  computer: string;
+  edition: Edition | null;
+  said: boolean;
+  hostConnecting?: boolean;
+  signingIn: boolean;
+  onKey: () => void;
+  onComputer: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const reader = useWaitReader();
+  const machines = useMachines(org.id, edition !== null);
+  const preparing = gate.state === "preparing" ? gate.view : null;
+  const { eta, email } = useSetupWait(preparing, reader.held);
+  const useKey = (
+    <span>
+      <Button size="sm" onClick={onKey}>
+        {t("connectAi.wait.useKey")}
+      </Button>
+    </span>
+  );
+  const line = (lead: ReactNode, text: string) => (
+    <p className="setup-line ac-iconline" role="status">
+      {lead}
+      <span>{text}</span>
+    </p>
+  );
+  const hold = holdText(t, org.standing);
+  let wait: ReactNode = null;
+  if (gate.state === "loading") wait = <Spinner />;
+  else if (gate.state === "preparing") {
+    // The computer's wait in one well: how far it is and the time left, or why it waits (not where the rail beside it
+    // already says so), then when the step under it turns on, said once (the owner's email line says it for them). A
+    // hold decides when anything runs there: it speaks alone. The well's lines start on the panel's text edge, so none
+    // leads with an icon.
+    wait = (hold || preparing) && (
+      <div className="ai-panel__wait">
+        {hold ? (
+          <p className="setup-line" role="status">
+            {hold}
+          </p>
+        ) : (
+          <>
+            {preparing?.step ? (
+              <SetupProgress view={preparing} />
+            ) : (
+              preparing &&
+              !(said && statusRestatesChip(preparing)) && (
+                <p className="setup-line" role="status">
+                  {t(preparing.textKey)}
+                </p>
+              )
+            )}
+            {eta && (
+              <p className="setup-eta" aria-live="polite">
+                {etaLine(t, eta)}
+              </p>
+            )}
+            <p className="setup-line">
+              {t(
+                email && reader.owner
+                  ? "connectAi.wait.email"
+                  : coding
+                    ? "connectAi.wait.key"
+                    : "connectAi.wait.signIn",
+              )}
+            </p>
+          </>
+        )}
+      </div>
+    );
+  } else if (gate.state === "offline" && !signingIn) {
+    wait = hostConnecting ? (
+      line(<Spinner size={14} />, t("connectAi.wait.connecting"))
+    ) : (
+      <>
+        <SettingNote icon="alert">
+          {edition === "cloud"
+            ? t("aiAccounts.connect.needsCloud.online", { computer })
+            : t("brain.offline", { computer })}
+        </SettingNote>
+        {useKey}
+      </>
+    );
+  } else if (gate.state === "missing") {
+    wait = (
+      <>
+        <SettingNote icon="computer">{t("aiAccounts.connect.noComputer")}</SettingNote>
+        <span>
+          <Button size="sm" variant="primary" onClick={onComputer}>
+            {t("aiAccounts.connect.addComputer")}
+          </Button>
+        </span>
+      </>
+    );
+  } else if (gate.state === "unsupported") {
+    const off = toolOffReason(
+      machines.data?.find((m) => m.id === machineId),
+      kind,
+    );
+    const program = t(`brain.card.${kind}`);
+    wait = (
+      <>
+        <SettingNote icon="alert">
+          {edition === "cloud"
+            ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
+            : gate.reason === "keys"
+              ? t("aiAccounts.connect.needs.keys")
+              : gate.reason === "tool_off"
+                ? t(off.key, { computer, command: off.command, program })
+                : t(`brain.reasons.${gate.reason}`, { computer, program })}
+        </SettingNote>
+        {useKey}
+      </>
+    );
+  } else if (gate.state === "locked") {
+    const pairer = machines.data?.find((m) => m.id === machineId)?.pairedBy?.name.split(" ")[0];
+    wait = (
+      <SettingNote icon="lock">
+        {gate.who === "computer"
+          ? t("connectAi.accountsLocked", { name: pairer ?? "", computer })
+          : t("noAi.lockedAdmins")}
+      </SettingNote>
+    );
+  }
+
+  return wait;
 }
 
 /** The API key being added: its maker (or the agentes.chat key, where the server offers one) and the key. */

@@ -4285,8 +4285,11 @@
   "connectAi.assignFailed": {
     "value": "The {{label}} account is connected, but {{agent}} couldn't switch to it."
   },
-  "connectAi.noAgents": {
-    "value": "A plan thinks only for its owner's agents, and you have none yet."
+  "connectAi.forNewAgents": {
+    "value": "{{label}} is connected. The agents you create think with it."
+  },
+  "connectAi.forNewAgentsHint": {
+    "value": "The agents you create think with it."
   },
   "connectAi.done": {
     "value": "Done"
@@ -9433,6 +9436,9 @@
   },
   "newAgent.errors.modelUnavailable": {
     "value": "Pick a model the workspace can use."
+  },
+  "newAgent.noAi": {
+    "value": "This workspace has no AI yet. Connect one now, or create the agent and connect one after."
   },
   "newAgent.instructions": {
     "value": "Instructions"

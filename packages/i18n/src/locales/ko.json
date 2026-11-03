@@ -1694,7 +1694,8 @@
     },
     "useAnyway": "{{email}} 사용",
     "assignFailed": "{{label}} 계정은 연결됐지만 {{agent}}을(를) 이 계정으로 바꾸지 못했어요.",
-    "noAgents": "요금제는 소유자의 에이전트만 사용할 수 있는데, 아직 에이전트가 없어요.",
+    "forNewAgents": "{{label}}이(가) 연결됐어요. 앞으로 만드는 에이전트는 이걸로 생각해요.",
+    "forNewAgentsHint": "앞으로 만드는 에이전트는 이걸로 생각해요.",
     "done": "완료",
     "agent": "대상 에이전트",
     "keyLocked": "API 키는 관리자만 추가할 수 있어요.",
@@ -3730,6 +3731,7 @@
       "handleTaken": "@{{handle}}은(는) 이미 다른 에이전트나 사람이 쓰고 있어요. @{{suggestion}}은(는) 어때요?",
       "modelUnavailable": "워크스페이스에서 사용할 수 있는 모델을 고르세요."
     },
+    "noAi": "워크스페이스에 아직 AI가 없어요. 지금 연결하거나, 에이전트를 만든 뒤에 연결하세요.",
     "instructions": "지침",
     "instructionsPlaceholder": "예: 문서를 바탕으로 #support에서 고객 질문에 답해요. 모르는 것은 팀원을 불러요.",
     "startedFrom": "{{role}} 텍스트에서 시작함",

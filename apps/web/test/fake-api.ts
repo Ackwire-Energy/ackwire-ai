@@ -2007,7 +2007,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           ...(state.extraModels ?? []),
         ],
       }),
-      credentials: async () => state.credentials,
+      credentials: async () => [...state.credentials],
       addCredential: async (orgId, input) => {
         log("agents.addCredential", orgId, { ...input, apiKey: "[redacted]" });
         if (state.keyRefusal) throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.");

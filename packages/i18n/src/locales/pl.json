@@ -1883,7 +1883,8 @@
     },
     "useAnyway": "Użyj {{email}}",
     "assignFailed": "Konto {{label}} jest połączone, ale nie udało się na nie przełączyć agenta {{agent}}.",
-    "noAgents": "Plan myśli tylko dla agentów swojego właściciela, a ty nie masz jeszcze żadnego.",
+    "forNewAgents": "{{label}} jest połączony. Agenci, których utworzysz, myślą z nim.",
+    "forNewAgentsHint": "Agenci, których utworzysz, myślą z nim.",
     "done": "Gotowe",
     "agent": "Dla którego agenta",
     "keyLocked": "Klucz API może dodać tylko administrator.",
@@ -4136,6 +4137,7 @@
       "handleTaken": "@{{handle}} należy już do innego agenta lub osoby. Może @{{suggestion}}?",
       "modelUnavailable": "Wybierz model, którego może używać przestrzeń robocza."
     },
+    "noAi": "Przestrzeń robocza nie ma jeszcze AI. Połącz je teraz albo utwórz agenta i połącz je później.",
     "instructions": "Instrukcje",
     "instructionsPlaceholder": "Np. Odpowiada na pytania klientów na #support na podstawie dokumentacji. Gdy czegoś nie wie, woła kogoś z zespołu.",
     "startedFrom": "Na podstawie tekstu roli {{role}}",

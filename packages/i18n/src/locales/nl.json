@@ -1767,7 +1767,8 @@
     },
     "useAnyway": "{{email}} gebruiken",
     "assignFailed": "Het account {{label}} is gekoppeld, maar {{agent}} kon er niet naar overstappen.",
-    "noAgents": "Een abonnement denkt alleen voor de agents van de eigenaar, en jij hebt er nog geen.",
+    "forNewAgents": "{{label}} is gekoppeld. De agents die je maakt denken ermee.",
+    "forNewAgentsHint": "De agents die je maakt denken ermee.",
     "done": "Klaar",
     "agent": "Voor welke agent",
     "keyLocked": "Alleen een beheerder voegt een API-sleutel toe.",
@@ -3916,6 +3917,7 @@
       "handleTaken": "@{{handle}} is al van een andere agent of persoon. Wat dacht je van @{{suggestion}}?",
       "modelUnavailable": "Kies een model dat de werkruimte kan gebruiken."
     },
+    "noAi": "De werkruimte heeft nog geen AI. Koppel er nu een, of maak de agent en koppel er daarna een.",
     "instructions": "Instructies",
     "instructionsPlaceholder": "Bijv. Beantwoordt vragen van klanten in #support op basis van de documentatie. Als hij iets niet weet, roept hij iemand van het team erbij.",
     "startedFrom": "Gestart vanuit de tekst van {{role}}",

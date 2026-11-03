@@ -1734,7 +1734,9 @@ export const ptBR = {
     },
     useAnyway: "Usar {{email}}",
     assignFailed: "A conta {{label}} está conectada, mas {{agent}} não conseguiu passar a usá-la.",
-    noAgents: "Um plano só pensa pelos agentes de quem o conecta, e você ainda não tem nenhum.",
+    /** A plan connected by someone who owns no agent yet: it thinks for the agents they create. */
+    forNewAgents: "{{label}} está conectado. Os agentes que você criar pensam com ele.",
+    forNewAgentsHint: "Os agentes que você criar pensam com ele.",
     done: "Pronto",
     agent: "Para qual agente",
     keyLocked: "Uma chave de API, só um admin adiciona.",
@@ -3871,6 +3873,8 @@ export const ptBR = {
       handleTaken: "@{{handle}} já é de outro agente ou pessoa. Que tal @{{suggestion}}?",
       modelUnavailable: "Escolha um modelo que o workspace pode usar.",
     },
+    /** The model step with nothing to think with yet: the agent is created all the same. */
+    noAi: "O workspace ainda não tem uma IA. Conecte uma agora, ou crie o agente e conecte depois.",
     instructions: "Instruções",
     instructionsPlaceholder:
       "Ex.: Responde dúvidas de clientes no #suporte com base na documentação. Quando não souber, chama alguém do time.",

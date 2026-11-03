@@ -1754,7 +1754,8 @@
     },
     "useAnyway": "{{email}} kullan",
     "assignFailed": "{{label}} hesabı bağlandı ama {{agent}} bu hesaba geçemedi.",
-    "noAgents": "Bir plan yalnızca sahibinin ajanları için düşünür ve henüz hiç ajanınız yok.",
+    "forNewAgents": "{{label}} bağlandı. Oluşturduğunuz ajanlar onunla düşünür.",
+    "forNewAgentsHint": "Oluşturduğunuz ajanlar onunla düşünür.",
     "done": "Tamam",
     "agent": "Hangi ajan için",
     "keyLocked": "API anahtarını yalnızca bir yönetici ekler.",
@@ -3840,6 +3841,7 @@
       "handleTaken": "@{{handle}} zaten başka bir ajana veya kişiye ait. @{{suggestion}} nasıl?",
       "modelUnavailable": "Çalışma alanının kullanabileceği bir model seçin."
     },
+    "noAi": "Çalışma alanının henüz bir yapay zekası yok. Şimdi bir tane bağlayın ya da ajanı oluşturup sonra bağlayın.",
     "instructions": "Talimatlar",
     "instructionsPlaceholder": "Örn. #destek kanalında müşteri sorularını belgelere dayanarak yanıtlar. Bilmediğinde ekipten birini çağırır.",
     "startedFrom": "{{role}} metninden başlatıldı",

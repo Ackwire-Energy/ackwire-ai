@@ -1829,7 +1829,8 @@
     },
     "useAnyway": "Utiliser {{email}}",
     "assignFailed": "Le compte {{label}} est connecté, mais {{agent}} n'a pas pu basculer dessus.",
-    "noAgents": "Un abonnement ne réfléchit que pour les agents de son titulaire, et vous n'en avez pas encore.",
+    "forNewAgents": "{{label}} est connecté. Les agents que vous créez réfléchissent avec lui.",
+    "forNewAgentsHint": "Les agents que vous créez réfléchissent avec lui.",
     "done": "Terminé",
     "agent": "Pour quel agent",
     "keyLocked": "Seul un admin peut ajouter une clé API.",
@@ -4038,6 +4039,7 @@
       "handleTaken": "@{{handle}} appartient déjà à un autre agent ou à une personne. Que diriez-vous de @{{suggestion}} ?",
       "modelUnavailable": "Choisissez un modèle que l'espace de travail peut utiliser."
     },
+    "noAi": "L'espace de travail n'a pas encore d'IA. Connectez-en une maintenant, ou créez l'agent et connectez-la ensuite.",
     "instructions": "Instructions",
     "instructionsPlaceholder": "Par ex. Répond aux questions des clients dans #support en s'appuyant sur la doc. Quand il ne sait pas, appelle quelqu'un de l'équipe.",
     "startedFrom": "Démarré à partir du texte {{role}}",

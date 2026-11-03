@@ -1696,7 +1696,8 @@
     },
     "useAnyway": "{{email}}を使う",
     "assignFailed": "{{label}}のアカウントは接続されましたが、{{agent}}を切り替えられませんでした。",
-    "noAgents": "プランが使えるのは持ち主のエージェントだけですが、まだエージェントがいません。",
+    "forNewAgents": "{{label}}を接続しました。これから作るエージェントはこれで動きます。",
+    "forNewAgentsHint": "これから作るエージェントはこれで動きます。",
     "done": "完了",
     "agent": "どのエージェント用か",
     "keyLocked": "APIキーを追加できるのは管理者だけです。",
@@ -3733,6 +3734,7 @@
       "handleTaken": "@{{handle}}はすでにほかのエージェントか人が使っています。@{{suggestion}}はいかがですか？",
       "modelUnavailable": "ワークスペースで使えるモデルを選んでください。"
     },
+    "noAi": "このワークスペースにはまだAIがありません。今すぐ接続するか、エージェントを作ってから接続してください。",
     "instructions": "指示",
     "instructionsPlaceholder": "例: ドキュメントをもとに#supportで顧客の質問に答えます。わからないときはチームの誰かを呼びます。",
     "startedFrom": "{{role}}のテキストから開始",
