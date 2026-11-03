@@ -21,6 +21,7 @@ import {
   applyComputerEvent,
   applyConsultEvent,
   applyMachineEvent,
+  applyMembershipEvent,
   applyNotificationEvent,
   applyReactions,
   applyReceiptEvent,
@@ -768,6 +769,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     if (!connection || !enabled) return;
     return connection.subscribe(channelId, (event) => {
       streams.apply(event);
+      applyMembershipEvent(qc, orgId, event);
       if (event.type === "approval.created" || event.type === "approval.decided") {
         cacheApproval(qc, orgId, event.approval);
       }

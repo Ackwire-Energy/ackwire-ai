@@ -147,6 +147,45 @@ describe("the members column", () => {
     expect(joao.getAttribute("data-presence")).toBe("offline");
   });
 
+  test("live: an agent someone else made and added, a person who joins, both leaving, without a reload", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = seedState();
+    const { sockets } = await open(state);
+    const names = () =>
+      [...(column() as HTMLElement).querySelectorAll(".members-side__label")].map((l) => l.textContent);
+    const channelEvent = (type: string, member: { type: "person" | "agent"; id: string }) =>
+      act(async () =>
+        sockets.last().push({ type: "event", channelId: ENG_ID, event: { type, channelId: ENG_ID, member } }),
+      );
+    expect(names()).not.toContain("Lodi");
+    // Made a moment ago in another browser: the app doesn't know it yet, so the agents are read again too.
+    const lodi = { ...(state.agents[0] as (typeof state.agents)[number]), id: "a-lodi", name: "Lodi", handle: "lodi" };
+    state.agents.push(lodi);
+    state.channelMembers[ENG_ID]?.push({ type: "agent", id: "a-lodi" });
+    await channelEvent("channel.member_added", { type: "agent", id: "a-lodi" });
+    await settle(4);
+    expect(names()).toContain("Lodi");
+    // A newcomer to the workspace, placed here by their invitation: `org.members` reads who is where again.
+    const bia = {
+      ...(state.members[1] as (typeof state.members)[number]),
+      userId: "u-bia",
+      name: "Bia",
+      email: "bia@acme.com.br",
+    };
+    state.members.push(bia);
+    state.channelMembers[ENG_ID]?.push({ type: "person", id: "u-bia" });
+    await act(async () => sockets.last().push({ type: "event", scope: "org", event: { type: "org.members" } }));
+    await settle(4);
+    expect(names()).toContain("Bia");
+    state.channelMembers[ENG_ID] = (state.channelMembers[ENG_ID] ?? []).filter(
+      (m) => m.id !== "a-lodi" && m.id !== "u-bia",
+    );
+    await channelEvent("channel.member_removed", { type: "agent", id: "a-lodi" });
+    await settle(4);
+    expect(names()).not.toContain("Lodi");
+    expect(names()).not.toContain("Bia");
+  });
+
   test("a row opens the member's card", async () => {
     widthIs(DESKTOP_QUERY);
     await open();

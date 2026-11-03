@@ -225,7 +225,7 @@ export function chatRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
-      await joinChannel(db, c.get("user").id, orgId, channelId);
+      await joinChannel(db, c.get("user").id, orgId, channelId, { pubsub: adapters.pubsub });
       return c.body(null, 204);
     },
   );

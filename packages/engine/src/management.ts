@@ -16,6 +16,7 @@ import {
 } from "./channels";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { publishChannelEvent } from "./events";
 import { agentBudgetState } from "./gateway";
 import {
   AGENT_MEDIA_LEVELS,
@@ -382,6 +383,7 @@ export async function setAgentChannels(
   orgId: string,
   agentId: string,
   input: { channelId: string; autoReply?: boolean }[],
+  options: { pubsub?: PubSub } = {},
 ) {
   const membership = await requireActiveMembership(db, actorId, orgId);
   const agent = await getAgent(db, orgId, agentId);
@@ -458,6 +460,26 @@ export async function setAgentChannels(
   });
   caches.channelMembers.deletePrefix(`${orgId}:`);
   caches.scopes.deletePrefix(`${orgId}:${agentId}:visible`);
+  // Each channel's members column follows, as when it is added or taken out from the channel itself.
+  const member = (autoReply?: boolean) => ({
+    type: "agent" as const,
+    id: agentId,
+    ...(autoReply === undefined ? {} : { autoReply }),
+  });
+  for (const c of adding)
+    await publishChannelEvent(options.pubsub, {
+      type: "channel.member_added",
+      channelId: c.id,
+      member: member(wanted.get(c.id) ?? true),
+    });
+  for (const c of removing)
+    await publishChannelEvent(options.pubsub, { type: "channel.member_removed", channelId: c.id, member: member() });
+  for (const c of retuned)
+    await publishChannelEvent(options.pubsub, {
+      type: "channel.member_updated",
+      channelId: c.id,
+      member: member(c.autoReply),
+    });
   return listAgentChannels(db, actorId, orgId, agentId);
 }
 

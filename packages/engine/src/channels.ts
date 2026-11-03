@@ -526,7 +526,13 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
  * Joins a public channel, or a private one limited to a role the person holds (ADR 0125). Other private channels
  * need an invitation from a member.
  */
-export async function joinChannel(db: Database, userId: string, orgId: string, channelId: string) {
+export async function joinChannel(
+  db: Database,
+  userId: string,
+  orgId: string,
+  channelId: string,
+  options: { pubsub?: PubSub } = {},
+) {
   await requirePermission(db, userId, orgId, "read");
   const [channel] = await db
     .select({
@@ -539,13 +545,23 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm" || (channel.visibility !== "public" && channel.byRole !== true))
     throw new ForbiddenError("This channel is private");
+  // The channel's members column shows them at once (a join from a channel's preview or the browser).
+  const joined = async () => {
+    caches.channelMembers.delete(`${orgId}:${channelId}`);
+    await publishChannelEvent(options.pubsub, {
+      type: "channel.member_added",
+      channelId,
+      member: { type: "person", id: userId },
+    });
+  };
   if (channel.visibility === "public") {
     await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
+    await joined();
     return;
   }
   // Checked again in the insert, under the lock that taking a role away holds (setMemberRoles, deleteRole,
   // updateChannel): a removal at the same moment either sees this membership and drops it, or wins and this refuses.
-  const joined = await db.transaction(async (tx) => {
+  const byRole = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     const rows = rowsOf(
       await tx.execute(sql`insert into ${channelMembers} (org_id, channel_id, user_id)
@@ -556,7 +572,8 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
     if (rows.length > 0) return true;
     return isChannelMember(tx, orgId, channelId, userId);
   });
-  if (!joined) throw new ForbiddenError("This channel is private");
+  if (!byRole) throw new ForbiddenError("This channel is private");
+  await joined();
 }
 
 /**

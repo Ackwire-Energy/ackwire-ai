@@ -1221,7 +1221,9 @@ export function managementRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const channels = await setAgentChannels(db, c.get("user").id, orgId, agentId, c.req.valid("json").channels);
+      const channels = await setAgentChannels(db, c.get("user").id, orgId, agentId, c.req.valid("json").channels, {
+        pubsub: adapters.pubsub,
+      });
       return c.json({ channels }, 200);
     },
   );
