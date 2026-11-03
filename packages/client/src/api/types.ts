@@ -2915,6 +2915,11 @@ export type IssuePatch = Partial<
 > & {
   /** Move to a board column: the issue takes that column's stage. */
   columnId?: string;
+  /**
+   * The whole list of acceptance criteria, in order (edited in place): an `id` keeps that criterion and its check,
+   * one without is new, one left out is removed.
+   */
+  criteria?: { id?: string; text: string }[];
 };
 
 /** A board column: it sits in a fixed stage; `name` null shows the stage's own name. */

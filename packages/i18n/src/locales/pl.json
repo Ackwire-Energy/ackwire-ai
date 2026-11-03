@@ -4931,6 +4931,13 @@
     "criteria": "Kryteria akceptacji",
     "criteriaCount": "{{done}} z {{total}}",
     "noCriteria": "Nie ma jeszcze kryteriów akceptacji.",
+    "edit": {
+      "title": "Edytuj tytuł",
+      "description": "Edytuj opis",
+      "criterion": "Edytuj kryterium „{{text}}”",
+      "criterionShort": "Edytuj kryterium",
+      "hint": "Zapisuje się, gdy opuścisz pole albo naciśniesz Esc."
+    },
     "askTitle": "Poproś o wykonanie tego zadania: {{name}}",
     "askText": "{{name}} przeczyta, co potrzebne, opisze tu plan w komentarzu i go wykona. Wszystko, co wrażliwe, np. publikacja, poprosi o twoje zatwierdzenie.",
     "askText_female": "{{name}} przeczyta, co potrzebne, opisze tu plan w komentarzu i go wykona. Wszystko, co wrażliwe, np. publikacja, poprosi o twoje zatwierdzenie.",
@@ -4983,6 +4990,7 @@
       "created": "utworzył(a) zadanie",
       "renamed": "zmienił(a) nazwę zadania",
       "description_changed": "edytował(a) opis",
+      "criteria_changed": "edytował(a) kryteria akceptacji",
       "status_changed": "zmienił(a) status na {{status}}",
       "priority_changed": "zmienił(a) priorytet na {{priority}}",
       "assigned": "przypisał(a) zadanie",

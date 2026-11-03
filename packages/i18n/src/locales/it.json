@@ -4818,6 +4818,13 @@
     "criteria": "Criteri di accettazione",
     "criteriaCount": "{{done}} di {{total}}",
     "noCriteria": "Ancora nessun criterio di accettazione.",
+    "edit": {
+      "title": "Modifica il titolo",
+      "description": "Modifica la descrizione",
+      "criterion": "Modifica il criterio \"{{text}}\"",
+      "criterionShort": "Modifica il criterio",
+      "hint": "Si salva quando esci dal campo o premi Esc."
+    },
     "askTitle": "Chiedi a {{name}} di fare questa attività",
     "askTitle_female": "Chiedi a {{name}} di fare questa attività",
     "askText": "{{name}} legge ciò che gli serve, commenta qui il piano e lo esegue. Tutto ciò che è sensibile, come pubblicare, chiede la tua approvazione.",
@@ -4873,6 +4880,7 @@
       "created": "ha creato l'attività",
       "renamed": "ha rinominato l'attività",
       "description_changed": "ha modificato la descrizione",
+      "criteria_changed": "ha modificato i criteri di accettazione",
       "status_changed": "ha cambiato lo stato in {{status}}",
       "priority_changed": "ha cambiato la priorità in {{priority}}",
       "assigned": "ha assegnato l'attività",

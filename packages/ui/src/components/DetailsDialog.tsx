@@ -32,8 +32,15 @@ export interface DetailsDialogProps {
   /** "Abrir em página própria": the item's own page. */
   page?: DetailsDialogPageLink;
   closeLabel: string;
-  /** 720 (reading width, the default) or 960 (previews: files, diffs). */
+  /** 720 (reading width, the default) or 960 (previews: files, diffs; an item laid out as its own page). */
   size?: "md" | "lg";
+  /** Always the full height: tabs or sections that change inside never make it grow or shrink. */
+  fill?: boolean;
+  /**
+   * The content draws the heading itself (an item laid out as its own page, its title edited in place): the title
+   * stays the dialog's name, hidden from sight, and the header keeps only its bar.
+   */
+  titleHidden?: boolean;
   /** A fixed bar at the bottom (primary actions). */
   footer?: ReactNode;
   children: ReactNode;
@@ -64,6 +71,8 @@ export function DetailsDialog({
   page,
   closeLabel,
   size = "md",
+  fill = false,
+  titleHidden = false,
   footer,
   children,
   className,
@@ -83,7 +92,7 @@ export function DetailsDialog({
       <RDialog.Portal>
         <RDialog.Overlay className="ac-dialog__scrim" />
         <RDialog.Content
-          className={cx("ac-details", size === "lg" && "ac-details--lg", className)}
+          className={cx("ac-details", size === "lg" && "ac-details--lg", fill && "ac-details--fill", className)}
           aria-describedby={undefined}
           onEscapeKeyDown={onEscapeKeyDown}
           onCloseAutoFocus={(e) => {
@@ -123,13 +132,17 @@ export function DetailsDialog({
                 </RDialog.Close>
               </div>
             </div>
-            <div className="ac-details__heading">
-              {icon && <span className="ac-details__icon">{icon}</span>}
-              <div className="ac-details__titles">
-                <RDialog.Title className="ac-details__title">{title}</RDialog.Title>
-                {subtitle && <div className="ac-details__subtitle">{subtitle}</div>}
+            {titleHidden ? (
+              <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
+            ) : (
+              <div className="ac-details__heading">
+                {icon && <span className="ac-details__icon">{icon}</span>}
+                <div className="ac-details__titles">
+                  <RDialog.Title className="ac-details__title">{title}</RDialog.Title>
+                  {subtitle && <div className="ac-details__subtitle">{subtitle}</div>}
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <div className="ac-details__body">{children}</div>
           {footer && <div className="ac-details__foot">{footer}</div>}

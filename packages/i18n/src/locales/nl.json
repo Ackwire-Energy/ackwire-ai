@@ -4673,6 +4673,13 @@
     "criteria": "Acceptatiecriteria",
     "criteriaCount": "{{done}} van {{total}}",
     "noCriteria": "Nog geen acceptatiecriteria.",
+    "edit": {
+      "title": "Titel bewerken",
+      "description": "Beschrijving bewerken",
+      "criterion": "Criterium \"{{text}}\" bewerken",
+      "criterionShort": "Criterium bewerken",
+      "hint": "Wordt opgeslagen als je het veld verlaat of op Esc drukt."
+    },
     "askTitle": "Vraag {{name}} om deze taak te doen",
     "askTitle_female": "Vraag {{name}} om deze taak te doen",
     "askText": "{{name}} leest wat hij nodig heeft, zet het plan hier in een reactie en voert het uit. Alles wat gevoelig is, zoals publiceren, vraagt om jouw goedkeuring.",
@@ -4728,6 +4735,7 @@
       "created": "heeft de taak gemaakt",
       "renamed": "heeft de taak hernoemd",
       "description_changed": "heeft de beschrijving bewerkt",
+      "criteria_changed": "heeft de acceptatiecriteria bewerkt",
       "status_changed": "heeft de status gewijzigd in {{status}}",
       "priority_changed": "heeft de prioriteit gewijzigd in {{priority}}",
       "assigned": "heeft de taak toegewezen",

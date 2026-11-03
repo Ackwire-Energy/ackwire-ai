@@ -4814,6 +4814,13 @@
     "criteria": "Critères d'acceptation",
     "criteriaCount": "{{done}} sur {{total}}",
     "noCriteria": "Aucun critère d'acceptation pour l'instant.",
+    "edit": {
+      "title": "Modifier le titre",
+      "description": "Modifier la description",
+      "criterion": "Modifier le critère « {{text}} »",
+      "criterionShort": "Modifier le critère",
+      "hint": "Enregistré quand vous quittez le champ ou appuyez sur Échap."
+    },
     "askTitle": "Demander à {{name}} de faire cette tâche",
     "askTitle_female": "Demander à {{name}} de faire cette tâche",
     "askText": "{{name}} lit ce dont il a besoin, commente le plan ici et s'en charge. Tout ce qui est sensible, comme publier, demande votre approbation.",
@@ -4869,6 +4876,7 @@
       "created": "a créé la tâche",
       "renamed": "a renommé la tâche",
       "description_changed": "a modifié la description",
+      "criteria_changed": "a modifié les critères d'acceptation",
       "status_changed": "a changé le statut en {{status}}",
       "priority_changed": "a changé la priorité en {{priority}}",
       "assigned": "a attribué la tâche",

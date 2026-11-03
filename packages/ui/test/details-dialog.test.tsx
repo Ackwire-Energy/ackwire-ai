@@ -86,6 +86,29 @@ describe("DetailsDialog", () => {
     expect(opened).toBe(1);
   });
 
+  test("an item laid out as its own page: the title only names it, and the height stays full", async () => {
+    render(
+      <DetailsDialog
+        open
+        onOpenChange={() => {}}
+        closeLabel="Fechar"
+        eyebrow="#6"
+        title="Exportar agenda"
+        fill
+        titleHidden
+      >
+        <h1>Exportar agenda</h1>
+      </DetailsDialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Exportar agenda" });
+    expect(dialog.className).toContain("ac-details--fill");
+    expect(dialog.querySelector(".ac-details__heading")).toBeNull();
+    expect(within(dialog).getAllByText("Exportar agenda")).toHaveLength(2);
+    expect(within(dialog).getByRole("heading", { level: 1, name: "Exportar agenda" })).toBeTruthy();
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css.split("\n.ac-details--fill {")[1]?.split("}")[0]).toContain("height: calc(100dvh - 48px)");
+  });
+
   test("the CSS: 720 reading width, its own scroll, a full-screen sheet on a phone", async () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";

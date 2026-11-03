@@ -6307,24 +6307,10 @@ html:not([data-pointer]) .run-continue:focus-visible {
     inset 0 0 0 1px var(--field-line),
     var(--field-ring);
 }
+/* "✓ Salvo" (SavedNote) beside the dialog's title. */
 .channel-topic__saved {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   margin-left: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink-muted);
   vertical-align: 2px;
-  opacity: 0;
-  transition: opacity 0.25s;
-}
-.channel-topic__saved[data-show] {
-  opacity: 1;
-}
-.channel-topic__saved .ac-icon {
-  width: 13px;
-  height: 13px;
 }
 @media (max-width: 640px) {
   .channel-topic {

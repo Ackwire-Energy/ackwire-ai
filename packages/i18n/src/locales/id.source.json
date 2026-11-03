@@ -11204,6 +11204,21 @@
   "issues.noCriteria": {
     "value": "No acceptance criteria yet."
   },
+  "issues.edit.title": {
+    "value": "Edit the title"
+  },
+  "issues.edit.description": {
+    "value": "Edit the description"
+  },
+  "issues.edit.criterion": {
+    "value": "Edit the criterion \"{{text}}\""
+  },
+  "issues.edit.criterionShort": {
+    "value": "Edit the criterion"
+  },
+  "issues.edit.hint": {
+    "value": "Saves when you leave the field or press Esc."
+  },
   "issues.askTitle": {
     "value": "Ask {{name}} to do this task"
   },
@@ -11336,6 +11351,9 @@
   },
   "issues.event.description_changed": {
     "value": "edited the description"
+  },
+  "issues.event.criteria_changed": {
+    "value": "edited the acceptance criteria"
   },
   "issues.event.status_changed": {
     "value": "changed the status to {{status}}"
