@@ -16,7 +16,7 @@ import {
 import { TYPING_GRACE_MS, typingLogFor, waitForBurst } from "../src/burst";
 import { type Fixture, setup } from "./fixtures";
 
-/** Token-trim items B3, B5, B8–B11 (docs/backend-progress.md): the model reads less, or reads it from the cache. */
+/** Token-trim items B3, B5, B8–B11 (ADR 0043): the model reads less, or reads it from the cache. */
 
 let f: Fixture;
 afterEach(async () => {
