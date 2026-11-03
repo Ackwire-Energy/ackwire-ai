@@ -23,7 +23,7 @@ describe("a reply's tools sit last, live and saved", () => {
           ") : body ? (\n          <MessageText\n            body={talk ? talk.lead : body}",
           "<Receipts message={m} />",
           "{cards}\n        {/* Its tools after",
-          "<ConsultGroup message={m} color={color} />",
+          "<ConsultGroup message={m} />",
           "<TurnTools",
           "<SavedTools",
           "<NoAiCard message={m} />",
@@ -76,7 +76,8 @@ describe("one call is its own line", () => {
     expect(tools).toContain("one={one}");
     expect(tools).toContain("const lone = savedOneLine(meta, onCard);");
     expect(tools).toContain("<Line line={{ ...only.line, detail }} color={color} onToggle={onToggle} />");
-    expect(source("ConsultGroup.tsx")).toContain("one={group.length === 1}");
+    // A question to a teammate is one agents-talking pill per consultation, not a tool line.
+    expect(source("ConsultGroup.tsx")).toContain("<AgentTalkPill\n          key={c.id}");
   });
 });
 
