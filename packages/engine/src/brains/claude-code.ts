@@ -14,6 +14,7 @@ import {
 } from "@agenteschat/adapters";
 import { type Database, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import type { CodeSetup } from "../git/machine";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
@@ -83,7 +84,7 @@ export interface ClaudeCodeBrainDeps {
    * the machine and says where the turn starts and what to add to the
    * system text ("# Your code"). Null or a failure: the turn runs as before.
    */
-  prepare?: (turn: BrainTurn, signal: AbortSignal) => Promise<{ cwd: string; prompt: string } | null>;
+  prepare?: (turn: BrainTurn, signal: AbortSignal) => Promise<CodeSetup | null>;
   /** How long a turn may take (default: the hub's, 3 h). */
   timeoutMs?: number;
   /** After the request's result, how long to wait for the stream's last events (default 1.5 s). */
@@ -380,7 +381,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           );
           return;
         }
-        const code = await deps.prepare?.(turn, io.signal).catch(() => null);
+        const code = await (turn.code ?? deps.prepare?.(turn, io.signal))?.catch(() => null);
         const request: BrainTurnRequest = {
           runId: turn.runId,
           kind: "claude_code",
@@ -388,7 +389,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           cwd: code?.cwd || session.cwd,
           ...(turn.model ? { model: turn.model } : {}),
           system: code?.prompt ? `${turn.system}\n\n${code.prompt}` : turn.system,
-          prompt: computerPrompt(turn),
+          prompt: computerPrompt(turn, code?.start),
           mcp: { token: deps.mcpToken?.(turn) ?? randomBytes(24).toString("base64url") },
           keepAlive: deps.keepAlive !== false,
           personalMcp,

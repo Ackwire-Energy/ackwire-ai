@@ -1,5 +1,6 @@
 import type { ArtifactRef, Message, ReplyRef } from "../api/types";
 import { mediaKindOf, messageMediaOf } from "./media";
+import { voiceOf } from "./voice";
 
 /** Same rule as the server (`replyExcerpt`): one line, no code fences, ~200 characters. */
 export function quoteExcerpt(body: string, max = 200): string {
@@ -37,13 +38,15 @@ export function localMeta(quote: Message | null, authorName: string, files: Arti
   const meta: Record<string, unknown> = {};
   if (quote) {
     // Quoting a GIF or a sticker: the quote names it until the server's copy comes (ADR 0091).
-    const media = messageMediaOf(quote.meta)?.kind;
+    const voice = voiceOf(quote.meta);
+    const media = voice ? ("voice" as const) : messageMediaOf(quote.meta)?.kind;
     meta.replyTo = {
       messageId: quote.id,
       threadId: quote.threadId,
       author: quote.author,
       authorName,
-      excerpt: quoteExcerpt(quote.body),
+      // A quote of a voice message names it: its words never travel.
+      excerpt: voice ? "" : quoteExcerpt(quote.body),
       ...(media ? { media } : {}),
     } satisfies ReplyRef;
   }

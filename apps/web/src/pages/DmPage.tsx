@@ -12,6 +12,7 @@ import { useApi } from "@/api/context";
 import { AudienceChip } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
+import { QueueButton, useAgentMachineId } from "@/components/ComputerQueue";
 import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
@@ -19,6 +20,11 @@ import { useOrg } from "@/components/org-context";
 import { SearchHereButton } from "@/components/search/SearchHereButton";
 import { useDirectory } from "@/hooks/useDirectory";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
+
+/** While anyone waits for the agent's computer: its line, beside the Computer button. */
+function DmQueueButton({ agentId }: { agentId: string }) {
+  return <QueueButton machineId={useAgentMachineId(agentId)} />;
+}
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
 export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMessageId?: string }) {
@@ -94,6 +100,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
         {person && <span className="channel__topic">{person.email}</span>}
       </div>
       <SearchHereButton channelId={dm.data.channelId} />
+      {agent && <DmQueueButton agentId={agent.id} />}
       {agent && <ComputerButton agent={agent} />}
       {agent && <ProfileButton agentId={agent.id} />}
     </header>

@@ -1,4 +1,5 @@
 import type { BrainEffort } from "@agenteschat/adapters";
+import type { CodeSetup } from "../git/machine";
 
 export type BrainKind = "model" | "claude_code" | "codex" | "cursor";
 
@@ -38,6 +39,8 @@ export interface BrainTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>; // JSON Schema object
+  /** The same in every run of the agent (`ToolSpec.stable`): the model brain's cached start of the tool list. */
+  stable?: boolean;
 }
 
 /** What a computer brain needs to reach the agent's machine. */
@@ -76,6 +79,11 @@ export interface BrainTurn {
   contextTokens?: number;
   /** The text the person/system sent that starts this turn (also the last user message). */
   trigger: string;
+  /**
+   * Computer brains: the checkouts' sync already started for this turn (during the quiet window), used instead of
+   * starting one (`prepareAgentCode`).
+   */
+  code?: Promise<CodeSetup | null>;
 }
 
 export interface ToolResult {

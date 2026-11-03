@@ -34,6 +34,7 @@ import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notice
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { appVia } from "@agenteschat/client/lib/via";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -63,11 +64,12 @@ import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
 import { chatHref, consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
-import { BrainWait } from "../outages/WaitCard";
+import { AwayPill, BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useMyHandle, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
+import { VoiceMessage } from "../voice/VoiceMessage";
 import { ReceiptMark } from "./AgentReceipts";
 import { secretRequestOf } from "./ask-store";
 import { ChatMedia } from "./ChatMedia";
@@ -334,8 +336,13 @@ export const MessageRow = memo(function MessageRow({
   );
 
   if (mine) {
-    // The bubble, or the GIF or sticker or the files of a message with no words, leads.
-    const lead = choiceReply ? (
+    // A voice message's player, a choice's answer, the bubble, or the GIF or sticker or the files of a message
+    // with no words, leads.
+    const lead = voiceOf(meta) ? (
+      <View style={styles.meFiles}>
+        <VoiceMessage message={m} />
+      </View>
+    ) : choiceReply ? (
       <View style={styles.meFiles}>{choiceReply}</View>
     ) : body ? (
       <View style={[styles.bubble, BUBBLE_RUN[run], { backgroundColor: c.bubble }]}>
@@ -476,6 +483,7 @@ export const MessageRow = memo(function MessageRow({
             <Text variant="footnote" tone="faint">
               {when.time(m.createdAt)}
             </Text>
+            {brainWait ? <AwayPill message={m} /> : null}
             {m.pinned ? <PinMark /> : null}
             {receipt && !m.local ? (
               <View style={styles.whoMark}>
@@ -552,6 +560,7 @@ export const MessageRow = memo(function MessageRow({
           </Pressable>
         ) : null}
         {media ? <ChatMedia media={media} liveId={m.id} /> : null}
+        {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
         {(stopped || atLimit || providerCut) && m.agentRunId ? (
           <StoppedLine
             message={m}

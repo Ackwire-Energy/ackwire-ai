@@ -768,6 +768,10 @@ links, and budget and approval alerts. `MILLIONSEND_API_KEY` wins when both are 
 **Password reset** needs email, so it shows only with `SMTP_URL` or `MILLIONSEND_API_KEY` set: "Forgot
 my password" on the sign-in page emails a link to the web app's reset page (`/reset-password`).
 
+**Voice messages.** People hold the microphone and send audio; agents read its words, and the audio's words stay hidden until someone opens them on that message. The microphone shows only with a speech engine. As the server's owner, pick a provider and paste its key in **Settings**, or set it in the environment: `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`, `SONIOX_API_KEY`, `GROQ_API_KEY` or `OPENAI_SPEECH_API_KEY`, with `SPEECH_ENGINES` for the order they are tried. With any of these, the audio goes to that provider to become text. `LOCAL_SPEECH_URL` points at a server of your own that speaks the OpenAI format (Speaches, a local Whisper or Parakeet), and the audio stays with you: `LOCAL_SPEECH_API_KEY` if it asks for a key, and `LOCAL_SPEECH_WARM=on` if it loads its model on demand and can start when someone presses the microphone (`POST <LOCAL_SPEECH_URL>/warm`). Every request to it names the workspace in `X-Agentes-Org`, and one that takes more than half a minute plus twice the recording goes to the next engine. A self-hosted server has no limit on minutes.
+
+Recordings are kept with your files, outside the Drive, for `VOICE_RETENTION_DAYS` (90 by default; 0 keeps them forever). A daily sweep then deletes the audio; the message and its words stay for agents and search, and the player says the recording is gone.
+
 **Files.** The compose file stores uploaded files (Drive files, attachments, photos) in the `files`
 volume. With all four `S3_*` variables set they go to that bucket instead, and with neither, into
 Postgres. Choose before the first upload: a file stays in the store it was written to. An
@@ -816,6 +820,9 @@ stops), and brings it back (with `SUPPORT_EMAIL` set, its people see where to wr
 legal hold), closed, with everything in it, without telling it.
 `GET /analytics` and `GET /analytics/connectors/{connector}` say how much each connector is used,
 by day, workspace and agent, in counts the server always keeps: never what a tool was sent or answered.
+`GET /analytics/work` and `GET /analytics/work/orgs/{orgId}` say how much the agents work and spend:
+turns by who started them and how they ended, waits for room on a computer, reply times, and tokens by
+type and who pays, with what they would cost through the API, per workspace or per agent, never what anyone wrote.
 `MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
 from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
 far each one is, and asks for a single-use code that the computer connects with

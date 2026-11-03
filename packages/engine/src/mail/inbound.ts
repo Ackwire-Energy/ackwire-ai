@@ -11,6 +11,7 @@ import { markComposioAccountBroken } from "../connectors/composio";
 import { NotFoundError } from "../errors";
 import { cutText } from "../format";
 import { type EventMerge, holdForNextRun, queueEventRun, type RoutineEventPayload } from "../routine-events";
+import { hasScope } from "../tools/scopes";
 import { neutralizeUntrusted } from "../untrusted";
 import {
   accountRef,
@@ -82,6 +83,8 @@ export async function ingestMail(
   if (!routine?.active || routine.deletedAt) return { added: 0, fired: false };
   const [account] = await db.select().from(mailAccounts).where(eq(mailAccounts.id, watch.accountId));
   if (!account || account.revokedAt) return { added: 0, fired: false };
+  // The watch outlives the agent's access (taken by the mailbox's owner, or dropped as its audience widened).
+  if (!(await hasScope(db, routine.orgId, routine.agentId, account.id, "mail:read"))) return { added: 0, fired: false };
   const policy = await agentMailPolicy(db, routine.orgId, routine.agentId, account.id);
   const now = deps.now?.() ?? new Date();
   const wanted = messages.filter(

@@ -109,6 +109,10 @@ export async function createTestServer(
      * Absent: `gifs` serves them, and a saved key is kept unchecked (tests never reach the network).
      */
     giphyFetch?: typeof fetch;
+    /** `false`: a store with no signed links, as on disk or in Postgres, so the server sends files itself. */
+    signedBlobs?: boolean;
+    /** Fake speech providers (ADR 0100), for an engine set through `env`. */
+    speechFetch?: typeof fetch;
     /** AI apps (ADR 0119): a fake fetch of apps' metadata documents (CIMD); absent = none answers. */
     appsFetchDocument?: FetchAppDocument;
   } = {},
@@ -123,7 +127,7 @@ export async function createTestServer(
   const email = createFakeEmailSender();
   const push = createFakePushSender();
   const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;
-  const platformBlobs = createMemoryBlobStore({ kind: options.platformKind });
+  const platformBlobs = createMemoryBlobStore({ kind: options.platformKind, sign: options.signedBlobs });
   const keyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
   const { giphyFetch } = options;
   // The installation's GIPHY key, as `start.ts` makes it off agentes.chat (ADR 0091, amended 2026-10-31).
@@ -166,6 +170,7 @@ export async function createTestServer(
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
     deltaFlushMs: 0,
     s3Fetch: options.s3Fetch,
+    speechFetch: options.speechFetch,
     resolveHost: options.resolveHost,
     github: options.github,
     judge: createFakeJudge(options.judge),
@@ -219,6 +224,8 @@ export async function createTestServer(
         streams: engine.streams,
         jevKey: engine.jevKey,
         gifKey,
+        speech: engine.speech,
+        voice: engine.voice,
       },
     },
     log,
@@ -289,7 +296,13 @@ export function browser(t: TestServer) {
   let cookie = "";
   const request = async (
     path: string,
-    init: { method?: string; json?: unknown; origin?: string | null; headers?: Record<string, string> } = {},
+    init: {
+      method?: string;
+      json?: unknown;
+      body?: RequestInit["body"];
+      origin?: string | null;
+      headers?: Record<string, string>;
+    } = {},
   ) => {
     const headers = new Headers(init.headers);
     // The tests' people read Portuguese, as before English became the default (a browser that says none reads English).
@@ -300,7 +313,7 @@ export function browser(t: TestServer) {
     const res = await t.app.request(path, {
       method: init.method ?? (init.json !== undefined ? "POST" : "GET"),
       headers,
-      body: init.json !== undefined ? JSON.stringify(init.json) : undefined,
+      body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
     });
     for (const c of res.headers.getSetCookie?.() ?? []) {
       const [pair] = c.split(";");

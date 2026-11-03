@@ -67,6 +67,7 @@ import {
 } from "@/lib/issues";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
+import { useIssueRealtime } from "@/realtime/context";
 import "./issues.css";
 
 /** One issue as a page (`/issues/131`); the board opens the same details in its panel. */
@@ -166,6 +167,8 @@ export function IssueDetails({ issue: i, variant }: { issue: Issue; variant: "pa
   const done = i.criteria.filter((c) => c.done).length;
   const from = useIssueSource(i);
   const activity = useIssueActivity(org.id, i.id);
+  // Comments, files and events arrive live while it's open (every tab reads this one list).
+  useIssueRealtime(org.id, i);
   const list = activity.data ?? [];
   const [tab, setTab] = useState<"details" | "files" | "history">("details");
   const files = useIssueFileEntries(i, list);

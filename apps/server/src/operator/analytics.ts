@@ -5,10 +5,14 @@ import {
   CONNECTOR_KEY,
   operatorAnalytics,
   operatorConnectorAnalytics,
+  operatorOrgWorkAnalytics,
+  operatorWorkAnalytics,
+  WORK_ANALYTICS_HOURLY_DAYS,
+  WORK_ANALYTICS_MAX_DAYS,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { errorResponse } from "../http/errors";
-import { json } from "../routes/app/context";
+import { json, OrgParams } from "../routes/app/context";
 import type { OperatorDeps } from "./app";
 
 const tags = ["Operator"];
@@ -192,6 +196,116 @@ const ConnectorAnalytics = z
   })
   .openapi("OperatorConnectorAnalytics");
 
+const WorkRange = z.object({
+  from: Range.shape.from,
+  to: z.string().openapi({
+    description: `The last UTC day, YYYY-MM-DD: at most ${WORK_ANALYTICS_MAX_DAYS} days, both counted. Else 400 \`analytics.range\`.`,
+    example: "2026-10-31",
+  }),
+});
+const Turns = z
+  .object({
+    total: Count.openapi({ description: "Agent turns (runs) created in the bucket." }),
+    person: Count.openapi({ description: "Started by a person's message." }),
+    agent: Count.openapi({
+      description: "Agent to agent: started by another agent's message or answer, or 2+ agent replies deep.",
+    }),
+    routine: Count.openapi({ description: "Started by a routine (its run, its reminder, its report)." }),
+    longWork: Count.openapi({ description: "Long work and other background runs." }),
+    followUp: Count.openapi({
+      description: "The agent coming back to its own work: a follow-up due, a wait or proposal ended, a check-in.",
+    }),
+    other: Count.openapi({ description: "Its trigger message is gone." }),
+    done: Count,
+    canceled: Count,
+    active: Count.openapi({ description: "Not ended yet (queued, running, waiting)." }),
+    failed: Count,
+    computerBusy: Count.openapi({ description: "Failed: no room on its computer for the whole wait." }),
+    noAi: Count.openapi({ description: "Failed: no AI to think with (no sign-in, no key, a revoked or wrong key)." }),
+    paused: Count.openapi({ description: "Failed: the workspace or agent on hold or paused, or its budget spent." }),
+    failedOther: Count,
+  })
+  .openapi("OperatorWorkTurns");
+const Waits = z
+  .object({
+    waited: Count.openapi({ description: "Turns that waited for room on a computer." }),
+    peakWaiting: Count.openapi({ description: "Most turns waiting for room at once (for a row, its own)." }),
+    personReplies: Count.openapi({ description: "Person-started turns that replied." }),
+    personFailed: Count.openapi({
+      description: "Person-started turns that failed: they have no reply, so the reply times leave them out.",
+    }),
+    replyMedianSec: z.number().int().nullable().openapi({
+      description:
+        "Median seconds from a person-started turn's creation to its reply; null without one. Work it handed to another agent is not waited for.",
+    }),
+    replyP90Sec: z.number().int().nullable(),
+  })
+  .openapi("OperatorWorkWaits");
+const Tokens = z
+  .object({
+    input: z.number().int().min(0).openapi({ description: "Uncached input tokens." }),
+    output: z.number().int().min(0),
+    cacheRead: z.number().int().min(0),
+    cacheWrite: z.number().int().min(0),
+    costUsd: z.number().openapi({ description: "What was billed through an API (a plan's tokens are 0)." }),
+    apiEquivalentUsd: z.number().openapi({
+      description: "Everything at API prices: a plan's tokens priced like the app's plan card (≈ … pela API).",
+    }),
+  })
+  .openapi("OperatorWorkTokens");
+const Payer = z.object({
+  payer: z.string().openapi({
+    description:
+      "Who pays: `plan` (a computer brain's plan), `workspace_key` (the workspace's API key), `platform_key` (this server's model key, or a key since removed), `platform` (this server's own services).",
+  }),
+  ...Tokens.shape,
+});
+const WorkRow = {
+  turns: Turns,
+  waits: Waits,
+  tokens: Tokens,
+  agentShare: z.number().min(0).max(1).openapi({ description: "Agent-to-agent turns over all turns." }),
+};
+const workSeries = z.array(z.object({ at: z.string(), ...WorkRow, byPayer: z.array(Payer) })).openapi({
+  description:
+    "Oldest first, by `bucket`: `at` is YYYY-MM-DD, or YYYY-MM-DDTHH (UTC) by hour. A bucket with nothing is left out.",
+});
+const workTotals = z.object({
+  ...WorkRow,
+  byPayer: z.array(Payer).openapi({ description: "Most tokens first." }),
+  turnsWithUsage: Count.openapi({ description: "Distinct turns that spent tokens in the dates." }),
+  perTurn: z
+    .object({ input: Count, output: Count, cacheRead: Count, cacheWrite: Count })
+    .openapi({ description: "Tokens over `turnsWithUsage`." }),
+});
+const workCommon = {
+  from: Day,
+  to: Day,
+  bucket: z
+    .enum(["hour", "day"])
+    .openapi({ description: `By hour for ${WORK_ANALYTICS_HOURLY_DAYS} days or fewer, else by day.` }),
+  totals: workTotals,
+  series: workSeries,
+  more: z.boolean().openapi({ description: `More rows than the ${ANALYTICS_ROWS_MAX} listed.` }),
+};
+const WorkAnalytics = z
+  .object({
+    ...workCommon,
+    workspaces: z
+      .array(z.object({ orgId: z.uuid(), ...WorkRow }))
+      .openapi({ description: `Most tokens first (then turns), at most ${ANALYTICS_ROWS_MAX}.` }),
+  })
+  .openapi("OperatorWorkAnalytics");
+const OrgWorkAnalytics = z
+  .object({
+    ...workCommon,
+    orgId: z.uuid(),
+    agents: z.array(z.object({ agentId: z.uuid(), ...WorkRow })).openapi({
+      description: `Most tokens first (then turns), at most ${ANALYTICS_ROWS_MAX}. The workspace's own usage (the router, embeddings) is only in the totals.`,
+    }),
+  })
+  .openapi("OperatorOrgWorkAnalytics");
+
 export function registerOperatorAnalytics(api: OpenAPIHono, { db }: OperatorDeps) {
   api.openapi(
     createRoute({
@@ -219,5 +333,33 @@ export function registerOperatorAnalytics(api: OpenAPIHono, { db }: OperatorDeps
     }),
     async (c) =>
       c.json(await operatorConnectorAnalytics(db, c.req.valid("param").connector, c.req.valid("query")), 200),
+  );
+
+  const workDescription =
+    "Turns and waits count runs created in the dates, tokens the usage recorded in them. Counts and ids only: no message, no name.";
+  api.openapi(
+    createRoute({
+      method: "get",
+      path: "/analytics/work",
+      tags,
+      summary: "Agent work and tokens across workspaces: per day (or hour) and per workspace",
+      description: workDescription,
+      request: { query: WorkRange },
+      responses: { 200: json(WorkAnalytics), 400: errors[400], 401: errors[401] },
+    }),
+    async (c) => c.json(await operatorWorkAnalytics(db, c.req.valid("query")), 200),
+  );
+
+  api.openapi(
+    createRoute({
+      method: "get",
+      path: "/analytics/work/orgs/{orgId}",
+      tags,
+      summary: "One workspace's agent work and tokens: per day (or hour) and per agent",
+      description: `${workDescription} An unknown workspace answers with zeros.`,
+      request: { params: OrgParams, query: WorkRange },
+      responses: { 200: json(OrgWorkAnalytics), 400: errors[400], 401: errors[401] },
+    }),
+    async (c) => c.json(await operatorOrgWorkAnalytics(db, c.req.valid("param").orgId, c.req.valid("query")), 200),
   );
 }

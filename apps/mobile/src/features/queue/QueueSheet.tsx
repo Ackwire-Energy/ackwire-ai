@@ -1,0 +1,267 @@
+import {
+  type ComputerQueue,
+  type QueueWaiting,
+  type QueueWorking,
+  useChannels,
+  useDms,
+  useMachineQueue,
+  useMachines,
+} from "@agenteschat/client";
+import {
+  durationText,
+  type QueueNames,
+  type QueueRow,
+  queueAllStartedText,
+  queueButtonText,
+  queueLeftText,
+  queuePurposeText,
+  queueStartText,
+  queueStatusText,
+  queueView,
+  queueWhereText,
+} from "@agenteschat/client/lib/computer-queue";
+import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { CHROME_MAX_SCALE, Chip, Count, Icon, PressScale, Text } from "@/ui";
+import { AgentFace } from "../shared/Face";
+import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
+import { SheetTitle } from "../shared/PromptForm";
+import { useSheet } from "../shared/SheetHost";
+import { machineOfAgents, queuePlace } from "./logic";
+
+/** The line of the computer these agents share (the first one's), live; nothing while none has a computer. */
+export function useAgentsQueue(agentIds: readonly string[]) {
+  const orgId = useOrgId();
+  const machines = useMachines(orgId);
+  const machineId = machineOfAgents(machines.data, agentIds);
+  const queue = useMachineQueue(orgId, machineId);
+  return { machineId, queue: queue.data ?? null };
+}
+
+/** Opens a computer's line in the screen's sheet, over the conversation. */
+export function useOpenQueue() {
+  const sheet = useSheet();
+  return useCallback((machineId: string) => sheet.open(<QueueSheet machineId={machineId} />), [sheet]);
+}
+
+/**
+ * The conversation bar's way into the line while turns wait for the computer: the waiting icon with how many wait.
+ * The bar sits outside the screen's sheet host, so the screen opens the sheet (`onPress`).
+ */
+export function QueueButton({ queue, onPress }: { queue: ComputerQueue; onPress: () => void }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  return (
+    <PressScale
+      to={0.9}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={queueButtonText(t, queue)}
+      hitSlop={4}
+      style={styles.button}
+    >
+      <Icon name="wait" size={20} color={c.ink2} />
+      <View style={styles.badge} pointerEvents="none">
+        <Count value={queue.waiting.length} size={10} inverted max={99} />
+      </View>
+    </PressScale>
+  );
+}
+
+/**
+ * A computer's line, as on the web's dialog: how full it is and when the next starts, "Working now" (every turn
+ * running: what for, where, for how long, the time left) and "In line" (the order, who asked, the estimated start;
+ * my own request marked "You go first"), and the rule that keeps it. What a turn is for, never its content.
+ */
+export function QueueSheet({ machineId }: { machineId: string }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const orgId = useOrgId();
+  const meId = useMeId();
+  const q = useMachineQueue(orgId, machineId);
+  const now = useNow(30_000);
+  const words = useQueueWords();
+  if (!q.data) {
+    return q.isError ? (
+      <Text tone="muted">{t("mobile.app.failed")}</Text>
+    ) : (
+      <ActivityIndicator color={c.muted} style={styles.loading} />
+    );
+  }
+  const view = queueView(q.data, meId ?? "");
+  const allStarted = queueAllStartedText(t, view, now);
+  return (
+    <>
+      <View accessible accessibilityRole="header" accessibilityLabel={t("queue.label", { name: q.data.name })}>
+        <SheetTitle title={q.data.name} subtitle={queueStatusText(t, view, now)} />
+      </View>
+      <GroupHead title={t("queue.workingNow", { n: view.working.length })} />
+      {view.working.length === 0 ? (
+        <Text variant="small" tone="muted">
+          {t("queue.nothingWorking")}
+        </Text>
+      ) : (
+        view.working.map((w) => <WorkingRow key={w.runId} row={w} words={words} now={now} />)
+      )}
+      {view.waiting.length > 0 ? (
+        <>
+          <GroupHead title={t("queue.inLine", { n: view.waiting.length })} aside={allStarted} />
+          {view.waiting.map((w) => (
+            <WaitingRow key={w.runId} row={w} words={words} now={now} />
+          ))}
+        </>
+      ) : null}
+      <Text variant="caption" tone="faint" style={styles.rule}>
+        {t("queue.rule")}
+      </Text>
+    </>
+  );
+}
+
+/** Names and places as this person knows them: agents and people by name, conversations they can see. */
+function useQueueWords() {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const meId = useMeId();
+  const dir = useDirectory();
+  const channels = useChannels(orgId);
+  const dms = useDms(orgId);
+  return useMemo(() => {
+    const names: QueueNames = {
+      viewerId: meId ?? "",
+      agent: (id) => dir.anyAgent(id)?.name,
+      person: (id) => dir.memberById.get(id)?.name,
+    };
+    return {
+      names,
+      agentName: (id: string) => names.agent(id) ?? t("channel.unknownAgent"),
+      line: (r: QueueWorking | QueueWaiting) =>
+        [queuePurposeText(t, r.purpose, names), queueWhereText(t, queuePlace(r.where, channels.data, dms.data))].join(
+          " · ",
+        ),
+    };
+  }, [t, meId, dir, channels.data, dms.data]);
+}
+
+type Words = ReturnType<typeof useQueueWords>;
+
+function GroupHead({ title, aside }: { title: string; aside?: string | null }) {
+  return (
+    <View style={styles.head}>
+      <Text variant="small" tone="ink" accessibilityRole="header" style={styles.headTitle}>
+        {title}
+      </Text>
+      {aside ? (
+        <Text variant="caption" tone="faint" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+          {aside}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function WorkingRow({ row: w, words, now }: { row: QueueRow<QueueWorking>; words: Words; now: number }) {
+  const { t } = useTranslation();
+  const elapsed = durationText(t, Math.max(0, now - Date.parse(w.startedAt)));
+  return (
+    <QueueLine
+      agentId={w.agentId}
+      position={null}
+      name={words.agentName(w.agentId)}
+      line={`${words.line(w)} · ${elapsed}`}
+      time={queueLeftText(t, w, now)}
+      mine={w.mine}
+    />
+  );
+}
+
+function WaitingRow({ row: w, words, now }: { row: QueueRow<QueueWaiting>; words: Words; now: number }) {
+  const { t } = useTranslation();
+  return (
+    <QueueLine
+      agentId={w.agentId}
+      position={w.position}
+      name={words.agentName(w.agentId)}
+      line={words.line(w)}
+      time={queueStartText(t, w, words.names.agent, now)}
+      mine={w.mine}
+      first={w.mine && w.people}
+    />
+  );
+}
+
+/**
+ * One turn: its place (in line), the agent's face on the first line, who and what for (wrapping), the time. `mine`
+ * highlights my own request; `first` (waiting, a person waits on it) also says "You go first".
+ */
+export function QueueLine({
+  agentId,
+  position,
+  name,
+  line,
+  time,
+  mine,
+  first = false,
+}: {
+  agentId: string;
+  position: number | null;
+  name: string;
+  line: string;
+  time: string | null;
+  mine: boolean;
+  first?: boolean;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  return (
+    <View
+      style={[styles.row, mine && { backgroundColor: c.sunken }]}
+      accessible
+      accessibilityLabel={[position, name, line, first ? t("queue.youFirst") : null, time].filter(Boolean).join(", ")}
+    >
+      {position !== null ? (
+        <Text variant="footnote" tone="faint" style={styles.pos} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+          {position}
+        </Text>
+      ) : null}
+      <AgentFace agentId={agentId} size={24} live={false} />
+      <View style={styles.text}>
+        <Text variant="footnote" tone="muted">
+          <Text variant="footnote" tone="ink" style={styles.bold}>
+            {name}
+          </Text>
+          {` ${line}`}
+        </Text>
+        {first ? <Chip icon="person" label={t("queue.youFirst")} /> : null}
+      </View>
+      {time ? (
+        <Text variant="caption" tone="faint" numberOfLines={1} style={styles.time}>
+          {time}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  loading: { marginVertical: 24 },
+  button: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  badge: { position: "absolute", top: 2, right: 0 },
+  head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginTop: 6 },
+  headTitle: { fontWeight: "600", flexShrink: 1 },
+  // The face (24) centered on the words' first line (footnote, 18 tall, 3 down); the place and the time too.
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  pos: { width: 16, paddingTop: 3, textAlign: "right", fontVariant: ["tabular-nums"] },
+  text: { flex: 1, minWidth: 0, gap: 4, paddingTop: 3 },
+  bold: { fontWeight: "600" },
+  time: { paddingTop: 4, flexShrink: 0, fontVariant: ["tabular-nums"] },
+  rule: { marginTop: 4 },
+});

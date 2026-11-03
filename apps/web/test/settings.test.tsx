@@ -434,7 +434,13 @@ describe("Configurações do workspace", () => {
     expect(plans.textContent).toContain("A conta que os seus agentes dividemMax");
     expect(plans.textContent).toContain("Claude Code · de Walter");
     expect(within(plans).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("41");
-    expect(plans.textContent).toContain("Ada ≈ 30% · Atlas ≈ 11%");
+    // The week's bar split by agent, and one list: no line of parts under it.
+    expect(within(plans).getByRole("meter", { name: "Semana" }).querySelectorAll(".ac-meter__seg").length).toBe(2);
+    expect(plans.textContent).not.toContain("Ada ≈ 30%");
+    expect([...plans.querySelectorAll(".plan-shares__row")].map((r) => r.textContent)).toEqual([
+      "Ada30%4,5 mi",
+      "Atlas11%600 mil",
+    ]);
     expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$\u00a092,00 pela API");
     const api = screen().getByRole("region", { name: "API do workspace" });
     expect(api.textContent).toContain("23% do orçamento");
@@ -515,7 +521,7 @@ describe("Configurações do workspace", () => {
     expect(line()?.textContent).toBe("Os agentes só respondem quando mencionados.");
   });
 
-  test("members see only their own settings: no Geral, roles or GIFs, never the workspace's keys or money", async () => {
+  test("members see only their own settings: no Geral, roles, GIFs or voice, never the workspace's keys or money", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
@@ -613,6 +619,70 @@ describe("Configurações do workspace", () => {
     expect(shownText(screen().getByRole("region", { name: "Contas dos planos" }))).toBe(
       "Contas dos planosNenhum agente pensa com um plano ainda.",
     );
+  });
+});
+
+describe("a plan account's agents (Contas dos planos)", () => {
+  /** The shared account with more agents than the list shows: Ada and Atlas, and five made-up colleagues. */
+  const crowded = () => {
+    const api = createFakeApi(seedState());
+    const plain = api.orgs.planUsage;
+    api.orgs.planUsage = async (...args) => {
+      const usage = await plain(...args);
+      const [acct] = usage.accounts;
+      if (!acct?.usage) return usage;
+      const crew = [
+        { agentId: "ag-rio", name: "Rio", percent: 2, tokens: 900_000 },
+        { agentId: "ag-nova", name: "Nova", percent: 1.5, tokens: 700_000 },
+        { agentId: "ag-lia", name: "Lia", percent: 1.2, tokens: 500_000 },
+        { agentId: "ag-theo", name: "Theo", percent: 0.9, tokens: 300_000 },
+        { agentId: "ag-bia", name: "Bia", percent: 0.6, tokens: 200_000 },
+      ];
+      const week = acct.usage.windows.find((w) => w.kind === "seven_day");
+      if (week?.agents) week.agents.push(...crew.map(({ tokens: _t, ...a }) => a));
+      acct.agents.push(...crew.map(({ percent: _p, ...a }) => ({ ...a, now: false })));
+      return usage;
+    };
+    return api;
+  };
+
+  test("the bar split in each agent's color, then one list biggest share first, then when it renews and the month", async () => {
+    await renderApp(`/org/${ORG_ID}/settings/usage`, { api: crowded() });
+    await settle(5);
+    const plans = screen().getByRole("region", { name: "Contas dos planos" });
+    const week = within(plans).getByRole("meter", { name: "Semana" });
+    const segs = [...week.querySelectorAll<HTMLElement>(".ac-meter__seg")];
+    // Colours only for the agents the list shows: the folded ones stay the plain use under them.
+    expect(segs.map((s) => s.style.width)).toEqual(["30%", "11%", "2%", "1.5%", "1.2%"]);
+    expect(segs.every((s) => s.style.getPropertyValue("--seg-deep").startsWith("#"))).toBe(true);
+    // The total stays at the bar's right.
+    expect(plans.textContent).toContain("Semana41%");
+    const rows = () => [...plans.querySelectorAll(".plan-shares__row")].map((r) => r.textContent);
+    expect(rows()).toEqual([
+      "Ada30%4,5 mi",
+      "Atlas11%600 mil",
+      "Rio2%900 mil",
+      "Nova1,5%700 mil",
+      "Lia1,2%500 mil",
+      "+2 agentes1,5%500 mil",
+    ]);
+    expect(within(plans).getByText("Este mês")).toBeTruthy();
+    // When it renews, once, under the list; then how old the numbers are; then the month.
+    const text = plans.textContent ?? "";
+    expect(plans.querySelectorAll(".ac-planmeter__reset").length).toBe(1);
+    expect(plans.querySelector(".ac-planmeter__reset")?.textContent).toMatch(/^5h renova .+ · semana renova /);
+    const at = (piece: string) => text.indexOf(piece);
+    expect(at("+2 agentes")).toBeLessThan(at("5h renova"));
+    expect(at("5h renova")).toBeLessThan(at("Atualizado"));
+    expect(at("Atualizado")).toBeLessThan(at("5,1 mi tokens este mês"));
+    expect(text.split("tokens este mês").length).toBe(2);
+    // The folded row opens the rest in place.
+    const more = within(plans).getByRole("button", { name: /\+2 agentes/ });
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    await click(more);
+    await settle(2);
+    expect(rows().slice(5)).toEqual(["Theo<1%300 mil", "Bia<1%200 mil"]);
+    expect(within(plans).queryByRole("button", { name: /\+2 agentes/ })).toBeNull();
   });
 });
 

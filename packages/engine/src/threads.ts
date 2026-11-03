@@ -6,7 +6,7 @@ import { type Channel, requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
-import { type PreviewMeta, previewMeta } from "./message-preview";
+import { type PreviewMeta, previewMeta, readableBody } from "./message-preview";
 import { type Message, messageView, replyExcerpt } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
 import { agentOnlyNoticeSql } from "./notices";
@@ -431,7 +431,7 @@ export async function createThreadFromRange(
   const range = await resolveRange(db, orgId, source, input);
   await requireRangeVisible(db, orgId, channel.id, source);
   const given = cleanTitle(input.title);
-  const title = given ?? autoThreadTitle(range.first.body);
+  const title = given ?? autoThreadTitle(readableBody(range.first.body, range.first.meta));
   const start: ThreadStartMeta = {
     title,
     contextChannelId: source.id,
@@ -581,7 +581,7 @@ export async function updateThread(
       if (fresh) movedIds = await moveRange(tx, fresh, root);
     }
     await syncThreadStart(tx, root, {
-      ...(title !== undefined ? { title: title ?? root.body } : {}),
+      ...(title !== undefined ? { title: title ?? readableBody(root.body, root.meta) } : {}),
       ...(range
         ? {
             contextChannelId: range.source.id,
@@ -908,6 +908,7 @@ interface ThreadSqlRow {
   channel_kind: "channel" | "dm" | "forum";
   created_at: Date | string;
   body: string;
+  root_meta: Record<string, unknown> | null;
   author_type: "person" | "agent";
   author_user_id: string | null;
   author_agent_id: string | null;
@@ -1030,7 +1031,7 @@ async function queryThreads(
           ${input.rootId ? sql`and t.root_message_id = ${input.rootId}::uuid` : sql``}
       ), listed as (
         select root.id, root.channel_id, v.name as channel_name, v.kind as channel_kind, root.created_at,
-          root.body, root.author_type, root.author_user_id, root.author_agent_id,
+          root.body, root.meta as root_meta, root.author_type, root.author_user_id, root.author_agent_id,
           coalesce(r.reply_count, 0) as reply_count, coalesce(r.last_at, root.created_at) as last_at,
           t.title, coalesce(t.state, 'open') as state, t.opened_by_reply_at, t.created_by, t.closed_by, t.closed_at,
           t.archived_by, t.archived_at, t.context_channel_id, t.context_first_message_id,
@@ -1152,7 +1153,7 @@ function toView(
     channelName: r.channel_name,
     channelKind: r.channel_kind,
     title: r.title,
-    rootText: replyExcerpt(r.body),
+    rootText: replyExcerpt(readableBody(r.body, r.root_meta)),
     rootAuthor: { type: r.author_type, id: r.author_type === "person" ? r.author_user_id : r.author_agent_id },
     state: r.state ?? "open",
     openedByReplyAt: isoOrNull(r.opened_by_reply_at ?? null),
@@ -1177,7 +1178,7 @@ function toView(
     lastMessage: last
       ? {
           author: { type: last.authorType, id: last.authorType === "person" ? last.authorUserId : last.authorAgentId },
-          excerpt: replyExcerpt(last.body),
+          excerpt: replyExcerpt(readableBody(last.body, last.meta)),
           meta: previewMeta(last.meta),
           createdAt: last.createdAt.toISOString(),
         }
@@ -1249,6 +1250,7 @@ export async function getThread(db: Database, actorId: string, orgId: string, ro
       channel_kind: channel.kind,
       created_at: root.createdAt,
       body: root.body,
+      root_meta: root.meta,
       author_type: root.authorType,
       author_user_id: root.authorUserId,
       author_agent_id: root.authorAgentId,

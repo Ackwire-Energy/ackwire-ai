@@ -3,6 +3,7 @@ import {
   type BrainTurnRequest,
   type ErrorReporter,
   type S3Fetch,
+  type SpeechFetch,
   STREAM_CLOSE,
 } from "@agenteschat/adapters";
 import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
@@ -60,6 +61,7 @@ import {
   createSetStatusToolSource,
   createSetupToolSource,
   createSkillToolSource,
+  createSpeechSettings,
   createStreamBroker,
   createTalker,
   createToolGateway,
@@ -71,8 +73,10 @@ import {
   createWorkToolSource,
   type EmailArt,
   emailArtAt,
+  envSpeechEngines,
   type GitProxyDeps,
   hubBrainLink,
+  isAgentesCloud,
   type JobDeps,
   type Judge,
   type MailDeps,
@@ -97,6 +101,7 @@ import {
   standingJudge,
   streamClosed,
   type ToolSource,
+  type VoiceDeps,
   warmAgentBrowser,
   withComposio,
   withJudgeFallback,
@@ -133,6 +138,8 @@ export interface EngineOptions {
   schedules?: ScheduleReader;
   /** Tests: fake S3 server and DNS for org buckets. */
   s3Fetch?: S3Fetch;
+  /** Tests: fake speech providers. */
+  speechFetch?: SpeechFetch;
   resolveHost?: ResolveHost;
   /** Per-run stage breakdown (debug log). */
   onRunProfile?: RunExecutorDeps["onRunProfile"];
@@ -496,7 +503,49 @@ export function buildEngine(o: EngineOptions) {
         prepare: prepareCode,
       }),
   };
+  // Voice messages (ADR 0100): engines from the environment, and on any other server the one its owner sets.
+  const speech = createSpeechSettings({
+    db,
+    keyWrapper: adapters.keyWrapper,
+    keyWrappers,
+    envOnly: isAgentesCloud(config.PUBLIC_URL),
+    fetch: o.speechFetch,
+    envEngines: envSpeechEngines(
+      config.SPEECH_ENGINES,
+      {
+        assemblyai: { apiKey: config.ASSEMBLYAI_API_KEY },
+        elevenlabs: { apiKey: config.ELEVENLABS_API_KEY },
+        soniox: { apiKey: config.SONIOX_API_KEY },
+        groq: { apiKey: config.GROQ_API_KEY },
+        openai: { apiKey: config.OPENAI_SPEECH_API_KEY },
+        local: {
+          baseUrl: config.LOCAL_SPEECH_URL,
+          model: config.LOCAL_SPEECH_MODEL,
+          apiKey: config.LOCAL_SPEECH_API_KEY,
+          warm: config.LOCAL_SPEECH_WARM === "on",
+        },
+      },
+      { fetch: o.speechFetch },
+    ),
+  });
+  const voice: VoiceDeps = {
+    db,
+    pubsub: adapters.pubsub,
+    blobs: artifacts.blobs,
+    engines: speech.chain,
+    judge: context.judge,
+    retentionDays: config.VOICE_RETENTION_DAYS,
+    // Fair use is for what we pay for: a self-hosted server has no limit.
+    limits: isAgentesCloud(config.PUBLIC_URL)
+      ? {
+          personMinutesPerDay: config.VOICE_LIMIT_PERSON_MINUTES_PER_DAY,
+          orgMinutesPerMember: config.VOICE_LIMIT_ORG_MINUTES_PER_MEMBER,
+          orgMinMinutesPerDay: config.VOICE_LIMIT_ORG_MIN_MINUTES_PER_DAY,
+        }
+      : null,
+  };
   const jobDeps: JobDeps = {
+    voice,
     db,
     gateway,
     pubsub: adapters.pubsub,
@@ -526,6 +575,7 @@ export function buildEngine(o: EngineOptions) {
     toolsOnDemand: o.toolsOnDemand ?? true,
     warmBrowser,
     brains,
+    prepareCode,
     machines: machineHub,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,
     contextMessages: config.AGENT_CONTEXT_MESSAGES,
@@ -579,6 +629,9 @@ export function buildEngine(o: EngineOptions) {
     talker,
     /** Awaited before the server serves (`ready()`), and the owner's routes read and change it. */
     jevKey,
+    /** Likewise: the speech engines, read before the first voice message. */
+    speech,
+    voice,
   };
 }
 

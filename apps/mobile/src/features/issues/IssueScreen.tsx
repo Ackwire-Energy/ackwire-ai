@@ -83,7 +83,14 @@ function IssueView({ number }: { number: number }) {
   const orgId = useOrgId();
   const scroll = useRef<ScrollViewInstance>(null);
   const issue = useIssue(orgId, number);
-  const pull = usePullRefresh(issue.refetch);
+  const qc = useQueryClient();
+  // Pulling down brings the activity too (comments, events), not only the task.
+  const pull = usePullRefresh(() =>
+    Promise.all([
+      issue.refetch(),
+      issue.data ? qc.refetchQueries({ queryKey: keys.issueActivity(orgId, issue.data.id) }) : null,
+    ]),
+  );
   const sheet = useSheet();
   const i = issue.data;
   if (!i) {

@@ -13,7 +13,8 @@ export function readComposerDraft(userId: string, key: string): ComposerDraft | 
   return readDraftBook(storage.get(bookKey(userId)), Date.now())[key];
 }
 
-function writeComposerDraft(userId: string, key: string, text: string) {
+/** Writes (or, blank, removes) one entry of this person's book of unsent texts. */
+export function writeComposerDraft(userId: string, key: string, text: string) {
   const name = bookKey(userId);
   const next = withDraft(readDraftBook(storage.get(name), Date.now()), key, text, Date.now());
   if (Object.keys(next).length === 0) storage.remove(name);

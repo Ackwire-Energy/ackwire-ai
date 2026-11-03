@@ -3832,6 +3832,9 @@
       "other": "{{names}} are waiting for the computer"
     }
   },
+  "receipts.queuedNext": {
+    "value": "{{names}} is in line for the computer · next"
+  },
   "receipts.nobody": {
     "value": "No agent will answer"
   },
@@ -7024,6 +7027,9 @@
   },
   "agent.runNoText": {
     "value": "No text"
+  },
+  "agent.runPrivate": {
+    "value": "In a conversation you're not in"
   },
   "agent.runTokens": {
     "value": "{{input}} in · {{cached}} cached · {{output}} out"
@@ -15758,6 +15764,180 @@
   "emoji.categories.symbols": {
     "value": "Symbols"
   },
+  "voice.word": {
+    "value": "Voice message"
+  },
+  "voice.wordTime": {
+    "value": "Voice message · {{time}}"
+  },
+  "voice.holdToRecord": {
+    "value": "Hold to record"
+  },
+  "voice.slideToDelete": {
+    "value": "Slide to delete"
+  },
+  "voice.send": {
+    "value": "Send audio"
+  },
+  "voice.delete": {
+    "value": "Delete recording"
+  },
+  "voice.deleted": {
+    "value": "Recording deleted."
+  },
+  "voice.pause": {
+    "value": "Pause"
+  },
+  "voice.resume": {
+    "value": "Keep recording"
+  },
+  "voice.listen": {
+    "value": "Listen to your recording"
+  },
+  "voice.play": {
+    "value": "Play"
+  },
+  "voice.stop": {
+    "value": "Stop"
+  },
+  "voice.speed": {
+    "value": "Speed"
+  },
+  "voice.left": {
+    "value": "{{seconds}} s left"
+  },
+  "voice.tooShort": {
+    "value": "Too short. Say a little more."
+  },
+  "voice.silent": {
+    "value": "Didn't hear anything. Nothing was sent."
+  },
+  "voice.notSent": {
+    "value": "Couldn't send the audio."
+  },
+  "voice.limit": {
+    "value": "That's a lot of audio for today. Write here and try again tomorrow."
+  },
+  "voice.micBlocked": {
+    "value": "The microphone is blocked"
+  },
+  "voice.micBlockedHint": {
+    "value": "Allow the microphone in your device settings to record."
+  },
+  "voice.openSettings": {
+    "value": "Open settings"
+  },
+  "voice.notNow": {
+    "value": "Not now"
+  },
+  "voice.expired": {
+    "value": "Audio expired"
+  },
+  "voice.showText": {
+    "value": "Show text"
+  },
+  "voice.hideText": {
+    "value": "Hide text"
+  },
+  "voice.record": {
+    "value": "Record audio"
+  },
+  "voice.recording": {
+    "value": "Recording audio"
+  },
+  "voice.discard": {
+    "value": "Delete recording"
+  },
+  "voice.stopListening": {
+    "value": "Stop listening"
+  },
+  "voice.keys": {
+    "value": "Enter sends · Esc deletes"
+  },
+  "voice.keysHold": {
+    "value": "Release to send · Esc deletes"
+  },
+  "voice.keysPaused": {
+    "value": "Paused · Space listens · Enter sends · Esc deletes"
+  },
+  "voice.pausePlay": {
+    "value": "Pause"
+  },
+  "voice.seek": {
+    "value": "Audio position"
+  },
+  "voice.speedAt": {
+    "value": "Speed {{speed}}×"
+  },
+  "voice.waiting": {
+    "value": "Goes as soon as you're back online"
+  },
+  "voice.notUnderstood": {
+    "value": "Couldn't make out the audio. Nothing was sent."
+  },
+  "voice.refused": {
+    "value": "The audio couldn't be sent in this conversation."
+  },
+  "voice.blockedMac": {
+    "value": "The microphone is blocked. On a Mac: System Settings › Privacy › Microphone."
+  },
+  "voice.blockedWeb": {
+    "value": "The microphone is blocked. Allow it from the lock next to the site's address."
+  },
+  "voice.noMic": {
+    "value": "No microphone found."
+  },
+  "voice.failed": {
+    "value": "Couldn't open the microphone. Try again."
+  },
+  "voice.noPlayback": {
+    "value": "Can't play it right now. You can still send it or keep recording."
+  },
+  "voice.settings.title": {
+    "value": "Voice messages"
+  },
+  "voice.settings.on": {
+    "value": "Voice messages"
+  },
+  "voice.settings.onHelp": {
+    "value": "People in this workspace can send audio in conversations."
+  },
+  "voice.settings.noEngine": {
+    "value": "Voice messages aren't available here yet."
+  },
+  "voice.settings.engineTitle": {
+    "value": "What turns voice into text"
+  },
+  "voice.settings.own": {
+    "value": "Your own server"
+  },
+  "voice.settings.ownHelp": {
+    "value": "Whisper or Parakeet on your machine. The audio stays there."
+  },
+  "voice.settings.address": {
+    "value": "Server address"
+  },
+  "voice.settings.key": {
+    "value": "{{name}} key"
+  },
+  "voice.settings.keyPlaceholder": {
+    "value": "Paste here"
+  },
+  "voice.settings.test": {
+    "value": "Test"
+  },
+  "voice.settings.tested": {
+    "value": "It works. Everyone now sees the microphone."
+  },
+  "voice.settings.sealed": {
+    "value": "Kept encrypted on your server and never shown again."
+  },
+  "voice.settings.leaves": {
+    "value": "Audio from voice messages goes to {{name}} to become text."
+  },
+  "voice.settings.invalid": {
+    "value": "The saved key doesn't open on this server. Paste it again."
+  },
   "media.word.gif": {
     "value": "GIF"
   },
@@ -18061,6 +18241,12 @@
       "other": "uses in the last 7 days"
     }
   },
+  "wiki.uses.week": {
+    "value": {
+      "one": "{{count}} use this week",
+      "other": "{{count}} uses this week"
+    }
+  },
   "wiki.uses.last": {
     "value": "{{name}} used it {{when}}"
   },
@@ -18069,6 +18255,168 @@
   },
   "wiki.uses.none": {
     "value": "No agent has used it yet. It goes into answers when someone asks about the subject."
+  },
+  "wiki.editedWhen": {
+    "value": "edited {{when}}"
+  },
+  "wiki.access.label": {
+    "value": "Who sees it: {{who}}"
+  },
+  "wiki.access.everyone": {
+    "value": "The whole workspace"
+  },
+  "wiki.access.everyoneHint": {
+    "value": "Any member and any agent with access to the wiki read this page."
+  },
+  "wiki.access.peopleAnd": {
+    "value": "Everyone and {{agents}}"
+  },
+  "wiki.access.peopleOnly": {
+    "value": "Everyone, no agents"
+  },
+  "wiki.access.ownersOnly": {
+    "value": "Owners only"
+  },
+  "wiki.access.withAllAgents": {
+    "value": "{{names}} and every agent"
+  },
+  "wiki.access.more": {
+    "value": {
+      "one": "{{count}} more",
+      "other": "{{count}} more"
+    }
+  },
+  "wiki.backlinkDm": {
+    "value": "Conversation with {{name}}"
+  },
+  "wiki.backlinkDmSomeone": {
+    "value": "someone"
+  },
+  "wiki.draftKept": {
+    "value": "Draft kept"
+  },
+  "wiki.draftRecovered": {
+    "value": "Draft recovered"
+  },
+  "wiki.markdown": {
+    "value": "Markdown"
+  },
+  "wiki.markdownHint": {
+    "value": "See and edit the text as Markdown"
+  },
+  "wiki.props.folderHint": {
+    "value": "The page's folder"
+  },
+  "wiki.props.noFolder": {
+    "value": "No folder"
+  },
+  "wiki.props.searchFolder": {
+    "value": "Search folders"
+  },
+  "wiki.props.createFolder": {
+    "value": "Create folder “{{name}}”"
+  },
+  "wiki.props.addTag": {
+    "value": "Tag"
+  },
+  "wiki.props.removeTag": {
+    "value": "Remove #{{tag}}"
+  },
+  "wiki.rich.placeholder": {
+    "value": "Write here. [[ links another page and / shows the blocks."
+  },
+  "wiki.rich.hint": {
+    "value": "[[ links another page · / shows the blocks · {{key}} S saves a version"
+  },
+  "wiki.rich.blockLabel": {
+    "value": "Block type"
+  },
+  "wiki.rich.strike": {
+    "value": "Strikethrough"
+  },
+  "wiki.rich.linkPage": {
+    "value": "Link a page"
+  },
+  "wiki.rich.column": {
+    "value": "Column"
+  },
+  "wiki.rich.addRow": {
+    "value": "Row"
+  },
+  "wiki.rich.addColumn": {
+    "value": "Column"
+  },
+  "wiki.rich.calloutText": {
+    "value": "Write the callout here."
+  },
+  "wiki.rich.codeText": {
+    "value": "code"
+  },
+  "wiki.rich.blocks.paragraph": {
+    "value": "Paragraph"
+  },
+  "wiki.rich.blocks.heading": {
+    "value": "Heading"
+  },
+  "wiki.rich.blocks.subheading": {
+    "value": "Subheading"
+  },
+  "wiki.rich.blocks.list": {
+    "value": "List"
+  },
+  "wiki.rich.blocks.numbered": {
+    "value": "Numbered list"
+  },
+  "wiki.rich.blocks.task": {
+    "value": "Task"
+  },
+  "wiki.rich.blocks.table": {
+    "value": "Table"
+  },
+  "wiki.rich.blocks.callout": {
+    "value": "Callout"
+  },
+  "wiki.rich.blocks.code": {
+    "value": "Code"
+  },
+  "wiki.rich.blocks.quote": {
+    "value": "Quote"
+  },
+  "wiki.rich.blocks.rule": {
+    "value": "Divider"
+  },
+  "wiki.rich.blocks.link": {
+    "value": "Wiki page"
+  },
+  "wiki.ask.button": {
+    "value": "Ask an agent"
+  },
+  "wiki.ask.title": {
+    "value": "Ask an agent"
+  },
+  "wiki.ask.text": {
+    "value": "The request goes to your conversation with the agent, with a link to the page. It edits with the wiki tools, and the version shows in the history as done at your request."
+  },
+  "wiki.ask.agent": {
+    "value": "Agent"
+  },
+  "wiki.ask.what": {
+    "value": "What should change?"
+  },
+  "wiki.ask.placeholder": {
+    "value": "E.g. update it with the 2027 price increase"
+  },
+  "wiki.ask.send": {
+    "value": "Send to {{name}}"
+  },
+  "wiki.ask.sendNone": {
+    "value": "Send"
+  },
+  "wiki.ask.sent": {
+    "value": "Request sent in your conversation with {{name}}."
+  },
+  "wiki.ask.message": {
+    "value": "About the page [[{{title}}]]:"
   },
   "wiki.import.cta": {
     "value": "Import from Obsidian"
@@ -18738,6 +19086,165 @@
   },
   "computer.target.noneText": {
     "value": "Doesn't run programs or keep files"
+  },
+  "queue.button": {
+    "value": {
+      "one": "Computer · {{count}} waiting",
+      "other": "Computer · {{count}} waiting"
+    }
+  },
+  "queue.buttonIdle": {
+    "value": "Computer"
+  },
+  "queue.see": {
+    "value": "See queue"
+  },
+  "queue.label": {
+    "value": "Line for {{name}}"
+  },
+  "queue.full": {
+    "value": "Full"
+  },
+  "queue.fullNext": {
+    "value": "Full · next starts in about {{n}} min"
+  },
+  "queue.free": {
+    "value": "Nobody in line"
+  },
+  "queue.workingNow": {
+    "value": "Working now · {{n}}"
+  },
+  "queue.inLine": {
+    "value": "In line · {{n}}"
+  },
+  "queue.allStarted": {
+    "value": "all started in ~{{n}} min"
+  },
+  "queue.nothingWorking": {
+    "value": "Nothing running right now"
+  },
+  "queue.rule": {
+    "value": "People go first. Agents mentioned together start one at a time."
+  },
+  "queue.youFirst": {
+    "value": "You go first"
+  },
+  "queue.startsIn": {
+    "value": "starts ~{{n}} min"
+  },
+  "queue.startsAfter": {
+    "value": "starts once {{after}} finishes"
+  },
+  "queue.left": {
+    "value": "~{{n}} min left"
+  },
+  "queue.who": {
+    "value": "{{name}}"
+  },
+  "queue.away": {
+    "value": "Away {{time}}"
+  },
+  "queue.purpose.you": {
+    "value": "answering you"
+  },
+  "queue.purpose.person": {
+    "value": "answering {{name}}"
+  },
+  "queue.purpose.someone": {
+    "value": "answering a person"
+  },
+  "queue.purpose.agent": {
+    "value": "asked by {{name}}"
+  },
+  "queue.purpose.someAgent": {
+    "value": "asked by an agent"
+  },
+  "queue.purpose.routine": {
+    "value": "a routine"
+  },
+  "queue.purpose.work": {
+    "value": "long work"
+  },
+  "queue.where.yourDm": {
+    "value": "your DM"
+  },
+  "queue.where.dm": {
+    "value": "DM with {{name}}"
+  },
+  "queue.where.thread": {
+    "value": "a thread in #{{name}}"
+  },
+  "queue.where.private": {
+    "value": "a private conversation"
+  },
+  "queue.live.nextEta": {
+    "value": "Waiting for the computer. Next up, in about {{n}} min"
+  },
+  "queue.live.nextAfter": {
+    "value": "Waiting for the computer. Next up, once {{after}} finishes"
+  },
+  "queue.live.next": {
+    "value": "Waiting for the computer. Next up"
+  },
+  "queue.live.behind": {
+    "value": "In line, {{nth}}. After {{names}}"
+  },
+  "queue.live.position": {
+    "value": "In line, {{nth}}"
+  },
+  "queue.nth.one": {
+    "value": "{{n}}st"
+  },
+  "queue.nth.two": {
+    "value": "{{n}}nd"
+  },
+  "queue.nth.few": {
+    "value": "{{n}}rd"
+  },
+  "queue.nth.other": {
+    "value": "{{n}}th"
+  },
+  "queue.fan.called": {
+    "value": {
+      "one": "{{count}} agent called",
+      "other": "{{count}} agents called"
+    }
+  },
+  "queue.fan.answered": {
+    "value": {
+      "one": "{{count}} answered",
+      "other": "{{count}} answered"
+    }
+  },
+  "queue.fan.working": {
+    "value": {
+      "one": "{{count}} working",
+      "other": "{{count}} working"
+    }
+  },
+  "queue.fan.inLine": {
+    "value": {
+      "one": "{{count}} in line",
+      "other": "{{count}} in line"
+    }
+  },
+  "queue.fan.failed": {
+    "value": {
+      "one": "{{count}} didn't answer",
+      "other": "{{count}} didn't answer"
+    }
+  },
+  "queue.fan.chip.answered": {
+    "value": "answered"
+  },
+  "queue.fan.chip.working": {
+    "value": "working"
+  },
+  "queue.fan.chip.inLine": {
+    "value": "in line"
+  },
+  "queue.fan.chip.failed": {
+    "value": "didn't answer"
   },
   "access.matrixTitle": {
     "value": "Agent access"
@@ -21574,6 +22081,9 @@
   },
   "toolReview.noTools": {
     "value": "The server didn't offer any tools."
+  },
+  "toolReview.unreadable": {
+    "value": "Couldn't read the connector's tools: {{reason}}"
   },
   "toolReview.refresh": {
     "value": "Look for new tools"
@@ -25216,6 +25726,9 @@
   "settings.section.media": {
     "value": "GIFs and stickers"
   },
+  "settings.section.voice": {
+    "value": "Voice"
+  },
   "settings.section.apps": {
     "value": "AI apps"
   },
@@ -25263,6 +25776,9 @@
   },
   "settings.sectionText.media": {
     "value": "What people can send in a conversation, and when agents send a GIF or a sticker."
+  },
+  "settings.sectionText.voice": {
+    "value": "Voice messages in conversations, and who turns voice into text."
   },
   "settings.sectionText.apps": {
     "value": "Ask this workspace's agents for tasks from Claude, Cursor and other apps."
@@ -25732,9 +26248,6 @@
   "usageViews.whose": {
     "value": "{{name}}'s"
   },
-  "usageViews.part": {
-    "value": "{{name}} ≈ {{percent}}"
-  },
   "usageViews.noWindows": {
     "value": "The limit shows up after this account is used again."
   },
@@ -25752,6 +26265,15 @@
   },
   "usageViews.equivalent": {
     "value": "≈ {{amount}} through the API"
+  },
+  "usageViews.thisMonth": {
+    "value": "This month"
+  },
+  "usageViews.moreAgents": {
+    "value": {
+      "one": "+{{count}} agent",
+      "other": "+{{count}} agents"
+    }
   },
   "usageViews.paid": {
     "value": "{{amount}} paid"
@@ -27161,20 +27683,20 @@
   },
   "chat.body.stretch_paused_runs": {
     "value": {
-      "one": "{{agents}} stopped to check with you · {{steps}} steps without you since your request",
-      "other": "{{agents}} stopped to check with you · {{steps}} steps on their own since your request"
+      "one": "{{agents}} paused to check with you before going on",
+      "other": "{{agents}} paused to check with you before going on"
     }
   },
   "chat.body.stretch_paused_spend": {
     "value": {
-      "one": "{{agents}} stopped to check with you · used {{percent}}% of the month's budget on this without you",
-      "other": "{{agents}} stopped to check with you · each used {{percent}}% of the month's budget on this without you"
+      "one": "{{agents}} paused to check with you · used {{percent}}% of the month's budget",
+      "other": "{{agents}} paused to check with you · each used {{percent}}% of the month's budget"
     }
   },
   "chat.body.stretch_paused_spend_cost": {
     "value": {
-      "one": "{{agents}} stopped to check with you · used {{amount}} ({{percent}}% of the month's budget) on this without you",
-      "other": "{{agents}} stopped to check with you · each used {{amount}} ({{percent}}% of the month's budget) on this without you"
+      "one": "{{agents}} paused to check with you · used {{amount}} ({{percent}}% of the month's budget)",
+      "other": "{{agents}} paused to check with you · each used {{amount}} ({{percent}}% of the month's budget)"
     }
   },
   "chat.body.memory.proposed": {

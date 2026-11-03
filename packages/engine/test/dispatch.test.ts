@@ -133,7 +133,7 @@ describe("dispatchMentions", () => {
     // A person waits on it now: it goes to the front of its computer's line, and looks again at once.
     expect(runs[0]?.transcript).toMatchObject({ roomPeople: true });
     const look = (await f.db.select().from(schema.outbox)).find((j) => j.dedupeKey?.includes(":steer:"));
-    expect(look?.payload).toEqual({ runId: runs[0]?.id, wait: "w1" });
+    expect(look?.payload).toEqual({ runId: runs[0]?.id, wait: "w1", line: machineId });
   });
 
   /** The agent's run in #general, parked in line for its computer. */
@@ -145,10 +145,11 @@ describe("dispatchMentions", () => {
       waitingMachineId: machineId,
       transcript: { waitingForBrain: { kind: "claude_code", machineId, code: "busy", waitId: "w1" } },
     });
+    return machineId;
   };
 
   test("a person's message the router sends to a run in line puts it first, and it looks again at once", async () => {
-    await inLine();
+    const machineId = await inLine();
     const unmentioned = await f.db.transaction((tx) =>
       insertMessage(tx, {
         orgId: f.org.id,
@@ -165,7 +166,7 @@ describe("dispatchMentions", () => {
     const look = (await f.db.select().from(schema.outbox)).find(
       (j) => j.dedupeKey === `agent_run.execute:${runs[0]?.id}:steer:${unmentioned.id}`,
     );
-    expect(look?.payload).toEqual({ runId: runs[0]?.id, wait: "w1" });
+    expect(look?.payload).toEqual({ runId: runs[0]?.id, wait: "w1", line: machineId });
   });
 
   test("Continuar on a pause card starts a fresh run, never the one waiting for its computer", async () => {

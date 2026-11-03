@@ -12,6 +12,7 @@ import type {
   Message,
   SecretRequest,
   ThreadInfo,
+  VoiceDroppedEvent,
 } from "@agenteschat/client";
 import {
   ApiError,
@@ -46,6 +47,7 @@ import {
   consultSeeds,
   createBrowserLiveConnection,
   dismissRun,
+  dropLocalVoice,
   dropProvisional,
   emptyStreams,
   expectReply,
@@ -72,6 +74,7 @@ import {
   touchRun,
   typingThrottle,
   unmarkStopping,
+  useIssueLive,
   useSendWaiting,
 } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
@@ -545,6 +548,12 @@ export function RealtimeProvider({
       // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
       // of agents (the sidebar's sections).
       applyWorkspaceEvent(qc, orgId, event);
+      // A recording that won't become a message: its bubble goes, and the person hears why (ADR 0100).
+      if (event.type === "voice.dropped" && "clientId" in event) {
+        const dropped = event as VoiceDroppedEvent;
+        dropLocalVoice(qc, orgId, dropped.channelId, dropped.clientId);
+        toast.show(tRef.current(dropped.reason === "silent" ? "voice.notUnderstood" : "voice.refused"), "error");
+      }
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
         const agent = qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === budgetEvent.agentId);
@@ -822,6 +831,11 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
     });
   }, [connection, enabled, orgId, channelId, qc, streams]);
+}
+
+/** An open task's activity, live: comments and events from others land in its feed (`useIssueLive`). */
+export function useIssueRealtime(orgId: string, issue: { id: string; channelId: string | null }) {
+  useIssueLive(orgId, useRealtime().connection, issue);
 }
 
 /** Each live event of a channel while mounted and `enabled` (the handler is read through a ref). */

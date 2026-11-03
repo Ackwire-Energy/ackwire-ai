@@ -41,9 +41,6 @@
 }
 .members-row__state {
   flex: 0 1 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
   min-width: 0;
   font-size: 12.5px;
   color: var(--muted);
@@ -60,24 +57,30 @@
 .members-row__state[data-tone="ok"] > .ac-icon {
   color: var(--ok);
 }
+/* A row breaks before it shrinks, so the actions go under the words whole when the row runs out of width; their
+   buttons wrap among themselves only when even a line of their own is too narrow (the list clips what overflows). */
 .members-row__acts {
+  flex: 0 1 auto;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-2);
   margin-left: auto;
 }
-/* The roles picker beside Aprovar and Recusar: as wide as what it names, never the whole row (it fills a form's field
-   elsewhere), so the three sit on one line. */
-.members-row__acts > .roles-picker.ac-btn {
+/* The role picker as wide as its words, beside the buttons, not the field-wide trigger it is in a form. */
+.members-row__acts .roles-picker.ac-btn {
   width: auto;
-  max-width: 220px;
+  max-width: 180px;
 }
 /* Ghost buttons in a row of their own keep their plates' rhythm (`.ac-acts`). */
 .members-row__acts.ac-acts {
-  gap: 0;
-  column-gap: calc(2 * var(--ghost-plate));
+  gap: var(--space-2) calc(2 * var(--ghost-plate));
+}
+/* Why approving can't let them in at once: in the row's flow beside the state. */
+.members-row__flag {
+  display: contents;
 }
 /* What the person wrote: under the words, as quoted, in a well. Its edge on the words' edge (the face and the gap). */
 .members-row__note {
@@ -122,17 +125,23 @@
 .members-person > .members-roles:empty {
   display: none;
 }
-@media (max-width: 760px) {
-  /* The state and the actions go under the words, on the words' edge. */
-  .members-row__state,
-  .members-row__acts {
-    margin-left: calc(24px + var(--space-3));
+@media (max-width: 640px) {
+  /* The person and the state on the first line (the state's words wrap beside its icon), the actions under them on
+     the right. */
+  .members-page .ac-list__row.members-row > .ac-avatar:first-child + .list-col {
+    flex-basis: 0;
+  }
+  .members-row__state {
+    max-width: 45%;
   }
   .members-row__acts {
-    justify-content: flex-start;
+    flex-basis: 100%;
   }
-  .members-row__note {
-    margin-left: calc(24px + var(--space-3));
+  /* On a line of its own under the words, so it never squeezes the name nor pushes the actions apart. */
+  .members-row__flag {
+    display: block;
+    flex-basis: 100%;
+    margin-left: calc(36px + var(--space-3));
   }
 }
 

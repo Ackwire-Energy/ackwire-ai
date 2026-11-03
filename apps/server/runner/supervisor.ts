@@ -109,6 +109,8 @@ const SCOPE_POLL_MS = 20;
 const SECRET_INSTALL_MS = 20_000;
 /** Clone slots one worker may hold or wait for at once. */
 const MAX_WORKER_SLOTS = 64;
+/** How long `reclaimBrains` waits for a worker's answer (a close waits up to `RECLAIM_EXIT_MS` for the CLI to exit). */
+const RECLAIM_REPLY_MS = 3_000;
 
 /** The broker is a child of the root runner home, never of an agent-owned home. */
 function secureSecretRoot(home: string, requireRoot = false): string {
@@ -173,6 +175,12 @@ function desktopUseOf(req: MachineRequest): WorkerDesktopUse | null {
 }
 
 /** The link's own frames, besides the machine protocol's. */
+/** A worker's answer to `brain.reclaim`. */
+export interface BrainReclaimed {
+  closed: boolean;
+  idle?: { since: number; spare: boolean };
+}
+
 export type WorkerLinkFrame =
   /** To the worker. */
   | ({ type: "worker.state" } & WorkerState)
@@ -195,6 +203,13 @@ export type WorkerLinkFrame =
     }
   /** From the worker: its agent's Chrome is in use on the agent's desktop (`BROWSER_LEASE_MS`). */
   | { type: "browser.desktop" }
+  /**
+   * To the worker: close its least recently used idle brain CLI (`BrainManager.reclaimIdle`), `spare` last; with
+   * `peek`, only say which it would (`idleCandidate`).
+   */
+  | { type: "brain.reclaim"; reclaimId: string; spare?: string; peek?: boolean }
+  /** From the worker: whether it closed one, or (`peek`) when the one it would close was last used. */
+  | ({ type: "brain.reclaimed"; reclaimId: string } & BrainReclaimed)
   /** To the worker: Browser was clicked on its agent's desktop (`BrowserManager.show`). */
   | { type: "browser.show"; showId: string; agent: AgentScope }
   /** From the worker: Chrome for Testing installs first. */
@@ -292,6 +307,8 @@ export interface SupervisorOptions {
   now?: () => number;
   /** Tests: how long a click on Browser waits for its worker (`SHOW_MS`). */
   showMs?: number;
+  /** Tests: `RECLAIM_REPLY_MS`. */
+  reclaimMs?: number;
   /** What root relayed, `relayed.json` (the live view of the agents' browsers is counted here). */
   relayed?: RelayCount;
   /** Tests: where processes are read (`/proc`), and how systemd is asked to move one. */
@@ -341,6 +358,8 @@ interface Worker {
   enters: number[];
   /** Its clone slots, by its id (`release` once it has one): a worker that stops gives them back. */
   slots: Map<string, { release?: () => void }>;
+  /** `brain.reclaim`s it hasn't answered, by this side's id. */
+  reclaims: Map<string, (reply: BrainReclaimed) => void>;
 }
 
 interface Show {
@@ -570,6 +589,45 @@ export class Supervisor {
     if (w && this.online) this.send(w, frame);
   }
 
+  /**
+   * A brain turn found no room on the computer: one idle CLI closes, the least recently used across the workers
+   * (never one mid-turn or holding its agent's work; `spare`, the waiting turn's own session, last). Every worker
+   * says which it would close, then they are asked in that order until one did. A worker that doesn't answer in
+   * time counts as none.
+   */
+  async reclaimBrains(spare?: string): Promise<boolean> {
+    const workers = [...this.workers.values()].filter((w) => w.ready);
+    const peeks = await Promise.all(
+      workers.map(async (w) => ({ w, idle: (await this.askBrains(w, { spare, peek: true }))?.idle })),
+    );
+    const order = peeks
+      .flatMap(({ w, idle }) => (idle ? [{ w, idle }] : []))
+      .sort((a, b) => Number(a.idle.spare) - Number(b.idle.spare) || a.idle.since - b.idle.since);
+    for (const { w } of order) if ((await this.askBrains(w, { spare }))?.closed) return true;
+    return false;
+  }
+
+  private askBrains(w: Worker, ask: { spare?: string; peek?: boolean }): Promise<BrainReclaimed | null> {
+    const reclaimId = String(++this.seq);
+    return new Promise((resolve) => {
+      const late = setTimeout(() => {
+        w.reclaims.delete(reclaimId);
+        resolve(null);
+      }, this.opts.reclaimMs ?? RECLAIM_REPLY_MS);
+      w.reclaims.set(reclaimId, (reply) => {
+        clearTimeout(late);
+        w.reclaims.delete(reclaimId);
+        resolve(reply);
+      });
+      this.send(w, {
+        type: "brain.reclaim",
+        reclaimId,
+        ...(ask.spare ? { spare: ask.spare } : {}),
+        ...(ask.peek ? { peek: true } : {}),
+      });
+    });
+  }
+
   /** New launches take the new network; occupied workers finish their work before retiring. */
   setNetwork(value: NetworkConfig) {
     this.network = networkConfig(value);
@@ -750,6 +808,7 @@ export class Supervisor {
         browserLeaseAt: 0,
         enters: [],
         slots: new Map(),
+        reclaims: new Map(),
       };
       this.workers.set(user.id, w);
     }
@@ -1113,6 +1172,15 @@ export class Supervisor {
         this.traffic.up += f.up;
         this.traffic.down += f.down;
       }
+      return;
+    }
+    if (f?.type === "brain.reclaimed") {
+      const idle = f.idle as Partial<NonNullable<BrainReclaimed["idle"]>> | undefined;
+      const valid = typeof idle?.since === "number" && Number.isFinite(idle.since) && typeof idle.spare === "boolean";
+      w.reclaims.get(typeof f.reclaimId === "string" ? f.reclaimId : "")?.({
+        closed: f.closed === true,
+        ...(valid ? { idle: { since: idle.since as number, spare: idle.spare as boolean } } : {}),
+      });
       return;
     }
     if (f?.type === "secret.installed") {

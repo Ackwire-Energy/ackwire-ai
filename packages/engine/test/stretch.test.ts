@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { and, asc, eq, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, inArray, schema, sql } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   answerNow,
@@ -24,6 +24,7 @@ import {
   stretchCardOf,
 } from "../src";
 import { deliverNotice } from "../src/delivery";
+import { refusedAtLimit } from "../src/stretch";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
@@ -488,7 +489,7 @@ test("a tool refused for the spend of the agent it would wake: the card names th
   const [card, ...more] = await cardsOf(f);
   expect(more).toEqual([]);
   if (!card) throw new Error("no card");
-  expect(card.body).toStartWith("Infra stopped to check with you: used 20%");
+  expect(card.body).toBe("Infra paused to check with you. It used 20% of the month's budget.");
   expect(card.meta.actionCard).toMatchObject({
     reason: "spend",
     agentIds: [infra.id],
@@ -541,6 +542,71 @@ test("a wake-up held inside the agents' DM: its card goes where the person asked
     .from(schema.agentRuns)
     .where(eq(schema.agentRuns.id, go.runs[0]?.runId ?? ""));
   expect(held).toMatchObject({ channelId: dm.id, hop: 1, triggerMessageId: note.id });
+});
+
+test("one card per stretch: Ada's refused tool in her long work's thread joins the card under Theo's hand-off", async () => {
+  f = await setup({ reply: lines({ theo: [], ada: [] }) });
+  const { theo, ada } = await team(f);
+  const asked = await ask(f, "@theo organiza o lançamento");
+  await fillStretch(f, theo.id, asked.id, asked.id);
+  const say = (agentId: string, body: string, threadId?: string) =>
+    insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      ...(threadId ? { threadId } : {}),
+      author: { type: "agent", agentId, runId: null, hop: 1, stretchId: asked.id },
+      body,
+    });
+  // Ada's work moved to the background: it answers in her anchor's own thread, in Ana's stretch.
+  const anchor = await say(ada.id, "Vou cuidar dos dados em segundo plano.");
+  const [work] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: ada.id,
+      channelId: f.general.id,
+      threadRootId: anchor.id,
+      triggerMessageId: asked.id,
+      trigger: "mention",
+      hop: 2,
+      stretchId: asked.id,
+      status: "done",
+    })
+    .returning();
+  if (!work) throw new Error("no run");
+  // Theo hands Ada more on the timeline: held past the limit, its card there, written as Theo.
+  const handOff = await say(theo.id, "@ada pode fechar a planilha?");
+  expect(await f.db.transaction((tx) => startOrJoinRun(tx, handOff, ada.id, "mention"))).toBeNull();
+  await drain(f);
+  // Ada's run in her thread asks Theo back: refused, and its wake-up joins that card instead of a second one there.
+  expect(await refusedAtLimit(f.db, work, theo.id)).toMatchObject({ isError: true });
+  await drain(f);
+  const [card, ...more] = await cardsOf(f);
+  expect(more).toEqual([]);
+  if (!card) throw new Error("no card");
+  expect(card).toMatchObject({ channelId: f.general.id, threadId: null, authorAgentId: theo.id });
+  expect(card.meta.actionCard).toMatchObject({
+    agentIds: [ada.id],
+    held: [
+      { agentId: ada.id, messageId: handOff.id },
+      { agentId: ada.id, messageId: null, threadId: anchor.id },
+    ],
+  });
+  expect(card.body).toBe("Ada paused to check with you before going on.");
+  expect(card.meta.bodyParams).toEqual({ agents: "Ada", count: 1 });
+  // Continuar: the hand-off on the timeline, and her refused work back in her thread, not under the card.
+  await withMicroseconds(f, card.id);
+  const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
+  const started = await f.db
+    .select()
+    .from(schema.agentRuns)
+    .where(
+      inArray(
+        schema.agentRuns.id,
+        go.runs.map((r) => r.runId),
+      ),
+    );
+  expect(started.map((r) => r.threadRootId).sort()).toEqual([handOff.id, anchor.id].sort());
 });
 
 test("Continuar starts every wake-up the card holds, also one held there after the card was read", async () => {

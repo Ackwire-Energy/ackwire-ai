@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cx } from "../cx";
 import {
   PLAN_ALMOST,
@@ -7,6 +8,7 @@ import {
   planLine,
   planState,
   planWindows,
+  renewals,
 } from "../plan-state";
 import { Meter } from "./Surfaces";
 
@@ -38,7 +40,9 @@ const passed = (iso: string | undefined, now: number) => iso !== undefined && Da
  * (lists, an agent's facts, Contas de IA): one line with the tightest windows
  * ("semana 40% · 5h 12%", after `label`), one bar for the fullest, every window
  * on hover, and only near the limit when it renews; nothing while no window is
- * known, unless the plan already refused a request ("No limite").
+ * known, unless the plan already refused a request ("No limite"). `children` (an
+ * account's agents) go between the bars and when they renew: each window's
+ * renewal then moves under them, on one line, before how old the numbers are.
  */
 export function PlanMeter({
   usage,
@@ -47,6 +51,7 @@ export function PlanMeter({
   label,
   now = Date.now(),
   className,
+  children,
 }: {
   usage: PlanMeterUsage;
   text: PlanMeterText;
@@ -55,6 +60,7 @@ export function PlanMeter({
   label?: string;
   now?: number;
   className?: string;
+  children?: ReactNode;
 }) {
   if (compact) {
     const shown = planLine(usage, text, now);
@@ -76,6 +82,7 @@ export function PlanMeter({
   const rows = planWindows(usage, now);
   const { state, until, used } = planState(usage, now);
   const headline = state === "limited" ? text.limited(until) : state === "almost" ? text.almost : null;
+  const renews = children ? renewals(rows, text, now) : null;
   return (
     <div className={cx("ac-planmeter", className)} data-state={state} data-level={planLevel(used, state === "limited")}>
       {headline && <p className="ac-planmeter__state">{headline}</p>}
@@ -95,14 +102,19 @@ export function PlanMeter({
                   label={name}
                   marks={[PLAN_ALMOST]}
                   {...(w.part !== undefined && fresh ? { part: w.part } : {})}
+                  {...(w.segments && fresh ? { segments: w.segments } : {})}
                 />
                 {w.note && fresh && <small className="ac-planmeter__note">{w.note}</small>}
-                {w.resetsAt && fresh && <small className="ac-planmeter__reset">{text.resets(w.resetsAt)}</small>}
+                {w.resetsAt && fresh && !children && (
+                  <small className="ac-planmeter__reset">{text.resets(w.resetsAt)}</small>
+                )}
               </li>
             );
           })}
         </ul>
       )}
+      {children}
+      {children && renews && <small className="ac-planmeter__reset">{renews}</small>}
       <small className="ac-planmeter__at">{text.updated(usage.at)}</small>
     </div>
   );

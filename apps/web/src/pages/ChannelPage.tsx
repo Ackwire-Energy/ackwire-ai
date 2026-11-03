@@ -59,6 +59,8 @@ import {
   usePlaceChannel,
   usePostMessage,
   useRoster,
+  useSendVoice,
+  useSettings,
   usesBrowser,
   useThreadInfo,
   useThreadMessages,
@@ -110,7 +112,7 @@ import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
-import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
+import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText, textOrMedia } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
   isOpenMission,
@@ -137,6 +139,7 @@ import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@
 import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { usageWaitOf } from "@agenteschat/client/lib/usage-pause";
 import { appVia } from "@agenteschat/client/lib/via";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import {
   AffixInput,
@@ -146,6 +149,7 @@ import {
   type ComposerCommand,
   ComposerFile,
   type ComposerFormatLabels,
+  type ComposerVoice,
   cx,
   DayDivider,
   Dialog,
@@ -174,6 +178,7 @@ import {
   SkeletonGroup,
   SkeletonMessage,
   Spinner,
+  type VoiceNotice,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -195,6 +200,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { ChatMedia } from "@/chat/ChatMedia";
+import { ChatVoice } from "@/chat/ChatVoice";
 import { MessageBody } from "@/chat/MessageBody";
 import { useBrowserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
@@ -230,6 +236,7 @@ import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelM
 import { ChannelPinnedBar } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
+import { QueueButton, QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -253,7 +260,7 @@ import { InviteOfferRow, useInviteOffer } from "@/components/invite/InviteDialog
 import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
-import { WaitingCard } from "@/components/MachineOutages";
+import { AwayPill, WaitingCard } from "@/components/MachineOutages";
 import { useMediaTabs } from "@/components/MediaPicker";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MemoryMarks } from "@/components/MemoryMark";
@@ -325,7 +332,7 @@ import { TYPED_VALUES } from "@/i18n";
 import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
-import { useDocumentTitle } from "@/lib/desktop";
+import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { entityMenu } from "@/lib/entity-menu";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
@@ -745,6 +752,7 @@ function ChannelView({
   );
   // What the channel suggests or picks for me goes to an agent that answers me (`canTalk`: who manages agents can't
   // talk to a locked one either), one people can read: a handle that is an id only when every agent's is.
+  const queueMachine = useAgentsMachineId(useMemo(() => channelAgents.map((a) => a.id), [channelAgents]));
   const talkable = channelAgents.filter(canTalk);
   const suggestedAgent = talkable.find((a) => !isIdHandle(a.handle)) ?? talkable[0];
   const channelPeople = useMemo(
@@ -804,6 +812,11 @@ function ChannelView({
     },
   });
   const { send, retry } = sendHelpers(post);
+  const sendVoice = useSendVoice(org.id, channel.id, {
+    me: { id: me.user.id },
+    onRefused: (error) =>
+      toast.show(errorCode(error) === "voice_limit" ? t("voice.limit") : errorText(t, error), "error"),
+  });
   const status = useConnectionStatus();
 
   const api = useApi();
@@ -1550,6 +1563,53 @@ function ChannelView({
   };
   const sendMedia = useCallback((media: MessageMedia) => sendMediaNow.current(media), []);
   const mediaTabs = useMediaTabs(sendMedia);
+  // Voice messages (ADR 0100), where this person can write and the workspace has them; a reply to a mission goes in
+  // text, to the mission. The recording goes in the box's thread, and the box stays as it was.
+  const voiceSettings = useSettings(org.id);
+  const voiceOn = Boolean(voiceSettings.data?.voiceAvailable && voiceSettings.data.voiceMessages);
+  const voice: ComposerVoice | undefined =
+    voiceOn && !chrome?.locked && !missionReply
+      ? {
+          scope: `${channel.id}:${thread?.id ?? ""}`,
+          allowed: async () => {
+            const { allowed } = await api.voice.allowed(org.id).catch(() => ({ allowed: true }));
+            if (!allowed) toast.show(t("voice.limit"));
+            return allowed;
+          },
+          onTake: ({ blob, durationMs, peaks }) => {
+            toBottom(true);
+            void sendVoice({
+              blob,
+              durationMs,
+              peaks,
+              threadId: thread ? thread.id : null,
+              replyTo: null,
+              language: i18n.language.split("-")[0] ?? null,
+            });
+          },
+          onNotice: (notice: VoiceNotice) => {
+            if (notice === "blocked") {
+              toast.show(t(desktopPlatform() === "mac" ? "voice.blockedMac" : "voice.blockedWeb"), "error");
+            } else {
+              toast.show(t(`voice.${notice}`), notice === "deleted" ? undefined : "error");
+            }
+          },
+          labels: {
+            record: t("voice.record"),
+            recording: t("voice.recording"),
+            pause: t("voice.pause"),
+            resume: t("voice.resume"),
+            discard: t("voice.discard"),
+            send: t("voice.send"),
+            listen: t("voice.listen"),
+            stopListening: t("voice.stopListening"),
+            keys: t("voice.keys"),
+            keysHold: t("voice.keysHold"),
+            keysPaused: t("voice.keysPaused"),
+            left: (seconds) => t("voice.left", { seconds }),
+          },
+        }
+      : undefined;
   // While an agent works here: the send button turns into stop (box empty), and typing offers
   // "Juntar ao que ele faz" (↵) or "Parar e mandar" (⌘↵).
   const stopName = stopTarget ? (dir.agentById.get(stopTarget.agentId)?.name ?? t("channel.unknownAgent")) : "";
@@ -1778,6 +1838,7 @@ function ChannelView({
                   {subtitle && <span className="channel__topic">{subtitle}</span>}
                 </div>
                 <div className="channel__acts ac-acts">
+                  <QueueButton machineId={queueMachine} />
                   <ChannelMembersStack
                     channelId={channel.id}
                     people={channelPeople}
@@ -2067,6 +2128,7 @@ function ChannelView({
                         onSend={onSend}
                         working={chrome?.locked ? null : working}
                         choice={choice}
+                        voice={voice}
                         disabled={Boolean(chrome?.locked)}
                         label={
                           chrome?.composerLabel ??
@@ -2454,6 +2516,9 @@ const Timeline = memo(function Timeline({
         />
       ),
     );
+    // Its agents in line for their computer: each one's turn right after it, where "thinking" shows otherwise.
+    if ((m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local)
+      rows.push(<QueueWaitTurns key={`queue-${item.key}`} message={m} />);
   }
   drawn.forEach((slot) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
@@ -3262,7 +3327,7 @@ export const TimelineMessage = memo(function TimelineMessage({
     return {
       author: dir.authorName(found.author),
       mine: found.author.type === "person" && found.author.id === me.user.id,
-      text: found.body,
+      text: textOrMedia(t, found.body, found.meta),
     };
   };
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
@@ -3348,6 +3413,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   const artifacts = artifactRefs(meta);
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone.
   const media = useMemo(() => messageMediaOf(m.meta), [m.meta]);
+  // A voice message is its recording: the player, and no text (ADR 0100).
+  const voice = useMemo(() => voiceOf(m.meta), [m.meta]);
   // The one an agent adds after its own reply: a message of its own, not a reply (no feedback, no run's cards).
   const mediaAfter = isMediaAfterReply(m.meta);
   // The run this message answers for (its steps, its browser, the questions it asked): none for that one.
@@ -3548,7 +3615,9 @@ export const TimelineMessage = memo(function TimelineMessage({
                   </span>
                 ),
               }
-            : undefined
+            : waitNotice
+              ? { label: <AwayPill notice={waitNotice} agentId={m.author.id ?? null} /> }
+              : undefined
       }
       aside={
         receipted || seenSlot ? (
@@ -3677,6 +3746,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             !actionCard &&
             // A question's card already says it: its own text isn't repeated above.
             !(question && body.trim() === question.text.trim()) &&
+            !voice &&
             !choiceReply &&
             (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
               <MessageText style={workOver ? { opacity: 0.6 } : undefined}>
@@ -3709,6 +3779,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             </p>
           )}
           {media && <ChatMedia media={media} />}
+          {voice && <ChatVoice message={m} voice={voice} />}
           {(stopped.canceled || atLimit || providerCut) && (
             <StoppedLine
               runId={m.agentRunId}
@@ -3739,7 +3810,9 @@ export const TimelineMessage = memo(function TimelineMessage({
           {agent &&
             memoryUpdates
               .filter((u) => u.action !== "proposed")
-              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
+              .map((u) => (
+                <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} sentAt={m.createdAt} />
+              ))}
           {browserTrail.length > 0 && m.author.id && !m.local && (
             <BrowserTrailCard
               agentId={m.author.id}

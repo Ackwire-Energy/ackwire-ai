@@ -145,13 +145,14 @@ describe("a stretch's pause card (ADR 0089)", () => {
     const state = seedState();
     state.messages.push(pause("p-runs", { reason: "runs", limit: 50, agentIds: [ADA_ID, ATLAS_ID] }));
     await open(state);
-    const row = cardRow("Ada e Atlas pararam para te consultar · 50 passos sozinhos desde o seu pedido");
+    const row = cardRow("Ada e Atlas pararam para checar com você antes de continuar");
     expect(row.textContent).not.toContain("server text");
+    expect(row.textContent).not.toContain("passos");
     await click(within(row).getByRole("button", { name: "Continuar" }));
     expect(state.calls.some((c) => c.method === "chat.answerNow" && c.args[1] === "p-runs")).toBe(true);
   });
 
-  test("an agent's budget share in money for who can see costs; once continued, who let them and no button", async () => {
+  test("an agent's budget share in money for who can see costs; once continued, one quiet line and no button", async () => {
     const state = seedState();
     state.messages.push(
       pause("p-spend", { reason: "spend", limit: 20, agentIds: [ADA_ID] }),
@@ -170,10 +171,14 @@ describe("a stretch's pause card (ADR 0089)", () => {
     );
     await open(state);
     // Ada's own budget is US$\u00a040: 20% of it.
-    const spend = cardRow("Ada parou para te consultar · usou US$\u00a08 (20% do orçamento do mês) nisso sem você");
+    const spend = cardRow("Ada parou para checar com você · usou US$\u00a08 (20% do orçamento do mês)");
     expect(within(spend).getByRole("button", { name: "Continuar" })).toBeTruthy();
-    const done = cardRow("Atlas parou para te consultar · 10 passos sem você desde o seu pedido");
-    expect(done.textContent).toContain("Você deixou continuar");
+    const done = cardRow("Você deixou continuar");
+    // The card folds: who let them go on and when, the pause itself only as the line's name.
+    expect(done.querySelector(".waitcard")).toBeNull();
+    expect(
+      within(done).getByRole("group", { name: "Atlas parou para checar com você antes de continuar" }),
+    ).toBeTruthy();
     expect(within(done).queryByRole("button", { name: "Continuar" })).toBeNull();
   });
 });

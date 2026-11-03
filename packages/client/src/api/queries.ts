@@ -81,6 +81,8 @@ import type {
   GifCategory,
   GifKey,
   InviteBatch,
+  IssueActivity,
+  IssueActivityEvent,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -122,6 +124,8 @@ import type {
   SidebarSection,
   SkillInput,
   SkillPatch,
+  SpeechKey,
+  SpeechKeyInput,
   StartChoice,
   StatusInput,
   StorageMigration,
@@ -249,6 +253,30 @@ function useGifKeyChange<T>(change: (api: ApiClient, input: T) => Promise<GifKey
 }
 export const useSaveGifKey = () => useGifKeyChange((api, apiKey: string) => api.system.saveGifKey(apiKey), true);
 export const useRemoveGifKey = () => useGifKeyChange<void>((api) => api.system.removeGifKey());
+
+/** The installation's speech engine (ADR 0100): `null` for everyone but its owner on a self-hosted server. */
+export const useSpeechKey = () => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.speechKey, queryFn: () => api.system.speechKey() });
+};
+
+function useSpeechKeyChange<T>(change: (api: ApiClient, input: T) => Promise<SpeechKey>, silent = false) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: T) => change(api, input),
+    onSuccess: (speechKey) => {
+      qc.setQueryData(keys.speechKey, speechKey);
+      // The engine is the server's: every workspace's microphone comes and goes with it (`voiceAvailable`).
+      void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[2] === "settings" });
+    },
+    // A refused key is said under its field.
+    ...(silent ? { meta: { silent: true } } : {}),
+  });
+}
+export const useSaveSpeechKey = () =>
+  useSpeechKeyChange((api, input: SpeechKeyInput) => api.system.saveSpeechKey(input), true);
+export const useRemoveSpeechKey = () => useSpeechKeyChange<void>((api) => api.system.removeSpeechKey());
 
 /**
  * The server's Web Push key (ADR 0071): `null` when this server has Web Push off. Asked only where this
@@ -1169,6 +1197,107 @@ export function usePostMessage(
       );
     },
   });
+}
+
+/** Local copies of recordings on their way, to play before the server has them: `clientId` → object URL. */
+const voiceLocal = new Map<string, string>();
+export const voiceLocalUrl = (clientId: string | null | undefined) => (clientId ? voiceLocal.get(clientId) : undefined);
+
+/** Client-only key on a recording's optimistic meta: it waits for a connection. */
+export const VOICE_WAITING = "voiceWaiting";
+
+const VOICE_RETRY_MS = [3_000, 10_000, 30_000];
+
+/** Until the connection seems back, or a little while. */
+function voiceRetryWait(attempt: number) {
+  const ms = VOICE_RETRY_MS[Math.min(attempt, VOICE_RETRY_MS.length - 1)] ?? 30_000;
+  return new Promise<void>((done) => {
+    const finish = () => {
+      clearTimeout(timer);
+      globalThis.removeEventListener?.("online", finish);
+      done();
+    };
+    const timer = setTimeout(finish, ms);
+    globalThis.addEventListener?.("online", finish);
+  });
+}
+
+/** A recording that won't become a message: its bubble goes, and its local copy with it. */
+export function dropLocalVoice(qc: QueryClient, orgId: string, channelId: string, clientId: string) {
+  const url = voiceLocal.get(clientId);
+  if (url) URL.revokeObjectURL(url);
+  voiceLocal.delete(clientId);
+  const without = (list: Message[] | undefined) => list?.filter((m) => !(m.local && m.clientId === clientId));
+  qc.setQueryData<Message[]>(keys.messages(orgId, channelId), without);
+}
+
+/**
+ * Sends a recording (ADR 0100): its bubble appears at once and stays until the server's message replaces it (same
+ * `clientId`). Without a connection the recording waits in memory and goes when it comes back, with the same
+ * `clientId`, so a send whose answer was lost is stored once. `onRefused`: the server said no, and the bubble went.
+ */
+export function useSendVoice(
+  orgId: string,
+  channelId: string,
+  options: { me: { id: string }; onRefused?: (error: unknown) => void },
+) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.messages(orgId, channelId);
+  const latest = useRef(options);
+  latest.current = options;
+  return useCallback(
+    async (input: {
+      blob: Blob;
+      durationMs: number;
+      peaks: number[];
+      threadId: string | null;
+      replyTo: string | null;
+      language: string | null;
+      meta?: Record<string, unknown>;
+    }) => {
+      const { blob, durationMs, peaks, threadId, replyTo, language, meta } = input;
+      const clientId = newClientId();
+      voiceLocal.set(clientId, URL.createObjectURL(blob));
+      const local: Message = {
+        id: `local-${clientId}`,
+        channelId,
+        threadId,
+        author: { type: "person", id: latest.current.me.id },
+        body: "",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        meta: { ...meta, voice: { clipId: "", durationMs, peaks } },
+        clientId,
+        local: "pending",
+        createdAt: new Date().toISOString(),
+      };
+      qc.setQueryData<Message[]>(key, (list) => upsertMessage(list, local));
+      playSound("send");
+      const waiting = (on: boolean) =>
+        qc.setQueryData<Message[]>(key, (list) =>
+          list?.map((m) =>
+            m.local && m.clientId === clientId ? { ...m, meta: { ...m.meta, [VOICE_WAITING]: on } } : m,
+          ),
+        );
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await api.voice.send(orgId, channelId, { blob, durationMs, peaks, clientId, threadId, replyTo, language });
+          waiting(false);
+          return;
+        } catch (error) {
+          if (!sendWaits(error)) {
+            dropLocalVoice(qc, orgId, channelId, clientId);
+            latest.current.onRefused?.(error);
+            return;
+          }
+          waiting(true);
+          await voiceRetryWait(attempt);
+        }
+      }
+    },
+    [api, qc, key, orgId, channelId],
+  );
 }
 
 /**
@@ -2830,6 +2959,54 @@ export const useIssueActivity = (orgId: string, id: string | undefined) => {
   });
 };
 
+/**
+ * A live event while a task is open: a comment or an event on it (`issue.comment`) goes into its activity once, and
+ * an event also refreshes the task itself (status, assignee, a linked PR). `false`: not about this task.
+ */
+export function applyIssueActivityEvent(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  issueId: string,
+  event: { type: string },
+): boolean {
+  if (event.type !== "issue.comment" || !("issueId" in event) || !("activity" in event)) return false;
+  const { issueId: id, activity } = event as IssueActivityEvent;
+  if (id !== issueId) return false;
+  qc.setQueryData<IssueActivity[]>(keys.issueActivity(orgId, issueId), (list) =>
+    !list || list.some((a) => a.id === activity.id) ? list : [...list, activity],
+  );
+  if (activity.kind === "event") void qc.invalidateQueries({ queryKey: [...keys.issues(orgId), "one"] });
+  return true;
+}
+
+/**
+ * A task's activity live while it is open: comments and events come on the task's channel, or as org broadcasts
+ * for a task with none. What was missed while the connection was down comes back on reconnect.
+ */
+export function useIssueLive(
+  orgId: string,
+  connection: RealtimeConnection | null,
+  issue: { id: string; channelId: string | null } | undefined,
+) {
+  const qc = useQueryClient();
+  const issueId = issue?.id;
+  const channelId = issue?.channelId ?? null;
+  useEffect(() => {
+    if (!connection || !issueId) return;
+    const take = (event: { type: string }) => void applyIssueActivityEvent(qc, orgId, issueId, event);
+    const offOrg = connection.onUserEvent(take);
+    const offChannel = channelId ? connection.subscribe(channelId, take) : undefined;
+    const offReconnect = connection.onReconnect(() => {
+      void qc.invalidateQueries({ queryKey: keys.issueActivity(orgId, issueId) });
+    });
+    return () => {
+      offOrg();
+      offChannel?.();
+      offReconnect();
+    };
+  }, [connection, orgId, qc, issueId, channelId]);
+}
+
 export function useIssueAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -3352,6 +3529,22 @@ export const useMachineOutages = (orgId: string, enabled = true) => {
     retry: false,
     refetchInterval: (q) => ((q.state.data?.outages.length ?? 0) > 0 ? 30_000 : false),
     refetchOnWindowFocus: true,
+    meta: { quiet: true },
+  });
+};
+
+/**
+ * A computer's line (who works on it, who waits, estimates). `computer.queue` events refetch it; while anything
+ * waits it also refetches every 30 s, so the estimates keep counting down.
+ */
+export const useMachineQueue = (orgId: string, machineId: string | null | undefined, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.machineQueue(orgId, machineId ?? ""),
+    queryFn: () => api.machines.queue(orgId, machineId ?? ""),
+    enabled: enabled && Boolean(machineId),
+    retry: false,
+    refetchInterval: (q) => ((q.state.data?.waiting.length ?? 0) > 0 ? 30_000 : false),
     meta: { quiet: true },
   });
 };
