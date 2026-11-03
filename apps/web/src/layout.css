@@ -8946,7 +8946,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   flex-wrap: wrap;
   gap: 8px;
 }
-/* "Adicionar conta": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
+/* "Add account": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
    sits nearer its own words than the next step's. Wrapped, its lines never end on a word alone, in a plan's panel or
    out of one (an agent's brain, Settings). */
 .agp-addacct {
@@ -9034,7 +9034,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   letter-spacing: 0.08em;
   user-select: all;
 }
-/* A sign-in's button and "Copiar link" beside it, wrapping under it when the column is narrow. */
+/* A sign-in's button and "Copy link" beside it, wrapping under it when the column is narrow. */
 .agp-addacct__acts {
   display: flex;
   flex-wrap: wrap;

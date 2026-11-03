@@ -959,7 +959,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     }
   });
 
-  test("Adicionar conta: Copiar link begins the sign-in with no window, copies its link and shows the code step", async () => {
+  test("Add account: Copy link begins the sign-in with no window, copies its link and shows the code step", async () => {
     const { state, api } = await onMac();
     const opened: string[] = [];
     const realOpen = window.open;
@@ -1001,7 +1001,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     }
   });
 
-  /** Claude's sign-in started from Adicionar conta, its code field showing; the sign-in window is a stand-in. */
+  /** Claude's sign-in started from Add account, its code field showing; the sign-in window is a stand-in. */
   async function codeField() {
     const { state, api } = await onMac();
     const d = await brainDialog();
