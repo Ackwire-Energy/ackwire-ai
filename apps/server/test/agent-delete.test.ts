@@ -16,7 +16,9 @@ test("deleting an agent for good (ADR 0082): owners and admins; it leaves the te
   expect((await member(`${agent}?purge=true`, { method: "DELETE" })).status).toBe(403);
   expect((await owner(`${agent}?purge=true`, { method: "DELETE" })).status).toBe(204);
 
-  expect(await (await member(`${org}/agents`)).json()).toEqual({ agents: [] });
+  // Only the workspace's right hand is left (ADR 0134).
+  const left = (await (await member(`${org}/agents`)).json()) as { agents: { handle: string }[] };
+  expect(left.agents.map((a) => a.handle)).toEqual(["lodi"]);
   expect(await (await member(`${org}/former-agents`)).json()).toEqual({
     agents: [{ id: agentId, name: "Dev", role: "", appearance: null, deleted: true }],
   });

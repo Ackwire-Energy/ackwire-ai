@@ -271,7 +271,8 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
   const [agentCount] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(agents)
-    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
+    // The team's agents: not its right hand (ADR 0134), which every workspace has.
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)));
   const [pending] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)

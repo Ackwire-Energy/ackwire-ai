@@ -150,7 +150,7 @@ export async function buildTelemetryReport(
       select
         (select count(*) from organizations) as organizations,
         (select count(*) from users) as people,
-        (select count(*) from agents where archived_at is null) as agents,
+        (select count(*) from agents where archived_at is null and builtin is null) as agents,
         (select count(*) from agent_runs where created_at >= ${day}) as runs,
         (select count(*) from agent_run_steps where kind = 'tool_call' and created_at >= ${day}) as tool_calls,
         (select coalesce(sum((details->>'seconds')::numeric), 0) from audit_log

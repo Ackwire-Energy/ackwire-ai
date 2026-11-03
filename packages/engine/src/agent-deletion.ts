@@ -11,6 +11,7 @@ import { concludeMission, type MissionDeps, OPEN_MISSION_STATUSES } from "./miss
 import { resolveNotifications } from "./notifications";
 import { recordOperatorEvent } from "./operator-events";
 import { requirePermission } from "./organizations";
+import { refuseRightHand } from "./right-hand";
 import { deleteAgentRoutines, type RoutineDeps } from "./routines";
 import { removeAgentSecrets } from "./secrets";
 
@@ -46,6 +47,7 @@ export type AgentDeletionDeps = MissionDeps & Pick<RoutineDeps, "pubsub" | "mail
 export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgId: string, agentId: string) {
   const { db } = deps;
   await requirePermission(db, actorId, orgId, "manage_agents");
+  await refuseRightHand(db, orgId, agentId, "deleted");
   const [agent] = await db
     .update(agents)
     .set({ archivedAt: sql`coalesce(${agents.archivedAt}, now())` })

@@ -2,6 +2,7 @@ import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@age
 import { currentHandles } from "../agents";
 import { cutText, cutTextEnd } from "../format";
 import { announceMessageMemories } from "../message-memories";
+import { isRightHand } from "../right-hand";
 import { neutralizeUntrusted } from "../untrusted";
 import {
   type ConsolidateResult,
@@ -111,7 +112,7 @@ export function parseReflectOutput(text: string): ReflectOutput {
 }
 
 export interface ReflectResult {
-  skipped?: "missing" | "cap_reached" | "nothing_new";
+  skipped?: "missing" | "cap_reached" | "nothing_new" | "right_hand";
   results: ConsolidateResult[];
   rejected: { content: string; reason: "secret" | "permissions" | "no_sources" }[];
   proposals: string[];
@@ -166,9 +167,11 @@ export async function reflectThread(
       ),
     );
   const orgAgents = await db
-    .select({ id: agents.id, handle: agents.handle })
+    .select({ id: agents.id, handle: agents.handle, builtin: agents.builtin })
     .from(agents)
     .where(and(eq(agents.orgId, input.orgId), isNull(agents.archivedAt)));
+  // What people tell the right hand stays with them (ADR 0134): no memory comes from its conversations.
+  if (orgAgents.some((a) => isRightHand(a) && agentIds.includes(a.id))) return { ...out, skipped: "right_hand" };
   const agentByHandle = new Map(orgAgents.map((a) => [a.handle, a.id]));
   const handleOf = new Map(orgAgents.map((a) => [a.id, a.handle]));
 

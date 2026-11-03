@@ -285,6 +285,10 @@ export const Agent = z
       description:
         "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows.",
     }),
+    builtin: z.enum(["right_hand"]).nullable().openapi({
+      description:
+        "A built-in agent the product ships (ADR 0134): `right_hand`, the team's right hand, one per workspace, never archived, deleted or exported. Null for the agents people make.",
+    }),
     brakes: AgentBrakes,
     brain: z
       .object({

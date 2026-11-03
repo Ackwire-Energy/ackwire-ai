@@ -39,6 +39,7 @@ import { readableBody, voiceOf } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
+import { rightHandReaches } from "./right-hand";
 import { inChannelRun, workKeepsThread } from "./run-scope";
 import { computerWaitSql, NO_AI, outageParkedSql, passedSql } from "./runs";
 import { afterSteered } from "./steering";
@@ -618,10 +619,12 @@ export async function insertMessageWithRuns(
             where mp.mission_id = mi.id and mp.user_id = ${userId} and mp.role = 'decide')
       ), mentioned as (
         select a.id from ${agents} a
-        join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
         where a.org_id = ${input.orgId}::uuid and a.archived_at is null
           and a.handle = any(${handles}::text[])
           and a.id is distinct from ${agentId}::uuid
+          and (exists (select 1 from ${channelMembers} cm where cm.agent_id = a.id
+              and cm.channel_id = ${input.channelId}::uuid)
+            or ${rightHandReaches(sql`a`, sql`${input.channelId}::uuid`)})
       ), mentioned_people as (
         select om.user_id from ${schema.organizationMembers} om
         join ${channelMembers} pcm on pcm.user_id = om.user_id and pcm.channel_id = ${input.channelId}::uuid
@@ -656,8 +659,10 @@ export async function insertMessageWithRuns(
         select a.id as agent_id, case when exists (select 1 from mentioned) then 'mention' else 'dm' end as trig,
           ${audienceSql("a", sql`${userId}::text`)} as allowed
         from ${agents} a
-        join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
         where ${startRuns}::boolean and a.org_id = ${input.orgId}::uuid and a.archived_at is null
+          and (exists (select 1 from ${channelMembers} cm where cm.agent_id = a.id
+              and cm.channel_id = ${input.channelId}::uuid)
+            or ${rightHandReaches(sql`a`, sql`${input.channelId}::uuid`)})
           and a.id not in (select agent_id from answered)
           and a.id <> all(${referenced}::uuid[])
           and (a.id in (select id from mentioned)

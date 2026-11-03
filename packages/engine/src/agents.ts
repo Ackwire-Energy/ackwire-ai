@@ -27,6 +27,7 @@ import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, Valida
 import type { CommandApproval } from "./missions";
 import { recordOperatorEvent } from "./operator-events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
+import { isRightHand, RIGHT_HAND_EDITABLE, refuseRightHand, rightHandPermanent } from "./right-hand";
 import { DEFAULT_AGENT_SCOPES, dropForeignMailGrants, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 import { resumeBudgetWaits } from "./usage-pause";
@@ -310,6 +311,15 @@ export async function handOver(
   await repointApprovals(deps, before.orgId, [before.id], ownerUserId);
 }
 
+/** The right hand's instructions, role, owner and the rest are the product's (ADR 0134): only `RIGHT_HAND_EDITABLE` changes. */
+async function refuseRightHandFields(db: Database, orgId: string, agentId: string, patch: Partial<AgentInput>) {
+  const fixed = Object.keys(patch).filter(
+    (k) => patch[k as keyof AgentInput] !== undefined && !RIGHT_HAND_EDITABLE.has(k),
+  );
+  if (fixed.length > 0 && isRightHand(await getAgent(db, orgId, agentId)))
+    throw rightHandPermanent(`changed this way (${fixed.join(", ")})`);
+}
+
 export async function updateAgent(
   db: Database,
   actorId: string,
@@ -319,6 +329,7 @@ export async function updateAgent(
   options: { remember?: boolean; pubsub?: PubSub } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "manage_agents");
+  await refuseRightHandFields(db, orgId, agentId, patch);
   const cleaned =
     patch.handle === undefined ? patch : { ...patch, handle: patch.handle.trim().replace(/^@/, "").toLowerCase() };
   // Stored whole and normalized: what the brakes read is what the settings show.
@@ -424,6 +435,7 @@ export async function updateAgent(
 
 export async function archiveAgent(db: Database, actorId: string, orgId: string, agentId: string) {
   await requirePermission(db, actorId, orgId, "manage_agents");
+  await refuseRightHand(db, orgId, agentId, "archived");
   const [gone] = await db
     .update(agents)
     .set({ archivedAt: new Date() })
@@ -506,6 +518,8 @@ export const agentView = (a: Agent) => ({
   appearance: (a.appearance ?? null) as AgentAppearance | null,
   /** It may follow a light reply with a sticker or a GIF (ADR 0091). */
   mediaReplies: a.mediaReplies,
+  /** A built-in agent the product ships (ADR 0134): `right_hand`, the team's right hand. Null for the others. */
+  builtin: a.builtin ?? null,
   /** Its autonomy brakes (ADR 0131), with the defaults filled in. */
   brakes: autonomySettings(a.autonomyBrakes),
   createdAt: a.createdAt,

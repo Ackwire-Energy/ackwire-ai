@@ -128,7 +128,10 @@ describe("organizations, agents and credentials", () => {
     expect(list).not.toContain("sk-ant-api-secret");
     const agents = await (await owner(`/api/app/organizations/${orgId}/agents`)).json();
     expect(agents).toMatchObject({
-      agents: [{ handle: "dev", model: "claude-sonnet-5-5", hasCredential: true, monthlyBudgetUsd: 50 }],
+      agents: [
+        { handle: "lodi", hasCredential: false },
+        { handle: "dev", model: "claude-sonnet-5-5", hasCredential: true, monthlyBudgetUsd: 50 },
+      ],
     });
     const rows = await t.db.select().from(schema.providerCredentials);
     expect(JSON.stringify(rows)).not.toContain("sk-ant-api-secret");
@@ -154,17 +157,29 @@ describe("organizations, agents and credentials", () => {
     expect((await ana(`/api/app/organizations/${orgId}/agents`)).status).toBe(200);
   });
 
-  test("an old app's coordinator (ADR 0093, retired by ADR 0134) is ignored", async () => {
+  test("the team's right hand (ADR 0134): listed with its mark, never archived or deleted; an old app's coordinator is ignored", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
     const { orgId, agentId: devId } = await seedOrg(owner);
-    // Phones without the update still send it: 200, and nothing changes.
-    const old = await owner(`/api/app/organizations/${orgId}/agents/${devId}`, {
-      method: "PATCH",
-      json: { coordinator: true },
-    });
+    const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+      owner(`/api/app/organizations/${orgId}${path}`, init);
+    const { agents } = (await (await api("/agents")).json()) as {
+      agents: { id: string; handle: string; builtin: string | null }[];
+    };
+    expect(agents.map((a) => [a.handle, a.builtin])).toEqual([
+      ["lodi", "right_hand"],
+      ["dev", null],
+    ]);
+    const lodi = agents[0]?.id;
+    for (const path of [`/agents/${lodi}`, `/agents/${lodi}?purge=true`]) {
+      const refused = await api(path, { method: "DELETE" });
+      expect(refused.status).toBe(403);
+      expect(await refused.json()).toMatchObject({ error: { code: "agent.right_hand_permanent" } });
+    }
+    // Phones without the update still send `coordinator`: 200, and nothing changes.
+    const old = await api(`/agents/${devId}`, { method: "PATCH", json: { coordinator: true } });
     expect(old.status).toBe(200);
-    expect(await old.json()).toMatchObject({ id: devId });
+    expect(await old.json()).toMatchObject({ id: devId, builtin: null });
   });
 
   test("unknown models are rejected", async () => {

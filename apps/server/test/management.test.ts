@@ -87,6 +87,8 @@ test("management API: settings, overview, people, invitations, credentials, agen
   expect(usage.defaultAgentBudgetUsd).toBe(50);
   expect(usage.agents).toEqual([
     expect.objectContaining({ handle: "dev", monthlyBudgetUsd: 50, budgetIsDefault: false }),
+    // The right hand is listed like any agent, on the workspace's default budget (ADR 0134).
+    expect.objectContaining({ handle: "lodi", calls: 0, budgetIsDefault: true }),
   ]);
 
   const renamed = await api(`/channels/${channelId}`, { method: "PATCH", json: { topic: "All hands" } });

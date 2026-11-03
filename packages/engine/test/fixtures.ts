@@ -201,6 +201,8 @@ export async function setup(
     forumTools?: boolean;
     /** Add the scheduling tools (schedule_reminder, create_routine…). */
     scheduleTools?: boolean;
+    /** Keep the workspace's right hand (ADR 0134). Off: its only agent is `@dev`. */
+    rightHand?: boolean;
     /** Add the wiki tools (search_wiki, read_wiki_page, create_wiki_page…). */
     wikiTools?: boolean;
     /** Add the sandbox tools with connected machines (a machine hub on this db). */
@@ -240,6 +242,8 @@ export async function setup(
     name: "Acme",
     context: "Acme builds rockets.",
   });
+  // Every workspace comes with its right hand (ADR 0134); the tests about it keep it, the others count only theirs.
+  if (!options.rightHand) await db.delete(schema.agents).where(eq(schema.agents.orgId, org.id));
   const credential = await createCredential(db, keyWrapper, owner.id, org.id, {
     provider: "anthropic",
     label: "main",

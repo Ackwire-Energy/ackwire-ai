@@ -37,6 +37,8 @@ import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
 import { openRequestsBlock, openRequestsOf } from "./open-requests";
 import { reachNote, reachOf } from "./reach";
 import { byAnotherAgent, WHY_AN_AGENT_CALLED, WHY_YOU_WERE_CALLED } from "./reply-policy";
+import { isRightHand } from "./right-hand";
+import { rightHandPrompt } from "./right-hand-prompt";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { WEBHOOK_EVENT, webhookEventText } from "./routine-hooks";
 import { heldHere } from "./run-inbox";
@@ -816,6 +818,14 @@ export async function buildRunContext(
       };
 
   const capabilities = await options.capabilities;
+  // The right hand's own block (ADR 0134), in place of instructions: read live for the person behind the run.
+  const rightHand =
+    isRightHand(agent) && requester
+      ? await rightHandPrompt(
+          { db, ai: options.ai },
+          { orgId: run.orgId, agent, personId: requester, inDm: channel.kind === "dm" },
+        )
+      : null;
   // Most stable first, so prompt-cache prefixes are shared: the rules are the same for every agent with the same
   // tools, the organization's block for every agent of the organization (a breakpoint after it, token-trim B5),
   // the agent's block per agent.
@@ -881,12 +891,14 @@ export async function buildRunContext(
       cache: true,
     },
     {
-      text: [
-        `You are ${agent.name} (@${agent.handle})${agent.role ? `, ${agent.role}` : ""}, an AI agent of this organization.`,
-        agent.instructions.trim() ? `# Your instructions\n${agent.instructions.trim()}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
+      text:
+        rightHand ??
+        [
+          `You are ${agent.name} (@${agent.handle})${agent.role ? `, ${agent.role}` : ""}, an AI agent of this organization.`,
+          agent.instructions.trim() ? `# Your instructions\n${agent.instructions.trim()}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
     },
     ...(capabilities ? [{ text: capabilities }] : []),
     // Follows the requester (whose part of the team it names).

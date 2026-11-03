@@ -15,6 +15,7 @@ import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
+import { isRightHand, RIGHT_HAND_GRANTS } from "../right-hand";
 import type { ToolDefinition } from "./types";
 
 const { agentScopes, agents, mailAccounts, dbConnections } = schema;
@@ -278,10 +279,18 @@ export async function freshGrantedKeys(db: Executor, orgId: string, agentId: str
 }
 
 async function loadScopeKeys(db: Executor, orgId: string, agentId: string): Promise<Set<string>> {
-  const rows = await db
-    .select({ connectionId: agentScopes.connectionId, scope: agentScopes.scope })
-    .from(agentScopes)
-    .where(and(eq(agentScopes.orgId, orgId), eq(agentScopes.agentId, agentId)));
+  const [rows, [agent]] = await Promise.all([
+    db
+      .select({ connectionId: agentScopes.connectionId, scope: agentScopes.scope })
+      .from(agentScopes)
+      .where(and(eq(agentScopes.orgId, orgId), eq(agentScopes.agentId, agentId))),
+    db
+      .select({ builtin: schema.agents.builtin })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.id, agentId))),
+  ]);
+  // The right hand's tools are fixed in code (ADR 0134): a grant row gives it nothing.
+  if (isRightHand(agent)) return new Set(RIGHT_HAND_GRANTS.map((scope) => grantKey(null, scope)));
   return new Set(rows.map((r) => grantKey(r.connectionId, r.scope)));
 }
 
@@ -292,18 +301,7 @@ export async function hasScope(
   connectionId: string | null | undefined,
   scope: string,
 ) {
-  const [row] = await db
-    .select({ id: agentScopes.id })
-    .from(agentScopes)
-    .where(
-      and(
-        eq(agentScopes.orgId, orgId),
-        eq(agentScopes.agentId, agentId),
-        connectionId ? eq(agentScopes.connectionId, connectionId) : isNull(agentScopes.connectionId),
-        eq(agentScopes.scope, scope),
-      ),
-    );
-  return row !== undefined;
+  return (await loadScopeKeys(db, orgId, agentId)).has(grantKey(connectionId, scope));
 }
 
 export async function listAgentScopes(db: Database, orgId: string, agentId: string): Promise<ScopeGrant[]> {

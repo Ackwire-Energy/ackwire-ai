@@ -391,7 +391,10 @@ describe("tools", () => {
     const agents = (await callTool(t, app.access, "list_agents", {})).structuredContent as {
       agents: { handle: string; can_message: boolean }[];
     };
-    expect(agents.agents.map((a) => [a.handle, a.can_message])).toEqual([["dev", true]]);
+    expect(agents.agents.map((a) => [a.handle, a.can_message])).toEqual([
+      ["lodi", true],
+      ["dev", true],
+    ]);
     const channels = (await callTool(t, app.access, "list_channels", { query: "gen" })).structuredContent as {
       channels: { id: string; is_member: boolean }[];
     };

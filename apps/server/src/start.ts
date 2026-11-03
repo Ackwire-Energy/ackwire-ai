@@ -54,6 +54,7 @@ import {
   emailArtFor,
   enableCaches,
   enableOperatorEvents,
+  ensureRightHands,
   type GifKey,
   isAgentesCloud,
   isBlockedAddress,
@@ -317,6 +318,12 @@ async function boot(
         log.info("MillionSend mailboxes disconnected", { checked: r.checked, webhooksLeft: r.webhooksLeft });
     })
     .catch((error: unknown) => log.warn("MillionSend mailboxes cleanup failed", { error: String(error) }));
+  // Off the boot path: every workspace made before the right hand gets one (ADR 0134); one query once they all have it.
+  void ensureRightHands(database.db)
+    .then((made) => {
+      if (made > 0) log.info("right hands created", { made });
+    })
+    .catch((error: unknown) => log.warn("right hands backfill failed", { error: String(error) }));
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
