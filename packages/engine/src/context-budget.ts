@@ -2,6 +2,7 @@ import {
   type ContentBlock,
   contextWindowOf,
   contextWindowWithin,
+  IMAGE_CHARS,
   type ModelMessage,
   type SystemBlock,
   type ToolSpec,
@@ -51,13 +52,16 @@ const REMOVED_PREFIX = "[Result removed to save space:";
 export const removedPlaceholder = (chars: number) =>
   `${REMOVED_PREFIX} ${chars} chars. Call the tool again if you need it.]`;
 
+const resultChars = (b: Extract<ContentBlock, { type: "tool_result" }>) =>
+  b.content.length + (b.images?.length ?? 0) * IMAGE_CHARS;
+
 const blockChars = (b: ContentBlock) =>
   b.type === "text"
     ? b.text.length
     : b.type === "tool_use"
       ? b.name.length + JSON.stringify(b.input).length
       : b.type === "tool_result"
-        ? b.content.length
+        ? resultChars(b)
         : JSON.stringify(b.data).length;
 
 /** Input tokens of a request, estimated: characters of the system blocks, messages and tool schemas over `CHARS_PER_TOKEN`. */
@@ -123,7 +127,7 @@ export function removableToolResults(messages: ModelMessage[]): ToolResultCandid
       else if (
         b.type === "tool_result" &&
         i < latest &&
-        b.content.length >= MIN_REMOVABLE_CHARS &&
+        resultChars(b) >= MIN_REMOVABLE_CHARS &&
         !b.content.startsWith(REMOVED_PREFIX)
       ) {
         const call = calls.get(b.toolUseId);
@@ -131,7 +135,7 @@ export function removableToolResults(messages: ModelMessage[]): ToolResultCandid
           toolUseId: b.toolUseId,
           name: call?.name ?? "unknown",
           input: call?.input ?? {},
-          chars: b.content.length,
+          chars: resultChars(b),
           excerpt: cutText(b.content, EXCERPT_CHARS),
           position: out.length,
         });
@@ -175,11 +179,11 @@ export function compactToolResults(messages: ModelMessage[], toolUseIds: Set<str
       return m;
     return {
       ...m,
-      content: m.content.map((b) =>
-        b.type === "tool_result" && toolUseIds.has(b.toolUseId)
-          ? { ...b, content: removedPlaceholder(b.content.length) }
-          : b,
-      ),
+      content: m.content.map((b) => {
+        if (b.type !== "tool_result" || !toolUseIds.has(b.toolUseId)) return b;
+        const { images: _images, ...rest } = b;
+        return { ...rest, content: removedPlaceholder(resultChars(b)) };
+      }),
     };
   });
 }

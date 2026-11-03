@@ -10,7 +10,8 @@ export type ContentBlock =
   (
     | { type: "text"; text: string; cache?: boolean }
     | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-    | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean }
+    /** `images`: pictures the tool returned (base64), shown to models that read images. */
+    | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean; images?: ToolImage[] }
     /**
      * A block we don't interpret (e.g. Anthropic `thinking` with its signature).
      * It must be sent back to the same provider exactly as received when the
@@ -25,6 +26,15 @@ export type ContentBlock =
      */
     restart?: string;
   };
+
+/** A picture in a tool's result: PNG, JPEG, GIF or WebP, base64. */
+export interface ToolImage {
+  mediaType: string;
+  data: string;
+}
+
+/** What an image counts for in prompt estimates: about the tokens of a large one (≈1,600), never its base64 length. */
+export const IMAGE_CHARS = 6400;
 
 export interface ModelMessage {
   role: "user" | "assistant";
@@ -189,9 +199,20 @@ export function promptChars(request: Pick<ModelRequest, "system" | "messages" | 
     typeof request.system === "string" ? request.system.length : request.system.reduce((n, b) => n + b.text.length, 0);
   let messages = 0;
   for (const m of request.messages)
-    messages += typeof m.content === "string" ? m.content.length : JSON.stringify(m.content).length;
+    messages += typeof m.content === "string" ? m.content.length : blocksChars(m.content);
   const tools = request.tools ? JSON.stringify(request.tools).length : 0;
   return system + messages + tools;
+}
+
+/** Characters of a message's blocks, an image as `IMAGE_CHARS`. */
+export function blocksChars(content: ContentBlock[]): number {
+  let images = 0;
+  const json = JSON.stringify(content, (key, value) => {
+    if (key !== "images" || !Array.isArray(value)) return value;
+    images += value.length;
+    return undefined;
+  });
+  return json.length + images * IMAGE_CHARS;
 }
 
 /** Tools in the order providers send them: the stable ones, then the others, each part sorted by name. */

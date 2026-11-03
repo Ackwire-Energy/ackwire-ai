@@ -2,10 +2,19 @@ import type { PubSub } from "@agenteschat/adapters";
 import { eq, schema, sql } from "@agenteschat/db";
 import { learnTrust } from "./context/learn";
 import { changeSkillAsAgent } from "./context/learned-skills";
-import { cutText } from "./format";
+import { cutText, formatBytes } from "./format";
 import type { Judge } from "./judge";
-import { agentSkillByName, SKILL_LIMITS, type SkillDeps, skillFilesOf, skillFileText } from "./skills";
-import type { ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
+import { type SandboxDeps, withSandbox } from "./sandbox";
+import {
+  agentSkillByName,
+  MODEL_IMAGE_TYPES,
+  notKeptReason,
+  SKILL_LIMITS,
+  type SkillDeps,
+  skillFile,
+  skillFilesOf,
+} from "./skills";
+import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const failed = (error: unknown): ToolOutput => ({
@@ -16,10 +25,23 @@ const failed = (error: unknown): ToolOutput => ({
 /**
  * Skills through the Tool Gateway (`skills:read`, on by default):
  * `load_skill` returns a skill's instructions and its files, and
- * `read_skill_file` one of its text files. Only skills enabled for the agent;
- * scripts are never shown: `run_skill_script` (sandbox tools, ADR 0021) runs them.
+ * `read_skill_file` one of them: text as text, an image as an image on a model brain, and on a computer brain (or
+ * any file that isn't text) the file saved to `.skills/{name}/` on the agent's computer, where its own tools open it.
+ * Only skills enabled for the agent; scripts are never shown: `run_skill_script` (sandbox tools, ADR 0021) runs them.
+ * `computer`: reaching the agent's computer (none: files that aren't text are described only).
  */
-export function createSkillToolSource(deps: SkillDeps & { pubsub?: PubSub; judge?: Judge }): ToolSource {
+export function createSkillToolSource(
+  deps: SkillDeps & { pubsub?: PubSub; judge?: Judge; computer?: SandboxDeps },
+): ToolSource {
+  /** Saves a skill's file on the agent's computer: its path there, or null with no computer to reach. */
+  const saveOnComputer = async (ctx: ToolContext, path: string, data: Uint8Array) => {
+    if (!deps.computer) return null;
+    const computer = deps.computer;
+    return withSandbox(computer, ctx, async (c) => {
+      await c.provider.writeFile(c.id, path, data);
+      return path;
+    }).catch(() => null);
+  };
   const tools: ToolDefinition[] = [
     {
       name: "load_skill",
@@ -45,11 +67,11 @@ export function createSkillToolSource(deps: SkillDeps & { pubsub?: PubSub; judge
           const list = files.length
             ? files
                 .map((f) => {
-                  if (f.status === "stored") return `- ${f.path} (${f.mime}, ${f.size} bytes)`;
+                  if (f.status === "stored") return `- ${f.path} (${f.mime}, ${formatBytes(f.size)})`;
                   if (f.status === "script") {
                     return `- ${f.path} (script: runs with run_skill_script if you have the code environment; its content is not shown)`;
                   }
-                  return `- ${f.path} (skipped: binary file)`;
+                  return `- ${notKeptReason(f, files)}`;
                 })
                 .join("\n")
             : "(no files)";
@@ -64,7 +86,8 @@ export function createSkillToolSource(deps: SkillDeps & { pubsub?: PubSub; judge
     },
     {
       name: "read_skill_file",
-      description: "Read a text file of one of your skills (references, templates, examples).",
+      description:
+        "Read a file of one of your skills (references, templates, examples, images): text comes as text, an image as an image you see; other files are saved to .skills/{name}/ on your computer, when you have one.",
       scope: "skills:read",
       inputSchema: {
         type: "object",
@@ -79,12 +102,40 @@ export function createSkillToolSource(deps: SkillDeps & { pubsub?: PubSub; judge
         try {
           const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, str(input.name));
           if (!skill) return { content: `No skill named ${str(input.name)} is enabled for you.`, isError: true };
-          const text = await skillFileText(deps, skill, str(input.path));
-          const shown =
-            text.length > SKILL_LIMITS.fileReadChars
-              ? `${cutText(text, SKILL_LIMITS.fileReadChars)}\n[truncated]`
-              : text;
-          return { content: `${skill.name}/${str(input.path)}:\n${shown}` };
+          const path = str(input.path);
+          const file = await skillFile(deps, skill, path);
+          if (file.text) {
+            const text = new TextDecoder().decode(file.data);
+            const shown =
+              text.length > SKILL_LIMITS.fileReadChars
+                ? `${cutText(text, SKILL_LIMITS.fileReadChars)}\n[truncated]`
+                : text;
+            return { content: `${skill.name}/${path}:\n${shown}` };
+          }
+          const about = `${skill.name}/${path} (${file.mime}, ${formatBytes(file.size)})`;
+          const image = MODEL_IMAGE_TYPES.has(file.mime);
+          const fits = file.data.byteLength <= SKILL_LIMITS.imageBytes;
+          // A computer brain (Claude Code, Codex) sees pictures with its own Read, not through our tools.
+          if (image && fits && !ctx.bridge) {
+            return {
+              content: `${about}: the image is attached.`,
+              images: [{ mediaType: file.mime, data: Buffer.from(file.data).toString("base64") }],
+            };
+          }
+          const saved = await saveOnComputer(ctx, `.skills/${skill.name}/${path}`, file.data);
+          const tooLarge =
+            image && !fits && !ctx.bridge
+              ? ` It is too large to show you here (max ${formatBytes(SKILL_LIMITS.imageBytes)}).`
+              : "";
+          if (saved) {
+            return {
+              content: `${about}:${tooLarge} saved to ${saved} in your folder on your computer: open it there with your own tools${image ? " (your Read tool shows images)" : ""}.`,
+              data: { path: saved },
+            };
+          }
+          return {
+            content: `${about}: not text, so its content isn't shown here.${tooLarge} With a computer it would be saved there for you to open.`,
+          };
         } catch (error) {
           return failed(error);
         }

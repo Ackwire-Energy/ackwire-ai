@@ -56,7 +56,18 @@ describe("Anthropic adapter (scripted transport)", () => {
               { type: "tool_use", id: "toolu_0", name: "search_context", input: { query: "x" } },
             ],
           },
-          { role: "user", content: [{ type: "tool_result", toolUseId: "toolu_0", content: "nothing", isError: true }] },
+          {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                toolUseId: "toolu_0",
+                content: "nothing",
+                isError: true,
+                images: [{ mediaType: "image/png", data: "UE5H" }],
+              },
+            ],
+          },
         ],
         maxTokens: 1000,
         tools: [
@@ -89,7 +100,17 @@ describe("Anthropic adapter (scripted transport)", () => {
     });
     expect((body.messages as Record<string, unknown>[])[2]).toEqual({
       role: "user",
-      content: [{ type: "tool_result", tool_use_id: "toolu_0", content: "nothing", is_error: true }],
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: "toolu_0",
+          content: [
+            { type: "text", text: "nothing" },
+            { type: "image", source: { type: "base64", media_type: "image/png", data: "UE5H" } },
+          ],
+          is_error: true,
+        },
+      ],
     });
 
     expect(deltas).toEqual(["Let me check."]);

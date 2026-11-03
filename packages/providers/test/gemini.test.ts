@@ -110,7 +110,13 @@ describe("Gemini adapter (Interactions API, scripted transport)", () => {
           {
             role: "user",
             content: [
-              { type: "tool_result", toolUseId: "fc_0", content: "nothing", isError: true },
+              {
+                type: "tool_result",
+                toolUseId: "fc_0",
+                content: "nothing",
+                isError: true,
+                images: [{ mediaType: "image/png", data: "UE5H" }],
+              },
               { type: "text", text: "and" },
               { type: "text", text: "now?" },
             ],
@@ -140,7 +146,10 @@ describe("Gemini adapter (Interactions API, scripted transport)", () => {
           type: "function_result",
           call_id: "fc_0",
           name: "search_context",
-          result: [{ type: "text", text: "nothing" }],
+          result: [
+            { type: "text", text: "nothing" },
+            { type: "image", data: "UE5H", mime_type: "image/png" },
+          ],
           is_error: true,
         },
         {

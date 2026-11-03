@@ -118,7 +118,18 @@ describe("OpenAI adapter (Responses API, scripted transport)", () => {
               { type: "tool_use", id: "call_0", name: "search_context", input: { query: "x" } },
             ],
           },
-          { role: "user", content: [{ type: "tool_result", toolUseId: "call_0", content: "nothing", isError: true }] },
+          {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                toolUseId: "call_0",
+                content: "nothing",
+                isError: true,
+                images: [{ mediaType: "image/png", data: "UE5H" }],
+              },
+            ],
+          },
         ],
         maxTokens: 900,
         tools: [
@@ -148,7 +159,14 @@ describe("OpenAI adapter (Responses API, scripted transport)", () => {
       { role: "user", content: "hi" },
       reasoning,
       { type: "function_call", call_id: "call_0", name: "search_context", arguments: '{"query":"x"}' },
-      { type: "function_call_output", call_id: "call_0", output: "ERROR: nothing" },
+      {
+        type: "function_call_output",
+        call_id: "call_0",
+        output: [
+          { type: "input_text", text: "ERROR: nothing" },
+          { type: "input_image", image_url: "data:image/png;base64,UE5H", detail: "auto" },
+        ],
+      },
     ]);
 
     expect(deltas).toEqual(["Check", "ing."]);

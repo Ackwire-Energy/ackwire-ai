@@ -391,7 +391,19 @@ function toBlockParam(
         {
           type: "tool_result",
           tool_use_id: block.toolUseId,
-          content: block.content,
+          content: block.images?.length
+            ? [
+                { type: "text", text: block.content },
+                ...block.images.map((i) => ({
+                  type: "image" as const,
+                  source: {
+                    type: "base64" as const,
+                    media_type: i.mediaType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+                    data: i.data,
+                  },
+                })),
+              ]
+            : block.content,
           ...(block.isError ? { is_error: true } : {}),
         },
       ];

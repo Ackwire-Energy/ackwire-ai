@@ -382,8 +382,13 @@ function toMessages(request: ModelRequest, claude: boolean): Message[] {
       continue;
     }
     for (const b of parts) {
-      if (b.type === "tool_result")
-        out.push({ role: "tool", tool_call_id: b.toolUseId, content: b.isError ? `ERROR: ${b.content}` : b.content });
+      if (b.type !== "tool_result") continue;
+      // ponytail: images left out, since a text-only model would refuse the request; send them once the catalog
+      // knows which OpenRouter models read images.
+      const content = b.images?.length
+        ? `${b.content}\n[The image is not shown: this connection sends text only.]`
+        : b.content;
+      out.push({ role: "tool", tool_call_id: b.toolUseId, content: b.isError ? `ERROR: ${content}` : content });
     }
     if (text) out.push({ role: "user", content: text });
   }

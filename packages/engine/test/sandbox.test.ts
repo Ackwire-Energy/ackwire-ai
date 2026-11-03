@@ -325,6 +325,33 @@ describe("Drive and skills", () => {
   });
 });
 
+describe("skill files on the computer", () => {
+  test("a computer brain's image and any brain's PDF are saved in .skills/{name}/ for the computer's own tools", async () => {
+    f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const { paired, runner } = await connectedComputer(f);
+    const md = "---\nname: graficos\ndescription: Faz gráficos.\n---\nVeja references/diagram.png.";
+    const zip = await zipOf({ "SKILL.md": md, "references/diagram.png": "PNG", "references/manual.pdf": "%PDF" });
+    const skill = await importSkillZip({ db: f.db, blobs: f.artifactDeps.blobs }, f.owner.id, f.org.id, zip);
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
+    const ctx = await runCtx();
+
+    const bridged = { ...ctx, bridge: { machineId: paired.machineId } };
+    const image = await call(bridged, "read_skill_file", { name: "graficos", path: "references/diagram.png" });
+    expect(image).toMatchObject({ data: { path: ".skills/graficos/references/diagram.png" } });
+    expect(image.images).toBeUndefined();
+    expect(image.content).toContain("your Read tool shows images");
+    expect(new TextDecoder().decode(runner.files.get(".skills/graficos/references/diagram.png"))).toBe("PNG");
+
+    // A model brain sees the image itself, and gets the PDF on its computer.
+    expect((await call(ctx, "read_skill_file", { name: "graficos", path: "references/diagram.png" })).images).toEqual([
+      { mediaType: "image/png", data: Buffer.from("PNG").toString("base64") },
+    ]);
+    const pdf = await call(ctx, "read_skill_file", { name: "graficos", path: "references/manual.pdf" });
+    expect(pdf.content).toContain("saved to .skills/graficos/references/manual.pdf in your folder");
+    expect(new TextDecoder().decode(runner.files.get(".skills/graficos/references/manual.pdf"))).toBe("%PDF");
+  });
+});
+
 describe("commands the computer holds for a person (ADR 0053 §3)", () => {
   test("run_code and a skill script: held, they say why and how to ask; with why they ask in the chat, and the approved call runs", async () => {
     f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });

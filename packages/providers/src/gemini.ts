@@ -282,7 +282,10 @@ function toInput(messages: ModelMessage[]): Step[] {
           type: "function_result",
           call_id: b.toolUseId,
           ...(name ? { name } : {}),
-          result: [{ type: "text", text: b.content }],
+          result: [
+            { type: "text", text: b.content },
+            ...(b.images ?? []).map((i) => ({ type: "image", data: i.data, mime_type: i.mediaType })),
+          ],
           ...(b.isError ? { is_error: true } : {}),
         });
         texts = null;

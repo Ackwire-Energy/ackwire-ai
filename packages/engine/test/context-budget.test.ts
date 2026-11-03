@@ -4,9 +4,11 @@ import {
   type ContentBlock,
   contextLimitsFor,
   contextWindowWithin,
+  IMAGE_CHARS,
   isContextLimit,
   type ModelMessage,
   type ModelRequest,
+  promptChars,
 } from "@agenteschat/providers";
 import {
   createFakeJudge,
@@ -18,6 +20,7 @@ import {
 } from "../src";
 import {
   CHARS_PER_TOKEN,
+  compactToolResults,
   contextBudgetTokens,
   estimateRequestTokens,
   fitContextWindow,
@@ -86,6 +89,24 @@ describe("estimate", () => {
     expect(withResult).toBeGreaterThan(t0 + 300);
     const tool = { name: "read_file", description: "Read a file.", inputSchema: { type: "object" } };
     expect(estimateRequestTokens({ ...base, tools: [tool] })).toBeGreaterThan(t0);
+  });
+
+  test("an image counts as about a large image's tokens, never its base64; removing its result drops it", () => {
+    const messages = conversation([{ id: "a", name: "read_skill_file", content: "diagram.png" }]);
+    const image = { mediaType: "image/png", data: "x".repeat(1_000_000) };
+    const shown: ModelMessage[] = [
+      ...messages.slice(0, -1),
+      { role: "user", content: [{ type: "tool_result", toolUseId: "a", content: "diagram.png", images: [image] }] },
+    ];
+    const extra = estimateRequestTokens({ system, messages: shown }) - estimateRequestTokens({ system, messages });
+    expect(Math.abs(extra - IMAGE_CHARS / CHARS_PER_TOKEN)).toBeLessThanOrEqual(1);
+    expect(promptChars({ system, messages: shown }) - promptChars({ system, messages })).toBeLessThan(IMAGE_CHARS + 20);
+    const compacted = compactToolResults(shown, new Set(["a"]));
+    expect(results(compacted)[0]).toEqual({
+      type: "tool_result",
+      toolUseId: "a",
+      content: removedPlaceholder(IMAGE_CHARS + 11),
+    });
   });
 
   test("budget is the window minus the output and the margin, capped for cost", () => {

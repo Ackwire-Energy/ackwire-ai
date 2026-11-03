@@ -1,4 +1,5 @@
 import type { Database, schema } from "@agenteschat/db";
+import type { ToolImage } from "@agenteschat/providers";
 import type { OutcomeKind } from "../context/outcomes";
 import type { JsonSchema } from "./json-schema";
 
@@ -62,6 +63,8 @@ export interface ToolOutput {
   /** Text the model sees as the tool result. */
   content: string;
   isError?: boolean;
+  /** Pictures the model sees with the text (base64 PNG, JPEG, GIF or WebP): model brains only, never kept in steps. */
+  images?: ToolImage[];
   /** Structured result kept in the run steps, not sent to the model. */
   data?: Record<string, unknown>;
   /** Ground truth this call produced (tests passed, PR merged…), recorded by the gateway. */

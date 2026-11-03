@@ -23,6 +23,7 @@ import {
   ProviderError,
   type StopReason,
   type SystemBlock,
+  type ToolImage,
   textOf,
 } from "@agenteschat/providers";
 import { extraUsageLeft, PLAN_NOTICE, PLAN_PAUSE, planBinding } from "@agenteschat/ui/plan-state";
@@ -586,7 +587,7 @@ export interface Transcript {
       askedAt?: number;
       /** A mission tool's own wait (a blocking decision, a review): its id; the answer comes as `result`. */
       waitId?: string;
-      result?: { content: string; isError: boolean };
+      result?: { content: string; isError: boolean; images?: ToolImage[] };
     }[];
   };
 }
@@ -3621,13 +3622,14 @@ async function executeRunInner(
             calls.push({ toolUseId: use.id, name: use.name, waitId: wait.id });
             waits.push(wait.id);
           } else {
-            const { content, isError } = outcome.output;
+            const { content, isError, images } = outcome.output;
             calls.push({
               toolUseId: use.id,
               name: use.name,
               result: {
                 content: cutShort && isError ? `${CUT_BY_RESTART}\n${content}` : content,
                 isError: isError === true,
+                ...(images?.length ? { images } : {}),
               },
             });
           }
@@ -3664,6 +3666,7 @@ async function executeRunInner(
               toolUseId: c.toolUseId,
               content: c.result?.content ?? "",
               ...(c.result?.isError ? { isError: true } : {}),
+              ...(c.result?.images ? { images: c.result.images } : {}),
             })),
           });
           // Going in circles (`stuck.ts`): only a step that repeats is judged, and the next verdict needs new steps.
