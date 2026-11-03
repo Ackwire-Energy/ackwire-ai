@@ -12182,5 +12182,136 @@
       "message": "给 {{name}} 发消息",
       "chooseOnWeb": "请在 agentes.chat 的 设置 › 电脑 中选择。"
     }
+  },
+  "taskManager": {
+    "title": "任务管理器",
+    "nav": "任务管理器",
+    "search": "搜索任务、智能体或应用",
+    "working_other": "{{count}} 个进行中",
+    "waiting_other": "{{count}} 个等你处理",
+    "all": "全部",
+    "now": "当前",
+    "agentTasks": "{{name}} 的任务",
+    "tasks_other": "{{count}} 个任务",
+    "free": "空闲",
+    "columns": {
+      "task": "任务",
+      "state": "状态",
+      "using": "正在使用",
+      "time": "时长",
+      "computer": "运行位置"
+    },
+    "sections": {
+      "asked": "成员的请求",
+      "background": "后台例行工作"
+    },
+    "state": {
+      "working": "工作中",
+      "ok": "等待你审批",
+      "answer": "等待回答",
+      "computerBusy": "等待电脑空位",
+      "inLine": "排队中 · 第 {{position}} 位",
+      "computerOffline": "等待电脑",
+      "plan": "等待套餐重置",
+      "budget": "等待预算重置",
+      "queued": "排队中",
+      "stopping": "正在停止…",
+      "stopped": "已停止"
+    },
+    "where": {
+      "dm": "私信",
+      "routine": "例行工作“{{name}}”",
+      "background": "后台"
+    },
+    "askedBy": "由 {{name}} 提出",
+    "askedByYou": "由你提出",
+    "servers": "agentes 服务器",
+    "plan": "已完成 {{done}}/{{total}}",
+    "program": {
+      "browser": "浏览器",
+      "screen": "电脑屏幕",
+      "terminal": "终端",
+      "agentes": "agentes",
+      "thinking": "思考中",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "查看步骤",
+      "stop": "停止",
+      "stopTask": "停止任务",
+      "stopAll": "全部停止",
+      "stopAllOf": "停止 {{name}} 的全部任务",
+      "open": "在对话中打开",
+      "openManager": "在任务管理器中打开"
+    },
+    "confirm": {
+      "title_other": "要停止 {{name}} 的 {{count}} 个任务吗？",
+      "body": "已完成的部分会保留，{{name}} 也会知道是你停止的。",
+      "short": "{{name}} 会知道是你停止的。",
+      "reason": "原因（可选）",
+      "stop_other": "停止 {{count}} 个"
+    },
+    "ended": {
+      "title": "今天已结束",
+      "done": "已完成",
+      "stopped": "被你停止",
+      "stoppedBy": "被 {{name}} 停止",
+      "failed": "未能完成",
+      "none": "今天还没有结束的任务。"
+    },
+    "empty": {
+      "title": "现在没有智能体在工作",
+      "body": "智能体开始任务后，任务会显示在这里。"
+    },
+    "strip": {
+      "tasks_other": "{{name}} 正在处理 {{count}} 个任务",
+      "waiting_other": "{{count}} 个等你处理",
+      "see": "查看",
+      "hide": "关闭",
+      "stopHere": "停止这个",
+      "here": "这里"
+    },
+    "stopped": {
+      "line": "你停止了这个任务",
+      "lineBy": "{{name}} 停止了这个任务",
+      "told": "已告知 {{agent}}，除非有人要求，否则不会再继续。",
+      "reason": "原因：“{{reason}}”",
+      "sayWhy": "说明原因",
+      "whyPlaceholder": "想说明原因吗？（可选）",
+      "send": "发送"
+    },
+    "activity": "最近 30 分钟",
+    "failed": "无法停止，请重试。",
+    "queue": {
+      "see": "查看队列",
+      "full_other": "已满 · {{count}} 个在排队",
+      "room": "有空位",
+      "computers": "电脑"
+    },
+    "navWhat": "查看每个智能体正在做什么，并停止需要停止的任务",
+    "cards": {
+      "label": "智能体",
+      "previous": "前面的智能体",
+      "next": "更多智能体"
+    },
+    "table": "任务",
+    "noResults": "没有符合这次搜索的任务。",
+    "toggleAgent": "显示或隐藏 {{name}} 的任务",
+    "using": "正在使用 {{names}}",
+    "activityOf": "{{name}} 最近 30 分钟做了什么",
+    "activityAll": "智能体最近 30 分钟做了什么",
+    "panel": {
+      "steps": "步骤",
+      "noSteps": "还没有步骤。"
+    },
+    "agentPanel": {
+      "now_other": "当前 {{count}} 个",
+      "wells": {
+        "now": "当前",
+        "waiting": "等你处理",
+        "done": "今天完成"
+      },
+      "none": "{{name}} 现在空闲。"
+    }
   }
 }

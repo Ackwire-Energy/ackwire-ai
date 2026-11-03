@@ -62,6 +62,7 @@ import {
   useSendVoice,
   useSettings,
   usesBrowser,
+  useTaskManager,
   useThreadInfo,
   useThreadMessages,
   useThreadMission,
@@ -134,6 +135,7 @@ import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
+import { tasksOf, todayStart } from "@agenteschat/client/lib/task-manager";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
@@ -309,6 +311,8 @@ import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } 
 import { SearchHereButton } from "@/components/search/SearchHereButton";
 import { TeamChecks } from "@/components/TeamChecks";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
+import { AgentTasksPanel } from "@/components/tasks/AgentTasksPanel";
+import { AgentTasksContext } from "@/components/tasks/agent-tasks-context";
 import { RangeBar, RangeRows, useRangeAdjust } from "@/components/threads/RangeSelect";
 import {
   ArchivedThreadsNote,
@@ -682,6 +686,17 @@ function ChannelView({
   const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
+  // A DM with an agent: its tasks (ADR 0128), from the pill in the header; one panel too, any other one closes it.
+  const [tasksOpen, setTasksOpen] = useState(false);
+  useEffect(() => {
+    if (panel || profile || consultId) setTasksOpen(false);
+  }, [panel, profile, consultId]);
+  const toggleTasks = useCallback(() => {
+    setPanel(null);
+    setProfile(null);
+    setConsultId(null);
+    setTasksOpen((open) => !open);
+  }, []);
   const outerPanel = useOpenAgentPanel();
   const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
     setPanel(null);
@@ -1244,6 +1259,18 @@ function ChannelView({
   const [askRegistry] = useState(createAskRegistry);
   const asksOut = useAsksOutOfView(scroller, askRegistry, isMember);
   const seeAsk = (id: string) => showRequest(scroller.current, id, !reducedMotion);
+  // A DM with an agent: its tasks (ADR 0128), a pill in the header while it has any, opening them in the side panel.
+  const tasksAgentId = chrome?.dmAgentId && !thread ? chrome.dmAgentId : null;
+  // Asked every 5 s: a pill beside the conversation, not the page that follows every task (3 s).
+  const taskView = useTaskManager(org.id, {
+    since: todayStart(),
+    enabled: Boolean(tasksAgentId) && isMember,
+    pollMs: 5_000,
+  });
+  const agentTasks = useMemo(
+    () => (tasksAgentId ? tasksOf(taskView.data?.tasks ?? [], tasksAgentId) : []),
+    [taskView.data, tasksAgentId],
+  );
   /** "Ver" on that line: back to the agent's block. */
   const seeRun = (runId: string) => {
     const row = Array.from(scroller.current?.querySelectorAll<HTMLElement>("[data-run-id]") ?? []).find(
@@ -1807,6 +1834,10 @@ function ChannelView({
 
   // A DM with an agent: the agent's chip sits in the composer's toolbar row.
   const agentDm = Boolean(chrome?.dmAgentId) && !thread;
+  const tasksControl = useMemo(
+    () => (tasksAgentId ? { tasks: agentTasks, open: tasksOpen, toggle: toggleTasks } : null),
+    [tasksAgentId, agentTasks, tasksOpen, toggleTasks],
+  );
   const Tag = chrome?.panel ? "section" : "main";
   const agentNames = joinNames(
     channelAgents.map((a) => a.name),
@@ -1827,7 +1858,10 @@ function ChannelView({
           {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
             are a left-aligned team chat. */}
           <Tag className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}>
-            {chrome?.header ?? (
+            {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
+            {chrome?.header ? (
+              <AgentTasksContext.Provider value={tasksControl}>{chrome.header}</AgentTasksContext.Provider>
+            ) : (
               <header className="channel__header">
                 <NavToggle />
                 <div
@@ -2269,6 +2303,15 @@ function ChannelView({
                   <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
                 </ErrorBoundary>
               )}
+            />
+          )}
+          {tasksOpen && tasksAgentId && (
+            <AgentTasksPanel
+              agentId={tasksAgentId}
+              channelId={channel.id}
+              tasks={agentTasks}
+              ended={taskView.data?.ended ?? []}
+              onClose={() => setTasksOpen(false)}
             />
           )}
         </ChannelThreadsContext.Provider>

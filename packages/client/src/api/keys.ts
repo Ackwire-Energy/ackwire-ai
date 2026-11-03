@@ -197,6 +197,8 @@ export const keys = {
   gifSearch: (orgId: string, q: string, category: string | null, lang: string) =>
     ["org", orgId, "gifs", q, category ?? "", lang] as const,
   working: (orgId: string) => ["org", orgId, "working"] as const,
+  taskManager: (orgId: string) => ["org", orgId, "task-manager"] as const,
+  taskSteps: (orgId: string, runId: string) => ["org", orgId, "task-manager", "steps", runId] as const,
   reminders: (orgId: string) => ["org", orgId, "reminders"] as const,
   /** Every mailbox read (prefix). */
   mail: (orgId: string) => ["org", orgId, "mail"] as const,

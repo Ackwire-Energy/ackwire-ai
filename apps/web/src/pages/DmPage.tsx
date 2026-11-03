@@ -18,6 +18,7 @@ import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { SearchHereButton } from "@/components/search/SearchHereButton";
+import { AgentTasksPill } from "@/components/tasks/AgentTasksPanel";
 import { useDirectory } from "@/hooks/useDirectory";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
@@ -99,6 +100,8 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
         )}
         {person && <span className="channel__topic">{person.email}</span>}
       </div>
+      {/* Its tasks (ADR 0128), while it has any: they open in the side panel. */}
+      {agent && <AgentTasksPill />}
       <SearchHereButton channelId={dm.data.channelId} />
       {agent && <DmQueueButton agentId={agent.id} />}
       {agent && <ComputerButton agent={agent} />}

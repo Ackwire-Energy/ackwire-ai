@@ -1114,6 +1114,10 @@
     "anyAgent": "所有智能体",
     "create": "创建"
   },
+  "taskManager": {
+    "loadFailed": "无法加载任务。",
+    "gone": "这个任务已经不在这里了。"
+  },
   "homeNow": {
     "working_other": "{{count}} 个工作中",
     "finished": {

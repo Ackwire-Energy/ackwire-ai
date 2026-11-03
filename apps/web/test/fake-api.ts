@@ -77,6 +77,8 @@ import type {
   SpeechKey,
   StoragePlatform,
   StorageUsage,
+  TaskManagerView,
+  TaskSteps,
   WorkspaceLimits,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -363,6 +365,13 @@ export interface FakeState {
   sidebarItemsError?: ApiError;
   /** The sidebar's sections in my order (`orgs.sidebarOrder`); unset = the default. */
   sidebarOrder?: SidebarSection[];
+  /**
+   * The task manager (ADR 0128, `working.taskManager`); unset = a server without it (no `working` part). Stopping a
+   * task (`agents.cancelRun`) moves it to `ended`, stopped by me.
+   */
+  taskManager?: TaskManagerView;
+  /** A task's steps by run (`working.taskSteps`, the task manager's panel); a run not here has none yet. */
+  taskSteps?: Record<string, TaskSteps>;
 }
 
 /** A new workspace's "Admin" role (ADR 0085); João holds it. */
@@ -2147,10 +2156,42 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             (r) => (!filter.agentId || r.agentId === filter.agentId) && (!filter.status || r.status === filter.status),
           )
           .slice(0, filter.limit),
-      cancelRun: async (orgId, runId) => {
-        log("agents.cancelRun", orgId, runId);
+      cancelRun: async (orgId, runId, reason) => {
+        if (reason === undefined) log("agents.cancelRun", orgId, runId);
+        else log("agents.cancelRun", orgId, runId, reason);
         if (state.runs.some((r) => r.id === runId && r.status !== "running" && r.status !== "queued"))
           throw new ApiError(409, "run_finished", "Run already finished");
+        // The task manager's task ends, stopped by me (what the server lists next).
+        const view = state.taskManager;
+        const task = view?.tasks.find((x) => x.runId === runId);
+        if (view && task) {
+          view.tasks = view.tasks.filter((x) => x.runId !== runId);
+          const me = state.me?.user;
+          view.ended.unshift({
+            runId,
+            agentId: task.agentId,
+            channelId: task.channelId,
+            channelKind: task.channelKind,
+            channelName: task.channelName,
+            threadId: task.threadId,
+            status: "canceled",
+            label: task.label,
+            background: task.background,
+            routine: task.routine,
+            startedAt: task.startedAt,
+            finishedAt: new Date().toISOString(),
+            stoppedBy: me ? { userId: me.id, name: me.name } : null,
+          });
+        }
+      },
+      stopReason: async (orgId, runId, reason) => {
+        log("agents.stopReason", orgId, runId, reason);
+        // The notice the agent reads keeps the reason, as the server's does.
+        for (const m of state.messages) {
+          const notice = m.meta?.notice as { kind?: string; refs?: Record<string, string> } | undefined;
+          if (notice?.kind === "run_stopped" && notice.refs?.runId === runId)
+            m.meta = { ...m.meta, notice: { ...notice, refs: { ...notice.refs, reason } } };
+        }
       },
       continueRun: async (orgId, runId) => {
         log("agents.continueRun", orgId, runId);
@@ -3244,6 +3285,23 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     databases: databases.client,
     browser: browser.client,
     desktop: browser.desktop,
+    // "Trabalhando agora" and the task manager only for a test that gives the task manager (`state.taskManager`).
+    ...(state.taskManager
+      ? {
+          working: {
+            list: async () => [],
+            taskManager: async (orgId: string, since?: string) => {
+              state.calls.push({ method: "working.taskManager", args: [orgId, since] });
+              return structuredClone(state.taskManager as TaskManagerView);
+            },
+            taskSteps: async (orgId: string, runId: string) => {
+              state.calls.push({ method: "working.taskSteps", args: [orgId, runId] });
+              const createdAt = state.taskManager?.tasks.find((x) => x.runId === runId)?.createdAt ?? NOW.toISOString();
+              return structuredClone(state.taskSteps?.[runId] ?? { run: { createdAt, finishedAt: null }, steps: [] });
+            },
+          },
+        }
+      : {}),
   };
   fakeMachinesOf.set(client, machines);
   fakeMailOf.set(client, mail);

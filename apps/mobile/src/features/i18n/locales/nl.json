@@ -1179,6 +1179,10 @@
     "anyAgent": "Alle agents",
     "create": "Aanmaken"
   },
+  "taskManager": {
+    "loadFailed": "Kon de taken niet laden.",
+    "gone": "Deze taak is er niet meer."
+  },
   "homeNow": {
     "working_one": "{{count}} aan het werk",
     "working_other": "{{count}} aan het werk",

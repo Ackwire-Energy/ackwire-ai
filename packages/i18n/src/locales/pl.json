@@ -13265,5 +13265,163 @@
       "message": "Napisz do {{name}}",
       "chooseOnWeb": "Wybierz go w agentes.chat, w Ustawienia › Komputery."
     }
+  },
+  "taskManager": {
+    "title": "Menedżer zadań",
+    "nav": "Menedżer zadań",
+    "search": "Szukaj zadania, agenta lub aplikacji",
+    "working_one": "{{count}} pracuje",
+    "working_few": "{{count}} pracują",
+    "working_many": "{{count}} pracuje",
+    "working_other": "{{count}} pracują",
+    "waiting_one": "{{count}} czeka na ciebie",
+    "waiting_few": "{{count}} czekają na ciebie",
+    "waiting_many": "{{count}} czeka na ciebie",
+    "waiting_other": "{{count}} czekają na ciebie",
+    "all": "Wszyscy",
+    "now": "Teraz",
+    "agentTasks": "Zadania agenta {{name}}",
+    "tasks_one": "{{count}} zadanie",
+    "tasks_few": "{{count}} zadania",
+    "tasks_many": "{{count}} zadań",
+    "tasks_other": "{{count}} zadania",
+    "free": "Bez zadań",
+    "columns": {
+      "task": "Zadanie",
+      "state": "Stan",
+      "using": "Używa teraz",
+      "time": "Czas",
+      "computer": "Gdzie działa"
+    },
+    "sections": {
+      "asked": "Zlecone przez osoby",
+      "background": "Rutyny w tle"
+    },
+    "state": {
+      "working": "Pracuje",
+      "ok": "Czeka na twoją zgodę",
+      "answer": "Czeka na odpowiedź",
+      "computerBusy": "Czeka na miejsce na komputerze",
+      "inLine": "W kolejce · {{position}}.",
+      "computerOffline": "Czeka na komputer",
+      "plan": "Czeka na limit planu",
+      "budget": "Czeka na budżet",
+      "queued": "W kolejce",
+      "stopping": "Zatrzymywanie…",
+      "stopped": "Zatrzymane"
+    },
+    "where": {
+      "dm": "Wiadomość bezpośrednia",
+      "routine": "Rutyna «{{name}}»",
+      "background": "W tle"
+    },
+    "askedBy": "{{name}} poprosił(a)",
+    "askedByYou": "Twoja prośba",
+    "servers": "Nasze serwery",
+    "plan": "{{done}} z {{total}} gotowe",
+    "program": {
+      "browser": "Przeglądarka",
+      "screen": "Ekran komputera",
+      "terminal": "Terminal",
+      "agentes": "agentes",
+      "thinking": "Myśli",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "Zobacz kroki",
+      "stop": "Zatrzymaj",
+      "stopTask": "Zatrzymaj zadanie",
+      "stopAll": "Zatrzymaj wszystkie",
+      "stopAllOf": "Zatrzymaj wszystkie zadania agenta {{name}}",
+      "open": "Otwórz w rozmowie",
+      "openManager": "Otwórz w menedżerze zadań"
+    },
+    "confirm": {
+      "title_one": "Zatrzymać zadanie agenta {{name}}?",
+      "title_few": "Zatrzymać {{count}} zadania agenta {{name}}?",
+      "title_many": "Zatrzymać {{count}} zadań agenta {{name}}?",
+      "title_other": "Zatrzymać {{count}} zadania agenta {{name}}?",
+      "body": "To, co już zrobione, zostaje, a {{name}} dowie się, że to zatrzymałeś(-aś).",
+      "short": "{{name}} dowie się, że to zatrzymałeś(-aś).",
+      "reason": "Dlaczego? (opcjonalnie)",
+      "stop_one": "Zatrzymaj",
+      "stop_few": "Zatrzymaj {{count}}",
+      "stop_many": "Zatrzymaj {{count}}",
+      "stop_other": "Zatrzymaj {{count}}"
+    },
+    "ended": {
+      "title": "Zakończone dzisiaj",
+      "done": "Gotowe",
+      "stopped": "Zatrzymane przez ciebie",
+      "stoppedBy": "Zatrzymane przez: {{name}}",
+      "failed": "Nie udało się skończyć",
+      "none": "Dzisiaj nic się jeszcze nie zakończyło."
+    },
+    "empty": {
+      "title": "Żaden agent teraz nie pracuje",
+      "body": "Gdy agent zacznie zadanie, pojawi się ono tutaj."
+    },
+    "strip": {
+      "tasks_one": "{{name}}: {{count}} zadanie",
+      "tasks_few": "{{name}}: {{count}} zadania",
+      "tasks_many": "{{name}}: {{count}} zadań",
+      "tasks_other": "{{name}}: {{count}} zadania",
+      "waiting_one": "{{count}} czeka na ciebie",
+      "waiting_few": "{{count}} czekają na ciebie",
+      "waiting_many": "{{count}} czeka na ciebie",
+      "waiting_other": "{{count}} czekają na ciebie",
+      "see": "Zobacz",
+      "hide": "Zamknij",
+      "stopHere": "Zatrzymaj to",
+      "here": "tutaj"
+    },
+    "stopped": {
+      "line": "Zatrzymałeś(-aś) to zadanie",
+      "lineBy": "{{name}} zatrzymał(a) to zadanie",
+      "told": "{{agent}} wie o tym i wróci do zadania tylko, jeśli ktoś poprosi.",
+      "reason": "Powód: «{{reason}}»",
+      "sayWhy": "Podaj powód",
+      "whyPlaceholder": "Chcesz podać powód? (opcjonalnie)",
+      "send": "Wyślij"
+    },
+    "activity": "Ostatnie 30 min",
+    "failed": "Nie udało się zatrzymać. Spróbuj ponownie.",
+    "queue": {
+      "see": "Zobacz kolejkę",
+      "full_one": "Brak miejsc · {{count}} w kolejce",
+      "full_few": "Brak miejsc · {{count}} w kolejce",
+      "full_many": "Brak miejsc · {{count}} w kolejce",
+      "full_other": "Brak miejsc · {{count}} w kolejce",
+      "room": "Są wolne miejsca",
+      "computers": "Komputery"
+    },
+    "navWhat": "Co teraz robi każdy agent i zatrzymywanie tego, co trzeba",
+    "cards": {
+      "label": "Agenci",
+      "previous": "Poprzedni agenci",
+      "next": "Więcej agentów"
+    },
+    "table": "Zadania",
+    "noResults": "Żadne zadanie nie pasuje do wyszukiwania.",
+    "toggleAgent": "Pokaż lub ukryj zadania agenta {{name}}",
+    "using": "Używa: {{names}}",
+    "activityOf": "Co agent {{name}} zrobił w ostatnich 30 min",
+    "activityAll": "Co agenci zrobili w ostatnich 30 min",
+    "panel": {
+      "steps": "Kroki",
+      "noSteps": "Na razie brak kroków."
+    },
+    "agentPanel": {
+      "now_one": "{{count}} teraz",
+      "now_few": "{{count}} teraz",
+      "now_many": "{{count}} teraz",
+      "now_other": "{{count}} teraz",
+      "wells": {
+        "now": "Teraz",
+        "waiting": "Czeka na ciebie",
+        "done": "Zrobione dzisiaj"
+      },
+      "none": "{{name}} nie ma teraz zadań."
+    }
   }
 }
