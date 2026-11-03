@@ -798,13 +798,21 @@ export async function setMyLocale(db: Database, userId: string, locale: UserLoca
   }
 }
 
-/** The person's language and whether it follows each device's. */
-export async function myLocale(db: Database, userId: string) {
+/**
+ * The person's name and photo as saved (a session's cached cookie keeps the old ones for minutes after a change
+ * elsewhere), their language and whether it follows each device's.
+ */
+export async function myAccount(db: Database, userId: string) {
   const [row] = await db
-    .select({ locale: users.locale, localeAuto: users.localeAuto })
+    .select({ name: users.name, image: users.image, locale: users.locale, localeAuto: users.localeAuto })
     .from(users)
     .where(eq(users.id, userId));
-  return { locale: row?.locale ?? null, localeAuto: row?.localeAuto ?? true };
+  return {
+    name: row?.name ?? null,
+    image: row?.image ?? null,
+    locale: row?.locale ?? null,
+    localeAuto: row?.localeAuto ?? true,
+  };
 }
 
 /**

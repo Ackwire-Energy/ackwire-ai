@@ -28,13 +28,24 @@ test("a new name reaches every workspace the person is in", async () => {
     orgIds.push(((await res.json()) as { organization: { id: string } }).organization.id);
   }
   await joinByInvitation(t, ana, orgIds[1] as string, "bia@example.com", { as: bia });
+  // A workspace she isn't in hears nothing.
+  const carla = browser(t);
+  await signUp(carla, "carla@example.com");
+  const other = await carla("/api/app/organizations", { json: { name: "Other" } });
+  const otherId = ((await other.json()) as { organization: { id: string } }).organization.id;
+  const phone = browser(t);
+  await phone("/api/auth/sign-in/email", { json: { email: "bia@example.com", password: "correct horse battery" } });
+  expect(((await (await phone("/api/app/me")).json()) as { user: { name: string } }).user.name).toBe("bia");
   const heard: string[] = [];
-  for (const orgId of orgIds)
+  for (const orgId of [...orgIds, otherId])
     t.adapters.pubsub.subscribe(orgTopic(orgId), (e) => {
       if ((e as { event?: { type?: string } }).event?.type === "org.members") heard.push(orgId);
     });
   expect((await bia("/api/auth/update-user", { json: { name: "Bia Souza" } })).status).toBe(200);
   expect(heard.sort()).toEqual([...orgIds].sort());
+  // Her other devices read it in `me`, past their session's cached cookie.
+  const me = (await (await phone("/api/app/me")).json()) as { user: { name: string } };
+  expect(me.user.name).toBe("Bia Souza");
   // The photo is theirs everywhere too; a handle is one workspace's.
   heard.length = 0;
   expect((await bia(`/api/app/organizations/${orgIds[0]}/me/avatar`, { method: "DELETE" })).status).toBe(204);
