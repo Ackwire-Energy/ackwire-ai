@@ -4631,7 +4631,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filtrer par responsable et priorité",
     "assigneeFilter": "Responsable",
     "priorityFilter": "Priorité",
     "title": "Tâches",
@@ -4642,13 +4641,6 @@
     "list": "Liste",
     "new": "Nouvelle tâche",
     "filters": "Filtrer les tâches",
-    "filter": {
-      "all": "Toutes",
-      "agents": "Avec des agents",
-      "people": "Avec des personnes",
-      "mine": "Les miennes",
-      "none": "Non attribuées"
-    },
     "unassigned_one": "{{count}} non attribuée",
     "unassigned_many": "{{count}} non attribuées",
     "unassigned_other": "{{count}} non attribuées",
@@ -4656,7 +4648,6 @@
     "panelLabel": "Tâche #{{number}}",
     "openPage": "Ouvrir la page de la tâche",
     "close": "Fermer",
-    "dropHere": "Déposer ici",
     "moved": "#{{number}} dans {{status}}.",
     "movedTo": "Déplacée vers {{column}}",
     "newIn": "Nouvelle tâche dans {{column}}",
@@ -4666,6 +4657,54 @@
     "flowHint": "La tâche avance d'elle-même, vers la première colonne de chaque étape : En cours quand un agent commence, En revue quand elle est prête à être vérifiée, Terminée quand vous approuvez.",
     "moreOptions": "Plus d'options",
     "showCanceled": "Afficher les annulées",
+    "filterButton": "Filtre",
+    "filterValue": "{{filter}} : {{value}}",
+    "me": "Moi",
+    "display": {
+      "title": "Affichage",
+      "label": "Affichage : {{layout}} · {{group}}",
+      "layout": "Disposition",
+      "group": "Grouper par",
+      "sort": "Trier par",
+      "fields": "Sur les cartes",
+      "saved": "Enregistré pour vous dans cet espace de travail",
+      "reset": "Revenir au réglage par défaut",
+      "by": {
+        "stage": "Étape",
+        "assignee": "Responsable",
+        "priority": "Priorité"
+      },
+      "order": {
+        "manual": "Manuel",
+        "priority": "Priorité",
+        "due": "Échéance"
+      },
+      "field": {
+        "assignee": "Responsable",
+        "priority": "Priorité",
+        "due": "Échéance",
+        "criteria": "Critères",
+        "pullRequest": "Pull request",
+        "label": "Étiquette"
+      }
+    },
+    "drop": {
+      "stage": "Déposez dans {{name}}",
+      "assignee": "Déposez pour la confier à {{name}}",
+      "unassign": "Déposez pour retirer le responsable",
+      "priority": "Déposez pour une priorité {{priority}}"
+    },
+    "drag": {
+      "role": "tâche déplaçable",
+      "help": "Espace prend la tâche, les flèches la déplacent, Espace la dépose et Échap annule.",
+      "picked": "Vous avez pris la #{{number}}. Les flèches la déplacent, Espace la dépose, Échap annule.",
+      "moved": "#{{number}} : {{group}}, position {{position}} sur {{total}}.",
+      "dropped": "Vous avez déposé la #{{number}} dans {{group}}.",
+      "canceled": "La #{{number}} est revenue à sa place.",
+      "assigned": "La #{{number}} est maintenant confiée à {{name}}.",
+      "unassigned": "La #{{number}} n'a plus de responsable.",
+      "prioritized": "La #{{number}} a maintenant une priorité {{priority}}."
+    },
     "canceledColumn": "Annulées",
     "columns": {
       "add": "Ajouter une colonne",
@@ -4842,6 +4881,13 @@
     "criteria": "Critères d'acceptation",
     "criteriaCount": "{{done}} sur {{total}}",
     "noCriteria": "Aucun critère d'acceptation pour l'instant.",
+    "edit": {
+      "title": "Modifier le titre",
+      "description": "Modifier la description",
+      "criterion": "Modifier le critère « {{text}} »",
+      "criterionShort": "Modifier le critère",
+      "hint": "Enregistré quand vous quittez le champ ou appuyez sur Échap."
+    },
     "askTitle": "Demander à {{name}} de faire cette tâche",
     "askTitle_female": "Demander à {{name}} de faire cette tâche",
     "askText": "{{name}} lit ce dont il a besoin, commente le plan ici et s'en charge. Tout ce qui est sensible, comme publier, demande votre approbation.",
@@ -4897,6 +4943,7 @@
       "created": "a créé la tâche",
       "renamed": "a renommé la tâche",
       "description_changed": "a modifié la description",
+      "criteria_changed": "a modifié les critères d'acceptation",
       "status_changed": "a changé le statut en {{status}}",
       "priority_changed": "a changé la priorité en {{priority}}",
       "assigned": "a attribué la tâche",
@@ -5099,7 +5146,24 @@
         "forum": "Les agents en discutent dans un sujet du forum",
         "artifact": "Devient un document dans le Drive"
       },
-      "ahead": "Préparé pour plus tard"
+      "ahead": "Préparé pour plus tard",
+      "createdBy": "Créée par {{name}} · {{date}}",
+      "nameLabel": "Nom de la routine",
+      "editName": "Modifier le nom",
+      "editWhat": "Modifier ce qu'elle fait",
+      "tabs": {
+        "label": "Parties de la routine",
+        "details": "Détails",
+        "runs": "Exécutions"
+      },
+      "nexts": "Prochaines exécutions",
+      "who": "Qui s'en charge",
+      "onAirLine": "S'exécute toute seule le moment venu",
+      "offAirLine": "Ne s'exécute pas tant que vous ne l'activez pas",
+      "reportHint": {
+        "always": "Même sans rien de nouveau",
+        "when_new": "Silencieuse quand il n'y a rien de nouveau"
+      }
     },
     "ahead": {
       "approved": "Approuvée · s'exécute {{when}}",

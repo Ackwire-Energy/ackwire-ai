@@ -27,6 +27,17 @@ const open = async (prepare?: (api: ReturnType<typeof createFakeApi>) => Promise
   return { state, api };
 };
 const card = (name: string) => screen().getByRole("article", { name });
+/** The aside's "Quando": the creation form's schedule and triggers, in a dialog of their own. */
+const quando = async (page: HTMLElement) => {
+  await click(within(page).getByRole("button", { name: "Quando" }));
+  await settle(4);
+};
+const pick = async (combobox: HTMLElement, option: string | RegExp) => {
+  combobox.focus();
+  await key(combobox, "Enter");
+  await click(within(screen().getByRole("listbox")).getByRole("option", { name: option }));
+  await settle(3);
+};
 const menu = async (name: string, item: string) => {
   const trigger = within(card(name)).getByRole("button", { name: `Mais ações: ${name}` });
   trigger.focus();
@@ -36,12 +47,16 @@ const menu = async (name: string, item: string) => {
 };
 
 describe("Rotinas: editar, duplicar, apagar", () => {
-  test("Editar opens the form filled in; Salvar sends only what changed and shows the next run", async () => {
+  test("Editar opens the routine's page; Quando opens its schedule and Salvar sends only what changed", async () => {
     const { state } = await open();
     await menu("Resumo da semana", "Editar");
-    const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
-    expect((within(dialog).getByLabelText("O que fazer") as HTMLTextAreaElement).value).toContain("Resuma o que");
-    expect((within(dialog).getByLabelText("Título") as HTMLInputElement).value).toBe("Resumo da semana");
+    const page = screen().getByRole("dialog", { name: "Resumo da semana" });
+    expect(screen().queryByRole("dialog", { name: "Editar rotina" })).toBeNull();
+    await quando(page);
+    const dialog = screen().getByRole("dialog", { name: "Quando" });
+    // Only the schedule: what it does, its name and its agent stay on the page.
+    expect(within(dialog).queryByLabelText("O que fazer")).toBeNull();
+    expect(within(dialog).queryByLabelText("Título")).toBeNull();
     expect((within(dialog).getByLabelText("Frequência") as HTMLInputElement).value).toBe("toda segunda às 9h");
     expect(dialog.textContent).toContain("Toda semana, seg, às 09:00");
     await type(within(dialog).getByLabelText("Frequência"), "dias úteis às 8h30");
@@ -62,18 +77,19 @@ describe("Rotinas: editar, duplicar, apagar", () => {
       },
     });
     expect(screen().getByText(/Rotina salva\. Próxima: /)).toBeTruthy();
-    expect(card("Resumo da semana").textContent).toContain("De segunda a sexta, às 08:30");
+    expect(screen().queryByRole("dialog", { name: "Quando" })).toBeNull();
+    // The page under it says the new schedule, beside the agent and in the aside.
+    expect(page.textContent).toContain("De segunda a sexta, às 08:30");
   });
 
   test("nothing changed: Salvar just closes", async () => {
     const { state } = await open();
     await menu("Resumo da semana", "Editar");
-    await click(
-      within(screen().getByRole("dialog", { name: "Editar rotina" })).getByRole("button", { name: "Salvar" }),
-    );
+    await quando(screen().getByRole("dialog", { name: "Resumo da semana" }));
+    await click(within(screen().getByRole("dialog", { name: "Quando" })).getByRole("button", { name: "Salvar" }));
     await settle(3);
     expect(state.calls.some((c) => c.method === "routines.update")).toBe(false);
-    expect(screen().queryByRole("dialog", { name: "Editar rotina" })).toBeNull();
+    expect(screen().queryByRole("dialog", { name: "Quando" })).toBeNull();
   });
 
   test("a routine in UTC starts in my zone, with a hint to keep UTC", async () => {
@@ -88,7 +104,8 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     );
     expect(card("Antiga em UTC").textContent).toContain("(UTC)");
     await menu("Antiga em UTC", "Editar");
-    const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
+    await quando(screen().getByRole("dialog", { name: "Antiga em UTC" }));
+    const dialog = screen().getByRole("dialog", { name: "Quando" });
     expect(dialog.textContent).toContain("Esta rotina está em UTC. Quer usar o horário de Brasília?");
     expect(within(dialog).getByRole("combobox", { name: "Fuso horário" }).textContent).toContain(
       "Horário de Brasília · UTC−3",
@@ -114,7 +131,8 @@ describe("Rotinas: editar, duplicar, apagar", () => {
       }),
     );
     await menu("Antiga em UTC", "Editar");
-    const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
+    await quando(screen().getByRole("dialog", { name: "Antiga em UTC" }));
+    const dialog = screen().getByRole("dialog", { name: "Quando" });
     await click(within(dialog).getByRole("button", { name: "Manter em UTC" }));
     await settle(3);
     expect(dialog.textContent).not.toContain("Esta rotina está em UTC");
@@ -147,6 +165,102 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     const avatar = card("Resumo da semana").querySelector(".ac-avatar--agent") as HTMLElement;
     expect(avatar.getAttribute("data-accessory")).toBe("hat");
     expect(avatar.style.getPropertyValue("--av-top")).toBeTruthy();
+  });
+});
+
+describe("Rotinas: the routine's page, edited where it is", () => {
+  const page = async () => {
+    await click(within(card("Resumo da semana")).getByRole("button", { name: "Resumo da semana" }));
+    await settle(4);
+    return screen().getByRole("dialog", { name: "Resumo da semana" });
+  };
+  const aside = (dialog: HTMLElement) => within(dialog).getByRole("complementary", { name: /^Detalhes: / });
+  const lastPatch = (state: ReturnType<typeof seedState>) =>
+    state.calls.filter((c) => c.method === "routines.update").at(-1)?.args[1];
+
+  test("full height: Rodar agora on the bar, Detalhes and Execuções, the aside; no Editar or Pausar", async () => {
+    await open();
+    const dialog = await page();
+    expect(dialog.className).toContain("ac-details--fill");
+    expect(within(dialog).getByRole("heading", { level: 1, name: "Resumo da semana" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Rodar agora" })).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Editar" })).toBeNull();
+    expect(within(dialog).queryByRole("button", { name: "Pausar" })).toBeNull();
+    expect(within(dialog).getByRole("tab", { name: "Detalhes" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(dialog).getByRole("tab", { name: /^Execuções/ })).toBeTruthy();
+    expect(aside(dialog).textContent).toContain("Quem faz");
+  });
+
+  test("renaming in place: Enter saves it and Salvo shows by Rotina", async () => {
+    const { state } = await open();
+    const dialog = await page();
+    await click(within(dialog).getByRole("heading", { level: 1, name: "Resumo da semana" }));
+    const field = within(dialog).getByRole("textbox", { name: "Nome da rotina" }) as HTMLInputElement;
+    expect(field.value).toBe("Resumo da semana");
+    await type(field, "Resumo de segunda");
+    await key(field, "Enter");
+    await settle(4);
+    expect(lastPatch(state)).toEqual({ name: "Resumo de segunda" });
+    expect(within(dialog).getByRole("heading", { level: 1, name: "Resumo de segunda" })).toBeTruthy();
+    expect(within(dialog).getByText("Salvo")).toBeTruthy();
+  });
+
+  test("an empty name keeps the old one and sends nothing", async () => {
+    const { state } = await open();
+    const dialog = await page();
+    await click(within(dialog).getByRole("button", { name: "Editar o nome" }));
+    const field = within(dialog).getByRole("textbox", { name: "Nome da rotina" });
+    await type(field, "   ");
+    await act(async () => fireEvent.blur(field));
+    await settle(3);
+    expect(state.calls.some((c) => c.method === "routines.update")).toBe(false);
+    expect(within(dialog).getByRole("heading", { level: 1, name: "Resumo da semana" })).toBeTruthy();
+  });
+
+  test("what it does, edited in place: leaving the box saves it", async () => {
+    const { state } = await open();
+    const dialog = await page();
+    expect(dialog.textContent).toContain("Resuma o que aconteceu na semana");
+    await click(within(dialog).getByRole("button", { name: "Editar o que ela faz" }));
+    const box = within(dialog).getByRole("textbox", { name: "O que fazer" }) as HTMLTextAreaElement;
+    expect(box.value).toContain("Resuma o que aconteceu na semana");
+    await type(box, "Resuma a semana em cinco linhas.");
+    await act(async () => fireEvent.blur(box));
+    await settle(4);
+    expect(lastPatch(state)).toEqual({ prompt: "Resuma a semana em cinco linhas." });
+    expect(within(dialog).queryByRole("textbox", { name: "O que fazer" })).toBeNull();
+    expect(dialog.textContent).toContain("Resuma a semana em cinco linhas.");
+  });
+
+  test("No ar is a switch in the aside: off pauses it and says what that means", async () => {
+    const { state } = await open();
+    const dialog = await page();
+    expect(aside(dialog).textContent).toContain("Roda sozinha quando chega a hora");
+    await click(within(aside(dialog)).getByRole("switch", { name: "No ar" }));
+    await settle(5);
+    expect(state.calls.some((c) => c.method === "routines.setActive" && c.args[1] === false)).toBe(true);
+    expect(within(aside(dialog)).getByRole("switch", { name: "No ar" }).getAttribute("aria-checked")).toBe("false");
+    expect(aside(dialog).textContent).toContain("Não roda até você ligar");
+    expect(screen().getByText(/Rotina pausada\./)).toBeTruthy();
+  });
+
+  test("Onde entrega changes at once from the aside, with who sees it under the value", async () => {
+    const { state } = await open();
+    const dialog = await page();
+    expect(aside(dialog).textContent).toContain("Todo mundo do canal vê");
+    await pick(within(aside(dialog)).getByRole("combobox", { name: "Onde entrega" }), /^Minha DM com o agente/);
+    await settle(3);
+    expect(lastPatch(state)).toEqual({ target: { type: "dm" } });
+    expect(aside(dialog).textContent).toContain("Só você vê");
+    expect(aside(dialog).textContent).not.toContain("Todo mundo do canal vê");
+  });
+
+  test("Quando posta changes at once, its meaning behind the ⓘ", async () => {
+    const { state } = await open();
+    const dialog = await page();
+    expect(within(aside(dialog)).getByRole("button", { name: "Sobre Quando posta" })).toBeTruthy();
+    await pick(within(aside(dialog)).getByRole("combobox", { name: "Quando posta" }), /^Toda vez/);
+    expect(lastPatch(state)).toEqual({ report: "always" });
   });
 });
 

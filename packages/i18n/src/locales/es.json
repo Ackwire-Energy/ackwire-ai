@@ -4578,7 +4578,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filtrar por responsable y prioridad",
     "assigneeFilter": "Responsable",
     "priorityFilter": "Prioridad",
     "title": "Tareas",
@@ -4589,13 +4588,6 @@
     "list": "Lista",
     "new": "Nueva tarea",
     "filters": "Filtrar tareas",
-    "filter": {
-      "all": "Todas",
-      "agents": "Con agentes",
-      "people": "Con personas",
-      "mine": "Mías",
-      "none": "Sin responsable"
-    },
     "unassigned_one": "{{count}} sin responsable",
     "unassigned_many": "{{count}} sin responsable",
     "unassigned_other": "{{count}} sin responsable",
@@ -4603,7 +4595,6 @@
     "panelLabel": "Tarea #{{number}}",
     "openPage": "Abrir la página de la tarea",
     "close": "Cerrar",
-    "dropHere": "Suelta aquí",
     "moved": "#{{number}} en {{status}}.",
     "movedTo": "Movida a {{column}}",
     "newIn": "Nueva tarea en {{column}}",
@@ -4613,6 +4604,54 @@
     "flowHint": "La tarea avanza sola, a la primera columna de cada etapa: En curso cuando un agente empieza, En revisión cuando está lista para revisar, Hecha cuando la apruebas.",
     "moreOptions": "Más opciones",
     "showCanceled": "Mostrar canceladas",
+    "filterButton": "Filtro",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Yo",
+    "display": {
+      "title": "Visualización",
+      "label": "Visualización: {{layout}} · {{group}}",
+      "layout": "Diseño",
+      "group": "Agrupar por",
+      "sort": "Ordenar por",
+      "fields": "En las tarjetas",
+      "saved": "Guardado para ti en este espacio de trabajo",
+      "reset": "Volver a lo predeterminado",
+      "by": {
+        "stage": "Etapa",
+        "assignee": "Responsable",
+        "priority": "Prioridad"
+      },
+      "order": {
+        "manual": "Manual",
+        "priority": "Prioridad",
+        "due": "Fecha límite"
+      },
+      "field": {
+        "assignee": "Responsable",
+        "priority": "Prioridad",
+        "due": "Fecha límite",
+        "criteria": "Criterios",
+        "pullRequest": "Pull request",
+        "label": "Etiqueta"
+      }
+    },
+    "drop": {
+      "stage": "Suelta en {{name}}",
+      "assignee": "Suelta para dársela a {{name}}",
+      "unassign": "Suelta para quitar el responsable",
+      "priority": "Suelta para prioridad {{priority}}"
+    },
+    "drag": {
+      "role": "tarea que se puede arrastrar",
+      "help": "Espacio toma la tarea, las flechas la mueven, Espacio la suelta y Esc cancela.",
+      "picked": "Tomaste la #{{number}}. Las flechas la mueven, Espacio la suelta, Esc cancela.",
+      "moved": "#{{number}}: {{group}}, posición {{position}} de {{total}}.",
+      "dropped": "Soltaste la #{{number}} en {{group}}.",
+      "canceled": "La #{{number}} volvió a su lugar.",
+      "assigned": "La #{{number}} ahora está con {{name}}.",
+      "unassigned": "La #{{number}} quedó sin responsable.",
+      "prioritized": "La #{{number}} ahora tiene prioridad {{priority}}."
+    },
     "canceledColumn": "Canceladas",
     "columns": {
       "add": "Agregar columna",
@@ -4789,6 +4828,13 @@
     "criteria": "Criterios de aceptación",
     "criteriaCount": "{{done}} de {{total}}",
     "noCriteria": "Todavía no hay criterios de aceptación.",
+    "edit": {
+      "title": "Editar el título",
+      "description": "Editar la descripción",
+      "criterion": "Editar el criterio \"{{text}}\"",
+      "criterionShort": "Editar el criterio",
+      "hint": "Se guarda cuando sales del campo o pulsas Esc."
+    },
     "askTitle": "Pídele a {{name}} que haga esta tarea",
     "askTitle_female": "Pídele a {{name}} que haga esta tarea",
     "askText": "{{name}} lee lo que necesita, comenta el plan aquí y lo hace. Todo lo sensible, como publicar, pide tu aprobación.",
@@ -4844,6 +4890,7 @@
       "created": "creó la tarea",
       "renamed": "renombró la tarea",
       "description_changed": "editó la descripción",
+      "criteria_changed": "editó los criterios de aceptación",
       "status_changed": "cambió el estado a {{status}}",
       "priority_changed": "cambió la prioridad a {{priority}}",
       "assigned": "asignó la tarea",
@@ -5046,7 +5093,24 @@
         "forum": "Los agentes discuten en un tema del foro",
         "artifact": "Se vuelve un documento en el Drive"
       },
-      "ahead": "Preparado para después"
+      "ahead": "Preparado para después",
+      "createdBy": "Creada por {{name}} · {{date}}",
+      "nameLabel": "Nombre de la rutina",
+      "editName": "Editar el nombre",
+      "editWhat": "Editar lo que hace",
+      "tabs": {
+        "label": "Partes de la rutina",
+        "details": "Detalles",
+        "runs": "Ejecuciones"
+      },
+      "nexts": "Próximas",
+      "who": "Quién la hace",
+      "onAirLine": "Se ejecuta sola cuando llega la hora",
+      "offAirLine": "No se ejecuta hasta que la actives",
+      "reportHint": {
+        "always": "Aunque no haya nada nuevo",
+        "when_new": "En silencio si no hay nada nuevo"
+      }
     },
     "ahead": {
       "approved": "Aprobada · se ejecuta {{when}}",

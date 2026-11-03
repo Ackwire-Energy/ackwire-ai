@@ -2716,6 +2716,30 @@ html:not([data-pointer]) .ac-back:focus-visible {
 .ac-details--lg {
   width: min(960px, calc(100% - 48px));
 }
+/* "✓ Salvo" after a field saves on its own (SavedNote). */
+.ac-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.ac-saved[data-show] {
+  opacity: 1;
+}
+.ac-saved .ac-icon {
+  width: 13px;
+  height: 13px;
+}
+/* Always the full height: changing tabs inside never makes it jump. */
+.ac-details--fill {
+  height: calc(100vh - 48px);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+  height: calc(100dvh - 48px);
+}
 .ac-details:focus {
   outline: none;
 }

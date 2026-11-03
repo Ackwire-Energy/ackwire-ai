@@ -177,6 +177,7 @@ import {
   MessageText,
   PixelSpinner,
   PixelStop,
+  SavedNote,
   Skeleton,
   SkeletonGroup,
   SkeletonMessage,
@@ -4358,16 +4359,7 @@ function ChannelDetails({
         title={
           <>
             {t("channel.detailsTitle", { channel: channel.name })}
-            {editable && (
-              <span className="channel-topic__saved" data-show={saved || undefined} aria-live="polite">
-                {saved && (
-                  <>
-                    <Icon name="check" />
-                    {t("common.saved")}
-                  </>
-                )}
-              </span>
-            )}
+            {editable && <SavedNote shown={saved} label={t("common.saved")} className="channel-topic__saved" />}
           </>
         }
         description={editable ? undefined : channel.topic || t("channel.noTopic")}

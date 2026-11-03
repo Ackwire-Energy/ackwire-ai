@@ -139,6 +139,13 @@ export const organizationMembers = pgTable(
      */
     sidebarItems: jsonb().$type<Record<string, string>>().notNull().default({}),
     /**
+     * How the person looks at Tarefas in this workspace: board or list, the grouping and order, what the cards show,
+     * the assignee and priority filters, canceled tasks. Here rather than in the browser so the web, the desktop app
+     * and the phone open it the same way; read through `issuesViewOf` (packages/engine/src/issues-view.ts), which
+     * drops whatever it doesn't know.
+     */
+    issuesView: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    /**
      * Whether the person sees the summary of what agents did under each reply ("Usou 4 ferramentas"); off, only the
      * live step line while they work and the cards that carry content or wait for a person.
      */

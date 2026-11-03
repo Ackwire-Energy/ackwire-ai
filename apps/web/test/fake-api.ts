@@ -44,6 +44,7 @@ import type {
   InvitationState,
   InvitationWithStatus,
   InviteLink,
+  IssuesView,
   JevKey,
   JoinApproval,
   JoinClaim,
@@ -84,6 +85,7 @@ import type {
 import { ApiError } from "@agenteschat/client";
 import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
+import { ISSUES_VIEW_DEFAULT } from "@agenteschat/client/lib/issues-view";
 import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
@@ -365,6 +367,8 @@ export interface FakeState {
   sidebarItemsError?: ApiError;
   /** The sidebar's sections in my order (`orgs.sidebarOrder`); unset = the default. */
   sidebarOrder?: SidebarSection[];
+  /** How I look at Tarefas (`orgs.issuesView`); unset = never changed (the default). */
+  issuesView?: IssuesView;
   /**
    * The task manager (ADR 0128, `working.taskManager`); unset = a server without it (no `working` part). Stopping a
    * task (`agents.cancelRun`) moves it to `ended`, stopped by me.
@@ -1478,6 +1482,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.setSidebarOrder", orgId, order);
         state.sidebarOrder = order ? [...order] : undefined;
         return [...(order ?? ["tools", "channels", "agents", "people"])];
+      },
+      issuesView: async () => structuredClone(state.issuesView ?? ISSUES_VIEW_DEFAULT),
+      setIssuesView: async (orgId, view) => {
+        log("orgs.setIssuesView", orgId, view);
+        state.issuesView = structuredClone(view);
+        return structuredClone(view);
       },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });

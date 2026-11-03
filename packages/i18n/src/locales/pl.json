@@ -4747,7 +4747,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filtruj według osoby przypisanej i priorytetu",
     "assigneeFilter": "Przypisana osoba",
     "priorityFilter": "Priorytet",
     "title": "Zadania",
@@ -4758,13 +4757,6 @@
     "list": "Lista",
     "new": "Nowe zadanie",
     "filters": "Filtruj zadania",
-    "filter": {
-      "all": "Wszystkie",
-      "agents": "Z agentami",
-      "people": "Z ludźmi",
-      "mine": "Moje",
-      "none": "Nieprzypisane"
-    },
     "unassigned_one": "{{count}} nieprzypisane",
     "unassigned_few": "{{count}} nieprzypisane",
     "unassigned_many": "{{count}} nieprzypisanych",
@@ -4773,7 +4765,6 @@
     "panelLabel": "Zadanie #{{number}}",
     "openPage": "Otwórz stronę zadania",
     "close": "Zamknij",
-    "dropHere": "Upuść tutaj",
     "moved": "#{{number}} w: {{status}}.",
     "movedTo": "Przeniesiono do: {{column}}",
     "newIn": "Nowe zadanie w: {{column}}",
@@ -4783,6 +4774,54 @@
     "flowHint": "Zadanie przesuwa się samo do pierwszej kolumny każdego etapu: W toku, gdy agent zaczyna, Do przeglądu, gdy jest gotowe do sprawdzenia, Gotowe, gdy zatwierdzisz pracę.",
     "moreOptions": "Więcej opcji",
     "showCanceled": "Pokaż anulowane",
+    "filterButton": "Filtr",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ja",
+    "display": {
+      "title": "Wyświetlanie",
+      "label": "Wyświetlanie: {{layout}} · {{group}}",
+      "layout": "Układ",
+      "group": "Grupuj według",
+      "sort": "Sortuj według",
+      "fields": "Na kartach",
+      "saved": "Zapisane dla ciebie w tej przestrzeni roboczej",
+      "reset": "Wróć do domyślnych",
+      "by": {
+        "stage": "Etap",
+        "assignee": "Przypisana osoba",
+        "priority": "Priorytet"
+      },
+      "order": {
+        "manual": "Ręcznie",
+        "priority": "Priorytet",
+        "due": "Termin"
+      },
+      "field": {
+        "assignee": "Przypisana osoba",
+        "priority": "Priorytet",
+        "due": "Termin",
+        "criteria": "Kryteria",
+        "pullRequest": "Pull request",
+        "label": "Etykieta"
+      }
+    },
+    "drop": {
+      "stage": "Upuść w: {{name}}",
+      "assignee": "Upuść, aby dać: {{name}}",
+      "unassign": "Upuść, aby usunąć przypisanie",
+      "priority": "Upuść, aby ustawić priorytet {{priority}}"
+    },
+    "drag": {
+      "role": "zadanie do przeciągania",
+      "help": "Spacja podnosi zadanie, strzałki je przesuwają, Spacja je upuszcza, a Esc anuluje.",
+      "picked": "Podnosisz #{{number}}. Strzałki przesuwają, Spacja upuszcza, Esc anuluje.",
+      "moved": "#{{number}}: {{group}}, pozycja {{position}} z {{total}}.",
+      "dropped": "Upuszczono #{{number}} w: {{group}}.",
+      "canceled": "#{{number}} wróciło na miejsce.",
+      "assigned": "#{{number}} jest teraz u: {{name}}.",
+      "unassigned": "#{{number}} nie ma teraz przypisanej osoby.",
+      "prioritized": "#{{number}} ma teraz priorytet {{priority}}."
+    },
     "canceledColumn": "Anulowane",
     "columns": {
       "add": "Dodaj kolumnę",
@@ -4958,6 +4997,13 @@
     "criteria": "Kryteria akceptacji",
     "criteriaCount": "{{done}} z {{total}}",
     "noCriteria": "Nie ma jeszcze kryteriów akceptacji.",
+    "edit": {
+      "title": "Edytuj tytuł",
+      "description": "Edytuj opis",
+      "criterion": "Edytuj kryterium „{{text}}”",
+      "criterionShort": "Edytuj kryterium",
+      "hint": "Zapisuje się, gdy opuścisz pole albo naciśniesz Esc."
+    },
     "askTitle": "Poproś o wykonanie tego zadania: {{name}}",
     "askText": "{{name}} przeczyta, co potrzebne, opisze tu plan w komentarzu i go wykona. Wszystko, co wrażliwe, np. publikacja, poprosi o twoje zatwierdzenie.",
     "askText_female": "{{name}} przeczyta, co potrzebne, opisze tu plan w komentarzu i go wykona. Wszystko, co wrażliwe, np. publikacja, poprosi o twoje zatwierdzenie.",
@@ -5010,6 +5056,7 @@
       "created": "utworzył(a) zadanie",
       "renamed": "zmienił(a) nazwę zadania",
       "description_changed": "edytował(a) opis",
+      "criteria_changed": "edytował(a) kryteria akceptacji",
       "status_changed": "zmienił(a) status na {{status}}",
       "priority_changed": "zmienił(a) priorytet na {{priority}}",
       "assigned": "przypisał(a) zadanie",
@@ -5211,7 +5258,24 @@
         "forum": "Agenci dyskutują w temacie na forum",
         "artifact": "Staje się dokumentem na Drive"
       },
-      "ahead": "Przygotowane na później"
+      "ahead": "Przygotowane na później",
+      "createdBy": "Utworzona przez: {{name}} · {{date}}",
+      "nameLabel": "Nazwa rutyny",
+      "editName": "Edytuj nazwę",
+      "editWhat": "Edytuj, co robi",
+      "tabs": {
+        "label": "Części rutyny",
+        "details": "Szczegóły",
+        "runs": "Uruchomienia"
+      },
+      "nexts": "Następne",
+      "who": "Kto ją wykonuje",
+      "onAirLine": "Uruchamia się sama, gdy przyjdzie pora",
+      "offAirLine": "Nie uruchomi się, dopóki jej nie włączysz",
+      "reportHint": {
+        "always": "Nawet gdy nie ma nic nowego",
+        "when_new": "Cisza, gdy nie ma nic nowego"
+      }
     },
     "ahead": {
       "approved": "Zatwierdzone · uruchomi się {{when}}",

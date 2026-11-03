@@ -4453,7 +4453,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Nach Zuständigen und Priorität filtern",
     "assigneeFilter": "Zuständig",
     "priorityFilter": "Priorität",
     "title": "Aufgaben",
@@ -4464,20 +4463,12 @@
     "list": "Liste",
     "new": "Neue Aufgabe",
     "filters": "Aufgaben filtern",
-    "filter": {
-      "all": "Alle",
-      "agents": "Bei Agenten",
-      "people": "Bei Personen",
-      "mine": "Meine",
-      "none": "Nicht zugewiesen"
-    },
     "unassigned_one": "{{count}} nicht zugewiesen",
     "unassigned_other": "{{count}} nicht zugewiesen",
     "emptyTitle": "Noch keine Aufgaben",
     "panelLabel": "Aufgabe #{{number}}",
     "openPage": "Seite der Aufgabe öffnen",
     "close": "Schließen",
-    "dropHere": "Hier ablegen",
     "moved": "#{{number}} in {{status}}.",
     "movedTo": "Verschoben nach {{column}}",
     "newIn": "Neue Aufgabe in {{column}}",
@@ -4487,6 +4478,54 @@
     "flowHint": "Die Aufgabe wandert von selbst in die erste Spalte jeder Phase: In Arbeit, wenn ein Agent beginnt, In Prüfung, wenn sie bereit zur Prüfung ist, Erledigt, wenn du freigibst.",
     "moreOptions": "Weitere Optionen",
     "showCanceled": "Abgebrochene anzeigen",
+    "filterButton": "Filtern",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ich",
+    "display": {
+      "title": "Darstellung",
+      "label": "Darstellung: {{layout}} · {{group}}",
+      "layout": "Anordnung",
+      "group": "Gruppieren nach",
+      "sort": "Sortieren nach",
+      "fields": "Auf den Karten",
+      "saved": "Für dich in diesem Workspace gespeichert",
+      "reset": "Zurück zum Standard",
+      "by": {
+        "stage": "Phase",
+        "assignee": "Zuständig",
+        "priority": "Priorität"
+      },
+      "order": {
+        "manual": "Manuell",
+        "priority": "Priorität",
+        "due": "Fälligkeit"
+      },
+      "field": {
+        "assignee": "Zuständig",
+        "priority": "Priorität",
+        "due": "Fälligkeit",
+        "criteria": "Kriterien",
+        "pullRequest": "Pull-Request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "In {{name}} ablegen",
+      "assignee": "Ablegen, um sie {{name}} zu geben",
+      "unassign": "Ablegen, um die Zuständigkeit zu entfernen",
+      "priority": "Ablegen für Priorität {{priority}}"
+    },
+    "drag": {
+      "role": "verschiebbare Aufgabe",
+      "help": "Leertaste nimmt die Aufgabe, die Pfeiltasten verschieben sie, Leertaste legt sie ab und Esc bricht ab.",
+      "picked": "Du hast #{{number}} aufgenommen. Die Pfeiltasten verschieben sie, Leertaste legt sie ab, Esc bricht ab.",
+      "moved": "#{{number}}: {{group}}, Position {{position}} von {{total}}.",
+      "dropped": "Du hast #{{number}} in {{group}} abgelegt.",
+      "canceled": "#{{number}} ist wieder an ihrem Platz.",
+      "assigned": "#{{number}} liegt jetzt bei {{name}}.",
+      "unassigned": "#{{number}} ist jetzt niemandem zugewiesen.",
+      "prioritized": "#{{number}} hat jetzt Priorität {{priority}}."
+    },
     "canceledColumn": "Abgebrochen",
     "columns": {
       "add": "Spalte hinzufügen",
@@ -4652,6 +4691,13 @@
     "criteria": "Akzeptanzkriterien",
     "criteriaCount": "{{done}} von {{total}}",
     "noCriteria": "Noch keine Akzeptanzkriterien.",
+    "edit": {
+      "title": "Titel bearbeiten",
+      "description": "Beschreibung bearbeiten",
+      "criterion": "Kriterium „{{text}}“ bearbeiten",
+      "criterionShort": "Kriterium bearbeiten",
+      "hint": "Wird gespeichert, wenn du das Feld verlässt oder Esc drückst."
+    },
     "askTitle": "{{name}} bitten, diese Aufgabe zu erledigen",
     "askText": "{{name}} liest, was er braucht, kommentiert hier den Plan und setzt ihn um. Alles Sensible, etwa Veröffentlichen, fragt nach deiner Freigabe.",
     "askText_female": "{{name}} liest, was sie braucht, kommentiert hier den Plan und setzt ihn um. Alles Sensible, etwa Veröffentlichen, fragt nach deiner Freigabe.",
@@ -4704,6 +4750,7 @@
       "created": "hat die Aufgabe erstellt",
       "renamed": "hat die Aufgabe umbenannt",
       "description_changed": "hat die Beschreibung bearbeitet",
+      "criteria_changed": "hat die Akzeptanzkriterien bearbeitet",
       "status_changed": "hat den Status auf {{status}} geändert",
       "priority_changed": "hat die Priorität auf {{priority}} geändert",
       "assigned": "hat die Aufgabe zugewiesen",
@@ -4904,7 +4951,24 @@
         "forum": "Die Agenten diskutieren in einem Forumsthema",
         "artifact": "Wird zu einem Dokument im Drive"
       },
-      "ahead": "Für später vorbereitet"
+      "ahead": "Für später vorbereitet",
+      "createdBy": "Erstellt von {{name}} · {{date}}",
+      "nameLabel": "Name der Routine",
+      "editName": "Namen bearbeiten",
+      "editWhat": "Bearbeiten, was sie tut",
+      "tabs": {
+        "label": "Bereiche der Routine",
+        "details": "Übersicht",
+        "runs": "Ausführungen"
+      },
+      "nexts": "Nächste Ausführungen",
+      "who": "Wer sie ausführt",
+      "onAirLine": "Läuft von selbst, wenn es so weit ist",
+      "offAirLine": "Läuft nicht, bis du sie einschaltest",
+      "reportHint": {
+        "always": "Auch wenn es nichts Neues gibt",
+        "when_new": "Still, wenn es nichts Neues gibt"
+      }
     },
     "ahead": {
       "approved": "Freigegeben · läuft {{when}}",

@@ -4497,7 +4497,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filteren op toegewezen persoon en prioriteit",
     "assigneeFilter": "Toegewezen aan",
     "priorityFilter": "Prioriteit",
     "title": "Taken",
@@ -4508,20 +4507,12 @@
     "list": "Lijst",
     "new": "Nieuwe taak",
     "filters": "Taken filteren",
-    "filter": {
-      "all": "Alle",
-      "agents": "Bij agents",
-      "people": "Bij mensen",
-      "mine": "Van mij",
-      "none": "Niet toegewezen"
-    },
     "unassigned_one": "{{count}} niet toegewezen",
     "unassigned_other": "{{count}} niet toegewezen",
     "emptyTitle": "Nog geen taken",
     "panelLabel": "Taak #{{number}}",
     "openPage": "De pagina van de taak openen",
     "close": "Sluiten",
-    "dropHere": "Hier loslaten",
     "moved": "#{{number}} in {{status}}.",
     "movedTo": "Verplaatst naar {{column}}",
     "newIn": "Nieuwe taak in {{column}}",
@@ -4531,6 +4522,54 @@
     "flowHint": "De taak verschuift vanzelf naar de eerste kolom van elke fase: Bezig als een agent begint, Ter controle als hij klaar is om te checken, Klaar als jij hem goedkeurt.",
     "moreOptions": "Meer opties",
     "showCanceled": "Geannuleerde tonen",
+    "filterButton": "Filteren",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ik",
+    "display": {
+      "title": "Weergave",
+      "label": "Weergave: {{layout}} · {{group}}",
+      "layout": "Indeling",
+      "group": "Groeperen op",
+      "sort": "Sorteren op",
+      "fields": "Op de kaarten",
+      "saved": "Voor jou bewaard in deze werkruimte",
+      "reset": "Terug naar standaard",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit"
+      },
+      "order": {
+        "manual": "Handmatig",
+        "priority": "Prioriteit",
+        "due": "Deadline"
+      },
+      "field": {
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit",
+        "due": "Deadline",
+        "criteria": "Voorwaarden",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Loslaten in {{name}}",
+      "assignee": "Loslaten om aan {{name}} te geven",
+      "unassign": "Loslaten om de toewijzing weg te halen",
+      "priority": "Loslaten voor prioriteit {{priority}}"
+    },
+    "drag": {
+      "role": "versleepbare taak",
+      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
+      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
+      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
+      "canceled": "#{{number}} staat weer op zijn plek.",
+      "assigned": "#{{number}} ligt nu bij {{name}}.",
+      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
+      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
+    },
     "canceledColumn": "Geannuleerd",
     "columns": {
       "add": "Kolom toevoegen",
@@ -4702,6 +4741,13 @@
     "criteria": "Acceptatiecriteria",
     "criteriaCount": "{{done}} van {{total}}",
     "noCriteria": "Nog geen acceptatiecriteria.",
+    "edit": {
+      "title": "Titel bewerken",
+      "description": "Beschrijving bewerken",
+      "criterion": "Criterium \"{{text}}\" bewerken",
+      "criterionShort": "Criterium bewerken",
+      "hint": "Wordt opgeslagen als je het veld verlaat of op Esc drukt."
+    },
     "askTitle": "Vraag {{name}} om deze taak te doen",
     "askTitle_female": "Vraag {{name}} om deze taak te doen",
     "askText": "{{name}} leest wat hij nodig heeft, zet het plan hier in een reactie en voert het uit. Alles wat gevoelig is, zoals publiceren, vraagt om jouw goedkeuring.",
@@ -4757,6 +4803,7 @@
       "created": "heeft de taak gemaakt",
       "renamed": "heeft de taak hernoemd",
       "description_changed": "heeft de beschrijving bewerkt",
+      "criteria_changed": "heeft de acceptatiecriteria bewerkt",
       "status_changed": "heeft de status gewijzigd in {{status}}",
       "priority_changed": "heeft de prioriteit gewijzigd in {{priority}}",
       "assigned": "heeft de taak toegewezen",
@@ -4954,7 +5001,24 @@
         "forum": "De agents overleggen in een forumonderwerp",
         "artifact": "Wordt een document in de Drive"
       },
-      "ahead": "Klaargezet voor later"
+      "ahead": "Klaargezet voor later",
+      "createdBy": "Gemaakt door {{name}} · {{date}}",
+      "nameLabel": "Naam van de routine",
+      "editName": "Naam bewerken",
+      "editWhat": "Bewerken wat hij doet",
+      "tabs": {
+        "label": "Onderdelen van de routine",
+        "details": "Gegevens",
+        "runs": "Uitvoeringen"
+      },
+      "nexts": "Volgende",
+      "who": "Wie het doet",
+      "onAirLine": "Draait vanzelf als het tijd is",
+      "offAirLine": "Draait niet tot je hem aanzet",
+      "reportHint": {
+        "always": "Ook als er niets nieuws is",
+        "when_new": "Stil als er niets nieuws is"
+      }
     },
     "ahead": {
       "approved": "Goedgekeurd · draait {{when}}",

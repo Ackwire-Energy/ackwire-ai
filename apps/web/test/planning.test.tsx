@@ -7,7 +7,7 @@ import { toYmd } from "@agenteschat/client/lib/format";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { mondayOf } from "@/pages/CalendarPage";
 import { splitCriteria } from "@/pages/IssuesPage";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { nextCronRun, parseSchedulePhrase } from "./fakes/planning";
 import { renderApp, screen, settle } from "./render";
 
@@ -89,28 +89,68 @@ describe("Issues (board and list)", () => {
     expect(screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" })).toBeTruthy();
   });
 
-  test("filters, search and the list view", async () => {
-    await go("issues");
-    await click(screen().getByRole("radio", { name: /^Com agentes/ }));
+  test("Filtro: who has it and the priority, as chips; the search; the list from Exibição", async () => {
+    const state = seedState();
+    await go("issues", createFakeApi(state));
+    const filterMenu = async (name: string) => {
+      const trigger = screen().getByRole("button", { name });
+      trigger.focus();
+      await key(trigger, "Enter");
+      return screen().getByRole("menu");
+    };
+    const pickIn = async (menu: HTMLElement, name: string) => {
+      await click(within(menu).getByRole("menuitemcheckbox", { name }));
+      await settle(3);
+    };
+    const closeMenu = async () => {
+      await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+      await settle(2);
+    };
+    // Me first, then the agents and the people with a task here, then nobody; then the priorities.
+    let menu = await filterMenu("Filtro");
     expect(
-      screen()
-        .getByRole("radio", { name: /^Com agentes/ })
-        .getAttribute("aria-checked"),
-    ).toBe("true");
+      within(menu)
+        .getAllByRole("menuitemcheckbox")
+        .map((o) => o.querySelector(".ac-menu__label")?.textContent),
+    ).toEqual(["Eu", "Ada", "Atlas", "João", "Sem responsável", "Alta", "Normal", "Baixa"]);
+    await pickIn(menu, "Ada");
+    expect(cardTitles(column("A fazer"))).toEqual(["Tabela de concorrentes atualizada"]);
     expect(cardTitles(column("Em andamento"))).toEqual(["Timeout no agendamento em horários de pico"]);
-    await click(screen().getByRole("radio", { name: /^Minhas/ }));
+    await closeMenu();
+    // In use: a chip that reads it and opens the same menu; kept for me.
+    expect(screen().getByRole("button", { name: "Responsável: Ada" })).toBeTruthy();
+    expect(state.issuesView?.assignees).toEqual([`agent:${ADA_ID}`]);
+    await click(screen().getByRole("button", { name: "Limpar Ada" }));
+    await settle(3);
+    expect(screen().queryByRole("button", { name: "Responsável: Ada" })).toBeNull();
+    expect(state.issuesView?.assignees).toEqual([]);
+    // Mine: none here.
+    menu = await filterMenu("Filtro");
+    await pickIn(menu, "Eu");
     expect(screen().getByText("Nenhuma tarefa com esses filtros.")).toBeTruthy();
-    await click(screen().getByRole("radio", { name: /^Todas/ }));
+    await pickIn(menu, "Eu");
+    await pickIn(menu, "Alta");
+    await closeMenu();
+    expect(screen().getAllByRole("link", { name: /^#\d+/ }).map((l) => l.getAttribute("aria-label"))).toEqual([
+      "#131 Confirmação do agendamento por WhatsApp",
+      "#128 Login devolve 401 depois do deploy das 9h",
+    ]);
+    await click(screen().getByRole("button", { name: "Limpar Alta" }));
+    await settle(3);
     await type(screen().getByRole("searchbox", { name: "Buscar tarefas" }), "#128");
     await settle(4);
     expect(screen().getAllByRole("link", { name: /^#\d+/ })).toHaveLength(1);
     await type(screen().getByRole("searchbox", { name: "Buscar tarefas" }), "");
     await settle(4);
-    await click(screen().getByRole("radio", { name: "Lista" }));
+    await click(screen().getByRole("button", { name: "Exibição: Quadro · Etapa" }));
+    await settle(2);
+    await click(within(screen().getByRole("dialog", { name: "Exibição" })).getByRole("button", { name: "Lista" }));
+    await settle(3);
     const rows = screen().getAllByRole("listitem");
     expect(rows).toHaveLength(7);
     expect(rows[0]?.textContent).toContain("#132");
     expect(rows.find((r) => r.textContent?.includes("#126"))?.textContent).toContain("Feito");
+    expect(state.issuesView?.layout).toBe("list");
   });
 
   test("Nova tarefa: title, criteria from '-' lines, assignee (each by its face), priority and a pasted print", async () => {
@@ -278,6 +318,60 @@ describe("Issue detail", () => {
     expect(aside.textContent).toContain("agendamento");
   });
 
+  test("title, description and criteria are edited where they are; leaving the field saves (Salvo)", async () => {
+    const { api } = await go("issues/131");
+    await click(screen().getByRole("heading", { level: 1, name: "Confirmação do agendamento por WhatsApp" }));
+    const title = screen().getByRole("textbox", { name: "Título" });
+    await type(title, "Confirmação por WhatsApp e SMS");
+    await act(async () => fireEvent.blur(title));
+    await settle(4);
+    expect((await api.issues.get(ORG_ID, 131)).title).toBe("Confirmação por WhatsApp e SMS");
+    expect(screen().getByRole("heading", { level: 1, name: "Confirmação por WhatsApp e SMS" })).toBeTruthy();
+    expect(screen().getByText("Salvo")).toBeTruthy();
+
+    await click(screen().getByRole("button", { name: "Editar a descrição" }));
+    const description = screen().getByRole("textbox", { name: "Descrição" });
+    await type(description, "Mandar a confirmação 24 h antes da consulta.");
+    await act(async () => fireEvent.blur(description));
+    await settle(4);
+    expect((await api.issues.get(ORG_ID, 131)).description).toBe("Mandar a confirmação 24 h antes da consulta.");
+
+    const criteria = () => screen().getByRole("region", { name: "Critérios de aceite" });
+    await click(
+      within(criteria()).getByRole("button", { name: 'Editar o critério "Paciente sem WhatsApp recebe SMS"' }),
+    );
+    const row = within(criteria()).getByRole("textbox", { name: "Critérios de aceite" });
+    await type(row, "Paciente sem WhatsApp recebe um SMS");
+    await act(async () => fireEvent.blur(row));
+    await settle(4);
+    const add = within(criteria()).getByRole("textbox", { name: "Adicionar critério" });
+    await type(add, "Funciona no fim de semana");
+    await key(add, "Enter");
+    await settle(4);
+    const saved = await api.issues.get(ORG_ID, 131);
+    expect(saved.criteria).toHaveLength(5);
+    expect(saved.criteria.map((c) => c.text)).toContain("Paciente sem WhatsApp recebe um SMS");
+    expect(saved.criteria.at(-1)?.text).toBe("Funciona no fim de semana");
+    expect(criteria().textContent).toContain("0 de 5");
+  });
+
+  test("in the dialog: the task's page at full height; Esc in the title being edited saves it and stays", async () => {
+    const { api } = await go("issues?open=131");
+    const dialog = screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" });
+    expect(dialog.className).toContain("ac-details--fill");
+    expect(
+      within(dialog).getByRole("heading", { level: 1, name: "Confirmação do agendamento por WhatsApp" }),
+    ).toBeTruthy();
+    expect(within(dialog).getByText(/^Criada por João/)).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Editar o título" }));
+    const title = within(dialog).getByRole("textbox", { name: "Título" });
+    await type(title, "Confirmação por WhatsApp");
+    await act(async () => fireEvent.keyDown(title, { key: "Escape" }));
+    await settle(4);
+    expect(screen().getByRole("dialog")).toBeTruthy();
+    expect((await api.issues.get(ORG_ID, 131)).title).toBe("Confirmação por WhatsApp");
+  });
+
   test("Pedir à Ada: assigns the agent, moves to Em andamento and logs it", async () => {
     await go("issues/131");
     const ask = screen().getByRole("region", { name: "Pedir a um agente" });
@@ -409,6 +503,11 @@ describe("Rotinas", () => {
     await settle(4);
     const details = screen().getByRole("dialog", { name: "Resumo da semana" });
     expect(details.textContent).toContain("Resuma o que");
+    // The runs are their own tab (Radix tabs switch on mouse down).
+    await act(async () =>
+      fireEvent.mouseDown(within(details).getByRole("tab", { name: /^Execuções/ }), { button: 0 }),
+    );
+    await settle(2);
     expect(details.textContent).toContain("Parada por");
     expect(details.textContent).toContain("O orçamento do mês acabou");
     expect(details.textContent).toContain("Contou o que achou");

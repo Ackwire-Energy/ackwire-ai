@@ -4318,7 +4318,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filter menurut penanggung jawab dan prioritas",
     "assigneeFilter": "Penanggung jawab",
     "priorityFilter": "Prioritas",
     "title": "Tugas",
@@ -4329,19 +4328,11 @@
     "list": "Daftar",
     "new": "Tugas baru",
     "filters": "Filter tugas",
-    "filter": {
-      "all": "Semua",
-      "agents": "Dengan agen",
-      "people": "Dengan orang",
-      "mine": "Milikku",
-      "none": "Belum ditugaskan"
-    },
     "unassigned_other": "{{count}} belum ditugaskan",
     "emptyTitle": "Belum ada tugas",
     "panelLabel": "Tugas #{{number}}",
     "openPage": "Buka halaman tugas",
     "close": "Tutup",
-    "dropHere": "Jatuhkan di sini",
     "moved": "#{{number}} di {{status}}.",
     "movedTo": "Dipindahkan ke {{column}}",
     "newIn": "Tugas baru di {{column}}",
@@ -4351,6 +4342,54 @@
     "flowHint": "Tugas berpindah sendiri, ke kolom pertama tiap tahap: Sedang dikerjakan saat agen mulai, Ditinjau saat siap diperiksa, Selesai saat kamu menyetujuinya.",
     "moreOptions": "Opsi lainnya",
     "showCanceled": "Tampilkan yang dibatalkan",
+    "filterButton": "Saring",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Saya",
+    "display": {
+      "title": "Tampilan",
+      "label": "Tampilan: {{layout}} · {{group}}",
+      "layout": "Tata letak",
+      "group": "Kelompokkan menurut",
+      "sort": "Urutkan menurut",
+      "fields": "Di kartu",
+      "saved": "Disimpan untukmu di ruang kerja ini",
+      "reset": "Kembali ke bawaan",
+      "by": {
+        "stage": "Tahap",
+        "assignee": "Penanggung jawab",
+        "priority": "Prioritas"
+      },
+      "order": {
+        "manual": "Manual",
+        "priority": "Prioritas",
+        "due": "Tenggat"
+      },
+      "field": {
+        "assignee": "Penanggung jawab",
+        "priority": "Prioritas",
+        "due": "Tenggat",
+        "criteria": "Kriteria",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Jatuhkan di {{name}}",
+      "assignee": "Jatuhkan untuk memberikannya ke {{name}}",
+      "unassign": "Jatuhkan untuk melepas penanggung jawab",
+      "priority": "Jatuhkan untuk prioritas {{priority}}"
+    },
+    "drag": {
+      "role": "tugas yang bisa diseret",
+      "help": "Spasi mengambil tugas, tombol panah memindahkannya, Spasi menjatuhkannya, dan Esc membatalkan.",
+      "picked": "Kamu mengambil #{{number}}. Tombol panah memindahkannya, Spasi menjatuhkannya, Esc membatalkan.",
+      "moved": "#{{number}}: {{group}}, posisi {{position}} dari {{total}}.",
+      "dropped": "Kamu menjatuhkan #{{number}} di {{group}}.",
+      "canceled": "#{{number}} kembali ke tempatnya.",
+      "assigned": "#{{number}} sekarang dipegang {{name}}.",
+      "unassigned": "#{{number}} sekarang tanpa penanggung jawab.",
+      "prioritized": "#{{number}} sekarang berprioritas {{priority}}."
+    },
     "canceledColumn": "Dibatalkan",
     "columns": {
       "add": "Tambah kolom",
@@ -4517,6 +4556,13 @@
     "criteria": "Kriteria penerimaan",
     "criteriaCount": "{{done}} dari {{total}}",
     "noCriteria": "Belum ada kriteria penerimaan.",
+    "edit": {
+      "title": "Edit judul",
+      "description": "Edit deskripsi",
+      "criterion": "Edit kriteria \"{{text}}\"",
+      "criterionShort": "Edit kriteria",
+      "hint": "Tersimpan saat kamu keluar dari kolom atau menekan Esc."
+    },
     "askTitle": "Minta {{name}} mengerjakan tugas ini",
     "askTitle_female": "Minta {{name}} mengerjakan tugas ini",
     "askText": "{{name}} membaca apa yang dibutuhkannya, menulis rencananya di sini, lalu mengerjakannya. Apa pun yang sensitif, seperti publikasi, akan meminta persetujuanmu.",
@@ -4572,6 +4618,7 @@
       "created": "membuat tugas",
       "renamed": "mengganti nama tugas",
       "description_changed": "mengedit deskripsi",
+      "criteria_changed": "mengedit kriteria penerimaan",
       "status_changed": "mengubah status menjadi {{status}}",
       "priority_changed": "mengubah prioritas menjadi {{priority}}",
       "assigned": "menugaskan tugas",
@@ -4770,7 +4817,24 @@
         "forum": "Agen berdiskusi di topik forum",
         "artifact": "Menjadi dokumen di Drive"
       },
-      "ahead": "Disiapkan untuk nanti"
+      "ahead": "Disiapkan untuk nanti",
+      "createdBy": "Dibuat oleh {{name}} · {{date}}",
+      "nameLabel": "Nama rutinitas",
+      "editName": "Edit nama",
+      "editWhat": "Edit yang dilakukannya",
+      "tabs": {
+        "label": "Bagian rutinitas",
+        "details": "Rincian",
+        "runs": "Riwayat proses"
+      },
+      "nexts": "Berikutnya",
+      "who": "Siapa yang mengerjakan",
+      "onAirLine": "Jalan sendiri saat waktunya tiba",
+      "offAirLine": "Tidak jalan sampai kamu mengaktifkannya",
+      "reportHint": {
+        "always": "Meski tidak ada yang baru",
+        "when_new": "Diam kalau tidak ada yang baru"
+      }
     },
     "ahead": {
       "approved": "Disetujui · jalan {{when}}",

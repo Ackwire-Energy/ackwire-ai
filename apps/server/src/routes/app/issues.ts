@@ -259,6 +259,14 @@ export function issueRoutes(deps: AppDeps) {
             assignee: Actor.nullable().optional(),
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
+            criteria: z
+              .array(z.object({ id: z.string().optional(), text: z.string().max(500) }))
+              .max(50)
+              .optional()
+              .openapi({
+                description:
+                  "The whole list of acceptance criteria, in order: an `id` keeps that criterion (and its check), one without is new, one left out is removed.",
+              }),
           }),
         ),
       },

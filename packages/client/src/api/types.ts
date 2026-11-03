@@ -2903,6 +2903,11 @@ export type IssuePatch = Partial<
 > & {
   /** Move to a board column: the issue takes that column's stage. */
   columnId?: string;
+  /**
+   * The whole list of acceptance criteria, in order (edited in place): an `id` keeps that criterion and its check,
+   * one without is new, one left out is removed.
+   */
+  criteria?: { id?: string; text: string }[];
 };
 
 /** A board column: it sits in a fixed stage; `name` null shows the stage's own name. */
@@ -5645,6 +5650,25 @@ export type SidebarPlace = "always" | "more" | "auto";
 export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
 /** A section of the sidebar, in the order I put them (`SIDEBAR_SECTIONS` in packages/engine/src/sidebar-items.ts). */
 export type SidebarSection = "tools" | "channels" | "agents" | "people";
+
+/**
+ * How I look at Tarefas in one workspace (`GET …/me/issues-view`), on every device: `ISSUES_VIEW_DEFAULT` in
+ * packages/client/src/lib/issues-view.ts until I change it. The search is never kept.
+ */
+export interface IssuesView {
+  layout: "board" | "list";
+  group: "stage" | "assignee" | "priority";
+  /** `manual`: the board's own order (what people drag); by priority (high first) or by due date (soonest first). */
+  sort: "manual" | "priority" | "due";
+  /** What the cards show besides their number and title. */
+  fields: Record<IssueCardField, boolean>;
+  /** Only tasks with one of these assignees: `agent:<id>`, `person:<id>` or `none` (empty: every task). */
+  assignees: string[];
+  /** Only tasks with one of these priorities (empty: every task). */
+  priorities: IssuePriority[];
+  showCanceled: boolean;
+}
+export type IssueCardField = "assignee" | "priority" | "due" | "criteria" | "pullRequest" | "label";
 
 export interface NotificationCount {
   unread: number;

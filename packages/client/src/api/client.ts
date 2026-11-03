@@ -127,6 +127,7 @@ import type {
   IssueInput,
   IssuePatch,
   IssueStatus,
+  IssuesView,
   JevKey,
   JoinApproval,
   JoinClaim,
@@ -410,6 +411,10 @@ export interface ApiClient {
     sidebarOrder(orgId: string): Promise<SidebarSection[]>;
     /** Saves my section order here (`null`: the default). */
     setSidebarOrder(orgId: string, order: SidebarSection[] | null): Promise<SidebarSection[]>;
+    /** How I look at Tarefas here, on every device (the default until I change it). */
+    issuesView(orgId: string): Promise<IssuesView>;
+    /** Keeps how I look at Tarefas here; answers with what the server kept. */
+    setIssuesView(orgId: string, view: IssuesView): Promise<IssuesView>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;

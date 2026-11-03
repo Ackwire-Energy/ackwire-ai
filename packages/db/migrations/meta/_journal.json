@@ -1303,6 +1303,13 @@
       "when": 1793665349811,
       "tag": "0187_notifications_done_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 187,
+      "version": "7",
+      "when": 1793665409811,
+      "tag": "0188_member_issues_view",
+      "breakpoints": true
     }
   ]
 }

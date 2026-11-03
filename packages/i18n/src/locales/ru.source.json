@@ -10744,9 +10744,6 @@
   "scopes.custom_write.description": {
     "value": "Use the write tools. Those marked sensitive always ask for approval."
   },
-  "issues.moreFilters": {
-    "value": "Filter by assignee and priority"
-  },
   "issues.assigneeFilter": {
     "value": "Assignee"
   },
@@ -10777,21 +10774,6 @@
   "issues.filters": {
     "value": "Filter tasks"
   },
-  "issues.filter.all": {
-    "value": "All"
-  },
-  "issues.filter.agents": {
-    "value": "With agents"
-  },
-  "issues.filter.people": {
-    "value": "With people"
-  },
-  "issues.filter.mine": {
-    "value": "Mine"
-  },
-  "issues.filter.none": {
-    "value": "Unassigned"
-  },
   "issues.unassigned": {
     "value": {
       "one": "{{count}} unassigned",
@@ -10809,9 +10791,6 @@
   },
   "issues.close": {
     "value": "Close"
-  },
-  "issues.dropHere": {
-    "value": "Drop here"
   },
   "issues.moved": {
     "value": "#{{number}} in {{status}}."
@@ -10839,6 +10818,114 @@
   },
   "issues.showCanceled": {
     "value": "Show canceled"
+  },
+  "issues.filterButton": {
+    "value": "Filter"
+  },
+  "issues.filterValue": {
+    "value": "{{filter}}: {{value}}"
+  },
+  "issues.me": {
+    "value": "Me"
+  },
+  "issues.display.title": {
+    "value": "Display"
+  },
+  "issues.display.label": {
+    "value": "Display: {{layout}} · {{group}}"
+  },
+  "issues.display.layout": {
+    "value": "Layout"
+  },
+  "issues.display.group": {
+    "value": "Group by"
+  },
+  "issues.display.sort": {
+    "value": "Sort by"
+  },
+  "issues.display.fields": {
+    "value": "On the cards"
+  },
+  "issues.display.saved": {
+    "value": "Saved for you in this workspace"
+  },
+  "issues.display.reset": {
+    "value": "Back to default"
+  },
+  "issues.display.by.stage": {
+    "value": "Stage"
+  },
+  "issues.display.by.assignee": {
+    "value": "Assignee"
+  },
+  "issues.display.by.priority": {
+    "value": "Priority"
+  },
+  "issues.display.order.manual": {
+    "value": "Manual"
+  },
+  "issues.display.order.priority": {
+    "value": "Priority"
+  },
+  "issues.display.order.due": {
+    "value": "Due date"
+  },
+  "issues.display.field.assignee": {
+    "value": "Assignee"
+  },
+  "issues.display.field.priority": {
+    "value": "Priority"
+  },
+  "issues.display.field.due": {
+    "value": "Due date"
+  },
+  "issues.display.field.criteria": {
+    "value": "Criteria"
+  },
+  "issues.display.field.pullRequest": {
+    "value": "Pull request"
+  },
+  "issues.display.field.label": {
+    "value": "Label"
+  },
+  "issues.drop.stage": {
+    "value": "Drop in {{name}}"
+  },
+  "issues.drop.assignee": {
+    "value": "Drop to give it to {{name}}"
+  },
+  "issues.drop.unassign": {
+    "value": "Drop to unassign"
+  },
+  "issues.drop.priority": {
+    "value": "Drop for {{priority}} priority"
+  },
+  "issues.drag.role": {
+    "value": "draggable task"
+  },
+  "issues.drag.help": {
+    "value": "Space picks the task up, the arrows move it, Space drops it and Esc cancels."
+  },
+  "issues.drag.picked": {
+    "value": "You picked up #{{number}}. The arrows move it, Space drops it, Esc cancels."
+  },
+  "issues.drag.moved": {
+    "value": "#{{number}}: {{group}}, position {{position}} of {{total}}."
+  },
+  "issues.drag.dropped": {
+    "value": "You dropped #{{number}} in {{group}}."
+  },
+  "issues.drag.canceled": {
+    "value": "#{{number}} went back to its place."
+  },
+  "issues.drag.assigned": {
+    "value": "#{{number}} is now with {{name}}."
+  },
+  "issues.drag.unassigned": {
+    "value": "#{{number}} has no assignee now."
+  },
+  "issues.drag.prioritized": {
+    "value": "#{{number}} now has {{priority}} priority."
   },
   "issues.canceledColumn": {
     "value": "Canceled"
@@ -11225,6 +11312,21 @@
   "issues.noCriteria": {
     "value": "No acceptance criteria yet."
   },
+  "issues.edit.title": {
+    "value": "Edit the title"
+  },
+  "issues.edit.description": {
+    "value": "Edit the description"
+  },
+  "issues.edit.criterion": {
+    "value": "Edit the criterion \"{{text}}\""
+  },
+  "issues.edit.criterionShort": {
+    "value": "Edit the criterion"
+  },
+  "issues.edit.hint": {
+    "value": "Saves when you leave the field or press Esc."
+  },
   "issues.askTitle": {
     "value": "Ask {{name}} to do this task"
   },
@@ -11309,6 +11411,9 @@
   },
   "issues.event.description_changed": {
     "value": "edited the description"
+  },
+  "issues.event.criteria_changed": {
+    "value": "edited the acceptance criteria"
   },
   "issues.event.status_changed": {
     "value": "changed the status to {{status}}"
@@ -11831,6 +11936,45 @@
   },
   "routines.panel.ahead": {
     "value": "Prepared for later"
+  },
+  "routines.panel.createdBy": {
+    "value": "Created by {{name}} · {{date}}"
+  },
+  "routines.panel.nameLabel": {
+    "value": "Routine name"
+  },
+  "routines.panel.editName": {
+    "value": "Edit the name"
+  },
+  "routines.panel.editWhat": {
+    "value": "Edit what it does"
+  },
+  "routines.panel.tabs.label": {
+    "value": "Parts of the routine"
+  },
+  "routines.panel.tabs.details": {
+    "value": "Details"
+  },
+  "routines.panel.tabs.runs": {
+    "value": "Runs"
+  },
+  "routines.panel.nexts": {
+    "value": "Next runs"
+  },
+  "routines.panel.who": {
+    "value": "Who does it"
+  },
+  "routines.panel.onAirLine": {
+    "value": "Runs by itself when it's time"
+  },
+  "routines.panel.offAirLine": {
+    "value": "Doesn't run until you turn it on"
+  },
+  "routines.panel.reportHint.always": {
+    "value": "Even with nothing new"
+  },
+  "routines.panel.reportHint.when_new": {
+    "value": "Quiet when there's nothing new"
   },
   "routines.ahead.approved": {
     "value": "Approved · runs {{when}}"
