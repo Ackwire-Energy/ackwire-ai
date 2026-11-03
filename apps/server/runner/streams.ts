@@ -7,7 +7,7 @@ import {
 import { RunnerError } from "./errors";
 import { writeJson } from "./json-file";
 
-/** System mode: what root relayed for the Cloud's guard, read from `<runner home>/relayed.json`. */
+/** System mode: what root relayed, in `<runner home>/relayed.json`, for an operator's network guard to read. */
 export const RELAYED_FILE = "relayed.json";
 
 /**

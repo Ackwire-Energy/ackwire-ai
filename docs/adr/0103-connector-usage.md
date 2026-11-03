@@ -1,6 +1,6 @@
 # 0103. Connector usage: counted per day, read by the operator
 
-- Status: Accepted (built: the counts and the operator API's reads, with the Cloud console's pages to follow in its repository)
+- Status: Accepted (built: the counts and the operator API's reads, for an operator's console to call)
 - Date: 2026-10-31
 - Amends: ADR 0056 §4 (two analytics reads)
 - Extends: ADR 0015 (the Tool Gateway), ADR 0016 (connectors), ADR 0038 (mailboxes through Composio), ADR 0039 (databases)
@@ -73,7 +73,7 @@ A source of Composio tools sets `connector` with the alias key and `via: "compos
 
 ## Consequences
 
-- Operators can rank connectors by use, see which ways they take, and estimate Composio's bill before it arrives. The Cloud console reads these two routes.
+- Operators can rank connectors by use, see which ways they take, and estimate Composio's bill before it arrives. An operator's console reads these two routes.
 - One more statement per connector call. Built-in tools, the mention run and the hot paths' query budgets don't change.
 - On agentes.chat Cloud, operators see how much each workspace uses each connector, as counts.
 - A custom server's hostname is kept: it says which servers deserve a one-click preset, and ADR 0056 already allows domains.

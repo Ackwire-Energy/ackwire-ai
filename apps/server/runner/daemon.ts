@@ -712,7 +712,7 @@ export class RunnerDaemon implements RequestObserver {
     const sizes = setInterval(() => this.measureShared(), SHARED_SIZE_MS);
     sizes.unref?.();
     this.timers.push(sizes);
-    // System mode: for the Cloud's guard, at most once a minute.
+    // System mode: for an operator's network guard, at most once a minute.
     const relayed = setInterval(() => {
       if (!this.session?.supervisor) return;
       try {

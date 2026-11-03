@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# CI's isolation-root job, Debian 13 leg: boots the agentes.chat Cloud's release (Debian's own kernel, and systemd
-# built with BPF_FRAMEWORK, which the agents' bind policy needs) in QEMU and runs the isolation test there as root,
-# with the toolchain the owner's Android build needs under that policy (Debian's JDK and adb, Gradle, and the
+# CI's isolation-root job, Debian 13 leg: boots Debian 13 (its own kernel, and systemd built with BPF_FRAMEWORK,
+# which the agents' bind policy needs) in QEMU and runs the isolation test there as root,
+# with the toolchain an Android build needs under that policy (Debian's JDK and adb, Gradle, and the
 # Kotlin compile daemon Gradle fetches), Xtigervnc as the agents' desktops run it, cron and at, and bpftool to
 # count the bind programs on a slice. The guest's second serial port is this job's log (its console, where a getty starts, goes to
 # a file), and the test's exit code comes back on it.
