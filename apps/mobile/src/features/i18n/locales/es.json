@@ -1707,28 +1707,11 @@
     "offline": "Sin conexión. Reintentando."
   },
   "onb": {
-    "progress": "Paso {{n}} de {{total}}",
-    "done": "Listo",
-    "optional": "opcional",
-    "back": "Atrás",
     "logo": "Logo",
     "logoHelp": "Opcional.",
     "logoPick": "Elegir",
     "zone": "Zona horaria: {{zone}}",
-    "importSources": "De dónde vienen los agentes",
-    "importLead": "Tráelos desde la web, en Configuración › Importar y exportar.",
-    "importSkip": "No tengo, omitir",
-    "agentsAda": "Ya estoy aquí",
-    "agentsLead": "Revisa quién más se une.",
-    "share": "Compartir un enlace de invitación",
     "shareMessage": "Únete a {{org}} en agentes.chat: {{url}}",
-    "shareNote": "Tú apruebas a cada persona que lo pida.",
-    "emailsPlaceholder": "nombre@empresa.com",
-    "membersNote": "Entran como miembros.",
-    "invalidEmail": "Revisa este correo.",
-    "invitesFailed": "No se pudieron enviar estas invitaciones. Inténtalo de nuevo.",
-    "removeEmail": "Quitar {{email}}",
-    "later": "Ahora no",
     "failed": "No se pudo guardar. Inténtalo de nuevo."
   },
   "ai": {

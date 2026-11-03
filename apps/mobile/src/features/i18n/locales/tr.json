@@ -1627,28 +1627,11 @@
     "offline": "Bağlantı yok. Yeniden deneniyor."
   },
   "onb": {
-    "progress": "Adım {{n}} / {{total}}",
-    "done": "Tamam",
-    "optional": "isteğe bağlı",
-    "back": "Geri",
     "logo": "Logo",
     "logoHelp": "İsteğe bağlı.",
     "logoPick": "Seç",
     "zone": "Saat dilimi: {{zone}}",
-    "importSources": "Ajanlar nereden geliyor",
-    "importLead": "Onları web'den, Ayarlar › İçe ve dışa aktar bölümünden getirin.",
-    "importSkip": "Kullanmıyorum, atla",
-    "agentsAda": "Ben zaten buradayım",
-    "agentsLead": "Başka kimin geleceğini işaretleyin.",
-    "share": "Davet bağlantısı paylaş",
     "shareMessage": "agentes.chat üzerinde {{org}} çalışma alanına katılın: {{url}}",
-    "shareNote": "İsteyen her kişiyi siz onaylarsınız.",
-    "emailsPlaceholder": "ad@sirket.com",
-    "membersNote": "Üye olarak katılırlar.",
-    "invalidEmail": "Bu e-postayı kontrol edin.",
-    "invitesFailed": "Bu davetler gönderilemedi. Tekrar deneyin.",
-    "removeEmail": "{{email}} adresini kaldır",
-    "later": "Şimdi değil",
     "failed": "Kaydedilemedi. Tekrar deneyin."
   },
   "ai": {

@@ -3969,18 +3969,6 @@
   "splash.offline": {
     "value": "No connection. Trying again."
   },
-  "onb.progress": {
-    "value": "Step {{n}} of {{total}}"
-  },
-  "onb.done": {
-    "value": "Done"
-  },
-  "onb.optional": {
-    "value": "optional"
-  },
-  "onb.back": {
-    "value": "Back"
-  },
   "onb.logo": {
     "value": "Logo"
   },
@@ -3993,47 +3981,8 @@
   "onb.zone": {
     "value": "Time zone: {{zone}}"
   },
-  "onb.importSources": {
-    "value": "Where the agents come from"
-  },
-  "onb.importLead": {
-    "value": "Bring them from the web, in Settings › Import and export."
-  },
-  "onb.importSkip": {
-    "value": "I don't, skip"
-  },
-  "onb.agentsAda": {
-    "value": "I'm already here"
-  },
-  "onb.agentsLead": {
-    "value": "Check who else joins."
-  },
-  "onb.share": {
-    "value": "Share an invite link"
-  },
   "onb.shareMessage": {
     "value": "Join {{org}} on agentes.chat: {{url}}"
-  },
-  "onb.shareNote": {
-    "value": "You approve each person who asks."
-  },
-  "onb.emailsPlaceholder": {
-    "value": "name@company.com"
-  },
-  "onb.membersNote": {
-    "value": "They join as members."
-  },
-  "onb.invalidEmail": {
-    "value": "Check this e-mail."
-  },
-  "onb.invitesFailed": {
-    "value": "Couldn't send these invitations. Try again."
-  },
-  "onb.removeEmail": {
-    "value": "Remove {{email}}"
-  },
-  "onb.later": {
-    "value": "Not now"
   },
   "onb.failed": {
     "value": "Couldn't save. Try again."

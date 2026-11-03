@@ -1547,28 +1547,11 @@
     "offline": "没有网络连接。正在重试。"
   },
   "onb": {
-    "progress": "第 {{n}} 步，共 {{total}} 步",
-    "done": "完成",
-    "optional": "可选",
-    "back": "返回",
     "logo": "标志",
     "logoHelp": "可选。",
     "logoPick": "选择",
     "zone": "时区：{{zone}}",
-    "importSources": "智能体从哪里来",
-    "importLead": "在网页版的“设置 › 导入和导出”中导入。",
-    "importSkip": "我没有，跳过",
-    "agentsAda": "我已经在这里了",
-    "agentsLead": "看看还有谁加入。",
-    "share": "分享邀请链接",
     "shareMessage": "在 agentes.chat 上加入 {{org}}：{{url}}",
-    "shareNote": "每个申请加入的人都需要你批准。",
-    "emailsPlaceholder": "name@company.com",
-    "membersNote": "他们将以成员身份加入。",
-    "invalidEmail": "请检查这个邮箱地址。",
-    "invitesFailed": "无法发送这些邀请，请重试。",
-    "removeEmail": "移除 {{email}}",
-    "later": "以后再说",
     "failed": "无法保存，请重试。"
   },
   "ai": {

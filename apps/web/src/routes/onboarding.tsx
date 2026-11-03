@@ -1,9 +1,10 @@
 import { keys, useMe } from "@agenteschat/client";
 import { isPaidReturn } from "@agenteschat/client/lib/billing";
+import { finishOnboarding } from "@agenteschat/client/lib/right-hand";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { requireUser } from "@/app/guards";
 import { useServerLocale } from "@/i18n";
-import { finishOnboarding, OnboardingPage } from "@/pages/OnboardingPage";
+import { OnboardingPage } from "@/pages/OnboardingPage";
 
 export const Route = createFileRoute("/onboarding")({
   // `?resume=<orgId>`: back from that workspace's plan (`/org/$orgId/onboarding`, ADR 0079), `paid` after paying;

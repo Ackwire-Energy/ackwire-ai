@@ -1707,28 +1707,11 @@
     "offline": "Nessuna connessione. Riprovo."
   },
   "onb": {
-    "progress": "Passaggio {{n}} di {{total}}",
-    "done": "Fatto",
-    "optional": "facoltativo",
-    "back": "Indietro",
     "logo": "Logo",
     "logoHelp": "Facoltativo.",
     "logoPick": "Scegli",
     "zone": "Fuso orario: {{zone}}",
-    "importSources": "Da dove arrivano gli agenti",
-    "importLead": "Portali dal web, in Impostazioni › Importa ed esporta.",
-    "importSkip": "Non ne ho, salta",
-    "agentsAda": "Sono già qui",
-    "agentsLead": "Controlla chi altro entra.",
-    "share": "Condividi un link di invito",
     "shareMessage": "Entra in {{org}} su agentes.chat: {{url}}",
-    "shareNote": "Approvi tu ogni persona che chiede.",
-    "emailsPlaceholder": "nome@azienda.com",
-    "membersNote": "Entrano come membri.",
-    "invalidEmail": "Controlla questa email.",
-    "invitesFailed": "Non è stato possibile inviare questi inviti. Riprova.",
-    "removeEmail": "Rimuovi {{email}}",
-    "later": "Non ora",
     "failed": "Non è stato possibile salvare. Riprova."
   },
   "ai": {

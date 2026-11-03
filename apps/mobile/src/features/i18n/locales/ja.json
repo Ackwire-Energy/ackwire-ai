@@ -1547,28 +1547,11 @@
     "offline": "接続がありません。再試行しています。"
   },
   "onb": {
-    "progress": "ステップ {{n}}/{{total}}",
-    "done": "完了",
-    "optional": "任意",
-    "back": "戻る",
     "logo": "ロゴ",
     "logoHelp": "任意です。",
     "logoPick": "選ぶ",
     "zone": "タイムゾーン: {{zone}}",
-    "importSources": "エージェントの移行元",
-    "importLead": "ウェブの 設定 › インポートとエクスポート から移行できます。",
-    "importSkip": "使っていないのでスキップ",
-    "agentsAda": "私はもうここにいます",
-    "agentsLead": "ほかに誰が参加するか確認しましょう。",
-    "share": "招待リンクを共有",
     "shareMessage": "agentes.chatで{{org}}に参加しましょう: {{url}}",
-    "shareNote": "参加を求めた人は、あなたが一人ずつ承認します。",
-    "emailsPlaceholder": "name@company.com",
-    "membersNote": "メンバーとして参加します。",
-    "invalidEmail": "このメールアドレスを確認してください。",
-    "invitesFailed": "これらの招待を送信できませんでした。もう一度お試しください。",
-    "removeEmail": "{{email}}を削除",
-    "later": "あとで",
     "failed": "保存できませんでした。もう一度お試しください。"
   },
   "ai": {

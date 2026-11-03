@@ -1547,28 +1547,11 @@
     "offline": "연결되어 있지 않아요. 다시 시도하는 중이에요."
   },
   "onb": {
-    "progress": "{{total}}단계 중 {{n}}단계",
-    "done": "완료",
-    "optional": "선택 사항",
-    "back": "뒤로",
     "logo": "로고",
     "logoHelp": "선택 사항이에요.",
     "logoPick": "선택",
     "zone": "시간대: {{zone}}",
-    "importSources": "에이전트를 가져올 곳",
-    "importLead": "웹의 설정 › 가져오기 및 내보내기에서 가져오세요.",
-    "importSkip": "없어요, 건너뛰기",
-    "agentsAda": "저는 이미 여기 있어요",
-    "agentsLead": "또 누가 참여하는지 확인하세요.",
-    "share": "초대 링크 공유",
     "shareMessage": "agentes.chat에서 {{org}}에 참여하세요: {{url}}",
-    "shareNote": "참여를 요청하는 사람은 한 명씩 내가 승인해요.",
-    "emailsPlaceholder": "name@company.com",
-    "membersNote": "멤버로 참여해요.",
-    "invalidEmail": "이 이메일을 확인해 주세요.",
-    "invitesFailed": "이 초대를 보내지 못했어요. 다시 시도해 주세요.",
-    "removeEmail": "{{email}} 삭제",
-    "later": "나중에",
     "failed": "저장하지 못했어요. 다시 시도해 주세요."
   },
   "ai": {

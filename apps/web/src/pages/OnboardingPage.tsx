@@ -1,9 +1,8 @@
-import type { ApiClient } from "@agenteschat/client";
 import { ApiError, keys, meQuery, useAuthConfig } from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
-import { RIGHT_HAND_DEFAULT, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { finishOnboarding, RIGHT_HAND_DEFAULT } from "@agenteschat/client/lib/right-hand";
 import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines";
 import { Button, Field, Icon, Input, Logo } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,16 +23,6 @@ import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, sessionStore, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import "./onboarding.css";
-
-/**
- * Ends a workspace's onboarding, for good, and says where it opens: its right hand's DM (ADR 0134), which takes the
- * setup on from there; the workspace itself when there is none to open.
- */
-export async function finishOnboarding(api: ApiClient, orgId: string) {
-  await api.orgs.saveOnboarding(orgId, { finished: true });
-  const rightHand = rightHandOf(await api.agents.list(orgId).catch(() => []));
-  return { orgId, agentId: rightHand?.id ?? null };
-}
 
 /**
  * The onboarding: one question, the workspace's name (with its logo and time zone), asked by its right hand; then the
