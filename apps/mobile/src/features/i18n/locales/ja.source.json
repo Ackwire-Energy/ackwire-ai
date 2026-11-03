@@ -827,42 +827,6 @@
   "chat.longPressHint": {
     "value": "Hold to react and see more actions"
   },
-  "chat.consult.answered": {
-    "value": "{{name}} answered"
-  },
-  "chat.consult.expiredF": {
-    "value": "{{name}} didn't answer in time"
-  },
-  "chat.consult.expiredM": {
-    "value": "{{name}} didn't answer in time"
-  },
-  "chat.consult.failedF": {
-    "value": "{{name}} couldn't answer"
-  },
-  "chat.consult.failedM": {
-    "value": "{{name}} couldn't answer"
-  },
-  "chat.consult.answerOfF": {
-    "value": "{{name}}'s answer"
-  },
-  "chat.consult.answerOfM": {
-    "value": "{{name}}'s answer"
-  },
-  "chat.consult.noAnswer": {
-    "value": "No answer."
-  },
-  "chat.consult.privateFF": {
-    "value": "A private chat between {{from}} and {{to}}"
-  },
-  "chat.consult.privateFM": {
-    "value": "A private chat between {{from}} and {{to}}"
-  },
-  "chat.consult.privateMF": {
-    "value": "A private chat between {{from}} and {{to}}"
-  },
-  "chat.consult.privateMM": {
-    "value": "A private chat between {{from}} and {{to}}"
-  },
   "chat.file": {
     "value": "File"
   },

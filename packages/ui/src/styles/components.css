@@ -6952,10 +6952,6 @@ button.ac-tools__row {
 button.ac-tools__row:hover {
   background: var(--plate-soft);
 }
-/* A line that opens beside the chat (another agent's conversation) while it shows there: like a thread's line. */
-button.ac-tools__row[aria-pressed="true"] {
-  background: var(--plate);
-}
 html:not([data-pointer]) button.ac-tools__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -8754,79 +8750,7 @@ html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
 }
 
 /* ── Agents asking agents ── */
-/* What the other agent said, folded into one neutral line at the top of the reply; it opens to the exchange. */
-.ac-consult {
-  margin: 6px 0 8px;
-  max-width: var(--msg-card-w);
-  border-radius: 12px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  overflow: hidden;
-}
-.ac-consult__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 36px;
-  padding: 6px 8px 6px 10px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink2);
-  border-radius: 12px;
-}
-.ac-consult__head:hover {
-  background: rgba(127, 127, 127, 0.05);
-}
-/* Opens beside the chat (the two agents' conversation in the panel) while it shows there: like the block's line. */
-.ac-consult__head[aria-pressed="true"] {
-  background: var(--plate);
-}
-html:not([data-pointer]) .ac-consult__head:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.ac-consult__head b {
-  font-weight: 650;
-  color: var(--ink);
-  flex: none;
-}
-.ac-consult__pv {
-  flex: 1;
-  min-width: 0;
-  color: var(--faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ac-consult--open .ac-consult__pv {
-  visibility: hidden;
-}
-.ac-consult__chev {
-  display: inline-flex;
-  flex: none;
-  color: var(--faint);
-  transition: transform 0.2s var(--out);
-}
-.ac-consult--open .ac-consult__chev {
-  transform: rotate(180deg);
-}
-/* Expired / couldn't answer: an icon chip where the agent would be (no colored dot) */
-.ac-consult__ic {
-  width: 20px;
-  height: 20px;
-  border-radius: 7px;
-  background: var(--sunken);
-  color: var(--muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
+/* What was asked and answered, opened in place under the pair row or in the panel. */
 .ac-consult__body {
   padding: 2px 12px 12px 38px;
   font-size: 13.5px;
@@ -8882,7 +8806,7 @@ html:not([data-pointer]) .ac-consult__head:focus-visible {
     padding-left: 12px;
   }
 }
-/* Inside a tool block's line (the questions a reply asked): the line's own padding holds it */
+/* Under the pair row or in the panel: the place's own padding holds it */
 .ac-consult__body.ac-consult__body--inline {
   padding: 0;
 }

@@ -378,20 +378,6 @@
       "back": "Znowu połączono"
     },
     "longPressHint": "Przytrzymaj, aby zareagować i zobaczyć więcej akcji",
-    "consult": {
-      "answered": "{{name}} odpowiada",
-      "expiredF": "{{name}} nie odpowiedziała na czas",
-      "expiredM": "{{name}} nie odpowiedział na czas",
-      "failedF": "{{name}} nie mogła odpowiedzieć",
-      "failedM": "{{name}} nie mógł odpowiedzieć",
-      "answerOfF": "Odpowiedź: {{name}}",
-      "answerOfM": "Odpowiedź: {{name}}",
-      "noAnswer": "Brak odpowiedzi.",
-      "privateFF": "Prywatna rozmowa: {{from}} i {{to}}",
-      "privateFM": "Prywatna rozmowa: {{from}} i {{to}}",
-      "privateMF": "Prywatna rozmowa: {{from}} i {{to}}",
-      "privateMM": "Prywatna rozmowa: {{from}} i {{to}}"
-    },
     "file": "Plik",
     "fileOpen": "Stuknij, aby otworzyć",
     "fileDeleted": "Plik usunięty",

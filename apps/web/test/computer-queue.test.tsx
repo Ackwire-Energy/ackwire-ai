@@ -338,16 +338,15 @@ describe("an offline computer's note", () => {
   });
 });
 
-test("pills never wrap; a closed answer shows two lines at most", async () => {
+test("pills never wrap; the pair row before a reply stays one 26px line, its names cut with no ellipsis", async () => {
   const css = await builtCss("src/styles.css", "src/components/computer-queue.css");
   const value = (selector: string, property: string) =>
     declarations(css, selector).findLast(([p]) => p === property)?.[1];
   expect(value(".ac-chip", "white-space")).toBe("nowrap");
   expect(value(".cq-link", "white-space")).toBe("nowrap");
-  expect(value(".ac-consult-group .ac-tools__label small", "-webkit-line-clamp")).toBe("2");
-  expect(value('.ac-consult-group .ac-tools__row[aria-expanded="true"] .ac-tools__label small', "display")).toBe(
-    "none",
-  );
+  expect(value(".consult-pair__row", "white-space")).toBe("nowrap");
+  expect(value(".consult-pair__row", "height")).toBe("26px");
+  expect(value(".consult-pair__name", "text-overflow")).toBeUndefined();
 });
 
 test("a narrow header fits: the waiting count alone beside the computer, the names give way before any button", async () => {

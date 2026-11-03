@@ -363,20 +363,6 @@
       "back": "De nouveau connecté"
     },
     "longPressHint": "Maintenez pour réagir et voir plus d'actions",
-    "consult": {
-      "answered": "{{name}} a répondu",
-      "expiredF": "{{name}} n'a pas répondu à temps",
-      "expiredM": "{{name}} n'a pas répondu à temps",
-      "failedF": "{{name}} n'a pas pu répondre",
-      "failedM": "{{name}} n'a pas pu répondre",
-      "answerOfF": "Réponse de {{name}}",
-      "answerOfM": "Réponse de {{name}}",
-      "noAnswer": "Pas de réponse.",
-      "privateFF": "Une discussion privée entre {{from}} et {{to}}",
-      "privateFM": "Une discussion privée entre {{from}} et {{to}}",
-      "privateMF": "Une discussion privée entre {{from}} et {{to}}",
-      "privateMM": "Une discussion privée entre {{from}} et {{to}}"
-    },
     "file": "Fichier",
     "fileOpen": "Touchez pour ouvrir",
     "fileDeleted": "Fichier supprimé",
