@@ -510,7 +510,7 @@ export interface ApiClient {
     proposal(orgId: string, messageId: string): Promise<AgentProposal>;
     /**
      * "Criar" on the card: the agent as proposed, with each line the person may give it. With `test` ("Criar e
-     * testar", ADR 0134) its `firstTask` is then sent from the clicker in their DM with it (`testChannelId`).
+     * testar", ADR 0134) the clicker's DM with it opens (`testChannelId`), its `firstTask` in the composer, unsent.
      */
     createProposed(
       orgId: string,

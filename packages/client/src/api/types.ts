@@ -753,7 +753,7 @@ export interface AgentProposalCard {
   kind: "agent_proposal";
   /** The person behind the run that proposed it. */
   forUserId: string | null;
-  /** `firstTask`: what "Criar e testar" sends the new agent, from the clicker, in their DM with it (ADR 0134). */
+  /** `firstTask`: what "Criar e testar" puts in the composer of the clicker's DM with the new agent (ADR 0134). */
   params: { draft: AgentDraft; why: string; firstTask?: string };
   /** `creating`: a person is creating it right now; `superseded`: a newer card for the same handle took its place. */
   state: "pending" | "creating" | "created" | "denied" | "superseded";
@@ -5670,6 +5670,8 @@ export interface AuditPage {
 export interface AuditQuery {
   actorType?: "person" | "agent" | "system";
   actorId?: string;
+  /** An agent's id: what it did, and what people applied from its cards. */
+  via?: string;
   outcome?: AuditOutcome[];
   /** Only calls whose approval or secret nobody has answered yet. */
   waiting?: boolean;

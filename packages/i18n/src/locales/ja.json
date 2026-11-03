@@ -1634,6 +1634,7 @@
       "redo": "やり直す",
       "redoMessage": "{{name}}のカードを今の値で作り直して",
       "createTest": "作成して試す",
+      "to": "から",
       "editFirst": "先に編集",
       "superseded": "新しい提案に置き換えられました",
       "onlyCreators": "エージェントを作れるのは管理者だけです",

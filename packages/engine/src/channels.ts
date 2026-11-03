@@ -31,6 +31,7 @@ import {
   requirePermission,
 } from "./organizations";
 import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
+import { refuseRightHand } from "./right-hand";
 import { closedRefusal, STANDING_COLUMNS } from "./standing";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
@@ -652,6 +653,8 @@ export async function addChannelMember(
     await publishUserEvent(options.pubsub, orgId, member.userId, event);
     return;
   }
+  // In no channel: an @mention reaches it anywhere (ADR 0134).
+  await refuseRightHand(db, orgId, member.agentId, "added to a channel");
   await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   const autoReply = member.autoReply ?? true;
   await db

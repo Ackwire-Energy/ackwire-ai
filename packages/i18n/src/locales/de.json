@@ -1697,6 +1697,7 @@
       "redo": "Neu machen",
       "redoMessage": "Mach die Karte für {{name}} mit den aktuellen Werten neu",
       "createTest": "Erstellen und testen",
+      "to": "auf",
       "editFirst": "Erst bearbeiten",
       "superseded": "Durch den neueren Vorschlag ersetzt",
       "onlyCreators": "Nur Admins erstellen Agenten",

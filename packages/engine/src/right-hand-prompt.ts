@@ -112,6 +112,8 @@ export async function rightHandPrompt(
   const name = person[0]?.name ?? "this person";
   const owner = membership?.role === "owner";
 
+  // Money only for who may see usage (ADR 0063); anyone else reads how much of it is used.
+  const money = can(membership, "view_usage");
   const agentLines = seen.map((a) => {
     const b = budgets.get(a.id);
     const used = b && b.budgetNanoUsd > 0 ? Math.round((b.spentNanoUsd / b.budgetNanoUsd) * 100) : 0;
@@ -120,7 +122,11 @@ export async function rightHandPrompt(
       `- @${a.handle} (${a.name})${a.role ? `, ${a.role}` : ""}`,
       `model ${a.model}${aiStates?.get(a.id)?.state === "no_ai" ? " (no AI: it can't answer)" : ""}`,
       where.length ? `in ${where.join(", ")}` : "in no channel",
-      b ? `budget ${usd(b.budgetNanoUsd)}/month${b.isDefault ? " (the default)" : ""}, ${used}% used` : "",
+      b
+        ? money
+          ? `budget ${usd(b.budgetNanoUsd)}/month${b.isDefault ? " (the default)" : ""}, ${used}% used`
+          : `${used}% of its monthly budget used`
+        : "",
     ]
       .filter(Boolean)
       .join("; ");
@@ -144,7 +150,7 @@ export async function rightHandPrompt(
       ? "No computer is ready for the agents yet, so they can't browse or run code: say where it is set up (Settings › Computers)."
       : "",
     seen.some((a) => channelsOf(a.id).length === 0)
-      ? "An agent is in no channel: offer to add it to one (add_agent_to_channel)."
+      ? "An agent is in no channel: offer to add it to one (propose_settings_change, its channels)."
       : "",
     seen.some((a) => {
       const b = budgets.get(a.id);

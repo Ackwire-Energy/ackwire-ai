@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { DirectMessage } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { introCard, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { introCards, presetsLeft, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { agentStarters, buildConversations, homeLayout, rightHandPin } from "../../src/features/chats/logic";
 import { SETTINGS_SECTIONS, visibleSections } from "../../src/features/settings/logic";
 import { agent, at } from "./fixtures";
@@ -39,15 +39,22 @@ test("outside its audience there is no pin", () => {
   expect(rightHandPin(rows, canTalk(hidden) ? hidden : undefined)).toEqual({ pin: null, rows });
 });
 
-test("its greeting's card: Connect AI, then how to start, then what next, then none", () => {
-  const base = { noAi: false, aiKnown: true, team: 0, createsAgents: true, alone: true };
-  expect(introCard({ ...base, noAi: true })).toBe("connect");
-  expect(introCard(base)).toBe("start");
+test("its greeting's cards: Connect AI, then how to start, then what next, then none", () => {
+  const base = { noAi: false, aiKnown: true, teamHandles: [] as string[], createsAgents: true, alone: true };
+  expect(introCards({ ...base, noAi: true })).toEqual(["connect"]);
+  expect(introCards(base)).toEqual(["start"]);
   // Not known yet, or someone who can't create agents: no start card.
-  expect(introCard({ ...base, aiKnown: false })).toBeNull();
-  expect(introCard({ ...base, createsAgents: false })).toBeNull();
-  expect(introCard({ ...base, team: 2 })).toBe("next");
-  expect(introCard({ ...base, team: 2, alone: false })).toBeNull();
+  expect(introCards({ ...base, aiKnown: false })).toEqual([]);
+  expect(introCards({ ...base, createsAgents: false })).toEqual([]);
+  // One ready-made agent created: the others still have their Criar, and what next shows under them.
+  expect(introCards({ ...base, teamHandles: ["theo"] })).toEqual(["start", "next"]);
+  expect(presetsLeft(["theo"])).toEqual(["ada", "lia", "atlas"]);
+  // All four, or an agent of their own: they moved on.
+  expect(introCards({ ...base, teamHandles: ["theo", "ada", "lia", "atlas"] })).toEqual(["next"]);
+  expect(introCards({ ...base, teamHandles: ["theo", "iara"] })).toEqual(["next"]);
+  expect(introCards({ ...base, teamHandles: ["iara"], alone: false })).toEqual([]);
+  // People here already: nothing left to offer, ready-made agents or not.
+  expect(introCards({ ...base, teamHandles: ["ada"], alone: false })).toEqual([]);
 });
 
 test("Configurações has its section for who manages agents, at its own screen", () => {

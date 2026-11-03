@@ -28,6 +28,7 @@ import {
   suggestedAiText,
 } from "@agenteschat/client/lib/action-cards";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, whenAt } from "@agenteschat/client/lib/format";
 import { hostOf } from "@agenteschat/client/lib/import/shared";
@@ -287,7 +288,9 @@ export function AgentProposalCardView({
   const lines = proposalLines(card, { userId: me.user.id, admin: can(org, "manage_agents") });
   const failed = (error: unknown) => toast.show(errorText(t, error), "error");
   const busy = create.isPending || deny.isPending;
-  const test = rightHand && Boolean(card.params.firstTask);
+  // Only for the person it was written for: anyone else (an admin from the inbox) gets the plain Criar.
+  const firstTask = rightHand && card.forUserId === me.user.id ? card.params.firstTask : undefined;
+  const test = Boolean(firstTask);
   const sent =
     asks && card.askedAt
       ? sentToText(
@@ -351,14 +354,16 @@ export function AgentProposalCardView({
                       { messageId, test },
                       {
                         // Nothing to think with yet (the clicker's accounts decide, not the suggestion): it is
-                        // created all the same, and Connect opens for it. Tried: its DM, with the task in it.
+                        // created all the same, and Connect opens for it. Tried: its DM, the task in the composer.
                         onSuccess: ({ agent: made, ai, testChannelId }) => {
                           if (ai === "none") connect?.open({ agentId: made.id, agentIds: [made.id] });
-                          else if (testChannelId)
+                          else if (testChannelId) {
+                            if (firstTask) setDraftFor(`agent:${made.id}`, firstTask);
                             void navigate({
                               to: "/org/$orgId/dm/agent/$agentId",
                               params: { orgId: org.id, agentId: made.id },
                             });
+                          }
                         },
                         onError: failed,
                       },

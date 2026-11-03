@@ -176,7 +176,8 @@ export async function createAgent(
   orgId: string,
   input: AgentInput & { autonomy?: CommandApproval; audienceMode?: Agent["audienceMode"] },
   defaults: { model: string },
-  options: { remember?: boolean } = {},
+  /** `via`: the agent whose card it was created from (the audit's "via"). */
+  options: { remember?: boolean; via?: string } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
   const { autonomy, audienceMode, ...fields } = input;
@@ -265,6 +266,7 @@ export async function createAgent(
         handle: agent.handle,
         model: agent.model,
         ...(autonomy ? { autonomy } : {}),
+        ...(options.via ? { via: options.via } : {}),
       },
     });
     // A model or key the creator picked is their latest choice; "Automático" with the default key is no choice.

@@ -14,7 +14,7 @@ import {
 } from "@agenteschat/client";
 import type { SettingsProposalCard } from "@agenteschat/client/lib/action-cards";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { formatTime } from "@agenteschat/client/lib/format";
+import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { decidersOf, onlyKey, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
 import { Button, Icon } from "@agenteschat/ui";
@@ -113,7 +113,7 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
           )
         }
       >
-        {who}: <b>{[name, ...lines.map((l) => `${l.field} → ${l.to}`)].join(" · ")}</b>
+        {who}: <b>{[name, ...lines.map((l) => `${lowerFirst(l.field, i18n.language)} ${l.to}`)].join(" · ")}</b>
         {p.decidedAt && ` · ${formatTime(i18n.language, p.decidedAt)}`}
         {receipt?.undoneAt && ` · ${t("rightHand.card.undone")}`}
       </RequestDone>
@@ -130,7 +130,7 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
       : p.askedAt
         ? t("proposals.waitingAdmin")
         : mine
-          ? t(onlyKey(p))
+          ? t(onlyKey(p), g)
           : t("proposals.waitingAdmin");
   const decision = p.stale ? (
     mine &&
@@ -208,7 +208,7 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
                 <dt>{l.field}</dt>
                 <dd>
                   <s>{l.from}</s>
-                  <Icon name="arrowRight" size={14} />
+                  <Icon name="arrowRight" size={14} label={t("rightHand.card.to")} />
                   <b>{l.to}</b>
                 </dd>
               </div>

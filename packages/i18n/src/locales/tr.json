@@ -1693,6 +1693,7 @@
       "redo": "Yeniden yap",
       "redoMessage": "{{name}} kartını şimdiki değerlerle yeniden yap",
       "createTest": "Oluştur ve dene",
+      "to": "yerine",
       "editFirst": "Önce düzenle",
       "superseded": "Daha yeni öneriyle değiştirildi",
       "onlyCreators": "Ajanları yalnızca yöneticiler oluşturur",

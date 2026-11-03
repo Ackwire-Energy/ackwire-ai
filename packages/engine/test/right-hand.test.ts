@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
+  addChannelMember,
   archiveAgent,
   buildRunContext,
   changeMemberRole,
@@ -20,9 +21,12 @@ import {
   reflectThread,
   rightHandPrompt,
   setAgentAudience,
+  setAgentChannels,
+  setAgentComputerTarget,
   updateAgent,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -112,6 +116,24 @@ test("its tools are fixed in code: a grant row gives it nothing, and its memory 
   expect(keys.has(grantKey(null, "setup:write"))).toBe(true);
   expect(keys.has(grantKey(null, "deny:remember"))).toBe(true);
   expect(keys.has(grantKey(null, "deny:web_fetch"))).toBe(true);
+  expect(keys.has(grantKey(null, "deny:add_agent_to_channel"))).toBe(true);
+});
+
+test("it is in no channel and on no computer, whoever asks", async () => {
+  f = await setup({ rightHand: true });
+  const [lodi] = await rightHandOf(f.org.id);
+  if (!lodi) throw new Error("no right hand");
+  const permanent = { code: "agent.right_hand_permanent" };
+  await expect(addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: lodi.id })).rejects.toMatchObject(
+    permanent,
+  );
+  await expect(
+    setAgentChannels(f.db, f.owner.id, f.org.id, lodi.id, [{ channelId: f.general.id }]),
+  ).rejects.toMatchObject(permanent);
+  const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+  await expect(
+    setAgentComputerTarget({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, lodi.id, machineId),
+  ).rejects.toMatchObject(permanent);
 });
 
 test("its prompt says what the person may do, and shows only the agents they may see", async () => {
@@ -142,6 +164,10 @@ test("its prompt says what the person may do, and shows only the agents they may
   expect(member).not.toContain("@cofre");
   expect(member).toContain("(1 more agent this person can't see.)");
   expect(member).toContain("Never ask for a key, password or token in the chat");
+  // Money only for who may see usage (ADR 0063).
+  expect(owner).toMatch(/@dev \(Dev\)[^\n]*budget US\$/);
+  expect(member).toMatch(/@dev \(Dev\)[^\n]*% of its monthly budget used/);
+  expect(member).not.toContain("US$");
 });
 
 test("its setup checklist names the workspace's context and a computer until they are there", async () => {

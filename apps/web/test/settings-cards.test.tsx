@@ -149,7 +149,10 @@ describe("a teammate's settings, on the right hand's card", () => {
     expect(lines[1]?.[2]).toContain("20");
     await click(within(c).getByRole("button", { name: "Aplicar" }));
     expect(state.calls.find((x) => x.method === "proposals.accept")?.args.slice(1, 2)).toEqual(["set-1"]);
-    expect(card("Mudar as configurações da Ada").textContent).toContain("Aplicado por você: Ada · Modelo →");
+    // As the approved card reads it: "Aplicado por você: Ada · modelo … · orçamento mensal US$ 20".
+    expect(card("Mudar as configurações da Ada").textContent).toMatch(
+      /Aplicado por você: Ada · modelo [^·→]+ · orçamento mensal [^·→]*20/,
+    );
   });
 
   test("Descartar refuses it; once applied, Desfazer on its line undoes it", async () => {
@@ -239,7 +242,7 @@ describe("a teammate's settings, on the right hand's card", () => {
 });
 
 describe("a new agent, on the right hand's card", () => {
-  test("Criar e testar creates it with its first task and opens its DM; Editar antes and Descartar beside it", async () => {
+  test("Criar e testar creates it and opens its DM with the first task in the composer, unsent; Editar antes and Descartar beside it", async () => {
     const { state, router } = await go(withAgentCard(seedState(), agentCard()));
     const c = card("Lodi propõe um novo agente");
     expect(within(c).getByRole("button", { name: "Editar antes" })).toBeTruthy();
@@ -251,6 +254,16 @@ describe("a new agent, on the right hand's card", () => {
     ]);
     const made = state.agents.find((a) => a.handle === "iara");
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${made?.id}`);
+    const box = screen().getByRole("combobox", { name: "Mensagem para Iara" }) as HTMLTextAreaElement;
+    expect(box.value).toBe("Responde o primeiro e-mail da fila.");
+    expect(state.calls.some((x) => x.method === "chat.post")).toBe(false);
+  });
+
+  test("someone it wasn't written for (an admin, from the inbox) gets the plain Criar", async () => {
+    await go(withAgentCard(seedState(), agentCard({ forUserId: "u-joao" })));
+    const c = card("Lodi propõe um novo agente");
+    expect(within(c).queryByRole("button", { name: "Criar e testar" })).toBeNull();
+    expect(within(c).getByRole("button", { name: "Criar Iara" })).toBeTruthy();
   });
 
   test("without a first task it reads Criar; replaced by a newer card, it stays greyed with nothing to do", async () => {

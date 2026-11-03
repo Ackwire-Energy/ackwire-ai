@@ -59,15 +59,15 @@ function Form({ agent }: { agent: Agent }) {
     }
     if (amount !== (agent.monthlyBudgetUsd ?? null)) save({ monthlyBudgetUsd: amount });
   };
-  // No role left picked: everyone again.
+  // The people picked on the web stay; nobody and no role left picked: everyone again.
   const toggleRole = (id: string) => {
     const roleIds = picked.includes(id) ? picked.filter((r) => r !== id) : [...picked, id];
+    const people = roleIds.length > 0 || audience.userIds.length > 0;
     save({
-      audience: audiencePatch(
-        roleIds.length ? { ...audience, mode: "people", userIds: [], roleIds } : { ...audience, mode: "everyone" },
-      ),
+      audience: audiencePatch(people ? { ...audience, mode: "people", roleIds } : { ...audience, mode: "everyone" }),
     });
   };
+  const everyone = audience.mode === "everyone";
   return (
     <SettingsPage title={agent.name} subtitle={t("rightHand.label")}>
       <GroupedHeader>{t("rightHand.settings.name")}</GroupedHeader>
@@ -120,8 +120,8 @@ function Form({ agent }: { agent: Agent }) {
         <GroupedRow
           icon="members"
           label={t("audience.mode.everyone")}
-          checked={picked.length === 0}
-          onPress={() => picked.length > 0 && save({ audience: audiencePatch({ ...audience, mode: "everyone" }) })}
+          checked={everyone}
+          onPress={() => !everyone && save({ audience: audiencePatch({ ...audience, mode: "everyone" }) })}
         />
         {roles.map((r) => (
           <GroupedRow key={r.id} label={r.name} checked={picked.includes(r.id)} onPress={() => toggleRole(r.id)} />

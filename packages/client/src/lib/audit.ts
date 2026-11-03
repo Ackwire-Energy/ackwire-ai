@@ -17,9 +17,12 @@ export const TOOL_CALL = "tool.call";
 export type AuditShow = "all" | "problems" | "waiting" | "people";
 export const AUDIT_SHOWS: readonly AuditShow[] = ["all", "problems", "waiting", "people"];
 
-/** What a shortcut and the agent filter (an agent's id, or null for every agent) ask the server. */
+/**
+ * What a shortcut and the agent filter (an agent's id, or null for every agent) ask the server. An agent: what it did
+ * and what people applied from its cards (`via`, ADR 0134).
+ */
 export function auditQueryOf(show: AuditShow, agentId: string | null): AuditQuery {
-  const agent: AuditQuery = agentId ? { actorType: "agent", actorId: agentId } : {};
+  const agent: AuditQuery = agentId ? { via: agentId } : {};
   if (show === "problems") return { ...agent, outcome: ["refused", "failed"] };
   if (show === "waiting") return { ...agent, waiting: true };
   if (show === "people") return { actorType: "person", kind: "change" };

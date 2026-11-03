@@ -3,7 +3,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
-import { introCard, isRightHand } from "@agenteschat/client/lib/right-hand";
+import { introCards, isRightHand, presetsLeft } from "@agenteschat/client/lib/right-hand";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
@@ -34,10 +34,11 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
   const members = useMembers(orgId);
   const team = dir.agents.filter((a) => !isRightHand(a));
   const first = team[0];
-  const card = introCard({
+  const teamHandles = team.map((a) => a.handle);
+  const cards = introCards({
     noAi: aiStateOf(status.data, agent.id) === "no_ai",
     aiKnown: Boolean(status.data),
-    team: team.length,
+    teamHandles,
     createsAgents: can(org, "create_agents"),
     alone: (members.data?.length ?? 0) <= 1,
   });
@@ -56,7 +57,7 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
         <Text variant="body" tone="ink2">
           {t("rightHand.intro.lead")}
         </Text>
-        {card === "connect" ? (
+        {cards.includes("connect") && (
           <IntroCard icon="brain" title={t("rightHand.intro.connect.title")} text={t("rightHand.intro.connect.text")}>
             <Button
               variant="primary"
@@ -66,18 +67,16 @@ export function RightHandIntro({ agent, channelId }: { agent: Agent; channelId: 
               onPress={() => openConnectAi({ agentId: agent.id })}
             />
           </IntroCard>
-        ) : card === "start" ? (
-          <StartCard channelId={channelId} />
-        ) : card === "next" && first ? (
-          <NextCard first={first} />
-        ) : null}
+        )}
+        {cards.includes("start") && <StartCard channelId={channelId} left={presetsLeft(teamHandles)} />}
+        {cards.includes("next") && first && <NextCard first={first} />}
       </View>
     </View>
   );
 }
 
-/** "Como você quer começar?": the ready-made agents, each its own Criar, or all four, or another way in. */
-function StartCard({ channelId }: { channelId: string }) {
+/** "Como você quer começar?": the ready-made agents not created yet, each its own Criar, or all of them, or another way in. */
+function StartCard({ channelId, left }: { channelId: string; left: readonly Preset[] }) {
   const { t } = useTranslation();
   const { orgId } = useOrg();
   const api = useApi();
@@ -100,7 +99,7 @@ function StartCard({ channelId }: { channelId: string }) {
   return (
     <IntroCard icon="agent" title={t("rightHand.intro.start.question")}>
       <View style={styles.presets}>
-        {PRESETS.map((p) => {
+        {left.map((p) => {
           const name = t(`onboarding.presets.${p}.name`);
           return (
             <Pressable
@@ -137,7 +136,7 @@ function StartCard({ channelId }: { channelId: string }) {
         wide
         label={t("rightHand.intro.start.team")}
         loading={create.isPending}
-        onPress={() => create.mutate(PRESETS)}
+        onPress={() => create.mutate(left)}
       />
       <Button
         variant="secondary"

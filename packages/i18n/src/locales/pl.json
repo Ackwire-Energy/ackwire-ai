@@ -1822,6 +1822,7 @@
       "redo": "Zrób ponownie",
       "redoMessage": "Przygotuj kartę dla {{name}} z obecnymi wartościami",
       "createTest": "Utwórz i przetestuj",
+      "to": "na",
       "editFirst": "Najpierw edytuj",
       "superseded": "Zastąpiona nowszą propozycją",
       "onlyCreators": "Tylko admini tworzą agentów",

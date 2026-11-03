@@ -66,7 +66,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
   );
   return (
     <>
-      <Card aria-label={t("rightHand.settings.name")}>
+      <Card>
         <div className="settings-rows">
           <PrefRow
             id="rh-name"

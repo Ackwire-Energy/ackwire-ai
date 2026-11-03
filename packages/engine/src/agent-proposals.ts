@@ -1,5 +1,17 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNotNull, isNull, notInArray, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  notInArray,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { AUTO_MODEL } from "@agenteschat/providers";
 import { orgToolCatalog, setAgentAccess } from "./access";
 import { type Agent, createAgent, getAgent, HANDLE_PATTERN, NEW_AGENT_DEFAULTS, takenHandles } from "./agents";
@@ -18,7 +30,7 @@ import { publishChannelEvent } from "./events";
 import { setAgentComputerTarget } from "./machines";
 import { DEFAULT_MAIL_POLICY, setAgentMail } from "./mail/policies";
 import { setAgentChannels } from "./management";
-import { getMessage, type Message, postPersonMessage } from "./messages";
+import { getMessage, type Message } from "./messages";
 import type { Notice } from "./notices";
 import { notify, resolveNotifications } from "./notifications";
 import { can, getMembership, requirePermission } from "./organizations";
@@ -40,6 +52,7 @@ const {
   machines,
   mailAccounts,
   messages,
+  notifications,
   organizationMembers,
   users,
 } = schema;
@@ -130,7 +143,7 @@ export interface AgentProposalCard {
   kind: "agent_proposal";
   /** The person behind the run that proposed it; null when nobody was. */
   forUserId: string | null;
-  /** `firstTask`: what "Criar e testar" sends the new agent in the clicker's DM with it (ADR 0134). */
+  /** `firstTask`: what "Criar e testar" puts in the composer of the clicker's DM with the new agent (ADR 0134). */
   params: { draft: AgentDraft; why: string; firstTask?: string };
   state: AgentProposalState;
   /** The agent made from it. */
@@ -744,6 +757,7 @@ export async function createProposedAgent(
       orgId,
       { name: draft.name, handle: draft.handle, role: draft.role, instructions: draft.instructions },
       NEW_AGENT_DEFAULTS,
+      { via: found.proposedBy },
     );
     if (draft.appearance) agent = await setAgentAppearance(deps.db, userId, orgId, agent.id, draft.appearance);
   } catch (error) {
@@ -760,16 +774,16 @@ export async function createProposedAgent(
   };
   await setCard(deps.db, found.message, card, "creating");
   await settle(deps, { ...found, card }, userId, agent, given.said);
-  const firstTask = found.card.params.firstTask;
-  // "Criar e testar": its first task, from the clicker, in their DM with it (their run, their permissions).
-  const dm = options.test && firstTask ? await openPersonAgentDm(deps.db, orgId, userId, agent.id) : null;
-  if (dm && firstTask) await postPersonMessage(deps, userId, orgId, dm.id, { body: firstTask });
+  // "Criar e testar": their DM with it, where the app puts the first task in the composer. Never sent for them: the
+  // right hand wrote it, and it would run with the clicker's permissions unread.
+  const dm =
+    options.test && found.card.params.firstTask ? await openPersonAgentDm(deps.db, orgId, userId, agent.id) : null;
   return {
     agent: (await getAgent(deps.db, orgId, agent.id)) ?? agent,
     proposal: view(found.message, card, found.proposedBy, true),
     /** The AI it got, which the clicker's accounts decide (not the one suggested when it was proposed). */
     ai: given.ai,
-    /** "Criar e testar": the DM its first task went to. */
+    /** "Criar e testar": the DM whose composer gets its first task. */
     testChannelId: dm?.id ?? null,
   };
 }
@@ -1067,7 +1081,37 @@ export async function supersedeOlderProposals(deps: AgentProposalDeps, newer: Me
   }
 }
 
-const askGroup = (messageId: string) => `change_request:agent:${messageId}`;
+const ASK_GROUP = "change_request:agent:";
+const askGroup = (messageId: string) => `${ASK_GROUP}${messageId}`;
+
+/**
+ * Closes the inbox entries of sent cards that ran out or are gone (expiry is read, never stored), so no admin is left
+ * waiting on a card nobody can create any more. Oldest first.
+ */
+export async function expireAgentProposalAsks(deps: { db: Database; pubsub?: PubSub }) {
+  // ponytail: 200 open asks per tick, oldest first; page through them if a workspace ever holds more.
+  const open = await deps.db
+    .select({ orgId: notifications.orgId, groupKey: notifications.groupKey })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.kind, "change_request"),
+        isNull(notifications.doneAt),
+        like(notifications.groupKey, `${ASK_GROUP}%`),
+      ),
+    )
+    .groupBy(notifications.orgId, notifications.groupKey)
+    .orderBy(sql`min(${notifications.createdAt})`)
+    .limit(200);
+  let closed = 0;
+  for (const n of open) {
+    const message = await getMessage(deps.db, n.orgId, n.groupKey.slice(ASK_GROUP.length));
+    const card = message && !message.deletedAt ? agentProposalOf(message.meta) : null;
+    if (card?.state === "pending" && !expired(card)) continue;
+    closed += await resolveNotifications(deps, n.orgId, { groupKey: n.groupKey });
+  }
+  return closed;
+}
 
 /**
  * "Pedir a um admin" on a new agent's card (ADR 0134): the person it is for can't create agents, so it goes to

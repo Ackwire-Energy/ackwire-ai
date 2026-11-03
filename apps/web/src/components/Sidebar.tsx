@@ -38,7 +38,7 @@ import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
 import { recentDms } from "@agenteschat/client/lib/recent";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
 import { looksUnread } from "@agenteschat/client/lib/unread";
 import {
@@ -98,7 +98,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
-import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
+import { rightHandSeen, STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useStreams } from "@/realtime/context";
@@ -1352,7 +1352,7 @@ function AgentRow({
 
 /**
  * The team's right hand (ADR 0134), pinned above the tools: its face, its name and "seu braço direito" muted on the
- * right, a one-time "Novo" until it is first opened (in this browser), and its DM's unread count. It opens the
+ * right, a one-time "Novo" until its DM first opens (in this browser), and its DM's unread count. It opens the
  * person's DM with it. Not part of the sections, so it is never moved or hidden.
  */
 function RightHandRow({
@@ -1368,8 +1368,7 @@ function RightHandRow({
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
-  const seenKey = `${me.user.id}.${org.id}`;
-  const [fresh, setFresh] = useState(() => !storedStrings(STORAGE_KEYS.rightHandSeen).includes(seenKey));
+  const fresh = rightHandSeen.useFresh(rightHandSeenKey(me.user.id, org.id));
   const shown = useAgentPresence(a.id);
   const label = t("rightHand.label");
   return (
@@ -1380,15 +1379,7 @@ function RightHandRow({
       title={`${a.name} · ${label}`}
       onMouseEnter={onPrefetch}
       onFocus={onPrefetch}
-      onClick={() => {
-        onOpen();
-        if (!fresh) return;
-        setFresh(false);
-        storage.set(
-          STORAGE_KEYS.rightHandSeen,
-          JSON.stringify([...storedStrings(STORAGE_KEYS.rightHandSeen), seenKey]),
-        );
-      }}
+      onClick={onOpen}
       data-unread={unread > 0}
       data-right-hand=""
     >

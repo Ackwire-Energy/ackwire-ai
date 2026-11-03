@@ -127,7 +127,7 @@ describe("the top of Lodi's DM", () => {
     expect(screen().queryByText("Conectar uma IA para o time")).toBeNull();
   });
 
-  test("a tile's Criar makes that agent alone, in #general; the card then gives way to the next one", async () => {
+  test("a tile's Criar makes that agent alone, in #general; the other tiles stay, the next card comes under", async () => {
     const state = fresh();
     await openDm(state);
     await click(button("Criar Lia"), 12);
@@ -136,9 +136,19 @@ describe("the top of Lodi's DM", () => {
     expect(made[0]?.appearance).toEqual({ color: "rose", eyes: "dots", accessory: "flower" });
     const lia = state.agents.find((a) => a.name === "Lia");
     expect(calls(state, "chat.addMember").map((c) => c.args.slice(1))).toEqual([[GENERAL_ID, { agentId: lia?.id }]]);
-    expect(startCard()).toBeNull();
+    expect(within(startCard() as HTMLElement).queryByRole("button", { name: "Criar Lia" })).toBeNull();
+    expect(button("Criar Theo")).toBeTruthy();
     expect(screen().getByRole("group", { name: "O time chegou. E agora?" })).toBeTruthy();
     expect(button("Convidar pessoas")).toBeTruthy();
+    // The team button makes only the ones left.
+    await click(button("Montar um time pra começar"), 16);
+    expect(calls(state, "agents.create").map((c) => (c.args[1] as { name: string }).name)).toEqual([
+      "Lia",
+      "Theo",
+      "Ada",
+      "Atlas",
+    ]);
+    expect(startCard()).toBeNull();
   });
 
   test("Montar um time pra começar makes the four, each with its own look, on Automático", async () => {

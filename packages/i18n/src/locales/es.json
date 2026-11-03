@@ -1758,6 +1758,7 @@
       "redo": "Rehacer",
       "redoMessage": "Rehaz la tarjeta de {{name}} con los valores de ahora",
       "createTest": "Crear y probar",
+      "to": "a",
       "editFirst": "Editar antes",
       "superseded": "Reemplazada por la propuesta más nueva",
       "onlyCreators": "Solo los admins crean agentes",

@@ -1761,6 +1761,7 @@
       "redo": "Refaire",
       "redoMessage": "Refais la carte de {{name}} avec les valeurs actuelles",
       "createTest": "Créer et tester",
+      "to": "à",
       "editFirst": "Modifier d’abord",
       "superseded": "Remplacée par la proposition plus récente",
       "onlyCreators": "Seuls les admins créent des agents",

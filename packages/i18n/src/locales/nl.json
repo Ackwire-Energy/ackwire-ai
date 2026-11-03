@@ -1696,6 +1696,7 @@
       "redo": "Opnieuw",
       "redoMessage": "Maak de kaart voor {{name}} opnieuw met de huidige waarden",
       "createTest": "Maken en testen",
+      "to": "naar",
       "editFirst": "Eerst bewerken",
       "superseded": "Vervangen door het nieuwere voorstel",
       "onlyCreators": "Alleen admins maken agents",

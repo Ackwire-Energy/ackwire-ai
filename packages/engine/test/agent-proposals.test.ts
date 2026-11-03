@@ -16,6 +16,7 @@ import {
   createSetupToolSource,
   createToolGateway,
   denyAgentProposal,
+  expireAgentProposalAsks,
   ForbiddenError,
   getAgentProposal,
   insertMessage,
@@ -803,7 +804,7 @@ describe("the right hand's agent cards (ADR 0134)", () => {
     return { ...ctx, agentId: lodi.id };
   }
 
-  test("Criar e testar sends its first task from the clicker, in their DM with it", async () => {
+  test("Criar e testar opens the clicker's DM with it and sends nothing for them", async () => {
     f = await setup({ rightHand: true });
     const ctx = await lodiRun(f, f.owner.id);
     const out = await propose(f, ctx, { ...ADA, first_task: "Desenha a tela de login." });
@@ -819,7 +820,7 @@ describe("the right hand's agent cards (ADR 0134)", () => {
     const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, made.agent.id);
     expect(made.testChannelId).toBe(dm.id);
     const said = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm.id));
-    expect(said.map((m) => [m.authorUserId, m.body])).toEqual([[f.owner.id, "Desenha a tela de login."]]);
+    expect(said.filter((m) => m.authorUserId !== null)).toEqual([]);
   });
 
   test("a newer card for the same handle takes the older one's place; another handle's stays", async () => {
@@ -858,5 +859,27 @@ describe("the right hand's agent cards (ADR 0134)", () => {
       .from(schema.notifications)
       .where(eq(schema.notifications.id, inbox[0]?.id ?? ""));
     expect(done?.doneAt).not.toBeNull();
+  });
+
+  test("a sent card that runs out leaves the admins' inbox", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia Rocha");
+    const out = await propose(f, await lodiRun(f, bia.id), ADA);
+    const messageId = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    await askAgentProposal({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, messageId);
+    const open = () =>
+      f.db
+        .select({ id: schema.notifications.id })
+        .from(schema.notifications)
+        .where(and(eq(schema.notifications.kind, "change_request"), sql`${schema.notifications.doneAt} is null`));
+    expect(await expireAgentProposalAsks({ db: f.db })).toBe(0);
+    expect(await open()).toHaveLength(1);
+    const past = JSON.stringify(new Date(Date.now() - 1000).toISOString());
+    await f.db
+      .update(schema.messages)
+      .set({ meta: sql`jsonb_set(${schema.messages.meta}, '{actionCard,expiresAt}', ${past}::jsonb)` })
+      .where(eq(schema.messages.id, messageId));
+    expect(await expireAgentProposalAsks({ db: f.db, pubsub: f.pubsub })).toBe(1);
+    expect(await open()).toEqual([]);
   });
 });

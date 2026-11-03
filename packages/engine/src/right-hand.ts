@@ -32,7 +32,7 @@ export const RIGHT_HAND_AUTO = {
  * Its tools, fixed in code whatever its grant rows say (`loadScopeKeys`): the setup cards, reading context, routines
  * for any agent, and `propose_instruction_change` (under `memory:write`, whose memory tools are denied: its runs keep
  * no memory, so nothing one person tells it reaches another). No apps, web, computer, databases, files or mail, so it
- * can't be used to reach data; nor posting elsewhere or long work.
+ * can't be used to reach data; nor posting elsewhere, putting agents in channels without a card, or long work.
  */
 export const RIGHT_HAND_GRANTS: readonly string[] = [
   "setup:write",
@@ -48,6 +48,7 @@ export const RIGHT_HAND_GRANTS: readonly string[] = [
     "web_fetch",
     "post_message",
     "send_dm",
+    "add_agent_to_channel",
     "work_in_background",
     "post_update",
     "steer_work",

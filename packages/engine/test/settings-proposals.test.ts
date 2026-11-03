@@ -8,6 +8,7 @@ import {
   createToolGateway,
   decideProposal,
   getAgent,
+  listAudit,
   listProposals,
   MAX_CARDS_PER_RUN,
   MAX_CARDS_PER_RUN_RIGHT_HAND,
@@ -141,6 +142,10 @@ describe("the settings card", () => {
       .from(schema.auditLog)
       .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, "proposal.accepted")));
     expect(audit?.details).toMatchObject({ via: lodi.id, target: "agent_settings" });
+    // "Ver o que o Lodi fez": what was applied from its cards, with the person as the actor.
+    const viaLodi = await listAudit(f.db, f.owner.id, f.org.id, { via: lodi.id });
+    expect(viaLodi.rows.map((r) => [r.action, r.actor.id])).toContainEqual(["proposal.accepted", f.owner.id]);
+    expect((await listAudit(f.db, f.owner.id, f.org.id, { via: f.agent.id })).rows).toEqual([]);
 
     await undoAgentAction({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, receipt?.id ?? "");
     expect(await getAgent(f.db, f.org.id, f.agent.id)).toMatchObject({
@@ -184,11 +189,19 @@ describe("the settings card", () => {
           .where(and(eq(schema.notifications.orgId, f.org.id), eq(schema.notifications.kind, "change_request")))
       ).sort((a, b) => a.userId.localeCompare(b.userId));
     expect(await inbox()).toEqual([]);
+    // Unsent, nobody else hears of it: not listed for an admin, and not theirs to apply.
+    expect((await listProposals(f.db, f.owner.id, f.org.id, { status: "pending" })).some((p) => p.id === row?.id)).toBe(
+      false,
+    );
+    expect(decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "accept")).rejects.toThrow();
     // Only the person who asked sends it, once.
     expect(askProposal({ db: f.db }, admin.id, f.org.id, row?.id ?? "")).rejects.toThrow(/Only the person who asked/);
     await askProposal({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, row?.id ?? "");
     expect(askProposal({ db: f.db }, bia.id, f.org.id, row?.id ?? "")).rejects.toThrow(/already sent/);
     expect((await inbox()).map((n) => n.userId).sort()).toEqual([admin.id, f.owner.id].sort());
+    expect(
+      (await listProposals(f.db, f.owner.id, f.org.id, { status: "pending" })).find((p) => p.id === row?.id),
+    ).toMatchObject({ canDecide: true });
     // Theo lost the right to manage agents before clicking: the click is refused.
     await f.db.delete(schema.organizationMemberRoles).where(eq(schema.organizationMemberRoles.userId, admin.id));
     expect(decideProposal(f.db, admin.id, f.org.id, row?.id ?? "", "accept")).rejects.toThrow();
@@ -221,8 +234,10 @@ describe("the settings card", () => {
     await call(f, ctx, { changes: [{ agent: "@dev", ai_account: "Claude do Caio" }], reason: "plano" });
     const [row] = (await cardRows(f, f.owner.id)).rows;
     expect(row?.canDecide).toBe(false);
-    expect((await listProposals(f.db, caio.id, f.org.id, { ids: [row?.id ?? ""] }))[0]?.canDecide).toBe(true);
+    // Unsent, the account's owner doesn't hear of it yet.
+    expect(await listProposals(f.db, caio.id, f.org.id, { ids: [row?.id ?? ""] })).toEqual([]);
     await askProposal({ db: f.db }, f.owner.id, f.org.id, row?.id ?? "");
+    expect((await listProposals(f.db, caio.id, f.org.id, { ids: [row?.id ?? ""] }))[0]?.canDecide).toBe(true);
     const asked = await f.db
       .select({ userId: schema.notifications.userId })
       .from(schema.notifications)

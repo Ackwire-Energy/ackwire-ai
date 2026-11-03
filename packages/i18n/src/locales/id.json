@@ -1634,6 +1634,7 @@
       "redo": "Ulangi",
       "redoMessage": "Buat ulang kartu {{name}} dengan nilai sekarang",
       "createTest": "Buat dan coba",
+      "to": "menjadi",
       "editFirst": "Edit dulu",
       "superseded": "Diganti oleh usulan yang lebih baru",
       "onlyCreators": "Hanya admin yang membuat agen",

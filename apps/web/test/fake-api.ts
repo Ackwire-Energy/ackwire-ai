@@ -1764,6 +1764,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           (r) =>
             (!query.actorType || r.actor.type === query.actorType) &&
             (!query.actorId || r.actor.id === query.actorId) &&
+            (!query.via || (r.actor.type === "agent" && r.actor.id === query.via) || r.details.via === query.via) &&
             (!query.outcome?.length || (r.outcome !== null && query.outcome.includes(r.outcome))) &&
             (!query.waiting ||
               (r.outcome === "pending" && (r.approval?.status === "pending" || r.secret?.status === "pending"))) &&

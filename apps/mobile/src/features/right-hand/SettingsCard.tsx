@@ -15,6 +15,7 @@ import {
   useSendDm,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { decidersOf, onlyKey, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
 import { useQueryClient } from "@tanstack/react-query";
@@ -119,7 +120,7 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
       receipt && !receipt.undoneAt && receipt.undoableUntil && Date.parse(receipt.undoableUntil) > Date.now();
     const words = [
       `${who}: ${markName(name)}`,
-      ...lines.map((l) => `${l.field} → ${l.to}`),
+      ...lines.map((l) => `${lowerFirst(l.field, i18n.language)} ${l.to}`),
       ...(receipt?.undoneAt ? [t("rightHand.card.undone")] : []),
     ].join(" · ");
     return (
@@ -154,7 +155,7 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
       ? "you"
       : p.askedAt || !mine
         ? t("proposals.waitingAdmin")
-        : t(onlyKey(p));
+        : t(onlyKey(p), g);
   const decision = p.stale ? (
     mine ? (
       <Button
@@ -225,7 +226,12 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
         lines.length > 0 ? (
           <View style={styles.lines}>
             {lines.map((l) => (
-              <View key={`${l.field}:${l.to}`} style={styles.line}>
+              <View
+                key={`${l.field}:${l.to}`}
+                style={styles.line}
+                accessible
+                accessibilityLabel={`${l.field}: ${l.from} ${t("rightHand.card.to")} ${l.to}`}
+              >
                 <Text variant="footnote" tone="muted" style={styles.field}>
                   {l.field}
                 </Text>

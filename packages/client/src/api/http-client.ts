@@ -556,6 +556,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           query: {
             actorType: query.actorType,
             actorId: query.actorId,
+            via: query.via,
             outcome: query.outcome?.length ? query.outcome.join(",") : undefined,
             waiting: query.waiting ? "true" : undefined,
             kind: query.kind,

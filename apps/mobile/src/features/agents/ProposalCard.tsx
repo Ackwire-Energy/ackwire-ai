@@ -35,6 +35,7 @@ import { AgentAvatar, Button, Icon, Text, useTheme } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { askEndedAt } from "../chat/ask-store";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
+import { requestComposerText } from "../chat/composer-request";
 import { markName } from "../chat/logic";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
@@ -94,7 +95,9 @@ export function AgentProposalView({
   const rightHand = isRightHand(agent);
   // The person it is for, who can't create agents: they send it on (the right hand's cards only).
   const sends = status === "open" && rightHand && !decides && card.forUserId === meId;
-  const test = rightHand && Boolean(card.params.firstTask);
+  // Only for the person it was written for: anyone else (an admin from the inbox) gets the plain Criar.
+  const firstTask = rightHand && card.forUserId === meId ? card.params.firstTask : undefined;
+  const test = Boolean(firstTask);
   const sent =
     sends && card.askedAt
       ? sentToText(
@@ -125,9 +128,12 @@ export function AgentProposalView({
         onSuccess: ({ agent: made, ai, testChannelId }) => {
           asks?.settle(messageId);
           // Nothing to think with yet (the tapper's accounts decide, not the suggestion): it is created all the same,
-          // and Connect opens for it here. Tried: its DM, with the task in it.
+          // and Connect opens for it here. Tried: its DM, the task in the composer.
           if (ai === "none") openConnectAi({ agentId: made.id });
-          else if (testChannelId) router.push(chatHref(testChannelId));
+          else if (testChannelId) {
+            if (firstTask) requestComposerText(testChannelId, firstTask);
+            router.push(chatHref(testChannelId));
+          }
         },
         onError: failed,
       },

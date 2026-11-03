@@ -1633,6 +1633,7 @@
       "redo": "重做",
       "redoMessage": "用现在的值重做{{name}}的卡片",
       "createTest": "创建并试用",
+      "to": "改为",
       "editFirst": "先编辑",
       "superseded": "已被更新的提议取代",
       "onlyCreators": "只有管理员能创建智能体",

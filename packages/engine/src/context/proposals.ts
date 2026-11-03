@@ -260,9 +260,19 @@ async function proposalsShown<T extends Proposal>(db: Database, actorId: string,
   return out;
 }
 
+/**
+ * A settings row the right hand made from a person's request and not yet sent on (ADR 0134): until they send it,
+ * only they and whoever reads the conversation its card is in hear of it.
+ */
+async function unsentHidden(db: Database, actorId: string, p: Proposal) {
+  if (p.target !== "agent_settings" || p.askedAt || p.requestedByUserId === actorId) return false;
+  const card = await cardOf(db, p);
+  return !card || !(await userVisibleChannels(db, p.orgId, actorId)).includes(card.channelId);
+}
+
 async function mayDecide(db: Database, actorId: string, p: Proposal) {
   const membership = await requirePermission(db, actorId, p.orgId, "read");
-  if (p.target === "agent_settings") return maySettle(db, actorId, p);
+  if (p.target === "agent_settings") return !(await unsentHidden(db, actorId, p)) && maySettle(db, actorId, p);
   if (isAgentSetting(p)) {
     if (can(membership, "manage_agents")) return true;
     return ownerDecides(p) && !!p.agentId && (await getAgent(db, p.orgId, p.agentId))?.ownerUserId === actorId;
@@ -300,7 +310,10 @@ export async function listProposals(
   const shown = await proposalsShown(db, actorId, membership, all);
   const rows = can(membership, "review_memory") ? shown : await proposalsVisible(db, actorId, orgId, shown);
   const out: (Proposal & { canDecide: boolean })[] = [];
-  for (const r of rows) out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
+  for (const r of rows) {
+    if (await unsentHidden(db, actorId, r)) continue;
+    out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
+  }
   return out;
 }
 

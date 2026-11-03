@@ -33,6 +33,8 @@ interface Lists {
   agents: Agent[];
   /** Who manages the channel: "Adicionar pessoa ou agente" at the bottom, the channel details' add flow. */
   onAdd?: () => void;
+  /** The search the lists were filtered by, which the right hand must match too to be shown. */
+  matches?: (name: string, handle: string) => boolean;
 }
 
 /** The channel's members on the right, as Discord's: grouped by the owner, hoisted roles, agents, online, offline. */
@@ -136,6 +138,7 @@ export function MembersSheet({
             channelId={channel.id}
             people={lists.people.filter((m) => matches(m.name, m.handle))}
             agents={lists.agents.filter((a) => matches(a.name, a.handle))}
+            matches={matches}
             {...(lists.onAdd ? { onAdd: lists.onAdd } : {})}
           />
         </div>
@@ -144,13 +147,18 @@ export function MembersSheet({
   );
 }
 
-function MembersList({ channelId, people, agents: members, onAdd }: Lists) {
+function MembersList({ channelId, people, agents: members, onAdd, matches }: Lists) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   // The right hand (ADR 0134) is in no channel, yet an @mention reaches it anywhere: it leads the agents.
   const rightHand = useDirectory(org.id).agents.find(isRightHand);
   const agents =
-    rightHand && rightHand.canTalk !== false && !members.some(isRightHand) ? [rightHand, ...members] : members;
+    rightHand &&
+    rightHand.canTalk !== false &&
+    !members.some(isRightHand) &&
+    (!matches || matches(rightHand.name, rightHand.handle))
+      ? [rightHand, ...members]
+      : members;
   const presences = usePresences();
   const roles = useRoles(org.id).data?.roles ?? [];
   const roster = useRoster(org.id, channelId);

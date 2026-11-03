@@ -1094,7 +1094,6 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   font-size: 13px;
   color: var(--ink-muted);
 }
-/* A lock when not everyone can talk to the agent (the tooltip says who). */
 /* The right hand's row (ADR 0134) above the tools: its label never pushes the name out; the label gives way first. */
 .sidebar__pin-row .sidebar__item-label {
   flex: 0 0 auto;
@@ -1120,6 +1119,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   border-radius: var(--radius-full);
   background: var(--info);
 }
+/* A lock when not everyone can talk to the agent (the tooltip says who). */
 .sidebar__item-meta--audience {
   display: inline-flex;
   align-items: center;
@@ -12439,9 +12439,12 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
 }
+/* Wide enough for its placeholder ("Padrão do workspace", longer in es, de, ru) after "US$". */
 .rh-set__budget .ac-input-affix {
-  width: 140px;
+  width: 260px;
+  min-width: 0;
 }
 .rh-set__audience {
   margin-top: 16px;

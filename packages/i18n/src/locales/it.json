@@ -1757,6 +1757,7 @@
       "redo": "Rifai",
       "redoMessage": "Rifai la scheda di {{name}} con i valori di adesso",
       "createTest": "Crea e prova",
+      "to": "a",
       "editFirst": "Modifica prima",
       "superseded": "Sostituita dalla proposta più recente",
       "onlyCreators": "Solo gli admin creano agenti",

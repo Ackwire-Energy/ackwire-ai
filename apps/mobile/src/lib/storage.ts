@@ -1,3 +1,4 @@
+import { seenList } from "@agenteschat/client/lib/seen-list";
 import * as SecureStore from "expo-secure-store";
 import { STORAGE_PREFIX } from "@/config";
 
@@ -20,6 +21,15 @@ export function readValueSync(name: string): string | null {
     return SecureStore.getItem(key(name));
   } catch {
     return null;
+  }
+}
+
+/** `writeValue` at once, for a value read back in the same render (`readValueSync`). */
+export function writeValueSync(name: string, value: string): void {
+  try {
+    SecureStore.setItem(key(name), value);
+  } catch {
+    // Storage unavailable: the app works without remembering.
   }
 }
 
@@ -62,10 +72,16 @@ export const STORED = {
   searchRecent: "search-recent",
   /** The person has touched the trackpad: its lesson is over ("1"). */
   trackpadTaught: "trackpad-taught",
-  /** `<user id>.<org id>` entries (JSON list): the right hand's row was opened there, so its "Novo" is gone. */
+  /** `<user id>.<org id>` entries (JSON list): the right hand's DM was opened there, so its "Novo" is gone. */
   rightHandSeen: "right-hand-seen",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {
   await Promise.all(Object.values(STORED).map((name) => writeValue(name, null)));
 }
+
+/** The right hand's DM opened, from its row or any other way in (`rightHandSeenKey`): its row's "Novo" is gone. */
+export const rightHandSeen = seenList(
+  () => readValueSync(STORED.rightHandSeen),
+  (value) => writeValueSync(STORED.rightHandSeen, value),
+);

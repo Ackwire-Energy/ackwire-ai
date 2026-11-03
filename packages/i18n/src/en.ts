@@ -1685,6 +1685,8 @@ export const en = {
       /** Sent from the person to the right hand when they press Redo on an out-of-date card. */
       redoMessage: "Redo the card for {{name}} with today's values",
       createTest: "Create and try it",
+      /** Read aloud for the arrow between a setting's old and new value ("Model Haiku 4.5 to Sonnet 4.5"). */
+      to: "to",
       editFirst: "Edit first",
       superseded: "Replaced by the newer proposal",
       onlyCreators: "Only admins create agents",

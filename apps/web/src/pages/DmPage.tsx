@@ -5,9 +5,10 @@ import { brainLine } from "@agenteschat/client/lib/brain";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { apiProviderOf, isAuto } from "@agenteschat/client/lib/providers";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { Avatar, BrainIcon, Button, ProviderLogo } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AudienceChip } from "@/components/AgentAudience";
@@ -21,12 +22,13 @@ import { RightHandIntro } from "@/components/RightHandIntro";
 import { SearchHereButton } from "@/components/search/SearchHereButton";
 import { AgentTasksPill } from "@/components/tasks/AgentTasksPanel";
 import { useDirectory } from "@/hooks/useDirectory";
+import { rightHandSeen } from "@/lib/storage";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
 export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMessageId?: string }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
@@ -46,6 +48,11 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   const agent = "agentId" in target ? dir.agentById.get(target.agentId) : undefined;
   const person = "userId" in target ? dir.memberById.get(target.userId) : undefined;
   const name = agent?.name ?? person?.name ?? "";
+  const rightHand = isRightHand(agent);
+  // Its DM is open, from its row or any other way in: its row's "Novo" goes.
+  useEffect(() => {
+    if (rightHand) rightHandSeen.mark(rightHandSeenKey(me.user.id, org.id));
+  }, [rightHand, me.user.id, org.id]);
 
   if (dm.isError) {
     return (
@@ -72,7 +79,6 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
   const thinksMark = thinks?.mark ?? (agent ? apiProviderOf(agent.model, models.data?.models ?? []) : undefined);
   const role = agent ? agent.role || `@${agent.handle}` : "";
   // The right hand (ADR 0134) says what it is and whose permissions it acts with, never an owner.
-  const rightHand = isRightHand(agent);
   const header = (
     <header className="channel__header">
       <NavToggle />

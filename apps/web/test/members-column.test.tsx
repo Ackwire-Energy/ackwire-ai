@@ -8,7 +8,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { COMPACT_QUERY, DESKTOP_QUERY } from "@/components/NavDrawer";
 import { TABLET_QUERY } from "@/components/Sidebar";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 let media: { mockRestore: () => void } | null = null;
@@ -149,7 +149,7 @@ describe("the members column", () => {
 
   test("on a phone: a sheet with the threads, pins and settings buttons, and a field that finds members", async () => {
     widthIs(COMPACT_QUERY);
-    await open();
+    await open(withRightHand(seedState()));
     expect(column()).toBeNull();
     await act(async () => fireEvent.click(toggle()));
     await settle(2);
@@ -159,6 +159,7 @@ describe("the members column", () => {
     expect(within(panel).getByRole("button", { name: "Configurações do canal" })).toBeTruthy();
     expect(within(panel).getByRole("button", { name: "Mensagens fixadas" })).toBeTruthy();
     expect(within(panel).getByRole("button", { name: /^Threads/ })).toBeTruthy();
+    expect(row(panel, "Lodi")).toBeTruthy();
     await act(async () =>
       fireEvent.change(within(panel).getByRole("searchbox", { name: "Buscar pessoas e agentes" }), {
         target: { value: "atl" },
@@ -166,6 +167,8 @@ describe("the members column", () => {
     );
     expect(row(panel, "Ada")).toBeNull();
     expect(row(panel, "Atlas")).toBeTruthy();
+    // The right hand leads the agents only when it matches too.
+    expect(row(panel, "Lodi")).toBeNull();
     // The cog closes the sheet for the channel's details.
     await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Configurações do canal" })));
     await settle(3);

@@ -1,8 +1,12 @@
 import type { ApiClient } from "../api/client";
 import type { Agent } from "../api/types";
+import { PRESETS } from "./onboarding";
 
 /** The workspace's right hand (ADR 0134): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
+
+/** Its one-time "Novo" is per person and workspace (`seenList` entries), gone once its DM opened. */
+export const rightHandSeenKey = (userId: string, orgId: string) => `${userId}.${orgId}`;
 
 /** The workspace's right hand among its agents, when this person may see it. */
 export const rightHandOf = <A extends Pick<Agent, "builtin">>(agents: readonly A[]) => agents.find(isRightHand);
@@ -26,22 +30,31 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
   return { orgId, agentId: rightHand?.id ?? null };
 }
 
+/** The ready-made agents not created yet, by handle. */
+export const presetsLeft = (teamHandles: readonly string[]) => PRESETS.filter((p) => !teamHandles.includes(p));
+
 /**
- * The card under the right hand's greeting at the top of its DM (ADR 0134): Connect AI while there is none, how to
- * start once there is one and no agent besides it (for whoever may create agents), then, the team here and nobody
- * else yet, what next; none after that.
+ * The cards under the right hand's greeting at the top of its DM (ADR 0134): Connect AI while there is none. With one,
+ * how to start (for whoever may create agents): with no agent yet, or, still alone, while the team is only ready-made
+ * agents and some are left, each tile its own Criar. And, the team here and nobody else yet, what next. None after.
  */
-export function introCard(s: {
+export function introCards(s: {
   noAi: boolean;
   /** The AI status has loaded. */
   aiKnown: boolean;
-  /** Agents besides the right hand. */
-  team: number;
+  /** The handles of the agents besides the right hand. */
+  teamHandles: readonly string[];
   createsAgents: boolean;
   /** The person is the workspace's only member. */
   alone: boolean;
-}): "connect" | "start" | "next" | null {
-  if (s.noAi) return "connect";
-  if (s.aiKnown && s.team === 0 && s.createsAgents) return "start";
-  return s.team > 0 && s.alone ? "next" : null;
+}): ("connect" | "start" | "next")[] {
+  if (s.noAi) return ["connect"];
+  const presets = new Set<string>(PRESETS);
+  const start =
+    s.aiKnown &&
+    s.createsAgents &&
+    (s.teamHandles.length === 0 ||
+      (s.alone && presetsLeft(s.teamHandles).length > 0 && s.teamHandles.every((h) => presets.has(h))));
+  const next = s.teamHandles.length > 0 && s.alone;
+  return [...(start ? (["start"] as const) : []), ...(next ? (["next"] as const) : [])];
 }

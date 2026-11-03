@@ -4207,6 +4207,9 @@
   "rightHand.card.createTest": {
     "value": "Create and try it"
   },
+  "rightHand.card.to": {
+    "value": "to"
+  },
   "rightHand.card.editFirst": {
     "value": "Edit first"
   },

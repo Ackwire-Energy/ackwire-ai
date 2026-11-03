@@ -68,6 +68,16 @@ describe("the right hand's row in the sidebar", () => {
     expect(pinRow()?.textContent).not.toContain("Novo");
     expect(pinRow()?.textContent).toContain("seu braço direito");
     cleanup();
+    localStorage.clear();
+    // Its DM opened any other way (the onboarding, Mensagem on its card): gone all the same.
+    const { router } = await go(withRightHand(seedState()));
+    expect(pinRow()?.textContent).toContain("Novo");
+    await act(async () => {
+      await router.navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: ORG_ID, agentId: LODI_ID } });
+    });
+    await settle(8);
+    expect(pinRow()?.textContent).not.toContain("Novo");
+    cleanup();
     // Remembered in this browser.
     const again = withRightHand(seedState());
     seedDm(again, { type: "agent", id: LODI_ID }, { unread: 2 });

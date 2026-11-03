@@ -7,7 +7,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
-import { introCard, isRightHand } from "@agenteschat/client/lib/right-hand";
+import { introCards, isRightHand, presetsLeft } from "@agenteschat/client/lib/right-hand";
 import { Button, Icon, Message, MessageText, normalizeAppearance } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -36,10 +36,11 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
   const members = useMembers(org.id);
   const connect = useConnectAi();
   const team = dir.agents.filter((a) => !isRightHand(a));
-  const card = introCard({
+  const teamHandles = team.map((a) => a.handle);
+  const cards = introCards({
     noAi: aiStateOf(status.data, agent.id) === "no_ai",
     aiKnown: Boolean(status.data),
-    team: team.length,
+    teamHandles,
     createsAgents: can(org, "create_agents"),
     alone: (members.data?.length ?? 0) <= 1,
   });
@@ -56,7 +57,7 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
         </p>
         <p>{t("rightHand.intro.lead")}</p>
       </MessageText>
-      {card === "connect" && connect ? (
+      {cards.includes("connect") && connect && (
         <div className="waitcard">
           <span className="waitcard__top ac-iconline">
             <Icon name="plug" size={16} />
@@ -69,17 +70,18 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
             </Button>
           </span>
         </div>
-      ) : card === "start" ? (
-        <StartCard agent={agent} />
-      ) : (
-        card === "next" && team[0] && <NextCard agent={agent} first={team[0]} />
       )}
+      {cards.includes("start") && <StartCard agent={agent} left={presetsLeft(teamHandles)} first={team.length === 0} />}
+      {cards.includes("next") && team[0] && <NextCard agent={agent} first={team[0]} />}
     </Message>
   );
 }
 
-/** "Como você quer começar?": the ready-made agents, each its own Criar, or all four, or another way in. */
-function StartCard({ agent }: { agent: Agent }) {
+/**
+ * "Como você quer começar?": the ready-made agents not created yet, each its own Criar, or all of them, or another
+ * way in. `first`: nothing created yet, so it waits for the person; after that it is a suggestion.
+ */
+function StartCard({ agent, left, first }: { agent: Agent; left: readonly Preset[]; first: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
@@ -107,12 +109,12 @@ function StartCard({ agent }: { agent: Agent }) {
       kind="question"
       agent={agent}
       label={question}
-      mine
+      mine={first}
       lead={question}
       what={question}
       body={
         <div className="rh-intro__presets">
-          {PRESETS.map((p) => {
+          {left.map((p) => {
             const name = t(`onboarding.presets.${p}.name`);
             return (
               <button
@@ -135,7 +137,7 @@ function StartCard({ agent }: { agent: Agent }) {
       }
       actions={
         <>
-          <Button size="sm" variant="primary" loading={create.isPending} onClick={() => create.mutate(PRESETS)}>
+          <Button size="sm" variant="primary" loading={create.isPending} onClick={() => create.mutate(left)}>
             {t("rightHand.intro.start.team")}
           </Button>
           <Button size="sm" onClick={() => actions?.focusComposer()}>
@@ -158,7 +160,10 @@ function StartCard({ agent }: { agent: Agent }) {
   );
 }
 
-/** The team is here, nobody else yet: invite the people, or open the first agent's DM with a first task written. */
+/**
+ * The team is here, nobody else yet: invite the people, or open the first agent's DM with a first task written. A
+ * suggestion, never waiting for the person: alone in a workspace, it stays.
+ */
 function NextCard({ agent, first }: { agent: Agent; first: Agent }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -172,7 +177,7 @@ function NextCard({ agent, first }: { agent: Agent; first: Agent }) {
       kind="question"
       agent={agent}
       label={question}
-      mine
+      mine={false}
       lead={question}
       what={question}
       actions={

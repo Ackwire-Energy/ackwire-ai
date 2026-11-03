@@ -57,7 +57,7 @@ import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { pinsIn } from "@agenteschat/client/lib/pins";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { isIdHandle } from "@agenteschat/ui/names";
@@ -84,6 +84,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StickerStageContext } from "@/agent/StickerCanvas";
 import { createStickerStage } from "@/agent/sticker-stage";
 import { holdOpenConversation } from "@/lib/push";
+import { rightHandSeen } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
 import {
@@ -324,6 +325,10 @@ function Chat({
   const dmAgent = dmAgentId ? dir.agentById.get(dmAgentId) : undefined;
   // The right hand (ADR 0134): its own line and composer hint, no computer, and its greeting on top.
   const rightHand = isRightHand(dmAgent) && !isThread;
+  // Its DM is open, from its row or any other way in: its row's "Novo" goes.
+  useEffect(() => {
+    if (rightHand && meId) rightHandSeen.mark(rightHandSeenKey(meId, orgId));
+  }, [rightHand, meId, orgId]);
   const member = dm ? true : (channel?.isMember ?? true);
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
   // The computer this conversation's agents share, while turns wait for it: the bar's way into its line.
