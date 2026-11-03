@@ -142,7 +142,7 @@ import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { type CodeSetup, codeStart } from "./git/machine";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
-import { handOffHolds } from "./hand-off";
+import { askVerdict, handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { type Judge, judgeCallOf } from "./judge";
@@ -3946,7 +3946,7 @@ async function executeRunInner(
               ),
             )
           : "";
-      const decision = await decideTurnEnd({
+      let decision = await decideTurnEnd({
         state,
         kind: betweenAgents ? "agents_dm" : "conversation",
         openRequest,
@@ -3981,6 +3981,19 @@ async function executeRunInner(
           : null,
         evidence: judging.evidence,
       });
+      // Read as needing a person (`ask`) yet asking them for nothing it needs (a status note, an optional offer): it is
+      // its answer, never a nudge to ask nor a question card the run would wait on. On a judge error the rule stands.
+      if (judge && decision.verdict === "ask" && (decision.rule === "ask" || decision.rule === "ask_card")) {
+        const asks = await askVerdict(judge, {
+          orgId: run.orgId,
+          agentId: run.agentId,
+          runId: run.id,
+          question: judged,
+          request: t.request ?? triggerMessage?.body ?? triggerText,
+          ...judging.evidence,
+        }).catch(() => "person" as const);
+        if (asks === "none") decision = { outcome: "done", rule: "asks_nothing", verdict: "done" };
+      }
       turnEnd = decision;
       if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
       t.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
