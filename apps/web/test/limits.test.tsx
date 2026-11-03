@@ -34,7 +34,7 @@ async function go(path: string, over: Partial<WorkspaceLimits>, billing = true) 
 }
 /**
  * Members' "Convidar pessoas" opens the invite dialog (ADR 0090); an address goes in, so the only thing that can keep
- * its button waiting is a full workspace.
+ * its first step's Continuar waiting is a full workspace.
  */
 async function inviteDialog() {
   const [open] = screen().getAllByRole("button", { name: "Convidar pessoas" });
@@ -46,7 +46,7 @@ async function inviteDialog() {
   await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
   return dialog;
 }
-const sendButton = (dialog: HTMLElement) => within(dialog).getByRole("button", { name: "Convidar 1 pessoa" });
+const sendButton = (dialog: HTMLElement) => within(dialog).getByRole("button", { name: "Continuar" });
 
 describe("a workspace's limits (ADR 0079)", () => {
   test("Plano e cobrança: people and files against them, in plain numbers", async () => {

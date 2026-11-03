@@ -2897,6 +2897,14 @@
     "nameLabel": "Ad",
     "roleLabel": "Rol",
     "roleHelp": "Ekip için ne yaptığı, örneğin E-posta ve takvim asistanı.",
+    "editName": "Adı düzenle: {{name}}",
+    "editHandle": "Bahsetmeleri düzenle: @{{handle}}",
+    "editRole": "Rolü düzenle: {{role}}",
+    "noRole": "Rol yok",
+    "rolePlaceholder": "Örn.: Destek",
+    "roleList": "Roller",
+    "roleUse": "“{{role}}” kullan",
+    "roleCurrent": "mevcut",
     "edit": "Düzenle",
     "chat": "Sohbet et",
     "moreActions": "Diğer işlemler",
@@ -4018,13 +4026,18 @@
     },
     "dialog": {
       "title": "{{org}} çalışma alanına davet et",
-      "sub": "E-postayla davet edilenler doğrudan katılır. Bağlantıyla gelenler istekte bulunur, siz onaylarsınız.",
-      "subLink": "Bağlantıyı açan herkes katılmak için istekte bulunur ve her kişiyi siz onaylarsınız.",
+      "stepOf": "Adım {{n}}/{{total}} · {{step}}",
+      "steps": {
+        "who": "Kim",
+        "role": "Rol",
+        "where": "Başlangıç kanalları",
+        "note": "Not"
+      },
       "emails": "E-postalar",
       "moreEmails": "Daha fazla e-posta…",
-      "help": "Her kişi bir e-posta alır ve seçtiğiniz rolle doğrudan katılır. Davet 7 gün geçerlidir.",
       "checkMarked": "İşaretli e-postaları kontrol edin: bunlara davet gitmeyecek.",
-      "channelsAndNote": "Kanallar ve not",
+      "pasteHelp": "İsterseniz bir liste yapıştırın: virgül, boşluk ya da satır başına bir adres.",
+      "leftOut": "Zaten katılmış ya da davet edilmiş olanlar dışarıda kalır.",
       "withNote": "notla",
       "alsoJoin": "Ayrıca şunlara katılırlar",
       "generalAlways": "Herkes #{{channel}} kanalına katılır",
@@ -4032,11 +4045,81 @@
       "optional": "(isteğe bağlı)",
       "notePlaceholder": "Merhaba. {{org}} çalışma alanına katılın: ekip ve ajanlar burada.",
       "or": "ya da bağlantıyı gönderin",
+      "continueWith": "{{count}} kişiyle devam et",
       "send_one": "{{count}} kişiyi davet et",
       "send_other": "{{count}} kişiyi davet et",
       "sent": "Davet gönderildi: {{email}}.",
       "sentMany": "{{count}} davet gönderildi.",
-      "alsoIn": "Ayrıca şunlara katılırlar: {{channels}}."
+      "alsoIn": "Ayrıca şunlara katılırlar: {{channels}}.",
+      "who": {
+        "title": "Kimi getirmek istiyorsunuz?",
+        "lead": "E-postaları bana verin. Her kişi bir davet alır ve doğrudan katılır."
+      },
+      "orLink": {
+        "title": "Bağlantı göndermeyi mi tercih edersiniz?",
+        "text": "Açan kişi katılmak için istekte bulunur, siz onaylarsınız.",
+        "open": "Bağlantıyı gör"
+      },
+      "role": {
+        "titleOne": "{{name}} hangi rolle katılsın?",
+        "titleMany": "Bu kişiler hangi rolle katılsın?",
+        "lead": "Rol, her kişinin neler yapabileceğini belirler. Sonra değiştirebilirsiniz.",
+        "each": "Her kişiye ayrı rol",
+        "same": "Herkese aynı rol"
+      },
+      "where": {
+        "titleOne": "{{name}} hemen hangi kanallara katılsın?",
+        "titleMany": "Bu kişiler hemen hangi kanallara katılsın?",
+        "lead": "Herkes #{{channel}} kanalında başlar. Diğerlerini siz seçersiniz.",
+        "label": "Kanallar",
+        "everyone": "Herkes katılır",
+        "private": "Özel · siz de buradasınız",
+        "people_one": "{{count}} kişi",
+        "people_other": "{{count}} kişi",
+        "fromChannel": "#{{channel}} zaten işaretli: daveti oradan başlattınız."
+      },
+      "noteStep": {
+        "title": "Davete bir şey eklememi ister misiniz?",
+        "lead": "E-postayla birlikte gider. Eklemezseniz olduğu gibi gönderirim."
+      },
+      "mailFor": "{{names}} için e-posta böyle görünür",
+      "mail": {
+        "from": "agentes.chat · alıcı: {{to}}",
+        "toMany": "{{email}} ve {{count}} kişi daha",
+        "subject": "agentes.chat'te bir çalışma alanına davet edildiniz",
+        "headline": "Bir çalışma alanına davet edildiniz",
+        "body": "<b>{{name}}</b> ({{email}}) sizi <b>{{org}}</b> çalışma alanına üye olarak davet etti.",
+        "noteFrom": "<b>{{name}}:</b> “{{note}}”",
+        "what": "agentes.chat, kişilerin ve yapay zeka ajanlarının birlikte çalıştığı yer.",
+        "button": "Daveti kabul et",
+        "small": "Davet 7 gün geçerli. Bu e-posta adresiyle kabul edin."
+      },
+      "done": {
+        "title": "Tamam, daveti gönderdim: {{names}}.",
+        "leadOne": "{{name}} katıldığında onu {{channels}} kanalında karşılar, size haber veririm.",
+        "leadMany": "Her kişi katıldığında onu {{channels}} kanalında karşılar, size haber veririm.",
+        "none": "Bu sefer hiç davet gönderilmedi.",
+        "noneLead": "Her adresin nedeni aşağıda."
+      },
+      "result": {
+        "invited": "Gönderildi",
+        "already_member": "zaten {{org}} içinde",
+        "already_invited": "zaten daveti vardı",
+        "invalid_email": "geçersiz e-posta"
+      },
+      "again": "Daha fazla kişi davet et",
+      "finish": "Bitir",
+      "linkStep": {
+        "title": "Bu, {{org}} bağlantısı.",
+        "lead": "Açan kişi katılmak için istekte bulunur. Her isteği size gösteririm, siz onaylarsınız.",
+        "how1": "Kişi bağlantıyı açar ve kim olduğunu söyler.",
+        "how2": "İstek, davet edebilen kişilere burada ve telefonda ulaşır.",
+        "how3": "Onaylarsınız ve kişinin hangi rolle katılacağını seçersiniz.",
+        "waiting_one": "Bir istek sizi bekliyor",
+        "waiting_other": "{{count}} istek sizi bekliyor",
+        "seeRequests": "İstekleri gör",
+        "byEmail": "E-postayla davet et"
+      }
     },
     "invitations": {
       "title": "Gönderilen davetler",

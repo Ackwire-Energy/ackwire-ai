@@ -2810,6 +2810,14 @@
     "nameLabel": "이름",
     "roleLabel": "역할",
     "roleHelp": "팀을 위해 하는 일이에요. 예: 이메일 및 캘린더 어시스턴트.",
+    "editName": "이름 편집: {{name}}",
+    "editHandle": "멘션 편집: @{{handle}}",
+    "editRole": "역할 편집: {{role}}",
+    "noRole": "역할 없음",
+    "rolePlaceholder": "예: 고객 지원",
+    "roleList": "역할 목록",
+    "roleUse": "“{{role}}” 사용",
+    "roleCurrent": "현재",
     "edit": "편집",
     "chat": "채팅",
     "moreActions": "더 보기",
@@ -3895,13 +3903,18 @@
     },
     "dialog": {
       "title": "{{org}}에 초대",
-      "sub": "이메일로 초대하면 바로 참여해요. 링크로는 참여를 요청하고 내가 승인해요.",
-      "subLink": "링크를 연 사람은 참여를 요청하고, 내가 한 명씩 승인해요.",
+      "stepOf": "{{total}}단계 중 {{n}}단계 · {{step}}",
+      "steps": {
+        "who": "누구",
+        "role": "역할",
+        "where": "시작 채널",
+        "note": "메모"
+      },
       "emails": "이메일",
       "moreEmails": "이메일 더 보기…",
-      "help": "각 사람에게 이메일이 가고, 고른 역할로 바로 참여해요. 초대는 7일 동안 유효해요.",
       "checkMarked": "표시된 이메일을 확인하세요. 해당 주소로는 초대가 가지 않아요.",
-      "channelsAndNote": "채널과 메모",
+      "pasteHelp": "원하면 목록을 붙여 넣어도 돼요. 쉼표, 공백, 또는 한 줄에 하나씩 넣으세요.",
+      "leftOut": "이미 있거나 이미 초대받은 사람은 빠져요.",
       "withNote": "메모 포함",
       "alsoJoin": "함께 참여할 채널",
       "generalAlways": "모두 #{{channel}}에 참여해요",
@@ -3909,10 +3922,78 @@
       "optional": "(선택 사항)",
       "notePlaceholder": "안녕하세요. {{org}}에 함께해요. 팀과 에이전트가 모두 여기 있어요.",
       "or": "또는 링크 보내기",
+      "continueWith": "{{count}}명으로 계속",
       "send_other": "{{count}}명 초대",
       "sent": "{{email}}에게 초대를 보냈어요.",
       "sentMany": "초대 {{count}}개를 보냈어요.",
-      "alsoIn": "{{channels}}에도 참여해요."
+      "alsoIn": "{{channels}}에도 참여해요.",
+      "who": {
+        "title": "누구를 데려올까요?",
+        "lead": "이메일을 알려 주세요. 각자 초대를 받고 바로 참여해요."
+      },
+      "orLink": {
+        "title": "링크를 보내는 게 좋을까요?",
+        "text": "링크를 연 사람이 참여를 요청하고, 내가 승인해요.",
+        "open": "링크 보기"
+      },
+      "role": {
+        "titleOne": "{{name}} 님은 어떤 역할로 참여할까요?",
+        "titleMany": "이 사람들은 어떤 역할로 참여할까요?",
+        "lead": "역할에 따라 각자 할 수 있는 일이 정해져요. 나중에 바꿀 수 있어요.",
+        "each": "사람마다 역할 정하기",
+        "same": "모두 같은 역할로"
+      },
+      "where": {
+        "titleOne": "{{name}} 님은 어떤 채널에 바로 참여할까요?",
+        "titleMany": "이 사람들은 어떤 채널에 바로 참여할까요?",
+        "lead": "모두 #{{channel}}에서 시작해요. 다른 채널은 직접 골라요.",
+        "label": "채널",
+        "everyone": "모두 참여",
+        "private": "비공개 · 내가 참여 중",
+        "people_other": "{{count}}명",
+        "fromChannel": "이 채널에서 초대해서 #{{channel}}이 이미 선택돼 있어요."
+      },
+      "noteStep": {
+        "title": "초대에 한마디 덧붙일까요?",
+        "lead": "이메일에 함께 들어가요. 없으면 그대로 보낼게요."
+      },
+      "mailFor": "{{names}} 님이 받는 메일",
+      "mail": {
+        "from": "agentes.chat · 받는 사람: {{to}}",
+        "toMany": "{{email}} 외 {{count}}명",
+        "subject": "agentes.chat 워크스페이스에 초대받았어요",
+        "headline": "워크스페이스에 초대받았어요",
+        "body": "<b>{{name}}</b> ({{email}}) 님이 <b>{{org}}</b>에 멤버로 초대했어요.",
+        "noteFrom": "<b>{{name}}:</b> “{{note}}”",
+        "what": "agentes.chat은 사람과 AI 에이전트가 함께 일하는 곳이에요.",
+        "button": "초대 수락",
+        "small": "초대는 7일 동안 유효해요. 이 이메일 주소로 수락하세요."
+      },
+      "done": {
+        "title": "{{names}} 님에게 초대를 보냈어요.",
+        "leadOne": "{{name}} 님이 들어오면 {{channels}}에서 맞이하고 알려 드릴게요.",
+        "leadMany": "한 명씩 들어올 때마다 {{channels}}에서 맞이하고 알려 드릴게요.",
+        "none": "이번에는 초대를 보내지 않았어요.",
+        "noneLead": "주소마다 이유를 아래에 적어 뒀어요."
+      },
+      "result": {
+        "invited": "보냄",
+        "already_member": "이미 {{org}}에 있음",
+        "already_invited": "이미 초대받음",
+        "invalid_email": "잘못된 이메일"
+      },
+      "again": "더 초대하기",
+      "finish": "완료",
+      "linkStep": {
+        "title": "{{org}}의 링크예요.",
+        "lead": "링크를 연 사람은 참여를 요청해요. 요청을 하나씩 보여 드리면 직접 승인해요.",
+        "how1": "상대가 링크를 열고 누구인지 알려요.",
+        "how2": "요청은 초대할 수 있는 사람에게 여기와 휴대폰으로 가요.",
+        "how3": "승인하면서 어떤 역할로 참여할지 골라요.",
+        "waiting_other": "요청 {{count}}개가 기다리고 있어요",
+        "seeRequests": "요청 보기",
+        "byEmail": "이메일로 초대"
+      }
     },
     "invitations": {
       "title": "보낸 초대",

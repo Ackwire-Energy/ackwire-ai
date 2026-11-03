@@ -13,9 +13,16 @@ import { renderApp, screen, settle } from "./render";
 afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
-const type = (label: string, value: string) =>
-  act(async () => fireEvent.change(screen().getByLabelText(label), { target: { value } }));
-const handleField = () => screen().getByLabelText("Menções") as HTMLInputElement;
+/** The name and the @ edit in place: their button opens the field, Enter keeps what was typed. */
+const EDIT = { Nome: /^Editar nome/, Menções: /^Editar menções/ } as const;
+const type = async (label: keyof typeof EDIT, value: string) => {
+  await click(screen().getByRole("button", { name: EDIT[label] }));
+  const field = screen().getByLabelText(label);
+  await act(async () => fireEvent.change(field, { target: { value } }));
+  await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+};
+/** The @ as the card reads it ("@ada"). */
+const handleShown = () => screen().getByRole("button", { name: EDIT.Menções }).textContent;
 const saveBar = () => screen().getByRole("region", { name: "Alterações não salvas" });
 const text = () => document.body.textContent ?? "";
 
@@ -36,11 +43,11 @@ async function settings(state = seedState(), api = createFakeApi(state)) {
 describe("renaming an agent on its page", () => {
   test("Menções follows the new name as it is typed, the hint says the old @ keeps working, Salvar sends both", async () => {
     const state = await settings();
-    expect(handleField().value).toBe("ada");
+    expect(handleShown()).toBe("@ada");
     expect(text()).toContain("É como todo mundo vê o agente. O @ acompanha o nome.");
 
     await type("Nome", "Claudio");
-    expect(handleField().value).toBe("claudio");
+    expect(handleShown()).toBe("@claudio");
     expect(text()).toContain("As menções passam a ser por @claudio. @ada continua funcionando.");
     expect(saveBar().textContent).toContain("Nome e Menções");
     // The page's title and the @ under it follow the draft.
@@ -61,10 +68,10 @@ describe("renaming an agent on its page", () => {
   test("an @ typed in Menções wins over the name", async () => {
     const state = await settings();
     await type("Menções", "Clau Dio!");
-    expect(handleField().value).toBe("claudio");
+    expect(handleShown()).toBe("@claudio");
     await type("Menções", "clau");
     await type("Nome", "Claudio");
-    expect(handleField().value).toBe("clau");
+    expect(handleShown()).toBe("@clau");
     await click(within(saveBar()).getByRole("button", { name: /^Salvar/ }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({ name: "Claudio", handle: "clau" });
@@ -77,7 +84,7 @@ describe("renaming an agent on its page", () => {
     await settings(state);
 
     await type("Nome", "Atlas");
-    expect(handleField().value).toBe("atlas");
+    expect(handleShown()).toBe("@atlas");
     expect(text()).toContain("@atlas já é de outro agente ou pessoa. Que tal @atlas-2?");
     expect(text()).not.toContain("As menções passam a ser por @atlas.");
     for (const [taken, free] of [
@@ -103,9 +110,9 @@ describe("renaming an agent on its page", () => {
 
   test("renaming back to the old name gives the old @ back", async () => {
     const state = await settings(renamedState());
-    expect(handleField().value).toBe("claudio");
+    expect(handleShown()).toBe("@claudio");
     await type("Nome", "Ada");
-    expect(handleField().value).toBe("ada");
+    expect(handleShown()).toBe("@ada");
     expect(text()).toContain("As menções passam a ser por @ada. @claudio continua funcionando.");
     expect(text()).not.toContain("já é de outro agente");
     await click(within(saveBar()).getByRole("button", { name: /^Salvar/ }));

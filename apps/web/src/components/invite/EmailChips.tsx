@@ -1,5 +1,5 @@
 import { Avatar, Button, Select, type SelectOption } from "@agenteschat/ui";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./invite.css";
 
@@ -11,6 +11,11 @@ export interface ChipAddress {
 
 /** What a paste must hold to become chips at once: more than one address, or an address with its name. */
 const LIST = /[\s,;<]/;
+
+/** An address's face: its first letter, as a person's tile shows their initials. */
+export function AddressFace({ email }: { email: string }) {
+  return <Avatar name={email} initials={email.charAt(0).toUpperCase()} size="sm" />;
+}
 
 /**
  * Addresses as chips (ADR 0090), in the onboarding's Team step and the invite dialog. Enter, a comma, a semicolon
@@ -26,10 +31,14 @@ export function EmailChips<T extends ChipAddress>({
   onRemove,
   aside,
   removable,
+  soft,
   placeholder,
   morePlaceholder,
   describedBy,
   onEnterEmpty,
+  draft: given,
+  onDraftChange,
+  inputRef,
 }: {
   /** The field's id, for its label. */
   id: string;
@@ -41,16 +50,28 @@ export function EmailChips<T extends ChipAddress>({
   aside: (chip: T) => ReactNode;
   /** Whether a chip can be taken out (one already sent can't); all of them when left out. */
   removable?: (chip: T) => boolean;
+  /** A good address that won't be sent (in already, invited already): drawn quiet. */
+  soft?: (chip: T) => boolean;
   placeholder: string;
   /** Once there are chips ("Mais e-mails…"). */
   morePlaceholder: string;
   describedBy?: string;
-  /** Enter with nothing typed (the dialog sends). */
+  /** Enter with nothing typed (the invite dialog goes on). */
   onEnterEmpty?: () => void;
+  /** What is typed and not a chip yet, for a screen that counts it (the invite dialog's Continuar). */
+  draft?: string;
+  onDraftChange?: (draft: string) => void;
+  inputRef?: RefObject<HTMLInputElement | null>;
 }) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState("");
-  const input = useRef<HTMLInputElement>(null);
+  const [own, setOwn] = useState("");
+  const draft = given ?? own;
+  const setDraft = (value: string) => {
+    setOwn(value);
+    onDraftChange?.(value);
+  };
+  const ownInput = useRef<HTMLInputElement>(null);
+  const input = inputRef ?? ownInput;
   const canRemove = (chip: T) => removable?.(chip) ?? true;
   const invalid = chips.some((c) => !c.valid);
   const commit = (text: string) => {
@@ -66,8 +87,13 @@ export function EmailChips<T extends ChipAddress>({
       }}
     >
       {chips.map((c) => (
-        <span key={c.email} className="email-chip" data-invalid={!c.valid || undefined}>
-          <Avatar name={c.email} initials={c.email.slice(0, 2).toUpperCase()} size="sm" />
+        <span
+          key={c.email}
+          className="email-chip"
+          data-invalid={!c.valid || undefined}
+          data-soft={(c.valid && soft?.(c)) || undefined}
+        >
+          <AddressFace email={c.email} />
           <span className="email-chip__email">{c.email}</span>
           {c.valid ? aside(c) : <span className="email-chip__bad">{t("members.chips.check")}</span>}
           {canRemove(c) && (

@@ -3011,6 +3011,14 @@
     "nameLabel": "Nome",
     "roleLabel": "Ruolo",
     "roleHelp": "Cosa fa per il team, ad es. Assistente per email e calendario.",
+    "editName": "Modifica nome: {{name}}",
+    "editHandle": "Modifica menzioni: @{{handle}}",
+    "editRole": "Modifica ruolo: {{role}}",
+    "noRole": "Nessun ruolo",
+    "rolePlaceholder": "Es.: Supporto",
+    "roleList": "Ruoli",
+    "roleUse": "Usa “{{role}}”",
+    "roleCurrent": "attuale",
     "edit": "Modifica",
     "chat": "Chat",
     "moreActions": "Altre azioni",
@@ -4232,13 +4240,18 @@
     },
     "dialog": {
       "title": "Invita in {{org}}",
-      "sub": "Via email entrano subito. Con il link, lo chiedono e tu approvi.",
-      "subLink": "Chi apre il link chiede di entrare e tu approvi ogni persona.",
+      "stepOf": "Passo {{n}} di {{total}} · {{step}}",
+      "steps": {
+        "who": "Chi",
+        "role": "Ruolo",
+        "where": "Da dove si parte",
+        "note": "Nota"
+      },
       "emails": "Email",
       "moreEmails": "Altre email…",
-      "help": "Ogni persona riceve un'email ed entra subito, con il ruolo che scegli. L'invito vale 7 giorni.",
       "checkMarked": "Controlla le email segnate: non riceveranno l'invito.",
-      "channelsAndNote": "Canali e nota",
+      "pasteHelp": "Incolla una lista, se vuoi: virgole, spazi o una per riga.",
+      "leftOut": "Chi è già dentro o ha già un invito resta fuori.",
       "withNote": "con una nota",
       "alsoJoin": "Entrano anche in",
       "generalAlways": "Tutti entrano in #{{channel}}",
@@ -4246,12 +4259,84 @@
       "optional": "(facoltativa)",
       "notePlaceholder": "Ciao. Vieni in {{org}}: il team e gli agenti sono tutti qui.",
       "or": "oppure invia il link",
+      "continueWith": "Continua con {{count}}",
       "send_one": "Invita {{count}} persona",
       "send_many": "Invita {{count}} persone",
       "send_other": "Invita {{count}} persone",
       "sent": "Invito inviato a {{email}}.",
       "sentMany": "{{count}} inviti inviati.",
-      "alsoIn": "Entrano anche in {{channels}}."
+      "alsoIn": "Entrano anche in {{channels}}.",
+      "who": {
+        "title": "Chi vuoi portare qui?",
+        "lead": "Dammi le email. Ogni persona riceve un invito ed entra subito."
+      },
+      "orLink": {
+        "title": "Preferisci mandare un link?",
+        "text": "Chi lo apre chiede di entrare, e tu approvi.",
+        "open": "Vedi il link"
+      },
+      "role": {
+        "titleOne": "Con quale ruolo entra {{name}}?",
+        "titleMany": "Con quale ruolo entrano queste persone?",
+        "lead": "Il ruolo dice cosa può fare ogni persona. Puoi cambiarlo dopo.",
+        "each": "Un ruolo per ogni persona",
+        "same": "Lo stesso ruolo per tutte le persone"
+      },
+      "where": {
+        "titleOne": "In quali canali entra subito {{name}}?",
+        "titleMany": "In quali canali entrano subito queste persone?",
+        "lead": "Si comincia sempre da #{{channel}}. Gli altri li scegli tu.",
+        "label": "Canali",
+        "everyone": "Ci entra ogni persona",
+        "private": "Privato · ci sei dentro",
+        "people_one": "{{count}} persona",
+        "people_many": "{{count}} persone",
+        "people_other": "{{count}} persone",
+        "fromChannel": "#{{channel}} è già selezionato: hai invitato da lì."
+      },
+      "noteStep": {
+        "title": "Vuoi che scriva qualcosa nell'invito?",
+        "lead": "Va nell'email. Se no, lo mando così."
+      },
+      "mailFor": "Ecco come arriva a {{names}}",
+      "mail": {
+        "from": "agentes.chat · a {{to}}",
+        "toMany": "{{email}} e {{count}} in più",
+        "subject": "Hai un invito per uno spazio di lavoro su agentes.chat",
+        "headline": "Hai un invito per uno spazio di lavoro",
+        "body": "<b>{{name}}</b> ({{email}}) ti ha invitato a entrare in <b>{{org}}</b> come membro.",
+        "noteFrom": "<b>{{name}}:</b> “{{note}}”",
+        "what": "agentes.chat è il posto dove persone e agenti IA lavorano insieme.",
+        "button": "Accetta l’invito",
+        "small": "L’invito vale per 7 giorni. Accettalo con questo indirizzo email."
+      },
+      "done": {
+        "title": "Fatto, ho mandato l'invito a {{names}}.",
+        "leadOne": "Quando {{name}} entra, gli do il benvenuto in {{channels}} e ti avviso.",
+        "leadMany": "Quando ogni persona entra, le do il benvenuto in {{channels}} e ti avviso.",
+        "none": "Questa volta non è partito nessun invito.",
+        "noneLead": "Qui sotto c'è il motivo per ogni indirizzo."
+      },
+      "result": {
+        "invited": "Inviato",
+        "already_member": "già in {{org}}",
+        "already_invited": "aveva già un invito",
+        "invalid_email": "email non valida"
+      },
+      "again": "Invita altre persone",
+      "finish": "Concludi",
+      "linkStep": {
+        "title": "Questo è il link di {{org}}.",
+        "lead": "Chi lo apre chiede di entrare. Ti mostro ogni richiesta, e tu approvi.",
+        "how1": "La persona apre il link e dice chi è.",
+        "how2": "La richiesta arriva a chi invita, qui e sul telefono.",
+        "how3": "Tu approvi e scegli con quale ruolo entra la persona.",
+        "waiting_one": "Una richiesta ti aspetta",
+        "waiting_many": "{{count}} richieste ti aspettano",
+        "waiting_other": "{{count}} richieste ti aspettano",
+        "seeRequests": "Vedi le richieste",
+        "byEmail": "Invita via email"
+      }
     },
     "invitations": {
       "title": "Inviti inviati",
