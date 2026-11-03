@@ -23,6 +23,7 @@ describe("the Status screen's draft (ADR 0084)", () => {
     expect(availabilityOf("away")).toBe("away");
     expect(availabilityOf("busy")).toBe("busy");
     expect(availabilityOf("hidden")).toBe("hidden");
+    expect(availabilityOf("out")).toBe("out");
   });
 
   test("it starts from your saved line, keeping its end", () => {

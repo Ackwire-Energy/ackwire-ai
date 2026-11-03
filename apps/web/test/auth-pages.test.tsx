@@ -428,11 +428,11 @@ describe("Criar conta (e-mail novo)", () => {
     await press(/^Continuar(?! com)/);
     await type("Seu nome", "Ana 2");
     expect(screen().queryByText("Isso parece uma senha. Aqui vai o seu nome.")).toBeNull();
-    await type("Seu nome", "Admin$10");
+    await type("Seu nome", "Fake#Pass1");
     expect(screen().getByText("Isso parece uma senha. Aqui vai o seu nome.")).toBeTruthy();
     // Only a hint: Continuar still goes on.
     await press(/^Continuar(?! com)/, 2);
-    await type("Crie uma senha", "Admin$10");
+    await type("Crie uma senha", "Fake#Pass1");
     await press(/Criar conta/);
     expect(calls.some((c) => c.method === "signUp")).toBe(false);
     expect(heading()).toBe("Prazer. Esse e-mail é novo por aqui.");
@@ -441,10 +441,10 @@ describe("Criar conta (e-mail novo)", () => {
     await press(/^Continuar(?! com)/, 2);
     // The password went with the mistake: a new one is typed.
     expect(screen().getByLabelText<HTMLInputElement>("Crie uma senha").value).toBe("");
-    await type("Crie uma senha", "Admin$10");
+    await type("Crie uma senha", "Fake#Pass1");
     await press(/Criar conta/);
     expect(calls.filter((c) => c.method === "signUp").map((c) => c.args[0])).toEqual([
-      { name: "Walter Souza", email: "walter@acme.com.br", password: "Admin$10" },
+      { name: "Walter Souza", email: "walter@acme.com.br", password: "Fake#Pass1" },
     ]);
   });
 
@@ -793,10 +793,10 @@ describe("Aceitar convite", () => {
   test("a new address whose password is the name typed: back on the name, no account", async () => {
     const { auth, calls } = createFakeAuth();
     await openInvite({}, { auth: () => auth });
-    await type("Seu nome", "Admin$10");
+    await type("Seu nome", "Fake#Pass1");
     expect(screen().getByText("Isso parece uma senha. Aqui vai o seu nome.")).toBeTruthy();
     await press(/^Continuar(?! com)/, 2);
-    await type("Crie uma senha", "Admin$10");
+    await type("Crie uma senha", "Fake#Pass1");
     await press("Entrar na Acme", 10);
     expect(calls.some((c) => c.method === "signUp")).toBe(false);
     expect(heading()).toBe("Oi. Ana chamou você para a Acme.");

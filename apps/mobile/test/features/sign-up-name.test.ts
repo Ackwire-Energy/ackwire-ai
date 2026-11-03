@@ -24,9 +24,9 @@ describe("a password typed as the name, on the phone", () => {
     });
 
   test("what the guard and the hint go by", () => {
-    expect(nameIsPassword("Admin$10", "Admin$10")).toBe(true);
-    expect(nameIsPassword("Ana Souza", "Admin$10")).toBe(false);
-    expect(looksLikePassword("Admin$10")).toBe(true);
+    expect(nameIsPassword("Fake#Pass1", "Fake#Pass1")).toBe(true);
+    expect(nameIsPassword("Ana Souza", "Fake#Pass1")).toBe(false);
+    expect(looksLikePassword("Fake#Pass1")).toBe(true);
     expect(looksLikePassword("Ana 2")).toBe(false);
   });
 });

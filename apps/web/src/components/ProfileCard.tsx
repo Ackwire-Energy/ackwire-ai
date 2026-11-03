@@ -469,7 +469,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       : null;
   // Its presence from its work and its line (ADR 0084): its own words or what it is doing now, and where.
   const shown = useAgentPresence(agent.id);
-  const line = agentLine(t, shown?.line ?? null);
+  const line = agentLine(t, shown?.line ?? null, i18n.language);
   const workingIn = useStreams((s) => agentWorkingIn(s, agent.id));
   const busy = workingIn !== null;
   const here = workingIn ? channels?.find((c) => c.id === workingIn)?.name : undefined;

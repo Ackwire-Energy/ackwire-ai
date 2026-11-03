@@ -4,6 +4,7 @@ import {
   agentView,
   announceMembers,
   audienceOf,
+  availabilityNow,
   availableProviders,
   can,
   cancelRun,
@@ -175,7 +176,7 @@ const personView = (
   online: Set<string>,
   viewerId: string,
 ) => {
-  const presence = memberPresence({ availability }, online.has(m.userId), m.userId === viewerId);
+  const presence = memberPresence({ availability, statusUntil }, online.has(m.userId), m.userId === viewerId);
   return {
     ...m,
     joinedAt: m.joinedAt.toISOString(),
@@ -183,7 +184,7 @@ const personView = (
     online: presence === "online" || presence === "away" || presence === "busy",
     presence,
     status: memberStatus({ statusText, statusEmoji, statusUntil }),
-    ...(m.userId === viewerId ? { availability } : {}),
+    ...(m.userId === viewerId ? { availability: availabilityNow({ availability, statusUntil }) } : {}),
   };
 };
 
@@ -217,11 +218,12 @@ const Person = z
     joinedAt: z.string(),
     lastSeenAt: z.string().nullable(),
     online: z.boolean().openapi({ description: "Seen as connected: `presence` is online, away or busy." }),
-    presence: z.enum(["online", "away", "busy", "hidden", "offline"]).openapi({
-      description: "`hidden` only for yourself; everyone else sees a hidden person as `offline`.",
+    presence: z.enum(["online", "away", "busy", "out", "hidden", "offline"]).openapi({
+      description:
+        "`hidden` only for yourself; everyone else sees a hidden person as `offline`. `out`: out of office, shown connected or not until their line's `until`.",
     }),
     status: MemberStatus.nullable().openapi({ description: "What the person wrote they are doing; null = nothing." }),
-    availability: z.enum(["auto", "away", "busy", "hidden"]).optional().openapi({
+    availability: z.enum(["auto", "away", "busy", "out", "hidden"]).optional().openapi({
       description: "Only on your own row: what you picked (your `presence` reads offline while you aren't connected).",
     }),
     handle: z.string().openapi({ description: "`@ana`: unique in the organization; mentions resolve by it." }),
@@ -596,13 +598,14 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/me/status",
       tags: ["Members"],
       security,
-      summary: "Set your availability (auto, away, busy, hidden) and what you are doing",
+      summary: "Set your availability (auto, away, busy, out of office, hidden) and what you are doing",
       request: {
         params: OrgParams,
         body: body(
           z.object({
-            availability: z.enum(["auto", "away", "busy", "hidden"]).optional().openapi({
-              description: "`auto` = online while connected; `hidden` = everyone else sees you offline.",
+            availability: z.enum(["auto", "away", "busy", "out", "hidden"]).optional().openapi({
+              description:
+                "`auto` = online while connected; `out` = out of office for everyone until your line's `until`; `hidden` = everyone else sees you offline.",
             }),
             status: z
               .object({

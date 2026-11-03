@@ -53,7 +53,7 @@ function PersonAuthorStatus({ userId }: { userId: string }) {
 }
 
 function AgentAuthorStatus({ agentId }: { agentId: string }) {
-  const { t } = useTranslation();
-  const line = agentLine(t, useAgentPresence(agentId)?.line ?? null);
+  const { t, i18n } = useTranslation();
+  const line = agentLine(t, useAgentPresence(agentId)?.line ?? null, i18n.language);
   return line ? <StatusEmoji emoji={line.emoji} text={line.text} className="msg-status" /> : null;
 }

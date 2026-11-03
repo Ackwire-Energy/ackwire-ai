@@ -209,10 +209,10 @@ describe("an invitation link asks to join", () => {
     await settle(4);
     await type(codeField() as HTMLInputElement, "123456");
     await settle(4);
-    await type(screen().getByLabelText("Seu nome"), "Admin$10x");
+    await type(screen().getByLabelText("Seu nome"), "Fake#Pass1x");
     expect(screen().getByRole("status").textContent).toBe("Isso parece uma senha. Aqui vai o seu nome.");
     await click(next());
-    await type(screen().getByLabelText("Crie uma senha"), "Admin$10x ");
+    await type(screen().getByLabelText("Crie uma senha"), "Fake#Pass1x ");
     await click(next());
     expect(lead()).toBe("Como o time te chama?");
     expect(screen().getByRole("alert").textContent).toBe("Esse é o seu nome? É igual à senha que você digitou.");

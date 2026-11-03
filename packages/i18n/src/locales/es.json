@@ -2371,12 +2371,14 @@
     "busy": "Ocupado",
     "hidden": "Invisible",
     "offline": "Desconectado",
+    "out": "Fuera de la oficina",
     "lower": {
       "online": "en línea",
       "away": "ausente",
       "busy": "ocupado",
       "hidden": "invisible",
-      "offline": "desconectado"
+      "offline": "desconectado",
+      "out": "fuera de la oficina"
     },
     "setStatus": "Definir estado",
     "seen": "visto {{when}}",
@@ -2399,6 +2401,7 @@
       "auto": "En línea mientras agentes.chat está abierto.",
       "away": "Fuera un rato: los demás saben que las respuestas pueden tardar.",
       "busy": "Todos ven que mejor no interrumpir ahora.",
+      "out": "Fuera del trabajo (vacaciones, día libre): todos lo ven hasta que tu estado desaparezca.",
       "hidden": "Apareces desconectado para todos y puedes seguir usando todo."
     },
     "suggest": {
@@ -2438,6 +2441,9 @@
       "waiting_plan": "Esperando a que el plan se renueve",
       "waiting_budget": "Esperando a que el presupuesto se renueve",
       "provider_down": "El proveedor de IA no responde · reintenta solo",
+      "out_of_plan": "Sin límite en el plan",
+      "out_of_budget": "Presupuesto del mes agotado",
+      "backAt": "vuelve {{when}}",
       "work": "En segundo plano: {{subject}}"
     },
     "agentWhy": {
@@ -2446,6 +2452,7 @@
       "away": "Inactivo desde {{when}}",
       "awayNever": "Aún no ha trabajado",
       "offline": "En pausa",
+      "out": "Sin límite por ahora · responde cuando se renueve",
       "noAi": "Sin IA conectada"
     },
     "bySelf": "Escrito por {{name}} · se borra cuando termine",
