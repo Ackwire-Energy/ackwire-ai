@@ -1345,6 +1345,13 @@
       "when": 1793725287800,
       "tag": "0193_right_hand",
       "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "7",
+      "when": 1793727031738,
+      "tag": "0194_right_hand_settings",
+      "breakpoints": true
     }
   ]
 }
