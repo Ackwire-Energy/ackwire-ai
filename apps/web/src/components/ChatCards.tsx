@@ -24,7 +24,7 @@ import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-wor
 import { Button, Chip, Diff, diffLines, Field, Icon, Input, MessageText, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -513,6 +513,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const [error, setError] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const [text, setText] = useState("");
+  const reopen = useRef<HTMLButtonElement>(null);
   const answer = useMutation({
     mutationFn: (input: { choice: string } | { text: string }) => api.questions.answer(org.id, question.id, input),
     // Errors are explained on the card.
@@ -614,13 +615,20 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                     setWriting(false);
                     setText("");
                     setError(null);
+                    // The button leaves with the field: focus goes back to the one that opened it.
+                    requestAnimationFrame(() => reopen.current?.focus());
                   }}
                 >
                   {t("common.cancel")}
                 </Button>
               </>
             ) : (
-              <Button variant={choices.length > 0 ? "ghost" : "primary"} size="sm" onClick={() => setWriting(true)}>
+              <Button
+                ref={reopen}
+                variant={choices.length > 0 ? "ghost" : "primary"}
+                size="sm"
+                onClick={() => setWriting(true)}
+              >
                 {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
               </Button>
             )}

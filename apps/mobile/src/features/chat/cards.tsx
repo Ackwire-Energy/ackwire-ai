@@ -682,6 +682,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       )
       .finally(() => setSkipping(false));
   };
+  const busy = picking !== null || skipping;
 
   if (q.status === "answered") {
     const who = q.answeredByUserId && q.answeredByUserId !== meId ? dir.memberById.get(q.answeredByUserId)?.name : null;
@@ -731,10 +732,10 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                 return (
                   <Pressable
                     key={choice}
-                    disabled={picking !== null}
+                    disabled={busy}
                     onPress={() => void answer({ choice })}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: on, disabled: picking !== null }}
+                    accessibilityState={{ selected: on, disabled: busy }}
                     style={({ pressed }) => [
                       styles.opt,
                       { backgroundColor: on ? c.ink : c.sunken },
@@ -748,7 +749,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                 );
               })}
               <Pressable
-                disabled={picking !== null}
+                disabled={busy}
                 onPress={write}
                 accessibilityRole="button"
                 style={({ pressed }) => [
@@ -764,7 +765,14 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
               </Pressable>
             </View>
           ) : (
-            <Button variant="primary" size="card" wide label={t("question.answer")} onPress={write} />
+            <Button
+              variant="primary"
+              size="card"
+              wide
+              label={t("question.answer")}
+              disabled={skipping}
+              onPress={write}
+            />
           )}
           <Button
             variant="ghost"
