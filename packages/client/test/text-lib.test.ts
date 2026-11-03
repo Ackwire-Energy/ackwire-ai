@@ -141,7 +141,7 @@ test("holdsText: the same words, spacing aside, never a word cut in the middle",
 });
 
 test("a name that looks like a password: no space, a digit and a symbol; real names never", () => {
-  for (const name of ["Admin$10", "S3nh@forte", " hunter2!xyz ", "P4ss#word"])
+  for (const name of ["Admin$10", "S3nh@forte", " hunter2!xyz ", "P4ss#word", "كلمة١٢٣$سر"])
     expect(looksLikePassword(name)).toBe(true);
   for (const name of [
     "Ana 2",
@@ -153,6 +153,12 @@ test("a name that looks like a password: no space, a digit and a symbol; real na
     "Dr. Müller",
     "Ana-Clara2",
     "Nguyễn Văn An",
+    "李小龙",
+    "محمد بن سلمان",
+    "Владимир",
+    "ジョン・スミス2世",
+    "Gal·la2024x",
+    "J.R.R.Tolkien3",
     "R2-D2",
     "Admin$10 Souza",
     "abc$1",

@@ -84,11 +84,12 @@ export function passwordState(password: string): "empty" | "short" | "long" | "o
 
 /**
  * A name step holding a password (typed there, or filled in by a password manager): 8 or more characters with no
- * space, a digit and a symbol. Hyphens, apostrophes and periods are name characters, so "Jean-Luc" or "O'Neil" pass.
+ * space, a digit (any script's) and a symbol. Hyphens, apostrophes, periods and middle dots are name characters, so
+ * "Jean-Luc", "O'Neil", "Gal·la" or "ジョン・スミス2世" pass.
  */
 export function looksLikePassword(name: string) {
   const n = name.trim();
-  return n.length >= 8 && !/\s/.test(n) && /\d/.test(n) && /[^\p{L}\p{M}\p{N}\s'’.-]/u.test(n);
+  return n.length >= 8 && !/\s/.test(n) && /\p{Nd}/u.test(n) && /[^\p{L}\p{M}\p{N}\s'’.·・-]/u.test(n);
 }
 
 /** The password chosen is the name typed a step before: the name step got the password. */

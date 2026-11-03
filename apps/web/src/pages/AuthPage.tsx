@@ -113,7 +113,11 @@ export function PasswordHelp({ password }: { password: string }) {
 export function NameHint({ name }: { name: string }) {
   const { t } = useTranslation();
   if (!looksLikePassword(name)) return null;
-  return <span className="auth__help">{t("auth.flow.nameLooksLikePassword")}</span>;
+  return (
+    <span className="auth__help" role="status">
+      {t("auth.flow.nameLooksLikePassword")}
+    </span>
+  );
 }
 
 export function AuthPage({

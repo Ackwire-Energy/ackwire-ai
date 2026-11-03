@@ -61,6 +61,19 @@ describe("the owner link", () => {
     expect(router.state.location.pathname).toBe("/onboarding");
   });
 
+  test("a password equal to the name makes no owner: the password is cleared and the line says why", async () => {
+    const { calls } = await openOwnerLink();
+    await type(screen().getByRole("textbox", { name: "Seu nome" }), "Admin$10x");
+    expect(screen().getByRole("status").textContent).toBe("Isso parece uma senha. Aqui vai o seu nome.");
+    await type(screen().getByRole("textbox", { name: "E-mail" }), "ana@acme.com");
+    await type(screen().getByLabelText("Crie uma senha"), " Admin$10x ");
+    await click(screen().getByRole("button", { name: /Criar a conta de dono/ }));
+    await settle(6);
+    expect(calls.some((c) => c.method === "ownerClaim")).toBe(false);
+    expect(screen().getByRole("alert").textContent).toBe("Esse é o seu nome? É igual à senha que você digitou.");
+    expect((screen().getByLabelText("Crie uma senha") as HTMLInputElement).value).toBe("");
+  });
+
   test("without the claim it says where the link is", async () => {
     await renderApp("/owner", { api: createFakeApi(seedState({ me: null })) });
     expect(heading()).toBe("Abra o link de dono deste servidor");
