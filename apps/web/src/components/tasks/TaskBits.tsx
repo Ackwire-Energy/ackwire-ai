@@ -245,15 +245,13 @@ export function ProgramLogo({ program }: { program: TaskProgram }) {
 
 /** "Usando agora": the logo, the program and what it does in it; a dash queued, when it starts in a computer's line. */
 export function UsingNow({ task }: { task: ManagedTask }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const text = useProgramText()(task);
   const place = linePlace(task);
   const now = useNow(place?.estimatedStartAt ? 30_000 : false);
   if (place) {
-    // In its computer's line it uses nothing yet: when it should start, worded as the line's own dialog words it.
-    const starts = place.estimatedStartAt
-      ? capitalize(t("queue.startsIn", { n: etaMinutes(place.estimatedStartAt, now) }), i18n.language)
-      : "—";
+    // In its computer's line it uses nothing yet: when it should start, exactly as the line's own dialog writes it.
+    const starts = place.estimatedStartAt ? t("queue.startsIn", { n: etaMinutes(place.estimatedStartAt, now) }) : "—";
     return <span className="tm-use tm-use--none">{starts}</span>;
   }
   if (!text) return <span className="tm-use tm-use--none">—</span>;

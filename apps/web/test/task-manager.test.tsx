@@ -637,7 +637,7 @@ describe("a computer's line", () => {
     expect(checkout.querySelector(".tm-cell--state")?.textContent).toBe("Na fila · 1º");
     // Grey with the clock: it waits on its computer, not on me.
     expect(checkout.querySelector(".tm-cell--state .ac-chip--waiting")).toBeNull();
-    expect(checkout.querySelector(".tm-cell--use")?.textContent).toBe("Começa em ~3 min");
+    expect(checkout.querySelector(".tm-cell--use")?.textContent).toBe("começa em ~3 min");
     const report = rowOf("Gerar o relatório");
     expect(report.querySelector(".tm-cell--state")?.textContent).toBe("Computador cheio");
     expect(report.querySelector(".tm-cell--use")?.textContent).toBe("—");
