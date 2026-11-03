@@ -2985,12 +2985,19 @@ html:not([data-pointer]) .channel-ref:focus-visible {
 .level-row:first-child {
   border-top: 0;
 }
+/* As tall as the 36px icon at least: a name alone centres on it; with lines under it the name leads the icon's top. */
 .level-row__text {
   flex: 1 1 220px;
   min-width: 0;
+  min-height: 36px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
+}
+/* The level control's middle on the icon's. */
+.level-row > .level-row__choice {
+  margin-top: calc((36px - var(--control-h-sm)) / 2);
 }
 .level-row__name {
   font-weight: 600;
@@ -7802,6 +7809,10 @@ html:not([data-pointer]) .onb__step:focus-visible {
   gap: 12px;
   margin: 22px 0 10px;
 }
+/* "Connect an AI" under the model's notes, the 12px a note keeps from what is above it. */
+.newag__connect {
+  margin-top: 12px;
+}
 .newag__sect--first {
   margin-top: 0;
 }
@@ -11616,15 +11627,15 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   margin-inline: calc((20px - 14px) / 2);
 }
 /*
- * A plan's panel reads in its head's two columns: the mark's (30px, `.ac-brand--sm`) and the text's, 12px after it.
- * Every line's words start on the text's column, and what leads a line (an icon, a step's number) sits centred in the
- * mark's. The option cards start their 12px of padding before the text's column, so their words are on it too. The
- * wait's well spans the panel from the mark's edge to the buttons', its words still on the text's column. A note
- * inside a step's words is the step's, not the panel's: its icon stays on the step's text.
+ * A plan's panel: only its head reads in two columns (the mark's 30px, `.ac-brand--sm`, and the name's 12px after it).
+ * Under the hairline the lines start at the panel's edge, as a step does outside the panel, with no empty column on
+ * their left: what leads a line (an icon, a step's number) sits centred in the numbers' 20px at the edge, its words
+ * 12px after it, where a numbered step's words are. A note inside a step's words is the step's, not the panel's: its
+ * icon stays on the step's text.
  */
 .ai-panel--plan {
-  --lead: 30px;
-  --text-edge: calc(var(--lead) + 12px);
+  --mark: 30px;
+  --lead: 20px;
 }
 .ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline,
 .ai-panel--plan .ai-panel__row > .ac-setnote {
@@ -11640,13 +11651,6 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 /* A step's title, an option's and the foot's line break into lines of a length, never onto a word or two alone. */
 .ai-panel--plan :is(.agp-addacct__text b, .ac-option__title, .ac-card__foot) {
   text-wrap: balance;
-}
-.ai-panel--plan > :not(.ai-panel__head, .ai-panel__wait, .ai-panel__row, .agp-addacct, .ac-iconline),
-.ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline) {
-  margin-left: var(--text-edge);
-}
-.ai-panel--plan > .grid-options {
-  margin-left: calc(var(--text-edge) - var(--space-3));
 }
 /* The account cards keep the chosen card's check clear in both states, so choosing one never rewraps a title and the
    two cards keep their height. */
@@ -11671,9 +11675,9 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
-/* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
+/* As far in from the panel's right edge as from its left, as the setup's well starts its icons. */
 .ai-panel__wait {
-  padding: 12px var(--text-edge);
+  padding: 12px 14px;
 }
 /* Short lines break into two of a length: under the steps' bar all of them, without it only the status or hold line.
    The e-mail line then runs the bar's column, so the well isn't empty on its right. */
@@ -11806,7 +11810,7 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
   display: flex;
   align-items: center;
   align-self: flex-start;
-  height: var(--lead);
+  height: var(--mark);
   gap: 8px;
   font-size: 13px;
   color: var(--ink-muted);
@@ -11840,45 +11844,38 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .agp-addacct > .ai-panel__row > :not(.ac-setnote) {
   margin-left: 22px;
 }
-/* In a plan's panel the row's action is its sign-in's state: under the note's words, on the text's column, as a
-   step's button. */
+/* In a plan's panel the row's action is its sign-in's state: under the note's words, as a numbered step's button. */
 .ai-panel--plan .ai-panel__row > .ac-setnote {
   flex-basis: 100%;
 }
 .ai-panel--plan .ai-panel__row > :not(.ac-setnote) {
-  margin-left: var(--text-edge);
+  margin-left: calc(var(--lead) + 12px);
 }
 .ai-panel__use {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* A step's button goes under its words, on the text's column. */
-.ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text {
-  flex-basis: calc(100% - var(--text-edge));
-}
-.ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {
-  margin-left: var(--text-edge);
-}
-/* A step's wait, under its words, leads its own line: the spinner centred in the mark's column, the word on the
-   text's. A step with no number starts on the text's column, a numbered one at the panel's edge. */
+/* A step's wait, under its words, leads its own line: the spinner centred in the numbers' column, the word where a
+   numbered step's words are. */
 .ai-panel--plan .agp-addacct__step > .agp-addacct__wait {
   gap: calc((var(--lead) - 14px) / 2 + 12px);
-  margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
-}
-.ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
   margin-left: calc((var(--lead) - 14px) / 2);
 }
-/* The line standing in for a field leads the same way, from inside the step's words (on the text's column). */
+/* The line standing in for a field leads the same way, from inside the step's words: at the edge in a step with no
+   number, 32px in (the number and its gap) in a numbered one. */
 .ai-panel--plan .agp-addacct__busy {
   gap: calc((var(--lead) - 14px) / 2 + 12px);
-  margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
+  margin-left: calc((var(--lead) - 14px) / 2);
 }
-/* At phone width for whom goes under the name, on the text's column. */
+.ai-panel--plan .agp-addacct__step.ac-iconline .agp-addacct__busy {
+  margin-left: calc((var(--lead) - 14px) / 2 - var(--lead) - 12px);
+}
+/* At phone width for whom goes under the name, on the head's text column. */
 @media (max-width: 640px) {
   .ai-panel__agent {
-    flex-basis: calc(100% - var(--text-edge));
+    flex-basis: calc(100% - var(--mark) - 12px);
     height: auto;
-    margin-left: var(--text-edge);
+    margin-left: calc(var(--mark) + 12px);
   }
   .ai-panel__agent > .ac-select {
     flex: 1;

@@ -498,12 +498,15 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(retry.parentElement?.querySelector(":scope > .ac-setnote")).not.toBeNull();
   });
 
-  test("a plan's panel: every line's words on its head's text edge, every lead centred in the mark's column, an even well", async () => {
+  test("a plan's panel: its body starts at the panel's edge, every lead centred in the numbers' column, an even well", async () => {
     const layout = await stylesheet("../src/layout.css");
     const plan = ruleOf(layout, ".ai-panel--plan");
-    expect(plan).toContain("--lead: 30px");
-    expect(plan).toContain("--text-edge: calc(var(--lead) + 12px)");
-    // 14px icons and 20px numbers, centred in the mark's 30px, 12px before the words. Only the panel's own lines: a
+    expect(plan).toContain("--mark: 30px");
+    expect(plan).toContain("--lead: 20px");
+    // No empty column on the body's left: nothing pushes its lines or the option cards in to the head's text column.
+    expect(layout).not.toContain("--text-edge");
+    expect(layout).not.toContain(".ai-panel--plan > .grid-options {");
+    // 14px icons and 20px numbers, centred in the numbers' 20px, 12px before the words. Only the panel's own lines: a
     // note inside a step's words ("Isso não parece uma chave…") keeps its icon on the step's text.
     const own = ".ai-panel--plan > :is(.ac-setnote, .setup-line, .ac-card__foot).ac-iconline";
     const row = ".ai-panel--plan .ai-panel__row > .ac-setnote";
@@ -515,10 +518,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step > i")).toContain(
       "margin-inline: calc((var(--lead) - 20px) / 2)",
     );
-    // The well spans the panel's content, as far in from its right edge as from its left: its words keep the text's
-    // column on both sides. An option card's 12px of padding start before that column, so its words are on it.
+    // The well spans the panel's content, as far in from its right edge as from its left.
     const well = ruleOf(layout, ".ai-panel__wait");
-    expect(well).toContain("padding: 12px var(--text-edge);");
+    expect(well).toContain("padding: 12px 14px;");
     expect(well).not.toContain("margin");
     // Under the steps' bar its short lines break into two of a length, and so does its status or hold line without
     // the bar: at 320 px the panel's pretty wrap ends "Esperando um computador disponível" on its last word alone.
@@ -530,23 +532,20 @@ describe("Conectar uma IA: one picker, plans first", () => {
     );
     expect(ruleOf(layout, ".ai-panel")).toContain("text-wrap: pretty");
     expect(layout).toContain("@supports not (text-wrap: pretty) {\n  .ai-panel__wait {\n    text-wrap: balance;\n");
-    expect(ruleOf(layout, ".ai-panel--plan > .grid-options")).toContain(
-      "margin-left: calc(var(--text-edge) - var(--space-3))",
-    );
-    // A step's wait goes under its words: its spinner in the mark's column, its word on the text's.
+    // A step's wait goes under its words: its spinner in the numbers' column, its word where a numbered step's are.
     expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step > .agp-addacct__wait")).toContain(
-      "margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge))",
-    );
-    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait")).toContain(
       "margin-left: calc((var(--lead) - 14px) / 2)",
     );
     // So does the line standing in for a field while its code goes, from inside the step's words.
     expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__busy")).toContain(
-      "margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge))",
+      "margin-left: calc((var(--lead) - 14px) / 2)",
+    );
+    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline .agp-addacct__busy")).toContain(
+      "margin-left: calc((var(--lead) - 14px) / 2 - var(--lead) - 12px)",
     );
     // The head's hairline runs edge to edge, as the foot's does; for whom centres on the head's mark.
     expect(ruleOf(layout, ".ai-panel__head")).toContain("margin-inline: calc(-1 * var(--card-pad))");
-    expect(ruleOf(layout, ".ai-panel__agent")).toContain("height: var(--lead)");
+    expect(ruleOf(layout, ".ai-panel__agent")).toContain("height: var(--mark)");
   });
 
   test("a step's button sits right under its words, on their column, at every width; a failure's note sits in its button's middle", async () => {
@@ -567,21 +566,13 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text)")).toContain(
       "margin-left: 32px",
     );
-    // In a plan's panel, on the text's column: numbered or not, the button starts where the words do.
-    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text")).toContain(
-      "flex-basis: calc(100% - var(--text-edge))",
-    );
-    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text)")).toContain(
-      "margin-left: var(--text-edge)",
-    );
-    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline)")).toContain(
-      "margin-left: var(--text-edge)",
-    );
+    // A plan's panel adds nothing of its own: a step's button starts where its words do, as anywhere else.
+    expect(layout).not.toContain(".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text");
+    expect(layout).not.toContain(".ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline)");
     // None of it waits for a narrow screen, and nothing pulls the words down to a button beside them.
     for (const rule of [
       ".agp-addacct__step {",
       ".agp-addacct__step:not(.ac-iconline) > .agp-addacct__text {",
-      ".ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text) {",
     ])
       expect(layout).toContain(`\n${rule}`);
     expect(layout).not.toContain(".agp-addacct__step:has(> .ac-btn--sm)");
@@ -592,7 +583,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // In a plan's panel what went wrong is the sign-in's state: its buttons under the note's words, as a step's.
     expect(layout).toContain("\n.ai-panel--plan .ai-panel__row > .ac-setnote {\n  flex-basis: 100%;\n}");
     expect(ruleOf(layout, ".ai-panel--plan .ai-panel__row > :not(.ac-setnote)")).toContain(
-      "margin-left: var(--text-edge)",
+      "margin-left: calc(var(--lead) + 12px)",
     );
     // A key's field can narrow to 102px, so "Enviar ao Computador da Costa Atelier" keeps its line in a panel too.
     expect(ruleOf(layout, ".agp-addacct__paste .ac-input")).toContain("min-width: 102px");
