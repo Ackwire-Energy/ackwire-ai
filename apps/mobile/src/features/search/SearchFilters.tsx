@@ -1,4 +1,5 @@
 import { useSearch } from "@agenteschat/client";
+import { hitText } from "@agenteschat/client/lib/media";
 import {
   groupByChannel,
   SEARCH_HAS,
@@ -241,7 +242,7 @@ export function FilteredResults({
                 items={inChannel.map((h) => ({
                   key: h.sourceId,
                   leading: h.author ? <Face who={h.author} size={34} live={false} /> : <Tile icon="chat" size={34} />,
-                  label: previewOf(h.snippet),
+                  label: previewOf(hitText(t, h)),
                   hint: [h.author?.name, when.short(h.createdAt)].filter(Boolean).join(" · "),
                   onPress: () => {
                     onOpen();

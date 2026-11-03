@@ -1,13 +1,20 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL, orgTopic, type RealtimeEvent } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import {
   ConflictError,
   changeMemberRole,
   createRole,
+  declineSecret,
   ForbiddenError,
+  getSecretRequest,
+  joinOrganization,
+  openDm,
+  openPersonAgentDm,
+  postPersonMessage,
   removalPreview,
   removeMember,
+  requireChannelAccess,
   setMemberRoles,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -80,6 +87,21 @@ test("removing someone: their agents pass to the remover, their plan leaves the 
   expect(after.ownerUserId).toBe(f.owner.id);
   expect(after.brain).toBe("model");
   expect(after.brainAccountId).toBeNull();
+});
+
+test("a remover who can't manage agents doesn't get the removed person's agents: the longest-standing owner does", async () => {
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const rh = await createRole(f.db, f.owner.id, f.org.id, { name: "RH", permissions: ["manage_members"] });
+  await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [rh.id]);
+  await f.db.update(schema.agents).set({ ownerUserId: caio.id }).where(eq(schema.agents.id, f.agent.id));
+
+  expect((await removalPreview(f.db, bia.id, f.org.id, caio.id))?.heir).toEqual({
+    userId: f.owner.id,
+    name: f.owner.name,
+  });
+  await removeMember(f.db, bia.id, f.org.id, caio.id);
+  expect((await agentRow()).ownerUserId).toBe(f.owner.id);
 });
 
 test("leaving: the agents pass to the longest-standing other owner; the last owner can't leave", async () => {
@@ -164,4 +186,88 @@ test("leaving on one's own is quiet, and the agents skip a blocked owner", async
   await removeMember(f.db, cy.id, f.org.id, cy.id, { pubsub: f.pubsub });
   expect((await agentRow()).ownerUserId).toBe(f.owner.id);
   expect(told).toContainEqual({ type: "membership.revoked", orgId: f.org.id, userId: cy.id, quiet: true });
+});
+
+test("someone removed and invited back is back in their DMs once one is opened again", async () => {
+  const ana = await addMember(f.db, f.org.id, "member", "ana");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const withAgent = await openDm(f.db, caio.id, f.org.id, { agentId: f.agent.id });
+  const withAna = await openDm(f.db, ana.id, f.org.id, { userId: caio.id });
+  await removeMember(f.db, f.owner.id, f.org.id, caio.id);
+  await f.db.insert(schema.organizationMembers).values({ orgId: f.org.id, userId: caio.id, role: "member" });
+
+  expect((await openDm(f.db, caio.id, f.org.id, { agentId: f.agent.id })).id).toBe(withAgent.id);
+  expect((await requireChannelAccess(f.db, caio.id, f.org.id, withAgent.id)).channel.id).toBe(withAgent.id);
+  expect((await openDm(f.db, ana.id, f.org.id, { userId: caio.id })).id).toBe(withAna.id);
+  expect((await requireChannelAccess(f.db, caio.id, f.org.id, withAna.id)).channel.id).toBe(withAna.id);
+});
+
+test("someone invited back is back in the DMs whose other people are still here, before anyone opens them", async () => {
+  const ana = await addMember(f.db, f.org.id, "member", "ana");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const dora = await addMember(f.db, f.org.id, "member", "dora");
+  const withAna = await openDm(f.db, ana.id, f.org.id, { userId: caio.id });
+  const withDora = await openDm(f.db, dora.id, f.org.id, { userId: caio.id });
+  const withAgent = await openPersonAgentDm(f.db, f.org.id, caio.id, f.agent.id);
+  await removeMember(f.db, f.owner.id, f.org.id, caio.id);
+  await removeMember(f.db, f.owner.id, f.org.id, dora.id);
+  await f.db.transaction((tx) => joinOrganization(tx, f.org.id, caio.id, "member"));
+
+  const has = async (channelId: string) =>
+    (
+      await f.db
+        .select()
+        .from(schema.channelMembers)
+        .where(and(eq(schema.channelMembers.channelId, channelId), eq(schema.channelMembers.userId, caio.id)))
+    ).length;
+  expect(await has(withAna.id)).toBe(1);
+  expect(await has(withAgent.id)).toBe(1);
+  expect(await has(withDora.id)).toBe(0);
+});
+
+test("an agent's DM with someone removed and back takes them in again; not while they're out", async () => {
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const dm = await openPersonAgentDm(f.db, f.org.id, caio.id, f.agent.id);
+  await removeMember(f.db, f.owner.id, f.org.id, caio.id);
+  await openPersonAgentDm(f.db, f.org.id, caio.id, f.agent.id);
+  const inDm = () =>
+    f.db
+      .select()
+      .from(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, dm.id), eq(schema.channelMembers.userId, caio.id)));
+  expect(await inDm()).toHaveLength(0);
+
+  await f.db.insert(schema.organizationMembers).values({ orgId: f.org.id, userId: caio.id, role: "member" });
+  await openPersonAgentDm(f.db, f.org.id, caio.id, f.agent.id);
+  expect(await inDm()).toHaveLength(1);
+});
+
+test("someone removed can't read or answer an agent's secret request, and the ones waiting on them close", async () => {
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id));
+  const [request] = await f.db
+    .insert(schema.secretRequests)
+    .values({
+      orgId: f.org.id,
+      runId: run?.id ?? "",
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      toolUseId: "tool-npm",
+      requestedForUserId: caio.id,
+      name: "NPM_TOKEN",
+      purpose: "publicar o pacote",
+      targetKind: "env",
+      publicKey: "pk",
+      expiresAt: new Date(Date.now() + 15 * 60_000),
+    })
+    .returning();
+  if (!request) throw new Error("no request");
+  expect((await getSecretRequest(f.db, caio.id, f.org.id, request.id)).status).toBe("pending");
+
+  await removeMember(f.db, f.owner.id, f.org.id, caio.id);
+  const [after] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, request.id));
+  expect(after?.status).toBe("canceled");
+  await expect(getSecretRequest(f.db, caio.id, f.org.id, request.id)).rejects.toBeInstanceOf(ForbiddenError);
+  await expect(declineSecret({ db: f.db }, caio.id, f.org.id, request.id)).rejects.toBeInstanceOf(ForbiddenError);
 });

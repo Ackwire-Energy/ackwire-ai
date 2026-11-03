@@ -210,6 +210,10 @@ export class Terminals {
     return n;
   }
 
+  closeAgent(agentId: string, why: string) {
+    for (const terminal of [...this.live]) if (terminal.agentId === agentId) terminal.end(why);
+  }
+
   /** Every terminal hangs up (the machine's terminal switch went off). */
   closeAll(why = "the terminal was turned off on this computer") {
     for (const t of [...this.live]) t.end(why);

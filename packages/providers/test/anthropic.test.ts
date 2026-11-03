@@ -445,3 +445,118 @@ test("a workspace id is sent as the anthropic-workspace-id header", async () => 
   );
   expect(requests[1]?.headers.get("anthropic-workspace-id")).toBeNull();
 });
+
+describe("prompt cache: a stable prefix whatever tools load", () => {
+  const tool = (name: string, stable?: boolean) => ({
+    name,
+    description: name,
+    inputSchema: { type: "object" },
+    ...(stable ? { stable: true } : {}),
+  });
+  const send = async (
+    request: Partial<Parameters<ModelProvider["stream"]>[0]>,
+    usage: Record<string, unknown> = {},
+  ) => {
+    const { fetcher, requests } = scripted(
+      sse([
+        { ...start(10), message: { ...start(10).message, usage: { ...start(10).message.usage, ...usage } } },
+        { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+        { type: "message_stop" },
+      ]),
+    );
+    const result = await createAnthropicProvider({ fetch: fetcher, maxRetries: 0 }).stream(
+      {
+        model: "claude-sonnet-5-5",
+        system: "s",
+        messages: [{ role: "user", content: "oi" }],
+        maxTokens: 10,
+        ...request,
+      },
+      { apiKey: "k", onDelta: () => {} },
+    );
+    return { body: requests[0]?.body as Record<string, unknown>, result };
+  };
+  const breakpoints = (body: Record<string, unknown>) =>
+    [...(body.tools as Record<string, unknown>[]), ...(body.system as Record<string, unknown>[])].filter(
+      (b) => b.cache_control,
+    ).length + (body.cache_control ? 1 : 0);
+
+  test("stable tools first, a breakpoint after the last; another group loaded keeps those bytes", async () => {
+    const core = [tool("search_context", true), tool("ask_user", true), tool("remember", true)];
+    const a = await send({ tools: [tool("find_tools"), ...core] });
+    const b = await send({ tools: [tool("list_issues"), tool("create_issue"), ...core] });
+    const names = (body: Record<string, unknown>) => (body.tools as { name: string }[]).map((t) => t.name);
+    expect(names(a.body)).toEqual(["ask_user", "remember", "search_context", "find_tools"]);
+    expect(names(b.body)).toEqual(["ask_user", "remember", "search_context", "create_issue", "list_issues"]);
+    const prefix = (body: Record<string, unknown>) => JSON.stringify((body.tools as unknown[]).slice(0, 3));
+    expect(prefix(a.body)).toBe(prefix(b.body));
+    expect((a.body.tools as Record<string, unknown>[])[2]?.cache_control).toEqual({ type: "ephemeral" });
+    expect((a.body.tools as Record<string, unknown>[])[3]?.cache_control).toBeUndefined();
+  });
+
+  test("1h on the stable prefix, 5 min on the conversation; never more than 4 breakpoints", async () => {
+    const { body, result } = await send(
+      {
+        cacheTtl: "1h",
+        tools: [tool("a", true), tool("b")],
+        system: [
+          { text: "org", cache: true },
+          { text: "agent", cache: true },
+          { text: "settled", cache: true },
+          { text: "turn" },
+        ],
+      },
+      {
+        cache_creation_input_tokens: 900,
+        cache_creation: { ephemeral_1h_input_tokens: 800, ephemeral_5m_input_tokens: 100 },
+      },
+    );
+    const hour = { type: "ephemeral", ttl: "1h" };
+    expect((body.tools as Record<string, unknown>[])[0]?.cache_control).toEqual(hour);
+    // The tools' breakpoint and the conversation's leave room for two in the system: the latest ones.
+    expect(body.system).toEqual([
+      { type: "text", text: "org" },
+      { type: "text", text: "agent", cache_control: hour },
+      { type: "text", text: "settled", cache_control: hour },
+      { type: "text", text: "turn" },
+    ]);
+    expect(body.cache_control).toEqual({ type: "ephemeral" });
+    expect(breakpoints(body)).toBe(4);
+    expect(result.usage).toEqual({
+      inputTokens: 10,
+      outputTokens: 1,
+      cacheReadTokens: 7,
+      cacheWriteTokens: 900,
+      cacheWriteLongTokens: 800,
+    });
+    // Without it, the 5-minute default everywhere.
+    const plain = await send({ tools: [tool("a", true)], system: [{ text: "agent", cache: true }] });
+    expect((plain.body.tools as Record<string, unknown>[])[0]?.cache_control).toEqual({ type: "ephemeral" });
+    expect((plain.body.system as Record<string, unknown>[])[0]?.cache_control).toEqual({ type: "ephemeral" });
+  });
+
+  test("another company's endpoint: the stable tools first all the same, no tool breakpoint or 1h", async () => {
+    const { fetcher, requests } = scripted(
+      sse([start(1), { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } }]),
+    );
+    await createAnthropicProvider({ fetch: fetcher, maxRetries: 0, compat: { toolChoiceAny: true } })
+      .stream(
+        {
+          model: "deepseek-v4-pro",
+          system: [{ text: "agent", cache: true }],
+          messages: [{ role: "user", content: "oi" }],
+          maxTokens: 10,
+          cacheTtl: "1h",
+          tools: [tool("z"), tool("b", true)],
+        },
+        { apiKey: "k", onDelta: () => {} },
+      )
+      .catch(() => {});
+    const body = requests[0]?.body as Record<string, unknown>;
+    expect((body.tools as Record<string, unknown>[]).map((t) => [t.name, t.cache_control])).toEqual([
+      ["b", undefined],
+      ["z", undefined],
+    ]);
+    expect(body.system).toEqual([{ type: "text", text: "agent", cache_control: { type: "ephemeral" } }]);
+  });
+});

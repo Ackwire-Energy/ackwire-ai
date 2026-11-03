@@ -18,9 +18,10 @@ import {
 import { isAppLocale, localeInfo } from "@agenteschat/i18n/locale";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
+import { readerOf, readerOfMessage } from "./agents-dm-reads";
 import type { AiStatusDeps } from "./ai-status";
 import { NO_PERSON, speakerFor } from "./audience";
-import { personOfMessage, runAuthority, UUID } from "./authority";
+import { runAuthority, UUID } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { type HandOff, handOffsFrom } from "./consultations";
@@ -235,8 +236,9 @@ export function ago(at: Date, now = Date.now()) {
 export interface ContextBlock extends SystemBlock {
   turn?: boolean;
   /**
-   * Found for this trigger (memory, wiki), already bounded when retrieved: a computer brain reads it
-   * whole after the clipped part of "# This turn", on the run's first turn (its session keeps it).
+   * Found for this trigger (memory, wiki, what was done here lately), already bounded when retrieved: a computer
+   * brain reads it whole after the clipped part of "# This turn", on the run's first turn (its session keeps it).
+   * Without `turn` the model brain reads it among the stable blocks, where it always was.
    */
   found?: boolean;
   /** The "# Now" block's inputs, so each turn renders the time it runs at (`gapMs`: since the message before). */
@@ -248,6 +250,12 @@ export interface ContextBlock extends SystemBlock {
 }
 
 export const isTurnBlock = (block: SystemBlock) => (block as ContextBlock).turn === true;
+
+/**
+ * What a computer brain reads in "# This turn" instead of its system prompt: the per-turn blocks and what was found
+ * for the trigger, so its system text is the same on every turn of its session (a resumed one keeps its cache).
+ */
+export const isComputerTurnBlock = (block: SystemBlock) => isTurnBlock(block) || (block as ContextBlock).found === true;
 
 /** The blocks that don't change during a run first, the per-turn ones last (prompt-cache friendly). */
 export const stableFirst = <T extends SystemBlock>(system: T[]): T[] => [
@@ -269,10 +277,20 @@ export function thisTurnText(
   now = new Date(),
   options: { found?: boolean } = {},
 ): string {
-  const blocks = system.filter(isTurnBlock);
+  const { head, found } = thisTurnParts(system, now, options);
+  return [head, found].filter(Boolean).join("\n\n");
+}
+
+/** `thisTurnText` in two: the clipped part (time, place, why) and what was found for the trigger after it. */
+export function thisTurnParts(
+  system: readonly ContextBlock[],
+  now = new Date(),
+  options: { found?: boolean } = {},
+): { head: string; found: string } {
+  const blocks = system.filter(isComputerTurnBlock);
   const fixed = blocks.filter((b) => !b.found);
   const found = options.found === false ? [] : blocks.filter((b) => b.found);
-  if (fixed.length === 0 && found.length === 0) return "";
+  if (fixed.length === 0 && found.length === 0) return { head: "", found: "" };
   // One level under "# This turn": "## Now", "## Where you are".
   const level = (text: string) => text.replace(/^# /, "## ");
   // The time first: it is what a resumed session most needs fresh.
@@ -290,7 +308,7 @@ export function thisTurnText(
     head.length > THIS_TURN_MAX_CHARS
       ? `${cutText(head, THIS_TURN_MAX_CHARS).trimEnd()}\n[… cut; look it up with your tools if you need more]`
       : head;
-  return [clipped, ...found.map((b) => level(b.text))].join("\n\n");
+  return { head: clipped, found: found.map((b) => level(b.text)).join("\n\n") };
 }
 
 /**
@@ -348,8 +366,11 @@ export async function buildRunContext(
     blocks?: boolean;
     /** `ask_choices` is available (ADR 0124): a short decision goes on a card instead of a numbered list. */
     choices?: boolean;
-    /** "What you can do", built from the granted tools (`describeCapabilities`). */
-    capabilities?: string;
+    /**
+     * "What you can do", built from the run's tools (`describeCapabilities`); a promise while the tool-group judge
+     * still decides them, read only when the blocks are put together.
+     */
+    capabilities?: string | Promise<string>;
     /** Skills enabled for the agent (name and description; the body loads on demand). */
     skills?: { name: string; description: string }[];
     /** `find_agent` is available: name the other agents in "# Your team". */
@@ -701,6 +722,7 @@ export async function buildRunContext(
         gapMs: previous ? Math.max(0, Date.now() - previous.createdAt.getTime()) : null,
       };
 
+  const capabilities = await options.capabilities;
   // Most stable first, so prompt-cache prefixes are shared: the org context is
   // the same for every agent of the organization, the agent block per agent.
   const system: ContextBlock[] = [
@@ -711,7 +733,6 @@ export async function buildRunContext(
       ]
         .filter(Boolean)
         .join("\n\n"),
-      cache: true,
     },
     {
       text: [
@@ -768,7 +789,7 @@ export async function buildRunContext(
         .join("\n\n"),
       cache: true,
     },
-    ...(options.capabilities ? [{ text: options.capabilities }] : []),
+    ...(capabilities ? [{ text: capabilities }] : []),
     ...(team ? [{ text: team }] : []),
     ...(options.skills && options.skills.length > 0
       ? [
@@ -784,6 +805,7 @@ export async function buildRunContext(
     ...(recentActions.length > 0
       ? [
           {
+            found: true,
             text: [
               `# Recent actions ${channel.kind === "dm" ? "in this DM" : flat ? "in this channel" : "in this thread"}`,
               "What the agents already did here, with the tools' real results:",
@@ -796,6 +818,7 @@ export async function buildRunContext(
     ...(workElsewhere.length > 0
       ? [
           {
+            found: true,
             text: [
               `# Your recent work with ${requesterName} in other conversations`,
               "What you yourself did in the last 14 days in conversations this person is in:",
@@ -910,6 +933,10 @@ export async function buildRunContext(
         })
       : []),
   ];
+  // Breakpoints: after the agent's block, and after the last block that changes only with settings (what it can do,
+  // its team, its skills); what follows (recent actions, briefs, the turn) changes from run to run.
+  const settled = system[1 + [capabilities, team, options.skills?.length].filter(Boolean).length];
+  if (settled) settled.cache = true;
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);
 
   return {
@@ -918,9 +945,10 @@ export async function buildRunContext(
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
     sessionPrompt: [
-      // Without the `ask_choices` line: it is there only when a person is behind the run, so it follows the
-      // requester like "# Your team" below.
-      ...system.filter((b) => b.cache).map((b) => b.text.replace(`\n${ASK_CHOICES_LINE}`, "")),
+      // The organization's context and the agent's block (name, role, instructions, how it works), without the
+      // `ask_choices` line: it is there only when a person is behind the run, so it follows the requester like
+      // "# Your team" below.
+      ...system.slice(0, 2).map((b) => b.text.replace(`\n${ASK_CHOICES_LINE}`, "")),
       // The roster, not "# Your team": that text follows the requester, so a person and an agent taking turns
       // would start a new session every turn.
       JSON.stringify(
@@ -1300,25 +1328,26 @@ async function userNameOf(db: Database, userId: string) {
 
 /**
  * The agents' DM, for one person (ADR 0053 §9): only the exchanges made for the same person as this run
- * (the person behind each message's question or note, `authority.ts`), and for nobody only when nobody
- * is behind this run either. The trigger always stays. `runIds`: the runs behind what stays.
+ * (the person behind each message's question or note, `authority.ts`; for a routine, its creator's
+ * routines: `readerOf`), and for nobody only when nobody is behind this run either. The trigger always stays. `runIds`: the runs behind what stays.
  */
 async function forSamePerson(db: Database, run: AgentRun, history: Message[], triggerId: string) {
   const authority = await runAuthority(db, run);
   const personId = authority.kind === "person" ? authority.personId : null;
-  // Messages one run wrote share its person: one lookup per run.
+  const reader = readerOf(authority);
+  // Messages one run wrote share its reader: one lookup per run.
   const lookups = new Map<string, Promise<string | null>>();
   const personOf = (m: Message) => {
     const key = m.agentRunId ? `run:${m.agentRunId}` : `message:${m.id}`;
     let found = lookups.get(key);
     if (!found) {
-      found = personOfMessage(db, run.orgId, m.id).catch(() => null);
+      found = readerOfMessage(db, run.orgId, m.id).catch(() => null);
       lookups.set(key, found);
     }
     return found;
   };
-  const people = await Promise.all(history.map((m) => (m.id === triggerId ? personId : personOf(m))));
-  const kept = history.filter((m, i) => m.id === triggerId || people[i] === personId);
+  const readers = await Promise.all(history.map((m) => (m.id === triggerId ? reader : personOf(m))));
+  const kept = history.filter((m, i) => m.id === triggerId || readers[i] === reader);
   return {
     personId,
     history: kept,
@@ -1448,6 +1477,9 @@ export function quotedLine(meta: Record<string, unknown> | null | undefined): st
   // A GIF or a sticker with no text (ADR 0091): what it was, never its title.
   if ((typeof r.excerpt !== "string" || !r.excerpt) && (r.mediaKind === "gif" || r.mediaKind === "sticker")) {
     return `(replying to ${who}'s ${r.mediaKind === "gif" ? "GIF" : "sticker"})\n`;
+  }
+  if ((typeof r.excerpt !== "string" || !r.excerpt) && r.mediaKind === "voice") {
+    return `(replying to ${who}'s voice message)\n`;
   }
   if (typeof r.excerpt !== "string" || !r.excerpt) return "";
   return `(replying to ${who}: "${r.excerpt}")\n`;

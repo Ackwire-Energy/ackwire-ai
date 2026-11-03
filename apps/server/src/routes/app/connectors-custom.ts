@@ -62,6 +62,10 @@ const CustomServer = z
       description:
         "`needs_reconnect`: its Composio account stopped working, and agents get no tool of it until Reconectar.",
     }),
+    toolsError: z.string().nullable().openapi({
+      description:
+        "Why its tools couldn't be read the last time they were listed (short); null when they were. The apps say it with Tentar de novo (`…/refresh`).",
+    }),
     tools: z.array(
       z.object({
         name: z.string(),
@@ -151,6 +155,7 @@ export function customConnectorRoutes(deps: AppDeps) {
     composio,
     judge: deps.extras?.context?.judge,
     blobs: adapters.platformBlobs,
+    log: deps.log,
   };
 
   // A server's icon, for the org's members.

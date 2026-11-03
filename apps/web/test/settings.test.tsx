@@ -8,6 +8,7 @@ import { setNavigateAway } from "@/lib/navigate";
 import { pick, rowMenu } from "./catalog";
 import { createFakeApi, OPENROUTER_KEY, OPENROUTER_MODELS, ORG_ID, seedState } from "./fake-api";
 import { shownText } from "./hint";
+import { pick as pickOption } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -514,7 +515,7 @@ describe("Configurações do workspace", () => {
     expect(line()?.textContent).toBe("Os agentes só respondem quando mencionados.");
   });
 
-  test("members see only their own settings: no Geral, roles or GIFs, never the workspace's keys or money", async () => {
+  test("members see only their own settings: no Geral, roles, GIFs or voice, never the workspace's keys or money", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
@@ -683,5 +684,15 @@ describe("Buscar no workspace", () => {
     await act(() => new Promise((r) => setTimeout(r, 300)));
     await settle(4);
     expect(document.body.textContent).toContain("Nada encontrado com “nada-disso”.");
+  });
+});
+
+test("changing Settings language saves the account before updating the local language", async () => {
+  const { state } = await go(seedState(), "settings/account");
+  await pickOption(screen().getByRole("combobox", { name: "Idioma" }), "English");
+  await settle(6);
+  expect(state.calls.find((call) => call.method === "account.updateMe")?.args[0]).toEqual({
+    locale: "en",
+    auto: false,
   });
 });

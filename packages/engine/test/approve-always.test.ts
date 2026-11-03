@@ -782,7 +782,7 @@ describe("Aprovar sempre leituras", () => {
     expect(removed.map((r) => r.details.reason)).toEqual(["owner_changed"]);
     expect((await invoke(gateway, ctx, name, sql(READ))).type).toBe("approval");
   });
-  test("an old owner deciding after the agent changed hands approves once, never for good", async () => {
+  test("after the agent changed hands its old owner no longer decides, and the new one may approve for good", async () => {
     f = await setup();
     const { gateway, name } = await sqlWorld(f);
     const ana = await addMember(f.db, f.org.id, "member", "ana");
@@ -791,9 +791,10 @@ describe("Aprovar sempre leituras", () => {
     const ask = asked(await invoke(gateway, await runOf(f), name, sql(READ)));
     await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { ownerUserId: bia.id });
     await expect(decide(f, ana.id, ask.id, { decision: "approve", always: true })).rejects.toBeInstanceOf(
-      ConflictError,
+      ForbiddenError,
     );
     expect(await rules(f)).toEqual([]);
-    expect((await decide(f, ana.id, ask.id, { decision: "approve" })).status).toBe("approved");
+    expect((await decide(f, bia.id, ask.id, { decision: "approve", always: true })).status).toBe("approved");
+    expect(await rules(f)).toHaveLength(1);
   });
 });

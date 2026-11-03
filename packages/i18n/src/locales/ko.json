@@ -1478,6 +1478,8 @@
     "failed_other": "{{names}}이(가) 답하지 못했어요",
     "asking_other": "{{names}}이(가) 내 답변을 기다리고 있어요",
     "outage_other": "{{names}}: AI 제공업체 장애 · 자동으로 다시 시도해요",
+    "queued_other": "{{names}}이(가) 컴퓨터 차례를 기다리는 중이에요",
+    "away_other": "{{names}}이(가) 컴퓨터를 기다리는 중이에요",
     "nobody": "답할 에이전트가 없어요",
     "status": {
       "seen": "확인함",
@@ -1486,6 +1488,8 @@
       "waiting": "승인 대기 중",
       "asking": "내 답변 대기 중",
       "outage": "AI 제공업체 장애 · 자동으로 다시 시도해요",
+      "queued": "컴퓨터 차례 대기 중",
+      "away": "컴퓨터 대기 중",
       "handled": "답함",
       "failed": "실패",
       "referenced": "언급만 됨",
@@ -1902,6 +1906,9 @@
     "rolesNone": "워크스페이스에 아직 역할이 없어요.",
     "rolesNeeded": "역할을 하나 이상 선택하세요.",
     "rolesLeave": "역할을 잃은 사람은 채널에서 나가요.",
+    "rolesChoose": "역할 선택",
+    "rolesChange": "역할 변경",
+    "rolesDone": "완료",
     "publicTitle": "#{{channel}}을(를) 공개할까요?",
     "publicBody": "워크스페이스의 모든 사람이 참여하고 이전 메시지를 포함한 모든 메시지를 읽을 수 있게 됩니다.",
     "publicConfirm": "공개하기",
@@ -2082,6 +2089,7 @@
       "waiting_approval": "승인 대기 중",
       "waiting_answer": "답변 대기 중",
       "waiting_computer": "컴퓨터 대기 중",
+      "queued_computer": "컴퓨터 차례 대기 중",
       "waiting_plan": "요금제 초기화 대기 중",
       "waiting_budget": "예산 초기화 대기 중",
       "provider_down": "AI 제공업체 장애 · 자동으로 다시 시도해요",
@@ -2762,6 +2770,7 @@
     "runsEmpty": "“{{q}}”와 일치하는 실행이 없어요.",
     "runsNone": "아직 실행이 없어요.",
     "runNoText": "텍스트 없음",
+    "runPrivate": "참여하지 않은 대화",
     "runTokens": "입력 {{input}} · 캐시 {{cached}} · 출력 {{output}}",
     "runTokensTip": "새 입력 토큰 {{input}}개, 캐시에서 읽은 토큰 {{cached}}개(더 저렴해요), 출력 {{output}}개",
     "budgetHelp": "한도에 도달하면 {{name}}은(는) 멈추고 채널에 알려요. {{ownerNote}}",
@@ -6200,6 +6209,68 @@
       "symbols": "기호"
     }
   },
+  "voice": {
+    "word": "음성 메시지",
+    "wordTime": "음성 메시지 · {{time}}",
+    "holdToRecord": "길게 눌러 녹음",
+    "slideToDelete": "밀어서 삭제",
+    "send": "오디오 보내기",
+    "delete": "녹음 삭제",
+    "deleted": "녹음을 삭제했어요.",
+    "pause": "일시정지",
+    "resume": "계속 녹음",
+    "listen": "녹음 들어보기",
+    "play": "재생",
+    "stop": "정지",
+    "speed": "속도",
+    "left": "{{seconds}}초 남음",
+    "tooShort": "너무 짧아요. 조금 더 말해 주세요.",
+    "silent": "아무것도 들리지 않았어요. 아무것도 보내지 않았어요.",
+    "notSent": "오디오를 보내지 못했어요.",
+    "limit": "오늘은 오디오를 많이 보냈어요. 여기에 글로 쓰고 내일 다시 시도해 주세요.",
+    "micBlocked": "마이크가 차단되어 있어요",
+    "micBlockedHint": "녹음하려면 기기 설정에서 마이크를 허용해 주세요.",
+    "openSettings": "설정 열기",
+    "notNow": "나중에",
+    "expired": "오디오 만료됨",
+    "showText": "텍스트 보기",
+    "hideText": "텍스트 숨기기",
+    "record": "오디오 녹음",
+    "recording": "오디오 녹음 중",
+    "discard": "녹음 삭제",
+    "stopListening": "듣기 중지",
+    "keys": "Enter로 보내기 · Esc로 삭제",
+    "keysHold": "놓으면 보내기 · Esc로 삭제",
+    "keysPaused": "일시정지됨 · 스페이스로 듣기 · Enter로 보내기 · Esc로 삭제",
+    "pausePlay": "일시정지",
+    "seek": "오디오 위치",
+    "speedAt": "속도 {{speed}}×",
+    "waiting": "다시 온라인이 되면 바로 보내요",
+    "notUnderstood": "오디오를 알아듣지 못했어요. 아무것도 보내지 않았어요.",
+    "refused": "이 대화에서는 오디오를 보낼 수 없어요.",
+    "blockedMac": "마이크가 차단되어 있어요. Mac에서: 시스템 설정 › 개인정보 보호 및 보안 › 마이크.",
+    "blockedWeb": "마이크가 차단되어 있어요. 사이트 주소 옆의 자물쇠에서 허용해 주세요.",
+    "noMic": "마이크를 찾을 수 없어요.",
+    "failed": "마이크를 열지 못했어요. 다시 시도해 주세요.",
+    "noPlayback": "지금은 재생할 수 없어요. 그래도 보내거나 계속 녹음할 수 있어요.",
+    "settings": {
+      "title": "음성 메시지",
+      "on": "음성 메시지",
+      "onHelp": "이 워크스페이스의 사람들은 대화에서 오디오를 보낼 수 있어요.",
+      "noEngine": "여기서는 아직 음성 메시지를 쓸 수 없어요.",
+      "engineTitle": "음성을 텍스트로 바꾸는 곳",
+      "own": "내 서버",
+      "ownHelp": "내 컴퓨터의 Whisper 또는 Parakeet. 오디오는 그곳에 남아요.",
+      "address": "서버 주소",
+      "key": "{{name}} 키",
+      "keyPlaceholder": "여기에 붙여넣기",
+      "test": "테스트",
+      "tested": "잘 작동해요. 이제 모두에게 마이크가 보여요.",
+      "sealed": "서버에 암호화되어 보관되고 다시는 표시되지 않아요.",
+      "leaves": "음성 메시지의 오디오는 텍스트로 바꾸기 위해 {{name}}(으)로 보내져요.",
+      "invalid": "저장된 키를 이 서버에서 열 수 없어요. 다시 붙여넣어 주세요."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -8516,6 +8587,7 @@
     "clearSearch": "검색어 지우기",
     "noMatch": "“{{q}}”에 대한 결과가 없어요.",
     "noTools": "서버가 제공한 도구가 없어요.",
+    "unreadable": "커넥터의 도구를 읽을 수 없습니다: {{reason}}",
     "refresh": "새 도구 찾기",
     "decideTitle": "결정 필요 · {{count}}",
     "decideHelp": "이름만으로는 무엇을 하는지 알 수 없어요. 제안을 확인하거나 다른 것을 고르세요.",
@@ -9309,6 +9381,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "네트워크가 바뀌고 있어요. 컴퓨터의 열린 세션은 {{when}}에 다시 시작돼요.",
+      "restart": "네트워크를 적용하려고 컴퓨터 세션을 다시 시작하고 있어요. 새 작업은 끝날 때까지 기다려요.",
+      "line": "출구 IP {{ip}}",
+      "hint": "에이전트가 웹을 탐색할 때 사이트에 보이는 주소예요. 컴퓨터의 네트워크가 바뀌면 함께 바뀌어요."
+    },
     "online": "온라인",
     "offline": "오프라인",
     "execOff": "명령 꺼짐",
@@ -9991,6 +10069,7 @@
       "import": "가져오기와 내보내기",
       "billing": "요금제와 결제",
       "media": "GIF와 스티커",
+      "voice": "음성",
       "apps": "AI 앱"
     },
     "sectionText": {
@@ -10009,6 +10088,7 @@
       "import": "다른 앱이나 워크스페이스에서 에이전트를 가져오고, 이 워크스페이스를 원하는 곳으로 옮겨요.",
       "billing": "이 워크스페이스의 agentes.chat 요금제, 카드, 청구서는 앱 밖의 별도 페이지에 있어요.",
       "media": "대화에서 보낼 수 있는 것과 에이전트가 GIF나 스티커를 보내는 시점이에요.",
+      "voice": "대화의 음성 메시지와, 음성을 텍스트로 바꾸는 곳.",
       "apps": "Claude, Cursor 등 다른 앱에서 이 워크스페이스의 에이전트에게 작업을 요청해요."
     },
     "title": "설정",
@@ -10382,6 +10462,10 @@
       "answeredRequestFar": "{{to}}이(가) {{from}}의 요청에 답했어요",
       "see": "보기"
     },
+    "talk": {
+      "readAll": "전체 읽기",
+      "more_other": "{{count}}줄 더"
+    },
     "consultPanel": {
       "label": "{{from}}과(와) {{to}}의 대화",
       "title": "{{from}} ⇄ {{to}}",
@@ -10683,6 +10767,7 @@
       "brain_unavailable": "지금은 {{brain}}이(가) 답할 수 없어요. 돌아오면 답할게요.",
       "provider_unavailable": "지금 AI 제공업체가 응답하지 않아요. 돌아오는 대로 답할게요.",
       "brain_busy": "지금 컴퓨터가 다른 작업으로 바빠요. 여유가 생기는 대로 답할게요.",
+      "brain_queued": "아직 컴퓨터 차례를 기다리고 있어요. 자리가 나는 대로 답할게요.",
       "brain_interrupted": "{{brain}}이(가) 끝내기 전에 멈췄어요. 이미 완료되어 반복하지 않은 것: {{tools}}.",
       "plan_limit_cut": "{{plan}} 요금제 한도에서 멈췄어요. 초기화되는 {{when}}에 멈춘 곳부터 이어 갈게요.",
       "plan_limit_cut_unknown": "{{plan}} 요금제 한도에서 멈췄어요. 초기화되는 대로 멈춘 곳부터 이어 갈게요.",
@@ -11613,6 +11698,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "보기만 하고 있어요.",
+      "title": "제어할까요?",
+      "working": "내가 제어하는 동안 {{name}}은(는) 잠시 멈춰요."
+    },
     "sub": {
       "control": "내가 제어 중 · {{name}} 대기 중",
       "controlAsked": "내가 제어 중 · {{name}}이(가) 요청함",

@@ -1,4 +1,4 @@
-import { PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
+import { CODEX_FOLDER_PROTOCOL, PERMISSION_TOOL, type PlanUsage, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   count,
@@ -31,6 +31,7 @@ import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { withTimeout } from "./agent-media";
 import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
+import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { publishApproval } from "./approvals";
 import { fedByRoutine, personOfMessage, runAuthority } from "./authority";
@@ -92,16 +93,17 @@ import {
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
+import { kickRoomQueue, roomGate, roomHead } from "./computer-queue";
 import { announceConsultationChange, answersOpen, onConsultedRunFinished } from "./consultations";
 import {
   buildRunContext,
   type ContextBlock,
   getChannelCached,
-  isTurnBlock,
+  isComputerTurnBlock,
   restatesReaction,
   stableFirst,
   teammatesNowAgain,
-  thisTurnText,
+  thisTurnParts,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
@@ -137,6 +139,7 @@ import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
+import { type CodeSetup, codeStart } from "./git/machine";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
@@ -145,6 +148,7 @@ import { type Judge, judgeCallOf } from "./judge";
 import { answerNoTurn, deliverLive, listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
+import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
@@ -223,6 +227,8 @@ import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials, maskCredentialsExcept } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import {
+  isCore,
+  isStableTool,
   ON_DEMAND_FIND,
   ON_DEMAND_USE,
   presentTools,
@@ -285,6 +291,7 @@ const {
   agentRuns,
   approvals,
   agentQuestions,
+  machines,
   messages,
   outbox,
   routineRuns,
@@ -345,6 +352,11 @@ export interface EngineDeps {
    * engine with fakes.
    */
   brains?: Partial<Record<BrainKind, BrainFactory>>;
+  /**
+   * The checkouts' sync before a computer brain's chat turn (`prepareAgentCode`, the brains' own `prepare`): started
+   * here while a run waits out the quiet window, so the turn doesn't wait for it after.
+   */
+  prepareCode?(turn: BrainTurn, signal: AbortSignal): Promise<CodeSetup | null>;
   /** Computers' status (machine hub): a computer brain's availability is checked before its turn. */
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
@@ -486,6 +498,8 @@ export interface Transcript {
     model?: string | null;
     /** A plan pause's: where its plan was read. */
     reading?: PlanReadingRef;
+    /** Its computer is just gone (within the outage grace): it waits without a word, and no outage shows yet. */
+    quiet?: boolean;
   };
   /**
    * Long work paused near a limit (ADR 0118): `paused` once it was (it stays long work), `cardId` its card,
@@ -503,17 +517,19 @@ export interface Transcript {
    * answers.
    */
   outage?: { since: number; n: number; waitId: string };
-  /** When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else. */
+  /**
+   * When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else.
+   * A blip (a deploy dropping the computer for seconds, within the outage grace) keeps its place; a real outage doesn't.
+   */
   roomWaitSince?: number;
+  /** A person waits on this run: it goes first in the computer's line (`computer-queue.ts`). */
+  roomPeople?: boolean;
+  /** When this run last sent a turn to its computer: agents' turns there are spaced (`roomGate`). */
+  roomAsk?: { machineId: string; at: number };
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
   activeMs?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
   brainNotice?: string;
-  /**
-   * Where this outage's "unavailable" note is (posted by this run, or by another run of the agent waiting
-   * for the same computer): a later run of the agent there waits without saying it again.
-   */
-  brainNoticeIn?: { channelId: string; threadId: string | null };
   /**
    * The computer dropped in the middle of a computer brain's turn: the turn is sent again to the same
    * computer once it is back (its session resumes), told which tools already ran so none is repeated.
@@ -593,8 +609,20 @@ const settingsChangedNote = (system: readonly SystemBlock[]) =>
   [
     "# Your settings changed",
     "People edited your settings (your instructions, the organization's context, your team or what you may use) after this session started. This is how they are now; where it differs from your system prompt, this wins:",
-    ...system.filter((b) => !isTurnBlock(b)).map((b) => b.text),
+    ...system.filter((b) => !isComputerTurnBlock(b)).map((b) => b.text),
   ].join("\n\n");
+
+/** The tools whose presence the context's text follows (`buildRunContext`'s options), besides "What you can do". */
+const CONTEXT_TOOLS: readonly string[] = [
+  ASK_USER_TOOL,
+  REACT_TOOL,
+  FOLLOW_UP_TOOL,
+  WORK_IN_BACKGROUND_TOOL,
+  SHOW_BLOCK_TOOL,
+  FIND_AGENT_TOOL,
+  "load_skill",
+  "read_wiki_page",
+];
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
@@ -612,6 +640,11 @@ export const COMPUTER_BUSY_RETRY_MS = 15_000;
  * stuck or too small for its agents: the run fails with `computer_busy` and the person can ask again.
  */
 export const COMPUTER_BUSY_WAIT_MS = 30 * 60_000;
+/**
+ * Waiting for room is a live state on the person's message, not a chat line: only a run still in line after this long
+ * says so, once per agent and conversation.
+ */
+export const COMPUTER_QUEUE_NOTE_MS = 10 * 60_000;
 
 /** What a computer brain is asked again after its computer dropped mid-turn. */
 export function interruptedTurnPrompt(
@@ -789,6 +822,9 @@ async function executeRunInner(
         code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
         source: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'source'`,
         cut: sql<string | null>`${agentRuns.transcript}->'interruptedTurn'->>'cause'`,
+        orgId: agentRuns.orgId,
+        machineId: agentRuns.waitingMachineId,
+        roomSince: sql<string | null>`${agentRuns.transcript}->>'roomWaitSince'`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
@@ -802,6 +838,25 @@ async function executeRunInner(
     // Asking a busy computer again: nothing says it works until a turn starts (its first words do), or the
     // conversation would flash "thinking" every few seconds while it waits.
     askingForRoom = row.code === "busy";
+    // Only the head of the computer's line asks it (`computer-queue.ts`); the others look again later, without
+    // claiming. Past the whole wait it goes on, to fail like any run that never found room.
+    if (askingForRoom && row.machineId) {
+      const head = await roomHead(db, row.machineId);
+      const waited = Date.now() - Number(row.roomSince ?? Date.now());
+      if (head && head.id !== runId && waited < (deps.computerBusyWaitMs ?? COMPUTER_BUSY_WAIT_MS)) {
+        const at = Date.now() + COMPUTER_BUSY_RETRY_MS;
+        await enqueue(db, {
+          orgId: row.orgId,
+          kind: "agent_run.execute",
+          payload: { runId, wait: options.wait },
+          // Per time slot: a computer back and a person's message add looks of their own, which merge here.
+          dedupeKey: `agent_run.execute:${runId}:room:${options.wait}:${Math.floor(at / COMPUTER_BUSY_RETRY_MS)}`,
+          runAt: new Date(at),
+          maxAttempts: 4,
+        });
+        return;
+      }
+    }
   }
   // Claim first (the common case is a queued run): one statement.
   let run: AgentRun;
@@ -921,6 +976,7 @@ async function executeRunInner(
     status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
     error?: string,
     outage?: true,
+    computer?: "queued" | "away",
   ) => {
     for (const id of withReceipts.splice(0)) {
       await publishMessageActions({ db, pubsub: deps.pubsub }, run.orgId, id).catch(() => {});
@@ -940,6 +996,7 @@ async function executeRunInner(
       status,
       ...(error ? { error, ...runErrorDetail(error) } : {}),
       ...(outage ? { outage } : {}),
+      ...(computer ? { computer } : {}),
     });
     // Long work (ADR 0121): a wait pauses its promise (the card that stopped it is the update); an end goes home.
     if (run.workId) {
@@ -963,6 +1020,7 @@ async function executeRunInner(
       status,
       ...(error === NO_AI ? { reason: NO_AI } : {}),
       ...(outage ? { outage } : {}),
+      ...(computer ? { computer } : {}),
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
     // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
@@ -1004,7 +1062,7 @@ async function executeRunInner(
     );
   };
 
-  const event = (status: RunStatus, error?: string, outage?: true): ChannelEvent => ({
+  const event = (status: RunStatus, error?: string, outage?: true, computer?: "queued" | "away"): ChannelEvent => ({
     type: "agent.run",
     channelId: run.channelId,
     threadId: replyThreadId,
@@ -1013,6 +1071,7 @@ async function executeRunInner(
     status,
     ...bg,
     ...(outage ? { outage } : {}),
+    ...(computer ? { computer } : {}),
     ...(error ? { error, ...runErrorDetail(error) } : {}),
   });
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */
@@ -1168,7 +1227,7 @@ async function executeRunInner(
   }
   if (!askingForRoom) await publishChannelEvent(deps.pubsub, event("running"));
   // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
-  let toolChoice: ToolGroupChoice | null = null;
+  let toolChoice = null as ToolGroupChoice | null;
   const judge = deps.context?.judge;
   /** The latest messages where the run answers, read once for every judge that needs them. */
   let recentRead: Promise<string[]> | null = null;
@@ -1199,27 +1258,34 @@ async function executeRunInner(
       .catch(() => fallbackChoice("error"));
   };
   const autoAsked = needsContext && autoWanted(agent) ? askAuto() : null;
-  if (needsContext && deps.toolsOnDemand && judge && granted.length > 0) {
-    const [recent, keep] = await Promise.all([
-      recentMessages(),
-      keptToolGroups(db, run, granted).catch(() => [] as string[]),
-    ]);
-    toolChoice = await chooseToolGroups(judge, {
-      orgId: run.orgId,
-      agentId: agent.id,
-      runId: run.id,
-      agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
-      message: trigger?.body ?? "",
-      recent,
-      tools: granted,
-      keep,
-    });
-    ctx.loadedGroups = toolChoice.groups;
-    tools = presentTools(granted, isSensitive, ctx.loadedGroups);
-    if (toolChoice.groups.includes(toolGroupKey({ scope: BROWSER_SCOPE }))) {
-      deps.warmBrowser?.({ orgId: run.orgId, agentId: agent.id, threadRootId: run.threadRootId });
-    }
-  }
+  // The judge's answer is awaited where the tools are needed: the context is read meanwhile (`CONTEXT_TOOLS`).
+  const judging: Promise<void> | null =
+    needsContext && deps.toolsOnDemand && judge && granted.length > 0
+      ? (async () => {
+          const [recent, keep] = await Promise.all([
+            recentMessages(),
+            keptToolGroups(db, run, granted).catch(() => [] as string[]),
+          ]);
+          const choice = await chooseToolGroups(judge, {
+            orgId: run.orgId,
+            agentId: agent.id,
+            runId: run.id,
+            agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+            message: trigger?.body ?? "",
+            recent,
+            tools: granted,
+            keep,
+          });
+          toolChoice = choice;
+          ctx.loadedGroups = choice.groups;
+          tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+          if (choice.groups.includes(toolGroupKey({ scope: BROWSER_SCOPE }))) {
+            deps.warmBrowser?.({ orgId: run.orgId, agentId: agent.id, threadRootId: run.threadRootId });
+          }
+        })()
+      : null;
+  // Read only when the context is built; a failure surfaces there.
+  judging?.catch(() => {});
   // What the agent shows it is doing (ADR 0084 §8–9): lines from facts everyone may see, picked by Jev in a request
   // of its own, beside the run and never in its way: its statements count apart from the run's.
   if (needsContext) {
@@ -1404,6 +1470,9 @@ async function executeRunInner(
   }
   if (!transcript) {
     const contextDeps = deps.context;
+    // The tools the context names are core ones: listed whatever groups the judge loads, so it needn't wait for it.
+    // A connector's tool of the same name could come with a group: then it waits.
+    if (judging && !granted.every((t) => isCore(t) || !CONTEXT_TOOLS.includes(t.name))) await judging;
     const pending: { label: string; reason: string }[] = deps.tools
       ? await pendingConnectors(db, run.orgId, new Set(granted.map((t) => t.name))).catch(() => [])
       : [];
@@ -1430,7 +1499,10 @@ async function executeRunInner(
         work: tools.some((t) => t.name === WORK_IN_BACKGROUND_TOOL),
         blocks: tools.some((t) => t.name === SHOW_BLOCK_TOOL),
         choices: tools.some((t) => t.name === ASK_CHOICES_TOOL),
-        capabilities: [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
+        // "What you can do" names the loaded groups: it waits for the judge.
+        capabilities: Promise.resolve(judging).then(() =>
+          [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
+        ),
         skills: skillList,
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),
         // Granted is enough: on demand (ADR 0043) it is one `use_tool` away.
@@ -1453,6 +1525,7 @@ async function executeRunInner(
                 known: agent.instructions,
                 // A person's own preferences come in for the runs they are behind (ADR 0120).
                 personIds: personId ? [personId] : [],
+                runId: run.id,
               }),
             )
             .catch(() => ({ text: "", itemIds: [] as string[] }))
@@ -1474,14 +1547,19 @@ async function executeRunInner(
           ).catch(() => ({ text: "", pageIds: [] as string[], held: false }))
         : Promise.resolve({ text: "", pageIds: [] as string[], held: false }),
     ]);
+    await judging;
     const issueId = context.issueId;
     if (issueId) later(() => linkRunToIssue({ db, pubsub: deps.pubsub }, run, issueId));
     const system: ContextBlock[] = [...context.system];
     if (contextDeps && context.stats.truncated) {
       // Long thread: the summary stands in for what didn't fit.
-      const summary = await ensureThreadSummary(contextDeps, run.orgId, run.threadRootId, { force: true }).catch(
+      const found = await ensureThreadSummary(contextDeps, run.orgId, run.threadRootId, { force: true }).catch(
         () => null,
       );
+      const dm = found
+        ? await agentsDmReads(db, run.orgId, run.channelId, () => readerOfRun(db, run.orgId, run.id))
+        : null;
+      const summary = found && (!dm || (await dm.item(found))) ? found : null;
       if (summary)
         system.push({ text: `# Earlier in this thread (summary)\n${itemLabel(summary)} ${summary.content}` });
     }
@@ -2014,9 +2092,14 @@ async function executeRunInner(
     triggerText = (await getMessage(db, run.orgId, run.triggerMessageId))?.body ?? "";
   }
   /** What a computer brain reads next when it isn't the trigger: results after a pause, new messages. */
-  let nextPrompt: string | null = transcript.interruptedTurn
-    ? interruptedTurnPrompt(transcript.interruptedTurn, resumeText)
-    : (resumeText ?? transcript.continued?.prompt ?? null);
+  // A prompt saved by a claim that parked before its turn already holds the cut turn's words and the trigger.
+  let nextPrompt: string | null = transcript.continued?.prompt
+    ? [transcript.continued.prompt, resumeText].filter(Boolean).join("\n\n")
+    : transcript.interruptedTurn
+      ? interruptedTurnPrompt(transcript.interruptedTurn, resumeText)
+      : resumeText;
+  /** What the next turn must still read if this claim parks before one runs (messages that joined it). */
+  let carried = transcript.continued?.prompt ?? null;
   // Read once: a later pause of this run resumes with its own text.
   delete transcript.continued;
   let computerTurns = 0;
@@ -2175,7 +2258,7 @@ async function executeRunInner(
    * is asked again every `COMPUTER_BUSY_RETRY_MS`, until `COMPUTER_BUSY_WAIT_MS` after its first refusal.
    */
   const brainUnavailable = async (
-    u: { code: string; message: string; resetsAt?: string },
+    u: { code: string; message: string; resetsAt?: string; queued?: boolean; retryAt?: number },
     firstLook = false,
   ): Promise<"fallback" | "waited" | "failed" | "no" | "back" | "canceled"> => {
     const from = plan.kind;
@@ -2196,8 +2279,10 @@ async function executeRunInner(
     // executed tools when the runner can't name them (Claude Code's own tools, an older runner): the same.
     const onlyThisComputer = (t.interruptedTurn?.executed.length ?? 0) > 0 || t.interruptedTurn?.cause === "plan_limit";
     // A background run never stands in on the model brain (`mayFallBack`): it waits for its computer.
+    // Behind others in the computer's line (`roomGate`) is no refusal: it waits its turn.
     if (
       !onlyThisComputer &&
+      !u.queued &&
       mayFallBack(agent, run) &&
       (await deps.gateway.hasModelCredential(thinker).catch(() => false))
     ) {
@@ -2237,24 +2322,41 @@ async function executeRunInner(
         await fail(COMPUTER_BUSY);
         return "failed";
       }
-    } else delete t.roomWaitSince;
+      if (!run.background && run.hop <= 1 && viaRoutine === null) t.roomPeople = true;
+    }
+    // Just gone (our own deploy, a runner dialing again): it waits without a word until the outage grace is over.
+    let quietUntil: number | null = null;
+    if (u.code === "machine_offline") {
+      const status = await deps.machines?.status(machineId).catch(() => null);
+      const seen = status?.lastSeenAt ? Date.parse(status.lastSeenAt) : Number.NaN;
+      if (status && !status.online && Date.now() - seen < TASK_OFFLINE_GRACE_MS)
+        quietUntil = seen + TASK_OFFLINE_GRACE_MS;
+    }
+    // Only a blip keeps its place in the line: after a real outage the wait for room starts over, or its clock
+    // (the note, `COMPUTER_BUSY_WAIT_MS`) would count the time the computer was gone as time it was busy.
+    if (!busy && quietUntil === null) delete t.roomWaitSince;
     // Nothing can stand in (no model credential, or background work): the run waits for the computer.
     await deferred;
     const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
-    // One note per outage and place: another run of this agent already waits for the same computer and
-    // said so here (an hourly routine, a second message): this one waits quietly with it.
     // A routine's run waits quietly: it runs when the computer is back (the next slot supersedes it), and
     // Rotinas and one notification per outage say so; a note per run of a computer that naps is noise.
-    const quiet = run.background || viaRoutine !== null;
-    const said = quiet || t.brainNotice === u.code || (await noticeAlreadyPosted(db, run, machineId, replyThreadId));
-    const say = !said;
-    const note = say
-      ? await db.transaction(async (tx) => {
+    // Waiting for room is said only after `COMPUTER_QUEUE_NOTE_MS`: until then the person's message shows it.
+    // A person's message that joined a routine's run is a person waiting: it is said for them.
+    const quiet =
+      run.background ||
+      (viaRoutine !== null && run.pendingMessageIds.length === 0 && !carried) ||
+      quietUntil !== null ||
+      (busy && Date.now() - (t.roomWaitSince ?? Date.now()) < COMPUTER_QUEUE_NOTE_MS);
+    const note = quiet
+      ? null
+      : await db.transaction(async (tx) => {
+          // One note per agent and conversation until it answers; an outage's, one per computer and conversation.
+          if (await waitNoteSaid(tx, run, machineId, replyThreadId, u.code === "machine_offline")) return null;
           const m = await post(
             tx,
             replyThreadId,
             busy
-              ? "My computer is busy with other tasks right now. I'll answer as soon as it's free."
+              ? "Still in line for the computer. I'll answer as soon as it has room."
               : `${u.message} I'll answer when it's back.`,
             {
               ...bodyCode("brain_unavailable", { brain: name }),
@@ -2264,6 +2366,7 @@ async function executeRunInner(
                 code: u.code,
                 machineId,
                 agentId: agent.id,
+                ...(busy ? { long: true } : {}),
                 ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}),
               },
             },
@@ -2272,25 +2375,32 @@ async function executeRunInner(
           );
           t.postedCount++;
           return m;
-        })
-      : null;
+        });
     t.postedUpTo = t.messages.length;
     t.brainNotice = u.code;
-    // Nothing said here by a quiet run: a person's message in the same place still gets its note.
-    if (!quiet) t.brainNoticeIn = { channelId: run.channelId, threadId: replyThreadId };
+    // What it was about to read (a person's decision, a cut turn, messages that joined it) is read when it picks up.
+    const keep = computerTurns === 0 ? nextPrompt : carried;
+    if (keep) t.continued = { prompt: keep };
     // `waitId`: one wait (its "computer is back" job is queued once per wait, `resumeRunsWaitingForMachine`).
-    t.waitingForBrain = { kind: from, machineId, code: u.code, waitId: Bun.randomUUIDv7() };
+    t.waitingForBrain = {
+      kind: from,
+      machineId,
+      code: u.code,
+      waitId: Bun.randomUUIDv7(),
+      ...(quietUntil !== null ? { quiet: true } : {}),
+    };
     if (!stillBusy)
       await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
-    // Online and full, it sends no "back" signal: ask again soon. Queued before the wait is stored, so a crash
-    // in between leaves at worst a job that finds another wait and does nothing.
-    if (busy) {
+    // Online and full, it sends no "back" signal: ask again soon. Just gone: look again when the grace is over (back
+    // before that, `resumeRunsWaitingForMachine` resumes it and this job finds another wait). Queued before the wait
+    // is stored, so a crash in between leaves at worst a job that finds another wait and does nothing.
+    if (busy || quietUntil !== null) {
       await enqueue(db, {
         orgId: run.orgId,
         kind: "agent_run.execute",
         payload: { runId: run.id, wait: t.waitingForBrain.waitId },
-        dedupeKey: `agent_run.execute:${run.id}:room:${t.waitingForBrain.waitId}`,
-        runAt: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS),
+        dedupeKey: `agent_run.execute:${run.id}:${busy ? "room" : "offline_note"}:${t.waitingForBrain.waitId}`,
+        runAt: new Date(busy ? (u.retryAt ?? Date.now() + COMPUTER_BUSY_RETRY_MS) : (quietUntil as number)),
         maxAttempts: 4,
       });
     }
@@ -2301,7 +2411,7 @@ async function executeRunInner(
     if (!moved) throw new PermanentJobError("run changed state while executing");
     // A routine's run waits for its own computer, never the API (ADR 0053 §6.4): its people hear it once.
     // Waiting for room is no outage: it ends within `COMPUTER_BUSY_WAIT_MS`, and the routine's ledger tells.
-    if (run.background && !busy)
+    if (run.background && !busy && quietUntil === null)
       await routineRunWaitingForComputer({ db, pubsub: deps.pubsub }, run, machineId).catch(() => {});
     if (note) {
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
@@ -2319,8 +2429,9 @@ async function executeRunInner(
         maxAttempts: 4,
       });
     }
-    await publishChannelEvent(deps.pubsub, event("waiting_input"));
-    await finished("waiting_input");
+    const computer = busy ? ("queued" as const) : ("away" as const);
+    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, undefined, computer));
+    await finished("waiting_input", undefined, undefined, computer);
     return "waited";
   };
 
@@ -2497,8 +2608,8 @@ async function executeRunInner(
     // Already back (a new runner's hello is what ended the turn): now. Same key as the "back" signal's job.
     const back = await deps.machines?.status(machineId).catch(() => null);
     if (back?.online) await job("brain_back");
-    await publishChannelEvent(deps.pubsub, event("waiting_input"));
-    await finished("waiting_input");
+    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, undefined, "away"));
+    await finished("waiting_input", undefined, undefined, "away");
   };
 
   /**
@@ -2924,6 +3035,8 @@ async function executeRunInner(
         { messageId: delivered.message.id, urgent: false },
       );
   };
+  /** The first computer turn's checkouts sync, started during the quiet window for that plan. */
+  let earlyCode: { plan: BrainPlan; code: Promise<CodeSetup | null> } | null = null;
   const autoTick: ReturnType<typeof setInterval> | null =
     run.background || run.workId || forum
       ? null
@@ -2938,6 +3051,21 @@ async function executeRunInner(
       run.trigger !== "router" &&
       triggerMessage?.authorType === "person"
     ) {
+      // Meanwhile a computer brain's checkouts get synced for its first turn (used only if that turn is the same).
+      if (plan.kind !== "model" && plan.session && deps.prepareCode && computerTurns === 0 && !nextPrompt) {
+        const early = brainTurnOf(run, thinker, transcript, tools, triggerText, plan);
+        const prepare = deps.prepareCode;
+        const machineId = plan.session.machineId;
+        // Not for Codex on a runner that never uses its checkouts (`CodexBrain`): a sync nobody reads.
+        const code = (async () => {
+          if (plan.kind === "codex") {
+            const protocol = (await deps.machines?.status(machineId).catch(() => null))?.protocol;
+            if (protocol !== undefined && protocol < CODEX_FOLDER_PROTOCOL) return null;
+          }
+          return prepare(early, signal);
+        })().catch(() => null);
+        earlyCode = { plan, code };
+      }
       await waitForBurst(db, triggerMessage, deps.quietMs, signal);
     }
     for (;;) {
@@ -2954,6 +3082,7 @@ async function executeRunInner(
       const steered = await deliverSteering(firstTurn && run.turns === 0);
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
+        carried = [carried ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
       }
       // Long work (ADR 0121): a move its own tool made in this process is taken now; a work past its caps waits in
       // line here, between steps; an API-model work hands its job back now and then (the job lease has a ceiling).
@@ -2997,6 +3126,21 @@ async function executeRunInner(
         ? { deps: { db, pubsub: deps.pubsub, judge }, tools: deps.tools, ctx, where, turnTools }
         : null;
 
+      // A shared computer's line (`roomGate`): its first turn waits behind the runs ahead, and agents' turns are spaced.
+      const roomMachine = plan.kind !== "model" ? (plan.session?.machineId ?? agent.machineId ?? null) : null;
+      if (roomMachine && computerTurns === 0) {
+        const people = Boolean(transcript.roomPeople) || (!run.background && run.hop <= 1 && viaRoutine === null);
+        const behind = await roomGate(db, run, roomMachine, { people, since: transcript.roomWaitSince ?? Date.now() });
+        if (behind) {
+          const handled = await brainUnavailable({
+            code: "busy",
+            message: "Waiting in line for the computer.",
+            queued: true,
+            retryAt: behind.retryAt,
+          });
+          if (handled === "waited" || handled === "failed") return;
+        } else transcript.roomAsk = { machineId: roomMachine, at: Date.now() };
+      }
       const turn = run.turns + 1;
       const deltas = createDeltaPublisher(
         deps.pubsub,
@@ -3072,12 +3216,24 @@ async function executeRunInner(
         }
       }
       let result: BrainStep;
+      /** The computer turned the turn away for want of room: nothing ended there that frees room. */
+      let refused = false;
       try {
         result = await thinkOnce(
           brain,
           // Memory and wiki once per run: its first turn, or a session started afresh.
           brainTurnOf(run, thinker, transcript, turnTools, prompt, turnPlan, {
             found: computerTurns === 0 || !turnPlan.session?.resume,
+            // Synced during the quiet window for this very turn; where it starts is picked again from its words now
+            // (what came in meanwhile may name another repository).
+            ...(earlyCode?.plan === turnPlan && computerTurns === 0
+              ? {
+                  code: startAgain(earlyCode.code, {
+                    trigger: prompt,
+                    messages: transcript.messages.map((m) => ({ content: flattenContent(m.content) })),
+                  }),
+                }
+              : {}),
           }),
           io,
           deltas.push,
@@ -3124,6 +3280,7 @@ async function executeRunInner(
         if (turnPlan.kind !== "model") {
           computerTurns++;
           nextPrompt = null;
+          carried = null;
           // The account it ran with (ADR 0041): when it was last used, after the turn.
           const account = turnPlan.account;
           if (account && computerTurns === 1) later(() => touchMachineAccount(db, run.orgId, account.id));
@@ -3154,7 +3311,14 @@ async function executeRunInner(
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
         // Anything but "no room" means the computer took the turn: that wait for room is over.
-        if (!(error instanceof BrainFailure && error.code === "busy")) delete transcript.roomWaitSince;
+        refused = error instanceof BrainFailure && error.code === "busy";
+        // Dropped before the computer said or did anything (a deploy as the turn went out): still in line.
+        const unsent =
+          error instanceof BrainFailure &&
+          error.code === "machine_offline" &&
+          !deltas.text() &&
+          executedNow.length === 0;
+        if (!refused && !unsent) delete transcript.roomWaitSince;
         if (turnAbort?.signal.aborted) {
           await interruptedTurn(turn, deltas.text());
           continue;
@@ -3273,6 +3437,9 @@ async function executeRunInner(
         throw error;
       } finally {
         if (turnAbort) unregisterTurnAbort(run.id, turnAbort);
+        // A turn ended on the computer and its memory is free: the next in its line asks now.
+        const ranOn = turnPlan.kind !== "model" ? (turnPlan.session?.machineId ?? agent.machineId) : null;
+        if (ranOn && !refused) await kickRoomQueue(db, ranOn).catch(() => {});
       }
       await deltas.flush();
       delete transcript.outage;
@@ -3932,9 +4099,16 @@ function brainTurnOf(
   tools: ToolDefinition[],
   trigger: string,
   plan: BrainPlan,
-  options: { found?: boolean } = {},
+  options: { found?: boolean; code?: Promise<CodeSetup | null> } = {},
 ): ComputerTurn {
   const model = plan.kind === "model" ? agent.model : plan.model;
+  const turnParts = () => {
+    if (plan.kind === "model") return undefined;
+    // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
+    const lost: ContextBlock[] =
+      t.sessionLost && !plan.session?.resume ? [{ turn: true, found: true, text: sessionLostNote(t.sessionLost) }] : [];
+    return thisTurnParts([...t.system, ...lost], new Date(), options);
+  };
   return {
     runId: run.id,
     orgId: run.orgId,
@@ -3944,7 +4118,7 @@ function brainTurnOf(
     get system() {
       if (plan.kind === "model") return t.system.map((b) => b.text).join("\n\n");
       const text = t.system
-        .filter((b) => !isTurnBlock(b))
+        .filter((b) => !isComputerTurnBlock(b))
         .map((b) => b.text)
         .join("\n\n");
       // A computer brain has its own tools (read, search, shell, git) besides ours.
@@ -3960,26 +4134,29 @@ function brainTurnOf(
         .join("\n\n");
     },
     get thisTurn() {
-      if (plan.kind === "model") return undefined;
-      // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
-      const lost: ContextBlock[] =
-        t.sessionLost && !plan.session?.resume
-          ? [{ turn: true, found: true, text: sessionLostNote(t.sessionLost) }]
-          : [];
-      return thisTurnText([...t.system, ...lost], new Date(), options) || undefined;
+      const parts = turnParts();
+      return [parts?.head, parts?.found].filter(Boolean).join("\n\n") || undefined;
+    },
+    get thisTurnFound() {
+      return turnParts()?.found || undefined;
     },
     get messages() {
       return t.messages.map((m) => ({ role: m.role, content: flattenContent(m.content) }));
     },
-    tools: tools.map(brainToolOf),
+    tools: tools.map((d) => (isStableTool(d) ? { ...brainToolOf(d), stable: true } : brainToolOf(d))),
     ...(model ? { model } : {}),
     ...(plan.session ? { session: t.sessionLost ? { ...plan.session, ownFolder: true } : plan.session } : {}),
     ...(plan.account ? { account: plan.account } : {}),
     ...(plan.effort ? { effort: plan.effort } : {}),
     ...(agent.contextTokens ? { contextTokens: agent.contextTokens } : {}),
     trigger,
+    ...(options.code ? { code: options.code } : {}),
   };
 }
+
+/** An early checkouts sync for a turn whose words may have changed since: where it starts picked again from them. */
+const startAgain = (code: Promise<CodeSetup | null>, turn: Parameters<typeof codeStart>[1]) =>
+  code.then((c) => (c?.pick ? { ...c, ...codeStart(c.pick, turn) } : c));
 
 /** A message as plain text for brains that take text: tool calls and results inline, provider blocks dropped. */
 const flattenContent = (content: string | ContentBlock[]): string =>
@@ -4517,32 +4694,42 @@ function appendUserText(t: Transcript, text: string) {
 }
 
 /**
- * Another run of this agent waits for the same computer and its "unavailable" note is in this
- * conversation (same channel, same thread or the main timeline): one note covers the outage there.
+ * Whether a note for this wait is already in the conversation (same channel and thread): the agent's last message
+ * there is one (one note per agent and conversation until it answers), or, for its computer being offline, any
+ * agent's note for that computer since it was last seen (one per computer and conversation per outage). Under a lock
+ * on that key, so runs parking together post at most one.
  */
-async function noticeAlreadyPosted(
-  db: Database,
-  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId">,
+async function waitNoteSaid(
+  tx: Executor,
+  run: Pick<AgentRun, "orgId" | "agentId" | "channelId">,
   machineId: string,
   threadId: string | null,
+  offline: boolean,
 ): Promise<boolean> {
-  const rows = await db
-    .select({
-      channelId: sql<string | null>`${agentRuns.transcript}->'brainNoticeIn'->>'channelId'`,
-      threadId: sql<string | null>`${agentRuns.transcript}->'brainNoticeIn'->>'threadId'`,
-    })
-    .from(agentRuns)
-    .where(
-      and(
-        eq(agentRuns.orgId, run.orgId),
-        eq(agentRuns.agentId, run.agentId),
-        eq(agentRuns.channelId, run.channelId),
-        eq(agentRuns.status, "waiting_input"),
-        eq(agentRuns.waitingMachineId, machineId),
-        sql`${agentRuns.id} <> ${run.id}`,
-      ),
-    );
-  return rows.some((r) => r.channelId === run.channelId && (r.threadId ?? null) === threadId);
+  const place = sql`${messages.orgId} = ${run.orgId} and ${messages.channelId} = ${run.channelId}
+    and ${messages.threadId} is not distinct from ${threadId}::uuid and ${messages.deletedAt} is null`;
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext(${`wait-note:${offline ? machineId : run.agentId}:${run.channelId}:${threadId ?? ""}`}))`,
+  );
+  if (offline) {
+    const [said] = await tx
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        sql`${place} and ${messages.meta}->>'bodyCode' = 'brain_unavailable'
+          and ${messages.meta}->'brainUnavailable'->>'machineId' = ${machineId}
+          and ${messages.createdAt} >= coalesce((select last_seen_at from ${machines} where id = ${machineId}::uuid), 'epoch')`,
+      )
+      .limit(1);
+    if (said) return true;
+  }
+  const [last] = await tx
+    .select({ code: sql<string | null>`${messages.meta}->>'bodyCode'` })
+    .from(messages)
+    .where(sql`${place} and ${messages.authorAgentId} = ${run.agentId}`)
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  return last?.code === "brain_unavailable";
 }
 
 /** What a message posted by a run a routine's report woke carries (`meta.routine`, ADR 0053 §7). */

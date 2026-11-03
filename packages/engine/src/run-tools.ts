@@ -672,7 +672,7 @@ export interface PostedPause {
 }
 
 /** A run's trigger, as its messages and cards read it. */
-export type RunTriggerRow = Pick<Message, "id" | "authorType" | "meta">;
+export type RunTriggerRow = Pick<Message, "id" | "authorType" | "authorAgentId" | "meta">;
 
 /** The trigger of a run (null when it is gone). */
 export async function runTriggerOf(
@@ -680,7 +680,12 @@ export async function runTriggerOf(
   run: Pick<AgentRun, "orgId" | "triggerMessageId">,
 ): Promise<RunTriggerRow | null> {
   const [row] = await db
-    .select({ id: messages.id, authorType: messages.authorType, meta: messages.meta })
+    .select({
+      id: messages.id,
+      authorType: messages.authorType,
+      authorAgentId: messages.authorAgentId,
+      meta: messages.meta,
+    })
     .from(messages)
     .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)));
   return row ?? null;
@@ -688,19 +693,32 @@ export async function runTriggerOf(
 
 /**
  * What every message a run posts carries, on every brain: the routine that called it (`viaRoutine`, a
- * small tag, since the routine's own call isn't shown) and whether the router brought it in after another
- * agent spoke (`joined`, ADR 0034). Only a person-authored trigger is a routine's call.
+ * small tag, since the routine's own call isn't shown), whether the router brought it in after another
+ * agent spoke (`joined`, ADR 0034) and the agent whose message it answers (`toAgent`: the apps fold a long
+ * one to its first paragraph, the rest a click away, ADR 0034). Only a person-authored trigger is a routine's
+ * call; an event the agent's own conversation got (`meta.notice`) is its own message, not another agent's.
  */
 export function runMessageMeta(
-  run: Pick<AgentRun, "trigger">,
-  trigger: Pick<Message, "authorType" | "meta"> | null | undefined,
+  run: Pick<AgentRun, "trigger" | "agentId">,
+  trigger: Pick<Message, "authorType" | "authorAgentId" | "meta"> | null | undefined,
 ): Record<string, unknown> {
   const call =
     trigger?.authorType === "person" ? (trigger.meta.routine as { id?: unknown; name?: unknown } | undefined) : null;
   const viaRoutine =
     call && typeof call.id === "string" && typeof call.name === "string" ? { id: call.id, name: call.name } : null;
   const joined = run.trigger === "router" && trigger?.authorType === "agent";
-  return { ...(viaRoutine ? { viaRoutine } : {}), ...(joined ? { joined: true } : {}) };
+  const toAgent =
+    trigger?.authorType === "agent" &&
+    trigger.authorAgentId &&
+    trigger.authorAgentId !== run.agentId &&
+    !trigger.meta.notice
+      ? trigger.authorAgentId
+      : null;
+  return {
+    ...(viaRoutine ? { viaRoutine } : {}),
+    ...(joined ? { joined: true } : {}),
+    ...(toAgent ? { toAgent } : {}),
+  };
 }
 
 /**

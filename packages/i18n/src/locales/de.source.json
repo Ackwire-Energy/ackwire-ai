@@ -3820,6 +3820,18 @@
       "other": "{{names}}: the AI provider is down · retries by itself"
     }
   },
+  "receipts.queued": {
+    "value": {
+      "one": "{{names}} is in line for the computer",
+      "other": "{{names}} are in line for the computer"
+    }
+  },
+  "receipts.away": {
+    "value": {
+      "one": "{{names}} is waiting for the computer",
+      "other": "{{names}} are waiting for the computer"
+    }
+  },
   "receipts.nobody": {
     "value": "No agent will answer"
   },
@@ -3840,6 +3852,12 @@
   },
   "receipts.status.outage": {
     "value": "The AI provider is down · retries by itself"
+  },
+  "receipts.status.queued": {
+    "value": "In line for the computer"
+  },
+  "receipts.status.away": {
+    "value": "Waiting for the computer"
   },
   "receipts.status.handled": {
     "value": "Answered"
@@ -4760,6 +4778,15 @@
   "newChannel.rolesLeave": {
     "value": "Whoever loses the role leaves the channel."
   },
+  "newChannel.rolesChoose": {
+    "value": "Choose roles"
+  },
+  "newChannel.rolesChange": {
+    "value": "Change roles"
+  },
+  "newChannel.rolesDone": {
+    "value": "Done"
+  },
   "newChannel.publicTitle": {
     "value": "Make #{{channel}} public?"
   },
@@ -5250,6 +5277,9 @@
   },
   "presence.agent.waiting_computer": {
     "value": "Waiting for the computer"
+  },
+  "presence.agent.queued_computer": {
+    "value": "In line for the computer"
   },
   "presence.agent.waiting_plan": {
     "value": "Waiting for the plan to reset"
@@ -7006,6 +7036,9 @@
   },
   "agent.runNoText": {
     "value": "No text"
+  },
+  "agent.runPrivate": {
+    "value": "In a conversation you're not in"
   },
   "agent.runTokens": {
     "value": "{{input}} in · {{cached}} cached · {{output}} out"
@@ -15740,6 +15773,180 @@
   "emoji.categories.symbols": {
     "value": "Symbols"
   },
+  "voice.word": {
+    "value": "Voice message"
+  },
+  "voice.wordTime": {
+    "value": "Voice message · {{time}}"
+  },
+  "voice.holdToRecord": {
+    "value": "Hold to record"
+  },
+  "voice.slideToDelete": {
+    "value": "Slide to delete"
+  },
+  "voice.send": {
+    "value": "Send audio"
+  },
+  "voice.delete": {
+    "value": "Delete recording"
+  },
+  "voice.deleted": {
+    "value": "Recording deleted."
+  },
+  "voice.pause": {
+    "value": "Pause"
+  },
+  "voice.resume": {
+    "value": "Keep recording"
+  },
+  "voice.listen": {
+    "value": "Listen to your recording"
+  },
+  "voice.play": {
+    "value": "Play"
+  },
+  "voice.stop": {
+    "value": "Stop"
+  },
+  "voice.speed": {
+    "value": "Speed"
+  },
+  "voice.left": {
+    "value": "{{seconds}} s left"
+  },
+  "voice.tooShort": {
+    "value": "Too short. Say a little more."
+  },
+  "voice.silent": {
+    "value": "Didn't hear anything. Nothing was sent."
+  },
+  "voice.notSent": {
+    "value": "Couldn't send the audio."
+  },
+  "voice.limit": {
+    "value": "That's a lot of audio for today. Write here and try again tomorrow."
+  },
+  "voice.micBlocked": {
+    "value": "The microphone is blocked"
+  },
+  "voice.micBlockedHint": {
+    "value": "Allow the microphone in your device settings to record."
+  },
+  "voice.openSettings": {
+    "value": "Open settings"
+  },
+  "voice.notNow": {
+    "value": "Not now"
+  },
+  "voice.expired": {
+    "value": "Audio expired"
+  },
+  "voice.showText": {
+    "value": "Show text"
+  },
+  "voice.hideText": {
+    "value": "Hide text"
+  },
+  "voice.record": {
+    "value": "Record audio"
+  },
+  "voice.recording": {
+    "value": "Recording audio"
+  },
+  "voice.discard": {
+    "value": "Delete recording"
+  },
+  "voice.stopListening": {
+    "value": "Stop listening"
+  },
+  "voice.keys": {
+    "value": "Enter sends · Esc deletes"
+  },
+  "voice.keysHold": {
+    "value": "Release to send · Esc deletes"
+  },
+  "voice.keysPaused": {
+    "value": "Paused · Space listens · Enter sends · Esc deletes"
+  },
+  "voice.pausePlay": {
+    "value": "Pause"
+  },
+  "voice.seek": {
+    "value": "Audio position"
+  },
+  "voice.speedAt": {
+    "value": "Speed {{speed}}×"
+  },
+  "voice.waiting": {
+    "value": "Goes as soon as you're back online"
+  },
+  "voice.notUnderstood": {
+    "value": "Couldn't make out the audio. Nothing was sent."
+  },
+  "voice.refused": {
+    "value": "The audio couldn't be sent in this conversation."
+  },
+  "voice.blockedMac": {
+    "value": "The microphone is blocked. On a Mac: System Settings › Privacy › Microphone."
+  },
+  "voice.blockedWeb": {
+    "value": "The microphone is blocked. Allow it from the lock next to the site's address."
+  },
+  "voice.noMic": {
+    "value": "No microphone found."
+  },
+  "voice.failed": {
+    "value": "Couldn't open the microphone. Try again."
+  },
+  "voice.noPlayback": {
+    "value": "Can't play it right now. You can still send it or keep recording."
+  },
+  "voice.settings.title": {
+    "value": "Voice messages"
+  },
+  "voice.settings.on": {
+    "value": "Voice messages"
+  },
+  "voice.settings.onHelp": {
+    "value": "People in this workspace can send audio in conversations."
+  },
+  "voice.settings.noEngine": {
+    "value": "Voice messages aren't available here yet."
+  },
+  "voice.settings.engineTitle": {
+    "value": "What turns voice into text"
+  },
+  "voice.settings.own": {
+    "value": "Your own server"
+  },
+  "voice.settings.ownHelp": {
+    "value": "Whisper or Parakeet on your machine. The audio stays there."
+  },
+  "voice.settings.address": {
+    "value": "Server address"
+  },
+  "voice.settings.key": {
+    "value": "{{name}} key"
+  },
+  "voice.settings.keyPlaceholder": {
+    "value": "Paste here"
+  },
+  "voice.settings.test": {
+    "value": "Test"
+  },
+  "voice.settings.tested": {
+    "value": "It works. Everyone now sees the microphone."
+  },
+  "voice.settings.sealed": {
+    "value": "Kept encrypted on your server and never shown again."
+  },
+  "voice.settings.leaves": {
+    "value": "Audio from voice messages goes to {{name}} to become text."
+  },
+  "voice.settings.invalid": {
+    "value": "The saved key doesn't open on this server. Paste it again."
+  },
   "media.word.gif": {
     "value": "GIF"
   },
@@ -20801,6 +21008,9 @@
   "connectors.toolChanges.description": {
     "value": "Text"
   },
+  "connectors.toolChanges.input": {
+    "value": "Input"
+  },
   "connectors.toolChanges.field.added": {
     "value": "new"
   },
@@ -20816,14 +21026,11 @@
   "connectors.toolChanges.removed": {
     "value": "Removed"
   },
-  "connectors.toolChanges.acceptOne": {
-    "value": "Accept {{tool}}"
-  },
-  "connectors.toolChanges.input": {
-    "value": "Input"
-  },
   "connectors.toolChanges.accept": {
     "value": "Accept"
+  },
+  "connectors.toolChanges.acceptOne": {
+    "value": "Accept {{tool}}"
   },
   "connectors.toolChanges.accepted": {
     "value": "{{tool}} updated."
@@ -21556,6 +21763,9 @@
   },
   "toolReview.noTools": {
     "value": "The server didn't offer any tools."
+  },
+  "toolReview.unreadable": {
+    "value": "Couldn't read the connector's tools: {{reason}}"
   },
   "toolReview.refresh": {
     "value": "Look for new tools"
@@ -23447,6 +23657,18 @@
   "errors.handle.takenByAgent": {
     "value": "@{{handle}} belongs to an agent."
   },
+  "machines.egress.draining": {
+    "value": "Network settings are changing. Open computer sessions will restart at {{when}}."
+  },
+  "machines.egress.restart": {
+    "value": "Computer sessions are restarting to apply network settings. New work waits until this finishes."
+  },
+  "machines.egress.line": {
+    "value": "Exit IP {{ip}}"
+  },
+  "machines.egress.hint": {
+    "value": "The address websites see when the agents browse. It updates when the computer’s network changes."
+  },
   "machines.online": {
     "value": "Online"
   },
@@ -25186,6 +25408,9 @@
   "settings.section.media": {
     "value": "GIFs and stickers"
   },
+  "settings.section.voice": {
+    "value": "Voice"
+  },
   "settings.section.apps": {
     "value": "AI apps"
   },
@@ -25233,6 +25458,9 @@
   },
   "settings.sectionText.media": {
     "value": "What people can send in a conversation, and when agents send a GIF or a sticker."
+  },
+  "settings.sectionText.voice": {
+    "value": "Voice messages in conversations, and who turns voice into text."
   },
   "settings.sectionText.apps": {
     "value": "Ask this workspace's agents for tasks from Claude, Cursor and other apps."
@@ -26182,6 +26410,15 @@
   "chat.consultGroup.see": {
     "value": "See"
   },
+  "chat.talk.readAll": {
+    "value": "Read all"
+  },
+  "chat.talk.more": {
+    "value": {
+      "one": "{{count}} more line",
+      "other": "{{count}} more lines"
+    }
+  },
   "chat.consultPanel.label": {
     "value": "Conversation between {{from}} and {{to}}"
   },
@@ -27032,6 +27269,9 @@
   },
   "chat.body.brain_busy": {
     "value": "My computer is busy with other tasks right now. I'll answer as soon as it's free."
+  },
+  "chat.body.brain_queued": {
+    "value": "Still in line for the computer. I'll answer as soon as it has room."
   },
   "chat.body.brain_interrupted": {
     "value": "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}."
@@ -29046,6 +29286,15 @@
   },
   "computerSetup.email.short": {
     "value": "We'll email you."
+  },
+  "desktop.ask.watching": {
+    "value": "You're just watching."
+  },
+  "desktop.ask.title": {
+    "value": "Want to take control?"
+  },
+  "desktop.ask.working": {
+    "value": "{{name}} pauses while you’re in control."
   },
   "desktop.sub.control": {
     "value": "You're in control · {{name}} waits"

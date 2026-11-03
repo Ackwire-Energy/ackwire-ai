@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { limitIp } from "@agenteschat/adapters";
 import {
   ARTIFACT_LIMITS,
@@ -152,6 +153,12 @@ export const Machine = z
         description:
           "Whether agents can use their own desktops there (protocol 21, ADR 0062): only where each agent works as its own OS user. Null when its runner doesn't report it.",
       }),
+    networkTransition: z
+      .object({ state: z.enum(["draining", "restart_required"]), deadline: z.string(), agents: z.array(z.string()) })
+      .nullable()
+      .optional(),
+    egress: z.object({ ip: z.string(), country: z.string().optional(), at: z.string() }).nullable().optional(),
+
     disk: z
       .object({
         freeGb: z.number().openapi({ description: "Free GB on the workspace's disk." }),
@@ -729,6 +736,29 @@ const DEVICE_POLL_LIMIT = { limit: 60, windowMs: 60_000 };
  */
 export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
   const { db, config, adapters } = deps;
+  api.openapi(
+    createRoute({
+      method: "get",
+      path: "/machines/ip",
+      tags,
+      summary: "The address this computer uses to reach the server",
+      responses: {
+        200: json(z.object({ ip: z.string().nullable(), country: z.string().nullable() })),
+        429: errorResponse("Too many requests"),
+      },
+    }),
+    async (c) => {
+      c.header("Cache-Control", "no-store");
+      const ip = requestIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`machine-ip:${limitIp(ip)}`, { limit: 120, windowMs: 60_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Try again in a minute.");
+      const country = c.req.header("cf-ipcountry") ?? "";
+      return c.json(
+        { ip: isIP(ip) ? ip : null, country: /^[A-Z]{2}$/.test(country) && country !== "XX" ? country : null },
+        200,
+      );
+    },
+  );
 
   api.openapi(
     createRoute({

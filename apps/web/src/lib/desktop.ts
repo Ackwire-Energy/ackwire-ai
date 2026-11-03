@@ -82,7 +82,10 @@ export function desktopNotice(
   const media = mediaKindOf(n.latest.media);
   return {
     title: oneLine(t(`desktopNotice.${kind}`), NOTICE_TITLE_MAX),
-    body: oneLine((first ?? second ?? "") || (media ? mediaWord(t, media) : ""), NOTICE_BODY_MAX),
+    body: oneLine(
+      media === "voice" ? mediaWord(t, media) : (first ?? second ?? "") || (media ? mediaWord(t, media) : ""),
+      NOTICE_BODY_MAX,
+    ),
     path: `/org/${encodeURIComponent(orgId)}/notifications`,
   };
 }

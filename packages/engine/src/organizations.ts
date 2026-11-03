@@ -23,6 +23,7 @@ import { revokeMemberApps } from "./apps/revoke";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, safeEqual, sha256 } from "./crypto";
+import { restoreDms } from "./dms";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -34,7 +35,7 @@ import { addressDomain } from "./mail/text";
 import { recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
 import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } from "./permissions";
-import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere } from "./roles";
+import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere, stillGivableRoleIds } from "./roles";
 import {
   assertCanWork,
   type BillingHold,
@@ -163,7 +164,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
  * refuses it at once; `includeBlocked` is for acting on them (removing them, changing their role).
  */
 export async function getMembership(
-  db: Database,
+  db: Executor,
   userId: string,
   orgId: string,
   options: { includeBlocked?: boolean } = {},
@@ -786,9 +787,15 @@ export type UserLocale = AppLocale;
  * Saves the person's app language (ADR 0122): `auto` when a device detected it ("Automático"), false when they
  * picked it, so every device shows that one.
  */
-export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false) {
+export async function setMyLocale(db: Database, userId: string, locale: UserLocale, auto = false, pubsub?: PubSub) {
   if (!isAppLocale(locale)) throw new ValidationError(`locale must be one of ${LOCALE_CODES.join(", ")}`);
   await db.update(users).set({ locale, localeAuto: auto }).where(eq(users.id, userId));
+  // Runners render each agent's browser start page in its responsible person's language.
+  if (pubsub) {
+    const orgs = await db.selectDistinct({ id: agents.orgId }).from(agents).where(eq(agents.ownerUserId, userId));
+    const { publishMachineAgentsChanged } = await import("./machines");
+    await Promise.all(orgs.map((org) => publishMachineAgentsChanged(pubsub, org.id)));
+  }
 }
 
 /** The person's language and whether it follows each device's. */
@@ -929,11 +936,12 @@ async function removableMember(db: Database, actorId: string, orgId: string, tar
 }
 
 /**
- * Who answers for the agents of someone leaving: whoever removes them, or, when they leave themselves, the workspace's
- * longest-standing other owner, one who can still sign in first (the last owner can't leave, so one is there).
+ * Who answers for the agents of someone leaving: whoever removes them when they may manage agents, else (or when they
+ * leave themselves) the workspace's longest-standing other owner, one who can still sign in first (the last owner
+ * can't leave, so one is there). Removing someone never hands their agents to a remover who couldn't take them.
  */
 async function heirOf(db: Executor, actorId: string, orgId: string, targetUserId: string) {
-  if (actorId !== targetUserId) return actorId;
+  if (actorId !== targetUserId && can(await getMembership(db, actorId, orgId), "manage_agents")) return actorId;
   const [owner] = await db
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
@@ -1027,9 +1035,8 @@ export async function removalPreview(
 }
 
 /**
- * Removes a member (or lets a member leave). The last owner can't leave. Their agents pass to whoever removes them
- * (`heirOf`); the plans they signed in leave the agents, which go back to the API, and the computers they connected
- * here go with them (`personalMachines`). Their messages stay.
+ * Removes a member (or lets a member leave). The last owner can't leave. Their agents pass on (`heirOf`); the plans they signed in leave the agents, which go back to the API, and the computers they connected
+ * here go with them (`personalMachines`). Every agent loses their mailboxes (`dropMailOfOwner`). Their messages stay.
  */
 export async function removeMember(
   db: Database,
@@ -1043,7 +1050,10 @@ export async function removeMember(
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
-  const { released, removed, handed, changed } = await db.transaction(async (tx) => {
+  const { cancelSecretRequestsFor, publishSecret } = await import("./secrets");
+  const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
+  const { dropMailOfOwner } = await import("./tools/scopes");
+  const { released, removed, handed, changed, heir, secrets, mailActions } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -1055,6 +1065,10 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
+    // And their inbox here, snippets included: invited back later, nothing from before returns.
+    await tx
+      .delete(schema.notifications)
+      .where(and(eq(schema.notifications.orgId, orgId), eq(schema.notifications.userId, targetUserId)));
     // And the wiki pages and folders they were named on: rejoining later doesn't give a restricted page back.
     await tx
       .update(schema.wikiPages)
@@ -1090,6 +1104,8 @@ export async function removeMember(
     if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
     // Their AI apps and personal tokens here stop now (ADR 0119).
     await revokeMemberApps(tx, orgId, targetUserId);
+    // The secrets agents are waiting on from them won't come.
+    const secrets = await cancelSecretRequestsFor(tx, orgId, targetUserId);
     // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an
     // agent on a computer of theirs then goes back to the API too (`releaseAgents`).
     const heir = await heirOf(tx, actorId, orgId, targetUserId);
@@ -1098,7 +1114,7 @@ export async function removeMember(
           .update(agents)
           .set({ ownerUserId: heir, updatedAt: new Date() })
           .where(and(eq(agents.orgId, orgId), eq(agents.ownerUserId, targetUserId)))
-          .returning({ id: agents.id })
+          .returning()
       : [];
     await dropAgentRules(
       tx,
@@ -1111,6 +1127,9 @@ export async function removeMember(
       role: target.role,
       ...(handed.length ? { agentsTo: heir, agents: handed.map((a) => a.id) } : {}),
     });
+    // No agent goes on reading or sending in their name: their mailboxes leave every agent, and what waits to run there doesn't.
+    await dropMailOfOwner(tx, orgId, targetUserId, actorId);
+    const mailActions = await cancelMailboxApprovals(tx, orgId, targetUserId, actorId);
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
     const released = await releaseMemberAccounts(tx, targetUserId, orgId);
     const removed = [];
@@ -1135,13 +1154,21 @@ export async function removeMember(
           ),
         );
     const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
-    return { released, removed, handed, changed };
+    return { released, removed, handed, changed, heir, secrets, mailActions };
   });
+  for (const row of secrets) await publishSecret({ db, pubsub: options.pubsub }, row, "secret.updated");
+  for (const row of mailActions) await publishApproval({ db, pubsub: options.pubsub }, row, "approval.decided");
   forgetAgents(
     orgId,
     handed.map((a) => a.id),
   );
   if (handed.length) caches.agents.delete(`${orgId}:team`);
+  if (heir && handed.length) {
+    const { handOver } = await import("./agents");
+    for (const agent of handed) {
+      await handOver({ db, pubsub: options.pubsub }, actorId, { ...agent, ownerUserId: targetUserId }, heir);
+    }
+  }
   await announceReleasedAccounts(options.pubsub, released);
   for (const { computer, freed } of removed) {
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);
@@ -1195,7 +1222,9 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
   const { announceRemovedMachine, detachMachine } = await import("./machines");
   const { accountDeletionPlan, afterClosing, closeForDeletion, queueAccountDeletedEmail, soleOwnerRefusal } =
     await import("./workspace-deletion");
-  const { plan, closed, released, removed } = await db.transaction(async (tx) => {
+  const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
+  const { dropMailOfOwner } = await import("./tools/scopes");
+  const { plan, closed, released, removed, mailActions } = await db.transaction(async (tx) => {
     // First, as creating a workspace does: one made in another tab meanwhile is in the plan below and closes with them.
     await lockWorkspacesOf(tx, userId);
     const mine = await tx
@@ -1217,6 +1246,12 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     }
     // Before the user row: `created_by` would turn null, and a null owner is nobody's.
     const released = await releaseMemberAccounts(tx, userId, null);
+    // Their mailboxes leave every agent there too (`removeMember`); a mailbox without an owner would be anyone's.
+    const mailActions = [];
+    for (const m of mine) {
+      await dropMailOfOwner(tx, m.orgId, userId, userId);
+      mailActions.push(...(await cancelMailboxApprovals(tx, m.orgId, userId, userId)));
+    }
     for (const org of plan.leaves) {
       await auditMember(tx, org.id, userId, "member.left", userId, { role: org.role, accountDeleted: true });
     }
@@ -1227,10 +1262,12 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their
-    // GIPHY key would go on serving every workspace's GIFs, with nobody left who could remove it (ADR 0091).
+    // GIPHY key would go on serving every workspace's GIFs, with nobody left who could remove it (ADR 0091); so would
+    // the speech provider's key (ADR 0100).
     if (userId === owner) {
       await deleteJevKey(tx, { type: "system", id: null });
       await deleteGifKey(tx, { type: "system", id: null });
+      await tx.delete(schema.instanceSecrets).where(eq(schema.instanceSecrets.name, "speech"));
     }
     // With nobody left, the next first account owns the server again.
     await tx.update(instanceTelemetry).set({ ownerUserId: null }).where(sql`not exists (select 1 from ${users})`);
@@ -1242,8 +1279,9 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
       payload: { userId },
       maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
     });
-    return { plan, closed, released, removed };
+    return { plan, closed, released, removed, mailActions };
   });
+  for (const row of mailActions) await publishApproval({ db, pubsub: options.pubsub }, row, "approval.decided");
   await announceReleasedAccounts(options.pubsub, released);
   for (const { computer, freed } of removed) {
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: userId }, freed);
@@ -1700,6 +1738,21 @@ async function seatsFull(db: Executor, orgId: string) {
  * address signs in (`account`) and whether the workspace is full (`full`), before anyone makes an account
  * (ADR 0090).
  */
+/**
+ * The role an invitation gives now: owner only while whoever sent it can still make owners, so removing or demoting
+ * them takes back what they handed out.
+ */
+async function invitedAs(
+  db: Executor,
+  invitation: { orgId: string; invitedByUserId: string | null; role: MemberRole },
+) {
+  const inviter = invitation.invitedByUserId
+    ? await getMembership(db, invitation.invitedByUserId, invitation.orgId)
+    : null;
+  const role: MemberRole = invitation.role === "owner" && can(inviter, "manage_owners") ? "owner" : "member";
+  return { inviter, role };
+}
+
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
     .select({
@@ -1713,6 +1766,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       expiresAt: organizationInvitations.expiresAt,
       acceptedAt: organizationInvitations.acceptedAt,
       invitedBy: users.name,
+      invitedByUserId: organizationInvitations.invitedByUserId,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
@@ -1758,12 +1812,14 @@ export async function previewInvitation(db: Database, token: string, now = new D
       closed: true as const,
     };
   }
+  // What accepting would give now, and who sent it only while they're still here.
+  const { inviter, role } = await invitedAs(db, row);
   return {
     orgName: row.orgName,
     email: row.email,
-    role: row.role,
+    role,
     kind: "email" as const,
-    invitedBy: row.invitedBy ?? null,
+    invitedBy: inviter ? (row.invitedBy ?? null) : null,
     expiresAt: row.expiresAt.toISOString(),
     account: await invitedAccount(db, row.email),
     ...((await seatsFull(db, row.orgId)) ? { full: true as const } : {}),
@@ -1878,7 +1934,12 @@ export async function acceptInvitation(
       );
     }
     await assertCanWork(tx, invitation.orgId);
-    await joinOrganization(tx, invitation.orgId, user.id, invitation.role, invitation.roleIds);
+    // What it gives is what whoever sent it could still give now: removing or demoting them takes back the roles they
+    // handed out, as with private channels below. Someone already in gets no roles from an old invitation.
+    const { inviter, role } = await invitedAs(tx, invitation);
+    const already = await getMembership(tx, user.id, invitation.orgId, { includeBlocked: true });
+    const roleIds = already ? [] : await stillGivableRoleIds(tx, inviter, invitation.orgId, invitation.roleIds);
+    await joinOrganization(tx, invitation.orgId, user.id, role, roleIds);
     // The channels it named, besides `general` (ADR 0090): those still there. A private one only while whoever sent
     // the invitation is still in it, as when it was sent (`invitableChannelIds`): leaving it, or the workspace, takes
     // back what they could give.
@@ -1916,8 +1977,8 @@ export async function acceptInvitation(
         .where(and(eq(users.id, user.id), eq(users.emailVerified, false)));
     }
     await auditMember(tx, invitation.orgId, user.id, "member.joined", user.id, {
-      role: invitation.role,
-      roleIds: invitation.roleIds,
+      role,
+      roleIds,
       invitedBy: invitation.invitedByUserId,
     });
     await tx
@@ -2029,6 +2090,7 @@ export async function joinOrganization(
   if (general) {
     await tx.insert(channelMembers).values({ orgId, channelId: general.id, userId }).onConflictDoNothing();
   }
+  await restoreDms(tx, orgId, userId);
 }
 
 /** Marks a person as seen now in an organization (WebSocket connect/disconnect). */

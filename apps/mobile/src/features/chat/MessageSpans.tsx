@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "@/ui";
 import { openPage } from "../ai/parts";
@@ -69,52 +70,92 @@ export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?:
 
 type TableBlock = Extract<Block, { kind: "table" }>;
 
-/** A cell's text length, for its column's width (the app has no table layout). */
+/** A cell's text length: a column's first guess, until its cells have been measured. */
 const cellLength = (cell: Inline[]) => cell.reduce((n, s) => n + s.text.length, 0);
+
+/** Widest a column gets: a longer cell wraps inside it, at its words. */
+const COL_MAX = 280;
+const COL_MIN = 56;
 
 /**
  * A table (the web's `md__table`): a quiet box with a hairline, the header on a soft band, rows split by
- * hairlines, numbers on the right in tabular figures. Columns are as wide as their longest cell (within
- * bounds); a wide table scrolls sideways inside its box.
+ * hairlines, numbers on the right in tabular figures. Each column is as wide as its widest cell as drawn (measured
+ * on an unseen copy that never wraps, since a guess by letters came out narrow and broke words), up to `COL_MAX`;
+ * a table wider than the message scrolls sideways inside its box.
  */
 export function Table({ header, rows, align }: Pick<TableBlock, "header" | "rows" | "align">) {
   const c = useColors();
+  const [drawn, setDrawn] = useState<Record<number, number>>({});
   const widths = header.map((h, col) => {
-    const longest = Math.max(cellLength(h), ...rows.map((r) => cellLength(r[col] ?? [])));
-    return Math.min(240, Math.max(56, longest * 8.6 + 24));
+    const natural = drawn[col] ?? Math.max(cellLength(h), ...rows.map((r) => cellLength(r[col] ?? []))) * 8.6 + 24;
+    // A pixel more than measured: rounding never wraps a cell that fits.
+    return Math.min(COL_MAX, Math.max(COL_MIN, Math.ceil(natural) + 1));
   });
+  const words = (inline: Inline[], col: number, head: boolean) => (
+    <Text
+      variant={head ? "label" : "subhead"}
+      tone={head ? "muted" : "ink"}
+      style={[styles.cellText, { textAlign: align[col] ?? "left" }]}
+    >
+      <Spans inline={inline} />
+    </Text>
+  );
   const cell = (inline: Inline[], col: number, head: boolean) => (
     <View key={col} style={[styles.cell, { width: widths[col] }]}>
-      <Text
-        variant={head ? "label" : "subhead"}
-        tone={head ? "muted" : "ink"}
-        style={[styles.cellText, { textAlign: align[col] ?? "left" }]}
-      >
-        <Spans inline={inline} />
-      </Text>
+      {words(inline, col, head)}
     </View>
   );
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={[styles.table, { borderColor: c.line2 ?? c.line }]}
-    >
-      <View>
-        <View style={[styles.tr, { backgroundColor: c.plate }]}>{header.map((h, col) => cell(h, col, true))}</View>
-        {rows.map((r, j) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: the rows of one table, in order
-          <View key={j} style={[styles.tr, { borderTopColor: c.line }, styles.trLine]}>
-            {header.map((_, col) => cell(r[col] ?? [], col, false))}
-          </View>
-        ))}
+    <View>
+      {/* Each column's cells unseen, on a sideways strip with no width to wrap them: their widths. */}
+      <View
+        pointerEvents="none"
+        style={styles.measure}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <ScrollView horizontal scrollEnabled={false} showsHorizontalScrollIndicator={false}>
+          {header.map((h, col) => (
+            <View
+              // biome-ignore lint/suspicious/noArrayIndexKey: the columns of one table, in order
+              key={col}
+              onLayout={(e) => {
+                const w = e.nativeEvent.layout.width;
+                setDrawn((d) => (d[col] === w ? d : { ...d, [col]: w }));
+              }}
+            >
+              {[h, ...rows.map((r) => r[col] ?? [])].map((inline, j) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: the cells of one column, in order
+                <View key={j} style={styles.cell}>
+                  {words(inline, col, j === 0)}
+                </View>
+              ))}
+            </View>
+          ))}
+        </ScrollView>
       </View>
-    </ScrollView>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.table, { borderColor: c.line2 ?? c.line }]}
+      >
+        <View>
+          <View style={[styles.tr, { backgroundColor: c.plate }]}>{header.map((h, col) => cell(h, col, true))}</View>
+          {rows.map((r, j) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the rows of one table, in order
+            <View key={j} style={[styles.tr, { borderTopColor: c.line }, styles.trLine]}>
+              {header.map((_, col) => cell(r[col] ?? [], col, false))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   table: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+  measure: { position: "absolute", top: 0, left: 0, right: 0, opacity: 0 },
   tr: { flexDirection: "row" },
   trLine: { borderTopWidth: StyleSheet.hairlineWidth },
   cell: { paddingHorizontal: 12, paddingVertical: 8 },

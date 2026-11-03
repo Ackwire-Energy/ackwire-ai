@@ -12,6 +12,7 @@ import type {
   Message,
   SecretRequest,
   ThreadInfo,
+  VoiceDroppedEvent,
 } from "@agenteschat/client";
 import {
   ApiError,
@@ -46,6 +47,7 @@ import {
   consultSeeds,
   createBrowserLiveConnection,
   dismissRun,
+  dropLocalVoice,
   dropProvisional,
   emptyStreams,
   expectReply,
@@ -154,11 +156,22 @@ export interface LiveMemoryCard {
 /** A small external store; components subscribe to slices of it (`useLive`). */
 export const PROVISIONAL_TTL_MS = 20_000;
 
-/** The agent's message now carries its memory cards (`meta.memoryUpdates`): drop the live ones. */
-function dropMemoryOfRun(memory: LiveState["memory"], channelId: string, runId: string) {
+/**
+ * The agent's message carries its memory cards (`meta.memoryUpdates`): drop the live ones it shows. From the event
+ * when it carries the message, else from the HTTP read that follows (a big message's event comes without it).
+ * The same object when nothing was dropped.
+ */
+function dropMemoryCards(
+  memory: LiveState["memory"],
+  channelId: string,
+  message: Pick<Message, "agentRunId" | "meta">,
+): LiveState["memory"] {
   const list = memory[channelId];
-  if (!list) return memory;
-  return { ...memory, [channelId]: list.filter((c) => !c.key.startsWith(`${runId}:`)) };
+  const updates = message.meta?.memoryUpdates;
+  if (!list || !message.agentRunId || !Array.isArray(updates)) return memory;
+  const shown = new Set(updates.map((u) => `${message.agentRunId}:${(u as { itemId?: unknown }).itemId}`));
+  const kept = list.filter((c) => !shown.has(c.key));
+  return kept.length === list.length ? memory : { ...memory, [channelId]: kept };
 }
 
 export function createStreamsStore(
@@ -234,10 +247,8 @@ export function createStreamsStore(
                 },
               ],
             }
-          : event.type === "message.created" &&
-              event.message?.agentRunId &&
-              Array.isArray(event.message.meta?.memoryUpdates)
-            ? dropMemoryOfRun(state.memory, event.channelId, event.message.agentRunId)
+          : event.type === "message.created" && event.message
+            ? dropMemoryCards(state.memory, event.channelId, event.message)
             : state.memory;
       if (event.type === "message.created" && event.message?.author?.type === "person" && event.message.author.id) {
         typing = stopTyping(typing, event.channelId, event.message.author.id);
@@ -279,14 +290,18 @@ export function createStreamsStore(
       );
     },
     /**
-     * Person messages loaded over HTTP: start their receipts. `before`: the receipts when the read was asked for;
-     * one that hasn't changed since takes the read as it is.
+     * Messages loaded over HTTP: start the person messages' receipts, and drop the live memory cards an agent's
+     * message now shows. `before`: the receipts when the read was asked for; one that hasn't changed since takes the
+     * read as it is.
      */
     seed: (messages: Message[], before?: ReceiptsState) => {
       let receipts = state.receipts;
-      for (const m of messages)
+      let memory = state.memory;
+      for (const m of messages) {
         receipts = seedReceipt(receipts, m, before !== undefined && receipts[m.id] === before[m.id]);
-      set({ ...state, receipts });
+        memory = dropMemoryCards(memory, m.channelId, m);
+      }
+      set({ ...state, receipts, memory });
     },
     /** Right after sending: provisional "pensando…" rows and receipts for the agents we mentioned. */
     expect: (channelId: string, messageId: string, agentIds: string[]) => {
@@ -532,6 +547,12 @@ export function RealtimeProvider({
       // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
       // of agents (the sidebar's sections).
       applyWorkspaceEvent(qc, orgId, event);
+      // A recording that won't become a message: its bubble goes, and the person hears why (ADR 0100).
+      if (event.type === "voice.dropped" && "clientId" in event) {
+        const dropped = event as VoiceDroppedEvent;
+        dropLocalVoice(qc, orgId, dropped.channelId, dropped.clientId);
+        toast.show(tRef.current(dropped.reason === "silent" ? "voice.notUnderstood" : "voice.refused"), "error");
+      }
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
         const agent = qc.getQueryData<Agent[]>(keys.agents(orgId))?.find((a) => a.id === budgetEvent.agentId);

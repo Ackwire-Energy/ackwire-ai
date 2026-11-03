@@ -1537,6 +1537,10 @@
     "asking_other": "{{names}} warten auf deine Antwort",
     "outage_one": "{{names}}: Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
     "outage_other": "{{names}}: Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
+    "queued_one": "{{names}} steht in der Warteschlange des Computers",
+    "queued_other": "{{names}} stehen in der Warteschlange des Computers",
+    "away_one": "{{names}} wartet auf den Computer",
+    "away_other": "{{names}} warten auf den Computer",
     "nobody": "Kein Agent wird antworten",
     "status": {
       "seen": "Gesehen",
@@ -1545,6 +1549,8 @@
       "waiting": "Wartet auf Freigabe",
       "asking": "Wartet auf deine Antwort",
       "outage": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
+      "queued": "In der Warteschlange des Computers",
+      "away": "Wartet auf den Computer",
       "handled": "Beantwortet",
       "failed": "Fehlgeschlagen",
       "referenced": "Nur erwähnt",
@@ -1970,6 +1976,9 @@
     "rolesNone": "Der Workspace hat noch keine Rollen.",
     "rolesNeeded": "Wähle mindestens eine Rolle.",
     "rolesLeave": "Wer die Rolle verliert, verlässt den Kanal.",
+    "rolesChoose": "Rollen wählen",
+    "rolesChange": "Rollen ändern",
+    "rolesDone": "Fertig",
     "publicTitle": "#{{channel}} öffentlich machen?",
     "publicBody": "Alle im Workspace können beitreten und alle Nachrichten lesen, auch die älteren.",
     "publicConfirm": "Öffentlich machen",
@@ -2154,6 +2163,7 @@
       "waiting_approval": "Wartet auf Freigabe",
       "waiting_answer": "Wartet auf eine Antwort",
       "waiting_computer": "Wartet auf den Computer",
+      "queued_computer": "In der Warteschlange des Computers",
       "waiting_plan": "Wartet, bis sich das Abo zurücksetzt",
       "waiting_budget": "Wartet, bis sich das Budget zurücksetzt",
       "provider_down": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
@@ -2858,6 +2868,7 @@
     "runsEmpty": "Keine Ausführungen zu „{{q}}“.",
     "runsNone": "Noch keine Ausführungen.",
     "runNoText": "Kein Text",
+    "runPrivate": "In einem Gespräch, an dem du nicht teilnimmst",
     "runTokens": "{{input}} rein · {{cached}} im Cache · {{output}} raus",
     "runTokensTip": "{{input}} neue Eingabe-Token, {{cached}} aus dem Cache gelesen (günstiger), {{output}} Ausgabe",
     "budgetHelp": "Am Limit hört {{name}} auf und sagt es im Kanal. {{ownerNote}}",
@@ -6481,6 +6492,68 @@
       "symbols": "Symbole"
     }
   },
+  "voice": {
+    "word": "Sprachnachricht",
+    "wordTime": "Sprachnachricht · {{time}}",
+    "holdToRecord": "Zum Aufnehmen gedrückt halten",
+    "slideToDelete": "Zum Löschen wischen",
+    "send": "Audio senden",
+    "delete": "Aufnahme löschen",
+    "deleted": "Aufnahme gelöscht.",
+    "pause": "Pausieren",
+    "resume": "Weiter aufnehmen",
+    "listen": "Deine Aufnahme anhören",
+    "play": "Abspielen",
+    "stop": "Stoppen",
+    "speed": "Geschwindigkeit",
+    "left": "Noch {{seconds}} s",
+    "tooShort": "Zu kurz. Sag noch etwas mehr.",
+    "silent": "Nichts gehört. Es wurde nichts gesendet.",
+    "notSent": "Das Audio konnte nicht gesendet werden.",
+    "limit": "Das ist viel Audio für heute. Schreib hier und versuch es morgen noch mal.",
+    "micBlocked": "Das Mikrofon ist blockiert",
+    "micBlockedHint": "Erlaube das Mikrofon in den Einstellungen deines Geräts, um aufzunehmen.",
+    "openSettings": "Einstellungen öffnen",
+    "notNow": "Nicht jetzt",
+    "expired": "Audio abgelaufen",
+    "showText": "Text anzeigen",
+    "hideText": "Text ausblenden",
+    "record": "Audio aufnehmen",
+    "recording": "Audio wird aufgenommen",
+    "discard": "Aufnahme löschen",
+    "stopListening": "Anhören beenden",
+    "keys": "Enter sendet · Esc löscht",
+    "keysHold": "Loslassen zum Senden · Esc löscht",
+    "keysPaused": "Pausiert · Leertaste hört an · Enter sendet · Esc löscht",
+    "pausePlay": "Pausieren",
+    "seek": "Position im Audio",
+    "speedAt": "Geschwindigkeit {{speed}}×",
+    "waiting": "Geht raus, sobald du wieder online bist",
+    "notUnderstood": "Das Audio war nicht zu verstehen. Es wurde nichts gesendet.",
+    "refused": "Das Audio konnte in dieser Unterhaltung nicht gesendet werden.",
+    "blockedMac": "Das Mikrofon ist blockiert. Auf dem Mac: Systemeinstellungen › Datenschutz & Sicherheit › Mikrofon.",
+    "blockedWeb": "Das Mikrofon ist blockiert. Erlaube es über das Schloss neben der Adresse der Website.",
+    "noMic": "Kein Mikrofon gefunden.",
+    "failed": "Das Mikrofon ließ sich nicht öffnen. Versuch es noch mal.",
+    "noPlayback": "Gerade nicht abspielbar. Du kannst es trotzdem senden oder weiter aufnehmen.",
+    "settings": {
+      "title": "Sprachnachrichten",
+      "on": "Sprachnachrichten",
+      "onHelp": "Personen in diesem Workspace können in Unterhaltungen Audio senden.",
+      "noEngine": "Sprachnachrichten sind hier noch nicht verfügbar.",
+      "engineTitle": "Was Sprache in Text umwandelt",
+      "own": "Dein eigener Server",
+      "ownHelp": "Whisper oder Parakeet auf deinem Rechner. Das Audio bleibt dort.",
+      "address": "Serveradresse",
+      "key": "{{name}}-Schlüssel",
+      "keyPlaceholder": "Hier einfügen",
+      "test": "Testen",
+      "tested": "Es funktioniert. Jetzt sehen alle das Mikrofon.",
+      "sealed": "Verschlüsselt auf deinem Server gespeichert und nie wieder angezeigt.",
+      "leaves": "Audio aus Sprachnachrichten geht an {{name}}, um zu Text zu werden.",
+      "invalid": "Der gespeicherte Schlüssel lässt sich auf diesem Server nicht öffnen. Füge ihn noch mal ein."
+    }
+  },
   "media": {
     "word": {
       "gif": "GIF",
@@ -8864,6 +8937,7 @@
     "clearSearch": "Suche leeren",
     "noMatch": "Nichts gefunden zu „{{q}}“.",
     "noTools": "Der Server hat keine Tools angeboten.",
+    "unreadable": "Die Tools des Connectors konnten nicht gelesen werden: {{reason}}",
     "refresh": "Nach neuen Tools suchen",
     "decideTitle": "Brauchen deine Entscheidung · {{count}}",
     "decideHelp": "Ihre Namen verraten nicht, was sie tun. Bestätige den Vorschlag oder wähle etwas anderes.",
@@ -9680,6 +9754,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Das Netzwerk ändert sich. Offene Sitzungen des Computers starten um {{when}} neu.",
+      "restart": "Die Sitzungen des Computers starten neu, um das Netzwerk zu übernehmen. Neue Arbeit wartet, bis das fertig ist.",
+      "line": "Ausgangs-IP {{ip}}",
+      "hint": "Die Adresse, die Websites sehen, wenn die Agenten surfen. Sie ändert sich, wenn sich das Netzwerk des Computers ändert."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Befehle aus",
@@ -10378,6 +10458,7 @@
       "import": "Import und Export",
       "billing": "Tarif und Abrechnung",
       "media": "GIFs und Sticker",
+      "voice": "Sprachnachrichten",
       "apps": "KI-Apps"
     },
     "sectionText": {
@@ -10396,6 +10477,7 @@
       "import": "Hol Agenten aus einer anderen App oder einem anderen Workspace und nimm diesen mit, wohin du willst.",
       "billing": "Der agentes.chat-Tarif, die Karte und die Rechnungen dieses Workspace liegen auf einer eigenen Seite von uns, außerhalb der App.",
       "media": "Was Personen in einer Unterhaltung senden können und wann Agenten ein GIF oder einen Sticker senden.",
+      "voice": "Sprachnachrichten in Unterhaltungen und wer Sprache in Text umwandelt.",
       "apps": "Bitte die Agenten dieses Workspace aus Claude, Cursor und anderen Apps um Aufgaben."
     },
     "title": "Einstellungen",
@@ -10787,6 +10869,11 @@
       "answeredRequestFar": "{{to}} hat die Anfrage von {{from}} beantwortet",
       "see": "Ansehen"
     },
+    "talk": {
+      "readAll": "Alles lesen",
+      "more_one": "{{count}} weitere Zeile",
+      "more_other": "{{count}} weitere Zeilen"
+    },
     "consultPanel": {
       "label": "Unterhaltung zwischen {{from}} und {{to}}",
       "title": "{{from}} ⇄ {{to}}",
@@ -11091,6 +11178,7 @@
       "brain_unavailable": "{{brain}} kann gerade nicht antworten. Ich antworte, sobald es wieder da ist.",
       "provider_unavailable": "Mein KI-Anbieter antwortet gerade nicht. Ich antworte, sobald er wieder da ist.",
       "brain_busy": "Mein Computer ist gerade mit anderen Aufgaben beschäftigt. Ich antworte, sobald er frei ist.",
+      "brain_queued": "Ich stehe noch in der Warteschlange des Computers. Ich antworte, sobald er Platz hat.",
       "brain_interrupted": "{{brain}} hat aufgehört, bevor es fertig war. Schon erledigt, wird nicht wiederholt: {{tools}}.",
       "plan_limit_cut": "Ich habe am Limit des {{plan}}-Abos aufgehört. Ich mache {{when}} weiter, wo ich war, wenn es sich zurücksetzt.",
       "plan_limit_cut_unknown": "Ich habe am Limit des {{plan}}-Abos aufgehört. Ich mache dort weiter, wo ich war, sobald es sich zurücksetzt.",
@@ -12030,6 +12118,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Du schaust nur zu.",
+      "title": "Steuerung übernehmen?",
+      "working": "{{name}} pausiert, solange du die Steuerung hast."
+    },
     "sub": {
       "control": "Du hast die Steuerung · {{name}} wartet",
       "controlAsked": "Du hast die Steuerung · {{name}} hat gefragt",

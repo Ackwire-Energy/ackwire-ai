@@ -17,7 +17,7 @@ import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
 import { dropAgentRules } from "./approval-rules";
-import { answersOthers, audienceOf } from "./audience";
+import { answersOthers, audienceOf, canTalkTo, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
@@ -27,7 +27,7 @@ import { publishOrgEvent } from "./events";
 import type { CommandApproval } from "./missions";
 import { recordOperatorEvent } from "./operator-events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
-import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
+import { DEFAULT_AGENT_SCOPES, dropForeignMailGrants, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 import { resumeBudgetWaits } from "./usage-pause";
 
@@ -312,13 +312,30 @@ async function planOwner(db: Database, agent: Agent): Promise<string | null> {
   return row?.owner ?? null;
 }
 
+/**
+ * An agent's new owner decides its approvals (those waiting or approved ahead move to them, inbox included), and one
+ * who couldn't talk to it before takes it out of the mailboxes other people gave it (`dropForeignMailGrants`).
+ */
+export async function handOver(
+  deps: { db: Database; pubsub?: PubSub },
+  actorId: string,
+  before: Agent,
+  ownerUserId: string | null,
+) {
+  // Loaded here: approvals build on this module.
+  const { repointApprovals } = await import("./approvals");
+  const newcomer = ownerUserId && !canTalkTo(before, ownerUserId, await speakerFor(deps.db, before.orgId, ownerUserId));
+  if (newcomer) await dropForeignMailGrants(deps.db, before.orgId, before.id, ownerUserId, actorId);
+  await repointApprovals(deps, before.orgId, [before.id], ownerUserId);
+}
+
 export async function updateAgent(
   db: Database,
   actorId: string,
   orgId: string,
   agentId: string,
   patch: Partial<AgentInput>,
-  options: { remember?: boolean } = {},
+  options: { remember?: boolean; pubsub?: PubSub } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "manage_agents");
   const input =
@@ -364,9 +381,11 @@ export async function updateAgent(
   if (!agent) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
-  // What its old owner approved for good was theirs to decide: the new owner is asked again.
-  if (before && before.ownerUserId !== owner)
+  if (before && before.ownerUserId !== agent.ownerUserId) {
+    // What its old owner approved for good was theirs to decide: the new owner is asked again.
     await dropAgentRules(db, orgId, [agentId], { type: "person", id: actorId });
+    await handOver({ db, pubsub: options.pubsub }, actorId, before, agent.ownerUserId);
+  }
   if (input.name !== undefined || handle !== undefined) {
     // What other runs read of it (who is in a channel, archived and old handles) names it as it is now.
     caches.agents.delete(`${orgId}:archived`);

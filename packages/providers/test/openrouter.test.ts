@@ -339,6 +339,34 @@ describe("OpenRouter adapter (Chat Completions, scripted transport)", () => {
     expect(body?.reasoning).toEqual({ effort: "low" });
   });
 
+  test("Claude's stable prefix for an hour; the stable tools first for every model", async () => {
+    setOpenRouterModels(models());
+    const { fetcher, requests } = scripted({ body: sse([delta({ content: "ok" }, "stop")]) });
+    await call(
+      {
+        model: "~anthropic/claude-sonnet-latest",
+        system: [{ text: "org" }, { text: "agent", cache: true }],
+        cacheTtl: "1h",
+        tools: [
+          { name: "a_group_tool", description: "", inputSchema: {} },
+          { name: "z_core", description: "", inputSchema: {}, stable: true },
+        ],
+      },
+      fetcher,
+    ).result;
+    const body = requests[0]?.body;
+    // The conversation's automatic breakpoint stays at 5 minutes (a longer entry must come first).
+    expect(body?.cache_control).toEqual({ type: "ephemeral" });
+    expect((body?.messages as { content: unknown }[] | undefined)?.[0]?.content).toEqual([
+      { type: "text", text: "org" },
+      { type: "text", text: "agent", cache_control: { type: "ephemeral", ttl: "1h" } },
+    ]);
+    expect(((body?.tools ?? []) as { function: { name: string } }[]).map((t) => t.function.name)).toEqual([
+      "z_core",
+      "a_group_tool",
+    ]);
+  });
+
   test("the reply: text deltas, tool calls by index, merged reasoning, the answering model, split usage and OpenRouter's cost", async () => {
     setOpenRouterModels(models());
     const { fetcher } = scripted({
