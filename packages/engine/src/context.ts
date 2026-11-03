@@ -261,11 +261,10 @@ export const isConversationBlock = (block: SystemBlock) => (block as ContextBloc
  * What a computer brain reads as "# This conversation" at the start of its session (and again after it compacted
  * its history), one level under it; "" when there is nothing.
  */
-export function conversationText(system: readonly SystemBlock[], extra: string[] = []): string {
-  const parts = [
-    ...system.filter((b) => isConversationBlock(b) && !isComputerTurnBlock(b)).map((b) => b.text),
-    ...extra,
-  ].filter((t) => t.trim());
+export function conversationText(system: readonly SystemBlock[]): string {
+  const parts = system
+    .filter((b) => isConversationBlock(b) && !isComputerTurnBlock(b) && b.text.trim())
+    .map((b) => b.text);
   if (parts.length === 0) return "";
   return ["# This conversation", ...parts.map((t) => t.replace(/^# /, "## "))].join("\n\n");
 }

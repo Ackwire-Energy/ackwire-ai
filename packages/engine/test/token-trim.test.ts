@@ -12,6 +12,7 @@ import {
   createJobHandlers,
   createWorkToolSource,
   drainOutbox,
+  EVERY_TOOL,
   getMessage,
   grantScopes,
   historyStart,
@@ -19,6 +20,7 @@ import {
   type Message,
   openDm,
   postPersonMessage,
+  presentTools,
   type ToolContext,
   toTurns,
 } from "../src";
@@ -503,6 +505,10 @@ test("Claude Code: two sessions of one agent list the same tools, every one it h
     "Only a conversation's run can go to the background: keep working here and answer when it's done.",
   );
 }, 20_000);
+
+test("Claude Code: an agent with no tools still lists none (no search over nothing)", () => {
+  expect(presentTools([], undefined, [EVERY_TOOL])).toEqual([]);
+});
 
 test("Claude Code: the system text is the same in every conversation; what holds for one comes once, not on a resume", async () => {
   f = await toolsSetup();

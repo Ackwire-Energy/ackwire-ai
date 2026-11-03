@@ -301,6 +301,7 @@ export function presentTools(
   blocked?: BlockedTools,
 ): ToolDefinition[] {
   if (loaded?.includes(EVERY_TOOL)) {
+    if (tools.length === 0) return [];
     const shown = presentTools(
       [...tools].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
       sensitive,
