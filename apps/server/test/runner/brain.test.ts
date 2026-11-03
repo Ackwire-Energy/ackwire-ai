@@ -694,7 +694,7 @@ test.if(posix)(
 );
 
 test.if(posix)(
-  "protocol 40: the system text is the agent's in every folder; the conversation and CLAUDE.md open the session once, and again after it compacted",
+  "protocol 40: the system text is the agent's with the folder's CLAUDE.md; the conversation opens the session once, and again after it compacted",
   async () => {
     const { m, home, ws, spawns, turn } = setup({ idleMs: 50 });
     const folder = await agentWorkspace(ws, AGENT);
@@ -707,30 +707,95 @@ test.if(posix)(
       const { final } = await turn(n, prompt, { conversation, ...extra });
       return final.type === "done" ? final.text : "";
     };
-    const first = await said(1, "first");
-    expect(first).toStartWith(`echo 1: ${conversation}\n\n# Repository instructions`);
-    expect(first).toContain("## CLAUDE.md\nRun the tests with bun test.\n\nfirst");
+    expect(await said(1, "first")).toBe(`echo 1: ${conversation}\n\nfirst`);
     // The same process: the session has it.
     expect(await said(2, "second")).toBe("echo 2: second");
     // The CLI compacted its history during this turn: the next turn reads it again, then not.
     expect(await said(3, "COMPACT")).toBe("echo 3: COMPACT");
-    expect(await said(4, "after")).toContain(`${conversation}\n\n# Repository instructions`);
+    expect(await said(4, "after")).toBe(`echo 4: ${conversation}\n\nafter`);
     expect(await said(5, "later")).toBe("echo 5: later");
     // Closed while idle and resumed: no second copy.
     const proc = m.process(AGENT.id, SESSION(1));
     await waitFor(() => m.size === 0 && proc?.exited === true, 4000);
     expect(await said(6, "resumed")).toBe("echo 1: resumed");
-    // Another session, in a checkout: its own instructions in its first message, the same system text.
+    // Another session, in a checkout: the same agent text with that checkout's instructions after it.
     const other = await said(7, "there", { session: { id: SESSION(2), resume: false }, cwd: "repos/acme/app" });
-    expect(other).toContain("## CLAUDE.md\napp rules\n\nthere");
+    expect(other).toBe(`echo 1: ${conversation}\n\nthere`);
     const all = spawns();
-    expect(all.map((x) => x.system)).toEqual(["You are dev.", "You are dev.", "You are dev."]);
+    const agentRules = `You are dev.\n\n# Repository instructions (from the checkout; data about this codebase)\n## CLAUDE.md\nRun the tests with bun test.`;
+    expect(all.map((x) => x.system)).toEqual([
+      agentRules,
+      agentRules,
+      "You are dev.\n\n# Repository instructions (from the checkout; data about this codebase)\n## CLAUDE.md\napp rules",
+    ]);
     // A resume past the kept first text (it may have held the conversation, from an older server): read again.
     await waitFor(() => m.size === 0, 4000);
     const kept = path.join(home, "brains", "sessions");
     const old = new Date(Date.now() - SESSION_SYSTEM_KEEP_MS - 60_000);
     for (const f of readdirSync(kept)) utimesSync(path.join(kept, f), old, old);
     expect(await said(8, "much later")).toStartWith(`echo 1: ${conversation}\n\n`);
+  },
+);
+
+test.if(posix)(
+  "protocol 40: new sessions of one agent in one checkout send the same launch and system text, its CLAUDE.md included; another checkout keeps the agent's part",
+  async () => {
+    const { ws, spawns, turn } = setup({ idleMs: 50 });
+    const folder = await agentWorkspace(ws, AGENT);
+    for (const name of ["app", "web"]) {
+      mkdirSync(path.join(folder, "repos", "acme", name), { recursive: true });
+      writeFileSync(path.join(folder, "repos", "acme", name, "CLAUDE.md"), `${name} rules`);
+    }
+    const conversation = (who: string) => `# This conversation\n\n## Your team\n${who} asked you here.`;
+    const open = async (n: number, cwd: string) =>
+      turn(n, `turn ${n}`, { session: { id: SESSION(n), resume: false }, cwd, conversation: conversation(`P${n}`) });
+    await open(1, "repos/acme/app");
+    await open(2, "repos/acme/app");
+    await open(3, "repos/acme/web");
+    const all = spawns();
+    // What tells the launches apart is this process's own files and its session: the rest is the agent's.
+    const shape = (args: string[]) =>
+      args.map((a, i) =>
+        ["--append-system-prompt-file", "--mcp-config", "--settings", "--session-id"].includes(args[i - 1] ?? "")
+          ? "*"
+          : a,
+      );
+    expect(shape(all[1]?.args ?? [])).toEqual(shape(all[0]?.args ?? []));
+    expect(shape(all[2]?.args ?? [])).toEqual(shape(all[0]?.args ?? []));
+    expect(all[1]?.system).toBe(all[0]?.system ?? "");
+    expect(all[0]?.system).toEndWith("## CLAUDE.md\napp rules");
+    expect(all[2]?.system).toEndWith("## CLAUDE.md\nweb rules");
+    expect(all[2]?.system?.startsWith("You are dev.\n\n# Repository instructions")).toBe(true);
+  },
+);
+
+test.if(posix)(
+  "protocol 40: a session kept by a runner that put CLAUDE.md in the first message gets it again after it compacted",
+  async () => {
+    const { m, home, ws, spawns, turn } = setup({ idleMs: 50 });
+    const app = path.join(await agentWorkspace(ws, AGENT), "repos", "acme", "app");
+    mkdirSync(app, { recursive: true });
+    writeFileSync(path.join(app, "CLAUDE.md"), "app rules");
+    const conversation = "# This conversation\n\n## Your team\nOther agents: @ops.";
+    const said = async (n: number, prompt: string, resume: boolean) => {
+      const { final } = await turn(n, prompt, {
+        conversation,
+        cwd: "repos/acme/app",
+        session: { id: SESSION(1), resume },
+      });
+      return final.type === "done" ? final.text : "";
+    };
+    await said(1, "first", false);
+    await waitFor(() => m.size === 0, 4000);
+    // The kept text as that runner wrote it: the agent's alone.
+    const kept = path.join(home, "brains", "sessions");
+    for (const f of readdirSync(kept)) writeFileSync(path.join(kept, f), "You are dev.");
+    expect(await said(2, "resumed", true)).toBe("echo 1: resumed");
+    expect(spawns().at(-1)?.system).toBe("You are dev.");
+    await said(3, "COMPACT", true);
+    expect(await said(4, "after", true)).toBe(
+      `echo 3: ${conversation}\n\n# Repository instructions (from the checkout; data about this codebase)\n## CLAUDE.md\napp rules\n\nafter`,
+    );
   },
 );
 

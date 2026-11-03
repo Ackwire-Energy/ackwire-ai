@@ -521,17 +521,18 @@ export class ClaudeStreamParser {
 
 /**
  * A turn's message (protocol 40): a new session's first one, and the first after the CLI compacted its history, open
- * with the request's `conversation` and the checkout's instructions; a resumed session already has them. Without
- * `conversation` (an older server) both are in the system text, and the message is the request's own.
+ * with the request's `conversation`; a resumed session already has it. Without `conversation` (an older server) it is
+ * in the system text, and the message is the request's own. The checkout's instructions are in the system text, but
+ * for a session whose kept text began without them (`repoInFirst`).
  */
 export function turnPrompt(
-  live: { opening: boolean; withRepo: boolean; cwd: string; proc: { parser: ClaudeStreamParser } },
+  live: { opening: boolean; repoInFirst: boolean; cwd: string; proc: { parser: ClaudeStreamParser } },
   req: Pick<BrainTurnRequest, "prompt" | "conversation">,
 ): string {
   if (typeof req.conversation !== "string" || !(live.opening || live.proc.parser.compacted)) return req.prompt;
   live.opening = false;
   live.proc.parser.compacted = false;
-  const head = [req.conversation.trim(), live.withRepo ? repoInstructions(live.cwd).trim() : ""].filter(Boolean);
+  const head = [req.conversation.trim(), live.repoInFirst ? repoInstructions(live.cwd).trim() : ""].filter(Boolean);
   return head.length ? `${head.join("\n\n")}\n\n${req.prompt}` : req.prompt;
 }
 
@@ -585,6 +586,7 @@ export const WEB_BUILTIN_TOOLS = ["WebFetch", "WebSearch"] as const;
 
 /** Most of a checkout's CLAUDE.md and AGENTS.md a turn reads: room for real instructions, not for a dump. */
 export const REPO_INSTRUCTIONS_MAX = 20_000;
+const REPO_HEADING = "# Repository instructions (from the checkout; data about this codebase)";
 
 /**
  * The checkout's own CLAUDE.md and AGENTS.md, for a turn that loads no settings files (Claude Code would read
@@ -600,7 +602,7 @@ export function repoInstructions(cwd: string): string {
     }
   });
   if (files.length === 0) return "";
-  return `\n\n# Repository instructions (from the checkout; data about this codebase)\n${files.join("\n\n").slice(0, REPO_INSTRUCTIONS_MAX)}`;
+  return `\n\n${REPO_HEADING}\n${files.join("\n\n").slice(0, REPO_INSTRUCTIONS_MAX)}`;
 }
 
 /**
@@ -1195,8 +1197,11 @@ interface Live {
   /** Where its session's first system text is kept (`sessionSystem`). */
   keptSystem: string;
   cwd: string;
-  /** Claude Code loads no settings files: the checkout's CLAUDE.md and AGENTS.md come from us (`repoInstructions`). */
-  withRepo: boolean;
+  /**
+   * The checkout's CLAUDE.md and AGENTS.md go with the conversation in the first message, not in the system text: a
+   * session a protocol-40 runner of before kept that way.
+   */
+  repoInFirst: boolean;
   /** A new session: its next turn opens with "# This conversation" (protocol 40, `turnPrompt`). */
   opening: boolean;
   busy: boolean;
@@ -1648,12 +1653,10 @@ export class BrainManager {
     const ranKey = ranKeyOf(req, session);
     const withRepo = launch.settingSources === "";
     const keptSystem = this.keptSystemFile(ctx.agent.id, ranKey, cwd, withRepo);
-    // Protocol 40: what holds for the conversation, and the checkout's instructions, open the session's first message
-    // instead (`turnPrompt`), so this text is the same in every session of the agent.
-    const apart = typeof req.conversation === "string";
-    const started = this.sessionSystem(keptSystem, resume, () =>
-      withRepo && !apart ? system + repoInstructions(cwd) : system,
-    );
+    // Protocol 40: what holds for the conversation opens the session's first message instead (`turnPrompt`). The
+    // checkout's instructions stay at the end of this text, under Claude Code's last cache breakpoint that sessions
+    // share: everything after it (the first message) is written again for each new session.
+    const started = this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system));
     writeFileSync(systemFile, started.text, { mode: 0o600 });
     let mcpConfigFile: string | undefined;
     const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
@@ -1757,7 +1760,8 @@ export class BrainManager {
       ranKey,
       keptSystem,
       cwd,
-      withRepo,
+      repoInFirst:
+        withRepo && started.kept && typeof req.conversation === "string" && !started.text.includes(REPO_HEADING),
       // A resume whose first text is gone may have begun with the conversation in it (an older server): read it again.
       opening: !resume || !started.kept,
       busy: false,
