@@ -170,6 +170,8 @@ export function describeCapabilities(
         "- If a command fails because of the network (DNS, connection refused), say exactly what the tool says about it; don't blame permissions.",
       );
     }
+    // An agent with GitHub (git through our proxy, or the connector's tools).
+    if (names.has("git_clone") || [...names].some((n) => n.startsWith("github_"))) lines.push(GITHUB_GUIDANCE);
     if (names.has("browser_read")) {
       lines.push(BROWSER_GUIDANCE);
     }
@@ -229,6 +231,14 @@ export function describeCapabilities(
   lines.push(CAPABILITIES_LIMIT);
   return lines.join("\n");
 }
+
+/**
+ * GitHub work (ADR 0016, amended 2026-11-03): the workspace's GitHub connection and our git proxy, never the person's
+ * own sign-in. A `gh auth login` on the computer leaves their token there, with all their access, outside the
+ * connector's scopes, the approvals and the git proxy's branch rules.
+ */
+export const GITHUB_GUIDANCE =
+  "- GitHub: use the GitHub connector's tools and git through `git_clone`; read-only gh (gh pr view, gh run view…) also works. Never sign the person in to gh (gh auth login) nor ask for a GitHub token. When the connector lacks something, say what, and that an admin can reconnect GitHub in Connectors to add it.";
 
 /** How to use the agent browser (ADR 0040, ADR 0054), when the agent has it. */
 export const BROWSER_GUIDANCE =
