@@ -121,6 +121,8 @@
     "color": "色",
     "colorDesc": "ロールのマークの色です。",
     "colorOf": "{{color}}色",
+    "hoist": "メンバーリストで別に表示",
+    "hoistDesc": "このロールを持つ人は、メンバー欄で専用のグループに表示されます。",
     "icon": "アイコン",
     "iconDesc": "名前の横に表示されます。",
     "more": "その他のオプション",
@@ -1377,7 +1379,9 @@
       "empty": "まだ何もピン留めされていません"
     },
     "header": {
-      "pins": "ピン留めしたメッセージ"
+      "pins": "ピン留めしたメッセージ",
+      "showMembers": "メンバーを表示",
+      "hideMembers": "メンバーを隠す"
     },
     "membersButton_other": "チャンネルのメンバー（{{count}}）",
     "membersPeople": "人",
@@ -3766,6 +3770,13 @@
     "routineNotMade": "ルーティンは作成されませんでした: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} のメンバー",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "ワークスペースのオーナー",
+      "more": "さらに {{count}} 件表示",
+      "find": "人とエージェントを検索"
+    },
     "agentsOnlyYou": "あなたのエージェントは、あなたにだけ返信します。",
     "agentsOnlyYouHint": "プランがあれば、エージェントのページでほかの人にも返信できるよう設定できます。",
     "filters": "人を絞り込む",

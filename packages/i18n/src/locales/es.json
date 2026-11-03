@@ -127,6 +127,8 @@
     "color": "Color",
     "colorDesc": "Pinta la marca del rol.",
     "colorOf": "Color {{color}}",
+    "hoist": "Mostrar aparte en la lista de miembros",
+    "hoistDesc": "Quien tiene este rol aparece en un grupo propio en la columna de miembros.",
     "icon": "Ícono",
     "iconDesc": "Se muestra junto al nombre.",
     "more": "Más opciones",
@@ -1477,7 +1479,9 @@
       "empty": "Aún no hay nada fijado aquí"
     },
     "header": {
-      "pins": "Mensajes fijados"
+      "pins": "Mensajes fijados",
+      "showMembers": "Mostrar miembros",
+      "hideMembers": "Ocultar miembros"
     },
     "membersButton_one": "Miembros del canal ({{count}})",
     "membersButton_many": "Miembros del canal ({{count}})",
@@ -4018,6 +4022,13 @@
     "routineNotMade": "La rutina no se creó: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Miembros de #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Propietario del workspace",
+      "more": "Mostrar {{count}} más",
+      "find": "Buscar personas y agentes"
+    },
     "agentsOnlyYou": "Tus agentes solo te responden a ti.",
     "agentsOnlyYouHint": "Con un plan, puedes dejar que cada uno responda a otras personas desde su página.",
     "filters": "Filtrar personas",

@@ -127,6 +127,8 @@
     "color": "Couleur",
     "colorDesc": "Colore la marque du rôle.",
     "colorOf": "Couleur {{color}}",
+    "hoist": "Afficher à part dans la liste des membres",
+    "hoistDesc": "Les personnes qui ont ce rôle ont leur propre groupe dans la colonne des membres.",
     "icon": "Icône",
     "iconDesc": "Affichée à côté du nom.",
     "more": "Plus d'options",
@@ -1477,7 +1479,9 @@
       "empty": "Rien n'est encore épinglé ici"
     },
     "header": {
-      "pins": "Messages épinglés"
+      "pins": "Messages épinglés",
+      "showMembers": "Afficher les membres",
+      "hideMembers": "Masquer les membres"
     },
     "membersButton_one": "Membres du canal ({{count}})",
     "membersButton_many": "Membres du canal ({{count}})",
@@ -4072,6 +4076,13 @@
     "routineNotMade": "La routine n'a pas été créée : {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Membres de #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Propriétaire du workspace",
+      "more": "Afficher {{count}} de plus",
+      "find": "Chercher des personnes et des agents"
+    },
     "agentsOnlyYou": "Vos agents ne répondent qu'à vous.",
     "agentsOnlyYouHint": "Avec un abonnement, vous pouvez laisser chacun répondre à d'autres personnes, depuis sa page.",
     "filters": "Filtrer les personnes",

@@ -692,6 +692,20 @@ function RoleLook({ role, data, lock }: { role: OrgRole; data: OrgRoles; lock: b
             </div>
           </div>
         )}
+        {!base && (
+          <div className="roles-look__row roles-look__row--switch">
+            <label className="roles-look__text" htmlFor="role-hoist">
+              <b>{t("rolesPage.hoist")}</b>
+              <span>{t("rolesPage.hoistDesc")}</span>
+            </label>
+            <Switch
+              id="role-hoist"
+              checked={role.hoist}
+              disabled={lock}
+              onCheckedChange={(hoist) => patch({ hoist })}
+            />
+          </div>
+        )}
       </div>
     </Card>
   );

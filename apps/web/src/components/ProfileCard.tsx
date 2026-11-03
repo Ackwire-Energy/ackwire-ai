@@ -38,6 +38,7 @@ export function ProfileTrigger({
   children,
   className,
   decorative,
+  side = "bottom",
 }: {
   actor: Actor;
   /** Accessible name of the button ("Perfil de Ada"). */
@@ -46,6 +47,8 @@ export function ProfileTrigger({
   className?: string;
   /** A second trigger next to a focusable one (the avatar beside the name): mouse only. */
   decorative?: boolean;
+  /** Where the card opens: the members column opens it to its left. */
+  side?: "bottom" | "left";
 }) {
   const { t } = useTranslation();
   // Hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
@@ -67,7 +70,7 @@ export function ProfileTrigger({
     <Popover
       hover={card}
       label={t("profile.cardLabel")}
-      side="bottom"
+      side={side}
       className="profile-card"
       trigger={
         <button

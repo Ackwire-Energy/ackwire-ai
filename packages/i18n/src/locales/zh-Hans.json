@@ -121,6 +121,8 @@
     "color": "颜色",
     "colorDesc": "角色标记的颜色。",
     "colorOf": "{{color}}色",
+    "hoist": "在成员列表中单独显示",
+    "hoistDesc": "拥有此角色的人会在成员栏中单独成组。",
     "icon": "图标",
     "iconDesc": "显示在名称旁边。",
     "more": "更多选项",
@@ -1377,7 +1379,9 @@
       "empty": "这里还没有置顶的内容"
     },
     "header": {
-      "pins": "置顶消息"
+      "pins": "置顶消息",
+      "showMembers": "显示成员",
+      "hideMembers": "隐藏成员"
     },
     "membersButton_other": "频道成员（{{count}}）",
     "membersPeople": "成员",
@@ -3810,6 +3814,13 @@
     "routineNotMade": "例行工作未创建：{{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} 的成员",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "工作区所有者",
+      "more": "再显示 {{count}} 个",
+      "find": "查找人员和智能体"
+    },
     "agentsOnlyYou": "你的智能体只回复你。",
     "agentsOnlyYouHint": "升级套餐后，你可以在每个智能体的页面上允许它回复其他人。",
     "filters": "筛选成员",

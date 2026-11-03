@@ -124,6 +124,8 @@
     "color": "Kleur",
     "colorDesc": "Kleurt het teken van de rol.",
     "colorOf": "Kleur {{color}}",
+    "hoist": "Apart tonen in de ledenlijst",
+    "hoistDesc": "Wie deze rol heeft, krijgt een eigen groep in de ledenkolom.",
     "icon": "Icoon",
     "iconDesc": "Naast de naam getoond.",
     "more": "Meer opties",
@@ -1427,7 +1429,9 @@
       "empty": "Hier is nog niets vastgezet"
     },
     "header": {
-      "pins": "Vastgezette berichten"
+      "pins": "Vastgezette berichten",
+      "showMembers": "Leden tonen",
+      "hideMembers": "Leden verbergen"
     },
     "membersButton_one": "Kanaalleden ({{count}})",
     "membersButton_other": "Kanaalleden ({{count}})",
@@ -3954,6 +3958,13 @@
     "routineNotMade": "De routine is niet gemaakt: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Leden van #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Eigenaar van de workspace",
+      "more": "Nog {{count}} tonen",
+      "find": "Mensen en agents zoeken"
+    },
     "agentsOnlyYou": "Je agents antwoorden alleen jou.",
     "agentsOnlyYouHint": "Met een abonnement kun je op de pagina van elke agent instellen dat hij ook anderen antwoordt.",
     "filters": "Mensen filteren",

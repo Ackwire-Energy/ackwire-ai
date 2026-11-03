@@ -124,6 +124,8 @@
     "color": "Renk",
     "colorDesc": "Rolün işaretini boyar.",
     "colorOf": "{{color}} renk",
+    "hoist": "Üye listesinde ayrı göster",
+    "hoistDesc": "Bu role sahip kişiler üye sütununda kendi grubunda görünür.",
     "icon": "Simge",
     "iconDesc": "Adın yanında gösterilir.",
     "more": "Diğer seçenekler",
@@ -1427,7 +1429,9 @@
       "empty": "Burada henüz sabitlenen bir şey yok"
     },
     "header": {
-      "pins": "Sabitlenen mesajlar"
+      "pins": "Sabitlenen mesajlar",
+      "showMembers": "Üyeleri göster",
+      "hideMembers": "Üyeleri gizle"
     },
     "membersButton_one": "Kanal üyeleri ({{count}})",
     "membersButton_other": "Kanal üyeleri ({{count}})",
@@ -3873,6 +3877,13 @@
     "routineNotMade": "Rutin oluşturulmadı: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "#{{channel}} üyeleri",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Çalışma alanının sahibi",
+      "more": "{{count}} tane daha göster",
+      "find": "Kişi ve ajan ara"
+    },
     "agentsOnlyYou": "Ajanlarınız yalnızca size yanıt veriyor.",
     "agentsOnlyYouHint": "Bir planla, her birinin sayfasından diğer kişilere de yanıt vermesine izin verebilirsiniz.",
     "filters": "Kişileri filtrele",

@@ -130,6 +130,8 @@ export const en = {
     color: "Color",
     colorDesc: "Paints the role's mark.",
     colorOf: "{{color}} color",
+    hoist: "Show apart in the members list",
+    hoistDesc: "People with this role get a group of their own in the members column.",
     icon: "Icon",
     iconDesc: "Shown next to the name.",
     more: "More options",
@@ -1405,7 +1407,7 @@ export const en = {
       unpin: "Unpin {{name}}'s message",
       empty: "Nothing pinned here yet",
     },
-    header: { pins: "Pinned messages" },
+    header: { pins: "Pinned messages", showMembers: "Show members", hideMembers: "Hide members" },
     membersButton_one: "Channel members ({{count}})",
     membersButton_other: "Channel members ({{count}})",
     membersPeople: "People",
@@ -3773,6 +3775,14 @@ export const en = {
     routineNotMade: "The routine wasn't created: {{reason}}",
   },
   members: {
+    /** The channel's members column (and its sheet on a phone). */
+    column: {
+      label: "Members of #{{channel}}",
+      group: "{{name}} — {{count}}",
+      ownerTitle: "Workspace owner",
+      more: "Show {{count}} more",
+      find: "Find people and agents",
+    },
     agentsOnlyYou: "Your agents answer only you.",
     agentsOnlyYouHint: "On a plan, you can let each one answer other people on its page.",
     filters: "Filter people",

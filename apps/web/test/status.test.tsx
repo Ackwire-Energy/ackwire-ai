@@ -188,9 +188,9 @@ describe("where a status shows", () => {
     // The sidebar row: the emoji after the name, the words in its title.
     const joao = within(nav()).getByRole("link", { name: /^João/ });
     expect(joao.getAttribute("title")).toBe("João · Ocupado · Focado no relatório");
-    await click(screen().getByRole("button", { name: "Membros do canal (4)" }));
-    await settle(4);
-    expect(screen().getByRole("region", { name: "Pessoas" }).textContent).toContain("🎧Focado no relatório");
+    // The members column: the line under the name.
+    const side = screen().getByRole("complementary", { name: "Membros de #eng" });
+    expect(within(side).getByRole("button", { name: "Perfil de João" }).textContent).toContain("🎧Focado no relatório");
     cleanup();
 
     await go(`c/${ENG_ID}`, state);
@@ -246,11 +246,10 @@ describe("where a status shows", () => {
     expect(badgeOf(card)).toBe("busy");
     cleanup();
 
-    // In the members list: its own words, as written.
+    // In the members column: its own words, as written.
     await go(`c/${ENG_ID}`, seedState({ agentStatuses: statuses }));
-    await click(screen().getByRole("button", { name: "Membros do canal (4)" }));
-    await settle(4);
-    expect(screen().getByRole("region", { name: "Agentes" }).textContent).toContain("🛠️Deploy da v2 em staging");
+    const side = screen().getByRole("complementary", { name: "Membros de #eng" });
+    expect(within(side).getByRole("region", { name: "Agentes" }).textContent).toContain("🛠️Deploy da v2 em staging");
   });
 
   test("an agent with no AI is drawn offline, and its card says why", async () => {

@@ -243,7 +243,7 @@ export function ChannelThreadsButton({ channelId, channelName }: { channelId: st
       trigger={
         <button
           type="button"
-          className="ac-btn ac-btn--ghost ac-btn--icon channel__icon"
+          className="ac-btn ac-btn--ghost ac-btn--icon channel__icon channel__threads"
           aria-label={t("threads.popover.button", { count: threads.length })}
           title={t("threads.popover.title")}
         >

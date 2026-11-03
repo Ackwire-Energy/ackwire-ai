@@ -161,7 +161,7 @@ function UnshownRow() {
     </span>
   );
 }
-const unshownRow = () => <UnshownRow />;
+export const unshownRow = () => <UnshownRow />;
 
 /** Tablet widths: the sidebar is always an icon rail (NavDrawer.tsx has the other breakpoints). */
 export const TABLET_QUERY = "(min-width: 761px) and (max-width: 1199px)";

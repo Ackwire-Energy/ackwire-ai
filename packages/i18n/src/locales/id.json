@@ -121,6 +121,8 @@
     "color": "Warna",
     "colorDesc": "Mewarnai tanda peran.",
     "colorOf": "Warna {{color}}",
+    "hoist": "Tampilkan terpisah di daftar anggota",
+    "hoistDesc": "Orang dengan peran ini mendapat grup sendiri di kolom anggota.",
     "icon": "Ikon",
     "iconDesc": "Ditampilkan di samping nama.",
     "more": "Opsi lainnya",
@@ -1377,7 +1379,9 @@
       "empty": "Belum ada yang disematkan di sini"
     },
     "header": {
-      "pins": "Pesan yang disematkan"
+      "pins": "Pesan yang disematkan",
+      "showMembers": "Tampilkan anggota",
+      "hideMembers": "Sembunyikan anggota"
     },
     "membersButton_other": "Anggota kanal ({{count}})",
     "membersPeople": "Orang",
@@ -3793,6 +3797,13 @@
     "routineNotMade": "Rutinitas tidak dibuat: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Anggota #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Pemilik workspace",
+      "more": "Tampilkan {{count}} lagi",
+      "find": "Cari orang dan agen"
+    },
     "agentsOnlyYou": "Agenmu hanya menjawabmu.",
     "agentsOnlyYouHint": "Dengan paket, kamu bisa membiarkan tiap agen menjawab orang lain dari halamannya.",
     "filters": "Filter orang",

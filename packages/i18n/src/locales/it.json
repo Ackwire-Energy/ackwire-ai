@@ -127,6 +127,8 @@
     "color": "Colore",
     "colorDesc": "Colora il segno del ruolo.",
     "colorOf": "Colore {{color}}",
+    "hoist": "Mostra a parte nell'elenco dei membri",
+    "hoistDesc": "Chi ha questo ruolo ha un gruppo tutto suo nella colonna dei membri.",
     "icon": "Icona",
     "iconDesc": "Appare accanto al nome.",
     "more": "Altre opzioni",
@@ -1477,7 +1479,9 @@
       "empty": "Qui non c'è ancora niente di fissato"
     },
     "header": {
-      "pins": "Messaggi fissati"
+      "pins": "Messaggi fissati",
+      "showMembers": "Mostra i membri",
+      "hideMembers": "Nascondi i membri"
     },
     "membersButton_one": "Membri del canale ({{count}})",
     "membersButton_many": "Membri del canale ({{count}})",
@@ -4075,6 +4079,13 @@
     "routineNotMade": "La routine non è stata creata: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Membri di #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Proprietario del workspace",
+      "more": "Mostra altri {{count}}",
+      "find": "Cerca persone e agenti"
+    },
     "agentsOnlyYou": "I tuoi agenti rispondono solo a te.",
     "agentsOnlyYouHint": "Con un piano, puoi far rispondere ognuno anche ad altre persone dalla sua pagina.",
     "filters": "Filtra persone",

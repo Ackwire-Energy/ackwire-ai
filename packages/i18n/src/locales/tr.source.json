@@ -335,6 +335,12 @@
   "rolesPage.colorOf": {
     "value": "{{color}} color"
   },
+  "rolesPage.hoist": {
+    "value": "Show apart in the members list"
+  },
+  "rolesPage.hoistDesc": {
+    "value": "People with this role get a group of their own in the members column."
+  },
   "rolesPage.icon": {
     "value": "Icon"
   },
@@ -3507,6 +3513,12 @@
   },
   "channel.header.pins": {
     "value": "Pinned messages"
+  },
+  "channel.header.showMembers": {
+    "value": "Show members"
+  },
+  "channel.header.hideMembers": {
+    "value": "Hide members"
   },
   "channel.membersButton": {
     "value": {
@@ -9524,6 +9536,21 @@
   },
   "newAgent.routineNotMade": {
     "value": "The routine wasn't created: {{reason}}"
+  },
+  "members.column.label": {
+    "value": "Members of #{{channel}}"
+  },
+  "members.column.group": {
+    "value": "{{name}} — {{count}}"
+  },
+  "members.column.ownerTitle": {
+    "value": "Workspace owner"
+  },
+  "members.column.more": {
+    "value": "Show {{count}} more"
+  },
+  "members.column.find": {
+    "value": "Find people and agents"
   },
   "members.agentsOnlyYou": {
     "value": "Your agents answer only you."

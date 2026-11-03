@@ -1,7 +1,6 @@
 import type { Agent, Channel, Member } from "@agenteschat/client";
 import { Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-import { ChannelMembersButton } from "@/components/ChannelMembers";
 import { ChannelPinsButton } from "@/components/ChannelPins";
 import { useChannelMenu } from "@/components/entity-menus";
 import { NavToggle } from "@/components/NavDrawer";
@@ -21,6 +20,8 @@ export function ChannelHeader({
   agents,
   onDetails,
   onSearch,
+  membersOpen,
+  onMembers,
 }: {
   channel: Channel;
   isMember: boolean;
@@ -30,10 +31,14 @@ export function ChannelHeader({
   onDetails: () => void;
   /** Enter in the search: its results in the panel. */
   onSearch: () => void;
+  /** The members column (a sheet on a phone) is showing. */
+  membersOpen: boolean;
+  onMembers: () => void;
 }) {
   const { t } = useTranslation();
   const channelEntries = useChannelMenu();
   const settings = t("shell.sidebarMenu.channelSettings");
+  const total = people.length + agents.length;
   return (
     <header className="channel__header">
       <NavToggle />
@@ -56,7 +61,18 @@ export function ChannelHeader({
         >
           <Icon name="cog" />
         </button>
-        <ChannelMembersButton channelId={channel.id} people={people} agents={agents} onDetails={onDetails} />
+        {total > 0 && (
+          <button
+            type="button"
+            className="ac-btn ac-btn--ghost ac-btn--icon channel__icon channel__members-toggle"
+            aria-label={t("channel.membersButton", { count: total })}
+            aria-pressed={membersOpen}
+            title={t(membersOpen ? "channel.header.hideMembers" : "channel.header.showMembers")}
+            onClick={onMembers}
+          >
+            <Icon name="members" />
+          </button>
+        )}
         {isMember && <HeaderSearch onOpen={onSearch} />}
       </div>
     </header>

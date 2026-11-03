@@ -267,6 +267,7 @@ import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, ReplyButton, useMessageMenu } from "@/components/MessageMore";
 import { MessageReceipts, SeenMark } from "@/components/MessageReceipts";
+import { MembersColumn, MembersSheet } from "@/components/members/MembersColumn";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
   AutoApprovedLine,
@@ -325,6 +326,7 @@ import { BarPhrase, ConsultClock, WaitLine, WorkingStack } from "@/components/Wo
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useMembersColumn } from "@/hooks/useMembersColumn";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
@@ -710,6 +712,7 @@ function ChannelView({
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const membersColumn = useMembersColumn();
   // Opened from a sidebar row's "Adicionar pessoas ou agentes": straight to adding, and closing that closes it all.
   const [addFirst, setAddFirst] = useState(false);
   // "Editar canal" from the sidebar's right click: the details open once this channel shows.
@@ -1838,6 +1841,8 @@ function ChannelView({
                 isMember={isMember}
                 people={channelPeople}
                 agents={channelAgents}
+                membersOpen={membersColumn.open}
+                onMembers={membersColumn.toggle}
                 onDetails={() => setDetailsOpen(true)}
                 onSearch={() => {
                   setPanel(null);
@@ -2217,6 +2222,22 @@ function ChannelView({
               />
             )}
           </Tag>
+          {!chrome && isMember && membersColumn.column && (
+            <MembersColumn channel={channel} people={channelPeople} agents={channelAgents} />
+          )}
+          {!chrome && isMember && membersColumn.sheet && (
+            <MembersSheet
+              channel={channel}
+              isMember={isMember}
+              people={channelPeople}
+              agents={channelAgents}
+              onDetails={() => {
+                membersColumn.closeSheet();
+                setDetailsOpen(true);
+              }}
+              onClose={membersColumn.closeSheet}
+            />
+          )}
           {panel && (
             <button
               type="button"

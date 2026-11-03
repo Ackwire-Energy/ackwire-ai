@@ -383,6 +383,7 @@ export function seedRoles(): OrgRole[] {
       color: "indigo",
       position: 0,
       permissions: ["administrator"],
+      hoist: true,
     },
     {
       ...role,

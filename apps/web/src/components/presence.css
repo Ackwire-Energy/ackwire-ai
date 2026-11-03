@@ -61,11 +61,6 @@
   color: var(--muted);
 }
 
-/* The members popover: the line in place of the meta. */
-.members-pop__meta.status-line {
-  display: flex;
-}
-
 /* The profile card: the line in a well, who wrote it or when it clears under it. */
 .profile-card__status {
   display: flex;

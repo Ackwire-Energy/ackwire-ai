@@ -130,6 +130,8 @@
     "color": "Kolor",
     "colorDesc": "Koloruje znaczek roli.",
     "colorOf": "Kolor: {{color}}",
+    "hoist": "Pokazuj osobno na liście członków",
+    "hoistDesc": "Osoby z tą rolą mają własną grupę w kolumnie członków.",
     "icon": "Ikona",
     "iconDesc": "Wyświetlana obok nazwy.",
     "more": "Więcej opcji",
@@ -1527,7 +1529,9 @@
       "empty": "Nic tu jeszcze nie przypięto"
     },
     "header": {
-      "pins": "Przypięte wiadomości"
+      "pins": "Przypięte wiadomości",
+      "showMembers": "Pokaż członków",
+      "hideMembers": "Ukryj członków"
     },
     "membersButton_one": "Członkowie kanału ({{count}})",
     "membersButton_few": "Członkowie kanału ({{count}})",
@@ -4170,6 +4174,13 @@
     "routineNotMade": "Nie utworzono rutyny: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Członkowie #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Właściciel workspace",
+      "more": "Pokaż jeszcze {{count}}",
+      "find": "Szukaj osób i agentów"
+    },
     "agentsOnlyYou": "Twoi agenci odpowiadają tylko tobie.",
     "agentsOnlyYouHint": "W planie możesz pozwolić każdemu z nich odpowiadać innym osobom, na jego stronie.",
     "filters": "Filtruj osoby",

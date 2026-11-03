@@ -146,7 +146,8 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
     width: 18px;
     height: 18px;
   }
-  /* Pins stay in the pinned bar and the settings in the members list's foot; the search takes the whole screen. */
+  /* Threads, pins and the settings move to the members sheet's head; the search takes the whole screen. */
+  .channel__acts > .channel__threads,
   .channel__acts > .channel__cog,
   .channel__acts > .channel__pin,
   .channel__acts > .channel__search {

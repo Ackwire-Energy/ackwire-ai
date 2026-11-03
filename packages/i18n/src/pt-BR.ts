@@ -132,6 +132,8 @@ export const ptBR = {
     color: "Cor",
     colorDesc: "Pinta o selo do papel.",
     colorOf: "Cor {{color}}",
+    hoist: "Mostrar separado na lista de membros",
+    hoistDesc: "Quem tem este papel aparece num grupo próprio na coluna de membros.",
     icon: "Ícone",
     iconDesc: "Aparece ao lado do nome.",
     more: "Mais opções",
@@ -1400,7 +1402,7 @@ export const ptBR = {
       unpin: "Desafixar a mensagem de {{name}}",
       empty: "Nada fixado aqui ainda",
     },
-    header: { pins: "Mensagens fixadas" },
+    header: { pins: "Mensagens fixadas", showMembers: "Mostrar membros", hideMembers: "Esconder membros" },
     membersButton_one: "Membros do canal ({{count}})",
     membersButton_other: "Membros do canal ({{count}})",
     membersPeople: "Pessoas",
@@ -3890,6 +3892,14 @@ export const ptBR = {
     routineNotMade: "A rotina não foi criada: {{reason}}",
   },
   members: {
+    /** The channel's members column (and its sheet on a phone). */
+    column: {
+      label: "Membros de #{{channel}}",
+      group: "{{name}} — {{count}}",
+      ownerTitle: "Dono do workspace",
+      more: "Mostrar mais {{count}}",
+      find: "Buscar pessoas e agentes",
+    },
     /** Before inviting, while every agent with an AI answers only the person. */
     agentsOnlyYou: "Seus agentes só atendem você.",
     agentsOnlyYouHint: "Num plano, você pode deixar cada um atender outras pessoas na página dele.",

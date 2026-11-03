@@ -124,6 +124,8 @@
     "color": "Farbe",
     "colorDesc": "Färbt das Abzeichen der Rolle.",
     "colorOf": "Farbe {{color}}",
+    "hoist": "Getrennt in der Mitgliederliste zeigen",
+    "hoistDesc": "Wer diese Rolle hat, bekommt eine eigene Gruppe in der Mitgliederspalte.",
     "icon": "Symbol",
     "iconDesc": "Wird neben dem Namen angezeigt.",
     "more": "Weitere Optionen",
@@ -1427,7 +1429,9 @@
       "empty": "Hier ist noch nichts angeheftet"
     },
     "header": {
-      "pins": "Angeheftete Nachrichten"
+      "pins": "Angeheftete Nachrichten",
+      "showMembers": "Mitglieder zeigen",
+      "hideMembers": "Mitglieder ausblenden"
     },
     "membersButton_one": "Mitglieder des Kanals ({{count}})",
     "membersButton_other": "Mitglieder des Kanals ({{count}})",
@@ -3909,6 +3913,13 @@
     "routineNotMade": "Die Routine wurde nicht erstellt: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Mitglieder von #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Inhaber des Workspace",
+      "more": "{{count}} weitere zeigen",
+      "find": "Personen und Agenten suchen"
+    },
     "agentsOnlyYou": "Deine Agenten antworten nur dir.",
     "agentsOnlyYouHint": "Mit einem Abo kannst du auf der Seite jedes Agenten festlegen, dass er auch anderen Personen antwortet.",
     "filters": "Personen filtern",
