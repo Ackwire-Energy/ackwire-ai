@@ -13,12 +13,14 @@ import { monthStartUtc } from "./usage";
  * without knowing any plan. Null is no limit, all a self-hosted server ever has.
  *
  * - `members`: membership rows, blocked accounts included; agents, invitations and requests to join never count.
+ * - `membersMax`: the most people the plan takes with seats added (`members` up to it); null: the service sets none.
  * - `storageBytes`: the files kept on this server's storage, files in the trash and the workspace's own bucket left out.
  * - `uploadBytesPerDay`: what was written to that storage in the last 24 hours.
  * - `platformUsdPerMonth`: what the platform's own AI (Jev) may cost for the workspace in a UTC calendar month.
  */
 export interface OrgLimits {
   members: number | null;
+  membersMax: number | null;
   storageBytes: number | null;
   uploadBytesPerDay: number | null;
   platformUsdPerMonth: number | null;
@@ -31,6 +33,7 @@ const NANO_PER_USD = 1e9;
 
 const LIMIT_COLUMNS = {
   members: organizations.limitMembers,
+  membersMax: organizations.limitMembersMax,
   storageBytes: organizations.limitStorageBytes,
   uploadBytesPerDay: organizations.limitUploadBytesPerDay,
   platformNanoUsd: organizations.limitPlatformNanoUsd,
@@ -39,12 +42,14 @@ const LIMIT_COLUMNS = {
 
 const limitsOf = (row: {
   members: number | null;
+  membersMax: number | null;
   storageBytes: number | null;
   uploadBytesPerDay: number | null;
   platformNanoUsd: number | null;
   updatedAt: Date | null;
 }) => ({
   members: row.members,
+  membersMax: row.membersMax,
   storageBytes: row.storageBytes,
   uploadBytesPerDay: row.uploadBytesPerDay,
   platformUsdPerMonth: row.platformNanoUsd === null ? null : row.platformNanoUsd / NANO_PER_USD,
@@ -56,11 +61,18 @@ export async function getOrgLimits(db: Executor, orgId: string): Promise<OrgLimi
   const [row] = await db.select(LIMIT_COLUMNS).from(organizations).where(eq(organizations.id, orgId));
   return row
     ? limitsOf(row)
-    : { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null, updatedAt: null };
+    : {
+        members: null,
+        membersMax: null,
+        storageBytes: null,
+        uploadBytesPerDay: null,
+        platformUsdPerMonth: null,
+        updatedAt: null,
+      };
 }
 
 /**
- * Sets all four limits (the operator API), whatever the workspace's standing. Setting what is already set changes
+ * Sets all the limits (the operator API), whatever the workspace's standing. Setting what is already set changes
  * nothing, `updatedAt` included. A new platform cap applies at once in this process, within a minute in the others.
  * Null when there is no such workspace.
  */
@@ -74,13 +86,14 @@ export async function setOrgLimits(
     .update(organizations)
     .set({
       limitMembers: limits.members,
+      limitMembersMax: limits.membersMax,
       limitStorageBytes: limits.storageBytes,
       limitUploadBytesPerDay: limits.uploadBytesPerDay,
       limitPlatformNanoUsd: nanoUsd,
       // The right side of SET reads the row as it was.
-      limitsUpdatedAt: sql`case when (${organizations.limitMembers}, ${organizations.limitStorageBytes},
-        ${organizations.limitUploadBytesPerDay}, ${organizations.limitPlatformNanoUsd})
-        is not distinct from (${limits.members}::integer, ${limits.storageBytes}::bigint,
+      limitsUpdatedAt: sql`case when (${organizations.limitMembers}, ${organizations.limitMembersMax},
+        ${organizations.limitStorageBytes}, ${organizations.limitUploadBytesPerDay}, ${organizations.limitPlatformNanoUsd})
+        is not distinct from (${limits.members}::integer, ${limits.membersMax}::integer, ${limits.storageBytes}::bigint,
         ${limits.uploadBytesPerDay}::bigint, ${nanoUsd}::bigint)
         then ${organizations.limitsUpdatedAt} else now() end`,
     })
@@ -281,7 +294,12 @@ export async function orgLimitsView(db: Database, actorId: string, orgId: string
     usesOwnBucket(db, orgId),
   ]);
   return {
-    members: { used: members, limit: limits.members },
+    members: {
+      used: members,
+      limit: limits.members,
+      max: limits.membersMax,
+      canAddSeats: limits.members !== null && limits.membersMax !== null && limits.members < limits.membersMax,
+    },
     storage: { usedBytes: usage.usedBytes, limitBytes: limits.storageBytes, ownStorage },
     uploads: { usedBytes24h: usage.uploadBytes24h, limitBytesPerDay: limits.uploadBytesPerDay },
   };

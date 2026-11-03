@@ -238,7 +238,14 @@ test("org detail: owners and admins, and counts of what is in it", async () => {
       },
     ],
     counts: { members: 2, agents: 1, channels: 1, machines: 1, invitations: 1 },
-    limits: { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null, updatedAt: null },
+    limits: {
+      members: null,
+      membersMax: null,
+      storageBytes: null,
+      uploadBytesPerDay: null,
+      platformUsdPerMonth: null,
+      updatedAt: null,
+    },
     meters: { storageBytes: 0, uploadBytes24h: 0, ownStorage: false, platformUsdThisMonth: 0 },
     deletion: null,
     deletionHold: null,
@@ -648,11 +655,12 @@ test("billing holds: put on, changed and lifted, never over a hold set through /
   expect((await hold({ hold: null })).applied).toBe(false);
 });
 
-test("limits: set all four, read back with what the workspace uses; any standing; idempotent", async () => {
+test("limits: set them all, read back with what the workspace uses; any standing; idempotent", async () => {
   const { orgId } = acme;
   type State = { updatedAt: string | null; [key: string]: unknown };
   const limits = {
     members: 10,
+    membersMax: 15,
     storageBytes: 200 * 1024 ** 3,
     uploadBytesPerDay: 10 * 1024 ** 3,
     platformUsdPerMonth: 10,
@@ -661,6 +669,7 @@ test("limits: set all four, read back with what the workspace uses; any standing
     {},
     { ...limits, members: undefined },
     { ...limits, members: 0 },
+    { ...limits, membersMax: 0 },
     { ...limits, members: 1.5 },
     { ...limits, storageBytes: -1 },
     { ...limits, platformUsdPerMonth: 100_001 },
@@ -687,9 +696,14 @@ test("limits: set all four, read back with what the workspace uses; any standing
 
   // Limits and standing are apart: a held workspace takes new limits too.
   await body(await put(`/orgs/${orgId}/billing-hold`, { hold: "unpaid" }));
+  // Left out, the plan's top is none.
   const none = { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null };
   heard.length = 0;
-  expect(await body(await put(`/orgs/${orgId}/limits`, none))).toEqual({ ...none, updatedAt: expect.any(String) });
+  expect(await body(await put(`/orgs/${orgId}/limits`, none))).toEqual({
+    ...none,
+    membersMax: null,
+    updatedAt: expect.any(String),
+  });
   expect(heard).toEqual([{ type: "org.limits", orgId }]);
   await body(await put(`/orgs/${orgId}/billing-hold`, { hold: null }));
 });

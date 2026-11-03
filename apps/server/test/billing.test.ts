@@ -95,13 +95,14 @@ describe("the workspace's limits", () => {
       return res.json();
     };
     expect(await read(member)).toEqual({
-      members: { used: 2, limit: null },
+      members: { used: 2, limit: null, max: null, canAddSeats: false },
       storage: { usedBytes: 0, limitBytes: null, ownStorage: false },
       uploads: { usedBytes24h: 0, limitBytesPerDay: null },
     });
-    await setOrgLimits(t.db, orgId, { members: 2, storageBytes: 1000, uploadBytesPerDay: 500, platformUsdPerMonth: 3 });
+    const limits = { members: 2, membersMax: 3, storageBytes: 1000, uploadBytesPerDay: 500, platformUsdPerMonth: 3 };
+    await setOrgLimits(t.db, orgId, limits);
     expect(await read(owner)).toEqual({
-      members: { used: 2, limit: 2 },
+      members: { used: 2, limit: 2, max: 3, canAddSeats: true },
       storage: { usedBytes: 0, limitBytes: 1000, ownStorage: false },
       uploads: { usedBytes24h: 0, limitBytesPerDay: 500 },
     });

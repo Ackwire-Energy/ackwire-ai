@@ -66,6 +66,8 @@ export const organizations = pgTable("organizations", {
    * `usage_records.cost_nano_usd`.
    */
   limitMembers: integer(),
+  /** The most people the workspace's plan takes with seats bought: past `limitMembers` up to it, a seat can be added. */
+  limitMembersMax: integer(),
   limitStorageBytes: bigint({ mode: "number" }),
   limitUploadBytesPerDay: bigint({ mode: "number" }),
   limitPlatformNanoUsd: bigint({ mode: "number" }),

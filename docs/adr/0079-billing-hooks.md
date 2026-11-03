@@ -38,11 +38,12 @@ ADR 0056 already gives every hook but one: a hold stops a workspace's agents and
 
 ### 4. Four limits, null meaning none
 
-`PUT /api/operator/v1/orgs/{orgId}/limits` sets `{ members, storageBytes, uploadBytesPerDay, platformUsdPerMonth }`, each a number or null (no limit); `GET /orgs/{orgId}` answers them with `updatedAt`, and the meters. A change (never the same limits set again) sends the workspace's apps `org.limits`, with no payload, and they read their limits again, so a new plan shows within seconds. A self-hosted server never sets any, so nothing is enforced there.
+`PUT /api/operator/v1/orgs/{orgId}/limits` sets `{ members, membersMax, storageBytes, uploadBytesPerDay, platformUsdPerMonth }`, each a number or null (no limit; `membersMax` may be left out, as null); `GET /orgs/{orgId}` answers them with `updatedAt`, and the meters. A change (never the same limits set again) sends the workspace's apps `org.limits`, with no payload, and they read their limits again, so a new plan shows within seconds. A self-hosted server never sets any, so nothing is enforced there.
 
 | Limit | Counts | Enforced |
 | --- | --- | --- |
 | `members` | every membership row, blocked accounts included; never agents, invitations or requests to join | when someone joins (accepting an invitation, an approved request), under the workspace's `org-members` lock, so it holds exactly; and before an invitation is sent, resent or a request approved, so a full workspace sends none that can't be accepted (`org.members_full`, 409) |
+| `membersMax` | not a limit: the most people the plan takes with seats added. `GET /api/app/organizations/{orgId}/limits` answers it as `members.max`, with `members.canAddSeats` below it. In a full workspace, whoever manages billing reads that a seat can be added in Plan and billing, or at the top that the plan can change; anyone else reads to ask them. The people meter counts against it, with the seats paid for under it | never |
 | `storageBytes` | the bytes of the files a workspace keeps on this server's storage, files in the trash left out | before any file is written (chat and Drive uploads, a computer's uploads, mail attachments, every version, skill files), as `used + incoming > limit` (`storage.full`, 409); skipped for a workspace on its own bucket. Also before a file comes back from the trash and before files are copied back from the workspace's own bucket, which would otherwise bring back more than the limit |
 | `uploadBytesPerDay` | the bytes written to that storage in the last 24 hours, rolling | where files are written (`storage.daily_full`, 409); never for files that come back, which keep the day they were first written |
 | `platformUsdPerMonth` | usage billed to the platform this UTC calendar month | §5 |

@@ -62,7 +62,18 @@ export function billingRoutes(deps: AppDeps) {
       responses: {
         200: json(
           z.object({
-            members: z.object({ used: z.number().int(), limit: z.number().int().nullable() }),
+            members: z.object({
+              used: z.number().int(),
+              limit: z.number().int().nullable().openapi({ description: "The seats paid for." }),
+              max: z
+                .number()
+                .int()
+                .nullable()
+                .openapi({ description: "The most people the plan takes with seats added; null: not said." }),
+              canAddSeats: z.boolean().openapi({
+                description: "Below `max`: whoever manages billing can add a seat on the billing service.",
+              }),
+            }),
             storage: z.object({
               usedBytes: z
                 .number()
