@@ -10191,18 +10191,19 @@ export const en = {
       address: "Server address",
       open: "Open {{app}}",
       client: {
-        claude: "Claude",
-        claude_code: "Claude Code",
-        chatgpt: "ChatGPT",
-        cursor: "Cursor",
         other: "Other app",
       },
       clientText: {
         claude: "claude.ai, app and phone",
-        claude_code: "In the terminal",
-        chatgpt: "chatgpt.com",
-        cursor: "The editor",
-        other: "VS Code and more",
+        terminal: "In the terminal",
+        editor: "Code editor",
+        extension: "Editor extension",
+        desktop: "Desktop app",
+        other: "Any MCP app",
+      },
+      group: {
+        chat: "Chat apps",
+        code: "Editors and terminals",
       },
       waiting: "Waiting for the app to connect",
       connected: "Connected: {{name}}",
@@ -10224,28 +10225,81 @@ export const en = {
         step2: "In Claude Code, type <code>/mcp</code>, pick agentes and Authenticate.",
         scope: "It works in every folder. For the current folder only, drop <code>--scope user</code>.",
       },
-      chatgpt: {
-        step1: "Open chatgpt.com/plugins.",
-        step2: "Click + then Add custom MCP server.",
-        step3: "Paste the address and connect.",
-        plans: "Available on paid ChatGPT plans.",
-      },
       cursor: {
         add: "Add to Cursor",
         manual: "Or paste into <code>~/.cursor/mcp.json</code>:",
         signIn: "Cursor asks you to sign in the first time you use it.",
       },
+      vscode: {
+        add: "Add to VS Code",
+        manual: "Or paste into <code>.vscode/mcp.json</code>:",
+      },
+      codex: {
+        step: "Run in the terminal. Codex opens the page for you to sign in:",
+      },
+      /** The IDE's own settings for its Copilot extension, where its mcp.json opens. */
+      copilotIdes: {
+        config: "In the IDE's GitHub Copilot settings, open <code>mcp.json</code> and paste:",
+      },
       other: {
-        tabs: "Which app",
-        vscode: "VS Code",
-        codex: "Codex",
-        any: "Any MCP app",
-        vscodeAdd: "Add to VS Code",
-        vscodeManual: "Or paste into <code>.vscode/mcp.json</code>:",
-        codexStep: "Run in the terminal. Codex opens the page for you to sign in:",
         anyStep: "Paste the address into the app. It opens this page for you to sign in.",
         anyToken: "Apps without OAuth sign-in use a personal token in the Authorization: Bearer header.",
         toTokens: "Create a personal token",
+      },
+      /**
+       * One step of an app's guide. The values are the app's own menu paths, buttons and fields, in its English, as
+       * its docs write them; keep them as they are.
+       */
+      step: {
+        open: "Open {{place}}.",
+        click: "Click {{button}}.",
+        clickThen: "Click {{button}}, then {{next}}.",
+        name: "Name it agentes.chat and paste the address.",
+        nameDescribe: "Name it agentes.chat and add a description.",
+        nameConnect: "Name it agentes.chat and click {{button}}.",
+        paste: "Paste the address.",
+        pasteIn: "Paste the address into {{field}}.",
+        choosePaste: "Choose {{option}} and paste the address.",
+        emptySecret: "Leave the client ID and secret empty and click {{button}}.",
+        choose: "Choose {{option}}.",
+        chooseThen: "Choose {{option}}, click {{button}}, then {{next}}.",
+        chooseConfig: "Choose {{option}} and paste:",
+        auth: "For authentication, choose {{option}}.",
+        /** {{box}} is the checkbox's own label. */
+        tick: "Tick “{{box}}” and click {{button}}.",
+        run: "Run in the terminal:",
+        orRun: "Or run in the terminal:",
+        /** A command the app runs from its own search box (Raycast's Install MCP Server). */
+        runCommand: "Run the {{command}} command.",
+        file: "Paste into <code>{{file}}</code>:",
+        orFile: "Or paste into <code>{{file}}</code>:",
+        pasteConfig: "Paste:",
+        mode: "In the chat, switch to {{mode}} mode.",
+        loginRun: "To sign in, run <code>{{command}}</code>.",
+        loginType: "To sign in, type <code>{{command}}</code> in the app.",
+        signIn: "Sign in with your agentes.chat account on the page that opens.",
+        signInFirst: "The app asks you to sign in the first time you use it.",
+        /** {{placeholder}} is the spot in the config above where the token goes. */
+        token: "Create a personal token and put it in place of {{placeholder}}.",
+        /** A button. */
+        install: "Add to {{app}}",
+      },
+      note: {
+        untested: "We haven't tested signing in from this app yet. If it fails, let us know.",
+        chatgptPlans: "On paid ChatGPT plans, not Free or Go. On Business, only admins can add it.",
+        chatgptPhone: "It can't be added from the phone app. Once added on the web, it shows on desktop and phone too.",
+        geminiPlans: "On the web only, with a personal Google account. It may need Google AI Pro or Ultra.",
+        codex:
+          "Needs a ChatGPT plan with Codex. The ChatGPT desktop app, the Codex CLI and its IDE extension share this setup.",
+        /** "MCP servers in Copilot" is the policy's name in GitHub's settings: keep it as is. */
+        copilotPolicy:
+          "On Copilot Business and Enterprise, an admin has to turn on the MCP servers in Copilot policy, which is off by default.",
+        grokAdmin: "On Grok Business and Enterprise, an admin adds the connector.",
+        perplexityPlans: "On Perplexity Pro, Max and Enterprise.",
+        leChatAdmin: "On the Team plan, an admin adds the connector.",
+        raycastPro: "Only on Raycast Pro.",
+        visualStudio: "Visual Studio 2022 17.14 or newer, with GitHub Copilot.",
+        continueAgent: "Works in Agent mode only.",
       },
     },
     consent: {

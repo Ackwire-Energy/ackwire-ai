@@ -10783,18 +10783,19 @@
       "address": "Serveradresse",
       "open": "{{app}} öffnen",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "Andere App"
       },
       "clientText": {
         "claude": "claude.ai, App und Handy",
-        "claude_code": "Im Terminal",
-        "chatgpt": "chatgpt.com",
-        "cursor": "Der Editor",
-        "other": "VS Code und mehr"
+        "terminal": "Im Terminal",
+        "editor": "Code-Editor",
+        "extension": "Editor-Erweiterung",
+        "desktop": "Desktop-App",
+        "other": "Jede MCP-App"
+      },
+      "group": {
+        "chat": "Chat-Apps",
+        "code": "Editoren und Terminals"
       },
       "waiting": "Warten, bis sich die App verbindet",
       "connected": "Verbunden: {{name}}",
@@ -10816,28 +10817,69 @@
         "step2": "Gib in Claude Code <code>/mcp</code> ein, wähle agentes und Authenticate.",
         "scope": "Es funktioniert in jedem Ordner. Nur für den aktuellen Ordner lass <code>--scope user</code> weg."
       },
-      "chatgpt": {
-        "step1": "Öffne chatgpt.com/plugins.",
-        "step2": "Klicke auf + und dann auf Add custom MCP server.",
-        "step3": "Füge die Adresse ein und verbinde.",
-        "plans": "Verfügbar in den kostenpflichtigen ChatGPT-Abos."
-      },
       "cursor": {
         "add": "Zu Cursor hinzufügen",
         "manual": "Oder füge es in <code>~/.cursor/mcp.json</code> ein:",
         "signIn": "Cursor bittet dich beim ersten Mal, dich anzumelden."
       },
+      "vscode": {
+        "add": "Zu VS Code hinzufügen",
+        "manual": "Oder füge es in <code>.vscode/mcp.json</code> ein:"
+      },
+      "codex": {
+        "step": "Im Terminal ausführen. Codex öffnet die Seite, damit du dich anmeldest:"
+      },
+      "copilotIdes": {
+        "config": "Öffne in den GitHub-Copilot-Einstellungen der IDE die <code>mcp.json</code> und füge ein:"
+      },
       "other": {
-        "tabs": "Welche App",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "Jede MCP-App",
-        "vscodeAdd": "Zu VS Code hinzufügen",
-        "vscodeManual": "Oder füge es in <code>.vscode/mcp.json</code> ein:",
-        "codexStep": "Im Terminal ausführen. Codex öffnet die Seite, damit du dich anmeldest:",
         "anyStep": "Füge die Adresse in die App ein. Sie öffnet diese Seite, damit du dich anmeldest.",
         "anyToken": "Apps ohne OAuth-Anmeldung nutzen einen persönlichen Token im Header Authorization: Bearer.",
         "toTokens": "Persönlichen Token erstellen"
+      },
+      "step": {
+        "open": "Öffne {{place}}.",
+        "click": "Klicke auf {{button}}.",
+        "clickThen": "Klicke auf {{button}} und dann auf {{next}}.",
+        "name": "Nenne ihn agentes.chat und füge die Adresse ein.",
+        "nameDescribe": "Nenne ihn agentes.chat und schreib eine Beschreibung.",
+        "nameConnect": "Nenne ihn agentes.chat und klicke auf {{button}}.",
+        "paste": "Füge die Adresse ein.",
+        "pasteIn": "Füge die Adresse in {{field}} ein.",
+        "choosePaste": "Wähle {{option}} und füge die Adresse ein.",
+        "emptySecret": "Lass Client ID und Secret leer und klicke auf {{button}}.",
+        "choose": "Wähle {{option}}.",
+        "chooseThen": "Wähle {{option}}, klicke auf {{button}} und dann auf {{next}}.",
+        "chooseConfig": "Wähle {{option}} und füge ein:",
+        "auth": "Wähle bei der Authentifizierung {{option}}.",
+        "tick": "Hake „{{box}}“ an und klicke auf {{button}}.",
+        "run": "Im Terminal ausführen:",
+        "orRun": "Oder im Terminal ausführen:",
+        "runCommand": "Führe den Befehl {{command}} aus.",
+        "file": "In <code>{{file}}</code> einfügen:",
+        "orFile": "Oder in <code>{{file}}</code> einfügen:",
+        "pasteConfig": "Einfügen:",
+        "mode": "Wechsle im Chat in den Modus {{mode}}.",
+        "loginRun": "Zum Anmelden führe <code>{{command}}</code> aus.",
+        "loginType": "Zum Anmelden gib in der App <code>{{command}}</code> ein.",
+        "signIn": "Melde dich auf der Seite, die sich öffnet, mit deinem agentes.chat-Konto an.",
+        "signInFirst": "Die App bittet dich beim ersten Mal, dich anzumelden.",
+        "token": "Erstelle einen persönlichen Token und setze ihn anstelle von {{placeholder}} ein.",
+        "install": "Zu {{app}} hinzufügen"
+      },
+      "note": {
+        "untested": "Die Anmeldung aus dieser App haben wir noch nicht getestet. Wenn sie fehlschlägt, sag uns Bescheid.",
+        "chatgptPlans": "In den kostenpflichtigen ChatGPT-Abos, nicht in Free oder Go. Bei Business können nur Admins ihn hinzufügen.",
+        "chatgptPhone": "In der Handy-App lässt er sich nicht hinzufügen. Sobald er im Web hinzugefügt ist, erscheint er auch am Computer und auf dem Handy.",
+        "geminiPlans": "Nur im Web, mit einem privaten Google-Konto. Eventuell braucht es Google AI Pro oder Ultra.",
+        "codex": "Braucht ein ChatGPT-Abo mit Codex. Die ChatGPT-Desktop-App, die Codex CLI und ihre IDE-Erweiterung teilen diese Einrichtung.",
+        "copilotPolicy": "Bei Copilot Business und Enterprise muss ein Admin die Richtlinie MCP servers in Copilot einschalten, die standardmäßig aus ist.",
+        "grokAdmin": "Bei Grok Business und Enterprise fügt ein Admin den Konnektor hinzu.",
+        "perplexityPlans": "In Perplexity Pro, Max und Enterprise.",
+        "leChatAdmin": "Im Team-Abo fügt ein Admin den Konnektor hinzu.",
+        "raycastPro": "Nur mit Raycast Pro.",
+        "visualStudio": "Visual Studio 2022 17.14 oder neuer, mit GitHub Copilot.",
+        "continueAgent": "Funktioniert nur im Modus Agent."
       }
     },
     "consent": {

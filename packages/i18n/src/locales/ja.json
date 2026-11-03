@@ -10381,18 +10381,19 @@
       "address": "サーバーアドレス",
       "open": "{{app}}を開く",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "その他のアプリ"
       },
       "clientText": {
         "claude": "claude.ai、アプリ、スマートフォン",
-        "claude_code": "ターミナルで",
-        "chatgpt": "chatgpt.com",
-        "cursor": "エディター",
-        "other": "VS Codeなど"
+        "terminal": "ターミナルで",
+        "editor": "コードエディタ",
+        "extension": "エディタ拡張機能",
+        "desktop": "デスクトップアプリ",
+        "other": "任意のMCPアプリ"
+      },
+      "group": {
+        "chat": "チャットアプリ",
+        "code": "エディタとターミナル"
       },
       "waiting": "アプリの接続を待っています",
       "connected": "接続しました: {{name}}",
@@ -10414,28 +10415,69 @@
         "step2": "Claude Codeで<code>/mcp</code>と入力し、agentesを選んで「Authenticate」を選択します。",
         "scope": "すべてのフォルダで使えます。現在のフォルダだけで使う場合は<code>--scope user</code>を外してください。"
       },
-      "chatgpt": {
-        "step1": "chatgpt.com/pluginsを開きます。",
-        "step2": "「+」をクリックし、「カスタムMCPサーバーを追加」を選びます。",
-        "step3": "アドレスを貼り付けて接続します。",
-        "plans": "ChatGPTの有料プランで利用できます。"
-      },
       "cursor": {
         "add": "Cursorに追加",
         "manual": "または<code>~/.cursor/mcp.json</code>に貼り付け:",
         "signIn": "初回使用時にCursorからログインを求められます。"
       },
+      "vscode": {
+        "add": "VS Codeに追加",
+        "manual": "または<code>.vscode/mcp.json</code>に貼り付け:"
+      },
+      "codex": {
+        "step": "ターミナルで実行します。Codexがログイン用のページを開きます:"
+      },
+      "copilotIdes": {
+        "config": "IDEのGitHub Copilot設定で<code>mcp.json</code>を開き、貼り付けます:"
+      },
       "other": {
-        "tabs": "アプリ",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "任意のMCPアプリ",
-        "vscodeAdd": "VS Codeに追加",
-        "vscodeManual": "または<code>.vscode/mcp.json</code>に貼り付け:",
-        "codexStep": "ターミナルで実行します。Codexがログイン用のページを開きます:",
         "anyStep": "アプリにアドレスを貼り付けます。ログイン用にこのページが開きます。",
         "anyToken": "OAuthログインに対応していないアプリは、Authorization: Bearerヘッダーで個人トークンを使います。",
         "toTokens": "個人トークンを作成"
+      },
+      "step": {
+        "open": "{{place}}を開きます。",
+        "click": "「{{button}}」をクリックします。",
+        "clickThen": "「{{button}}」をクリックし、次に「{{next}}」をクリックします。",
+        "name": "名前をagentes.chatにして、アドレスを貼り付けます。",
+        "nameDescribe": "名前をagentes.chatにして、説明を書きます。",
+        "nameConnect": "名前をagentes.chatにして、「{{button}}」をクリックします。",
+        "paste": "アドレスを貼り付けます。",
+        "pasteIn": "「{{field}}」にアドレスを貼り付けます。",
+        "choosePaste": "「{{option}}」を選んで、アドレスを貼り付けます。",
+        "emptySecret": "client IDとsecretは空のまま、「{{button}}」をクリックします。",
+        "choose": "「{{option}}」を選びます。",
+        "chooseThen": "「{{option}}」を選び、「{{button}}」をクリックしてから「{{next}}」をクリックします。",
+        "chooseConfig": "「{{option}}」を選んで貼り付けます:",
+        "auth": "認証で「{{option}}」を選びます。",
+        "tick": "「{{box}}」にチェックを入れ、「{{button}}」をクリックします。",
+        "run": "ターミナルで実行:",
+        "orRun": "またはターミナルで実行:",
+        "runCommand": "「{{command}}」コマンドを実行します。",
+        "file": "<code>{{file}}</code>に貼り付け:",
+        "orFile": "または<code>{{file}}</code>に貼り付け:",
+        "pasteConfig": "貼り付け:",
+        "mode": "チャットで{{mode}}モードに切り替えます。",
+        "loginRun": "ログインするには<code>{{command}}</code>を実行します。",
+        "loginType": "ログインするには、アプリで<code>{{command}}</code>と入力します。",
+        "signIn": "開いたページでagentes.chatのアカウントにログインします。",
+        "signInFirst": "初回使用時にアプリからログインを求められます。",
+        "token": "個人トークンを作成し、{{placeholder}}の部分に入れます。",
+        "install": "{{app}}に追加"
+      },
+      "note": {
+        "untested": "このアプリからのログインはまだテストしていません。うまくいかない場合はお知らせください。",
+        "chatgptPlans": "ChatGPTの有料プランで使えます(FreeとGoを除く)。Businessでは管理者だけが追加できます。",
+        "chatgptPhone": "スマートフォンアプリからは追加できません。ウェブで追加すると、デスクトップとスマートフォンにも表示されます。",
+        "geminiPlans": "ウェブのみ、個人のGoogleアカウントで使えます。Google AI ProまたはUltraが必要な場合があります。",
+        "codex": "Codexを含むChatGPTプランが必要です。ChatGPTのデスクトップアプリ、Codex CLI、IDE拡張機能はこの設定を共有します。",
+        "copilotPolicy": "Copilot BusinessとEnterpriseでは、管理者がポリシー「MCP servers in Copilot」をオンにする必要があります。初期状態ではオフです。",
+        "grokAdmin": "Grok BusinessとEnterpriseでは、管理者がコネクタを追加します。",
+        "perplexityPlans": "Perplexity Pro、Max、Enterpriseで使えます。",
+        "leChatAdmin": "Teamプランでは、管理者がコネクタを追加します。",
+        "raycastPro": "Raycast Proのみ。",
+        "visualStudio": "Visual Studio 2022 17.14以降とGitHub Copilotが必要です。",
+        "continueAgent": "Agentモードでのみ動作します。"
       }
     },
     "consent": {

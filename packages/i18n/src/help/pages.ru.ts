@@ -446,6 +446,7 @@ export const helpRu: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Claude Code:** выполните `claude mcp add --transport http --scope user agentes <адрес>`, затем введите `/mcp`, выберите agentes и **Authenticate**. Только для текущей папки уберите `--scope user`.",
               "**Cursor:** **Добавить в Cursor** в **Настройки › Приложения ИИ** или адрес в `~/.cursor/mcp.json`. Cursor попросит войти при первом использовании.",
               '**VS Code:** **Добавить в VS Code** или адрес в `.vscode/mcp.json` с `"type": "http"`.',
+              "**Другие приложения:** у ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrains и других есть свои шаги в **Подключить приложение**, ваш адрес уже подставлен.",
             ],
           },
           "При входе agentes.chat показывает, какое приложение просит доступ и куда оно вернётся. Продолжайте, только если вы сами только что начали подключение.",

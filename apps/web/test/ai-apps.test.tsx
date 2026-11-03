@@ -6,12 +6,21 @@ setupDom();
 import type { AuditRow, Message } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import {
+  APP_CLIENTS,
   claudeCodeCommand,
   codexCommands,
+  codexConfig,
+  continueConfig,
+  copilotIdesConfig,
   cursorConfig,
   cursorInstallLink,
+  geminiCliConfig,
+  gooseInstallLink,
+  opencodeConfig,
   vscodeConfig,
   vscodeInstallLink,
+  warpConfig,
+  zedConfig,
 } from "@agenteschat/client/lib/app-clients";
 import {
   appFacts,
@@ -86,6 +95,40 @@ describe("the client facts: one command, link or file per app, with this server'
     expect(codexCommands(url)).toBe("codex mcp add agentes --url https://agentes.example/mcp\ncodex mcp login agentes");
     expect(JSON.parse(cursorConfig(url))).toEqual({ mcpServers: { agentes: { url } } });
     expect(JSON.parse(vscodeConfig(url))).toEqual({ servers: { agentes: { type: "http", url } } });
+  });
+
+  test("each vendor's own config format, with the address in it", () => {
+    expect(codexConfig(url)).toBe('[mcp_servers.agentes]\nurl = "https://agentes.example/mcp"');
+    expect(JSON.parse(geminiCliConfig(url))).toEqual({ mcpServers: { agentes: { httpUrl: url } } });
+    expect(JSON.parse(zedConfig(url))).toEqual({ context_servers: { agentes: { url } } });
+    expect(JSON.parse(warpConfig(url))).toEqual({ agentes: { url, headers: { Authorization: "Bearer <token>" } } });
+    expect(JSON.parse(opencodeConfig(url)).mcp).toEqual({ agentes: { type: "remote", url } });
+    expect(JSON.parse(copilotIdesConfig(url))).toEqual({
+      servers: { agentes: { url, requestInit: { headers: { Authorization: "Bearer <token>" } } } },
+    });
+    expect(continueConfig(url)).toContain("    type: streamable-http\n    url: https://agentes.example/mcp\n");
+    const goose = new URL(gooseInstallLink(url));
+    expect(goose.protocol).toBe("goose:");
+    expect(goose.searchParams.get("url")).toBe(url);
+    expect(goose.searchParams.get("type")).toBe("streamable_http");
+  });
+
+  test("every guide carries the address, and a step that signs in", () => {
+    const signIn =
+      /^(step\.(signIn|signInFirst|loginRun|loginType|token)|claude\.step3|claudeCode\.step2|codex\.step|other\.anyStep)$/;
+    for (const client of APP_CLIENTS) {
+      const guide = client.guide(url);
+      const carries = guide.steps.some(
+        (s) =>
+          s.address ||
+          s.code?.includes(url) ||
+          s.install?.includes(encodeURIComponent(url)) ||
+          s.install?.includes(btoa(JSON.stringify({ url }))),
+      );
+      expect([client.id, carries]).toEqual([client.id, true]);
+      const signs = guide.steps.some((s) => signIn.test(s.text)) || guide.notes.some((n) => n.text === "cursor.signIn");
+      expect([client.id, signs]).toEqual([client.id, true]);
+    }
   });
 
   test("Cursor's install link carries the config as base64 JSON; VS Code's as URL-encoded JSON", () => {
@@ -215,27 +258,46 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
   test("Conectar um app: a card per app with its official mark, each app's exact steps with this server's address", async () => {
     await go();
     await click(section().getAllByRole("button", { name: "Conectar um app" })[0] as HTMLElement);
+    const groupCards = (name: string) =>
+      [...dialog().getByRole("region", { name }).querySelectorAll(".apps-client")].map((c) => [
+        c.querySelector(".apps-client__name")?.textContent,
+        c.querySelector(".ac-brand")?.getAttribute("data-mark") ?? null,
+      ]);
+    expect(groupCards("Apps de chat")).toEqual([
+      ["ChatGPT", "openai"],
+      ["Claude", "claude"],
+      ["Gemini", "gemini"],
+      ["Grok", "grok"],
+      ["Perplexity", "perplexity"],
+      ["Le Chat", "mistral"],
+      ["Raycast", "raycast"],
+    ]);
+    expect(groupCards("Editores e terminais")).toEqual([
+      ["Claude Code", "claude"],
+      ["Cursor", "cursor"],
+      ["Codex", "openai"],
+      ["VS Code", "vscode"],
+      ["Gemini CLI", "gemini"],
+      ["Devin Desktop", "devin"],
+      ["JetBrains AI Assistant", "jetbrains"],
+      ["GitHub Copilot", "githubcopilot"],
+      ["Zed", "zed"],
+      ["Cline", "cline"],
+      ["Warp", "warp"],
+      ["Goose", "goose"],
+      ["OpenCode", "opencode"],
+      ["Visual Studio", "visualstudio"],
+      ["Continue", "continue"],
+      ["Copilot CLI", "githubcopilot"],
+    ]);
     const cards = dialog()
       .getAllByRole("button")
       .filter((b) => b.classList.contains("apps-client"));
-    // ChatGPT and Codex wait for their QA gates (ADR 0119).
-    expect(cards.map((c) => c.querySelector(".apps-client__name")?.textContent)).toEqual([
-      "Claude",
-      "Claude Code",
-      "Cursor",
-      "Outro app",
-    ]);
-    expect(cards.map((c) => c.querySelector(".ac-brand")?.getAttribute("data-mark") ?? null)).toEqual([
-      "claude",
-      "claude",
-      "cursor",
-      null,
-    ]);
+    expect(cards.at(-1)?.textContent).toBe("Outro appQualquer app com MCP");
 
-    await click(cards[1] as HTMLElement);
+    await click(dialog().getByRole("button", { name: /^Claude Code/ }));
     expect(dialog().getByRole("heading", { name: "Claude Code" })).toBeTruthy();
     expect(screen().getByRole("dialog").textContent).toContain(claudeCodeCommand(SERVER_URL));
-    expect(screen().getByRole("dialog").querySelector("code")?.textContent).toBeTruthy();
     expect([...screen().getByRole("dialog").querySelectorAll("li code")].map((c) => c.textContent)).toContain("/mcp");
     expect(screen().getByRole("dialog").textContent).toContain("Esperando o app se conectar");
     await click(dialog().getByRole("button", { name: "Voltar para os apps" }));
@@ -244,10 +306,8 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
     const open = dialog().getByRole("link", { name: "Abrir o Claude" });
     expect(open.getAttribute("href")).toBe("https://claude.ai/customize/connectors");
     expect(open.getAttribute("target")).toBe("_blank");
-    expect(screen().getByRole("dialog").textContent).toContain("Personalizar\u00a0›\u00a0Conectores");
-    expect(screen().getByRole("dialog").textContent).toContain("Adicionar conector personalizado");
+    expect(screen().getByRole("dialog").textContent).toContain("Personalizar › Conectores");
     expect(screen().getByRole("dialog").textContent).toContain("Entrar agora");
-    expect(screen().getByRole("dialog").textContent).toContain(SERVER_URL);
     await click(dialog().getByRole("button", { name: "Voltar para os apps" }));
 
     await click(dialog().getByRole("button", { name: /^Cursor/ }));
@@ -257,13 +317,92 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
     expect(screen().getByRole("dialog").textContent).toContain("~/.cursor/mcp.json");
     await click(dialog().getByRole("button", { name: "Voltar para os apps" }));
 
-    await click(dialog().getByRole("button", { name: /^Outro app/ }));
+    await click(dialog().getByRole("button", { name: /^VS Code/ }));
     expect(dialog().getByRole("link", { name: "Adicionar ao VS Code" }).getAttribute("href")).toBe(
       vscodeInstallLink(SERVER_URL),
     );
-    expect(dialog().queryByRole("tab", { name: "Codex" })).toBeNull();
-    await pickTab(dialog().getByRole("tab", { name: "Qualquer app com MCP" }));
-    expect(screen().getByRole("dialog").textContent).toContain("Cole o endereço no app.");
+    expect(screen().getByRole("dialog").textContent).toContain("MCP servers in Copilot");
+    await click(dialog().getByRole("button", { name: "Voltar para os apps" }));
+
+    await click(dialog().getByRole("button", { name: /^ChatGPT/ }));
+    expect(dialog().getByRole("link", { name: "Abrir o ChatGPT" }).getAttribute("href")).toBe(
+      "https://chatgpt.com/plugins",
+    );
+    const chatgpt = screen().getByRole("dialog").textContent ?? "";
+    expect(chatgpt).toContain("Clique em + e depois em Add custom MCP server.");
+    expect(chatgpt).toContain("Marque “I understand and want to continue” e clique em Create as a plugin.");
+    expect(chatgpt).toContain("Ainda não testamos a entrada por este app.");
+    await click(dialog().getByRole("button", { name: "Voltar para os apps" }));
+
+    await click(dialog().getByRole("button", { name: /^Continue/ }));
+    expect(screen().getByRole("dialog").textContent).toContain("Authorization: Bearer <token>");
+    expect(screen().getByRole("dialog").textContent).toContain("Crie um token pessoal e coloque no lugar de <token>.");
+    await click(dialog().getByRole("button", { name: "Criar um token pessoal" }));
+    expect(dialog().getByRole("heading", { name: "Criar token" })).toBeTruthy();
+  });
+
+  test("every guide has this workspace's address to copy and its way to sign in", async () => {
+    await go();
+    await click(section().getAllByRole("button", { name: "Conectar um app" })[0] as HTMLElement);
+    const SIGN_IN = "Entre com sua conta do agentes.chat na página que abrir.";
+    const FIRST = "O app pede para você entrar na primeira vez que usar.";
+    const TOKEN = "Crie um token pessoal e coloque no lugar de <token>.";
+    // How each app signs in: OAuth through this server's page, or a personal token where the app documents no OAuth.
+    const auth: Record<string, string> = {
+      ChatGPT: SIGN_IN,
+      Claude: "autorize na página que abrir",
+      Gemini: SIGN_IN,
+      Grok: SIGN_IN,
+      Perplexity: SIGN_IN,
+      "Le Chat": SIGN_IN,
+      Raycast: SIGN_IN,
+      "Claude Code": "escolha agentes e Authenticate",
+      Cursor: "O Cursor pede para entrar",
+      Codex: "O Codex abre a página para você entrar",
+      "VS Code": FIRST,
+      "Gemini CLI": "Para entrar, digite /mcp auth agentes no app.",
+      "Devin Desktop": FIRST,
+      "JetBrains AI Assistant": FIRST,
+      "GitHub Copilot": TOKEN,
+      Zed: FIRST,
+      Cline: FIRST,
+      Warp: TOKEN,
+      Goose: FIRST,
+      OpenCode: "Para entrar, rode opencode mcp auth agentes.",
+      "Visual Studio": SIGN_IN,
+      Continue: TOKEN,
+      "Copilot CLI": FIRST,
+      "Outro app": "Ele abre esta página para você entrar.",
+    };
+    const untested = [
+      "ChatGPT",
+      "Gemini",
+      "Grok",
+      "Perplexity",
+      "Le Chat",
+      "Raycast",
+      "Codex",
+      "Devin Desktop",
+      "JetBrains AI Assistant",
+      "Zed",
+      "Cline",
+      "Copilot CLI",
+    ];
+    const names = [...document.querySelectorAll(".apps-client__name")].map((n) => n.textContent ?? "");
+    expect(names).toEqual(Object.keys(auth));
+    for (const name of names) {
+      const card = [...document.querySelectorAll(".apps-client")].find(
+        (c) => c.querySelector(".apps-client__name")?.textContent === name,
+      );
+      await click(card as HTMLElement);
+      const box = screen().getByRole("dialog");
+      expect([name, (box.textContent ?? "").includes(SERVER_URL)]).toEqual([name, true]);
+      expect([name, (box.textContent ?? "").includes(auth[name] as string)]).toEqual([name, true]);
+      const tokenButton = within(box).queryByRole("button", { name: "Criar um token pessoal" });
+      expect([name, !!tokenButton]).toEqual([name, auth[name] === TOKEN || name === "Outro app"]);
+      expect([name, (box.textContent ?? "").includes("Ainda não testamos")]).toEqual([name, untested.includes(name)]);
+      await click(within(box).getByRole("button", { name: "Voltar para os apps" }));
+    }
   });
 
   test("the new app shows in the dialog once its sign-in is done; Concluir lists it, with its access and its times", async () => {

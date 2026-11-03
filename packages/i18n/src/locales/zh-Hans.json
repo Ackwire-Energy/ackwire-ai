@@ -10459,18 +10459,19 @@
       "address": "服务器地址",
       "open": "打开 {{app}}",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "其他应用"
       },
       "clientText": {
         "claude": "claude.ai、桌面应用和手机",
-        "claude_code": "在终端中",
-        "chatgpt": "chatgpt.com",
-        "cursor": "编辑器",
-        "other": "VS Code 等"
+        "terminal": "在终端中",
+        "editor": "代码编辑器",
+        "extension": "编辑器扩展",
+        "desktop": "桌面应用",
+        "other": "任意 MCP 应用"
+      },
+      "group": {
+        "chat": "聊天应用",
+        "code": "编辑器和终端"
       },
       "waiting": "等待应用连接",
       "connected": "已连接：{{name}}",
@@ -10492,28 +10493,69 @@
         "step2": "在 Claude Code 中输入 <code>/mcp</code>，选择 agentes，然后选择 Authenticate。",
         "scope": "它在所有文件夹中都有效。如只用于当前文件夹，请去掉 <code>--scope user</code>。"
       },
-      "chatgpt": {
-        "step1": "打开 chatgpt.com/plugins。",
-        "step2": "点击 +，然后选择“添加自定义 MCP 服务器”。",
-        "step3": "粘贴地址并连接。",
-        "plans": "适用于 ChatGPT 付费套餐。"
-      },
       "cursor": {
         "add": "添加到 Cursor",
         "manual": "或粘贴到 <code>~/.cursor/mcp.json</code>：",
         "signIn": "首次使用时，Cursor 会要求你登录。"
       },
+      "vscode": {
+        "add": "添加到 VS Code",
+        "manual": "或粘贴到 <code>.vscode/mcp.json</code>："
+      },
+      "codex": {
+        "step": "在终端中运行。Codex 会打开页面让你登录："
+      },
+      "copilotIdes": {
+        "config": "在 IDE 的 GitHub Copilot 设置中打开 <code>mcp.json</code> 并粘贴："
+      },
       "other": {
-        "tabs": "哪个应用",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "任意 MCP 应用",
-        "vscodeAdd": "添加到 VS Code",
-        "vscodeManual": "或粘贴到 <code>.vscode/mcp.json</code>：",
-        "codexStep": "在终端中运行。Codex 会打开页面让你登录：",
         "anyStep": "把地址粘贴到应用中。它会打开这个页面让你登录。",
         "anyToken": "不支持 OAuth 登录的应用，可在 Authorization: Bearer 请求头中使用个人令牌。",
         "toTokens": "创建个人令牌"
+      },
+      "step": {
+        "open": "打开 {{place}}。",
+        "click": "点击“{{button}}”。",
+        "clickThen": "点击“{{button}}”，然后点击“{{next}}”。",
+        "name": "命名为 agentes.chat 并粘贴地址。",
+        "nameDescribe": "命名为 agentes.chat 并写一段描述。",
+        "nameConnect": "命名为 agentes.chat 并点击“{{button}}”。",
+        "paste": "粘贴地址。",
+        "pasteIn": "把地址粘贴到“{{field}}”。",
+        "choosePaste": "选择“{{option}}”并粘贴地址。",
+        "emptySecret": "client ID 和 secret 留空，点击“{{button}}”。",
+        "choose": "选择“{{option}}”。",
+        "chooseThen": "选择“{{option}}”，点击“{{button}}”，然后点击“{{next}}”。",
+        "chooseConfig": "选择“{{option}}”并粘贴：",
+        "auth": "身份验证选择“{{option}}”。",
+        "tick": "勾选“{{box}}”并点击“{{button}}”。",
+        "run": "在终端中运行：",
+        "orRun": "或在终端中运行：",
+        "runCommand": "运行 {{command}} 命令。",
+        "file": "粘贴到 <code>{{file}}</code>：",
+        "orFile": "或粘贴到 <code>{{file}}</code>：",
+        "pasteConfig": "粘贴：",
+        "mode": "在聊天中切换到 {{mode}} 模式。",
+        "loginRun": "要登录，请运行 <code>{{command}}</code>。",
+        "loginType": "要登录，请在应用中输入 <code>{{command}}</code>。",
+        "signIn": "在打开的页面中用你的 agentes.chat 账号登录。",
+        "signInFirst": "首次使用时，应用会要求你登录。",
+        "token": "创建一个个人令牌，替换 {{placeholder}}。",
+        "install": "添加到 {{app}}"
+      },
+      "note": {
+        "untested": "我们还没有测试过从这个应用登录。如果失败，请告诉我们。",
+        "chatgptPlans": "适用于 ChatGPT 付费套餐，不含 Free 和 Go。Business 中只有管理员可以添加。",
+        "chatgptPhone": "无法在手机应用中添加。在网页上添加后，桌面端和手机上也会显示。",
+        "geminiPlans": "仅限网页版，需使用个人 Google 账号。可能需要 Google AI Pro 或 Ultra。",
+        "codex": "需要包含 Codex 的 ChatGPT 套餐。ChatGPT 桌面应用、Codex CLI 和 IDE 扩展共用这份配置。",
+        "copilotPolicy": "在 Copilot Business 和 Enterprise 中，管理员需要开启 MCP servers in Copilot 策略，它默认是关闭的。",
+        "grokAdmin": "在 Grok Business 和 Enterprise 中，由管理员添加连接器。",
+        "perplexityPlans": "适用于 Perplexity Pro、Max 和 Enterprise。",
+        "leChatAdmin": "在 Team 套餐中，由管理员添加连接器。",
+        "raycastPro": "仅限 Raycast Pro。",
+        "visualStudio": "需要 Visual Studio 2022 17.14 或更新版本，以及 GitHub Copilot。",
+        "continueAgent": "仅在 Agent 模式下可用。"
       }
     },
     "consent": {

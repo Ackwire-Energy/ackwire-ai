@@ -26151,35 +26151,32 @@
   "apps.dialog.open": {
     "value": "Open {{app}}"
   },
-  "apps.dialog.client.claude": {
-    "value": "Claude"
-  },
-  "apps.dialog.client.claude_code": {
-    "value": "Claude Code"
-  },
-  "apps.dialog.client.chatgpt": {
-    "value": "ChatGPT"
-  },
-  "apps.dialog.client.cursor": {
-    "value": "Cursor"
-  },
   "apps.dialog.client.other": {
     "value": "Other app"
   },
   "apps.dialog.clientText.claude": {
     "value": "claude.ai, app and phone"
   },
-  "apps.dialog.clientText.claude_code": {
+  "apps.dialog.clientText.terminal": {
     "value": "In the terminal"
   },
-  "apps.dialog.clientText.chatgpt": {
-    "value": "chatgpt.com"
+  "apps.dialog.clientText.editor": {
+    "value": "Code editor"
   },
-  "apps.dialog.clientText.cursor": {
-    "value": "The editor"
+  "apps.dialog.clientText.extension": {
+    "value": "Editor extension"
+  },
+  "apps.dialog.clientText.desktop": {
+    "value": "Desktop app"
   },
   "apps.dialog.clientText.other": {
-    "value": "VS Code and more"
+    "value": "Any MCP app"
+  },
+  "apps.dialog.group.chat": {
+    "value": "Chat apps"
+  },
+  "apps.dialog.group.code": {
+    "value": "Editors and terminals"
   },
   "apps.dialog.waiting": {
     "value": "Waiting for the app to connect"
@@ -26229,18 +26226,6 @@
   "apps.dialog.claudeCode.scope": {
     "value": "It works in every folder. For the current folder only, drop <code>--scope user</code>."
   },
-  "apps.dialog.chatgpt.step1": {
-    "value": "Open chatgpt.com/plugins."
-  },
-  "apps.dialog.chatgpt.step2": {
-    "value": "Click + then Add custom MCP server."
-  },
-  "apps.dialog.chatgpt.step3": {
-    "value": "Paste the address and connect."
-  },
-  "apps.dialog.chatgpt.plans": {
-    "value": "Available on paid ChatGPT plans."
-  },
   "apps.dialog.cursor.add": {
     "value": "Add to Cursor"
   },
@@ -26250,26 +26235,17 @@
   "apps.dialog.cursor.signIn": {
     "value": "Cursor asks you to sign in the first time you use it."
   },
-  "apps.dialog.other.tabs": {
-    "value": "Which app"
-  },
-  "apps.dialog.other.vscode": {
-    "value": "VS Code"
-  },
-  "apps.dialog.other.codex": {
-    "value": "Codex"
-  },
-  "apps.dialog.other.any": {
-    "value": "Any MCP app"
-  },
-  "apps.dialog.other.vscodeAdd": {
+  "apps.dialog.vscode.add": {
     "value": "Add to VS Code"
   },
-  "apps.dialog.other.vscodeManual": {
+  "apps.dialog.vscode.manual": {
     "value": "Or paste into <code>.vscode/mcp.json</code>:"
   },
-  "apps.dialog.other.codexStep": {
+  "apps.dialog.codex.step": {
     "value": "Run in the terminal. Codex opens the page for you to sign in:"
+  },
+  "apps.dialog.copilotIdes.config": {
+    "value": "In the IDE's GitHub Copilot settings, open <code>mcp.json</code> and paste:"
   },
   "apps.dialog.other.anyStep": {
     "value": "Paste the address into the app. It opens this page for you to sign in."
@@ -26279,6 +26255,126 @@
   },
   "apps.dialog.other.toTokens": {
     "value": "Create a personal token"
+  },
+  "apps.dialog.step.open": {
+    "value": "Open {{place}}."
+  },
+  "apps.dialog.step.click": {
+    "value": "Click {{button}}."
+  },
+  "apps.dialog.step.clickThen": {
+    "value": "Click {{button}}, then {{next}}."
+  },
+  "apps.dialog.step.name": {
+    "value": "Name it agentes.chat and paste the address."
+  },
+  "apps.dialog.step.nameDescribe": {
+    "value": "Name it agentes.chat and add a description."
+  },
+  "apps.dialog.step.nameConnect": {
+    "value": "Name it agentes.chat and click {{button}}."
+  },
+  "apps.dialog.step.paste": {
+    "value": "Paste the address."
+  },
+  "apps.dialog.step.pasteIn": {
+    "value": "Paste the address into {{field}}."
+  },
+  "apps.dialog.step.choosePaste": {
+    "value": "Choose {{option}} and paste the address."
+  },
+  "apps.dialog.step.emptySecret": {
+    "value": "Leave the client ID and secret empty and click {{button}}."
+  },
+  "apps.dialog.step.choose": {
+    "value": "Choose {{option}}."
+  },
+  "apps.dialog.step.chooseThen": {
+    "value": "Choose {{option}}, click {{button}}, then {{next}}."
+  },
+  "apps.dialog.step.chooseConfig": {
+    "value": "Choose {{option}} and paste:"
+  },
+  "apps.dialog.step.auth": {
+    "value": "For authentication, choose {{option}}."
+  },
+  "apps.dialog.step.tick": {
+    "value": "Tick “{{box}}” and click {{button}}."
+  },
+  "apps.dialog.step.run": {
+    "value": "Run in the terminal:"
+  },
+  "apps.dialog.step.orRun": {
+    "value": "Or run in the terminal:"
+  },
+  "apps.dialog.step.runCommand": {
+    "value": "Run the {{command}} command."
+  },
+  "apps.dialog.step.file": {
+    "value": "Paste into <code>{{file}}</code>:"
+  },
+  "apps.dialog.step.orFile": {
+    "value": "Or paste into <code>{{file}}</code>:"
+  },
+  "apps.dialog.step.pasteConfig": {
+    "value": "Paste:"
+  },
+  "apps.dialog.step.mode": {
+    "value": "In the chat, switch to {{mode}} mode."
+  },
+  "apps.dialog.step.loginRun": {
+    "value": "To sign in, run <code>{{command}}</code>."
+  },
+  "apps.dialog.step.loginType": {
+    "value": "To sign in, type <code>{{command}}</code> in the app."
+  },
+  "apps.dialog.step.signIn": {
+    "value": "Sign in with your agentes.chat account on the page that opens."
+  },
+  "apps.dialog.step.signInFirst": {
+    "value": "The app asks you to sign in the first time you use it."
+  },
+  "apps.dialog.step.token": {
+    "value": "Create a personal token and put it in place of {{placeholder}}."
+  },
+  "apps.dialog.step.install": {
+    "value": "Add to {{app}}"
+  },
+  "apps.dialog.note.untested": {
+    "value": "We haven't tested signing in from this app yet. If it fails, let us know."
+  },
+  "apps.dialog.note.chatgptPlans": {
+    "value": "On paid ChatGPT plans, not Free or Go. On Business, only admins can add it."
+  },
+  "apps.dialog.note.chatgptPhone": {
+    "value": "It can't be added from the phone app. Once added on the web, it shows on desktop and phone too."
+  },
+  "apps.dialog.note.geminiPlans": {
+    "value": "On the web only, with a personal Google account. It may need Google AI Pro or Ultra."
+  },
+  "apps.dialog.note.codex": {
+    "value": "Needs a ChatGPT plan with Codex. The ChatGPT desktop app, the Codex CLI and its IDE extension share this setup."
+  },
+  "apps.dialog.note.copilotPolicy": {
+    "value": "On Copilot Business and Enterprise, an admin has to turn on the MCP servers in Copilot policy, which is off by default."
+  },
+  "apps.dialog.note.grokAdmin": {
+    "value": "On Grok Business and Enterprise, an admin adds the connector."
+  },
+  "apps.dialog.note.perplexityPlans": {
+    "value": "On Perplexity Pro, Max and Enterprise."
+  },
+  "apps.dialog.note.leChatAdmin": {
+    "value": "On the Team plan, an admin adds the connector."
+  },
+  "apps.dialog.note.raycastPro": {
+    "value": "Only on Raycast Pro."
+  },
+  "apps.dialog.note.visualStudio": {
+    "value": "Visual Studio 2022 17.14 or newer, with GitHub Copilot."
+  },
+  "apps.dialog.note.continueAgent": {
+    "value": "Works in Agent mode only."
   },
   "apps.consent.title.verified": {
     "value": "<b>{{name}}</b> wants to access your account"

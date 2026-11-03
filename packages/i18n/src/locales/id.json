@@ -10449,18 +10449,19 @@
       "address": "Alamat server",
       "open": "Buka {{app}}",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "Aplikasi lain"
       },
       "clientText": {
         "claude": "claude.ai, aplikasi, dan ponsel",
-        "claude_code": "Di terminal",
-        "chatgpt": "chatgpt.com",
-        "cursor": "Editornya",
-        "other": "VS Code dan lainnya"
+        "terminal": "Di terminal",
+        "editor": "Editor kode",
+        "extension": "Ekstensi editor",
+        "desktop": "Aplikasi desktop",
+        "other": "Aplikasi MCP apa pun"
+      },
+      "group": {
+        "chat": "Aplikasi chat",
+        "code": "Editor dan terminal"
       },
       "waiting": "Menunggu aplikasi terhubung",
       "connected": "Terhubung: {{name}}",
@@ -10482,28 +10483,69 @@
         "step2": "Di Claude Code, ketik <code>/mcp</code>, pilih agentes, lalu Authenticate.",
         "scope": "Berfungsi di semua folder. Untuk folder saat ini saja, hapus <code>--scope user</code>."
       },
-      "chatgpt": {
-        "step1": "Buka chatgpt.com/plugins.",
-        "step2": "Klik + lalu Add custom MCP server.",
-        "step3": "Tempel alamatnya lalu hubungkan.",
-        "plans": "Tersedia di paket ChatGPT berbayar."
-      },
       "cursor": {
         "add": "Tambahkan ke Cursor",
         "manual": "Atau tempel di <code>~/.cursor/mcp.json</code>:",
         "signIn": "Cursor memintamu masuk saat pertama kali memakainya."
       },
+      "vscode": {
+        "add": "Tambahkan ke VS Code",
+        "manual": "Atau tempel di <code>.vscode/mcp.json</code>:"
+      },
+      "codex": {
+        "step": "Jalankan di terminal. Codex membuka halaman untuk kamu masuk:"
+      },
+      "copilotIdes": {
+        "config": "Di pengaturan GitHub Copilot pada IDE, buka <code>mcp.json</code> lalu tempel:"
+      },
       "other": {
-        "tabs": "Aplikasi apa",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "Aplikasi MCP apa pun",
-        "vscodeAdd": "Tambahkan ke VS Code",
-        "vscodeManual": "Atau tempel di <code>.vscode/mcp.json</code>:",
-        "codexStep": "Jalankan di terminal. Codex membuka halaman untuk kamu masuk:",
         "anyStep": "Tempel alamatnya di aplikasi. Aplikasi akan membuka halaman ini untuk kamu masuk.",
         "anyToken": "Aplikasi tanpa login OAuth memakai token pribadi di header Authorization: Bearer.",
         "toTokens": "Buat token pribadi"
+      },
+      "step": {
+        "open": "Buka {{place}}.",
+        "click": "Klik {{button}}.",
+        "clickThen": "Klik {{button}}, lalu {{next}}.",
+        "name": "Beri nama agentes.chat dan tempel alamatnya.",
+        "nameDescribe": "Beri nama agentes.chat dan tulis deskripsinya.",
+        "nameConnect": "Beri nama agentes.chat lalu klik {{button}}.",
+        "paste": "Tempel alamatnya.",
+        "pasteIn": "Tempel alamatnya di {{field}}.",
+        "choosePaste": "Pilih {{option}} dan tempel alamatnya.",
+        "emptySecret": "Biarkan client ID dan secret kosong, lalu klik {{button}}.",
+        "choose": "Pilih {{option}}.",
+        "chooseThen": "Pilih {{option}}, klik {{button}}, lalu {{next}}.",
+        "chooseConfig": "Pilih {{option}} lalu tempel:",
+        "auth": "Untuk autentikasi, pilih {{option}}.",
+        "tick": "Centang “{{box}}” lalu klik {{button}}.",
+        "run": "Jalankan di terminal:",
+        "orRun": "Atau jalankan di terminal:",
+        "runCommand": "Jalankan perintah {{command}}.",
+        "file": "Tempel di <code>{{file}}</code>:",
+        "orFile": "Atau tempel di <code>{{file}}</code>:",
+        "pasteConfig": "Tempel:",
+        "mode": "Di chat, beralih ke mode {{mode}}.",
+        "loginRun": "Untuk masuk, jalankan <code>{{command}}</code>.",
+        "loginType": "Untuk masuk, ketik <code>{{command}}</code> di aplikasi.",
+        "signIn": "Masuk dengan akun agentes.chat-mu di halaman yang terbuka.",
+        "signInFirst": "Aplikasi memintamu masuk saat pertama kali memakainya.",
+        "token": "Buat token pribadi dan taruh di tempat {{placeholder}}.",
+        "install": "Tambahkan ke {{app}}"
+      },
+      "note": {
+        "untested": "Kami belum menguji masuk dari aplikasi ini. Kalau gagal, kabari kami.",
+        "chatgptPlans": "Di paket berbayar ChatGPT, kecuali Free dan Go. Di Business, hanya admin yang bisa menambahkannya.",
+        "chatgptPhone": "Tidak bisa ditambahkan dari aplikasi ponsel. Setelah ditambahkan di web, ia juga muncul di desktop dan ponsel.",
+        "geminiPlans": "Hanya di web, dengan akun Google pribadi. Mungkin perlu Google AI Pro atau Ultra.",
+        "codex": "Perlu paket ChatGPT dengan Codex. Aplikasi desktop ChatGPT, Codex CLI, dan ekstensi IDE-nya memakai pengaturan yang sama.",
+        "copilotPolicy": "Di Copilot Business dan Enterprise, admin harus menyalakan kebijakan MCP servers in Copilot, yang mati secara default.",
+        "grokAdmin": "Di Grok Business dan Enterprise, admin yang menambahkan konektor.",
+        "perplexityPlans": "Di Perplexity Pro, Max, dan Enterprise.",
+        "leChatAdmin": "Di paket Team, admin yang menambahkan konektor.",
+        "raycastPro": "Hanya di Raycast Pro.",
+        "visualStudio": "Visual Studio 2022 17.14 atau lebih baru, dengan GitHub Copilot.",
+        "continueAgent": "Hanya berfungsi di mode Agent."
       }
     },
     "consent": {
