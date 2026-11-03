@@ -6,6 +6,7 @@ import {
   answerQuestion,
   ConflictError,
   cancelRun,
+  dismissQuestion,
   drainOutbox,
   expireQuestions,
   listMessages,
@@ -164,6 +165,27 @@ describe("ask_user", () => {
     expect(request.tools?.map((t) => t.name)).toContain("ask_user");
     expect(systemText(request.system)).toContain("don't ask about simple requests");
     expect(systemText(request.system)).toContain("ambiguous after you have looked with your tools");
+  });
+
+  test("a person skips the question: the card says so and the run goes on without an answer", async () => {
+    f = await setup({ askUser: true, reply });
+    await post("@dev deploy it");
+    await drainOutbox(f.db, f.handlers);
+    const [q] = await questions();
+    const skipped = await dismissQuestion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, q?.id ?? "");
+    expect(skipped).toMatchObject({ status: "answered", answer: null, answeredByUserId: f.owner.id, dismissed: true });
+    await expect(dismissQuestion({ db: f.db }, f.owner.id, f.org.id, q?.id ?? "")).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+    await expect(
+      answerQuestion({ db: f.db }, f.owner.id, f.org.id, q?.id ?? "", { choice: "staging" }),
+    ).rejects.toBeInstanceOf(ConflictError);
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("done");
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("The person skipped this question");
+    expect((await questions())[0]?.status).toBe("dismissed");
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.find((m) => m.id === q?.messageId)?.meta.question).toMatchObject({ dismissed: true, answer: null });
   });
 
   test("with no answer in 24 hours the run goes on and the model is told", async () => {

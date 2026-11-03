@@ -98,7 +98,7 @@ test("the prompt names the loaded tools only by name and the on-demand groups in
 
 test("the prompt tells the agent to guide a person to connect an app it lacks, never to say it doesn't exist", () => {
   expect(describeCapabilities(presentTools(tools(), undefined, []))).toContain(
-    "Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), `find_tools` also says how to get it: guide the person to connect it instead of saying it doesn't exist.",
+    "Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), `find_tools` also says how to get it: guide the person to connect it instead of saying it doesn't exist; when none can be connected and it has a web version, use that in your browser.",
   );
 });
 

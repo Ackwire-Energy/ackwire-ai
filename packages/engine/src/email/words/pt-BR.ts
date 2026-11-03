@@ -318,4 +318,26 @@ export const ptBR: Words = {
     table: (day) => `A tabela inteira: bun run report:autonomy --day ${day}`,
     why: "Você recebeu este e-mail porque este endereço está em OPS_REPORT_EMAIL neste servidor. Ele sai uma vez por dia.",
   },
+  planOpened: {
+    subject: (plan) => `Mais pessoas podem falar com seu agente pelo seu plano do ${plan}`,
+    preheader: (plan) => `As conversas delas usam o seu plano do ${plan} e os limites dele.`,
+    headline: "Mais pessoas podem falar com seu agente",
+    body: (by, agent, plan) => [
+      { b: by },
+      " deixou mais pessoas falarem com ",
+      { b: agent },
+      `. As conversas delas usam o seu plano do ${plan} e os limites dele.`,
+    ],
+    agent: "Agente",
+    by: "Mudado por",
+    was: "Antes",
+    now: "Agora",
+    everyone: "Todo mundo no workspace",
+    onlyYou: "Só você",
+    you: "Você",
+    note: "Para desfazer, mude Quem pode falar na página do agente.",
+    button: "Ver quem pode falar",
+    why: (org) =>
+      `Você recebeu este e-mail porque um agente seu na ${org} pensa com o seu plano e outra pessoa mudou quem pode falar com ele.`,
+  },
 };

@@ -144,6 +144,19 @@ describe("EmojiPicker", () => {
     expect(body().getByRole("status").textContent).toBe("Nenhum emoji encontrado.");
   });
 
+  test("every grid has its eight columns, so a short one starts on the left, and it never scrolls sideways", async () => {
+    localStorage.setItem("agentes:emoji-recent", JSON.stringify(["🎉"]));
+    render(<EmojiPicker labels={LABELS} onPick={() => {}} />);
+    expect(body().getByRole("grid", { name: "Usados recentemente" }).querySelectorAll("button").length).toBe(1);
+    for (const grid of body().getAllByRole("grid")) expect(grid.querySelectorAll("colgroup > col").length).toBe(8);
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-emoji__grid col")).toContain("width: 12.5%;");
+    expect(rule(".ac-emoji__grid td")).not.toContain("width");
+    expect(rule(".ac-emoji__scroll")).toContain("overflow-x: hidden;");
+    expect(rule(".ac-emoji-popover")).toContain("overflow-x: hidden;");
+  });
+
   test("keyboard: ArrowDown enters the grid, arrows move, Enter picks; picks become recent", async () => {
     const picked: string[] = [];
     const { unmount } = render(<EmojiPicker labels={LABELS} onPick={(e) => picked.push(e)} />);

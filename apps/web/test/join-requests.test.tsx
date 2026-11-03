@@ -202,6 +202,26 @@ describe("an invitation link asks to join", () => {
     expect(state.calls.filter((c) => c.method === "invites.claim").map((c) => c.args)).toEqual([["lnk", KEY]]);
   });
 
+  test("a password equal to the name asks nothing: back on the name with the line, the password cleared", async () => {
+    const { state } = await openLink(LINK);
+    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
+    await click(next());
+    await settle(4);
+    await type(codeField() as HTMLInputElement, "123456");
+    await settle(4);
+    await type(screen().getByLabelText("Seu nome"), "Fake#Pass1x");
+    expect(screen().getByRole("status").textContent).toBe("Isso parece uma senha. Aqui vai o seu nome.");
+    await click(next());
+    await type(screen().getByLabelText("Crie uma senha"), "Fake#Pass1x ");
+    await click(next());
+    expect(lead()).toBe("Como o time te chama?");
+    expect(screen().getByRole("alert").textContent).toBe("Esse é o seu nome? É igual à senha que você digitou.");
+    await type(screen().getByLabelText("Seu nome"), "Ana Souza");
+    await click(next());
+    expect((screen().getByLabelText("Crie uma senha") as HTMLInputElement).value).toBe("");
+    expect(state.calls.some((c) => c.method === "invites.ask")).toBe(false);
+  });
+
   test("the wait survives a reload; approved, the page signs in with its one-time sign-in and opens the workspace", async () => {
     await openLink(LINK, { claims: [{ status: "pending" }] });
     await askThrough();

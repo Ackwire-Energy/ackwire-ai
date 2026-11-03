@@ -9,7 +9,7 @@ import { publishChannelEvent, publishUserEvent } from "./events";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
-import { getMembership, requirePermission } from "./organizations";
+import { can, getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, channelReads, messages, agents, users, organizationMembers } = schema;
 
@@ -95,7 +95,8 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
       .from(agents)
       .where(and(eq(agents.id, target.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
     if (!agent) throw new NotFoundError("Agent not found");
-    if (!canTalkTo(agent, actorId, speakerOf(membership))) blockedAgent = agent;
+    // Who manages agents opens it anyway (its composer says why it won't answer and offers to let them in).
+    if (!canTalkTo(agent, actorId, speakerOf(membership)) && !can(membership, "manage_agents")) blockedAgent = agent;
     other = `a:${target.agentId}`;
   }
   const dmKey = keyOf([`u:${actorId}`, other]);
@@ -111,7 +112,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
     await reopenDm(db, orgId, found);
     return found;
   }
-  // A new DM with an agent this person can't talk to isn't started; an old one stays readable.
+  // A new DM with an agent this person can't talk to isn't started (unless they manage agents); an old one stays readable.
   if (blockedAgent) throw await audienceError(db, blockedAgent);
   const created = await db.transaction(async (tx) => {
     const [channel] = await tx

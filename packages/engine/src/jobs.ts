@@ -13,6 +13,7 @@ import { AGENT_MEDIA_JOB, enqueueAgentMedia, maybeSendAgentMedia } from "./agent
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
+import { PLAN_OPENED_JOB } from "./audience";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
@@ -43,7 +44,7 @@ import {
   requesterOf,
 } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
-import { type EmailArt, sendQueuedEmail } from "./email";
+import { type EmailArt, queuePlanOpenedEmail, sendQueuedEmail } from "./email";
 import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
@@ -93,6 +94,8 @@ import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
+import { runSkillUpdates, SKILL_UPDATES_JOB } from "./skill-updates";
+import type { SkillDeps } from "./skills";
 import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
@@ -137,6 +140,8 @@ export interface JobDeps extends RunExecutorDeps {
   gifs?: GifProvider | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
+  /** Skills that update by themselves from their links (job `skills.update`). */
+  skills?: SkillDeps;
   /** Voice messages (job `voice.transcribe`, ADR 0100). */
   voice?: VoiceDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
@@ -896,6 +901,12 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       }
       await forgetCodeEmail(deps.db, job);
     },
+    // Someone else let more people talk to an agent on a person's plan: that person's email (`planOpened`).
+    [PLAN_OPENED_JOB]: async (job) => {
+      // No address for the email's link: a server without emailArt sends no email anyway.
+      if (!deps.emailArt) return;
+      await queuePlanOpenedEmail(deps.db, deps.emailArt.home, orgOf(job), job.id, job.payload);
+    },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
       await saveWaitlistContact(deps.db, deps.email, String(job.payload.entryId));
@@ -981,6 +992,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // Receipts of a push ~15 min later: tokens whose device is gone are deleted.
     "push.receipts": async (job) => {
       await checkPushReceipts({ db: deps.db, push: deps.push }, pushTicketsOf(job.payload.tickets));
+    },
+    // A workspace's skills that update by themselves from their links, once a day.
+    [SKILL_UPDATES_JOB]: async (job) => {
+      if (!deps.skills) return;
+      await runSkillUpdates(deps.skills, orgOf(job));
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;

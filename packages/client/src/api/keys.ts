@@ -41,6 +41,8 @@ export const keys = {
   channelCard: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "card"] as const,
   channelCategories: (orgId: string) => ["org", orgId, "channel-categories"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
+  channelPermissions: (orgId: string, channelId: string) =>
+    ["org", orgId, "channel", channelId, "permissions"] as const,
   messages: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "messages"] as const,
   /** A channel's older pages loaded on scroll-up: outside the channel's key, which holds only message lists. */
   olderPages: (orgId: string, channelId: string) => ["org", orgId, "older-pages", channelId] as const,
@@ -135,6 +137,7 @@ export const keys = {
     ["org", orgId, "artifacts", "blob", id, version] as const,
   skills: (orgId: string) => ["org", orgId, "skills"] as const,
   skill: (orgId: string, id: string) => ["org", orgId, "skills", "one", id] as const,
+  skillSettings: (orgId: string) => ["org", orgId, "skills", "settings"] as const,
   agentSkills: (orgId: string, agentId: string) => ["org", orgId, "skills", "agent", agentId] as const,
   learnedSkills: (orgId: string, agentId: string) => ["org", orgId, "skills", "learned", agentId] as const,
   access: (orgId: string) => ["org", orgId, "access"] as const,

@@ -46,6 +46,7 @@ import { DEFAULT_KEY, keyOptions, NO_OWNER, usd } from "@/components/AgentFields
 import { DeleteAgentDialog } from "@/components/DeleteAgentDialog";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useWidenAsk } from "@/components/ReachLines";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
 import {
@@ -152,6 +153,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   const visible = useVisibleChannels();
   const items = useConnectedById();
   const update = useUpdateAgent(org.id, agent.id);
+  const asks = useWidenAsk(agent);
   const setLevels = useSetLevels();
   const [edits, setEdits] = useState<Edits>({});
   const [saving, setSaving] = useState(false);
@@ -414,6 +416,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       toast.show(problem, "error");
       return;
     }
+    if (fields.has("audience") && !(await asks.ask(draft.audience)([]))) return;
     setSaving(true);
     const done: Field[] = [];
     let failed = false;
@@ -777,6 +780,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       </Dialog>
 
       <DeleteAgentDialog agent={deleting ? agent : null} onClose={() => setDeleting(false)} onDeleted={leave} />
+      {asks.dialog}
     </AgentEditProvider>
   );
 }

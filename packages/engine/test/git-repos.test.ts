@@ -181,23 +181,23 @@ describe("enforcement in the Tool Gateway", () => {
 
     // No list: every repository; the result says which one it touched.
     expect(
-      await gateway.invoke(ctx, { toolUseId: "a", name: "github_get_pull_request", input: pr("x", "y") }),
+      await gateway.invoke(ctx, { toolUseId: "a", name: "github_pull_request_read", input: pr("x", "y") }),
     ).toMatchObject({ type: "result", output: { data: { repo: "x/y" } } });
 
     await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app", "walt/*"]);
     expect(
-      await gateway.invoke(ctx, { toolUseId: "b", name: "github_get_pull_request", input: pr("acme", "app") }),
+      await gateway.invoke(ctx, { toolUseId: "b", name: "github_pull_request_read", input: pr("acme", "app") }),
     ).toMatchObject({
       type: "result",
-      output: { content: wrapExternal("github_get_pull_request", "PR #4: fix token refresh (checks passing)") },
+      output: { content: wrapExternal("github_pull_request_read", "PR #4: fix token refresh (checks passing)") },
     });
     expect(
-      await gateway.invoke(ctx, { toolUseId: "c", name: "github_get_pull_request", input: pr("walt", "anything") }),
+      await gateway.invoke(ctx, { toolUseId: "c", name: "github_pull_request_read", input: pr("walt", "anything") }),
     ).toMatchObject({ type: "result", output: { data: { repo: "walt/anything" } } });
 
     const denied = await gateway.invoke(ctx, {
       toolUseId: "d",
-      name: "github_get_pull_request",
+      name: "github_pull_request_read",
       input: pr("acme", "infra"),
     });
     expect(denied).toMatchObject({ type: "result", output: { isError: true, data: { deniedRepo: "acme/infra" } } });
@@ -225,16 +225,16 @@ describe("enforcement in the Tool Gateway", () => {
     ).toBe("approval");
 
     // A call that names no repository can't run while the agent has a list.
-    expect(await gateway.invoke(ctx, { toolUseId: "g", name: "github_get_issue", input: { number: 1 } })).toMatchObject(
-      {
-        type: "result",
-        output: { isError: true, data: {} },
-      },
-    );
+    expect(
+      await gateway.invoke(ctx, { toolUseId: "g", name: "github_issue_read", input: { number: 1 } }),
+    ).toMatchObject({
+      type: "result",
+      output: { isError: true, data: {} },
+    });
     expect(mcp.calls.map((x) => `${x.tool} ${x.args.owner}/${x.args.repo}`)).toEqual([
-      "get_pull_request x/y",
-      "get_pull_request acme/app",
-      "get_pull_request walt/anything",
+      "pull_request_read x/y",
+      "pull_request_read acme/app",
+      "pull_request_read walt/anything",
     ]);
   });
 
@@ -264,18 +264,18 @@ describe("enforcement in the Tool Gateway", () => {
 
     const denied = await invokeToolForRun(deps, id, {
       id: "b-1",
-      name: "github_get_pull_request",
+      name: "github_pull_request_read",
       input: pr("acme", "infra"),
     });
     expect(denied).toMatchObject({ result: { isError: true }, code: "tool.not_allowed" });
     expect(denied.result.content).toContain("acme/infra isn't one of your GitHub repositories");
     const allowed = await invokeToolForRun(deps, id, {
       id: "b-2",
-      name: "github_get_pull_request",
+      name: "github_pull_request_read",
       input: pr("acme", "app"),
     });
     expect(allowed.result.isError).toBeUndefined();
-    expect(mcp.calls.map((x) => `${x.tool} ${x.args.owner}/${x.args.repo}`)).toEqual(["get_pull_request acme/app"]);
+    expect(mcp.calls.map((x) => `${x.tool} ${x.args.owner}/${x.args.repo}`)).toEqual(["pull_request_read acme/app"]);
     // What the engine takes at the end of the turn: the refused repository and the one it worked in.
     expect(await takeBridgeEffects(f.db, ctx.runId)).toMatchObject({ deniedRepo: "acme/infra", repo: "acme/app" });
   });

@@ -122,6 +122,8 @@ A person watching can also **take over** on their own, while the agent may use i
 - Passkeys and hardware keys don't cross a remote view; the person picks another sign-in method.
 - We never copy cookies from the owner's own browser.
 
+**Addendum (2026-11-03).** The hand-off is how the agent goes on, not a last resort: `browser_ask_person` is described as handing the person the step only they can do (sign in, scan a QR code with their phone, type a code sent to them, solve a captcha, confirm on their phone), after opening the page and getting to that step, and never a reason to stop or to say it can't. The browser guidance says the same, and a service with no connector but a web version is used in the browser, the person signing in (ADR 0097, addendum 2026-11-03).
+
 ### 7. Live view: `agent-browser`'s JPEG stream, in memory
 
 - The runner opens the session's local stream only while someone watches and forwards frames over its machine socket, with the active tab's address and title. The server relays them to the viewers' sockets in memory: nothing written to Postgres, nothing stored.

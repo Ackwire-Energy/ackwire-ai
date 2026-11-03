@@ -10,6 +10,7 @@ import type {
   Agent,
   AgentAccess,
   AgentAction,
+  AgentAudience,
   AgentBrain,
   AgentBrainInput,
   AgentBrowserSettings,
@@ -65,6 +66,7 @@ import type {
   ChannelCategory,
   ChannelInput,
   ChannelMember,
+  ChannelOverride,
   Choices,
   CodeSent,
   CommandApproval,
@@ -92,6 +94,7 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  ForeignMailbox,
   FormerAgent,
   ForumParticipantsInput,
   ForumPost,
@@ -153,6 +156,7 @@ import type {
   Mission,
   MissionBrain,
   MissionCommand,
+  MissionCommandDecision,
   MissionCommandRule,
   MissionControl,
   MissionCreateInput,
@@ -233,6 +237,8 @@ import type {
   SkillInput,
   SkillPatch,
   SkillPick,
+  SkillSettings,
+  SkillSourceUpdate,
   SpeechKey,
   SpeechKeyInput,
   StartChoice,
@@ -520,6 +526,8 @@ export interface ApiClient {
     /** Decides an agent's proposal of costly work nobody asked for (ADR 0131): its card's `signalId`. */
     decideCostly(orgId: string, signalId: string, decision: CostlyDecision): Promise<{ state: CostlyDecision }>;
     update(orgId: string, agentId: string, input: Partial<AgentInput>): Promise<Agent>;
+    /** The mailboxes saving `audience` would take from it (others gave them), taking nothing: ask before widening. */
+    mailLoss(orgId: string, agentId: string, audience: AgentAudience): Promise<ForeignMailbox[]>;
     archive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
     purge(orgId: string, agentId: string): Promise<void>;
@@ -661,6 +669,10 @@ export interface ApiClient {
     removeMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
     /** "Quando responde" for an agent in this channel (its creator, an admin or the agent's owner). */
     setAutoReply(orgId: string, channelId: string, agentId: string, autoReply: boolean): Promise<void>;
+    /** The channel's exceptions (ADR 0134), for who manages it. */
+    permissions(orgId: string, channelId: string): Promise<ChannelOverride[]>;
+    /** Sets one exception; empty `allow` and `deny` remove it (null). */
+    setPermission(orgId: string, channelId: string, override: ChannelOverride): Promise<ChannelOverride | null>;
     messages(
       orgId: string,
       channelId: string,
@@ -860,8 +872,19 @@ export interface ApiClient {
     learned?(orgId: string, agentId: string): Promise<LearnedSkill[]>;
     /** Undo the agent's last change to its own skill. */
     revert?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Update it from its link: new text applies (undoable), files that run wait (older servers: absent). */
+    updateFromSource?(orgId: string, id: string): Promise<SkillSourceUpdate>;
+    /** Apply the waiting update as it was shown; if its link changed since, it waits again. */
+    approveUpdate?(orgId: string, id: string): Promise<SkillSourceUpdate>;
+    /** Refuse the waiting update. */
+    dismissUpdate?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Back to the version before its last update from its link. */
+    undoUpdate?(orgId: string, id: string): Promise<SkillDetail>;
     /** Bring back a skill archived for disuse. */
     restore?(orgId: string, id: string): Promise<SkillDetail>;
+    /** The workspace's skill settings (older servers: absent). */
+    settings?(orgId: string): Promise<SkillSettings>;
+    saveSettings?(orgId: string, input: SkillSettings): Promise<SkillSettings>;
   };
   access: {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */
@@ -935,6 +958,8 @@ export interface ApiClient {
   questions: {
     /** Answers an agent's question with a choice or free text. */
     answer(orgId: string, questionId: string, input: { choice?: string; text?: string }): Promise<AgentQuestion>;
+    /** Skips it: the agent goes on without an answer. */
+    dismiss(orgId: string, questionId: string): Promise<AgentQuestion>;
   };
   /** Secrets agents ask for (ADR 0027): only the person asked answers; the value goes sealed. */
   secrets: {
@@ -1074,7 +1099,7 @@ export interface ApiClient {
       orgId: string,
       missionId: string,
       commandId: string,
-      decision: "allow" | "deny" | "always",
+      decision: MissionCommandDecision,
     ): Promise<MissionCommand>;
     /** "Liberar e continuar": allow the commands a task was refused (one or several) and resume it once. */
     retryCommand(

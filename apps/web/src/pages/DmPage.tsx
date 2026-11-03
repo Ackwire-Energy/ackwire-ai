@@ -16,6 +16,7 @@ import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { LetMeTalkButton } from "@/components/ReachLines";
 import { SearchHereButton } from "@/components/search/SearchHereButton";
 import { AgentTasksPill } from "@/components/tasks/AgentTasksPanel";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -54,7 +55,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
       </main>
     );
   }
-  if (!dm.data || dir.loading) return <ChannelSkeleton />;
+  if (!dm.data || dir.loading) return <ChannelSkeleton dm={kind} />;
 
   const owner = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId) : undefined;
   const model = !agent
@@ -123,6 +124,7 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
           agent && !canTalk(agent)
             ? audienceNotice(t, agent, (uid) => dir.memberById.get(uid)?.name, dir.roleName)
             : undefined,
+        lockedAction: agent ? <LetMeTalkButton agent={agent} /> : undefined,
         emptyText: agent ? t("dm.emptyAgent", agentGrammar(agent.name)) : undefined,
         emptyTitle: agent ? t("chat.sayHiAgent", agentGrammar(agent.name)) : t("chat.sayHiPerson", { name }),
         suggestions: agent ? greetingSuggestions(t, agent.role) : [],

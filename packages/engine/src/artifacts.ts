@@ -111,6 +111,24 @@ export interface ArtifactView {
 export interface ArtifactDetailView extends ArtifactView {
   shownVersion: number;
   content: ArtifactContent;
+  /** It keeps versions: a history and "Enviar nova versão" (`keepsVersions`). */
+  versioned: boolean;
+}
+
+/** A picture, a clip or a recording: a snapshot, sent again as a new file rather than as a version. */
+const SNAPSHOT_TYPE = /^(image|video|audio)\//i;
+
+/**
+ * Whether an artifact keeps versions (ADR 0019, addendum 2026-11-03): what is worked on over time does (documents,
+ * tables, diffs, pages, diagrams, files such as a PDF or a spreadsheet), a snapshot does not (an agent's screenshot, a
+ * photo), unless it already has a history from before, which stays.
+ */
+export function keepsVersions(content: ArtifactContent, latestVersion: number): boolean {
+  return content.kind !== "file" || latestVersion > 1 || !SNAPSHOT_TYPE.test(content.contentType);
+}
+
+function detail(artifact: ArtifactView, shownVersion: number, content: ArtifactContent): ArtifactDetailView {
+  return { ...artifact, shownVersion, content, versioned: keepsVersions(content, artifact.version) };
 }
 
 export interface ArtifactVersionView {
@@ -776,7 +794,7 @@ export async function createArtifact(
     excerpt: excerptOf(content),
     stored: encode(content),
   });
-  return { ...artifact, shownVersion: 1, content };
+  return detail(artifact, 1, content);
 }
 
 /**
@@ -799,7 +817,7 @@ export async function createConversationArtifact(
     excerpt: excerptOf(content),
     stored: encode(content),
   });
-  return { ...artifact, shownVersion: 1, content };
+  return detail(artifact, 1, content);
 }
 
 /** "Guardar no Drive": a block a person wants to keep joins the Drive and search (ADR 0113). */
@@ -854,7 +872,7 @@ export async function updateArtifact(
     note: input.note,
     title: input.title,
   });
-  return { ...artifact, shownVersion: version, content };
+  return detail(artifact, version, content);
 }
 
 /** Checks a file's name and size and describes it (ADR 0025). */
@@ -899,7 +917,7 @@ export async function createFileArtifact(
     note: input.note,
     author: input.author,
   });
-  return { ...artifact, shownVersion: 1, content: storedFileContent(file.name, blob, input.bytes) };
+  return detail(artifact, 1, storedFileContent(file.name, blob, input.bytes));
 }
 
 /** A new version of a `file` artifact from bytes (who may: like documents and tables). */
@@ -924,6 +942,13 @@ export async function addFileVersion(
   if (input.baseVersion !== undefined && input.baseVersion !== current.currentVersion) {
     throw new ConflictError("Someone saved a newer version. Reload and try again.");
   }
+  const latest = await versionRow(deps.db, current);
+  if (!keepsVersions(fileContent(latest, null), current.currentVersion)) {
+    throw new ValidationError(
+      "this file is a snapshot (an image, a video or a recording): send it as a new file",
+      "artifact.not_versioned",
+    );
+  }
   const file = fileInput(input);
   const { artifact, blob, version } = await insertVersion(deps, actor, orgId, current, {
     stored: file.stored,
@@ -931,7 +956,7 @@ export async function addFileVersion(
     note: input.note,
     title: input.title,
   });
-  return { ...artifact, shownVersion: version, content: storedFileContent(file.name, blob, input.bytes) };
+  return detail(artifact, version, storedFileContent(file.name, blob, input.bytes));
 }
 
 async function versionRow(db: Database, a: ArtifactRow, version?: number) {
@@ -990,7 +1015,7 @@ export async function getArtifact(
 ): Promise<ArtifactDetailView> {
   const a = await readable(deps, actor, orgId, artifactId);
   const v = await versionRow(deps.db, a, version);
-  return { ...view(a, editableKind(a.kind)), shownVersion: v.version, content: await contentOf(deps, a, v) };
+  return detail(view(a, editableKind(a.kind)), v.version, await contentOf(deps, a, v));
 }
 
 export async function listArtifactVersions(

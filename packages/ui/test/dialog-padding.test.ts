@@ -58,7 +58,7 @@ describe("dialog padding", () => {
     expect(css).toMatch(/\n\.ac-details \{[^}]*--details-pad: 24px;/);
     const phone = css.split("@media (max-width: 640px) {").slice(1).join("\n");
     expect(phone).toMatch(/\.ac-dialog \{[^}]*--dialog-pad: 16px;/);
-    expect(phone).toMatch(/\.ac-details--lg \{[^}]*--details-pad: 16px;/);
+    expect(phone).toMatch(/\.ac-details--lg[\s,.a-z-]*\{[^}]*--details-pad: 16px;/);
   });
 
   test("every edge of every dialog takes its dialog's inset: the bottom as the top, the top as the sides", async () => {

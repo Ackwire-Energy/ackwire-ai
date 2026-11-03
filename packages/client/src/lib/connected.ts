@@ -30,6 +30,8 @@ export interface ConnectedItem {
   viaComposio: boolean;
   /** Its account stopped working (a Composio account): no tools until Reconectar. */
   needsReconnect: boolean;
+  /** OAuth scopes its sign-in lacks (GitHub's `project`): Reconectar adds what they let agents do. */
+  reconnectAdds: string[];
   createdAt: string;
   /** Tools agents can be given. */
   tools: number;
@@ -63,6 +65,7 @@ export function fromConnection(c: Connection, catalog: ConnectorDef[]): Connecte
     account: accountNote(c.label, c.accountLabel),
     viaComposio: false,
     needsReconnect: false,
+    reconnectAdds: c.reconnectAdds ?? [],
     createdAt: c.createdAt,
     tools: def?.tools.length ?? 0,
     pending: 0,
@@ -83,12 +86,28 @@ export function fromServer(s: CustomServer, catalog: ConnectorDef[]): ConnectedI
     account: s.accountLabel ? accountNote(s.label, s.accountLabel) : s.via === "composio" ? null : host(s.serverUrl),
     viaComposio: s.via === "composio",
     needsReconnect: s.status === "needs_reconnect",
+    reconnectAdds: [],
     createdAt: s.createdAt,
     tools: exposedTools(s).length,
     pending,
     needsReview: !s.reviewedAt || pending > 0,
     server: s,
   };
+}
+
+/**
+ * The line that says what Reconectar adds to a connection whose sign-in lacks scopes the connector asks for now
+ * ("Reconecte o GitHub para os agentes usarem também o GitHub Projects"); null when nothing is missing.
+ */
+export function reconnectAddsText(t: TFunction, item: Pick<ConnectedItem, "reconnectAdds" | "label" | "def">) {
+  if (item.reconnectAdds.length === 0) return null;
+  const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
+  const what = item.reconnectAdds
+    .map((scope) =>
+      tt(`connectors.adds.${`${item.def?.id ?? ""}_${scope}`.replace(/[^a-zA-Z0-9]/g, "_")}`, { defaultValue: scope }),
+    )
+    .join(", ");
+  return t("connectors.reconnectAdds", { name: item.label, what });
 }
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");

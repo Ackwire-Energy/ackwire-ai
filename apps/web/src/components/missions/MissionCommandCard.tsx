@@ -1,4 +1,4 @@
-import type { MissionCommandMeta } from "@agenteschat/client";
+import type { MissionCommandDecision, MissionCommandMeta } from "@agenteschat/client";
 import { ApiError, useMission, useMissionAct, useMissionCommands } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
@@ -28,7 +28,7 @@ export function MissionCommandCard({ command: meta }: { command: MissionCommandM
   const toast = useToast();
   const mission = useMission(org.id, meta.missionId);
   const commands = useMissionCommands(org.id, meta.missionId);
-  const decide = useMissionAct(org.id, meta.missionId, (decision: "allow" | "deny" | "always") =>
+  const decide = useMissionAct(org.id, meta.missionId, (decision: MissionCommandDecision) =>
     api.missions.decideCommand(org.id, meta.missionId, meta.id, decision),
   );
   const m = mission.data;
@@ -41,7 +41,7 @@ export function MissionCommandCard({ command: meta }: { command: MissionCommandM
     ) : null;
   }
   const who = executorName(m.executor === "codex" ? "codex" : "claude");
-  const answer = (decision: "allow" | "deny" | "always") =>
+  const answer = (decision: MissionCommandDecision) =>
     decide.mutate(decision, { onError: (e) => toast.show(errorText(t, e), "error") });
   const by = c.decidedBy ? (dir.memberById.get(c.decidedBy)?.name ?? t("missions.someone")) : "";
   const time = c.decidedAt ? formatTime(i18n.language, c.decidedAt) : "";
@@ -72,6 +72,11 @@ export function MissionCommandCard({ command: meta }: { command: MissionCommandM
                 {t("missions.command.always")}
               </Button>
             )}
+            {c.agentKind && (
+              <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={() => answer("agent")}>
+                {t("missions.command.alwaysAgent")}
+              </Button>
+            )}
           </div>
         ) : (
           <p className="mi-hint">{t("missions.command.waiting")}</p>
@@ -82,16 +87,24 @@ export function MissionCommandCard({ command: meta }: { command: MissionCommandM
             ? t("missions.command.expired")
             : c.always
               ? t("missions.command.alwaysBy", { name: by, time, rules: c.rules.map(ruleText).join(", ") })
-              : t(c.state === "allowed" ? "missions.command.allowedBy" : "missions.command.deniedBy", {
-                  name: by,
-                  time,
-                })}
+              : c.forAgent && c.agentKind
+                ? t("missions.command.alwaysAgentBy", { name: by, time, kind: c.agentKind })
+                : t(c.state === "allowed" ? "missions.command.allowedBy" : "missions.command.deniedBy", {
+                    name: by,
+                    time,
+                  })}
         </p>
       )}
       {c.state === "pending" && c.rules.length > 0 && m.canAct && (
         <p className="mi-hint ac-iconline">
           <Icon name="info" size={14} />
           {t("missions.command.alwaysHint", { rules: c.rules.map(ruleText).join(", ") })}
+        </p>
+      )}
+      {c.state === "pending" && c.agentKind && m.canAct && (
+        <p className="mi-hint ac-iconline">
+          <Icon name="info" size={14} />
+          {t("missions.command.alwaysAgentHint", { kind: c.agentKind })}
         </p>
       )}
     </section>

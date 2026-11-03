@@ -160,3 +160,99 @@ export function membersWhoMaySql(orgId: unknown, permission: RolePermission): SQ
   return sql`(select wm.user_id from organization_members wm where wm.org_id = ${orgId}
     and ${maySql(sql`wm.org_id`, sql`wm.user_id`, permission)})`;
 }
+
+/** The keys a channel may change for a role or a person (ADR 0134). */
+export const CHANNEL_KEYS = ["post", "talk_to_agents", "manage_channels"] as const;
+export type ChannelKey = (typeof CHANNEL_KEYS)[number];
+
+export const isChannelKey = (v: unknown): v is ChannelKey =>
+  typeof v === "string" && (CHANNEL_KEYS as readonly string[]).includes(v);
+
+/** One of a channel's exceptions that applies to a person: `everyone`'s, one of their roles', or their own. */
+export interface ChannelOverride {
+  target: "everyone" | "role" | "person";
+  allow: readonly string[];
+  deny: readonly string[];
+}
+
+const decided = (o: ChannelOverride | undefined, key: ChannelKey) =>
+  o?.allow.includes(key) ? true : o?.deny.includes(key) ? false : undefined;
+
+/**
+ * A person's keys in one channel (ADR 0134), Discord's order: their workspace keys, then `everyone`'s exception,
+ * then their roles' (any allow wins over a deny), then their own, last. An owner or `administrator` is never
+ * overridden, and `manage_channels` held in the workspace is never taken away. `channelMaySql` is the same rule.
+ */
+export function channelPermissions(
+  permissions: ReadonlySet<Permission>,
+  overrides: readonly ChannelOverride[],
+): ReadonlySet<Permission> {
+  if (overrides.length === 0 || permissions.has("administrator")) return permissions;
+  const out = new Set(permissions);
+  const everyone = overrides.find((o) => o.target === "everyone");
+  const person = overrides.find((o) => o.target === "person");
+  const roles = overrides.filter((o) => o.target === "role");
+  for (const key of CHANNEL_KEYS) {
+    if (key === "manage_channels" && permissions.has(key)) continue;
+    const byRoles = roles.some((o) => o.allow.includes(key))
+      ? true
+      : roles.some((o) => o.deny.includes(key))
+        ? false
+        : undefined;
+    const verdict = decided(person, key) ?? byRoles ?? decided(everyone, key);
+    if (verdict === true) out.add(key);
+    else if (verdict === false) out.delete(key);
+  }
+  return out;
+}
+
+/** An exception's say on `key`: true (allow), false (deny) or null, as SQL over a `channel_permission_overrides` row `o`. */
+const verdictSql = (key: SQL) =>
+  sql`case when ${key} = any(o.allow) then true when ${key} = any(o.deny) then false end`;
+
+/**
+ * `channelPermissions` in SQL: whether the member `userId` of `orgId` may `key` in `channelId`. For checks inside
+ * one statement (the message insert's runs, the router, the channel list).
+ */
+export function channelMaySql(orgId: unknown, channelId: unknown, userId: unknown, key: ChannelKey): SQL<boolean> {
+  const k = sql`${key}::text`;
+  const c = qualified(channelId);
+  const holds = (keys: SQL) => sql`exists (
+          select 1 from org_roles pr
+          where pr.org_id = pm.org_id
+            and (pr.kind = 'everyone' or pr.id in (
+              select pmr.role_id from organization_member_roles pmr where pmr.org_id = pm.org_id and pmr.user_id = pm.user_id))
+            and pr.permissions && ${keys})`;
+  return sql<boolean>`exists (
+    select 1 from organization_members pm
+    where pm.org_id = ${qualified(orgId)} and pm.user_id = ${qualified(userId)}
+      and (pm.role = 'owner' or ${holds(sql`array['administrator']::text[]`)}
+        ${key === "manage_channels" ? sql`or ${holds(sql`array['manage_channels']::text[]`)}` : sql``}
+        or coalesce(
+          (select ${verdictSql(k)} from channel_permission_overrides o
+            where o.channel_id = ${c} and o.org_id = pm.org_id and o.user_id = pm.user_id),
+          (select case when bool_or(${k} = any(o.allow)) then true when bool_or(${k} = any(o.deny)) then false end
+            from channel_permission_overrides o
+            join organization_member_roles omr on omr.org_id = o.org_id and omr.role_id = o.role_id and omr.user_id = pm.user_id
+            where o.channel_id = ${c} and o.org_id = pm.org_id),
+          (select ${verdictSql(k)} from channel_permission_overrides o
+            join org_roles er on er.id = o.role_id and er.kind = 'everyone'
+            where o.channel_id = ${c} and o.org_id = pm.org_id),
+          ${holds(sql`array[${k}]::text[]`)})))`;
+}
+
+/** The exceptions of `channelId` that apply to `userId` (`ChannelOverride`s), as a SQL json array (null with none). */
+export const channelOverridesSql = (orgId: unknown, channelId: unknown, userId: unknown) => {
+  const [org, channel, user] = [qualified(orgId), qualified(channelId), qualified(userId)];
+  return sql<ChannelOverride[] | string | null>`(
+  select json_agg(json_build_object('target', case when o.user_id is not null then 'person'
+      when ovr.kind = 'everyone' then 'everyone' else 'role' end, 'allow', o.allow, 'deny', o.deny))
+  from channel_permission_overrides o left join org_roles ovr on ovr.id = o.role_id
+  where o.channel_id = ${channel} and o.org_id = ${org}
+    and (o.user_id = ${user} or ovr.kind = 'everyone' or exists (select 1 from organization_member_roles ovm
+      where ovm.org_id = o.org_id and ovm.user_id = ${user} and ovm.role_id = o.role_id)))`;
+};
+
+/** `channelOverridesSql`'s value as read back (some drivers hand json over as text). */
+export const parseOverrides = (v: ChannelOverride[] | string | null | undefined): ChannelOverride[] =>
+  typeof v === "string" ? JSON.parse(v) : (v ?? []);

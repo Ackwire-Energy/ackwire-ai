@@ -222,12 +222,17 @@ export const isGithubSkillLink = (url: string) => /^https:\/\/github\.com\/[^/\s
 /** "GitHub · Em agentes novos · v3 · 2 agentes usam": a skill's facts in the list. */
 export function skillLine(
   t: TFunction,
-  s: Pick<Skill, "source" | "sourceUrl" | "version" | "defaultForNewAgents">,
+  s: Pick<Skill, "source" | "sourceUrl" | "version" | "defaultForNewAgents" | "autoUpdate" | "pendingUpdate">,
   users: number | null,
 ): string {
   return [
     t(`skills.source.${skillSourceKey(s)}`),
     s.defaultForNewAgents ? t("skills.defaultChip") : null,
+    s.pendingUpdate && !s.pendingUpdate.dismissed
+      ? t("skills.waitingChip")
+      : s.autoUpdate
+        ? t("skills.autoChip")
+        : null,
     t("skills.version", { version: s.version }),
     users !== null ? t("skills.usedBy", { count: users }) : null,
   ]

@@ -352,6 +352,10 @@ export const Channel = z
     mentionCount: z.number().int().optional().openapi({
       description: "Channel list only: of `unreadCount`, the messages that mention you (counted even while muted).",
     }),
+    can: z.object({ post: z.boolean(), callAgents: z.boolean(), manage: z.boolean() }).optional().openapi({
+      description:
+        "Channel list only: what you may do here with its exceptions (ADR 0134): send messages, wake its agents, manage it.",
+    }),
     muted: z.boolean().optional().openapi({
       description: "Channel list only: you muted it, so it never looks unread (`PUT`/`DELETE …/mute`).",
     }),
@@ -764,7 +768,8 @@ export const AgentBrain = z
     accountsSupported: z.boolean().openapi({ description: "The computer's runner knows accounts (protocol 13)." }),
     onlyOwner: z.boolean().openapi({ description: '"Atende outras pessoas" off: nobody but its owner talks to it.' }),
     canUsePlans: z.boolean().openapi({
-      description: "The caller owns the agent: only they choose its plan and let other people talk to it on a plan.",
+      description:
+        "The caller owns the agent, so its plans are the caller's own: they sign one in for it. Admins choose among its owner's accounts and whom it answers too.",
     }),
     ownSignIn: z.boolean().openapi({
       description: "The computer's own sign-in can think for it: the person who connected the computer owns the agent.",
@@ -836,6 +841,10 @@ export const AgentSetupResult = z
       ])
       .optional(),
     params: z.record(z.string(), z.string()).optional(),
+    opensPlan: z.literal(true).optional().openapi({
+      description:
+        "It lets more people talk to it on its owner's plan, someone else's (in a preview: would): that owner gets an email, so the apps ask first.",
+    }),
   })
   .openapi("AgentSetupResult");
 

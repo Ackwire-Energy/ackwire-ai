@@ -66,6 +66,21 @@ describe("DetailsDialog", () => {
     expect(body().queryByRole("dialog")).toBeNull();
   });
 
+  test("with no eyebrow, the heading sits on the bar beside the buttons, not on an empty row above it", () => {
+    render(
+      <DetailsDialog open onOpenChange={() => {}} closeLabel="Fechar" title="tela.png" subtitle="Arquivo · 245 kB">
+        <p>Prévia</p>
+      </DetailsDialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "tela.png" });
+    const bar = dialog.querySelector(".ac-details__bar") as HTMLElement;
+    expect(bar.classList.contains("ac-details__bar--titled")).toBe(true);
+    expect(bar.firstElementChild?.className).toBe("ac-details__heading");
+    expect(bar.lastElementChild?.className).toContain("ac-details__actions");
+    expect(dialog.querySelector(".ac-details__eyebrow")).toBeNull();
+    expect(dialog.querySelectorAll(".ac-details__heading")).toHaveLength(1);
+  });
+
   test("Esc closes it and the page is left without a scroll or pointer lock", async () => {
     render(<Harness />);
     await act(async () => fireEvent.click(body().getByRole("button", { name: "Abrir detalhes" })));
@@ -114,7 +129,10 @@ describe("DetailsDialog", () => {
     const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
     expect(rule(".ac-details")).toContain("width: min(720px, calc(100% - 48px))");
     expect(rule(".ac-details__body")).toContain("overflow-y: auto");
-    expect(css).toMatch(/@media \(max-width: 640px\) \{\s*\.ac-details,\s*\.ac-details--lg \{[^}]*inset: 0/);
+    expect(css).toMatch(
+      /@media \(max-width: 640px\) \{\s*\.ac-details,\s*\.ac-details--lg,\s*\.ac-details--xl \{[^}]*inset: 0/,
+    );
+    expect(rule(".ac-details--xl")).toContain("width: min(1440px, calc(100% - 96px))");
     // The old side sheet is gone.
     expect(css).not.toContain(".ac-sheet");
   });

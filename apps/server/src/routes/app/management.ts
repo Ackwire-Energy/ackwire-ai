@@ -2,6 +2,7 @@ import {
   AGENT_MEDIA_LEVELS,
   agentDetail,
   agentView,
+  announceMembers,
   audienceOf,
   availabilityNow,
   availableProviders,
@@ -585,6 +586,7 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       const me = await updateMyProfile(db, c.get("user").id, orgId, c.req.valid("json"));
+      await announceMembers(adapters.pubsub, orgId);
       const online = new Set(await adapters.presence.online(orgId));
       return c.json(personView(me, online, me.userId), 200);
     },
@@ -1293,7 +1295,9 @@ export function managementRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const channels = await setAgentChannels(db, c.get("user").id, orgId, agentId, c.req.valid("json").channels);
+      const channels = await setAgentChannels(db, c.get("user").id, orgId, agentId, c.req.valid("json").channels, {
+        pubsub: adapters.pubsub,
+      });
       return c.json({ channels }, 200);
     },
   );

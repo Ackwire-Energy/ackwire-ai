@@ -34,13 +34,19 @@ const statusOf = async (fx: Fixture, agentId: string, options = {}) =>
 /** Spends `agentId`'s whole budget for this month. */
 async function spendBudget(fx: Fixture, agentId: string) {
   await fx.db.update(schema.agents).set({ monthlyBudgetNanoUsd: 1_000 }).where(eq(schema.agents.id, agentId));
-  await fx.db.insert(schema.agentBudgetPeriods).values({
-    orgId: fx.org.id,
-    agentId,
-    periodStart: monthStartUtc(new Date()).toISOString().slice(0, 10),
-    spentNanoUsd: 1_000,
-    reservedNanoUsd: 0,
-  });
+  await fx.db
+    .insert(schema.agentBudgetPeriods)
+    .values({
+      orgId: fx.org.id,
+      agentId,
+      periodStart: monthStartUtc(new Date()).toISOString().slice(0, 10),
+      spentNanoUsd: 1_000,
+      reservedNanoUsd: 0,
+    })
+    .onConflictDoUpdate({
+      target: [schema.agentBudgetPeriods.agentId, schema.agentBudgetPeriods.periodStart],
+      set: { spentNanoUsd: 1_000 },
+    });
 }
 
 /** Puts `agentId` on Claude Code on a new computer of the workspace. */

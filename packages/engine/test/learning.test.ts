@@ -25,6 +25,7 @@ import {
   retrieveForRun,
   SKILL_MIN_SPREAD,
   setSkillLocked,
+  setSkillSettings,
   shareAcrossAgents,
   type ToolContext,
   type ToolSource,
@@ -520,7 +521,7 @@ describe("agents learn on their own (ADR 0120)", () => {
     ]);
 
     // update_skill: only after load_skill in the run, never a locked skill or another agent's; a person's skill
-    // becomes a proposal.
+    // changes at once while agents improve skills by themselves (the default), else it becomes a proposal.
     const skill = async (slug: string, extra: Partial<typeof schema.skills.$inferInsert> = {}) => {
       const [s] = await f.db
         .insert(schema.skills)
@@ -542,16 +543,19 @@ describe("agents learn on their own (ADR 0120)", () => {
     ).toContain("credential");
     expect((await fix("mine")).content).toBe("Updated mine (v2).");
     expect((await fix("frozen")).content).toContain("A person locked this skill");
-    expect((await fix("handbook")).content).toContain("A person made this skill");
+    expect((await fix("handbook")).content).toBe("Updated handbook (v2).");
+    await setSkillSettings(f.db, f.owner.id, f.org.id, { agentsImprove: false });
+    const proposed = await invoke(work, "update_skill", { name: "handbook", body: "# handbook\n1. Another step." });
+    expect(proposed.content).toContain("Agents don't change this skill by themselves here");
     const [proposal] = await f.db.select().from(schema.contextProposals);
     expect([proposal?.target, proposal?.access?.[0]?.label, proposal?.proposedText]).toEqual([
       "skill",
       "handbook",
-      "# handbook\n1. The fixed step.",
+      "# handbook\n1. Another step.",
     ]);
-    expect((await receipts()).filter((r) => r.kind === "skill.updated").map((r) => r.before)).toEqual([
-      { body: "# mine" },
-    ]);
+    expect(
+      (await receipts()).filter((r) => r.kind === "skill.updated").map((r) => (r.before as { body: string }).body),
+    ).toEqual(["# mine", "# handbook"]);
 
     // Another agent's skill.
     const other = await createAgent(

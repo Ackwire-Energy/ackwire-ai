@@ -1156,6 +1156,57 @@ export async function notifyToolChanged(
 export const resolveToolChanged = (deps: NotificationDeps, orgId: string, connectionId: string) =>
   resolveNotifications(deps, orgId, { groupKeyPrefix: toolChangedGroup(connectionId) });
 
+const skillWaitingGroup = (skillId: string) => `skill_update:waiting:${skillId}:`;
+
+/**
+ * An update of a skill from its link: applied (`updated`), waiting because it changes what runs (`waiting`, the files)
+ * or would replace what agents changed (`latest.reason` `edited`),
+ * or refused (`failed`, its code). Who hears it: `to` an update, who manages skills a waiting one, both a refusal
+ * (`to` may have lost the right or left the workspace, which only who manages skills can fix). `edited`: an agent
+ * changed a skill a person made ("Agentes melhoram as skills sozinhos"), told to `to` (its author) in one row per
+ * skill that gathers the agents' changes while unread.
+ */
+export async function notifySkillUpdate(
+  deps: NotificationDeps,
+  skill: { id: string; orgId: string; name: string },
+  what:
+    | { state: "updated"; version: number }
+    | { state: "waiting"; hash: string; scripts: string[]; edited?: boolean }
+    | { state: "failed"; reason: string }
+    | { state: "edited"; agentId: string; version: number },
+  to: string | null,
+) {
+  const key =
+    what.state === "waiting"
+      ? `${skillWaitingGroup(skill.id)}${what.hash}`
+      : what.state === "edited"
+        ? `skill_update:edited:${skill.id}`
+        : `skill_update:${what.state}:${skill.id}:${what.state === "updated" ? what.version : what.reason}:${Date.now()}`;
+  if (what.state === "edited" && !to) return;
+  await notify(deps, {
+    orgId: skill.orgId,
+    ...(what.state === "edited" ? { actor: { type: "agent" as const, id: what.agentId } } : {}),
+    userIds:
+      to && (what.state === "updated" || what.state === "edited")
+        ? [to]
+        : [...(await adminsOf(deps, skill.orgId, "manage_agents")), ...(to && what.state === "failed" ? [to] : [])],
+    kind: "skill_update",
+    groupKey: key,
+    waiting: what.state === "waiting",
+    source: { skillId: skill.id, label: skill.name },
+    latest: {
+      statusTo: what.state,
+      ...(what.state === "waiting" ? { title: what.scripts.join(", ") } : {}),
+      ...(what.state === "waiting" && what.edited ? { reason: "edited" } : {}),
+      ...(what.state === "failed" ? { reason: what.reason } : {}),
+    },
+  });
+}
+
+/** The skill's waiting update was applied or refused: its notices are done. */
+export const resolveSkillWaiting = (deps: NotificationDeps, orgId: string, skillId: string) =>
+  resolveNotifications(deps, orgId, { groupKeyPrefix: skillWaitingGroup(skillId) });
+
 // ── Workspace standing (ADR 0056 §8) ──────────────────────────────────────────
 
 /**

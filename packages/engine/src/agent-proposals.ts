@@ -897,6 +897,7 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
             orgId,
             agent.id,
             draft.channelIds.map((channelId) => ({ channelId })),
+            { pubsub: deps.pubsub },
           ),
         )
       : null;

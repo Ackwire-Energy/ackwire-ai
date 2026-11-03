@@ -151,6 +151,10 @@ Errors keep the plan's wording: `stale ref: e12 is no longer on the screen` and 
 
 No new server env vars: availability comes from the machine and the scope, and Jev uses `TYPESAFE_API_KEY` and `JEV_VISION_MODEL`. Without Jev, refs and exact names work, checks use the org's cheap model on the text, and nothing is found on images. All of it is public code, and the Cloud runs the same.
 
+### 13. A person-only step is handed over (2026-11-03)
+
+`desktop_ask_person` and the desktop guidance follow the browser's hand-off (ADR 0040 §6 addendum): an app that needs the person's sign-in, a QR code, a code or a captcha is opened and brought to that step, then handed over; it is never a reason to stop. Without `desktop_ask_person`, the agent says the one step the person must do.
+
 ## Order
 
 1. This ADR, and the screen layer's part: the desktop verbs, `kind`, region captures and the close-up, box sanity, the costly words, `dismiss: false`, image re-checks (done here).

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { nameIsPassword } from "@agenteschat/client/lib/text";
 import type { Config } from "@agenteschat/config";
 import { type Database, schema, sql } from "@agenteschat/db";
 import { onUserCreated, pinnedOwner, recordSignUp, safeEqual, sha256 } from "@agenteschat/engine";
@@ -6,6 +7,7 @@ import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthEndpoint, formCsrfMiddleware } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
+import { NAME_IS_PASSWORD, NAME_IS_PASSWORD_MESSAGE } from "./auth";
 import type { Logger } from "./logger";
 
 /**
@@ -91,6 +93,9 @@ export function ownerSignIn(deps: OwnerSignInDeps) {
           if (!config.OWNER_CLAIM_SHA256) throw new APIError("NOT_FOUND", { message: "This server has no owner link" });
           if (!matches(ctx.body.token, config.OWNER_CLAIM_SHA256)) {
             throw new APIError("UNAUTHORIZED", { message: "This isn't this server's owner link" });
+          }
+          if (nameIsPassword(ctx.body.name, ctx.body.password)) {
+            throw new APIError("BAD_REQUEST", { code: NAME_IS_PASSWORD, message: NAME_IS_PASSWORD_MESSAGE });
           }
           const id = ctx.context.generateId({ model: "user" }) || randomUUID();
           const passwordHash = await ctx.context.password.hash(ctx.body.password);

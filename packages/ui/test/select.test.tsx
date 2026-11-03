@@ -114,4 +114,27 @@ describe("Select", () => {
       ),
     ).toContain("translate: none;");
   });
+
+  test("an action row is set apart by a line, rows keep a gap, two-line rows the sides' room", async () => {
+    const options = [...roles, { value: "new", label: "Nova categoria…", action: true }];
+    render(<Select aria-label="Categoria" value="member" onValueChange={() => {}} options={options} />);
+    const trigger = body().getByRole("combobox", { name: "Categoria" });
+    trigger.focus();
+    await key(trigger, "Enter");
+    const listbox = body().getByRole("listbox");
+    const separators = listbox.querySelectorAll(".ac-menu__separator");
+    expect(separators.length).toBe(1);
+    expect(separators[0]?.nextElementSibling?.textContent).toContain("Nova categoria");
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+    expect(rule(".ac-menu--select [data-radix-select-viewport]")).toContain("gap: 2px;");
+    expect(rule(".ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)")).toContain(
+      "padding-block: var(--menu-item-px);",
+    );
+  });
+});
+
+test("a list mixing two-line options and one-line actions gives every row the same room above and below", async () => {
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url)).text();
+  expect(css).toContain(".ac-menu:has(.ac-menu__desc) .ac-menu__item {\n  padding-block: var(--menu-item-px);\n}");
 });

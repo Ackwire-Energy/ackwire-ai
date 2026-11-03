@@ -1614,6 +1614,9 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
  * scrolled to the bottom (the menu's own padding, outside the scroll, reads as next to none there).
  */
 .ac-menu--select [data-radix-select-viewport] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding-block: var(--space-1);
 }
 .ac-menu--dropdown {
@@ -1795,6 +1798,15 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   width: 32px;
   height: 32px;
   font-size: var(--text-sm);
+}
+/* Two lines (a name and its description): the room above and below matches the sides, as a one-line row's does. */
+.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
+  padding-block: var(--menu-item-px);
+}
+/* A list that mixes two-line rows with one-line ones (an option and "+ Nova categoria…"): every row gets the same room,
+   so the action row's padding matches the options above it. */
+.ac-menu:has(.ac-menu__desc) .ac-menu__item {
+  padding-block: var(--menu-item-px);
 }
 .ac-menu__desc {
   font-size: 13px;
@@ -2174,6 +2186,8 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   color: var(--ink-muted);
   font-size: 14px;
   line-height: 20px;
+  /* A question about several people puts each on its own line. */
+  white-space: pre-line;
 }
 .ac-dialog__tools {
   padding: 0 var(--dialog-pad) 8px;
@@ -2767,6 +2781,9 @@ html:not([data-pointer]) .ac-back:focus-visible {
 .ac-details--lg {
   width: min(960px, calc(100% - 48px));
 }
+.ac-details--xl {
+  width: min(1440px, calc(100% - 96px));
+}
 /* "✓ Salvo" after a field saves on its own (SavedNote). */
 .ac-saved {
   display: inline-flex;
@@ -2821,6 +2838,14 @@ html:not([data-pointer]) .ac-back:focus-visible {
 /* An `.ac-acts` row: the close's icon on the head's padding line. */
 .ac-details__actions {
   flex: none;
+}
+/* The heading in the bar: the buttons on its title's first line, the title wrapping in what is left. */
+.ac-details__bar--titled {
+  align-items: flex-start;
+}
+.ac-details__bar--titled > .ac-details__heading {
+  flex: 1;
+  min-width: 0;
 }
 .ac-details__heading {
   display: flex;
@@ -3605,6 +3630,22 @@ html:not([data-pointer]) .ac-date__day:focus-visible {
 html:not([data-pointer]) .ac-token__remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+/* Inside a field (a search's filters): low enough to stay clear of its top and bottom, square-ish like Discord's. */
+.ac-token--sm {
+  gap: 4px;
+  height: 22px;
+  padding: 0 2px 0 6px;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+}
+.ac-token--sm:not(:has(.ac-token__remove)) {
+  padding-right: 6px;
+}
+.ac-token--sm .ac-token__remove {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-cut);
 }
 
 /* "@" suggestions above the composer */
@@ -6330,10 +6371,12 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
 }
 
 /* Emoji picker: glass popover, search, category tabs, grids */
+/* It never scrolls sideways, an emoji growing under the pointer included. */
 .ac-emoji-popover {
   width: 332px;
   max-width: calc(100vw - 32px);
   padding: 8px;
+  overflow-x: hidden;
 }
 /* Its popover stops at a menu's 280px (`.ac-menu`): only the grid gives up height, so it is the one scroll and its last
    row stays inside. */
@@ -6400,8 +6443,12 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
   filter: none;
   opacity: 1;
 }
+/* Room inside its clip for a hovered cell's 1.12 growth (~3px a side), taken out of the popover's padding. */
 .ac-emoji__scroll {
   height: 248px;
+  margin-inline: -4px;
+  padding-inline: 4px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -6418,8 +6465,10 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
   border-collapse: collapse;
   table-layout: fixed;
 }
-.ac-emoji__grid td {
+.ac-emoji__grid col {
   width: 12.5%;
+}
+.ac-emoji__grid td {
   padding: 0;
 }
 .ac-emoji__cell {
@@ -8102,7 +8151,8 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 /* Details on a phone: a full-screen sheet, clear of the notch and the home bar. */
 @media (max-width: 640px) {
   .ac-details,
-  .ac-details--lg {
+  .ac-details--lg,
+  .ac-details--xl {
     inset: 0;
     transform: none;
     width: 100%;
@@ -8407,8 +8457,8 @@ html:not([data-pointer]) .ac-optcard > .ac-optrow:focus-visible {
   padding-left: 16px;
 }
 .ac-optrow__more--card {
-  gap: 22px;
-  padding: 18px 16px 16px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid var(--line);
 }
 /* The card's last band (a switch with what it does): full width under a hairline. */

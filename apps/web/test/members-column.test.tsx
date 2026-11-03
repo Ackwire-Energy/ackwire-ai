@@ -68,6 +68,21 @@ describe("the members column", () => {
     expect(toggle().getAttribute("aria-pressed")).toBe("false");
   });
 
+  test("under the channel's header: the header spans the chat and the column, which starts below it", async () => {
+    widthIs(DESKTOP_QUERY);
+    await open();
+    const main = screen().getByRole("main");
+    const header = main.querySelector(":scope > .channel__header") as HTMLElement;
+    expect(header).toBeTruthy();
+    const body = header.nextElementSibling as HTMLElement;
+    expect(body.classList.contains("channel__body")).toBe(true);
+    expect(body.firstElementChild?.classList.contains("channel__col")).toBe(true);
+    expect(body.lastElementChild).toBe(column());
+    // The messages and the composer stay in the chat's column, not under the members.
+    expect(body.querySelector(":scope > .channel__col .channel__messages")).toBeTruthy();
+    expect(body.querySelector(":scope > .channel__col .channel__composer")).toBeTruthy();
+  });
+
   test("closed by default on a tablet, where the toggle opens it beside the chat", async () => {
     widthIs(TABLET_QUERY);
     await open();
@@ -130,6 +145,56 @@ describe("the members column", () => {
     const joao = offline.querySelector(".members-side__inner") as HTMLElement;
     expect(joao.textContent).toContain("João");
     expect(joao.getAttribute("data-presence")).toBe("offline");
+  });
+
+  test("live: an agent someone else made and added, a person who joins, both leaving, without a reload", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = seedState();
+    const { sockets } = await open(state);
+    const names = () =>
+      [...(column() as HTMLElement).querySelectorAll(".members-side__label")].map((l) => l.textContent);
+    const channelEvent = (type: string, member: { type: "person" | "agent"; id: string }) =>
+      act(async () =>
+        sockets.last().push({ type: "event", channelId: ENG_ID, event: { type, channelId: ENG_ID, member } }),
+      );
+    expect(names()).not.toContain("Lodi");
+    // Made a moment ago in another browser: the app doesn't know it yet, so the agents are read again too.
+    const lodi = { ...(state.agents[0] as (typeof state.agents)[number]), id: "a-lodi", name: "Lodi", handle: "lodi" };
+    state.agents.push(lodi);
+    state.channelMembers[ENG_ID]?.push({ type: "agent", id: "a-lodi" });
+    await channelEvent("channel.member_added", { type: "agent", id: "a-lodi" });
+    await settle(4);
+    expect(names()).toContain("Lodi");
+    // A newcomer to the workspace, placed here by their invitation: `org.members` reads who is where again.
+    const bia = {
+      ...(state.members[1] as (typeof state.members)[number]),
+      userId: "u-bia",
+      name: "Bia",
+      email: "bia@acme.com.br",
+    };
+    state.members.push(bia);
+    state.channelMembers[ENG_ID]?.push({ type: "person", id: "u-bia" });
+    await act(async () => sockets.last().push({ type: "event", scope: "org", event: { type: "org.members" } }));
+    await settle(4);
+    expect(names()).toContain("Bia");
+    state.channelMembers[ENG_ID] = (state.channelMembers[ENG_ID] ?? []).filter(
+      (m) => m.id !== "a-lodi" && m.id !== "u-bia",
+    );
+    await channelEvent("channel.member_removed", { type: "agent", id: "a-lodi" });
+    await settle(4);
+    expect(names()).not.toContain("Lodi");
+    expect(names()).not.toContain("Bia");
+  });
+
+  test("someone's new name (from another device) shows at once", async () => {
+    widthIs(DESKTOP_QUERY);
+    const { state, sockets } = await open();
+    const joao = state.members.find((m) => m.userId === "u-joao");
+    if (joao) joao.name = "João Pedro";
+    await act(async () => sockets.last().push({ type: "event", scope: "org", event: { type: "org.members" } }));
+    await settle(6);
+    expect(row(column() as HTMLElement, "João Pedro")).toBeTruthy();
+    expect(row(column() as HTMLElement, "João")).toBeNull();
   });
 
   test("a row opens the member's card", async () => {
@@ -305,6 +370,9 @@ describe("answering without a mention, as true for my own messages as who picks 
     );
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
+    // Who manages it lands on Visão geral (ADR 0134): its people and agents are under Membros.
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Membros" })));
+    await settle(2);
     const row = within(dialog).getByText("Atlas").closest(".member-row") as HTMLElement;
     const line = row.querySelector(".small")?.textContent;
     const button = within(row).getByRole("button", { name: "Opções de Atlas" });
@@ -368,6 +436,10 @@ describe("the team's coordinator here (ADR 0093)", () => {
       fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
     );
     await settle(3);
+    await act(async () =>
+      fireEvent.click(within(screen().getByRole("dialog", { name: /eng/ })).getByRole("button", { name: "Membros" })),
+    );
+    await settle(2);
     const row = within(screen().getByRole("dialog", { name: /eng/ }))
       .getByText("Atlas")
       .closest(".member-row") as HTMLElement;

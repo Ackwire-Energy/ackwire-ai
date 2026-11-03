@@ -445,6 +445,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Claude Code:** `claude mcp add --transport http --scope user agentes <address>` komutunu çalıştırın, ardından `/mcp` yazın, agentes'i seçin ve **Authenticate**'e tıklayın. Yalnızca geçerli klasör için `--scope user` kısmını çıkarın.",
               "**Cursor:** **Ayarlar › Yapay zeka uygulamaları** içindeki **Cursor'a ekle** ya da adresi `~/.cursor/mcp.json` dosyasına ekleyin. Cursor ilk kullanımda giriş yapmanızı ister.",
               '**VS Code:** **VS Code\'a ekle** ya da adresi `"type": "http"` ile `.vscode/mcp.json` dosyasına ekleyin.',
+              "**Diğer uygulamalar:** ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrains ve daha fazlasının adımları, adresiniz önceden doldurulmuş olarak **Uygulama bağla** içinde.",
             ],
           },
           "Giriş yaptığınızda agentes.chat, erişimi hangi uygulamanın istediğini ve nereye döneceğini gösterir. Yalnızca bağlantıyı az önce siz başlattıysanız devam edin.",

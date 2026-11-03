@@ -129,6 +129,60 @@ test("an admin who isn't in the audience still sees every detail", async () => {
   expect((await admin(`${org}/agents/${rex.id}/access`)).status).toBe(200);
 });
 
+test("the owner and admins see another admin's agent kept to a role they don't hold, in every list and on its page, and manage it", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const org = `/api/app/organizations/${orgId}`;
+  const walt = await joinByInvitation(t, owner, orgId, "walt@example.com", { role: "admin" });
+  const caio = await joinByInvitation(t, owner, orgId, "caio@example.com", { role: "admin" });
+  const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  const support = (await (await owner(`${org}/roles`, { json: { name: "Suporte", permissions: [] } })).json()) as {
+    id: string;
+  };
+  const rex = (await (
+    await walt(`${org}/agents`, {
+      json: {
+        name: "Rex",
+        handle: "rex",
+        instructions: "Walt's notes.",
+        audience: { mode: "people", userIds: [], roleIds: [support.id] },
+      },
+    })
+  ).json()) as { id: string };
+
+  for (const admin of [owner, caio]) {
+    const listed = ((await (await admin(`${org}/agents`)).json()) as { agents: ListedAgent[] }).agents;
+    expect(listed.find((a) => a.id === rex.id)).toMatchObject({
+      seesDetails: true,
+      canTalk: false,
+      instructions: "Walt's notes.",
+    });
+    const page = (await (await admin(`${org}/agents/${rex.id}`)).json()) as {
+      seesDetails: boolean;
+      instructions: string;
+    };
+    expect(page).toMatchObject({ seesDetails: true, instructions: "Walt's notes." });
+    const team = (await (await admin(`${org}/team`)).json()) as { agents: { id: string; seesDetails: boolean }[] };
+    expect(team.agents.find((a) => a.id === rex.id)?.seesDetails).toBe(true);
+    for (const part of DETAIL_READS) {
+      const res = await admin(`${org}/agents/${rex.id}/${part}`);
+      expect({ part, status: res.status }).toEqual({ part, status: 200 });
+    }
+    // Its conversation opens (locked in the apps), not a refusal.
+    expect((await admin(`${org}/dms`, { json: { agentId: rex.id } })).status).toBe(200);
+  }
+  const edited = await caio(`${org}/agents/${rex.id}`, { method: "PATCH", json: { role: "Suporte" } });
+  expect(edited.status).toBe(200);
+
+  // A member outside it: the public card, and no new conversation.
+  const forBia = ((await (await bia(`${org}/agents`)).json()) as { agents: ListedAgent[] }).agents;
+  expect(forBia.find((a) => a.id === rex.id)).toMatchObject({ seesDetails: false, instructions: "" });
+  expect((await bia(`${org}/agents/${rex.id}/access`)).status).toBe(403);
+  expect((await bia(`${org}/dms`, { json: { agentId: rex.id } })).status).toBe(403);
+});
+
 test("what the agents know of the workspace is only for who configures it", async () => {
   t = await createTestServer();
   const owner = browser(t);

@@ -23,6 +23,12 @@ test("the channel header's icons never get a plate, sit 14px apart, and a phone 
   expect(last(shipped, ".channel__icon.ac-btn", "width")).toBe("24px");
   expect(last(shipped, ".channel__icon.ac-btn", "margin")).toBe("0 -6px");
 
+  // The threads count: an ink pill in either theme (the page's color on the ink), never the header's own gray.
+  expect(last(shipped, ".channel__icon-count.ac-count", "background")).toBe("var(--ink2)");
+  expect(last(shipped, ".channel__icon-count.ac-count", "color")).toBe("var(--pane)");
+  expect(last(shipped, ".channel__icon-count.ac-count", "font-weight")).toBe("700");
+  expect(last(shipped, ".channel__icon-count.ac-count", "box-shadow")).toBe("0 0 0 2px var(--pane)");
+
   // The field grows while it is used.
   expect(last(shipped, ".channel__search.search-box", "width")).toBe("248px");
   expect(last(shipped, ".channel__search.search-box:focus-within", "width")).toBe("320px");

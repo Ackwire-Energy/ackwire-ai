@@ -382,6 +382,8 @@
       "name": "很高兴认识你。这个邮箱是新的。",
       "nameLead": "团队里大家怎么称呼你？",
       "namePlaceholder": "你的名字",
+      "nameIsPassword": "这是你的名字吗？它和你输入的密码一样。",
+      "nameLooksLikePassword": "这看起来像密码。这里填你的名字。",
       "newPassword": "再设置一个密码。",
       "newPasswordNamed": "好的，{{name}}。再设置一个密码。",
       "closed": "这个邮箱还没有账号。",
@@ -1231,6 +1233,7 @@
     "timezone": "时区",
     "profileTitle": "你在此工作区的个人资料",
     "handle": "你的 @",
+    "nameEmpty": "请填写你的名字。",
     "timezoneHelp": "在你的资料卡上显示当地时间。",
     "timezoneInvalid": "请使用 Asia/Shanghai 这样的时区格式。",
     "useOrgZone": "使用工作区时区",
@@ -1390,6 +1393,52 @@
     "working_other": "{{count}} 个智能体正在工作"
   },
   "channel": {
+    "settingsNav": {
+      "label": "频道设置",
+      "overview": "概览",
+      "permissions": "权限",
+      "members": "成员"
+    },
+    "perms": {
+      "advanced": "高级权限",
+      "intro": "例外只在这个频道生效。默认跟随工作区的角色。",
+      "targets": "有例外的角色和成员",
+      "add": "添加角色或成员",
+      "addSearch": "搜索角色或成员",
+      "addNone": "没有找到角色或成员",
+      "groupRoles": "角色",
+      "groupPeople": "成员",
+      "clear": "移除例外",
+      "stateLabel": "{{target}}的{{key}}",
+      "state": {
+        "deny": "拒绝",
+        "inherit": "默认",
+        "allow": "允许"
+      },
+      "keys": {
+        "post": {
+          "title": "发送消息",
+          "line": "在这里发言、在话题中回复和置顶消息"
+        },
+        "callAgents": {
+          "title": "呼叫智能体",
+          "line": "获得这个频道智能体的回复"
+        },
+        "manage": {
+          "title": "管理频道",
+          "line": "修改名称、谁能看到、成员和这些权限"
+        }
+      },
+      "default": {
+        "allowedBy": "默认：由角色{{role}}允许",
+        "notHeld": "默认：角色{{role}}不允许",
+        "followsEveryone": "默认：跟随此频道中的{{role}}",
+        "person": "默认：跟随此人的角色"
+      },
+      "readOnlyComposer": "你不能在这个频道发送消息",
+      "agentsDenied": "你不能在这个频道呼叫智能体",
+      "forbidden": "你只能修改自己拥有的权限，且仅限比你低的角色和成员"
+    },
     "pins": {
       "title": "已置顶",
       "button_other": "置顶消息（{{count}}）",
@@ -1832,6 +1881,20 @@
       "done": "已发送邀请",
       "adminOnly": "由有邀请权限的人发送"
     },
+    "install_skill": {
+      "title": "安装技能",
+      "open": "安装",
+      "done": "已安装",
+      "adminOnly": "由管理智能体的人安装"
+    },
+    "update_skills": {
+      "title_other": "更新 {{count}} 个技能",
+      "update": "更新",
+      "review": "审核",
+      "done": "已是最新",
+      "waiting": "等待审核",
+      "adminOnly": "由管理智能体的人更新"
+    },
     "agentProposal": {
       "title": "{{agent}} 提议创建一个新智能体",
       "review": "查看",
@@ -1891,7 +1954,16 @@
     "added": "{{name}} 已加入频道。",
     "allow": "允许 {{person}} 与他对话",
     "allow_female": "允许 {{person}} 与她对话",
-    "allowed": "完成：{{person}} 现在可以与 {{name}} 对话了。"
+    "allowed": "完成：{{person}} 现在可以与 {{name}} 对话了。",
+    "allowMe": "让我也能和他对话",
+    "allowMe_female": "让我也能和她对话",
+    "allowedMe": "好了：你现在可以和 {{name}} 对话了。",
+    "mailLossTitle": "移除邮箱访问权限？",
+    "mailLoss": "{{name}} 可以访问 {{owners}} 的邮箱。能和他对话的人变多后，他们可能会通过他接触到这些邮件，所以这项访问权限会被移除。连接该邮箱的人可以重新授予。",
+    "mailLoss_female": "{{name}} 可以访问 {{owners}} 的邮箱。能和她对话的人变多后，他们可能会通过她接触到这些邮件，所以这项访问权限会被移除。连接该邮箱的人可以重新授予。",
+    "planTitle": "使用 {{owner}} 的套餐吗？",
+    "planOpen": "和 {{name}} 的对话会使用 {{owner}} 的 {{plan}} 套餐及其额度。{{owner}} 会收到一封邮件通知。",
+    "plansTitle": "使用 {{owners}} 的套餐吗？"
   },
   "teamChecks": {
     "group": "智能体没有重复做的事",
@@ -2075,12 +2147,15 @@
     "editChannel": "编辑频道"
   },
   "channelMembers": {
+    "caption": "谁能看到这个频道",
+    "captionOpen": "对整个工作区开放",
     "addRow": "添加成员或智能体",
     "invite": "邀请 {{email}} 加入 {{org}} 和 #{{channel}}",
     "inviteOrg": "邀请 {{email}} 加入 {{org}}",
     "addTitle": "添加到 #{{channel}}",
     "addSearch": "搜索成员或智能体",
-    "addEmpty": "大家都已经在这里了，或者没有找到“{{q}}”。",
+    "addEmpty": "频道外没有人匹配“{{q}}”。",
+    "addEveryone": "{{org}} 的所有人都已在 #{{channel}} 中。",
     "addConfirm_other": "添加 {{count}} 个",
     "actions": "{{name}} 的选项",
     "remove": "从频道中移除",
@@ -2297,7 +2372,11 @@
     "alreadyAnswered": "这个问题已被回答或已关闭。",
     "closed": "未回答就关闭了。",
     "failed": "无法发送回答，请重试。",
-    "withdrawn": "{{name}} 不再需要回答了。"
+    "withdrawn": "{{name}} 不再需要回答了。",
+    "skip": "跳过",
+    "skipFailed": "无法跳过此问题，请重试。",
+    "dismissed": "{{name}}跳过了此问题。",
+    "dismissedByYou": "你跳过了此问题。"
   },
   "ask": {
     "kind": {
@@ -2363,6 +2442,8 @@
       "reads": "始终批准读取",
       "note": "从现在起涵盖 {{actions}}，任何值都适用。如需撤销：{{name}} 页面的“工具和权限”。",
       "noteTarget": "从现在起涵盖 {{actions}}。如需撤销：{{name}} 页面的“工具和权限”。",
+      "noteCommand": "从现在起涵盖计算机上的 {{actions}}，参数不限。如需撤销：{{name}} 页面的“工具和权限”。",
+      "computer": "计算机上的命令",
       "noteReads": "从现在起仅涵盖 {{actions}} 在此项目（{{target}}）中的读取。会更改数据的操作仍需批准。如需撤销：{{name}} 页面的“工具和权限”。",
       "noteReadsAll": "从现在起仅涵盖 {{actions}} 在此连接中的读取。会更改数据的操作仍需批准。如需撤销：{{name}} 页面的“工具和权限”。",
       "readsRule": "{{tool}} 的读取",
@@ -2885,6 +2966,14 @@
     "nameLabel": "名称",
     "roleLabel": "角色",
     "roleHelp": "它为团队做什么，例如：邮件和日历助理。",
+    "editName": "编辑名称：{{name}}",
+    "editHandle": "编辑提及：@{{handle}}",
+    "editRole": "编辑角色：{{role}}",
+    "noRole": "无角色",
+    "rolePlaceholder": "例如：客服",
+    "roleList": "角色列表",
+    "roleUse": "使用“{{role}}”",
+    "roleCurrent": "当前",
     "edit": "编辑",
     "chat": "聊天",
     "moreActions": "更多操作",
@@ -2933,15 +3022,7 @@
     "budgetDefaultHelp": "留空：使用工作区默认值。",
     "budgetDefaultHelpAmount": "留空：使用工作区默认值（{{amount}}）。",
     "budgetInvalid": "请输入大于零的值。",
-    "notFound": "该智能体不存在或已归档。",
-    "editName": "编辑名称：{{name}}",
-    "editHandle": "编辑提及：@{{handle}}",
-    "editRole": "编辑角色：{{role}}",
-    "noRole": "无角色",
-    "rolePlaceholder": "例如：客服",
-    "roleList": "角色列表",
-    "roleUse": "使用“{{role}}”",
-    "roleCurrent": "当前"
+    "notFound": "该智能体不存在或已归档。"
   },
   "agentPage": {
     "work": {
@@ -2953,6 +3034,7 @@
         "label_female": "她的工作方式",
         "computer": "工作位置",
         "brain": "思考方式",
+        "brainWith": "用 {{plan}} 思考",
         "browser": "浏览器",
         "effort": "{{level}}投入"
       },
@@ -3007,7 +3089,7 @@
         "none": "没有电脑可用",
         "planModel": "模型",
         "account": "账号",
-        "accountLocked": "只有 {{name}} 可以更改",
+        "accountWho": "只有 {{name}} 的负责人 {{owner}} 的账号：套餐只为其所有者的智能体思考。",
         "accountSignedOut": "已退出登录，请重新登录",
         "thisComputer": "{{computer}} 的账号",
         "accountMove": "{{agents}} 正在使用 · 移到这里",
@@ -3036,7 +3118,7 @@
           "max": "最高"
         },
         "effortText": {
-          "auto": "为每项任务自动选择投入程度。",
+          "auto": "自动模型会为每项任务选择投入程度。选择一个模型即可固定投入程度。",
           "low": "回复快，适合简单问题。",
           "medium": "默认设置，大多数时候思考得足够充分。",
           "high": "在难题上思考更多，更慢，费用也更高。",
@@ -3061,6 +3143,11 @@
           "answers": "回复对象",
           "defaults": "恢复默认",
           "done": "完成",
+          "contents": {
+            "model": "上下文窗口",
+            "auto": "上下文窗口和回复对象",
+            "fixed": "投入程度、上下文窗口和回复对象"
+          },
           "allDefault": "全部为默认",
           "effort": "投入程度：{{level}}",
           "context": "上下文：{{size}}",
@@ -4025,20 +4112,6 @@
     },
     "dialog": {
       "title": "邀请加入 {{org}}",
-      "emails": "邮箱",
-      "moreEmails": "更多邮箱…",
-      "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
-      "withNote": "附带留言",
-      "alsoJoin": "同时加入",
-      "generalAlways": "所有人都会加入 #{{channel}}",
-      "note": "邮件中的留言",
-      "optional": "（可选）",
-      "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
-      "or": "或发送链接",
-      "send_other": "邀请 {{count}} 人",
-      "sent": "已向 {{email}} 发送邀请。",
-      "sentMany": "已发送 {{count}} 份邀请。",
-      "alsoIn": "他们也会加入 {{channels}}。",
       "stepOf": "第 {{n}} 步，共 {{total}} 步 · {{step}}",
       "steps": {
         "who": "邀请谁",
@@ -4046,9 +4119,23 @@
         "where": "加入频道",
         "note": "留言"
       },
+      "emails": "邮箱",
+      "moreEmails": "更多邮箱…",
+      "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
       "pasteHelp": "也可以粘贴一个列表：用逗号、空格分隔，或每行一个。",
       "leftOut": "已经在这里或已被邀请的人不会再收到邀请。",
+      "withNote": "附带留言",
+      "alsoJoin": "同时加入",
+      "generalAlways": "所有人都会加入 #{{channel}}",
+      "note": "邮件中的留言",
+      "optional": "（可选）",
+      "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
+      "or": "或发送链接",
       "continueWith": "继续（{{count}} 人）",
+      "send_other": "邀请 {{count}} 人",
+      "sent": "已向 {{email}} 发送邀请。",
+      "sentMany": "已发送 {{count}} 份邀请。",
+      "alsoIn": "他们也会加入 {{channels}}。",
       "who": {
         "title": "你想邀请谁？",
         "lead": "把邮箱告诉我。每个人都会收到邀请，并直接加入。"
@@ -4322,6 +4409,18 @@
       "label": "写入 Issue",
       "description": "创建 Issue 并发表评论。"
     },
+    "github_actions_read": {
+      "label": "读取 Actions",
+      "description": "列出工作流和运行，并读取其作业和日志。"
+    },
+    "github_projects_read": {
+      "label": "读取 Projects",
+      "description": "列出并读取 GitHub Projects 及其字段和条目。"
+    },
+    "github_projects_write": {
+      "label": "编辑 Projects",
+      "description": "向 GitHub Projects 添加条目，并移动或编辑条目。"
+    },
     "github_actions_run": {
       "label": "运行工作流",
       "description": "启动 GitHub Actions 工作流（可能会部署）。始终需要审批。"
@@ -4432,6 +4531,54 @@
     "flowHint": "任务会自动移到每个阶段的第一列：智能体开始时移到“进行中”，可以检查时移到“审核中”，你批准后移到“已完成”。",
     "moreOptions": "更多选项",
     "showCanceled": "显示已取消",
+    "filterButton": "筛选",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "我",
+    "display": {
+      "title": "显示",
+      "label": "显示：{{layout}} · {{group}}",
+      "layout": "布局",
+      "group": "分组依据",
+      "sort": "排序依据",
+      "fields": "卡片上显示",
+      "saved": "已在此工作区为你保存",
+      "reset": "恢复默认",
+      "by": {
+        "stage": "阶段",
+        "assignee": "负责人",
+        "priority": "优先级"
+      },
+      "order": {
+        "manual": "手动",
+        "priority": "优先级",
+        "due": "截止日期"
+      },
+      "field": {
+        "assignee": "负责人",
+        "priority": "优先级",
+        "due": "截止日期",
+        "criteria": "标准",
+        "pullRequest": "拉取请求",
+        "label": "标签"
+      }
+    },
+    "drop": {
+      "stage": "放到{{name}}",
+      "assignee": "放下以交给{{name}}",
+      "unassign": "放下以移除负责人",
+      "priority": "放下以设为{{priority}}优先级"
+    },
+    "drag": {
+      "role": "可拖动的任务",
+      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
+      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
+      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
+      "dropped": "你把 #{{number}} 放到了{{group}}。",
+      "canceled": "#{{number}} 回到了原位。",
+      "assigned": "#{{number}} 现在由{{name}}负责。",
+      "unassigned": "#{{number}} 现在没有负责人。",
+      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
+    },
     "canceledColumn": "已取消",
     "columns": {
       "add": "添加列",
@@ -4674,54 +4821,6 @@
       "agent_asked": "请 {{name}} 来完成",
       "forum_opened": "将它提交到论坛：{{title}}",
       "forum_evaluated": "带回了论坛的结果：{{title}}"
-    },
-    "filterButton": "筛选",
-    "filterValue": "{{filter}}：{{value}}",
-    "me": "我",
-    "display": {
-      "title": "显示",
-      "label": "显示：{{layout}} · {{group}}",
-      "layout": "布局",
-      "group": "分组依据",
-      "sort": "排序依据",
-      "fields": "卡片上显示",
-      "saved": "已在此工作区为你保存",
-      "reset": "恢复默认",
-      "by": {
-        "stage": "阶段",
-        "assignee": "负责人",
-        "priority": "优先级"
-      },
-      "order": {
-        "manual": "手动",
-        "priority": "优先级",
-        "due": "截止日期"
-      },
-      "field": {
-        "assignee": "负责人",
-        "priority": "优先级",
-        "due": "截止日期",
-        "criteria": "标准",
-        "pullRequest": "拉取请求",
-        "label": "标签"
-      }
-    },
-    "drop": {
-      "stage": "放到{{name}}",
-      "assignee": "放下以交给{{name}}",
-      "unassign": "放下以移除负责人",
-      "priority": "放下以设为{{priority}}优先级"
-    },
-    "drag": {
-      "role": "可拖动的任务",
-      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
-      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
-      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
-      "dropped": "你把 #{{number}} 放到了{{group}}。",
-      "canceled": "#{{number}} 回到了原位。",
-      "assigned": "#{{number}} 现在由{{name}}负责。",
-      "unassigned": "#{{number}} 现在没有负责人。",
-      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
     }
   },
   "routines": {
@@ -4905,7 +5004,6 @@
         "artifact": "生成 Drive 中的文档"
       },
       "ahead": "为之后准备好的",
-      "ownActions": "自动执行",
       "createdBy": "由 {{name}} 创建 · {{date}}",
       "nameLabel": "例行工作名称",
       "editName": "编辑名称",
@@ -4922,7 +5020,8 @@
       "reportHint": {
         "always": "即使没有新内容",
         "when_new": "没有新内容时保持安静"
-      }
+      },
+      "ownActions": "自动执行"
     },
     "ownActions": {
       "hint": "每次运行都会在你已连接的应用中直接执行这些操作，无需询问。其中的其他操作会先请人审批，合并、部署和回滚始终需要审批。",
@@ -5414,6 +5513,9 @@
       "allowedBy": "由 {{name}} 批准 · {{time}}",
       "deniedBy": "由 {{name}} 拒绝 · {{time}}",
       "alwaysBy": "由 {{name}} 在此专项任务中允许 · {{time}}：{{rules}}",
+      "alwaysAgent": "对此智能体始终批准",
+      "alwaysAgentHint": "“对此智能体始终批准”会在每个任务和对话中允许 {{kind}}，参数不限。如需撤销：智能体页面的“工具和权限”。",
+      "alwaysAgentBy": "{{name}} 已为此智能体允许 · {{time}}：{{kind}}",
       "state": {
         "allowed": "已批准",
         "denied": "已拒绝",
@@ -6326,6 +6428,46 @@
     "saved": "已保存 {{name}}。",
     "refresh": "从链接更新",
     "refreshed": "已从链接更新 {{name}}。",
+    "upToDate": "{{name}} 已经和链接中的内容一致。",
+    "waitingToast": "{{name}} 的更新会修改会运行的文件，所以要等审核。",
+    "autoUpdate": "自动更新",
+    "autoUpdateHelp": "每天读取它的链接。新文本会生效，可撤销。脚本的改动要等管理技能的人处理。",
+    "autoChip": "自动更新",
+    "waitingChip": "更新待处理",
+    "lastUpdate": "{{when}}从链接更新",
+    "undoUpdate": "撤销更新",
+    "undone": "{{name}} 已回到版本 {{version}}。",
+    "agentsImprove": "智能体自行改进技能",
+    "agentsImproveHelp": "智能体发现技能有误或缺少步骤时，会立即修正：生成一个可撤销的新版本，并通知技能的创建者。脚本的改动要等管理技能的人处理。",
+    "agentsImproveThis": "智能体自行改进此技能",
+    "agentChange": "{{agent}} {{when}}修改了它",
+    "undoAgentChange": "撤销修改",
+    "pending": {
+      "title": "来自链接的更新会修改会运行的文件：{{files}}",
+      "lead": "只有在你信任这些文件时才应用。智能体会在它们的电脑上运行这些文件。",
+      "edited": "来自链接的更新会替换智能体对它做的修改",
+      "editedLead": "应用后使用链接中的版本。之后可以撤销。",
+      "apply": "应用更新",
+      "dismiss": "不应用",
+      "applied": "已从链接更新 {{name}}。",
+      "changedAgain": "链接又变了。请审核新的文件。",
+      "dismissed": "未应用更新。链接再有新改动时会再次询问。"
+    },
+    "updateFailed": {
+      "no_skill_md": "无法更新：链接里已经没有 SKILL.md。",
+      "connection_gone": "无法更新：读取它的 GitHub 连接已失效。",
+      "link_holds_several": "无法更新：链接里现在有多个技能。",
+      "link_renamed": "无法更新：链接里现在是另一个技能。",
+      "owner_gone": "无法更新：开启自动更新的人已不能管理技能。请重新开启。",
+      "other": "无法从链接更新。"
+    },
+    "notice": {
+      "updated": "{{name}} 已从链接更新",
+      "waiting": "{{name}} 的一个更新会修改它的脚本",
+      "waitingEdited": "{{name}} 的更新会替换智能体做的修改",
+      "failed": "{{name}} 无法从链接更新",
+      "edited": "智能体改进了 {{name}}"
+    },
     "remove": "移除",
     "removeTitle": "移除 {{name}}？",
     "removeAgents_other": "{{names}} 正在使用这个技能，移除后将无法再使用。",
@@ -6393,9 +6535,6 @@
     "share": {
       "switch": "回复其他成员",
       "switchAll": "回复其他成员",
-      "switchOther": "只回复 {{owner}}",
-      "onOther": "{{name}} 使用 {{owner}} 的套餐思考。只有 {{owner}} 可以让其他成员和他对话。",
-      "onOther_female": "{{name}} 使用 {{owner}} 的套餐思考。只有 {{owner}} 可以让其他成员和她对话。",
       "line": {
         "off": "{{name}} 只回复你，使用你的 {{plan}}。",
         "off_female": "{{name}} 只回复你，使用你的 {{plan}}。",
@@ -6403,6 +6542,11 @@
         "on_female": "{{name}} 会回复所有能和她对话的人，使用你的 {{plan}}。",
         "offAll": "它们只回复你，使用你的 {{plan}}。",
         "onAll": "它们会回复所有能和它们对话的人，使用你的 {{plan}}。"
+      },
+      "lineOf": {
+        "off": "{{name}} 只回复 {{owner}}，使用 {{owner}} 的 {{plan}}。",
+        "on": "{{name}} 会回复所有能和他对话的人，使用 {{owner}} 的 {{plan}}。",
+        "on_female": "{{name}} 会回复所有能和她对话的人，使用 {{owner}} 的 {{plan}}。"
       },
       "plan": {
         "own": "{{provider}} 套餐",
@@ -6418,6 +6562,7 @@
       "savedEveryone": "{{name}} 现在会回复其他成员。",
       "savedEveryone_female": "{{name}} 现在会回复其他成员。",
       "savedOwner": "{{name}} 现在只回复你。",
+      "savedOwnerOf": "{{name}} 现在只回复 {{owner}}。",
       "savedOwner_female": "{{name}} 现在只回复你。",
       "backOnApi": "{{name}} 已改回使用 API，仍然只回复你。",
       "backOnApi_female": "{{name}} 已改回使用 API，仍然只回复你。",
@@ -6427,9 +6572,6 @@
       "letPeople_female": "让 {{name}} 回复其他成员",
       "pickPeople": "{{name}} 只回复选中的成员，但目前还没有选中任何人。请在“谁可以对话”中选择。",
       "pickPeople_female": "{{name}} 只回复选中的成员，但目前还没有选中任何人。请在“谁可以对话”中选择。"
-    },
-    "errors": {
-      "planOwnerOnly": "只有 {{agentName}} 的负责人可以让更多人加入：{{agentName}} 使用的是他们的套餐。"
     },
     "add": {
       "paste": "粘贴",
@@ -8119,6 +8261,7 @@
     "countsLabel": "新增 {{added}} 行，删除 {{removed}} 行",
     "htmlPreview": "交互式页面，打开即可查看。",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "无频道",
     "download": "下载",
     "downloadCsv": "下载 CSV",
@@ -8832,6 +8975,10 @@
     "connectedList": "已连接",
     "connected": "已连接",
     "connectedAs": "已连接为 {{account}}",
+    "reconnectAdds": "重新连接 {{name}}，让智能体也能{{what}}。",
+    "adds": {
+      "github_project": "使用 GitHub Projects（读取看板并移动卡片）"
+    },
     "toolsCount_other": "{{count}} 个工具",
     "active": "已启用",
     "notReviewed": "等待审核",
@@ -9932,6 +10079,7 @@
     },
     "artifact": {
       "fileTooLarge": "文件超过 {{max}} MB，这是单个文件的上限。",
+      "notVersioned": "图片、视频或录音没有版本。请作为新文件发送。",
       "fileRequired": "请选择要上传的文件。",
       "fileNameRequired": "文件需要一个名称。",
       "notFound": "这个文件已不存在，或你无权访问。"
@@ -9960,7 +10108,11 @@
       "invalidDescription": "描述需为 1 到 {{max}} 个字符。",
       "tooLarge": "技能太大（最大 {{max}} MB）。",
       "tooManyFiles": "技能的文件太多（最多 {{max}} 个）。",
-      "connectionGone": "读取 {{repo}} 的 GitHub 连接已失效。请重新连接 GitHub 以更新这个技能。"
+      "connectionGone": "读取 {{repo}} 的 GitHub 连接已失效。请重新连接 GitHub 以更新这个技能。",
+      "linkHoldsSeveral": "链接里现在有多个技能。请从这个技能自己的文件夹重新安装。",
+      "linkRenamed": "链接里现在是技能 {{name}}。",
+      "noLink": "只有从链接安装的技能才会从链接更新。",
+      "noPendingUpdate": "这个技能没有待处理的更新。"
     },
     "agentGroup": {
       "notFound": "这个分组已不存在。",
@@ -10339,18 +10491,19 @@
       "address": "服务器地址",
       "open": "打开 {{app}}",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "其他应用"
       },
       "clientText": {
         "claude": "claude.ai、桌面应用和手机",
-        "claude_code": "在终端中",
-        "chatgpt": "chatgpt.com",
-        "cursor": "编辑器",
-        "other": "VS Code 等"
+        "terminal": "在终端中",
+        "editor": "代码编辑器",
+        "extension": "编辑器扩展",
+        "desktop": "桌面应用",
+        "other": "任意 MCP 应用"
+      },
+      "group": {
+        "chat": "聊天应用",
+        "code": "编辑器和终端"
       },
       "waiting": "等待应用连接",
       "connected": "已连接：{{name}}",
@@ -10372,28 +10525,69 @@
         "step2": "在 Claude Code 中输入 <code>/mcp</code>，选择 agentes，然后选择 Authenticate。",
         "scope": "它在所有文件夹中都有效。如只用于当前文件夹，请去掉 <code>--scope user</code>。"
       },
-      "chatgpt": {
-        "step1": "打开 chatgpt.com/plugins。",
-        "step2": "点击 +，然后选择“添加自定义 MCP 服务器”。",
-        "step3": "粘贴地址并连接。",
-        "plans": "适用于 ChatGPT 付费套餐。"
-      },
       "cursor": {
         "add": "添加到 Cursor",
         "manual": "或粘贴到 <code>~/.cursor/mcp.json</code>：",
         "signIn": "首次使用时，Cursor 会要求你登录。"
       },
+      "vscode": {
+        "add": "添加到 VS Code",
+        "manual": "或粘贴到 <code>.vscode/mcp.json</code>："
+      },
+      "codex": {
+        "step": "在终端中运行。Codex 会打开页面让你登录："
+      },
+      "copilotIdes": {
+        "config": "在 IDE 的 GitHub Copilot 设置中打开 <code>mcp.json</code> 并粘贴："
+      },
       "other": {
-        "tabs": "哪个应用",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "任意 MCP 应用",
-        "vscodeAdd": "添加到 VS Code",
-        "vscodeManual": "或粘贴到 <code>.vscode/mcp.json</code>：",
-        "codexStep": "在终端中运行。Codex 会打开页面让你登录：",
         "anyStep": "把地址粘贴到应用中。它会打开这个页面让你登录。",
         "anyToken": "不支持 OAuth 登录的应用，可在 Authorization: Bearer 请求头中使用个人令牌。",
         "toTokens": "创建个人令牌"
+      },
+      "step": {
+        "open": "打开 {{place}}。",
+        "click": "点击“{{button}}”。",
+        "clickThen": "点击“{{button}}”，然后点击“{{next}}”。",
+        "name": "命名为 agentes.chat 并粘贴地址。",
+        "nameDescribe": "命名为 agentes.chat 并写一段描述。",
+        "nameConnect": "命名为 agentes.chat 并点击“{{button}}”。",
+        "paste": "粘贴地址。",
+        "pasteIn": "把地址粘贴到“{{field}}”。",
+        "choosePaste": "选择“{{option}}”并粘贴地址。",
+        "emptySecret": "client ID 和 secret 留空，点击“{{button}}”。",
+        "choose": "选择“{{option}}”。",
+        "chooseThen": "选择“{{option}}”，点击“{{button}}”，然后点击“{{next}}”。",
+        "chooseConfig": "选择“{{option}}”并粘贴：",
+        "auth": "身份验证选择“{{option}}”。",
+        "tick": "勾选“{{box}}”并点击“{{button}}”。",
+        "run": "在终端中运行：",
+        "orRun": "或在终端中运行：",
+        "runCommand": "运行 {{command}} 命令。",
+        "file": "粘贴到 <code>{{file}}</code>：",
+        "orFile": "或粘贴到 <code>{{file}}</code>：",
+        "pasteConfig": "粘贴：",
+        "mode": "在聊天中切换到 {{mode}} 模式。",
+        "loginRun": "要登录，请运行 <code>{{command}}</code>。",
+        "loginType": "要登录，请在应用中输入 <code>{{command}}</code>。",
+        "signIn": "在打开的页面中用你的 agentes.chat 账号登录。",
+        "signInFirst": "首次使用时，应用会要求你登录。",
+        "token": "创建一个个人令牌，替换 {{placeholder}}。",
+        "install": "添加到 {{app}}"
+      },
+      "note": {
+        "untested": "我们还没有测试过从这个应用登录。如果失败，请告诉我们。",
+        "chatgptPlans": "适用于 ChatGPT 付费套餐，不含 Free 和 Go。Business 中只有管理员可以添加。",
+        "chatgptPhone": "无法在手机应用中添加。在网页上添加后，桌面端和手机上也会显示。",
+        "geminiPlans": "仅限网页版，需使用个人 Google 账号。可能需要 Google AI Pro 或 Ultra。",
+        "codex": "需要包含 Codex 的 ChatGPT 套餐。ChatGPT 桌面应用、Codex CLI 和 IDE 扩展共用这份配置。",
+        "copilotPolicy": "在 Copilot Business 和 Enterprise 中，管理员需要开启 MCP servers in Copilot 策略，它默认是关闭的。",
+        "grokAdmin": "在 Grok Business 和 Enterprise 中，由管理员添加连接器。",
+        "perplexityPlans": "适用于 Perplexity Pro、Max 和 Enterprise。",
+        "leChatAdmin": "在 Team 套餐中，由管理员添加连接器。",
+        "raycastPro": "仅限 Raycast Pro。",
+        "visualStudio": "需要 Visual Studio 2022 17.14 或更新版本，以及 GitHub Copilot。",
+        "continueAgent": "仅在 Agent 模式下可用。"
       }
     },
     "consent": {
@@ -11213,6 +11407,8 @@
         "creatingChannel": "创建了频道",
         "offeringConnectAi": "提议连接 AI",
         "offeringConnectApp": "提议连接一个应用",
+        "offeringSkill": "提议安装一个技能",
+        "updatingSkills": "更新了技能",
         "offeringInvites": "提议邀请成员",
         "proposingAgent": "提议了智能体",
         "askingAgent": "询问了另一个智能体",
@@ -11297,6 +11493,8 @@
       "creatingChannel": "创建频道",
       "offeringConnectAi": "准备连接 AI",
       "offeringConnectApp": "准备连接应用",
+      "offeringSkill": "准备安装技能",
+      "updatingSkills": "正在更新技能",
       "offeringInvites": "准备邀请",
       "proposingAgent": "提议智能体",
       "askingAgent": "询问另一个智能体",
@@ -11407,6 +11605,8 @@
       "action_connect_app": "连接 {{name}}",
       "action_add_mcp": "添加 MCP 服务器",
       "action_invite_people": "邀请成员",
+      "action_install_skill": "安装技能",
+      "action_update_skills": "更新技能",
       "agent_proposal": "提议了一个新智能体：{{name}}",
       "approval_request": "审批请求：{{title}}",
       "secret_request": "{{agent}} 请求了一个密钥：{{name}}",
@@ -11611,6 +11811,14 @@
     "offer_invites": {
       "label": "提议邀请成员",
       "description": "发布一张卡片，点击按钮即可打开已填好地址的邀请对话框。"
+    },
+    "offer_install_skill": {
+      "label": "提议安装技能",
+      "description": "发布一张卡片，按钮会打开已填好技能链接的安装窗口。"
+    },
+    "update_skill_from_source": {
+      "label": "从链接更新技能",
+      "description": "从安装来源更新技能。脚本的改动要等人处理。"
     },
     "propose_agent": {
       "label": "提议创建智能体",

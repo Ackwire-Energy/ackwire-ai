@@ -21,6 +21,7 @@ import {
   applyComputerEvent,
   applyConsultEvent,
   applyMachineEvent,
+  applyMembershipEvent,
   applyNotificationEvent,
   applyReactions,
   applyReceiptEvent,
@@ -70,6 +71,7 @@ import {
   type StreamsState,
   seedReceipt,
   staleProvisional,
+  startThreadCache,
   stopTyping,
   type TypingState,
   touchRun,
@@ -132,6 +134,8 @@ export interface LiveNotice {
   threadId: string | null;
   messageId: string;
   text: string;
+  /** `channel.agents_denied`: this channel's exceptions, not the agent's audience (ADR 0134). */
+  code?: string;
 }
 
 /** `agent.unavailable` (user scope): my message mentioned an agent that doesn't answer me. */
@@ -142,6 +146,7 @@ export interface AgentUnavailableEvent {
   threadId: string | null;
   messageId: string;
   text: string;
+  code?: string;
 }
 
 export const isAgentUnavailable = (e: { type: string }): e is AgentUnavailableEvent =>
@@ -343,7 +348,14 @@ export function createStreamsStore(
     unavailable: (e: AgentUnavailableEvent) => {
       const key = `${e.messageId}:${e.agentId}`;
       const list = (state.notices[e.channelId] ?? []).filter((n) => n.key !== key);
-      const notice = { key, agentId: e.agentId, threadId: e.threadId, messageId: e.messageId, text: e.text };
+      const notice = {
+        key,
+        agentId: e.agentId,
+        threadId: e.threadId,
+        messageId: e.messageId,
+        text: e.text,
+        code: e.code,
+      };
       set({
         ...state,
         streams: dismissRun(state.streams, `pending:${e.agentId}:${e.messageId}`),
@@ -506,6 +518,11 @@ export function RealtimeProvider({
       if (event.type === "channels.layout") {
         void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
         void qc.invalidateQueries({ queryKey: keys.channelCategories(orgId) });
+      }
+      // A channel's exceptions changed (ADR 0134): what I may do there (`can`) and its open permissions page.
+      if (event.type === "channel.permissions" && "channelId" in event && typeof event.channelId === "string") {
+        void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.channelPermissions(orgId, event.channelId) });
       }
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
@@ -773,6 +790,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     if (!connection || !enabled) return;
     return connection.subscribe(channelId, (event) => {
       streams.apply(event);
+      applyMembershipEvent(qc, orgId, event);
       if (event.type === "approval.created" || event.type === "approval.decided") {
         cacheApproval(qc, orgId, event.approval);
       }
@@ -831,9 +849,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if (event.message) cacheMessage(qc, orgId, event.message);
         else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
         // A new top-level message may get agent replies in its thread: start watching it.
-        if (event.message && !event.message.threadId) {
-          qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
-        }
+        if (event.message) startThreadCache(qc, orgId, event.message);
         // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines. An agent's
         // sticker after its reply (ADR 0091) changes none of them.
         if (event.message?.threadId && !isMediaAfterReply(event.message.meta)) {

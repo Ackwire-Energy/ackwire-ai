@@ -14,7 +14,7 @@ import {
   isSignupAllowed,
   listMachineRequests,
   listMemberships,
-  myLocale,
+  myAccount,
   type Permission,
   previewInvitation,
   removeMember,
@@ -301,11 +301,11 @@ describe("creating a workspace while one is held", () => {
 
 describe("the person's language (ADR 0122)", () => {
   test("any language of the app, picked or detected; anything else refused", async () => {
-    expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: "pt-BR", localeAuto: true });
+    expect(await myAccount(f.db, f.owner.id)).toMatchObject({ locale: "pt-BR", localeAuto: true });
     await setMyLocale(f.db, f.owner.id, "fr");
-    expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: "fr", localeAuto: false });
+    expect(await myAccount(f.db, f.owner.id)).toMatchObject({ locale: "fr", localeAuto: false });
     await setMyLocale(f.db, f.owner.id, "ja", true);
-    expect(await myLocale(f.db, f.owner.id)).toEqual({ locale: "ja", localeAuto: true });
+    expect(await myAccount(f.db, f.owner.id)).toMatchObject({ locale: "ja", localeAuto: true });
     await expect(setMyLocale(f.db, f.owner.id, "xx" as "en")).rejects.toThrow();
   });
 

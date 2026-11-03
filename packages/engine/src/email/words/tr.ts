@@ -340,4 +340,26 @@ export const words: EmailWords = {
     table: (day) => `Tablonun tamamı: bun run report:autonomy --day ${day}`,
     why: "Bu e-postayı, bu adres bu sunucudaki OPS_REPORT_EMAIL içinde olduğu için aldınız. Günde bir kez gönderilir.",
   },
+  planOpened: {
+    subject: (plan) => `${plan} planın üzerinden ajanınla daha fazla kişi konuşabilir`,
+    preheader: (plan) => `Onların konuşmaları ${plan} planını ve limitlerini kullanır.`,
+    headline: "Ajanınla daha fazla kişi konuşabilir",
+    body: (by, agent, plan) => [
+      { b: by },
+      ", ",
+      { b: agent },
+      ` ile daha fazla kişinin konuşmasına izin verdi. Onların konuşmaları ${plan} planını ve limitlerini kullanır.`,
+    ],
+    agent: "Ajan",
+    by: "Değiştiren",
+    was: "Önce",
+    now: "Şimdi",
+    everyone: "Workspace'teki herkes",
+    onlyYou: "Yalnızca sen",
+    you: "Sen",
+    note: "Geri almak için ajanın sayfasında Kimler konuşabilir ayarını değiştir.",
+    button: "Kimlerin konuşabildiğini gör",
+    why: (org) =>
+      `Bu e-postayı, ${org} içindeki bir ajanın senin planınla düşündüğü ve başka biri onunla kimlerin konuşabileceğini değiştirdiği için aldın.`,
+  },
 };

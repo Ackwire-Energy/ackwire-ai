@@ -37,6 +37,12 @@ Anything a person can do in the UI, an agent can start: directly, within its per
 - When the person who asked may not (`manage_connectors`, `invite_people`), the card is posted only if someone who may can open the conversation (`deciderCanOpen` with that permission), and the tool tells the agent to say an admin does it from the card and offer to ask one; otherwise nothing is posted and the agent is told to offer to ask one (`request_approval`, or a channel an admin reads).
 - Agents' hints that point to the page say "Settings › Connectors and MCPs" (and the Portuguese the app shows).
 
+### 6. Skills (amended 2026-11-03)
+
+- `offer_install_skill` (`url`, a GitHub link, and `why`) posts a card (`kind: "install_skill"`, `bodyCode` `action_install_skill`) whose button opens Instalar skill with the link read and its skills listed to pick; who manages agents (`manage_agents`) installs there. Done once the library has a skill from that link. Agents are told to use it instead of installing into their CLI's own skills folder, where only they would have it.
+- `update_skill_from_source` (`name` or `all`) runs the update from the link (ADR 0020, amended 2026-11-03) for a person who manages agents, with a `skill.updated` receipt (Undo restores the whole version before); an update that changes files that run, or a person who can't, gets a card (`kind: "update_skills"`, `bodyCode` `action_update_skills`) whose buttons open each skill.
+- Both are in `skills:read`, loaded on demand (`find_tools`, the "more" group: the prompt names them), count toward the 3 cards per run and follow §5 for who may.
+
 ## Consequences
 
 - A prompt injection gets at most a card a person must click, with an address shown on it; the connect itself runs the same server checks as Settings (SSRF guard, OAuth, review of tools).

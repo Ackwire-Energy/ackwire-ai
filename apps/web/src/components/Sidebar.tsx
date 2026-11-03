@@ -1544,7 +1544,7 @@ function AccountMenu() {
           {t("auth.signOut")}
         </MenuItem>
       </Menu>
-      <ProfileDialog focus={profile ? "handle" : null} onClose={() => setProfile(false)} />
+      <ProfileDialog focus={profile ? "name" : null} onClose={() => setProfile(false)} />
       <SetStatusDialog open={statusOpen} onClose={() => setStatusOpen(false)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
       <AddPasswordDialog

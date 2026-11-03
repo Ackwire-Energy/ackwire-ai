@@ -791,6 +791,10 @@ describe("an agent's question (ask_user)", () => {
     expect(
       questionOf({ question: { ...question, status: "answered", answer: null, withdrawn: true } })?.withdrawn,
     ).toBe(true);
+    // Skipped by a person: the card says who skipped it.
+    expect(
+      questionOf({ question: { ...question, status: "answered", answer: null, dismissed: true } })?.dismissed,
+    ).toBe(true);
     expect(questionOf({ question: { id: "q", text: "" } })).toBeNull();
     expect(questionOf({})).toBeNull();
     expect(questionOf(undefined)).toBeNull();

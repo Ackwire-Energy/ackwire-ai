@@ -55,6 +55,7 @@ const sentence = () => screen().getByRole("region", { name: "Como trabalha" });
 const brainCell = () => {
   const cell = within(sentence()).getByRole("button", { name: "Mudar quem pensa" });
   return {
+    label: cell.querySelector("small")?.textContent,
     value: cell.querySelector(".agp-cell__value")?.textContent,
     sub: cell.querySelector(".agp-cell__sub")?.textContent,
   };
@@ -126,7 +127,7 @@ describe("Como trabalha under the name", () => {
     expect(sentence().textContent).toContain("ComputadorNenhum computador");
     expect(sentence().textContent).toContain("Pensa com");
     // On the API: its model, then that it pays per use.
-    expect(brainCell()).toEqual({ value: "Claude Sonnet 5.5", sub: "Pela API" });
+    expect(brainCell()).toEqual({ label: "Pensa com", value: "Claude Sonnet 5.5", sub: "Pela API" });
     expect(sentence().textContent).toContain("Navegadornão navega em sites");
     expect(sentence().textContent?.indexOf("Computador")).toBeLessThan(
       sentence().textContent?.indexOf("Pensa com") ?? 0,
@@ -337,8 +338,8 @@ describe("Quem pensa (its dialog)", () => {
     const api = createFakeApi(state);
     api.agents.brain = async () => fakeAgentBrain(ADA_ID, { brain: "codex", model: null, effectiveModel: "gpt-6-sol" });
     await open(state, api);
-    // The model it runs and its effort, over the plan that pays for it.
-    expect(brainCell()).toEqual({ value: "GPT-6 Sol · esforço médio", sub: "ChatGPT" });
+    // The plan that pays for it in the label, the model it runs and its effort under it.
+    expect(brainCell()).toEqual({ label: "Pensa com ChatGPT", value: "GPT-6 Sol · esforço médio", sub: undefined });
     const d = await brainDialog();
     expect(card(d, /^ChatGPT/).getAttribute("aria-checked")).toBe("true");
     await model(d, /Luna/);
@@ -449,7 +450,11 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   test("the cell names the account when the computer has more than one; Usar saves the account and the effort", async () => {
     const { state } = await onMac();
     // The computer's own sign-in by the name the Connect cards give it, never the computer's.
-    expect(brainCell()).toEqual({ value: "Sonnet · esforço médio", sub: "A conta que os seus agentes dividem" });
+    expect(brainCell()).toEqual({
+      label: "Pensa com Claude",
+      value: "Sonnet · esforço médio",
+      sub: "A conta que os seus agentes dividem",
+    });
     expect(sentence().textContent).not.toContain("Conta deste MacBook");
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta" });
@@ -693,14 +698,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(within(d).queryByRole("button", { name: "Conectar outra conta" })).toBeNull();
   });
 
-  test("only the agent's owner changes the account; an old app on the computer shows nothing about it", async () => {
+  test("an admin changes the account among its owner's, told whose they are; an old app on the computer shows nothing about it", async () => {
     await onMac({ canUsePlans: false, canManageAccounts: false });
     let d = await brainDialog();
-    const locked = within(d).getByRole("combobox", { name: "Conta" });
-    expect(locked.hasAttribute("disabled")).toBe(true);
+    const picker = within(d).getByRole("combobox", { name: "Conta" });
+    expect(picker.hasAttribute("disabled")).toBe(false);
     // Someone else's agents don't share the viewer's sign-in: to them it is the computer's.
-    expect(locked.textContent).toContain("Conta deste MacBook");
-    expect(d.textContent).toContain("Só João troca");
+    expect(picker.textContent).toContain("Conta deste MacBook");
+    expect(d.textContent).toContain(
+      "Só contas de João, responsável pela Ada: um plano só pensa pelos agentes do seu dono.",
+    );
+    expect(d.textContent).not.toMatch(/Só João troca|Adicionar conta/);
     cleanup();
     await onMac({ accountsSupported: false });
     expect(sentence().textContent).not.toMatch(/Conta deste MacBook|A conta que os seus agentes dividem/);
@@ -1557,9 +1565,13 @@ describe("Quem pensa: a coding plan's models", () => {
     ]);
   });
 
-  test("the cell: the model and its effort, under them the plan that pays, or its account among two of that plan", async () => {
+  test("the cell: the plan that pays in its label, the model and its effort under it, its account among two of that plan", async () => {
     await onPlan("opencode", { model: "deepseek-v4.1-flash", effectiveModel: "deepseek-v4.1-flash", effort: "max" });
-    expect(brainCell()).toEqual({ value: "DeepSeek V4.1 Flash · esforço máximo", sub: "OpenCode Go" });
+    expect(brainCell()).toEqual({
+      label: "Pensa com OpenCode Go",
+      value: "DeepSeek V4.1 Flash · esforço máximo",
+      sub: undefined,
+    });
     expect(sentence().querySelector(".ac-brand[data-mark='opencode']")).not.toBeNull();
     cleanup();
     await onPlan("opencode", {
@@ -1580,13 +1592,13 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(within(await brainDialog()).queryByRole("button", { name: "Conectar outro plano" })).toBeNull();
   });
 
-  test("someone who isn't its owner can't swap its owner's coding plan for Claude: another account is the owner's pick", async () => {
+  test("an admin moves its owner's agent off the owner's coding plan, onto the owner's other plans or the API", async () => {
     await onPlan("opencode", { canUsePlans: false, canManageAccounts: false }, { mine: false });
     const d = await brainDialog();
     const claude = card(d, /^Claude/);
-    expect(claude.hasAttribute("disabled")).toBe(true);
-    expect(claude.textContent).toContain("Só João troca");
-    // Another program, or the API, stays theirs to choose.
+    expect(claude.hasAttribute("disabled")).toBe(false);
+    expect(claude.textContent).toContain("Usa o plano do Claude de João");
+    expect(d.textContent).not.toContain("Só João troca");
     expect(card(d, /^ChatGPT/).hasAttribute("disabled")).toBe(false);
     expect(card(d, /^Chave de API/).hasAttribute("disabled")).toBe(false);
     expect(card(d, /^OpenCode Go/).textContent).toContain("Usa o plano do OpenCode Go de João");
@@ -1819,7 +1831,10 @@ describe("Quem pensa: Automático", () => {
     ]);
     await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
     await settle(2);
-    // A fixed model: the effort's four levels, none of them Automático, in the advanced settings.
+    // A fixed model: the effort's four levels, none of them Automático, in the advanced settings, whose row names
+    // what it holds.
+    const row = () => within(d).getByRole("button", { name: /^Configuração avançada/ }).textContent;
+    expect(row()).toContain("Esforço, janela de contexto e quem atende");
     let a = await advanced(d);
     const ramp = within(a).getByRole("slider", { name: "Esforço" });
     expect(ramp.getAttribute("aria-valuemax")).toBe("4");
@@ -1827,9 +1842,14 @@ describe("Quem pensa: Automático", () => {
     await done(a);
     await model(d, /^Automático/);
     expect(d.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
-    // The model picks the effort too: no ramp to set.
+    // The model picks the effort too: no ramp to set, and the place says so and how to set it.
+    expect(row()).toContain("Janela de contexto e quem atende");
+    expect(row()).not.toContain("Esforço");
     a = await advanced(d);
     expect(within(a).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    expect(a.textContent).toContain(
+      "EsforçoO modelo Automático escolhe o esforço de cada tarefa. Escolha um modelo para fixar o esforço.",
+    );
     await done(a);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
@@ -1874,8 +1894,9 @@ describe("Quem pensa: Automático", () => {
 
   test("a saved Automático reads as such in the cell", async () => {
     await onClaude({ model: "auto", effectiveModel: "auto", effort: "auto" });
-    // The only Claude account there is the computer's own: the plan's name, not the account's.
-    expect(brainCell()).toEqual({ value: "Automático · esforço automático", sub: "Claude" });
+    // The only Claude account there is the computer's own: the plan's name, not the account's. Automático picks the
+    // effort too, so no effort follows it.
+    expect(brainCell()).toEqual({ label: "Pensa com Claude", value: "Automático", sub: undefined });
   });
 
   test("the organization's model: Automático is the first choice, and Usar saves the agent's model as auto", async () => {
@@ -2007,6 +2028,44 @@ describe("Usar em outros agentes (ADR 0094)", () => {
     });
     expect(document.body.textContent).toContain("1 agente agora pensa com Opus pelo plano do Claude.");
     expect(screen().queryByRole("dialog", { name: "Quem pensa" })).toBeNull();
+    // No agent picked on someone else's plan: nothing asked.
+    expect(screen().queryByRole("dialog", { name: /^Usar o plano/ })).toBeNull();
+  });
+
+  test("an agent picked on someone else's plan: one question naming its owner first; Cancelar saves nothing, Continuar once", async () => {
+    const state = await withOthers();
+    state.setupResults = {
+      ...state.setupResults,
+      [ATLAS_ID]: { status: "applied", opensPlan: true },
+    };
+    const d = await brainDialog();
+    await click(card(d, /^Claude/));
+    await model(d, /^Opus/);
+    await click(within(d).getByRole("button", { name: /^Usar em outros agentes/ }));
+    const c = screen().getByRole("dialog", { name: "Usar em outros agentes" });
+    await click(within(c).getByRole("checkbox", { name: /^Atlas/ }));
+    const saves = () => copyCalls(state).filter((x) => !(x as { preview?: boolean }).preview);
+    await click(within(c).getByRole("button", { name: "Usar em 1 agente" }));
+    const q = screen().getByRole("dialog", { name: "Usar o plano de João?" });
+    expect(q.textContent).toContain(
+      "As conversas com Atlas vão usar o plano do Claude de João e os limites dele. João vai receber um email avisando.",
+    );
+    await click(within(q).getByRole("button", { name: "Cancelar" }));
+    await settle(4);
+    expect(screen().queryByRole("dialog", { name: /^Usar o plano/ })).toBeNull();
+    expect(brainCalls(state)).toEqual([]);
+    expect(saves()).toEqual([]);
+    await click(within(c).getByRole("button", { name: "Usar em 1 agente" }));
+    await click(
+      within(screen().getByRole("dialog", { name: "Usar o plano de João?" })).getByRole("button", {
+        name: "Continuar",
+      }),
+    );
+    await settle(6);
+    expect(brainCalls(state)).toHaveLength(1);
+    expect(saves()).toEqual([
+      { setup: expect.objectContaining({ brain: "claude_code", model: "opus" }), agentIds: [ATLAS_ID] },
+    ]);
   });
 
   test("the Autonomia goes too: said with the setup, each agent's change on its line, even where the AI can't", async () => {

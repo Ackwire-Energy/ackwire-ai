@@ -1,5 +1,5 @@
 import { keys, useAiAccounts, useSetShowActivity } from "@agenteschat/client";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { authErrorText, errorText } from "@agenteschat/client/lib/errors";
 import { browserTimezone, isTimeZone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
@@ -13,6 +13,7 @@ import {
   DialogBody,
   DialogFooter,
   Field,
+  Input,
   PlanMeter,
   ProviderLogo,
   Segmented,
@@ -23,6 +24,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import type { AuthResult } from "@/auth/client";
+import { useAuth } from "@/auth/context";
 import { PrefRow } from "@/components/NoticePrefs";
 import { OpenOnPhoneDialog } from "@/components/OpenOnPhone";
 import { useOrg } from "@/components/org-context";
@@ -60,7 +63,7 @@ export function AccountSection() {
   const theme = useTheme();
   const look = useSyncExternalStore(onMenuLookChange, menuLook, () => "ours" as const);
   const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);
-  const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
+  const [profile, setProfile] = useState<"name" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
   // Adding a password and deleting the account: their dialogs are the account button's, kept in the address so a
   // sign-in again comes back to them.
@@ -76,7 +79,7 @@ export function AccountSection() {
             lead={<MyFace className="settings-row__face" />}
             label={t("shell.profile")}
             help={t("shell.profileHint")}
-            onOpen={() => setProfile("handle")}
+            onOpen={() => setProfile("name")}
           />
           <PrefRow
             id="account-zone"
@@ -232,15 +235,23 @@ export function AccountSection() {
   );
 }
 
-/** "Perfil" and "Fuso horário": my photo, handle and time zone in this workspace. */
-export function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null; onClose: () => void }) {
+class NameRefused extends Error {
+  constructor(readonly result: Extract<AuthResult, { ok: false }>) {
+    super(result.code);
+  }
+}
+
+/** "Perfil" and "Fuso horário": my name (the account's, the same in every workspace), photo, handle and time zone here. */
+export function ProfileDialog({ focus, onClose }: { focus: "name" | "timezone" | null; onClose: () => void }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
+  const auth = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const dir = useDirectory(org.id);
   const mine = dir.memberById.get(me.user.id);
+  const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [zone, setZone] = useState("");
   const [useOrgZone, setUseOrgZone] = useState(false);
@@ -248,26 +259,34 @@ export function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone"
   const [photo, setPhoto] = useState(false);
   useEffect(() => {
     if (!focus) return;
+    setName(me.user.name);
     setHandle(mine?.handle ?? "");
     setZone(mine?.timezone || browserTimezone() || "UTC");
     setUseOrgZone(false);
     setError(null);
-  }, [focus, mine]);
+  }, [focus, mine, me.user.name]);
   const zoneOk = useOrgZone || isTimeZone(zone.trim());
+  const nameOk = name.trim() !== "";
   const save = useMutation({
-    mutationFn: () =>
-      api.orgs.updateMe(org.id, {
+    mutationFn: async () => {
+      if (name.trim() !== me.user.name) {
+        const result = await auth.updateName(name.trim());
+        if (!result.ok) throw new NameRefused(result);
+      }
+      await api.orgs.updateMe(org.id, {
         handle: handle.trim() || undefined,
         timezone: useOrgZone ? null : zone.trim(),
-      }),
+      });
+    },
     meta: { silent: true },
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: keys.members(org.id) });
       void qc.invalidateQueries({ queryKey: keys.people(org.id) });
       toast.show(t("shell.profileSaved"));
       onClose();
     },
-    onError: (e) => setError(errorText(t, e)),
+    onError: (e) => setError(e instanceof NameRefused ? authErrorText(t, e.result) : errorText(t, e)),
   });
   return (
     <Dialog
@@ -281,7 +300,7 @@ export function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone"
         style={{ display: "contents" }}
         onSubmit={(e) => {
           e.preventDefault();
-          if (zoneOk) save.mutate();
+          if (zoneOk && nameOk && !save.isPending) save.mutate();
         }}
       >
         <DialogBody>
@@ -292,13 +311,16 @@ export function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone"
               {t("photo.change")}
             </Button>
           </div>
-          <Field label={t("shell.handle")} id="me-handle">
-            <AffixInput
-              prefix="@"
-              value={handle}
-              onChange={(e) => setHandle(e.target.value)}
-              autoFocus={focus === "handle"}
+          <Field label={t("auth.yourName")} id="me-name" error={nameOk ? undefined : t("shell.nameEmpty")}>
+            <Input
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus={focus === "name"}
             />
+          </Field>
+          <Field label={t("shell.handle")} id="me-handle">
+            <AffixInput prefix="@" value={handle} onChange={(e) => setHandle(e.target.value)} />
           </Field>
           <Field
             label={t("shell.timezone")}
@@ -318,7 +340,12 @@ export function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone"
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={!zoneOk || save.isPending} loading={save.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!zoneOk || !nameOk || save.isPending}
+            loading={save.isPending}
+          >
             {t("common.save")}
           </Button>
         </DialogFooter>

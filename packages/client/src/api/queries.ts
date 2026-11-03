@@ -34,16 +34,20 @@ import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
+import { threadStartOf } from "../lib/threads";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
+import { voiceOf } from "../lib/voice";
 import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
 import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
+import { ApiError } from "./http";
 import { keys } from "./keys";
 import { keepSending, outbox } from "./outbox";
 import type {
   AgentAction,
+  AgentAudience,
   AgentComputer,
   AgentDatabase,
   AgentDatabaseInput,
@@ -68,6 +72,7 @@ import type {
   CalendarEventPatch,
   Channel,
   ChannelInput,
+  ChannelOverride,
   ComputerSetup,
   DatabaseActionName,
   DatabaseConnectionInput,
@@ -75,6 +80,7 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  ForeignMailbox,
   ForumParticipantsInput,
   ForumPostInput,
   ForumSuggestedIssue,
@@ -129,6 +135,7 @@ import type {
   SidebarSection,
   SkillInput,
   SkillPatch,
+  SkillSettings,
   SpeechKey,
   SpeechKeyInput,
   StartChoice,
@@ -138,6 +145,7 @@ import type {
   ThreadCreateInput,
   ThreadFilters,
   ThreadInfo,
+  ThreadPage,
   ThreadPatch,
   ToolDecision,
   UnreadEvent,
@@ -672,18 +680,64 @@ export function useDenyAgentProposal(orgId: string) {
   });
 }
 
+function agentChanged(qc: QueryClient, orgId: string, agentId: string) {
+  void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, agentId) });
+  void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
+}
+
 export function useUpdateAgent(orgId: string, agentId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Partial<AgentInput>) => api.agents.update(orgId, agentId, input),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, agentId) });
-      void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
+    onSuccess: () => agentChanged(qc, orgId, agentId),
+  });
+}
+
+/**
+ * Lets more people talk to the agent. `ask` gets the mailboxes saving `audience` would take from it (only a mailbox's
+ * owner gives an agent access to it), maybe none, and nothing is saved without its yes: it asks when they are some or
+ * the agent is on someone else's plan (`widenQuestion`). The save sends what was agreed: a mailbox given meanwhile
+ * makes the server refuse it, and `ask` gets the new list.
+ */
+export function useWidenAudience(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const save = useMutation({
+    mutationFn: async ({
+      audience,
+      ask,
+    }: {
+      audience: AgentAudience;
+      ask: (m: ForeignMailbox[]) => Promise<boolean>;
+    }) => {
+      for (let tries = 1; ; tries++) {
+        const mailboxes = await api.agents.mailLoss(orgId, agentId, audience).catch((e: unknown) => {
+          // An older server without the check: nothing to ask, as before it.
+          if (e instanceof ApiError && e.status === 404) return null;
+          throw e;
+        });
+        if (!(await ask(mailboxes ?? []))) return null;
+        const mailLossSeen = mailboxes?.map((m) => m.accountId);
+        try {
+          return await api.agents.update(orgId, agentId, { audience, ...(mailLossSeen ? { mailLossSeen } : {}) });
+        } catch (e) {
+          if (!(e instanceof ApiError && e.code === "agent.mail_loss_changed") || tries >= 3) throw e;
+        }
+      }
+    },
+    onSuccess: (saved) => {
+      if (saved) agentChanged(qc, orgId, agentId);
     },
   });
+  const widen = (
+    audience: AgentAudience,
+    ask: (mailboxes: ForeignMailbox[]) => Promise<boolean>,
+    onSaved?: () => void,
+  ) => save.mutate({ audience, ask }, { onSuccess: (saved) => saved && onSaved?.() });
+  return { widen, busy: save.isPending, done: save.isSuccess && save.data !== null };
 }
 
 export function useAddCredential(orgId: string) {
@@ -949,8 +1003,8 @@ export function useAddChannelMember(orgId: string) {
 }
 
 /**
- * Puts a message in the right cache: the channel list, or its thread.
- * Replaces the optimistic copy (same `clientId`), which always waits in the
+ * Puts a message in the right cache: the channel list, or its thread (a thread's list starts with its root
+ * when a channel list here has it). Replaces the optimistic copy (same `clientId`), which always waits in the
  * channel list (a thread may not be loaded yet): a reply's copy is removed
  * from there too, or it would stay "sending…" next to the real one.
  */
@@ -960,7 +1014,21 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
   const withoutLocal = (list: Message[] | undefined) =>
     message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
   if (message.threadId && message.clientId) qc.setQueryData<Message[]>(channelKey, withoutLocal);
-  qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list), message));
+  // A thread's first list holds its root, as the server lists it: a panel opened on it shows the root.
+  const started = !message.threadId || qc.getQueryData(key) !== undefined;
+  const root = message.threadId ? cachedTopLevel(qc, orgId, message.threadId, message.channelId) : undefined;
+  qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list) ?? (root && [root]), message));
+  // Its root in no list here (an older thread): the reply alone must not pass for the whole thread.
+  if (!started && !root) void qc.invalidateQueries({ queryKey: key, exact: true, refetchType: "none" });
+}
+
+/**
+ * A new top-level message may get agent replies in its thread: its thread's list starts now, with the message as
+ * its root (what the server lists first), so a thread opened on it before any reply still shows it.
+ */
+export function startThreadCache(qc: ReturnType<typeof useQueryClient>, orgId: string, message: Message) {
+  if (message.threadId) return;
+  qc.setQueryData<Message[]>(keys.thread(orgId, message.channelId, message.id), (list) => list ?? [message]);
 }
 
 /**
@@ -2297,6 +2365,47 @@ export const useRoster = (orgId: string, channelId: string, enabled = true) => {
   });
 };
 
+/** A channel's exceptions (ADR 0134), for who manages it. */
+export const useChannelPermissions = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.channelPermissions(orgId, channelId),
+    queryFn: () => api.chat.permissions(orgId, channelId),
+    enabled,
+  });
+};
+
+/**
+ * Sets one exception of a channel, at once on screen (the three-state control keeps its focus under the arrow keys),
+ * one save at a time in order; then its list and everyone's channel list (`can`) refetch.
+ */
+export function useSetChannelPermission(orgId: string, channelId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.channelPermissions(orgId, channelId);
+  return useMutation({
+    scope: { id: `channel-permissions:${channelId}` },
+    mutationFn: (override: ChannelOverride) => api.chat.setPermission(orgId, channelId, override),
+    onMutate: async (override) => {
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<ChannelOverride[]>(key);
+      const rest = (before ?? []).filter(
+        (o) => o.target.type !== override.target.type || o.target.id !== override.target.id,
+      );
+      const empty = override.allow.length === 0 && override.deny.length === 0;
+      qc.setQueryData<ChannelOverride[]>(key, empty ? rest : [...rest, override]);
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(key, ctx.before);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: key });
+      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+    },
+  });
+}
+
 export function useUpdateChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -3305,6 +3414,17 @@ export const useSkills = (orgId: string, enabled = true) => {
   return useQuery({ queryKey: keys.skills(orgId), queryFn: () => api.skills.list(orgId), enabled, retry: false });
 };
 
+/** "Agentes melhoram as skills sozinhos" for the workspace; on when the server doesn't say (older servers). */
+export const useSkillSettings = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.skillSettings(orgId),
+    queryFn: () => api.skills.settings?.(orgId) ?? Promise.resolve({ agentsImprove: true }),
+    enabled,
+    retry: false,
+  });
+};
+
 export const useSkill = (orgId: string, id: string | null) => {
   const api = useApi();
   return useQuery({
@@ -3374,6 +3494,8 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         | { type: "remove"; id: string }
         | { type: "revert"; id: string }
         | { type: "restore"; id: string }
+        | { type: "updateFromSource" | "approveUpdate" | "dismissUpdate" | "undoUpdate"; id: string }
+        | { type: "settings"; settings: SkillSettings }
         | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
     ): Promise<unknown> => {
       switch (action.type) {
@@ -3395,6 +3517,13 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
           return api.skills.revert?.(orgId, action.id) ?? Promise.resolve();
         case "restore":
           return api.skills.restore?.(orgId, action.id) ?? Promise.resolve();
+        case "updateFromSource":
+        case "approveUpdate":
+        case "dismissUpdate":
+        case "undoUpdate":
+          return api.skills[action.type]?.(orgId, action.id) ?? Promise.resolve();
+        case "settings":
+          return api.skills.saveSettings?.(orgId, action.settings) ?? Promise.resolve();
       }
     },
     // The library and every agent's lists (`keys.skills` is their prefix).
@@ -3985,20 +4114,93 @@ export function useChannelThreads(orgId: string, channelId: string, tab: "all" |
   return useQuery({ ...channelThreadsQuery(api, orgId, channelId, tab), enabled });
 }
 
+/** A top-level message some channel's cache already holds (its first page or the older ones). */
+function cachedTopLevel(qc: QueryClient, orgId: string, id: string, channelId?: string): Message | undefined {
+  const lists = qc.getQueriesData<Message[] | { pages: Message[] }>({
+    queryKey: ["org", orgId],
+    predicate: (q) =>
+      (q.queryKey[2] === "channel" && q.queryKey[4] === "messages" && (!channelId || q.queryKey[3] === channelId)) ||
+      (q.queryKey[2] === "older-pages" && (!channelId || q.queryKey[3] === channelId)),
+  });
+  for (const [, data] of lists) {
+    const found = (Array.isArray(data) ? data : data?.pages)?.find((m) => m.id === id && !m.threadId && !m.local);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * A thread as the caches already know it, shown while its own read is on its way: its row in a channel's thread
+ * list or, not a thread yet, its root message as the server makes one from it. None for a range's root (its context
+ * comes from the server) or a conversation not in the lists.
+ */
+export function cachedThreadInfo(qc: QueryClient, orgId: string, threadId: string): ThreadInfo | undefined {
+  for (const [, page] of qc.getQueriesData<ThreadPage>({ queryKey: ["org", orgId, "threads", "channel"] })) {
+    const found = page?.threads.find((x) => x.id === threadId);
+    if (found) return found;
+  }
+  const root = cachedTopLevel(qc, orgId, threadId);
+  if (!root || threadStartOf(root.meta)) return undefined;
+  const channel = qc.getQueryData<Channel[]>(keys.channels(orgId))?.find((c) => c.id === root.channelId);
+  const dm = channel
+    ? undefined
+    : qc.getQueryData<DirectMessage[]>(keys.dms(orgId))?.find((d) => d.channelId === root.channelId);
+  if (!channel && !dm) return undefined;
+  const author = { type: root.author.type, id: root.author.id ?? null } as ThreadInfo["rootAuthor"];
+  return {
+    id: root.id,
+    channelId: root.channelId,
+    channelName: channel?.name ?? "",
+    channelKind: channel ? "channel" : "dm",
+    title: null,
+    rootText: voiceOf(root.meta) ? "" : root.body.replace(/\s+/g, " ").trim(),
+    rootAuthor: author,
+    state: "open",
+    createdBy: null,
+    closedBy: null,
+    closedAt: null,
+    archivedBy: null,
+    archivedAt: null,
+    context: null,
+    replyCount: 0,
+    lastActivityAt: root.createdAt,
+    lastMessage: null,
+    participants: [author],
+    working: false,
+    needsYou: false,
+    openedByReplyAt: null,
+    suggestedResolved: false,
+    canManage: false,
+    unread: 0,
+    mission: null,
+    createdAt: root.createdAt,
+  };
+}
+
 export function useThreadInfo(orgId: string, threadId: string | null | undefined) {
   const api = useApi();
+  const qc = useQueryClient();
   return useQuery({
     queryKey: keys.threadInfo(orgId, threadId ?? ""),
     queryFn: () => api.threads.get(orgId, threadId ?? ""),
     enabled: Boolean(threadId),
     staleTime: 15_000,
+    placeholderData: () => (threadId ? cachedThreadInfo(qc, orgId, threadId) : undefined),
   });
 }
 
-/** A thread's root and replies (the same cache the channel uses for agent replies). */
+/**
+ * A thread's root and replies (the same cache the channel uses for agent replies). Until they are read, the root
+ * the channel already holds stands in (`isPlaceholderData`): only the replies are still unknown.
+ */
 export function useThreadMessages(orgId: string, channelId: string | undefined, rootId: string) {
   const api = useApi();
+  const qc = useQueryClient();
   return useQuery({
+    placeholderData: () => {
+      const root = channelId ? cachedTopLevel(qc, orgId, rootId, channelId) : undefined;
+      return root ? [root] : undefined;
+    },
     queryKey: keys.thread(orgId, channelId ?? "", rootId),
     queryFn: async ({ client, queryKey }) => {
       const start = client.getQueryData<Message[]>(queryKey);

@@ -211,6 +211,8 @@ const errorText = (e: unknown) =>
 export class OpencodeEventMapper {
   session?: string;
   streamed = "";
+  /** The text after the turn's last tool call: its answer (what came before was narration). */
+  answer = "";
   failed?: string;
   private worked = false;
   private tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, steps: 0 };
@@ -242,9 +244,11 @@ export class OpencodeEventMapper {
         // Each text part is a whole paragraph of its own (before and after tools).
         const delta = this.streamed && !this.streamed.endsWith("\n") ? `\n\n${said}` : said;
         this.streamed += delta;
+        this.answer = this.answer ? `${this.answer}\n\n${said}` : said;
         return [{ type: "text_delta", text: delta }];
       }
       case "tool_use": {
+        this.answer = "";
         const state = isRecord(part.state) ? part.state : {};
         if (state.status !== "completed" && state.status !== "error") return [];
         this.worked = true;
@@ -303,7 +307,7 @@ export class OpencodeEventMapper {
         ? undefined
         : `OpenCode exited with code ${input.exitCode ?? "?"}${input.stderr ? `: ${this.clean(input.stderr)}` : ""}`);
     if (problem) return [...usage, ...opencodeProblem(problem, this.worked)];
-    return [...usage, { type: "done", text: this.streamed, session: { id: input.sessionId } }];
+    return [...usage, { type: "done", text: this.answer || this.streamed, session: { id: input.sessionId } }];
   }
 }
 

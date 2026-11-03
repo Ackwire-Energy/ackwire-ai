@@ -35,6 +35,7 @@ test("people upload files as is: download with the real name and type, versions,
     title: "Relatório",
     untrusted: true,
     canEdit: true,
+    versioned: true,
     content: { kind: "file", name: "relatório.pdf", contentType: "application/pdf", size: PDF.byteLength },
   });
 
@@ -112,4 +113,22 @@ test("uploads: a file is required, other origins are refused, multipart only whe
   expect(((await big.json()) as { error: { code: string } }).error.code).toBe("artifact.file_too_large");
   const list = (await (await owner(`${base}/artifacts`)).json()) as { artifacts: unknown[] };
   expect(list.artifacts).toEqual([]);
+});
+
+test("a picture is a snapshot: no versions, so a new one is refused in words the app shows", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const base = `/api/app/organizations/${orgId}`;
+  const shot = await upload(owner, `${base}/artifacts/files`, {
+    file: new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "tela.png", { type: "image/png" }),
+    title: "Tela",
+  });
+  const shotView = (await shot.json()) as { id: string; versioned: boolean };
+  expect(shotView.versioned).toBe(false);
+  const shotV2 = await upload(owner, `${base}/artifacts/${shotView.id}/files`, {
+    file: new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0])], "tela.png", { type: "image/png" }),
+  });
+  expect(shotV2.status).toBe(400);
+  expect(((await shotV2.json()) as { error: { code: string } }).error.code).toBe("artifact.not_versioned");
 });

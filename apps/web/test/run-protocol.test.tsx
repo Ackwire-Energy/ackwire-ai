@@ -38,9 +38,10 @@ describe("narration keyed by turn", () => {
     expect(s.runs.r?.text).toBe("Pronto.");
   });
 
-  test("a delta of a new turn turns the previous text into narration", () => {
-    const s = run([delta(0, 0, "Primeiro olho os logs."), delta(1, 1, "Achei.")]);
-    expect(narrationOf(s.runs.r ?? {})).toEqual(["Primeiro olho os logs."]);
+  // ADR 0097, 2026-11-03 addendum item 6: text still in the body when the next model call starts is a held reply.
+  test("a delta of a new turn replaces a held reply, it never becomes narration", () => {
+    const s = run([delta(0, 0, "Não consigo, precisa do seu QR code."), delta(1, 1, "Achei.")]);
+    expect(narrationOf(s.runs.r ?? {})).toEqual([]);
     expect(s.runs.r?.text).toBe("Achei.");
   });
 

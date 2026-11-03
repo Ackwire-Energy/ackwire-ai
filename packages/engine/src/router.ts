@@ -812,7 +812,7 @@ export async function routeMessage(
         // Never the agent that wrote it.
         byAgent && message.authorAgentId ? ne(agents.id, message.authorAgentId) : undefined,
         // Never an agent this person can't talk to: not as a pick, not as "the last agent" of a follow-up.
-        audienceSql("agents", sql`${personId}::text`),
+        audienceSql("agents", sql`${personId}::text`, { channelId: sql`${message.channelId}::uuid` }),
       ),
     )
     // Oldest first: the last tie-break of a default pick.

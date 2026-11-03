@@ -49,10 +49,10 @@ export function LoadingLine({ width = 180 }: { width?: number | string }) {
   );
 }
 
-/** A conversation loading: messages shaped like the real ones. */
-export function LoadingConversation() {
+/** A conversation loading: messages shaped like the real ones (`count`: a thread's replies still on their way). */
+export function LoadingConversation({ count }: { count?: number }) {
   const { t } = useTranslation();
-  return <SkeletonConversation label={t("common.loadingMessages")} />;
+  return <SkeletonConversation label={t("common.loadingMessages")} count={count} />;
 }
 
 /** Cards (Issues board, Drive, Calendário). */

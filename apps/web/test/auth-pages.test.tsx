@@ -420,6 +420,34 @@ describe("Criar conta (e-mail novo)", () => {
     }
   });
 
+  test("a password typed as the name: a soft hint there, and the same password back on the name, no account", async () => {
+    const { api } = authApi(NEW);
+    const { auth, calls } = createFakeAuth();
+    await renderApp("/signup", { api, auth });
+    await type("E-mail", "walter@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    await type("Seu nome", "Ana 2");
+    expect(screen().queryByText("Isso parece uma senha. Aqui vai o seu nome.")).toBeNull();
+    await type("Seu nome", "Fake#Pass1");
+    expect(screen().getByText("Isso parece uma senha. Aqui vai o seu nome.")).toBeTruthy();
+    // Only a hint: Continuar still goes on.
+    await press(/^Continuar(?! com)/, 2);
+    await type("Crie uma senha", "Fake#Pass1");
+    await press(/Criar conta/);
+    expect(calls.some((c) => c.method === "signUp")).toBe(false);
+    expect(heading()).toBe("Prazer. Esse e-mail é novo por aqui.");
+    expect(screen().getByRole("alert").textContent).toBe("Esse é o seu nome? É igual à senha que você digitou.");
+    await type("Seu nome", "Walter Souza");
+    await press(/^Continuar(?! com)/, 2);
+    // The password went with the mistake: a new one is typed.
+    expect(screen().getByLabelText<HTMLInputElement>("Crie uma senha").value).toBe("");
+    await type("Crie uma senha", "Fake#Pass1");
+    await press(/Criar conta/);
+    expect(calls.filter((c) => c.method === "signUp").map((c) => c.args[0])).toEqual([
+      { name: "Walter Souza", email: "walter@acme.com.br", password: "Fake#Pass1" },
+    ]);
+  });
+
   test("sign-up closed for that e-mail: says so and offers another e-mail", async () => {
     const { api } = authApi({ ...NEW, canSignUp: false });
     await renderApp("/login", { api, auth: createFakeAuth().auth });
@@ -760,6 +788,19 @@ describe("Aceitar convite", () => {
       ["inv", proof],
     ]);
     expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
+  });
+
+  test("a new address whose password is the name typed: back on the name, no account", async () => {
+    const { auth, calls } = createFakeAuth();
+    await openInvite({}, { auth: () => auth });
+    await type("Seu nome", "Fake#Pass1");
+    expect(screen().getByText("Isso parece uma senha. Aqui vai o seu nome.")).toBeTruthy();
+    await press(/^Continuar(?! com)/, 2);
+    await type("Crie uma senha", "Fake#Pass1");
+    await press("Entrar na Acme", 10);
+    expect(calls.some((c) => c.method === "signUp")).toBe(false);
+    expect(heading()).toBe("Oi. Ana chamou você para a Acme.");
+    expect(screen().getByRole("alert").textContent).toBe("Esse é o seu nome? É igual à senha que você digitou.");
   });
 
   test("an account with a password: only its password, Esqueci a senha in place, its provider too; then in", async () => {

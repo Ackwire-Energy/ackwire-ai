@@ -211,6 +211,31 @@ describe("agents, runs and usage", () => {
       { channelId: eng[0]?.id ?? "", autoReply: false },
     ]);
     expect(channels).toEqual([{ id: eng[0]?.id ?? "", name: "eng", autoReply: false }]);
+    // From its page, as from the channel: each channel's members column hears who came, went or changed.
+    const engId = eng[0]?.id ?? "";
+    const inEng = f.listen(engId);
+    const inGeneral = f.listen(f.general.id);
+    const pub = { pubsub: f.pubsub };
+    await setAgentChannels(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      f.agent.id,
+      [{ channelId: engId, autoReply: true }, { channelId: f.general.id }],
+      pub,
+    );
+    await setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [], pub);
+    await Bun.sleep(5);
+    const seen = (list: { type: string }[]) =>
+      list.map((e) => [e.type, (e as unknown as { member: { type: string; id: string; autoReply?: boolean } }).member]);
+    expect(seen(inEng)).toEqual([
+      ["channel.member_updated", { type: "agent", id: f.agent.id, autoReply: true }],
+      ["channel.member_removed", { type: "agent", id: f.agent.id }],
+    ]);
+    expect(seen(inGeneral)).toEqual([
+      ["channel.member_added", { type: "agent", id: f.agent.id, autoReply: true }],
+      ["channel.member_removed", { type: "agent", id: f.agent.id }],
+    ]);
     await expect(
       setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [{ channelId: crypto.randomUUID() }]),
     ).rejects.toBeInstanceOf(ValidationError);

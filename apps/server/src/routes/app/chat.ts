@@ -103,6 +103,7 @@ export function chatRoutes(deps: AppDeps) {
             unreadCount: r.unreadCount,
             mentionCount: r.mentionCount,
             muted: r.muted,
+            can: r.can,
             lastMessage: r.lastMessage ? { ...r.lastMessage, createdAt: r.lastMessage.createdAt.toISOString() } : null,
           })),
         },
@@ -225,7 +226,7 @@ export function chatRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
-      await joinChannel(db, c.get("user").id, orgId, channelId);
+      await joinChannel(db, c.get("user").id, orgId, channelId, { pubsub: adapters.pubsub });
       return c.body(null, 204);
     },
   );

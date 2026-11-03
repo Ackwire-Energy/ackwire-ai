@@ -179,7 +179,16 @@ interface Created {
  * proposal card, ADR 0081) it opens filled in with the draft, on its last step, while the proposal is open. With
  * `onClose` it is the card's review, in a dialog over the conversation: creating, saying no or leaving closes it.
  */
-export function NewAgentPage({ proposalId = null, onClose }: { proposalId?: string | null; onClose?: () => void }) {
+export function NewAgentPage({
+  proposalId = null,
+  channelId = null,
+  onClose,
+}: {
+  proposalId?: string | null;
+  /** A channel's "Criar agente" (its Adicionar dialog): the agent starts in that channel. */
+  channelId?: string | null;
+  onClose?: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const proposal = useAgentProposal(org.id, proposalId);
@@ -233,10 +242,22 @@ export function NewAgentPage({ proposalId = null, onClose }: { proposalId?: stri
       </main>
     );
   }
-  return from ? <NewAgentFlow key={from.messageId} from={from} onClose={onClose} /> : <NewAgentFlow />;
+  return from ? (
+    <NewAgentFlow key={from.messageId} from={from} onClose={onClose} />
+  ) : (
+    <NewAgentFlow channelId={channelId} />
+  );
 }
 
-function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () => void }) {
+function NewAgentFlow({
+  from,
+  channelId = null,
+  onClose,
+}: {
+  from?: AgentProposal;
+  channelId?: string | null;
+  onClose?: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org, me } = useOrg();
@@ -305,7 +326,9 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   // The routine a proposal came with: made once the agent is where it reports.
   const [withRoutine, setWithRoutine] = useState(Boolean(draft?.routine));
   const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
-  const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds));
+  // The channel it was asked for stays picked whatever role is chosen (the roles' presets add theirs).
+  const asked = channelId ? [channelId] : [];
+  const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds ?? asked));
   const [owner, setOwner] = useState(me.user.id);
   const [audience, setAudience] = useState<AgentAudience>({ mode: "everyone", userIds: [] });
   // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
@@ -701,7 +724,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     setInstructions("");
     setLevels(presetLevels("custom", connectedList));
     setSkillIds(library.data ? new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)) : null);
-    setChannelIds(new Set());
+    setChannelIds(new Set(asked));
     setOwner(me.user.id);
     setAudience({ mode: "everyone", userIds: [] });
     startWith(startOf(me.user.id));
@@ -766,7 +789,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     setLook({ ...preset.look });
     setInstructions(t(`newAgent.roles.${id}.instructions`));
     if (managesAgents) setLevels(presetLevels(id, connectedList));
-    setChannelIds(new Set(presetChannels(id, myChannels)));
+    setChannelIds(new Set([...asked, ...presetChannels(id, myChannels)]));
     startWith(startOf(ownerId));
     setAiPicked(false);
   };

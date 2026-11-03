@@ -236,8 +236,8 @@ describe("agent page: the budget on the overview", () => {
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet" };
     await go("", state);
     const work = screen().getByRole("region", { name: "Como trabalha" });
-    // The model, over the plan that pays for it.
-    expect(work.textContent).toContain("Pensa comSonnetClaude");
+    // The plan that pays for it in the label, the model under it.
+    expect(work.textContent).toContain("Pensa com ClaudeSonnet");
     // A member doesn't see where it works or its browser.
     expect(work.textContent).not.toContain("Trabalha");
   });

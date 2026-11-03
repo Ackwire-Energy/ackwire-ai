@@ -47,6 +47,14 @@ const go = async (state = seedState()) => {
     await signOut();
     state.me = null;
   };
+  // As the server: the account's name is its member's name in every workspace.
+  const updateName = fake.auth.updateName;
+  fake.auth.updateName = async (name) => {
+    const result = await updateName(name);
+    if (state.me) state.me.user.name = name;
+    for (const m of state.members) if (m.userId === state.me?.user.id) m.name = name;
+    return result;
+  };
   const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state), auth: fake.auth });
   await settle(6);
   return { ...r, state, authCalls: fake.calls };
@@ -111,13 +119,14 @@ describe("the account menu", () => {
     await go();
     const status = await openStatus();
     const radios = within(status).getAllByRole("menuitemradio");
-    expect(names(radios)).toEqual(["Online", "Ausente", "Ocupado", "Oculto"]);
-    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false"]);
+    expect(names(radios)).toEqual(["Online", "Ausente", "Ocupado", "Fora do escritório", "Oculto"]);
+    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false", "false"]);
     // Each choice with its badge, drawn as on my face.
     expect(radios.map((r) => r.querySelector(".ac-presence")?.getAttribute("data-presence"))).toEqual([
       "online",
       "away",
       "busy",
+      "out",
       "hidden",
     ]);
     expect(within(status).getByRole("menuitem", { name: "O que você está fazendo?" })).toBeTruthy();
@@ -163,11 +172,43 @@ describe("the account menu", () => {
     const row = account();
     await click(within(await openMenu()).getByRole("menuitem", { name: "Editar perfil" }));
     const dialog = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
-    expect(document.activeElement).toBe(within(dialog).getByLabelText("Seu @"));
+    expect(document.activeElement).toBe(within(dialog).getByLabelText("Seu nome"));
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
     await click(within(dialog).getByRole("button", { name: "Cancelar" }));
     expect(screen().queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(row);
+  });
+
+  test("my name is in my profile: one Salvar saves it, and the directory shows it at once", async () => {
+    const state = seedState();
+    const { authCalls } = await go(state);
+    const me = state.me;
+    await click(within(await openMenu()).getByRole("menuitem", { name: "Editar perfil" }));
+    const dialog = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
+    const name = within(dialog).getByLabelText<HTMLInputElement>("Seu nome");
+    expect(name.value).toBe(me?.user.name ?? "");
+    await act(async () => fireEvent.change(name, { target: { value: "  Walter Lima " } }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(authCalls.filter((c) => c.method === "updateName")).toEqual([
+      { method: "updateName", args: ["Walter Lima"] },
+    ]);
+    expect(state.calls.filter((c) => c.method === "orgs.updateMe")).toHaveLength(1);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(account().getAttribute("aria-label")).toContain("Walter Lima");
+  });
+
+  test("an empty name can't be saved", async () => {
+    const { authCalls, state } = await go();
+    await click(within(await openMenu()).getByRole("menuitem", { name: "Editar perfil" }));
+    const dialog = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
+    await act(async () => fireEvent.change(within(dialog).getByLabelText("Seu nome"), { target: { value: "   " } }));
+    expect(within(dialog).getByText("Escreva seu nome.")).toBeTruthy();
+    const save = within(dialog).getByRole<HTMLButtonElement>("button", { name: "Salvar" });
+    expect(save.disabled).toBe(true);
+    await act(async () => fireEvent.submit(save.closest("form") as HTMLFormElement));
+    await settle(2);
+    expect(authCalls.some((c) => c.method === "updateName")).toBe(false);
+    expect(state.calls.some((c) => c.method === "orgs.updateMe")).toBe(false);
   });
 
   test("Configurações opens Sua conta in the settings", async () => {
@@ -192,7 +233,13 @@ describe("the account menu", () => {
     await click(screen().getAllByRole("button", { name: "Abrir menu" })[0] as HTMLElement);
     const menu = await openMenu();
     expect(within(menu).queryByRole("menuitem", { name: "Definir status" })).toBeNull();
-    expect(names(within(menu).getAllByRole("menuitemradio"))).toEqual(["Online", "Ausente", "Ocupado", "Oculto"]);
+    expect(names(within(menu).getAllByRole("menuitemradio"))).toEqual([
+      "Online",
+      "Ausente",
+      "Ocupado",
+      "Fora do escritório",
+      "Oculto",
+    ]);
     expect(names(within(menu).getAllByRole("menuitem"))).toEqual([
       "O que você está fazendo?",
       "Editar perfil",

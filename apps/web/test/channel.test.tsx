@@ -535,6 +535,9 @@ describe("Canal", () => {
     );
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
+    // Who manages it lands on Visão geral (ADR 0134): its people and agents are under Membros.
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Membros" })));
+    await settle(2);
     expect(dialog.textContent).toContain("Agentes");
     expect(dialog.textContent).toContain("Pessoas");
     expect(dialog.textContent).toContain("João");

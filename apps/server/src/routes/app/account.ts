@@ -3,6 +3,7 @@ import {
   accountDeletionPlan,
   addHostComputer,
   announceMembers,
+  announceProfile,
   appleSignInTokens,
   avatarFile,
   CODE_LENGTH,
@@ -25,7 +26,7 @@ import {
   listInvitations,
   listMembers,
   listMemberships,
-  myLocale,
+  myAccount,
   NotFoundError,
   needsWorkspaceAllowance,
   noticeInvitationAccepted,
@@ -479,13 +480,13 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const user = c.get("user");
-      const [memberships, password, verified, creates, unfinished, language] = await Promise.all([
+      const [memberships, password, verified, creates, unfinished, account] = await Promise.all([
         listMemberships(db, user.id),
         hasPassword(db, user.id),
         isEmailVerified(db, user.id),
         canCreateWorkspace(db, user.id, workspacePolicy(config)),
         unfinishedWorkspaces(db, user.id),
-        myLocale(db, user.id),
+        myAccount(db, user.id),
       ]);
       // A deleted account's session lives on in a cached cookie for minutes: its other tabs and devices learn it here.
       if (verified === null) {
@@ -502,13 +503,13 @@ export function accountRoutes(deps: AppDeps) {
         {
           user: {
             id: user.id,
-            name: user.name,
+            name: account.name ?? user.name,
             email: user.email,
-            image: user.image ?? null,
+            image: account.image,
             hasPassword: password,
             emailVerified: verified,
-            locale: language.locale,
-            localeAuto: language.localeAuto,
+            locale: account.locale,
+            localeAuto: account.localeAuto,
             canCreateWorkspace: creates,
           },
           organizations: memberships.map((m) => {
@@ -812,7 +813,9 @@ export function accountRoutes(deps: AppDeps) {
       await requirePermission(db, user.id, c.req.valid("param").orgId, "read");
       const limit = await deps.adapters.rateLimiter.consume(`avatar:${user.id}`, { limit: 10, windowMs: 3600_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many photo changes. Try again later.");
-      return c.json(await setAvatar({ db, blobs: deps.adapters.platformBlobs }, user.id, c.req.valid("json")), 200);
+      const avatar = await setAvatar({ db, blobs: deps.adapters.platformBlobs }, user.id, c.req.valid("json"));
+      await announceProfile(db, deps.adapters.pubsub, user.id);
+      return c.json(avatar, 200);
     },
   );
 
@@ -829,6 +832,7 @@ export function accountRoutes(deps: AppDeps) {
     async (c) => {
       await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
       await removeAvatar({ db, blobs: deps.adapters.platformBlobs }, c.get("user").id);
+      await announceProfile(db, deps.adapters.pubsub, c.get("user").id);
       return c.body(null, 204);
     },
   );

@@ -197,10 +197,14 @@ function pushWords(t: TFunction, target: string) {
   return t("approval.always.pushTo", { repo: target.slice(0, at), branch: target.slice(at + 1) });
 }
 
+/** A command rule's tool (no connection, its action the command's kind); mirrors engine `approval-rules.ts` `COMMAND_RULE_TOOL`. */
+export const COMMAND_RULE_TOOL = "command";
+
 /** What "Aprovar sempre" covers on a card, in words: each action the tool runs, else the tool itself. */
 export function approveAlwaysWords(t: TFunction, approval: Pick<Approval, "approveAlways">) {
   const kind = approval.approveAlways;
   if (!kind) return "";
+  if (kind.tool === COMMAND_RULE_TOOL) return kind.actions.join(", ");
   if (kind.tool === BRANCH_PUSH) return kind.actions.map((target) => pushWords(t, target)).join(", ");
   const tool = toolName(t, partsOf(kind.tool), kind.tool);
   if (sqlReadsTarget(kind.actions[0]) !== null) return tool;
@@ -224,18 +228,28 @@ export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approv
         : "approval.always.noteReadsAll"
       : approval.approveAlways?.tool === BRANCH_PUSH
         ? "approval.always.noteTarget"
-        : "approval.always.note";
+        : approval.approveAlways?.tool === COMMAND_RULE_TOOL
+          ? "approval.always.noteCommand"
+          : "approval.always.note";
   return t(key, { ...agentGrammar(agentName), actions: approveAlwaysWords(t, approval), target: target ?? "" });
 }
 
+/** Where a rule applies, for its list: the connection's name, or the agent's computer for a command. */
+export const approvalRuleServer = (t: TFunction, rule: Pick<ApprovalRule, "server">) =>
+  rule.server ?? t("approval.always.computer");
+
 /** A rule the agent runs without asking, in words: a push by its branch, its action, else the tool as labelled. */
-export function approvalRuleWords(t: TFunction, rule: Pick<ApprovalRule, "tool" | "action" | "toolLabel">) {
+export function approvalRuleWords(
+  t: TFunction,
+  rule: Pick<ApprovalRule, "tool" | "action" | "toolLabel"> & { connectionId?: string | null },
+) {
   const target = sqlReadsTarget(rule.action);
   if (target !== null) {
     const words = t("approval.always.readsRule", { tool: rule.toolLabel });
     return target ? `${words} · ${target}` : words;
   }
   if (rule.tool === BRANCH_PUSH && rule.action) return pushWords(t, rule.action);
+  if (rule.tool === COMMAND_RULE_TOOL && !rule.connectionId) return rule.action;
   return rule.action ? actionName(t, rule.action) : rule.toolLabel;
 }
 

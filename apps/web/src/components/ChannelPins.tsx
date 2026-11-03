@@ -107,11 +107,7 @@ function PinsPopover({
           return (
             <div key={p.messageId} className="pins-pop__item">
               <button type="button" className="thread-pop__row" onClick={() => go(p)}>
-                {author.id ? (
-                  <ActorAvatar actor={{ type: author.type, id: author.id }} name={name} size="sm" />
-                ) : (
-                  <span />
-                )}
+                {author.id ? <ActorAvatar actor={{ type: author.type, id: author.id }} name={name} /> : <span />}
                 <span className="thread-pop__text">
                   <b>{name}</b>
                   <small>{pinPreview(t, p)}</small>

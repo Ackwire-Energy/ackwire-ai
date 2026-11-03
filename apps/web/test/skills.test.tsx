@@ -124,6 +124,31 @@ describe("Configurações → Skills", () => {
     expect(screen().getByText("Revisão de PR removida.")).toBeTruthy();
   });
 
+  test("Agentes melhoram as skills sozinhos: the workspace's switch, a skill's own, and Desfazer for an agent's change", async () => {
+    const { state, section } = await settings();
+    const all = within(section()).getByRole("switch", { name: "Agentes melhoram as skills sozinhos" });
+    expect(all.getAttribute("aria-checked")).toBe("true");
+    await click(all);
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "skills.saveSettings")?.args).toEqual([
+      ORG_ID,
+      { agentsImprove: false },
+    ]);
+
+    await click(within(section()).getByRole("button", { name: "Atendimento" }));
+    await settle(4);
+    const sheet = screen().getByRole("dialog", { name: "Atendimento" });
+    expect(sheet.textContent).toContain("Ada mudou");
+    await click(within(sheet).getByRole("button", { name: "Desfazer mudança" }));
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "skills.undoUpdate")).toBe(true);
+    const own = within(sheet).getByRole("switch", { name: "Agentes melhoram esta skill sozinhos" });
+    expect(own.getAttribute("aria-checked")).toBe("false");
+    await click(own);
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "skills.update")?.args.at(-1)).toEqual({ agentsImprove: true });
+  });
+
   test("Instalar skill: GitHub link, .zip and Escrever", async () => {
     const { state, section } = await settings();
     await click(within(section()).getByRole("button", { name: "Instalar skill" }));

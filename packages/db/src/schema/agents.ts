@@ -290,6 +290,12 @@ export const organizationSettings = pgTable("organization_settings", {
   agentSetup: jsonb().$type<AgentSetup>(),
   /** People can send voice messages (ADR 0100): needs a speech engine on the server too. */
   voiceMessages: boolean().notNull().default(true),
+  /**
+   * "Agentes melhoram as skills sozinhos": an agent's fix to a skill a person made applies at once (a new version,
+   * with Desfazer) instead of waiting as a proposal; scripts still wait for a person (ADR 0120). A skill's own
+   * `skills.agents_improve` wins.
+   */
+  agentsImproveSkills: boolean().notNull().default(true),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

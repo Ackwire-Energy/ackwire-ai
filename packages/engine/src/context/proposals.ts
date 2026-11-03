@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -38,7 +38,7 @@ import { enqueue } from "../outbox";
 import { maySql } from "../permissions";
 import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
-import { writeSkillBody } from "../skills";
+import { pinBlobs, runsCode, skillFolderFiles, writeSkillBody, writeSkillChange } from "../skills";
 import { ALL_TOOLS } from "../tools/scopes";
 import {
   type ContextItem,
@@ -253,6 +253,9 @@ async function mayDecide(db: Database, actorId: string, p: Proposal) {
     return ownerDecides(p) && !!p.agentId && (await getAgent(db, p.orgId, p.agentId))?.ownerUserId === actorId;
   }
   if (p.target === "org_context") return can(membership, "configure");
+  // A file that runs on agents' computers is a skill change of its own: who manages skills, as an update from its
+  // link that changes one (`approveSkillUpdate`).
+  if (p.target === "skill" && p.skillPath && runsCode(p.skillPath)) return can(membership, "manage_agents");
   if (can(membership, "review_memory")) return true;
   if (p.target === "agent_instructions" && p.agentId) {
     const agent = await getAgent(db, p.orgId, p.agentId);
@@ -304,7 +307,7 @@ export async function decideProposal(
   orgId: string,
   proposalId: string,
   decision: "accept" | "reject",
-  options: { finalText?: string; judge?: Judge; pubsub?: PubSub } = {},
+  options: { finalText?: string; judge?: Judge; pubsub?: PubSub; blobs?: BlobStoreResolver } = {},
 ): Promise<Proposal> {
   const [p] = await db
     .select()
@@ -322,11 +325,12 @@ export async function decideProposal(
     checkContent(options.finalText);
     await checkPermissionText(options.judge, orgId, options.finalText);
   }
+  const blobs = options.blobs && p.skillPath ? await pinBlobs(options.blobs, orgId) : options.blobs;
   const decided = await db.transaction(async (tx) => {
     const as = tx as unknown as Database;
     let status: Proposal["status"] = decision === "accept" ? "accepted" : "rejected";
     if (decision === "accept" && p.target === "skill") {
-      if (!(await appliedToSkill(as, p))) status = "stale";
+      if (!(await appliedToSkill({ db: as, blobs }, p))) status = "stale";
     } else if (decision === "accept" && p.target === "org_context") {
       const [org] = await tx.select().from(organizations).where(eq(organizations.id, orgId)).for("update");
       if (!org || sha256(org.context) !== p.baseHash) status = "stale";
@@ -395,15 +399,23 @@ export async function decideProposal(
 export const proposalSkillId = (p: Pick<Proposal, "access">) => p.access?.[0]?.id ?? null;
 
 /**
- * An agent's change to a skill a person made or installed (ADR 0120): the new body as a diff, applied only when a
- * person who manages agents accepts it and the skill is still as it was.
+ * An agent's change to a skill a person made or installed (ADR 0120), or to a file of one (`file`: its path and its
+ * text now, empty for a new file): the new text as a diff, applied only when a person who manages agents accepts it
+ * and the skill (or the file) is still as it was. A script always comes here, whatever the skill's setting.
  */
 export async function proposeSkillChange(
   deps: { db: Database; pubsub?: PubSub },
-  input: { orgId: string; agentId: string; skill: { id: string; name: string; body: string }; body: string },
+  input: {
+    orgId: string;
+    agentId: string;
+    skill: { id: string; name: string; body: string };
+    body: string;
+    file?: { path: string; text: string };
+  },
 ): Promise<Proposal | null> {
   checkContent(input.body);
-  if (input.body === input.skill.body) return null;
+  const base = input.file ? input.file.text : input.skill.body;
+  if (input.body === base) return null;
   const [proposal] = await deps.db
     .insert(contextProposals)
     .values({
@@ -411,11 +423,20 @@ export async function proposeSkillChange(
       target: "skill",
       agentId: input.agentId,
       proposedByAgentId: input.agentId,
-      baseHash: sha256(input.skill.body),
+      baseHash: sha256(base),
       proposedText: input.body,
-      diff: lineDiff(input.skill.body, input.body),
-      access: [{ id: input.skill.id, label: input.skill.name, on: true }],
-      rationale: `A fix to the skill ${input.skill.name} from using it.`,
+      diff: lineDiff(base, input.body),
+      access: [
+        {
+          id: input.skill.id,
+          label: input.file ? `${input.skill.name}/${input.file.path}` : input.skill.name,
+          on: true,
+        },
+      ],
+      skillPath: input.file?.path ?? null,
+      rationale: input.file
+        ? `A change to ${input.file.path} of the skill ${input.skill.name} from using it.`
+        : `A fix to the skill ${input.skill.name} from using it.`,
     })
     .returning();
   if (!proposal) return null;
@@ -423,16 +444,33 @@ export async function proposeSkillChange(
   return proposal;
 }
 
-async function appliedToSkill(db: Database, p: Proposal) {
+async function appliedToSkill(deps: { db: Database; blobs?: BlobStoreResolver }, p: Proposal) {
+  const { db } = deps;
   const id = proposalSkillId(p);
   if (!id) return false;
+  const edited = () => db.update(schema.skills).set({ editedSinceSource: true }).where(eq(schema.skills.id, id));
   const [skill] = await db
     .select()
     .from(schema.skills)
     .where(and(eq(schema.skills.id, id), eq(schema.skills.orgId, p.orgId), isNull(schema.skills.deletedAt)))
     .for("update");
-  if (!skill || sha256(skill.body) !== p.baseHash) return false;
-  await writeSkillBody(db, skill, p.proposedText);
+  if (!skill) return false;
+  if (!p.skillPath) {
+    if (sha256(skill.body) !== p.baseHash) return false;
+    await writeSkillBody(db, skill, p.proposedText);
+    await edited();
+    return true;
+  }
+  if (!deps.blobs) throw new ValidationError("Skill files can't be changed on this server (no storage)");
+  const path = p.skillPath;
+  const [kept] = await skillFolderFiles({ db, blobs: deps.blobs }, skill, [path]);
+  const now = kept ? new TextDecoder().decode(kept.data) : "";
+  if (sha256(now) !== p.baseHash) return false;
+  await writeSkillChange(deps, skill, {
+    body: skill.body,
+    files: [{ path, data: new TextEncoder().encode(p.proposedText) }],
+  });
+  await edited();
   return true;
 }
 

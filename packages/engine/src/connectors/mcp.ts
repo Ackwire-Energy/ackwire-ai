@@ -235,7 +235,8 @@ export function createConnectorToolSource(
   const cache = new Map<string, { at: number; tools: McpTool[] }>();
 
   async function withSession<T>(connection: ConnectorConnection, fn: (s: McpSession) => Promise<T>): Promise<T> {
-    const session = await connect(connection, await connectionHeaders(deps, connection));
+    const extra = isCustom(connection) ? undefined : CONNECTOR_CATALOG[connection.connector]?.headers;
+    const session = await connect(connection, { ...extra, ...(await connectionHeaders(deps, connection)) });
     try {
       return await fn(session);
     } finally {

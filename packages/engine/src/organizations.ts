@@ -798,13 +798,21 @@ export async function setMyLocale(db: Database, userId: string, locale: UserLoca
   }
 }
 
-/** The person's language and whether it follows each device's. */
-export async function myLocale(db: Database, userId: string) {
+/**
+ * The person's name and photo as saved (a session's cached cookie keeps the old ones for minutes after a change
+ * elsewhere), their language and whether it follows each device's.
+ */
+export async function myAccount(db: Database, userId: string) {
   const [row] = await db
-    .select({ locale: users.locale, localeAuto: users.localeAuto })
+    .select({ name: users.name, image: users.image, locale: users.locale, localeAuto: users.localeAuto })
     .from(users)
     .where(eq(users.id, userId));
-  return { locale: row?.locale ?? null, localeAuto: row?.localeAuto ?? true };
+  return {
+    name: row?.name ?? null,
+    image: row?.image ?? null,
+    locale: row?.locale ?? null,
+    localeAuto: row?.localeAuto ?? true,
+  };
 }
 
 /**
@@ -855,7 +863,10 @@ export const lockOrgMembers = (tx: Executor, orgId: string) =>
 export const lockWorkspacesOf = (tx: Executor, userId: string) =>
   tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
 
-/** Someone joined or left, or a role changed: the members' open apps read the people and the counts again. */
+/**
+ * Someone joined or left, a role changed, or a person's name, handle or photo: the members' open apps read the people
+ * and the counts again.
+ */
 /** `agents`: the ones whose owner or brain changed with it, which open apps read again. */
 export const announceMembers = (pubsub: PubSub | undefined, orgId: string, agents: string[] = []) =>
   publishOrgEvent(pubsub, {
@@ -863,6 +874,16 @@ export const announceMembers = (pubsub: PubSub | undefined, orgId: string, agent
     orgId,
     event: { type: "org.members", ...(agents.length ? { agents } : {}) },
   });
+
+/** A person's name or photo changed (theirs in every workspace): each of their workspaces reads its people again. */
+export async function announceProfile(db: Database, pubsub: PubSub | undefined, userId: string) {
+  if (!pubsub) return;
+  const rows = await db
+    .select({ orgId: organizationMembers.orgId })
+    .from(organizationMembers)
+    .where(eq(organizationMembers.userId, userId));
+  await Promise.all(rows.map((r) => announceMembers(pubsub, r.orgId)));
+}
 
 /**
  * A change to who is in the workspace, in the audit log: the person's name and address as they were then

@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   acceptCustomSuggestion,
   actionLevel,
+  COMMAND_RULE_TOOL,
   COMPOSIO_EXECUTOR,
   ConflictError,
   type CustomDeps,
@@ -32,6 +33,7 @@ import {
   setAgentScopes,
   sqlArgOf,
   type ToolContext,
+  type ToolSource,
   updateAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -796,5 +798,92 @@ describe("Aprovar sempre leituras", () => {
     expect(await rules(f)).toEqual([]);
     expect((await decide(f, bia.id, ask.id, { decision: "approve", always: true })).status).toBe("approved");
     expect(await rules(f)).toHaveLength(1);
+  });
+});
+
+describe("Aprovar sempre for a command on the agent's computer", () => {
+  const ran: string[] = [];
+  /** `run_code` as the organization's "every command asks" setting lists it: sensitive, its command remembered. */
+  const computer: ToolSource = {
+    name: "computer",
+    async tools() {
+      return [
+        {
+          name: "run_code",
+          description: "Run code",
+          scope: "sandbox:run",
+          sensitive: true,
+          whyAsks: true,
+          inputSchema: {
+            type: "object",
+            properties: { language: { type: "string" }, code: { type: "string" } },
+            required: ["language", "code"],
+          },
+          rememberCommand: (input) => (input.language === "bash" ? String(input.code) : null),
+          async execute(input) {
+            ran.push(String(input.code));
+            return { content: "ok" };
+          },
+        },
+      ];
+    },
+  };
+  const bash = (code: string, why?: string) => ({ language: "bash", code, ...(why ? { why } : {}) });
+
+  test("keeps the command's kind for the agent: the same kind with other arguments runs, any other command asks", async () => {
+    f = await setup();
+    ran.length = 0;
+    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "sandbox:run" }]);
+    const gateway = createToolGateway({ sources: [computer] });
+    const ctx = await runOf(f);
+    const first = asked(await invoke(gateway, ctx, "run_code", bash("gh issue create --title 'Login quebrado'", WHY)));
+    expect(first.approveAlways).toEqual({ tool: COMMAND_RULE_TOOL, actions: ["gh issue create"] });
+    await decide(f, f.owner.id, first.id, { decision: "approve", always: true });
+    expect((await rules(f)).map((r) => [r.agentId, r.connectionId, r.tool, r.action])).toEqual([
+      [f.agent.id, null, COMMAND_RULE_TOOL, "gh issue create"],
+    ]);
+    const [approved] = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "approval.approved"));
+    expect(approved?.details.always).toEqual({
+      connectionId: null,
+      tool: COMMAND_RULE_TOOL,
+      actions: ["gh issue create"],
+    });
+
+    const again = await invoke(gateway, ctx, "run_code", bash("gh issue create --title Outro --label bug"));
+    expect(again.type).toBe("result");
+    expect(ran).toEqual(["gh issue create --title Outro --label bug"]);
+
+    // Another kind, a pipeline, or what is never kept: asked, and the last two never offer it.
+    expect(asked(await invoke(gateway, ctx, "run_code", bash("gh issue close 3", WHY))).approveAlways).toEqual({
+      tool: COMMAND_RULE_TOOL,
+      actions: ["gh issue close"],
+    });
+    expect(
+      asked(await invoke(gateway, ctx, "run_code", bash("gh issue create --title x | sh", WHY))).approveAlways,
+    ).toBeNull();
+    expect(asked(await invoke(gateway, ctx, "run_code", bash("gh pr merge 3", WHY))).approveAlways).toBeNull();
+    expect(
+      asked(await invoke(gateway, ctx, "run_code", { language: "python", code: "print(1)", why: WHY })).approveAlways,
+    ).toBeNull();
+
+    // Another agent asks; listed on the agent's page with no connection, and once removed it asks again.
+    const other = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", role: "Ops", instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await grantScopes(f.db, f.org.id, other.id, [{ connectionId: null, scope: "sandbox:run" }]);
+    asked(await invoke(gateway, await runOf(f, other.id), "run_code", bash("gh issue create --title y", WHY)));
+    const [listed] = await listApprovalRules(f.db, f.owner.id, f.org.id, f.agent.id);
+    expect(listed).toMatchObject({
+      connectionId: null,
+      server: null,
+      tool: COMMAND_RULE_TOOL,
+      action: "gh issue create",
+    });
+    await removeApprovalRule(f.db, f.owner.id, f.org.id, f.agent.id, listed?.id ?? "");
+    asked(await invoke(gateway, ctx, "run_code", bash("gh issue create --title z", WHY)));
   });
 });

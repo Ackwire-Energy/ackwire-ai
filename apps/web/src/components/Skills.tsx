@@ -1,10 +1,20 @@
-import type { Skill, SkillChoice, SkillDetail, SkillFile, SkillSkipped, SkillVia } from "@agenteschat/client";
+import type {
+  Skill,
+  SkillChoice,
+  SkillDetail,
+  SkillFile,
+  SkillSkipped,
+  SkillSourceUpdate,
+  SkillVia,
+} from "@agenteschat/client";
 import {
+  useAgents,
   useCatalog,
   useConnections,
   useGitHubRepos,
   useSkill,
   useSkillAction,
+  useSkillSettings,
   useSkills,
   useSkillUsage,
 } from "@agenteschat/client";
@@ -18,10 +28,12 @@ import {
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
+  SKILL_UPDATE_TOAST,
   searchRepos,
   skillPickOf,
   skillRefusalText,
   skillSourceViaText,
+  skillUpdateErrorText,
   skillViaText,
   skippedSkillText,
 } from "@agenteschat/client/lib/skills";
@@ -113,6 +125,11 @@ function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null
       <span className="skill-row__meta">
         <SourceChip skill={skill} />
         {skill.defaultForNewAgents && <Chip icon="check">{t("skills.defaultChip")}</Chip>}
+        {skill.pendingUpdate && !skill.pendingUpdate.dismissed ? (
+          <Chip icon="alert">{t("skills.waitingChip")}</Chip>
+        ) : (
+          skill.autoUpdate && <Chip icon="refresh">{t("skills.autoChip")}</Chip>
+        )}
         <span className="small muted tabular">
           {t("skills.version", { version: skill.version })}
           {users !== null && <> · {t("skills.usedBy", { count: users })}</>}
@@ -136,8 +153,9 @@ function ViaLine({ children }: { children: string }) {
 /**
  * Configurações → Skills: the org library (admins manage it). `install`: back from connecting GitHub in Instalar
  * skill, the link it couldn't read, which the dialog reads again (`connected`: the server's `?connected=github`).
+ * `skill`: the skill to open (a notice of its update from its link).
  */
-export function SkillsSection({ install, connected }: { install?: string; connected?: string }) {
+export function SkillsSection({ install, connected, skill }: { install?: string; connected?: string; skill?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const admin = can(org, "manage_agents");
@@ -145,13 +163,15 @@ export function SkillsSection({ install, connected }: { install?: string; connec
   const [installing, setInstalling] = useState(Boolean(install));
   const [returned, setReturned] = useState(install);
   useEffect(() => {
-    if (install) window.history.replaceState(null, "", window.location.pathname);
-  }, [install]);
+    if (install || skill) window.history.replaceState(null, "", window.location.pathname);
+  }, [install, skill]);
   const [all, setAll] = useState(false);
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(skill ?? null);
   const list = skills.data ?? [];
   const usage = useSkillUsage(org.id, admin && list.length > 0);
+  const settings = useSkillSettings(org.id, admin);
+  const action = useSkillAction(org.id);
   if (!admin) return null;
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   return (
@@ -167,6 +187,20 @@ export function SkillsSection({ install, connected }: { install?: string; connec
         )}
       </div>
       {unavailable && <p className="small muted">{t("skills.unavailable")}</p>}
+      {settings.data && (
+        <>
+          <span className="row" style={{ gap: 10, alignItems: "center" }}>
+            <Switch
+              id="skills-agents-improve"
+              checked={settings.data.agentsImprove}
+              disabled={action.isPending}
+              onCheckedChange={(on) => action.mutate({ type: "settings", settings: { agentsImprove: on } })}
+            />
+            <label htmlFor="skills-agents-improve">{t("skills.agentsImprove")}</label>
+          </span>
+          <p className="small muted">{t("skills.agentsImproveHelp")}</p>
+        </>
+      )}
       {skills.isLoading && <LoadingList count={3} avatar={false} />}
       {skills.isSuccess && list.length === 0 && <p className="small muted">{t("skills.empty")}</p>}
       {list.length > 0 && (
@@ -660,6 +694,166 @@ function ConnectedRepos({ onPick, onBack }: { onPick: (fullName: string) => void
   );
 }
 
+/**
+ * A skill from a link, as it updates from it: "Atualizar sozinha", an update waiting because it changes files that run
+ * (applied or refused here, the files named), why its last update failed, and Desfazer for the last one.
+ */
+function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const action = useSkillAction(org.id);
+  if (s.source !== "url" || !s.sourceUrl) return null;
+  const pending = s.pendingUpdate && !s.pendingUpdate.dismissed ? s.pendingUpdate : null;
+  return (
+    <>
+      {pending && (
+        <div className="waitcard">
+          <span className="waitcard__top ac-iconline">
+            <Icon name="alert" size={16} />
+            <span>
+              {pending.scripts.length > 0
+                ? t("skills.pending.title", { files: pending.scripts.join(", ") })
+                : t("skills.pending.edited")}
+            </span>
+          </span>
+          {pending.scripts.length > 0 && <p>{t("skills.pending.lead")}</p>}
+          {pending.edited && <p>{t("skills.pending.editedLead")}</p>}
+          <span className="waitcard__acts">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={action.isPending}
+              onClick={() =>
+                action.mutate(
+                  { type: "approveUpdate", id: s.id },
+                  {
+                    onSuccess: (r) =>
+                      toast.show(
+                        t(
+                          (r as SkillSourceUpdate).status === "waiting"
+                            ? "skills.pending.changedAgain"
+                            : "skills.pending.applied",
+                          {
+                            name: s.name,
+                          },
+                        ),
+                      ),
+                  },
+                )
+              }
+            >
+              {t("skills.pending.apply")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={action.isPending}
+              onClick={() =>
+                action.mutate(
+                  { type: "dismissUpdate", id: s.id },
+                  { onSuccess: () => toast.show(t("skills.pending.dismissed")) },
+                )
+              }
+            >
+              {t("skills.pending.dismiss")}
+            </Button>
+          </span>
+        </div>
+      )}
+      {s.updateError && <Alert>{skillUpdateErrorText(t, s.updateError)}</Alert>}
+      {s.lastUpdate && !s.lastUpdate.agentId && (
+        <p className="small muted row" style={{ gap: 8, alignItems: "center" }}>
+          <span>{t("skills.lastUpdate", { when: relativeTime(t, i18n.language, s.lastUpdate.at) })}</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={action.isPending}
+            onClick={() =>
+              action.mutate(
+                { type: "undoUpdate", id: s.id },
+                {
+                  onSuccess: (r) =>
+                    toast.show(
+                      t("skills.undone", {
+                        name: s.name,
+                        version: s.lastUpdate?.fromVersion ?? (r as SkillDetail).version,
+                      }),
+                    ),
+                },
+              )
+            }
+          >
+            {t("skills.undoUpdate")}
+          </Button>
+        </p>
+      )}
+      <span className="row" style={{ gap: 10, alignItems: "center" }}>
+        <Switch
+          id={`skill-auto-${s.id}`}
+          checked={s.autoUpdate ?? false}
+          disabled={action.isPending}
+          onCheckedChange={(on) => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: on } })}
+        />
+        <label htmlFor={`skill-auto-${s.id}`}>{t("skills.autoUpdate")}</label>
+      </span>
+      <p className="small muted">{t("skills.autoUpdateHelp")}</p>
+    </>
+  );
+}
+
+/**
+ * A person's skill as agents improve it: its own "Agentes melhoram esta skill sozinhos" (the workspace's until set),
+ * and the last change an agent made, with Desfazer while it is still the skill's version.
+ */
+function AgentImprove({ skill: s }: { skill: SkillDetail }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const action = useSkillAction(org.id);
+  const settings = useSkillSettings(org.id);
+  const agents = useAgents(org.id);
+  const change = s.lastUpdate?.agentId ? s.lastUpdate : null;
+  const agent = change ? agents.data?.find((a) => a.id === change.agentId) : undefined;
+  if (s.origin === "agent") return null;
+  return (
+    <>
+      {change && (
+        <p className="small muted row" style={{ gap: 8, alignItems: "center" }}>
+          <span>
+            {t("skills.agentChange", {
+              agent: agent?.name ?? t("channel.unknownAgent"),
+              when: relativeTime(t, i18n.language, change.at),
+            })}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={action.isPending}
+            onClick={() =>
+              action.mutate(
+                { type: "undoUpdate", id: s.id },
+                { onSuccess: () => toast.show(t("skills.undone", { name: s.name, version: change.fromVersion })) },
+              )
+            }
+          >
+            {t("skills.undoAgentChange")}
+          </Button>
+        </p>
+      )}
+      <span className="row" style={{ gap: 10, alignItems: "center" }}>
+        <Switch
+          id={`skill-improve-${s.id}`}
+          checked={s.agentsImprove ?? settings.data?.agentsImprove ?? true}
+          disabled={action.isPending}
+          onCheckedChange={(on) => action.mutate({ type: "update", id: s.id, patch: { agentsImprove: on } })}
+        />
+        <label htmlFor={`skill-improve-${s.id}`}>{t("skills.agentsImproveThis")}</label>
+      </span>
+    </>
+  );
+}
+
 /** Skill detail: rendered SKILL.md, its files (text opens in a viewer; scripts need a sandbox), actions. */
 export function SkillSheet({
   id,
@@ -712,9 +906,10 @@ export function SkillSheet({
                 loading={refresh.isPending}
                 onClick={() =>
                   refresh.mutate(
-                    { type: "reimport", id: s.id },
+                    { type: "updateFromSource", id: s.id },
                     {
-                      onSuccess: () => toast.show(t("skills.refreshed", { name: s.name })),
+                      onSuccess: (r) =>
+                        toast.show(t(SKILL_UPDATE_TOAST[(r as SkillSourceUpdate).status], { name: s.name })),
                       onError: (e) => toast.show(skillRefusalText(t, e, can(org, "manage_connectors")), "error"),
                     },
                   )
@@ -740,6 +935,8 @@ export function SkillSheet({
           <div className="skill-sheet__main">
             <p className="muted">{s.description}</p>
             {via && <ViaLine>{via}</ViaLine>}
+            <SourceUpdate skill={s} />
+            <AgentImprove skill={s} />
             {editing ? <EditSkill skill={s} onDone={() => setEditing(false)} /> : <Markdown source={s.body} />}
           </div>
           <nav className="skill-sheet__files" aria-label={t("skills.files")}>

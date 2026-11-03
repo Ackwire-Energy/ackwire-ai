@@ -7,6 +7,7 @@ import {
   describeCapabilities,
   drainOutbox,
   forComputerBrain,
+  GITHUB_GUIDANCE,
   grantScopes,
   postPersonMessage,
   setAgentScopes,
@@ -110,4 +111,19 @@ test("summarizeGrants: built-ins by group, connections by name, '*' with every c
   expect(summarizeGrants([row("*")], ["Sentry", "GitHub"])).toBe("every tool of the organization (Sentry, GitHub)");
   expect(summarizeGrants([row("deny:sentry_list_issues", "Sentry")], ["Sentry"])).toBe("conversation only");
   expect(summarizeGrants([], [])).toBe("conversation only");
+});
+
+test("GitHub work goes through the connector and the git proxy, never the person's own gh sign-in", () => {
+  expect(GITHUB_GUIDANCE).toContain("Never sign the person in to gh (gh auth login)");
+  expect(GITHUB_GUIDANCE).toContain("reconnect GitHub in Connectors");
+  // Said to an agent with GitHub (git through our proxy, or the connector's tools), not to one without.
+  for (const [name, scope] of [
+    ["git_clone", "github:git.read"],
+    ["github_issue_write", "github:issues.write"],
+  ] as const) {
+    expect(describeCapabilities([{ name, description: "x", scope }])).toContain(GITHUB_GUIDANCE);
+  }
+  expect(describeCapabilities([{ name: "run_code", description: "x", scope: "sandbox:run" }])).not.toContain(
+    GITHUB_GUIDANCE,
+  );
 });

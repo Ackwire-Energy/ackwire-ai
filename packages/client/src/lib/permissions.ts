@@ -38,22 +38,33 @@ export const can = (org: { permissions?: readonly string[] } | null | undefined,
 
 type Membership = Parameters<typeof can>[0];
 
+type ChannelLike = {
+  isMember?: boolean;
+  createdByUserId?: string | null;
+  /** From the channel list, with the channel's exceptions (ADR 0134). */
+  can?: { post: boolean; callAgents: boolean; manage: boolean };
+};
+
 /**
- * Who manages a channel (its name, members and category): who may manage every channel, or its creator while still in
- * it. Mirrors the server's `managesChannel` (packages/engine/src/channels.ts).
+ * Who manages a channel (its name, members, category and exceptions): the server's answer in `channel.can`, else
+ * who may manage every channel, or its creator while still in it. Mirrors the server's `managesChannel`
+ * (packages/engine/src/channels.ts).
  */
 export const managesChannel = (
-  channel: { isMember?: boolean; createdByUserId?: string | null } | null | undefined,
+  channel: ChannelLike | null | undefined,
   meId: string | null | undefined,
   org: Membership,
-) => can(org, "manage_channels") || (!!meId && channel?.isMember === true && channel.createdByUserId === meId);
+) =>
+  channel?.can
+    ? channel.can.manage
+    : can(org, "manage_channels") || (!!meId && channel?.isMember === true && channel.createdByUserId === meId);
 
 /**
  * Who picks how an agent replies in a channel: who manages the channel, or the agent's owner. Mirrors the server's
  * `setChannelAgentAutoReply` (packages/engine/src/channels.ts).
  */
 export const setsAutoReply = (
-  channel: { isMember?: boolean; createdByUserId?: string | null } | null | undefined,
+  channel: ChannelLike | null | undefined,
   agent: { ownerUserId?: string | null } | null | undefined,
   meId: string | null | undefined,
   org: Membership,
@@ -65,7 +76,7 @@ export const setsAutoReply = (
  * agent to be theirs or `manage_agents`.
  */
 export const addsAgentsTo = (
-  channel: { isMember?: boolean; createdByUserId?: string | null } | null | undefined,
+  channel: ChannelLike | null | undefined,
   meId: string | null | undefined,
   org: Membership,
 ) => (channel?.isMember === true && can(org, "post")) || managesChannel(channel, meId, org);

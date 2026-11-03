@@ -20,6 +20,8 @@ export interface SelectOption<V extends string = string> {
    * click on it (which never picks the option), and while the keys rest on the option; always its description.
    */
   hint?: string;
+  /** A row that does something rather than a choice ("Nova categoria…"): a line sets the first one apart. */
+  action?: boolean;
 }
 
 export interface SelectProps<V extends string = string> {
@@ -46,8 +48,14 @@ export interface SelectProps<V extends string = string> {
   onCloseAutoFocus?: (event: Event) => void;
 }
 
-function renderItem<V extends string>(o: SelectOption<V>) {
-  return <SelectItem key={o.value} option={o} />;
+/** The options, a line before the first of a run of action rows that follows choices. */
+function renderItems<V extends string>(items: SelectOption<V>[], all: typeof items) {
+  return items.map((o) => {
+    const item = <SelectItem key={o.value} option={o} />;
+    const before = all[all.indexOf(o) - 1];
+    if (!o.action || !before || before.action) return item;
+    return [<RSelect.Separator key={`${o.value}-sep`} className="ac-menu__separator" />, item];
+  });
 }
 
 function SelectItem<V extends string>({ option: o }: { option: SelectOption<V> }) {
@@ -187,10 +195,10 @@ export function Select<V extends string = string>({
                 group ? (
                   <RSelect.Group key={group}>
                     <RSelect.Label className="ac-menu__heading">{group}</RSelect.Label>
-                    {items.map(renderItem)}
+                    {renderItems(items, options)}
                   </RSelect.Group>
                 ) : (
-                  items.map(renderItem)
+                  renderItems(items, options)
                 ),
               )}
             </RSelect.Viewport>

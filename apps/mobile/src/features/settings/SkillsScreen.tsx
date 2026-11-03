@@ -1,10 +1,20 @@
-import type { Connection, SkillChoice, SkillDetail, SkillFile, SkillSkipped, SkillVia } from "@agenteschat/client";
+import type {
+  Connection,
+  SkillChoice,
+  SkillDetail,
+  SkillFile,
+  SkillSkipped,
+  SkillSourceUpdate,
+  SkillVia,
+} from "@agenteschat/client";
 import {
   keys,
+  useAgents,
   useCatalog,
   useGitHubRepos,
   useSkill,
   useSkillAction,
+  useSkillSettings,
   useSkills,
   useSkillUsage,
 } from "@agenteschat/client";
@@ -17,10 +27,12 @@ import {
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
+  SKILL_UPDATE_TOAST,
   searchRepos,
   skillPickOf,
   skillRefusalText,
   skillSourceViaText,
+  skillUpdateErrorText,
   skillViaText,
   skippedSkillText,
 } from "@agenteschat/client/lib/skills";
@@ -70,6 +82,8 @@ export function SkillsScreen() {
   const skills = useSkills(orgId, admin);
   const list = skills.data ?? [];
   const usage = useSkillUsage(orgId, admin && list.length > 0);
+  const settings = useSkillSettings(orgId, admin);
+  const action = useSkillAction(orgId);
   const [q, setQ] = useState("");
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   const shown = searchSkills(list, q);
@@ -95,6 +109,23 @@ export function SkillsScreen() {
               onPress={() => router.push("/settings/skills/new")}
             />
           </GroupedList>
+          {settings.data ? (
+            <>
+              <Gap />
+              <GroupedList>
+                <GroupedRow
+                  label={t("skills.agentsImprove")}
+                  labelLines={2}
+                  toggle={settings.data.agentsImprove}
+                  disabled={action.isPending}
+                  onPress={() =>
+                    action.mutate({ type: "settings", settings: { agentsImprove: !settings.data?.agentsImprove } })
+                  }
+                />
+              </GroupedList>
+              <GroupedFooter>{t("skills.agentsImproveHelp")}</GroupedFooter>
+            </>
+          ) : null}
           {list.length > SKILLS_INLINE ? (
             <View style={styles.search}>
               <SearchField
@@ -170,11 +201,11 @@ export function SkillScreen({ id }: { id: string }) {
 
   const refresh = (item: SkillDetail) =>
     action.mutate(
-      { type: "reimport", id: item.id },
+      { type: "updateFromSource", id: item.id },
       {
-        onSuccess: () => {
+        onSuccess: (r) => {
           successHaptic();
-          toast({ title: t("skills.refreshed", { name: item.name }), icon: "check" });
+          toast({ title: t(SKILL_UPDATE_TOAST[(r as SkillSourceUpdate).status], { name: item.name }), icon: "check" });
         },
         // A repository none of the workspace's GitHub reads, as Instalar skill says it.
         onError: (e) => toast({ title: skillRefusalText(t, e, can(org, "manage_connectors")), icon: "x" }),
@@ -236,6 +267,8 @@ export function SkillScreen({ id }: { id: string }) {
               <Note icon={<SocialMark provider="github" color={c.muted} size={15} />}>{via}</Note>
             </View>
           ) : null}
+          {admin ? <SourceUpdate skill={s} /> : null}
+          {admin ? <AgentImprove skill={s} /> : null}
           <Gap />
           <GroupedList>
             <View style={styles.page}>
@@ -286,6 +319,162 @@ export function SkillScreen({ id }: { id: string }) {
   );
 }
 
+/**
+ * A skill from a link, as the web's sheet: an update waiting because it changes files that run (applied or refused
+ * here, the files named), why its last update failed, Desfazer for the last one, and "Atualizar sozinha".
+ */
+function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const { orgId } = useOrg();
+  const action = useSkillAction(orgId);
+  if (s.source !== "url" || !s.sourceUrl) return null;
+  const pending = s.pendingUpdate && !s.pendingUpdate.dismissed ? s.pendingUpdate : null;
+  const said = (title: string) => {
+    successHaptic();
+    toast({ title, icon: "check" });
+  };
+  return (
+    <>
+      {pending ? (
+        <>
+          <View style={styles.note}>
+            <Note icon="shield">
+              {pending.scripts.length > 0
+                ? t("skills.pending.title", { files: pending.scripts.join(", ") })
+                : t("skills.pending.edited")}
+            </Note>
+          </View>
+          <GroupedList>
+            <GroupedRow
+              icon="check"
+              label={t("skills.pending.apply")}
+              disabled={action.isPending}
+              onPress={() =>
+                action.mutate(
+                  { type: "approveUpdate", id: s.id },
+                  {
+                    onSuccess: (r) =>
+                      said(
+                        t(
+                          (r as SkillSourceUpdate).status === "waiting"
+                            ? "skills.pending.changedAgain"
+                            : "skills.pending.applied",
+                          { name: s.name },
+                        ),
+                      ),
+                  },
+                )
+              }
+            />
+            <GroupedRow
+              icon="x"
+              label={t("skills.pending.dismiss")}
+              disabled={action.isPending}
+              onPress={() =>
+                action.mutate(
+                  { type: "dismissUpdate", id: s.id },
+                  { onSuccess: () => said(t("skills.pending.dismissed")) },
+                )
+              }
+            />
+          </GroupedList>
+          <GroupedFooter>
+            {[
+              ...(pending.scripts.length > 0 ? [t("skills.pending.lead")] : []),
+              ...(pending.edited ? [t("skills.pending.editedLead")] : []),
+            ].join(" ")}
+          </GroupedFooter>
+        </>
+      ) : null}
+      {s.updateError ? (
+        <View style={styles.note}>
+          <Note icon="x">{skillUpdateErrorText(t, s.updateError)}</Note>
+        </View>
+      ) : null}
+      <Gap />
+      <GroupedList>
+        <GroupedRow
+          label={t("skills.autoUpdate")}
+          toggle={s.autoUpdate ?? false}
+          disabled={action.isPending}
+          onPress={() => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: !s.autoUpdate } })}
+        />
+        {s.lastUpdate && !s.lastUpdate.agentId ? (
+          <GroupedRow
+            icon="undo"
+            label={t("skills.undoUpdate")}
+            sub={t("skills.lastUpdate", { when: relativeTime(t, i18n.language, s.lastUpdate.at) })}
+            disabled={action.isPending}
+            onPress={() =>
+              action.mutate(
+                { type: "undoUpdate", id: s.id },
+                {
+                  onSuccess: () => said(t("skills.undone", { name: s.name, version: s.lastUpdate?.fromVersion ?? 0 })),
+                },
+              )
+            }
+          />
+        ) : null}
+      </GroupedList>
+      <GroupedFooter>{t("skills.autoUpdateHelp")}</GroupedFooter>
+    </>
+  );
+}
+
+/**
+ * A person's skill as agents improve it, as the web's sheet: its own "Agentes melhoram esta skill sozinhos" (the
+ * workspace's until set), and the last change an agent made, with Desfazer while it is still the skill's version.
+ */
+function AgentImprove({ skill: s }: { skill: SkillDetail }) {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const { orgId } = useOrg();
+  const action = useSkillAction(orgId);
+  const settings = useSkillSettings(orgId);
+  const agents = useAgents(orgId);
+  if (s.origin === "agent") return null;
+  const change = s.lastUpdate?.agentId ? s.lastUpdate : null;
+  const agent = change ? agents.data?.find((a) => a.id === change.agentId) : undefined;
+  const on = s.agentsImprove ?? settings.data?.agentsImprove ?? true;
+  return (
+    <>
+      <Gap />
+      <GroupedList>
+        <GroupedRow
+          label={t("skills.agentsImproveThis")}
+          labelLines={2}
+          toggle={on}
+          disabled={action.isPending}
+          onPress={() => action.mutate({ type: "update", id: s.id, patch: { agentsImprove: !on } })}
+        />
+        {change ? (
+          <GroupedRow
+            icon="undo"
+            label={t("skills.undoAgentChange")}
+            sub={t("skills.agentChange", {
+              agent: agent?.name ?? t("channel.unknownAgent"),
+              when: relativeTime(t, i18n.language, change.at),
+            })}
+            disabled={action.isPending}
+            onPress={() =>
+              action.mutate(
+                { type: "undoUpdate", id: s.id },
+                {
+                  onSuccess: () => {
+                    successHaptic();
+                    toast({ title: t("skills.undone", { name: s.name, version: change.fromVersion }), icon: "check" });
+                  },
+                },
+              )
+            }
+          />
+        ) : null}
+      </GroupedList>
+    </>
+  );
+}
+
 type InstallTab = "github" | "zip" | "write";
 
 /** How many of the connected GitHub's repositories show at once: the search finds the rest. */
@@ -300,15 +489,15 @@ const REPOS_SHOWN = 30;
  * connection read it; when none can, "Conectar o GitHub" opens the connect sheet over it (or it says whom to ask),
  * and the link is read again once GitHub is connected.
  */
-export function InstallSkillScreen() {
+export function InstallSkillScreen({ initialUrl }: { initialUrl?: string }) {
   return (
     <SheetHostProvider>
-      <InstallSkill />
+      <InstallSkill initialUrl={initialUrl} />
     </SheetHostProvider>
   );
 }
 
-function InstallSkill() {
+function InstallSkill({ initialUrl }: { initialUrl?: string }) {
   const { t } = useTranslation();
   const c = useColors();
   const toast = useToast();
@@ -369,6 +558,13 @@ function InstallSkill() {
       },
     );
   };
+  // An agent's card: its link read once, its skills listed to pick.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on opening only
+  useEffect(() => {
+    if (!initialUrl || !isGithubSkillLink(initialUrl)) return;
+    setUrl(initialUrl);
+    read(initialUrl, true);
+  }, []);
   const pickRepo = (fullName: string) => {
     const link = githubRepoLink(fullName);
     setUrl(link);

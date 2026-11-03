@@ -445,6 +445,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Claude Code:** `claude mcp add --transport http --scope user agentes <address>` を実行し、`/mcp` と入力して agentes を選び、**Authenticate** を選びます。今のフォルダだけで使う場合は `--scope user` を外してください。",
               "**Cursor:** **設定 › AIアプリ** の **Cursorに追加** を使うか、`~/.cursor/mcp.json` にアドレスを書きます。初めて使うときに Cursor がログインを求めます。",
               '**VS Code:** **VS Codeに追加** を使うか、`.vscode/mcp.json` に `"type": "http"` と一緒にアドレスを書きます。',
+              "**ほかのアプリ:** ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrainsなどは、**アプリを接続** にそれぞれの手順があり、アドレスも入力済みです。",
             ],
           },
           "ログインするとき、agentes.chat はどのアプリがアクセスを求めているか、どこに戻るかを表示します。自分で接続を始めたばかりの場合だけ続けてください。",

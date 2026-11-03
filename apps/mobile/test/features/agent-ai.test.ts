@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
 import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
+import { setupPlanQuestion } from "@agenteschat/client/lib/audience";
 import { CURSOR_KEY_PLAN, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
 import { markOf } from "@agenteschat/ui/brand/marks";
 import type { TFunction } from "i18next";
@@ -56,7 +57,7 @@ describe("the agent's AI", () => {
     expect(accountKindOf(undefined)).toBeNull();
   });
 
-  test("its page lists the viewer's own accounts of that kind, and someone else's only while it's this agent's", () => {
+  test("its page lists its owner's accounts of that kind, to an admin too, and someone else's only while it's this agent's", () => {
     const view: View = {
       account: "theirs-now",
       ownSignIn: false,
@@ -64,12 +65,16 @@ describe("the agent's AI", () => {
       accounts: [
         account("mine"),
         account("codex", { kind: "codex" }),
-        account("theirs", { mine: false }),
-        account("theirs-now", { mine: false }),
+        account("theirs", { mine: false, ownerId: "u2" }),
+        account("theirs-now", { mine: false, ownerId: "u2" }),
       ],
     };
-    expect(agentAccounts(view, "claude_code").map((a) => a.id)).toEqual(["mine", "theirs-now"]);
-    expect(agentAccounts(view, "codex").map((a) => a.id)).toEqual(["codex"]);
+    const owner = { ...view, canUsePlans: true };
+    expect(agentAccounts(owner, "claude_code", "u1").map((a) => a.id)).toEqual(["mine", "theirs-now"]);
+    expect(agentAccounts(owner, "codex", "u1").map((a) => a.id)).toEqual(["codex"]);
+    // An admin of u1's agent: u1's, never their own.
+    const admin = { ...view, account: null, canUsePlans: false };
+    expect(agentAccounts(admin, "claude_code", "u1").map((a) => a.id)).toEqual(["mine"]);
   });
 
   test("the usage shown is its account's, or the computer's own sign-in's only where that thinks for it", () => {
@@ -179,15 +184,16 @@ describe("the agent's AI", () => {
     }
     // One switch, its line under it saying what its state does, with the ⓘ, the plan's words behind it.
     expect(parts).toContain('label={t("aiAccounts.share.switch")}');
-    expect(parts).toContain("planReplies(t, { on, agent, brain, plan, coding })");
+    expect(parts).toContain("planReplies(t, { on, agent, owner, brain, plan, coding })");
     expect(parts).toMatch(
       /<InfoHint\s+name=\{t\("common\.about", \{ label: t\("aiAccounts\.share\.terms\.about"\) \}\)\}\s+text=\{says\.text\}[^>]*>\s*<Text[^>]*>\s*\{says\.line\}/,
     );
     // The line names the agent.
     expect(screen).toMatch(/<PlanReplies\s+agent=\{name\}/);
     expect(connect).toMatch(/<PlanReplies\s+agent=\{done\?\.agent \?\? agent\?\.name \?\? ""\}/);
-    // Someone who isn't the plan's owner: whom it answers and who decides, no switch.
-    expect(screen).toMatch(/view\.canUsePlans \? \(\s*<PlanReplies[\s\S]*?\) : \(\s*<PlanRepliesOf/);
+    // An admin who isn't the plan's owner gets the same switch, its line naming whose plan it is.
+    expect(screen).toContain("owner={view.canUsePlans ? undefined : ownerFirst}");
+    expect(screen).not.toContain("PlanRepliesOf");
     // On a plan's page: under its steps or the account cards, and on the page that says it's done.
     expect(connect).toContain("{steps || ownable ? repliesRow : null}");
     expect(connect).toContain("<View style={styles.doneReplies}>{repliesRow}</View>");
@@ -784,6 +790,33 @@ describe("the agent's AI", () => {
     expect(screen).toContain("onPress={() => openAgentSetup(agentId)}");
     const route = await Bun.file(new URL("../../app/(app)/agent-setup/[id].tsx", import.meta.url).pathname).text();
     expect(route).toContain("<AgentSetupScreen agentId={id");
+  });
+
+  test("Usar em outros agentes on other people's plans asks once before saving, naming every owner", async () => {
+    const t = await translator("pt-BR");
+    const claude = { kind: "claude_code" as const, provider: null };
+    expect(setupPlanQuestion(t, claude, [])).toBeNull();
+    expect(
+      setupPlanQuestion(t, claude, [
+        { agent: "Ada", owner: "João" },
+        { agent: "Atlas", owner: "João" },
+        { agent: "Lia", owner: "Bia" },
+      ]),
+    ).toEqual({
+      title: "Usar os planos de João e Bia?",
+      description: [
+        "As conversas com Ada e Atlas vão usar o plano do Claude de João e os limites dele. João vai receber um email avisando.",
+        "As conversas com Lia vão usar o plano do Claude de Bia e os limites dele. Bia vai receber um email avisando.",
+      ].join("\n"),
+    });
+    // Asked before anything saves: Cancelar returns before the one call.
+    const setup = await Bun.file(
+      new URL("../../src/features/ai/AgentSetupScreen.tsx", import.meta.url).pathname,
+    ).text();
+    const asked = setup.indexOf("await confirmQuestion(t, setupPlanQuestion(");
+    expect(asked).toBeGreaterThan(-1);
+    expect(setup.indexOf("api.agents.applySetup(")).toBeGreaterThan(asked);
+    expect(setup.match(/api\.agents\.applySetup\(/g)).toHaveLength(1);
   });
 
   test("Criar agente on the phone thinks with the last setup: the API's model and key, or a plan saved right after", async () => {

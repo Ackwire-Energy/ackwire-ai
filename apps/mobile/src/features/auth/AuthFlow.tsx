@@ -1,6 +1,13 @@
 import { invitationQuery, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
 import { type HumanAction, humanCheckHeaders, withHumanCheck } from "@agenteschat/client/lib/human-check";
-import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
+import {
+  emailTypoFix,
+  isEmail,
+  looksLikePassword,
+  nameIsPassword,
+  passwordState,
+  webmailOf,
+} from "@agenteschat/client/lib/text";
 import { useQuery } from "@tanstack/react-query";
 import { router, useIsFocused } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
@@ -300,7 +307,12 @@ export function AuthFlow({
     if (step === "email") void lookUp();
     else if (step === "password") void signIn();
     else if (step === "name") go("newPassword");
-    else if (step === "newPassword") void signUp();
+    else if (step === "newPassword" && nameIsPassword(name, password)) {
+      // The name step got the password: no account with a password for a name.
+      setPassword("");
+      go("name");
+      setError(t("auth.flow.nameIsPassword"));
+    } else if (step === "newPassword") void signUp();
     else if (step === "forgot") void sendReset();
   };
 
@@ -444,6 +456,7 @@ export function AuthFlow({
           autoFocus
         />
       ) : null}
+      {step === "name" && !error ? <NameHint name={name} /> : null}
 
       {error ? (
         <Text tone="danger" variant="small" accessibilityLiveRegion="polite" style={CENTER}>
@@ -540,6 +553,17 @@ function Who({ email, onChange }: { email: string; onChange?: () => void }) {
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+/** Under a name step's field: a soft line, never a block, when what's typed there looks like a password. */
+export function NameHint({ name }: { name: string }) {
+  const { t } = useTranslation();
+  if (!looksLikePassword(name)) return null;
+  return (
+    <Text variant="small" tone="muted" accessibilityLiveRegion="polite" style={CENTER}>
+      {t("auth.flow.nameLooksLikePassword")}
+    </Text>
   );
 }
 

@@ -520,6 +520,14 @@ export interface AgentAudience {
   consultable?: boolean;
 }
 
+/** A mailbox someone else gave the agent, which a wider audience takes from it (only its owner gives it again). */
+export interface ForeignMailbox {
+  accountId: string;
+  address: string;
+  ownerUserId: string | null;
+  ownerName: string | null;
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -677,6 +685,8 @@ export interface AgentInput {
   ownerUserId?: string | null;
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
+  /** With `audience`: the mailboxes the person agreed it loses; losing another refuses the save (409). */
+  mailLossSeen?: string[];
   appearance?: AgentLookInput;
   /** Editing only, admins: it coordinates the team (true takes it from whoever had it), ADR 0093. */
   coordinator?: boolean;
@@ -837,6 +847,22 @@ export interface Channel {
   muted?: boolean;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
+  /**
+   * Channel list only: what I may do here with its exceptions (ADR 0134): send messages, wake its agents, manage it.
+   * Absent (an older server): the workspace's keys decide.
+   */
+  can?: { post: boolean; callAgents: boolean; manage: boolean };
+}
+
+/** A key a channel may change for a role or a person (ADR 0134). */
+export type ChannelKey = "post" | "talk_to_agents" | "manage_channels";
+export const CHANNEL_KEYS: readonly ChannelKey[] = ["post", "talk_to_agents", "manage_channels"];
+
+/** One exception of a channel: for a role (`everyone`, "Todos", too) or a person. */
+export interface ChannelOverride {
+  target: { type: "role" | "person"; id: string };
+  allow: ChannelKey[];
+  deny: ChannelKey[];
 }
 
 /** Who may join a channel, on creating it or changing it later. */
@@ -1105,6 +1131,12 @@ export interface ActiveRun {
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
 export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
+  /** Someone joined or left, or an agent's way of replying changed (agents carry `autoReply`). */
+  | {
+      type: "channel.member_added" | "channel.member_removed" | "channel.member_updated";
+      channelId: string;
+      member: { type: "person" | "agent"; id: string; autoReply?: boolean };
+    }
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
@@ -1502,9 +1534,10 @@ export interface Approval {
 /** A kind of call the agent runs without asking, approved for good by someone who decides its approvals. */
 export interface ApprovalRule {
   id: string;
-  connectionId: string;
-  /** The connection's name ("Composio"). */
-  server: string;
+  /** Null: a command on the agent's computer (`tool` is `command`, `action` its kind: `gh issue create`). */
+  connectionId: string | null;
+  /** The connection's name ("Composio"); null for a command. */
+  server: string | null;
   /** The server's own tool name. */
   tool: string;
   /** How the workspace labelled that tool. */
@@ -1603,6 +1636,8 @@ export interface Connection {
   tokenExpiresAt: string | null;
   createdAt: string;
   revokedAt: string | null;
+  /** OAuth scopes this sign-in lacks that the connector asks for now (GitHub's `project`). Older servers leave it out. */
+  reconnectAdds?: string[];
 }
 
 /** An installation of our GitHub App bound to the organization (repository access for git and PRs). */
@@ -2549,6 +2584,8 @@ export interface AgentQuestion {
   answeredByUserId: string | null;
   /** The agent took it back: it no longer needs an answer. */
   withdrawn?: true;
+  /** A person (`answeredByUserId`) skipped it: the agent went on without an answer. */
+  dismissed?: true;
 }
 
 /**
@@ -2786,6 +2823,8 @@ export interface ArtifactDetail extends Artifact {
   /** The version shown (may be older than `version`). */
   shownVersion: number;
   content: ArtifactContent;
+  /** It keeps versions (a history, "Enviar nova versão"): false for a snapshot such as a screenshot (ADR 0019). */
+  versioned?: boolean;
 }
 
 /** `message.meta.artifacts`: what the agent created or changed in that reply. */
@@ -3412,8 +3451,33 @@ export interface Skill {
   locked?: boolean;
   useCount?: number;
   lastUsedAt?: string | null;
+  /** "Atualizar sozinha": read from its link every day (older servers leave these out). */
+  autoUpdate?: boolean;
+  /** When its link was last read to update it. */
+  checkedAt?: string | null;
+  /**
+   * An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or would
+   * replace what agents changed since (`edited`, left out by older servers).
+   */
+  pendingUpdate?: { scripts: string[]; at: string; dismissed: boolean; edited?: boolean } | null;
+  /** Why its last update from its link failed: a code (`skill.no_skill_md`, `skill.connection_gone`…). */
+  updateError?: string | null;
+  /** Its last update from its link, or an agent's last change to it (`agentId`), while Desfazer can take it back. */
+  lastUpdate?: { fromVersion: number; at: string; agentId?: string | null } | null;
+  /** "Agentes melhoram as skills sozinhos" set for this skill; null: the workspace's setting. */
+  agentsImprove?: boolean | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * An update from a skill's link: `waiting` when it adds or changes files that run (`scripts`), which a person who
+ * manages skills applies or refuses.
+ */
+export interface SkillSourceUpdate {
+  status: "unchanged" | "updated" | "waiting";
+  skill: SkillDetail;
+  scripts?: string[];
 }
 
 export interface SkillFile {
@@ -3478,6 +3542,15 @@ export interface SkillPatch {
   defaultForNewAgents?: boolean;
   /** Freeze it: agents can't change it. */
   locked?: boolean;
+  /** Update it from its link every day, with the rights of whoever turns it on. */
+  autoUpdate?: boolean;
+  /** Agents improve it by themselves; null follows the workspace. */
+  agentsImprove?: boolean | null;
+}
+
+/** The workspace's skill settings: "Agentes melhoram as skills sozinhos" (on by default). */
+export interface SkillSettings {
+  agentsImprove: boolean;
 }
 
 /** A skill an agent made from its own how-tos (ADR 0120), archived ones too. */
@@ -4898,7 +4971,7 @@ export interface AgentBrain {
   accountsSupported: boolean;
   /** Nobody but the agent's owner talks to it ("Atende outras pessoas" off). */
   onlyOwner: boolean;
-  /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
+  /** The viewer owns the agent: only they connect its plan and turn its paid extra usage on or off. */
   canUsePlans: boolean;
   /** "Conta deste computador" can think for it: whoever connected the computer owns the agent. */
   ownSignIn: boolean;
@@ -5049,6 +5122,8 @@ export interface AgentSetupResult {
   params?: Record<string, string>;
   /** Its Autonomia changes, whatever its AI does: wherever the caller may set it by hand, `skipped` agents too. */
   autonomy?: { from: CommandApproval; to: CommandApproval };
+  /** It lets more people talk to it on its owner's plan, someone else's: the apps ask first (`setupPlanQuestion`). */
+  opensPlan?: true;
 }
 
 /** `GET …/agent-setup`: what a new agent starts thinking with (the last setup saved or used on others). */
@@ -5393,9 +5468,16 @@ export interface MissionCommand {
   decidedBy: string | null;
   decidedAt: string | null;
   always: boolean;
+  /** "Aprovar sempre para o agente" is offered: the kind of command it keeps (`gh issue create`). Older servers leave it out. */
+  agentKind?: string | null;
+  /** The person chose it. */
+  forAgent?: boolean;
   createdAt: string;
   expiresAt: string;
 }
+
+/** A mission command card's answer: `always` for the rest of the mission, `agent` that kind for the agent for good. */
+export type MissionCommandDecision = "allow" | "deny" | "always" | "agent";
 
 // ── Notifications (contract: one inbox per person per organization) ─────────────
 
@@ -5478,7 +5560,13 @@ export type NotificationKind =
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
-  | "app_created";
+  | "app_created"
+  /**
+   * An update of a skill from its link: `latest.statusTo` `updated`, `waiting` (it changes files that run: who manages
+   * skills, waiting, the files in `latest.title`) or `failed` (`latest.reason` its code). `source.skillId`, its name in
+   * `source.label`. Opens the skill.
+   */
+  | "skill_update";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5499,6 +5587,8 @@ export interface NotificationSource {
   questionId?: string;
   missionId?: string;
   routineId?: string;
+  /** `skill_update`: the skill. */
+  skillId?: string;
   /** `machine_connected`: the computer. */
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */

@@ -1,4 +1,3 @@
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type CodingPlan, planReplies } from "@agenteschat/client/lib/plans";
 import * as Clipboard from "expo-clipboard";
 import { openBrowserAsync } from "expo-web-browser";
@@ -8,7 +7,6 @@ import { Linking, StyleSheet, TextInput, View } from "react-native";
 import {
   Button,
   fieldText,
-  GroupedFooter,
   GroupedList,
   GroupedRow,
   Icon,
@@ -78,13 +76,15 @@ export function Note({
 
 /**
  * "Atende outras pessoas" (ADR 0059 §5), the web's `PlanReplies`: off, an agent on its owner's plan answers only them;
- * on, everyone who may talk to it. Under it, a line saying which, on which plan, and the plan's terms behind its ⓘ.
+ * on, everyone who may talk to it. Under it, a line saying which, on which plan (whose, to an admin), and the plan's
+ * terms behind its ⓘ.
  * A plan's page and the agent's AI draw the same.
  */
 export function PlanReplies({
   on,
   onChange,
   agent,
+  owner,
   brain,
   plan,
   coding,
@@ -94,6 +94,8 @@ export function PlanReplies({
   onChange: (on: boolean) => void;
   /** The agent's name, for the line under the switch. */
   agent: string;
+  /** The plan's owner's first name, to anyone else (an admin); absent: the viewer's own plan. */
+  owner?: string;
   brain: "claude_code" | "codex" | "cursor" | "opencode";
   /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
   plan?: string | null;
@@ -102,7 +104,7 @@ export function PlanReplies({
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const says = planReplies(t, { on, agent, brain, plan, coding });
+  const says = planReplies(t, { on, agent, owner, brain, plan, coding });
   return (
     <View>
       <GroupedList>
@@ -125,22 +127,6 @@ export function PlanReplies({
           </Text>
         </InfoHint>
       </View>
-    </View>
-  );
-}
-
-/** The same place for someone who isn't the plan's owner: whom the agent answers, and who decides. */
-export function PlanRepliesOf({ on, owner, agentName }: { on: boolean; owner: string; agentName: string }) {
-  const { t } = useTranslation();
-  return (
-    <View>
-      <GroupedList>
-        <GroupedRow
-          label={on ? t("aiAccounts.share.switch") : t("aiAccounts.share.switchOther", { owner })}
-          labelLines={2}
-        />
-      </GroupedList>
-      <GroupedFooter>{t("aiAccounts.share.onOther", { ...agentGrammar(agentName), owner })}</GroupedFooter>
     </View>
   );
 }

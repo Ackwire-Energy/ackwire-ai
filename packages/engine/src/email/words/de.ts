@@ -338,4 +338,26 @@ export const words: EmailWords = {
     table: (day) => `Die ganze Tabelle: bun run report:autonomy --day ${day}`,
     why: "Du erhältst diese E-Mail, weil diese Adresse auf diesem Server in OPS_REPORT_EMAIL steht. Sie kommt einmal am Tag.",
   },
+  planOpened: {
+    subject: (plan) => `Mehr Leute können über dein ${plan}-Abo mit deinem Agenten sprechen`,
+    preheader: (plan) => `Ihre Unterhaltungen nutzen dein ${plan}-Abo und seine Limits.`,
+    headline: "Mehr Leute können mit deinem Agenten sprechen",
+    body: (by, agent, plan) => [
+      { b: by },
+      " hat mehr Leute mit ",
+      { b: agent },
+      ` sprechen lassen. Ihre Unterhaltungen nutzen dein ${plan}-Abo und seine Limits.`,
+    ],
+    agent: "Agent",
+    by: "Geändert von",
+    was: "Vorher",
+    now: "Jetzt",
+    everyone: "Alle im Workspace",
+    onlyYou: "Nur du",
+    you: "Du",
+    note: "Zum Rückgängigmachen ändere Wer schreiben darf auf der Seite des Agenten.",
+    button: "Ansehen, wer schreiben darf",
+    why: (org) =>
+      `Du erhältst diese E-Mail, weil einer deiner Agenten in ${org} mit deinem Abo denkt und jemand anderes geändert hat, wer mit ihm sprechen darf.`,
+  },
 };
