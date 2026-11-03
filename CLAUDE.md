@@ -1,54 +1,50 @@
-# agentes (domínio agentes.chat)
-Workspace estilo Slack/Teams onde pessoas e agentes de IA trabalham juntos.
-O produto usa design system próprio (`docs/design`): botões, inputs, ícones, tudo original.
+# agentes.chat
+
+A Slack/Teams-style workspace where people and AI agents work together. This file is for contributors and their coding agents: the engineering rules and where things live. Start with `README.md`, `CONTRIBUTING.md` and `SELF_HOSTING.md`; architecture decisions are in `docs/adr/`.
+
+Product name in code and docs: **agentes.chat**. Package scope `@agenteschat/*`. The product has its own design system (`docs/design`): buttons, inputs and icons are all original, so reuse its components instead of generic ones.
 
 ## Stack
-Bun + Hono + Drizzle, front Vite + React + TanStack, WebSocket nativo do Bun, Better Auth (ADR 0011). Postgres é a única dependência no self-host (fila em outbox no Postgres, ADR 0005); Redis e Turbopuffer só como módulos da Cloud.
-Código aberto: AGPL-3.0-only em tudo o que é público, contribuições sob a mesma licença, sem `ee/` (ADR 0002). Self-host por docker-compose, 100% grátis (`SELF_HOSTING.md`); a Cloud é a mesma imagem com variáveis de ambiente. O self-host funciona só com Postgres: serviço externo é opcional, ligado por variável, atrás das interfaces/módulos (adaptadores trocáveis).
 
-## Conceitos
-- Organização (multi-tenant): tudo tem org_id. Contexto da org entra no prompt de todos os agentes.
-- Agente: papel, instruções, modelo, credencial, conectores/escopos, orçamento, humano responsável.
-- Credenciais de provedor ficam no nível da org, cifradas; agente aponta para uma (ou para a chave da plataforma).
-- Roteador: modelo barato e fixo decide quem responde (0 a 2 agentes). Nunca concede permissão.
-- Conectores em 2 camadas: org conecta o MCP uma vez; cada agente recebe subconjunto de escopos.
-- Ações sensíveis (merge, deploy, rollback) sempre viram pedido de aprovação humana no chat.
-- Issues, Drive (relatório, organograma, tabela, diff) e rotinas via jobs agendados.
+Bun + Hono + Drizzle on the server, Vite + React + TanStack on the web, Bun's native WebSocket, Better Auth (ADR 0011). PostgreSQL is the only required dependency (ADR 0005).
 
-## Ambiente e testes
-- Os testes não precisam de Docker nem de Postgres local; credenciais reais só no `.env`.
-- Testes unitários obrigatórios; rodam em PGlite em memória + fakes, sem `.env`, sem rede.
-- Para corrigir uma falha, rode um arquivo de teste por vez (`bun test caminho/do/arquivo.test.ts`); a verificação completa roda no CI do GitHub.
-- Desenvolvimento local usa um `DATABASE_URL` próprio, nunca o de produção.
-- Migrations commitadas são imutáveis; qualquer mudança vai numa migration nova.
+Licensing: AGPL-3.0-only for everything public, contributions under the same license, no `ee/` directory (ADR 0002). `packages/setup` (`@agenteschat/setup`) is the one MIT package. Self-hosting is docker-compose and free (`SELF_HOSTING.md`); agentes.chat Cloud runs this same image, configured by env vars. Any external service is optional, switched on by an env var behind an interface or module (swappable adapters).
 
-## Regras
-- Nunca expor chaves no client. Todo acesso a modelo/MCP passa pelo backend.
-- Cada chamada de modelo registra tokens e custo com agent_id e org_id.
+## Concepts
 
-Decisões de arquitetura: `docs/adr/` (manter atualizado).
+- Organization (multi-tenant): everything has an `org_id`. The organization's context goes into every agent's prompt.
+- Agent: role, instructions, model, credential, connectors and scopes, budget, responsible person.
+- Provider credentials live at the organization level, encrypted; an agent points at one (or at the platform key).
+- Router: a cheap, fixed model decides who answers (0 to 2 agents). It never grants permissions.
+- Connectors in two layers: the organization connects an MCP server once; each agent gets a subset of its scopes.
+- Sensitive actions (merge, deploy, rollback) always become a human approval request in the chat.
+- Issues, Drive (reports, org chart, tables, diffs) and routines through scheduled jobs.
 
-## Backend (English): where things live
-
-Product name in code and docs: **agentes.chat**. Package scope `@agenteschat/*`. Public repo `agentes-chat`; the Cloud runs this same image with env vars (ADR 0002). Backend decisions: `docs/adr/`.
-
-### Non-negotiables
+## Non-negotiables
 
 - PostgreSQL is the only required dependency (no Redis/BullMQ in core). Jobs = Postgres outbox, in-process workers (ADR 0005).
-- `apps/` and `packages/` never import `ee/` or any cloud package (`bun run check:boundaries`). With no contributor license agreement, anything in the server process must be AGPL, so Cloud-only behavior is public code switched on by env vars (through `AgentesModule` and adapters) or a separate private service over the network, never a private in-process module (ADR 0002).
+- `apps/` and `packages/` never import `ee/` or any cloud package (`bun run check:boundaries`). With no contributor license agreement, anything in the server process must be AGPL, so Cloud-only behavior is public code switched on by env vars (through `AgentesModule` and adapters) or a separate service over the network, never a private in-process module (ADR 0002).
 - Every tenant-owned table has `org_id` (a test enforces it).
-- Model calls go only through the Model Gateway (`packages/engine/src/gateway.ts`): budget checked before the call, usage + cost recorded with `org_id` and `agent_id`. Provider keys are encrypted per org (envelope encryption) and never returned to clients (ADR 0007).
+- Never expose keys to a client: every model and MCP call goes through the backend.
+- Model calls go only through the Model Gateway (`packages/engine/src/gateway.ts`): budget checked before the call, tokens and cost recorded with `org_id` and `agent_id`. Provider keys are encrypted per org (envelope encryption) and never returned to clients (ADR 0007).
 - Env vars only in `packages/config/src/schema.ts`, then `bun run docs:env` (regenerates `.env.example`).
-- Every file outside `PRIVATE_PATHS` (`scripts/check-boundaries.ts`) is public, comments included: cite the ADR or state the reason, never a private planning id, prototype screen or internal name (`bun run check:boundaries` fails on them).
-- Tests need no Docker or local Postgres: they run on in-memory PGlite and a fake model provider; no `.env` and no network needed. Real credentials go in `.env` (only `dev`/`start` read it).
+- Committed migrations are immutable: any change goes in a new migration (`bun run db:generate <name>`).
+- Every file is public, comments included: cite the ADR or state the reason itself, never an internal planning id, prototype screen or internal name (`bun run check:boundaries` fails on them).
+- A new architecture decision, or a change to one, gets an ADR in `docs/adr/`.
 
-### Commands
+## Tests and local development
+
+- Unit tests are required. They run on in-memory PGlite and fakes (a fake model provider from `@agenteschat/providers/testing`): no Docker, no local Postgres, no `.env`, no network.
+- Real credentials go only in `.env` (only `dev`/`start` read it). Local development uses its own `DATABASE_URL`, never a production one.
+- To fix a failure, run one test file (`bun test path/to/file.test.ts`); CI runs the full suite.
+
+## Commands
 
 `bun run ci:local` (every CI check but the image boot) · `bun test` · `bun run typecheck` · `bun run lint` · `bun run format` · `bun run check:boundaries` · `bun run check:licenses` · `bun run db:generate <name>` · `bun run docs:env` · `bun run dev`
 
 Run lint, typecheck, tests and boundaries before declaring work done.
 
-### Map
+## Map
 
 - Boot: `apps/server/src/start.ts` (`startServer`: config → DB → migrations → adapters + module overrides → HTTP + WebSocket → workers). Self-host entry: `src/main.ts`.
 - HTTP app: `apps/server/src/app.ts` (`createApp`, testable via `app.request`). Private web-app API: `src/routes/app/*` (`/api/app/*`, `createRoute` from `@hono/zod-openapi`, cookie session + CSRF in `routes/app/context.ts`). OpenAPI at `/api/openapi.json`.
