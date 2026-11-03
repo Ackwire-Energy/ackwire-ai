@@ -231,18 +231,22 @@ describe("the count chip", () => {
     expect(small.querySelector(".ac-countchip")?.className).toBe("ac-countchip ac-countchip--sm");
     expect(body().getByText("6").className).toBe("ac-countchip ac-countchip--strong");
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
-    const rule = /\.ac-countchip \{([^}]*)\}/.exec(css)?.[1] ?? "";
-    for (const decl of [
-      "display: inline-flex",
-      "align-items: center",
-      "justify-content: center",
-      "line-height: 1",
-      "align-self: center",
-      "height: var(--count-h)",
-      "min-width: var(--count-h)",
-    ]) {
+    const rule = /\.ac-countchip \{(\s*--count-h[^}]*)\}/.exec(css)?.[1] ?? "";
+    for (const decl of ["align-self: center", "height: var(--count-h)", "min-width: var(--count-h)"]) {
       expect(rule).toContain(decl);
     }
+    // Every count pill centres its figures' own box (cap height to baseline) on the pill, not the font's line box.
+    const centred = /\.ac-count,\s*\.ac-countchip \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    for (const decl of [
+      "display: inline-block",
+      "align-content: center",
+      "text-align: center",
+      "line-height: 1",
+      "text-box: trim-both cap alphabetic",
+    ]) {
+      expect(centred).toContain(decl);
+    }
+    expect(rule).not.toMatch(/display|line-height/);
     // Digits come from the shared count rule: the text face, tabular (Doto is only for special moments).
     const counts = /\.ac-num,[^{]*\.ac-countchip,[^{]*\{([^}]*)\}/.exec(css)?.[1] ?? "";
     expect(counts).toContain("font-family: var(--font-sans)");

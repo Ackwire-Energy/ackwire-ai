@@ -94,7 +94,6 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
   padding: 0 4px;
   font-size: 10.5px;
   font-weight: 700;
-  line-height: 1;
   color: var(--pane);
   background: var(--ink2);
   box-shadow: 0 0 0 2px var(--pane);

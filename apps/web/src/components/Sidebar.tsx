@@ -1381,13 +1381,13 @@ function PersonRow({
 function UnreadCount({ count, mentions = false }: { count: number; mentions?: boolean }) {
   const { t } = useTranslation();
   return (
-    <span
+    <CountBadge
       className="sidebar__unread"
       role="img"
       aria-label={t(mentions ? "shell.unreadMentions" : "shell.unread", { count })}
     >
       {count > 99 ? "99+" : count}
-    </span>
+    </CountBadge>
   );
 }
 

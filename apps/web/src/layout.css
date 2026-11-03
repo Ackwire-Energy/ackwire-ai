@@ -1442,21 +1442,16 @@ html:not([data-pointer]) .member-row--add:focus-visible {
 .sidebar__item[data-unread="true"] .sidebar__item-label {
   font-weight: 600;
 }
+/* A count pill (`.ac-count`, which centres the number) in red; proportional digits, so a lone "1" isn't set in a
+   "0"'s width off to one side. */
 .sidebar__unread {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  box-sizing: border-box;
-  display: inline-grid;
-  place-items: center;
-  border-radius: var(--radius-full);
   background: var(--danger);
   color: var(--raised);
   font-size: 11.5px;
   font-weight: 700;
-  /* Its own line, the pill's height, so the number sits in the middle; proportional digits, so a lone "1" isn't set
-     in a "0"'s width off to one side. */
-  line-height: 18px;
   font-variant-numeric: normal;
 }
 .sidebar__label-row {
@@ -6242,7 +6237,6 @@ html:not([data-pointer]) .run-continue:focus-visible {
   height: 16px;
   padding: 0 4px;
   font-size: 10px;
-  line-height: 16px;
 }
 .sidebar[data-rail="true"] .sidebar__top,
 .sidebar[data-rail="true"] .sidebar__scroll,
