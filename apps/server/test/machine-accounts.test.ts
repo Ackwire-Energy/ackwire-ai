@@ -209,9 +209,12 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   });
   expect((await api(`/agents/${agentId}/brain`, { method: "PUT", json: { account: OLD_ACCOUNT } })).status).toBe(400);
   expect((await api(`/agents/${agentId}/brain`, { method: "PUT", json: { effort: "turbo" } })).status).toBe(400);
-  const locked = await asAdmin(`/agents/${agentId}/brain`, { method: "PUT", json: { account: null } });
-  expect(locked.status).toBe(403);
-  expect(await code(locked)).toBe("account.not_owner");
+  // An admin picks among the owner's too: the computer's own sign-in, since the owner connected the Mac, and back.
+  const moved = await asAdmin(`/agents/${agentId}/brain`, { method: "PUT", json: { account: null } });
+  expect(moved.status).toBe(200);
+  expect(await moved.json()).toMatchObject({ account: null, canUsePlans: false, canManageAccounts: false });
+  const back = await asAdmin(`/agents/${agentId}/brain`, { method: "PUT", json: { account: login.loginId } });
+  expect(await back.json()).toMatchObject({ account: login.loginId });
 
   // Remove: signed out on the computer, the agent back on the computer's own sign-in.
   expect((await asAdmin(`${base}/accounts/${login.loginId}`, { method: "DELETE" })).status).toBe(403);
