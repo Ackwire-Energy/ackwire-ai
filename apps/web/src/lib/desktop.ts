@@ -1,5 +1,6 @@
 import type { AppNotification, SignInProvider } from "@agenteschat/client";
-import { mediaKindOf, mediaWord } from "@agenteschat/client/lib/media";
+import { noticeLine } from "@agenteschat/client/lib/island";
+import { mediaWord } from "@agenteschat/client/lib/media";
 import type { i18n as I18n, TFunction } from "i18next";
 import { useEffect } from "react";
 
@@ -54,8 +55,6 @@ const NOTICE_KINDS = [
 ] as const;
 type NoticeKind = (typeof NOTICE_KINDS)[number];
 const isNoticeKind = (kind: string): kind is NoticeKind => (NOTICE_KINDS as readonly string[]).includes(kind);
-/** Kinds whose own title says what it is (the approval's action, the mission's name); the rest say their text. */
-const TITLED = new Set(["approval", "forum_turn", "mission_stopped", "routine_failed", "routine_paused"]);
 const NOTICE_TITLE_MAX = 80;
 const NOTICE_BODY_MAX = 180;
 
@@ -77,13 +76,11 @@ export function desktopNotice(
   if (n.readAt || n.doneAt || n.count > 1) return null;
   const kind = isNoticeKind(n.kind) ? n.kind : n.waiting ? "waiting" : null;
   if (!kind) return null;
-  const [first, second] = TITLED.has(kind) ? [n.latest.title, n.latest.text] : [n.latest.text, n.latest.title];
-  // A GIF or a sticker with no words: its word (ADR 0091).
-  const media = mediaKindOf(n.latest.media);
   return {
     title: oneLine(t(`desktopNotice.${kind}`), NOTICE_TITLE_MAX),
+    // The snippet, an approval's action, or the word for a GIF, a sticker or a voice message (ADR 0091, 0100).
     body: oneLine(
-      media === "voice" ? mediaWord(t, media) : (first ?? second ?? "") || (media ? mediaWord(t, media) : ""),
+      noticeLine(n, (media) => mediaWord(t, media)),
       NOTICE_BODY_MAX,
     ),
     path: `/org/${encodeURIComponent(orgId)}/notifications`,

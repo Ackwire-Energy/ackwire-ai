@@ -1101,6 +1101,22 @@
     "secret_request": "Un agent a besoin d'un secret de votre part",
     "waiting": "Quelque chose vous attend"
   },
+  "island": {
+    "label": "Nouvelles notifications",
+    "expand": "Voir les notifications",
+    "reply": "Répondre",
+    "otherAnswer": "Autre réponse",
+    "review": "Examiner",
+    "open": "Ouvrir",
+    "dismiss": "Ignorer",
+    "send": "Envoyer",
+    "placeholder": "Écrivez votre réponse…",
+    "sent": "Envoyé",
+    "answered": "Vous avez répondu : {{choice}}",
+    "failed": "L’envoi a échoué. Réessayez.",
+    "all": "Tout voir",
+    "closes": "ferme"
+  },
   "contextMenu": {
     "label": "Menu d'actions",
     "react": "Réagir",

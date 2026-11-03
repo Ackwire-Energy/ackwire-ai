@@ -1029,6 +1029,22 @@
     "secret_request": "有智能体需要你提供一项机密信息",
     "waiting": "有事项在等你处理"
   },
+  "island": {
+    "label": "新通知",
+    "expand": "查看通知",
+    "reply": "回复",
+    "otherAnswer": "其他回答",
+    "review": "审核",
+    "open": "打开",
+    "dismiss": "忽略",
+    "send": "发送",
+    "placeholder": "写下你的回答…",
+    "sent": "已发送",
+    "answered": "你的回答：{{choice}}",
+    "failed": "没有发送成功，请重试。",
+    "all": "查看全部",
+    "closes": "关闭"
+  },
   "contextMenu": {
     "label": "操作",
     "react": "回应",

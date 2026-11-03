@@ -1,0 +1,560 @@
+import type { AppNotification } from "@agenteschat/client";
+import { useNotificationAction, useNotificationReply } from "@agenteschat/client";
+import { type IslandItem, islandLead, noticeLine } from "@agenteschat/client/lib/island";
+import { mediaWord } from "@agenteschat/client/lib/media";
+import { replyTarget, waitingCardOf } from "@agenteschat/client/lib/notifications";
+import { router } from "expo-router";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  AccessibilityInfo,
+  type LayoutChangeEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { scheduleOnRN } from "react-native-worklets";
+import { setIslandLive } from "@/lib/push";
+import { serverUrl } from "@/lib/server";
+import { useRealtime } from "@/providers/realtime";
+import { haptics, Icon, type IconName, Text, useTheme } from "@/ui";
+import { variantStyle } from "@/ui/Text";
+import { useNoticeTitle } from "../activity/noticeTitle";
+import { openPage } from "../ai/parts";
+import { notificationHref, notificationWebPath } from "../links/logic";
+import { Face } from "../shared/Face";
+import { useOrgId } from "../shared/hooks";
+import { island } from "./island";
+
+/** The camera's island on iPhones that have one: the island grows out of it and folds back into it. */
+const CAMERA = { width: 126, height: 37, top: 11 };
+/** From this top inset an iPhone has the camera's island (14 Pro and later); below it, a notch or nothing. */
+const CAMERA_INSET = 59;
+const PILL_HEIGHT = 72;
+/** Open: until its height is measured. */
+const OPEN_GUESS = 260;
+const TICK_MS = 250;
+/** Swiped up this far, it's put away. */
+const PUT_AWAY = -24;
+/** "Enviado" stays this long before the notice leaves. */
+const SENT_MS = 1400;
+const OPEN_MAX = 3;
+const WHITE = "#fff";
+const MUTED = "rgba(255,255,255,0.64)";
+const LINE = "rgba(255,255,255,0.12)";
+
+type Shape = "none" | "pill" | "small" | "open";
+
+/**
+ * The island on the phone (ADR 0071 §9): what reaches me while the app is open grows out of the camera's island (on
+ * other phones it drops from the top as a dark pill), with the face of whoever called. A tap opens it with the whole
+ * text and the answer right there; swiping it up puts it away. A notice leaves after a few seconds, and one waiting
+ * on me shrinks beside the camera until I decide. While it is up, the system's banner stays away.
+ */
+export function NoticeIsland() {
+  const { t } = useTranslation();
+  const { motion, reducedMotion } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { status } = useRealtime();
+  const snap = useSyncExternalStore(island.subscribe, island.get, island.get);
+  const [open, setOpen] = useState(false);
+  const [openHeight, setOpenHeight] = useState(OPEN_GUESS);
+
+  // Up with the socket live: the system's banner stays away (nothing shows twice).
+  useEffect(() => {
+    setIslandLive(status === "open");
+    return () => setIslandLive(false);
+  }, [status]);
+
+  useEffect(() => {
+    const timer = setInterval(() => island.tick(TICK_MS), TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    island.pause("open", open);
+    return () => island.pause("open", false);
+  }, [open]);
+
+  const { lead, small, others } = islandLead(snap.items);
+  // The last one shown stays drawn while the island folds away.
+  const shown = useRef<IslandItem | null>(null);
+  if (lead) shown.current = lead;
+  useEffect(() => {
+    if (!snap.items.length) setOpen(false);
+  }, [snap.items.length]);
+
+  // A new arrival: a light tap.
+  const seen = useRef(snap.seq);
+  useEffect(() => {
+    if (snap.seq === seen.current) return;
+    seen.current = snap.seq;
+    if (snap.items.length) haptics.light();
+  }, [snap.seq, snap.items.length]);
+
+  const camera = Platform.OS === "ios" && insets.top >= CAMERA_INSET;
+  const top = camera ? CAMERA.top : insets.top + 6;
+  const shape: Shape = !lead ? "none" : open ? "open" : small ? "small" : "pill";
+  const size = {
+    none: camera ? { w: CAMERA.width, h: CAMERA.height } : { w: 44, h: 44 },
+    pill: { w: Math.min(width - 20, 420), h: PILL_HEIGHT },
+    small: { w: camera ? 250 : 200, h: camera ? CAMERA.height : 40 },
+    open: { w: Math.min(width - 16, 440), h: openHeight },
+  }[shape];
+  const corner = shape === "open" ? (camera ? 44 : 28) : shape === "pill" ? 36 : size.h / 2;
+
+  const w = useSharedValue(size.w);
+  const h = useSharedValue(size.h);
+  const r = useSharedValue(corner);
+  const fade = useSharedValue(0);
+  const content = useSharedValue(0);
+  const drag = useSharedValue(0);
+  useEffect(() => {
+    const to = (v: number) => (reducedMotion ? withTiming(v, { duration: 160 }) : withSpring(v, motion.pop));
+    w.value = to(size.w);
+    h.value = to(size.h);
+    r.value = to(corner);
+    if (shape === "none") {
+      content.value = withTiming(0, { duration: 120 });
+      // Back into the camera's island (or a dot), then gone.
+      fade.value = withDelay(reducedMotion ? 0 : 260, withTiming(0, { duration: 160 }));
+    } else {
+      fade.value = withTiming(1, { duration: 120 });
+      content.value = 0;
+      content.value = withDelay(reducedMotion ? 0 : 160, withTiming(1, { duration: 220 }));
+    }
+  }, [shape, size.w, size.h, corner, reducedMotion, motion.pop, w, h, r, fade, content]);
+
+  // Swiped up: what isn't waiting leaves, what is shrinks beside the camera.
+  const putAway = useCallback(() => {
+    setOpen(false);
+    island.putAway();
+  }, []);
+  const pan = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY([-8, 8])
+        .onChange((e) => {
+          drag.value = Math.min(0, drag.value + e.changeY);
+        })
+        .onEnd(() => {
+          if (drag.value < PUT_AWAY) scheduleOnRN(putAway);
+          drag.value = withSpring(0, { damping: 18, stiffness: 260 });
+        }),
+    [drag, putAway],
+  );
+
+  const box = useAnimatedStyle(() => ({
+    width: w.value,
+    height: h.value,
+    borderRadius: r.value,
+    opacity: fade.value,
+    transform: [{ translateY: drag.value }],
+  }));
+  const inner = useAnimatedStyle(() => ({ opacity: content.value }));
+
+  const item = lead ?? shown.current;
+  if (!item && shape === "none") return null;
+
+  return (
+    <>
+      {open ? (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setOpen(false)}
+          accessibilityLabel={t("common.close")}
+          accessibilityRole="button"
+        />
+      ) : null}
+      <View pointerEvents="box-none" style={[styles.place, { top }]}>
+        <GestureDetector gesture={pan}>
+          <Animated.View pointerEvents={shape === "none" ? "none" : "auto"} style={[styles.island, box]}>
+            <Animated.View style={[styles.fill, inner]}>
+              {shape === "open" ? (
+                <View
+                  style={{ width: size.w }}
+                  onLayout={(e: LayoutChangeEvent) => setOpenHeight(Math.ceil(e.nativeEvent.layout.height))}
+                >
+                  {snap.items.slice(0, OPEN_MAX).map((i, k) => (
+                    <Fragment key={i.n.id}>
+                      {k > 0 ? <View style={styles.rule} /> : null}
+                      <IslandRow n={i.n} onOpened={() => setOpen(false)} />
+                    </Fragment>
+                  ))}
+                  {snap.items.length > OPEN_MAX ? (
+                    <Pressable
+                      onPress={() => {
+                        setOpen(false);
+                        router.push("/activity");
+                      }}
+                      style={styles.all}
+                      accessibilityRole="link"
+                    >
+                      <Text variant="footnote" style={{ color: MUTED }}>
+                        {t("island.all")}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : item && shape === "small" ? (
+                <SmallIsland item={item} others={others} camera={camera} onPress={() => setOpen(true)} />
+              ) : item ? (
+                <Pill item={item} others={others} onPress={() => setOpen(true)} />
+              ) : null}
+            </Animated.View>
+          </Animated.View>
+        </GestureDetector>
+      </View>
+    </>
+  );
+}
+
+/** Who did what, the names bold, in white. */
+function Title({ n, lines }: { n: AppNotification; lines: number }) {
+  const { parts, names } = useNoticeTitle(n);
+  return (
+    <Text variant="subhead" numberOfLines={lines} style={{ color: MUTED }}>
+      {parts.map((part, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one fixed sentence
+        <Fragment key={i}>
+          {i > 0 ? <Text style={styles.names}>{names}</Text> : null}
+          {part}
+        </Fragment>
+      ))}
+    </Text>
+  );
+}
+
+const useLine = (n: AppNotification) => {
+  const { t } = useTranslation();
+  return noticeLine(n, (kind) => mediaWord(t, kind));
+};
+
+/** Closed: the face, who did what and the line; how many more. */
+function Pill({ item, others, onPress }: { item: IslandItem; others: number; onPress: () => void }) {
+  const { t } = useTranslation();
+  const { title } = useNoticeTitle(item.n);
+  const line = useLine(item.n);
+  // Said aloud as it arrives (VoiceOver, TalkBack).
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility([title, line].filter(Boolean).join(". "));
+  }, [title, line]);
+  return (
+    <Pressable
+      onPress={onPress}
+      style={styles.pill}
+      accessibilityRole="button"
+      accessibilityLabel={[title, line].filter(Boolean).join(", ")}
+      accessibilityHint={t("island.expand")}
+    >
+      <Face who={faceOf(item.n)} size={40} />
+      <View style={styles.grow}>
+        <Title n={item.n} lines={1} />
+        {line ? (
+          <Text variant="subhead" numberOfLines={1} style={{ color: WHITE }}>
+            {line}
+          </Text>
+        ) : null}
+      </View>
+      {others > 0 ? (
+        <View style={styles.count}>
+          <Text variant="caption" style={styles.countText}>
+            +{others}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** Only requests waiting on me are left: the face beside the camera and what it asks of me. */
+function SmallIsland({
+  item,
+  others,
+  camera,
+  onPress,
+}: {
+  item: IslandItem;
+  others: number;
+  camera: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  const { title } = useNoticeTitle(item.n);
+  const ask = item.n.waiting ? waitingCardOf(item.n).action : "open";
+  const label = ask === "review" ? t("island.review") : ask === "answer" ? t("island.reply") : t("island.open");
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.small, camera ? styles.smallSplit : styles.smallTogether]}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={t("island.expand")}
+    >
+      <Face who={faceOf(item.n)} size={27} />
+      <Text variant="footnote" numberOfLines={1} style={styles.smallLabel}>
+        {others > 0 ? `${label} +${others}` : label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** One notice on the open island: who and what, the whole line, and the answer right there. */
+function IslandRow({ n, onOpened }: { n: AppNotification; onOpened: () => void }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const act = useNotificationAction(orgId);
+  const reply = useNotificationReply(orgId);
+  const line = useLine(n);
+  const [typing, setTyping] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [done, setDone] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    island.pause(`typing:${n.id}`, typing);
+    return () => island.pause(`typing:${n.id}`, false);
+  }, [typing, n.id]);
+
+  const target = replyTarget(n);
+  const waiting = n.waiting ? waitingCardOf(n) : null;
+  const suggestions = n.kind === "agent_question" ? (n.latest.suggestions ?? []) : [];
+  const href = notificationHref(n);
+  const web = href ? null : notificationWebPath(n, orgId);
+
+  const read = () => {
+    if (!n.readAt) act.mutate({ type: "read", item: n, read: true });
+  };
+  const open = () => {
+    read();
+    island.settle(n.id);
+    onOpened();
+    // An approval opens in its sheet (held to approve there); the rest, where it happened.
+    if (href) router.push(href);
+    else if (web) openPage(`${serverUrl()}${web}`);
+  };
+  const answer = (text: string, choice = false) => {
+    if (!target || !text.trim()) return;
+    setFailed(false);
+    reply.mutate(
+      { target, text: text.trim(), choice },
+      {
+        onSuccess: () => {
+          read();
+          setTyping(false);
+          haptics.success();
+          setDone(choice ? t("island.answered", { choice: text.trim() }) : t("island.sent"));
+          setTimeout(() => island.settle(n.id), SENT_MS);
+        },
+        onError: () => {
+          haptics.error();
+          setFailed(true);
+        },
+      },
+    );
+  };
+  const canOpen = Boolean(href || web);
+  const primary = waiting && waiting.action !== "answer" && canOpen;
+
+  return (
+    <View style={styles.row}>
+      <Face who={faceOf(n)} size={34} />
+      <View style={styles.grow}>
+        <Title n={n} lines={2} />
+        {line ? (
+          <Text variant="callout" numberOfLines={4} style={styles.text}>
+            {line}
+          </Text>
+        ) : null}
+        {done ? (
+          <View style={styles.done} accessibilityLiveRegion="polite">
+            <Icon name="check" size={16} color="#7ee2a8" />
+            <Text variant="footnote" style={styles.doneText}>
+              {done}
+            </Text>
+          </View>
+        ) : typing && target ? (
+          <View style={styles.reply}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              autoFocus
+              placeholder={t("island.placeholder")}
+              placeholderTextColor={MUTED}
+              accessibilityLabel={t("island.reply")}
+              returnKeyType="send"
+              onSubmitEditing={() => answer(draft)}
+              editable={!reply.isPending}
+              style={[styles.input, { ...variantStyle("callout"), lineHeight: undefined }]}
+              keyboardAppearance="dark"
+            />
+            <Chip
+              icon="send"
+              label={t("island.send")}
+              iconOnly
+              primary
+              disabled={!draft.trim() || reply.isPending}
+              onPress={() => answer(draft)}
+            />
+          </View>
+        ) : (
+          <View style={styles.acts}>
+            {suggestions.map((s) => (
+              <Chip key={s} label={s} outline disabled={reply.isPending} onPress={() => answer(s, true)} />
+            ))}
+            {primary ? (
+              <Chip
+                label={waiting?.action === "review" ? t("island.review") : t("island.open")}
+                primary
+                onPress={open}
+              />
+            ) : null}
+            {target ? (
+              <Chip
+                icon="reply"
+                label={suggestions.length ? t("island.otherAnswer") : t("island.reply")}
+                onPress={() => setTyping(true)}
+              />
+            ) : null}
+            {!primary && canOpen ? <Chip label={t("island.open")} onPress={open} /> : null}
+          </View>
+        )}
+        {failed ? (
+          <Text variant="footnote" style={styles.failed}>
+            {t("island.failed")}
+          </Text>
+        ) : null}
+      </View>
+      <Pressable
+        onPress={() => island.dismiss(n.id)}
+        hitSlop={10}
+        style={styles.x}
+        accessibilityRole="button"
+        accessibilityLabel={t("island.dismiss")}
+      >
+        <Icon name="x" size={16} color={MUTED} />
+      </Pressable>
+    </View>
+  );
+}
+
+/** A button on the island: white on the dark for the main one, a soft tint for the rest, a ring for a choice. */
+function Chip({
+  label,
+  icon,
+  iconOnly,
+  primary,
+  outline,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  icon?: IconName;
+  iconOnly?: boolean;
+  primary?: boolean;
+  outline?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const ink = primary ? "#000" : WHITE;
+  return (
+    <Pressable
+      onPress={() => {
+        haptics.light();
+        onPress();
+      }}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      style={({ pressed }) => [
+        styles.chip,
+        iconOnly && styles.chipIcon,
+        primary ? styles.chipPrimary : outline ? styles.chipOutline : styles.chipSoft,
+        (pressed || disabled) && { opacity: disabled ? 0.45 : 0.75 },
+      ]}
+    >
+      {icon ? <Icon name={icon} size={16} color={ink} /> : null}
+      {iconOnly ? null : (
+        <Text variant="subhead" style={{ color: ink, fontWeight: "600" }}>
+          {label}
+        </Text>
+      )}
+    </Pressable>
+  );
+}
+
+const faceOf = (n: AppNotification) => {
+  const a = n.actors[0];
+  return a ? { type: a.type === "agent" ? "agent" : "person", id: a.id } : null;
+};
+
+const styles = StyleSheet.create({
+  // The island's place: centered, whatever its width while it grows.
+  place: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 100 },
+  island: {
+    backgroundColor: "#000",
+    overflow: "hidden",
+    borderCurve: "continuous",
+    boxShadow: "0 18px 40px -16px rgba(0,0,0,0.6)",
+  },
+  fill: { flex: 1 },
+  pill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12, paddingLeft: 16, paddingRight: 18 },
+  grow: { flex: 1, minWidth: 0 },
+  names: { color: WHITE, fontWeight: "600" },
+  count: {
+    minWidth: 26,
+    height: 22,
+    paddingHorizontal: 7,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countText: { color: WHITE, fontWeight: "700" },
+  small: { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 5 },
+  // Beside the camera: the face on its left, the ask on its right.
+  smallSplit: { justifyContent: "space-between", paddingRight: 14 },
+  smallTogether: { gap: 10, paddingRight: 14 },
+  smallLabel: { color: WHITE, fontWeight: "600" },
+  row: { flexDirection: "row", gap: 12, paddingTop: 18, paddingBottom: 16, paddingLeft: 16, paddingRight: 40 },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: LINE, marginHorizontal: 16 },
+  text: { color: WHITE, marginTop: 2 },
+  acts: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
+  chip: {
+    height: 36,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  chipIcon: { width: 36, paddingHorizontal: 0 },
+  chipPrimary: { backgroundColor: WHITE },
+  chipSoft: { backgroundColor: "rgba(255,255,255,0.14)" },
+  chipOutline: { borderWidth: 1.5, borderColor: "rgba(255,255,255,0.24)" },
+  reply: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingLeft: 14,
+    paddingRight: 4,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  input: { flex: 1, minWidth: 0, color: WHITE, paddingVertical: 6 },
+  done: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
+  doneText: { color: "#7ee2a8", fontWeight: "600" },
+  failed: { color: "#ff8a80", marginTop: 6 },
+  x: { position: "absolute", top: 14, right: 12, padding: 4 },
+  all: { alignItems: "center", paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: LINE },
+});

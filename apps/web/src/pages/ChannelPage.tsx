@@ -342,6 +342,7 @@ import { onAgentPanel, takeAgentPanel } from "@/lib/agent-panel-ask";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
+import { holdOnScreen } from "@/lib/island";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -851,6 +852,9 @@ function ChannelView({
   // Reading the channel marks it read: the sidebar's badges (channel and DM) clear at once. Only while the tab is
   // in view: an answer arriving in a tab left in the background is unread, and its notification pushes (ADR 0071).
   const markChannelRead = useMarkChannelRead(org.id).mutate;
+  // On screen, this conversation raises no notice on the island (ADR 0071 §9): its messages already show here.
+  const screenThread = thread?.id ?? null;
+  useEffect(() => holdOnScreen({ channelId: channel.id, threadId: screenThread }), [channel.id, screenThread]);
   const lastId = channelMessages.data?.at(-1)?.id;
   useEffect(() => {
     if (!isMember || !lastId || lastId.startsWith("local-")) return;

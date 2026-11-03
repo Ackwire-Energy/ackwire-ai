@@ -1583,14 +1583,14 @@ function Chat({
     ],
   );
 
-  // Pushes about this conversation stay quiet while it is on screen (no banner, no buzz).
+  // Pushes about this conversation stay quiet while it is on screen (no banner, no buzz), and so does the island.
   const focused = useIsFocused();
   useEffect(() => {
     if (!focused) return;
     // The release clears it only if it still holds this screen's conversation (the next screen may have
     // taken over before this one's blur).
-    return holdOpenConversation({ orgId, channelId });
-  }, [focused, orgId, channelId]);
+    return holdOpenConversation({ orgId, channelId, threadId });
+  }, [focused, orgId, channelId, threadId]);
   // "Falar com o Theo" from two agents' conversation: "@theo " in this field, once this screen is in view again.
   const composerRequest = useComposerRequest(channelId);
   const prefill = focused ? composerRequest : null;

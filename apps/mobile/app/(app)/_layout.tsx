@@ -2,6 +2,7 @@ import { usePrefetchRecent, useSendWaiting } from "@agenteschat/client";
 import { type ErrorBoundaryProps, Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
+import { NoticeIsland } from "@/features/island/NoticeIsland";
 import { useConnection, useRememberAgentLooks } from "@/features/shared/hooks";
 import { useAppIconBadge } from "@/features/shared/queries";
 import { ScreenError } from "@/features/shared/ScreenError";
@@ -40,7 +41,13 @@ export default function AppLayout() {
   // Signed in, the organization not known yet (the splash or `Entering` covers this) or none (the first run, `OnboardingFlow`, covers it):
   // the screens need one, so they mount once it's chosen, at the URL the app opened with.
   if (!org.state) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
-  return <AppStack />;
+  return (
+    <>
+      <AppStack />
+      {/* What reaches me while the app is open, out of the camera's island (ADR 0071 §9). */}
+      <NoticeIsland />
+    </>
+  );
 }
 
 function AppStack() {

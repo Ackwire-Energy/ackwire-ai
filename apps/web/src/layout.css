@@ -242,6 +242,8 @@ p {
  * then the page, laid out as before (a row: the page's main column and anything beside it).
  */
 .shell__work {
+  /* The island's place (components/notice-island.css): centered over the work area. */
+  position: relative;
   flex: 1 1 560px;
   min-width: 0;
   height: 100%;

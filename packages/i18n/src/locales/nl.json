@@ -1065,6 +1065,22 @@
     "secret_request": "Een agent heeft een geheim van je nodig",
     "waiting": "Er wacht iets op jou"
   },
+  "island": {
+    "label": "Nieuwe meldingen",
+    "expand": "Meldingen tonen",
+    "reply": "Beantwoorden",
+    "otherAnswer": "Ander antwoord",
+    "review": "Bekijken",
+    "open": "Openen",
+    "dismiss": "Verbergen",
+    "send": "Versturen",
+    "placeholder": "Schrijf je antwoord…",
+    "sent": "Verstuurd",
+    "answered": "Je antwoordde: {{choice}}",
+    "failed": "Dat lukte niet. Probeer het opnieuw.",
+    "all": "Alles bekijken",
+    "closes": "sluit"
+  },
   "contextMenu": {
     "label": "Acties",
     "react": "Reageren",

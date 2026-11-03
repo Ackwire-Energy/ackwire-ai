@@ -1065,6 +1065,22 @@
     "secret_request": "Ein Agent braucht ein Secret von dir",
     "waiting": "Etwas wartet auf dich"
   },
+  "island": {
+    "label": "Neue Benachrichtigungen",
+    "expand": "Benachrichtigungen anzeigen",
+    "reply": "Antworten",
+    "otherAnswer": "Andere Antwort",
+    "review": "Prüfen",
+    "open": "Öffnen",
+    "dismiss": "Ausblenden",
+    "send": "Senden",
+    "placeholder": "Schreib deine Antwort…",
+    "sent": "Gesendet",
+    "answered": "Deine Antwort: {{choice}}",
+    "failed": "Hat nicht geklappt. Versuch es noch mal.",
+    "all": "Alle ansehen",
+    "closes": "schließt"
+  },
   "contextMenu": {
     "label": "Aktionen",
     "react": "Reagieren",

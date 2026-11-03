@@ -1101,6 +1101,22 @@
     "secret_request": "Un agente ha bisogno di un segreto da te",
     "waiting": "Qualcosa ti aspetta"
   },
+  "island": {
+    "label": "Nuove notifiche",
+    "expand": "Mostra notifiche",
+    "reply": "Rispondi",
+    "otherAnswer": "Altra risposta",
+    "review": "Rivedi",
+    "open": "Apri",
+    "dismiss": "Ignora",
+    "send": "Invia",
+    "placeholder": "Scrivi la tua risposta…",
+    "sent": "Inviato",
+    "answered": "Hai risposto: {{choice}}",
+    "failed": "Non è andato a buon fine. Riprova.",
+    "all": "Vedi tutte",
+    "closes": "chiude"
+  },
   "contextMenu": {
     "label": "Azioni",
     "react": "Reagisci",

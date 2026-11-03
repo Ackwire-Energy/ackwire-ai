@@ -182,7 +182,7 @@ export function groupByDay(
 }
 
 /** The DM's or message's channel. */
-export const channelOf = (n: AppNotification) => n.source.channelId ?? n.source.dmId ?? null;
+export const channelOf = (n: Pick<AppNotification, "source">) => n.source.channelId ?? n.source.dmId ?? null;
 
 /**
  * Who asks to join in a request notice: the first people who asked, in that order (the notice's time is the first

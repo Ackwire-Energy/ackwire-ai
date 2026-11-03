@@ -1137,6 +1137,22 @@
     "secret_request": "Agent potrzebuje od ciebie sekretu",
     "waiting": "Coś czeka na ciebie"
   },
+  "island": {
+    "label": "Nowe powiadomienia",
+    "expand": "Pokaż powiadomienia",
+    "reply": "Odpowiedz",
+    "otherAnswer": "Inna odpowiedź",
+    "review": "Sprawdź",
+    "open": "Otwórz",
+    "dismiss": "Odrzuć",
+    "send": "Wyślij",
+    "placeholder": "Napisz odpowiedź…",
+    "sent": "Wysłano",
+    "answered": "Twoja odpowiedź: {{choice}}",
+    "failed": "Nie udało się wysłać. Spróbuj ponownie.",
+    "all": "Zobacz wszystkie",
+    "closes": "zamyka"
+  },
   "contextMenu": {
     "label": "Akcje",
     "react": "Zareaguj",
