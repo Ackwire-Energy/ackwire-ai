@@ -238,7 +238,7 @@ export function describeCapabilities(
  * connector's scopes, the approvals and the git proxy's branch rules.
  */
 export const GITHUB_GUIDANCE =
-  "- GitHub: use the GitHub connector's tools and git through `git_clone`; read-only gh (gh pr view, gh run view…) also works. Never sign the person in to gh (gh auth login) nor ask for a GitHub token. When the connector lacks something, say what, and that an admin can reconnect GitHub in Connectors to add it.";
+  "- GitHub: use the GitHub connector's tools and git through `git_clone`; read-only gh (gh pr view, gh run view…) runs without asking only where gh is already signed in. Never sign the person in to gh (gh auth login) nor ask for a GitHub token. When the connector lacks something, say what, and that an admin can reconnect GitHub in Connectors to add it.";
 
 /** How to use the agent browser (ADR 0040, ADR 0054), when the agent has it. */
 export const BROWSER_GUIDANCE =

@@ -125,10 +125,14 @@ describe("connections", () => {
       [{ connectionId: first.id, scope: "github:pr.read" }],
       connectorGrantValidator,
     );
+    await f.db
+      .insert(schema.approvalRules)
+      .values({ orgId: f.org.id, agentId: f.agent.id, connectionId: first.id, tool: "issue_write" });
     const second = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
       connector: "github",
       apiKey: "ghp_rotated_654321",
     });
+    expect((await f.db.select().from(schema.approvalRules)).map((r) => r.connectionId)).toEqual([second.id]);
     expect(await grantsOn(second.id)).toEqual([
       ["dev", "github:pr.read", f.owner.id],
       ["ops", "connector:*", f.owner.id],

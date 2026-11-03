@@ -791,13 +791,9 @@ const GH_READS: Record<string, ReadonlySet<string>> = {
 
 /** Read-only gh (`gh pr view 12 --json title`, `gh run list -R a/b`): never `--web`, which opens a browser. */
 function readOnlyGh(argv: string[]) {
-  const words: string[] = [];
-  for (let i = 1; i < argv.length; i++) {
-    const a = argv[i] as string;
-    if (GH_VALUE.has(a)) i++;
-    else if (!/^--(repo|hostname)=/.test(a)) words.push(a);
-  }
-  if (words.some((a) => a === "-w" || a === "--web")) return false;
+  const words = ghWords(argv.slice(1));
+  // `--web=true` and `-cw` too.
+  if (words.some((a) => /^--web(=|$)|^-[a-zA-Z]*w/.test(a))) return false;
   // gh's own jq reads the environment (`$ENV`, `env`), where keys live.
   if (words.some((a) => /^(-q|--jq)/.test(a)) && words.some((a) => /env/i.test(a))) return false;
   const [group = "", sub = ""] = words;
@@ -1034,6 +1030,19 @@ const GIT_GLOBAL_FLAG =
   /^(--no-pager|-p|--paginate|-P|--bare|--no-replace-objects|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-optional-locks|--no-advice|--no-lazy-fetch)$/;
 /** gh options that pick another repository or host, anywhere in the command. */
 const GH_VALUE = new Set(["-R", "--repo", "--hostname"]);
+/**
+ * gh's words without those options, in each form gh takes (`-R a/b`, `--repo=a/b`, `-Ra/b`): `gh pr -Ra/b merge 1`
+ * is a merge.
+ */
+function ghWords(args: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i] as string;
+    if (GH_VALUE.has(a)) i++;
+    else if (!/^--(repo|hostname)=|^-R./.test(a)) out.push(a);
+  }
+  return out;
+}
 /** Wrappers that run the next word as the command (`nice -n 5 git push …`, `env -u X git push …`). */
 const WRAPPERS = new Set(["command", "builtin", "nice", "nohup", "time", "env", "caffeinate"]);
 /** Wrapper options that take the next word. */
@@ -1074,13 +1083,8 @@ export function normalizedCommand(words: string[]): string {
       else break;
     }
     out.push(...rest.slice(i).map((a) => a.replace(/^(\+?)refs\/heads\//, "$1").replace(/:refs\/heads\//, ":")));
-  } else if (cmd === "gh") {
-    for (let i = 0; i < rest.length; i++) {
-      const a = rest[i] as string;
-      if (GH_VALUE.has(a)) i++;
-      else if (!/^--(repo|hostname)=/.test(a)) out.push(a);
-    }
-  } else out.push(...rest);
+  } else if (cmd === "gh") out.push(...ghWords(rest));
+  else out.push(...rest);
   return out.join(" ");
 }
 
@@ -1835,10 +1839,12 @@ export const forbiddenCode = (reason: string) => FORBIDDEN_CODES[reason] ?? "rul
 // ── "Aprovar sempre" for a command: its kind ──────────────────────────────────
 
 /** Interpreters whose first plain word is a script: alone, their kind would cover any code. */
-const SCRIPT_RUNNERS = /^(python[\d.]*|node|nodejs|bun|deno|ruby|perl|php)$/;
+const SCRIPT_RUNNERS = /^(python[\d.]*|node|nodejs|bun|deno|ruby|perl|php|npx|bunx|pnpx|uvx|pipx)$/;
+/** Kinds that run whatever script or package their next word names (`bun run ./x.ts`, `npm exec pkg`). */
+const RUNS_ANY = /^(npm|pnpm|yarn|bun|deno|uv|poetry|pdm|go) (run|x|exec|dlx)$/;
 /** Words of a kind that delete, publish, deploy, sign in or change settings and secrets: never approved for good. */
 const NEVER_FOR_GOOD_WORD =
-  /^(delete|del|destroy|remove|rm|drop|uninstall|purge|prune|clean|reset|restore|revert|rollback|merge|deploy|release|publish|unpublish|push|secret|secrets|variable|variables|ruleset|rerun|archive|unarchive|transfer|rename|apply|login|logout|auth|token|kill|approve|revoke|rotate|sudo)$/;
+  /^(delete|del|destroy|remove|rm|drop|uninstall|purge|prune|clean|reset|restore|revert|rollback|merge|deploy|release|publish|unpublish|push|secret|secrets|variable|variables|ruleset|rerun|archive|unarchive|transfer|rename|apply|login|logout|auth|token|kill|approve|revoke|rotate|sudo|config|alias|ssh-key|gpg-key|deploy-key)$/;
 /** Kinds that start workflows, change a repository's settings or approve pull requests (`gh pr review --approve`). */
 const NEVER_FOR_GOOD_KIND = /^gh (workflow (run|enable|disable)|repo edit|pr review)(\s|$)/;
 /** A subcommand word: lower case, no path, no value. */
@@ -1865,7 +1871,9 @@ export function commandKind(command: string): string | null {
   const input = { command };
   if (deniedMessage("Bash", input) || secretRead("Bash", input) || inlineCode(s.argv)) return null;
   if (outboundCallProblem("Bash", input) || gitPushes(command)?.length !== 0) return null;
-  const args = program === "gh" ? rest.filter((a, i) => !GH_VALUE.has(a) && !GH_VALUE.has(rest[i - 1] ?? "")) : rest;
+  // curl and wget only ask when they send or save: their kind would cover every upload.
+  if (program === "curl" || program === "wget") return null;
+  const args = program === "gh" ? ghWords(rest) : rest;
   if (args[0]?.startsWith("-")) return null;
   const words = [program];
   for (const a of args) {
@@ -1874,6 +1882,12 @@ export function commandKind(command: string): string | null {
   }
   if (words.length === 1 && SCRIPT_RUNNERS.test(program)) return null;
   const kind = words.join(" ");
-  if (words.slice(1).some((w) => NEVER_FOR_GOOD_WORD.test(w)) || NEVER_FOR_GOOD_KIND.test(kind)) return null;
+  if (RUNS_ANY.test(kind) || NEVER_FOR_GOOD_KIND.test(kind)) return null;
+  // Every plain word, not just the kind's: options in between still pick the subcommand (`make X=1 deploy`,
+  // `cargo +nightly publish`), and a word that only names something loses the button, never a card.
+  if (args.some((w) => NEVER_FOR_GOOD_WORD.test(w))) return null;
+  // Its kind alone only reads (`git branch`, `find`, `gh pr view`): what asked was an option (`-D`, `-delete`,
+  // `--web`), which the kind would cover with any arguments.
+  if (readOnlySimple({ argv: words, writes: [], reads: [] }, { cwd: "/nonexistent", folders: [] }, true)) return null;
   return kind;
 }

@@ -279,6 +279,8 @@ async function storeConnection(
     if (!row) throw new Error("connection insert returned nothing");
     if (previous) {
       await tx.update(agentScopes).set({ connectionId: row.id }).where(eq(agentScopes.connectionId, previous.id));
+      // "Aprovar sempre" (and the git proxy's grants through it) moves with them: Reconectar never asks again.
+      await tx.update(approvalRules).set({ connectionId: row.id }).where(eq(approvalRules.connectionId, previous.id));
     }
     // A custom server writes its own rows (`connector.custom_connected`, custom.ts).
     if (!input.connector.startsWith("custom:")) {
@@ -637,9 +639,10 @@ export async function completeOAuth(
     serverUrl: checkServerUrl(row.serverUrl ?? def.serverUrl),
     secret: { accessToken: token.access_token, refreshToken: token.refresh_token },
     tokenExpiresAt: token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null,
-    oauthScopes: (typeof token.scope === "string" ? token.scope.split(/[\s,]+/) : def.oauth.scopes)
-      .filter(Boolean)
-      .join(" "),
+    // An empty `scope` (a GitHub App's client, which has no scopes) is unknown, never "none granted".
+    oauthScopes:
+      (typeof token.scope === "string" ? token.scope.split(/[\s,]+/) : def.oauth.scopes).filter(Boolean).join(" ") ||
+      null,
   });
   return { ...stored, returnTo: row.returnTo };
 }
