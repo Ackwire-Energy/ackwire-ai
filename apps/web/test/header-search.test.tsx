@@ -142,10 +142,14 @@ describe("the header search (Discord's)", () => {
   });
 
   test("moving to another channel scopes an untouched search there; words typed keep the search as it is", async () => {
-    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+    const api = createFakeApi(seedState());
+    const query = spyOn(api.search, "query");
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(6);
     const chip = () => document.querySelector(".channel__header .ac-token")?.textContent;
     expect(chip()).toBe("em: #eng");
+    // The starting chip alone runs no search until the results show.
+    expect(query).not.toHaveBeenCalled();
     await act(() =>
       router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: ORG_ID, channelId: GENERAL_ID } }),
     );

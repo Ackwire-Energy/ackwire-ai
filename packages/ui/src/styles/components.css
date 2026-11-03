@@ -3608,7 +3608,7 @@ html:not([data-pointer]) .ac-token__remove:focus-visible {
   height: 22px;
   padding: 0 2px 0 6px;
   border-radius: var(--radius-xs);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .ac-token--sm:not(:has(.ac-token__remove)) {
   padding-right: 6px;
