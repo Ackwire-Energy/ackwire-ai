@@ -1489,6 +1489,7 @@
     "claimed_other": "{{names}}이(가) 답하는 중이에요",
     "waiting_other": "{{names}}이(가) 승인을 기다리고 있어요",
     "handled_other": "{{names}}이(가) 답했어요",
+    "passed_other": "아무도 답하지 않았어요",
     "failed_other": "{{names}}이(가) 답하지 못했어요",
     "asking_other": "{{names}}이(가) 내 답변을 기다리고 있어요",
     "outage_other": "{{names}}: AI 제공업체 장애 · 자동으로 다시 시도해요",
@@ -1508,6 +1509,7 @@
       "handled": "답함",
       "failed": "실패",
       "referenced": "언급만 됨",
+      "passed": "답하지 않음",
       "reacted": "반응함"
     },
     "failedShort": "답하지 못했어요",

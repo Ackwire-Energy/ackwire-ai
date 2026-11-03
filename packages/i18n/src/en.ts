@@ -1517,6 +1517,9 @@ export const en = {
     waiting_other: "{{names}} are waiting for approval",
     handled_one: "{{names}} answered",
     handled_other: "{{names}} answered",
+    /** Every agent it was for ended without answering. */
+    passed_one: "No one replied",
+    passed_other: "No one replied",
     failed_one: "{{names}} couldn't answer",
     failed_other: "{{names}} couldn't answer",
     asking_one: "{{names}} is waiting for your answer",
@@ -1542,6 +1545,7 @@ export const en = {
       handled: "Answered",
       failed: "Failed",
       referenced: "Only mentioned",
+      passed: "Didn't reply",
       reacted: "Reacted",
     },
     failedShort: "Couldn't answer",

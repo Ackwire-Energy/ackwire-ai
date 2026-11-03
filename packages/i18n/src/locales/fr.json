@@ -1606,6 +1606,9 @@
     "handled_one": "{{names}} a répondu",
     "handled_many": "{{names}} ont répondu",
     "handled_other": "{{names}} ont répondu",
+    "passed_one": "Personne n'a répondu",
+    "passed_many": "Personne n'a répondu",
+    "passed_other": "Personne n'a répondu",
     "failed_one": "{{names}} n'a pas pu répondre",
     "failed_many": "{{names}} n'ont pas pu répondre",
     "failed_other": "{{names}} n'ont pas pu répondre",
@@ -1633,6 +1636,7 @@
       "handled": "A répondu",
       "failed": "Échec",
       "referenced": "Seulement mentionné",
+      "passed": "N'a pas répondu",
       "reacted": "A réagi"
     },
     "failedShort": "N'a pas pu répondre",

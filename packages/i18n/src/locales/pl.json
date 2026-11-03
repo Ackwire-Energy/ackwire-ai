@@ -1663,6 +1663,10 @@
     "handled_few": "{{names}}: odpowiedzi wysłane",
     "handled_many": "{{names}}: odpowiedzi wysłane",
     "handled_other": "{{names}}: odpowiedzi wysłane",
+    "passed_one": "Nikt nie odpowiedział",
+    "passed_few": "Nikt nie odpowiedział",
+    "passed_many": "Nikt nie odpowiedział",
+    "passed_other": "Nikt nie odpowiedział",
     "failed_one": "{{names}}: nie udało się odpowiedzieć",
     "failed_few": "{{names}}: nie udało się odpowiedzieć",
     "failed_many": "{{names}}: nie udało się odpowiedzieć",
@@ -1697,6 +1701,7 @@
       "handled": "Odpowiedź wysłana",
       "failed": "Błąd",
       "referenced": "Tylko wspomniany",
+      "passed": "Brak odpowiedzi",
       "reacted": "Dodano reakcję"
     },
     "failedShort": "Nie udało się odpowiedzieć",

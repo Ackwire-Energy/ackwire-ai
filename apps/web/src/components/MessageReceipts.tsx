@@ -71,7 +71,8 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
  * the time's line under my own turn (`part="check"`), never a line of its own, so it never changes the message's
  * height or the room before the next one. Clicking or focusing it opens a popover with each agent and its status, and
  * who picked them. The mark is the clock, one tick or two (`receiptTicks`). While the author's own plan picks, and
- * when no agent will answer (an agent's reaction counts as acting), "Chamar um agente" is in its popover: never a line
+ * when no agent will answer or every one it was for passed (an agent's reaction counts as acting), "Chamar um agente"
+ * is in its popover: never a line
  * in the timeline, which read as wrong beside an agent's reaction. A message sent into a task at work wears what
  * became of it there instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change.
  * Words only for what you can act on (a failure, no AI connected) or what nobody can (the AI provider is down, it
@@ -101,7 +102,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <CallAgentMenu />
       </ReceiptAction>
     ) : null;
-  const nobody = status?.kind === "nobody";
+  // Nobody will answer, or every agent it was for ended without answering: a person can call one.
+  const nobody = status?.kind === "nobody" || status?.kind === "passed";
   // "Tentar de novo" sends the words again as mine: never an agent's.
   const worded =
     status?.kind === "outage" ||
@@ -142,7 +144,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const phaseText = (id: string) => {
     const phase = phases.get(id) ?? "seen";
     if (phase === "no_ai") return t("noAi.chip");
-    if (phase === "seen" && reacted.has(id)) return t("receipts.status.reacted");
+    // A reaction was its answer, whatever its run's state says.
+    if (reacted.has(id)) return t("receipts.status.reacted");
     return view.referenced.includes(id) && phase === "seen"
       ? t("receipts.status.referenced")
       : t(`receipts.status.${phase}`);

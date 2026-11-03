@@ -1489,6 +1489,7 @@
     "claimed_other": "{{names}}が回答中",
     "waiting_other": "{{names}}が承認待ち",
     "handled_other": "{{names}}が回答しました",
+    "passed_other": "誰も回答しませんでした",
     "failed_other": "{{names}}は回答できませんでした",
     "asking_other": "{{names}}があなたの回答を待っています",
     "outage_other": "{{names}}: AIプロバイダーが停止中 · 自動で再試行します",
@@ -1508,6 +1509,7 @@
       "handled": "回答済み",
       "failed": "失敗",
       "referenced": "メンションのみ",
+      "passed": "回答しませんでした",
       "reacted": "リアクションしました"
     },
     "failedShort": "回答できませんでした",

@@ -15,7 +15,8 @@ import type { RunSteeredEvent } from "./streams";
  */
 /**
  * `outage`: its run is parked because its AI provider is down, and retries by itself. `queued`: in line for room on
- * its computer; `away`: waiting for its computer to come back.
+ * its computer; `away`: waiting for its computer to come back. `passed`: its run ended without answering (it passed
+ * and posted nothing, or was canceled before it started).
  */
 export type ReceiptPhase =
   | "seen"
@@ -27,6 +28,7 @@ export type ReceiptPhase =
   | "queued"
   | "away"
   | "handled"
+  | "passed"
   | "failed"
   | "no_ai";
 
@@ -74,22 +76,25 @@ const phaseOf = (
   status: RunStatus | "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
   outage?: boolean,
   computer?: "queued" | "away",
+  passed?: boolean,
 ): ReceiptPhase =>
-  outage && status === "waiting_input"
-    ? "outage"
-    : computer && status === "waiting_input"
-      ? computer
-      : status === "queued"
-        ? "picked"
-        : status === "running"
-          ? "claimed"
-          : status === "waiting_approval"
-            ? "waiting"
-            : status === "waiting_input"
-              ? "asking"
-              : status === "failed"
-                ? "failed"
-                : "handled";
+  passed
+    ? "passed"
+    : outage && status === "waiting_input"
+      ? "outage"
+      : computer && status === "waiting_input"
+        ? computer
+        : status === "queued"
+          ? "picked"
+          : status === "running"
+            ? "claimed"
+            : status === "waiting_approval"
+              ? "waiting"
+              : status === "waiting_input"
+                ? "asking"
+                : status === "failed"
+                  ? "failed"
+                  : "handled";
 
 const RANK: Record<ReceiptPhase, number> = {
   seen: 0,
@@ -101,6 +106,7 @@ const RANK: Record<ReceiptPhase, number> = {
   queued: 2,
   away: 2,
   handled: 3,
+  passed: 3,
   failed: 3,
   no_ai: 3,
 };
@@ -201,7 +207,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
   if (r && existing?.confirmed && !fresh) {
     let next = state;
     for (const h of r.handled) {
-      const phase = h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer);
+      const phase = h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer, h.passed);
       const follows = existing.runOf?.[h.agentId];
       if (RANK[phase] < RANK.handled || (follows && h.runId && h.runId !== follows)) continue;
       next = linkRun(set(next, message.id, h.agentId, phase), message.id, h.runId, h.agentId);
@@ -215,7 +221,12 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
     for (const id of r.seenBy) next = set(next, message.id, id, "seen");
     for (const id of r.pickedBy) next = set(next, message.id, id, "picked");
     for (const h of r.handled) {
-      next = set(next, message.id, h.agentId, h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer));
+      next = set(
+        next,
+        message.id,
+        h.agentId,
+        h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer, h.passed),
+      );
       next = linkRun(next, message.id, h.runId, h.agentId);
     }
     // Receipts come from the router's decision: "nobody picked it" is final. A read with none (the router is
@@ -321,7 +332,7 @@ export function applyReceiptEvent(
         event.reason === NO_AI
           ? "no_ai"
           : event.status
-            ? phaseOf(event.status, event.outage, event.computer)
+            ? phaseOf(event.status, event.outage, event.computer, event.passed)
             : "handled",
       );
     case "agent.run.steered": {
@@ -352,7 +363,7 @@ export function applyReceiptEvent(
         event.runId,
         event.threadId,
         event.agentId,
-        phaseOf(event.status, event.outage, event.computer),
+        phaseOf(event.status, event.outage, event.computer, event.passed),
         event.status === "waiting_approval",
       );
     case "question.asked":
@@ -388,6 +399,8 @@ export interface ReceiptView {
         kind: "picked" | "claimed" | "waiting" | "asking" | "outage" | "away" | "queued" | "handled" | "failed";
         agents: string[];
       }
+    /** Every agent it was for ended without answering: "No one replied", and a person can call one. */
+    | { kind: "passed"; agents: string[] }
     /** `mentionNeeded`: no step could read it and no rule fit, so only a mention reaches an agent. */
     | { kind: "nobody"; mentionNeeded?: true }
     /** Nobody will answer for want of an AI (`agents`: those that couldn't think; empty: nobody was asked). */
@@ -422,8 +435,11 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
     const agents = with_(kind);
     if (agents.length) return { seen, status: { kind, agents }, done: false, referenced, ...decided };
   }
+  // One answer is an answer, whoever else passed.
   const handled = with_("handled");
   if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced, ...decided };
+  const passed = with_("passed");
+  if (passed.length) return { seen, status: { kind: "passed", agents: passed }, done: true, referenced, ...decided };
   if (receipt.platformCap) return { seen, status: { kind: "platform_cap" }, done: false, referenced };
   // A mention always gets an answer unless the server said that agent can't, or that the message only
   // references it (never "nobody" on a guess).
@@ -448,7 +464,7 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
  */
 export type ReceiptTicks = "clock" | "check" | "checks";
 
-const ACTED: ReadonlySet<ReceiptPhase> = new Set(["handled", "failed", "no_ai"]);
+const ACTED: ReadonlySet<ReceiptPhase> = new Set(["handled", "passed", "failed", "no_ai"]);
 
 export function receiptTicks(receipt: MessageReceipt | undefined): ReceiptTicks {
   if (!receipt || (receipt.picking && !receipt.routed)) return "clock";

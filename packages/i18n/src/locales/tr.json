@@ -1546,6 +1546,8 @@
     "waiting_other": "{{names}} onay bekliyor",
     "handled_one": "{{names}} yanıtladı",
     "handled_other": "{{names}} yanıtladı",
+    "passed_one": "Kimse yanıtlamadı",
+    "passed_other": "Kimse yanıtlamadı",
     "failed_one": "{{names}} yanıtlayamadı",
     "failed_other": "{{names}} yanıtlayamadı",
     "asking_one": "{{names}} yanıtınızı bekliyor",
@@ -1570,6 +1572,7 @@
       "handled": "Yanıtladı",
       "failed": "Başarısız oldu",
       "referenced": "Yalnızca bahsedildi",
+      "passed": "Yanıtlamadı",
       "reacted": "Tepki verdi"
     },
     "failedShort": "Yanıtlayamadı",

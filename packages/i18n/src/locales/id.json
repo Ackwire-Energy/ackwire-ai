@@ -1489,6 +1489,7 @@
     "claimed_other": "{{names}} sedang menjawab",
     "waiting_other": "{{names}} menunggu persetujuan",
     "handled_other": "{{names}} sudah menjawab",
+    "passed_other": "Tidak ada yang menjawab",
     "failed_other": "{{names}} tidak bisa menjawab",
     "asking_other": "{{names}} menunggu jawabanmu",
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
@@ -1508,6 +1509,7 @@
       "handled": "Sudah menjawab",
       "failed": "Gagal",
       "referenced": "Hanya disebut",
+      "passed": "Tidak menjawab",
       "reacted": "Bereaksi"
     },
     "failedShort": "Tidak bisa menjawab",
