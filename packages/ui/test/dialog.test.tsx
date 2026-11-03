@@ -293,8 +293,23 @@ describe("Dialog without a footer", () => {
     const dialog = body().getByRole("dialog", { name: "Conectar uma IA" });
     expect(dialog.lastElementChild?.classList.contains("ac-dialog__body")).toBe(true);
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
-    expect(css).toMatch(/\n\.ac-dialog__body:last-child \{\s*padding-bottom: 20px;/);
-    // On a phone, the sheet's own 16 px.
-    expect(css).toMatch(/@media \(max-width: 640px\) \{[^@]*\.ac-dialog__body:last-child \{\s*padding-bottom: 16px;/);
+    expect(css).toMatch(
+      /\n\.ac-dialog__body:last-child,\n\.ac-dialog__list:last-child \{\s*padding-bottom: var\(--dialog-pad\);/,
+    );
+  });
+
+  test("an empty footer renders nothing, so a list above it ends on the dialog's own edge", () => {
+    render(
+      <Dialog open onOpenChange={() => {}} title="Membros" closeLabel="Fechar">
+        <DialogSearchList query="" onQueryChange={() => {}} searchLabel="Buscar" emptyText="Nada" isEmpty={false}>
+          <p>Ada</p>
+        </DialogSearchList>
+        <DialogFooter note={undefined} />
+        <DialogFooter>{false}</DialogFooter>
+      </Dialog>,
+    );
+    const dialog = body().getByRole("dialog", { name: "Membros" });
+    expect(dialog.querySelector(".ac-dialog__foot")).toBeNull();
+    expect(dialog.lastElementChild?.classList.contains("ac-dialog__list")).toBe(true);
   });
 });

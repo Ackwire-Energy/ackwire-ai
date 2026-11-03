@@ -2053,6 +2053,8 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 22px;
+  /* One inset for every edge: the head's top, the sides, and the bottom under the last body item, list or footer. */
+  --dialog-pad: 20px;
 }
 .ac-dialog:focus {
   outline: none;
@@ -2067,7 +2069,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 20px 20px 12px;
+  padding: var(--dialog-pad) var(--dialog-pad) 12px;
 }
 .ac-dialog__lead {
   display: flex;
@@ -2115,13 +2117,13 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 }
 .ac-dialog__desc {
   margin: 0;
-  padding: 0 20px 12px;
+  padding: 0 var(--dialog-pad) 12px;
   color: var(--ink-muted);
   font-size: 14px;
   line-height: 20px;
 }
 .ac-dialog__tools {
-  padding: 0 20px 8px;
+  padding: 0 var(--dialog-pad) 8px;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -2132,7 +2134,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   min-height: 0;
   overflow-y: auto;
   /* Room for focus rings at the edges of the scroll area. */
-  padding: 4px 20px;
+  padding: 4px var(--dialog-pad);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -2140,15 +2142,16 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 .ac-dialog__body > * {
   flex: none;
 }
-/* With no footer under it, the body keeps the dialog's own edge below its last item. */
-.ac-dialog__body:last-child {
-  padding-bottom: 20px;
+/* With no footer under it, the body or the list keeps the dialog's own edge below its last item. */
+.ac-dialog__body:last-child,
+.ac-dialog__list:last-child {
+  padding-bottom: var(--dialog-pad);
 }
 .ac-dialog__list {
   flex: 1 1 auto;
   min-height: min(120px, 30vh);
   overflow-y: auto;
-  padding: 0 20px;
+  padding: 0 var(--dialog-pad);
 }
 .ac-dialog__empty {
   margin: 0;
@@ -2161,10 +2164,10 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
-  padding: 20px;
+  padding: var(--dialog-pad);
 }
 .ac-dialog__foot--bar {
-  padding: 12px 20px 20px;
+  padding: 12px var(--dialog-pad) var(--dialog-pad);
   border-top: 1px solid var(--line);
 }
 .ac-dialog__foot-note {
@@ -2705,6 +2708,8 @@ html:not([data-pointer]) .ac-back:focus-visible {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 22px;
+  /* One inset for every edge, as in `.ac-dialog`. */
+  --details-pad: 24px;
 }
 .ac-details--lg {
   width: min(960px, calc(100% - 48px));
@@ -2717,7 +2722,7 @@ html:not([data-pointer]) .ac-back:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 16px 24px 0;
+  padding: var(--details-pad) var(--details-pad) 0;
 }
 .ac-details__bar {
   display: flex;
@@ -2789,7 +2794,7 @@ html:not([data-pointer]) .ac-back:focus-visible {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 16px 24px 24px;
+  padding: 16px var(--details-pad) var(--details-pad);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2832,7 +2837,7 @@ html:not([data-pointer]) .ac-back:focus-visible {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding: 12px 24px 16px;
+  padding: 12px var(--details-pad) var(--details-pad);
   border-top: 1px solid var(--line);
 }
 
@@ -8004,30 +8009,13 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
     max-height: calc(100dvh - 12px - env(safe-area-inset-top, 0px));
     border-radius: var(--radius-section) var(--radius-section) 0 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    --dialog-pad: 16px;
   }
   .ac-dialog__head {
-    padding: 18px 16px 10px;
-  }
-  .ac-dialog__desc,
-  .ac-dialog__tools {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-  .ac-dialog__body {
-    padding: 4px 16px;
-  }
-  .ac-dialog__body:last-child {
-    padding-bottom: 16px;
-  }
-  .ac-dialog__list {
-    padding: 0 16px;
+    padding-bottom: 10px;
   }
   .ac-dialog__foot {
     flex-wrap: wrap;
-    padding: 16px;
-  }
-  .ac-dialog__foot--bar {
-    padding: 12px 16px 16px;
   }
   .ac-dialog__foot-note {
     flex-basis: 100%;
@@ -8047,15 +8035,10 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
     border-radius: 0;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  .ac-details__head {
-    padding: 12px 16px 0;
+    --details-pad: 16px;
   }
   .ac-details__body {
-    padding: 12px 16px 20px;
-  }
-  .ac-details__foot {
-    padding: 12px 16px;
+    padding-top: 12px;
   }
 }
 /* Their entrance on phones: up from the bottom edge (the centered one would jump sideways). */

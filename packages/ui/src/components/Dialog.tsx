@@ -187,6 +187,8 @@ export function DialogFooter({
   className?: string;
   children?: ReactNode;
 }) {
+  // An empty footer would only stack its padding under the content: the body or list above keeps the edge instead.
+  if (note == null && (children == null || children === false)) return null;
   return (
     <div className={cx("ac-dialog__foot", bar && "ac-dialog__foot--bar", className)}>
       {note !== undefined && <span className="ac-dialog__foot-note">{note}</span>}

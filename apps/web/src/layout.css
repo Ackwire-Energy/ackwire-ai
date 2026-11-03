@@ -1086,7 +1086,8 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .member-row--add:hover {
   color: var(--ink);
 }
-.ac-dialog__list:has(> .member-row--add:last-child) {
+/* Above a footer's line, the add row keeps its air (last in the dialog, the list's own edge does). */
+.ac-dialog__list:not(:last-child):has(> .member-row--add:last-child) {
   padding-bottom: 16px;
 }
 html:not([data-pointer]) .member-row--add:focus-visible {
@@ -1854,11 +1855,10 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 }
 .code-viewer .ac-dialog__head {
   border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
 }
 .code-viewer__body.ac-dialog__body {
   flex: 1 1 auto;
-  padding: 12px 0 20px;
+  padding: 12px 0 var(--dialog-pad);
 }
 .code-viewer__code {
   font-size: 13px;
@@ -1954,7 +1954,7 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 }
 .chart-viewer__body.ac-dialog__body {
   gap: 20px;
-  padding: 16px 24px 24px;
+  padding-top: 16px;
 }
 .chart-cells {
   display: block;
@@ -3527,9 +3527,10 @@ html:not([data-pointer]) .settings-tile:focus-visible {
  */
 .ac-dialog.catalog {
   height: min(740px, calc(100dvh - 48px));
+  --dialog-pad: 28px;
 }
 .catalog .ac-dialog__head {
-  padding: 24px 28px 14px;
+  padding-bottom: 14px;
   /* For its title's type (30px on 33px, 24px at phone width), measured as the app's 18/24 one is (styles.css). */
   --title-cap-mid: 0.88px;
 }
@@ -3545,7 +3546,7 @@ html:not([data-pointer]) .settings-tile:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 0 28px 18px;
+  padding: 0 var(--dialog-pad) 18px;
 }
 .catalog__search {
   max-width: 360px;
@@ -3628,7 +3629,7 @@ html:not([data-pointer]) .catalog__cat:focus-visible {
 .catalog__list {
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 28px 32px;
+  padding: 24px var(--dialog-pad) var(--dialog-pad);
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -3820,6 +3821,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
  */
 .ac-dialog.catalog-svc {
   overflow: hidden;
+  --dialog-pad: 24px;
 }
 /* Behind the head (z-index -1 inside the dialog's own stacking context): the head's icon overlaps its edge. */
 .catalog-svc .catalog-feat__sky {
@@ -3834,7 +3836,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   align-items: flex-start;
   gap: 14px;
   margin-top: -36px;
-  padding: 0 24px 4px;
+  padding: 0 var(--dialog-pad) 4px;
 }
 /*
  * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
@@ -3844,8 +3846,8 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
  */
 .catalog-svc .ac-dialog__acts {
   position: absolute;
-  top: 24px;
-  right: 24px;
+  top: var(--dialog-pad);
+  right: var(--dialog-pad);
   /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
   translate: none;
 }
@@ -3872,7 +3874,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   letter-spacing: -0.025em;
 }
 .catalog-svc .ac-dialog__desc {
-  padding: 0 24px;
+  padding: 0 var(--dialog-pad);
   color: var(--ink2);
 }
 .catalog-svc__body {
@@ -3882,7 +3884,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 20px 24px 24px;
+  padding: 20px var(--dialog-pad) var(--dialog-pad);
 }
 .catalog-svc__part {
   padding: 14px 16px;
@@ -3925,7 +3927,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   align-items: center;
   justify-content: flex-end;
   gap: 16px;
-  padding: 16px 24px 20px;
+  padding: 16px var(--dialog-pad) var(--dialog-pad);
   border-top: 1px solid var(--line);
 }
 .catalog-svc__how {
@@ -3949,13 +3951,11 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
     align-self: flex-start;
     max-width: 100%;
   }
-  .catalog__tools,
-  .catalog__list {
-    padding-left: 16px;
-    padding-right: 16px;
+  .ac-dialog.catalog {
+    --dialog-pad: 16px;
   }
   .catalog .ac-dialog__head {
-    padding: 20px 16px 12px;
+    padding-bottom: 12px;
     --title-cap-mid: 0.51px;
   }
   .catalog .ac-dialog__title {
