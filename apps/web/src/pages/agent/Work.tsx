@@ -1141,6 +1141,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     })),
     {
       value: ADD,
+      action: true,
       // A coding plan's key that was refused gets a new key; a sign-in that ended signs in again.
       label: signedOut
         ? t(isPlanId(card) ? "aiAccounts.page.newKey" : "agentPage.work.brain.signInAgain")

@@ -1610,6 +1610,9 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
  * scrolled to the bottom (the menu's own padding, outside the scroll, reads as next to none there).
  */
 .ac-menu--select [data-radix-select-viewport] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding-block: var(--space-1);
 }
 .ac-menu--dropdown {
@@ -1791,6 +1794,10 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   width: 32px;
   height: 32px;
   font-size: var(--text-sm);
+}
+/* Two lines (a name and its description): the room above and below matches the sides, as a one-line row's does. */
+.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
+  padding-block: var(--menu-item-px);
 }
 .ac-menu__desc {
   font-size: 13px;
