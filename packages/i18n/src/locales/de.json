@@ -9595,7 +9595,7 @@
     "nameHelp": "So erscheint die Datenbank für dich und die Agenten.",
     "namePlaceholder": "Z. B.: Produktion",
     "url": "Adresse der Datenbank",
-    "urlHelp": "Beginnt mit postgres://. Verschlüsselt auf dem Server gespeichert. Niemand sieht sie wieder, nicht einmal die Agenten.",
+    "urlHelp": "Beginnt mit postgres://. Der Datenbankname am Ende ist optional. Verschlüsselt auf dem Server gespeichert. Niemand sieht sie wieder, nicht einmal die Agenten.",
     "urlPlaceholder": "postgres://benutzer:passwort@host/db",
     "urlInvalid": "Füg eine Adresse ein, die mit postgres:// beginnt, oder füll die Felder unter Erweitert aus.",
     "howTitle": "Wie erstelle ich einen Benutzer mit reinem Lesezugriff?",
@@ -9648,13 +9648,15 @@
       "unreachable": "Wir konnten den Datenbankserver nicht erreichen. Prüf die Adresse und ob er Verbindungen von außen annimmt.",
       "blocked_host": "Dieser Server ist nicht erlaubt. Nutze die öffentliche Adresse der Datenbank (interne Adressen wie DATABASE_URL von Railway funktionieren von hier aus nicht).",
       "tls": "Die Datenbank hat keine sichere Verbindung angenommen. Aktiviere SSL in der Datenbank oder wähl unter Erweitert „Ohne Verschlüsselung“ (nur für Testdatenbanken).",
-      "unknown": "Verbindung gerade nicht möglich. Versuch es gleich noch einmal."
+      "unknown": "Verbindung gerade nicht möglich. Versuch es gleich noch einmal.",
+      "no_databases": "Dieser Benutzer kann keine Datenbank auf diesem Server öffnen. Prüfe seine Rechte oder den Namensanfang."
     },
     "connect": "Verbinden",
     "connectedToast": "{{name}} verbunden.",
     "testing": {
       "reach": "Datenbank wird erreicht…",
-      "tables": "Tabellen werden angesehen…"
+      "tables": "Tabellen werden angesehen…",
+      "databases": "Datenbanken werden angesehen…"
     },
     "canWrite": "Dieser Benutzer kann Daten ändern. Agenten lesen sowieso nur, aber am sichersten ist ein Benutzer mit reinem Lesezugriff (wie du einen erstellst, steht in Schritt 1).",
     "toolsLead": "Was Agenten in {{name}} tun können. Vorerst lesen sie nur: In der Datenbank wird nichts geändert.",
@@ -9702,15 +9704,41 @@
       "timeout": "Zeitlimit pro Abfrage",
       "timeoutHelp": "Eine Abfrage, die länger dauert, wird abgebrochen, damit sie die Datenbank nicht belastet.",
       "seconds_one": "{{count}} Sekunde",
-      "seconds_other": "{{count}} Sekunden"
+      "seconds_other": "{{count}} Sekunden",
+      "databases": "Datenbanken",
+      "databasesAll": "Alle",
+      "databasesSome": "Nur diese",
+      "databasePlaceholder": "Name der Datenbank",
+      "databasesHelp": "Die Regeln unten gelten für jede Datenbank, die dieser Agent liest.",
+      "tablesIn": "Tabellen (gesehen in {{database}})",
+      "capHelpAll": "Leer = kein Limit. Über alle Datenbanken gezählt."
     },
     "agent": {
       "title": "Datenbanken",
       "help": "Datenbanken, die {{org}} verbunden hat. Der Agent liest nur.",
       "levelText": "Fragt die Tabellen ab, die die Regeln erlauben, nur lesend.",
       "rulesOf": "Regeln in {{name}}",
-      "saved": "Datenbankzugriff von {{name}} gespeichert."
-    }
+      "saved": "Datenbankzugriff von {{name}} gespeichert.",
+      "allDatabases": "Alle Datenbanken von {{name}}",
+      "someDatabases_one": "{{count}} Datenbank von {{name}}",
+      "someDatabases_other": "{{count}} Datenbanken von {{name}}"
+    },
+    "scope": "Welche Datenbanken",
+    "scopeOne": "Nur diese Datenbank",
+    "scopeAll": "Alle Datenbanken dieses Servers",
+    "scopeAllHelp": "Für eine Datenbank pro Kunde. Agenten sehen die Liste und wählen bei jeder Abfrage die Datenbank.",
+    "prefix": "Nur Namen, die beginnen mit",
+    "prefixPlaceholder": "Z. B. kunde_",
+    "prefixHelp": "Leer lassen für alle. Neue Datenbanken mit diesem Anfang erscheinen von selbst.",
+    "databaseOptional": "Optional bei allen Datenbanken.",
+    "connectedToastAll_one": "{{name}} mit {{count}} Datenbank verbunden.",
+    "connectedToastAll_other": "{{name}} mit {{count}} Datenbanken verbunden.",
+    "howAll": "Um alle Datenbanken zu lesen (Postgres 14 oder neuer).",
+    "count_one": "{{count}} Datenbank",
+    "count_other": "{{count}} Datenbanken",
+    "prefixRow": "Datenbanken, die mit {{prefix}} beginnen",
+    "refresh": "Liste aktualisieren",
+    "refreshName": "Liste der Datenbanken von {{name}} aktualisieren"
   },
   "mail": {
     "choice": {

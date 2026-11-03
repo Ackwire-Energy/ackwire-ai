@@ -9929,7 +9929,7 @@
     "nameHelp": "Cómo aparece la base de datos para ti y para los agentes.",
     "namePlaceholder": "Ej.: Producción",
     "url": "Dirección de la base de datos",
-    "urlHelp": "Empieza con postgres://. Se guarda cifrada en el servidor. Nadie la vuelve a ver, ni siquiera los agentes.",
+    "urlHelp": "Empieza con postgres://. El nombre de la base al final es opcional. Se guarda cifrada en el servidor. Nadie la vuelve a ver, ni siquiera los agentes.",
     "urlPlaceholder": "postgres://usuario:clave@host/bd",
     "urlInvalid": "Pega una dirección que empiece con postgres://, o completa los campos en Avanzado.",
     "howTitle": "¿Cómo creo un usuario de solo lectura?",
@@ -9982,13 +9982,15 @@
       "unreachable": "No pudimos llegar al servidor de la base de datos. Revisa la dirección y si acepta conexiones desde fuera.",
       "blocked_host": "Este servidor no está permitido. Usa la dirección pública de la base de datos (las direcciones internas, como la DATABASE_URL de Railway, no funcionan desde aquí).",
       "tls": "La base de datos no aceptó una conexión segura. Activa SSL en la base de datos, o elige Sin cifrado en Avanzado (solo bases de datos de prueba).",
-      "unknown": "No se pudo conectar ahora. Intenta de nuevo en un momento."
+      "unknown": "No se pudo conectar ahora. Intenta de nuevo en un momento.",
+      "no_databases": "Este usuario no puede abrir ninguna base de este servidor. Revisa sus permisos o el comienzo del nombre."
     },
     "connect": "Conectar",
     "connectedToast": "{{name}} conectada.",
     "testing": {
       "reach": "Hablando con la base de datos…",
-      "tables": "Mirando las tablas…"
+      "tables": "Mirando las tablas…",
+      "databases": "Viendo las bases…"
     },
     "canWrite": "Este usuario puede cambiar datos. Los agentes solo leen de todos modos, pero lo más seguro es un usuario de solo lectura (mira cómo crearlo en el paso 1).",
     "toolsLead": "Lo que los agentes pueden hacer en {{name}}. Por ahora solo leen: no se cambia nada en la base de datos.",
@@ -10037,15 +10039,44 @@
       "timeoutHelp": "Una consulta que tarda más se cancela, para no cargar la base de datos.",
       "seconds_one": "{{count}} segundo",
       "seconds_many": "{{count}} segundos",
-      "seconds_other": "{{count}} segundos"
+      "seconds_other": "{{count}} segundos",
+      "databases": "Bases de datos",
+      "databasesAll": "Todas",
+      "databasesSome": "Solo estas",
+      "databasePlaceholder": "Nombre de la base",
+      "databasesHelp": "Las reglas de abajo valen para todas las bases que lee este agente.",
+      "tablesIn": "Tablas (vistas en {{database}})",
+      "capHelpAll": "Vacío = sin límite. Sumando todas las bases."
     },
     "agent": {
       "title": "Bases de datos",
       "help": "Bases de datos que conectó {{org}}. El agente solo lee.",
       "levelText": "Consulta las tablas que permiten las reglas, solo lectura.",
       "rulesOf": "Reglas en {{name}}",
-      "saved": "Se guardó el acceso de {{name}} a las bases de datos."
-    }
+      "saved": "Se guardó el acceso de {{name}} a las bases de datos.",
+      "allDatabases": "Todas las bases de {{name}}",
+      "someDatabases_one": "{{count}} base de {{name}}",
+      "someDatabases_many": "{{count}} bases de {{name}}",
+      "someDatabases_other": "{{count}} bases de {{name}}"
+    },
+    "scope": "Qué bases de datos",
+    "scopeOne": "Solo esta base",
+    "scopeAll": "Todas las bases de este servidor",
+    "scopeAllHelp": "Para quien tiene una base por cliente. Los agentes ven la lista y eligen la base en cada consulta.",
+    "prefix": "Solo las que empiezan con",
+    "prefixPlaceholder": "Ej.: cliente_",
+    "prefixHelp": "Déjalo vacío para todas. Las bases nuevas con ese comienzo aparecen solas.",
+    "databaseOptional": "Opcional cuando son todas las bases.",
+    "connectedToastAll_one": "{{name}} conectado con {{count}} base.",
+    "connectedToastAll_many": "{{name}} conectado con {{count}} bases.",
+    "connectedToastAll_other": "{{name}} conectado con {{count}} bases.",
+    "howAll": "Para leer todas las bases (Postgres 14 o más nuevo).",
+    "count_one": "{{count}} base",
+    "count_many": "{{count}} bases",
+    "count_other": "{{count}} bases",
+    "prefixRow": "bases que empiezan con {{prefix}}",
+    "refresh": "Actualizar lista",
+    "refreshName": "Actualizar la lista de bases de {{name}}"
   },
   "mail": {
     "choice": {

@@ -10006,7 +10006,7 @@
     "nameHelp": "Come appare il database a te e agli agenti.",
     "namePlaceholder": "Es.: Produzione",
     "url": "Indirizzo del database",
-    "urlHelp": "Inizia con postgres://. Conservato cifrato sul server. Nessuno lo vedrà più, nemmeno gli agenti.",
+    "urlHelp": "Inizia con postgres://. Il nome del database alla fine è facoltativo. Salvato cifrato sul server. Nessuno lo rivede, nemmeno gli agenti.",
     "urlPlaceholder": "postgres://utente:password@host/db",
     "urlInvalid": "Incolla un indirizzo che inizi con postgres://, oppure compila i campi in Avanzate.",
     "howTitle": "Come creo un utente in sola lettura?",
@@ -10059,13 +10059,15 @@
       "unreachable": "Non siamo riusciti a raggiungere il server del database. Controlla l'indirizzo e se accetta connessioni dall'esterno.",
       "blocked_host": "Questo server non è consentito. Usa l'indirizzo pubblico del database (gli indirizzi interni, come DATABASE_URL di Railway, non funzionano da qui).",
       "tls": "Il database non ha accettato una connessione sicura. Attiva SSL nel database, oppure scegli Nessuna cifratura in Avanzate (solo database di prova).",
-      "unknown": "Impossibile collegarsi ora. Riprova tra poco."
+      "unknown": "Impossibile collegarsi ora. Riprova tra poco.",
+      "no_databases": "Questo utente non riesce ad aprire nessun database di questo server. Controlla i permessi o l'inizio del nome."
     },
     "connect": "Collega",
     "connectedToast": "{{name}} collegato.",
     "testing": {
       "reach": "Contatto con il database…",
-      "tables": "Lettura delle tabelle…"
+      "tables": "Lettura delle tabelle…",
+      "databases": "Guardo i database…"
     },
     "canWrite": "Questo utente può modificare i dati. Gli agenti leggono soltanto comunque, ma la scelta più sicura è un utente in sola lettura (vedi come crearne uno al passaggio 1).",
     "toolsLead": "Cosa possono fare gli agenti in {{name}}. Per ora leggono soltanto: nel database non viene modificato nulla.",
@@ -10114,15 +10116,44 @@
       "timeoutHelp": "Una query che dura di più viene annullata, così non appesantisce il database.",
       "seconds_one": "{{count}} secondo",
       "seconds_many": "{{count}} secondi",
-      "seconds_other": "{{count}} secondi"
+      "seconds_other": "{{count}} secondi",
+      "databases": "Database",
+      "databasesAll": "Tutti",
+      "databasesSome": "Solo questi",
+      "databasePlaceholder": "Nome del database",
+      "databasesHelp": "Le regole qui sotto valgono per ogni database che questo agente legge.",
+      "tablesIn": "Tabelle (viste in {{database}})",
+      "capHelpAll": "Vuoto = nessun limite. Sommando tutti i database."
     },
     "agent": {
       "title": "Database",
       "help": "Database collegati da {{org}}. L'agente legge soltanto.",
       "levelText": "Interroga le tabelle consentite dalle regole, in sola lettura.",
       "rulesOf": "Regole in {{name}}",
-      "saved": "Accesso al database di {{name}} salvato."
-    }
+      "saved": "Accesso al database di {{name}} salvato.",
+      "allDatabases": "Tutti i database di {{name}}",
+      "someDatabases_one": "{{count}} database di {{name}}",
+      "someDatabases_many": "{{count}} database di {{name}}",
+      "someDatabases_other": "{{count}} database di {{name}}"
+    },
+    "scope": "Quali database",
+    "scopeOne": "Solo questo database",
+    "scopeAll": "Tutti i database di questo server",
+    "scopeAllHelp": "Per chi ha un database per cliente. Gli agenti vedono l'elenco e scelgono il database a ogni query.",
+    "prefix": "Solo i nomi che iniziano con",
+    "prefixPlaceholder": "Es. cliente_",
+    "prefixHelp": "Lascia vuoto per tutti. I nuovi database con questo inizio compaiono da soli.",
+    "databaseOptional": "Facoltativo con tutti i database.",
+    "connectedToastAll_one": "{{name}} connesso con {{count}} database.",
+    "connectedToastAll_many": "{{name}} connesso con {{count}} database.",
+    "connectedToastAll_other": "{{name}} connesso con {{count}} database.",
+    "howAll": "Per leggere tutti i database (Postgres 14 o più recente).",
+    "count_one": "{{count}} database",
+    "count_many": "{{count}} database",
+    "count_other": "{{count}} database",
+    "prefixRow": "database che iniziano con {{prefix}}",
+    "refresh": "Aggiorna elenco",
+    "refreshName": "Aggiorna l'elenco dei database di {{name}}"
   },
   "mail": {
     "choice": {

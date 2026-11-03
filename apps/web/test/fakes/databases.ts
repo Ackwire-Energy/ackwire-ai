@@ -22,6 +22,8 @@ export interface FakeDatabases {
   nextError: DatabaseConnectError | null;
   /** The next connection's user can change data. */
   canWrite: boolean;
+  /** A whole server's databases. */
+  server: string[];
   /** Per agent, per connection. */
   agentDatabases: Map<string, Map<string, AgentDatabase>>;
 }
@@ -35,6 +37,7 @@ export function createFakeDatabases(log: (method: string, ...args: unknown[]) =>
     ],
     nextError: null,
     canWrite: false,
+    server: ["cliente_a", "cliente_b", "cliente_c"],
     agentDatabases: new Map(),
     client: undefined as never,
   };
@@ -58,7 +61,9 @@ export function createFakeDatabases(log: (method: string, ...args: unknown[]) =>
       log("databases.connect", orgId, input);
       failOnce();
       const url = input.url ? new URL(input.url) : null;
-      const database = input.database ?? url?.pathname.slice(1) ?? "postgres";
+      const whole = input.wholeServer === true;
+      const listed = fake.server.filter((n) => n.startsWith(input.databasePrefix ?? ""));
+      const database = input.database || url?.pathname.slice(1) || (whole ? (listed[0] ?? "") : "postgres");
       const connection: DatabaseConnection = {
         id: crypto.randomUUID(),
         label: input.label ?? database,
@@ -66,6 +71,9 @@ export function createFakeDatabases(log: (method: string, ...args: unknown[]) =>
         host: input.host ?? url?.hostname ?? "",
         port: input.port ?? (url?.port ? Number(url.port) : 5432),
         database,
+        wholeServer: whole,
+        databasePrefix: whole ? (input.databasePrefix ?? null) : null,
+        databaseCount: whole ? listed.length : null,
         username: input.username ?? decodeURIComponent(url?.username ?? ""),
         sslmode: input.sslmode ?? "require",
         status: "active",
@@ -100,6 +108,11 @@ export function createFakeDatabases(log: (method: string, ...args: unknown[]) =>
       log("databases.tables", orgId, connectionId);
       find(connectionId);
       return clone(fake.tables);
+    },
+    serverDatabases: async (orgId, connectionId, refresh) => {
+      log("databases.serverDatabases", orgId, connectionId, refresh);
+      const c = find(connectionId);
+      return fake.server.filter((n) => n.startsWith(c.databasePrefix ?? ""));
     },
     agent: async (orgId, agentId) => {
       log("databases.agent", orgId, agentId);

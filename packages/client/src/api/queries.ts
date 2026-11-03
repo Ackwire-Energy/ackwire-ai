@@ -4867,16 +4867,34 @@ export const useDatabases = (orgId: string, enabled = true) => {
   });
 };
 
-/** A database's tables (the rules' table picker). */
-export const useDatabaseTables = (orgId: string, connectionId: string | null) => {
+/** A database's tables (the rules' table picker); on a whole server, of `database` (default: the sample). */
+export const useDatabaseTables = (orgId: string, connectionId: string | null, database?: string) => {
   const api = useApi();
   return useQuery({
-    queryKey: keys.databaseTables(orgId, connectionId ?? ""),
-    queryFn: () => api.databases.tables(orgId, connectionId ?? ""),
+    queryKey: keys.databaseTables(orgId, connectionId ?? "", database),
+    queryFn: () => api.databases.tables(orgId, connectionId ?? "", database),
     enabled: Boolean(connectionId),
     staleTime: 5 * 60_000,
     retry: false,
   });
+};
+
+/** A whole-server connection's databases; `refresh()` reads the list again on the server. */
+export const useServerDatabases = (orgId: string, connectionId: string, enabled = true) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: keys.serverDatabases(orgId, connectionId),
+    queryFn: () => api.databases.serverDatabases(orgId, connectionId),
+    enabled,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const refresh = useMutation({
+    mutationFn: () => api.databases.serverDatabases(orgId, connectionId, true),
+    onSuccess: (names) => qc.setQueryData(keys.serverDatabases(orgId, connectionId), names),
+  });
+  return { ...query, refresh };
 };
 
 /** An agent's access and rules per database. */

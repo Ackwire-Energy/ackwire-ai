@@ -335,8 +335,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ).connection,
       disconnect: (orgId, connectionId) =>
         request<void>(`${org(orgId)}/databases/${enc(connectionId)}`, { method: "DELETE" }),
-      tables: async (orgId, connectionId) =>
-        (await request<{ tables: DatabaseTable[] }>(`${org(orgId)}/databases/${enc(connectionId)}/tables`)).tables,
+      tables: async (orgId, connectionId, database) =>
+        (
+          await request<{ tables: DatabaseTable[] }>(
+            `${org(orgId)}/databases/${enc(connectionId)}/tables${database ? `?database=${enc(database)}` : ""}`,
+          )
+        ).tables,
+      serverDatabases: async (orgId, connectionId, refresh) =>
+        (
+          await request<{ databases: string[] }>(
+            `${org(orgId)}/databases/${enc(connectionId)}/databases${refresh ? "?refresh=1" : ""}`,
+          )
+        ).databases,
       agent: async (orgId, agentId) =>
         (await request<{ databases: AgentDatabase[] }>(`${org(orgId)}/agents/${enc(agentId)}/databases`)).databases,
       setAgent: (orgId, agentId, connectionId, input) =>

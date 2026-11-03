@@ -10000,7 +10000,7 @@
     "nameHelp": "Comment la base de données apparaît pour vous et pour les agents.",
     "namePlaceholder": "Ex. : Production",
     "url": "Adresse de la base de données",
-    "urlHelp": "Commence par postgres://. Stockée chiffrée sur le serveur. Personne ne la reverra, pas même les agents.",
+    "urlHelp": "Commence par postgres://. Le nom de la base à la fin est facultatif. Stockée chiffrée sur le serveur. Personne ne la revoit, pas même les agents.",
     "urlPlaceholder": "postgres://utilisateur:mdp@hôte/base",
     "urlInvalid": "Collez une adresse qui commence par postgres://, ou remplissez les champs sous Avancé.",
     "howTitle": "Comment créer un utilisateur en lecture seule ?",
@@ -10053,13 +10053,15 @@
       "unreachable": "Impossible de joindre le serveur de la base de données. Vérifiez l'adresse et qu'il accepte les connexions de l'extérieur.",
       "blocked_host": "Ce serveur n'est pas autorisé. Utilisez l'adresse publique de la base de données (les adresses internes, comme le DATABASE_URL de Railway, ne fonctionnent pas d'ici).",
       "tls": "La base de données n'a pas accepté de connexion sécurisée. Activez SSL sur la base de données, ou choisissez Sans chiffrement sous Avancé (bases de test uniquement).",
-      "unknown": "Connexion impossible pour le moment. Réessayez dans un instant."
+      "unknown": "Connexion impossible pour le moment. Réessayez dans un instant.",
+      "no_databases": "Cet utilisateur ne peut ouvrir aucune base de ce serveur. Vérifiez ses droits ou le début du nom."
     },
     "connect": "Connecter",
     "connectedToast": "{{name}} connecté.",
     "testing": {
       "reach": "Contact avec la base de données…",
-      "tables": "Examen des tables…"
+      "tables": "Examen des tables…",
+      "databases": "Lecture des bases…"
     },
     "canWrite": "Cet utilisateur peut modifier des données. Les agents ne font que lire de toute façon, mais le plus sûr est un utilisateur en lecture seule (voir comment le créer à l'étape 1).",
     "toolsLead": "Ce que les agents peuvent faire dans {{name}}. Pour l'instant, ils ne font que lire : rien n'est modifié dans la base de données.",
@@ -10108,15 +10110,44 @@
       "timeoutHelp": "Une requête qui dure plus longtemps est annulée, pour ne pas surcharger la base de données.",
       "seconds_one": "{{count}} seconde",
       "seconds_many": "{{count}} secondes",
-      "seconds_other": "{{count}} secondes"
+      "seconds_other": "{{count}} secondes",
+      "databases": "Bases",
+      "databasesAll": "Toutes",
+      "databasesSome": "Seulement celles-ci",
+      "databasePlaceholder": "Nom de la base",
+      "databasesHelp": "Les règles ci-dessous s'appliquent à chaque base que cet agent lit.",
+      "tablesIn": "Tables (vues dans {{database}})",
+      "capHelpAll": "Vide = pas de limite. Compté sur toutes les bases."
     },
     "agent": {
       "title": "Bases de données",
       "help": "Bases de données connectées par {{org}}. L'agent ne fait que lire.",
       "levelText": "Interroge les tables autorisées par les règles, en lecture seule.",
       "rulesOf": "Règles dans {{name}}",
-      "saved": "Accès de {{name}} à la base de données enregistré."
-    }
+      "saved": "Accès de {{name}} à la base de données enregistré.",
+      "allDatabases": "Toutes les bases de {{name}}",
+      "someDatabases_one": "{{count}} base de {{name}}",
+      "someDatabases_many": "{{count}} bases de {{name}}",
+      "someDatabases_other": "{{count}} bases de {{name}}"
+    },
+    "scope": "Quelles bases",
+    "scopeOne": "Seulement cette base",
+    "scopeAll": "Toutes les bases de ce serveur",
+    "scopeAllHelp": "Pour une base par client. Les agents voient la liste et choisissent la base à chaque requête.",
+    "prefix": "Seulement les noms qui commencent par",
+    "prefixPlaceholder": "Ex. : client_",
+    "prefixHelp": "Laissez vide pour toutes. Les nouvelles bases qui commencent ainsi apparaissent d'elles-mêmes.",
+    "databaseOptional": "Facultatif pour toutes les bases.",
+    "connectedToastAll_one": "{{name}} connecté avec {{count}} base.",
+    "connectedToastAll_many": "{{name}} connecté avec {{count}} bases.",
+    "connectedToastAll_other": "{{name}} connecté avec {{count}} bases.",
+    "howAll": "Pour lire toutes les bases (Postgres 14 ou plus récent).",
+    "count_one": "{{count}} base",
+    "count_many": "{{count}} bases",
+    "count_other": "{{count}} bases",
+    "prefixRow": "bases qui commencent par {{prefix}}",
+    "refresh": "Actualiser la liste",
+    "refreshName": "Actualiser la liste des bases de {{name}}"
   },
   "mail": {
     "choice": {

@@ -1470,7 +1470,10 @@ export interface ApiClient {
       input: DatabaseConnectionInput & { offActions?: DatabaseActionName[] },
     ): Promise<DatabaseConnection>;
     disconnect(orgId: string, connectionId: string): Promise<void>;
-    tables(orgId: string, connectionId: string): Promise<DatabaseTable[]>;
+    /** On a whole server, of `database` (default: the sample). */
+    tables(orgId: string, connectionId: string, database?: string): Promise<DatabaseTable[]>;
+    /** A whole-server connection's databases; `refresh` reads the list again. */
+    serverDatabases(orgId: string, connectionId: string, refresh?: boolean): Promise<string[]>;
     /** An agent's access and rules per database. */
     agent(orgId: string, agentId: string): Promise<AgentDatabase[]>;
     setAgent(orgId: string, agentId: string, connectionId: string, input: AgentDatabaseInput): Promise<AgentDatabase>;

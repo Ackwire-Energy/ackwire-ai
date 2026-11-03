@@ -9295,7 +9295,7 @@
     "nameHelp": "这个数据库对你和智能体显示的名称。",
     "namePlaceholder": "例如：生产环境",
     "url": "数据库地址",
-    "urlHelp": "以 postgres:// 开头。加密保存在服务器上，之后任何人都无法再查看，智能体也不能。",
+    "urlHelp": "以 postgres:// 开头。末尾的数据库名可以省略。加密保存在服务器上，之后没人能再看到，智能体也不能。",
     "urlPlaceholder": "postgres://user:password@host/db",
     "urlInvalid": "请粘贴以 postgres:// 开头的地址，或填写“高级”下的各项。",
     "howTitle": "如何创建只读用户？",
@@ -9348,13 +9348,15 @@
       "unreachable": "无法连接到数据库服务器。请检查地址，以及它是否接受外部连接。",
       "blocked_host": "不允许使用此服务器。请使用数据库的公网地址（内部地址，如 Railway 的 DATABASE_URL，从这里无法使用）。",
       "tls": "数据库不接受安全连接。请在数据库中开启 SSL，或在“高级”中选择“不加密”（仅限测试数据库）。",
-      "unknown": "暂时无法连接，请稍后再试。"
+      "unknown": "暂时无法连接，请稍后再试。",
+      "no_databases": "此用户无法打开此服务器上的任何数据库。请检查权限或名称开头。"
     },
     "connect": "连接",
     "connectedToast": "{{name}} 已连接。",
     "testing": {
       "reach": "正在连接数据库…",
-      "tables": "正在查看数据表…"
+      "tables": "正在查看数据表…",
+      "databases": "正在查看数据库…"
     },
     "canWrite": "这个用户可以更改数据。智能体本身只会读取，但最安全的做法是使用只读用户（创建方法见第 1 步）。",
     "toolsLead": "智能体在 {{name}} 中可以做什么。目前它们只读取，不会更改数据库中的任何内容。",
@@ -9401,15 +9403,38 @@
       "capHelp": "留空 = 不限制。",
       "timeout": "每次查询的时间上限",
       "timeoutHelp": "超时的查询会被取消，以免给数据库造成负担。",
-      "seconds_other": "{{count}} 秒"
+      "seconds_other": "{{count}} 秒",
+      "databases": "数据库",
+      "databasesAll": "全部",
+      "databasesSome": "仅这些",
+      "databasePlaceholder": "数据库名称",
+      "databasesHelp": "以下规则适用于此智能体读取的每个数据库。",
+      "tablesIn": "表（取自 {{database}}）",
+      "capHelpAll": "留空 = 不限。按所有数据库合计。"
     },
     "agent": {
       "title": "数据库",
       "help": "{{org}} 连接的数据库。智能体只读取。",
       "levelText": "在规则允许的范围内查询数据表，只读。",
       "rulesOf": "{{name}} 中的规则",
-      "saved": "已保存 {{name}} 的数据库访问权限。"
-    }
+      "saved": "已保存 {{name}} 的数据库访问权限。",
+      "allDatabases": "{{name}} 的所有数据库",
+      "someDatabases_other": "{{name}} 的 {{count}} 个数据库"
+    },
+    "scope": "哪些数据库",
+    "scopeOne": "仅此数据库",
+    "scopeAll": "此服务器上的所有数据库",
+    "scopeAllHelp": "适合每个客户一个数据库的情况。智能体会看到列表，每次查询时选择一个数据库。",
+    "prefix": "仅名称以此开头的",
+    "prefixPlaceholder": "例如 customer_",
+    "prefixHelp": "留空表示全部。以此开头的新数据库会自动出现。",
+    "databaseOptional": "选择全部数据库时可不填。",
+    "connectedToastAll_other": "{{name}} 已连接，共 {{count}} 个数据库。",
+    "howAll": "用于读取所有数据库（Postgres 14 或更新版本）。",
+    "count_other": "{{count}} 个数据库",
+    "prefixRow": "以 {{prefix}} 开头的数据库",
+    "refresh": "刷新列表",
+    "refreshName": "刷新 {{name}} 的数据库列表"
   },
   "mail": {
     "choice": {

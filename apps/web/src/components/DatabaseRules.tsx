@@ -1,7 +1,8 @@
-import type { DatabasePolicy } from "@agenteschat/client";
-import { useDatabaseTables } from "@agenteschat/client";
-import { DATABASE_TIMEOUTS, splitColumns, tableRuleNames } from "@agenteschat/client/lib/databases";
+import type { DatabaseConnection, DatabasePolicy } from "@agenteschat/client";
+import { useDatabaseTables, useServerDatabases } from "@agenteschat/client";
+import { DATABASE_TIMEOUTS, splitColumns, splitDatabaseNames, tableRuleNames } from "@agenteschat/client/lib/databases";
 import { CheckboxPill, Field, Input, Segmented } from "@agenteschat/ui";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AddressList } from "@/components/AddressList";
 import { useOrg } from "@/components/org-context";
@@ -9,21 +10,27 @@ import { useOrg } from "@/components/org-context";
 /**
  * The rules for one database (ADR 0039), in the email rules' shape: tables
  * (none = all), hidden columns, a daily cap and the time limit per query.
+ * A whole-server connection adds which of its databases (none = all); the
+ * rest applies to each, with the tables read from the sample database.
  */
 export function DatabaseRulesPanel({
-  connectionId,
+  connection,
   policy,
   onChange,
   disabled,
 }: {
-  connectionId: string;
+  connection: DatabaseConnection;
   policy: DatabasePolicy;
   onChange: (policy: DatabasePolicy) => void;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const connectionId = connection.id;
+  const whole = connection.wholeServer;
   const tables = useDatabaseTables(org.id, connectionId);
+  const names = useServerDatabases(org.id, connectionId, whole);
+  const [some, setSome] = useState((policy.databases?.length ?? 0) > 0);
   const set = (next: Partial<DatabasePolicy>) => onChange({ ...policy, ...next });
   const id = (name: string) => `db-${name}-${connectionId}`;
   const numberOrNull = (v: string) => {
@@ -36,8 +43,44 @@ export function DatabaseRulesPanel({
         <h4 id={id("read-h")} className="mail-rules__h">
           {t("database.rulesRead")}
         </h4>
+        {whole && (
+          <div className="ac-field">
+            <span className="ac-field__label">{t("database.rule.databases")}</span>
+            <Segmented
+              size="sm"
+              label={t("database.rule.databases")}
+              value={some ? "some" : "all"}
+              onValueChange={(v) => {
+                if (disabled) return;
+                setSome(v === "some");
+                if (v === "all") set({ databases: undefined });
+              }}
+              options={[
+                { value: "all", label: t("database.rule.databasesAll") },
+                { value: "some", label: t("database.rule.databasesSome") },
+              ]}
+            />
+            {some && (
+              <AddressList
+                id={id("databases")}
+                label={t("database.rule.databasesSome")}
+                values={policy.databases ?? []}
+                onChange={(databases) => set({ databases })}
+                disabled={disabled}
+                split={splitDatabaseNames}
+                suggestions={names.data}
+                clearable
+                inputMode="text"
+                placeholder={t("database.rule.databasePlaceholder")}
+              />
+            )}
+            <span className="ac-field__help">{t("database.rule.databasesHelp")}</span>
+          </div>
+        )}
         <fieldset className="mail-rules__group">
-          <legend className="ac-field__label">{t("database.rule.tables")}</legend>
+          <legend className="ac-field__label">
+            {whole ? t("database.rule.tablesIn", { database: connection.database }) : t("database.rule.tables")}
+          </legend>
           {tables.isLoading ? (
             <span className="small muted">{t("database.rule.tablesLoading")}</span>
           ) : tables.isError ? (
@@ -82,7 +125,11 @@ export function DatabaseRulesPanel({
         <h4 id={id("limits-h")} className="mail-rules__h">
           {t("database.rulesLimits")}
         </h4>
-        <Field label={t("database.rule.cap")} id={id("cap")} help={t("database.rule.capHelp")}>
+        <Field
+          label={t("database.rule.cap")}
+          id={id("cap")}
+          help={whole ? t("database.rule.capHelpAll") : t("database.rule.capHelp")}
+        >
           <Input
             className="ac-num mail-rules__cap"
             type="number"

@@ -5,12 +5,13 @@ import type {
   DatabasePolicy,
   DatabaseProvider,
 } from "@agenteschat/client";
-import { keys, useAgentDatabases, useAgents, useDatabaseAction } from "@agenteschat/client";
+import { keys, useAgentDatabases, useAgents, useDatabaseAction, useServerDatabases } from "@agenteschat/client";
 import type { Level } from "@agenteschat/client/lib/access-levels";
 import {
   DATABASE_PROVIDER_URLS,
   DATABASE_PROVIDERS,
   databaseErrorOf,
+  databaseNameOf,
   databaseOffActions,
   databaseReviewTools,
   defaultDatabasePolicy,
@@ -142,7 +143,15 @@ export function DatabaseConnectFlow({
 }
 
 /** "Como criar um usuário só de leitura?": where the address is, three steps, the SQL to paste and the provider's page. */
-export function ReadOnlyUserHelp({ provider, database }: { provider: DatabaseProvider; database: string }) {
+export function ReadOnlyUserHelp({
+  provider,
+  database,
+  wholeServer,
+}: {
+  provider: DatabaseProvider;
+  database: string;
+  wholeServer?: boolean;
+}) {
   const { t } = useTranslation();
   const url = DATABASE_PROVIDER_URLS[provider];
   return (
@@ -154,7 +163,8 @@ export function ReadOnlyUserHelp({ provider, database }: { provider: DatabasePro
           <li key={n}>{t(`database.how.${provider}.${n}`)}</li>
         ))}
       </ol>
-      <CommandBlock command={readOnlyRoleSql(database || "postgres")} />
+      <CommandBlock command={readOnlyRoleSql(database || "postgres", { wholeServer })} />
+      {wholeServer && <span className="small muted">{t("database.howAll")}</span>}
       {url && (
         <a className="ac-link small mail-howto__link" href={url} target="_blank" rel="noreferrer noopener">
           <Icon name="external" size={14} />
@@ -190,18 +200,22 @@ function ConnectStep({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [sslmode, setSslmode] = useState<"require" | "disable">("require");
+  /** "Quais bancos"; null = follows whether a database name was given. */
+  const [scope, setScope] = useState<"one" | "all" | null>(null);
+  const [prefix, setPrefix] = useState("");
   const [advanced, setAdvanced] = useState(false);
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState<DatabaseConnectError | null>(null);
+  const fields = host.trim() !== "" && username.trim() !== "" && password !== "";
+  const urlError = touched && !fields && !isDatabaseUrl(url) ? t("database.urlInvalid") : undefined;
+  const dbName = database.trim() || databaseNameOf(url);
+  const whole = (scope ?? (dbName ? "one" : "all")) === "all";
   const testing = useStepText(connect.isPending, [
     t("database.testing.reach"),
+    ...(whole ? [t("database.testing.databases")] : []),
     t("database.testing.tables"),
     t("connectFlow.almost"),
   ]);
-  const fields = host.trim() !== "" && username.trim() !== "" && password !== "";
-  const urlError = touched && !fields && !isDatabaseUrl(url) ? t("database.urlInvalid") : undefined;
-  const dbName =
-    database.trim() || (/\/([^/?]+)(\?|$)/.exec(url.trim().replace(/^postgres(ql)?:\/\/[^/]+/, ""))?.[1] ?? "");
 
   const submit = () => {
     setTouched(true);
@@ -219,10 +233,15 @@ function ConnectStep({
         ...(username.trim() ? { username: username.trim() } : {}),
         ...(password ? { password } : {}),
         ...(sslmode === "disable" ? { sslmode } : {}),
+        ...(whole ? { wholeServer: true, ...(prefix.trim() ? { databasePrefix: prefix.trim() } : {}) } : {}),
       },
       {
         onSuccess: (connection) => {
-          toast.show(t("database.connectedToast", { name: connection.label }));
+          toast.show(
+            connection.wholeServer && connection.databaseCount !== null
+              ? t("database.connectedToastAll", { name: connection.label, count: connection.databaseCount })
+              : t("database.connectedToast", { name: connection.label }),
+          );
           onConnected(connection);
         },
         onError: (e) => setError(databaseErrorOf(e)),
@@ -264,7 +283,36 @@ function ConnectStep({
             }}
           />
         </Field>
-        <ReadOnlyUserHelp provider={provider} database={dbName} />
+        <div className="ac-field">
+          <span className="ac-field__label">{t("database.scope")}</span>
+          <Segmented
+            size="sm"
+            label={t("database.scope")}
+            value={whole ? "all" : "one"}
+            onValueChange={(v) => {
+              setScope(v);
+              setError(null);
+            }}
+            options={[
+              { value: "one", label: t("database.scopeOne") },
+              { value: "all", label: t("database.scopeAll") },
+            ]}
+          />
+          {whole && <span className="ac-field__help">{t("database.scopeAllHelp")}</span>}
+        </div>
+        {whole && (
+          <Field label={t("database.prefix")} id="db-prefix" help={t("database.prefixHelp")}>
+            <Input
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={63}
+              value={prefix}
+              placeholder={t("database.prefixPlaceholder")}
+              onChange={(e) => setPrefix(e.target.value)}
+            />
+          </Field>
+        )}
+        <ReadOnlyUserHelp provider={provider} database={dbName} wholeServer={whole} />
         <p className="small muted mail-hint">
           <Icon name="info" size={14} />
           <span>{t("database.dedicated")}</span>
@@ -285,7 +333,11 @@ function ConnectStep({
                 <Input inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value)} />
               </Field>
             </div>
-            <Field label={t("database.database")} id="db-database">
+            <Field
+              label={t("database.database")}
+              id="db-database"
+              help={whole ? t("database.databaseOptional") : undefined}
+            >
               <Input autoComplete="off" value={database} onChange={(e) => setDatabase(e.target.value)} />
             </Field>
             <Field label={t("mail.username")} id="db-username">
@@ -608,7 +660,7 @@ function AgentRules({
         <b>{agent.name}</b>
       </span>
       <DatabaseRulesPanel
-        connectionId={connection.id}
+        connection={connection}
         policy={shown}
         onChange={(next) => {
           setCopied(null);
@@ -692,12 +744,22 @@ export function DatabaseRow({
   onDisconnect: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const servers = useServerDatabases(org.id, connection.id, connection.wholeServer);
   const using = agents.filter((a) => connection.agents.some((x) => x.agentId === a.id));
   const name = connection.label;
-  const meta = [
-    t("connectors.connectedAs", { account: `${connection.username}@${connection.host}/${connection.database}` }),
-    relativeTime(t, i18n.language, connection.createdAt),
-  ];
+  const count = servers.data?.length ?? connection.databaseCount;
+  const meta = connection.wholeServer
+    ? [
+        t("connectors.connectedAs", { account: `${connection.username}@${connection.host}` }),
+        ...(count !== null ? [t("database.count", { count })] : []),
+        ...(connection.databasePrefix ? [t("database.prefixRow", { prefix: connection.databasePrefix })] : []),
+        relativeTime(t, i18n.language, connection.createdAt),
+      ]
+    : [
+        t("connectors.connectedAs", { account: `${connection.username}@${connection.host}/${connection.database}` }),
+        relativeTime(t, i18n.language, connection.createdAt),
+      ];
   return (
     <div className="ac-list__row connected-row">
       <DatabaseIcon size="lg" />
@@ -736,6 +798,18 @@ export function DatabaseRow({
           {connection.status === "needs_reconnect" && (
             <Button size="sm" variant="primary" aria-label={t("mail.reconnectName", { name })} onClick={onReconnect}>
               {t("mail.reconnect")}
+            </Button>
+          )}
+          {connection.wholeServer && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={t("database.refreshName", { name })}
+              disabled={servers.refresh.isPending}
+              loading={servers.refresh.isPending}
+              onClick={() => servers.refresh.mutate()}
+            >
+              {t("database.refresh")}
             </Button>
           )}
           <Button size="sm" aria-label={t("connectors.whoName", { name })} onClick={onWho}>

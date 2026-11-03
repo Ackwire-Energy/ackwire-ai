@@ -258,3 +258,97 @@ describe("the agent's database access", () => {
     expect(screen().getByText("Acesso de Ada ao banco salvo.")).toBeTruthy();
   });
 });
+
+describe("Quais bancos: one database, or every database of the server", () => {
+  test("follows whether the address names a database; every database sends wholeServer and the prefix", async () => {
+    const { api, state } = databaseApi();
+    const dialog = await openCatalog(api);
+    await pick(dialog, "Banco de dados");
+    const scope = () => within(flow()).getByRole("radiogroup", { name: "Quais bancos" });
+    const checked = () => within(scope()).getByRole("radio", { checked: true }).textContent;
+    // No address yet: every database, with the prefix field and the role that reads them all.
+    expect(checked()).toBe("Todos os bancos deste servidor");
+    expect(flow().textContent).toContain("Para quem tem um banco por cliente.");
+    expect(flow().textContent).toContain("grant pg_read_all_data to agentes_leitura;");
+    await type(within(flow()).getByLabelText("Endereço do banco"), "postgres://reader:pw@db.acme.com:6543/app");
+    expect(checked()).toBe("Só este banco");
+    expect(within(flow()).queryByLabelText("Só os que começam com")).toBeNull();
+    expect(flow().textContent).toContain("grant connect on database app");
+    await type(within(flow()).getByLabelText("Endereço do banco"), "postgres://reader:pw@db.acme.com:6543");
+    expect(checked()).toBe("Todos os bancos deste servidor");
+    await type(within(flow()).getByLabelText("Só os que começam com"), "cliente_");
+    await type(within(flow()).getByLabelText("Nome"), "Clientes");
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "databases.connect").at(-1)?.args[1]).toMatchObject({
+      url: "postgres://reader:pw@db.acme.com:6543",
+      wholeServer: true,
+      databasePrefix: "cliente_",
+    });
+    expect(screen().getByText("Clientes conectado com 3 bancos.")).toBeTruthy();
+  });
+
+  test("picking Só este banco for an address without a name sends no wholeServer", async () => {
+    const { api, state } = databaseApi();
+    const dialog = await openCatalog(api);
+    await pick(dialog, "Banco de dados");
+    await type(within(flow()).getByLabelText("Endereço do banco"), "postgres://reader:pw@db.acme.com");
+    await click(
+      within(within(flow()).getByRole("radiogroup", { name: "Quais bancos" })).getByRole("radio", {
+        name: "Só este banco",
+      }),
+    );
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    const sent = state.calls.filter((c) => c.method === "databases.connect").at(-1)?.args[1] as Record<string, unknown>;
+    expect(sent.wholeServer).toBeUndefined();
+  });
+
+  test("the agent's page: Todos os bancos or Só estes, rules for every database", async () => {
+    const { api, state, databases } = databaseApi();
+    await databases.client.connect(ORG_ID, {
+      label: "Clientes",
+      url: "postgres://reader:pw@db.acme.com",
+      wholeServer: true,
+    });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+    await settle(10);
+    const level = screen().getByRole("radiogroup", { name: "Nível em Clientes" });
+    await click(within(level).getByRole("radio", { name: "Ler" }));
+    const row = level.closest("li") as HTMLElement;
+    expect(row.textContent).toContain("Todos os bancos de Clientes");
+    await click(within(row).getByLabelText("Regras em Clientes"));
+    await settle(4);
+    expect(row.textContent).toContain("Tabelas (vistas em cliente_a)");
+    expect(row.textContent).toContain("Somando todos os bancos.");
+    await click(
+      within(within(row).getByRole("radiogroup", { name: "Bancos" })).getByRole("radio", { name: "Só estes" }),
+    );
+    await type(within(row).getByRole("combobox", { name: "Só estes" }), "cliente_b");
+    await click(within(row).getByRole("button", { name: "Adicionar em Só estes" }));
+    expect(row.textContent).toContain("1 banco de Clientes");
+    await click(within(row).getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "databases.setAgent")?.args[3]).toMatchObject({
+      level: "read",
+      policy: { databases: ["cliente_b"] },
+    });
+  });
+
+  test("the connected row: user@server, how many databases, the prefix, Atualizar lista", async () => {
+    const { api, state, databases } = databaseApi();
+    await databases.client.connect(ORG_ID, {
+      label: "Clientes",
+      url: "postgres://reader:pw@db.acme.com",
+      wholeServer: true,
+      databasePrefix: "cliente_",
+    });
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    const row = (await screen().findByText("Clientes")).closest(".connected-row") as HTMLElement;
+    expect(row.textContent).toContain("reader@db.acme.com · 3 bancos · bancos que começam com cliente_");
+    await click(within(row).getByRole("button", { name: "Atualizar a lista de bancos de Clientes" }));
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "databases.serverDatabases" && c.args[2] === true)).toBe(true);
+  });
+});

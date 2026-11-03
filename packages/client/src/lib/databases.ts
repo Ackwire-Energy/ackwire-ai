@@ -29,7 +29,14 @@ export const DATABASE_PROVIDER_URLS: Record<DatabaseProvider, string | null> = {
   other: null,
 };
 
-export const DATABASE_ERRORS: DatabaseConnectError[] = ["auth", "unreachable", "blocked_host", "tls", "unknown"];
+export const DATABASE_ERRORS: DatabaseConnectError[] = [
+  "auth",
+  "unreachable",
+  "blocked_host",
+  "tls",
+  "no_databases",
+  "unknown",
+];
 
 /** The error code of a failed connect or reconnect (`422 { error }`); anything else is `unknown`. */
 export function databaseErrorOf(error: unknown): DatabaseConnectError {
@@ -40,8 +47,16 @@ export function databaseErrorOf(error: unknown): DatabaseConnectError {
   return "unknown";
 }
 
-/** A user that can only read, to paste in the provider's SQL editor (the password is the person's to choose). */
-export function readOnlyRoleSql(database: string) {
+/**
+ * A user that can only read, to paste in the provider's SQL editor (the password is the person's to choose).
+ * `wholeServer`: every database of the server, through the `pg_read_all_data` role (Postgres 14 or newer).
+ */
+export function readOnlyRoleSql(database: string, options: { wholeServer?: boolean } = {}) {
+  if (options.wholeServer)
+    return [
+      "create role agentes_leitura login password 'troque-esta-senha';",
+      "grant pg_read_all_data to agentes_leitura;",
+    ].join("\n");
   const db = /^[a-z_][a-z0-9_$]*$/i.test(database) ? database : `"${database.replace(/"/g, '""')}"`;
   return [
     "create role agentes_leitura login password 'troque-esta-senha';",
@@ -51,6 +66,10 @@ export function readOnlyRoleSql(database: string) {
     "alter default privileges in schema public grant select on tables to agentes_leitura;",
   ].join("\n");
 }
+
+/** The database name at the end of a `postgres://` address, if it has one. */
+export const databaseNameOf = (url: string) =>
+  /\/([^/?]+)(\?|$)/.exec(url.trim().replace(/^postgres(ql)?:\/\/[^/]+/, ""))?.[1] ?? "";
 
 /** `postgres://…` looks complete enough to try (the server says exactly what's wrong). */
 export const isDatabaseUrl = (value: string) => /^postgres(ql)?:\/\/[^/\s]+/.test(value.trim());
@@ -156,10 +175,21 @@ export function splitColumns(text: string): { valid: string[]; invalid: string[]
   return { valid, invalid };
 }
 
+/** Typed text → database names (split on commas, spaces, semicolons; at most 63 characters each). */
+export function splitDatabaseNames(text: string): { valid: string[]; invalid: string[] } {
+  const parts = text.split(/[\s,;]+/).filter(Boolean);
+  return { valid: parts.filter((p) => p.length <= 63), invalid: parts.filter((p) => p.length > 63) };
+}
+
 /** How many rules narrow what the agent reads (the "Regras" summary). */
 export const databaseRulesCount = (p: DatabasePolicy) =>
-  [p.tables.length > 0, p.hiddenColumns.length > 0, p.dailyQueryCap !== null, p.timeoutSeconds !== 15].filter(Boolean)
-    .length;
+  [
+    (p.databases?.length ?? 0) > 0,
+    p.tables.length > 0,
+    p.hiddenColumns.length > 0,
+    p.dailyQueryCap !== null,
+    p.timeoutSeconds !== 15,
+  ].filter(Boolean).length;
 
 const ACTIONS: DatabaseActionName[] = ["list_tables", "describe_table", "query"];
 

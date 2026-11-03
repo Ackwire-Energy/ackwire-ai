@@ -9673,7 +9673,7 @@
     "nameHelp": "Hoe de database er voor jou en de agents uitziet.",
     "namePlaceholder": "Bijv.: Productie",
     "url": "Adres van de database",
-    "urlHelp": "Begint met postgres://. Versleuteld opgeslagen op de server. Niemand ziet het nog, ook de agents niet.",
+    "urlHelp": "Begint met postgres://. De databasenaam aan het eind is optioneel. Versleuteld op de server opgeslagen. Niemand ziet het nog, ook de agents niet.",
     "urlPlaceholder": "postgres://user:wachtwoord@host/db",
     "urlInvalid": "Plak een adres dat begint met postgres://, of vul de velden onder Geavanceerd in.",
     "howTitle": "Hoe maak ik een gebruiker die alleen kan lezen?",
@@ -9726,13 +9726,15 @@
       "unreachable": "We konden de databaseserver niet bereiken. Controleer het adres en of hij verbindingen van buitenaf accepteert.",
       "blocked_host": "Deze server is niet toegestaan. Gebruik het publieke adres van de database (interne adressen, zoals DATABASE_URL van Railway, werken niet vanaf hier).",
       "tls": "De database accepteerde geen beveiligde verbinding. Zet SSL aan in de database, of kies Geen versleuteling onder Geavanceerd (alleen voor testdatabases).",
-      "unknown": "Kon nu geen verbinding maken. Probeer het zo opnieuw."
+      "unknown": "Kon nu geen verbinding maken. Probeer het zo opnieuw.",
+      "no_databases": "Deze gebruiker kan geen enkele database op deze server openen. Controleer de rechten of het begin van de naam."
     },
     "connect": "Koppelen",
     "connectedToast": "{{name}} gekoppeld.",
     "testing": {
       "reach": "De database bereiken…",
-      "tables": "De tabellen bekijken…"
+      "tables": "De tabellen bekijken…",
+      "databases": "Databases bekijken…"
     },
     "canWrite": "Deze gebruiker kan data wijzigen. Agents lezen hoe dan ook alleen, maar het veiligst is een gebruiker die alleen kan lezen (zie in stap 1 hoe je die maakt).",
     "toolsLead": "Wat agents kunnen doen in {{name}}. Voorlopig lezen ze alleen: er wordt niets gewijzigd in de database.",
@@ -9780,15 +9782,41 @@
       "timeout": "Tijdslimiet per query",
       "timeoutHelp": "Een query die langer duurt, wordt geannuleerd, zodat hij de database niet belast.",
       "seconds_one": "{{count}} seconde",
-      "seconds_other": "{{count}} seconden"
+      "seconds_other": "{{count}} seconden",
+      "databases": "Databases",
+      "databasesAll": "Alle",
+      "databasesSome": "Alleen deze",
+      "databasePlaceholder": "Naam van de database",
+      "databasesHelp": "De regels hieronder gelden voor elke database die deze agent leest.",
+      "tablesIn": "Tabellen (gezien in {{database}})",
+      "capHelpAll": "Leeg = geen limiet. Opgeteld over alle databases."
     },
     "agent": {
       "title": "Databases",
       "help": "Databases die {{org}} heeft gekoppeld. De agent leest alleen.",
       "levelText": "Bevraagt de tabellen die de regels toestaan, alleen lezen.",
       "rulesOf": "Regels in {{name}}",
-      "saved": "Databasetoegang van {{name}} opgeslagen."
-    }
+      "saved": "Databasetoegang van {{name}} opgeslagen.",
+      "allDatabases": "Alle databases van {{name}}",
+      "someDatabases_one": "{{count}} database van {{name}}",
+      "someDatabases_other": "{{count}} databases van {{name}}"
+    },
+    "scope": "Welke databases",
+    "scopeOne": "Alleen deze database",
+    "scopeAll": "Alle databases op deze server",
+    "scopeAllHelp": "Voor één database per klant. Agents zien de lijst en kiezen bij elke query de database.",
+    "prefix": "Alleen namen die beginnen met",
+    "prefixPlaceholder": "Bijv. klant_",
+    "prefixHelp": "Leeg laten voor alle. Nieuwe databases met dit begin verschijnen vanzelf.",
+    "databaseOptional": "Optioneel bij alle databases.",
+    "connectedToastAll_one": "{{name}} verbonden met {{count}} database.",
+    "connectedToastAll_other": "{{name}} verbonden met {{count}} databases.",
+    "howAll": "Om alle databases te lezen (Postgres 14 of nieuwer).",
+    "count_one": "{{count}} database",
+    "count_other": "{{count}} databases",
+    "prefixRow": "databases die beginnen met {{prefix}}",
+    "refresh": "Lijst vernieuwen",
+    "refreshName": "Lijst met databases van {{name}} vernieuwen"
   },
   "mail": {
     "choice": {
