@@ -8733,9 +8733,12 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   padding: 4px 0;
   border-block: 1px solid var(--line);
 }
+/* The cells reach out by their padding: each icon starts on the card's edge, where the rules start, and the chevron
+   ends on the other; the hover plate bleeds past them, as a ghost button at a row's edge does. */
 .agp-cells {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-inline: -12px;
 }
 .agp-cell {
   position: relative;
@@ -8744,7 +8747,7 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   align-items: start;
   gap: 10px;
   min-width: 0;
-  padding: 10px 10px 10px 12px;
+  padding: 10px 12px;
   border: 0;
   border-radius: 13px 13px 13px 4px;
   background: none;
@@ -8845,8 +8848,8 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   color: var(--faint);
 }
 .agp-workcard__foot {
-  margin: 4px 6px 0;
-  padding: 8px 6px 4px;
+  margin: 4px 0 0;
+  padding: 8px 0 4px;
   border-top: 1px solid var(--line);
 }
 .agp-numbers {
@@ -9313,7 +9316,6 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 }
 .agp-aside .agp-cells {
   grid-template-columns: minmax(0, 1fr);
-  margin: 0 -12px;
 }
 .agp-aside .agp-cell + .agp-cell::before {
   display: none;
