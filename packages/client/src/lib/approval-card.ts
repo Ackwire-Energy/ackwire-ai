@@ -72,12 +72,30 @@ export function approveAlwaysOn(items: readonly Approval[]): Set<string> {
   return new Set(kinds.values());
 }
 
-const sameKind = (a: Approval, b: Approval) =>
-  a.agentId === b.agentId && a.tool === b.tool && a.title === b.title && a.connectorAccount === b.connectorAccount;
+// The same "Aprovar sempre" kind too: a SQL write (none offered) never folds among reads, its SQL hidden.
+const kindOf = (a: Approval) => JSON.stringify([a.agentId, a.tool, a.title, a.connectorAccount, a.approveAlways]);
+const sameKind = (a: Approval, b: Approval) => kindOf(a) === kindOf(b);
 
 /**
- * A card's items as they are drawn: several waiting requests of one kind in a row (same agent, tool and action) come
- * together as one run ("3 pedidos de Ada para Executar sql"), anything else stands alone. A run this person may decide
+ * A key for each run of `approvalRuns` that stays the same while its requests are decided one by one (its first id
+ * doesn't), so an unfolded run stays open: its kind, and which run of that kind on the card (a lone request is its id;
+ * one decided out of a run doesn't shift the count).
+ */
+export function runKeys(runs: readonly Approval[][]): string[] {
+  const seen = new Map<string, number>();
+  return runs.map((run) => {
+    const [first] = run;
+    if (!first || run.length < 2) return first?.id ?? "";
+    const kind = kindOf(first);
+    const n = seen.get(kind) ?? 0;
+    seen.set(kind, n + 1);
+    return `${kind}#${n}`;
+  });
+}
+
+/**
+ * A card's items as they are drawn: several waiting requests of one kind in a row (same agent, tool, action and
+ * "Aprovar sempre" kind) come together as one run ("3 pedidos de Ada para Executar sql"), anything else stands alone. A run this person may decide
  * only one of stands apart again: "Aprovar todos" would cover just that one.
  */
 export function approvalRuns(items: readonly Approval[]): Approval[][] {
@@ -92,12 +110,11 @@ export function approvalRuns(items: readonly Approval[]): Approval[][] {
 }
 
 /**
- * The other requests "Aprovar sempre" on `a` approves with it: those of its run that this person may decide and that
- * the same rule covers (a write among SQL reads keeps asking).
+ * The other requests "Aprovar sempre" on `a` approves with it: those on its card that this person may decide and that
+ * the same rule covers. The rule is per connection, which the agent's tool name says, so the same server tool on
+ * another account keeps asking, as does a write among SQL reads.
  */
-export function approveAlwaysAlso(run: readonly Approval[], a: Approval): string[] {
-  const kind = JSON.stringify(a.approveAlways);
-  return run
-    .filter((x) => x.id !== a.id && x.status === "pending" && x.canDecide && JSON.stringify(x.approveAlways) === kind)
-    .map((x) => x.id);
+export function approveAlwaysAlso(card: readonly Approval[], a: Approval): string[] {
+  if (!a.approveAlways) return [];
+  return card.filter((x) => x.id !== a.id && x.status === "pending" && x.canDecide && sameKind(x, a)).map((x) => x.id);
 }

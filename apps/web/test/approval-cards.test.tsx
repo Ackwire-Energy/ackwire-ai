@@ -65,15 +65,26 @@ describe("Aprovações: requests sharing a card", () => {
     // The card is the run: no group head over it, and its requests folded.
     expect(run.closest(".ap-group")).toBeNull();
     expect(within(run).queryAllByRole("article")).toHaveLength(0);
-    await act(async () => fireEvent.click(within(run).getByRole("button", { name: "Ver cada um" })));
+    // The keyboard: the run is no one request (no `data-id`), Enter unfolds it.
+    expect(run.dataset.id).toBeUndefined();
+    run.focus();
+    await act(async () => fireEvent.keyDown(run, { key: "Enter" }));
     expect(within(run).getAllByRole("article")).toHaveLength(3);
+    // Deciding its first request keeps the rest unfolded.
+    const [one] = within(run).getAllByRole("article");
     await act(async () =>
-      fireEvent.click(within(run).getAllByRole("button", { name: "Aprovar todos" })[0] as HTMLElement),
+      fireEvent.click(within(one as HTMLElement).getAllByRole("button", { name: /^Aprovar/ })[0] as HTMLElement),
+    );
+    await settle(4);
+    const rest = document.querySelector(".ap-run") as HTMLElement;
+    expect(within(rest).getAllByRole("article")).toHaveLength(2);
+    await act(async () =>
+      fireEvent.click(within(rest).getAllByRole("button", { name: "Aprovar todos" })[0] as HTMLElement),
     );
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
       ORG_ID,
-      ["ap-s1", "ap-s2", "ap-s3"],
+      ["ap-s2", "ap-s3"],
       "approve",
     ]);
   });

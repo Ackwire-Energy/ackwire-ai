@@ -10,6 +10,7 @@ import {
   asOfNow,
   cardDeadline,
   itemOwnWords,
+  runKeys,
 } from "@agenteschat/client/lib/approval-card";
 import { approvalRuleWords, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import {
@@ -410,9 +411,10 @@ describe("several requests on one card", () => {
       goal("s666666", sql),
       goal("s7777777", { ...sql, agentId: "a2" }),
     ];
-    // A decided one, another tool or another agent ends the run.
+    // A decided one, another tool, another agent or another "Aprovar sempre" kind (the write among reads) ends the run.
     expect(approvalRuns(items).map((run) => run.map((a) => a.id))).toEqual([
-      ["s1", "s22", "s333"],
+      ["s1", "s22"],
+      ["s333"],
       ["m4444"],
       ["s55555"],
       ["s666666"],
@@ -426,12 +428,23 @@ describe("several requests on one card", () => {
     expect(
       approvalRuns([goal("s1", { ...sql, canDecide: false }), goal("s22", { ...sql, canDecide: false })]),
     ).toHaveLength(1);
-    const [run = []] = approvalRuns(items);
-    // The write among the reads keeps asking; one this person can't decide is left too.
-    expect(approveAlwaysAlso(run, run[0] ?? goal("x"))).toEqual(["s22"]);
-    expect(
-      approveAlwaysAlso([...run, goal("s8", { ...sql, approveAlways: reads, canDecide: false })], run[0] ?? goal("x")),
-    ).toEqual(["s22"]);
+    // The write among the reads keeps asking; so do one this person can't decide and the same server tool on another
+    // connection (another agent tool name: the rule is per connection).
+    const card = [
+      ...items,
+      goal("s8", { ...sql, approveAlways: reads, canDecide: false }),
+      goal("s9", { ...sql, tool: "supabase_beta_execute_sql", approveAlways: reads }),
+    ];
+    expect(approveAlwaysAlso(card, card[0] ?? goal("x"))).toEqual(["s22"]);
+    expect(approveAlwaysAlso(card, card[2] ?? goal("x"))).toEqual([]);
+    // A run keeps its key while its requests are decided one by one, so it stays unfolded.
+    const three = [goal("t1", sql), goal("t22", sql), goal("t333", sql)];
+    const [kind] = runKeys(approvalRuns(three));
+    expect(kind).not.toBe("t1");
+    expect(runKeys(approvalRuns([goal("t1", { ...sql, status: "approved" }), ...three.slice(1)]))).toEqual([
+      "t1",
+      kind,
+    ]);
   });
 
   test("its words in both languages", async () => {

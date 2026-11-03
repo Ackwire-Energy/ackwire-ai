@@ -6,6 +6,7 @@ import {
   approveAlwaysOn,
   cardDeadline,
   itemOwnWords,
+  runKeys,
 } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
@@ -137,7 +138,8 @@ export function ApprovalGroupAsk({
   members: Map<string, Member>;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  // Which runs are unfolded, by `runKeys`: one stays open while its requests are decided, the card reshaping or not.
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
   const first = items[0];
   if (!first) return null;
   const waiting = items.filter((a) => a.status === "pending");
@@ -151,8 +153,17 @@ export function ApprovalGroupAsk({
   const left = deadline ? Math.max(0, new Date(deadline).getTime() - Date.now()) / DAY_MS : 0;
   const partial = approveAllPartial(t, items, waits);
   const runs = approvalRuns(items);
+  const keys = runKeys(runs);
   const [only] = runs;
   const one = runs.length === 1 && only && only.length > 1 ? only : null;
+  const isOpen = (key = "") => opened.has(key);
+  const setOpen = (key = "", open: boolean) =>
+    setOpened((o) => {
+      const next = new Set(o);
+      if (open) next.add(key);
+      else next.delete(key);
+      return next;
+    });
   const item = (a: Approval, inRun: boolean) => (
     <GroupItem
       key={a.id}
@@ -178,17 +189,25 @@ export function ApprovalGroupAsk({
           ? { logo: <ConnectorMark approval={first} />, title: runHead(t, one, agent), more: t("approval.run.show") }
           : undefined
       }
-      open={one ? open : undefined}
-      onOpenChange={one ? setOpen : undefined}
+      open={one ? isOpen(keys[0]) : undefined}
+      onOpenChange={one ? (open) => setOpen(keys[0], open) : undefined}
       body={
         <>
           {one ? (
-            open && <ul className="rq__items">{one.map((a) => item(a, true))}</ul>
+            isOpen(keys[0]) && <ul className="rq__items">{one.map((a) => item(a, true))}</ul>
           ) : (
             <ul className="rq__items">
-              {runs.map((run) =>
+              {runs.map((run, i) =>
                 run.length > 1 && run[0] ? (
-                  <RunItem key={run[0].id} run={run} items={items} always={always} agent={agent}>
+                  <RunItem
+                    key={keys[i]}
+                    run={run}
+                    items={items}
+                    always={always}
+                    agent={agent}
+                    open={isOpen(keys[i])}
+                    onOpenChange={(open) => setOpen(keys[i], open)}
+                  >
                     {run.map((a) => item(a, true))}
                   </RunItem>
                 ) : (
@@ -242,16 +261,19 @@ function RunItem({
   items,
   always,
   agent,
+  open,
+  onOpenChange,
   children,
 }: {
   run: Approval[];
   items: Approval[];
   always: Set<string>;
   agent: Agent | undefined;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
   const first = run[0];
   if (!first) return null;
   return (
@@ -263,7 +285,7 @@ function RunItem({
         <span className="rq__wt">
           <b>{runHead(t, run, agent)}</b>
         </span>
-        <button type="button" className="rq__more" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button type="button" className="rq__more" aria-expanded={open} onClick={() => onOpenChange(!open)}>
           {t("approval.run.show")}
         </button>
       </div>

@@ -372,8 +372,11 @@ export interface AskWell {
   tile: ReactNode;
   title: string;
   detail?: string | null;
-  /** "Ver o e-mail" / "Ver detalhes" / "Ver a mudança" / "Ver a tela" and what it opens. */
-  more?: { label: string; content: ReactNode } | null;
+  /**
+   * "Ver o e-mail" / "Ver detalhes" / "Ver a mudança" / "Ver a tela" and what it opens; `open` and `onToggle` when its
+   * owner keeps that state (a run of approvals, open still once its card reshapes).
+   */
+  more?: { label: string; content: ReactNode; open?: boolean; onToggle?: () => void } | null;
 }
 
 /**
@@ -407,7 +410,8 @@ export function AskCard({
   const reduced = useReducedMotion();
   const store = useAskStore();
   const slot = useRef<ComponentRef<typeof View>>(null);
-  const [open, setOpen] = useState(false);
+  const [openHere, setOpen] = useState(false);
+  const open = well?.more?.open ?? openHere;
   const color = agentLook(dir.agentById.get(agentId)).color;
   const label = t(`ask.kind.${kind}`);
   useLayoutEffect(() => {
@@ -463,7 +467,8 @@ export function AskCard({
                 <Pressable
                   onPress={() => {
                     tapHaptic();
-                    setOpen((o) => !o);
+                    if (well.more?.onToggle) well.more.onToggle();
+                    else setOpen((o) => !o);
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ expanded: open }}

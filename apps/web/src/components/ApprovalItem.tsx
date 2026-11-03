@@ -111,20 +111,20 @@ export function ApproveAlways({
         });
   const always = (el: HTMLElement) => {
     const burst = prepareBurst(el);
-    decide.mutate(
-      { id: approval.id, decision: "approve", always: true },
-      {
-        onSuccess: () => {
-          burst();
-          if (also.length) others.mutate({ ids: also, decision: "approve" });
-          toast.show(
-            t("approval.always.done", { name: g.name }),
-            "info",
-            { label: t("approval.always.open"), run: open },
-            t("approval.always.undoHere", { context: g.context, name: g.name }),
-          );
-        },
+    // Not `mutate`'s own onSuccess: the decided event can unmount this button before the reply, and that callback
+    // would then never send `also`. A failure is shown by the query client's mutation cache.
+    decide.mutateAsync({ id: approval.id, decision: "approve", always: true }).then(
+      () => {
+        burst();
+        if (also.length) others.mutate({ ids: also, decision: "approve" });
+        toast.show(
+          t("approval.always.done", { name: g.name }),
+          "info",
+          { label: t("approval.always.open"), run: open },
+          t("approval.always.undoHere", { context: g.context, name: g.name }),
+        );
       },
+      () => {},
     );
   };
   return (

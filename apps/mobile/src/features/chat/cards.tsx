@@ -19,6 +19,7 @@ import {
   asOfNow,
   cardDeadline,
   itemOwnWords,
+  runKeys,
 } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
@@ -261,6 +262,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   const asks = useAskStore();
   const one = useDecideApproval(orgId);
   const all = useDecideApprovals(orgId);
+  // Which runs are unfolded, by `runKeys`: one stays open while its requests are decided, the card reshaping or not.
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
   const first = items[0];
   if (!first) return null;
@@ -274,6 +276,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   const leadItem = waiting[0] ?? first;
   const always = approveAlwaysOn(items);
   const runs = approvalRuns(items);
+  const keys = runKeys(runs);
   const [only] = runs;
   const single = runs.length === 1 && only && only.length > 1 ? only : null;
   const busy = one.isPending || all.isPending;
@@ -315,8 +318,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
         onError: failed,
       },
     );
-  const toggle = (id: string) => {
-    tapHaptic();
+  const toggle = (id = "") => {
     setOpened((o) => {
       const next = new Set(o);
       if (!next.delete(id)) next.add(id);
@@ -397,6 +399,8 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
               more: {
                 label: t("approval.run.show"),
                 content: <View style={styles.items}>{single.map((a) => item(a, true))}</View>,
+                open: opened.has(keys[0] ?? ""),
+                onToggle: () => toggle(keys[0]),
               },
             }
           : undefined
@@ -406,13 +410,14 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
           partial
         ) : (
           <View style={styles.items}>
-            {runs.map((run) => {
+            {runs.map((run, i) => {
               const [lead] = run;
               if (!lead) return null;
               if (run.length < 2) return item(lead, false);
-              const open = opened.has(lead.id);
+              const key = keys[i] ?? lead.id;
+              const open = opened.has(key);
               return (
-                <View key={lead.id} style={[styles.item, { backgroundColor: c.sunken }]}>
+                <View key={key} style={[styles.item, { backgroundColor: c.sunken }]}>
                   <View style={styles.itemRow}>
                     <ApprovalMark approval={lead} size={24} />
                     <View style={styles.grow}>
@@ -420,7 +425,10 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                         {head(run)}
                       </Text>
                       <Pressable
-                        onPress={() => toggle(lead.id)}
+                        onPress={() => {
+                          tapHaptic();
+                          toggle(key);
+                        }}
                         accessibilityRole="button"
                         accessibilityState={{ expanded: open }}
                         hitSlop={6}

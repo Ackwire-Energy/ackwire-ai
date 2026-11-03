@@ -129,6 +129,26 @@ describe("Aprovar sempre on a request", () => {
     await click(within(dialog).getByRole("button", { name: "Aprovar sempre" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
   });
+
+  test("on a run: approves the like ones waiting beside it, never the same tool on another connection", async () => {
+    const state = withComposio();
+    const [first] = state.approvals;
+    if (!first) throw new Error("no approval");
+    const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+    state.approvals.splice(
+      0,
+      1,
+      { ...first, id: "ap-c1", createdAt: at(4) },
+      { ...first, id: "ap-c2", createdAt: at(3) },
+      { ...first, id: "ap-c3", tool: `composio2_${EXECUTOR}`, createdAt: at(2) },
+    );
+    await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(state) });
+    await settle(4);
+    const run = document.querySelector(".ap-run") as HTMLElement;
+    await click(within(run).getByRole("button", { name: "Aprovar sempre" }));
+    expect(approveCalls(state)).toEqual([[ORG_ID, "ap-c1", undefined, true]]);
+    expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([ORG_ID, ["ap-c2"], "approve"]);
+  });
 });
 
 describe("Ferramentas e acesso: Aprovado sempre", () => {

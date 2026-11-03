@@ -18,6 +18,7 @@ import {
   approveAlwaysAlso,
   approveAlwaysOn,
   cardDeadline,
+  runKeys,
 } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
@@ -182,6 +183,8 @@ export function ApprovalsPage() {
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useOpenParam();
   const [refusing, setRefusing] = useState<string | null>(null);
+  // Unfolded runs, by card and `runKeys`: here, not in the run's card, which remounts when its card regroups.
+  const [openRuns, setOpenRuns] = useState<ReadonlySet<string>>(new Set());
   const all = approvals.data ?? [];
   const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
   const query = q.trim().toLowerCase();
@@ -263,6 +266,14 @@ export function ApprovalsPage() {
         const i = current ? cards.indexOf(current) : -1;
         const next = cards[Math.max(0, Math.min(cards.length - 1, i + (key === "j" ? 1 : -1)))];
         next?.focus();
+      } else if (current && !current.dataset.id) {
+        if (e.key === "Enter" && el === current) {
+          e.preventDefault();
+          current.querySelector<HTMLElement>(".ap-card__actions [aria-expanded]")?.click();
+        } else if (key === "a") {
+          e.preventDefault();
+          current.querySelector<HTMLElement>('[data-approve^="all-"]')?.focus();
+        }
       } else if (e.key === "Enter" && current?.dataset.id && el === current) {
         e.preventDefault();
         setOpenId(current.dataset.id);
@@ -386,11 +397,21 @@ export function ApprovalsPage() {
                 />
               );
               // Waiting requests of one kind in a row: one card that unfolds into them.
+              // Keyed by `runKeys`: an unfolded run stays open while its requests are decided one by one.
               const runs = approvalRuns(items);
-              const cards = runs.map((run) =>
+              const keys = runKeys(runs).map((key) => `${items[0]?.messageId ?? ""}:${key}`);
+              const cards = runs.map((run, i) =>
                 run.length > 1 && run[0] ? (
                   <RunCard
-                    key={run[0].id}
+                    key={keys[i]}
+                    open={openRuns.has(keys[i] ?? "")}
+                    onToggle={() =>
+                      setOpenRuns((o) => {
+                        const next = new Set(o);
+                        if (!next.delete(keys[i] ?? "")) next.add(keys[i] ?? "");
+                        return next;
+                      })
+                    }
                     run={run}
                     items={items}
                     always={always}
@@ -1013,6 +1034,8 @@ function RunCard({
   always,
   agent,
   channel,
+  open,
+  onToggle,
   children,
 }: {
   run: Approval[];
@@ -1020,10 +1043,11 @@ function RunCard({
   always: Set<string>;
   agent: Agent | undefined;
   channel: string;
+  open: boolean;
+  onToggle: () => void;
   children: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
-  const [open, setOpen] = useState(false);
   const first = run[0];
   if (!first) return null;
   const name = agent?.name ?? t("channel.unknownAgent");
@@ -1032,7 +1056,8 @@ function RunCard({
   const deadline = cardDeadline(run) ?? first.expiresAt;
   const leftMs = new Date(deadline).getTime() - Date.now();
   return (
-    <article className="ap-card ap-run" data-id={first.id} data-burst="" tabIndex={-1} aria-label={head}>
+    // No `data-id`: the keyboard's Enter, A and R act on one request; on a run, Enter unfolds and A goes to Aprovar todos.
+    <article className="ap-card ap-run" data-burst="" tabIndex={-1} aria-label={head}>
       <span className="ap-card__face">
         <AgentAvatar agentId={first.agentId} name={name} size="md" state="waiting" />
       </span>
@@ -1053,7 +1078,7 @@ function RunCard({
           <ApproveAll items={run} label={t("approval.run.approve")}>
             {lead && <ApproveAlways approval={lead} agent={agent} also={approveAlwaysAlso(items, lead)} />}
           </ApproveAll>
-          <Button size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <Button size="sm" aria-expanded={open} onClick={onToggle}>
             {t("approval.run.show")}
           </Button>
         </div>
