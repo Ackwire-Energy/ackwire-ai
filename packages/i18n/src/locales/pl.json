@@ -2445,6 +2445,14 @@
       "waitingCount_many": "Czeka {{count}}",
       "waitingCount_other": "Czeka {{count}}"
     },
+    "run": {
+      "head_one": "{{count}} prośba od {{name}}: {{what}}",
+      "head_few": "{{count}} prośby od {{name}}: {{what}}",
+      "head_many": "{{count}} próśb od {{name}}: {{what}}",
+      "head_other": "{{count}} prośby od {{name}}: {{what}}",
+      "approve": "Zatwierdź wszystkie",
+      "show": "Zobacz każdą"
+    },
     "always": {
       "button": "Zawsze zatwierdzaj",
       "reads": "Zawsze zatwierdzaj odczyty",

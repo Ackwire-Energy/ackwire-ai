@@ -2244,6 +2244,11 @@
       "partialAdmin": "admin",
       "waitingCount_other": "{{count}} menunggu"
     },
+    "run": {
+      "head_other": "{{count}} permintaan dari {{name}} untuk {{what}}",
+      "approve": "Setujui semua",
+      "show": "Lihat satu per satu"
+    },
     "always": {
       "button": "Selalu setujui",
       "reads": "Selalu setujui pembacaan",

@@ -3,7 +3,9 @@ import type { MachineTask } from "@agenteschat/client";
 import {
   approvalCardItems,
   approvalCards,
+  approvalRuns,
   approveAllScope,
+  approveAlwaysAlso,
   approveAlwaysOn,
   asOfNow,
   cardDeadline,
@@ -394,6 +396,42 @@ describe("several requests on one card", () => {
       ["g1", "g22", "g333", "g4444"],
       ["other"],
     ]);
+  });
+
+  test("waiting requests of one kind in a row come together as one run, and Aprovar sempre takes the run's like ones", () => {
+    const sql = { tool: "supabase_execute_sql", title: "Executar sql" };
+    const reads = { tool: "supabase_execute_sql", actions: ["sql-read:project_id=p1"] };
+    const items = [
+      goal("s1", { ...sql, approveAlways: reads }),
+      goal("s22", { ...sql, approveAlways: reads }),
+      goal("s333", { ...sql, approveAlways: null }),
+      goal("m4444"),
+      goal("s55555", { ...sql, status: "approved" }),
+      goal("s666666", sql),
+      goal("s7777777", { ...sql, agentId: "a2" }),
+    ];
+    // A decided one, another tool or another agent ends the run.
+    expect(approvalRuns(items).map((run) => run.map((a) => a.id))).toEqual([
+      ["s1", "s22", "s333"],
+      ["m4444"],
+      ["s55555"],
+      ["s666666"],
+      ["s7777777"],
+    ]);
+    expect(approvalRuns([])).toEqual([]);
+    // Only one of a run this person may decide: no "Aprovar todos" for one, each stands alone.
+    expect(
+      approvalRuns([goal("s1", sql), goal("s22", { ...sql, canDecide: false })]).map((run) => run.map((a) => a.id)),
+    ).toEqual([["s1"], ["s22"]]);
+    expect(
+      approvalRuns([goal("s1", { ...sql, canDecide: false }), goal("s22", { ...sql, canDecide: false })]),
+    ).toHaveLength(1);
+    const [run = []] = approvalRuns(items);
+    // The write among the reads keeps asking; one this person can't decide is left too.
+    expect(approveAlwaysAlso(run, run[0] ?? goal("x"))).toEqual(["s22"]);
+    expect(
+      approveAlwaysAlso([...run, goal("s8", { ...sql, approveAlways: reads, canDecide: false })], run[0] ?? goal("x")),
+    ).toEqual(["s22"]);
   });
 
   test("its words in both languages", async () => {

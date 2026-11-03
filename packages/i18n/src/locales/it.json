@@ -2381,6 +2381,13 @@
       "waitingCount_many": "{{count}} in attesa",
       "waitingCount_other": "{{count}} in attesa"
     },
+    "run": {
+      "head_one": "{{count}} richiesta di {{name}} per {{what}}",
+      "head_many": "{{count}} richieste di {{name}} per {{what}}",
+      "head_other": "{{count}} richieste di {{name}} per {{what}}",
+      "approve": "Approva tutte",
+      "show": "Vedi una per una"
+    },
     "always": {
       "button": "Approva sempre",
       "reads": "Approva sempre le letture",

@@ -2448,6 +2448,14 @@
       "waitingCount_many": "{{count}} ждут",
       "waitingCount_other": "{{count}} ждут"
     },
+    "run": {
+      "head_one": "{{count}} запрос от {{name}}: {{what}}",
+      "head_few": "{{count}} запроса от {{name}}: {{what}}",
+      "head_many": "{{count}} запросов от {{name}}: {{what}}",
+      "head_other": "{{count}} запроса от {{name}}: {{what}}",
+      "approve": "Одобрить все",
+      "show": "Посмотреть каждый"
+    },
     "always": {
       "button": "Одобрять всегда",
       "reads": "Всегда одобрять чтение",

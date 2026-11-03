@@ -2286,6 +2286,13 @@ export const ptBR = {
       waitingCount_one: "{{count}} esperando",
       waitingCount_other: "{{count}} esperando",
     },
+    /** Vários pedidos esperando do mesmo tipo em sequência, num só: "3 pedidos de Ada para Executar sql". */
+    run: {
+      head_one: "{{count}} pedido de {{name}} para {{what}}",
+      head_other: "{{count}} pedidos de {{name}} para {{what}}",
+      approve: "Aprovar todos",
+      show: "Ver cada um",
+    },
     /** "Aprovar sempre": the agent's next calls of this kind run without asking. */
     always: {
       button: "Aprovar sempre",

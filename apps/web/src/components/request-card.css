@@ -196,15 +196,6 @@ html:not([data-pointer]) .rq__more:focus-visible {
   font-size: 12.5px;
   color: var(--faint);
 }
-.rq__always {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-}
-.rq__always .ap-always {
-  margin: 0;
-}
 .rq__field {
   margin-top: 12px;
 }
@@ -372,17 +363,34 @@ html:not([data-pointer]) .rq__more:focus-visible {
 }
 .rq__items .rq__well {
   margin-top: 0;
-  flex-wrap: wrap;
 }
+/* An item's decision: one row under its values, left-aligned, every button the footer's height. */
 .rq__item-acts {
-  display: inline-flex;
-  gap: 6px;
-  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.rq__item-acts > .ac-btn {
+  height: 32px;
 }
 .rq__item-outcome {
-  flex: none;
+  margin: 6px 0 0;
   font-size: 12.5px;
   color: var(--muted);
+}
+/* A run's requests, unfolded under its buttons. */
+.rq__run > .rq__items {
+  margin-top: 8px;
+}
+/* An approval's values read whole across the card (the well's other kinds keep one line). */
+.rq[data-ask-kind="approval"] .rq__wt small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 /* A request's own why, when it differs from the card's lead: read whole. */
 .rq__wt small.rq__item-why {

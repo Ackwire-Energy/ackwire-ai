@@ -1,5 +1,12 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
-import { approveAllScope, approveAlwaysOn, cardDeadline, itemOwnWords } from "@agenteschat/client/lib/approval-card";
+import {
+  approvalRuns,
+  approveAllScope,
+  approveAlwaysAlso,
+  approveAlwaysOn,
+  cardDeadline,
+  itemOwnWords,
+} from "@agenteschat/client/lib/approval-card";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import {
@@ -12,7 +19,8 @@ import {
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { Button } from "@agenteschat/ui";
-import { useState } from "react";
+import type { TFunction } from "i18next";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AheadLine, ApproveAlways, CancelAhead } from "@/components/ApprovalItem";
 import { useOrg } from "@/components/org-context";
@@ -33,8 +41,8 @@ const DAY_MS = 24 * 3_600_000;
 /**
  * An approval waiting in the conversation, as a request card: the agent's words, the exact action in the well
  * with the app's mark, "Ver o e-mail" / "Ver detalhes" opening it whole (with where it came from), then Approve
- * (held for high risk), "Agora não" (which asks why, kept as a lesson) and, where offered, "Aprovar sempre" with what
- * it covers, and the fuse to its expiry. Who can't decide sees who it waits for.
+ * (held for high risk), "Aprovar sempre" where offered (what it covers on a line under the buttons) and "Agora não"
+ * (which asks why, kept as a lesson), in one row under the text, and the fuse to its expiry. Who can't decide sees who it waits for.
  */
 export function ApprovalAsk({
   approval,
@@ -90,10 +98,10 @@ export function ApprovalAsk({
         ) : (
           <>
             <ApproveButton approval={approval} />
+            <ApproveAlways approval={approval} agent={agent} />
             <Button size="sm" onClick={() => setRefusing(true)}>
               {t("approval.notNow")}
             </Button>
-            <ApproveAlways approval={approval} agent={agent} />
           </>
         )
       }
@@ -103,11 +111,21 @@ export function ApprovalAsk({
   );
 }
 
+/** "3 pedidos de Ada para Executar sql": a run of requests, said as one. */
+const runHead = (t: TFunction, run: Approval[], agent: Agent | undefined) =>
+  t("approval.run.head", {
+    count: run.length,
+    name: agent?.name ?? t("channel.unknownAgent"),
+    what: run[0] ? approvalTitle(t, run[0]) : "",
+  });
+
 /**
- * Several requests of one agent in one conversation, on one card (the server joins them: `openApprovalCard`):
- * each item with its values and its own approve / "Agora não", decided ones folded into the list with how they
- * ended, "Aprovar tudo" / "Agora não para todos" over the ones listed now, and the earliest deadline's fuse.
- * Someone who may decide only some reads that "Aprovar tudo" covers only those.
+ * Several requests of one agent in one conversation, on one card (the server joins them: `openApprovalCard`).
+ * Waiting requests of one kind in a row fold into one run (`approvalRuns`) with "Aprovar todos" and "Ver cada um";
+ * a card that is one run is that run, its buttons in the footer. Otherwise each item (or run) has its values and its
+ * own buttons in a row under them, decided ones folded into the list with how they ended, and "Aprovar tudo" /
+ * "Agora não para todos" over the ones listed now in the footer, with the earliest deadline's fuse. Someone who may
+ * decide only some reads that "Aprovar tudo" covers only those.
  */
 export function ApprovalGroupAsk({
   items,
@@ -119,6 +137,7 @@ export function ApprovalGroupAsk({
   members: Map<string, Member>;
 }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const first = items[0];
   if (!first) return null;
   const waiting = items.filter((a) => a.status === "pending");
@@ -131,6 +150,20 @@ export function ApprovalGroupAsk({
   const deadline = cardDeadline(items);
   const left = deadline ? Math.max(0, new Date(deadline).getTime() - Date.now()) / DAY_MS : 0;
   const partial = approveAllPartial(t, items, waits);
+  const runs = approvalRuns(items);
+  const [only] = runs;
+  const one = runs.length === 1 && only && only.length > 1 ? only : null;
+  const item = (a: Approval, inRun: boolean) => (
+    <GroupItem
+      key={a.id}
+      approval={a}
+      lead={leadItem}
+      always={!inRun && always.has(a.id)}
+      also={approveAlwaysAlso(items, a)}
+      agent={agent}
+      members={members}
+    />
+  );
   return (
     <RequestCard
       id={first.id}
@@ -140,46 +173,125 @@ export function ApprovalGroupAsk({
       mine={mine}
       waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
       lead={why ?? t("approval.askMany", { count: waiting.length })}
+      object={
+        one
+          ? { logo: <ConnectorMark approval={first} />, title: runHead(t, one, agent), more: t("approval.run.show") }
+          : undefined
+      }
+      open={one ? open : undefined}
+      onOpenChange={one ? setOpen : undefined}
       body={
         <>
-          <ul className="rq__items">
-            {items.map((a) => (
-              <GroupItem
-                key={a.id}
-                approval={a}
-                lead={leadItem}
-                always={always.has(a.id)}
-                agent={agent}
-                members={members}
-              />
-            ))}
-          </ul>
+          {one ? (
+            open && <ul className="rq__items">{one.map((a) => item(a, true))}</ul>
+          ) : (
+            <ul className="rq__items">
+              {runs.map((run) =>
+                run.length > 1 && run[0] ? (
+                  <RunItem key={run[0].id} run={run} items={items} always={always} agent={agent}>
+                    {run.map((a) => item(a, true))}
+                  </RunItem>
+                ) : (
+                  run[0] && item(run[0], false)
+                ),
+              )}
+            </ul>
+          )}
           {partial && <p className="rq__note">{partial}</p>}
         </>
       }
-      actions={approveAllScope(items).ids.length > 1 ? <ApproveAll items={items} /> : undefined}
+      actions={
+        one ? (
+          <RunActions run={one} items={items} always={always} agent={agent} />
+        ) : approveAllScope(items).ids.length > 1 ? (
+          <ApproveAll items={items} />
+        ) : undefined
+      }
       end={
         deadline ? <RequestFuse left={left} agent={agent} text={expiryText(t, { expiresAt: deadline })} /> : undefined
       }
-      what={t("approval.askMany", { count: waiting.length })}
+      what={one ? runHead(t, one, agent) : t("approval.askMany", { count: waiting.length })}
     />
   );
 }
 
+/** A run's decision: "Aprovar todos", "Aprovar sempre" where its kind offers it, "Agora não para todos". */
+function RunActions({
+  run,
+  items,
+  always,
+  agent,
+}: {
+  run: Approval[];
+  items: Approval[];
+  always: Set<string>;
+  agent: Agent | undefined;
+}) {
+  const { t } = useTranslation();
+  const lead = run.find((a) => always.has(a.id) && a.canDecide);
+  return (
+    <ApproveAll items={run} label={t("approval.run.approve")}>
+      {lead && <ApproveAlways approval={lead} agent={agent} also={approveAlwaysAlso(items, lead)} />}
+    </ApproveAll>
+  );
+}
+
+/** A run among other requests on a card: said as one, its buttons under it, "Ver cada um" unfolding its requests. */
+function RunItem({
+  run,
+  items,
+  always,
+  agent,
+  children,
+}: {
+  run: Approval[];
+  items: Approval[];
+  always: Set<string>;
+  agent: Agent | undefined;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const first = run[0];
+  if (!first) return null;
+  return (
+    <li className="rq__item rq__run" data-status="pending">
+      <div className="rq__well">
+        <span className="rq__logo">
+          <ConnectorMark approval={first} />
+        </span>
+        <span className="rq__wt">
+          <b>{runHead(t, run, agent)}</b>
+        </span>
+        <button type="button" className="rq__more" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {t("approval.run.show")}
+        </button>
+      </div>
+      <div className="rq__item-acts">
+        <RunActions run={run} items={items} always={always} agent={agent} />
+      </div>
+      {open && <ul className="rq__items">{children}</ul>}
+    </li>
+  );
+}
+
 /**
- * One request on a shared card: its values (and its own why and origin where they differ from the card's lead),
- * its own decision while it waits ("Aprovar sempre" beside it on the first of its kind), how it ended once decided.
+ * One request on a shared card: its values (and its own why and origin where they differ from the card's lead) across
+ * the item, then its own decision in a row under them while it waits ("Aprovar sempre" on the first of its kind), or
+ * how it ended once decided.
  */
 function GroupItem({
   approval,
   lead,
   always,
+  also,
   agent,
   members,
 }: {
   approval: Approval;
   lead: Approval;
   always: boolean;
+  also: string[];
   agent: Agent | undefined;
   members: Map<string, Member>;
 }) {
@@ -213,30 +325,26 @@ function GroupItem({
             </small>
           )}
         </span>
-        {pending ? (
-          approval.canDecide &&
-          !refusing && (
-            <span className="rq__item-acts">
-              <ApproveButton approval={approval} />
-              <Button size="sm" onClick={() => setRefusing(true)}>
-                {t("approval.notNow")}
-              </Button>
-            </span>
-          )
-        ) : (
-          <span className="rq__item-outcome">
-            {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}
-            {ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} />}
-          </span>
-        )}
         <button type="button" className="rq__more" aria-expanded={open} onClick={() => setOpen(!open)}>
           {email ? t("approval.seeEmail") : t("approval.seeDetails")}
         </button>
       </div>
-      {pending && always && approval.canDecide && !refusing && (
-        <div className="rq__always">
-          <ApproveAlways approval={approval} agent={agent} />
-        </div>
+      {pending ? (
+        approval.canDecide &&
+        !refusing && (
+          <div className="rq__item-acts">
+            <ApproveButton approval={approval} />
+            {always && <ApproveAlways approval={approval} agent={agent} also={also} />}
+            <Button size="sm" onClick={() => setRefusing(true)}>
+              {t("approval.notNow")}
+            </Button>
+          </div>
+        )
+      ) : (
+        <p className="rq__item-outcome">
+          {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}
+          {ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} />}
+        </p>
       )}
       {open && (
         <div className="rq__details">

@@ -2234,6 +2234,11 @@
       "partialAdmin": "管理者",
       "waitingCount_other": "{{count}}件待機中"
     },
+    "run": {
+      "head_other": "{{name}} から {{what}} の依頼が {{count}} 件",
+      "approve": "すべて承認",
+      "show": "1 件ずつ見る"
+    },
     "always": {
       "button": "常に承認",
       "reads": "読み取りを常に承認",

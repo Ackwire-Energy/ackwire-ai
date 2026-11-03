@@ -5635,6 +5635,18 @@
       "other": "{{count}} waiting"
     }
   },
+  "approval.run.head": {
+    "value": {
+      "one": "{{count}} request from {{name}} to {{what}}",
+      "other": "{{count}} requests from {{name}} to {{what}}"
+    }
+  },
+  "approval.run.approve": {
+    "value": "Approve all"
+  },
+  "approval.run.show": {
+    "value": "See each one"
+  },
   "approval.always.button": {
     "value": "Always approve"
   },

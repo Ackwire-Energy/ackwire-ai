@@ -2298,6 +2298,12 @@
       "waitingCount_one": "{{count}} bekliyor",
       "waitingCount_other": "{{count}} bekliyor"
     },
+    "run": {
+      "head_one": "{{name}} adlı ajandan {{count}} istek: {{what}}",
+      "head_other": "{{name}} adlı ajandan {{count}} istek: {{what}}",
+      "approve": "Tümünü onayla",
+      "show": "Tek tek gör"
+    },
     "always": {
       "button": "Her zaman onayla",
       "reads": "Okumaları her zaman onayla",

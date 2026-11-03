@@ -2232,6 +2232,11 @@
       "partialAdmin": "관리자",
       "waitingCount_other": "{{count}}개 대기 중"
     },
+    "run": {
+      "head_other": "{{name}}의 {{what}} 요청 {{count}}건",
+      "approve": "모두 승인",
+      "show": "하나씩 보기"
+    },
     "always": {
       "button": "항상 승인",
       "reads": "읽기 항상 승인",

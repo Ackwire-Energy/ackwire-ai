@@ -71,3 +71,33 @@ export function approveAlwaysOn(items: readonly Approval[]): Set<string> {
   }
   return new Set(kinds.values());
 }
+
+const sameKind = (a: Approval, b: Approval) =>
+  a.agentId === b.agentId && a.tool === b.tool && a.title === b.title && a.connectorAccount === b.connectorAccount;
+
+/**
+ * A card's items as they are drawn: several waiting requests of one kind in a row (same agent, tool and action) come
+ * together as one run ("3 pedidos de Ada para Executar sql"), anything else stands alone. A run this person may decide
+ * only one of stands apart again: "Aprovar todos" would cover just that one.
+ */
+export function approvalRuns(items: readonly Approval[]): Approval[][] {
+  const runs: Approval[][] = [];
+  for (const a of items) {
+    const run = runs.at(-1);
+    const head = run?.[0];
+    if (run && head && a.status === "pending" && head.status === "pending" && sameKind(head, a)) run.push(a);
+    else runs.push([a]);
+  }
+  return runs.flatMap((run) => (run.length > 1 && approveAllScope(run).ids.length === 1 ? run.map((a) => [a]) : [run]));
+}
+
+/**
+ * The other requests "Aprovar sempre" on `a` approves with it: those of its run that this person may decide and that
+ * the same rule covers (a write among SQL reads keeps asking).
+ */
+export function approveAlwaysAlso(run: readonly Approval[], a: Approval): string[] {
+  const kind = JSON.stringify(a.approveAlways);
+  return run
+    .filter((x) => x.id !== a.id && x.status === "pending" && x.canDecide && JSON.stringify(x.approveAlways) === kind)
+    .map((x) => x.id);
+}

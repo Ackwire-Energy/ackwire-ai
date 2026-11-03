@@ -179,7 +179,7 @@ describe("Canal", () => {
     expect(done.textContent).toContain("Month: 2026-10");
   });
 
-  test("several requests on one card: each item, 'Aprovar tudo' for exactly those listed, a new one joining live", async () => {
+  test("several requests of one kind on one card: one run, 'Aprovar todos' for exactly those listed, a new one joining live", async () => {
     const state = seedState();
     const [merge] = state.approvals;
     if (!merge) throw new Error("no approval");
@@ -199,6 +199,15 @@ describe("Canal", () => {
     const { socket } = await open(state);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(screen().getAllByRole("group", { name: "Pedido de aprovação" })).toHaveLength(1);
+    // Folded: the run said as one, its buttons in the footer.
+    const head = card.querySelector(".rq__well b")?.textContent ?? "";
+    expect(head).toMatch(/^3 pedidos de Ada para /);
+    expect(card.querySelectorAll(".rq__item")).toHaveLength(0);
+    expect([...(card.querySelector(".rq__foot")?.querySelectorAll("button") ?? [])].map((b) => b.textContent)).toEqual([
+      "Aprovar todos",
+      "Agora não para todos",
+    ]);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver cada um" })));
     expect(card.querySelectorAll(".rq__item")).toHaveLength(3);
     expect(card.textContent).toContain("Month: 2026-12");
     // A fourth joins the open card over realtime, not a card of its own.
@@ -213,10 +222,11 @@ describe("Canal", () => {
     );
     await settle();
     expect(card.querySelectorAll(".rq__item")).toHaveLength(4);
+    expect(card.querySelector(".rq__well b")?.textContent).toMatch(/^4 pedidos de Ada para /);
     expect(card.textContent).toContain("Month: 2027-02");
     // Ana may decide three of the four (only an admin decides the new one): it says so.
     expect(card.textContent).toContain("Você pode decidir 3 de 4");
-    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar tudo" })));
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar todos" })));
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
       ORG_ID,
@@ -229,7 +239,51 @@ describe("Canal", () => {
     expect(after.textContent).toContain("Aprovado por você");
   });
 
-  test("a shared card: a joined request keeps its own why, and 'Aprovar sempre' is offered once per kind", async () => {
+  test("a mixed card: each item's buttons in a row under its values, a run among them with its own", async () => {
+    const state = seedState();
+    const [merge] = state.approvals;
+    if (!merge) throw new Error("no approval");
+    const goal = (id: string, month: string, minutes: number) => ({
+      ...merge,
+      id,
+      tool: "goal_upsert",
+      title: "Painel: Goal upsert",
+      detail: `panel.goal_upsert · month=${month}`,
+      connector: "panel",
+      params: { month },
+      createdAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    });
+    const close = { ...goal("ap-c1", "2026-10", 1), tool: "ticket_close", title: "Painel: Ticket close" };
+    state.approvals.splice(0, 1, goal("ap-g1", "2026-11", 4), goal("ap-g2", "2026-12", 3), close);
+    const cardMessage = state.messages.find((m) => m.id === "msg-card");
+    if (cardMessage) cardMessage.meta = { ...cardMessage.meta, approvalId: "ap-g1" };
+    await open(state);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    const [run, single] = [...card.querySelectorAll(".rq__items > .rq__item")] as HTMLElement[];
+    if (!run || !single) throw new Error("no items");
+    expect(run.classList.contains("rq__run")).toBe(true);
+    expect(run.querySelector(".rq__well b")?.textContent).toMatch(/^2 pedidos de Ada para /);
+    // The buttons sit under the values, never squeezed beside them in the well.
+    for (const item of [run, single]) {
+      expect(item.querySelector(".rq__well button:not(.rq__more)")).toBeNull();
+      expect(item.querySelector(":scope > .rq__well + .rq__item-acts")).not.toBeNull();
+    }
+    const labels = (el: Element | null) =>
+      [...(el?.querySelectorAll(":scope > button") ?? [])].map((b) => b.textContent);
+    expect(labels(run.querySelector(".rq__item-acts"))).toEqual(["Aprovar todos", "Agora não para todos"]);
+    expect(labels(single.querySelector(".rq__item-acts")).at(-1)).toBe("Agora não");
+    // The card's own footer decides all three.
+    expect(labels(card.querySelector(".rq__foot"))).toEqual(["Aprovar tudo", "Agora não para todos"]);
+    await act(async () => fireEvent.click(within(run).getByRole("button", { name: "Aprovar todos" })));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
+      ORG_ID,
+      ["ap-g1", "ap-g2"],
+      "approve",
+    ]);
+  });
+
+  test("a run that offers 'Aprovar sempre': once, in its footer, approving the run's like ones with it", async () => {
     const state = seedState();
     const [merge] = state.approvals;
     if (!merge) throw new Error("no approval");
@@ -257,19 +311,29 @@ describe("Canal", () => {
     if (cardMessage) cardMessage.meta = { ...cardMessage.meta, approvalId: "ap-g1" };
     await open(state);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    const foot = card.querySelector(".rq__foot") as HTMLElement;
+    expect([...foot.querySelectorAll(":scope > button")].map((b) => b.textContent)).toEqual([
+      "Aprovar todos",
+      "Aprovar sempre",
+      "Agora não para todos",
+    ]);
+    // What it covers, on a line of its own under the buttons.
+    expect(foot.querySelector(":scope > .ap-always")).not.toBeNull();
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver cada um" })));
     const items = [...card.querySelectorAll(".rq__item")] as HTMLElement[];
     expect(items).toHaveLength(3);
     // The lead's why is the card's; the one asked for another reason says its own on its line.
     expect(items[1]?.querySelector(".rq__item-why")).toBeNull();
     expect(items[2]?.querySelector(".rq__item-why")?.textContent).toBe("Branch velha, já mergeada.");
-    // On the item's face, without opening its details.
-    expect(within(items[0] as HTMLElement).queryByRole("button", { name: "Aprovar sempre" })).not.toBeNull();
-    for (const item of items) {
-      const more = within(item).getByRole("button", { name: "Ver detalhes" });
-      await act(async () => fireEvent.click(more));
-    }
-    expect(within(items[0] as HTMLElement).queryByRole("button", { name: /Aprovar sempre/ })).not.toBeNull();
-    expect(within(items[1] as HTMLElement).queryByRole("button", { name: /Aprovar sempre/ })).toBeNull();
+    for (const item of items) expect(within(item).queryByRole("button", { name: /Aprovar sempre/ })).toBeNull();
+    await act(async () => fireEvent.click(within(foot).getByRole("button", { name: "Aprovar sempre" })));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-g1", undefined, true]);
+    expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
+      ORG_ID,
+      ["ap-g2", "ap-g3"],
+      "approve",
+    ]);
   });
 
   test("a card older than the approvals list reaches still lists all its requests, fetched by the card", async () => {

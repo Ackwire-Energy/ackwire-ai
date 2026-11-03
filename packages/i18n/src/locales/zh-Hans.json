@@ -2235,6 +2235,11 @@
       "partialAdmin": "管理员",
       "waitingCount_other": "{{count}} 项等待中"
     },
+    "run": {
+      "head_other": "{{name}} 的 {{count}} 个{{what}}请求",
+      "approve": "全部批准",
+      "show": "逐个查看"
+    },
     "always": {
       "button": "始终批准",
       "reads": "始终批准读取",

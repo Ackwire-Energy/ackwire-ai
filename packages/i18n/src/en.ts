@@ -2257,6 +2257,14 @@ export const en = {
       waitingCount_one: "{{count}} waiting",
       waitingCount_other: "{{count}} waiting",
     },
+    /** Several waiting requests of one kind in a row, folded into one: "3 requests from Ada to Run sql". */
+    run: {
+      head_one: "{{count}} request from {{name}} to {{what}}",
+      head_other: "{{count}} requests from {{name}} to {{what}}",
+      approve: "Approve all",
+      /** Unfolds the run into its requests, each with its own decision. */
+      show: "See each one",
+    },
     always: {
       button: "Always approve",
       /** The SQL tool's reads of one project only (anything else it runs still asks). */

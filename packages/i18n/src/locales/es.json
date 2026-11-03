@@ -2382,6 +2382,13 @@
       "waitingCount_many": "{{count}} pendientes",
       "waitingCount_other": "{{count}} pendientes"
     },
+    "run": {
+      "head_one": "{{count}} pedido de {{name}} para {{what}}",
+      "head_many": "{{count}} pedidos de {{name}} para {{what}}",
+      "head_other": "{{count}} pedidos de {{name}} para {{what}}",
+      "approve": "Aprobar todos",
+      "show": "Ver cada uno"
+    },
     "always": {
       "button": "Aprobar siempre",
       "reads": "Aprobar siempre las lecturas",

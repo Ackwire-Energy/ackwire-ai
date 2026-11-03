@@ -2311,6 +2311,12 @@
       "waitingCount_one": "{{count}} wachtend",
       "waitingCount_other": "{{count}} wachtend"
     },
+    "run": {
+      "head_one": "{{count}} verzoek van {{name}} om {{what}}",
+      "head_other": "{{count}} verzoeken van {{name}} om {{what}}",
+      "approve": "Alles goedkeuren",
+      "show": "Elk bekijken"
+    },
     "always": {
       "button": "Altijd goedkeuren",
       "reads": "Lezen altijd goedkeuren",

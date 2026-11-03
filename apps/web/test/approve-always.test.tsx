@@ -48,6 +48,13 @@ describe("Aprovar sempre on a request", () => {
     expect(card.querySelector(".rq__details")).toBeNull();
     expect(card.textContent).toContain(HINT);
     expect(card.querySelector(".ap-always")?.getAttribute("title")).toBe("GITHUB_CREATE_AN_ISSUE_COMMENT");
+    // One row under the text, in this order, and what it covers on its own line under them.
+    const foot = card.querySelector(".rq__foot") as HTMLElement;
+    expect([...foot.querySelectorAll(":scope > button")].map((b) => b.textContent).slice(1)).toEqual([
+      "Aprovar sempre",
+      "Agora não",
+    ]);
+    expect(foot.querySelector(":scope > .ap-always")).not.toBeNull();
     await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
     expect(screen().getByRole("group", { name: "Aprovação concluída" })).toBeTruthy();
@@ -109,7 +116,11 @@ describe("Aprovar sempre on a request", () => {
     await settle(4);
     const card = screen().getByRole("article", { name: TITLE });
     expect(card.textContent).toContain(HINT);
-    expect(within(card).getByRole("button", { name: "Aprovar sempre" })).toBeTruthy();
+    expect(
+      [...(card.querySelector(".ap-card__actions")?.querySelectorAll(":scope > button") ?? [])]
+        .map((b) => b.textContent)
+        .slice(1),
+    ).toEqual(["Aprovar sempre", "Recusar", "Detalhes"]);
     const risky = screen().getByRole("article", { name: "Run deploy workflow" });
     expect(within(risky).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     await click(within(card).getByRole("button", { name: "Detalhes" }));

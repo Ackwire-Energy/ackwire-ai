@@ -1,5 +1,5 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
-import { useCancelApproval, useDecideApproval } from "@agenteschat/client";
+import { useCancelApproval, useDecideApproval, useDecideApprovals } from "@agenteschat/client";
 import {
   type ApprovalAction,
   aheadPhase,
@@ -78,15 +78,25 @@ function waitingFor(t: TFunction, approval: Approval, agent: Agent | undefined, 
 
 /**
  * "Aprovar sempre" ("Aprovar sempre leituras" for a SQL tool's reads), where the request offers it: approves this one
- * and the agent's next calls of its kind. The line under it says exactly what that covers and where to undo it.
+ * and the agent's next calls of its kind, and with it `also` (the requests of that kind waiting beside it,
+ * `approveAlwaysAlso`). The line under it says exactly what that covers and where to undo it.
  */
-export function ApproveAlways({ approval, agent }: { approval: Approval; agent: Agent | undefined }) {
+export function ApproveAlways({
+  approval,
+  agent,
+  also = [],
+}: {
+  approval: Approval;
+  agent: Agent | undefined;
+  also?: string[];
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const navigate = useNavigate();
   const openPanel = useOpenAgentPanel();
   const decide = useDecideApproval(org.id);
+  const others = useDecideApprovals(org.id);
   if (!approveAlwaysOffered(approval)) return null;
   const g = agentGrammar(agent?.name ?? t("channel.unknownAgent"));
   const kind = approval.approveAlways;
@@ -106,6 +116,7 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
       {
         onSuccess: () => {
           burst();
+          if (also.length) others.mutate({ ids: also, decision: "approve" });
           toast.show(
             t("approval.always.done", { name: g.name }),
             "info",
@@ -119,10 +130,9 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
   return (
     <>
       <Button
-        variant="ghost"
         size="sm"
         icon="check"
-        disabled={decide.isPending}
+        disabled={decide.isPending || others.isPending}
         loading={decide.isPending}
         onClick={(e) => always(e.currentTarget)}
       >

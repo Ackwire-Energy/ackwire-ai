@@ -2310,6 +2310,12 @@
       "waitingCount_one": "{{count}} wartet",
       "waitingCount_other": "{{count}} warten"
     },
+    "run": {
+      "head_one": "{{count}} Anfrage von {{name}}: {{what}}",
+      "head_other": "{{count}} Anfragen von {{name}}: {{what}}",
+      "approve": "Alle freigeben",
+      "show": "Einzeln ansehen"
+    },
     "always": {
       "button": "Immer freigeben",
       "reads": "Lesezugriffe immer freigeben",
