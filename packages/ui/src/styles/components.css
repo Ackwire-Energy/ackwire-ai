@@ -8147,8 +8147,8 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
 /* Details on a phone: a full-screen sheet, clear of the notch and the home bar. */
 @media (max-width: 640px) {
   .ac-details,
-  .ac-details--xl,
-  .ac-details--lg {
+  .ac-details--lg,
+  .ac-details--xl {
     inset: 0;
     transform: none;
     width: 100%;
