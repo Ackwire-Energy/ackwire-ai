@@ -87,6 +87,18 @@ describe("who can talk to the agent", () => {
     });
     expect((await card(caio.id))?.canTalk).toBe(true);
 
+    // A member whose role manages agents, without being an admin: the same as an admin.
+    const managers = await createRole(f.db, f.owner.id, f.org.id, { name: "Gestores", permissions: ["manage_agents"] });
+    const lia = await addMember(f.db, f.org.id, "member", "lia");
+    await setMemberRoles(f.db, f.owner.id, f.org.id, lia.id, [managers.id]);
+    expect(await card(lia.id)).toMatchObject({ seesDetails: true, canTalk: false });
+    const liaDm = await openDm(f.db, lia.id, f.org.id, { agentId: f.agent.id });
+    expect(liaDm.kind).toBe("dm");
+    // Seeing it isn't talking to it: what they write there starts no run.
+    const sent = await postPersonMessage(deps(), lia.id, f.org.id, liaDm.id, { body: "oi" });
+    await drainOutbox(f.db, f.handlers);
+    expect(await runsOf(sent.id)).toEqual([]);
+
     // A member outside it: its public card, no conversation.
     expect(await card(bia.id)).toMatchObject({ seesDetails: false, canTalk: false, capabilities: [] });
     await expect(openDm(f.db, bia.id, f.org.id, { agentId: f.agent.id })).rejects.toMatchObject({
