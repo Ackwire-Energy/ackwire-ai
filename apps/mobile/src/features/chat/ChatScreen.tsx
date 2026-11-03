@@ -1037,7 +1037,7 @@ function Chat({
   const [seek, setSeek] = useState<string | null>(focusId);
   const [flashId, setFlashId] = useState<string | null>(null);
   const seekPages = useRef(0);
-  const seekReady = isThread ? threadMessages.isSuccess : top.isSuccess;
+  const seekReady = isThread ? threadMessages.isSuccess && !threadMessages.isPlaceholderData : top.isSuccess;
   useEffect(() => {
     if (!seek || !seekReady) return;
     const index = shownRows.findIndex((r) => r.kind === "message" && r.message.id === seek);
@@ -1491,7 +1491,10 @@ function Chat({
       })
     : null;
   const connectInline = banner === null;
-  const loading = isThread ? threadMessages.isLoading : top.isLoading;
+  // A thread opens on its root the channel holds (`isPlaceholderData`) when it has no replies to wait for.
+  const loading = isThread
+    ? threadMessages.isLoading || (threadMessages.isPlaceholderData && (thread.data?.replyCount ?? 1) > 0)
+    : top.isLoading;
 
   const renderItem = useCallback(
     ({ item }: { item: Row }) => {

@@ -4987,11 +4987,33 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   flex: 1;
   min-height: 0;
 }
-.channel__composer-skeleton {
-  min-height: 52px;
+/* The composer at rest: its one text line (the textarea's padding and line) and its toolbar with the send square. */
+.channel__composer-skeleton-line {
+  display: block;
+  min-height: 32px;
+  padding: 12px 16px 2px;
+  line-height: 22px;
+}
+.channel__composer-skeleton-line::before {
+  content: "\a0";
+}
+.channel__composer-skeleton-send.ac-skeleton {
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  margin-left: auto;
+  border-radius: var(--control-r-sm);
+}
+/* A thread's header in the panel: the title's and the meta's own lines. */
+.channel__skeleton-title,
+.channel__skeleton-meta {
+  display: flex;
   align-items: center;
-  padding: 0 var(--space-4);
-  border-color: var(--line);
+}
+.channel__skeleton-title {
+  height: 24px;
+}
+.channel__skeleton-meta {
+  height: 18px;
 }
 @media (prefers-reduced-motion: no-preference) {
   .channel__messages[data-fresh] .ac-msg,
@@ -5032,8 +5054,8 @@ html:not([data-pointer]) .tr-ok:focus-visible {
  * sidebar's sliding pill stopped halfway and jumped. Nothing moves with prefers-reduced-motion.
  */
 @media (prefers-reduced-motion: no-preference) {
-  /* A thread opening in the side panel has its own entrance. */
-  .shell__main:not(.thread-panel__chat) {
+  /* A thread opening in the side panel has its own entrance; a view taking over from its own skeleton is already in. */
+  .shell__main:not(.thread-panel__chat, [data-continues]) {
     animation: page-in 160ms ease-out both;
   }
 }

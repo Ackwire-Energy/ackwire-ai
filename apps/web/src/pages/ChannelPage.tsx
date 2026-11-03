@@ -180,9 +180,10 @@ import {
   PixelStop,
   SavedNote,
   Skeleton,
+  SkeletonConversationRows,
   SkeletonGroup,
-  SkeletonMessage,
   Spinner,
+  skeletonOnScreen,
   type VoiceNotice,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -555,38 +556,89 @@ export function ChannelPage({
 }
 
 /**
- * The whole conversation loading (header, messages, composer) with the real
- * layout, so nothing jumps when it arrives.
+ * The whole conversation loading (header, messages, composer) with the real layout, so nothing jumps when it
+ * arrives: the header's one row (a thread's in the panel), the same message rows the conversation shows while its
+ * messages load, and the composer's box at its resting height (its text line and its toolbar, no bar in it).
  */
-export function ChannelSkeleton({ panel }: { panel?: boolean } = {}) {
+export function ChannelSkeleton({
+  thread,
+  panel,
+  dm,
+}: {
+  thread?: boolean;
+  panel?: boolean;
+  /** A DM's header: the face (an agent's square, a person's circle), the name and its line, Ver perfil. */
+  dm?: "agent" | "person";
+} = {}) {
   const { t } = useTranslation();
   const Tag = panel ? "section" : "main";
   return (
     <Tag className={cx("shell__main shell__main--chat", panel && "thread-panel__chat")}>
       <SkeletonGroup label={t("common.loadingMessages")} className="channel__skeleton">
-        <header className="channel__header">
-          <NavToggle />
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0, flex: 1 }}>
-            <Skeleton width={160} height={16} />
-            <Skeleton width={260} height={10} />
-          </div>
-          <Skeleton width={72} height={28} />
-        </header>
+        {dm ? (
+          <header className="channel__header">
+            <NavToggle />
+            <Skeleton shape={dm === "agent" ? "square" : "circle"} width={36} height={36} />
+            <div className="thread-head__text">
+              <span className="channel__skeleton-title">
+                <Skeleton width={140} height={14} />
+              </span>
+              <span className="channel__skeleton-meta">
+                <Skeleton width={220} height={10} />
+              </span>
+            </div>
+            {dm === "agent" && <Skeleton shape="block" width={88} height={28} />}
+          </header>
+        ) : thread ? (
+          // `ThreadHeader`: back to the channel (as a page), who, the title and its line, ⋯ (and, in the panel,
+          // full screen and close).
+          <header className={cx("channel__header thread-head", panel && "thread-head--panel")}>
+            {!panel && (
+              <>
+                <NavToggle />
+                <Skeleton shape="block" width={28} height={28} />
+              </>
+            )}
+            <span className="thread-head__who">
+              <Skeleton shape="circle" width={24} height={24} />
+            </span>
+            <div className="thread-head__text">
+              <span className="channel__skeleton-title">
+                <Skeleton width={180} height={14} />
+              </span>
+              <span className="channel__skeleton-meta">
+                <Skeleton width={140} height={10} />
+              </span>
+            </div>
+            {(panel ? [0, 1, 2] : [0]).map((i) => (
+              <Skeleton key={i} shape="block" width={28} height={28} />
+            ))}
+          </header>
+        ) : (
+          <header className="channel__header">
+            <NavToggle />
+            <div className="channel__head-text">
+              <Skeleton shape="block" width={20} height={20} />
+              <Skeleton width={140} height={14} />
+            </div>
+            <div className="channel__acts">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} shape="block" width={20} height={20} />
+              ))}
+            </div>
+          </header>
+        )}
         <div className="channel__messages">
           <div className="channel__spacer" aria-hidden="true" />
-          <div className="ac-skeleton-conversation">
-            <SkeletonMessage lines={2} seed={0} />
-            <SkeletonMessage lines={1} grouped seed={1} />
-            <SkeletonMessage lines={3} agent seed={2} />
-            <SkeletonMessage lines={1} seed={3} />
-            <SkeletonMessage lines={2} agent seed={4} />
-          </div>
+          <SkeletonConversationRows />
         </div>
         <div className="channel__composer">
           <div className="ac-composer channel__composer-skeleton" aria-hidden="true">
-            <Skeleton width="36%" />
+            <span className="channel__composer-skeleton-line" />
+            <div className="ac-composer__tools">
+              <Skeleton shape="block" className="channel__composer-skeleton-send" />
+            </div>
           </div>
-          <p className="ac-composer__hint">&nbsp;</p>
         </div>
       </SkeletonGroup>
     </Tag>
@@ -621,6 +673,8 @@ function ChannelView({
   // Thread view: the thread's root and replies (the channel's page still holds my unsent replies).
   const threadMessages = useThreadMessages(org.id, thread && isMember ? channel.id : undefined, thread?.id ?? "");
   const messages = thread ? threadMessages : channelMessages;
+  // Read from the server (a thread's root the channel held stands in until then: its replies are still unknown).
+  const serverRead = messages.isSuccess && !messages.isPlaceholderData;
   // The channel's threads: closed lines, context marks, markers (not in a thread view or while adjusting).
   const listsThreads = isMember && !thread;
   const openThreads = useChannelThreads(org.id, channel.id, "all", listsThreads);
@@ -870,7 +924,7 @@ function ChannelView({
   // A thread open in view: its replies are read (its unread and the Threads mark clear, on every device).
   const markThreadRead = useMarkThreadRead(org.id).mutate;
   const threadId = thread?.id;
-  const lastReplyId = threadId ? threadMessages.data?.at(-1)?.id : undefined;
+  const lastReplyId = threadId && !threadMessages.isPlaceholderData ? threadMessages.data?.at(-1)?.id : undefined;
   useEffect(() => {
     if (!threadId || !isMember || !lastReplyId || lastReplyId.startsWith("local-")) return;
     const mark = () => {
@@ -885,12 +939,12 @@ function ChannelView({
   const hadSkeleton = useRef(messages.isLoading);
   const [fresh, setFresh] = useState(false);
   useEffect(() => {
-    if (!messages.isSuccess || !hadSkeleton.current) return;
+    if (!serverRead || !hadSkeleton.current) return;
     hadSkeleton.current = false;
     setFresh(true);
     const timer = setTimeout(() => setFresh(false), 400);
     return () => clearTimeout(timer);
-  }, [messages.isSuccess]);
+  }, [serverRead]);
 
   // Person messages loaded over HTTP start their receipts.
   useEffect(() => {
@@ -1089,7 +1143,7 @@ function ChannelView({
   const landed = useRef(new Set<string>());
   // When the first page arrived (rows before that, and right after, are the conversation opening).
   const readyAt = useRef(0);
-  if (messages.isSuccess && !readyAt.current) readyAt.current = Date.now();
+  if (serverRead && !readyAt.current) readyAt.current = Date.now();
   const [holding, setHolding] = useState(false);
   const holdingRef = useRef(false);
   const setHold = (on: boolean) => {
@@ -1342,8 +1396,8 @@ function ChannelView({
   const fromCache = useRef(messages.data !== undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reports once the rows (or an empty channel) are on screen
   useEffect(() => {
-    if (timeline.length > 0 || messages.isSuccess) reportPainted(channel.id, channel.name, fromCache.current);
-  }, [timeline.length > 0, messages.isSuccess, channel.id, channel.name]);
+    if (timeline.length > 0 || serverRead) reportPainted(channel.id, channel.name, fromCache.current);
+  }, [timeline.length > 0, serverRead, channel.id, channel.name]);
 
   // `[[` in the composer links wiki pages.
   const wikiPages = useWikiTree(org.id);
@@ -1523,7 +1577,7 @@ function ChannelView({
   const found = focusTarget ? timeline.some((i) => i.kind === "message" && i.message.id === focusTarget) : false;
   // biome-ignore lint/correctness/useExhaustiveDependencies: steps while the timeline grows
   useEffect(() => {
-    if (focusDone || !focusTarget || !messages.isSuccess) return;
+    if (focusDone || !focusTarget || !serverRead) return;
     if (found) {
       setFocusDone(true);
       stick.current = false;
@@ -1541,7 +1595,7 @@ function ChannelView({
       focusPages.current += 1;
       loadOlder();
     }
-  }, [found, focusDone, focusTarget, messages.isSuccess, olderState, older.length]);
+  }, [found, focusDone, focusTarget, serverRead, olderState, older.length]);
   /** A quote was clicked: the original on screen, or paged in like `?m=`. */
   const jumpTo = (messageId: string) => {
     if (highlightMessage(scroller.current, messageId)) {
@@ -1803,9 +1857,9 @@ function ChannelView({
   const adjustFound = adjustList.some((m) => m.id === adjustFirst);
   // biome-ignore lint/correctness/useExhaustiveDependencies: steps while older pages arrive
   useEffect(() => {
-    if (!adjustFirst || adjustFound || !messages.isSuccess || olderState !== "idle") return;
+    if (!adjustFirst || adjustFound || !serverRead || olderState !== "idle") return;
     loadOlder();
-  }, [adjustFirst, adjustFound, messages.isSuccess, olderState, older.length]);
+  }, [adjustFirst, adjustFound, serverRead, olderState, older.length]);
   // Esc leaves the selection (back to the thread).
   useEffect(() => {
     if (!adjusting) return;
@@ -1901,6 +1955,8 @@ function ChannelView({
     [tasksAgentId, agentTasks, tasksOpen, toggleTasks],
   );
   const Tag = chrome?.panel ? "section" : "main";
+  // It takes over from the conversation's skeleton (`ChannelSkeleton`): no second entrance of the whole view.
+  const [continues] = useState(skeletonOnScreen);
 
   return (
     // A thread inside the panel opens profiles in its channel's panel, not inside itself.
@@ -1909,7 +1965,10 @@ function ChannelView({
         <ChannelThreadsContext.Provider value={threadsView}>
           {/* A DM with an agent reads as one centered column; channels, threads and DMs between people
             are a left-aligned team chat. */}
-          <Tag className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}>
+          <Tag
+            className={cx("shell__main shell__main--chat", chrome?.panel && "thread-panel__chat")}
+            data-continues={continues || undefined}
+          >
             {/* A page's own header (a DM's) gets the agent's tasks for its pill (`AgentTasksPill`). */}
             {chrome?.header ? (
               <AgentTasksContext.Provider value={tasksControl}>{chrome.header}</AgentTasksContext.Provider>
@@ -2032,7 +2091,7 @@ function ChannelView({
                     {messages.isError && !messages.data && (
                       <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
                     )}
-                    {messages.isSuccess && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
+                    {serverRead && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
                       <div className="channel__empty">
                         <EmptyState
                           icon="message"
@@ -2077,7 +2136,7 @@ function ChannelView({
                       <>
                         <Timeline
                           items={timeline}
-                          ready={messages.isSuccess}
+                          ready={serverRead}
                           slots={slots}
                           runKeys={runKeys.current}
                           divider={divider}
@@ -2087,6 +2146,10 @@ function ChannelView({
                           consultGroups={consultGroups}
                           seenId={thread ? null : seenId}
                         />
+                        {/* A thread's root is on screen from the channel: only its replies are loading. */}
+                        {thread && messages.isPlaceholderData && thread.replyCount > 0 && (
+                          <LoadingConversation count={Math.min(thread.replyCount, 6)} />
+                        )}
                         {!thread && (
                           <ArchivedThreadsNote
                             channelId={channel.id}
