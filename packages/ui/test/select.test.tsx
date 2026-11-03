@@ -133,3 +133,8 @@ describe("Select", () => {
     );
   });
 });
+
+test("a list mixing two-line options and one-line actions gives every row the same room above and below", async () => {
+  const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url)).text();
+  expect(css).toContain(".ac-menu:has(.ac-menu__desc) .ac-menu__item {\n  padding-block: var(--menu-item-px);\n}");
+});

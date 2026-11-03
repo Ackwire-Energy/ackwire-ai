@@ -1799,6 +1799,11 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
 .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) {
   padding-block: var(--menu-item-px);
 }
+/* A list that mixes two-line rows with one-line ones (an option and "+ Nova categoria…"): every row gets the same room,
+   so the action row's padding matches the options above it. */
+.ac-menu:has(.ac-menu__desc) .ac-menu__item {
+  padding-block: var(--menu-item-px);
+}
 .ac-menu__desc {
   font-size: 13px;
   line-height: 18px;
