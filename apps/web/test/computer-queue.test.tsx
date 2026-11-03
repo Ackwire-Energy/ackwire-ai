@@ -5,7 +5,7 @@ setupDom();
 
 import type { Agent, ComputerQueue, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { builtCss, declarations } from "./built-css";
+import { atRule, builtCss, declarations, topLevel } from "./built-css";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -274,12 +274,29 @@ describe("a computer's line", () => {
     expect(screen().queryByRole("button", { name: /aguardando/ })).toBeNull();
   });
 
-  test("in an agent's DM the line's button sits beside the Computer button", async () => {
-    const { api } = setup();
-    await renderApp(`/org/${ORG_ID}/dm/agent/${ATLAS_ID}`, { api });
+  test("in an agent's DM one Computer button says who waits, and the line goes on to the computer", async () => {
+    const { api, machines, queue } = setup();
+    const r = await renderApp(`/org/${ORG_ID}/dm/agent/${ATLAS_ID}`, { api });
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
     await settle(10);
-    expect(screen().getByRole("button", { name: "Computador · 2 aguardando" })).toBeTruthy();
-    expect(screen().getByRole("button", { name: "Computador" })).toBeTruthy();
+    const header = document.querySelector(".channel__header") as HTMLElement;
+    const computers = () => within(header).queryAllByRole("button", { name: /^Computador/ });
+    expect(computers().map((b) => b.textContent)).toEqual(["Computador · 2 aguardando2"]);
+    await click(computers()[0] as Element);
+    await settle(4);
+    const line = screen().getByRole("dialog", { name: "Fila de Studio" });
+    await click(within(line).getByRole("button", { name: "Abrir o computador" }));
+    await settle(6);
+    expect(screen().queryByRole("dialog", { name: "Fila de Studio" })).toBeNull();
+    expect(screen().getAllByRole("dialog").length).toBe(1);
+    // Nobody waits: the plain Computer button, the one way to the computer.
+    machines?.setQueue({ ...queue, working: [], waiting: [] });
+    await act(async () => socket.push(orgEvent({ type: "computer.queue", machineId: queue.machineId })));
+    await settle(6);
+    // (Behind the computer's dialog, so read from the page itself.)
+    expect(header.querySelectorAll(".brw-dm")).toHaveLength(1);
+    expect(header.querySelector(".cq-btn")).toBeNull();
   });
 });
 
@@ -331,4 +348,33 @@ test("pills never wrap; a closed answer shows two lines at most", async () => {
   expect(value('.ac-consult-group .ac-tools__row[aria-expanded="true"] .ac-tools__label small', "display")).toBe(
     "none",
   );
+});
+
+test("a narrow header fits: the waiting count alone beside the computer, the names give way before any button", async () => {
+  const css = await builtCss(
+    "src/styles.css",
+    "src/components/computer-queue.css",
+    "src/components/browser/browser.css",
+  );
+  const value = (sheet: string, selector: string, property: string) =>
+    declarations(sheet, selector).findLast(([p]) => p === property)?.[1];
+  // Wide: the words, no badge.
+  const wide = topLevel(css);
+  expect(value(wide, ".cq-btn .cq-btn__count", "display")).toBe("none");
+  expect(value(wide, ".cq-btn.ac-btn", "white-space")).toBe("nowrap");
+  // At 390 and 360 (under 640): the words go to screen readers only, the count shows.
+  const phone = atRule(css, "@media (max-width: 640px)");
+  expect(value(phone, ".cq-btn .cq-btn__label", "position")).toBe("absolute");
+  expect(value(phone, ".cq-btn .cq-btn__label", "width")).toBe("1px");
+  expect(value(phone, ".cq-btn .cq-btn__count", "display")).toBe("inline-flex");
+  expect(value(phone, ".brw-dm .brw-dm__label", "position")).toBe("absolute");
+  // One line: buttons keep their size, the title and its subtitle shrink and end in "…".
+  const narrow = atRule(css, "@media (max-width: 760px)");
+  expect(value(narrow, ".channel__header", "flex-wrap")).toBe("nowrap");
+  expect(value(narrow, ".channel__header>.ac-btn", "flex")).toBe("none");
+  expect(value(narrow, ".channel__header>.ac-acts", "flex")).toBe("none");
+  expect(value(narrow, ".channel__header>.channel__acts", "column-gap")).toBe("8px");
+  expect(value(narrow, ".channel__title", "text-overflow")).toBe("ellipsis");
+  expect(value(narrow, ".channel__title", "min-width")).toBe("0");
+  expect(value(narrow, ".channel__topic", "text-overflow")).toBe("ellipsis");
 });

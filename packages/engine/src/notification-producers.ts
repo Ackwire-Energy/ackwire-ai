@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
+import { and, asc, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
@@ -7,6 +7,8 @@ import { isMediaAfterReply } from "./media";
 import { previewMediaKind, readableBody } from "./message-preview";
 import { isAgentOnlyNotice } from "./notices";
 import {
+  dropRunFailure,
+  joinRunFailure,
   type NotificationActor,
   type NotificationDeps,
   type NotificationSource,
@@ -943,40 +945,52 @@ const runFailedGroup = (run: { agentId: string; channelId: string; threadRootId:
 
 /**
  * A conversation run failed for good (`reportRunFailure`): `userId` (else the agent's owner) hears it once per agent
- * and conversation, with the run's coded reason (`latest.reason`). Resolved by the agent's next good run there.
+ * and conversation, with the run's coded reason (`latest.reason`, `cause.code` when the run knew it better, and the
+ * plan it names). Failures of one cause close together share one row (`joinRunFailure`). Resolved by the agent's next
+ * good run there.
  */
 export async function notifyRunFailed(
   deps: NotificationDeps,
   run: { orgId: string; agentId: string; channelId: string; threadRootId: string; triggerMessageId: string },
   userId: string | null,
   reason: string,
+  cause?: { code?: string; plan?: string },
 ) {
   const to = userId ?? (await agentOwner(deps, run.agentId));
   if (!to) return;
   const [channel] = await deps.db.select({ name: channels.name }).from(channels).where(eq(channels.id, run.channelId));
-  await notify(deps, {
-    orgId: run.orgId,
-    userIds: [to],
-    kind: "run_failed",
-    groupKey: runFailedGroup(run),
-    actor: agent(run.agentId),
-    source: {
-      channelId: run.channelId,
-      ...(run.threadRootId !== run.triggerMessageId ? { threadId: run.threadRootId } : {}),
-      messageId: run.triggerMessageId,
-      agentId: run.agentId,
-      ...(channel?.name ? { label: channel.name } : {}),
-    },
-    latest: { reason: reason.split(":")[0] ?? reason },
+  const groupKey = runFailedGroup(run);
+  const source = {
+    channelId: run.channelId,
+    ...(run.threadRootId !== run.triggerMessageId ? { threadId: run.threadRootId } : {}),
+    messageId: run.triggerMessageId,
+    agentId: run.agentId,
+    ...(channel?.name ? { label: channel.name } : {}),
+  };
+  const said = { reason: cause?.code ?? reason.split(":")[0] ?? reason, ...(cause?.plan ? { plan: cause.plan } : {}) };
+  // One at a time per person, so a burst of failures finds the row the first one made.
+  await deps.db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`run-failed:${run.orgId}:${to}`}))`);
+    const d = { ...deps, db: tx };
+    if (await joinRunFailure(d, run.orgId, to, { key: groupKey, ...source }, said)) return;
+    await notify(d, {
+      orgId: run.orgId,
+      userIds: [to],
+      kind: "run_failed",
+      groupKey,
+      actor: agent(run.agentId),
+      source,
+      latest: { ...said, failures: [{ key: groupKey, ...source }] },
+    });
   });
 }
 
-/** The agent's run in that conversation ended well: its failure there is done. */
+/** The agent's run in that conversation ended well: its failure there is done (it leaves a shared row). */
 export async function resolveRunFailed(
   deps: NotificationDeps,
   run: { orgId: string; agentId: string; channelId: string; threadRootId: string },
 ) {
-  await resolveNotifications(deps, run.orgId, { groupKey: runFailedGroup(run) });
+  await dropRunFailure(deps, run.orgId, runFailedGroup(run));
 }
 
 /** A routine ran well again: its failure streak and computer outage notifications are done. */

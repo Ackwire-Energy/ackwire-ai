@@ -33,6 +33,7 @@ import {
   opensConnectAi,
   replyTarget,
   restrictionOf,
+  runFailedGroupOf,
   snoozeTimes,
   sortWaiting,
   stepCells,
@@ -236,6 +237,8 @@ function SourceChip({
   const { t } = useTranslation();
   const s = n.source;
   const channel = channelOf(n);
+  // Agents failing in many conversations: each says its own when the row opens.
+  if (runFailedGroupOf(n)) return null;
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
@@ -309,6 +312,8 @@ type WhatKey =
   | "routineFinished"
   | "routineFailed"
   | "runFailed"
+  | "runFailedMany"
+  | "runFailedManyAny"
   | "routinePaused"
   | "routineStalled"
   | "agentUnreached"
@@ -387,8 +392,14 @@ export function Headline({
       return k("routineFinished", { name });
     case "routine_failed":
       return k("routineFailed", { name });
-    case "run_failed":
-      return k("runFailed", { name });
+    case "run_failed": {
+      // Agents that failed for one cause close together: one line for all of them.
+      const group = runFailedGroupOf(n);
+      if (!group) return k("runFailed", { name });
+      return group.cause
+        ? k("runFailedMany", { count: group.agents, cause: sayWords(t, group.cause) })
+        : k("runFailedManyAny", { count: group.agents });
+    }
     case "routine_paused":
       return k("routinePaused", { name });
     case "routine_stalled":
@@ -589,6 +600,38 @@ function ThreadReplies({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: s
         );
       })}
     </div>
+  );
+}
+
+/** The agents of a shared failure row, each opening the conversation where it couldn't go on. */
+function RunFailures({ n, dir, channelName }: { n: AppNotification; dir: Dir; channelName: (id: string) => string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const openNotification = useNotificationOpener();
+  return (
+    <ul className="nt-reps nt-fails">
+      {(runFailedGroupOf(n)?.failures ?? []).map(({ key, ...source }) => {
+        const place = channelName(source.channelId) || source.label;
+        return (
+          <li key={key}>
+            <button
+              type="button"
+              className="nt-rep"
+              onClick={(e) => {
+                e.stopPropagation();
+                openNotification({ ...n, source, latest: {} }, org.id);
+              }}
+            >
+              <Face actor={{ type: "agent", id: source.agentId }} dir={dir} size="sm" className="nt-av22" />
+              <span className="nt-rep__head">
+                <b>{nameOf(t, dir, { type: "agent", id: source.agentId })}</b>
+                {place && <small>{t("notifications.source.channel", { name: place })}</small>}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -905,11 +948,15 @@ function Row({
                     ? t("notifications.hide")
                     : n.kind === "issue_comment"
                       ? t("notifications.showComments", { count: n.count })
-                      : t("notifications.showReplies", { count: n.count })}
+                      : n.kind === "run_failed"
+                        ? t("notifications.showAgents", { count: runFailedGroupOf(n)?.agents ?? n.count })
+                        : t("notifications.showReplies", { count: n.count })}
                 </button>
                 {s.open &&
                   (n.kind === "issue_comment" ? (
                     <IssueComments n={n} dir={dir} mine={mine} />
+                  ) : n.kind === "run_failed" ? (
+                    <RunFailures n={n} dir={dir} channelName={channelName} />
                   ) : (
                     <ThreadReplies n={n} dir={dir} mine={mine} />
                   ))}
