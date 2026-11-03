@@ -77,7 +77,7 @@ describe("provider marks", () => {
     expect(
       ["OpenCode", "xAI", "Alibaba", "Meituan", "Tencent", "StepFun", "Meta", "Reflection", "Xiaomi"].map(markOf),
     ).toEqual(["opencode", "xai", "alibaba", "meituan", "tencent", "stepfun", "meta", "reflection", "xiaomi"]);
-    for (const id of ["model", "agent", "mistral", "", null, undefined, "constructor", "__proto__", "toString"])
+    for (const id of ["model", "agent", "mosaic", "", null, undefined, "constructor", "__proto__", "toString"])
       expect(markOf(id)).toBeNull();
   });
 
@@ -206,14 +206,14 @@ describe("provider marks", () => {
   });
 
   test("an id without a mark shows its initial on a neutral tile", () => {
-    const el = logo(render(<ProviderLogo id="mistral" size="sm" off />).container);
+    const el = logo(render(<ProviderLogo id="mosaic" size="sm" off />).container);
     expect(el.querySelector("svg")).toBeNull();
     expect(el.textContent).toBe("M");
     expect(el.dataset.mark).toBeUndefined();
     expect(el.className).toContain("ac-brand--mono");
     expect(el.className).toContain("ac-brand--off");
     cleanup();
-    expect(logo(render(<ProviderLogo id="mistral" size="chip" />).container).textContent).toBe("M");
+    expect(logo(render(<ProviderLogo id="mosaic" size="chip" />).container).textContent).toBe("M");
   });
 
   test("BrainLogo still draws Claude for Claude Code and OpenAI for Codex, at its sizes", () => {
