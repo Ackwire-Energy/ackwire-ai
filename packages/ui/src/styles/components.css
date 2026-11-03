@@ -6418,8 +6418,11 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
   filter: none;
   opacity: 1;
 }
+/* Room inside its clip for a hovered cell's 1.12 growth (~3px a side), taken out of the popover's padding. */
 .ac-emoji__scroll {
   height: 248px;
+  margin-inline: -4px;
+  padding-inline: 4px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
