@@ -680,7 +680,8 @@ export function routineRoutes(deps: AppDeps) {
             access: Access.optional(),
             report: Report.optional(),
             ownActions: OwnActions.optional().openapi({
-              description: "Replaces the list; only its creator, when they decide the agent's approvals.",
+              description:
+                "Replaces the list. Adding an action takes its creator, when they decide the agent's approvals; any of its editors may take actions away.",
             }),
           }),
         ),

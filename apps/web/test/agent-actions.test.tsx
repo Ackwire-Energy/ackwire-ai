@@ -112,7 +112,7 @@ describe("receipts under the agent's reply", () => {
     );
     const row = receipts().querySelector(".ag-rc") as HTMLElement;
     expect(row.textContent).toContain("Criei a rotina Resumo da semana");
-    expect(row.textContent).toContain("Faz sozinha, sem pedir: SLACK_SEND_MESSAGE e GMAIL_SEND_EMAIL");
+    expect(row.textContent).toContain("Faz sozinha, sem pedir: Enviar mensagem (Slack) e Enviar e-mail (Gmail)");
   });
 
   test("several: 'N mudanças · agora', Desfazer tudo, one row each with its own Desfazer", async () => {

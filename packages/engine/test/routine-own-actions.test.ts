@@ -310,6 +310,15 @@ describe("a routine's own job (routines.own_actions)", () => {
       }),
     );
     expect(mcp.calls).toEqual([]);
+
+    // Taking actions away only makes it ask more: she may, and so may an editor who isn't its creator.
+    const shrunk = await updateRoutine(deps, cora.id, f.org.id, routine.id, { ownActions: [] });
+    expect(shrunk.ownActions).toEqual([]);
+    const own = await createRoutine(deps, f.owner.id, f.org.id, { ...input, ownActions: ["SLACK_SEND_MESSAGE"] });
+    await expect(
+      updateRoutine(deps, cora.id, f.org.id, own.id, { ownActions: ["SLACK_SEND_MESSAGE", "GMAIL_SEND_EMAIL"] }),
+    ).rejects.toMatchObject({ code: "routine.act_take_over" });
+    expect((await updateRoutine(deps, cora.id, f.org.id, own.id, { ownActions: [] })).ownActions).toEqual([]);
   });
 
   test("a routine with no own actions asks for every write, as before", async () => {

@@ -11,6 +11,7 @@ import {
   routineOwnActions,
   undoableNow,
 } from "@agenteschat/client/lib/actions";
+import { ownActionName } from "@agenteschat/client/lib/approval-words";
 import { joinNames, relativeTime, toYmd } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { cx, Icon, type IconName, onScreenNow } from "@agenteschat/ui";
@@ -269,7 +270,12 @@ function Receipt({
         </span>
         {ownActions.length > 0 && (
           <span className="ag-rc__by">
-            {t("agentActions.routine.ownActions", { actions: joinNames(ownActions, t) })}
+            {t("agentActions.routine.ownActions", {
+              actions: joinNames(
+                ownActions.map((name) => ownActionName(t, name)),
+                t,
+              ),
+            })}
           </span>
         )}
         {undoneBy && <span className="ag-rc__by">{t("agentActions.undoneBy", { name: undoneBy })}</span>}

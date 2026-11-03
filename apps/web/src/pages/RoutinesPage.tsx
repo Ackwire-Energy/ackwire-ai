@@ -23,7 +23,7 @@ import {
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
-import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { approvalTitle, ownActionName } from "@agenteschat/client/lib/approval-words";
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
@@ -2190,7 +2190,9 @@ function OwnActions({ routine }: { routine: Routine | undefined }) {
     <>
       <ul className="routine-own" aria-label={t("routines.panel.ownActions")}>
         {own.map((action) => (
-          <li key={action}>{action}</li>
+          <li key={action} title={action}>
+            {ownActionName(t, action)}
+          </li>
         ))}
       </ul>
       <p className="small muted">{t("routines.ownActions.hint")}</p>

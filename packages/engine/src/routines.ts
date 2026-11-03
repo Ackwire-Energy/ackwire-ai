@@ -1414,7 +1414,10 @@ export interface RoutinePatch {
   active?: boolean;
   access?: RoutineAccess;
   report?: RoutineReport;
-  /** Replaces its own actions (`RoutineInput.ownActions`): only its creator, when they decide the agent's approvals. */
+  /**
+   * Replaces its own actions (`RoutineInput.ownActions`): adding one takes its creator, when they decide the agent's
+   * approvals; any editor may take them away.
+   */
   ownActions?: string[];
 }
 
@@ -1467,13 +1470,16 @@ export async function updateRoutine(
   if (patch.ownActions !== undefined) {
     const ownActions = ownActionsOf(patch.ownActions);
     if (JSON.stringify(ownActions) !== JSON.stringify(current.ownActions)) {
-      if (actorId !== current.createdByUserId) {
-        throw new ForbiddenError(
-          "Take the routine over before changing what it does on its own",
-          "routine.act_take_over",
-        );
+      // Taking actions away only makes it ask more, so any of its editors may; adding one is its creator's word.
+      if (ownActions.some((a) => !current.ownActions.includes(a))) {
+        if (actorId !== current.createdByUserId) {
+          throw new ForbiddenError(
+            "Take the routine over before changing what it does on its own",
+            "routine.act_take_over",
+          );
+        }
+        await requireActionApprover(db, actorId, orgId, agent.ownerUserId);
       }
-      if (ownActions.length > 0) await requireActionApprover(db, actorId, orgId, agent.ownerUserId);
       set.ownActions = ownActions;
     }
   }

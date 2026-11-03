@@ -6,6 +6,7 @@ import {
   useRoutines,
   useRuleDescribe,
 } from "@agenteschat/client";
+import { ownActionName } from "@agenteschat/client/lib/approval-words";
 import { formatTokensShort, formatUsd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -398,6 +399,19 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               <Block>
                 <Text variant="footnote" tone="muted">
                   {t("routines.ahead.hint")}
+                </Text>
+              </Block>
+            </Section>
+          ) : null}
+
+          {r.canSeeDetails ? (
+            <Section title={t("routines.panel.ownActions")}>
+              {(r.ownActions ?? []).map((name) => (
+                <GroupedRow key={name} label={ownActionName(t, name)} />
+              ))}
+              <Block>
+                <Text variant="footnote" tone="muted">
+                  {t(r.ownActions?.length ? "routines.ownActions.hint" : "routines.ownActions.none")}
                 </Text>
               </Block>
             </Section>

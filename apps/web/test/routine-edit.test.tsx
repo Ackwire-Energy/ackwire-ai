@@ -69,7 +69,7 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     await open();
     await menu("Resumo da semana", "Editar");
     const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
-    expect(within(dialog).getByRole("list", { name: "Faz sozinha" }).textContent).toBe("SLACK_SEND_MESSAGE");
+    expect(within(dialog).getByRole("list", { name: "Faz sozinha" }).textContent).toBe("Enviar mensagem (Slack)");
     expect(dialog.textContent).toContain("Qualquer outra ação neles pede aprovação antes");
     await click(within(dialog).getByRole("button", { name: "Cancelar" }));
     await settle(3);
