@@ -130,11 +130,18 @@ export const howToSubject = (title: string) => `${HOW_TO_WORD} ${title}`;
 export const isHowTo = (i: Pick<ContextItem, "kind" | "subjectKey">) =>
   i.kind === "note" && i.subjectKey.split(" ").includes(HOW_TO_WORD);
 /**
- * What a chat receipt for a saved memory says: its plain title, or a person's own words. An agent's untitled finding
- * has none (its text may be technical): it gets no receipt and stays in the Memory tab.
+ * Learning with no chat receipt (ADR 0120): the agent's playbook, and anything it found on its own (no person's words
+ * among the evidence), like where a script lives. It stays in the Memory tab and in later runs.
  */
-export const receiptLine = (i: Pick<ContextItem, "title" | "content" | "createdByKind">) =>
-  i.title.trim() || (i.createdByKind === "person" ? i.content : "");
+export const learnedQuietly = (i: Pick<ContextItem, "kind" | "agentId" | "scopeType" | "createdByKind" | "evidence">) =>
+  isPlaybook(i) || !i.evidence.some((e) => e.type === "human");
+/**
+ * What a chat receipt for a saved memory says: its plain title, or a person's own words. None for what was learned
+ * quietly (`learnedQuietly`), nor for an agent's untitled item (its text may be technical).
+ */
+export const receiptLine = (
+  i: Pick<ContextItem, "title" | "content" | "kind" | "agentId" | "scopeType" | "createdByKind" | "evidence">,
+) => (learnedQuietly(i) ? "" : i.title.trim() || (i.createdByKind === "person" ? i.content : ""));
 export const howToSql = () =>
   sql`(${contextItems.kind} = 'note' and ${HOW_TO_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
 

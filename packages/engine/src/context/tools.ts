@@ -16,7 +16,6 @@ import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
 import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-reads";
-import { isPlaybook } from "../audience";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -39,6 +38,7 @@ import {
   howToSql,
   howToSubject,
   isHowTo,
+  learnedQuietly,
   receiptLine,
   supersede,
 } from "./items";
@@ -363,7 +363,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               : { ...memoryJudging(deps), mayReplace: (old) => old.createdByKind !== "person" },
           );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
-          // The memory card in the chat only for what a person said; the rest is a quiet receipt.
+          // The memory card and the receipt only for what a person said; the agent's own finding stays quiet.
           if (said)
             await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, res.item).catch(() => {});
           if (res.action === "outweighed") {
@@ -426,7 +426,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               createdByKind: requester ? "person" : (item.createdByKind as "agent" | "job"),
               createdById: requester ?? ctx.agentId,
             });
-            if (!isPlaybook(row))
+            if (requester || !learnedQuietly(item))
               await recordAgentActions(tx, ctx, [
                 {
                   kind: "memory.updated",
@@ -469,7 +469,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             .update(contextItems)
             .set({ status: "archived", updatedAt: new Date() })
             .where(eq(contextItems.id, item.id));
-          if (requester || !isPlaybook(item))
+          if (requester || !learnedQuietly(item))
             await recordAgentActions(tx, ctx, [
               {
                 kind: "memory.forgotten",
@@ -676,12 +676,12 @@ const KEY_DESCRIPTION =
 
 /**
  * A new memory, or a new version of one: a receipt with Undo, its line the plain summary (the title). The same thing
- * again (merged) has nothing to undo; the agent's playbook has no receipt (`isPlaybook`), it lives in the Memory tab.
+ * again (merged) has nothing to undo; what the agent learned quietly has none (`learnedQuietly`), it lives in the Memory tab.
  */
 async function recordSave(ctx: ToolContext, res: ConsolidateResult) {
   if (res.action !== "created" && res.action !== "superseded" && res.action !== "disputed") return;
   const line = receiptLine(res.item);
-  if (isPlaybook(res.item) || !line) return;
+  if (!line) return;
   const replaced = res.action === "superseded" ? res.previous : undefined;
   await recordAgentActions(ctx.db, ctx, [
     {

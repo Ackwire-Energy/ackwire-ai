@@ -1005,7 +1005,7 @@ describe("learning guards", () => {
 });
 
 describe("quiet learning (ADR 0120 addendum)", () => {
-  test("its own how-tos and lessons leave no receipt; a fact for people is one line, its plain title", async () => {
+  test("its own how-tos, lessons and findings leave no receipt; a fact a person told it is one line, its plain title", async () => {
     f = await setup();
     const { run } = await personRun();
     await invoke(run, "save_how_to", {
@@ -1015,20 +1015,38 @@ describe("quiet learning (ADR 0120 addendum)", () => {
     });
     await invoke(run, "remember", {
       kind: "fact",
-      title: "O escritório fecha às 18h",
-      content: "Office hours end at 18:00 (handbook, section 4).",
+      title: "O script de publicação fica na pasta ops",
+      content: "The deploy script lives in ops/deploy.sh.",
       basis: "found",
+    });
+    await invoke(run, "remember", {
+      kind: "fact",
+      title: "O escritório fecha às 18h",
+      content: "Office hours end at 18:00.",
+      basis: "person_said",
     });
     const saved = await items();
     const howTo = saved.find((i) => i.kind === "note");
-    const fact = saved.find((i) => i.kind === "fact");
-    expect([howTo && isPlaybook(howTo), fact && isPlaybook(fact)]).toEqual([true, false]);
+    const found = saved.find((i) => i.content.includes("ops/"));
+    const told = saved.find((i) => i.content.includes("18:00"));
+    expect([howTo && isPlaybook(howTo), found && isPlaybook(found)]).toEqual([true, false]);
+    // The finding is still the agent's memory: on its memory page and in its next runs.
+    expect([found?.status, found?.agentId, found?.createdByKind]).toEqual(["active", f.agent.id, "agent"]);
     const rows = await receipts();
     expect(rows.map((r) => [r.kind, r.targetId, r.params.text])).toEqual([
-      ["memory.saved", fact?.id ?? "", "O escritório fecha às 18h"],
+      ["memory.saved", told?.id ?? "", "O escritório fecha às 18h"],
     ]);
 
-    // The learning job: its own lesson stays quiet too.
+    // The learning job: its own lesson and a fact it found in a tool call stay quiet too.
+    const { run: next } = await personRun("@dev and the models?");
+    const toolUseId = `tu_${crypto.randomUUID()}`;
+    await addRunStep(f.db, next, "tool_call", { toolUseId, name: "query_db", input: {} });
+    await addRunStep(f.db, next, "tool_result", {
+      toolUseId,
+      name: "query_db",
+      content: "ERROR: cannot execute UPDATE in a read-only transaction",
+      isError: false,
+    });
     learnOutput = {
       items: [
         {
@@ -1039,12 +1057,20 @@ describe("quiet learning (ADR 0120 addendum)", () => {
           content: "Check NORTHWIND_KEY is set before calling /v1/models; a missing key answers 401.",
           refs: ["m1"],
         },
+        {
+          kind: "fact",
+          scope: "own",
+          about_person: "",
+          title: "O banco de testes só aceita leitura",
+          key: "staging db read only",
+          content: "The staging database is read-only (UPDATE fails in a read-only transaction).",
+          refs: ["s1"],
+        },
       ],
       skill_fixes: [],
     };
-    const { run: next } = await personRun("@dev and the models?");
     const out = await learnRun(f.context, { orgId: f.org.id, runId: next.id });
-    expect(out.saved).toHaveLength(1);
+    expect(out.saved).toHaveLength(2);
     expect((await receipts()).length).toBe(1);
   });
 
@@ -1087,7 +1113,7 @@ describe("quiet learning (ADR 0120 addendum)", () => {
       kind: "fact",
       title: "O escritório fecha às 18h",
       content: "Office hours end at 18:00 (handbook, section 4).",
-      basis: "found",
+      basis: "person_said",
     });
     const fact = (await items()).find((i) => i.title === "O escritório fecha às 18h");
     if (!fact) throw new Error("no fact");

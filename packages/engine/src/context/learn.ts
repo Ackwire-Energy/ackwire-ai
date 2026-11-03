@@ -2,7 +2,6 @@ import type { ErrorTags } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
 import { modelInfo } from "@agenteschat/providers";
 import { recordAgentActions } from "../agent-actions";
-import { isPlaybook } from "../audience";
 import { callLine, type LearnSignal, type RunCall, runCalls } from "../continuation";
 import { cutText, cutTextEnd } from "../format";
 import { agentBudgetState } from "../gateway";
@@ -311,8 +310,8 @@ const ACTIVE = ["queued", "running", "waiting_approval", "waiting_input"] as con
  * what to keep. Code decides the rest: refs must exist, trust comes from the run (`learnTrust`) and from the refs,
  * scopes beyond the agent's own need high trust (a person's also a message of theirs), and it only adds: an item a
  * person wrote is never replaced (both stay, disputed). Bounded per agent and day, skipped while the agent works
- * in the same conversation. Posts nothing; what matters to people is a quiet receipt with Undo, the agent's playbook
- * none (`isPlaybook`).
+ * in the same conversation. Posts nothing; what a person told it is a quiet receipt with Undo, the rest none
+ * (`learnedQuietly`).
  */
 export async function learnRun(deps: ContextDeps, input: { orgId: string; runId: string }): Promise<LearnResult> {
   const { db } = deps;
@@ -526,10 +525,9 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
     try {
       const res = await consolidateItem(db, base, judging);
       out.saved.push({ id: res.item.id, action: res.action, trust: res.item.trust, scopeType: res.item.scopeType });
-      // The agent's playbook stays out of the chat (`isPlaybook`); what matters to people is one plain line.
+      // Only what a person told it gets one plain line in the chat (`learnedQuietly`).
       if (
         (res.action === "created" || res.action === "superseded" || res.action === "disputed") &&
-        !isPlaybook(res.item) &&
         receiptLine(res.item)
       )
         await recordAgentActions(db, ctx, [
