@@ -3090,6 +3090,8 @@ export const en = {
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself.",
           cursorKey: "Use a Cursor API key instead",
+          /** Beside the sign-in button: its link, to open in another browser or profile. */
+          copyLink: "Copy link",
           openAgain: "Open again",
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",

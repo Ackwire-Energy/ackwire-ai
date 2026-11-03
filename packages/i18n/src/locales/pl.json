@@ -3390,6 +3390,7 @@
           "opencodeFree": "Darmowe modele OpenCode nie wymagają klucza. Klucz z konsoli OpenCode dodaje modele płatne.",
           "cursorFinish": "Zaloguj się na stronie Cursor, a logowanie na komputerze {{computer}} zakończy się samo.",
           "cursorKey": "Użyj zamiast tego klucza API Cursor",
+          "copyLink": "Kopiuj link",
           "openAgain": "Otwórz ponownie",
           "stepTwo": "Wklej kod, który pokazuje Claude",
           "codeLabel": "Kod Claude",

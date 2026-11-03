@@ -8958,11 +8958,15 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 .agp-addacct:focus {
   outline: none;
 }
+/* Back as the arrow before the title, as every other back in the app; its plate reaches out so the arrow sits on the
+   block's edge, under the steps' column. */
 .agp-addacct__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 4px;
+}
+.agp-addacct__head > .ac-btn {
+  margin-inline-start: -8px;
 }
 .agp-addacct__head > b {
   font-size: 15px;
@@ -9029,6 +9033,13 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   font-weight: 650;
   letter-spacing: 0.08em;
   user-select: all;
+}
+/* A sign-in's button and "Copiar link" beside it, wrapping under it when the column is narrow. */
+.agp-addacct__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .agp-addacct__wait {
   flex: none;

@@ -3302,6 +3302,7 @@
           "opencodeFree": "Les modèles gratuits d'OpenCode ne demandent aucune clé. Une clé de la console OpenCode ajoute les modèles payants.",
           "cursorFinish": "Connectez-vous sur la page de Cursor, et la connexion se termine toute seule sur {{computer}}.",
           "cursorKey": "Utiliser plutôt une clé API Cursor",
+          "copyLink": "Copier le lien",
           "openAgain": "Rouvrir",
           "stepTwo": "Collez le code affiché par Claude",
           "codeLabel": "Code Claude",

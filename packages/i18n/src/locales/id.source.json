@@ -7783,6 +7783,9 @@
   "agentPage.work.brain.add.cursorKey": {
     "value": "Use a Cursor API key instead"
   },
+  "agentPage.work.brain.add.copyLink": {
+    "value": "Copy link"
+  },
   "agentPage.work.brain.add.openAgain": {
     "value": "Open again"
   },

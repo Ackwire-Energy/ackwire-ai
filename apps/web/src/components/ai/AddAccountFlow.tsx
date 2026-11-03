@@ -31,7 +31,9 @@ import { openPopup, sendPopup } from "@/lib/popup";
  * server. Cursor (ADR 0114): its sign-in page, and the computer finishes by
  * itself; or, chosen under it, a Cursor API key, sent like a plan's key. "Colar" shows only while the field is empty. Every start is a click,
  * never the block showing. The page asks every 2 s; Voltar or closing stops
- * the sign-in on the computer. Reads that fail while the server restarts or
+ * the sign-in on the computer. "Copiar link" beside a sign-in's button copies
+ * its link instead, to open in another browser or profile (it begins the
+ * sign-in when it hasn't yet). Reads that fail while the server restarts or
  * the computer reconnects say Reconnecting, and the same sign-in goes on
  * (`loginRead`). One key can go to several logins at once (`fanOut`): each is
  * begun, sealed to and watched on its own.
@@ -219,6 +221,9 @@ function AddAccountFlow({
   const [sendFailed, setSendFailed] = useState<"away" | "refused" | null>(null);
   const [pasteFailed, setPasteFailed] = useState(false);
   const [copied, setCopied] = useState(false);
+  // "Copiar link": the sign-in's link on its way to the clipboard (it may begin the sign-in first), then copied.
+  const [copyingLink, setCopyingLink] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   // Signed in, but not as the account it was for (the hint): theirs to use or not.
   const [other, setOther] = useState<MachineAccount | null>(null);
   // The logins a key went to (`fanOut`), and the first of them that didn't end signed in.
@@ -413,6 +418,43 @@ function AddAccountFlow({
     }
   };
 
+  /**
+   * The sign-in's link copied, to open in another browser or profile (where the person is signed in to the maker):
+   * the sign-in begins here when it hasn't yet. The write starts in the click itself, the link to come: Safari allows
+   * no later write. Copied, it counts as opened, so Claude's code field shows.
+   */
+  const copyLink = () => {
+    setCopyingLink(true);
+    const url = login
+      ? Promise.resolve(login.url)
+      : begin().then((l) => {
+          if (!l) throw new Error("no sign-in");
+          return l.url;
+        });
+    const done = () => {
+      setLinkCopied(true);
+      setOpened(true);
+    };
+    const later = () =>
+      url
+        .then((u) => navigator.clipboard.writeText(u))
+        .then(done, () => undefined)
+        .finally(() => setCopyingLink(false));
+    try {
+      const blob = url.then((u) => new Blob([u], { type: "text/plain" }));
+      // Rejected when the sign-in doesn't begin, which only fails the write (the block says why).
+      blob.catch(() => undefined);
+      void navigator.clipboard
+        .write([new ClipboardItem({ "text/plain": blob })])
+        .then(() => {
+          done();
+          setCopyingLink(false);
+        }, later);
+    } catch {
+      void later();
+    }
+  };
+
   const waiting = (
     <span className="agp-addacct__wait" role="status">
       <Icon name="spinner" size={14} />
@@ -533,6 +575,34 @@ function AddAccountFlow({
       {t("agentPage.work.brain.add.openAgain")}
     </OpenPage>
   );
+  /** The sign-in's button (or "Abrir de novo" once begun) with "Copiar link" beside it. */
+  const signIn = (label: string) => (
+    <span className="agp-addacct__acts">
+      {login ? (
+        openAgain(login.url)
+      ) : (
+        <Button
+          size="sm"
+          variant="primary"
+          icon="external"
+          loading={(starting && !copyingLink) || loading}
+          disabled={!ready || starting}
+          onClick={start}
+        >
+          {label}
+        </Button>
+      )}
+      <Button
+        size="sm"
+        icon={linkCopied ? "check" : "copy"}
+        loading={starting && copyingLink}
+        disabled={!ready || (starting && !copyingLink)}
+        onClick={copyLink}
+      >
+        {linkCopied ? t("common.copied") : t("agentPage.work.brain.add.copyLink")}
+      </Button>
+    </span>
+  );
 
   const signInHint = t("agentPage.work.brain.add.stepOneHint", { computer, brand: t(`aiAccounts.connect.${kind}`) });
   let steps: ReactNode;
@@ -579,22 +649,7 @@ function AddAccountFlow({
     steps = (
       <>
         <Step
-          side={
-            login ? (
-              openAgain(login.url)
-            ) : (
-              <Button
-                size="sm"
-                variant="primary"
-                icon="external"
-                loading={starting || loading}
-                disabled={!ready}
-                onClick={start}
-              >
-                {signInLabel ?? t("agentPage.work.brain.add.open.cursor")}
-              </Button>
-            )
-          }
+          side={signIn(signInLabel ?? t("agentPage.work.brain.add.open.cursor"))}
         >
           <StepTitle title={t("agentPage.work.brain.add.stepOne.cursor")} hint={signInHint} />
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
@@ -616,22 +671,7 @@ function AddAccountFlow({
         </Step>
         <Step
           n={2}
-          side={
-            login ? (
-              openAgain(login.url)
-            ) : (
-              <Button
-                size="sm"
-                variant="primary"
-                icon="external"
-                loading={starting || loading}
-                disabled={!ready}
-                onClick={start}
-              >
-                {signInLabel ?? t("agentPage.work.brain.add.open.codex")}
-              </Button>
-            )
-          }
+          side={signIn(signInLabel ?? t("agentPage.work.brain.add.open.codex"))}
         >
           <StepTitle title={t("agentPage.work.brain.add.stepOne.codex")} hint={signInHint} />
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
@@ -654,22 +694,7 @@ function AddAccountFlow({
     steps = (
       <>
         <Step
-          side={
-            login ? (
-              openAgain(login.url)
-            ) : (
-              <Button
-                size="sm"
-                variant="primary"
-                icon="external"
-                loading={starting || loading}
-                disabled={!ready}
-                onClick={start}
-              >
-                {signInLabel ?? t("agentPage.work.brain.add.open.claude_code")}
-              </Button>
-            )
-          }
+          side={signIn(signInLabel ?? t("agentPage.work.brain.add.open.claude_code"))}
         >
           <StepTitle title={t("agentPage.work.brain.add.stepOne.claude_code")} hint={signInHint} />
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
@@ -701,13 +726,19 @@ function AddAccountFlow({
     <section ref={box} tabIndex={-1} className="agp-addacct" aria-label={title}>
       {onBack && (
         <div className="agp-addacct__head">
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="chevronLeft"
+            aria-label={t("common.back")}
+            title={t("common.back")}
+            onClick={onBack}
+          />
           <b className="row" style={{ gap: 8 }}>
             {plan && <ProviderLogo id={provider ?? ""} size="xs" />}
             {title}
           </b>
-          <Button size="sm" variant="ghost" icon="chevronLeft" onClick={onBack}>
-            {t("common.back")}
-          </Button>
         </div>
       )}
       {other || ended ? (
