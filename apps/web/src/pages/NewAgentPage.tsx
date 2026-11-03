@@ -415,11 +415,23 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const roleName = role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText || null;
   // With nothing to think with yet, the agent is created all the same (ADR 0061 §6), and Connect opens for it after.
   const connectAfter = plan === null && connectPlan === null && usable.size === 0;
+  // "Conectar uma IA" from the model step: the same dialog as Settings › Contas de IA, for the agent being made when
+  // it is mine (a plan signs in for the agents I create), else the workspace's key (admins). The plan it connects is
+  // what the agent thinks with once it shows up in "Quem pensa".
+  const [connectedHere, setConnectedHere] = useState(false);
+  const connectsHere = connect && (ownerId === me.user.id || can(org, "manage_credentials"));
+  const connectHere = () => {
+    if (!connect) return;
+    setConnectedHere(ownerId === me.user.id);
+    connect.open(ownerId === me.user.id ? { forNewAgent: true } : { intent: "api_key" });
+  };
   // A plan account of mine that can think for it (one connected in place from the model step, or before I had any
   // agent), with nothing else to think with or no last setup to start from: the agent thinks with it. A default, not
   // a pick: another owner drops it.
   const ownPlan =
-    connectAfter || (!aiPicked && plan === null && connectPlan === null && startOf(me.user.id) === null)
+    connectAfter ||
+    connectedHere ||
+    (!aiPicked && plan === null && connectPlan === null && startOf(me.user.id) === null)
       ? planAccountOption(brainOptions)
       : undefined;
   // biome-ignore lint/correctness/useExhaustiveDependencies: once an account shows up, after what it starts with
@@ -1364,22 +1376,13 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
               })}
             </span>
           )}
-          {connectAfter && (
-            <>
-              <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>
-              {connect && (ownerId === me.user.id || can(org, "manage_credentials")) && (
-                <span>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    // A plan thinks only for its owner's agents: for someone else's, the workspace's key.
-                    onClick={() => connect.open(ownerId === me.user.id ? { forNewAgent: true } : { intent: "api_key" })}
-                  >
-                    {t("connectAi.title.any")}
-                  </Button>
-                </span>
-              )}
-            </>
+          {connectAfter && <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>}
+          {connectsHere && (
+            <span>
+              <Button size="sm" variant={connectAfter ? "primary" : "default"} icon="plus" onClick={connectHere}>
+                {t("aiAccounts.page.connect")}
+              </Button>
+            </span>
           )}
           {errorLine(errorOf("model"))}
           <div className="newag__sect">

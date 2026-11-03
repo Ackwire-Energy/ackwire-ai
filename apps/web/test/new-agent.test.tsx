@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { type AgentInput, ApiError } from "@agenteschat/client";
+import { type AgentInput, ApiError, keys } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
@@ -664,6 +664,96 @@ describe("Criar agente: what gets created", () => {
     const box = screen().getByRole("dialog", { name: "Conectar uma IA" });
     const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Os agentes que você criar pensam com ele.");
+  });
+
+  test("with the workspace's key too: Conectar uma IA is right there, and the plan it connects is what it thinks with", async () => {
+    const state = seedState();
+    state.agents = [];
+    // The workspace's key is OpenAI's: Claude's models need a Claude key until a Claude plan is here.
+    state.credentials = state.credentials.map((c) => ({ ...c, provider: "openai", label: "OpenAI da Acme" }));
+    state.brainMachines = [];
+    const api = createFakeApi(state);
+    const mini = {
+      machineId: "machine_mini",
+      name: "Mac mini",
+      online: true,
+      mine: true,
+      canAdd: true,
+      keys: true,
+      brains: { claude_code: true, codex: false },
+    };
+    fakeMachinesOf.get(api)?.setAiAccounts({ accounts: [], computers: [mini] });
+    const { services } = await renderApp(`/org/${ORG_ID}/agents/new`, { api });
+    await settle(8);
+    await startAs("Assistente");
+    await typeIn(screen().getByLabelText("Nome"), "Lia");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    expect(screen().queryByText(NO_AI)).toBeNull();
+    let list = await openBrain();
+    expect(within(list).getAllByRole("option", { name: /Precisa de uma chave de API Claude/ }).length).toBeGreaterThan(
+      0,
+    );
+    await act(async () => fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Escape" }));
+    await settle(2);
+    // An API model picked first: connecting a plan here still moves the agent onto it.
+    await chooseBrain(/^GPT-5 US/);
+    await click(screen().getByRole("button", { name: "Conectar uma IA" }));
+    await settle(6);
+    const box = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    // The same choices as Settings › Contas de IA and the setup, for the agents they create.
+    const choices = within(box).getByRole("group", { name: "Qual IA eles vão usar?" });
+    expect(within(choices).getByRole("button", { name: "Claude" })).toBeTruthy();
+    expect(within(choices).getByRole("button", { name: /^Chave de API/ })).toBeTruthy();
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("Os agentes que você criar pensam com ele.");
+    await act(async () => fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Escape" }));
+    await settle(2);
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [
+        {
+          id: "acct_1",
+          kind: "claude_code",
+          label: "Claude",
+          email: "walter@acme.com.br",
+          plan: "max",
+          status: "active",
+          ownerId: "u-walter",
+          ownerName: "Walter",
+          mine: true,
+          usedBy: [],
+          usage: null,
+          provider: null,
+          keyHint: null,
+          machineId: "machine_mini",
+          computer: "Mac mini",
+        },
+      ],
+      computers: [mini],
+    });
+    state.brainMachines = [
+      { machineId: "machine_mini", name: "Mac mini", online: true, options: [plan("claude_code", true)] },
+    ];
+    await act(async () => {
+      await services.queryClient.invalidateQueries({ queryKey: keys.aiAccounts(ORG_ID) });
+      await services.queryClient.invalidateQueries({ queryKey: keys.brainMachines(ORG_ID) });
+    });
+    await settle(8);
+    // The draft kept, the plan chosen, and its models listed as the plan's, ready.
+    expect(brainBox().textContent).toStartWith("Plano do Claude");
+    list = await openBrain();
+    expect(within(list).queryByRole("option", { name: /Precisa de uma chave de API Claude/ })).toBeNull();
+    await act(async () => fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Escape" }));
+    await settle(2);
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Lia" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "lia")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code", account: "acct_1" },
+    ]);
   });
 
   test("no AI yet: the agent is created all the same, and Connect opens for it", async () => {

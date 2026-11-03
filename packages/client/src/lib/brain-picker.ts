@@ -108,6 +108,9 @@ export function apiPickOptions(t: TFunction, locale: string, choices: [string, M
 export const planAccountOption = (options: readonly BrainPickOption[]) =>
   options.find((o) => !o.disabled && "accountId" in o.pick && Boolean(o.pick.accountId) && o.pick.model === AUTO);
 
+/** The API provider whose models a plan also thinks with (Claude's plan: Anthropic's models). */
+const PLAN_PROVIDER: Partial<Record<PlanChoice, string>> = { claude: "anthropic", chatgpt: "openai" };
+
 export function brainPickOptions(
   t: TFunction,
   locale: string,
@@ -276,7 +279,15 @@ export function brainPickOptions(
         ),
     ];
   });
-  return [auto, ...apiPickOptions(t, locale, api), ...plans];
+  // A plan ready here thinks with its maker's models: those that would need an API key leave the list, so Claude's
+  // models read as the plan's (available), not as "needs a Claude API key".
+  const covered = new Set(
+    plans.flatMap((o) =>
+      !o.disabled && o.pick.kind !== "connect" && "choice" in o.pick ? (PLAN_PROVIDER[o.pick.choice] ?? []) : [],
+    ),
+  );
+  const apiRows = apiPickOptions(t, locale, api).filter((o) => !(o.disabled && o.mark && covered.has(o.mark)));
+  return [auto, ...apiRows, ...plans];
 }
 
 /** The option a new agent's choice shows as (undefined: one the list no longer has). */

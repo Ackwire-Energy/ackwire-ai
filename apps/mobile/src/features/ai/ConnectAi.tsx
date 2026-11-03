@@ -59,7 +59,7 @@ export type ConnectKey = ReturnType<typeof useConnectKey>;
 
 /**
  * "Conectar uma IA" as a sheet (`/connect-ai?from=<messageId>&intent=<step>&provider=<id>&agentId=<id>&plan=<plan>
- * &email=<address>&ready=1`): for an agent with no AI what the person already has, then the plans, each signing in on
+ * &email=<address>&ready=1&forNew=1`): for an agent with no AI what the person already has, then the plans, each signing in on
  * the agent's computer, then the workspace's API key (ConnectAiFlow); a message that asked for one of them opens on
  * its page, and `plan` on that plan's (Sign in again).
  * Once connected from a message, the agent answers it by itself. `email`: one more login of the account other agents
@@ -81,10 +81,12 @@ export function ConnectAiSheet() {
     plan?: string;
     email?: string;
     ready?: string;
+    forNew?: string;
   }>();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
   const mayAddKey = can(org, "manage_credentials");
-  const mine = dir.agents.filter((a) => a.ownerUserId === meId);
+  // From the create-agent step: for the agent being made, never one I have.
+  const mine = params.forNew === "1" ? [] : dir.agents.filter((a) => a.ownerUserId === meId);
   const named = params.agentId ? [params.agentId] : null;
   const agents = (named ? mine.filter((a) => named.includes(a.id)) : mine).map((a) => ({ id: a.id, name: a.name }));
   // The agents a plan was connected for here: they think with it before the AI status says so.
@@ -136,6 +138,7 @@ export function ConnectAiSheet() {
           onAccount={() => {
             setAccountAdded(true);
             void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
+            void qc.invalidateQueries({ queryKey: keys.brainMachines(orgId) });
             answer();
           }}
           {...(one && one.ownerUserId !== meId && mayAddKey ? { theirs: { id: one.id, name: one.name } } : {})}

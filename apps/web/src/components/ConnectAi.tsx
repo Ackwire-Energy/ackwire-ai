@@ -257,6 +257,8 @@ function ConnectAiDialog({
   const done = () => {
     setConnected(true);
     void qc.invalidateQueries({ queryKey: keys.aiStatus(org.id) });
+    // What "Quem pensa" lists (a new agent's step, an agent's page): the plan's models there are ready now.
+    void qc.invalidateQueries({ queryKey: keys.brainMachines(org.id) });
     onConnected();
   };
   const saveKey = () => {

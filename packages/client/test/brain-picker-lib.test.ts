@@ -94,6 +94,23 @@ describe("Quem pensa as one list (the new agent's step)", () => {
     expect(gpt?.description).toStartWith("newAgent.modelNeedsKey");
   });
 
+  test("Claude's plan ready here: Claude's models read as the plan's, none says it needs a Claude API key", () => {
+    const options = build([], []);
+    expect(options.some((o) => o.value === "claude-sonnet-5-5")).toBe(false);
+    const plan = options.filter((o) => o.value.startsWith("claude@m1/"));
+    expect(plan.map((o) => o.label)).toEqual(["brain.auto.label", "Opus", "Sonnet", "Haiku"]);
+    expect(plan.every((o) => !o.disabled)).toBe(true);
+    // ChatGPT's plan isn't ready there: its models still say what they need.
+    expect(options.find((o) => o.value === "gpt-6.1-sol")?.description).toStartWith("newAgent.modelNeedsKey");
+    const noComputer = brainPickOptions(t, "pt-BR", {
+      api: modelChoices(MODELS, [], false),
+      machines: [],
+      accounts: [],
+      ownerIsMe: true,
+    });
+    expect(noComputer.find((o) => o.value === "claude-sonnet-5-5")?.disabled).toBe(true);
+  });
+
   test("a plan offers what the agent's page offers there: Automático and the same models", () => {
     const options = build([goKey]);
     const claude = options.filter((o) => o.pick.kind === "claude_code" && !("accountId" in o.pick && o.pick.accountId));

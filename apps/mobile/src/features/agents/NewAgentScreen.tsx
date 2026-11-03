@@ -192,8 +192,12 @@ function NewAgentForm({
   });
   const [picked, setPicked] = useState<BrainPickOption | null>(null);
   const [picking, setPicking] = useState(false);
+  // "Conectar uma IA" from this step (the same sheet as Settings, for the agents I create): the plan it connects is
+  // what the agent thinks with once it shows up, over a pick made before.
+  const [connectedHere, setConnectedHere] = useState(false);
+  const ownPlan = planAccountOption(brainOptions);
   // No last setup to start from: a plan account of mine that can think for it (one connected before I had an agent).
-  const chosen = picked ?? (proposed || start ? null : (planAccountOption(brainOptions) ?? null));
+  const chosen = (connectedHere ? ownPlan : undefined) ?? picked ?? (proposed || start ? null : (ownPlan ?? null));
   const thinks = chosen
     ? pickedAi(chosen.pick, aiAccounts.data?.computers)
     : newAgentAi(start && useLast ? start : null);
@@ -679,8 +683,21 @@ function NewAgentForm({
           onPick={(o) => {
             setPicked(o);
             setUseLast(false);
+            setConnectedHere(false);
           }}
         />
+        {proposed ? null : (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="plus"
+            label={t("aiAccounts.page.connect")}
+            onPress={() => {
+              setConnectedHere(true);
+              openConnectAi({ forNew: "1" });
+            }}
+          />
+        )}
 
         <View style={styles.section}>
           {managesAgents ? (
