@@ -128,9 +128,27 @@ export interface WikiPageSummary {
   updatedBy: WikiAuthor;
 }
 
+/** Who a DM is with for its reader (`a:<agentId>|u:<userId>`, sorted): its agent, else the other person. */
+function dmOther(dmKey: string | null, viewer: string): { type: "agent" | "person"; id: string } | null {
+  const parts = (dmKey ?? "").split("|");
+  const agent = parts.find((p) => p.startsWith("a:"));
+  if (agent) return { type: "agent", id: agent.slice(2) };
+  const other = parts.find((p) => p.startsWith("u:") && p.slice(2) !== viewer);
+  return other ? { type: "person", id: other.slice(2) } : null;
+}
+
 export type WikiBacklink =
   | { kind: "page"; slug: string; title: string; excerpt: string }
-  | { kind: "message"; channelId: string; messageId: string; channelName: string; excerpt: string; at: string }
+  | {
+      kind: "message";
+      channelId: string;
+      messageId: string;
+      channelName: string;
+      /** In a direct conversation: who it is with, for the reader (a DM's name is an internal key). */
+      dm: { type: "agent" | "person"; id: string } | null;
+      excerpt: string;
+      at: string;
+    }
   | { kind: "forum"; topicId: string; title: string }
   | { kind: "issue"; number: number; title: string };
 
@@ -187,6 +205,12 @@ export class WikiVersionConflictError extends ConflictError {
 }
 
 // ── Normalization ────────────────────────────────────────────────────────────
+
+/**
+ * A title whose folder is given apart keeps its slashes ("30/out e 1/nov") as division slashes (∕): a "/" in a title
+ * names a folder, in links and in paths, so it would cut the title there.
+ */
+const keepSlashes = (title: string) => title.replace(/\//g, "\u2215");
 
 function cleanTitle(title: string) {
   const t = title.replace(/\s+/g, " ").trim().slice(0, WIKI_LIMITS.title);
@@ -643,6 +667,7 @@ async function backlinksOf(db: Database, actor: WikiActor, page: PageRow): Promi
         createdAt: messages.createdAt,
         channelName: channels.name,
         kind: channels.kind,
+        dmKey: channels.dmKey,
         visibility: channels.visibility,
         memberId: channelMembers.id,
         topicId: forumTopics.id,
@@ -675,6 +700,7 @@ async function backlinksOf(db: Database, actor: WikiActor, page: PageRow): Promi
         channelId: m.channelId,
         messageId: m.id,
         channelName: m.channelName,
+        dm: m.kind === "dm" ? dmOther(m.dmKey, viewer) : null,
         excerpt: excerpt(m.body, page),
         at: m.createdAt.toISOString(),
       });
@@ -1007,7 +1033,9 @@ export async function createWikiPage(
   const folder = cleanFolder(
     input.folder ?? (input.title.includes("/") ? input.title.split("/").slice(0, -1).join("/") : ""),
   );
-  const leafTitle = cleanTitle(title.split("/").pop() ?? title);
+  // "Pasta/Título" names its folder only when no folder comes apart; with one, the whole title stays.
+  const leafTitle =
+    input.folder === undefined ? cleanTitle(title.split("/").pop() ?? title) : cleanTitle(keepSlashes(title));
   const author = authorCols(actor);
   const row = await db.transaction(async (tx) => {
     const wanted = wikiSlug(leafTitle);
@@ -1403,7 +1431,8 @@ export async function renameWikiPage(
   const { db } = deps;
   const current = await findPage(db, actor, orgId, ref);
   await requireWriter(db, actor, orgId, current);
-  const title = cleanTitle(input.title.split("/").pop() ?? input.title);
+  // Renaming never moves (moving has its own call): the whole title stays.
+  const title = cleanTitle(keepSlashes(input.title));
   const wanted = wikiSlug(title);
   if (!wanted) throw new ValidationError("The title needs letters or numbers", "wiki.title_empty_slug");
   const author = authorCols(actor);

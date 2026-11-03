@@ -4302,7 +4302,16 @@ export interface ImportedSource {
 /** Where a page is mentioned: other pages, messages, forum topics, issues. */
 export type WikiBacklink =
   | { kind: "page"; slug: string; title: string; excerpt?: string }
-  | { kind: "message"; channelId: string; messageId: string; channelName: string; excerpt: string; at: string }
+  | {
+      kind: "message";
+      channelId: string;
+      messageId: string;
+      channelName: string;
+      /** In a direct conversation: who it is with (a DM's name is an internal key). */
+      dm?: { type: "agent" | "person"; id: string } | null;
+      excerpt: string;
+      at: string;
+    }
   | { kind: "forum"; topicId: string; title: string }
   | { kind: "issue"; number: number; title: string };
 

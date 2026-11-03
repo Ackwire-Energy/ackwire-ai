@@ -7149,9 +7149,73 @@
     "uses": {
       "title": "このページを使っているエージェント",
       "count_other": "過去7日間の使用回数",
+      "week_other": "今週{{count}}回参照",
       "last": "{{name}}が{{when}}に使用",
       "lastIn": "{{name}}が{{when}}に#{{channel}}での回答に使用",
       "none": "まだどのエージェントも使っていません。誰かがこのテーマについて質問すると、回答に使われます。"
+    },
+    "editedWhen": "{{when}}に編集",
+    "access": {
+      "label": "閲覧できる人：{{who}}",
+      "everyone": "ワークスペース全体",
+      "everyoneHint": "Wikiにアクセスできるメンバーとエージェントは全員このページを読めます。",
+      "peopleAnd": "全員と{{agents}}",
+      "peopleOnly": "全員（エージェントなし）",
+      "ownersOnly": "オーナーのみ",
+      "withAllAgents": "{{names}}とすべてのエージェント",
+      "more_other": "ほか{{count}}"
+    },
+    "backlinkDm": "{{name}}との会話",
+    "backlinkDmSomeone": "だれか",
+    "draftKept": "下書きを保存しました",
+    "draftRecovered": "下書きを復元しました",
+    "markdown": "Markdown",
+    "markdownHint": "テキストをMarkdownで表示・編集",
+    "props": {
+      "folderHint": "ページのフォルダー",
+      "noFolder": "フォルダーなし",
+      "searchFolder": "フォルダーを検索",
+      "createFolder": "フォルダー「{{name}}」を作成",
+      "addTag": "タグ",
+      "removeTag": "#{{tag}}を外す"
+    },
+    "rich": {
+      "placeholder": "ここに書きます。[[ でほかのページにリンク、/ でブロックを表示します。",
+      "hint": "[[ でページにリンク · / でブロック · {{key}} S でバージョンを保存",
+      "blockLabel": "ブロックの種類",
+      "strike": "取り消し線",
+      "linkPage": "ページにリンク",
+      "column": "列",
+      "addRow": "行",
+      "addColumn": "列",
+      "calloutText": "ここに強調する内容を書きます。",
+      "codeText": "コード",
+      "blocks": {
+        "paragraph": "段落",
+        "heading": "見出し",
+        "subheading": "小見出し",
+        "list": "リスト",
+        "numbered": "番号付きリスト",
+        "task": "タスク",
+        "table": "表",
+        "callout": "強調ブロック",
+        "code": "コード",
+        "quote": "引用",
+        "rule": "区切り線",
+        "link": "Wikiのページ"
+      }
+    },
+    "ask": {
+      "button": "エージェントに頼む",
+      "title": "エージェントに頼む",
+      "text": "依頼はページへのリンク付きで、あなたとエージェントの会話に送られます。エージェントはWikiのツールで編集し、そのバージョンは履歴にあなたの依頼として残ります。",
+      "agent": "エージェント",
+      "what": "何を変えますか？",
+      "placeholder": "例：2027年の値上げを反映して",
+      "send": "{{name}}に送信",
+      "sendNone": "送信",
+      "sent": "{{name}}との会話で依頼を送りました。",
+      "message": "ページ [[{{title}}]] について："
     },
     "import": {
       "cta": "Obsidianからインポート",

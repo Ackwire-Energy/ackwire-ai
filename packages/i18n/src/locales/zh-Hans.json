@@ -7232,9 +7232,73 @@
     "uses": {
       "title": "使用此页面的智能体",
       "count_other": "次使用（近 7 天）",
+      "week_other": "本周被参考 {{count}} 次",
       "last": "{{name}} 在{{when}}使用过",
       "lastIn": "{{name}} 在{{when}}使用过，在 #{{channel}} 中回答时",
       "none": "还没有智能体使用过它。当有人问到相关主题时，它会被用于回答。"
+    },
+    "editedWhen": "{{when}}编辑",
+    "access": {
+      "label": "谁能看到：{{who}}",
+      "everyone": "整个工作区",
+      "everyoneHint": "任何成员和任何能访问Wiki的智能体都能读这页。",
+      "peopleAnd": "所有人和{{agents}}",
+      "peopleOnly": "所有人，不含智能体",
+      "ownersOnly": "仅所有者",
+      "withAllAgents": "{{names}}和所有智能体",
+      "more_other": "另外 {{count}} 个"
+    },
+    "backlinkDm": "与{{name}}的对话",
+    "backlinkDmSomeone": "某人",
+    "draftKept": "草稿已保存",
+    "draftRecovered": "草稿已恢复",
+    "markdown": "Markdown",
+    "markdownHint": "以 Markdown 查看和编辑文本",
+    "props": {
+      "folderHint": "页面所在文件夹",
+      "noFolder": "无文件夹",
+      "searchFolder": "搜索文件夹",
+      "createFolder": "创建文件夹“{{name}}”",
+      "addTag": "标签",
+      "removeTag": "移除 #{{tag}}"
+    },
+    "rich": {
+      "placeholder": "在这里写。[[ 链接其他页面，/ 显示所有块。",
+      "hint": "[[ 链接页面 · / 显示块 · {{key}} S 保存一个版本",
+      "blockLabel": "块类型",
+      "strike": "删除线",
+      "linkPage": "链接页面",
+      "column": "列",
+      "addRow": "行",
+      "addColumn": "列",
+      "calloutText": "在这里写提示内容。",
+      "codeText": "代码",
+      "blocks": {
+        "paragraph": "段落",
+        "heading": "标题",
+        "subheading": "副标题",
+        "list": "列表",
+        "numbered": "编号列表",
+        "task": "待办",
+        "table": "表格",
+        "callout": "提示块",
+        "code": "代码",
+        "quote": "引用",
+        "rule": "分隔线",
+        "link": "Wiki页面"
+      }
+    },
+    "ask": {
+      "button": "请智能体修改",
+      "title": "请智能体修改",
+      "text": "请求会连同页面链接一起发到你和智能体的对话里。智能体用Wiki工具编辑，这个版本会在历史中记为应你的请求所改。",
+      "agent": "智能体",
+      "what": "要改什么？",
+      "placeholder": "例如：按 2027 年的涨价更新",
+      "send": "发送给{{name}}",
+      "sendNone": "发送",
+      "sent": "已在与{{name}}的对话中发送请求。",
+      "message": "关于页面 [[{{title}}]]："
     },
     "import": {
       "cta": "从 Obsidian 导入",

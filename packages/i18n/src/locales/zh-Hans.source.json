@@ -18241,6 +18241,12 @@
       "other": "uses in the last 7 days"
     }
   },
+  "wiki.uses.week": {
+    "value": {
+      "one": "{{count}} use this week",
+      "other": "{{count}} uses this week"
+    }
+  },
   "wiki.uses.last": {
     "value": "{{name}} used it {{when}}"
   },
@@ -18249,6 +18255,168 @@
   },
   "wiki.uses.none": {
     "value": "No agent has used it yet. It goes into answers when someone asks about the subject."
+  },
+  "wiki.editedWhen": {
+    "value": "edited {{when}}"
+  },
+  "wiki.access.label": {
+    "value": "Who sees it: {{who}}"
+  },
+  "wiki.access.everyone": {
+    "value": "The whole workspace"
+  },
+  "wiki.access.everyoneHint": {
+    "value": "Any member and any agent with access to the wiki read this page."
+  },
+  "wiki.access.peopleAnd": {
+    "value": "Everyone and {{agents}}"
+  },
+  "wiki.access.peopleOnly": {
+    "value": "Everyone, no agents"
+  },
+  "wiki.access.ownersOnly": {
+    "value": "Owners only"
+  },
+  "wiki.access.withAllAgents": {
+    "value": "{{names}} and every agent"
+  },
+  "wiki.access.more": {
+    "value": {
+      "one": "{{count}} more",
+      "other": "{{count}} more"
+    }
+  },
+  "wiki.backlinkDm": {
+    "value": "Conversation with {{name}}"
+  },
+  "wiki.backlinkDmSomeone": {
+    "value": "someone"
+  },
+  "wiki.draftKept": {
+    "value": "Draft kept"
+  },
+  "wiki.draftRecovered": {
+    "value": "Draft recovered"
+  },
+  "wiki.markdown": {
+    "value": "Markdown"
+  },
+  "wiki.markdownHint": {
+    "value": "See and edit the text as Markdown"
+  },
+  "wiki.props.folderHint": {
+    "value": "The page's folder"
+  },
+  "wiki.props.noFolder": {
+    "value": "No folder"
+  },
+  "wiki.props.searchFolder": {
+    "value": "Search folders"
+  },
+  "wiki.props.createFolder": {
+    "value": "Create folder “{{name}}”"
+  },
+  "wiki.props.addTag": {
+    "value": "Tag"
+  },
+  "wiki.props.removeTag": {
+    "value": "Remove #{{tag}}"
+  },
+  "wiki.rich.placeholder": {
+    "value": "Write here. [[ links another page and / shows the blocks."
+  },
+  "wiki.rich.hint": {
+    "value": "[[ links another page · / shows the blocks · {{key}} S saves a version"
+  },
+  "wiki.rich.blockLabel": {
+    "value": "Block type"
+  },
+  "wiki.rich.strike": {
+    "value": "Strikethrough"
+  },
+  "wiki.rich.linkPage": {
+    "value": "Link a page"
+  },
+  "wiki.rich.column": {
+    "value": "Column"
+  },
+  "wiki.rich.addRow": {
+    "value": "Row"
+  },
+  "wiki.rich.addColumn": {
+    "value": "Column"
+  },
+  "wiki.rich.calloutText": {
+    "value": "Write the callout here."
+  },
+  "wiki.rich.codeText": {
+    "value": "code"
+  },
+  "wiki.rich.blocks.paragraph": {
+    "value": "Paragraph"
+  },
+  "wiki.rich.blocks.heading": {
+    "value": "Heading"
+  },
+  "wiki.rich.blocks.subheading": {
+    "value": "Subheading"
+  },
+  "wiki.rich.blocks.list": {
+    "value": "List"
+  },
+  "wiki.rich.blocks.numbered": {
+    "value": "Numbered list"
+  },
+  "wiki.rich.blocks.task": {
+    "value": "Task"
+  },
+  "wiki.rich.blocks.table": {
+    "value": "Table"
+  },
+  "wiki.rich.blocks.callout": {
+    "value": "Callout"
+  },
+  "wiki.rich.blocks.code": {
+    "value": "Code"
+  },
+  "wiki.rich.blocks.quote": {
+    "value": "Quote"
+  },
+  "wiki.rich.blocks.rule": {
+    "value": "Divider"
+  },
+  "wiki.rich.blocks.link": {
+    "value": "Wiki page"
+  },
+  "wiki.ask.button": {
+    "value": "Ask an agent"
+  },
+  "wiki.ask.title": {
+    "value": "Ask an agent"
+  },
+  "wiki.ask.text": {
+    "value": "The request goes to your conversation with the agent, with a link to the page. It edits with the wiki tools, and the version shows in the history as done at your request."
+  },
+  "wiki.ask.agent": {
+    "value": "Agent"
+  },
+  "wiki.ask.what": {
+    "value": "What should change?"
+  },
+  "wiki.ask.placeholder": {
+    "value": "E.g. update it with the 2027 price increase"
+  },
+  "wiki.ask.send": {
+    "value": "Send to {{name}}"
+  },
+  "wiki.ask.sendNone": {
+    "value": "Send"
+  },
+  "wiki.ask.sent": {
+    "value": "Request sent in your conversation with {{name}}."
+  },
+  "wiki.ask.message": {
+    "value": "About the page [[{{title}}]]:"
   },
   "wiki.import.cta": {
     "value": "Import from Obsidian"

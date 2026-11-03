@@ -58,20 +58,32 @@ export function tableAt(
   return { table: { type: "table", header, rows, align }, next: j };
 }
 
-export function parseMarkdown(source: string, options: { breaks?: boolean } = {}): MdBlock[] {
+/** A block and the source lines it came from (`[first, end)`), for an editor that keeps untouched blocks as written. */
+export type MdRangedBlock = MdBlock & { range: [number, number] };
+
+export function parseMarkdown(source: string, options: { breaks?: boolean; ranges: true }): MdRangedBlock[];
+export function parseMarkdown(source: string, options?: { breaks?: boolean; ranges?: false }): MdBlock[];
+export function parseMarkdown(source: string, options: { breaks?: boolean; ranges?: boolean } = {}): MdBlock[] {
   const join = options.breaks ? "\n" : " ";
   const lines = source.replace(/\r\n?/g, "\n").split("\n");
   const out: MdBlock[] = [];
   let i = 0;
+  let start = 0;
+  // Each block is pushed once its lines are read (`i` is past them).
+  const push = (b: MdBlock) => {
+    const ranged: MdRangedBlock = { ...b, range: [start, i] };
+    out.push(options.ranges ? ranged : b);
+  };
   while (i < lines.length) {
+    start = i;
     const line = lines[i] as string;
     const fence = line.match(/^\s*```\s*([\w+-]*)\s*$/);
     if (fence) {
       const body: string[] = [];
       i++;
       while (i < lines.length && !/^\s*```\s*$/.test(lines[i] as string)) body.push(lines[i++] as string);
-      i++;
-      out.push({ type: "code", lang: fence[1] ?? "", text: body.join("\n") });
+      i = Math.min(i + 1, lines.length);
+      push({ type: "code", lang: fence[1] ?? "", text: body.join("\n") });
       continue;
     }
     if (!line.trim()) {
@@ -80,33 +92,33 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
     }
     const heading = line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/);
     if (heading) {
-      out.push({ type: "heading", level: (heading[1] as string).length, text: heading[2] ?? "" });
       i++;
+      push({ type: "heading", level: (heading[1] as string).length, text: heading[2] ?? "" });
       continue;
     }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
-      out.push({ type: "rule" });
       i++;
+      push({ type: "rule" });
       continue;
     }
     const table = tableAt(lines, i);
     if (table) {
-      out.push(table.table);
       i = table.next;
+      push(table.table);
       continue;
     }
     if (/^\s*>/.test(line)) {
       const body: string[] = [];
       while (i < lines.length && /^\s*>/.test(lines[i] as string))
         body.push((lines[i++] as string).replace(/^\s*>\s?/, ""));
-      out.push({ type: "quote", text: body.join(join), lines: body });
+      push({ type: "quote", text: body.join(join), lines: body });
       continue;
     }
     // `![[foto.png]]` alone on its line: an Obsidian embed (an attachment or another note).
     const embed = line.match(/^\s*!\[\[([^[\]\n|]+)(?:\|[^\]\n]*)?\]\]\s*$/);
     if (embed) {
-      out.push({ type: "embed", target: (embed[1] ?? "").trim() });
       i++;
+      push({ type: "embed", target: (embed[1] ?? "").trim() });
       continue;
     }
     const item = line.match(LIST);
@@ -122,7 +134,7 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
           items[items.length - 1] += `${join}${(lines[i++] as string).trim()}`;
         } else break;
       }
-      out.push({ type: "list", ordered, items });
+      push({ type: "list", ordered, items });
       continue;
     }
     const para: string[] = [];
@@ -132,7 +144,7 @@ export function parseMarkdown(source: string, options: { breaks?: boolean } = {}
       para.push(l.trim());
       i++;
     }
-    out.push({ type: "paragraph", text: para.join(join) });
+    push({ type: "paragraph", text: para.join(join) });
   }
   return out;
 }
