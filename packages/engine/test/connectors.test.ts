@@ -5,6 +5,7 @@ import {
   type ConnectorDeps,
   completeOAuth,
   connectionHeaders,
+  connectionView,
   connectorGrantValidator,
   createApiKeyConnection,
   createConnectorToolSource,
@@ -176,29 +177,33 @@ describe("MCP tools through the Tool Gateway", () => {
     };
     const all = await source.tools(ctx);
     expect(all.map((t) => [t.name, t.scope, t.sensitive]).sort()).toEqual([
-      ["github_get_issue", "github:issues.read", false],
-      ["github_get_pull_request", "github:pr.read", false],
+      ["github_issue_read", "github:issues.read", false],
       ["github_merge_pull_request", "github:pr.merge", true],
+      ["github_pull_request_read", "github:pr.read", false],
     ]);
     // Counted under the catalog's id, by the server's own tool names (ADR 0103).
     expect(Object.fromEntries(all.map((t) => [t.name, t.connector]))).toEqual({
-      github_get_issue: { key: "github", via: "mcp", tool: "get_issue" },
-      github_get_pull_request: { key: "github", via: "mcp", tool: "get_pull_request" },
+      github_issue_read: { key: "github", via: "mcp", tool: "issue_read" },
+      github_pull_request_read: { key: "github", via: "mcp", tool: "pull_request_read" },
       github_merge_pull_request: { key: "github", via: "mcp", tool: "merge_pull_request" },
     });
     // The chat draws each call with the connector's own logo.
     expect(new Set(all.map((t) => t.service))).toEqual(new Set(["github"]));
     expect(mcp.sessions[0]).toEqual({
       serverUrl: "https://api.githubcopilot.com/mcp/",
-      headers: { authorization: "Bearer ghp_secret_123456" },
+      // Projects and Actions too, besides the server's default toolsets.
+      headers: {
+        authorization: "Bearer ghp_secret_123456",
+        "X-MCP-Toolsets": "context,repos,issues,pull_requests,users,actions,projects",
+      },
     });
 
     const gateway = createToolGateway({ sources: [source] });
     // A new connection is every agent's, whole (the merge still asks a person, below).
     expect((await gateway.list(ctx)).map((t) => t.name).sort()).toEqual([
-      "github_get_issue",
-      "github_get_pull_request",
+      "github_issue_read",
       "github_merge_pull_request",
+      "github_pull_request_read",
     ]);
     await setAgentScopes(
       f.db,
@@ -211,7 +216,7 @@ describe("MCP tools through the Tool Gateway", () => {
       ],
       connectorGrantValidator,
     );
-    expect((await gateway.list(ctx)).map((t) => t.name)).toEqual(["github_get_issue", "github_get_pull_request"]);
+    expect((await gateway.list(ctx)).map((t) => t.name)).toEqual(["github_issue_read", "github_pull_request_read"]);
 
     // Grant rows need a run for steps; use a real one.
     const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
@@ -233,29 +238,29 @@ describe("MCP tools through the Tool Gateway", () => {
     expect(
       await gateway.invoke(rctx, {
         toolUseId: "t1",
-        name: "github_get_pull_request",
+        name: "github_pull_request_read",
         input: { owner: "acme", repo: "app", pullNumber: 42 },
       }),
     ).toMatchObject({
       type: "result",
       // The MCP server's text is third-party data: wrapped for the model.
-      output: { content: wrapExternal("github_get_pull_request", "PR #42: fix token refresh (checks passing)") },
+      output: { content: wrapExternal("github_pull_request_read", "PR #42: fix token refresh (checks passing)") },
     });
     expect(
-      await gateway.invoke(rctx, { toolUseId: "t2", name: "github_get_issue", input: { number: 1 } }),
+      await gateway.invoke(rctx, { toolUseId: "t2", name: "github_issue_read", input: { number: 1 } }),
     ).toMatchObject({
-      output: { content: wrapExternal("github_get_issue", "boom"), isError: true },
+      output: { content: wrapExternal("github_issue_read", "boom"), isError: true },
     });
     expect(
       await gateway.invoke(rctx, { toolUseId: "t3", name: "github_delete_repository", input: { repo: "app" } }),
     ).toMatchObject({
       output: { content: "Unknown tool github_delete_repository", isError: true },
     });
-    expect(mcp.calls.map((c) => c.tool)).toEqual(["get_pull_request"]);
+    expect(mcp.calls.map((c) => c.tool)).toEqual(["pull_request_read"]);
     const used = await f.db.select().from(schema.connectorUsageDays).orderBy(schema.connectorUsageDays.tool);
     expect(used.map((r) => [r.connector, r.via, r.tool, r.calls, r.errors])).toEqual([
-      ["github", "mcp", "get_issue", 1, 1],
-      ["github", "mcp", "get_pull_request", 1, 0],
+      ["github", "mcp", "issue_read", 1, 1],
+      ["github", "mcp", "pull_request_read", 1, 0],
     ]);
 
     // Disconnecting removes the tools and the grants.
@@ -294,7 +299,7 @@ describe("MCP tools through the Tool Gateway", () => {
           };
         return {
           chunks: [],
-          toolUses: [{ name: "github_get_pull_request", input: { owner: "acme", repo: "app", pullNumber: 42 } }],
+          toolUses: [{ name: "github_pull_request_read", input: { owner: "acme", repo: "app", pullNumber: 42 } }],
         };
       },
     });
@@ -326,14 +331,14 @@ describe("MCP tools through the Tool Gateway", () => {
       tool: "github_merge_pull_request",
     });
     expect(approval?.detail).toBe("github.merge_pull_request · owner=acme · repo=app · pullNumber=42");
-    expect(mcp.calls.map((x) => x.tool)).toEqual(["get_pull_request"]);
+    expect(mcp.calls.map((x) => x.tool)).toEqual(["pull_request_read"]);
 
     await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
       decision: "approve",
     });
     await drainOutbox(f.db, f.handlers);
     expect(mcp.calls).toEqual([
-      { tool: "get_pull_request", args: { owner: "acme", repo: "app", pullNumber: 42 } },
+      { tool: "pull_request_read", args: { owner: "acme", repo: "app", pullNumber: 42 } },
       { tool: "merge_pull_request", args: { owner: "acme", repo: "app", pullNumber: 42 } },
     ]);
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
@@ -376,7 +381,7 @@ describe("OAuth (state + PKCE)", () => {
       client_id: "gh-client",
       redirect_uri: "https://chat.example.com/api/app/connectors/oauth/callback",
       response_type: "code",
-      scope: "repo read:org workflow",
+      scope: "repo read:org workflow project",
       state,
       code_challenge_method: "S256",
     });
@@ -394,7 +399,15 @@ describe("OAuth (state + PKCE)", () => {
 
     const { connection, returnTo } = await completeOAuth(deps, { id: f.owner.id }, { state, code: "good-code" });
     expect(returnTo).toBe("/settings/connectors");
-    expect(connection).toMatchObject({ connector: "github", authType: "oauth" });
+    expect(connection).toMatchObject({
+      connector: "github",
+      authType: "oauth",
+      oauthScopes: "repo read:org workflow project",
+    });
+    expect(connectionView(connection).reconnectAdds).toEqual([]);
+    // A sign-in from before Projects (the migration kept what it granted): Reconectar adds `project`.
+    expect(connectionView({ ...connection, oauthScopes: "repo read:org workflow" }).reconnectAdds).toEqual(["project"]);
+    expect(connectionView({ ...connection, authType: "api_key", oauthScopes: null }).reconnectAdds).toEqual([]);
     expect(JSON.stringify(await f.db.select().from(schema.connectorConnections))).not.toContain("gho_token_1");
     expect(await connectionHeaders(deps, connection)).toEqual({ authorization: "Bearer gho_token_1" });
     expect(token.seen[0]?.get("client_secret")).toBe("gh-secret");
