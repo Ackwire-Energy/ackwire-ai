@@ -32,20 +32,23 @@ const cancels = (state: ReturnType<typeof seedState>) => state.calls.filter((c) 
 const esc = () => act(async () => fireEvent.keyDown(window, { key: "Escape" }));
 
 describe("Parar is immediate", () => {
-  test("the card above the box: the agent's name, its face until its row shows, 'Ver' out of view and its stop", async () => {
+  test("the card above the box, its row out of view: its face, its name and step, 'Ver' once the row shows, its stop", async () => {
     const { state, ev } = await open((s) => {
       const ada = s.agents.find((a) => a.id === ADA_ID);
       if (ada) (ada as { appearance?: unknown }).appearance = { color: "amber", accessory: "hat" };
     });
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(3);
-    // happy-dom has no layout: the block counts as out of view, so the line above the composer speaks.
+    // happy-dom has no layout: the block counts as out of view, so the line above the composer speaks for it.
     const bar = document.querySelector('.ac-typing[data-active="true"]') as HTMLElement;
-    // Its row isn't in the conversation yet: the bar keeps its face; once the row shows, the face is there only.
+    // Its row isn't in the conversation yet: its face, its step and its stop, no "Ver" (nothing to go back to).
     expect(bar.querySelector(".ac-avatar--agent")).not.toBeNull();
+    expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
+    expect(within(bar).queryByRole("button", { name: "Ver" })).toBeNull();
     await act(() => new Promise((r) => setTimeout(r, 2100)));
-    expect(bar.querySelector(".ac-avatar--agent")).toBeNull();
-    expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada");
+    // The row shows, out of view: the bar still speaks for it, with "Ver".
+    expect(bar.querySelector(".ac-avatar--agent")).not.toBeNull();
+    expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
     expect(within(bar).getByRole("button", { name: "Ver" })).toBeTruthy();
     // Its stop, one click, nothing asked.
     await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Parar" })));

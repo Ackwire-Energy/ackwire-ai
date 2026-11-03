@@ -1,10 +1,10 @@
 import type { TFunction } from "i18next";
 import type { ConnectorDef, OrgSummary, Run, RunStep } from "../api/types";
-import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
+import type { LiveCode, LiveOutput, LiveRun, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
-import { capitalize, joinNames, shortTarget } from "./format";
+import { capitalize, joinNames, lowerFirst, shortTarget } from "./format";
 import { MAIL_BRANDS } from "./mail";
 
 /**
@@ -672,6 +672,16 @@ export function waitStep(t: TFunction, work: LiveWork[] | undefined): string {
   const hint = last?.kind === "call" && last.running ? toolHint(last.tool, now, last.detail) : now.hint;
   const target = hint ? shortTarget(hint) : "";
   return target ? `${verb} · ${target}…` : `${verb}…`;
+}
+
+/**
+ * The bar's words for one agent whose row is out of view: the row's step with a lower-case start, after its name
+ * ("Nina consultando o Email · …"), or "escrevendo…" while its words arrive and no call runs.
+ */
+export function barStep(t: TFunction, run: Pick<LiveRun, "text" | "work">, locale?: string): string {
+  const calling = (run.work ?? []).some((w) => w.kind === "call" && w.running);
+  if (!calling && run.text.length > 0) return `${activityVerb(t, { kind: "writing" })}…`;
+  return lowerFirst(waitStep(t, run.work), locale);
 }
 
 /** "1,2 s", "760 ms": a line's time, finer than the block's. */

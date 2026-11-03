@@ -73,11 +73,11 @@ import {
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import {
   activityVerb,
-  barAsking,
   barElapsed,
   barEntries,
-  barFaces,
+  entriesOffScreen,
   isWriting,
+  runElapsed,
   toolActivity,
   waitsForWords,
 } from "@agenteschat/client/lib/activity";
@@ -143,7 +143,7 @@ import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/cl
 import { usageWaitOf } from "@agenteschat/client/lib/usage-pause";
 import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
-import { showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
+import { barStep, showsActivity, splitCanceled } from "@agenteschat/client/lib/work";
 import {
   AffixInput,
   Avatar,
@@ -187,11 +187,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Children,
+  createContext,
   Fragment,
   memo,
   type ReactElement,
   type ReactNode,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -222,7 +224,7 @@ import {
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
-import { ActorAvatar, AgentAvatar, AgentSpinner, PersonAvatar } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
@@ -327,7 +329,7 @@ import {
 } from "@/components/threads/ThreadLines";
 import { UsageWaitCancel } from "@/components/UsagePauseCard";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
-import { BarPhrase, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
+import { BarAlsoTyping, BarPhrase, BarStep, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -1261,10 +1263,13 @@ function ChannelView({
 
   // Which agents' blocks are on screen: the line above the composer speaks only for those out of view.
   // By run: a "pensando…" hands its block (same key) to the real run, and that run must count as in view.
-  const inView = useBlocksInView(scroller, slots.map((x) => x.runId).join(" "));
+  // A block's row draws only after its opener's delay (`RunBlock`): then it is measured again.
+  const [rowsDrawn, setRowsDrawn] = useState(0);
+  const rowDrawn = useCallback(() => setRowsDrawn((n) => n + 1), []);
+  const inView = useBlocksInView(scroller, `${slots.map((x) => x.runId).join(" ")} ${rowsDrawn}`);
   const outOfView = useMemo(() => (runId: string) => !inView.has(runId), [inView]);
   // Requests waiting for you that scrolled out of view: the same line says so first (waiting beats working).
-  // Their cards register with this view's scroller (`AskRegistryProvider` around it, not around the panels).
+  // Their cards register with this view's scroller (`RowsProvider` around it, not around the panels).
   const [askRegistry] = useState(createAskRegistry);
   const asksOut = useAsksOutOfView(scroller, askRegistry, isMember);
   const seeAsk = (id: string) => showRequest(scroller.current, id, !reducedMotion);
@@ -1939,7 +1944,7 @@ function ChannelView({
                   </div>
                 )}
                 {olderState !== "loading" && <DatePill scroller={scroller} ref={datePill} />}
-                <AskRegistryProvider value={askRegistry}>
+                <RowsProvider asks={askRegistry} stop={stopTarget?.runId} drawn={rowDrawn}>
                   <section
                     ref={scroller}
                     className="channel__messages"
@@ -2069,7 +2074,7 @@ function ChannelView({
                     <LiveMemoryCards channelId={channel.id} />
                     <LiveNotices channelId={channel.id} />
                   </section>
-                </AskRegistryProvider>
+                </RowsProvider>
                 {holding && (
                   <div className="channel__pill">
                     <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
@@ -2691,6 +2696,12 @@ function RunBlock({
   const quiet = Boolean(live && saysNothingYet(live));
   const due = useDue(liveStart ?? null, live ? openerDelayMs(live.runId) : 0, quiet);
   const shown = message ?? placeholder;
+  // Its live row on the page: the view measures which blocks are in view again (the bar speaks for those out of it).
+  const rowDrawn = useContext(RowDrawnContext);
+  const drawnRun = live && !message && !(quiet && !due) ? live.runId : null;
+  useLayoutEffect(() => {
+    if (drawnRun) rowDrawn?.();
+  }, [drawnRun, rowDrawn]);
   if (!shown) return null;
   if (live && !message && quiet && !due) return null;
   // At work it never groups under the agent's own message: it starts as the waiting row with its face, and taking the
@@ -2768,6 +2779,52 @@ function RunClock({ run }: { run: LiveRun }) {
   const { i18n } = useTranslation();
   const [at] = useState(() => new Date(run.startedAt ?? Date.now()).toISOString());
   return <time dateTime={at}>{formatTime(i18n.language, at)}</time>;
+}
+
+/** The run whose live row offers its stop: the bar's rule, the latest run here the viewer may stop. */
+const RowStopContext = createContext<string | undefined>(undefined);
+/** Told when a run's live row is drawn, so the view measures which blocks are in view again. */
+const RowDrawnContext = createContext<(() => void) | undefined>(undefined);
+
+/** What the conversation's rows read from their view: the requests' registry, which row stops, and "a row drew". */
+function RowsProvider({
+  asks,
+  stop,
+  drawn,
+  children,
+}: {
+  asks: AskRegistry;
+  stop: string | undefined;
+  drawn: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <AskRegistryProvider value={asks}>
+      <RowDrawnContext.Provider value={drawn}>
+        <RowStopContext.Provider value={stop}>{children}</RowStopContext.Provider>
+      </RowDrawnContext.Provider>
+    </AskRegistryProvider>
+  );
+}
+
+/**
+ * The end of an agent's live row: "· 12 s" (the bar's clock) and its stop. The bar says neither while the row is on
+ * screen, so they sit where the eye already is. The clock keeps its room from the start, so the stop never shifts
+ * when the seconds appear.
+ */
+function RunTail({ run }: { run: LiveRun }) {
+  const { t } = useTranslation();
+  const atWork = run.status === "thinking" || run.status === "queued" || run.status === "running";
+  const now = useSecond(atWork);
+  const stoppable = useContext(RowStopContext) === run.runId;
+  const { stop } = useStopRun();
+  if (!atWork && !stoppable) return null;
+  return (
+    <span className="run-tail">
+      {atWork && <span className="run-tail__clock ac-num">{runElapsed(t, run, now)}</span>}
+      {stoppable && <StopButton run={run} onStop={stop} place="row" />}
+    </span>
+  );
 }
 
 /** Under a live block: "sem notícias há 4 min · Atualizar", or what it is doing between its steps. */
@@ -3076,9 +3133,10 @@ function useAsksOutOfView(scroller: { current: HTMLElement | null }, registry: A
 
 /**
  * The bar right above the composer, one for everyone at work here and always one width: a glass pill (in
- * the first agent's color while agents work) with the orbit, or the typing dots when only people type, their
- * small faces and one line that says it all. One agent on its own gets a turning phrase (a light line while
- * it thinks, what it does, what it said last), its time, "Ver" when its block is out of view and its stop.
+ * the first agent's color while agents work), their small faces (the typing dots first when only people type)
+ * and one line that says it all. An agent whose live row is on screen is left out: the row says its step, its
+ * time and its stop. Its row out of view, the bar speaks for it: its face, the row's step, its time, "Ver" and
+ * its stop.
  */
 function ActivityBar({
   channelId,
@@ -3109,7 +3167,7 @@ function ActivityBar({
   /** Runs whose questions a block near the end shows (`ConsultGroup`): the line doesn't say them again. */
   consultBlocks: ReadonlySet<string>;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const all = useStreams((s) => runsInChannel(s, channelId).filter((r) => visible?.current(r) ?? true), sameRuns);
@@ -3127,13 +3185,20 @@ function ActivityBar({
   const consults = consultsForLine(heard, consultBlocks);
   asking.current = consults.length > 0;
   const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id, threadId);
-  const entries = barEntries(
+  // Its row on screen says what it does, for how long and how to stop it: the bar leaves that agent out (a row not
+  // drawn yet is out of view).
+  const rowInView = (r: LiveRun) => !outOfView(r.runId);
+  const entries = entriesOffScreen(
+    barEntries(
+      runs,
+      ids,
+      (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
+      (id) => dir.memberById.get(id)?.name,
+      consults,
+      true,
+    ),
     runs,
-    ids,
-    (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
-    (id) => dir.memberById.get(id)?.name,
-    consults,
-    true,
+    rowInView,
   );
   const { stop } = useStopRun();
   const active = entries.length > 0;
@@ -3142,17 +3207,19 @@ function ActivityBar({
   const firstAgent = agents[0];
   // The time, "Ver" and the stop are one agent's: with several, the line can't say whose (the composer still stops).
   const soloRun = agents.length === 1 && firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
-  const took = barElapsed(t, entries, runs, now);
-  // One agent on its own: its face is on its row in the conversation once the row shows, not here again. With no
-  // faces in the bar, the orbit stands in for them.
-  const stackShown = !(entries.length === 1 && soloRun && rowShows(soloRun, now) && !barAsking(entries));
-  const facesShown = stackShown && barFaces(entries).length > 0;
+  // Only while its row is out of view (a question it asks keeps its phrase here, its row in view or not).
+  const soloAway = soloRun && !rowInView(soloRun) ? soloRun : undefined;
+  const took = soloAway ? barElapsed(t, entries, runs, now) : null;
+  // The row's own words for what it does now, after its name; a question out keeps its own phrase.
+  const step = soloAway && firstAgent && !firstAgent.consult ? barStep(t, soloAway, i18n.language) : null;
+  const typers = entries.some((e) => e.type === "person");
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
     (r) => outOfView(r.runId) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
   );
   // An agent working in its browser: the bar says so, and a click opens its browser card in the conversation.
-  const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
+  // Its row in view draws its browser card itself.
+  const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r) && !rowInView(r));
   const openBrowser = browsing ? () => requestBrowserCard({ agentId: browsing.agentId }) : undefined;
   // A request waiting for you, out of view: the bar says that instead (waiting beats working).
   const ask = asks[0];
@@ -3178,6 +3245,8 @@ function ActivityBar({
         data-active={active || Boolean(ask)}
         data-ask={ask ? true : undefined}
         data-browser={pill && openBrowser ? true : undefined}
+        // The agent's step and someone typing: the pill widens so neither is cut to nothing.
+        data-wide={pill && step !== null && typers ? true : undefined}
         onClick={
           pill && openBrowser
             ? (e) => {
@@ -3214,32 +3283,33 @@ function ActivityBar({
               {t("ask.bar.see")}
             </button>
             {/* An agent still at work keeps its stop at the end; the line stays the request. */}
-            {soloRun && stoppable === soloRun.runId && <StopButton run={soloRun} onStop={stop} place="bar" />}
+            {soloAway && stoppable === soloAway.runId && <StopButton run={soloAway} onStop={stop} place="bar" />}
           </>
         )}
         {pill && (
           <>
             {firstAgent && <ActivitySky color={colorOf(dir.agentById.get(firstAgent.id))} />}
-            {/* Agents at work: their faces open the pill, else the pixel orbit in the first one's color; people only
-                typing: the dots. */}
-            {firstAgent ? (
-              facesShown ? null : (
-                <AgentSpinner agentId={firstAgent.id} size={14} />
-              )
-            ) : (
+            {/* Agents at work: their faces open the pill (their rows are out of view); people only typing: the dots
+                first. */}
+            {!firstAgent && (
               <span className="ac-typing__dots" aria-hidden="true">
                 <span />
                 <span />
                 <span />
               </span>
             )}
-            {stackShown && <WorkingStack entries={entries} />}
+            <WorkingStack entries={entries} />
             {/* The phrase turns: the old one leaves upward, the new one comes from below. Names in ink. */}
             <span className="ac-typing__text">
-              <BarPhrase entries={entries} />
+              {step !== null && firstAgent ? (
+                <BarStep name={firstAgent.name} step={step} />
+              ) : (
+                <BarPhrase entries={entries} />
+              )}
             </span>
             <ConsultClock entries={entries} now={now} />
             {took && <span className="ac-typing__elapsed ac-num">{took}</span>}
+            {step !== null && <BarAlsoTyping entries={entries} />}
             {openBrowser && (
               <Button
                 size="sm"
@@ -3252,15 +3322,16 @@ function ActivityBar({
                 onClick={openBrowser}
               />
             )}
-            {soloRun && outOfView(soloRun.runId) && (
+            {/* "Ver" once its row is in the conversation (before that, there is nothing to go back to). */}
+            {soloAway && rowShows(soloAway, now) && (
               <>
                 <span className="ac-typing__sep" aria-hidden="true" />
-                <button type="button" className="ac-typing__see" onClick={() => onSee(soloRun.runId)}>
+                <button type="button" className="ac-typing__see" onClick={() => onSee(soloAway.runId)}>
                   {t("run.strip.see")}
                 </button>
               </>
             )}
-            {soloRun && stoppable === soloRun.runId && <StopButton run={soloRun} onStop={stop} place="bar" />}
+            {soloAway && stoppable === soloAway.runId && <StopButton run={soloAway} onStop={stop} place="bar" />}
           </>
         )}
       </div>
@@ -3673,6 +3744,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         }
         meta={m.local || live ? undefined : details}
         note={joinedTip ? { label: t("chat.joined.label"), tip: joinedTip } : undefined}
+        // Its words arriving: its time and its stop after the time it started (the bar no longer says them).
         status={
           liveWaiting
             ? { icon: "waiting", label: t("channel.waitingApproval") }
@@ -3688,7 +3760,9 @@ export const TimelineMessage = memo(function TimelineMessage({
                 }
               : waitNotice
                 ? { label: <AwayPill notice={waitNotice} agentId={m.author.id ?? null} /> }
-                : undefined
+                : live && !waiting
+                  ? { label: <RunTail run={live} /> }
+                  : undefined
         }
         aside={
           receipted || seenSlot ? (
@@ -3708,7 +3782,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       >
         {live && waiting ? (
           <Parts resetKey={m}>
-            <WaitLine work={live.work} color={colorOf(agent)} />
+            <WaitLine work={live.work} color={colorOf(agent)} tail={<RunTail run={live} />} />
             <LiveRunStatus run={live} quietOnly />
             <RunBrowserCard run={live} name={name} />
             <span className="ac-visually-hidden">{t("channel.writing")}</span>

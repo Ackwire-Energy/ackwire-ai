@@ -3221,17 +3221,15 @@ html:not([data-pointer]) .ac-color__hue:focus-visible {
     opacity: 0.6;
   }
 }
+/* One width whatever it says (a narrow row gives way), cut with "…": the time and the stop after it never move under
+   the pointer as the step turns. */
 .ac-wait__step {
   display: flex;
+  flex: 0 1 340px;
   min-width: 0;
   color: var(--muted);
   font-size: 14px;
   line-height: 20px;
-}
-/* Its words are cut to fit before they get here (verb first, a path's last part): never an ellipsis over them. */
-.ac-wait__step .ac-turn__in,
-.ac-wait__step .ac-turn__out {
-  text-overflow: clip;
 }
 /* The bar's phrase turns: the old one leaves upward, the new one comes
    from below, in the same cell. Reduced motion: a plain swap. */

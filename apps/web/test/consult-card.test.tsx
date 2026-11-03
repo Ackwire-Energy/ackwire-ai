@@ -262,7 +262,7 @@ describe("the working line while an agent asks another", () => {
     const run = { threadId: null, runId: "r-ask", agentId: ADA_ID };
     await push(socket, { type: "agent.thinking", ...run });
     await settle();
-    expect(bar()).toBe("Ada");
+    expect(bar()).toBe("Ada pensando…");
     await push(socket, { type: "agent.tool", ...run, tool: "ask_agent" });
     await push(socket, { type: "agent.consulting", ...run, consultedAgentId: ATLAS_ID });
     // The asking run pauses while it waits.
@@ -287,8 +287,8 @@ describe("the working line while an agent asks another", () => {
     expect(typingBar().querySelector(".ac-typing__clock")).toBeNull();
     await push(socket, { type: "agent.delta", ...run, seq: 0, text: "O Atlas me passou" });
     await settle();
-    // Writing now: the question is over; the card stays on while she works.
-    expect(bar()).toBe("Ada");
+    // Writing now: the question is over; the card stays on while she works (her row out of view, no layout here).
+    expect(bar()).toBe("Ada escrevendo…");
     expect(typingBar().querySelector(".ac-typing__to")).toBeNull();
   });
 
@@ -301,10 +301,10 @@ describe("the working line while an agent asks another", () => {
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(2);
     await push(socket, { type: "agent.idle", threadId: null, runId: "r-b", agentId: ATLAS_ID });
     await settle();
-    expect(bar()).toBe("Ada");
-    // Alone, with its row not in the conversation yet: the bar keeps its face until the row shows.
+    expect(bar()).toBe("Ada pensando…");
+    // Alone, its row out of view (not in the conversation yet, then no layout here): the bar keeps its face.
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(1);
     await act(() => new Promise((r) => setTimeout(r, 2100)));
-    expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(0);
+    expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(1);
   });
 });

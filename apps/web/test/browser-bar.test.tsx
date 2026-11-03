@@ -33,7 +33,8 @@ describe("the activity bar while an agent is in its browser", () => {
     await ev({ type: "agent.tool", ...run, tool: "browser_open" });
     await settle();
     expect(bar().dataset.browser).toBe("true");
-    expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada");
+    // Its row out of view (no layout here): the bar says its row's step.
+    expect(bar().querySelector(".ac-typing__text")?.textContent).toStartWith("Ada ");
     expect(within(bar()).getByRole("button", { name: "No navegador" })).toBeTruthy();
 
     // The agent's browser card on its live row: its page always in view, in a frame of its color whose top says

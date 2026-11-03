@@ -7,6 +7,8 @@ import {
   barElapsed,
   barEntries,
   barPhrase,
+  entriesOffScreen,
+  runElapsed,
   toolActivity,
   waitsForWords,
 } from "@agenteschat/client/lib/activity";
@@ -21,7 +23,7 @@ import {
 import { dayLabel, shortTarget } from "@agenteschat/client/lib/format";
 import { initialReveal, REVEAL_MAX_LAG_MS, rebaseReveal, revealStep, wordEnd } from "@agenteschat/client/lib/reveal";
 import { buildTimeline, groupsWith, messageKey } from "@agenteschat/client/lib/timeline";
-import { stepLabel, stepPhrase, toolPhrase, toolWhy, waitStep } from "@agenteschat/client/lib/work";
+import { barStep, stepLabel, stepPhrase, toolPhrase, toolWhy, waitStep } from "@agenteschat/client/lib/work";
 import type { TFunction } from "i18next";
 import { createI18n } from "@/i18n";
 
@@ -182,6 +184,55 @@ describe("the card's phrase and the waiting row's step line", () => {
     expect(shortTarget("a long line about the quarterly numbers of the north team")).toBe(
       "a long line about the quarterly numbers",
     );
+  });
+
+  test("an agent whose row is on screen leaves the bar; a question out and people typing stay", () => {
+    const theo = { ...base, status: "running" as const, text: "" };
+    const iris = { ...base, runId: "r2", agentId: "iris", status: "running" as const, text: "" };
+    const names = (id: string) => (id === "theo" ? "Theo" : "Iris");
+    const entries = barEntries([theo, iris], ["u-marina"], names, () => "Marina", [], true);
+    const shown = (inView: string[]) =>
+      entriesOffScreen(entries, [theo, iris], (r) => inView.includes(r.runId)).map((e) => e.name);
+    expect(shown([])).toEqual(["Theo", "Iris", "Marina"]);
+    expect(shown(["r1"])).toEqual(["Iris", "Marina"]);
+    expect(shown(["r1", "r2"])).toEqual(["Marina"]);
+    const asking = barEntries(
+      [theo],
+      [],
+      names,
+      () => undefined,
+      [
+        {
+          runId: "r1",
+          agentId: "theo",
+          consultedAgentId: "iris",
+          channelId: "c1",
+          threadId: "m1",
+          status: "asking",
+          since: 0,
+          at: 0,
+        },
+      ],
+      true,
+    );
+    expect(entriesOffScreen(asking, [theo], () => true)).toEqual(asking);
+  });
+
+  test("out of view, the bar takes the row's step after the name, its start in lower case; 'escrevendo…' as it writes", () => {
+    expect(barStep(t, { text: "", work: [] }, "pt-BR")).toBe("pensando…");
+    expect(barStep(t, { text: "", work: [call({ tool: "read_file", detail: "src/auth/refresh.ts" })] }, "pt-BR")).toBe(
+      "mexendo nos arquivos do PC · refresh.ts…",
+    );
+    expect(barStep(t, { text: "Pronto: criei", work: [] }, "pt-BR")).toBe("escrevendo…");
+    // A call running while its words wait: the call's step.
+    expect(barStep(t, { text: "Vou olhar", work: [call({ detail: null })] }, "pt-BR")).toBe("usando o navegador…");
+    expect(barStep(tEn, { text: "", work: [] }, "en")).toBe("thinking…");
+  });
+
+  test("a run's time, the bar's and its row's alike: from 2 s on, minutes past a minute", () => {
+    expect(runElapsed(t, { startedAt: 10_000 }, 11_500)).toBeNull();
+    expect(runElapsed(t, { startedAt: 10_000 }, 22_000)).toBe("12 s");
+    expect(runElapsed(t, { startedAt: 0 }, 65_000)).toBe("1 min 5 s");
   });
 });
 
