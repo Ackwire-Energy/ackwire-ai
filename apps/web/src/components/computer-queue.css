@@ -218,3 +218,28 @@ html:not([data-pointer]) .cq-link:focus-visible {
     display: inline-flex;
   }
 }
+
+/* An agent's usage line (UsageQueue.tsx): the row answering now, a row's "Não rodar", and "Não rodar nenhuma" asked in place. */
+.cq__time[data-now] {
+  color: var(--agent);
+  font-weight: 600;
+}
+.cq-stop {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.cq-confirm {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.cq-confirm__ask {
+  margin-right: auto;
+  font-weight: 600;
+}

@@ -4045,6 +4045,12 @@
       "other": "{{names}} answer when the budget renews"
     }
   },
+  "receipts.line": {
+    "value": {
+      "one": "{{names}} starts when another work ends",
+      "other": "{{names}} start when other works end"
+    }
+  },
   "receipts.canceled": {
     "value": {
       "one": "{{names}} won't answer",
@@ -4086,6 +4092,9 @@
   },
   "receipts.status.budget": {
     "value": "Answers when the budget renews"
+  },
+  "receipts.status.line": {
+    "value": "Starts when another work ends"
   },
   "receipts.status.canceled": {
     "value": "Canceled"
@@ -4680,6 +4689,102 @@
   },
   "usageCard.extraHint": {
     "value": "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets."
+  },
+  "usageQueue.title": {
+    "value": {
+      "one": "{{agent}} has {{count}} conversation to pick up",
+      "other": "{{agent}} has {{count}} conversations to pick up"
+    }
+  },
+  "usageQueue.line": {
+    "value": "Picks up {{when}}, when the {{plan}} plan resets. One at a time, in this order."
+  },
+  "usageQueue.lineUnknown": {
+    "value": "Picks up as soon as the {{plan}} plan resets. One at a time, in this order."
+  },
+  "usageQueue.lineBudget": {
+    "value": "Picks up {{when}}, when the budget renews, or sooner if an admin raises it. One at a time, in this order."
+  },
+  "usageQueue.shared": {
+    "value": "The line belongs to the plan: {{agents}} share the same account."
+  },
+  "usageQueue.dm": {
+    "value": "DM with {{name}}"
+  },
+  "usageQueue.yourDm": {
+    "value": "Your DM"
+  },
+  "usageQueue.thread": {
+    "value": "Thread in #{{channel}}"
+  },
+  "usageQueue.routine": {
+    "value": "Routine {{name}}"
+  },
+  "usageQueue.work": {
+    "value": "Work: {{name}}"
+  },
+  "usageQueue.askedBy": {
+    "value": "Asked by {{names}} · {{ago}}"
+  },
+  "usageQueue.paused": {
+    "value": "Paused {{ago}}"
+  },
+  "usageQueue.after": {
+    "value": {
+      "one": "{{count}} message since",
+      "other": "{{count}} messages since"
+    }
+  },
+  "usageQueue.nothingAfter": {
+    "value": "Nothing since"
+  },
+  "usageQueue.wrote": {
+    "value": {
+      "one": "{{names}} wrote since",
+      "other": "{{names}} wrote since"
+    }
+  },
+  "usageQueue.queued": {
+    "value": "In line"
+  },
+  "usageQueue.answering": {
+    "value": "Answering now"
+  },
+  "usageQueue.hidden": {
+    "value": {
+      "one": "+{{count}} in conversations you can't see",
+      "other": "+{{count}} in conversations you can't see"
+    }
+  },
+  "usageQueue.dontRunAll": {
+    "value": "Don't run any"
+  },
+  "usageQueue.confirmAll": {
+    "value": {
+      "one": "Don't run {{count}} conversation?",
+      "other": "Don't run these {{count}} conversations?"
+    }
+  },
+  "usageQueue.yesDontRun": {
+    "value": "Yes, don't run"
+  },
+  "usageQueue.keep": {
+    "value": "Keep"
+  },
+  "usageQueue.canceledAll": {
+    "value": {
+      "one": "{{count}} conversation canceled. {{agent}} won't answer it when the limit is back.",
+      "other": "{{count}} conversations canceled. {{agent}} won't answer them when the limit is back."
+    }
+  },
+  "usageQueue.empty": {
+    "value": "Nothing waiting to pick up."
+  },
+  "usageQueue.waiting": {
+    "value": {
+      "one": "{{count}} conversation waiting",
+      "other": "{{count}} conversations waiting"
+    }
   },
   "actionCard.connect_ai.title": {
     "value": "Connect an AI for {{agents}}"
@@ -29050,6 +29155,9 @@
   },
   "chat.body.usage_wait_canceled": {
     "value": "Canceled. It won't run when the limit is back."
+  },
+  "chat.body.usage_wait_archived": {
+    "value": "It won't run: the agent was archived."
   },
   "chat.body.usage_paused": {
     "value": "{{agent}} paused this work · {{plan}} plan at {{percent}}% {{window}}"

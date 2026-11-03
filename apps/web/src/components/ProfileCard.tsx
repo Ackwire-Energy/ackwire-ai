@@ -68,6 +68,7 @@ import { LetMeTalkButton, useWidenAsk } from "@/components/ReachLines";
 import { useEmojiLabels } from "@/components/Reactions";
 import { RolesPicker } from "@/components/roles/RolesPicker";
 import { colorOf, ProfileSky } from "@/components/Sky";
+import { SeeUsageQueue } from "@/components/UsageQueue";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { type MenuEntry, tidy } from "@/lib/context-menu";
@@ -517,6 +518,10 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
                   ? t("presence.bySelf", { name: agent.name })
                   : t("presence.byAuto")}
             </small>
+            {/* Out of office with conversations waiting (ADR 0118): what it picks up when it is back, in order. */}
+            {(shown.line.kind === "out_of_plan" || shown.line.kind === "out_of_budget") && shown.line.count ? (
+              <SeeUsageQueue agentId={agent.id} />
+            ) : null}
           </span>
         </div>
       )}

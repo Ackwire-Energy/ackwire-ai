@@ -7,8 +7,10 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, Text, useTheme } from "@/ui";
+import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { useFailed } from "../routines/hooks";
 import { useDirectory, useMeId } from "../shared/hooks";
+import { useSheetIfAny } from "../shared/SheetHost";
 
 /**
  * "Don't run it" on what waits for a plan's or budget's limit (the web's): cancels the run, so nothing runs when the
@@ -52,6 +54,8 @@ function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: b
 
 /** Under an agent's "I'll answer when the plan resets" (the web's): "Don't run it" while the run still waits. */
 export function UsageWaitCancel({ message: m }: { message: Message }) {
+  const { t } = useTranslation();
+  const sheet = useSheetIfAny();
   const { org } = useOrg();
   const dir = useDirectory();
   const meId = useMeId();
@@ -65,6 +69,15 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
         may={mayContinueUsage(wait, meId, owner, can(org, "manage_agents"))}
         count={wait.count}
       />
+      {m.author.id && sheet ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="wait"
+          label={t("queue.see")}
+          onPress={() => sheet.open(<UsageQueueSheet agentId={m.author.id ?? ""} />)}
+        />
+      ) : null}
     </View>
   );
 }

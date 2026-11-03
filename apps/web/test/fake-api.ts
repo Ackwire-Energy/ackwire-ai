@@ -83,6 +83,7 @@ import type {
   StorageUsage,
   TaskManagerView,
   TaskSteps,
+  UsageQueue,
   WorkspaceLimits,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -244,6 +245,8 @@ export interface FakeState {
   statuses?: Map<string, { availability: Availability; status: MemberStatus | null }>;
   /** `agents.statuses`; unset = every agent online with no line. */
   agentStatuses?: AgentStatus[];
+  /** Per agent: what it picks up when its plan or budget is back (`agents.usageQueue`). */
+  usageQueues?: Record<string, UsageQueue>;
   memories: Memory[];
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
@@ -2095,6 +2098,28 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
               activeAt: new Date().toISOString(),
             })),
         ),
+      usageQueue: async (orgId, agentId) => {
+        log("agents.usageQueue", orgId, agentId);
+        return structuredClone(
+          state.usageQueues?.[agentId] ?? {
+            agentId,
+            reason: null,
+            plan: null,
+            resetsAt: null,
+            sharedWith: [],
+            rows: [],
+            hidden: 0,
+            mayStopAll: false,
+          },
+        );
+      },
+      cancelUsageQueue: async (orgId, agentId) => {
+        log("agents.cancelUsageQueue", orgId, agentId);
+        const q = state.usageQueues?.[agentId];
+        const canceled = q?.rows.filter((r) => r.state === "queued").length ?? 0;
+        if (q) q.rows = q.rows.filter((r) => r.state !== "queued");
+        return { canceled, skipped: 0 };
+      },
       importFromGithub: async (orgId, url) => {
         log("agents.importFromGithub", orgId, url);
         const files = state.githubFiles?.[url];

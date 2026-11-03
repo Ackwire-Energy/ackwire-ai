@@ -13,6 +13,7 @@ import { Button, Icon } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
+import { SeeUsageQueue } from "@/components/UsageQueue";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
@@ -62,7 +63,7 @@ function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: b
 
 /**
  * Under an agent's "I'll answer when the plan resets": "Don't run it" ("Não rodar estas 3" for the later turns it
- * speaks for), while the run still waits.
+ * speaks for), while the run still waits, and "Ver fila": everything else it picks up when the limit is back.
  */
 export function UsageWaitCancel({ message, wait }: { message: Message; wait: UsageWait }) {
   const { org, me } = useOrg();
@@ -72,6 +73,7 @@ export function UsageWaitCancel({ message, wait }: { message: Message; wait: Usa
   return (
     <span className="waitcard__acts">
       <DontRunButton runId={wait.runId} may={may} count={wait.count} />
+      {message.author.id && <SeeUsageQueue agentId={message.author.id} />}
     </span>
   );
 }

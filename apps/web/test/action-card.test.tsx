@@ -302,6 +302,59 @@ describe("what waits on a plan's limit: Não rodar", () => {
     expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-w-three")).toBe(true);
   });
 
+  test("Ver fila: what the agent picks up when the plan is back, in order, with Não rodar per row and for all", async () => {
+    const state = seedState();
+    state.messages.push(note("w-line", {}));
+    const row = (runId: string, over: Record<string, unknown> = {}) => ({
+      runId,
+      kind: "conversation" as const,
+      channelId: ENG_ID,
+      threadId: null,
+      channelKind: "channel",
+      channelName: "eng",
+      askers: ["u-joao"],
+      since: new Date(NOW.getTime() - 3 * 24 * 3600_000).toISOString(),
+      after: { count: 12, names: ["Nina", "Ada"] },
+      state: "queued" as const,
+      title: null,
+      mayStop: true,
+      ...over,
+    });
+    state.usageQueues = {
+      [ATLAS_ID]: {
+        agentId: ATLAS_ID,
+        reason: "plan",
+        plan: "Claude",
+        resetsAt: null,
+        sharedWith: [ADA_ID],
+        rows: [row("r-a", { state: "answering" }), row("r-b", { after: { count: 0, names: [] } })],
+        hidden: 1,
+        mayStopAll: true,
+      },
+    };
+    await open(state);
+    const note_ = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Respondo assim que ele renovar")) as HTMLElement;
+    await click(within(note_).getByRole("button", { name: "Ver fila" }));
+    const dialog = await screen().findByRole("dialog");
+    expect(dialog.textContent).toContain("Atlas tem 3 conversas para retomar");
+    expect(dialog.textContent).toContain("Retoma assim que o plano do Claude renovar. Uma de cada vez, nesta ordem.");
+    expect(dialog.textContent).toContain("A fila é do plano: Ada e Atlas dividem a mesma conta.");
+    expect(dialog.textContent).toContain("Respondendo agora");
+    expect(dialog.textContent).toContain("12 mensagens depois · Nina e Ada escreveram depois");
+    expect(dialog.textContent).toContain("Nada depois");
+    expect(dialog.textContent).toContain("+1 em conversas que você não vê");
+    // The row answering now has nothing to cancel; the one in line does.
+    expect(within(dialog).getAllByRole("button", { name: "Não rodar" })).toHaveLength(1);
+    await click(within(dialog).getByRole("button", { name: "Não rodar" }));
+    expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-b")).toBe(true);
+    await click(within(dialog).getByRole("button", { name: "Não rodar nenhuma" }));
+    expect(dialog.textContent).toContain("Não rodar as 2 conversas?");
+    await click(within(dialog).getByRole("button", { name: "Sim, não rodar" }));
+    expect(state.calls.some((c) => c.method === "agents.cancelUsageQueue" && c.args[1] === ATLAS_ID)).toBe(true);
+  });
+
   test("back at work, the note offers nothing to cancel", async () => {
     const state = seedState();
     state.messages.push(note("w-back", { ended: true }));

@@ -11,6 +11,7 @@ import type {
 import { clockHour } from "./format";
 import { workStatusText } from "./long-work";
 import { usageWhen } from "./plan-usage";
+import { usageWaitingText } from "./usage-queue";
 
 /**
  * Presence and written status (ADR 0084), platform-neutral: what you pick, the suggestions, when a status
@@ -130,7 +131,12 @@ export function agentStatusText(
   if (line.kind === "out_of_plan" || line.kind === "out_of_budget") {
     const what = t(`presence.agent.${line.kind}`);
     const back = line.until ? t("presence.agent.backAt", { when: usageWhen(t, locale, line.until, now) }) : null;
-    return { emoji: line.emoji ?? AGENT_KIND_EMOJI[line.kind], text: back ? `${what} · ${back}` : what };
+    // How many conversations wait for it (ADR 0118): the same count its queue shows.
+    const waiting = line.count ? usageWaitingText(t, line.count) : null;
+    return {
+      emoji: line.emoji ?? AGENT_KIND_EMOJI[line.kind],
+      text: [what, back, waiting].filter(Boolean).join(" · "),
+    };
   }
   return {
     emoji: line.emoji ?? AGENT_KIND_EMOJI[line.kind],

@@ -52,6 +52,7 @@ export type ReceiptWords =
   | "receipts.away"
   | "receipts.plan"
   | "receipts.budget"
+  | "receipts.line"
   | "receipts.handled"
   | "receipts.passed"
   | "receipts.canceled"
@@ -83,6 +84,7 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
   switch (status.kind) {
     case "picked":
     case "claimed":
+    case "line":
     case "handled":
     case "passed":
     case "canceled": {
