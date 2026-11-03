@@ -1,3 +1,4 @@
+import { nameIsPassword } from "@agenteschat/client/lib/text";
 import {
   approveJoinRequest,
   askToJoin,
@@ -24,7 +25,7 @@ import {
   turnOffInviteLink,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { hashPassword, mintUserSignIn, sessionUser } from "../../auth";
+import { hashPassword, mintUserSignIn, NAME_IS_PASSWORD, NAME_IS_PASSWORD_MESSAGE, sessionUser } from "../../auth";
 import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { humanCheckRefusal } from "../../http/human-check";
@@ -506,6 +507,9 @@ export function inviteRoutes(deps: AppDeps) {
       const user = await sessionUser(deps.auth, c.req.raw.headers);
       if (!user && (!input.name || !input.email)) {
         return apiError(c, 400, "invalid_request", "Your name and your email are needed");
+      }
+      if (!user && input.name && input.password && nameIsPassword(input.name, input.password)) {
+        return apiError(c, 400, NAME_IS_PASSWORD, NAME_IS_PASSWORD_MESSAGE);
       }
       // The password is hashed here, as Better Auth hashes one, and kept with the request until an approval.
       const keeps = !user && input.password && input.code;

@@ -246,7 +246,8 @@ const SETUP_FIELDS = [
  * workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they are
  * read again, and `agent.coordinator` (ADR 0093) that another agent coordinates the team, or none: the agents are.
  * `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. `org.members` (someone
- * joined or left, or a role changed, ADR 0085) refetches the people, Members, the roles, `me`, the agents, the
+ * joined or left, a role changed, ADR 0085, or a person's name, handle or photo) refetches the people, Members, each
+ * channel's roster, the roles, `me`, the agents, the
  * routines (roles decide whom an agent answers) and the channels (roles decide which ones are listed, ADR 0125), and the pages of the agents it names (their owner or brain changed
  * when someone left). Returns whether the
  * event was one of these.
@@ -265,6 +266,8 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
       keys.channels(orgId),
     ])
       void qc.invalidateQueries({ queryKey: key });
+    // A person's name, handle or photo: each channel's members column (`roster`) names them.
+    void qc.invalidateQueries({ predicate: (q) => q.queryKey[1] === orgId && q.queryKey[4] === "roster" });
     const agents = (event as { agents?: unknown }).agents;
     if (Array.isArray(agents) && agents.length) {
       for (const id of agents.filter((a): a is string => typeof a === "string")) {

@@ -3,6 +3,7 @@ import {
   accountDeletionPlan,
   addHostComputer,
   announceMembers,
+  announceProfile,
   appleSignInTokens,
   avatarFile,
   CODE_LENGTH,
@@ -812,7 +813,9 @@ export function accountRoutes(deps: AppDeps) {
       await requirePermission(db, user.id, c.req.valid("param").orgId, "read");
       const limit = await deps.adapters.rateLimiter.consume(`avatar:${user.id}`, { limit: 10, windowMs: 3600_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many photo changes. Try again later.");
-      return c.json(await setAvatar({ db, blobs: deps.adapters.platformBlobs }, user.id, c.req.valid("json")), 200);
+      const avatar = await setAvatar({ db, blobs: deps.adapters.platformBlobs }, user.id, c.req.valid("json"));
+      await announceProfile(db, deps.adapters.pubsub, user.id);
+      return c.json(avatar, 200);
     },
   );
 
@@ -829,6 +832,7 @@ export function accountRoutes(deps: AppDeps) {
     async (c) => {
       await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
       await removeAvatar({ db, blobs: deps.adapters.platformBlobs }, c.get("user").id);
+      await announceProfile(db, deps.adapters.pubsub, c.get("user").id);
       return c.body(null, 204);
     },
   );

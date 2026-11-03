@@ -152,6 +152,8 @@ const KNOWN = {
   EARLY_ACCESS_EMAIL_UNVERIFIED: "auth.earlyAccess.unverified",
   // A provider's sign-up on a closed server comes back to /login with this code.
   SIGNUP_CLOSED: "auth.flow.closedLead",
+  // A sign-up whose name is its password (apps/server auth.ts `NAME_IS_PASSWORD`).
+  NAME_IS_PASSWORD: "auth.flow.nameIsPassword",
   account_not_linked: "auth.unconfirmed",
   // A provider that hasn't confirmed its own address, to a confirmed account here (apps/server auth.ts `authHandler`).
   provider_email_unverified: "auth.providerUnverified",
