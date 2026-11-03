@@ -4490,6 +4490,13 @@
     "criteria": "验收标准",
     "criteriaCount": "{{done}} / {{total}}",
     "noCriteria": "还没有验收标准。",
+    "edit": {
+      "title": "编辑标题",
+      "description": "编辑描述",
+      "criterion": "编辑标准“{{text}}”",
+      "criterionShort": "编辑标准",
+      "hint": "离开输入框或按 Esc 时保存。"
+    },
     "askTitle": "请 {{name}} 完成这个任务",
     "askTitle_female": "请 {{name}} 完成这个任务",
     "askText": "{{name}} 会阅读所需内容，在这里评论计划并完成它。任何敏感操作（比如发布）都会先请你审批。",
@@ -4545,6 +4552,7 @@
       "created": "创建了任务",
       "renamed": "重命名了任务",
       "description_changed": "编辑了描述",
+      "criteria_changed": "编辑了验收标准",
       "status_changed": "将状态改为{{status}}",
       "priority_changed": "将优先级改为{{priority}}",
       "assigned": "分配了任务",

@@ -4577,6 +4577,13 @@ export const ptBR = {
     criteria: "Critérios de aceite",
     criteriaCount: "{{done}} de {{total}}",
     noCriteria: "Sem critérios de aceite ainda.",
+    edit: {
+      title: "Editar o título",
+      description: "Editar a descrição",
+      criterion: 'Editar o critério "{{text}}"',
+      criterionShort: "Editar o critério",
+      hint: "Salva quando você sai do campo ou aperta Esc.",
+    },
     askTitle: "Pedir ao {{name}} para fazer esta tarefa",
     askTitle_female: "Pedir à {{name}} para fazer esta tarefa",
     askText:
@@ -4626,6 +4633,7 @@ export const ptBR = {
       created: "criou a tarefa",
       renamed: "renomeou a tarefa",
       description_changed: "editou a descrição",
+      criteria_changed: "editou os critérios de aceite",
       status_changed: "mudou o status para {{status}}",
       priority_changed: "mudou a prioridade para {{priority}}",
       assigned: "atribuiu a tarefa",

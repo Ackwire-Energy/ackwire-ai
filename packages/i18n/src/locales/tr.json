@@ -4570,6 +4570,13 @@
     "criteria": "Kabul kriterleri",
     "criteriaCount": "{{done}}/{{total}}",
     "noCriteria": "Henüz kabul kriteri yok.",
+    "edit": {
+      "title": "Başlığı düzenle",
+      "description": "Açıklamayı düzenle",
+      "criterion": "\"{{text}}\" kriterini düzenle",
+      "criterionShort": "Kriteri düzenle",
+      "hint": "Alandan çıktığınızda veya Esc'ye bastığınızda kaydedilir."
+    },
     "askTitle": "Bu görevi {{name}} ajanından isteyin",
     "askText": "{{name}} ihtiyaç duyduğu şeyleri okur, planı buraya yorum olarak yazar ve uygular. Yayınlamak gibi hassas her şey onayınızı ister.",
     "askText_female": "{{name}} ihtiyaç duyduğu şeyleri okur, planı buraya yorum olarak yazar ve uygular. Yayınlamak gibi hassas her şey onayınızı ister.",
@@ -4622,6 +4629,7 @@
       "created": "görevi oluşturdu",
       "renamed": "görevi yeniden adlandırdı",
       "description_changed": "açıklamayı düzenledi",
+      "criteria_changed": "kabul kriterlerini düzenledi",
       "status_changed": "durumu {{status}} olarak değiştirdi",
       "priority_changed": "önceliği {{priority}} olarak değiştirdi",
       "assigned": "görevi atadı",

@@ -527,8 +527,26 @@ export function createMockPlanning(
         const i = await findIssue(orgId, id);
         const author = await me();
         const s = await columnsOf(orgId);
-        const { columnId, ...rest } = patch;
-        let change: Omit<IssuePatch, "columnId"> = rest;
+        const { columnId, criteria, ...rest } = patch;
+        let change: Omit<IssuePatch, "columnId" | "criteria"> = rest;
+        // The whole list, as the backend takes it: an id keeps that criterion (and its check), none is a new one.
+        if (criteria) {
+          const list = criteria.filter((c) => c.text.trim());
+          i.criteria = list.map((c) => {
+            const kept = i.criteria.find((x) => x.id === c.id);
+            return kept ? { ...kept, text: c.text.trim() } : { id: mockId("crit"), text: c.text.trim(), done: false };
+          });
+          await log(orgId, i, {
+            kind: "event",
+            author,
+            event: "criteria_changed",
+            text: "editou os critérios de aceite",
+          });
+        }
+        if (change.title && change.title !== i.title)
+          await log(orgId, i, { kind: "event", author, event: "renamed", text: "renomeou a tarefa" });
+        if (change.description !== undefined && change.description !== i.description)
+          await log(orgId, i, { kind: "event", author, event: "description_changed", text: "editou a descrição" });
         // A column carries its stage; a bare status lands on top of that stage's first column.
         const column = columnId ? s.columns.find((c) => c.id === columnId) : undefined;
         if (columnId && !column) throw new MockNotFoundError("Coluna não encontrada.");

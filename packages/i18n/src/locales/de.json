@@ -4608,6 +4608,13 @@
     "criteria": "Akzeptanzkriterien",
     "criteriaCount": "{{done}} von {{total}}",
     "noCriteria": "Noch keine Akzeptanzkriterien.",
+    "edit": {
+      "title": "Titel bearbeiten",
+      "description": "Beschreibung bearbeiten",
+      "criterion": "Kriterium „{{text}}“ bearbeiten",
+      "criterionShort": "Kriterium bearbeiten",
+      "hint": "Wird gespeichert, wenn du das Feld verlässt oder Esc drückst."
+    },
     "askTitle": "{{name}} bitten, diese Aufgabe zu erledigen",
     "askText": "{{name}} liest, was er braucht, kommentiert hier den Plan und setzt ihn um. Alles Sensible, etwa Veröffentlichen, fragt nach deiner Freigabe.",
     "askText_female": "{{name}} liest, was sie braucht, kommentiert hier den Plan und setzt ihn um. Alles Sensible, etwa Veröffentlichen, fragt nach deiner Freigabe.",
@@ -4660,6 +4667,7 @@
       "created": "hat die Aufgabe erstellt",
       "renamed": "hat die Aufgabe umbenannt",
       "description_changed": "hat die Beschreibung bearbeitet",
+      "criteria_changed": "hat die Akzeptanzkriterien bearbeitet",
       "status_changed": "hat den Status auf {{status}} geändert",
       "priority_changed": "hat die Priorität auf {{priority}} geändert",
       "assigned": "hat die Aufgabe zugewiesen",
