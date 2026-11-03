@@ -25,3 +25,23 @@ export async function finishOnboarding(api: ApiClient, orgId: string) {
   const rightHand = rightHandOf(await api.agents.list(orgId).catch(() => []));
   return { orgId, agentId: rightHand?.id ?? null };
 }
+
+/**
+ * The card under the right hand's greeting at the top of its DM (ADR 0134): Connect AI while there is none, how to
+ * start once there is one and no agent besides it (for whoever may create agents), then, the team here and nobody
+ * else yet, what next; none after that.
+ */
+export function introCard(s: {
+  noAi: boolean;
+  /** The AI status has loaded. */
+  aiKnown: boolean;
+  /** Agents besides the right hand. */
+  team: number;
+  createsAgents: boolean;
+  /** The person is the workspace's only member. */
+  alone: boolean;
+}): "connect" | "start" | "next" | null {
+  if (s.noAi) return "connect";
+  if (s.aiKnown && s.team === 0 && s.createsAgents) return "start";
+  return s.team > 0 && s.alone ? "next" : null;
+}

@@ -68,6 +68,7 @@ import { MessageFiles } from "../files/MessageFiles";
 import { chatHref, consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { AwayPill, BrainWait } from "../outages/WaitCard";
+import { SettingsProposals } from "../right-hand/SettingsCard";
 import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useMyHandle, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -638,6 +639,7 @@ export const MessageRow = memo(function MessageRow({
           {isAgent ? <ProposalCard message={m} /> : null}
           {isAgent ? <OfferCard message={m} /> : null}
           {isAgent ? <InstructionProposals message={m} /> : null}
+          {isAgent ? <SettingsProposals message={m} /> : null}
           {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
           {handoff ? <HandoffCard handoff={handoff} /> : null}
           {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}

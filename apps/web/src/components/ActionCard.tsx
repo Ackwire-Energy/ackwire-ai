@@ -29,10 +29,11 @@ import {
 } from "@agenteschat/client/lib/action-cards";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { formatTime, joinNames, whenAt } from "@agenteschat/client/lib/format";
+import { joinNames, whenAt } from "@agenteschat/client/lib/format";
 import { hostOf } from "@agenteschat/client/lib/import/shared";
 import { choiceOf } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
+import { sentToText } from "@agenteschat/client/lib/proposals";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { holdersOf } from "@agenteschat/client/lib/roles";
 import { connectorName } from "@agenteschat/client/lib/scopes";
@@ -289,13 +290,12 @@ export function AgentProposalCardView({
   const test = rightHand && Boolean(card.params.firstTask);
   const sent =
     asks && card.askedAt
-      ? (() => {
-          const names = holdersOf(members, roles, "create_agents").map((m) => m.name);
-          const when = formatTime(i18n.language, card.askedAt);
-          return names.length
-            ? t("rightHand.card.sentTo", { names: joinNames(names, t), when })
-            : t("rightHand.card.sentToAny", { when });
-        })()
+      ? sentToText(
+          t,
+          i18n.language,
+          holdersOf(members, roles, "create_agents").map((m) => m.name),
+          card.askedAt,
+        )
       : null;
   if (status === "superseded") {
     return (

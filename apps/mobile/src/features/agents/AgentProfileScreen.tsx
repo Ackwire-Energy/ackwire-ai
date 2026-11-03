@@ -9,6 +9,7 @@ import {
   useApprovalRules,
   useMemoryAboutMe,
   useMemoryAction,
+  useModelLabel,
   useRemoveApprovalRule,
   useUsage,
 } from "@agenteschat/client";
@@ -20,6 +21,8 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentPlan, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
+import { AUTO } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
@@ -52,6 +55,7 @@ import { openConnectAi } from "../ai/NoAiCard";
 import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
+import { openRightHandSettings } from "../right-hand/SettingsScreen";
 import { useConnectedById } from "../settings/hooks";
 import { agentBadgeInset } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -138,6 +142,9 @@ function Profile({ id }: { id: string }) {
   const agent = dir.agentById.get(id);
   // Someone it doesn't answer (not its owner, not an admin) sees only its public card: no tools, memory or month.
   const details = seesDetails(agent);
+  // The team's right hand (ADR 0134): what it is and how it works, its model, Configurar for who manages agents.
+  const rightHand = isRightHand(agent);
+  const modelLabel = useModelLabel();
   const detail = useAgentDetail(orgId, id);
   const access = useAgentAccess(orgId, id, details);
   const usage = useUsage(orgId);
@@ -233,14 +240,18 @@ function Profile({ id }: { id: string }) {
     />
   );
 
-  const ownerLine = mine
-    ? t("mobile.intentAgents.ownerYou")
-    : owner
-      ? t("mobile.intentAgents.owner", { name: owner })
-      : null;
-  const roleLine = [roleName || null, plain ? (roleName ? lowerFirst(plain, i18n.language) : plain) : null]
-    .filter(Boolean)
-    .join(" · ");
+  const ownerLine = rightHand
+    ? null
+    : mine
+      ? t("mobile.intentAgents.ownerYou")
+      : owner
+        ? t("mobile.intentAgents.owner", { name: owner })
+        : null;
+  const roleLine = rightHand
+    ? `${t("rightHand.role")} · ${t("rightHand.label")}`
+    : [roleName || null, plain ? (roleName ? lowerFirst(plain, i18n.language) : plain) : null]
+        .filter(Boolean)
+        .join(" · ");
   const shownDid = allDid ? did : did.slice(0, DID_SHOWN);
 
   return (
@@ -338,7 +349,24 @@ function Profile({ id }: { id: string }) {
           ) : null}
         </View>
 
-        {details ? (
+        {rightHand && agent ? (
+          <Section title={t("rightHand.profile.how")}>
+            <Card>
+              <Row leading={<Tile icon="shield" />} title={t("rightHand.profile.permissions")} />
+              <Row leading={<Tile icon="lock" />} title={t("rightHand.profile.private")} />
+              <Row leading={<Tile icon="hash" />} title={t("rightHand.profile.channels")} />
+              <Row
+                leading={<Tile icon="brain" />}
+                title={t("rightHand.profile.model")}
+                meta={
+                  <Text variant="small" tone="muted">
+                    {agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
+                  </Text>
+                }
+              />
+            </Card>
+          </Section>
+        ) : details ? (
           <>
             {forYou.data || forYou.isError ? (
               <Section
@@ -585,7 +613,13 @@ function Profile({ id }: { id: string }) {
         <PushedHeader
           plate
           solid={false}
-          {...(decides && agent ? { action: { label: t("agent.edit"), onPress: () => openAgentEdit(id) } } : {})}
+          {...(rightHand
+            ? can(org, "manage_agents")
+              ? { action: { label: t("rightHand.profile.configure"), onPress: openRightHandSettings } }
+              : {}
+            : decides && agent
+              ? { action: { label: t("agent.edit"), onPress: () => openAgentEdit(id) } }
+              : {})}
         />
       </View>
     </View>

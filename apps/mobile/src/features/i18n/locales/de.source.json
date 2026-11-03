@@ -1937,6 +1937,12 @@
       "other": "This workspace used its Composio calls for the month"
     }
   },
+  "activity.kind.change_request": {
+    "value": {
+      "one": "{{names}} asks for a change to the team",
+      "other": "{{names}} ask for a change to the team"
+    }
+  },
   "activity.kind.browser_profile_request": {
     "value": {
       "one": "{{names}} asks for one more browser profile",

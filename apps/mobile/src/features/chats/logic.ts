@@ -383,6 +383,19 @@ export function agentStarters(
     }));
 }
 
+/**
+ * The right hand's own row on top of Conversas (ADR 0134): its DM, or one to start (no channel yet), never under
+ * Agentes; the other rows without it. No pin when there is none for this person (outside its audience).
+ */
+export function rightHandPin(
+  rows: ConversationRow[],
+  agent: { id: string; name: string; handle: string } | undefined,
+): { pin: ConversationRow | null; rows: ConversationRow[] } {
+  if (!agent) return { pin: null, rows };
+  const isIt = (r: ConversationRow) => r.kind === "dm" && r.with.type === "agent" && r.with.id === agent.id;
+  return { pin: rows.find(isIt) ?? agentStarters([agent])[0] ?? null, rows: rows.filter((r) => !isIt(r)) };
+}
+
 /** The home's closed sections as remembered: any keys (categories come and go), anything unreadable: none. */
 export function parseHomeCollapsed(raw: string | null): string[] {
   if (!raw) return [];

@@ -7,7 +7,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { introCard, isRightHand } from "@agenteschat/client/lib/right-hand";
 import { Button, Icon, Message, MessageText, normalizeAppearance } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -36,8 +36,13 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
   const members = useMembers(org.id);
   const connect = useConnectAi();
   const team = dir.agents.filter((a) => !isRightHand(a));
-  const noAi = aiStateOf(status.data, agent.id) === "no_ai";
-  const alone = (members.data?.length ?? 0) <= 1;
+  const card = introCard({
+    noAi: aiStateOf(status.data, agent.id) === "no_ai",
+    aiKnown: Boolean(status.data),
+    team: team.length,
+    createsAgents: can(org, "create_agents"),
+    alone: (members.data?.length ?? 0) <= 1,
+  });
   return (
     <Message
       agent
@@ -51,7 +56,7 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
         </p>
         <p>{t("rightHand.intro.lead")}</p>
       </MessageText>
-      {noAi && connect ? (
+      {card === "connect" && connect ? (
         <div className="waitcard">
           <span className="waitcard__top ac-iconline">
             <Icon name="plug" size={16} />
@@ -64,10 +69,10 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
             </Button>
           </span>
         </div>
-      ) : status.data && team.length === 0 && can(org, "create_agents") ? (
+      ) : card === "start" ? (
         <StartCard agent={agent} />
       ) : (
-        team[0] && alone && <NextCard agent={agent} first={team[0]} />
+        card === "next" && team[0] && <NextCard agent={agent} first={team[0]} />
       )}
     </Message>
   );

@@ -1,6 +1,8 @@
 import {
   type AgentDraft,
+  type AgentProposalCard,
   type Message,
+  useAskAgentProposal,
   useCatalog,
   useChannels,
   useConnections,
@@ -8,6 +10,8 @@ import {
   useCreateProposedRoutine,
   useCustomServers,
   useDenyAgentProposal,
+  useMembers,
+  useRoles,
 } from "@agenteschat/client";
 import {
   agentProposalOf,
@@ -19,6 +23,9 @@ import {
 } from "@agenteschat/client/lib/action-cards";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { can } from "@agenteschat/client/lib/permissions";
+import { sentToText } from "@agenteschat/client/lib/proposals";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { holdersOf } from "@agenteschat/client/lib/roles";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,6 +37,7 @@ import { askEndedAt } from "../chat/ask-store";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { markName } from "../chat/logic";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
+import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
 import { useDirectory, useMeId } from "../shared/hooks";
@@ -41,9 +49,31 @@ import { fullLook } from "./edit";
  * viewer can't). Criar makes it as it is in one tap, Revisar opens "Criar agente" filled in with it, Recusar says no,
  * for who may create agents. Then one line with what was decided; it opens the draft, the lines it got and, once
  * created, the way to the new agent's page.
+ *
+ * The right hand's (ADR 0134) reads Criar e testar, full width, when it comes with a first task (created, the task goes
+ * from the tapper in their DM with it, which opens), then Editar antes and Descartar; a newer one for the same agent
+ * puts it away; and a person who can't create agents sends it to whoever may (Pedir a um admin), then reads whom it
+ * went to. In their inbox it is the same card.
  */
 export function ProposalCard({ message: m }: { message: Message }) {
-  const { t } = useTranslation();
+  const card = agentProposalOf(m.meta);
+  if (!card || m.author.type !== "agent") return null;
+  return <AgentProposalView messageId={m.id} proposerId={m.author.id} sentAt={m.createdAt} card={card} />;
+}
+
+export function AgentProposalView({
+  messageId,
+  proposerId,
+  sentAt,
+  card,
+}: {
+  messageId: string;
+  proposerId: string | null;
+  /** When the card was posted: the fuse burns from it to the expiry. */
+  sentAt: string;
+  card: AgentProposalCard;
+}) {
+  const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const meId = useMeId();
   const dir = useDirectory();
@@ -51,14 +81,29 @@ export function ProposalCard({ message: m }: { message: Message }) {
   const create = useCreateProposedAgent(orgId);
   const makeRoutine = useCreateProposedRoutine(orgId);
   const deny = useDenyAgentProposal(orgId);
+  const ask = useAskAgentProposal(orgId);
+  const members = useMembers(orgId).data ?? [];
+  const roles = useRoles(orgId).data?.roles ?? [];
   const failed = useFailed();
   const asks = useAskStore();
-  const card = agentProposalOf(m.meta);
-  if (!card || m.author.type !== "agent") return null;
   const { draft, why } = card.params;
   const status = proposalStatus(card);
   const decides = status === "open" && can(org, "create_agents");
-  const proposer = (m.author.id && dir.agentById.get(m.author.id)?.name) || t("channel.unknownAgent");
+  const agent = proposerId ? dir.agentById.get(proposerId) : undefined;
+  const proposer = agent?.name || t("channel.unknownAgent");
+  const rightHand = isRightHand(agent);
+  // The person it is for, who can't create agents: they send it on (the right hand's cards only).
+  const sends = status === "open" && rightHand && !decides && card.forUserId === meId;
+  const test = rightHand && Boolean(card.params.firstTask);
+  const sent =
+    sends && card.askedAt
+      ? sentToText(
+          t,
+          i18n.language,
+          holdersOf(members, roles, "create_agents").map((p) => p.name),
+          card.askedAt,
+        )
+      : null;
   const lines = proposalLines(card, { userId: meId ?? "", admin: can(org, "manage_agents") });
   const outcome =
     status === "created"
@@ -67,17 +112,35 @@ export function ProposalCard({ message: m }: { message: Message }) {
         ? t("proposals.refused")
         : status === "expired"
           ? t("approval.expired")
-          : decides
-            ? null
-            : t("proposals.waitingAdmin");
+          : status === "superseded"
+            ? t("rightHand.card.superseded")
+            : decides
+              ? null
+              : t("proposals.waitingAdmin");
   const busy = create.isPending || deny.isPending;
+  const createIt = () =>
+    create.mutate(
+      { messageId, test },
+      {
+        onSuccess: ({ agent: made, ai, testChannelId }) => {
+          asks?.settle(messageId);
+          // Nothing to think with yet (the tapper's accounts decide, not the suggestion): it is created all the same,
+          // and Connect opens for it here. Tried: its DM, with the task in it.
+          if (ai === "none") openConnectAi({ agentId: made.id });
+          else if (testChannelId) router.push(chatHref(testChannelId));
+        },
+        onError: failed,
+      },
+    );
+  const edit = () => router.push(`/new-agent?proposal=${encodeURIComponent(messageId)}` as never);
+  const dismiss = () => deny.mutate(messageId, { onSuccess: () => asks?.settle(messageId), onError: failed });
   if (status === "open") {
     return (
       <AskCard
-        id={m.id}
+        id={messageId}
         kind="agent"
-        agentId={m.author.id ?? ""}
-        waitsFor={decides ? "you" : null}
+        agentId={proposerId ?? ""}
+        waitsFor={decides ? "you" : sends && !card.askedAt ? t("rightHand.card.onlyCreators") : null}
         lead={why || t("actionCard.agentProposal.title", { agent: proposer })}
         well={{
           tile: <AgentAvatar agent={fullLook(draft.appearance)} size={32} name={draft.name} live={false} />,
@@ -94,8 +157,42 @@ export function ProposalCard({ message: m }: { message: Message }) {
         }}
         body={lines.length > 0 ? <Lines lines={lines} draft={draft} /> : undefined}
         foot={
-          <AskFoot expiry={<ExpiryLine expiresAt={card.expiresAt} />}>
-            {decides ? (
+          <AskFoot expiry={<ExpiryLine createdAt={sentAt} expiresAt={card.expiresAt} />}>
+            {decides && rightHand ? (
+              <>
+                <Button
+                  variant="primary"
+                  size="card"
+                  wide
+                  icon={test ? "bolt" : undefined}
+                  label={test ? t("rightHand.card.createTest") : t("newAgent.create", { name: draft.name })}
+                  disabled={busy}
+                  onPress={createIt}
+                />
+                <AskButtons
+                  primary={
+                    <Button
+                      variant="secondary"
+                      size="card"
+                      wide
+                      label={t("rightHand.card.editFirst")}
+                      disabled={busy}
+                      onPress={edit}
+                    />
+                  }
+                  secondary={
+                    <Button
+                      variant="ghost"
+                      size="card"
+                      wide
+                      label={t("rightHand.card.dismiss")}
+                      disabled={busy}
+                      onPress={dismiss}
+                    />
+                  }
+                />
+              </>
+            ) : decides ? (
               <>
                 <AskButtons
                   primary={
@@ -105,20 +202,7 @@ export function ProposalCard({ message: m }: { message: Message }) {
                       wide
                       label={t("newAgent.create", { name: draft.name })}
                       disabled={busy}
-                      onPress={() =>
-                        create.mutate(
-                          { messageId: m.id },
-                          {
-                            onSuccess: ({ agent, ai }) => {
-                              asks?.settle(m.id);
-                              // Nothing to think with yet (the tapper's accounts decide, not the suggestion): it is
-                              // created all the same, and Connect opens for it here.
-                              if (ai === "none") openConnectAi({ agentId: agent.id });
-                            },
-                            onError: failed,
-                          },
-                        )
-                      }
+                      onPress={createIt}
                     />
                   }
                   secondary={
@@ -128,7 +212,7 @@ export function ProposalCard({ message: m }: { message: Message }) {
                       wide
                       label={t("actionCard.agentProposal.review")}
                       disabled={busy}
-                      onPress={() => router.push(`/new-agent?proposal=${encodeURIComponent(m.id)}` as never)}
+                      onPress={edit}
                     />
                   }
                 />
@@ -138,9 +222,26 @@ export function ProposalCard({ message: m }: { message: Message }) {
                   wide
                   label={t("approval.refuse")}
                   disabled={busy}
-                  onPress={() => deny.mutate(m.id, { onSuccess: () => asks?.settle(m.id), onError: failed })}
+                  onPress={dismiss}
                 />
               </>
+            ) : sent ? (
+              <View style={styles.sent}>
+                <Icon name="send" size={14} color={colors.muted} />
+                <Text variant="small" tone="muted" style={styles.fill}>
+                  {sent}
+                </Text>
+              </View>
+            ) : sends ? (
+              <Button
+                variant="primary"
+                size="card"
+                wide
+                icon="send"
+                label={t("rightHand.card.askAdmin")}
+                loading={ask.isPending}
+                onPress={() => ask.mutate(messageId, { onError: failed })}
+              />
             ) : (
               <Text variant="small" tone="muted">
                 {outcome}
@@ -197,7 +298,7 @@ export function ProposalCard({ message: m }: { message: Message }) {
                     size="sm"
                     label={t("newAgent.routineKeep", { name: draft.routine?.name })}
                     disabled={makeRoutine.isPending}
-                    onPress={() => makeRoutine.mutate(m.id, { onError: failed })}
+                    onPress={() => makeRoutine.mutate(messageId, { onError: failed })}
                   />
                 ) : null}
               </View>
@@ -296,4 +397,5 @@ const styles = StyleSheet.create({
   line: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   mark: { width: 16, height: 18, alignItems: "center", justifyContent: "center" },
   acts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+  sent: { flexDirection: "row", alignItems: "center", gap: 6 },
 });

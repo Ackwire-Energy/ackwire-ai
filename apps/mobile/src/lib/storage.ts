@@ -62,6 +62,8 @@ export const STORED = {
   searchRecent: "search-recent",
   /** The person has touched the trackpad: its lesson is over ("1"). */
   trackpadTaught: "trackpad-taught",
+  /** `<user id>.<org id>` entries (JSON list): the right hand's row was opened there, so its "Novo" is gone. */
+  rightHandSeen: "right-hand-seen",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

@@ -69,6 +69,11 @@ export function useUserEvents() {
       // Org event: someone changed the task board's columns. Deleting one moves its tasks, so the
       // tasks refresh too (the columns live under the same key).
       if (event.type === "issue.columns") void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+      // A change I asked the right hand for was decided by someone else (ADR 0134): "Aplicado por …" on my card.
+      if (event.type === "proposal.decided") {
+        void qc.invalidateQueries({ queryKey: keys.proposals(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      }
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string")
         refreshMission(qc, orgId, event.missionId);
     });

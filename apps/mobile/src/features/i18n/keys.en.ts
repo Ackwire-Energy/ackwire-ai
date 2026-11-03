@@ -811,6 +811,8 @@ export const featureKeysEn = {
       invitation_accepted_other: "{{names}} accepted your invitation",
       composio_limit_one: "This workspace used its Composio calls for the month",
       composio_limit_other: "This workspace used its Composio calls for the month",
+      change_request_one: "{{names}} asks for a change to the team",
+      change_request_other: "{{names}} ask for a change to the team",
       browser_profile_request_one: "{{names}} asks for one more browser profile",
       browser_profile_request_other: "{{names}} ask for one more browser profile",
       connector_tool_changed_one: "A connected server changed tools you approved",

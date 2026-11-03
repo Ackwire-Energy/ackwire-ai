@@ -746,6 +746,7 @@
       "computer_ready_other": "Komputer ruang kerjamu sudah siap",
       "invitation_accepted_other": "{{names}} menerima undanganmu",
       "composio_limit_other": "Ruang kerja ini sudah memakai jatah panggilan Composio bulan ini",
+      "change_request_other": "{{names}} meminta perubahan di tim",
       "browser_profile_request_other": "{{names}} meminta satu profil browser lagi",
       "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",

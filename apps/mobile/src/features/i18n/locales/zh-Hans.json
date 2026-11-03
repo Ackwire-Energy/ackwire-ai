@@ -746,6 +746,7 @@
       "computer_ready_other": "你的工作区电脑已就绪",
       "invitation_accepted_other": "{{names}} 接受了你的邀请",
       "composio_limit_other": "此工作区已用完本月的 Composio 调用次数",
+      "change_request_other": "{{names}} 请求调整团队",
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",

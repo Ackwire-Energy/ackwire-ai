@@ -14,9 +14,9 @@ import {
 } from "@agenteschat/client";
 import type { SettingsProposalCard } from "@agenteschat/client/lib/action-cards";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { decidersOf, onlyKey, settingLineText } from "@agenteschat/client/lib/proposals";
+import { decidersOf, onlyKey, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
 import { Button, Icon } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -121,13 +121,7 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
   }
 
   const asked = p.askedAt
-    ? (() => {
-        const names = decidersOf(p, members, roles, agent?.ownerUserId);
-        const when = formatTime(i18n.language, p.askedAt);
-        return names.length
-          ? t("rightHand.card.sentTo", { names: joinNames(names, t), when })
-          : t("rightHand.card.sentToAny", { when });
-      })()
+    ? sentToText(t, i18n.language, decidersOf(p, members, roles, agent?.ownerUserId), p.askedAt)
     : null;
   const state = p.stale
     ? t("rightHand.card.stale")

@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { MemoryUpdate, OrgRole, Person, Proposal, ProposalAccessLine, ProposalSettingLine } from "../api/types";
-import { formatUsd } from "./format";
+import { formatTime, formatUsd, joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 import { holdersOf } from "./roles";
 import { scopeText } from "./scopes";
@@ -270,4 +270,12 @@ export function decidersOf<P extends Pick<Person, "userId" | "name" | "role" | "
   if (p.decider.type === "account_owner") return people.filter((m) => m.userId === agentOwnerId).map((m) => m.name);
   const admins = holdersOf(people, roles, "manage_agents").map((m) => m.name);
   return p.decider.type === "user" ? [...new Set([p.decider.name, ...admins])] : admins;
+}
+
+/** "Enviado para Heitor e Bia · 14:02" under a card someone sent on with "Pedir a um admin" (ADR 0134). */
+export function sentToText(t: TFunction, locale: string, names: readonly string[], askedAt: string): string {
+  const when = formatTime(locale, askedAt);
+  return names.length
+    ? t("rightHand.card.sentTo", { names: joinNames(names, t), when })
+    : t("rightHand.card.sentToAny", { when });
 }

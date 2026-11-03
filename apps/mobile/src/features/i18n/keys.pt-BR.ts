@@ -819,6 +819,8 @@ export const featureKeysPtBR = {
       invitation_accepted_other: "{{names}} aceitaram seu convite",
       composio_limit_one: "As chamadas da Composio deste mês acabaram",
       composio_limit_other: "As chamadas da Composio deste mês acabaram",
+      change_request_one: "{{names}} pede uma mudança no time",
+      change_request_other: "{{names}} pedem uma mudança no time",
       browser_profile_request_one: "{{names}} pede mais um perfil do navegador",
       browser_profile_request_other: "{{names}} pedem mais um perfil do navegador",
       connector_tool_changed_one: "Um servidor conectado mudou ferramentas que você aprovou",

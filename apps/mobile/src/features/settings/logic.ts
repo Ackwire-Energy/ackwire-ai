@@ -32,6 +32,7 @@ import type { IconName } from "@/ui";
 export type SettingsSection =
   | "apps"
   | "general"
+  | "right_hand"
   | "members"
   | "audit"
   | "media"
@@ -67,6 +68,14 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
     icon: "home",
     href: "/settings/general",
     allowed: (o) => can(o, "configure"),
+  },
+  // The team's right hand (ADR 0134): its name, AI, budget and audience, for who manages agents.
+  {
+    id: "right_hand",
+    group: "org",
+    icon: "agent",
+    href: "/settings/right-hand",
+    allowed: (o) => can(o, "manage_agents"),
   },
   // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).
   { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },

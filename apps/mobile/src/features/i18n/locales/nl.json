@@ -799,6 +799,8 @@
       "invitation_accepted_other": "{{names}} hebben je uitnodiging aangenomen",
       "composio_limit_one": "Deze werkruimte heeft haar Composio-aanroepen voor de maand opgebruikt",
       "composio_limit_other": "Deze werkruimte heeft haar Composio-aanroepen voor de maand opgebruikt",
+      "change_request_one": "{{names}} vraagt om een wijziging in het team",
+      "change_request_other": "{{names}} vragen om een wijziging in het team",
       "browser_profile_request_one": "{{names}} vraagt om nog een browserprofiel",
       "browser_profile_request_other": "{{names}} vragen om nog een browserprofiel",
       "connector_tool_changed_one": "Een gekoppelde server heeft tools gewijzigd die je hebt goedgekeurd",
