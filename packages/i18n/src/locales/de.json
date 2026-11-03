@@ -1861,6 +1861,18 @@
     },
     "connect": "Verbinden",
     "connected": "Verbunden",
+    "connect_app": {
+      "title": "{{name}} verbinden",
+      "mcp": "Einen MCP-Server hinzufügen",
+      "adminOnly": "Ein Admin verbindet es"
+    },
+    "invite": {
+      "title_one": "{{count}} Person einladen",
+      "title_other": "{{count}} Personen einladen",
+      "open": "Einladen",
+      "done": "Einladung gesendet",
+      "adminOnly": "Wer einladen darf, sendet sie"
+    },
     "agentProposal": {
       "title": "{{agent}} schlägt einen neuen Agenten vor",
       "review": "Prüfen",
@@ -4385,7 +4397,7 @@
     },
     "setup_write": {
       "label": "Workspace einrichten",
-      "description": "Anbieten, eine KI mit einer Karte zu verbinden, die eine Person anklickt, und Kanäle für die anfragende Person erstellen, mit Rückgängig."
+      "description": "Anbieten, eine KI, eine App oder einen MCP-Server zu verbinden oder Personen einzuladen, mit einer Karte, die eine Person anklickt, und Kanäle für die anfragende Person erstellen, mit Rückgängig."
     },
     "github_git_read": {
       "label": "Repositorys klonen (git)",
@@ -8533,6 +8545,12 @@
   "connectors": {
     "title": "Konnektoren",
     "add": "Konnektor hinzufügen",
+    "mcp": {
+      "title": "MCP",
+      "add": "MCP hinzufügen",
+      "list": "Verbundene MCP-Server",
+      "none": "Hier erscheinen die MCP-Server, die du über ihre Adresse verbindest."
+    },
     "addTitle": "Konnektor hinzufügen",
     "catalogText": "Einmal für {{org}} verbinden. Dann wählst du, was jeder Agent nutzen darf.",
     "catalog": "Verfügbare Konnektoren",
@@ -10777,7 +10795,7 @@
       "members": "Mitglieder und Einladungen",
       "roles": "Rollen und Berechtigungen",
       "access": "Agenten und Zugriff",
-      "connectors": "Konnektoren",
+      "connectors": "Konnektoren und MCP",
       "skills": "Skills",
       "keys": "KI-Konten",
       "storage": "Speicher",
@@ -10797,7 +10815,7 @@
       "members": "Wer im Workspace ist, und Einladungen.",
       "roles": "Was jede Person darf. Rollen addieren sich.",
       "access": "Was jeder Agent nutzen kann: eine Stufe pro Konnektor.",
-      "connectors": "Dienste, die einmal für den ganzen Workspace verbunden werden.",
+      "connectors": "Dienste und MCP-Server, die einmal für den ganzen Workspace verbunden werden.",
       "skills": "Markdown-Anweisungen, die Agenten öffnen, wenn sie sie brauchen.",
       "keys": "Deine Abos und die API-Schlüssel des Workspace.",
       "storage": "Wo die Dateien des Workspace liegen.",
@@ -11346,6 +11364,8 @@
         "readingForum": "Das Forum gelesen",
         "creatingChannel": "Einen Kanal erstellt",
         "offeringConnectAi": "Angeboten, eine KI zu verbinden",
+        "offeringConnectApp": "Angeboten, eine App zu verbinden",
+        "offeringInvites": "Angeboten, Personen einzuladen",
         "proposingAgent": "Einen Agenten vorgeschlagen",
         "askingAgent": "Einen anderen Agenten gefragt",
         "tellingAgent": "Einem anderen Agenten Bescheid gegeben",
@@ -11428,6 +11448,8 @@
       "readingForum": "Lesen im Forum",
       "creatingChannel": "Erstellen eines Kanals",
       "offeringConnectAi": "Vorbereiten einer KI-Verbindung",
+      "offeringConnectApp": "Vorbereiten einer App-Verbindung",
+      "offeringInvites": "Vorbereiten der Einladungen",
       "proposingAgent": "Vorschlagen eines Agenten",
       "askingAgent": "Fragen eines anderen Agenten",
       "tellingAgent": "Benachrichtigen eines anderen Agenten",
@@ -11534,6 +11556,9 @@
       "no_ai_signed_out": "Ich kann noch nicht antworten: Meine KI ist abgemeldet.",
       "no_ai_not_signed_in": "Ich kann noch nicht antworten: {{brain}} ist auf meinem Computer nicht angemeldet.",
       "action_connect_ai": "KI verbinden",
+      "action_connect_app": "{{name}} verbinden",
+      "action_add_mcp": "Einen MCP-Server hinzufügen",
+      "action_invite_people": "Personen einladen",
       "agent_proposal": "Hat einen neuen Agenten vorgeschlagen: {{name}}",
       "approval_request": "Freigabeanfrage: {{title}}",
       "secret_request": "{{agent}} hat um einen Schlüssel gebeten: {{name}}",
@@ -11733,6 +11758,14 @@
     "offer_connect_ai": {
       "label": "Anbieten, eine KI zu verbinden",
       "description": "Postet eine Karte, deren Taste den Dialog zum Verbinden eines Abos oder API-Schlüssels öffnet."
+    },
+    "offer_connect_app": {
+      "label": "Anbieten, eine App oder einen MCP zu verbinden",
+      "description": "Postet eine Karte, deren Taste den Dialog zum Verbinden einer App oder eines MCP-Servers über seine Adresse öffnet."
+    },
+    "offer_invites": {
+      "label": "Anbieten, Personen einzuladen",
+      "description": "Postet eine Karte, deren Taste den Einladungsdialog mit den eingetragenen Adressen öffnet."
     },
     "propose_agent": {
       "label": "Agenten vorschlagen",

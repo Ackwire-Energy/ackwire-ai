@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Connection, ConnectorDef, CustomServer } from "@agenteschat/client";
-import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { connectedItems, isMcpItem, itemName } from "@agenteschat/client/lib/connected";
 import type { TFunction } from "i18next";
 import {
   accountActions,
@@ -77,6 +77,17 @@ describe("connectors gallery", () => {
     expect(connectionOf(github, items)).toBeUndefined();
     const revoked = conn("github", { revokedAt: "2026-10-23T13:00:00.000Z" });
     expect(connectionOf(github, connectedItems([revoked], [], catalog))).toBeUndefined();
+  });
+
+  test("the MCPs strip: a server by an address the catalog doesn't list; a vendor's listed server stays a connector", () => {
+    const sentry = def("sentry", { kind: "remote_mcp", serverUrl: "https://mcp.sentry.dev/mcp" });
+    const items = connectedItems(
+      [conn("github")],
+      [server("https://mcp.sentry.dev/mcp"), server("https://mcp.acme.dev/mcp")],
+      [def("github"), sentry],
+    );
+    expect(items.filter(isMcpItem).map((i) => i.server?.serverUrl)).toEqual(["https://mcp.acme.dev/mcp"]);
+    expect(items.filter((i) => !isMcpItem(i)).length).toBe(2);
   });
 
   test("suggestions: the first three ready here and not connected, in our order", () => {

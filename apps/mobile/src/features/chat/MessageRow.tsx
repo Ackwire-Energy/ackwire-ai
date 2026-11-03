@@ -59,6 +59,7 @@ import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { CostlyProposalCard } from "../ai/CostlyProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
+import { OfferCard } from "../ai/OfferCard";
 import { StretchCard } from "../ai/StretchCard";
 import { UsagePauseCard, UsageWaitCancel } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
@@ -635,6 +636,7 @@ export const MessageRow = memo(function MessageRow({
           {isAgent ? <UsagePauseCard message={m} /> : null}
           {isAgent ? <UsageWaitCancel message={m} /> : null}
           {isAgent ? <ProposalCard message={m} /> : null}
+          {isAgent ? <OfferCard message={m} /> : null}
           {isAgent ? <InstructionProposals message={m} /> : null}
           {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
           {handoff ? <HandoffCard handoff={handoff} /> : null}

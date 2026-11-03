@@ -1804,6 +1804,17 @@
     },
     "connect": "Hubungkan",
     "connected": "Terhubung",
+    "connect_app": {
+      "title": "Hubungkan {{name}}",
+      "mcp": "Tambah server MCP",
+      "adminOnly": "Admin yang menghubungkannya"
+    },
+    "invite": {
+      "title_other": "Undang {{count}} orang",
+      "open": "Undang",
+      "done": "Undangan terkirim",
+      "adminOnly": "Orang yang boleh mengundang yang mengirimnya"
+    },
     "agentProposal": {
       "title": "{{agent}} mengusulkan agen baru",
       "review": "Tinjau",
@@ -4250,7 +4261,7 @@
     },
     "setup_write": {
       "label": "Siapkan ruang kerja",
-      "description": "Tawarkan untuk menghubungkan AI lewat kartu yang diklik seseorang, dan buat kanal untuk yang meminta, dengan Urungkan."
+      "description": "Tawarkan untuk menghubungkan AI, aplikasi, atau server MCP, atau mengundang orang, lewat kartu yang diklik seseorang, dan buat kanal untuk yang meminta, dengan Urungkan."
     },
     "github_git_read": {
       "label": "Kloning repositori (git)",
@@ -8252,6 +8263,12 @@
   "connectors": {
     "title": "Konektor",
     "add": "Tambah konektor",
+    "mcp": {
+      "title": "MCP",
+      "add": "Tambah MCP",
+      "list": "Server MCP yang terhubung",
+      "none": "Server MCP yang kamu hubungkan lewat alamatnya muncul di sini."
+    },
     "addTitle": "Tambah konektor",
     "catalogText": "Hubungkan sekali untuk {{org}}. Lalu pilih apa yang bisa dipakai tiap agen.",
     "catalog": "Konektor yang tersedia",
@@ -10448,7 +10465,7 @@
       "members": "Anggota dan undangan",
       "roles": "Peran dan izin",
       "access": "Agen dan akses",
-      "connectors": "Konektor",
+      "connectors": "Konektor dan MCP",
       "skills": "Skill",
       "keys": "Akun AI",
       "storage": "Penyimpanan",
@@ -10468,7 +10485,7 @@
       "members": "Siapa saja yang ada di ruang kerja, dan undangan.",
       "roles": "Yang bisa dilakukan tiap orang. Peran saling menambah.",
       "access": "Yang bisa dipakai tiap agen: satu tingkat per konektor.",
-      "connectors": "Layanan yang dihubungkan sekali untuk seluruh ruang kerja.",
+      "connectors": "Layanan dan server MCP yang dihubungkan sekali untuk seluruh ruang kerja.",
       "skills": "Instruksi Markdown yang dibuka agen saat dibutuhkan.",
       "keys": "Paketmu dan kunci API ruang kerja.",
       "storage": "Tempat file ruang kerja disimpan.",
@@ -10998,6 +11015,8 @@
         "readingForum": "Membaca forum",
         "creatingChannel": "Membuat kanal",
         "offeringConnectAi": "Menawarkan menghubungkan AI",
+        "offeringConnectApp": "Menawarkan menghubungkan aplikasi",
+        "offeringInvites": "Menawarkan mengundang orang",
         "proposingAgent": "Mengusulkan agen",
         "askingAgent": "Bertanya ke agen lain",
         "tellingAgent": "Memberi tahu agen lain",
@@ -11080,6 +11099,8 @@
       "readingForum": "membaca forum",
       "creatingChannel": "membuat kanal",
       "offeringConnectAi": "menyiapkan AI untuk dihubungkan",
+      "offeringConnectApp": "menyiapkan aplikasi untuk dihubungkan",
+      "offeringInvites": "menyiapkan undangan",
       "proposingAgent": "mengusulkan agen",
       "askingAgent": "bertanya ke agen lain",
       "tellingAgent": "memberi tahu agen lain",
@@ -11185,6 +11206,9 @@
       "no_ai_signed_out": "Aku belum bisa menjawab: AI-ku sudah keluar.",
       "no_ai_not_signed_in": "Aku belum bisa menjawab: {{brain}} belum masuk di komputerku.",
       "action_connect_ai": "Hubungkan AI",
+      "action_connect_app": "Hubungkan {{name}}",
+      "action_add_mcp": "Tambah server MCP",
+      "action_invite_people": "Undang orang",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
       "secret_request": "{{agent}} meminta kunci: {{name}}",
@@ -11381,6 +11405,14 @@
     "offer_connect_ai": {
       "label": "Tawarkan menghubungkan AI",
       "description": "Memposting kartu yang tombolnya membuka dialog untuk menghubungkan paket atau kunci API."
+    },
+    "offer_connect_app": {
+      "label": "Tawarkan menghubungkan aplikasi atau MCP",
+      "description": "Memposting kartu yang tombolnya membuka dialog untuk menghubungkan aplikasi atau server MCP lewat alamatnya."
+    },
+    "offer_invites": {
+      "label": "Tawarkan mengundang orang",
+      "description": "Memposting kartu yang tombolnya membuka dialog undangan dengan alamat yang sudah terisi."
     },
     "propose_agent": {
       "label": "Usulkan agen",

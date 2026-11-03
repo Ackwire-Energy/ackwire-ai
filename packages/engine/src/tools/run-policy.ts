@@ -112,6 +112,8 @@ const HERE = new Set([
   "desktop_ask_person",
   "update_thread",
   "offer_connect_ai",
+  "offer_connect_app",
+  "offer_invites",
   "propose_agent",
   "follow_up",
   "cancel_follow_up",

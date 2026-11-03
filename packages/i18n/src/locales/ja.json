@@ -1794,6 +1794,17 @@
     },
     "connect": "接続",
     "connected": "接続済み",
+    "connect_app": {
+      "title": "{{name}}を接続",
+      "mcp": "MCPサーバーを追加",
+      "adminOnly": "管理者が接続します"
+    },
+    "invite": {
+      "title_other": "{{count}}人を招待",
+      "open": "招待",
+      "done": "招待を送信済み",
+      "adminOnly": "招待できる人が送信します"
+    },
     "agentProposal": {
       "title": "{{agent}}が新しいエージェントを提案しています",
       "review": "確認する",
@@ -4222,7 +4233,7 @@
     },
     "setup_write": {
       "label": "ワークスペースを設定",
-      "description": "人がクリックするカードでAIの接続を提案したり、依頼した人のためにチャンネルを作成したりします（元に戻せます）。"
+      "description": "人がクリックするカードでAI、アプリ、MCPサーバーの接続やメンバーの招待を提案したり、依頼した人のためにチャンネルを作成したりします（元に戻せます）。"
     },
     "github_git_read": {
       "label": "リポジトリをクローン（git）",
@@ -8184,6 +8195,12 @@
   "connectors": {
     "title": "コネクタ",
     "add": "コネクタを追加",
+    "mcp": {
+      "title": "MCP",
+      "add": "MCPを追加",
+      "list": "接続済みのMCPサーバー",
+      "none": "アドレスで接続したMCPサーバーがここに表示されます。"
+    },
     "addTitle": "コネクタを追加",
     "catalogText": "{{org}}で一度接続すれば、各エージェントが何を使えるかを選べます。",
     "catalog": "利用できるコネクタ",
@@ -10380,7 +10397,7 @@
       "members": "メンバーと招待",
       "roles": "ロールと権限",
       "access": "エージェントとアクセス",
-      "connectors": "コネクタ",
+      "connectors": "コネクタとMCP",
       "skills": "スキル",
       "keys": "AIアカウント",
       "storage": "ストレージ",
@@ -10400,7 +10417,7 @@
       "members": "ワークスペースのメンバーと招待。",
       "roles": "各メンバーができること。ロールの権限は合算されます。",
       "access": "各エージェントが使えるもの。コネクタごとに1つのレベル。",
-      "connectors": "ワークスペース全体で一度だけ接続するサービス。",
+      "connectors": "ワークスペース全体で一度だけ接続するサービスとMCPサーバー。",
       "skills": "エージェントが必要なときに開くMarkdownの指示。",
       "keys": "あなたのプランと、ワークスペースのAPIキー。",
       "storage": "ワークスペースのファイルの保存先。",
@@ -10930,6 +10947,8 @@
         "readingForum": "フォーラムを読みました",
         "creatingChannel": "チャンネルを作成しました",
         "offeringConnectAi": "AIの接続を提案しました",
+        "offeringConnectApp": "アプリの接続を提案しました",
+        "offeringInvites": "メンバーの招待を提案しました",
         "proposingAgent": "エージェントを提案しました",
         "askingAgent": "別のエージェントに質問しました",
         "tellingAgent": "別のエージェントに伝えました",
@@ -11012,6 +11031,8 @@
       "readingForum": "フォーラムを読み込み中",
       "creatingChannel": "チャンネルを作成中",
       "offeringConnectAi": "AIの接続を準備中",
+      "offeringConnectApp": "アプリの接続を準備中",
+      "offeringInvites": "招待を準備中",
       "proposingAgent": "エージェントを提案中",
       "askingAgent": "別のエージェントに質問中",
       "tellingAgent": "別のエージェントに連絡中",
@@ -11117,6 +11138,9 @@
       "no_ai_signed_out": "まだ返信できません。AIがログアウトされています。",
       "no_ai_not_signed_in": "まだ返信できません。私のコンピューターで{{brain}}にログインしていません。",
       "action_connect_ai": "AIを接続",
+      "action_connect_app": "{{name}}を接続",
+      "action_add_mcp": "MCPサーバーを追加",
+      "action_invite_people": "メンバーを招待",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
       "approval_request": "承認リクエスト: {{title}}",
       "secret_request": "{{agent}}がキーを求めました: {{name}}",
@@ -11313,6 +11337,14 @@
     "offer_connect_ai": {
       "label": "AIの接続を提案",
       "description": "プランやAPIキーを接続するダイアログを開くボタン付きのカードを投稿します。"
+    },
+    "offer_connect_app": {
+      "label": "アプリやMCPの接続を提案",
+      "description": "アプリやMCPサーバーをアドレスで接続するダイアログを開くボタン付きのカードを投稿します。"
+    },
+    "offer_invites": {
+      "label": "メンバーの招待を提案",
+      "description": "アドレスが入力済みの招待ダイアログを開くボタン付きのカードを投稿します。"
     },
     "propose_agent": {
       "label": "エージェントを提案",

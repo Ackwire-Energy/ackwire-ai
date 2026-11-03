@@ -4519,6 +4519,30 @@
   "actionCard.connected": {
     "value": "Connected"
   },
+  "actionCard.connect_app.title": {
+    "value": "Connect {{name}}"
+  },
+  "actionCard.connect_app.mcp": {
+    "value": "Add an MCP server"
+  },
+  "actionCard.connect_app.adminOnly": {
+    "value": "An admin connects it"
+  },
+  "actionCard.invite.title": {
+    "value": {
+      "one": "Invite {{count}} person",
+      "other": "Invite {{count}} people"
+    }
+  },
+  "actionCard.invite.open": {
+    "value": "Invite"
+  },
+  "actionCard.invite.done": {
+    "value": "Invited"
+  },
+  "actionCard.invite.adminOnly": {
+    "value": "Someone who may invite sends it"
+  },
   "actionCard.agentProposal.title": {
     "value": "{{agent}} proposes a new agent"
   },
@@ -10616,7 +10640,7 @@
     "value": "Set up the workspace"
   },
   "scopes.setup_write.description": {
-    "value": "Offer to connect an AI with a card a person clicks, and create channels for whoever asked, with Undo."
+    "value": "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for whoever asked, with Undo."
   },
   "scopes.github_git_read.label": {
     "value": "Clone repositories (git)"
@@ -20864,6 +20888,18 @@
   "connectors.add": {
     "value": "Add connector"
   },
+  "connectors.mcp.title": {
+    "value": "MCPs"
+  },
+  "connectors.mcp.add": {
+    "value": "Add MCP"
+  },
+  "connectors.mcp.list": {
+    "value": "Connected MCP servers"
+  },
+  "connectors.mcp.none": {
+    "value": "MCP servers you connect by their address show up here."
+  },
   "connectors.addTitle": {
     "value": "Add connector"
   },
@@ -26099,7 +26135,7 @@
     "value": "Agents and access"
   },
   "settings.section.connectors": {
-    "value": "Connectors"
+    "value": "Connectors and MCPs"
   },
   "settings.section.skills": {
     "value": "Skills"
@@ -26153,7 +26189,7 @@
     "value": "What each agent can use: one level per connector."
   },
   "settings.sectionText.connectors": {
-    "value": "Services connected once for the whole workspace."
+    "value": "Services and MCP servers connected once for the whole workspace."
   },
   "settings.sectionText.skills": {
     "value": "Markdown instructions agents open when they need them."
@@ -27528,6 +27564,12 @@
   "chat.work.step.offeringConnectAi": {
     "value": "Offered to connect an AI"
   },
+  "chat.work.step.offeringConnectApp": {
+    "value": "Offered to connect an app"
+  },
+  "chat.work.step.offeringInvites": {
+    "value": "Offered to invite people"
+  },
   "chat.work.step.proposingAgent": {
     "value": "Proposed an agent"
   },
@@ -27764,6 +27806,12 @@
   },
   "chat.activity.offeringConnectAi": {
     "value": "getting an AI ready to connect"
+  },
+  "chat.activity.offeringConnectApp": {
+    "value": "getting an app ready to connect"
+  },
+  "chat.activity.offeringInvites": {
+    "value": "getting invitations ready"
   },
   "chat.activity.proposingAgent": {
     "value": "proposing an agent"
@@ -28058,6 +28106,15 @@
   },
   "chat.body.action_connect_ai": {
     "value": "Connect an AI"
+  },
+  "chat.body.action_connect_app": {
+    "value": "Connect {{name}}"
+  },
+  "chat.body.action_add_mcp": {
+    "value": "Add an MCP server"
+  },
+  "chat.body.action_invite_people": {
+    "value": "Invite people"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"
@@ -28391,6 +28448,18 @@
   },
   "builtinTools.offer_connect_ai.description": {
     "value": "Posts a card whose button opens the dialog to connect a plan or an API key."
+  },
+  "builtinTools.offer_connect_app.label": {
+    "value": "Offer to connect an app or MCP"
+  },
+  "builtinTools.offer_connect_app.description": {
+    "value": "Posts a card whose button opens the dialog to connect an app or an MCP server by its address."
+  },
+  "builtinTools.offer_invites.label": {
+    "value": "Offer to invite people"
+  },
+  "builtinTools.offer_invites.description": {
+    "value": "Posts a card whose button opens the invite dialog with the addresses filled in."
   },
   "builtinTools.propose_agent.label": {
     "value": "Propose an agent"
@@ -30700,89 +30769,5 @@
   },
   "taskManager.agentPanel.none": {
     "value": "{{name}} is free now."
-  },
-  "app.issues.form.agentStartsAll": {
-    "value": "{{name}} starts as soon as the task is created, with the description, the criteria and the attachments. Anything sensitive asks for your approval."
-  },
-  "app.issues.form.titleShort": {
-    "value": "Task title"
-  },
-  "app.issues.form.quickPlaceholder": {
-    "value": "Describe what's needed. Paste screenshots, drop files. Lines starting with “-” become acceptance criteria."
-  },
-  "app.issues.form.pasteHint": {
-    "value": "Paste a screenshot with {{keys}} or drop files here."
-  },
-  "app.issues.form.expand": {
-    "value": "Open the full form"
-  },
-  "app.issues.form.collapse": {
-    "value": "Back to the quick form"
-  },
-  "app.issues.form.another": {
-    "value": "Create another"
-  },
-  "app.issues.form.addCriterion": {
-    "value": "Add a criterion"
-  },
-  "app.issues.form.removeCriterion": {
-    "value": "Remove the criterion"
-  },
-  "app.issues.form.drop": {
-    "value": "Drop to attach to the task"
-  },
-  "app.issues.form.dropText": {
-    "value": "Photos, videos, PDFs, spreadsheets… up to {{max}} MB each."
-  },
-  "app.issues.form.createHint": {
-    "value": "{{keys}} creates the task"
-  },
-  "app.issues.discussion": {
-    "value": "Discussion"
-  },
-  "app.issues.noComments": {
-    "value": "No comments yet."
-  },
-  "app.issues.tabs.label": {
-    "value": "Task sections"
-  },
-  "app.issues.tabs.details": {
-    "value": "Details"
-  },
-  "app.issues.tabs.files": {
-    "value": "Attachments"
-  },
-  "app.issues.tabs.history": {
-    "value": "History"
-  },
-  "app.issues.files.title": {
-    "value": "Attachments"
-  },
-  "app.issues.files.add": {
-    "value": "Add files"
-  },
-  "app.issues.files.addHint": {
-    "value": "or drop them here"
-  },
-  "app.issues.files.grid": {
-    "value": "Grid"
-  },
-  "app.issues.files.empty": {
-    "value": "No attachments yet. Drop files here or paste a screenshot."
-  },
-  "app.issues.files.fromCreation": {
-    "value": "At creation · {{when}}"
-  },
-  "app.issues.files.fromComment": {
-    "value": "{{name}}'s comment · {{when}}"
-  },
-  "app.issues.files.linked": {
-    "value": "Linked by {{name}}"
-  },
-  "app.issues.history.commented": {
-    "value": "commented"
-  },
-  "app.issues.history.commentedFiles": {
-    "value": "commented with attachments"
   }
 }

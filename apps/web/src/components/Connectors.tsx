@@ -20,6 +20,7 @@ import {
   type ConnectedItem,
   connectedIds,
   connectedItems,
+  isMcpItem,
   itemName,
   outcomeText,
 } from "@agenteschat/client/lib/connected";
@@ -156,6 +157,8 @@ export function ConnectorsSection({
   }, [mail, account, mailAccounts.data, mailAccounts.isError, admin, t, toast]);
   const defs = catalog.data?.connectors ?? [];
   const items = connectedItems(connections.data ?? [], servers.data ?? [], defs);
+  const apps = items.filter((i) => !isMcpItem(i));
+  const mcps = items.filter(isMcpItem);
   const agentList = agents.data ?? [];
   const access = useAgentsAccess(agentList, items.length > 0);
   const using = (item: ConnectedItem) =>
@@ -189,121 +192,142 @@ export function ConnectorsSection({
     window.history.replaceState(null, "", window.location.pathname);
   }, [connected, outcome, review, connections.data, servers.data, catalog.data, listsFetching, admin, t, toast]);
 
-  return (
-    <Card aria-labelledby="sec-conn">
-      <div className="row" style={{ gap: 12 }}>
-        <h2 id="sec-conn" className="ac-card__title" style={{ flex: "1 1 280px" }}>
-          {t("connectors.title")}
-        </h2>
-        {admin && (
-          <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)}>
-            {t("connectors.add")}
-          </Button>
-        )}
-      </div>
-      {composio.data && nearComposioLimit(composio.data) && (
-        <p className="small muted">{composioUsageText(t, i18n.language, composio.data)}</p>
-      )}
-      {admin && <ToolChanges orgId={org.id} />}
-      {(connections.isLoading || servers.isLoading) && <LoadingList count={2} trailing />}
-      {connections.isSuccess &&
-        servers.isSuccess &&
-        items.length === 0 &&
-        accounts.length === 0 &&
-        dbList.length === 0 && <p className="small muted">{t("connectors.none")}</p>}
-      {items.length + accounts.length + dbList.length > 0 && (
-        <List className="connected-list" aria-label={t("connectors.connectedList")}>
-          {accounts.map((account) => (
-            <MailRow
-              key={`mail-${account.id}`}
-              account={account}
-              agents={agentList}
-              admin={admin}
-              onTools={() => setMailFlow({ step: 1, account })}
-              onWho={() => setMailFlow({ step: 2, account })}
-              onAddresses={() => setAddressesOf(account)}
-              onReconnect={() => reconnect(account)}
-              onDisconnect={() => setRemovingMail(account)}
-            />
-          ))}
-          {dbList.map((connection) => (
-            <DatabaseRow
-              key={`db-${connection.id}`}
-              connection={connection}
-              agents={agentList}
-              admin={admin}
-              onTools={() => setDbFlow({ step: 1, connection })}
-              onWho={() => setDbFlow({ step: 2, connection })}
-              onReconnect={() => setReconnectingDb(connection)}
-              onDisconnect={() => setRemovingDb(connection)}
-            />
-          ))}
-          {items.map((item) => (
-            <ConnectedRow
-              key={item.id}
-              item={item}
-              using={using(item)}
-              total={agentList.length}
-              admin={admin}
-              onTools={() => setFlow({ step: 1, item })}
-              onWho={() => setFlow({ step: 2, item })}
-              onRename={() => setRenaming(item)}
-              onReconnect={() => setFlow({ step: 0, def: item.def, mode: "reconnect", item })}
-              onAddAccount={() => setFlow({ step: 0, def: item.def, mode: "add", item })}
-              onDisconnect={() => setRemoving(item)}
-            />
-          ))}
-        </List>
-      )}
-      <GitHubAppPanel />
+  const row = (item: ConnectedItem) => (
+    <ConnectedRow
+      key={item.id}
+      item={item}
+      using={using(item)}
+      total={agentList.length}
+      admin={admin}
+      onTools={() => setFlow({ step: 1, item })}
+      onWho={() => setFlow({ step: 2, item })}
+      onRename={() => setRenaming(item)}
+      onReconnect={() => setFlow({ step: 0, def: item.def, mode: "reconnect", item })}
+      onAddAccount={() => setFlow({ step: 0, def: item.def, mode: "add", item })}
+      onDisconnect={() => setRemoving(item)}
+    />
+  );
+  const loaded = connections.isSuccess && servers.isSuccess;
 
-      <ConnectorCatalogDialog
-        open={adding}
-        onOpenChange={setAdding}
-        connectors={defs}
-        connected={connectedIds(items)}
-        loading={catalog.isLoading}
-        onPick={(def) => {
-          setAdding(false);
-          // Connected already: a server by address takes another account, a catalog connector a new sign-in.
-          const item = items.find((i) => i.def?.id === def.id);
-          setFlow(item ? { step: 0, def, mode: item.custom ? "add" : "reconnect", item } : { step: 0, def });
-        }}
-        onOther={() => {
-          setAdding(false);
-          setFlow({ step: 0, def: null });
-        }}
-        mail={{
-          choices: mailChoices(mailProviders.data),
-          connected: new Set(accounts.map(choiceOf)),
-          onPick: (choice) => {
+  return (
+    <>
+      <Card aria-labelledby="sec-conn">
+        <div className="row" style={{ gap: 12 }}>
+          <h2 id="sec-conn" className="ac-card__title" style={{ flex: "1 1 280px" }}>
+            {t("connectors.title")}
+          </h2>
+          {admin && (
+            <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)}>
+              {t("connectors.add")}
+            </Button>
+          )}
+        </div>
+        {composio.data && nearComposioLimit(composio.data) && (
+          <p className="small muted">{composioUsageText(t, i18n.language, composio.data)}</p>
+        )}
+        {admin && <ToolChanges orgId={org.id} />}
+        {(connections.isLoading || servers.isLoading) && <LoadingList count={2} trailing />}
+        {loaded && apps.length === 0 && accounts.length === 0 && dbList.length === 0 && (
+          <p className="small muted">{t("connectors.none")}</p>
+        )}
+        {apps.length + accounts.length + dbList.length > 0 && (
+          <List className="connected-list" aria-label={t("connectors.connectedList")}>
+            {accounts.map((account) => (
+              <MailRow
+                key={`mail-${account.id}`}
+                account={account}
+                agents={agentList}
+                admin={admin}
+                onTools={() => setMailFlow({ step: 1, account })}
+                onWho={() => setMailFlow({ step: 2, account })}
+                onAddresses={() => setAddressesOf(account)}
+                onReconnect={() => reconnect(account)}
+                onDisconnect={() => setRemovingMail(account)}
+              />
+            ))}
+            {dbList.map((connection) => (
+              <DatabaseRow
+                key={`db-${connection.id}`}
+                connection={connection}
+                agents={agentList}
+                admin={admin}
+                onTools={() => setDbFlow({ step: 1, connection })}
+                onWho={() => setDbFlow({ step: 2, connection })}
+                onReconnect={() => setReconnectingDb(connection)}
+                onDisconnect={() => setRemovingDb(connection)}
+              />
+            ))}
+            {apps.map(row)}
+          </List>
+        )}
+        <GitHubAppPanel />
+      </Card>
+      <Card aria-labelledby="sec-mcp">
+        <div className="row" style={{ gap: 12 }}>
+          <h2 id="sec-mcp" className="ac-card__title" style={{ flex: "1 1 280px" }}>
+            {t("connectors.mcp.title")}
+          </h2>
+          {admin && (
+            <Button size="sm" variant="primary" icon="plus" onClick={() => setFlow({ step: 0, def: null })}>
+              {t("connectors.mcp.add")}
+            </Button>
+          )}
+        </div>
+        {loaded && mcps.length === 0 && <p className="small muted">{t("connectors.mcp.none")}</p>}
+        {mcps.length > 0 && (
+          <List className="connected-list" aria-label={t("connectors.mcp.list")}>
+            {mcps.map(row)}
+          </List>
+        )}
+
+        <ConnectorCatalogDialog
+          open={adding}
+          onOpenChange={setAdding}
+          connectors={defs}
+          connected={connectedIds(items)}
+          loading={catalog.isLoading}
+          onPick={(def) => {
             setAdding(false);
-            setMailFlow({ step: 0, choice });
-          },
-        }}
-        database={{
-          connected: dbList.length > 0,
-          onPick: () => {
+            // Connected already: a server by address takes another account, a catalog connector a new sign-in.
+            const item = items.find((i) => i.def?.id === def.id);
+            setFlow(item ? { step: 0, def, mode: item.custom ? "add" : "reconnect", item } : { step: 0, def });
+          }}
+          onOther={() => {
             setAdding(false);
-            setDbFlow({ step: 0 });
-          },
-        }}
-      />
-      <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
-      <MailConnectFlow flow={mailFlow} onChange={setMailFlow} onClose={() => setMailFlow(null)} />
-      <MailReconnectDialog account={reconnecting} onClose={() => setReconnecting(null)} />
-      <MailAddressesDialog account={addressesOf} onClose={() => setAddressesOf(null)} />
-      <MailDisconnectDialog account={removingMail} onClose={() => setRemovingMail(null)} />
-      <DatabaseConnectFlow flow={dbFlow} onChange={setDbFlow} onClose={() => setDbFlow(null)} />
-      <DatabaseReconnectDialog connection={reconnectingDb} onClose={() => setReconnectingDb(null)} />
-      <DatabaseDisconnectDialog connection={removingDb} onClose={() => setRemovingDb(null)} />
-      <DisconnectDialog
-        item={removing}
-        using={removing ? using(removing).length : 0}
-        onClose={() => setRemoving(null)}
-      />
-      <RenameDialog item={renaming} onClose={() => setRenaming(null)} />
-    </Card>
+            setFlow({ step: 0, def: null });
+          }}
+          mail={{
+            choices: mailChoices(mailProviders.data),
+            connected: new Set(accounts.map(choiceOf)),
+            onPick: (choice) => {
+              setAdding(false);
+              setMailFlow({ step: 0, choice });
+            },
+          }}
+          database={{
+            connected: dbList.length > 0,
+            onPick: () => {
+              setAdding(false);
+              setDbFlow({ step: 0 });
+            },
+          }}
+        />
+        <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
+        <MailConnectFlow flow={mailFlow} onChange={setMailFlow} onClose={() => setMailFlow(null)} />
+        <MailReconnectDialog account={reconnecting} onClose={() => setReconnecting(null)} />
+        <MailAddressesDialog account={addressesOf} onClose={() => setAddressesOf(null)} />
+        <MailDisconnectDialog account={removingMail} onClose={() => setRemovingMail(null)} />
+        <DatabaseConnectFlow flow={dbFlow} onChange={setDbFlow} onClose={() => setDbFlow(null)} />
+        <DatabaseReconnectDialog connection={reconnectingDb} onClose={() => setReconnectingDb(null)} />
+        <DatabaseDisconnectDialog connection={removingDb} onClose={() => setRemovingDb(null)} />
+        <DisconnectDialog
+          item={removing}
+          using={removing ? using(removing).length : 0}
+          onClose={() => setRemoving(null)}
+        />
+        <RenameDialog item={renaming} onClose={() => setRenaming(null)} />
+      </Card>
+    </>
   );
 }
 

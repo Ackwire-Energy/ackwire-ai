@@ -1865,6 +1865,18 @@
     },
     "connect": "Koppelen",
     "connected": "Gekoppeld",
+    "connect_app": {
+      "title": "{{name}} koppelen",
+      "mcp": "Een MCP-server toevoegen",
+      "adminOnly": "Een admin koppelt het"
+    },
+    "invite": {
+      "title_one": "{{count}} persoon uitnodigen",
+      "title_other": "{{count}} personen uitnodigen",
+      "open": "Uitnodigen",
+      "done": "Uitnodiging verstuurd",
+      "adminOnly": "Wie mag uitnodigen, verstuurt het"
+    },
     "agentProposal": {
       "title": "{{agent}} stelt een nieuwe agent voor",
       "review": "Bekijken",
@@ -4429,7 +4441,7 @@
     },
     "setup_write": {
       "label": "De werkruimte inrichten",
-      "description": "Aanbieden om een AI te koppelen met een kaart waarop iemand klikt, en kanalen maken voor wie erom vroeg, met Ongedaan maken."
+      "description": "Aanbieden om een AI, een app of een MCP-server te koppelen of mensen uit te nodigen met een kaart waarop iemand klikt, en kanalen maken voor wie erom vroeg, met Ongedaan maken."
     },
     "github_git_read": {
       "label": "Repositories klonen (git)",
@@ -8611,6 +8623,12 @@
   "connectors": {
     "title": "Connectors",
     "add": "Connector toevoegen",
+    "mcp": {
+      "title": "MCP's",
+      "add": "MCP toevoegen",
+      "list": "Gekoppelde MCP-servers",
+      "none": "MCP-servers die je via hun adres koppelt, verschijnen hier."
+    },
     "addTitle": "Connector toevoegen",
     "catalogText": "Koppel één keer voor {{org}}. Kies daarna wat elke agent mag gebruiken.",
     "catalog": "Beschikbare connectors",
@@ -10855,7 +10873,7 @@
       "members": "Leden en uitnodigingen",
       "roles": "Rollen en rechten",
       "access": "Agents en toegang",
-      "connectors": "Connectors",
+      "connectors": "Connectors en MCP's",
       "skills": "Skills",
       "keys": "AI-accounts",
       "storage": "Opslag",
@@ -10875,7 +10893,7 @@
       "members": "Wie er in de werkruimte zit, en uitnodigingen.",
       "roles": "Wat iedereen kan doen. Rollen tellen op.",
       "access": "Wat elke agent kan gebruiken: één niveau per connector.",
-      "connectors": "Diensten die één keer voor de hele werkruimte zijn gekoppeld.",
+      "connectors": "Diensten en MCP-servers die één keer voor de hele werkruimte zijn gekoppeld.",
       "skills": "Markdown-instructies die agents openen als ze ze nodig hebben.",
       "keys": "Je abonnementen en de API-sleutels van de werkruimte.",
       "storage": "Waar de bestanden van de werkruimte staan.",
@@ -11429,6 +11447,8 @@
         "readingForum": "Het forum gelezen",
         "creatingChannel": "Een kanaal gemaakt",
         "offeringConnectAi": "Aangeboden een AI te koppelen",
+        "offeringConnectApp": "Aangeboden een app te koppelen",
+        "offeringInvites": "Aangeboden mensen uit te nodigen",
         "proposingAgent": "Een agent voorgesteld",
         "askingAgent": "Een andere agent iets gevraagd",
         "tellingAgent": "Een andere agent iets laten weten",
@@ -11511,6 +11531,8 @@
       "readingForum": "het forum aan het lezen",
       "creatingChannel": "een kanaal aan het maken",
       "offeringConnectAi": "een AI klaar aan het zetten om te koppelen",
+      "offeringConnectApp": "een app klaar aan het zetten om te koppelen",
+      "offeringInvites": "uitnodigingen klaar aan het zetten",
       "proposingAgent": "een agent aan het voorstellen",
       "askingAgent": "een andere agent iets aan het vragen",
       "tellingAgent": "een andere agent iets aan het laten weten",
@@ -11618,6 +11640,9 @@
       "no_ai_signed_out": "Ik kan nog niet antwoorden: mijn AI is uitgelogd.",
       "no_ai_not_signed_in": "Ik kan nog niet antwoorden: {{brain}} is niet ingelogd op mijn computer.",
       "action_connect_ai": "AI koppelen",
+      "action_connect_app": "{{name}} koppelen",
+      "action_add_mcp": "Een MCP-server toevoegen",
+      "action_invite_people": "Mensen uitnodigen",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
       "secret_request": "{{agent}} vroeg om een sleutel: {{name}}",
@@ -11817,6 +11842,14 @@
     "offer_connect_ai": {
       "label": "Aanbieden een AI te koppelen",
       "description": "Plaatst een kaart met een knop die het venster opent om een abonnement of API-sleutel te koppelen."
+    },
+    "offer_connect_app": {
+      "label": "Aanbieden een app of MCP te koppelen",
+      "description": "Plaatst een kaart met een knop die het venster opent om een app of een MCP-server via zijn adres te koppelen."
+    },
+    "offer_invites": {
+      "label": "Aanbieden mensen uit te nodigen",
+      "description": "Plaatst een kaart met een knop die het uitnodigingsvenster opent met de adressen al ingevuld."
     },
     "propose_agent": {
       "label": "Agent voorstellen",

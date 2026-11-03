@@ -349,7 +349,12 @@ export function buildEngine(o: EngineOptions) {
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
       // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo, new agents proposed.
-      createSetupToolSource({ pubsub: adapters.pubsub, ai: { gateway }, context }),
+      createSetupToolSource({
+        pubsub: adapters.pubsub,
+        ai: { gateway },
+        context,
+        catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
+      }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createSkillToolSource({ db, blobs: artifacts.blobs, pubsub: adapters.pubsub, judge: context.judge }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),

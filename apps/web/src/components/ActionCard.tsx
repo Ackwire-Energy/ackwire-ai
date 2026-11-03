@@ -1,26 +1,37 @@
 import type { AgentDraft, AgentProposalCard, Message } from "@agenteschat/client";
 import {
   useAiStatus,
+  useAllInvitations,
+  useCatalog,
   useChannels,
+  useConnections,
   useCreateProposedAgent,
   useCreateProposedRoutine,
+  useCustomServers,
   useDenyAgentProposal,
   useMailAccounts,
+  useMembers,
 } from "@agenteschat/client";
 import {
   actionCardOf,
+  type ConnectAppCard,
   connectAiDone,
+  connectAppDone,
+  type InviteCard,
+  inviteDone,
   type ProposalLine,
   proposalLines,
   proposalStatus,
   routineLeft,
   suggestedAiText,
 } from "@agenteschat/client/lib/action-cards";
-import { itemName } from "@agenteschat/client/lib/connected";
+import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, whenAt } from "@agenteschat/client/lib/format";
+import { hostOf } from "@agenteschat/client/lib/import/shared";
 import { choiceOf } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
+import { connectorName } from "@agenteschat/client/lib/scopes";
 import { Button, Dialog, Icon, Spinner } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { lazy, type ReactNode, Suspense, useState } from "react";
@@ -29,8 +40,10 @@ import { useConnectedById } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useConnectAi } from "@/components/ConnectAi";
+import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { CostlyProposalCardView } from "@/components/CostlyProposalCard";
+import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
@@ -67,6 +80,8 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "agent_proposal") return <AgentProposalCardView message={message} card={card} />;
   if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
   if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
+  if (card.kind === "connect_app") return <ConnectAppCardView card={card} />;
+  if (card.kind === "invite_people") return <InviteCardView card={card} />;
   if (card.kind === "autonomy_proposal") return <CostlyProposalCardView message={message} card={card} />;
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
@@ -112,6 +127,98 @@ export function ActionCard({ message }: { message: Message }) {
 }
 
 /**
+ * "Conectar Linear" / "Adicionar MCP" (`offer_connect_app`): Conectar opens the same connect dialog as Settings, at the
+ * catalog entry or at connecting by address with the address filled in; the person signs in or types the key there.
+ * Who may not connect reads who does. Done once the workspace has it.
+ */
+function ConnectAppCardView({ card }: { card: ConnectAppCard }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const catalog = useCatalog();
+  const connections = useConnections(org.id);
+  const servers = useCustomServers(org.id);
+  const [flow, setFlow] = useState<FlowState | null>(null);
+  const defs = catalog.data?.connectors ?? [];
+  const def = defs.find((d) => d.id === card.connector) ?? null;
+  const name = def ? connectorName(t, def) : card.url ? hostOf(card.url) : "";
+  const title = name ? t("actionCard.connect_app.title", { name }) : t("actionCard.connect_app.mcp");
+  if (connectAppDone(card, connectedItems(connections.data ?? [], servers.data ?? [], defs))) {
+    return (
+      <RequestDone done label={title}>
+        {t("actionCard.connected")}: <b>{title}</b>
+      </RequestDone>
+    );
+  }
+  return (
+    <div className="waitcard">
+      <span className="waitcard__top ac-iconline">
+        {def ? <ConnectorIcon def={def} label={name} /> : <Icon name="plug" size={16} />}
+        <span>{title}</span>
+      </span>
+      {card.why && <p>{card.why}</p>}
+      {card.url && (
+        <p className="small">
+          <code>{card.url}</code>
+        </p>
+      )}
+      <span className="waitcard__acts">
+        {can(org, "manage_connectors") ? (
+          <Button size="sm" onClick={() => setFlow(def ? { step: 0, def } : { step: 0, def: null, url: card.url })}>
+            {t("actionCard.connect")}
+          </Button>
+        ) : (
+          <span className="small muted">{t("actionCard.connect_app.adminOnly")}</span>
+        )}
+      </span>
+      <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
+    </div>
+  );
+}
+
+/**
+ * "Convidar pessoas" (`offer_invites`): Convidar opens the workspace's invite dialog with the addresses filled in, as
+ * members; the person sends it there. Done once each address is invited or a member.
+ */
+function InviteCardView({ card }: { card: InviteCard }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const invite = useInviteDialog();
+  const mayInvite = can(org, "invite_people");
+  const invitations = useAllInvitations(org.id, mayInvite);
+  const members = useMembers(org.id);
+  const title = t("actionCard.invite.title", { count: card.emails.length });
+  const known = [
+    ...(invitations.data ?? []).filter((i) => i.status === "pending").map((i) => i.email),
+    ...(members.data ?? []).map((m) => m.email),
+  ];
+  if (inviteDone(card, known)) {
+    return (
+      <RequestDone done label={title}>
+        {t("actionCard.invite.done")}: <b>{card.emails.join(", ")}</b>
+      </RequestDone>
+    );
+  }
+  return (
+    <div className="waitcard">
+      <span className="waitcard__top ac-iconline">
+        <Icon name="personAdd" size={16} />
+        <span>{title}</span>
+      </span>
+      {card.why && <p>{card.why}</p>}
+      <p className="small muted">{card.emails.join(", ")}</p>
+      <span className="waitcard__acts">
+        {mayInvite && invite ? (
+          <Button size="sm" onClick={() => invite.open({ emails: card.emails })}>
+            {t("actionCard.invite.open")}
+          </Button>
+        ) : (
+          <span className="small muted">{t("actionCard.invite.adminOnly")}</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 /**
  * "Ada propõe um novo agente". While it is open, a request card like every other: the agent's reason, the draft in the
  * well (its face, name, handle and role, and the AI it would think with where the line has room), what it gets a line

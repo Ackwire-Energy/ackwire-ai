@@ -1981,6 +1981,20 @@
     },
     "connect": "Połącz",
     "connected": "Połączono",
+    "connect_app": {
+      "title": "Połącz {{name}}",
+      "mcp": "Dodaj serwer MCP",
+      "adminOnly": "Łączy go administrator"
+    },
+    "invite": {
+      "title_one": "Zaproś {{count}} osobę",
+      "title_few": "Zaproś {{count}} osoby",
+      "title_many": "Zaproś {{count}} osób",
+      "title_other": "Zaproś {{count}} osoby",
+      "open": "Zaproś",
+      "done": "Zaproszenie wysłane",
+      "adminOnly": "Wysyła je osoba, która może zapraszać"
+    },
     "agentProposal": {
       "title": "{{agent}} proponuje nowego agenta",
       "review": "Przejrzyj",
@@ -4679,7 +4693,7 @@
     },
     "setup_write": {
       "label": "Konfigurowanie przestrzeni roboczej",
-      "description": "Proponowanie podłączenia AI kartą, którą klika osoba, i tworzenie kanałów dla tego, kto prosi, z opcją Cofnij."
+      "description": "Proponowanie podłączenia AI, aplikacji lub serwera MCP albo zaproszenia osób kartą, którą klika osoba, i tworzenie kanałów dla tego, kto prosi, z opcją Cofnij."
     },
     "github_git_read": {
       "label": "Klonowanie repozytoriów (git)",
@@ -9168,6 +9182,12 @@
   "connectors": {
     "title": "Konektory",
     "add": "Dodaj konektor",
+    "mcp": {
+      "title": "MCP",
+      "add": "Dodaj MCP",
+      "list": "Połączone serwery MCP",
+      "none": "Tu pojawiają się serwery MCP połączone przez ich adres."
+    },
     "addTitle": "Dodaj konektor",
     "catalogText": "Połącz raz dla {{org}}. Potem wybierz, z czego może korzystać każdy agent.",
     "catalog": "Dostępne konektory",
@@ -11509,7 +11529,7 @@
       "members": "Członkowie i zaproszenia",
       "roles": "Role i uprawnienia",
       "access": "Agenci i dostęp",
-      "connectors": "Konektory",
+      "connectors": "Konektory i MCP",
       "skills": "Umiejętności",
       "keys": "Konta AI",
       "storage": "Miejsce na dane",
@@ -11529,7 +11549,7 @@
       "members": "Kto jest w przestrzeni roboczej oraz zaproszenia.",
       "roles": "Co może każda osoba. Role się sumują.",
       "access": "Z czego może korzystać każdy agent: jeden poziom na konektor.",
-      "connectors": "Usługi podłączone raz dla całej przestrzeni roboczej.",
+      "connectors": "Usługi i serwery MCP podłączone raz dla całej przestrzeni roboczej.",
       "skills": "Instrukcje w Markdown, które agenci otwierają, gdy ich potrzebują.",
       "keys": "Twoje plany i klucze API przestrzeni roboczej.",
       "storage": "Gdzie są przechowywane pliki przestrzeni roboczej.",
@@ -12121,6 +12141,8 @@
         "readingForum": "Przeczytano forum",
         "creatingChannel": "Utworzono kanał",
         "offeringConnectAi": "Zaproponowano połączenie AI",
+        "offeringConnectApp": "Zaproponowano połączenie aplikacji",
+        "offeringInvites": "Zaproponowano zaproszenie osób",
         "proposingAgent": "Zaproponowano agenta",
         "askingAgent": "Zapytano innego agenta",
         "tellingAgent": "Poinformowano innego agenta",
@@ -12203,6 +12225,8 @@
       "readingForum": "czytanie forum",
       "creatingChannel": "tworzenie kanału",
       "offeringConnectAi": "przygotowywanie połączenia AI",
+      "offeringConnectApp": "przygotowywanie połączenia aplikacji",
+      "offeringInvites": "przygotowywanie zaproszeń",
       "proposingAgent": "proponowanie agenta",
       "askingAgent": "pytanie innego agenta",
       "tellingAgent": "informowanie innego agenta",
@@ -12312,6 +12336,9 @@
       "no_ai_signed_out": "Nie mogę jeszcze odpowiadać: moje AI jest wylogowane.",
       "no_ai_not_signed_in": "Nie mogę jeszcze odpowiadać: {{brain}} nie jest zalogowany na moim komputerze.",
       "action_connect_ai": "Połącz AI",
+      "action_connect_app": "Połącz {{name}}",
+      "action_add_mcp": "Dodaj serwer MCP",
+      "action_invite_people": "Zaproś osoby",
       "agent_proposal": "Propozycja nowego agenta: {{name}}",
       "approval_request": "Prośba o zatwierdzenie: {{title}}",
       "secret_request": "{{agent}} prosi o klucz: {{name}}",
@@ -12517,6 +12544,14 @@
     "offer_connect_ai": {
       "label": "Zaproponuj połączenie AI",
       "description": "Publikuje kartę z przyciskiem, który otwiera okno połączenia planu lub klucza API."
+    },
+    "offer_connect_app": {
+      "label": "Zaproponuj połączenie aplikacji lub MCP",
+      "description": "Publikuje kartę z przyciskiem, który otwiera okno połączenia aplikacji lub serwera MCP po jego adresie."
+    },
+    "offer_invites": {
+      "label": "Zaproponuj zaproszenie osób",
+      "description": "Publikuje kartę z przyciskiem, który otwiera okno zaproszenia z wpisanymi adresami."
     },
     "propose_agent": {
       "label": "Zaproponuj agenta",

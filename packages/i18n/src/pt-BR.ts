@@ -1838,6 +1838,18 @@ export const ptBR = {
     },
     connect: "Conectar",
     connected: "Conectado",
+    connect_app: {
+      title: "Conectar {{name}}",
+      mcp: "Adicionar um servidor MCP",
+      adminOnly: "Um admin conecta",
+    },
+    invite: {
+      title_one: "Convidar {{count}} pessoa",
+      title_other: "Convidar {{count}} pessoas",
+      open: "Convidar",
+      done: "Convite enviado",
+      adminOnly: "Quem pode convidar envia",
+    },
     agentProposal: {
       title: "{{agent}} propõe um novo agente",
       review: "Revisar",
@@ -4358,7 +4370,7 @@ export const ptBR = {
     setup_write: {
       label: "Configurar o workspace",
       description:
-        "Oferecer conectar uma IA com um card que uma pessoa clica, e criar canais para quem pediu, com Desfazer.",
+        "Oferecer conectar uma IA, um app ou um servidor MCP, ou convidar pessoas, com um card que uma pessoa clica, e criar canais para quem pediu, com Desfazer.",
     },
     github_git_read: {
       label: "Clonar repositórios (git)",
@@ -8396,6 +8408,12 @@ export const ptBR = {
   connectors: {
     title: "Conectores",
     add: "Adicionar conector",
+    mcp: {
+      title: "MCPs",
+      add: "Adicionar MCP",
+      list: "Servidores MCP conectados",
+      none: "Os servidores MCP que você conectar pelo endereço aparecem aqui.",
+    },
     addTitle: "Adicionar conector",
     catalogText: "Conecte uma vez para a {{org}}. Depois escolha o que cada agente pode usar.",
     catalog: "Conectores disponíveis",
@@ -10378,7 +10396,7 @@ export const ptBR = {
       members: "Membros e convites",
       roles: "Papéis e permissões",
       access: "Agentes e acesso",
-      connectors: "Conectores",
+      connectors: "Conectores e MCPs",
       skills: "Skills",
       keys: "Contas de IA",
       storage: "Armazenamento",
@@ -10398,7 +10416,7 @@ export const ptBR = {
       members: "Quem está no workspace e os convites.",
       roles: "O que cada pessoa pode fazer. Papéis se somam.",
       access: "O que cada agente pode usar: um nível por conector.",
-      connectors: "Serviços conectados uma vez para o workspace inteiro.",
+      connectors: "Serviços e servidores MCP conectados uma vez para o workspace inteiro.",
       skills: "Instruções em Markdown que os agentes abrem quando precisam.",
       keys: "Seus planos e as chaves de API do workspace.",
       storage: "Onde ficam os arquivos do workspace.",
@@ -10984,6 +11002,8 @@ export const ptBR = {
         readingForum: "Leu o fórum",
         creatingChannel: "Criou um canal",
         offeringConnectAi: "Ofereceu conectar uma IA",
+        offeringConnectApp: "Ofereceu conectar um app",
+        offeringInvites: "Ofereceu convidar pessoas",
         proposingAgent: "Propôs um agente",
         askingAgent: "Perguntou a outro agente",
         tellingAgent: "Avisou outro agente",
@@ -11066,6 +11086,8 @@ export const ptBR = {
       readingForum: "lendo o fórum",
       creatingChannel: "criando um canal",
       offeringConnectAi: "preparando a conexão de uma IA",
+      offeringConnectApp: "preparando a conexão de um app",
+      offeringInvites: "preparando os convites",
       proposingAgent: "propondo um agente",
       askingAgent: "perguntando a outro agente",
       tellingAgent: "avisando outro agente",
@@ -11182,6 +11204,9 @@ export const ptBR = {
       /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */
       no_ai_not_signed_in: "Ainda não consigo responder: o {{brain}} está sem login no meu computador.",
       action_connect_ai: "Conectar uma IA",
+      action_connect_app: "Conectar {{name}}",
+      action_add_mcp: "Adicionar um servidor MCP",
+      action_invite_people: "Convidar pessoas",
       agent_proposal: "Propôs um novo agente: {{name}}",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "{{agent}} pediu uma chave: {{name}}",
@@ -11390,6 +11415,14 @@ export const ptBR = {
     offer_connect_ai: {
       label: "Oferecer conectar uma IA",
       description: "Posta um card cujo botão abre a conexão de um plano ou de uma chave de API.",
+    },
+    offer_connect_app: {
+      label: "Oferecer conectar um app ou MCP",
+      description: "Posta um card cujo botão abre a conexão de um app ou de um servidor MCP pelo endereço.",
+    },
+    offer_invites: {
+      label: "Oferecer convidar pessoas",
+      description: "Posta um card cujo botão abre o convite com os endereços já preenchidos.",
     },
     propose_agent: {
       label: "Propor um agente",

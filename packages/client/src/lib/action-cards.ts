@@ -10,6 +10,8 @@ import type {
   SuggestedAi,
 } from "../api/types";
 import type { Level } from "./access-levels";
+import type { ConnectedItem } from "./connected";
+import { isHttpsUrl, sameServer } from "./custom-tools";
 import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
 import { type UsagePauseCard, usagePauseCardOf } from "./usage-pause";
@@ -98,7 +100,34 @@ export const mayContinueStretch = (
   admin: boolean,
 ) => admin || (meId !== null && (card.forUserId === meId || card.agentIds.some((id) => ownerOf(id) === meId)));
 
-export type ActionCard = ConnectAiCard | AgentProposalCard | StretchCard | UsagePauseCard | CostlyProposalCard;
+/**
+ * "Conectar Linear" / "Adicionar MCP" (`offer_connect_app`): the connect dialog at a catalog entry, or at connecting by
+ * address with `url` filled in (neither: the address is typed there).
+ */
+export interface ConnectAppCard {
+  kind: "connect_app";
+  forUserId: string | null;
+  connector?: string;
+  url?: string;
+  why: string;
+}
+
+/** "Convidar pessoas" (`offer_invites`): the invite dialog with these addresses filled in, as members. */
+export interface InviteCard {
+  kind: "invite_people";
+  forUserId: string | null;
+  emails: string[];
+  why: string;
+}
+
+export type ActionCard =
+  | ConnectAiCard
+  | ConnectAppCard
+  | InviteCard
+  | AgentProposalCard
+  | StretchCard
+  | UsagePauseCard
+  | CostlyProposalCard;
 
 /**
  * An agent asks before costly work nobody asked for directly (ADR 0131 §3): opening a PR, installing packages, a long
@@ -262,8 +291,24 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;
   const card = raw as { kind?: unknown; forUserId?: unknown; params?: unknown };
-  if (card.kind !== "connect_ai" || !card.params || typeof card.params !== "object") return null;
+  if (!card.params || typeof card.params !== "object") return null;
   const p = card.params as Record<string, unknown>;
+  const forUserId = typeof card.forUserId === "string" ? card.forUserId : null;
+  const why = typeof p.why === "string" ? p.why : "";
+  if (card.kind === "connect_app") {
+    return {
+      kind: "connect_app",
+      forUserId,
+      ...(typeof p.connector === "string" ? { connector: p.connector } : {}),
+      ...(typeof p.url === "string" && isHttpsUrl(p.url) ? { url: p.url } : {}),
+      why,
+    };
+  }
+  if (card.kind === "invite_people") {
+    const emails = Array.isArray(p.emails) ? p.emails.filter((e): e is string => typeof e === "string") : [];
+    return emails.length > 0 ? { kind: "invite_people", forUserId, emails, why } : null;
+  }
+  if (card.kind !== "connect_ai") return null;
   return {
     kind: "connect_ai",
     forUserId: typeof card.forUserId === "string" ? card.forUserId : null,
@@ -289,3 +334,15 @@ export function connectAiDone(
     (id) => aiStateOf(status, id) === "ready" && (!brain || agentById.get(id)?.brain?.kind === brain),
   );
 }
+
+/** Done once the workspace has it: a connection of its catalog entry, or a server at its address. */
+export const connectAppDone = (card: ConnectAppCard, items: readonly Pick<ConnectedItem, "def" | "server">[]) =>
+  card.connector
+    ? items.some((i) => i.def?.id === card.connector)
+    : Boolean(card.url) && items.some((i) => sameServer(i.server?.serverUrl, card.url));
+
+/** Done once every address is invited (an invitation open or accepted), by the invitations the viewer may list. */
+export const inviteDone = (card: InviteCard, invited: readonly string[]) => {
+  const have = new Set(invited.map((e) => e.toLowerCase()));
+  return card.emails.every((e) => have.has(e.toLowerCase()));
+};

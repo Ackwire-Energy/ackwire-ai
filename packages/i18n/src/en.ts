@@ -1807,6 +1807,18 @@ export const en = {
     },
     connect: "Connect",
     connected: "Connected",
+    connect_app: {
+      title: "Connect {{name}}",
+      mcp: "Add an MCP server",
+      adminOnly: "An admin connects it",
+    },
+    invite: {
+      title_one: "Invite {{count}} person",
+      title_other: "Invite {{count}} people",
+      open: "Invite",
+      done: "Invited",
+      adminOnly: "Someone who may invite sends it",
+    },
     agentProposal: {
       title: "{{agent}} proposes a new agent",
       review: "Review",
@@ -4226,7 +4238,7 @@ export const en = {
     setup_write: {
       label: "Set up the workspace",
       description:
-        "Offer to connect an AI with a card a person clicks, and create channels for whoever asked, with Undo.",
+        "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for whoever asked, with Undo.",
     },
     github_git_read: {
       label: "Clone repositories (git)",
@@ -8179,6 +8191,13 @@ export const en = {
   connectors: {
     title: "Connectors",
     add: "Add connector",
+    /** Settings › Connectors and MCPs: the second card, every MCP server connected by its address. */
+    mcp: {
+      title: "MCPs",
+      add: "Add MCP",
+      list: "Connected MCP servers",
+      none: "MCP servers you connect by their address show up here.",
+    },
     addTitle: "Add connector",
     catalogText: "Connect once for {{org}}. Then choose what each agent can use.",
     catalog: "Available connectors",
@@ -10159,7 +10178,7 @@ export const en = {
       members: "Members and invitations",
       roles: "Roles and permissions",
       access: "Agents and access",
-      connectors: "Connectors",
+      connectors: "Connectors and MCPs",
       skills: "Skills",
       keys: "AI accounts",
       storage: "Storage",
@@ -10180,7 +10199,7 @@ export const en = {
       members: "Who is in the workspace, and invitations.",
       roles: "What each person can do. Roles add up.",
       access: "What each agent can use: one level per connector.",
-      connectors: "Services connected once for the whole workspace.",
+      connectors: "Services and MCP servers connected once for the whole workspace.",
       skills: "Markdown instructions agents open when they need them.",
       keys: "Your plans and the workspace's API keys.",
       storage: "Where the workspace's files live.",
@@ -10739,6 +10758,8 @@ export const en = {
         readingForum: "Read the forum",
         creatingChannel: "Created a channel",
         offeringConnectAi: "Offered to connect an AI",
+        offeringConnectApp: "Offered to connect an app",
+        offeringInvites: "Offered to invite people",
         proposingAgent: "Proposed an agent",
         askingAgent: "Asked another agent",
         tellingAgent: "Told another agent",
@@ -10821,6 +10842,8 @@ export const en = {
       readingForum: "reading the forum",
       creatingChannel: "creating a channel",
       offeringConnectAi: "getting an AI ready to connect",
+      offeringConnectApp: "getting an app ready to connect",
+      offeringInvites: "getting invitations ready",
       proposingAgent: "proposing an agent",
       askingAgent: "asking another agent",
       tellingAgent: "telling another agent",
@@ -10936,6 +10959,9 @@ export const en = {
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
       action_connect_ai: "Connect an AI",
+      action_connect_app: "Connect {{name}}",
+      action_add_mcp: "Add an MCP server",
+      action_invite_people: "Invite people",
       agent_proposal: "Proposed a new agent: {{name}}",
       approval_request: "Approval request: {{title}}",
       secret_request: "{{agent}} asked for a key: {{name}}",
@@ -11140,6 +11166,14 @@ export const en = {
     offer_connect_ai: {
       label: "Offer to connect an AI",
       description: "Posts a card whose button opens the dialog to connect a plan or an API key.",
+    },
+    offer_connect_app: {
+      label: "Offer to connect an app or MCP",
+      description: "Posts a card whose button opens the dialog to connect an app or an MCP server by its address.",
+    },
+    offer_invites: {
+      label: "Offer to invite people",
+      description: "Posts a card whose button opens the invite dialog with the addresses filled in.",
     },
     propose_agent: {
       label: "Propose an agent",

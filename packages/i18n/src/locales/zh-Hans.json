@@ -1798,6 +1798,17 @@
     },
     "connect": "连接",
     "connected": "已连接",
+    "connect_app": {
+      "title": "连接 {{name}}",
+      "mcp": "添加 MCP 服务器",
+      "adminOnly": "由管理员连接"
+    },
+    "invite": {
+      "title_other": "邀请 {{count}} 人",
+      "open": "邀请",
+      "done": "已发送邀请",
+      "adminOnly": "由有邀请权限的人发送"
+    },
     "agentProposal": {
       "title": "{{agent}} 提议创建一个新智能体",
       "review": "查看",
@@ -4265,7 +4276,7 @@
     },
     "setup_write": {
       "label": "设置工作区",
-      "description": "用一张由成员点击的卡片提议连接 AI，并为提出请求的人创建频道，可撤销。"
+      "description": "用一张由成员点击的卡片提议连接 AI、应用或 MCP 服务器，或邀请成员，并为提出请求的人创建频道，可撤销。"
     },
     "github_git_read": {
       "label": "克隆仓库（git）",
@@ -8261,6 +8272,12 @@
   "connectors": {
     "title": "连接器",
     "add": "添加连接器",
+    "mcp": {
+      "title": "MCP",
+      "add": "添加 MCP",
+      "list": "已连接的 MCP 服务器",
+      "none": "通过地址连接的 MCP 服务器会显示在这里。"
+    },
     "addTitle": "添加连接器",
     "catalogText": "为 {{org}} 连接一次，然后选择每个智能体可以使用什么。",
     "catalog": "可用的连接器",
@@ -10457,7 +10474,7 @@
       "members": "成员和邀请",
       "roles": "角色和权限",
       "access": "智能体和访问权限",
-      "connectors": "连接器",
+      "connectors": "连接器和 MCP",
       "skills": "技能",
       "keys": "AI 账号",
       "storage": "存储",
@@ -10477,7 +10494,7 @@
       "members": "工作区里有谁，以及邀请。",
       "roles": "每个人可以做什么。角色权限会叠加。",
       "access": "每个智能体可以使用什么：每个连接器一个级别。",
-      "connectors": "为整个工作区一次性连接的服务。",
+      "connectors": "为整个工作区一次性连接的服务和 MCP 服务器。",
       "skills": "智能体在需要时打开的 Markdown 指令。",
       "keys": "你的套餐和工作区的 API 密钥。",
       "storage": "工作区文件的存放位置。",
@@ -11012,6 +11029,8 @@
         "readingForum": "阅读了论坛",
         "creatingChannel": "创建了频道",
         "offeringConnectAi": "提议连接 AI",
+        "offeringConnectApp": "提议连接一个应用",
+        "offeringInvites": "提议邀请成员",
         "proposingAgent": "提议了智能体",
         "askingAgent": "询问了另一个智能体",
         "tellingAgent": "告知了另一个智能体",
@@ -11094,6 +11113,8 @@
       "readingForum": "阅读论坛",
       "creatingChannel": "创建频道",
       "offeringConnectAi": "准备连接 AI",
+      "offeringConnectApp": "准备连接应用",
+      "offeringInvites": "准备邀请",
       "proposingAgent": "提议智能体",
       "askingAgent": "询问另一个智能体",
       "tellingAgent": "告知另一个智能体",
@@ -11200,6 +11221,9 @@
       "no_ai_signed_out": "我暂时无法回答：我的 AI 已退出登录。",
       "no_ai_not_signed_in": "我暂时无法回答：{{brain}} 还没有在我的电脑上登录。",
       "action_connect_ai": "连接 AI",
+      "action_connect_app": "连接 {{name}}",
+      "action_add_mcp": "添加 MCP 服务器",
+      "action_invite_people": "邀请成员",
       "agent_proposal": "提议了一个新智能体：{{name}}",
       "approval_request": "审批请求：{{title}}",
       "secret_request": "{{agent}} 请求了一个密钥：{{name}}",
@@ -11396,6 +11420,14 @@
     "offer_connect_ai": {
       "label": "提议连接 AI",
       "description": "发布一张卡片，点击按钮即可打开连接套餐或 API 密钥的对话框。"
+    },
+    "offer_connect_app": {
+      "label": "提议连接应用或 MCP",
+      "description": "发布一张卡片，点击按钮即可打开按地址连接应用或 MCP 服务器的对话框。"
+    },
+    "offer_invites": {
+      "label": "提议邀请成员",
+      "description": "发布一张卡片，点击按钮即可打开已填好地址的邀请对话框。"
     },
     "propose_agent": {
       "label": "提议创建智能体",
