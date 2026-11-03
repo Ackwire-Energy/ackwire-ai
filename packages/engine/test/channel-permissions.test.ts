@@ -234,6 +234,28 @@ describe("channel exceptions", () => {
     expect(after).toMatchObject({ active: false, pausedReason: "creator_no_access" });
   });
 
+  test("a routine whose creator may no longer call agents there pauses, as their own message would wake nobody", async () => {
+    const { bia } = await world();
+    // Not the agent's owner (who always calls it): someone who runs routines for the workspace.
+    const ops = await createRole(f.db, f.owner.id, f.org.id, { name: "Rotinas", permissions: ["manage_routines"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [ops.id]);
+    const routineDeps = { db: f.db, pubsub: f.pubsub, context: f.context };
+    const routine = await createRoutine(routineDeps, bia.id, f.org.id, {
+      agentId: f.agent.id,
+      prompt: "Resuma o dia.",
+      target: { type: "channel" as const, channelId: f.general.id },
+      trigger: { type: "schedule" as const, phrase: "todo dia às 9h" },
+    });
+    await set({ type: "person", id: bia.id }, [], ["talk_to_agents"]);
+    const [run] = await f.db
+      .insert(schema.routineRuns)
+      .values({ orgId: f.org.id, routineId: routine.id, at: new Date(), trigger: "schedule", status: "queued" })
+      .returning();
+    await executeRoutineRun(routineDeps, run?.id ?? "");
+    const [after] = await f.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id));
+    expect(after).toMatchObject({ active: false, pausedReason: "audience" });
+  });
+
   test("Gerenciar o canal: an allow lets a member manage it while in it; a deny never takes it from who holds it", async () => {
     const { bia, cara, everyone } = await world();
     await set({ type: "person", id: bia.id }, ["manage_channels"], []);

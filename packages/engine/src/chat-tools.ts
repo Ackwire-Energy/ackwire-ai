@@ -132,13 +132,19 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
                 .where(eq(channelMembers.channelId, channel.id))
             : [];
           // Not in it = not found: never reveal private channels. Nobody behind the run: the agent's own channels.
+          // Whoever is behind it must be able to send there (ADR 0134): the agent never posts for someone who can't.
+          const poster = creator ?? requester;
           if (
             !channel ||
-            !(creator
-              ? await personCanPost(ctx.db, ctx.orgId, creator, channel.id)
-              : members.some((m) => (requester ? m.userId === requester : m.agentId === ctx.agentId)))
+            !(poster
+              ? await personCanPost(ctx.db, ctx.orgId, poster, channel.id)
+              : members.some((m) => m.agentId === ctx.agentId))
           ) {
-            const who = creator ? "this routine's creator can post" : requester ? "the person who asked is" : "you are";
+            const who = creator
+              ? "this routine's creator can post"
+              : requester
+                ? "the person who asked can post"
+                : "you are";
             return { content: `No channel #${name} that ${who} in.`, isError: true };
           }
           if (channel.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };

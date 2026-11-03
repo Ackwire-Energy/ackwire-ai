@@ -19,7 +19,7 @@ import { getAgent } from "./agents";
 import { decidesAgentApprovals } from "./approval-rules";
 import { cancelRoutineAhead, type RoutineAheadView, routinesAhead } from "./approvals";
 import type { ArtifactDeps } from "./artifacts";
-import { audienceError, canTalkTo, speakerFor, speakerOf } from "./audience";
+import { audienceError, audienceSql, canTalkTo, speakerFor, speakerOf } from "./audience";
 import { recordAudit } from "./audit";
 import { UUID } from "./authority";
 import { brainOf } from "./brain-settings";
@@ -2143,6 +2143,12 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   let deliverTo: RoutineBrief["deliverTo"];
   if (target.type === "channel" || target.type === "conversation") {
     if (!(await personCanPost(db, routine.orgId, creator, target.channelId))) return paused("creator_no_access");
+    // Its run is the creator calling the agent there: a channel exception that takes that away pauses it (ADR 0134).
+    const [talks] = await db
+      .select({ ok: audienceSql("agents", sql`${creator}::text`, { channelId: sql`${target.channelId}::uuid` }) })
+      .from(agents)
+      .where(eq(agents.id, agent.id));
+    if (!talks?.ok) return paused("audience");
     const [member] = await db
       .select({ id: channelMembers.id })
       .from(channelMembers)

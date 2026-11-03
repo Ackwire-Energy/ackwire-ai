@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
-import { createChannel, drainOutbox, openDm, postPersonMessage } from "../src";
+import { addChannelMember, createChannel, drainOutbox, openDm, postPersonMessage, setChannelOverride } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -96,7 +96,24 @@ test("post_message: from a DM to #general with the file (as a copy); only channe
   await drainOutbox(f.db, f.handlers);
   expect((await toolResults()).filter((r) => r.name === "post_message").at(-1)).toMatchObject({
     isError: true,
-    content: "No channel #segredo that the person who asked is in.",
+    content: "No channel #segredo that the person who asked can post in.",
+  });
+
+  // In #general but its exceptions stop them sending there (ADR 0134): the agent doesn't send it for them.
+  const leo = await addMember(f.db, f.org.id, "member", "leo");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: leo.id });
+  await setChannelOverride(f.db, f.owner.id, f.org.id, f.general.id, {
+    target: { type: "person", id: leo.id },
+    allow: [],
+    deny: ["post"],
+  });
+  const leoDm = await openDm(f.db, leo.id, f.org.id, { agentId: f.agent.id });
+  target = "#general";
+  await postPersonMessage(deps, leo.id, f.org.id, leoDm.id, { body: "boa, manda no canal geral" });
+  await drainOutbox(f.db, f.handlers);
+  expect((await toolResults()).filter((r) => r.name === "post_message").at(-1)).toMatchObject({
+    isError: true,
+    content: "No channel #general that the person who asked can post in.",
   });
 });
 
