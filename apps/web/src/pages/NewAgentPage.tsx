@@ -1379,7 +1379,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
           )}
           {connectAfter && <SettingNote icon="info">{t("newAgent.noAi")}</SettingNote>}
           {connectsHere && (
-            <span>
+            <span className="newag__connect">
               <Button size="sm" variant={connectAfter ? "primary" : "default"} icon="plus" onClick={connectHere}>
                 {t("aiAccounts.page.connect")}
               </Button>
