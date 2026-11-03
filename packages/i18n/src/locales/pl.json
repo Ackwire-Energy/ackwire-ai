@@ -4749,7 +4749,19 @@
       "criteriaFound_few": "{{count}} kryteria akceptacji",
       "criteriaFound_many": "{{count}} kryteriów akceptacji",
       "criteriaFound_other": "{{count}} kryterium akceptacji",
-      "agentStarts": "{{name}} zacznie, gdy tylko zadanie zostanie utworzone. Wszystko, co wrażliwe, poprosi o twoje zatwierdzenie."
+      "agentStarts": "{{name}} zacznie, gdy tylko zadanie zostanie utworzone. Wszystko, co wrażliwe, poprosi o twoje zatwierdzenie.",
+      "agentStartsAll": "{{name}} zacznie, gdy tylko zadanie zostanie utworzone, z opisem, kryteriami i załącznikami. Wszystko, co wrażliwe, poprosi o twoje zatwierdzenie.",
+      "titleShort": "Tytuł zadania",
+      "quickPlaceholder": "Opisz, czego potrzeba. Wklej zrzuty ekranu, przeciągnij pliki. Wiersze zaczynające się od „-” stają się kryteriami akceptacji.",
+      "pasteHint": "Wklej zrzut ekranu skrótem {{keys}} albo przeciągnij tu pliki.",
+      "expand": "Otwórz pełny formularz",
+      "collapse": "Wróć do szybkiego formularza",
+      "another": "Utwórz kolejne",
+      "addCriterion": "Dodaj kryterium",
+      "removeCriterion": "Usuń kryterium",
+      "drop": "Upuść, żeby dołączyć do zadania",
+      "dropText": "Zdjęcia, filmy, PDF-y, arkusze… do {{max}} MB każdy.",
+      "createHint": "{{keys}} tworzy zadanie"
     },
     "back": "Zadania",
     "notFound": "To zadanie nie istnieje albo nie masz do niego dostępu.",
@@ -4772,6 +4784,8 @@
     "asked": "Prośba wysłana. {{name}} będzie tu publikować postępy. Twoja rozmowa zostaje w wiadomości bezpośredniej.",
     "activity": "Aktywność",
     "noActivity": "Jeszcze nic.",
+    "discussion": "Dyskusja",
+    "noComments": "Jeszcze nie ma komentarzy.",
     "comment": "Skomentuj zadanie",
     "commentPlaceholder": "Komentarz · użyj @, żeby zawołać agenta",
     "send": "Skomentuj",
@@ -4787,6 +4801,26 @@
     "noLinks": "Nic jeszcze nie powiązano.",
     "openConversation": "Zobacz rozmowę",
     "labels": "Etykiety",
+    "tabs": {
+      "label": "Części zadania",
+      "details": "Szczegóły",
+      "files": "Załączniki",
+      "history": "Historia"
+    },
+    "files": {
+      "title": "Załączniki",
+      "add": "Dodaj pliki",
+      "addHint": "albo przeciągnij je tutaj",
+      "grid": "Siatka",
+      "empty": "Jeszcze nie ma załączników. Przeciągnij tu pliki albo wklej zrzut ekranu.",
+      "fromCreation": "Przy tworzeniu · {{when}}",
+      "fromComment": "Komentarz: {{name}} · {{when}}",
+      "linked": "Połączone przez: {{name}}"
+    },
+    "history": {
+      "commented": "dodaje komentarz",
+      "commentedFiles": "dodaje komentarz z załącznikami"
+    },
     "event": {
       "work_update": "{{text}}",
       "work_stopped": "zatrzymał(a) pracę w tle",

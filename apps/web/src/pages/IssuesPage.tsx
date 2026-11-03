@@ -1,28 +1,20 @@
-import type { Issue, IssueColumn, IssuePriority, IssueStatus } from "@agenteschat/client";
-import { useIssueAction, useIssueColumns, useIssues } from "@agenteschat/client";
-import { dueLabel, parseDayInput, relativeTime, toYmd } from "@agenteschat/client/lib/format";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import type { Issue, IssueColumn, IssueStatus } from "@agenteschat/client";
+import { useIssueColumns, useIssues } from "@agenteschat/client";
+import { dueLabel, relativeTime, toYmd } from "@agenteschat/client/lib/format";
 import {
   Button,
   Chip,
   CriteriaPixels,
   cx,
-  Dialog,
-  DialogBody,
-  DialogFooter,
   EmptyState,
-  Field,
   FilterBar,
   FilterChip,
   Icon,
-  Input,
   Menu,
   MenuCheckboxItem,
   MenuItem,
   SearchField,
   Segmented,
-  Select,
-  Textarea,
   Toolbar,
   WorkSweep,
 } from "@agenteschat/ui";
@@ -30,7 +22,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { type DragEvent, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
+import { useActors } from "@/components/actors";
 import { IssueCardWork } from "@/components/BackgroundWork";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
@@ -39,17 +31,14 @@ import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import {
   BOARD,
-  columnIdOf,
   columnsOf,
   groupByColumn,
   isCustomBoard,
   isOpen,
   isStalled,
   isWorking,
-  PRIORITIES,
   STATUS_ICON,
   STATUSES,
-  splitCriteria,
   useAssigneeColor,
   useColumnTitle,
   useStageName,
@@ -60,6 +49,7 @@ import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { AddColumnDialog, Board } from "./IssueBoard";
 import { IssueDialog } from "./IssuePage";
+import { NewIssueDialog } from "./NewIssueDialog";
 import "./issues.css";
 
 export { BOARD, PRIORITIES, STATUSES, splitCriteria } from "@/lib/issues";
@@ -675,190 +665,5 @@ function IssueRows({
         </li>
       ))}
     </ul>
-  );
-}
-
-function NewIssueDialog({
-  open,
-  columnId,
-  columns,
-  onClose,
-}: {
-  open: boolean;
-  /** The column of A fazer it was asked from ("Nova tarefa" under a column); else the first. */
-  columnId: string | null;
-  columns: IssueColumn[];
-  onClose: () => void;
-}) {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const title_ = useColumnTitle();
-  const todoColumns = columnsOf(columns, "todo");
-  const [column, setColumn] = useState<string | null>(null);
-  const [openedWith, setOpenedWith] = useState<string | null | undefined>(undefined);
-  if (open && openedWith !== columnId) {
-    setOpenedWith(columnId);
-    setColumn(columnId);
-  }
-  if (!open && openedWith !== undefined) setOpenedWith(undefined);
-  const chosenColumn = todoColumns.find((c) => c.id === column) ?? todoColumns[0];
-  const actors = useActors();
-  const action = useIssueAction(org.id);
-  const [title, setTitle] = useState("");
-  const [text, setText] = useState("");
-  const [assignee, setAssignee] = useState(NO_ACTOR);
-  const [priority, setPriority] = useState<IssuePriority>("normal");
-  const [due, setDue] = useState("");
-  const dueDate = due.trim() ? parseDayInput(due, new Date(), i18n.language) : null;
-  // A day in the language's own order ("24/10", "10/24", "24.10."), for the field's hint.
-  const dayLike = (year?: "numeric") =>
-    new Intl.DateTimeFormat(i18n.language, { day: "2-digit", month: "2-digit", year }).format(new Date(2026, 9, 24));
-  const dueExamples = { example: dayLike(), exampleYear: dayLike("numeric") };
-  const dueError = due.trim() !== "" && !dueDate;
-  const { criteria } = splitCriteria(text);
-  const chosen = actorFromKey(assignee);
-  const agent = chosen?.type === "agent" ? actors.dir.agentById.get(chosen.id) : undefined;
-  const reset = () => {
-    setTitle("");
-    setText("");
-    setAssignee(NO_ACTOR);
-    setPriority("normal");
-    setDue("");
-  };
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-      title={t("issues.new")}
-      description={t("issues.form.intro")}
-      closeLabel={t("common.close")}
-      width={560}
-    >
-      <form
-        style={{ display: "contents" }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!title.trim() || dueError) return;
-          const { description, criteria } = splitCriteria(text);
-          action.mutate(
-            {
-              type: "create",
-              input: {
-                title: title.trim(),
-                description,
-                criteria,
-                assignee: chosen?.type === "person" ? chosen : null,
-                priority,
-                dueDate,
-              },
-            },
-            {
-              onSuccess: (created) => {
-                const issue = created as Issue;
-                // New tasks land in the first column of A fazer; another one was chosen.
-                if (chosenColumn && chosenColumn.id !== columnIdOf(issue, columns) && chosen?.type !== "agent")
-                  action.mutate({ type: "update", id: issue.id, patch: { columnId: chosenColumn.id } });
-                // An agent picked here starts right away ("Pedir"): assigned, its run linked, in progress.
-                if (chosen?.type === "agent")
-                  action.mutate(
-                    { type: "ask", id: issue.id, agentId: chosen.id },
-                    {
-                      // Couldn't ask (not in a shared channel…): it stays assigned to the agent.
-                      onError: () => action.mutate({ type: "update", id: issue.id, patch: { assignee: chosen } }),
-                    },
-                  );
-                toast.show(t("issues.form.created", { number: issue.number }));
-                reset();
-                onClose();
-              },
-            },
-          );
-        }}
-      >
-        <DialogBody>
-          <Field label={t("issues.form.title")} id="ni-title">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t("issues.form.titlePlaceholder")}
-            />
-          </Field>
-          <Field label={t("issues.form.description")} id="ni-desc" help={t("issues.form.descriptionHelp")}>
-            <Textarea
-              rows={5}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={t("issues.form.descriptionPlaceholder")}
-            />
-          </Field>
-          {criteria.length > 0 && (
-            <div className="issue-critprev" aria-live="polite">
-              <span className="ac-eyebrow">{t("issues.form.criteriaFound", { count: criteria.length })}</span>
-              <ul>
-                {criteria.map((c) => (
-                  <li key={c}>{c}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {todoColumns.length > 1 && (
-            <Field label={t("issues.column")} id="ni-col">
-              <Select
-                value={chosenColumn?.id}
-                onValueChange={setColumn}
-                options={todoColumns.map((c) => ({ value: c.id, label: title_(c) }))}
-              />
-            </Field>
-          )}
-          <div className="grid-fields">
-            <Field label={t("issues.form.assignee")} id="ni-who">
-              <Select value={assignee} onValueChange={setAssignee} options={actors.options(true)} />
-            </Field>
-            <Field label={t("issues.form.priority")} id="ni-pri">
-              <Select
-                value={priority}
-                onValueChange={(v) => setPriority(v as IssuePriority)}
-                options={PRIORITIES.map((p) => ({ value: p, label: t(`issues.priority.${p}`) }))}
-              />
-            </Field>
-            <Field
-              label={t("issues.form.due")}
-              id="ni-due"
-              help={t("issues.form.dueHelp", dueExamples)}
-              error={dueError ? t("issues.form.dueInvalid", dueExamples) : undefined}
-            >
-              <Input
-                value={due}
-                onChange={(e) => setDue(e.target.value)}
-                inputMode="numeric"
-                placeholder={dueExamples.example}
-              />
-            </Field>
-          </div>
-          {agent && (
-            <p className="issue-agent-note ac-iconline">
-              <Icon name="shield" size={14} />
-              {t("issues.form.agentStarts", agentGrammar(agent.name))}
-            </p>
-          )}
-        </DialogBody>
-        <DialogFooter>
-          <Button type="button" onClick={onClose}>
-            {t("issues.form.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!title.trim() || dueError || action.isPending}
-            loading={action.isPending}
-          >
-            {t("issues.form.create")}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Dialog>
   );
 }

@@ -12,7 +12,7 @@ import { useToast } from "@/lib/toast";
 const MAX_ATTACHMENTS = 10;
 
 /** A file picked for the next comment: uploading, uploaded (with its Drive ref) or failed. */
-interface PendingFile {
+export interface PendingFile {
   key: string;
   name: string;
   icon: IconName;
@@ -81,6 +81,9 @@ export function useComposerFiles(channelId: string | null, focus?: () => void) {
   const attached = files.flatMap((f) => (f.status === "done" && f.ref ? [f.ref] : []));
   return {
     attached,
+    /** The files as they are now, for a box that draws them its own way (the new-issue form's grid). */
+    items: files,
+    remove: (key: string) => drop((x) => x.key !== key),
     uploading: files.some((f) => f.status === "uploading"),
     onFiles: add,
     clear: () => drop(() => false),
