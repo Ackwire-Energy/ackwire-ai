@@ -112,20 +112,26 @@ export const audiencePatch = (a: AgentAudience): AgentAudience => ({
   consultable: a.consultable ?? true,
 });
 
-/** On a plan (ADR 0059 §5) only its owner lets more people in: anyone else choosing `next` is stopped. */
-export const audienceBlocked = (agent: Agent, next: AgentAudience, myUserId: string) =>
+/** Everyone in the workspace: what "Atende outras pessoas" turned on lets in at most. */
+export const EVERYONE_AUDIENCE: AgentAudience = { mode: "everyone", userIds: [], roleIds: [] };
+
+/**
+ * Saving `next` lets more people talk to an agent that thinks with someone else's plan (ADR 0059 §5): their plan pays
+ * for those conversations, so the apps ask first, and the server emails its owner.
+ */
+export const opensOthersPlan = (agent: Agent, next: AgentAudience, myUserId: string) =>
   engineOfBrain(agent.brain?.kind) !== "agent" &&
+  agent.ownerUserId != null &&
   agent.ownerUserId !== myUserId &&
   audienceWidens(audienceOf(agent), next, agent.ownerUserId);
 
 /**
  * "Let me talk to it": its audience with me let in, when it keeps me out and I may change it (its owner or who manages
- * agents), I talk to agents at all, and it isn't on someone else's plan (`audienceBlocked`); null otherwise.
+ * agents) and I talk to agents at all; null otherwise. On someone else's plan the save asks first (`opensOthersPlan`).
  */
 export function audienceWithMe(org: OrgSummary | undefined, agent: Agent, myUserId: string): AgentAudience | null {
   if (canTalk(agent) || !can(org, "talk_to_agents") || !canEditAudience(org, agent, myUserId)) return null;
-  const next = audienceWith(agent, myUserId);
-  return next && !audienceBlocked(agent, next, myUserId) ? next : null;
+  return audienceWith(agent, myUserId);
 }
 
 /** Why to ask before widening its audience: the agent loses the mailboxes others gave it, named by whose they are. */
@@ -134,6 +140,28 @@ export const mailLossText = (t: TFunction, agent: Pick<Agent, "name">, mailboxes
     ...agentGrammar(agent.name),
     owners: joinNames([...new Set(mailboxes.map((m) => m.ownerName ?? m.address))], t),
   });
+
+/**
+ * The one question before widening its audience, or null when there is nothing to ask: on someone else's plan
+ * (`planOwner`: their name, from `opensOthersPlan`), whose plan and limits it uses and that they get an email, and the
+ * mailboxes it loses (`mailLossText`).
+ */
+export function widenQuestion(
+  t: TFunction,
+  agent: Pick<Agent, "name" | "brain">,
+  planOwner: string | null,
+  mailboxes: readonly ForeignMailbox[],
+): { title: string; description: string } | null {
+  const mail = mailboxes.length > 0 ? mailLossText(t, agent, mailboxes) : null;
+  if (!planOwner) return mail ? { title: t("reach.mailLossTitle"), description: mail } : null;
+  const kind = agent.brain?.kind && agent.brain.kind !== "model" ? agent.brain.kind : "claude_code";
+  const plan = t(`aiAccounts.connect.${kind}`);
+  const why = t("reach.planOpen", { name: agent.name, owner: planOwner, plan });
+  return {
+    title: t("reach.planTitle", { owner: planOwner }),
+    description: mail ? t("common.joinSentences", { a: why, b: mail }) : why,
+  };
+}
 
 /** One line of "Quem pode falar": the whole workspace (its `everyone` role's mark), a role, or a person. */
 export type AudienceLine<P> =

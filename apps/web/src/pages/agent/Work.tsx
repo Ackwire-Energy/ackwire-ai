@@ -53,6 +53,7 @@ import {
   ownSignInTitle,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
+import { EVERYONE_AUDIENCE } from "@agenteschat/client/lib/audience";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import {
   type Advanced,
@@ -141,6 +142,7 @@ import { useConnectAi } from "@/components/ConnectAi";
 import { LoadingLine } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
+import { useWidenAsk } from "@/components/ReachLines";
 import {
   OpenPrefsButton,
   ReconnectThisMacButton,
@@ -705,6 +707,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [contextTokens, setContextTokens] = useState<ContextLimit | null>(savedContext);
   // "Configuração avançada" open: what it edits, put on the form by "Pronto" (nothing saves before "Usar").
   const [adv, setAdv] = useState<Advanced | null>(null);
+  const asks = useWidenAsk(agent);
   const [copying, setCopying] = useState(false);
   // "Levar a autonomia" off: the others keep their own.
   const [withAutonomy, setWithAutonomy] = useState(true);
@@ -1559,7 +1562,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             <Button onClick={() => setAdv(null)}>{t("common.cancel")}</Button>
             <Button
               variant="primary"
-              onClick={() => {
+              onClick={async () => {
+                // Letting more people in on someone else's plan asks first: it spends their plan.
+                if (onlyOwner && !adv.onlyOwner && !(await asks.ask(EVERYONE_AUDIENCE)([]))) return;
                 setEffort(adv.effort);
                 setContextTokens(adv.contextTokens);
                 setFallback(adv.fallback);
@@ -1584,6 +1589,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           onUse={(agentIds) => void copyTo(agentIds)}
         />
       )}
+      {asks.dialog}
     </Dialog>
   );
 }

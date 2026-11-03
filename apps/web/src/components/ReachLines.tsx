@@ -1,12 +1,20 @@
 import {
   type Agent,
+  type AgentAudience,
   type ForeignMailbox,
   type Message,
   useAddChannelMember,
   useChannels,
   useWidenAudience,
 } from "@agenteschat/client";
-import { audienceWith, audienceWithMe, canEditAudience, mailLossText, modeOf } from "@agenteschat/client/lib/audience";
+import {
+  audienceWith,
+  audienceWithMe,
+  canEditAudience,
+  modeOf,
+  opensOthersPlan,
+  widenQuestion,
+} from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
@@ -132,7 +140,7 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
   const dir = useDirectory(org.id);
   const toast = useToast();
   const save = useWidenAudience(org.id, agent.id);
-  const mailLoss = useMailLossAsk(agent);
+  const asks = useWidenAsk(agent);
   const person = dir.memberById.get(userId)?.name;
   const audience = audienceWith(agent, userId);
   if (!person || !audience || modeOf(agent) === "everyone" || !canEditAudience(org, agent, me.user.id)) return null;
@@ -145,26 +153,26 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
         disabled={save.busy || save.done}
         onClick={(ev) => {
           ev.stopPropagation();
-          save.widen(audience, mailLoss.ask, () => toast.show(t("reach.allowed", { person, name: g.name })));
+          save.widen(audience, asks.ask(audience), () => toast.show(t("reach.allowed", { person, name: g.name })));
         }}
       >
         {t("reach.allow", { person, context: g.context })}
       </button>
-      {mailLoss.dialog}
+      {asks.dialog}
     </>
   );
 }
 
 /**
  * "Quero falar com ele": who manages agents (or owns it) lets themselves into an agent that keeps them out. Nothing
- * when it answers them already or is on someone else's plan, where only its owner lets more people in.
+ * when it answers them already. On someone else's plan it asks first (`useWidenAsk`).
  */
 export function LetMeTalkButton({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const toast = useToast();
   const save = useWidenAudience(org.id, agent.id);
-  const mailLoss = useMailLossAsk(agent);
+  const asks = useWidenAsk(agent);
   const audience = audienceWithMe(org, agent, me.user.id);
   if (!audience) return null;
   const g = agentGrammar(agent.name);
@@ -175,23 +183,37 @@ export function LetMeTalkButton({ agent }: { agent: Agent }) {
         variant="primary"
         icon="message"
         disabled={save.busy || save.done}
-        onClick={() => save.widen(audience, mailLoss.ask, () => toast.show(t("reach.allowedMe", g)))}
+        onClick={() => save.widen(audience, asks.ask(audience), () => toast.show(t("reach.allowedMe", g)))}
       >
         {t("reach.allowMe", g)}
       </Button>
-      {mailLoss.dialog}
+      {asks.dialog}
     </>
   );
 }
 
 /**
- * Before a wider audience takes the mailboxes other people gave the agent: whose they are and why, Cancel or Continue.
- * `ask` answers whether to go on.
+ * The one question before a wider audience (`widenQuestion`): on someone else's plan, that it uses their plan and
+ * they get an email, and the mailboxes other people gave the agent that it loses. `ask(next)` answers whether to go
+ * on, at once when there is nothing to ask. Every save that widens an agent's audience goes through it.
  */
-function useMailLossAsk(agent: Agent) {
+export function useWidenAsk(agent: Agent) {
   const { t } = useTranslation();
-  const [asking, setAsking] = useState<{ mailboxes: ForeignMailbox[]; answer: (yes: boolean) => void } | null>(null);
-  const ask = (mailboxes: ForeignMailbox[]) => new Promise<boolean>((answer) => setAsking({ mailboxes, answer }));
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const [asking, setAsking] = useState<{
+    question: { title: string; description: string };
+    answer: (yes: boolean) => void;
+  } | null>(null);
+  const ask =
+    (next: AgentAudience) =>
+    (mailboxes: ForeignMailbox[]): Promise<boolean> => {
+      const owner = opensOthersPlan(agent, next, me.user.id)
+        ? (dir.memberById.get(agent.ownerUserId ?? "")?.name ?? t("channel.unknownPerson"))
+        : null;
+      const question = widenQuestion(t, agent, owner, mailboxes);
+      return question ? new Promise((answer) => setAsking({ question, answer })) : Promise.resolve(true);
+    };
   const answer = (yes: boolean) => {
     asking?.answer(yes);
     setAsking(null);
@@ -203,8 +225,8 @@ function useMailLossAsk(agent: Agent) {
       <Dialog
         open
         onOpenChange={(open) => !open && answer(false)}
-        title={t("reach.mailLossTitle")}
-        description={mailLossText(t, agent, asking.mailboxes)}
+        title={asking.question.title}
+        description={asking.question.description}
         closeLabel={t("common.close")}
         width={440}
       >

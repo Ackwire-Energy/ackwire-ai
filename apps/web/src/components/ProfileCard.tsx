@@ -64,7 +64,7 @@ import { CoordinatorChip } from "@/components/CoordinatorChip";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
-import { LetMeTalkButton } from "@/components/ReachLines";
+import { LetMeTalkButton, useWidenAsk } from "@/components/ReachLines";
 import { useEmojiLabels } from "@/components/Reactions";
 import { RolesPicker } from "@/components/roles/RolesPicker";
 import { colorOf, ProfileSky } from "@/components/Sky";
@@ -603,62 +603,67 @@ function AudienceEdit({ agent }: { agent: Agent }) {
   const { org } = useOrg();
   const toast = useToast();
   const update = useUpdateAgent(org.id, agent.id);
+  const asks = useWidenAsk(agent);
   const g = agentGrammar(agent.name);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<AgentAudience>(() => audienceOf(agent));
   const valid = audienceValid(draft, agent.ownerUserId);
   return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) return;
-        setDraft(audienceOf(agent));
-      }}
-      side="right"
-      align="start"
-      label={t("audience.title", g)}
-      className="mcard-audience"
-      trigger={
-        <button type="button" className="mcard__edit">
-          {t("profile.audienceEdit")}
-        </button>
-      }
-    >
-      <span className="mcard-audience__title">{t("audience.title", g)}</span>
-      <AudienceChoice
-        compact
-        value={draft}
-        onChange={setDraft}
-        ownerUserId={agent.ownerUserId}
-        agentName={agent.name}
-        idPrefix={`mcard-audience-${agent.id}`}
-        onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
-      />
-      {!valid && (
-        <span className="small mcard-audience__err" role="alert">
-          {draft.mode === "owner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone")}
-        </span>
-      )}
-      <div className="mcard-audience__acts">
-        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          {t("common.cancel")}
-        </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={!valid || update.isPending}
-          onClick={() =>
-            update.mutate(
-              { audience: audiencePatch(draft) },
-              { onSuccess: () => setOpen(false), onError: (e) => toast.show(errorText(t, e), "error") },
-            )
-          }
-        >
-          {t("common.save")}
-        </Button>
-      </div>
-    </Popover>
+    <>
+      <Popover
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) return;
+          setDraft(audienceOf(agent));
+        }}
+        side="right"
+        align="start"
+        label={t("audience.title", g)}
+        className="mcard-audience"
+        trigger={
+          <button type="button" className="mcard__edit">
+            {t("profile.audienceEdit")}
+          </button>
+        }
+      >
+        <span className="mcard-audience__title">{t("audience.title", g)}</span>
+        <AudienceChoice
+          compact
+          value={draft}
+          onChange={setDraft}
+          ownerUserId={agent.ownerUserId}
+          agentName={agent.name}
+          idPrefix={`mcard-audience-${agent.id}`}
+          onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
+        />
+        {!valid && (
+          <span className="small mcard-audience__err" role="alert">
+            {draft.mode === "owner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone")}
+          </span>
+        )}
+        <div className="mcard-audience__acts">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={!valid || update.isPending}
+            onClick={async () => {
+              if (!(await asks.ask(draft)([]))) return;
+              update.mutate(
+                { audience: audiencePatch(draft) },
+                { onSuccess: () => setOpen(false), onError: (e) => toast.show(errorText(t, e), "error") },
+              );
+            }}
+          >
+            {t("common.save")}
+          </Button>
+        </div>
+      </Popover>
+      {asks.dialog}
+    </>
   );
 }
 

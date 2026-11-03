@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentAccess, AgentForYouItem, Memory, OrgSummary, PlanUsage } from "@agenteschat/client";
-import { listsAgent, mailLossText } from "@agenteschat/client/lib/audience";
+import { listsAgent, mailLossText, widenQuestion } from "@agenteschat/client/lib/audience";
 import { planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { planLine } from "@agenteschat/ui/plan-state";
 import {
@@ -422,5 +422,21 @@ describe("an agent that doesn't answer me", () => {
     expect(mailLossText(t, { name: "Theo" }, [box("x", null, "suporte@acme.com")])).toStartWith(
       "Theo tem acesso à caixa de email de suporte@acme.com. Com mais pessoas falando com ele,",
     );
+  });
+
+  test("on someone else's plan the one question names whose plan it uses and that they get an email, the mailboxes after", async () => {
+    const t = await translator("pt-BR");
+    const onPlan = { name: "Ada", brain: { kind: "codex" } as NonNullable<typeof kept.brain> };
+    const box = { accountId: "joao", address: "joao@acme.com", ownerUserId: "u-joao", ownerName: "João" };
+    expect(widenQuestion(t, onPlan, "João", [])).toEqual({
+      title: "Usar o plano de João?",
+      description:
+        "As conversas com Ada vão usar o plano do ChatGPT de João e os limites dele. João vai receber um email avisando.",
+    });
+    expect(widenQuestion(t, onPlan, "João", [box])?.description).toContain(
+      "João vai receber um email avisando. Ada tem acesso à caixa de email de João.",
+    );
+    const screen = await Bun.file(new URL("../../src/features/chat/ReachLines.tsx", import.meta.url).pathname).text();
+    expect(screen.match(/ask\(audience\)/g)).toHaveLength(2);
   });
 });

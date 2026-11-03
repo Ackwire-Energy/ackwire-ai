@@ -1,6 +1,7 @@
 import type { AgentBrain, AgentBrainInput } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useModels } from "@agenteschat/client";
 import { signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import { EVERYONE_AUDIENCE } from "@agenteschat/client/lib/audience";
 import {
   type Advanced,
   advancedDefaults,
@@ -20,6 +21,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
+import { useWidenAsk } from "../chat/ReachLines";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
@@ -59,6 +61,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const insets = useSafeAreaInsets();
   const dir = useDirectory();
   const agent = dir.agentById.get(agentId);
+  const ask = useWidenAsk(agent);
   const name = agent?.name ?? "";
   const ownerFirst = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name.split(" ")[0] : undefined;
   const g = agentGrammar(name);
@@ -191,8 +194,10 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
                     agent={name}
                     owner={view.canUsePlans ? undefined : ownerFirst}
                     on={!view.onlyOwner}
-                    onChange={(on) => {
+                    onChange={async (on) => {
                       if (busy) return;
+                      // Letting more people in on someone else's plan asks first: it spends their plan.
+                      if (on && view.onlyOwner && !(await ask(EVERYONE_AUDIENCE)([]))) return;
                       void save(
                         { onlyOwner: !on },
                         on

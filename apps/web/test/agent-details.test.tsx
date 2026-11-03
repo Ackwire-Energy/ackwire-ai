@@ -130,4 +130,27 @@ describe("an agent that doesn't answer an admin", () => {
     ]);
     expect(state.agents.find((a) => a.id === ADA_ID)?.audience?.userIds).toContain("u-walter");
   });
+
+  test("on João's Claude plan one question says it uses his plan and he gets an email, and the mailbox it loses", async () => {
+    const state = keptOut();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "claude_code" } as NonNullable<typeof ada.brain>;
+    state.mailLoss = {
+      [ADA_ID]: [{ accountId: "mb-joao", address: "joao@acme.com", ownerUserId: "u-joao", ownerName: "João" }],
+    };
+    await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: /Quero falar com/ })));
+    await settle(2);
+    const ask = screen().getByRole("dialog", { name: "Usar o plano de João?" });
+    expect(ask.textContent).toContain(
+      "As conversas com Ada vão usar o plano do Claude de João e os limites dele. João vai receber um email avisando.",
+    );
+    expect(ask.textContent).toContain("Ada tem acesso à caixa de email de João.");
+    expect(state.calls.some((c) => c.method === "agents.update")).toBe(false);
+    await act(async () => fireEvent.click(within(ask).getByRole("button", { name: "Continuar" })));
+    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(state.calls.filter((c) => c.method === "agents.update")).toHaveLength(1);
+  });
 });

@@ -692,9 +692,10 @@ export function useUpdateAgent(orgId: string, agentId: string) {
 }
 
 /**
- * Lets more people talk to the agent. When saving `audience` would take mailboxes other people gave it (only a
- * mailbox's owner gives an agent access to it), `ask` names them first and nothing is saved without its yes. The save
- * sends what was agreed: a mailbox given meanwhile makes the server refuse it, and `ask` names the new list.
+ * Lets more people talk to the agent. `ask` gets the mailboxes saving `audience` would take from it (only a mailbox's
+ * owner gives an agent access to it), maybe none, and nothing is saved without its yes: it asks when they are some or
+ * the agent is on someone else's plan (`widenQuestion`). The save sends what was agreed: a mailbox given meanwhile
+ * makes the server refuse it, and `ask` gets the new list.
  */
 export function useWidenAudience(orgId: string, agentId: string) {
   const api = useApi();
@@ -713,7 +714,7 @@ export function useWidenAudience(orgId: string, agentId: string) {
           if (e instanceof ApiError && e.status === 404) return null;
           throw e;
         });
-        if (mailboxes && mailboxes.length > 0 && !(await ask(mailboxes))) return null;
+        if (!(await ask(mailboxes ?? []))) return null;
         const mailLossSeen = mailboxes?.map((m) => m.accountId);
         try {
           return await api.agents.update(orgId, agentId, { audience, ...(mailLossSeen ? { mailLossSeen } : {}) });

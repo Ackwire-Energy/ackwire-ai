@@ -1915,6 +1915,10 @@ export const en = {
       "{{name}} has access to the mailbox of {{owners}}. With more people talking to him, they could reach those emails through him, so that access is removed. Whoever connected the mailbox can give it again.",
     mailLoss_female:
       "{{name}} has access to the mailbox of {{owners}}. With more people talking to her, they could reach those emails through her, so that access is removed. Whoever connected the mailbox can give it again.",
+    /** Before widening an agent on someone else's plan (ADR 0059 §5): it spends their plan, and they get an email. */
+    planTitle: "Use {{owner}}'s plan?",
+    planOpen:
+      "Conversations with {{name}} will use {{owner}}'s {{plan}} plan and its limits. {{owner}} will get an email about it.",
   },
   teamChecks: {
     group: "What the agent didn't repeat",

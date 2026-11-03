@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { Agent, OrgRole, OrgSummary } from "../src/api/types";
-import { audienceBlocked, audienceLines, audiencePatch, audienceWithMe } from "../src/lib/audience";
+import type { TFunction } from "i18next";
+import type { Agent, ForeignMailbox, OrgRole, OrgSummary } from "../src/api/types";
+import { audienceLines, audiencePatch, audienceWithMe, opensOthersPlan, widenQuestion } from "../src/lib/audience";
 import { agentWorkingIn, type StreamsState } from "../src/realtime/streams";
 
 const role = (id: string, position: number, kind: OrgRole["kind"] = "custom") =>
@@ -78,8 +79,30 @@ describe("audienceWithMe", () => {
     expect(audienceWithMe(member, kept, "u-bia")).toBeNull();
     expect(audienceWithMe(admin, { ...kept, canTalk: true }, "u-caio")).toBeNull();
   });
-  test("on someone else's plan only its owner lets more people in", () => {
+  test("on someone else's plan an admin lets themselves in too, asked first; its owner isn't asked", () => {
     const onPlan = { ...kept, brain: { kind: "claude_code" } as Agent["brain"] };
-    expect(audienceWithMe(admin, onPlan, "u-caio")).toBeNull();
+    const next = audienceWithMe(admin, onPlan, "u-caio");
+    expect(next).toEqual({ mode: "people", userIds: ["u-caio"], roleIds: ["suporte"] });
+    expect(next && opensOthersPlan(onPlan, next, "u-caio")).toBe(true);
+    expect(opensOthersPlan(onPlan, { mode: "everyone", userIds: [], roleIds: [] }, "u-heitor")).toBe(false);
+    expect(opensOthersPlan(kept, { mode: "everyone", userIds: [], roleIds: [] }, "u-caio")).toBe(false);
+    expect(audienceWithMe(member, onPlan, "u-bia")).toBeNull();
+  });
+});
+
+describe("widenQuestion", () => {
+  const t = ((key: string, o?: Record<string, string>) =>
+    `${key}${o ? JSON.stringify(o) : ""}`) as unknown as TFunction;
+  const ada = { name: "Ada", brain: { kind: "claude_code" } as Agent["brain"] };
+  const box = { accountId: "m1", address: "w@x.test", ownerName: "Walter" } as ForeignMailbox;
+  test("nothing to ask, the mailboxes alone, or the plan with the mailboxes in one question", () => {
+    expect(widenQuestion(t, ada, null, [])).toBeNull();
+    expect(widenQuestion(t, ada, null, [box])?.title).toBe("reach.mailLossTitle");
+    const plan = widenQuestion(t, ada, "Walter", []);
+    expect(plan?.title).toBe('reach.planTitle{"owner":"Walter"}');
+    expect(plan?.description).toContain('"plan":"aiAccounts.connect.claude_code"');
+    expect(widenQuestion(t, ada, "Walter", [box])?.description).toMatch(
+      /^common\.joinSentences.*reach\.planOpen.*reach\.mailLoss/,
+    );
   });
 });

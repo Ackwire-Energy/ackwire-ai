@@ -1946,6 +1946,9 @@ export const ptBR = {
       "{{name}} tem acesso à caixa de email de {{owners}}. Com mais pessoas falando com ele, elas poderiam chegar a esses emails por ele, então esse acesso é removido. Quem conectou a caixa de email pode dar de novo.",
     mailLoss_female:
       "{{name}} tem acesso à caixa de email de {{owners}}. Com mais pessoas falando com ela, elas poderiam chegar a esses emails por ela, então esse acesso é removido. Quem conectou a caixa de email pode dar de novo.",
+    planTitle: "Usar o plano de {{owner}}?",
+    planOpen:
+      "As conversas com {{name}} vão usar o plano do {{plan}} de {{owner}} e os limites dele. {{owner}} vai receber um email avisando.",
   },
   teamChecks: {
     group: "O que o agente não repetiu",

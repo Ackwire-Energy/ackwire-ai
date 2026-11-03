@@ -2028,7 +2028,9 @@
     "allowedMe": "Fatto: ora puoi parlare con {{name}}.",
     "mailLossTitle": "Togliere l'accesso alla casella di posta?",
     "mailLoss": "{{name}} ha accesso alla casella di posta di {{owners}}. Se più persone parlano con lui, potrebbero raggiungere quelle email tramite lui, quindi questo accesso viene tolto. Chi ha collegato la casella può darlo di nuovo.",
-    "mailLoss_female": "{{name}} ha accesso alla casella di posta di {{owners}}. Se più persone parlano con lei, potrebbero raggiungere quelle email tramite lei, quindi questo accesso viene tolto. Chi ha collegato la casella può darlo di nuovo."
+    "mailLoss_female": "{{name}} ha accesso alla casella di posta di {{owners}}. Se più persone parlano con lei, potrebbero raggiungere quelle email tramite lei, quindi questo accesso viene tolto. Chi ha collegato la casella può darlo di nuovo.",
+    "planTitle": "Usare il piano di {{owner}}?",
+    "planOpen": "Le conversazioni con {{name}} useranno il piano {{plan}} di {{owner}} e i suoi limiti. {{owner}} riceverà un'email che lo avvisa."
   },
   "teamChecks": {
     "group": "Cosa l'agente non ha ripetuto",

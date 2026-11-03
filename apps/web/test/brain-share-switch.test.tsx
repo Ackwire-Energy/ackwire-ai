@@ -228,7 +228,7 @@ describe("Atende outras pessoas (Quem pensa)", () => {
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: null, fallback: true }]);
   });
 
-  test("an admin who doesn't own it: the same switch, its line naming whose plan it is", async () => {
+  test("an admin who doesn't own it: the same switch, its line naming whose plan it is, asked first", async () => {
     const state = await ada({}, { mine: false });
     const d = await brainDialog();
     const a = await advanced(d);
@@ -239,6 +239,9 @@ describe("Atende outras pessoas (Quem pensa)", () => {
       "Atende outras pessoasA Ada atende quem pode falar com ela, pelo plano do Claude de João.",
     );
     await done(a);
+    const ask = screen().getByRole("dialog", { name: "Usar o plano de João?" });
+    expect(ask.textContent).toContain("João vai receber um email avisando.");
+    await click(within(ask).getByRole("button", { name: "Continuar" }));
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toMatchObject({ onlyOwner: false });

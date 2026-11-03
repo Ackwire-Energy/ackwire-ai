@@ -390,7 +390,7 @@ describe("who can talk to the agent", () => {
     expect(email.sent).toHaveLength(1);
     const [sent] = email.sent;
     const [owner] = await f.db.select().from(schema.users).where(eq(schema.users.id, f.owner.id));
-    expect(sent?.to).toEqual([owner?.email]);
+    expect(sent?.to).toEqual([String(owner?.email)]);
     expect(sent?.subject).toBe("More people can talk to your agent on your Claude plan");
     expect(sent?.text).toContain("caio");
     expect(sent?.text).toContain("You and bia");
