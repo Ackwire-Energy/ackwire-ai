@@ -328,11 +328,14 @@ function LineChart({
   spec,
   big,
   spark = false,
+  bleed = false,
   height,
 }: {
   spec: ChartSpec;
   big: boolean;
   spark?: boolean;
+  /** Edge to edge (a card's own chart): the line from side to side, its area down to the bottom. */
+  bleed?: boolean;
   height?: number;
 }) {
   const { i18n } = useTranslation();
@@ -349,13 +352,14 @@ function LineChart({
     const flat = linePoints(all, width, h);
     return spec.series.map((s, k) => {
       const offset = spec.series.slice(0, k).reduce((n, x) => n + x.values.length, 0);
+      const inset = bleed ? 0 : 8;
       return s.values.map((_, i): [number, number] => {
         const [, y] = flat[offset + i] ?? [0, 0];
-        const x = 8 + (i * (width - 16)) / Math.max(1, s.values.length - 1);
+        const x = inset + (i * (width - 2 * inset)) / Math.max(1, s.values.length - 1);
         return [x, y];
       });
     });
-  }, [width, h, spec.series, all]);
+  }, [width, h, spec.series, all, bleed]);
   const ink = chartInk(color, dark);
   const slices = chartSlices(color, dark);
   const path = useRef<SVGPathElement>(null);
@@ -375,12 +379,16 @@ function LineChart({
     const cols = Math.round(width / CHART_CELL);
     const rows = Math.round(h / CHART_CELL);
     const tops = lineTops(first, cols);
+    // Edge to edge, the columns at the very sides (where the curve's samples round past) take their neighbor's top.
+    if (bleed) fillEnds(tops);
     const [near, far] = chartAreaTones(color, dark);
-    paintCells(area.current, cols, rows, areaCells(cols, rows, tops), (v) => (v === 1 ? near : v === 2 ? far : null));
-  }, [width, h, color, dark, first]);
+    // Edge to edge, the dither fades over twice the height, so it still reaches the card's bottom edge.
+    const cells = areaCells(cols, bleed ? rows * 2 : rows, tops);
+    paintCells(area.current, cols, rows, cells, (v) => (v === 1 ? near : v === 2 ? far : null));
+  }, [width, h, color, dark, first, bleed]);
 
   return (
-    <div className="chart-line" data-spark={spark}>
+    <div className="chart-line" data-spark={spark} data-bleed={bleed || undefined}>
       <div
         className="chart-line__plot"
         ref={plot}
@@ -479,6 +487,44 @@ function LineChart({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Tops missing at either end (NaN) take the nearest column's, so an edge-to-edge area has no gap at its sides. */
+function fillEnds(tops: number[]) {
+  const first = tops.findIndex((v) => !Number.isNaN(v));
+  if (first < 0) return;
+  for (let i = 0; i < first; i++) tops[i] = tops[first] as number;
+  for (let i = first + 1; i < tops.length; i++) if (Number.isNaN(tops[i] as number)) tops[i] = tops[i - 1] as number;
+}
+
+/**
+ * A line with no axes, points or tips, in an agent's tones, edge to edge (the task manager's cards: an agent's last
+ * half hour). Drawn at once, no grow-in: it is redrawn as the numbers come.
+ */
+export function Sparkline({
+  values,
+  color,
+  height = 36,
+  label,
+}: {
+  values: number[];
+  color: AgentColor;
+  height?: number;
+  label: string;
+}) {
+  const spec = useMemo<ChartSpec>(
+    () => ({ type: "line", title: label, labels: values.map(() => ""), series: [{ name: label, values }] }),
+    [values, label],
+  );
+  return (
+    <div className="chart-spark" role="img" aria-label={label}>
+      <ChartAccent.Provider value={color}>
+        <ChartStill.Provider value={true}>
+          <LineChart spec={spec} big={false} spark bleed height={height} />
+        </ChartStill.Provider>
+      </ChartAccent.Provider>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { can, type Membership, requireActiveMembership } from "./organizations";
 import { type AgentQuestionRow, publishQuestion, syncQuestionMessage } from "./questions";
 import { closeRoutineRun } from "./routine-ledger";
 import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
+import { tellAgentStopped } from "./run-stopped";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
 import { standingErrorDetail } from "./standing";
@@ -204,7 +205,7 @@ export async function cancelRun(
   userId: string,
   orgId: string,
   runId: string,
-  options: { stopMessageId?: string } = {},
+  options: { stopMessageId?: string; reason?: string; tell?: boolean } = {},
 ): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
   const { db } = deps;
   const membership = await requireActiveMembership(db, userId, orgId);
@@ -224,7 +225,13 @@ export async function cancelRun(
   if (!(await mayStopRun(db, userId, membership, row)))
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
-  return stopRun(deps, orgId, row.run, row.channelKind, { type: "person", id: userId }, options);
+  const stopped = await stopRun(deps, orgId, row.run, row.channelKind, { type: "person", id: userId }, options);
+  // The agent is told (ADR 0128), unless the stop came with a message to it ("Parar e mandar": that message says it)
+  // or the agent stopped it itself on a person's word (`tell: false`).
+  if (!options.stopMessageId && options.tell !== false) {
+    await tellAgentStopped(deps, row.run, stopped.previousStatus, userId, options.reason).catch(() => null);
+  }
+  return stopped;
 }
 
 /**

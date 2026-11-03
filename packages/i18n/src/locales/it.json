@@ -13014,5 +13014,154 @@
       "message": "Scrivi a {{name}}",
       "chooseOnWeb": "Sceglilo su agentes.chat, in Impostazioni › Computer."
     }
+  },
+  "taskManager": {
+    "title": "Gestione attività",
+    "nav": "Gestione attività",
+    "search": "Cerca un'attività, un agente o un'app",
+    "working_one": "{{count}} al lavoro",
+    "working_many": "{{count}} al lavoro",
+    "working_other": "{{count}} al lavoro",
+    "waiting_one": "{{count}} ti aspetta",
+    "waiting_many": "{{count}} ti aspettano",
+    "waiting_other": "{{count}} ti aspettano",
+    "all": "Tutti",
+    "now": "In corso",
+    "agentTasks": "Attività di {{name}}",
+    "tasks_one": "{{count}} attività",
+    "tasks_many": "{{count}} attività",
+    "tasks_other": "{{count}} attività",
+    "free": "Disponibile",
+    "columns": {
+      "task": "Attività",
+      "state": "Stato",
+      "using": "Sta usando",
+      "time": "Durata",
+      "computer": "Gira su"
+    },
+    "sections": {
+      "asked": "Chieste da persone",
+      "background": "Routine in background"
+    },
+    "state": {
+      "working": "Al lavoro",
+      "ok": "Aspetta il tuo ok",
+      "answer": "Aspetta una risposta",
+      "computerBusy": "Aspetta spazio sul computer",
+      "inLine": "In coda · {{position}}º",
+      "computerOffline": "Aspetta il computer",
+      "plan": "Aspetta il piano",
+      "budget": "Aspetta il budget",
+      "queued": "In coda",
+      "stopping": "Arresto in corso…",
+      "stopped": "Fermata"
+    },
+    "where": {
+      "dm": "Conversazione diretta",
+      "routine": "Routine «{{name}}»",
+      "background": "In background"
+    },
+    "askedBy": "L'ha chiesta {{name}}",
+    "askedByYou": "L'hai chiesta tu",
+    "servers": "I nostri server",
+    "plan": "{{done}} di {{total}} fatti",
+    "program": {
+      "browser": "Browser",
+      "screen": "Schermo del computer",
+      "terminal": "Terminale",
+      "agentes": "agentes",
+      "thinking": "Sta pensando",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "Vedi i passaggi",
+      "stop": "Ferma",
+      "stopTask": "Ferma l'attività",
+      "stopAll": "Ferma tutte",
+      "stopAllOf": "Ferma tutto di {{name}}",
+      "open": "Apri nella conversazione",
+      "openManager": "Apri in Gestione attività"
+    },
+    "confirm": {
+      "title_one": "Fermare l'attività di {{name}}?",
+      "title_many": "Fermare le {{count}} attività di {{name}}?",
+      "title_other": "Fermare le {{count}} attività di {{name}}?",
+      "body": "Ciò che è già stato fatto resta, e {{name}} saprà che hai fermato il lavoro.",
+      "short": "{{name}} saprà che hai fermato il lavoro.",
+      "reason": "Perché? (facoltativo)",
+      "stop_one": "Ferma",
+      "stop_many": "Ferma {{count}}",
+      "stop_other": "Ferma {{count}}"
+    },
+    "ended": {
+      "title": "Concluse oggi",
+      "done": "Completata",
+      "stopped": "L'hai fermata",
+      "stoppedBy": "L'ha fermata {{name}}",
+      "failed": "Non completata",
+      "none": "Ancora nulla di concluso oggi."
+    },
+    "empty": {
+      "title": "Nessun agente sta lavorando ora",
+      "body": "Quando un agente inizia un'attività, compare qui."
+    },
+    "strip": {
+      "tasks_one": "{{name}} su {{count}} attività",
+      "tasks_many": "{{name}} su {{count}} attività",
+      "tasks_other": "{{name}} su {{count}} attività",
+      "waiting_one": "{{count}} ti aspetta",
+      "waiting_many": "{{count}} ti aspettano",
+      "waiting_other": "{{count}} ti aspettano",
+      "see": "Vedi",
+      "hide": "Chiudi",
+      "stopHere": "Ferma questa",
+      "here": "qui"
+    },
+    "stopped": {
+      "line": "Hai fermato questa attività",
+      "lineBy": "{{name}} ha fermato questa attività",
+      "told": "{{agent}} ha ricevuto l'avviso e la riprende solo se qualcuno lo chiede.",
+      "reason": "Motivo: «{{reason}}»",
+      "sayWhy": "Spiega perché",
+      "whyPlaceholder": "Vuoi dire perché? (facoltativo)",
+      "send": "Invia"
+    },
+    "activity": "Ultimi 30 min",
+    "failed": "Arresto non riuscito. Riprova.",
+    "queue": {
+      "see": "Vedi la coda",
+      "full_one": "Pieno · {{count}} in coda",
+      "full_many": "Pieno · {{count}} in coda",
+      "full_other": "Pieno · {{count}} in coda",
+      "room": "Ha spazio",
+      "computers": "Computer"
+    },
+    "navWhat": "Cosa sta facendo ogni agente ora, e fermare ciò che serve",
+    "cards": {
+      "label": "Agenti",
+      "previous": "Agenti precedenti",
+      "next": "Altri agenti"
+    },
+    "table": "Attività",
+    "noResults": "Nessuna attività corrisponde a questa ricerca.",
+    "toggleAgent": "Mostra o nascondi le attività di {{name}}",
+    "using": "Usa {{names}}",
+    "activityOf": "Cosa ha fatto {{name}} negli ultimi 30 min",
+    "activityAll": "Cosa hanno fatto gli agenti negli ultimi 30 min",
+    "panel": {
+      "steps": "Passaggi",
+      "noSteps": "Ancora nessun passaggio."
+    },
+    "agentPanel": {
+      "now_one": "{{count}} in corso",
+      "now_many": "{{count}} in corso",
+      "now_other": "{{count}} in corso",
+      "wells": {
+        "now": "In corso",
+        "waiting": "Ti aspetta",
+        "done": "Concluse oggi"
+      },
+      "none": "{{name}} ora è disponibile."
+    }
   }
 }

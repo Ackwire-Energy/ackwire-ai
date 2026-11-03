@@ -1183,6 +1183,11 @@ export const featureKeysPtBR = {
     anyAgent: "Todos os agentes",
     create: "Criar",
   },
+  // The task manager (ADR 0128; the rest of its words are shared, `taskManager.*`).
+  taskManager: {
+    loadFailed: "Não deu para carregar as tarefas.",
+    gone: "Essa tarefa não está mais aqui.",
+  },
   // intentional: chats/activity/ui
   homeNow: {
     working_one: "{{count}} trabalhando",

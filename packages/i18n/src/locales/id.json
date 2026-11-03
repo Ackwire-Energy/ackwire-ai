@@ -12134,5 +12134,136 @@
       "message": "Kirim pesan ke {{name}}",
       "chooseOnWeb": "Pilih di agentes.chat, di Pengaturan › Komputer."
     }
+  },
+  "taskManager": {
+    "title": "Pengelola tugas",
+    "nav": "Pengelola tugas",
+    "search": "Cari tugas, agen, atau aplikasi",
+    "working_other": "{{count}} sedang bekerja",
+    "waiting_other": "{{count}} menunggumu",
+    "all": "Semua",
+    "now": "Sekarang",
+    "agentTasks": "Tugas {{name}}",
+    "tasks_other": "{{count}} tugas",
+    "free": "Luang",
+    "columns": {
+      "task": "Tugas",
+      "state": "Status",
+      "using": "Sedang dipakai",
+      "time": "Waktu",
+      "computer": "Berjalan di"
+    },
+    "sections": {
+      "asked": "Diminta oleh orang",
+      "background": "Rutinitas di latar belakang"
+    },
+    "state": {
+      "working": "Bekerja",
+      "ok": "Menunggu persetujuanmu",
+      "answer": "Menunggu jawaban",
+      "computerBusy": "Menunggu tempat di komputer",
+      "inLine": "Antre · ke-{{position}}",
+      "computerOffline": "Menunggu komputer",
+      "plan": "Menunggu kuota paket",
+      "budget": "Menunggu anggaran",
+      "queued": "Dalam antrean",
+      "stopping": "Menghentikan…",
+      "stopped": "Dihentikan"
+    },
+    "where": {
+      "dm": "Pesan langsung",
+      "routine": "Rutinitas «{{name}}»",
+      "background": "Di latar belakang"
+    },
+    "askedBy": "{{name}} meminta",
+    "askedByYou": "Kamu meminta",
+    "servers": "Server kami",
+    "plan": "{{done}} dari {{total}} selesai",
+    "program": {
+      "browser": "Browser",
+      "screen": "Layar komputer",
+      "terminal": "Terminal",
+      "agentes": "agentes",
+      "thinking": "Berpikir",
+      "inside": "{{program}} · {{detail}}"
+    },
+    "actions": {
+      "steps": "Lihat langkah",
+      "stop": "Hentikan",
+      "stopTask": "Hentikan tugas",
+      "stopAll": "Hentikan semua",
+      "stopAllOf": "Hentikan semua tugas {{name}}",
+      "open": "Buka di percakapan",
+      "openManager": "Buka di pengelola tugas"
+    },
+    "confirm": {
+      "title_other": "Hentikan {{count}} tugas {{name}}?",
+      "body": "Yang sudah dikerjakan tetap tersimpan, dan {{name}} diberi tahu bahwa kamu menghentikannya.",
+      "short": "{{name}} diberi tahu bahwa kamu menghentikannya.",
+      "reason": "Kenapa? (opsional)",
+      "stop_other": "Hentikan {{count}}"
+    },
+    "ended": {
+      "title": "Selesai hari ini",
+      "done": "Selesai",
+      "stopped": "Kamu menghentikannya",
+      "stoppedBy": "Dihentikan oleh {{name}}",
+      "failed": "Tidak bisa selesai",
+      "none": "Belum ada yang selesai hari ini."
+    },
+    "empty": {
+      "title": "Tidak ada agen yang bekerja sekarang",
+      "body": "Saat agen memulai tugas, tugas itu muncul di sini."
+    },
+    "strip": {
+      "tasks_other": "{{name}} mengerjakan {{count}} tugas",
+      "waiting_other": "{{count}} menunggumu",
+      "see": "Lihat",
+      "hide": "Tutup",
+      "stopHere": "Hentikan yang ini",
+      "here": "di sini"
+    },
+    "stopped": {
+      "line": "Kamu menghentikan tugas ini",
+      "lineBy": "{{name}} menghentikan tugas ini",
+      "told": "{{agent}} sudah diberi tahu dan hanya melanjutkan kalau ada yang meminta.",
+      "reason": "Alasan: «{{reason}}»",
+      "sayWhy": "Beri alasan",
+      "whyPlaceholder": "Mau kasih alasan? (opsional)",
+      "send": "Kirim"
+    },
+    "activity": "30 menit terakhir",
+    "failed": "Tidak bisa menghentikannya. Coba lagi.",
+    "queue": {
+      "see": "Lihat antrean",
+      "full_other": "Penuh · {{count}} antre",
+      "room": "Ada tempat",
+      "computers": "Komputer"
+    },
+    "navWhat": "Apa yang sedang dikerjakan tiap agen, dan hentikan yang perlu",
+    "cards": {
+      "label": "Agen",
+      "previous": "Agen sebelumnya",
+      "next": "Agen lainnya"
+    },
+    "table": "Tugas",
+    "noResults": "Tidak ada tugas yang cocok dengan pencarian ini.",
+    "toggleAgent": "Tampilkan atau sembunyikan tugas {{name}}",
+    "using": "Memakai {{names}}",
+    "activityOf": "Yang dikerjakan {{name}} dalam 30 menit terakhir",
+    "activityAll": "Yang dikerjakan para agen dalam 30 menit terakhir",
+    "panel": {
+      "steps": "Langkah",
+      "noSteps": "Belum ada langkah."
+    },
+    "agentPanel": {
+      "now_other": "{{count}} sekarang",
+      "wells": {
+        "now": "Sekarang",
+        "waiting": "Menunggumu",
+        "done": "Selesai hari ini"
+      },
+      "none": "{{name}} sedang luang."
+    }
   }
 }

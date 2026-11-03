@@ -5619,6 +5619,102 @@ export interface WorkingRun {
   work?: { id: string; title: string; plan: { done: number; total: number } | null; since: string } | null;
 }
 
+/** What a task uses right now: its latest tool call, as the chat's live chip says it (ADR 0128). */
+export interface TaskNow {
+  tool: string;
+  detail: string | null;
+  connector: string | null;
+  service: string | null;
+  serviceIcon: string | null;
+  at: string;
+}
+
+/** One task in the task manager (`GET …/task-manager`, ADR 0128): a run still on. No cost. */
+export interface ManagedTask {
+  runId: string;
+  agentId: string;
+  channelId: string;
+  channelKind: "channel" | "dm";
+  /** Null for a DM (and a routine's room). */
+  channelName: string | null;
+  /** Null: the main timeline. */
+  threadId: string | null;
+  status: "queued" | "running" | "waiting_approval" | "waiting_input";
+  startedAt: string | null;
+  createdAt: string;
+  /** What it works on (≤ 80): the long work's title, the thread's title, else its first message. */
+  label: string | null;
+  /** A routine's background run. */
+  background: boolean;
+  routine: { id: string; name: string } | null;
+  /** Long work (ADR 0121): its plan's progress. */
+  plan: { done: number; total: number } | null;
+  /** Who asked (a person); null for another agent, a routine or an event. */
+  requester: { userId: string; name: string } | null;
+  /** `model`, `claude_code`, `codex`, `cursor`; null before its first turn. */
+  brain: string | null;
+  /** The agent's computer. */
+  machine: { id: string; name: string } | null;
+  now: TaskNow | null;
+  /** Tool calls so far. */
+  steps: number;
+  pendingMessageIds: string[];
+  /** You may stop it (who asked, the agent's owner, an admin). */
+  canStop: boolean;
+  /** What it waits on when it isn't a person: its computer (full or away), its plan's limit, the budget. */
+  held?: "computer_busy" | "computer_offline" | "plan" | "budget" | null;
+  /** Its place in its computer's line for room (people's turns first, then the longest wait). */
+  line?: {
+    machineId: string;
+    position: number;
+    of: number;
+    people: boolean;
+    /** When it should start (the line's estimate); null with no basis. */
+    estimatedStartAt: string | null;
+  } | null;
+}
+
+/** A computer with turns running or waiting for room (counts only). */
+export interface ComputerSummary {
+  id: string;
+  name: string;
+  working: number;
+  inLine: number;
+}
+
+/** A task that ended (`ended` of the task manager). */
+export interface EndedTask {
+  runId: string;
+  agentId: string;
+  channelId: string;
+  channelKind: "channel" | "dm";
+  channelName: string | null;
+  threadId: string | null;
+  status: "done" | "failed" | "canceled";
+  label: string | null;
+  background: boolean;
+  routine: { id: string; name: string } | null;
+  startedAt: string | null;
+  finishedAt: string;
+  /** Stopped by a person: who. */
+  stoppedBy: { userId: string; name: string } | null;
+}
+
+/** A task's steps (`GET …/task-manager/{runId}/steps`): the chat chip's fields per call, how each ended. */
+export interface TaskSteps {
+  run: { createdAt: string; finishedAt: string | null };
+  steps: RunStep[];
+}
+
+export interface TaskManagerView {
+  tasks: ManagedTask[];
+  ended: EndedTask[];
+  /** Computers with turns running or waiting for room (absent on an older server). */
+  computers?: ComputerSummary[];
+  /** Per agent with work in the last hour: tool calls per minute, 60 points, oldest first. */
+  activity: Record<string, number[]>;
+}
+
 /** A one-off reminder in a conversation (`reminders.*`; also a routine in Rotinas). */
 export interface Reminder {
   id: string;

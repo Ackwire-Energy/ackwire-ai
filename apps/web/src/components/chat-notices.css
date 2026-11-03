@@ -69,6 +69,14 @@ html:not([data-pointer]) .cn-line__toggle:focus-visible {
   font-weight: 400;
 }
 
+/* "Você parou esta tarefa" (ADR 0128): the same quiet line; "Dizer por quê" opens its field and Mandar
+   (`.tm-saywhy`) under it, in the words' column. */
+.cn-stopped__why {
+  flex: 1 1 100%;
+  max-width: 520px;
+  margin: 2px 0 2px 22px;
+}
+
 /*
  * A long message from one agent to another, folded to its first paragraph: "Ler tudo · mais 18 linhas" opens it
  * whole in its thread beside the chat, pressed while that thread shows there (like a thread's line).

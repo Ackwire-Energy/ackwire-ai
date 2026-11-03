@@ -9,7 +9,7 @@ import { untrustedBlock } from "./untrusted";
  * stopped waiting on (`wait_result`), a fast reply it gave while it worked
  * (`talker_reply`), what people decided on its proposal of a new agent or of
  * a change (`proposal_result`), how a vote it started came out (`poll_result`), its own follow-up (`follow_up`: the line it set, and at
- * its time the notice that wakes it, `refs.wake`), agents its @mention couldn't wake (`wake_skipped`, ADR 0097). Stored on the notice
+ * its time the notice that wakes it, `refs.wake`), agents its @mention couldn't wake (`wake_skipped`, ADR 0097), a person stopping one of its tasks (`run_stopped`, ADR 0128). Stored on the notice
  * message as `meta.notice`; the agent's context reads it as an event, never
  * as a person's words.
  *
@@ -28,7 +28,8 @@ export type NoticeKind =
   | "poll_result"
   | "follow_up"
   | "wake_skipped"
-  | "work_check_in";
+  | "work_check_in"
+  | "run_stopped";
 
 /**
  * Notices only for the agent they are for: another agent's note, the late result of a wait it stopped waiting on, what
@@ -54,6 +55,19 @@ export const agentOnlyNoticeSql = (meta: SQL): SQL =>
     AGENT_ONLY_NOTICES.map((k) => sql`${k}`),
     sql`, `,
   )})`;
+
+/**
+ * Notices people see in the conversation but that are never news (ADR 0128): a person stopping a task is a receipt.
+ * Conversation previews, unread counts and a thread's activity skip them, like the agent-only ones.
+ */
+export const QUIET_NOTICES: readonly NoticeKind[] = ["run_stopped"];
+
+/** Agent-only or quiet, in SQL, on a message's `meta`: left out of previews, unread counts and thread activity. */
+export const quietNoticeSql = (meta: SQL): SQL =>
+  sql`(${agentOnlyNoticeSql(meta)} or coalesce(${meta}->'notice'->>'kind', '') in (${sql.join(
+    QUIET_NOTICES.map((k) => sql`${k}`),
+    sql`, `,
+  )}))`;
 
 export interface Notice {
   kind: NoticeKind;
@@ -145,6 +159,9 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       return `[Not woken]: ${n.text}`;
     case "work_check_in":
       return `[Your background work]: ${n.text}`;
+    // A person stopped one of its tasks (ADR 0128); the reason is that person's words.
+    case "run_stopped":
+      return `[A person stopped your task]: ${n.text}`;
     case "follow_up": {
       const at = n.refs?.at ?? "";
       if (n.refs?.wake)

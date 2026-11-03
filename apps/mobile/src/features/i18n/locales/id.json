@@ -1114,6 +1114,10 @@
     "anyAgent": "Semua agen",
     "create": "Buat"
   },
+  "taskManager": {
+    "loadFailed": "Tidak bisa memuat tugas.",
+    "gone": "Tugas ini sudah tidak ada di sini."
+  },
   "homeNow": {
     "working_other": "{{count}} sedang bekerja",
     "finished": {
