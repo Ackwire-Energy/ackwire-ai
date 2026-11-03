@@ -257,10 +257,10 @@ export async function loadAgentStatuses(
       : outNow
         ? "out"
         : heavy
-        ? "busy"
-        : runs.length > 0 || (activeAt && ms - activeAt.getTime() < AGENT_AWAY_AFTER_MS)
-          ? "online"
-          : "away";
+          ? "busy"
+          : runs.length > 0 || (activeAt && ms - activeAt.getTime() < AGENT_AWAY_AFTER_MS)
+            ? "online"
+            : "away";
     return { agentId: a.id, presence, status, activeAt: activeAt?.toISOString() ?? null };
   });
 }

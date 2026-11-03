@@ -827,10 +827,12 @@ export async function routeMessage(
   // Out of office (ADR 0084 §12): with nothing to think with until a reset, an agent doesn't answer a message nobody
   // mentioned it in (the others do); a mention still reaches it.
   if (deps.outOfOffice && candidates.length > 0) {
-    const out = await deps.outOfOffice(
-      message.orgId,
-      candidates.map((c) => c.agentId),
-    ).catch(() => new Set<string>());
+    const out = await deps
+      .outOfOffice(
+        message.orgId,
+        candidates.map((c) => c.agentId),
+      )
+      .catch(() => new Set<string>());
     candidates = candidates.filter((c) => !out.has(c.agentId));
   }
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
