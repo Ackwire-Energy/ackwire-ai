@@ -1646,7 +1646,7 @@ export function NotificationsPage() {
   const rest = doneView ? items : items.filter((n) => !n.waiting);
   const days = groupByDay(rest, undefined, doneView ? (n) => n.doneAt ?? n.updatedAt : undefined);
   const unreadTotal = counts?.unread ?? badge.data?.unread ?? 0;
-  const waitingTotal = counts?.waiting ?? 0;
+  const waitingTotal = counts?.waiting ?? badge.data?.waiting ?? 0;
   const nothing = list.isSuccess && (counts?.all ?? 0) === 0 && items.length === 0;
 
   // The tab says how many are unread.
@@ -1962,7 +1962,8 @@ export function NotificationsPage() {
         {/* How many are unread sits on the title's row, on its right. */}
         <div className="nt-title">
           <h1>{t("notifications.title")}</h1>
-          {list.isSuccess && <p className="nt-title__count">{summary}</p>}
+          {/* The counts the sidebar already has show at once; the list's own replace them when it arrives. */}
+          {(list.isSuccess || badge.isSuccess) && <p className="nt-title__count">{summary}</p>}
         </div>
         <div className="list-head__acts">
           <Menu

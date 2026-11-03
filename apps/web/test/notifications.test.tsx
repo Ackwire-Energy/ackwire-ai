@@ -123,6 +123,20 @@ const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
 };
 
 describe("Notificações", () => {
+  test("how many are unread is on the title's row from the first paint, before the list arrives", async () => {
+    const state = seedState({
+      notifications: [notification({ id: "n-a", kind: "mention" }), notification({ id: "n-b", kind: "mention" })],
+    });
+    const api = createFakeApi(state);
+    // The list never answers: only the count the sidebar loads at start is there.
+    api.notifications.list = () => new Promise(() => {});
+    await renderApp(`/org/${ORG_ID}/notifications`, { api });
+    await settle(4);
+    const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
+    expect(title.parentElement?.className).toBe("nt-title");
+    expect(title.nextElementSibling?.textContent).toContain("2 não lidas");
+  });
+
   test("waiting on top with the agent looking up, the rest by day, filters with counts, the badge and the tab title", async () => {
     await go();
     const title = screen().getByRole("heading", { level: 1, name: "Notificações" });
