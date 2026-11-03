@@ -10437,7 +10437,20 @@
     "count_other": "{{count}} bazy",
     "prefixRow": "bazy zaczynające się od {{prefix}}",
     "refresh": "Odśwież listę",
-    "refreshName": "Odśwież listę baz {{name}}"
+    "refreshName": "Odśwież listę baz {{name}}",
+    "scopeEdit": "Bazy",
+    "scopeEditName": "Bazy w {{name}}",
+    "scopeSaved": "Zapisano: {{name}}.",
+    "widenTitle": "Otworzyć cały serwer?",
+    "widenTitlePrefix": "Otworzyć więcej baz?",
+    "widenText_one": "Agent z dostępem będzie czytać wszystkie bazy na tym serwerze. Możesz to ograniczyć dla każdego agenta w Regułach.",
+    "widenText_few": "{{count}} agenci z dostępem będą czytać wszystkie bazy na tym serwerze. Możesz to ograniczyć dla każdego agenta w Regułach.",
+    "widenText_many": "{{count}} agentów z dostępem będzie czytać wszystkie bazy na tym serwerze. Możesz to ograniczyć dla każdego agenta w Regułach.",
+    "widenText_other": "{{count}} agenta z dostępem będzie czytać wszystkie bazy na tym serwerze. Możesz to ograniczyć dla każdego agenta w Regułach.",
+    "widenTextPrefix_one": "Agent z dostępem będzie czytać wszystkie bazy zaczynające się od {{prefix}}. Możesz to ograniczyć dla każdego agenta w Regułach.",
+    "widenTextPrefix_few": "{{count}} agenci z dostępem będą czytać wszystkie bazy zaczynające się od {{prefix}}. Możesz to ograniczyć dla każdego agenta w Regułach.",
+    "widenTextPrefix_many": "{{count}} agentów z dostępem będzie czytać wszystkie bazy zaczynające się od {{prefix}}. Możesz to ograniczyć dla każdego agenta w Regułach.",
+    "widenTextPrefix_other": "{{count}} agenta z dostępem będzie czytać wszystkie bazy zaczynające się od {{prefix}}. Możesz to ograniczyć dla każdego agenta w Regułach."
   },
   "mail": {
     "choice": {

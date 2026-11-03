@@ -9350,7 +9350,14 @@
     "count_other": "데이터베이스 {{count}}개",
     "prefixRow": "{{prefix}}(으)로 시작하는 데이터베이스",
     "refresh": "목록 새로고침",
-    "refreshName": "{{name}}의 데이터베이스 목록 새로고침"
+    "refreshName": "{{name}}의 데이터베이스 목록 새로고침",
+    "scopeEdit": "데이터베이스",
+    "scopeEditName": "{{name}}의 데이터베이스",
+    "scopeSaved": "{{name}}을(를) 저장했어요.",
+    "widenTitle": "서버 전체를 열까요?",
+    "widenTitlePrefix": "데이터베이스를 더 열까요?",
+    "widenText_other": "접근 권한이 있는 에이전트 {{count}}명이 이 서버의 모든 데이터베이스를 읽게 돼요. 에이전트별 제한은 규칙에서 할 수 있어요.",
+    "widenTextPrefix_other": "접근 권한이 있는 에이전트 {{count}}명이 {{prefix}}(으)로 시작하는 모든 데이터베이스를 읽게 돼요. 에이전트별 제한은 규칙에서 할 수 있어요."
   },
   "mail": {
     "choice": {

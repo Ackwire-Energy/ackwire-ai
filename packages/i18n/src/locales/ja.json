@@ -9357,7 +9357,14 @@
     "count_other": "{{count}} 個のデータベース",
     "prefixRow": "{{prefix}} で始まるデータベース",
     "refresh": "一覧を更新",
-    "refreshName": "{{name}} のデータベース一覧を更新"
+    "refreshName": "{{name}} のデータベース一覧を更新",
+    "scopeEdit": "データベース",
+    "scopeEditName": "{{name}} のデータベース",
+    "scopeSaved": "{{name}} を保存しました。",
+    "widenTitle": "サーバー全体を開きますか？",
+    "widenTitlePrefix": "対象のデータベースを広げますか？",
+    "widenText_other": "アクセスできる {{count}} 体のエージェントが、このサーバーのすべてのデータベースを読めるようになります。エージェントごとの制限はルールで設定できます。",
+    "widenTextPrefix_other": "アクセスできる {{count}} 体のエージェントが、{{prefix}} で始まるすべてのデータベースを読めるようになります。エージェントごとの制限はルールで設定できます。"
   },
   "mail": {
     "choice": {

@@ -31351,5 +31351,32 @@
       "one": "{{count}} database of {{name}}",
       "other": "{{count}} databases of {{name}}"
     }
+  },
+  "database.scopeEdit": {
+    "value": "Databases"
+  },
+  "database.scopeEditName": {
+    "value": "Databases of {{name}}"
+  },
+  "database.scopeSaved": {
+    "value": "{{name}} saved."
+  },
+  "database.widenTitle": {
+    "value": "Open the whole server?"
+  },
+  "database.widenTitlePrefix": {
+    "value": "Open more databases?"
+  },
+  "database.widenText": {
+    "value": {
+      "one": "The agent with access will read every database on this server. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database on this server. You can limit it per agent in Rules."
+    }
+  },
+  "database.widenTextPrefix": {
+    "value": {
+      "one": "The agent with access will read every database starting with {{prefix}}. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database starting with {{prefix}}. You can limit it per agent in Rules."
+    }
   }
 }

@@ -96,6 +96,12 @@ export function createFakeDatabases(log: (method: string, ...args: unknown[]) =>
       }
       if (input.label !== undefined) c.label = input.label;
       if (input.offActions !== undefined) c.offActions = [...input.offActions];
+      if (input.wholeServer !== undefined) {
+        failOnce();
+        c.wholeServer = input.wholeServer;
+        c.databasePrefix = input.wholeServer ? input.databasePrefix || null : null;
+        c.databaseCount = c.wholeServer ? fake.server.filter((n) => n.startsWith(c.databasePrefix ?? "")).length : null;
+      }
       return clone(c);
     },
     disconnect: async (orgId, connectionId) => {

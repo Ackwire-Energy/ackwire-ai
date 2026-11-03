@@ -9816,7 +9816,16 @@
     "count_other": "{{count}} databases",
     "prefixRow": "databases die beginnen met {{prefix}}",
     "refresh": "Lijst vernieuwen",
-    "refreshName": "Lijst met databases van {{name}} vernieuwen"
+    "refreshName": "Lijst met databases van {{name}} vernieuwen",
+    "scopeEdit": "Databases",
+    "scopeEditName": "Databases van {{name}}",
+    "scopeSaved": "{{name}} opgeslagen.",
+    "widenTitle": "De hele server openen?",
+    "widenTitlePrefix": "Meer databases openen?",
+    "widenText_one": "De agent met toegang leest dan alle databases op deze server. Per agent beperken kan bij Regels.",
+    "widenText_other": "De {{count}} agents met toegang lezen dan alle databases op deze server. Per agent beperken kan bij Regels.",
+    "widenTextPrefix_one": "De agent met toegang leest dan alle databases die beginnen met {{prefix}}. Per agent beperken kan bij Regels.",
+    "widenTextPrefix_other": "De {{count}} agents met toegang lezen dan alle databases die beginnen met {{prefix}}. Per agent beperken kan bij Regels."
   },
   "mail": {
     "choice": {

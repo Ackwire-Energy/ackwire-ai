@@ -9434,7 +9434,14 @@
     "count_other": "{{count}} 个数据库",
     "prefixRow": "以 {{prefix}} 开头的数据库",
     "refresh": "刷新列表",
-    "refreshName": "刷新 {{name}} 的数据库列表"
+    "refreshName": "刷新 {{name}} 的数据库列表",
+    "scopeEdit": "数据库",
+    "scopeEditName": "{{name}} 的数据库",
+    "scopeSaved": "{{name}} 已保存。",
+    "widenTitle": "开放整个服务器？",
+    "widenTitlePrefix": "开放更多数据库？",
+    "widenText_other": "有访问权限的 {{count}} 个智能体将可以读取此服务器上的所有数据库。可以在规则中按智能体限制。",
+    "widenTextPrefix_other": "有访问权限的 {{count}} 个智能体将可以读取所有以 {{prefix}} 开头的数据库。可以在规则中按智能体限制。"
   },
   "mail": {
     "choice": {

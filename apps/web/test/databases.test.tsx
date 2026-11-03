@@ -3,6 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { defaultDatabasePolicy } from "@agenteschat/client/lib/databases";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { pick, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeDatabasesOf, ORG_ID, seedState } from "./fake-api";
@@ -350,5 +351,90 @@ describe("Quais bancos: one database, or every database of the server", () => {
     await click(within(row).getByRole("button", { name: "Atualizar a lista de bancos de Clientes" }));
     await settle(4);
     expect(state.calls.some((c) => c.method === "databases.serverDatabases" && c.args[2] === true)).toBe(true);
+  });
+});
+
+describe("Bancos of a connected database: ask before more databases open", () => {
+  async function connected(input: { wholeServer?: boolean; databasePrefix?: string }, readers: string[]) {
+    const { api, state, databases } = databaseApi();
+    const c = await databases.client.connect(ORG_ID, {
+      label: "Clientes",
+      url: "postgres://reader:pw@db.acme.com/app",
+      ...input,
+    });
+    for (const agentId of readers)
+      await databases.client.setAgent(ORG_ID, agentId, c.id, { level: "read", policy: defaultDatabasePolicy() });
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    const row = (await screen().findByText("Clientes")).closest(".connected-row") as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Bancos de Clientes" }));
+    const updates = () => state.calls.filter((c) => c.method === "databases.update");
+    return { updates };
+  }
+  const pickAll = () =>
+    click(
+      within(within(flow()).getByRole("radiogroup", { name: "Quais bancos" })).getByRole("radio", {
+        name: "Todos os bancos deste servidor",
+      }),
+    );
+  const save = () => click(within(flow()).getByRole("button", { name: "Salvar" }));
+
+  test("one database → the whole server with agents reading it asks once; Cancelar saves nothing, Continuar saves once", async () => {
+    const { updates } = await connected({}, [ADA_ID, ATLAS_ID]);
+    await pickAll();
+    await save();
+    expect(flow().textContent).toContain("Abrir o servidor inteiro?");
+    expect(flow().textContent).toContain(
+      "Os 2 agentes com acesso passam a ler todos os bancos deste servidor. Dá para limitar por agente em Regras.",
+    );
+    await click(within(flow()).getByRole("button", { name: "Cancelar" }));
+    expect(updates()).toHaveLength(0);
+    // Back on the choice, still Todos: saving asks again.
+    await save();
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(updates()).toHaveLength(1);
+    expect(updates()[0]?.args[2]).toEqual({ wholeServer: true, databasePrefix: "" });
+    expect(screen().queryByRole("dialog")).toBeNull();
+  });
+
+  test("no question with no agent reading it", async () => {
+    const { updates } = await connected({}, []);
+    await pickAll();
+    await save();
+    await settle(4);
+    expect(updates()).toHaveLength(1);
+    expect(screen().queryByText("Abrir o servidor inteiro?")).toBeNull();
+  });
+
+  test("a longer prefix or one database asks nothing; another prefix asks with the prefix", async () => {
+    const narrow = await connected({ wholeServer: true, databasePrefix: "cliente_" }, [ADA_ID]);
+    await type(within(flow()).getByLabelText("Só os que começam com"), "cliente_a");
+    await save();
+    await settle(4);
+    expect(narrow.updates()).toHaveLength(1);
+    expect(narrow.updates()[0]?.args[2]).toEqual({ wholeServer: true, databasePrefix: "cliente_a" });
+    cleanup();
+
+    const one = await connected({ wholeServer: true, databasePrefix: "cliente_" }, [ADA_ID]);
+    await click(
+      within(within(flow()).getByRole("radiogroup", { name: "Quais bancos" })).getByRole("radio", {
+        name: "Só este banco",
+      }),
+    );
+    await save();
+    await settle(4);
+    expect(one.updates()[0]?.args[2]).toEqual({ wholeServer: false });
+    cleanup();
+
+    const other = await connected({ wholeServer: true, databasePrefix: "cliente_" }, [ADA_ID]);
+    await type(within(flow()).getByLabelText("Só os que começam com"), "loja_");
+    await save();
+    expect(flow().textContent).toContain("Abrir mais bancos?");
+    expect(flow().textContent).toContain("O agente com acesso passa a ler todos os bancos que começam com loja_.");
+    expect(other.updates()).toHaveLength(0);
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(other.updates()).toHaveLength(1);
   });
 });

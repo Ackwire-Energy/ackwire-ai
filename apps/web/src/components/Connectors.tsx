@@ -57,6 +57,7 @@ import {
   type DatabaseFlowState,
   DatabaseReconnectDialog,
   DatabaseRow,
+  DatabaseScopeDialog,
 } from "@/components/DatabaseConnect";
 import { GitHubAppPanel } from "@/components/GitHubAppPanel";
 import { LoadingList } from "@/components/Loading";
@@ -130,6 +131,7 @@ export function ConnectorsSection({
   const dbList = databases.data ?? [];
   const [dbFlow, setDbFlow] = useState<DatabaseFlowState | null>(null);
   const [reconnectingDb, setReconnectingDb] = useState<DatabaseConnection | null>(null);
+  const [scopingDb, setScopingDb] = useState<DatabaseConnection | null>(null);
   const [removingDb, setRemovingDb] = useState<DatabaseConnection | null>(null);
   const reconnect = (account: MailAccount) => {
     // Gmail/Outlook sign in again on the provider's page; the rest take a new app password or API key.
@@ -254,6 +256,7 @@ export function ConnectorsSection({
                 onTools={() => setDbFlow({ step: 1, connection })}
                 onWho={() => setDbFlow({ step: 2, connection })}
                 onReconnect={() => setReconnectingDb(connection)}
+                onScope={() => setScopingDb(connection)}
                 onDisconnect={() => setRemovingDb(connection)}
               />
             ))}
@@ -319,6 +322,7 @@ export function ConnectorsSection({
         <MailDisconnectDialog account={removingMail} onClose={() => setRemovingMail(null)} />
         <DatabaseConnectFlow flow={dbFlow} onChange={setDbFlow} onClose={() => setDbFlow(null)} />
         <DatabaseReconnectDialog connection={reconnectingDb} onClose={() => setReconnectingDb(null)} />
+        <DatabaseScopeDialog connection={scopingDb} onClose={() => setScopingDb(null)} />
         <DatabaseDisconnectDialog connection={removingDb} onClose={() => setRemovingDb(null)} />
         <DisconnectDialog
           item={removing}

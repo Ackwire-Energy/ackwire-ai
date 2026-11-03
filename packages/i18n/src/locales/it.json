@@ -10153,7 +10153,18 @@
     "count_other": "{{count}} database",
     "prefixRow": "database che iniziano con {{prefix}}",
     "refresh": "Aggiorna elenco",
-    "refreshName": "Aggiorna l'elenco dei database di {{name}}"
+    "refreshName": "Aggiorna l'elenco dei database di {{name}}",
+    "scopeEdit": "Database",
+    "scopeEditName": "Database di {{name}}",
+    "scopeSaved": "{{name}} salvato.",
+    "widenTitle": "Aprire tutto il server?",
+    "widenTitlePrefix": "Aprire più database?",
+    "widenText_one": "L'agente con accesso leggerà tutti i database di questo server. Puoi limitarlo per agente in Regole.",
+    "widenText_many": "I {{count}} agenti con accesso leggeranno tutti i database di questo server. Puoi limitarlo per agente in Regole.",
+    "widenText_other": "I {{count}} agenti con accesso leggeranno tutti i database di questo server. Puoi limitarlo per agente in Regole.",
+    "widenTextPrefix_one": "L'agente con accesso leggerà tutti i database che iniziano con {{prefix}}. Puoi limitarlo per agente in Regole.",
+    "widenTextPrefix_many": "I {{count}} agenti con accesso leggeranno tutti i database che iniziano con {{prefix}}. Puoi limitarlo per agente in Regole.",
+    "widenTextPrefix_other": "I {{count}} agenti con accesso leggeranno tutti i database che iniziano con {{prefix}}. Puoi limitarlo per agente in Regole."
   },
   "mail": {
     "choice": {

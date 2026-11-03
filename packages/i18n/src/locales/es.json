@@ -10076,7 +10076,18 @@
     "count_other": "{{count}} bases",
     "prefixRow": "bases que empiezan con {{prefix}}",
     "refresh": "Actualizar lista",
-    "refreshName": "Actualizar la lista de bases de {{name}}"
+    "refreshName": "Actualizar la lista de bases de {{name}}",
+    "scopeEdit": "Bases de datos",
+    "scopeEditName": "Bases de datos de {{name}}",
+    "scopeSaved": "{{name}} guardado.",
+    "widenTitle": "¿Abrir todo el servidor?",
+    "widenTitlePrefix": "¿Abrir más bases?",
+    "widenText_one": "El agente con acceso pasa a leer todas las bases de este servidor. Puedes limitarlo por agente en Reglas.",
+    "widenText_many": "Los {{count}} agentes con acceso pasan a leer todas las bases de este servidor. Puedes limitarlo por agente en Reglas.",
+    "widenText_other": "Los {{count}} agentes con acceso pasan a leer todas las bases de este servidor. Puedes limitarlo por agente en Reglas.",
+    "widenTextPrefix_one": "El agente con acceso pasa a leer todas las bases que empiezan con {{prefix}}. Puedes limitarlo por agente en Reglas.",
+    "widenTextPrefix_many": "Los {{count}} agentes con acceso pasan a leer todas las bases que empiezan con {{prefix}}. Puedes limitarlo por agente en Reglas.",
+    "widenTextPrefix_other": "Los {{count}} agentes con acceso pasan a leer todas las bases que empiezan con {{prefix}}. Puedes limitarlo por agente en Reglas."
   },
   "mail": {
     "choice": {

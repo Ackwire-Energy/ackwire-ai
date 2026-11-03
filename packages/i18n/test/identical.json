@@ -1460,6 +1460,7 @@
       "database.provider.render",
       "database.provider.supabase",
       "database.rule.databases",
+      "database.scopeEdit",
       "drive.agent",
       "drive.agentRole",
       "drive.agents",

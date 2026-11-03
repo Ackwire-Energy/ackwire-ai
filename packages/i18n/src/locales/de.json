@@ -9738,7 +9738,16 @@
     "count_other": "{{count}} Datenbanken",
     "prefixRow": "Datenbanken, die mit {{prefix}} beginnen",
     "refresh": "Liste aktualisieren",
-    "refreshName": "Liste der Datenbanken von {{name}} aktualisieren"
+    "refreshName": "Liste der Datenbanken von {{name}} aktualisieren",
+    "scopeEdit": "Datenbanken",
+    "scopeEditName": "Datenbanken von {{name}}",
+    "scopeSaved": "{{name}} gespeichert.",
+    "widenTitle": "Den ganzen Server öffnen?",
+    "widenTitlePrefix": "Mehr Datenbanken öffnen?",
+    "widenText_one": "Der Agent mit Zugriff liest dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenText_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken dieses Servers. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenTextPrefix_one": "Der Agent mit Zugriff liest dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen.",
+    "widenTextPrefix_other": "Die {{count}} Agenten mit Zugriff lesen dann alle Datenbanken, die mit {{prefix}} beginnen. Unter Regeln lässt sich das pro Agent begrenzen."
   },
   "mail": {
     "choice": {

@@ -9336,6 +9336,19 @@ export const ptBR = {
     prefixRow: "bancos que começam com {{prefix}}",
     refresh: "Atualizar lista",
     refreshName: "Atualizar a lista de bancos de {{name}}",
+    scopeEdit: "Bancos",
+    scopeEditName: "Bancos de {{name}}",
+    scopeSaved: "{{name}} salvo.",
+    widenTitle: "Abrir o servidor inteiro?",
+    widenTitlePrefix: "Abrir mais bancos?",
+    widenText_one:
+      "O agente com acesso passa a ler todos os bancos deste servidor. Dá para limitar por agente em Regras.",
+    widenText_other:
+      "Os {{count}} agentes com acesso passam a ler todos os bancos deste servidor. Dá para limitar por agente em Regras.",
+    widenTextPrefix_one:
+      "O agente com acesso passa a ler todos os bancos que começam com {{prefix}}. Dá para limitar por agente em Regras.",
+    widenTextPrefix_other:
+      "Os {{count}} agentes com acesso passam a ler todos os bancos que começam com {{prefix}}. Dá para limitar por agente em Regras.",
     testing: {
       reach: "Falando com o banco…",
       databases: "Vendo os bancos…",

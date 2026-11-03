@@ -9676,7 +9676,16 @@
     "count_other": "{{count}} veritabanı",
     "prefixRow": "{{prefix}} ile başlayan veritabanları",
     "refresh": "Listeyi yenile",
-    "refreshName": "{{name}} veritabanı listesini yenile"
+    "refreshName": "{{name}} veritabanı listesini yenile",
+    "scopeEdit": "Veritabanları",
+    "scopeEditName": "{{name}} veritabanları",
+    "scopeSaved": "{{name}} kaydedildi.",
+    "widenTitle": "Sunucunun tamamı açılsın mı?",
+    "widenTitlePrefix": "Daha fazla veritabanı açılsın mı?",
+    "widenText_one": "Erişimi olan ajan bu sunucudaki tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
+    "widenText_other": "Erişimi olan {{count}} ajan bu sunucudaki tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
+    "widenTextPrefix_one": "Erişimi olan ajan {{prefix}} ile başlayan tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz.",
+    "widenTextPrefix_other": "Erişimi olan {{count}} ajan {{prefix}} ile başlayan tüm veritabanlarını okuyabilecek. Ajan başına sınırı Kurallar bölümünden koyabilirsiniz."
   },
   "mail": {
     "choice": {

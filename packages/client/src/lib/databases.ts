@@ -74,6 +74,18 @@ export const databaseNameOf = (url: string) =>
 /** `postgres://…` looks complete enough to try (the server says exactly what's wrong). */
 export const isDatabaseUrl = (value: string) => /^postgres(ql)?:\/\/[^/\s]+/.test(value.trim());
 
+/**
+ * Saving `next` may let agents read databases `current` didn't: one database becomes the whole server, or the
+ * prefix is dropped or changed to one that isn't a longer version of the old one.
+ */
+export function widensDatabaseScope(
+  current: Pick<DatabaseConnection, "wholeServer" | "databasePrefix">,
+  next: { wholeServer: boolean; databasePrefix: string },
+) {
+  if (!next.wholeServer) return false;
+  return !current.wholeServer || !next.databasePrefix.trim().startsWith(current.databasePrefix ?? "");
+}
+
 /** A new agent's rules for a database: every table, the sensitive columns found when connecting hidden. */
 export const defaultDatabasePolicy = (connection?: Pick<DatabaseConnection, "suggestedHidden">): DatabasePolicy => ({
   tables: [],

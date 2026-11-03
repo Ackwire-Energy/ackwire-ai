@@ -9425,7 +9425,14 @@
     "count_other": "{{count}} database",
     "prefixRow": "database yang diawali {{prefix}}",
     "refresh": "Muat ulang daftar",
-    "refreshName": "Muat ulang daftar database {{name}}"
+    "refreshName": "Muat ulang daftar database {{name}}",
+    "scopeEdit": "Database",
+    "scopeEditName": "Database {{name}}",
+    "scopeSaved": "{{name}} disimpan.",
+    "widenTitle": "Buka seluruh server?",
+    "widenTitlePrefix": "Buka lebih banyak database?",
+    "widenText_other": "{{count}} agen yang punya akses akan membaca semua database di server ini. Kamu bisa membatasinya per agen di Aturan.",
+    "widenTextPrefix_other": "{{count}} agen yang punya akses akan membaca semua database yang diawali {{prefix}}. Kamu bisa membatasinya per agen di Aturan."
   },
   "mail": {
     "choice": {

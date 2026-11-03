@@ -18,6 +18,7 @@ import {
   isDatabaseUrl,
   POSTGRES_MARK,
   readOnlyRoleSql,
+  widensDatabaseScope,
 } from "@agenteschat/client/lib/databases";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import {
@@ -283,35 +284,15 @@ function ConnectStep({
             }}
           />
         </Field>
-        <div className="ac-field">
-          <span className="ac-field__label">{t("database.scope")}</span>
-          <Segmented
-            size="sm"
-            label={t("database.scope")}
-            value={whole ? "all" : "one"}
-            onValueChange={(v) => {
-              setScope(v);
-              setError(null);
-            }}
-            options={[
-              { value: "one", label: t("database.scopeOne") },
-              { value: "all", label: t("database.scopeAll") },
-            ]}
-          />
-          {whole && <span className="ac-field__help">{t("database.scopeAllHelp")}</span>}
-        </div>
-        {whole && (
-          <Field label={t("database.prefix")} id="db-prefix" help={t("database.prefixHelp")}>
-            <Input
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={63}
-              value={prefix}
-              placeholder={t("database.prefixPlaceholder")}
-              onChange={(e) => setPrefix(e.target.value)}
-            />
-          </Field>
-        )}
+        <ScopeFields
+          whole={whole}
+          prefix={prefix}
+          onScope={(v) => {
+            setScope(v);
+            setError(null);
+          }}
+          onPrefix={setPrefix}
+        />
         <ReadOnlyUserHelp provider={provider} database={dbName} wholeServer={whole} />
         <p className="small muted mail-hint">
           <Icon name="info" size={14} />
@@ -380,6 +361,51 @@ function ConnectStep({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+/** "Quais bancos" and, for every database, "Só os que começam com". */
+function ScopeFields({
+  whole,
+  prefix,
+  onScope,
+  onPrefix,
+}: {
+  whole: boolean;
+  prefix: string;
+  onScope: (scope: "one" | "all") => void;
+  onPrefix: (prefix: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="ac-field">
+        <span className="ac-field__label">{t("database.scope")}</span>
+        <Segmented
+          size="sm"
+          label={t("database.scope")}
+          value={whole ? "all" : "one"}
+          onValueChange={onScope}
+          options={[
+            { value: "one", label: t("database.scopeOne") },
+            { value: "all", label: t("database.scopeAll") },
+          ]}
+        />
+        {whole && <span className="ac-field__help">{t("database.scopeAllHelp")}</span>}
+      </div>
+      {whole && (
+        <Field label={t("database.prefix")} id="db-prefix" help={t("database.prefixHelp")}>
+          <Input
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={63}
+            value={prefix}
+            placeholder={t("database.prefixPlaceholder")}
+            onChange={(e) => onPrefix(e.target.value)}
+          />
+        </Field>
+      )}
+    </>
   );
 }
 
@@ -733,6 +759,7 @@ export function DatabaseRow({
   onTools,
   onWho,
   onReconnect,
+  onScope,
   onDisconnect,
 }: {
   connection: DatabaseConnection;
@@ -741,6 +768,7 @@ export function DatabaseRow({
   onTools: () => void;
   onWho: () => void;
   onReconnect: () => void;
+  onScope: () => void;
   onDisconnect: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -815,6 +843,9 @@ export function DatabaseRow({
           <Button size="sm" aria-label={t("connectors.whoName", { name })} onClick={onWho}>
             {t("connectors.who")}
           </Button>
+          <Button size="sm" variant="ghost" aria-label={t("database.scopeEditName", { name })} onClick={onScope}>
+            {t("database.scopeEdit")}
+          </Button>
           <Button size="sm" variant="ghost" aria-label={t("connectors.toolsName", { name })} onClick={onTools}>
             {t("connectors.tools")}
           </Button>
@@ -829,6 +860,123 @@ export function DatabaseRow({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * "Quais bancos" of a connected database (tested first, like a reconnect). Letting agents that already read it
+ * see more databases asks once, in place: "Abrir o servidor inteiro?".
+ */
+export function DatabaseScopeDialog({
+  connection,
+  onClose,
+}: {
+  connection: DatabaseConnection | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const { update } = useDatabaseAction(org.id);
+  const [scope, setScope] = useState<"one" | "all" | null>(null);
+  const [prefix, setPrefix] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<DatabaseConnectError | null>(null);
+  const whole = (scope ?? (connection?.wholeServer ? "all" : "one")) === "all";
+  const nextPrefix = (prefix ?? connection?.databasePrefix ?? "").trim();
+  const name = connection?.label ?? "";
+  const using = connection?.agents.length ?? 0;
+  const close = () => {
+    setScope(null);
+    setPrefix(null);
+    setConfirming(false);
+    setError(null);
+    onClose();
+  };
+  const save = () => {
+    if (!connection) return;
+    setConfirming(false);
+    setError(null);
+    if (whole === connection.wholeServer && (!whole || nextPrefix === (connection.databasePrefix ?? "")))
+      return close();
+    update.mutate(
+      { connectionId: connection.id, wholeServer: whole, ...(whole ? { databasePrefix: nextPrefix } : {}) },
+      {
+        onSuccess: (saved) => {
+          toast.show(
+            saved.wholeServer && saved.databaseCount !== null
+              ? t("database.connectedToastAll", { name: saved.label, count: saved.databaseCount })
+              : t("database.scopeSaved", { name: saved.label }),
+          );
+          close();
+        },
+        onError: (e) => setError(databaseErrorOf(e)),
+      },
+    );
+  };
+  const submit = () =>
+    connection && using > 0 && widensDatabaseScope(connection, { wholeServer: whole, databasePrefix: nextPrefix })
+      ? setConfirming(true)
+      : save();
+  return (
+    <Dialog
+      open={connection !== null}
+      onOpenChange={(o) => !o && close()}
+      title={
+        confirming
+          ? nextPrefix
+            ? t("database.widenTitlePrefix")
+            : t("database.widenTitle")
+          : t("database.scopeEditName", { name })
+      }
+      description={
+        confirming
+          ? nextPrefix
+            ? t("database.widenTextPrefix", { count: using, prefix: nextPrefix })
+            : t("database.widenText", { count: using })
+          : undefined
+      }
+      closeLabel={t("common.close")}
+      width={confirming ? 440 : 520}
+    >
+      {confirming ? (
+        <DialogFooter>
+          <Button onClick={() => setConfirming(false)}>{t("common.cancel")}</Button>
+          <Button variant="primary" onClick={save}>
+            {t("common.continue")}
+          </Button>
+        </DialogFooter>
+      ) : (
+        <form
+          style={{ display: "contents" }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <DialogBody className="cflow__body">
+            <ScopeFields
+              whole={whole}
+              prefix={prefix ?? connection?.databasePrefix ?? ""}
+              onScope={(v) => {
+                setScope(v);
+                setError(null);
+              }}
+              onPrefix={setPrefix}
+            />
+            {error && <Alert>{t(`database.error.${error}`)}</Alert>}
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" onClick={close}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" disabled={update.isPending} loading={update.isPending}>
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </form>
+      )}
+    </Dialog>
   );
 }
 

@@ -9143,6 +9143,19 @@ export const en = {
     prefixRow: "databases starting with {{prefix}}",
     refresh: "Refresh list",
     refreshName: "Refresh the list of databases of {{name}}",
+    scopeEdit: "Databases",
+    scopeEditName: "Databases of {{name}}",
+    scopeSaved: "{{name}} saved.",
+    widenTitle: "Open the whole server?",
+    widenTitlePrefix: "Open more databases?",
+    widenText_one:
+      "The agent with access will read every database on this server. You can limit it per agent in Rules.",
+    widenText_other:
+      "The {{count}} agents with access will read every database on this server. You can limit it per agent in Rules.",
+    widenTextPrefix_one:
+      "The agent with access will read every database starting with {{prefix}}. You can limit it per agent in Rules.",
+    widenTextPrefix_other:
+      "The {{count}} agents with access will read every database starting with {{prefix}}. You can limit it per agent in Rules.",
     testing: {
       reach: "Reaching the database…",
       databases: "Looking at the databases…",
