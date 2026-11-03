@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, schema, sql } from "@agenteschat/db";
 import { type Agent, getAgentCached } from "./agents";
 import { runBrainOf } from "./brains/select";
+import { endsAsking } from "./brakes";
 import { publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
@@ -269,9 +270,13 @@ export function createTalker(deps: TalkerDeps): Talker {
           waited,
           now: at,
         });
-        const text = await ask(deps, run, agent, snapshot);
-        if (!text) return decide("pass");
-        const posted = await postReply(deps, run, agent, message, text, at);
+        const answer = await ask(deps, run, agent, snapshot);
+        // A question the cheap model let pass ("??", "what are you doing?") still hears where the work is (ADR 0131 §2).
+        if (answer === null && !endsAsking(message.body)) return decide("pass");
+        // The cheap model couldn't answer (no API key, an outage, too slow): the server's own status line, so a
+        // person asking a working agent always hears what it does (ADR 0131 §2).
+        const reply = typeof answer === "string" ? { text: answer, meta: {} } : await statusReply(deps.db, run, at);
+        const posted = await postReply(deps, run, agent, message, reply.text, at, reply.meta);
         decide(posted ?? "reply");
       } catch {
         decide("error");
@@ -280,7 +285,37 @@ export function createTalker(deps: TalkerDeps): Talker {
   };
 }
 
-/** The cheap model's decision: the reply's text, or null (pass, timeout, error). */
+/** `ask`'s answer when the model gave none (an error or the timeout), as opposed to a pass. */
+const FAILED = Symbol("failed");
+
+/**
+ * The server's status line for a working run (ADR 0131 §2): how long it has worked, how many steps, and what it does
+ * now (its automatic status line), worded by the apps (`talker_status`); the English is the fallback.
+ */
+export async function statusReply(db: Executor, run: AgentRun, now: Date) {
+  const [a] = await db
+    .select({ runId: schema.agents.statusRunId, kind: schema.agents.statusKind, subject: schema.agents.statusSubject })
+    .from(schema.agents)
+    .where(eq(schema.agents.id, run.agentId));
+  const line = a?.runId === run.id && a.kind ? { kind: a.kind, subject: a.subject ?? "" } : null;
+  const start = run.startedAt ?? run.createdAt;
+  const minutes = Math.max(1, Math.round((now.getTime() - start.getTime()) / 60_000));
+  const steps = (run.transcript as { executedCalls?: unknown } | null)?.executedCalls;
+  const count = typeof steps === "number" && steps > 0 ? steps : 0;
+  return {
+    text: `Still on it (${minutes} min${count ? `, ${count} steps` : ""}). I'll read your message after this step.`,
+    meta: {
+      bodyCode: "talker_status",
+      bodyParams: {
+        minutes: String(minutes),
+        steps: String(count),
+        ...(line ? { kind: line.kind, subject: line.subject } : {}),
+      },
+    },
+  };
+}
+
+/** The cheap model's decision: the reply's text, null to pass, or `FAILED` (timeout, error). */
 async function ask(deps: TalkerDeps, run: AgentRun, agent: Agent, snapshot: TalkerSnapshot) {
   const abort = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -305,9 +340,9 @@ async function ask(deps: TalkerDeps, run: AgentRun, agent: Agent, snapshot: Talk
       signal: abort.signal,
     });
     return parseDecision(result.text);
-  })().catch(() => null);
+  })().catch(() => FAILED);
   try {
-    return await Promise.race([call, timeout]);
+    return (await Promise.race([call, timeout])) ?? (abort.signal.aborted ? FAILED : null);
   } finally {
     clearTimeout(timer);
   }
@@ -328,6 +363,7 @@ async function postReply(
   message: Message,
   text: string,
   at: Date,
+  extraMeta: Record<string, unknown> = {},
 ): Promise<TalkerSkip | null> {
   const result = await deps.db.transaction(async (tx) => {
     const [locked] = await tx.select().from(agentRuns).where(eq(agentRuns.id, run.id)).for("update");
@@ -360,7 +396,7 @@ async function postReply(
       threadId: replyThreadOf(run),
       author: { type: "agent", agentId: agent.id, runId: null, hop: run.hop, stretchId: runStretchOf(locked) },
       body: text,
-      meta: { talker: { runId: run.id, inReplyTo: message.id }, notice },
+      meta: { talker: { runId: run.id, inReplyTo: message.id }, notice, ...extraMeta },
     });
     await tx
       .update(agentRuns)

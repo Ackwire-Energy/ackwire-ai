@@ -1817,6 +1817,51 @@
     "remove": "La retirer",
     "send": "Envoyer quand même"
   },
+  "costlyCard": {
+    "go": "Vas-y",
+    "always": "Toujours",
+    "notNow": "Pas maintenant",
+    "never": "Jamais",
+    "waiting": "En attente de la personne responsable",
+    "you": "Vous",
+    "decided": {
+      "go": "{{name}} a dit vas-y",
+      "always": "{{name}} a dit toujours pour ceci",
+      "not_now": "{{name}} a dit pas maintenant",
+      "never": "{{name}} a dit jamais pour ceci"
+    }
+  },
+  "brakes": {
+    "title": "Travail que personne n'a demandé",
+    "subtitle": "Ce qu'il commence seul, à partir d'une routine, d'une alerte ou d'un autre agent. Ce qu'une personne demande n'est jamais retenu.",
+    "costly": "Demander avant un travail coûteux",
+    "costlyHelp": "Avant d'ouvrir une pull request, d'installer des paquets ou un long travail, il demande à la personne responsable.",
+    "costlyAsk": "Demander d'abord",
+    "costlyGo": "Le faire directement",
+    "cost": {
+      "pr": "ouvrir des pull requests",
+      "install": "installer des paquets",
+      "long": "longs travaux"
+    },
+    "rememberedGo": "Toujours : {{what}}",
+    "rememberedNever": "Jamais : {{what}}",
+    "forget": "Oublier ces réponses",
+    "atOnce": "Travaux en même temps",
+    "atOnceHelp": "Combien de travaux que personne n'a demandés il mène en même temps. Les autres attendent leur tour.",
+    "prs": "Pull requests par heure",
+    "prsHelp": "Le maximum que son propre travail ouvre en une heure.",
+    "call": "Agents qu'il peut appeler",
+    "callHelp": "Qui il peut mentionner ou à qui il peut confier du travail.",
+    "callAll": "Tous",
+    "callSome": "Seulement ceux-ci",
+    "callNone": "Aucun",
+    "project": "Projet",
+    "projectHelp": "Les agents de projets différents ne s'appellent pas entre eux.",
+    "projectPlaceholder": "App mobile",
+    "otherProjects": "Peut appeler des agents d'autres projets",
+    "peopleNote": "Ces limites ne retiennent jamais ce qu'une personne demande.",
+    "failed": "Impossible d'enregistrer. Réessayez."
+  },
   "stretchCard": {
     "continued": "{{name}} les a laissés continuer · {{time}}",
     "continuedByYou": "Vous les avez laissés continuer · {{time}}"
@@ -11281,6 +11326,7 @@
     "stopFailed": "Impossible de l'arrêter. Seuls la personne qui a demandé, le propriétaire de l'agent ou un admin le peuvent.",
     "autoUpdate": "Toujours dessus ({{duration}}).",
     "autoUpdateNow": "En ce moment : {{now}}.",
+    "statusReply": "Je suis toujours dessus ({{duration}}). Je lis votre message après cette étape.",
     "status": {
       "one": "Travaille sur : {{subject}}",
       "oneUntitled": "Travaille en arrière-plan",
@@ -11672,6 +11718,15 @@
       "agent": "Avec {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Personne ne l'a demandé directement. Puis-je ouvrir une pull request ?",
+        "install": "Personne ne l'a demandé directement. Puis-je installer ces paquets ?",
+        "long": "Cela prend beaucoup d'étapes, et personne ne l'a demandé directement. Puis-je continuer ?"
+      },
+      "autonomy_digest_one": "{{count}} alerte semblait connue ou sans danger, je n'ai donc pas travaillé dessus :",
+      "autonomy_digest_many": "{{count}} alertes semblaient connues ou sans danger, je n'ai donc pas travaillé dessus :",
+      "autonomy_digest_other": "{{count}} alertes semblaient connues ou sans danger, je n'ai donc pas travaillé dessus :",
+      "autonomy_loop": "J'ai arrêté de travailler là-dessus de moi-même. C'est revenu {{count}} fois en un jour ({{title}}). Dites-moi comment vous voulez que je le traite.",
       "mission_plan": "Plan pour « {{title}} » sur {{computer}}",
       "mission_planNoComputer": "Plan pour « {{title}} »",
       "mission_decision": "Décision : {{question}}",

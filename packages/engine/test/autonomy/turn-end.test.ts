@@ -91,7 +91,8 @@ scenario("S32", "a promise repeated without acting: bounded continues, then a qu
   await assertInvariants(w);
 });
 
-scenario("S33", "an offer of reversible work inside the request is done, not asked", async () => {
+// ADR 0131 §1: an offer that ends asking the person waits for their answer, never judged into going ahead.
+scenario("S33", "an offer that ends asking waits for the answer", async () => {
   const w = await world({
     agents: ["otto"],
     judge: {
@@ -109,7 +110,7 @@ scenario("S33", "an offer of reversible work inside the request is done, not ask
   await w.grant("otto", ["issues:write"]);
   await w.say("@otto faz a triagem desses 5 bugs: login, export, pdf, push, busca");
   await w.settle();
-  expect((await w.calls("otto")).map((c) => [c.name, c.isError])).toEqual([["create_issue", false]]);
+  expect(await w.calls("otto")).toEqual([]);
   await assertInvariants(w);
 });
 

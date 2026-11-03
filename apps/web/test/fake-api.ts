@@ -1849,6 +1849,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return agent;
       },
       proposal: async (_orgId, messageId) => proposalView(messageId),
+      decideCostly: async (orgId, signalId, decision) => {
+        log("agents.decideCostly", orgId, signalId, decision);
+        return { state: decision };
+      },
       denyProposal: async (orgId, messageId) => {
         log("agents.denyProposal", orgId, messageId);
         Object.assign(proposalCard(messageId).card, { state: "denied", decidedByUserId: state.me?.user.id ?? null });

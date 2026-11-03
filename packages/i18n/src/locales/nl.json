@@ -1756,6 +1756,51 @@
     "remove": "Verwijderen",
     "send": "Toch versturen"
   },
+  "costlyCard": {
+    "go": "Ga je gang",
+    "always": "Altijd",
+    "notNow": "Nu niet",
+    "never": "Nooit",
+    "waiting": "Wacht op de verantwoordelijke persoon",
+    "you": "Jij",
+    "decided": {
+      "go": "{{name}} zei ga je gang",
+      "always": "{{name}} zei altijd hiervoor",
+      "not_now": "{{name}} zei nu niet",
+      "never": "{{name}} zei nooit hiervoor"
+    }
+  },
+  "brakes": {
+    "title": "Werk waar niemand om vroeg",
+    "subtitle": "Wat hij zelf begint, na een routine, een melding of een andere agent. Waar een persoon om vraagt, wordt nooit tegengehouden.",
+    "costly": "Vragen voor duur werk",
+    "costlyHelp": "Voordat hij een pull request opent, pakketten installeert of aan een lange klus begint, vraagt hij het de verantwoordelijke persoon.",
+    "costlyAsk": "Eerst vragen",
+    "costlyGo": "Gewoon doen",
+    "cost": {
+      "pr": "pull requests openen",
+      "install": "pakketten installeren",
+      "long": "lange klussen"
+    },
+    "rememberedGo": "Altijd: {{what}}",
+    "rememberedNever": "Nooit: {{what}}",
+    "forget": "Deze antwoorden vergeten",
+    "atOnce": "Klussen tegelijk",
+    "atOnceHelp": "Hoeveel klussen waar niemand om vroeg hij tegelijk doet. De rest wacht op zijn beurt.",
+    "prs": "Pull requests per uur",
+    "prsHelp": "Het hoogste aantal dat zijn eigen werk in een uur opent.",
+    "call": "Agents die hij mag roepen",
+    "callHelp": "Wie hij mag noemen of aan wie hij werk mag doorgeven.",
+    "callAll": "Alle",
+    "callSome": "Alleen deze",
+    "callNone": "Geen",
+    "project": "Project",
+    "projectHelp": "Agents van verschillende projecten roepen elkaar niet.",
+    "projectPlaceholder": "Mobiele app",
+    "otherProjects": "Mag agents van andere projecten roepen",
+    "peopleNote": "Deze grenzen houden nooit tegen waar een persoon om vraagt.",
+    "failed": "Opslaan lukte niet. Probeer het opnieuw."
+  },
   "stretchCard": {
     "continued": "{{name}} liet ze doorgaan · {{time}}",
     "continuedByYou": "Jij liet ze doorgaan · {{time}}"
@@ -10923,6 +10968,7 @@
     "stopFailed": "Kon het niet stoppen. Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dat.",
     "autoUpdate": "Nog mee bezig ({{duration}}).",
     "autoUpdateNow": "Nu: {{now}}.",
+    "statusReply": "Ik ben er nog mee bezig ({{duration}}). Ik lees je bericht na deze stap.",
     "status": {
       "one": "Bezig met: {{subject}}",
       "oneUntitled": "Bezig op de achtergrond",
@@ -11305,6 +11351,14 @@
       "agent": "Met {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Niemand vroeg hier direct om. Mag ik een pull request openen?",
+        "install": "Niemand vroeg hier direct om. Mag ik deze pakketten installeren?",
+        "long": "Dit kost veel stappen, en niemand vroeg er direct om. Mag ik doorgaan?"
+      },
+      "autonomy_digest_one": "{{count}} melding leek bekend of onschuldig, dus ik heb er niet aan gewerkt:",
+      "autonomy_digest_other": "{{count}} meldingen leken bekend of onschuldig, dus ik heb er niet aan gewerkt:",
+      "autonomy_loop": "Ik ben er uit mezelf mee gestopt. Het kwam {{count}} keer op een dag terug ({{title}}). Zeg me hoe je wilt dat ik ermee omga.",
       "mission_plan": "Plan voor “{{title}}” op {{computer}}",
       "mission_planNoComputer": "Plan voor “{{title}}”",
       "mission_decision": "Besluit: {{question}}",

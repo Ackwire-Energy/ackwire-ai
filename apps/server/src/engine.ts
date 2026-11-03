@@ -320,7 +320,11 @@ export function buildEngine(o: EngineOptions) {
       // The agent takes back a request for a person it no longer needs (listed while it has one open).
       createWithdrawRequestToolSource({ pubsub: adapters.pubsub }),
       // An agent with no AI connected is refused at once: its answer would never come.
-      createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
+      createAskAgentToolSource({
+        pubsub: adapters.pubsub,
+        ai: { gateway, machines: machineHub },
+        judge: context.judge,
+      }),
       createFindAgentToolSource({ machines: machineHub }),
       createUsageToolSource(),
       // What the agent says it is doing, next to its name (ADR 0084).
@@ -409,6 +413,7 @@ export function buildEngine(o: EngineOptions) {
       ...(o.toolSources ?? []),
     ],
     catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
+    pubsub: adapters.pubsub,
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));

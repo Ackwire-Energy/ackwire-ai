@@ -124,6 +124,11 @@ export const agents = pgTable(
      * asked, never that person. A plan only answering its owner (ADR 0059 §5) still keeps them out.
      */
     consultable: boolean().notNull().default(true),
+    /**
+     * Autonomy brakes (ADR 0131): what it may start that nobody asked for directly (costly work, how much at once,
+     * PRs an hour) and which agents it may call. Validated in code (`autonomySettings`); `{}` = the defaults.
+     */
+    autonomyBrakes: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     /**

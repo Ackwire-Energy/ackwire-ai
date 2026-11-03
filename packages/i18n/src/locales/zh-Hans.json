@@ -1692,6 +1692,51 @@
     "remove": "删掉它",
     "send": "仍然发送"
   },
+  "costlyCard": {
+    "go": "可以做",
+    "always": "总是",
+    "notNow": "现在不要",
+    "never": "永不",
+    "waiting": "等待负责人",
+    "you": "你",
+    "decided": {
+      "go": "{{name}} 说可以做",
+      "always": "{{name}} 说这类总是可以",
+      "not_now": "{{name}} 说现在不要",
+      "never": "{{name}} 说这类永远不要"
+    }
+  },
+  "brakes": {
+    "title": "没人要求的工作",
+    "subtitle": "它因为例程、警报或其他智能体而自己开始的工作。人要求的事从不会被拦下。",
+    "costly": "做高成本工作前先问",
+    "costlyHelp": "在打开拉取请求、安装软件包或开始长时间任务之前，它会先问负责人。",
+    "costlyAsk": "先问",
+    "costlyGo": "直接做",
+    "cost": {
+      "pr": "打开拉取请求",
+      "install": "安装软件包",
+      "long": "长时间任务"
+    },
+    "rememberedGo": "总是：{{what}}",
+    "rememberedNever": "永不：{{what}}",
+    "forget": "忘记这些回答",
+    "atOnce": "同时进行的工作",
+    "atOnceHelp": "它同时进行多少项没人要求的工作。其余的排队等候。",
+    "prs": "每小时拉取请求数",
+    "prsHelp": "它自己的工作一小时内最多打开的数量。",
+    "call": "可以呼叫的智能体",
+    "callHelp": "它可以提及或交接工作的对象。",
+    "callAll": "全部",
+    "callSome": "仅这些",
+    "callNone": "无",
+    "project": "项目",
+    "projectHelp": "不同项目的智能体不会相互呼叫。",
+    "projectPlaceholder": "移动应用",
+    "otherProjects": "可以呼叫其他项目的智能体",
+    "peopleNote": "这些限制从不拦下人要求的事。",
+    "failed": "无法保存。请重试。"
+  },
   "stretchCard": {
     "continued": "{{name}} 让它们继续了 · {{time}}",
     "continuedByYou": "你让它们继续了 · {{time}}"
@@ -10522,6 +10567,7 @@
     "stopFailed": "无法停止。只有提出请求的人、智能体的负责人或管理员可以。",
     "autoUpdate": "仍在进行中（{{duration}}）。",
     "autoUpdateNow": "当前：{{now}}。",
+    "statusReply": "仍在处理中（{{duration}}）。完成这一步后我会读你的消息。",
     "status": {
       "one": "正在处理：{{subject}}",
       "oneUntitled": "正在后台工作",
@@ -10895,6 +10941,13 @@
       "agent": "与 {{name}}"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "没人直接要求这件事。我可以打开一个拉取请求吗？",
+        "install": "没人直接要求这件事。我可以安装这些软件包吗？",
+        "long": "这需要很多步骤，而且没人直接要求。我可以继续吗？"
+      },
+      "autonomy_digest_other": "{{count}} 条警报看起来是已知的或无害的，所以我没有处理：",
+      "autonomy_loop": "我已主动停止处理这件事。它一天内重复出现了 {{count}} 次（{{title}}）。告诉我你希望怎么处理。",
       "mission_plan": "在 {{computer}} 上执行“{{title}}”的计划",
       "mission_planNoComputer": "“{{title}}”的计划",
       "mission_decision": "决定：{{question}}",

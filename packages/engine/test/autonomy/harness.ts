@@ -80,6 +80,8 @@ export interface JudgeTable {
   noteReply?: number;
   /** `ask_check`: what an `ask_user` question asks for (default: something only a person can give); "fail" errors. */
   ask?: (state: Record<string, unknown>) => "findable" | "secret" | "person" | "fail";
+  /** `alert_triage` (ADR 0131 §5): whether an unrequested item is work now or noise for the digest (default work). */
+  triage?: (state: Record<string, unknown>) => "work" | "noise";
 }
 
 /** Judgments the engine asks along the way that the scenarios leave at the fake's defaults. */
@@ -190,6 +192,8 @@ export async function world(options: WorldOptions) {
         if (v === "fail") throw new Error("judge unavailable");
         return v;
       }
+      case "alert_triage":
+        return table.triage?.(state) ?? "work";
       case "note_reply":
       case "note_reply_matters":
         return table.noteReply ?? 0.9;

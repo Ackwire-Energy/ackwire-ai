@@ -4264,6 +4264,117 @@
   "keyGuard.send": {
     "value": "Send anyway"
   },
+  "costlyCard.go": {
+    "value": "Go ahead"
+  },
+  "costlyCard.always": {
+    "value": "Always"
+  },
+  "costlyCard.notNow": {
+    "value": "Not now"
+  },
+  "costlyCard.never": {
+    "value": "Never"
+  },
+  "costlyCard.waiting": {
+    "value": "Waiting for the person responsible"
+  },
+  "costlyCard.you": {
+    "value": "You"
+  },
+  "costlyCard.decided.go": {
+    "value": "{{name}} said go ahead"
+  },
+  "costlyCard.decided.always": {
+    "value": "{{name}} said always for this"
+  },
+  "costlyCard.decided.not_now": {
+    "value": "{{name}} said not now"
+  },
+  "costlyCard.decided.never": {
+    "value": "{{name}} said never for this"
+  },
+  "brakes.title": {
+    "value": "Work nobody asked for"
+  },
+  "brakes.subtitle": {
+    "value": "What it starts on its own, from a routine, an alert or another agent. What a person asks is never held."
+  },
+  "brakes.costly": {
+    "value": "Ask before costly work"
+  },
+  "brakes.costlyHelp": {
+    "value": "Before opening a pull request, installing packages or a long job, it asks the person responsible."
+  },
+  "brakes.costlyAsk": {
+    "value": "Ask first"
+  },
+  "brakes.costlyGo": {
+    "value": "Just do it"
+  },
+  "brakes.cost.pr": {
+    "value": "opening pull requests"
+  },
+  "brakes.cost.install": {
+    "value": "installing packages"
+  },
+  "brakes.cost.long": {
+    "value": "long jobs"
+  },
+  "brakes.rememberedGo": {
+    "value": "Always: {{what}}"
+  },
+  "brakes.rememberedNever": {
+    "value": "Never: {{what}}"
+  },
+  "brakes.forget": {
+    "value": "Forget these answers"
+  },
+  "brakes.atOnce": {
+    "value": "Jobs at once"
+  },
+  "brakes.atOnceHelp": {
+    "value": "How many jobs nobody asked for it runs at the same time. The others wait their turn."
+  },
+  "brakes.prs": {
+    "value": "Pull requests an hour"
+  },
+  "brakes.prsHelp": {
+    "value": "The most its own work opens in an hour."
+  },
+  "brakes.call": {
+    "value": "Agents it may call"
+  },
+  "brakes.callHelp": {
+    "value": "Who it may mention or hand work to."
+  },
+  "brakes.callAll": {
+    "value": "All"
+  },
+  "brakes.callSome": {
+    "value": "Only these"
+  },
+  "brakes.callNone": {
+    "value": "None"
+  },
+  "brakes.project": {
+    "value": "Project"
+  },
+  "brakes.projectHelp": {
+    "value": "Agents of different projects don't call each other."
+  },
+  "brakes.projectPlaceholder": {
+    "value": "Mobile app"
+  },
+  "brakes.otherProjects": {
+    "value": "May call agents of other projects"
+  },
+  "brakes.peopleNote": {
+    "value": "These limits never hold what a person asks for."
+  },
+  "brakes.failed": {
+    "value": "Couldn't save. Try again."
+  },
   "stretchCard.continued": {
     "value": "{{name}} let them go on · {{time}}"
   },
@@ -26365,6 +26476,9 @@
   "work.autoUpdateNow": {
     "value": "Now: {{now}}."
   },
+  "work.statusReply": {
+    "value": "Still on it ({{duration}}). I'll read your message after this step."
+  },
   "work.status.one": {
     "value": "Working on: {{subject}}"
   },
@@ -27341,6 +27455,24 @@
   },
   "chat.issueWork.agent": {
     "value": "With {{name}}"
+  },
+  "chat.body.autonomy_proposal.pr": {
+    "value": "Nobody asked for this directly. May I open a pull request?"
+  },
+  "chat.body.autonomy_proposal.install": {
+    "value": "Nobody asked for this directly. May I install these packages?"
+  },
+  "chat.body.autonomy_proposal.long": {
+    "value": "This is taking many steps, and nobody asked for it directly. May I keep going?"
+  },
+  "chat.body.autonomy_digest": {
+    "value": {
+      "one": "{{count}} alert looked known or harmless, so I didn't work on it:",
+      "other": "{{count}} alerts looked known or harmless, so I didn't work on them:"
+    }
+  },
+  "chat.body.autonomy_loop": {
+    "value": "I stopped working on this on my own. It came back {{count}} times in a day ({{title}}). Tell me how you want it handled."
   },
   "chat.body.mission_plan": {
     "value": "Plan for “{{title}}” on {{computer}}"

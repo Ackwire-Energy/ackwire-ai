@@ -559,7 +559,39 @@ export interface Agent {
    * workspace allows. Absent: on (the default).
    */
   mediaReplies?: boolean;
+  /** Its autonomy brakes (ADR 0131); absent from an older server (the defaults). */
+  brakes?: AgentBrakes;
 }
+
+/** A costly step unrequested work needs a person's go for (ADR 0131 §3). */
+export type CostKind = "pr" | "install" | "long";
+
+/** What an agent may start that nobody asked for directly, and which agents it may call (ADR 0131). */
+export interface AgentBrakes {
+  /** Costly work nobody asked for: `ask` proposes it first, `go` does it. */
+  costly: "ask" | "go";
+  go: CostKind[];
+  never: CostKind[];
+  maxUnrequested: number;
+  maxPrsPerHour: number;
+  callAgents: "all" | "some" | "none";
+  callAgentIds: string[];
+  project: string;
+  otherProjects: boolean;
+}
+
+/** The brakes an agent has when none were set (`autonomySettings`' defaults on the server). */
+export const BRAKES_DEFAULTS: AgentBrakes = {
+  costly: "ask",
+  go: [],
+  never: [],
+  maxUnrequested: 2,
+  maxPrsPerHour: 3,
+  callAgents: "all",
+  callAgentIds: [],
+  project: "",
+  otherProjects: false,
+};
 
 /** An agent no longer in the team (archived or deleted): what its messages and reports still show. */
 export interface FormerAgent {
@@ -654,7 +686,12 @@ export interface AgentInput {
   mediaReplies?: boolean;
   /** The Autonomia it starts with (the last setup's, ADR 0094): only an admin or its own owner sends it. */
   autonomy?: CommandApproval;
+  /** Editing only: its autonomy brakes (ADR 0131); the fields given change. */
+  brakes?: Partial<AgentBrakes>;
 }
+
+/** A person's answer to an agent's proposal of costly work nobody asked for (ADR 0131 §3). */
+export type CostlyDecision = "go" | "not_now" | "never" | "always";
 
 /**
  * The AI a proposed agent starts with (ADR 0081): an account of the person it was proposed for that thinks for

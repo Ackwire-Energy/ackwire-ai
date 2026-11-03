@@ -20,6 +20,7 @@ import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { canTalkTo, speakerFor, viaAgent } from "./audience";
 import { runAuthorityById } from "./authority";
 import { routineBriefOfRun } from "./background";
+import { type BrakeOutcome, brakeWakes, callableAgents, notCallableText } from "./brakes";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
 import { INBOX_JOB, startOrJoinRun } from "./dispatch";
@@ -27,7 +28,7 @@ import { isAgentOnlyDm, openAgentDm } from "./dms";
 import { publishChannelEvent } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
-import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
+import { getMessage, insertMessage, type Message, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
 import { notifyAgentUnreached } from "./notification-producers";
 import { runReadOutsideById } from "./outside";
@@ -88,6 +89,9 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pu
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
   if (!target) return { refused: refuse(await noAgentText(ctx, [handle], { viaAgent: true })) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
+  // Who this agent may call at all (ADR 0131 §8): its own settings, before anyone's audience.
+  if (!(await callableAgents(db, ctx.orgId, ctx.agentId, [target.id])).has(target.id))
+    return { refused: refuse(notCallableText([`@${handle}`])) };
   const behind = await personBehindCall(ctx);
   const routine = behind ? null : await actingRoutineOfCall(ctx);
   const person = behind ?? routine?.creatorUserId ?? null;
@@ -152,7 +156,9 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pu
  *
  * `tell_agent`: work or news handed to another agent, tracked the same way (`createTellAgentTool`).
  */
-export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck } = {}): ToolSource {
+export function createAskAgentToolSource(
+  deps: { pubsub?: PubSub; ai?: AiCheck; judge?: Judge | null } = {},
+): ToolSource {
   const tool: ToolDefinition = {
     name: ASK_AGENT_TOOL,
     description:
@@ -270,7 +276,7 @@ async function chainOf(db: Executor, ctx: Pick<ToolContext, "orgId" | "runId">) 
  * (`reportHandOffs`). Same checks as `ask_agent`, no note back into the conversation it is answering, and the same
  * note to the same agent once an hour.
  */
-function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefinition {
+function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck; judge?: Judge | null }): ToolDefinition {
   return {
     name: TELL_AGENT_TOOL,
     description:
@@ -316,6 +322,8 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
       if (same) return same;
       const atLimit = await refusedAtLimit(db, reached.run, target.id);
       if (atLimit) return atLimit;
+      // Nobody asked for it directly: the note meets the brakes on unrequested work before it wakes anyone (ADR 0131).
+      const braked = (await runAuthorityById(db, ctx.orgId, ctx.runId)).kind !== "person";
       const sent = await sendNote(db, {
         orgId: ctx.orgId,
         agentId: ctx.agentId,
@@ -324,12 +332,33 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
         targetAgentId: target.id,
         body,
         chain,
+        deferStart: braked,
       });
       if (!sent) {
         return {
           content: `You already told @${handle} exactly this in the last hour, so it wasn't sent again. Carry on.`,
           data: { agentNote: { duplicate: true, agentId: target.id } },
         };
+      }
+      if (braked) {
+        const { held } = await brakeWakes(
+          { db, pubsub: deps.pubsub, judge: deps.judge ?? null },
+          sent.message,
+          [target.id],
+          { reportIn: await peopleSee(db, reached.run, here) },
+        );
+        const outcome = held.get(target.id);
+        if (!outcome) await startNoteRun(db, sent.message, target.id);
+        else if (outcome !== "later") {
+          await db
+            .update(agentConsultations)
+            .set({ status: "answered", answer: HELD_WORDS[outcome], answeredAt: new Date(), reportedAt: new Date() })
+            .where(eq(agentConsultations.id, sent.consultationId));
+          return {
+            content: `@${handle} ${HELD_WORDS[outcome]} Carry on with your own part.`,
+            data: { agentNote: { held: outcome, agentId: target.id } },
+          };
+        }
       }
       await publishChannelEvent(deps.pubsub, {
         type: "agent.consulting",
@@ -356,6 +385,50 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
 }
 
 /**
+ * Where people read about a run's held note (ADR 0131): where its routine reports, the conversation a consultation
+ * chain started in, else the run's own conversation.
+ */
+async function peopleSee(db: Executor, run: AgentRun, here: { kind: string; dmKey: string | null } | undefined) {
+  const report = run.background ? (await routineBriefOfRun(db, run))?.deliverTo : undefined;
+  if (report) return { channelId: report.channelId, threadId: report.threadId ?? null };
+  const origin = here && isAgentOnlyDm(here) ? await consultationOrigin(db, run.orgId, run.id) : null;
+  return origin
+    ? { channelId: origin.channelId, threadId: origin.threadId }
+    : { channelId: run.channelId, threadId: replyThreadOf(run) };
+}
+
+/** What the sender reads when the brakes held its note (ADR 0131 §4–6). */
+const HELD_WORDS: Record<Exclude<BrakeOutcome, "later">, string> = {
+  linked: "is already working on this same item: your note joined that work, nothing new started.",
+  digest:
+    "didn't start on it: it looks known or harmless, so it goes into a summary for a person instead. Don't send it again.",
+  loop: "stopped working on this item on its own: it came back too often today, and a person was asked how to handle it. Don't send it again.",
+};
+
+/**
+ * Starts (or joins) the run a note sent with `deferStart` wakes, once the brakes let it through, and ties the note's
+ * row to that run.
+ */
+export async function startNoteRun(db: Database, message: Message, targetAgentId: string) {
+  return db.transaction(async (tx) => {
+    const started = await startOrJoinRun(tx, message, targetAgentId, "dm", { park: 1 });
+    const runId = started ? ("created" in started ? started.created.id : started.joined) : null;
+    if (runId)
+      await tx
+        .update(agentConsultations)
+        .set({ targetRunId: runId })
+        .where(
+          and(
+            eq(agentConsultations.orgId, message.orgId),
+            eq(agentConsultations.messageId, message.id),
+            isNull(agentConsultations.targetRunId),
+          ),
+        );
+    return started;
+  });
+}
+
+/**
  * A note from a run to another agent (`tell_agent`'s delivery, also an @mention of an agent outside the
  * conversation, `reach.ts`): into the two agents' private DM, taken by the other agent's run at work there for the
  * same person or starting one, tracked as a `note` row whose result comes back to the sending run's conversation
@@ -373,6 +446,8 @@ export async function sendNote(
     chain: string[];
     /** An @mention of an agent outside the conversation (`settleReach`), not a tell_agent call. */
     fromMention?: boolean;
+    /** Wakes nobody yet: the caller starts it (`startNoteRun`) once the brakes let it through. */
+    deferStart?: boolean;
   },
 ) {
   const consultationId = Bun.randomUUIDv7();
@@ -392,7 +467,7 @@ export async function sendNote(
       },
     });
     // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
-    const started = await startOrJoinRun(tx, message, input.targetAgentId, "dm", { park: 1 });
+    const started = input.deferStart ? null : await startOrJoinRun(tx, message, input.targetAgentId, "dm", { park: 1 });
     // A mention's copy that run already answers an open note of this chain for: no row of its own, so what comes of
     // both goes back once (ADR 0032 "Calm wakes").
     if (input.fromMention && started && "joined" in started) {

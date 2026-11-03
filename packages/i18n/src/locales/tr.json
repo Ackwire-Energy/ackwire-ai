@@ -1744,6 +1744,51 @@
     "remove": "Kaldır",
     "send": "Yine de gönder"
   },
+  "costlyCard": {
+    "go": "Devam et",
+    "always": "Her zaman",
+    "notNow": "Şimdi değil",
+    "never": "Asla",
+    "waiting": "Sorumlu kişiyi bekliyor",
+    "you": "Sen",
+    "decided": {
+      "go": "{{name}} devam et dedi",
+      "always": "{{name}} bunun için her zaman dedi",
+      "not_now": "{{name}} şimdi değil dedi",
+      "never": "{{name}} bunun için asla dedi"
+    }
+  },
+  "brakes": {
+    "title": "Kimsenin istemediği iş",
+    "subtitle": "Bir rutin, bir uyarı veya başka bir ajan üzerine kendi başına başlattığı şeyler. Bir kişinin istediği hiçbir zaman bekletilmez.",
+    "costly": "Maliyetli işten önce sor",
+    "costlyHelp": "Pull request açmadan, paket kurmadan veya uzun bir işe başlamadan önce sorumlu kişiye sorar.",
+    "costlyAsk": "Önce sor",
+    "costlyGo": "Doğrudan yap",
+    "cost": {
+      "pr": "pull request açmak",
+      "install": "paket kurmak",
+      "long": "uzun işler"
+    },
+    "rememberedGo": "Her zaman: {{what}}",
+    "rememberedNever": "Asla: {{what}}",
+    "forget": "Bu cevapları unut",
+    "atOnce": "Aynı anda iş",
+    "atOnceHelp": "Kimsenin istemediği kaç işi aynı anda yapacağı. Diğerleri sırasını bekler.",
+    "prs": "Saatte pull request",
+    "prsHelp": "Kendi işinin bir saatte açabileceği en fazla sayı.",
+    "call": "Çağırabileceği ajanlar",
+    "callHelp": "Kimden bahsedebileceği veya kime iş devredebileceği.",
+    "callAll": "Hepsi",
+    "callSome": "Sadece bunlar",
+    "callNone": "Hiçbiri",
+    "project": "Proje",
+    "projectHelp": "Farklı projelerin ajanları birbirini çağırmaz.",
+    "projectPlaceholder": "Mobil uygulama",
+    "otherProjects": "Diğer projelerin ajanlarını çağırabilir",
+    "peopleNote": "Bu sınırlar bir kişinin istediğini asla bekletmez.",
+    "failed": "Kaydedilemedi. Tekrar dene."
+  },
   "stretchCard": {
     "continued": "{{name}} devam etmelerine izin verdi · {{time}}",
     "continuedByYou": "Devam etmelerine siz izin verdiniz · {{time}}"
@@ -10783,6 +10828,7 @@
     "stopFailed": "Durdurulamadı. Yalnızca isteyen kişi, ajanın sahibi ya da bir yönetici durdurabilir.",
     "autoUpdate": "Hâlâ üzerinde çalışıyor ({{duration}}).",
     "autoUpdateNow": "Şimdi: {{now}}.",
+    "statusReply": "Hâlâ üzerinde çalışıyorum ({{duration}}). Mesajını bu adımdan sonra okuyacağım.",
     "status": {
       "one": "Üzerinde çalışıyor: {{subject}}",
       "oneUntitled": "Arka planda çalışıyor",
@@ -11149,6 +11195,14 @@
       "agent": "{{name}} ile"
     },
     "body": {
+      "autonomy_proposal": {
+        "pr": "Bunu kimse doğrudan istemedi. Bir pull request açabilir miyim?",
+        "install": "Bunu kimse doğrudan istemedi. Bu paketleri kurabilir miyim?",
+        "long": "Bu çok adım sürüyor ve kimse doğrudan istemedi. Devam edebilir miyim?"
+      },
+      "autonomy_digest_one": "{{count}} uyarı bilinen veya zararsız görünüyordu, bu yüzden üzerinde çalışmadım:",
+      "autonomy_digest_other": "{{count}} uyarı bilinen veya zararsız görünüyordu, bu yüzden üzerinde çalışmadım:",
+      "autonomy_loop": "Bu konuda kendi başıma çalışmayı bıraktım. Bir günde {{count}} kez geri geldi ({{title}}). Nasıl ele almamı istediğini söyle.",
       "mission_plan": "{{computer}} üzerinde “{{title}}” için plan",
       "mission_planNoComputer": "“{{title}}” için plan",
       "mission_decision": "Karar: {{question}}",
