@@ -62,14 +62,17 @@ allowed-tools:
  * A minimal zip writer (stored entries) for tests. `zip64`: the end record as git archive writes it past 65,535 files,
  * its count at the maximum and the real values in a zip64 record before it.
  */
-function zip(files: Record<string, string>, options: { zip64?: boolean } = {}) {
+/** The first bytes of a PNG: enough for the type read from its bytes. */
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function zip(files: Record<string, string | Uint8Array>, options: { zip64?: boolean } = {}) {
   const enc = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
   let offset = 0;
   for (const [path, text] of Object.entries(files)) {
     const name = enc.encode(path);
-    const data = enc.encode(text);
+    const data = typeof text === "string" ? enc.encode(text) : text;
     const local = new Uint8Array(30 + name.length + data.length);
     const lv = new DataView(local.buffer);
     lv.setUint32(0, 0x04034b50, true);
@@ -831,7 +834,13 @@ describe("runtime", () => {
   });
 
   test("read_skill_file shows an image to a model brain; a PDF is described; files too large say so", async () => {
-    const reads = ["references/diagram.png", "references/manual.pdf", "references/big.jpg", "references/huge.webp"];
+    const reads = [
+      "references/diagram.png",
+      "references/photo.png",
+      "references/manual.pdf",
+      "references/big.jpg",
+      "references/huge.webp",
+    ];
     let step = 0;
     f = await setup({
       skillTools: true,
@@ -848,9 +857,13 @@ describe("runtime", () => {
       f.org.id,
       zip({
         "SKILL.md": SKILL_MD,
-        "references/diagram.png": "PNG",
+        "references/diagram.png": PNG,
+        "references/photo.png": "GIF89a",
         "references/manual.pdf": "%PDF-1.4",
-        "references/big.jpg": "x".repeat(SKILL_LIMITS.imageBytes + 1),
+        "references/big.jpg": Uint8Array.from(
+          { length: SKILL_LIMITS.imageBytes + 1 },
+          (_, i) => [0xff, 0xd8, 0xff][i] ?? 0,
+        ),
         "references/huge.webp": "x".repeat(SKILL_LIMITS.assetBytes),
       }),
     );
@@ -859,6 +872,7 @@ describe("runtime", () => {
       ["references/diagram.png", "stored"],
       ["references/huge.webp", "ignored"],
       ["references/manual.pdf", "stored"],
+      ["references/photo.png", "stored"],
     ]);
     await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
@@ -872,23 +886,26 @@ describe("runtime", () => {
     );
     const diagram = results.find((b) => b.type === "tool_result" && b.content.includes("diagram.png"));
     expect(diagram).toMatchObject({
-      images: [{ mediaType: "image/png", data: Buffer.from("PNG").toString("base64") }],
+      images: [{ mediaType: "image/png", data: Buffer.from(PNG).toString("base64") }],
     });
+    // Its type from its bytes, never its name: an API refuses an image sent under another type.
+    const photo = results.find((b) => b.type === "tool_result" && b.content.includes("photo.png"));
+    expect(photo).toMatchObject({ images: [{ mediaType: "image/gif" }] });
     const steps = (await f.db.select().from(schema.agentRunSteps))
       .filter((s) => s.kind === "tool_result")
       .map((s) => s.data as { content: string; isError: boolean });
     expect(steps[0]?.content).toBe(
-      "relatorio-semanal/references/diagram.png (image/png, 3 bytes): the image is attached.",
+      "relatorio-semanal/references/diagram.png (image/png, 8 bytes): the image is attached.",
     );
     // Never the bytes in the run's steps.
-    expect(JSON.stringify(steps)).not.toContain(Buffer.from("PNG").toString("base64"));
-    expect(steps[1]).toMatchObject({ isError: false });
-    expect(steps[1]?.content).toContain(
+    expect(JSON.stringify(steps)).not.toContain(Buffer.from(PNG).toString("base64"));
+    expect(steps[2]).toMatchObject({ isError: false });
+    expect(steps[2]?.content).toContain(
       "manual.pdf (application/pdf, 8 bytes): not text, so its content isn't shown here.",
     );
-    expect(steps[2]?.content).toContain("It is too large to show you here (max 3.6 MB).");
-    expect(steps[3]).toMatchObject({ isError: true });
-    expect(steps[3]?.content).toContain("huge.webp (20.0 MB) was not kept: a skill keeps up to 20 MB of images");
+    expect(steps[3]?.content).toContain("It is too large to show you here (max 3.6 MB).");
+    expect(steps[4]).toMatchObject({ isError: true });
+    expect(steps[4]?.content).toContain("huge.webp (20.0 MB) was not kept: a skill keeps up to 20 MB of images");
   });
 
   test("denying the tools hides them; other orgs never see the skill", async () => {

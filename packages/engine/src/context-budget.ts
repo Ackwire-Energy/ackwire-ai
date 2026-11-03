@@ -188,6 +188,37 @@ export function compactToolResults(messages: ModelMessage[], toolUseIds: Set<str
   });
 }
 
+/**
+ * Base64 of the images one request carries, newest kept first: under the smallest request the APIs take (Gemini's
+ * 20 MB), so a run that read several large pictures still goes out.
+ */
+export const IMAGES_PER_REQUEST_CHARS = 15_000_000;
+
+/** The messages with older tool results' images dropped (a note says so) past `maxChars` of base64, else the same array. */
+export function dropOldImages(messages: ModelMessage[], maxChars = IMAGES_PER_REQUEST_CHARS): ModelMessage[] {
+  let total = 0;
+  let changed = false;
+  const out = [...messages];
+  for (let i = out.length - 1; i >= 0; i--) {
+    const m = out[i] as ModelMessage;
+    if (typeof m.content === "string") continue;
+    let dropped = false;
+    const content = m.content.map((b) => {
+      if (b.type !== "tool_result" || !b.images?.length) return b;
+      total += b.images.reduce((n, img) => n + img.data.length, 0);
+      if (total <= maxChars) return b;
+      dropped = true;
+      const { images: _images, ...rest } = b;
+      return { ...rest, content: `${b.content}\n[Image removed to save space. Read the file again if you need it.]` };
+    });
+    if (dropped) {
+      out[i] = { ...m, content };
+      changed = true;
+    }
+  }
+  return changed ? out : messages;
+}
+
 /** What the person asked: `task`, else the latest message of a person (not a tool result). */
 function taskOf(messages: ModelMessage[], task: string | undefined): string {
   if (task?.trim()) return task;

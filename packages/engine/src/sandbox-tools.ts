@@ -2,6 +2,7 @@ import {
   ACCESS_PROTOCOL,
   type ExecRequest,
   type ExecResult,
+  MAX_INLINE_FILE_BYTES,
   type PubSub,
   policyRefusal,
   TASK_EXECUTORS,
@@ -25,7 +26,7 @@ import {
   updateArtifact,
 } from "./artifacts";
 import { recordAudit } from "./audit";
-import { sniffImage } from "./avatars";
+import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
 import { cutText, formatBytes, textOfBytes } from "./format";
 import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
@@ -354,7 +355,7 @@ export function parseCsv(text: string): string[][] {
 /** A sandbox file → Drive content, by extension. */
 /** What `read_file` says of a binary file instead of its bytes (models here take text only). */
 function binaryFileNote(path: string, data: Uint8Array): string {
-  const image = sniffImage(data) ?? (data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46 ? "image/gif" : null);
+  const image = sniffModelImage(data);
   const type = image ?? /\.([a-z0-9]{1,8})$/i.exec(path)?.[1]?.toLowerCase() ?? "unknown type";
   const instead = !image
     ? "Inspect it with run_code (`file`, `unzip -l`, a script), or give it to people with upload_file."
@@ -852,9 +853,12 @@ export function createSandboxToolSource(
           const timeout = timeoutOf(input, execTimeout, maxTimeout);
           const base = `.skills/${skill.name}`;
           const args = (Array.isArray(input.args) ? input.args : []).map((a) => quote(String(a))).join(" ");
+          // A file past what one write to a computer carries (a big PDF) stays behind instead of failing every run.
+          const copied = files.filter((f) => f.data.byteLength <= MAX_INLINE_FILE_BYTES);
+          const left = files.filter((f) => f.data.byteLength > MAX_INLINE_FILE_BYTES).map((f) => f.path);
           const started = Date.now();
           const result = await run(ctx, async (computer) => {
-            for (const f of files) await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
+            for (const f of copied) await computer.provider.writeFile(computer.id, `${base}/${f.path}`, f.data);
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
               timeoutSeconds: timeout,
@@ -864,7 +868,10 @@ export function createSandboxToolSource(
             return r;
           });
           const seconds = Math.round((Date.now() - started) / 1000);
-          return execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
+          const output = execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
+          if (left.length === 0) return output;
+          const note = `Not copied to ${base}/ (over ${formatBytes(MAX_INLINE_FILE_BYTES)} each): ${left.join(", ")}.`;
+          return { ...output, content: `${output.content}\n${note}` };
         } catch (error) {
           return heldForApproval(error, "Not run") ?? failed(error);
         }

@@ -13,6 +13,7 @@ import {
   reimportSkill,
   restoreSkill,
   revertSkillChange,
+  SKILL_LIMITS,
   type SkillDeps,
   saveSkill,
   setAgentSkills,
@@ -208,8 +209,12 @@ export function skillRoutes(deps: AppDeps) {
             z.object({
               zipBase64: z
                 .string()
-                .max(4_000_000)
-                .openapi({ description: "The skill folder as a zip, base64 (≤ 2 MB of text and scripts unzipped)." }),
+                // Base64 of a zip holding all a skill keeps (text and scripts, plus its images and other files).
+                .max(Math.ceil(((SKILL_LIMITS.maxBytes + SKILL_LIMITS.assetBytes) * 4) / 3) + 1_000_000)
+                .openapi({
+                  description:
+                    "The skill folder as a zip, base64 (≤ 2 MB of text and scripts and 20 MB of other files unzipped).",
+                }),
             }),
           ]),
         ),

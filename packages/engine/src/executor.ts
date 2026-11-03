@@ -111,7 +111,7 @@ import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
-import { fitContextWindow } from "./context-budget";
+import { dropOldImages, fitContextWindow } from "./context-budget";
 import {
   advance as advanceContinuation,
   type ContinuationState,
@@ -3265,6 +3265,11 @@ async function executeRunInner(
       // Context budget: a request that wouldn't fit the model's window sends old tool results as a
       // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
       if (turnPlan.kind === "model") {
+        const pictured = dropOldImages(transcript.messages);
+        if (pictured !== transcript.messages) {
+          transcript.messages = pictured;
+          await saveTranscript(db, transcript);
+        }
         const fitted = await fitContextWindow(judge, {
           orgId: run.orgId,
           agentId: agent.id,

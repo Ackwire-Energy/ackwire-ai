@@ -1,19 +1,12 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { eq, schema, sql } from "@agenteschat/db";
+import { sniffModelImage } from "./avatars";
 import { learnTrust } from "./context/learn";
 import { changeSkillAsAgent } from "./context/learned-skills";
 import { cutText, formatBytes } from "./format";
 import type { Judge } from "./judge";
 import { type SandboxDeps, withSandbox } from "./sandbox";
-import {
-  agentSkillByName,
-  MODEL_IMAGE_TYPES,
-  notKeptReason,
-  SKILL_LIMITS,
-  type SkillDeps,
-  skillFile,
-  skillFilesOf,
-} from "./skills";
+import { agentSkillByName, notKeptReason, SKILL_LIMITS, type SkillDeps, skillFile, skillFilesOf } from "./skills";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -33,14 +26,14 @@ const failed = (error: unknown): ToolOutput => ({
 export function createSkillToolSource(
   deps: SkillDeps & { pubsub?: PubSub; judge?: Judge; computer?: SandboxDeps },
 ): ToolSource {
-  /** Saves a skill's file on the agent's computer: its path there, or null with no computer to reach. */
+  /** Saves a skill's file on the agent's computer: its path there, or why it couldn't be. */
   const saveOnComputer = async (ctx: ToolContext, path: string, data: Uint8Array) => {
-    if (!deps.computer) return null;
     const computer = deps.computer;
-    return withSandbox(computer, ctx, async (c) => {
-      await c.provider.writeFile(c.id, path, data);
-      return path;
-    }).catch(() => null);
+    if (!computer) return { why: "There is no computer here to save it on." };
+    return withSandbox(computer, ctx, (c) => c.provider.writeFile(c.id, path, data)).then(
+      () => ({ saved: path }),
+      (error: unknown) => ({ why: error instanceof Error ? error.message : String(error) }),
+    );
   };
   const tools: ToolDefinition[] = [
     {
@@ -113,28 +106,29 @@ export function createSkillToolSource(
             return { content: `${skill.name}/${path}:\n${shown}` };
           }
           const about = `${skill.name}/${path} (${file.mime}, ${formatBytes(file.size)})`;
-          const image = MODEL_IMAGE_TYPES.has(file.mime);
+          // By its bytes: a model's API refuses an image sent under another type (a .png that is a JPEG).
+          const image = sniffModelImage(file.data);
           const fits = file.data.byteLength <= SKILL_LIMITS.imageBytes;
-          // A computer brain (Claude Code, Codex) sees pictures with its own Read, not through our tools.
+          // A computer brain (Claude Code, Codex, OpenCode) sees pictures with its own tools, not through ours.
           if (image && fits && !ctx.bridge) {
             return {
               content: `${about}: the image is attached.`,
-              images: [{ mediaType: file.mime, data: Buffer.from(file.data).toString("base64") }],
+              images: [{ mediaType: image, data: Buffer.from(file.data).toString("base64") }],
             };
           }
-          const saved = await saveOnComputer(ctx, `.skills/${skill.name}/${path}`, file.data);
           const tooLarge =
-            image && !fits && !ctx.bridge
+            image && !ctx.bridge
               ? ` It is too large to show you here (max ${formatBytes(SKILL_LIMITS.imageBytes)}).`
               : "";
-          if (saved) {
+          const result = await saveOnComputer(ctx, `.skills/${skill.name}/${path}`, file.data);
+          if ("saved" in result) {
             return {
-              content: `${about}:${tooLarge} saved to ${saved} in your folder on your computer: open it there with your own tools${image ? " (your Read tool shows images)" : ""}.`,
-              data: { path: saved },
+              content: `${about}:${tooLarge} saved to ${result.saved} in your folder on your computer: open it there with your own tools${image && ctx.bridge ? ", which show images" : ""}.`,
+              data: { path: result.saved },
             };
           }
           return {
-            content: `${about}: not text, so its content isn't shown here.${tooLarge} With a computer it would be saved there for you to open.`,
+            content: `${about}: not text, so its content isn't shown here.${tooLarge} Not saved on your computer: ${result.why}`,
           };
         } catch (error) {
           return failed(error);

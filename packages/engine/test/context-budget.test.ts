@@ -22,6 +22,7 @@ import {
   CHARS_PER_TOKEN,
   compactToolResults,
   contextBudgetTokens,
+  dropOldImages,
   estimateRequestTokens,
   fitContextWindow,
   MAX_CONTEXT_TOKENS,
@@ -89,6 +90,24 @@ describe("estimate", () => {
     expect(withResult).toBeGreaterThan(t0 + 300);
     const tool = { name: "read_file", description: "Read a file.", inputSchema: { type: "object" } };
     expect(estimateRequestTokens({ ...base, tools: [tool] })).toBeGreaterThan(t0);
+  });
+
+  test("past the images a request carries, the oldest results' images go first, a note in their place", () => {
+    const result = (id: string, data: string): ModelMessage => ({
+      role: "user",
+      content: [{ type: "tool_result", toolUseId: id, content: id, images: [{ mediaType: "image/png", data }] }],
+    });
+    const messages = [result("old", "x".repeat(6)), result("new", "y".repeat(6))];
+    expect(dropOldImages(messages, 12)).toBe(messages);
+    const [old, recent] = dropOldImages(messages, 10);
+    expect(old?.content).toEqual([
+      {
+        type: "tool_result",
+        toolUseId: "old",
+        content: "old\n[Image removed to save space. Read the file again if you need it.]",
+      },
+    ]);
+    expect(recent).toBe(messages[1]);
   });
 
   test("an image counts as about a large image's tokens, never its base64; removing its result drops it", () => {

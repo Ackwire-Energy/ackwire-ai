@@ -36,6 +36,27 @@ export interface ToolImage {
 /** What an image counts for in prompt estimates: about the tokens of a large one (≈1,600), never its base64 length. */
 export const IMAGE_CHARS = 6400;
 
+/**
+ * The messages with tool results' images left out, a note in their place: for endpoints that take text only
+ * (another company's Anthropic-compatible API, OpenRouter), where an image would fail the whole request.
+ */
+export const withoutImages = (messages: ModelMessage[]): ModelMessage[] =>
+  messages.map((m) =>
+    typeof m.content === "string"
+      ? m
+      : {
+          ...m,
+          content: m.content.map((b) => {
+            if (b.type !== "tool_result" || !b.images?.length) return b;
+            const { images: _images, ...rest } = b;
+            return {
+              ...rest,
+              content: `${b.content}\n[The image is not shown: this model connection takes text only.]`,
+            };
+          }),
+        },
+  );
+
 export interface ModelMessage {
   role: "user" | "assistant";
   content: string | ContentBlock[];
