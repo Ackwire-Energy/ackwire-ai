@@ -159,8 +159,13 @@ export interface MarkdownProps {
   words?: boolean;
   /** The first lines of a page (a link's hover card): its ```mermaid blocks stay code, the cut may have split one. */
   excerpt?: boolean;
-  /** Added to the wrapper (`md--tail` on a streaming answer's last block). */
+  /** Added to the wrapper. */
   className?: string;
+  /**
+   * The blocks without a wrapper of their own: a streaming answer draws its settled blocks and its tail inside one
+   * `.md--message`, so the space between blocks is the same while it streams as on the final message.
+   */
+  bare?: boolean;
 }
 
 const TASK = /^\[( |x|X)\]\s+(.*)$/;
@@ -184,6 +189,7 @@ export function Markdown({
   words,
   excerpt,
   className,
+  bare,
 }: MarkdownProps) {
   const message = variant === "message";
   const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink, embed, words, channel);
@@ -298,6 +304,7 @@ export function Markdown({
     }
     return null;
   });
+  if (bare) return <>{blocks}</>;
   const extra = className ? ` ${className}` : "";
   return message ? (
     <div className={`md md--message${extra}`}>{blocks}</div>

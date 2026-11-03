@@ -168,11 +168,11 @@ describe("streaming words", () => {
 
   test("MessageBody live: settled blocks plain, the tail last with fading words", () => {
     const el = render(<MessageBody body={"Primeiro bloco.\n\nAgora escrevendo"} live />).container;
-    const blocks = el.querySelectorAll(".md");
+    // One wrapper (the gap between blocks stays the same as each settles): the tail is its last block.
+    expect(el.querySelectorAll(".md")).toHaveLength(1);
+    const blocks = (el.querySelector(".md") as HTMLElement).children;
     expect(blocks).toHaveLength(2);
     expect(blocks[0]?.querySelector(".ac-word")).toBeNull();
-    expect(blocks[1]?.classList.contains("md--tail")).toBe(true);
-    expect(el.lastElementChild).toBe(blocks[1] ?? null);
     expect([...(blocks[1]?.querySelectorAll(".ac-word") ?? [])].map((w) => w.textContent)).toEqual([
       "Agora",
       "escrevendo",
@@ -253,10 +253,10 @@ describe("```mermaid fences", () => {
     const view = render(<MessageBody body={`Olha o fluxo:\n\n\`\`\`mermaid\n${FLOW}`} live />);
     await settle();
     const el = view.container;
-    expect(el.querySelector(".md--tail .code-card__code")?.textContent).toBe(FLOW);
+    expect(el.querySelector(".md > :last-child .code-card__code")?.textContent).toBe(FLOW);
     view.rerender(<MessageBody body={`Olha o fluxo:\n\n${fence(FLOW)}`} live />);
     await settle();
-    expect(el.querySelector(".md--tail .code-card__code")?.textContent).toBe(FLOW);
+    expect(el.querySelector(".md > :last-child .code-card__code")?.textContent).toBe(FLOW);
     expect(el.querySelector("img")).toBeNull();
     expect(asked).toEqual([]);
     view.rerender(<MessageBody body={`Olha o fluxo:\n\n${fence(FLOW)}`} />);
@@ -287,7 +287,7 @@ describe("```mermaid fences", () => {
     view.rerender(<MessageBody body={`${answer}\n\n`} live />);
     await settle();
     const el = view.container;
-    expect(el.querySelector(".md--tail .code-card__preview img")).not.toBeNull();
+    expect(el.querySelector(".md .code-card__preview img")).not.toBeNull();
     expect(el.querySelector(".code-card__code")).toBeNull();
     expect(asked).toEqual([FLOW]);
   });

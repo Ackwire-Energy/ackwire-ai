@@ -949,10 +949,19 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   position: relative;
   padding: 8px 24px 20px;
 }
-/* The activity bar takes room only while someone works: no empty band above the composer. */
+/* The activity bar takes room only while someone works: no empty band above the composer. Its room opens and closes
+   in a short glide, so the messages above (kept at the bottom) move with it instead of jumping its height. */
 .channel__composer > .ac-typing:not([data-active="true"]) {
   min-height: 0;
+  height: 0;
   margin: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .channel__composer > .ac-typing {
+    transition:
+      height 180ms ease-out,
+      margin 180ms ease-out;
+  }
 }
 /* Messages fade out at the list's bottom edge, above the composer: a mask on the list itself, so a hovered
    (lifted) row, its reactions and any background fade too. The padding keeps the newest line clear of it. */
@@ -6683,7 +6692,9 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   height: auto;
   max-height: 320px;
 }
-.file-thumb[data-loading] {
+/* Also when alone on the message (its `height: auto` would otherwise collapse the tile until the image decodes). */
+.file-thumb[data-loading],
+.artifact-tile:only-child .file-thumb[data-loading] {
   width: 240px;
   height: 180px;
 }
