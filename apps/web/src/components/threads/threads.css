@@ -146,13 +146,14 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   max-height: min(420px, 60vh);
   overflow-y: auto;
 }
+/* A face or a kind tile at the members column's 32px, with a row's usual room on each side. */
 .thread-pop__row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   width: 100%;
-  padding: 8px;
+  padding: 8px 12px;
   border: 0;
   border-radius: 12px;
   background: transparent;
@@ -165,11 +166,6 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
 html:not([data-pointer]) .thread-pop__row:focus-visible {
   outline: none;
   background: var(--plate);
-}
-.thread-pop__row .thread-kind {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
 }
 .thread-pop__text {
   min-width: 0;
@@ -191,15 +187,25 @@ html:not([data-pointer]) .thread-pop__row:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* "Fixadas": a row goes to the message; its Desafixar sits beside it, not inside the row's button. */
+/*
+ * "Fixadas": a row goes to the message, its Desafixar a button of its own (never inside the row's button), both in
+ * one card that lights as a whole, the × inside its edge.
+ */
 .pins-pop__item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  padding-right: 8px;
+  border-radius: 12px;
+}
+.pins-pop__item:hover,
+html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
+  background: var(--plate);
 }
 .pins-pop__item > .thread-pop__row {
   flex: 1;
   min-width: 0;
+  padding-right: 8px;
+  background: transparent;
 }
 .pins-pop__time {
   font-size: 12px;

@@ -358,7 +358,11 @@ describe("the pinned bar under the channel header", () => {
     const list = screen().getByRole("dialog", { name: "Mensagens fixadas em #eng" });
     const rows = [...list.querySelectorAll(".pins-pop__item")] as HTMLElement[];
     expect(rows.map((row) => row.querySelector(".thread-pop__text b")?.textContent)).toEqual(["Ada", "João"]);
-    expect(rows[0]?.querySelector(".ac-avatar")).toBeTruthy();
+    // The face at the usual 32px (no size class), the × inside the row's card.
+    expect(rows[0]?.querySelector(".ac-avatar")?.className).not.toMatch(/ac-avatar--(xs|sm)/);
+    expect(rows[0]?.querySelector("button[aria-label='Desafixar a mensagem de Ada']")?.parentElement).toBe(rows[0]);
+    const css = await Bun.file(new URL("../src/components/threads/threads.css", import.meta.url).pathname).text();
+    expect(css.split("\n.pins-pop__item:hover,")[1]?.split("}")[0]).toContain("background: var(--plate);");
     expect(rows[0]?.querySelector(".thread-pop__text small")?.textContent).toContain("Achei a causa");
     expect(rows[0]?.querySelector(".pins-pop__time")?.textContent).toBeTruthy();
 
