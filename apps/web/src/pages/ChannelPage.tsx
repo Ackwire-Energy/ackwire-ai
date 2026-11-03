@@ -3958,6 +3958,11 @@ export const TimelineMessage = memo(function TimelineMessage({
                     wikiLink={wikiLink}
                     channelRefs={channelRefsOf(m.meta)}
                     accent={colorOf(agent)}
+                    pinFrom={
+                      m.author.type === "agent" && m.author.id && !m.local && !readOnly
+                        ? { messageId: m.id, agentId: m.author.id }
+                        : null
+                    }
                   />
                   {talk && openThread && (
                     <button

@@ -28,8 +28,8 @@ const click = async (el: Element) => {
 const nav = () => document.getElementById("app-nav") as HTMLElement;
 const rows = () =>
   [...nav().querySelectorAll(".sidebar__tools > a.sidebar__item .sidebar__item-label")].map((l) => l.textContent);
-/** The tools in the list on top, in order (More keeps the rest), under Início, which always heads it. */
-const listed = () => rows().slice(1);
+/** The tools in the list on top, in order (More keeps the rest), under Home and Dashboards, which always head it. */
+const listed = () => rows().slice(2);
 const openMore = async () => {
   await click(within(nav()).getByRole("button", { name: "Mais" }));
   return screen().getByRole("dialog", { name: "Mais" });
@@ -84,7 +84,7 @@ describe("the bell", () => {
 describe("the tools on top", () => {
   test("by default Threads, Tarefas and Drive, Aprovações while some wait; the rest in More, then Personalizar", async () => {
     await go();
-    expect(rows()[0]).toBe("Início");
+    expect(rows().slice(0, 2)).toEqual(["Início", "Painéis"]);
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
     const more = await openMore();
     // The task manager (ADR 0128) is always there, after the tools a person places.

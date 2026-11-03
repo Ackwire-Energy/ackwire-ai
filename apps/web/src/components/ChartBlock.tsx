@@ -1,22 +1,28 @@
 import { type ChartSpec, chartShares, chartTable, formatChartValue, parseChart } from "@agenteschat/client/lib/chart";
-import { type AgentColor, Button, Dialog, DialogBody, PixelSpinner, parseColor } from "@agenteschat/ui";
 import {
-  areaCells,
+  type AgentColor,
+  Button,
+  Dialog,
+  DialogBody,
+  PixelSpinner,
+  paintCells,
+  paintLineArea,
+  useElementWidth,
+} from "@agenteschat/ui";
+import {
   barCells,
   CHART_CELL,
-  chartAreaTones,
   chartInk,
   chartRamp,
   chartSlices,
   linePoints,
-  lineTops,
   ringCells,
   smoothPath,
 } from "@agenteschat/ui/sky/chart";
+import { chartBlockToWidgetSpec } from "@agenteschat/ui/widgets/spec";
 import {
   createContext,
   type ReactNode,
-  type RefObject,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -26,10 +32,18 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { CodeBlock } from "@/components/CodeBlock";
+import { useOrg } from "@/components/org-context";
+import { PinToDashboard } from "@/components/widgets/PinToDashboard";
 import { useDarkTheme, useGrowFrom } from "@/lib/grow";
 
 /** The color of the agent who wrote the message (its charts take its tones); sky elsewhere. */
 export const ChartAccent = createContext<AgentColor>("sky");
+
+/**
+ * The agent's message a chart is in, where it can be pinned to a board as a widget (ADR 0134): its "Pin" button.
+ * Null elsewhere (a live answer, a notice, a consultation): no button.
+ */
+export const ChartMessage = createContext<{ messageId: string; agentId: string } | null>(null);
 
 /**
  * Charts already drawn once (by their data): when an answer stops streaming, the live row gives way to the
@@ -46,7 +60,7 @@ const reduceMotion = () => typeof matchMedia !== "undefined" && matchMedia("(pre
  */
 export function ChartOrCode({ text, writing }: { text: string; writing?: boolean }) {
   const spec = useMemo(() => parseChart(text), [text]);
-  if (spec) return <ChartBlock spec={spec} />;
+  if (spec) return <ChartBlock spec={spec} source={text} />;
   if (writing) return <ChartPending />;
   return <CodeBlock lang="json" text={text} />;
 }
@@ -66,9 +80,19 @@ function ChartPending() {
  * in the agent's tones. Hover shows a value; "Tabela" flips the card to the same data as a table; full screen
  * grows out of the card with the chart big and its table under it.
  */
-export function ChartBlock({ spec }: { spec: ChartSpec }) {
+export function ChartBlock({
+  spec,
+  source,
+}: {
+  spec: ChartSpec;
+  /** The block's JSON as written in the message: what "Pin" keeps. */
+  source?: string;
+}) {
   const { t } = useTranslation();
   const [table, setTable] = useState(false);
+  const message = useContext(ChartMessage);
+  const pinnable = useMemo(() => Boolean(message && source && chartBlockToWidgetSpec(source)), [message, source]);
+  const [pinning, setPinning] = useState(false);
   const [still] = useState(() => {
     const key = JSON.stringify([spec.type, spec.title, spec.labels, spec.series, spec.value]);
     const seen = drawn.has(key);
@@ -85,6 +109,17 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
           <b>{spec.title}</b>
           {spec.subtitle && <small>{spec.subtitle}</small>}
         </span>
+        {pinnable && (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="pin"
+            aria-label={t("widgets.pin.label")}
+            title={t("widgets.pin.label")}
+            onClick={() => setPinning(true)}
+          />
+        )}
         <Button variant="ghost" size="sm" aria-pressed={table} onClick={() => setTable((v) => !v)}>
           {t("common.table")}
         </Button>
@@ -120,8 +155,22 @@ export function ChartBlock({ spec }: { spec: ChartSpec }) {
           <ChartTable spec={spec} />
         </DialogBody>
       </Dialog>
+      {pinning && message && source && (
+        <ChartPin
+          messageId={message.messageId}
+          agentId={message.agentId}
+          block={source}
+          onClose={() => setPinning(false)}
+        />
+      )}
     </figure>
   );
+}
+
+/** "Pin" on a chart: the dialog that puts it on My Home or a board, in the workspace on screen. */
+function ChartPin(props: { messageId: string; agentId: string; block: string; onClose: () => void }) {
+  const { org } = useOrg();
+  return <PinToDashboard orgId={org.id} {...props} />;
 }
 
 function ChartView({ spec, big = false }: { spec: ChartSpec; big?: boolean }) {
@@ -188,52 +237,6 @@ function useShown() {
   return shown;
 }
 
-/** An element's width, kept up to date. */
-function useWidth<T extends HTMLElement>(): [RefObject<T | null>, number] {
-  const ref = useRef<T>(null);
-  const [width, setWidth] = useState(0);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    setWidth(el.clientWidth);
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return [ref, width];
-}
-
-/** Paints cells (one canvas pixel each, drawn at CHART_CELL points) in the color `tone(value)` gives. */
-function paintCells(
-  canvas: HTMLCanvasElement | null,
-  cols: number,
-  rows: number,
-  cells: ArrayLike<number>,
-  tone: (value: number) => string | null,
-) {
-  if (!canvas || cols < 1 || rows < 1) return;
-  canvas.width = cols;
-  canvas.height = rows;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const img = ctx.createImageData(cols, rows);
-  const cache = new Map<number, [number, number, number] | null>();
-  for (let i = 0; i < cols * rows; i++) {
-    const v = cells[i] ?? -1;
-    if (!cache.has(v)) {
-      const c = tone(v);
-      cache.set(v, c ? parseColor(c) : null);
-    }
-    const rgb = cache.get(v);
-    if (!rgb) continue;
-    img.data[i * 4] = rgb[0];
-    img.data[i * 4 + 1] = rgb[1];
-    img.data[i * 4 + 2] = rgb[2];
-    img.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-}
-
 type Tip = { x: number; y: number; text: ReactNode } | null;
 
 function TipLayer({ tip }: { tip: Tip }) {
@@ -258,7 +261,7 @@ function BarChart({ spec, big }: { spec: ChartSpec; big: boolean }) {
   const values = spec.series[0]?.values ?? [];
   const max = Math.max(0, ...values) || 1;
   const shown = useShown();
-  const [rail, railWidth] = useWidth<HTMLSpanElement>();
+  const [rail, railWidth] = useElementWidth<HTMLSpanElement>();
   const [tip, setTip] = useState<Tip>(null);
   const [hot, setHot] = useState<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -342,7 +345,7 @@ function LineChart({
   const color = useContext(ChartAccent);
   const dark = useDarkTheme();
   const shown = useShown();
-  const [plot, width] = useWidth<HTMLDivElement>();
+  const [plot, width] = useElementWidth<HTMLDivElement>();
   const h = height ?? (big ? 260 : 150);
   const main = spec.series[0]?.values ?? [];
   const all = useMemo(() => spec.series.flatMap((s) => s.values), [spec.series]);
@@ -376,15 +379,7 @@ function LineChart({
     const el = path.current;
     if (!el || width < 10) return;
     setLength(el.getTotalLength());
-    const cols = Math.round(width / CHART_CELL);
-    const rows = Math.round(h / CHART_CELL);
-    const tops = lineTops(first, cols);
-    // Edge to edge, the columns at the very sides (where the curve's samples round past) take their neighbor's top.
-    if (bleed) fillEnds(tops);
-    const [near, far] = chartAreaTones(color, dark);
-    // Edge to edge, the dither fades over twice the height, so it still reaches the card's bottom edge.
-    const cells = areaCells(cols, bleed ? rows * 2 : rows, tops);
-    paintCells(area.current, cols, rows, cells, (v) => (v === 1 ? near : v === 2 ? far : null));
+    paintLineArea(area.current, first, width, h, color, dark, bleed);
   }, [width, h, color, dark, first, bleed]);
 
   return (
@@ -489,14 +484,6 @@ function LineChart({
       )}
     </div>
   );
-}
-
-/** Tops missing at either end (NaN) take the nearest column's, so an edge-to-edge area has no gap at its sides. */
-function fillEnds(tops: number[]) {
-  const first = tops.findIndex((v) => !Number.isNaN(v));
-  if (first < 0) return;
-  for (let i = 0; i < first; i++) tops[i] = tops[first] as number;
-  for (let i = first + 1; i < tops.length; i++) if (Number.isNaN(tops[i] as number)) tops[i] = tops[i - 1] as number;
 }
 
 /**

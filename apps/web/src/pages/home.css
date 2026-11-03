@@ -1,6 +1,9 @@
-/* Início (ADR 0108): one column, the greeting, the ask composer, then sections of rows, each on a list card. */
+/*
+ * Home (ADR 0108): the greeting, the ask composer, then the mural (ADR 0134): a 4-column board where "Waiting on
+ * you" and "Working now" are fixed tiles among the person's widgets; what got done and what comes next under it.
+ */
 .page--list.home {
-  max-width: 760px;
+  max-width: 1120px;
 }
 
 .home-start {
@@ -147,6 +150,32 @@ html:not([data-pointer]) :is(a, button).home-row:focus-visible {
 
 .home-calm {
   margin-bottom: 0;
+}
+
+/* The mural's head: its title and count, Organize and + at its end. */
+.home-sec__acts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.home-sec__acts .home-sec__more {
+  margin-left: 0;
+}
+/* A fixed tile: its rows from edge to edge; the calm card fills it without a frame of its own. */
+.home-mural .wg--fixed .home-calm {
+  margin: 0 16px 8px;
+}
+.home-mural .wg--fixed .wg__head .home-sec__more {
+  margin-right: 6px;
+  font-size: 13px;
+}
+/* A board's notice: the row, then what can be done right here, under its text. */
+.home-wrow > .home-row {
+  padding-bottom: 6px;
+}
+.home-row__acts {
+  padding: 0 16px 12px 60px;
 }
 
 /* A phone: the button goes under the text, from its start, so the text keeps the row's width. */

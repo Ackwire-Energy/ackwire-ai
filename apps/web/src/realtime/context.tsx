@@ -20,6 +20,7 @@ import {
   applyChannelEvent,
   applyComputerEvent,
   applyConsultEvent,
+  applyDashboardEvent,
   applyMachineEvent,
   applyNotificationEvent,
   applyReactions,
@@ -554,6 +555,8 @@ export function RealtimeProvider({
       // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
       // of agents (the sidebar's sections).
       applyWorkspaceEvent(qc, orgId, event);
+      // Boards and widgets (ADR 0134): only ids come; the boards on screen refetch.
+      applyDashboardEvent(qc, orgId, event);
       // A recording that won't become a message: its bubble goes, and the person hears why (ADR 0100).
       if (event.type === "voice.dropped" && "clientId" in event) {
         const dropped = event as VoiceDroppedEvent;

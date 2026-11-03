@@ -390,6 +390,11 @@ export function Sidebar() {
           <Icon name="home" />
           <span className="sidebar__item-label">{t("shell.home")}</span>
         </Link>
+        {/* Fixed after Home, like it (ADR 0134 §14): the boards of widgets agents keep up to date. */}
+        <Link to="/org/$orgId/dashboards" params={{ orgId }} className="sidebar__item" title={t("dashboards.sidebar")}>
+          <Icon name="chart" />
+          <span className="sidebar__item-label">{t("dashboards.sidebar")}</span>
+        </Link>
         <ToolList items={listed} row={toolRow} />
         <MoreTools items={inMore} row={toolRow} countOf={countOf} onCustomize={() => setCustomizing(true)} />
       </div>

@@ -35,17 +35,17 @@ export interface WidgetLayout {
   h: 1 | 2;
 }
 
-/** One big number: "R$ 18.420", "4 abertos", with how it moved and a small trend line. */
+/** One big number: "$18,420", "4 open", with how it moved and a small trend line. */
 export interface KpiWidgetSpec {
   kind: "kpi";
   value: number;
   /** Before the number: a currency ("R$", "US$", "$", "€", "£"). */
   prefix?: string;
-  /** After the number: "%", "min", "abertos". */
+  /** After the number: "%", "min", "open". */
   suffix?: string;
   /** How it moved: "+12%". `up` true = the good direction (drawn in the up tone), whatever the sign. */
   delta?: { text: string; up: boolean };
-  /** The line under it: "vs. ontem até agora". */
+  /** The line under it: "vs. yesterday so far". */
   note?: string;
   /** A small trend, oldest first. */
   spark?: number[];
@@ -56,9 +56,9 @@ export interface GoalWidgetSpec {
   kind: "goal";
   /** 0–100 (more is drawn full). */
   pct: number;
-  /** "R$ 248 mil de R$ 400 mil". */
+  /** "$248k of $400k". */
   line: string;
-  /** "No ritmo de agora, bate no dia 27." */
+  /** "At this pace, it gets there on the 27th." */
   note?: string;
 }
 
@@ -80,7 +80,7 @@ export interface LineWidgetSpec {
   labels: string[];
   values: number[];
   unit?: string;
-  /** "1.320 ontem · +33% na semana". */
+  /** "1,320 yesterday · +33% this week". */
   note?: string;
 }
 
@@ -340,7 +340,7 @@ export const widgetSpecOf = (raw: unknown): WidgetSpec | null => {
 const PREFIX_UNITS = new Set(["R$", "US$", "$", "€", "£"]);
 
 /**
- * A delta as the chat writes it ("+0,8 pp vs semana anterior", "−4% vs. semana passada") split into what moved and
+ * A delta as the chat writes it ("+0.8 pp vs the week before", "−4% vs. last week") split into what moved and
  * the words after it: a first word that starts with a sign or a digit is the move, the rest the note. A move that
  * starts with a minus reads as down.
  */

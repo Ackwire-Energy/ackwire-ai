@@ -2,7 +2,7 @@ import { type AgentColor, Mention } from "@agenteschat/ui";
 import { memo, type ReactNode, useCallback, useRef } from "react";
 import { ChannelRef } from "@/chat/ChannelRef";
 import { splitSettled } from "@/chat/live-text";
-import { ChartAccent } from "@/components/ChartBlock";
+import { ChartAccent, ChartMessage } from "@/components/ChartBlock";
 import { type ChannelRenderer, Markdown, type MentionRenderer, type WikiLinkRenderer } from "@/lib/markdown";
 
 /**
@@ -24,6 +24,7 @@ export function MessageBody({
   channelRefs,
   live,
   accent = "sky",
+  pinFrom = null,
 }: {
   body: string;
   resolveMention?: (handle: string) => string | null;
@@ -37,6 +38,8 @@ export function MessageBody({
   live?: boolean;
   /** The writing agent's color: its charts take its tones. */
   accent?: AgentColor;
+  /** An agent's saved message: its charts can be pinned to a board (ADR 0134). */
+  pinFrom?: { messageId: string; agentId: string } | null;
 }) {
   const mention = useCallback(
     (handle: string, key: string) =>
@@ -68,27 +71,29 @@ export function MessageBody({
   const { settled, tail } = splitSettled(body);
   return (
     <ChartAccent.Provider value={accent}>
-      <div className="md md--message">
-        {settled && (
-          // Live: stable renderers, so a new function identity doesn't re-render it every frame. Final: the real ones
-          // (a mention resolved later still shows); the swap only re-renders the same blocks.
-          <SettledBlocks
-            source={settled}
-            mention={live ? stableMention : mention}
-            channel={live ? stableChannel : channel}
-            wikiLink={live ? stableWiki : wikiLink}
+      <ChartMessage.Provider value={pinFrom}>
+        <div className="md md--message">
+          {settled && (
+            // Live: stable renderers, so a new function identity doesn't re-render it every frame. Final: the real ones
+            // (a mention resolved later still shows); the swap only re-renders the same blocks.
+            <SettledBlocks
+              source={settled}
+              mention={live ? stableMention : mention}
+              channel={live ? stableChannel : channel}
+              wikiLink={live ? stableWiki : wikiLink}
+            />
+          )}
+          <Markdown
+            source={tail}
+            variant="message"
+            mention={mention}
+            channel={channel}
+            wikiLink={wikiLink}
+            words={live}
+            bare
           />
-        )}
-        <Markdown
-          source={tail}
-          variant="message"
-          mention={mention}
-          channel={channel}
-          wikiLink={wikiLink}
-          words={live}
-          bare
-        />
-      </div>
+        </div>
+      </ChartMessage.Provider>
     </ChartAccent.Provider>
   );
 }

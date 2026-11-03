@@ -1,5 +1,5 @@
 import type { NotificationKind } from "@agenteschat/client";
-import { type OpenTarget, ROUTINE_TROUBLE } from "@agenteschat/client/lib/notifications";
+import { type OpenTarget, ROUTINE_TROUBLE, WIDGET_NOTICES } from "@agenteschat/client/lib/notifications";
 
 /**
  * A click on a browser notification (Web Push, ADR 0071) lands where a click on the same notification in the
@@ -20,10 +20,22 @@ export interface PushOpenData {
   missionId?: string;
   handoffId?: string;
   messageId?: string;
+  /** A board's notice (ADR 0134), when the push names its board and widget. */
+  dashboardId?: string;
+  widgetId?: string;
 }
 
 /** The ids a push carries besides its notification's, as the server names them. */
-const PLACE_KEYS = ["channelId", "threadId", "approvalId", "missionId", "handoffId", "messageId"] as const;
+const PLACE_KEYS = [
+  "channelId",
+  "threadId",
+  "approvalId",
+  "missionId",
+  "handoffId",
+  "messageId",
+  "dashboardId",
+  "widgetId",
+] as const;
 
 /** An id that can go in a path as it is: what the server makes (UUIDs), never a slash, a dot or a query. */
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -113,6 +125,15 @@ export function fallbackTarget(data: PushOpenData): OpenTarget | null {
   if (kind === "machine_connected" || kind === "computer_ready")
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   if (kind && ROUTINE_TROUBLE.has(kind as NotificationKind)) return { to: "/org/$orgId/routines" };
+  // A board's notice (ADR 0134): its board with the widget open when the push names them, else the boards.
+  if (kind && WIDGET_NOTICES.has(kind as NotificationKind))
+    return data.dashboardId
+      ? {
+          to: "/org/$orgId/dashboards/$dashboardId",
+          params: { dashboardId: data.dashboardId },
+          ...(data.widgetId ? { search: { widget: data.widgetId } } : {}),
+        }
+      : { to: "/org/$orgId/dashboards" };
   // A help request's card may be in a DM, which a push can't tell from a channel (`/c/<dm id>` doesn't exist).
   if (kind === "browser_handoff") return null;
   const at = data.messageId ? { search: { m: data.messageId } } : {};

@@ -29,6 +29,10 @@ export interface FakeDashboards {
   perRunUsd: number;
   /** A widget's run ended: its data shows (`ok`), or it fails with `failure`. */
   finish(widgetId: string, result: { spec: WidgetSpec; title?: string } | { failure: string; detail?: string }): void;
+  /** A board as the server would send it (mine, private, editable unless `over` says otherwise), added to `boards`. */
+  addBoard(over: Partial<Dashboard>): Dashboard;
+  /** A widget on a board, as the server would send it (`ok` with data when `over` gives a spec). */
+  addWidget(dashboardId: string, over: Partial<Widget>): Widget;
 }
 
 const RUNS: Record<string, number> = { half: 48, hour: 24, day: 1, week: 1 / 7, manual: 0 };
@@ -137,6 +141,18 @@ export function createFakeDashboards(
     suggestions: new Map(),
     pinnable: [],
     perRunUsd: 0.015,
+    addBoard(over) {
+      const d = newBoard(over);
+      fake.boards.push(d);
+      return d;
+    },
+    addWidget(dashboardId, over) {
+      const d = board(dashboardId);
+      const w = newWidget(d, { status: over.spec ? "ok" : "building", kind: over.spec?.kind ?? null, ...over });
+      d.widgets.push(w);
+      touch(d);
+      return w;
+    },
     finish(widgetId, result) {
       const { w } = find(widgetId);
       if ("spec" in result) {
