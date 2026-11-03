@@ -121,8 +121,28 @@ test("JSON events: text parts as paragraphs, OpenCode's own tools executed, our 
   ]);
   expect(m.finish({ exitCode: 0, sessionId: SESSION })).toEqual([
     { type: "usage", input: 22, output: 4, source: "plan", model: "opencode/big-pickle", cacheRead: 5, cacheWrite: 3 },
-    { type: "done", text: "Let me look.\n\nDone.", session: { id: SESSION } },
+    { type: "done", text: "Done.", session: { id: SESSION } },
   ]);
+});
+
+test("the answer is the text after the last tool call: a give-up before its own retry is narration, never posted", () => {
+  const m = new OpencodeEventMapper();
+  const said = (text: string) => JSON.stringify({ type: "text", part: { type: "text", text } });
+  for (const l of [
+    said("Não tenho como ler seu WhatsApp."),
+    JSON.stringify({
+      type: "tool_use",
+      part: { tool: `${CODEX_MCP_SERVER}_find_tools`, state: { status: "completed" } },
+    }),
+    said("Abri o WhatsApp Web no meu navegador."),
+    said("Escaneie o QR code e eu leio as mensagens."),
+  ])
+    m.line(l);
+  expect(m.finish({ exitCode: 0, sessionId: SESSION }).at(-1)).toEqual({
+    type: "done",
+    text: "Abri o WhatsApp Web no meu navegador.\n\nEscaneie o QR code e eu leio as mensagens.",
+    session: { id: SESSION },
+  });
 });
 
 test("a turn that went wrong: a limit, a refused key, anything else, a non-zero exit", () => {
@@ -262,7 +282,7 @@ test.skipIf(!posix)(
     const frames: { type: string; event?: CodexBrainEvent }[] = [];
     const scope = { signal: new AbortController().signal, output: () => {}, emit: (f: never) => frames.push(f) };
     const reply = (await handleRequest(ctx, turn(), scope as never)) as { final: CodexBrainEvent };
-    expect(reply.final).toEqual({ type: "done", text: "Let me check.\n\nAll good.", session: { id: SESSION } });
+    expect(reply.final).toEqual({ type: "done", text: "All good.", session: { id: SESSION } });
     const events = frames.flatMap((f) => (f.type === "brain.event" && f.event ? [f.event] : []));
     expect(events.filter((e) => e.type === "tool_call").map((e) => (e as { name: string }).name)).toEqual(["bash"]);
     expect(events.find((e) => e.type === "usage")).toEqual({

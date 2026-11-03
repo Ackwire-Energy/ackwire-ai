@@ -303,7 +303,7 @@ export async function askVerdict(
           secret: "A secret typed into the chat: a password, an API key, a token, a code, a private key.",
           person:
             "Something only a person can give that the agent needs to go on: a decision, a preference or a priority, an approval, a payment, an access or a sign-in, a test only they can run; or a request so ambiguous that what they meant can't be found anywhere; or `tried` already shows it searched where the answer would be.",
-          none: "Nothing the agent needs to go on: `question` is a status note or an update that needs no answer, says it needs nothing from them, or only offers optional extra work the request doesn't need ('only if you want…', 'I can also…'); or `reply` already settles the request and `question` merely offers more. A note that describes something it still needs from them to finish the request (an access, a decision, a test) is not this, even when it asks no question.",
+          none: "Nothing the agent needs to go on: `question` is a status note or an update that needs no answer, says it needs nothing from them, or only offers optional extra work the request doesn't need ('only if you want…', 'I can also…'); or `reply` already settles the request and `question` merely offers more. A way to do the request itself, or the step it needs from them (a sign-in, a QR code, their consent to their own account), is never this, however it is worded. A note that describes something it still needs from them to finish the request (an access, a decision, a test) is not this, even when it asks no question.",
         },
       },
     },

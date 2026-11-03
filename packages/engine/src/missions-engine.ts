@@ -428,7 +428,7 @@ export const KEEP_GOING_DELAY_MS = 60_000;
 
 /** What the main session reads when its turn ended with plan items open and nothing waiting on a person. */
 export const KEEP_GOING_PROMPT =
-  "Your last turn ended with plan items still open and nothing waiting on a person: go on with the next one now. If you can't go on without something only a person can give (a credential, an access, a decision, a test only they can run), ask for it directly now: ask_user with one clear question (request_secret for a credential, a blocking ask_decision for a choice), and mark that item waiting_you. A list of what is missing is not a question. If the plan is out of date, fix it with update_plan.";
+  "Your last turn ended with plan items still open and nothing waiting on a person: go on with the next one now. If you can't go on without something only a person can give (a credential, an access, a decision, a test only they can run), ask for it directly now: ask_user with one clear question (request_secret for a credential, a blocking ask_decision for a choice, browser_ask_person or desktop_ask_person for a sign-in, a QR code or a code once the page or app is at that step), and mark that item waiting_you. A step that needs a person is never a reason to stop: do everything up to it, then hand it over. A list of what is missing is not a question. If the plan is out of date, fix it with update_plan.";
 
 /** Schedules the keep-going check of a mission whose run just ended (`keepMissionGoing`). */
 export async function scheduleKeepGoing(db: Executor, mission: { id: string; orgId: string }) {

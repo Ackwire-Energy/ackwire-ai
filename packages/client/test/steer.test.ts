@@ -268,6 +268,15 @@ describe("the live work: what it read, when it read it", () => {
     expect(s.runs.r1?.text).toBe("Certo, mudando.");
   });
 
+  test("a new model call: narration stays in the work, a whole reply sent back for another try is replaced", () => {
+    let s = run([delta(0, 1, "Vou abrir o site.")]);
+    s = applyChannelEvent(s, { type: "agent.narration", ...base, turn: 1, text: "Vou abrir o site." } as Ev);
+    s = applyChannelEvent(s, delta(1, 2, "Não consigo: o site pede um QR code."));
+    s = applyChannelEvent(s, delta(2, 3, "Abri o WhatsApp Web: escaneie o QR code."));
+    expect(s.runs.r1?.work).toEqual([{ kind: "say", text: "Vou abrir o site.", turn: 1 }]);
+    expect(s.runs.r1?.text).toBe("Abri o WhatsApp Web: escaneie o QR code.");
+  });
+
   test("agent.passed: its row goes at once, and late deltas don't bring it back", () => {
     let s = run([delta(0, 1, "Hmm")]);
     expect(s.runs.r1).toBeDefined();
