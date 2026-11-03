@@ -1,9 +1,8 @@
-/* A channel's members on the right (Discord's member list): the sidebar's surface, its own scroll. The thread, search
-   and agent panels float over it. */
+/* A channel's members on the right (Discord's member list): under the channel's header, the sidebar's surface, its
+   own scroll. The thread, search and agent panels float over it. */
 .members-side {
   flex: 0 0 264px;
   width: 264px;
-  height: 100%;
   overflow-y: auto;
   padding: 18px 10px 24px 12px;
   box-sizing: border-box;

@@ -68,6 +68,21 @@ describe("the members column", () => {
     expect(toggle().getAttribute("aria-pressed")).toBe("false");
   });
 
+  test("under the channel's header: the header spans the chat and the column, which starts below it", async () => {
+    widthIs(DESKTOP_QUERY);
+    await open();
+    const main = screen().getByRole("main");
+    const header = main.querySelector(":scope > .channel__header") as HTMLElement;
+    expect(header).toBeTruthy();
+    const body = header.nextElementSibling as HTMLElement;
+    expect(body.classList.contains("channel__body")).toBe(true);
+    expect(body.firstElementChild?.classList.contains("channel__col")).toBe(true);
+    expect(body.lastElementChild).toBe(column());
+    // The messages and the composer stay in the chat's column, not under the members.
+    expect(body.querySelector(":scope > .channel__col .channel__messages")).toBeTruthy();
+    expect(body.querySelector(":scope > .channel__col .channel__composer")).toBeTruthy();
+  });
+
   test("closed by default on a tablet, where the toggle opens it beside the chat", async () => {
     widthIs(TABLET_QUERY);
     await open();

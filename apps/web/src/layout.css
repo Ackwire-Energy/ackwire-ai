@@ -1003,6 +1003,19 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   gap: 6px;
   vertical-align: top;
 }
+/* Under the header: the conversation's column, and the members column beside it, so the header and its line
+   span both (Discord's). */
+.channel__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.channel__col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .channel__messages {
   flex: 1;
   min-height: 0;

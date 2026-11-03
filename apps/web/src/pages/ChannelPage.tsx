@@ -1922,384 +1922,392 @@ function ChannelView({
                 }}
               />
             )}
-            {isMember && (
-              <ChannelPinnedBar
-                channelId={channel.id}
-                channelName={chrome ? undefined : channel.name}
-                threadId={thread?.id}
-              />
-            )}
-            {!chrome && isMember && arriving && (
-              <ArrivalCard channel={channel} onSayHi={() => composer.current?.focus()} onClose={arrival.close} />
-            )}
-            {!chrome && isMember && !arriving && (
-              <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
-            )}
-
-            {!isMember ? (
-              <div className="channel__empty">
-                <EmptyState
-                  icon="channel"
-                  title={t("channel.notMemberTitle")}
-                  actions={
-                    <Button
-                      variant="primary"
-                      onClick={() => join.mutate()}
-                      disabled={join.isPending}
-                      loading={join.isPending}
-                    >
-                      {t("channel.join", { channel: channel.name })}
-                    </Button>
-                  }
-                >
-                  {t("channel.notMemberText")}
-                </EmptyState>
-              </div>
-            ) : (
-              <>
-                {olderState === "loading" && (
-                  <div className="channel__older" role="status">
-                    <span className="channel__older-pill">
-                      <Spinner size={14} />
-                      {t("channel.loadingOlder")}
-                    </span>
-                  </div>
+            {/* Under the header: the conversation, and the members beside it (the header spans both, as Discord's). */}
+            <div className="channel__body">
+              <div className="channel__col">
+                {isMember && (
+                  <ChannelPinnedBar
+                    channelId={channel.id}
+                    channelName={chrome ? undefined : channel.name}
+                    threadId={thread?.id}
+                  />
                 )}
-                {olderState !== "loading" && <DatePill scroller={scroller} ref={datePill} />}
-                <AskRegistryProvider value={askRegistry}>
-                  <section
-                    ref={scroller}
-                    className="channel__messages"
-                    data-fresh={fresh || undefined}
-                    aria-label={t("channel.messages")}
-                    aria-live="polite"
-                    aria-relevant="additions"
-                    onWheel={(e) => {
-                      markScrollGesture();
-                      if (e.deltaY < 0) {
-                        markUpGesture();
-                        letGo();
-                      } else markGesture();
-                    }}
-                    onTouchMove={() => {
-                      markScrollGesture();
-                      markUpGesture();
-                    }}
-                    // On the list itself, not on a row: its scrollbar.
-                    onPointerDown={(e) => (e.target === e.currentTarget ? markUpGesture() : markGesture())}
-                    onKeyDown={(e) => (isScrollUpKey(e) ? markUpGesture() : markGesture())}
-                    onScroll={(e) => {
-                      const previousTop = lastScrollTop.current;
-                      lastScrollTop.current = e.currentTarget.scrollTop;
-                      // Only the person scrolling unpins (or loads older pages); layout changes never do.
-                      const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
-                      // A drag selecting text past the top edge scrolls up too: the person is reading.
-                      const upByPerson =
-                        Date.now() - lastUpGesture.current < GESTURE_MS || (byPerson && selectingIn(e.currentTarget));
-                      if (byPerson) datePill.current?.poke();
-                      if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
-                      if (upByPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
-                        letGo();
-                        return;
-                      }
-                      const near = nearBottom(e.currentTarget);
-                      if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
-                      // Pinned again only when the person comes back down, not by layout.
-                      const movedDown = previousTop !== null && e.currentTarget.scrollTop > previousTop;
-                      if (near && !stick.current && !(byPerson && movedDown)) return;
-                      stick.current = near;
-                      if (near) clearUnseen();
-                      // The person reached the end by themselves: the answer was read, the hold is over.
-                      if (near && byPerson) {
-                        markRead();
-                        if (holdingRef.current) setHold(false);
-                      }
-                    }}
-                  >
-                    {/* Pushes short channels down, next to the composer. */}
-                    <div className="channel__spacer" aria-hidden="true" />
-                    {chrome?.top}
-                    {messages.isLoading && <LoadingConversation />}
-                    {messages.isError && !messages.data && (
-                      <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
-                    )}
-                    {messages.isSuccess && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
-                      <div className="channel__empty">
-                        <EmptyState
-                          icon="message"
-                          // A DM with an agent: the light sky, like the other empty screens about agents.
-                          sky={Boolean(chrome?.dmAgentId)}
-                          title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
-                          actions={
-                            emptySuggestions.length > 0 ? (
-                              <fieldset className="channel__suggestions">
-                                <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
-                                {emptySuggestions.map((s) => (
-                                  <Button
-                                    key={s.text}
-                                    size="sm"
-                                    onClick={() => {
-                                      setDraft(s.text);
-                                      composer.current?.focus();
-                                    }}
-                                  >
-                                    {s.label}
-                                  </Button>
-                                ))}
-                              </fieldset>
-                            ) : undefined
-                          }
+                {!chrome && isMember && arriving && (
+                  <ArrivalCard channel={channel} onSayHi={() => composer.current?.focus()} onClose={arrival.close} />
+                )}
+                {!chrome && isMember && !arriving && (
+                  <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
+                )}
+
+                {!isMember ? (
+                  <div className="channel__empty">
+                    <EmptyState
+                      icon="channel"
+                      title={t("channel.notMemberTitle")}
+                      actions={
+                        <Button
+                          variant="primary"
+                          onClick={() => join.mutate()}
+                          disabled={join.isPending}
+                          loading={join.isPending}
                         >
-                          {chrome?.emptyText}
-                        </EmptyState>
+                          {t("channel.join", { channel: channel.name })}
+                        </Button>
+                      }
+                    >
+                      {t("channel.notMemberText")}
+                    </EmptyState>
+                  </div>
+                ) : (
+                  <>
+                    {olderState === "loading" && (
+                      <div className="channel__older" role="status">
+                        <span className="channel__older-pill">
+                          <Spinner size={14} />
+                          {t("channel.loadingOlder")}
+                        </span>
                       </div>
                     )}
-                    {adjustThreadId ? (
-                      <RangeRows
-                        adjust={adjust}
-                        scroller={scroller}
-                        renderMessage={(m) => (
-                          <ErrorBoundary resetKey={m} fallback={unshownLine}>
-                            <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
-                          </ErrorBoundary>
+                    {olderState !== "loading" && <DatePill scroller={scroller} ref={datePill} />}
+                    <AskRegistryProvider value={askRegistry}>
+                      <section
+                        ref={scroller}
+                        className="channel__messages"
+                        data-fresh={fresh || undefined}
+                        aria-label={t("channel.messages")}
+                        aria-live="polite"
+                        aria-relevant="additions"
+                        onWheel={(e) => {
+                          markScrollGesture();
+                          if (e.deltaY < 0) {
+                            markUpGesture();
+                            letGo();
+                          } else markGesture();
+                        }}
+                        onTouchMove={() => {
+                          markScrollGesture();
+                          markUpGesture();
+                        }}
+                        // On the list itself, not on a row: its scrollbar.
+                        onPointerDown={(e) => (e.target === e.currentTarget ? markUpGesture() : markGesture())}
+                        onKeyDown={(e) => (isScrollUpKey(e) ? markUpGesture() : markGesture())}
+                        onScroll={(e) => {
+                          const previousTop = lastScrollTop.current;
+                          lastScrollTop.current = e.currentTarget.scrollTop;
+                          // Only the person scrolling unpins (or loads older pages); layout changes never do.
+                          const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
+                          // A drag selecting text past the top edge scrolls up too: the person is reading.
+                          const upByPerson =
+                            Date.now() - lastUpGesture.current < GESTURE_MS ||
+                            (byPerson && selectingIn(e.currentTarget));
+                          if (byPerson) datePill.current?.poke();
+                          if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
+                          if (upByPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
+                            letGo();
+                            return;
+                          }
+                          const near = nearBottom(e.currentTarget);
+                          if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
+                          // Pinned again only when the person comes back down, not by layout.
+                          const movedDown = previousTop !== null && e.currentTarget.scrollTop > previousTop;
+                          if (near && !stick.current && !(byPerson && movedDown)) return;
+                          stick.current = near;
+                          if (near) clearUnseen();
+                          // The person reached the end by themselves: the answer was read, the hold is over.
+                          if (near && byPerson) {
+                            markRead();
+                            if (holdingRef.current) setHold(false);
+                          }
+                        }}
+                      >
+                        {/* Pushes short channels down, next to the composer. */}
+                        <div className="channel__spacer" aria-hidden="true" />
+                        {chrome?.top}
+                        {messages.isLoading && <LoadingConversation />}
+                        {messages.isError && !messages.data && (
+                          <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
                         )}
-                      />
-                    ) : (
-                      <>
-                        <Timeline
-                          items={timeline}
-                          ready={messages.isSuccess}
-                          slots={slots}
-                          runKeys={runKeys.current}
-                          divider={divider}
-                          channelId={channel.id}
-                          runVisible={runVisible}
-                          dmPersonId={thread ? undefined : chrome?.dmPersonId}
-                          consultGroups={consultGroups}
-                          seenId={thread ? null : seenId}
-                        />
-                        {!thread && (
-                          <ArchivedThreadsNote
-                            channelId={channel.id}
-                            count={archivedThreads.data?.threads.length ?? 0}
+                        {messages.isSuccess && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
+                          <div className="channel__empty">
+                            <EmptyState
+                              icon="message"
+                              // A DM with an agent: the light sky, like the other empty screens about agents.
+                              sky={Boolean(chrome?.dmAgentId)}
+                              title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
+                              actions={
+                                emptySuggestions.length > 0 ? (
+                                  <fieldset className="channel__suggestions">
+                                    <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
+                                    {emptySuggestions.map((s) => (
+                                      <Button
+                                        key={s.text}
+                                        size="sm"
+                                        onClick={() => {
+                                          setDraft(s.text);
+                                          composer.current?.focus();
+                                        }}
+                                      >
+                                        {s.label}
+                                      </Button>
+                                    ))}
+                                  </fieldset>
+                                ) : undefined
+                              }
+                            >
+                              {chrome?.emptyText}
+                            </EmptyState>
+                          </div>
+                        )}
+                        {adjustThreadId ? (
+                          <RangeRows
+                            adjust={adjust}
+                            scroller={scroller}
+                            renderMessage={(m) => (
+                              <ErrorBoundary resetKey={m} fallback={unshownLine}>
+                                <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
+                              </ErrorBoundary>
+                            )}
+                          />
+                        ) : (
+                          <>
+                            <Timeline
+                              items={timeline}
+                              ready={messages.isSuccess}
+                              slots={slots}
+                              runKeys={runKeys.current}
+                              divider={divider}
+                              channelId={channel.id}
+                              runVisible={runVisible}
+                              dmPersonId={thread ? undefined : chrome?.dmPersonId}
+                              consultGroups={consultGroups}
+                              seenId={thread ? null : seenId}
+                            />
+                            {!thread && (
+                              <ArchivedThreadsNote
+                                channelId={channel.id}
+                                count={archivedThreads.data?.threads.length ?? 0}
+                              />
+                            )}
+                          </>
+                        )}
+                        {ephemeral && (
+                          <MissionEphemeral
+                            kind={ephemeral.kind}
+                            missionId={ephemeral.missionId}
+                            onClose={() => setEphemeral(null)}
                           />
                         )}
-                      </>
+                        <LiveMemoryCards channelId={channel.id} />
+                        <LiveNotices channelId={channel.id} />
+                      </section>
+                    </AskRegistryProvider>
+                    {holding && (
+                      <div className="channel__pill">
+                        <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
+                          <Icon name="chevronDown" size={16} />
+                          {t("channel.endOfReply")}
+                        </Button>
+                      </div>
                     )}
-                    {ephemeral && (
-                      <MissionEphemeral
-                        kind={ephemeral.kind}
-                        missionId={ephemeral.missionId}
-                        onClose={() => setEphemeral(null)}
+                    <div className="channel__pill">
+                      <button
+                        type="button"
+                        className="channel__newpill"
+                        data-on={(pillOn && !holding) || undefined}
+                        aria-hidden={!pillOn || holding || undefined}
+                        tabIndex={pillOn && !holding ? 0 : -1}
+                        aria-label={t("channel.newPill.label", {
+                          text: pillText.join(" · ") || t("channel.newMessages"),
+                        })}
+                        onClick={openUnseen}
+                      >
+                        <Icon name="chevronDown" size={16} />
+                        <span className="channel__newpill-stack" aria-hidden="true">
+                          {[
+                            ...pillWriting.map((id) => ({ type: "agent" as const, id })),
+                            ...pillAuthors.flatMap((a) => (a.id ? [{ type: a.type, id: a.id }] : [])),
+                          ]
+                            .filter((a, i, all) => all.findIndex((x) => x.type === a.type && x.id === a.id) === i)
+                            .slice(0, 3)
+                            .map((a) => (
+                              <ActorAvatar key={`${a.type}:${a.id}`} actor={a} size="xs" name={dir.authorName(a)} />
+                            ))}
+                        </span>
+                        <span>{pillText[0] ?? t("channel.newMessages")}</span>
+                        {pillText.length > 1 && (
+                          <span className="channel__newpill-more">
+                            {pillText
+                              .slice(1)
+                              .map((x) => `· ${x}`)
+                              .join(" ")}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                    <div className="channel__composer">
+                      <ConnectionBanner status={status} />
+                      <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
+                      <ActivityBar
+                        channelId={channel.id}
+                        threadId={thread?.id ?? null}
+                        visible={runVisible}
+                        outOfView={outOfView}
+                        onSee={seeRun}
+                        asks={asksOut}
+                        onSeeAsk={seeAsk}
+                        stoppable={stopTarget?.runId}
+                        consultBlocks={consultGroups.nearEnd}
                       />
-                    )}
-                    <LiveMemoryCards channelId={channel.id} />
-                    <LiveNotices channelId={channel.id} />
-                  </section>
-                </AskRegistryProvider>
-                {holding && (
-                  <div className="channel__pill">
-                    <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
-                      <Icon name="chevronDown" size={16} />
-                      {t("channel.endOfReply")}
-                    </Button>
-                  </div>
+                      {adjustThreadId ? (
+                        <RangeBar adjust={adjust} />
+                      ) : chrome?.composerReplacement ? (
+                        chrome.composerReplacement
+                      ) : (
+                        <>
+                          <Composer
+                            attachments={
+                              files.length > 0
+                                ? files.map((f) => (
+                                    <ComposerFile
+                                      key={f.key}
+                                      name={f.name}
+                                      icon={f.icon}
+                                      preview={f.preview}
+                                      detail={formatBytes(i18n.language, f.size)}
+                                      status={f.status}
+                                      statusLabel={
+                                        f.status === "uploading"
+                                          ? t("channel.uploading")
+                                          : f.status === "failed"
+                                            ? t("channel.uploadFailed")
+                                            : undefined
+                                      }
+                                      removeLabel={t("channel.removeFile", { name: f.name })}
+                                      onRemove={() => dropFiles((x) => x.key !== f.key)}
+                                    />
+                                  ))
+                                : undefined
+                            }
+                            onFiles={chrome?.locked ? undefined : addFiles}
+                            canSendEmpty={attached.length > 0}
+                            sendBlocked={uploading}
+                            format={formatLabels}
+                            emoji={mediaTabs ? { ...emojiLabels, button: mediaTabs.button } : emojiLabels}
+                            pickerTabs={mediaTabs?.tabs}
+                            pickerLabels={mediaTabs?.labels}
+                            id={`composer-${thread?.id ?? channel.id}`}
+                            textareaRef={composer}
+                            value={draft}
+                            onChange={(v) => {
+                              setDraft(v);
+                              if (v.trim()) sendTyping(v);
+                            }}
+                            onSend={onSend}
+                            working={chrome?.locked ? null : working}
+                            choice={choice}
+                            voice={voice}
+                            disabled={Boolean(chrome?.locked)}
+                            label={
+                              chrome?.composerLabel ??
+                              (chrome?.composerTarget
+                                ? t("channel.composerDm", { name: chrome.composerTarget })
+                                : t("channel.composerLabel", { channel: channel.name }))
+                            }
+                            placeholder={
+                              // DMs name the person or agent ("Mensagem para Theo"); channels keep "#nome".
+                              chrome?.composerLabel ??
+                              (chrome?.composerTarget
+                                ? t("channel.composerDm", { name: chrome.composerTarget })
+                                : t("channel.composerPlaceholder", { channel: channel.name }))
+                            }
+                            sendLabel={t("channel.send")}
+                            sendText={t("channel.send")}
+                            attachLabel={t("channel.attach")}
+                            pills={composerPills}
+                            inlinePills={agentDm}
+                            links={{
+                              listLabel: t("wiki.editor.suggest"),
+                              search: (q) =>
+                                (wikiPages.data ?? [])
+                                  .filter((p) => p.title.toLowerCase().includes(q.trim().toLowerCase()))
+                                  .slice(0, 8)
+                                  .map((p) => ({
+                                    key: `wiki:${p.slug}`,
+                                    insert: p.title,
+                                    label: p.title,
+                                    description: p.folder || undefined,
+                                    leading: <Icon name="book" size={16} />,
+                                  })),
+                            }}
+                            commands={
+                              commands.length > 0 ? { listLabel: t("composer.commands"), list: commands } : undefined
+                            }
+                            channels={{ search: channelSearch, listLabel: t("channelRefs.list") }}
+                            mentions={{
+                              search: mentionSearch,
+                              listLabel: t("mentions.list"),
+                              onPick: (item) => {
+                                if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
+                              },
+                            }}
+                          />
+                          {offer && (
+                            <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
+                          )}
+                          <KeyGuardDialog
+                            ask={keyAsk}
+                            onClose={() => setKeyAsk(null)}
+                            onSend={() => {
+                              setKeyAsk(null);
+                              if (keyAsk) onSend(keyAsk.text, { interrupt: keyAsk.interrupt, keyChecked: true });
+                            }}
+                            onEdit={(text) => {
+                              setKeyAsk(null);
+                              setDraft(text);
+                              composer.current?.focus();
+                            }}
+                          />
+                          {chrome?.composerNote && !chrome.locked && (
+                            <p className="ac-composer__hint">{chrome.composerNote}</p>
+                          )}
+                          {chrome?.locked && <p className="ac-composer__hint">{chrome.locked}</p>}
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
-                <div className="channel__pill">
-                  <button
-                    type="button"
-                    className="channel__newpill"
-                    data-on={(pillOn && !holding) || undefined}
-                    aria-hidden={!pillOn || holding || undefined}
-                    tabIndex={pillOn && !holding ? 0 : -1}
-                    aria-label={t("channel.newPill.label", { text: pillText.join(" · ") || t("channel.newMessages") })}
-                    onClick={openUnseen}
-                  >
-                    <Icon name="chevronDown" size={16} />
-                    <span className="channel__newpill-stack" aria-hidden="true">
-                      {[
-                        ...pillWriting.map((id) => ({ type: "agent" as const, id })),
-                        ...pillAuthors.flatMap((a) => (a.id ? [{ type: a.type, id: a.id }] : [])),
-                      ]
-                        .filter((a, i, all) => all.findIndex((x) => x.type === a.type && x.id === a.id) === i)
-                        .slice(0, 3)
-                        .map((a) => (
-                          <ActorAvatar key={`${a.type}:${a.id}`} actor={a} size="xs" name={dir.authorName(a)} />
-                        ))}
-                    </span>
-                    <span>{pillText[0] ?? t("channel.newMessages")}</span>
-                    {pillText.length > 1 && (
-                      <span className="channel__newpill-more">
-                        {pillText
-                          .slice(1)
-                          .map((x) => `· ${x}`)
-                          .join(" ")}
-                      </span>
-                    )}
-                  </button>
-                </div>
-                <div className="channel__composer">
-                  <ConnectionBanner status={status} />
-                  <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
-                  <ActivityBar
-                    channelId={channel.id}
-                    threadId={thread?.id ?? null}
-                    visible={runVisible}
-                    outOfView={outOfView}
-                    onSee={seeRun}
-                    asks={asksOut}
-                    onSeeAsk={seeAsk}
-                    stoppable={stopTarget?.runId}
-                    consultBlocks={consultGroups.nearEnd}
-                  />
-                  {adjustThreadId ? (
-                    <RangeBar adjust={adjust} />
-                  ) : chrome?.composerReplacement ? (
-                    chrome.composerReplacement
-                  ) : (
-                    <>
-                      <Composer
-                        attachments={
-                          files.length > 0
-                            ? files.map((f) => (
-                                <ComposerFile
-                                  key={f.key}
-                                  name={f.name}
-                                  icon={f.icon}
-                                  preview={f.preview}
-                                  detail={formatBytes(i18n.language, f.size)}
-                                  status={f.status}
-                                  statusLabel={
-                                    f.status === "uploading"
-                                      ? t("channel.uploading")
-                                      : f.status === "failed"
-                                        ? t("channel.uploadFailed")
-                                        : undefined
-                                  }
-                                  removeLabel={t("channel.removeFile", { name: f.name })}
-                                  onRemove={() => dropFiles((x) => x.key !== f.key)}
-                                />
-                              ))
-                            : undefined
-                        }
-                        onFiles={chrome?.locked ? undefined : addFiles}
-                        canSendEmpty={attached.length > 0}
-                        sendBlocked={uploading}
-                        format={formatLabels}
-                        emoji={mediaTabs ? { ...emojiLabels, button: mediaTabs.button } : emojiLabels}
-                        pickerTabs={mediaTabs?.tabs}
-                        pickerLabels={mediaTabs?.labels}
-                        id={`composer-${thread?.id ?? channel.id}`}
-                        textareaRef={composer}
-                        value={draft}
-                        onChange={(v) => {
-                          setDraft(v);
-                          if (v.trim()) sendTyping(v);
-                        }}
-                        onSend={onSend}
-                        working={chrome?.locked ? null : working}
-                        choice={choice}
-                        voice={voice}
-                        disabled={Boolean(chrome?.locked)}
-                        label={
-                          chrome?.composerLabel ??
-                          (chrome?.composerTarget
-                            ? t("channel.composerDm", { name: chrome.composerTarget })
-                            : t("channel.composerLabel", { channel: channel.name }))
-                        }
-                        placeholder={
-                          // DMs name the person or agent ("Mensagem para Theo"); channels keep "#nome".
-                          chrome?.composerLabel ??
-                          (chrome?.composerTarget
-                            ? t("channel.composerDm", { name: chrome.composerTarget })
-                            : t("channel.composerPlaceholder", { channel: channel.name }))
-                        }
-                        sendLabel={t("channel.send")}
-                        sendText={t("channel.send")}
-                        attachLabel={t("channel.attach")}
-                        pills={composerPills}
-                        inlinePills={agentDm}
-                        links={{
-                          listLabel: t("wiki.editor.suggest"),
-                          search: (q) =>
-                            (wikiPages.data ?? [])
-                              .filter((p) => p.title.toLowerCase().includes(q.trim().toLowerCase()))
-                              .slice(0, 8)
-                              .map((p) => ({
-                                key: `wiki:${p.slug}`,
-                                insert: p.title,
-                                label: p.title,
-                                description: p.folder || undefined,
-                                leading: <Icon name="book" size={16} />,
-                              })),
-                        }}
-                        commands={
-                          commands.length > 0 ? { listLabel: t("composer.commands"), list: commands } : undefined
-                        }
-                        channels={{ search: channelSearch, listLabel: t("channelRefs.list") }}
-                        mentions={{
-                          search: mentionSearch,
-                          listLabel: t("mentions.list"),
-                          onPick: (item) => {
-                            if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
-                          },
-                        }}
-                      />
-                      {offer && (
-                        <AddToChannelOffer channelId={channel.id} agentId={offer} onDone={() => setOffer(null)} />
-                      )}
-                      <KeyGuardDialog
-                        ask={keyAsk}
-                        onClose={() => setKeyAsk(null)}
-                        onSend={() => {
-                          setKeyAsk(null);
-                          if (keyAsk) onSend(keyAsk.text, { interrupt: keyAsk.interrupt, keyChecked: true });
-                        }}
-                        onEdit={(text) => {
-                          setKeyAsk(null);
-                          setDraft(text);
-                          composer.current?.focus();
-                        }}
-                      />
-                      {chrome?.composerNote && !chrome.locked && (
-                        <p className="ac-composer__hint">{chrome.composerNote}</p>
-                      )}
-                      {chrome?.locked && <p className="ac-composer__hint">{chrome.locked}</p>}
-                    </>
-                  )}
-                </div>
-              </>
-            )}
 
-            {!chrome?.header && (
-              <ChannelDetails
-                open={detailsOpen}
-                onOpenChange={(open) => {
-                  setDetailsOpen(open);
-                  if (!open) setAddFirst(false);
-                }}
-                channel={channel}
-                startAdding={addFirst}
-              />
-            )}
-            {missionDraft !== null && (
-              <NewMissionDialog
-                open
-                onOpenChange={(o) => !o && setMissionDraft(null)}
-                initialGoal={missionDraft}
-                initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
-                initialAgentId={suggestedAgent?.id}
-              />
-            )}
+                {!chrome?.header && (
+                  <ChannelDetails
+                    open={detailsOpen}
+                    onOpenChange={(open) => {
+                      setDetailsOpen(open);
+                      if (!open) setAddFirst(false);
+                    }}
+                    channel={channel}
+                    startAdding={addFirst}
+                  />
+                )}
+                {missionDraft !== null && (
+                  <NewMissionDialog
+                    open
+                    onOpenChange={(o) => !o && setMissionDraft(null)}
+                    initialGoal={missionDraft}
+                    initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
+                    initialAgentId={suggestedAgent?.id}
+                  />
+                )}
+              </div>
+              {!chrome && membersColumn.column && (
+                <MembersColumn
+                  channel={channel}
+                  people={channelPeople}
+                  agents={channelAgents}
+                  {...(addsMembers ? { onAdd: addMembers } : {})}
+                />
+              )}
+            </div>
           </Tag>
-          {!chrome && membersColumn.column && (
-            <MembersColumn
-              channel={channel}
-              people={channelPeople}
-              agents={channelAgents}
-              {...(addsMembers ? { onAdd: addMembers } : {})}
-            />
-          )}
           {!chrome && membersColumn.sheet && (
             <MembersSheet
               channel={channel}

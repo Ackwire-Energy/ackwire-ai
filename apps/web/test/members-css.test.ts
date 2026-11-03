@@ -16,6 +16,12 @@ test("the members column: 264px on the sidebar's surface, offline rows quieter, 
 
   expect(last(shipped, ".members-side", "width")).toBe("264px");
   expect(last(shipped, ".members-side", "background")).toBe("var(--side)");
+  // Inside the chat's main, beside the conversation's column and under the header (whose line spans both).
+  expect(last(shipped, ".members-side", "height")).toBeUndefined();
+  expect(last(shipped, ".channel__body", "display")).toBe("flex");
+  expect(last(shipped, ".channel__body", "min-height")).toBe("0");
+  expect(last(shipped, ".channel__col", "flex-direction")).toBe("column");
+  expect(last(shipped, ".channel__col", "min-width")).toBe("0");
   expect(last(shipped, ".members-side__inner[data-presence=offline]", "opacity")).toBe(".45");
   // The open card's row keeps the chosen plate, hover the lighter one.
   expect(last(shipped, ".members-side__row.profile-trigger[data-state=open]", "background")).toBe("var(--side-chosen)");
