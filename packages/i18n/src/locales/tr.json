@@ -4332,7 +4332,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Atanana ve önceliğe göre filtrele",
     "assigneeFilter": "Atanan",
     "priorityFilter": "Öncelik",
     "title": "Görevler",
@@ -4343,20 +4342,12 @@
     "list": "Liste",
     "new": "Yeni görev",
     "filters": "Görevleri filtrele",
-    "filter": {
-      "all": "Tümü",
-      "agents": "Ajanlarda",
-      "people": "Kişilerde",
-      "mine": "Benim",
-      "none": "Atanmamış"
-    },
     "unassigned_one": "{{count}} atanmamış",
     "unassigned_other": "{{count}} atanmamış",
     "emptyTitle": "Henüz görev yok",
     "panelLabel": "Görev #{{number}}",
     "openPage": "Görevin sayfasını aç",
     "close": "Kapat",
-    "dropHere": "Buraya bırakın",
     "moved": "#{{number}} artık {{status}} durumunda.",
     "movedTo": "{{column}} sütununa taşındı",
     "newIn": "{{column}} sütununda yeni görev",
@@ -4366,6 +4357,54 @@
     "flowHint": "Görev kendiliğinden her aşamanın ilk sütununa geçer: bir ajan başladığında Devam ediyor, kontrole hazır olduğunda İncelemede, siz onayladığınızda Tamamlandı.",
     "moreOptions": "Diğer seçenekler",
     "showCanceled": "İptal edilenleri göster",
+    "filterButton": "Filtre",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ben",
+    "display": {
+      "title": "Görünüm",
+      "label": "Görünüm: {{layout}} · {{group}}",
+      "layout": "Düzen",
+      "group": "Gruplama ölçütü",
+      "sort": "Sıralama ölçütü",
+      "fields": "Kartlarda",
+      "saved": "Bu çalışma alanında sizin için kaydedildi",
+      "reset": "Varsayılana dön",
+      "by": {
+        "stage": "Aşama",
+        "assignee": "Atanan",
+        "priority": "Öncelik"
+      },
+      "order": {
+        "manual": "Elle",
+        "priority": "Öncelik",
+        "due": "Son tarih"
+      },
+      "field": {
+        "assignee": "Atanan",
+        "priority": "Öncelik",
+        "due": "Son tarih",
+        "criteria": "Kriterler",
+        "pullRequest": "Pull request",
+        "label": "Etiket"
+      }
+    },
+    "drop": {
+      "stage": "{{name}} sütununa bırakın",
+      "assignee": "Bırakın, {{name}} üstlensin",
+      "unassign": "Atananı kaldırmak için bırakın",
+      "priority": "Önceliği {{priority}} yapmak için bırakın"
+    },
+    "drag": {
+      "role": "sürüklenebilir görev",
+      "help": "Boşluk tuşu görevi alır, ok tuşları taşır, Boşluk tuşu bırakır ve Esc iptal eder.",
+      "picked": "#{{number}} görevini aldınız. Ok tuşları taşır, Boşluk bırakır, Esc iptal eder.",
+      "moved": "#{{number}}: {{group}}, {{total}} içinde {{position}}. sıra.",
+      "dropped": "#{{number}} bırakıldı: {{group}}.",
+      "canceled": "#{{number}} yerine döndü.",
+      "assigned": "#{{number}} artık {{name}} üzerinde.",
+      "unassigned": "#{{number}} artık kimseye atanmamış.",
+      "prioritized": "#{{number}} artık {{priority}} öncelikli."
+    },
     "canceledColumn": "İptal edildi",
     "columns": {
       "add": "Sütun ekle",

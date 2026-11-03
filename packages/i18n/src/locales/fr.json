@@ -4546,7 +4546,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filtrer par responsable et priorité",
     "assigneeFilter": "Responsable",
     "priorityFilter": "Priorité",
     "title": "Tâches",
@@ -4557,13 +4556,6 @@
     "list": "Liste",
     "new": "Nouvelle tâche",
     "filters": "Filtrer les tâches",
-    "filter": {
-      "all": "Toutes",
-      "agents": "Avec des agents",
-      "people": "Avec des personnes",
-      "mine": "Les miennes",
-      "none": "Non attribuées"
-    },
     "unassigned_one": "{{count}} non attribuée",
     "unassigned_many": "{{count}} non attribuées",
     "unassigned_other": "{{count}} non attribuées",
@@ -4571,7 +4563,6 @@
     "panelLabel": "Tâche #{{number}}",
     "openPage": "Ouvrir la page de la tâche",
     "close": "Fermer",
-    "dropHere": "Déposer ici",
     "moved": "#{{number}} dans {{status}}.",
     "movedTo": "Déplacée vers {{column}}",
     "newIn": "Nouvelle tâche dans {{column}}",
@@ -4581,6 +4572,54 @@
     "flowHint": "La tâche avance d'elle-même, vers la première colonne de chaque étape : En cours quand un agent commence, En revue quand elle est prête à être vérifiée, Terminée quand vous approuvez.",
     "moreOptions": "Plus d'options",
     "showCanceled": "Afficher les annulées",
+    "filterButton": "Filtre",
+    "filterValue": "{{filter}} : {{value}}",
+    "me": "Moi",
+    "display": {
+      "title": "Affichage",
+      "label": "Affichage : {{layout}} · {{group}}",
+      "layout": "Disposition",
+      "group": "Grouper par",
+      "sort": "Trier par",
+      "fields": "Sur les cartes",
+      "saved": "Enregistré pour vous dans cet espace de travail",
+      "reset": "Revenir au réglage par défaut",
+      "by": {
+        "stage": "Étape",
+        "assignee": "Responsable",
+        "priority": "Priorité"
+      },
+      "order": {
+        "manual": "Manuel",
+        "priority": "Priorité",
+        "due": "Échéance"
+      },
+      "field": {
+        "assignee": "Responsable",
+        "priority": "Priorité",
+        "due": "Échéance",
+        "criteria": "Critères",
+        "pullRequest": "Pull request",
+        "label": "Étiquette"
+      }
+    },
+    "drop": {
+      "stage": "Déposez dans {{name}}",
+      "assignee": "Déposez pour la confier à {{name}}",
+      "unassign": "Déposez pour retirer le responsable",
+      "priority": "Déposez pour une priorité {{priority}}"
+    },
+    "drag": {
+      "role": "tâche déplaçable",
+      "help": "Espace prend la tâche, les flèches la déplacent, Espace la dépose et Échap annule.",
+      "picked": "Vous avez pris la #{{number}}. Les flèches la déplacent, Espace la dépose, Échap annule.",
+      "moved": "#{{number}} : {{group}}, position {{position}} sur {{total}}.",
+      "dropped": "Vous avez déposé la #{{number}} dans {{group}}.",
+      "canceled": "La #{{number}} est revenue à sa place.",
+      "assigned": "La #{{number}} est maintenant confiée à {{name}}.",
+      "unassigned": "La #{{number}} n'a plus de responsable.",
+      "prioritized": "La #{{number}} a maintenant une priorité {{priority}}."
+    },
     "canceledColumn": "Annulées",
     "columns": {
       "add": "Ajouter une colonne",

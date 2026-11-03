@@ -7,7 +7,7 @@ import { toYmd } from "@agenteschat/client/lib/format";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { mondayOf } from "@/pages/CalendarPage";
 import { splitCriteria } from "@/pages/IssuesPage";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { nextCronRun, parseSchedulePhrase } from "./fakes/planning";
 import { renderApp, screen, settle } from "./render";
 
@@ -89,28 +89,68 @@ describe("Issues (board and list)", () => {
     expect(screen().getByRole("dialog", { name: "Confirmação do agendamento por WhatsApp" })).toBeTruthy();
   });
 
-  test("filters, search and the list view", async () => {
-    await go("issues");
-    await click(screen().getByRole("radio", { name: /^Com agentes/ }));
+  test("Filtro: who has it and the priority, as chips; the search; the list from Exibição", async () => {
+    const state = seedState();
+    await go("issues", createFakeApi(state));
+    const filterMenu = async (name: string) => {
+      const trigger = screen().getByRole("button", { name });
+      trigger.focus();
+      await key(trigger, "Enter");
+      return screen().getByRole("menu");
+    };
+    const pickIn = async (menu: HTMLElement, name: string) => {
+      await click(within(menu).getByRole("menuitemcheckbox", { name }));
+      await settle(3);
+    };
+    const closeMenu = async () => {
+      await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+      await settle(2);
+    };
+    // Me first, then the agents and the people with a task here, then nobody; then the priorities.
+    let menu = await filterMenu("Filtro");
     expect(
-      screen()
-        .getByRole("radio", { name: /^Com agentes/ })
-        .getAttribute("aria-checked"),
-    ).toBe("true");
+      within(menu)
+        .getAllByRole("menuitemcheckbox")
+        .map((o) => o.querySelector(".ac-menu__label")?.textContent),
+    ).toEqual(["Eu", "Ada", "Atlas", "João", "Sem responsável", "Alta", "Normal", "Baixa"]);
+    await pickIn(menu, "Ada");
+    expect(cardTitles(column("A fazer"))).toEqual(["Tabela de concorrentes atualizada"]);
     expect(cardTitles(column("Em andamento"))).toEqual(["Timeout no agendamento em horários de pico"]);
-    await click(screen().getByRole("radio", { name: /^Minhas/ }));
+    await closeMenu();
+    // In use: a chip that reads it and opens the same menu; kept for me.
+    expect(screen().getByRole("button", { name: "Responsável: Ada" })).toBeTruthy();
+    expect(state.issuesView?.assignees).toEqual([`agent:${ADA_ID}`]);
+    await click(screen().getByRole("button", { name: "Limpar Ada" }));
+    await settle(3);
+    expect(screen().queryByRole("button", { name: "Responsável: Ada" })).toBeNull();
+    expect(state.issuesView?.assignees).toEqual([]);
+    // Mine: none here.
+    menu = await filterMenu("Filtro");
+    await pickIn(menu, "Eu");
     expect(screen().getByText("Nenhuma tarefa com esses filtros.")).toBeTruthy();
-    await click(screen().getByRole("radio", { name: /^Todas/ }));
+    await pickIn(menu, "Eu");
+    await pickIn(menu, "Alta");
+    await closeMenu();
+    expect(screen().getAllByRole("link", { name: /^#\d+/ }).map((l) => l.getAttribute("aria-label"))).toEqual([
+      "#131 Confirmação do agendamento por WhatsApp",
+      "#128 Login devolve 401 depois do deploy das 9h",
+    ]);
+    await click(screen().getByRole("button", { name: "Limpar Alta" }));
+    await settle(3);
     await type(screen().getByRole("searchbox", { name: "Buscar tarefas" }), "#128");
     await settle(4);
     expect(screen().getAllByRole("link", { name: /^#\d+/ })).toHaveLength(1);
     await type(screen().getByRole("searchbox", { name: "Buscar tarefas" }), "");
     await settle(4);
-    await click(screen().getByRole("radio", { name: "Lista" }));
+    await click(screen().getByRole("button", { name: "Exibição: Quadro · Etapa" }));
+    await settle(2);
+    await click(within(screen().getByRole("dialog", { name: "Exibição" })).getByRole("button", { name: "Lista" }));
+    await settle(3);
     const rows = screen().getAllByRole("listitem");
     expect(rows).toHaveLength(7);
     expect(rows[0]?.textContent).toContain("#132");
     expect(rows.find((r) => r.textContent?.includes("#126"))?.textContent).toContain("Feito");
+    expect(state.issuesView?.layout).toBe("list");
   });
 
   test("Nova tarefa: title, criteria from '-' lines, assignee (each by its face), priority and a pasted print", async () => {

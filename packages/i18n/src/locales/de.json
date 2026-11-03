@@ -4370,7 +4370,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Nach Zuständigen und Priorität filtern",
     "assigneeFilter": "Zuständig",
     "priorityFilter": "Priorität",
     "title": "Aufgaben",
@@ -4381,20 +4380,12 @@
     "list": "Liste",
     "new": "Neue Aufgabe",
     "filters": "Aufgaben filtern",
-    "filter": {
-      "all": "Alle",
-      "agents": "Bei Agenten",
-      "people": "Bei Personen",
-      "mine": "Meine",
-      "none": "Nicht zugewiesen"
-    },
     "unassigned_one": "{{count}} nicht zugewiesen",
     "unassigned_other": "{{count}} nicht zugewiesen",
     "emptyTitle": "Noch keine Aufgaben",
     "panelLabel": "Aufgabe #{{number}}",
     "openPage": "Seite der Aufgabe öffnen",
     "close": "Schließen",
-    "dropHere": "Hier ablegen",
     "moved": "#{{number}} in {{status}}.",
     "movedTo": "Verschoben nach {{column}}",
     "newIn": "Neue Aufgabe in {{column}}",
@@ -4404,6 +4395,54 @@
     "flowHint": "Die Aufgabe wandert von selbst in die erste Spalte jeder Phase: In Arbeit, wenn ein Agent beginnt, In Prüfung, wenn sie bereit zur Prüfung ist, Erledigt, wenn du freigibst.",
     "moreOptions": "Weitere Optionen",
     "showCanceled": "Abgebrochene anzeigen",
+    "filterButton": "Filtern",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ich",
+    "display": {
+      "title": "Darstellung",
+      "label": "Darstellung: {{layout}} · {{group}}",
+      "layout": "Anordnung",
+      "group": "Gruppieren nach",
+      "sort": "Sortieren nach",
+      "fields": "Auf den Karten",
+      "saved": "Für dich in diesem Workspace gespeichert",
+      "reset": "Zurück zum Standard",
+      "by": {
+        "stage": "Phase",
+        "assignee": "Zuständig",
+        "priority": "Priorität"
+      },
+      "order": {
+        "manual": "Manuell",
+        "priority": "Priorität",
+        "due": "Fälligkeit"
+      },
+      "field": {
+        "assignee": "Zuständig",
+        "priority": "Priorität",
+        "due": "Fälligkeit",
+        "criteria": "Kriterien",
+        "pullRequest": "Pull-Request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "In {{name}} ablegen",
+      "assignee": "Ablegen, um sie {{name}} zu geben",
+      "unassign": "Ablegen, um die Zuständigkeit zu entfernen",
+      "priority": "Ablegen für Priorität {{priority}}"
+    },
+    "drag": {
+      "role": "verschiebbare Aufgabe",
+      "help": "Leertaste nimmt die Aufgabe, die Pfeiltasten verschieben sie, Leertaste legt sie ab und Esc bricht ab.",
+      "picked": "Du hast #{{number}} aufgenommen. Die Pfeiltasten verschieben sie, Leertaste legt sie ab, Esc bricht ab.",
+      "moved": "#{{number}}: {{group}}, Position {{position}} von {{total}}.",
+      "dropped": "Du hast #{{number}} in {{group}} abgelegt.",
+      "canceled": "#{{number}} ist wieder an ihrem Platz.",
+      "assigned": "#{{number}} liegt jetzt bei {{name}}.",
+      "unassigned": "#{{number}} ist jetzt niemandem zugewiesen.",
+      "prioritized": "#{{number}} hat jetzt Priorität {{priority}}."
+    },
     "canceledColumn": "Abgebrochen",
     "columns": {
       "add": "Spalte hinzufügen",

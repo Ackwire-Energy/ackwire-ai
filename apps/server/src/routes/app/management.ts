@@ -14,6 +14,12 @@ import {
   getOrgSettings,
   getRun,
   INVITE_NOTE_MAX,
+  ISSUES_GROUPS,
+  ISSUES_LAYOUTS,
+  ISSUES_SORTS,
+  ISSUES_VIEW_ASSIGNEE,
+  ISSUES_VIEW_MAX_ASSIGNEES,
+  ISSUES_VIEW_PRIORITIES,
   inviteMany,
   listAgentChannels,
   listInvitationsWithStatus,
@@ -22,6 +28,7 @@ import {
   makeDefaultCredential,
   memberPresence,
   memberStatus,
+  myIssuesView,
   mySidebarItems,
   mySidebarOrder,
   orgOverview,
@@ -42,6 +49,7 @@ import {
   seesAgentDetails,
   setAgentChannels,
   setInvitationRoles,
+  setMyIssuesView,
   setMySidebarItem,
   setMySidebarItems,
   setMySidebarOrder,
@@ -73,6 +81,31 @@ const SidebarItems = z
   .openapi("SidebarItems", {
     description:
       "Where each tool at the top of the sidebar goes: `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero (approvals and threads). A tool left out keeps the app's default.",
+  });
+
+/** What a card shows besides its number and title (`ISSUE_CARD_FIELDS`). */
+const IssueCardFields = z.object({
+  assignee: z.boolean(),
+  priority: z.boolean(),
+  due: z.boolean(),
+  criteria: z.boolean(),
+  pullRequest: z.boolean(),
+  label: z.boolean(),
+});
+
+const IssuesView = z
+  .object({
+    layout: z.enum(ISSUES_LAYOUTS),
+    group: z.enum(ISSUES_GROUPS),
+    sort: z.enum(ISSUES_SORTS),
+    fields: IssueCardFields,
+    assignees: z.array(z.string().regex(ISSUES_VIEW_ASSIGNEE)).max(ISSUES_VIEW_MAX_ASSIGNEES),
+    priorities: z.array(z.enum(ISSUES_VIEW_PRIORITIES)).max(ISSUES_VIEW_PRIORITIES.length),
+    showCanceled: z.boolean(),
+  })
+  .openapi("IssuesView", {
+    description:
+      "How you look at Tarefas in one workspace: `board` or `list`, grouped by `stage`, `assignee` or `priority`, in `manual` order (the board's) or by `priority` or `due` date, what the cards show (`fields`), the assignee filter (`agent:<id>`, `person:<id>`, `none`) and the priority filter (empty: every task), and whether canceled tasks show.",
   });
 
 const Settings = z
@@ -696,6 +729,42 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       return c.json({ items: await setMySidebarItems(db, orgId, c.get("user").id, c.req.valid("json").items) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/issues-view",
+      tags: ["Members"],
+      security,
+      summary: "How you look at Tarefas in this workspace",
+      description:
+        "Yours alone, on every device you sign in on; the default until you change it. The search is never kept.",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ view: IssuesView })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ view: await myIssuesView(db, orgId, c.get("user").id) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/issues-view",
+      tags: ["Members"],
+      security,
+      summary: "Keep how you look at Tarefas in this workspace",
+      description:
+        "Replaces your view with this one. Answers with what was kept: an assignee filter repeated is kept once.",
+      request: { params: OrgParams, body: body(z.object({ view: IssuesView })) },
+      responses: { 200: json(z.object({ view: IssuesView })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ view: await setMyIssuesView(db, orgId, c.get("user").id, c.req.valid("json").view) }, 200);
     },
   );
 

@@ -4205,7 +4205,6 @@
     }
   },
   "issues": {
-    "moreFilters": "담당자와 우선순위로 필터",
     "assigneeFilter": "담당자",
     "priorityFilter": "우선순위",
     "title": "작업",
@@ -4216,19 +4215,11 @@
     "list": "목록",
     "new": "새 작업",
     "filters": "작업 필터",
-    "filter": {
-      "all": "전체",
-      "agents": "에이전트 담당",
-      "people": "사람 담당",
-      "mine": "내 작업",
-      "none": "담당자 없음"
-    },
     "unassigned_other": "담당자 없음 {{count}}개",
     "emptyTitle": "아직 작업이 없어요",
     "panelLabel": "작업 #{{number}}",
     "openPage": "작업 페이지 열기",
     "close": "닫기",
-    "dropHere": "여기에 놓기",
     "moved": "#{{number}}을(를) {{status}}(으)로 옮겼어요.",
     "movedTo": "{{column}}(으)로 이동",
     "newIn": "{{column}}에 새 작업",
@@ -4238,6 +4229,54 @@
     "flowHint": "작업은 각 단계의 첫 열로 알아서 이동해요. 에이전트가 시작하면 진행 중, 확인할 준비가 되면 검토 중, 승인하면 완료로 가요.",
     "moreOptions": "옵션 더 보기",
     "showCanceled": "취소된 작업 보기",
+    "filterButton": "필터",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "나",
+    "display": {
+      "title": "표시",
+      "label": "표시: {{layout}} · {{group}}",
+      "layout": "레이아웃",
+      "group": "그룹 기준",
+      "sort": "정렬 기준",
+      "fields": "카드에 표시",
+      "saved": "이 워크스페이스에 내 설정으로 저장돼요",
+      "reset": "기본값으로 되돌리기",
+      "by": {
+        "stage": "단계",
+        "assignee": "담당자",
+        "priority": "우선순위"
+      },
+      "order": {
+        "manual": "수동",
+        "priority": "우선순위",
+        "due": "마감일"
+      },
+      "field": {
+        "assignee": "담당자",
+        "priority": "우선순위",
+        "due": "마감일",
+        "criteria": "조건",
+        "pullRequest": "풀 리퀘스트",
+        "label": "라벨"
+      }
+    },
+    "drop": {
+      "stage": "{{name}}에 놓기",
+      "assignee": "놓아서 {{name}}에게 맡기기",
+      "unassign": "놓아서 담당자 빼기",
+      "priority": "놓아서 우선순위를 {{priority}}(으)로"
+    },
+    "drag": {
+      "role": "끌 수 있는 작업",
+      "help": "스페이스로 작업을 집고, 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
+      "picked": "#{{number}}을(를) 집었어요. 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
+      "moved": "#{{number}}: {{group}}, {{total}}개 중 {{position}}번째예요.",
+      "dropped": "#{{number}}을(를) {{group}}에 놓았어요.",
+      "canceled": "#{{number}}이(가) 제자리로 돌아갔어요.",
+      "assigned": "#{{number}}은(는) 이제 {{name}} 담당이에요.",
+      "unassigned": "#{{number}}에 이제 담당자가 없어요.",
+      "prioritized": "#{{number}}의 우선순위가 이제 {{priority}}이에요."
+    },
     "canceledColumn": "취소됨",
     "columns": {
       "add": "열 추가",

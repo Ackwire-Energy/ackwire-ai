@@ -1,9 +1,10 @@
 /*
- * Tarefas (issues in the code): agents working now, the
- * org's board (custom columns inside fixed stages; drag between and inside
- * columns) or a list, and the details (the shared details dialog, or the
- * task's own page). Pixel pieces: CriteriaPixels and WorkSweep from
- * @agenteschat/ui (their holders are `position: relative`).
+ * Tarefas (issues in the code): agents working now, the tasks as a board or a
+ * list (grouped by stage, with the org's custom columns inside fixed stages, by
+ * assignee or by priority; cards drag between and inside groups, issue-drag.ts),
+ * and the details (the shared details dialog, or the task's own page). Pixel
+ * pieces: CriteriaPixels and WorkSweep from @agenteschat/ui (their holders are
+ * `position: relative`).
  */
 .issues {
   max-width: none;
@@ -156,11 +157,127 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   color: var(--ink);
 }
 
-/* ── Toolbar end: Quadro/Lista and "Mais opções" ─────────────────────────── */
+/* ── Toolbar end: "Exibição" and "Mais opções" ──────────────────────────── */
 .issues-tools {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+.issues-display__trigger.ac-btn {
+  gap: 6px;
+}
+.issues-display__sub {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+.issues-display__trigger .issues-display__chev {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-muted);
+}
+
+/* "Exibição": layout cards with their pictures, the grouping, the order, what the cards show, canceled ones. */
+.issues-display.ac-popover {
+  width: 344px;
+  max-width: calc(100vw - 24px);
+  max-height: none;
+  padding: 14px;
+  gap: 14px;
+}
+.issues-layouts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.issues-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 8px;
+  border: 0;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--raised);
+  box-shadow:
+    0 0 0 1px var(--line2),
+    var(--e1);
+  color: var(--ink2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s,
+    background-color 0.15s;
+}
+.issues-layout[aria-pressed="true"] {
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+  color: var(--ink);
+}
+html:not([data-pointer]) .issues-layout:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.issues-mini {
+  image-rendering: pixelated;
+}
+.issues-mini__well {
+  fill: var(--sunken);
+}
+.issues-mini__card {
+  fill: var(--raised);
+  stroke: var(--line2);
+  stroke-width: 0.5;
+}
+.issues-mini__ink {
+  fill: var(--ink);
+}
+.issues-display__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.issues-display__row--col {
+  flex-direction: column;
+  align-items: stretch;
+}
+.issues-display__label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.issues-display__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.issues-display__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.issues-display__foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.issues-display__foot .ac-icon {
+  color: var(--ok);
+}
+.issues-display__reset {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
 }
 
 /* ── Board ──────────────────────────────────────────────────────────────── */
@@ -229,9 +346,9 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
     background 0.15s,
     box-shadow 0.15s;
 }
+/* Where the moving card would land lights up. */
 .issues-col.is-over {
-  background: color-mix(in srgb, var(--sunken) 86%, var(--ink) 6%);
-  box-shadow: inset 0 0 0 1.5px var(--line2);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ink) 22%, transparent);
 }
 .issues-col.is-canceled {
   opacity: 0.8;
@@ -254,7 +371,7 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.issues-col__head > span {
+.issues-col__head > .tabular {
   font-size: 12.5px;
   color: var(--faint);
 }
@@ -279,20 +396,18 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   display: flex;
   flex-direction: column;
 }
-/* Where a dragged card lands. */
-.issues-col__line {
-  height: 3px;
-  margin: -3px 4px;
-  border-radius: 2px;
-  background: var(--ink);
-  opacity: 0.55;
-}
-.issues-col__empty {
+/* Empty: compact and calm; it says where a card would land only while one moves. */
+.issues-col__empty,
+.issues-col__drop {
   margin: 0;
-  padding: 22px 8px;
+  padding: 14px 8px;
   text-align: center;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: var(--faint);
+}
+.issues-col__drop {
+  color: var(--ink2);
+  font-weight: 600;
 }
 .issues-col__add.ac-btn {
   margin-top: 6px;
@@ -323,9 +438,6 @@ html:not([data-pointer]) .issues-now__card:focus-visible {
   transform: translateY(-2px);
   box-shadow: var(--e2), var(--top);
 }
-.issue-card.is-dragging {
-  opacity: 0.4;
-}
 html:not([data-pointer]) .issue-card:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -335,13 +447,18 @@ html:not([data-pointer]) .issue-card:focus-visible {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
+/* The top line wraps whole pieces: a label never splits from its dot. */
 .issue-card__top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px 6px;
   min-width: 0;
   font-size: 12px;
   color: var(--faint);
+}
+.issue-card__top > span {
+  white-space: nowrap;
 }
 .issue-card__grow {
   flex: 1;
@@ -428,8 +545,20 @@ html:not([data-pointer]) .issue-card:focus-visible {
 .issue-card__foot {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
+}
+/* Nobody has it: an empty place the size of a face, before the words. */
+.issue-nobody {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border-bottom-left-radius: var(--radius-cut);
+  box-shadow: inset 0 0 0 1.5px var(--line2);
+  color: var(--faint);
 }
 .issue-card .ac-chip,
 .issue-list__row .ac-chip {
@@ -481,7 +610,7 @@ html:not([data-pointer]) .issue-card:focus-visible {
   font-weight: 650;
   color: var(--ink2);
 }
-.issues-group__title span {
+.issues-group__title > .tabular {
   font-weight: 500;
   font-size: 12.5px;
   color: var(--faint);
@@ -490,6 +619,11 @@ html:not([data-pointer]) .issue-card:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  border-radius: var(--radius-section);
+  transition: background-color 0.18s;
+}
+.issues-group__col.is-over {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
 .issues-group__col + .issues-group__col {
   margin-top: 6px;
@@ -504,7 +638,7 @@ html:not([data-pointer]) .issue-card:focus-visible {
   font-weight: 600;
   color: var(--muted);
 }
-.issues-group__sub span {
+.issues-group__sub > .tabular {
   font-weight: 500;
   color: var(--faint);
 }
@@ -574,6 +708,99 @@ html:not([data-pointer]) .issue-list__row:focus-visible {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+/* An empty group while a card moves: what a drop there does. */
+.issue-list__drop {
+  padding: 12px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+
+/* ── Moving cards (issue-drag.ts) ───────────────────────────────────────── */
+.issue-card,
+.issue-list__row {
+  cursor: grab;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
+body.issues-dragging,
+body.issues-dragging * {
+  cursor: grabbing !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.issues [data-slot][hidden] {
+  display: none !important;
+}
+/* Sent back: hidden in its place until its copy lands there. */
+.issues [data-landing] {
+  visibility: hidden;
+}
+/* The copy under the pointer, above the page. */
+.issue-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: var(--z-floating);
+  pointer-events: none;
+  will-change: transform;
+  transform-origin: 30% 20%;
+}
+.issue-ghost > .issue-card,
+.issue-ghost .issue-list__row {
+  background: var(--raised);
+  box-shadow: var(--e3);
+}
+.issue-ghost > .issue-list {
+  box-shadow: var(--e3);
+}
+/* Where it would land: a well in fine pixels, the card's size and corners. */
+.issue-spot {
+  box-sizing: border-box;
+  flex: none;
+  border-radius: 16px;
+  background:
+    repeating-conic-gradient(color-mix(in srgb, var(--ink) 12%, transparent) 0 25%, transparent 0 50%) 0 0 / 4px 4px,
+    var(--sunken);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ink) 18%, transparent);
+  transform-origin: top;
+}
+.issue-spot--row {
+  margin: 2px 0;
+  border-radius: 12px;
+  list-style: none;
+}
+/* Picked with Space: lifted and ringed while the arrows move it. */
+.issue-card.is-picked {
+  outline: none;
+  box-shadow:
+    var(--e3),
+    0 0 0 2px var(--ink);
+  transform: translateY(-3px) rotate(-1deg);
+  transition: transform 0.18s var(--spring);
+}
+/* A row sits in its list's clipped box: the ring goes inside. */
+.issue-list__row.is-picked {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.issues [data-count] {
+  display: inline-block;
+}
+.issue-burst {
+  position: fixed;
+  z-index: var(--z-floating);
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+@media (prefers-reduced-motion: reduce) {
+  .issue-card.is-picked {
+    transform: none;
+  }
 }
 
 /* ── New issue ──────────────────────────────────────────────────────────── */

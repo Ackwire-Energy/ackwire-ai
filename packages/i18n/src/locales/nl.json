@@ -4414,7 +4414,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filteren op toegewezen persoon en prioriteit",
     "assigneeFilter": "Toegewezen aan",
     "priorityFilter": "Prioriteit",
     "title": "Taken",
@@ -4425,20 +4424,12 @@
     "list": "Lijst",
     "new": "Nieuwe taak",
     "filters": "Taken filteren",
-    "filter": {
-      "all": "Alle",
-      "agents": "Bij agents",
-      "people": "Bij mensen",
-      "mine": "Van mij",
-      "none": "Niet toegewezen"
-    },
     "unassigned_one": "{{count}} niet toegewezen",
     "unassigned_other": "{{count}} niet toegewezen",
     "emptyTitle": "Nog geen taken",
     "panelLabel": "Taak #{{number}}",
     "openPage": "De pagina van de taak openen",
     "close": "Sluiten",
-    "dropHere": "Hier loslaten",
     "moved": "#{{number}} in {{status}}.",
     "movedTo": "Verplaatst naar {{column}}",
     "newIn": "Nieuwe taak in {{column}}",
@@ -4448,6 +4439,54 @@
     "flowHint": "De taak verschuift vanzelf naar de eerste kolom van elke fase: Bezig als een agent begint, Ter controle als hij klaar is om te checken, Klaar als jij hem goedkeurt.",
     "moreOptions": "Meer opties",
     "showCanceled": "Geannuleerde tonen",
+    "filterButton": "Filteren",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ik",
+    "display": {
+      "title": "Weergave",
+      "label": "Weergave: {{layout}} · {{group}}",
+      "layout": "Indeling",
+      "group": "Groeperen op",
+      "sort": "Sorteren op",
+      "fields": "Op de kaarten",
+      "saved": "Voor jou bewaard in deze werkruimte",
+      "reset": "Terug naar standaard",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit"
+      },
+      "order": {
+        "manual": "Handmatig",
+        "priority": "Prioriteit",
+        "due": "Deadline"
+      },
+      "field": {
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit",
+        "due": "Deadline",
+        "criteria": "Voorwaarden",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Loslaten in {{name}}",
+      "assignee": "Loslaten om aan {{name}} te geven",
+      "unassign": "Loslaten om de toewijzing weg te halen",
+      "priority": "Loslaten voor prioriteit {{priority}}"
+    },
+    "drag": {
+      "role": "versleepbare taak",
+      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
+      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
+      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
+      "canceled": "#{{number}} staat weer op zijn plek.",
+      "assigned": "#{{number}} ligt nu bij {{name}}.",
+      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
+      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
+    },
     "canceledColumn": "Geannuleerd",
     "columns": {
       "add": "Kolom toevoegen",

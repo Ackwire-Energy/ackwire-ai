@@ -4237,7 +4237,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filter menurut penanggung jawab dan prioritas",
     "assigneeFilter": "Penanggung jawab",
     "priorityFilter": "Prioritas",
     "title": "Tugas",
@@ -4248,19 +4247,11 @@
     "list": "Daftar",
     "new": "Tugas baru",
     "filters": "Filter tugas",
-    "filter": {
-      "all": "Semua",
-      "agents": "Dengan agen",
-      "people": "Dengan orang",
-      "mine": "Milikku",
-      "none": "Belum ditugaskan"
-    },
     "unassigned_other": "{{count}} belum ditugaskan",
     "emptyTitle": "Belum ada tugas",
     "panelLabel": "Tugas #{{number}}",
     "openPage": "Buka halaman tugas",
     "close": "Tutup",
-    "dropHere": "Jatuhkan di sini",
     "moved": "#{{number}} di {{status}}.",
     "movedTo": "Dipindahkan ke {{column}}",
     "newIn": "Tugas baru di {{column}}",
@@ -4270,6 +4261,54 @@
     "flowHint": "Tugas berpindah sendiri, ke kolom pertama tiap tahap: Sedang dikerjakan saat agen mulai, Ditinjau saat siap diperiksa, Selesai saat kamu menyetujuinya.",
     "moreOptions": "Opsi lainnya",
     "showCanceled": "Tampilkan yang dibatalkan",
+    "filterButton": "Saring",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Saya",
+    "display": {
+      "title": "Tampilan",
+      "label": "Tampilan: {{layout}} · {{group}}",
+      "layout": "Tata letak",
+      "group": "Kelompokkan menurut",
+      "sort": "Urutkan menurut",
+      "fields": "Di kartu",
+      "saved": "Disimpan untukmu di ruang kerja ini",
+      "reset": "Kembali ke bawaan",
+      "by": {
+        "stage": "Tahap",
+        "assignee": "Penanggung jawab",
+        "priority": "Prioritas"
+      },
+      "order": {
+        "manual": "Manual",
+        "priority": "Prioritas",
+        "due": "Tenggat"
+      },
+      "field": {
+        "assignee": "Penanggung jawab",
+        "priority": "Prioritas",
+        "due": "Tenggat",
+        "criteria": "Kriteria",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Jatuhkan di {{name}}",
+      "assignee": "Jatuhkan untuk memberikannya ke {{name}}",
+      "unassign": "Jatuhkan untuk melepas penanggung jawab",
+      "priority": "Jatuhkan untuk prioritas {{priority}}"
+    },
+    "drag": {
+      "role": "tugas yang bisa diseret",
+      "help": "Spasi mengambil tugas, tombol panah memindahkannya, Spasi menjatuhkannya, dan Esc membatalkan.",
+      "picked": "Kamu mengambil #{{number}}. Tombol panah memindahkannya, Spasi menjatuhkannya, Esc membatalkan.",
+      "moved": "#{{number}}: {{group}}, posisi {{position}} dari {{total}}.",
+      "dropped": "Kamu menjatuhkan #{{number}} di {{group}}.",
+      "canceled": "#{{number}} kembali ke tempatnya.",
+      "assigned": "#{{number}} sekarang dipegang {{name}}.",
+      "unassigned": "#{{number}} sekarang tanpa penanggung jawab.",
+      "prioritized": "#{{number}} sekarang berprioritas {{priority}}."
+    },
     "canceledColumn": "Dibatalkan",
     "columns": {
       "add": "Tambah kolom",

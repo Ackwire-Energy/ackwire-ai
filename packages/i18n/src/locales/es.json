@@ -4493,7 +4493,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filtrar por responsable y prioridad",
     "assigneeFilter": "Responsable",
     "priorityFilter": "Prioridad",
     "title": "Tareas",
@@ -4504,13 +4503,6 @@
     "list": "Lista",
     "new": "Nueva tarea",
     "filters": "Filtrar tareas",
-    "filter": {
-      "all": "Todas",
-      "agents": "Con agentes",
-      "people": "Con personas",
-      "mine": "Mías",
-      "none": "Sin responsable"
-    },
     "unassigned_one": "{{count}} sin responsable",
     "unassigned_many": "{{count}} sin responsable",
     "unassigned_other": "{{count}} sin responsable",
@@ -4518,7 +4510,6 @@
     "panelLabel": "Tarea #{{number}}",
     "openPage": "Abrir la página de la tarea",
     "close": "Cerrar",
-    "dropHere": "Suelta aquí",
     "moved": "#{{number}} en {{status}}.",
     "movedTo": "Movida a {{column}}",
     "newIn": "Nueva tarea en {{column}}",
@@ -4528,6 +4519,54 @@
     "flowHint": "La tarea avanza sola, a la primera columna de cada etapa: En curso cuando un agente empieza, En revisión cuando está lista para revisar, Hecha cuando la apruebas.",
     "moreOptions": "Más opciones",
     "showCanceled": "Mostrar canceladas",
+    "filterButton": "Filtro",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Yo",
+    "display": {
+      "title": "Visualización",
+      "label": "Visualización: {{layout}} · {{group}}",
+      "layout": "Diseño",
+      "group": "Agrupar por",
+      "sort": "Ordenar por",
+      "fields": "En las tarjetas",
+      "saved": "Guardado para ti en este espacio de trabajo",
+      "reset": "Volver a lo predeterminado",
+      "by": {
+        "stage": "Etapa",
+        "assignee": "Responsable",
+        "priority": "Prioridad"
+      },
+      "order": {
+        "manual": "Manual",
+        "priority": "Prioridad",
+        "due": "Fecha límite"
+      },
+      "field": {
+        "assignee": "Responsable",
+        "priority": "Prioridad",
+        "due": "Fecha límite",
+        "criteria": "Criterios",
+        "pullRequest": "Pull request",
+        "label": "Etiqueta"
+      }
+    },
+    "drop": {
+      "stage": "Suelta en {{name}}",
+      "assignee": "Suelta para dársela a {{name}}",
+      "unassign": "Suelta para quitar el responsable",
+      "priority": "Suelta para prioridad {{priority}}"
+    },
+    "drag": {
+      "role": "tarea que se puede arrastrar",
+      "help": "Espacio toma la tarea, las flechas la mueven, Espacio la suelta y Esc cancela.",
+      "picked": "Tomaste la #{{number}}. Las flechas la mueven, Espacio la suelta, Esc cancela.",
+      "moved": "#{{number}}: {{group}}, posición {{position}} de {{total}}.",
+      "dropped": "Soltaste la #{{number}} en {{group}}.",
+      "canceled": "La #{{number}} volvió a su lugar.",
+      "assigned": "La #{{number}} ahora está con {{name}}.",
+      "unassigned": "La #{{number}} quedó sin responsable.",
+      "prioritized": "La #{{number}} ahora tiene prioridad {{priority}}."
+    },
     "canceledColumn": "Canceladas",
     "columns": {
       "add": "Agregar columna",

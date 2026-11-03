@@ -4252,7 +4252,6 @@
     }
   },
   "issues": {
-    "moreFilters": "按负责人和优先级筛选",
     "assigneeFilter": "负责人",
     "priorityFilter": "优先级",
     "title": "任务",
@@ -4263,19 +4262,11 @@
     "list": "列表",
     "new": "新建任务",
     "filters": "筛选任务",
-    "filter": {
-      "all": "全部",
-      "agents": "由智能体负责",
-      "people": "由成员负责",
-      "mine": "我的",
-      "none": "未分配"
-    },
     "unassigned_other": "{{count}} 个未分配",
     "emptyTitle": "还没有任务",
     "panelLabel": "任务 #{{number}}",
     "openPage": "打开任务页面",
     "close": "关闭",
-    "dropHere": "拖放到这里",
     "moved": "#{{number}} 已移至{{status}}。",
     "movedTo": "已移至{{column}}",
     "newIn": "在{{column}}中新建任务",
@@ -4285,6 +4276,54 @@
     "flowHint": "任务会自动移到每个阶段的第一列：智能体开始时移到“进行中”，可以检查时移到“审核中”，你批准后移到“已完成”。",
     "moreOptions": "更多选项",
     "showCanceled": "显示已取消",
+    "filterButton": "筛选",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "我",
+    "display": {
+      "title": "显示",
+      "label": "显示：{{layout}} · {{group}}",
+      "layout": "布局",
+      "group": "分组依据",
+      "sort": "排序依据",
+      "fields": "卡片上显示",
+      "saved": "已在此工作区为你保存",
+      "reset": "恢复默认",
+      "by": {
+        "stage": "阶段",
+        "assignee": "负责人",
+        "priority": "优先级"
+      },
+      "order": {
+        "manual": "手动",
+        "priority": "优先级",
+        "due": "截止日期"
+      },
+      "field": {
+        "assignee": "负责人",
+        "priority": "优先级",
+        "due": "截止日期",
+        "criteria": "标准",
+        "pullRequest": "拉取请求",
+        "label": "标签"
+      }
+    },
+    "drop": {
+      "stage": "放到{{name}}",
+      "assignee": "放下以交给{{name}}",
+      "unassign": "放下以移除负责人",
+      "priority": "放下以设为{{priority}}优先级"
+    },
+    "drag": {
+      "role": "可拖动的任务",
+      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
+      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
+      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
+      "dropped": "你把 #{{number}} 放到了{{group}}。",
+      "canceled": "#{{number}} 回到了原位。",
+      "assigned": "#{{number}} 现在由{{name}}负责。",
+      "unassigned": "#{{number}} 现在没有负责人。",
+      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
+    },
     "canceledColumn": "已取消",
     "columns": {
       "add": "添加列",

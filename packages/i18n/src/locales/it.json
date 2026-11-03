@@ -4550,7 +4550,6 @@
     }
   },
   "issues": {
-    "moreFilters": "Filtra per assegnatario e priorità",
     "assigneeFilter": "Assegnatario",
     "priorityFilter": "Priorità",
     "title": "Attività",
@@ -4561,13 +4560,6 @@
     "list": "Elenco",
     "new": "Nuova attività",
     "filters": "Filtra attività",
-    "filter": {
-      "all": "Tutte",
-      "agents": "Con agenti",
-      "people": "Con persone",
-      "mine": "Mie",
-      "none": "Non assegnate"
-    },
     "unassigned_one": "{{count}} non assegnata",
     "unassigned_many": "{{count}} non assegnate",
     "unassigned_other": "{{count}} non assegnate",
@@ -4575,7 +4567,6 @@
     "panelLabel": "Attività #{{number}}",
     "openPage": "Apri la pagina dell'attività",
     "close": "Chiudi",
-    "dropHere": "Rilascia qui",
     "moved": "#{{number}} in {{status}}.",
     "movedTo": "Spostata in {{column}}",
     "newIn": "Nuova attività in {{column}}",
@@ -4585,6 +4576,54 @@
     "flowHint": "L'attività si sposta da sola, nella prima colonna di ogni fase: In corso quando un agente inizia, In revisione quando è pronta da verificare, Fatto quando approvi.",
     "moreOptions": "Altre opzioni",
     "showCanceled": "Mostra annullate",
+    "filterButton": "Filtro",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Io",
+    "display": {
+      "title": "Visualizzazione",
+      "label": "Visualizzazione: {{layout}} · {{group}}",
+      "layout": "Disposizione",
+      "group": "Raggruppa per",
+      "sort": "Ordina per",
+      "fields": "Sulle schede",
+      "saved": "Salvato per te in questo spazio di lavoro",
+      "reset": "Torna all'impostazione predefinita",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Assegnatario",
+        "priority": "Priorità"
+      },
+      "order": {
+        "manual": "Manuale",
+        "priority": "Priorità",
+        "due": "Scadenza"
+      },
+      "field": {
+        "assignee": "Assegnatario",
+        "priority": "Priorità",
+        "due": "Scadenza",
+        "criteria": "Criteri",
+        "pullRequest": "Pull request",
+        "label": "Etichetta"
+      }
+    },
+    "drop": {
+      "stage": "Rilascia in {{name}}",
+      "assignee": "Rilascia per assegnarla a {{name}}",
+      "unassign": "Rilascia per togliere l'assegnatario",
+      "priority": "Rilascia per priorità {{priority}}"
+    },
+    "drag": {
+      "role": "attività trascinabile",
+      "help": "Spazio prende l'attività, le frecce la spostano, Spazio la rilascia ed Esc annulla.",
+      "picked": "Hai preso la #{{number}}. Le frecce la spostano, Spazio la rilascia, Esc annulla.",
+      "moved": "#{{number}}: {{group}}, posizione {{position}} di {{total}}.",
+      "dropped": "Hai rilasciato la #{{number}} in {{group}}.",
+      "canceled": "La #{{number}} è tornata al suo posto.",
+      "assigned": "La #{{number}} ora è di {{name}}.",
+      "unassigned": "La #{{number}} ora non ha un assegnatario.",
+      "prioritized": "La #{{number}} ora ha priorità {{priority}}."
+    },
     "canceledColumn": "Annullate",
     "columns": {
       "add": "Aggiungi colonna",

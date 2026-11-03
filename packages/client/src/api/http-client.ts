@@ -99,6 +99,7 @@ import type {
   Issue,
   IssueActivity,
   IssueColumn,
+  IssuesView,
   JevKey,
   JoinApproval,
   JoinClaim,
@@ -498,6 +499,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: { order },
           })
         ).order,
+      issuesView: async (orgId) => (await request<{ view: IssuesView }>(`${org(orgId)}/me/issues-view`)).view,
+      setIssuesView: async (orgId, view) =>
+        (await request<{ view: IssuesView }>(`${org(orgId)}/me/issues-view`, { method: "PUT", json: { view } })).view,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>

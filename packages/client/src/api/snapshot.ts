@@ -39,7 +39,8 @@ interface Snapshot {
 
 /**
  * `["org", orgId, <list>]`: the lists the shell and the chat need right away. Where I put the sidebar's tools too, and
- * the overview with its count of the approvals waiting for me, so no tool moves in once the server answers.
+ * the overview with its count of the approvals waiting for me, so no tool moves in once the server answers; and how I
+ * look at Tarefas, so the board doesn't open as the default and then turn into my list.
  */
 const ORG_LISTS = new Set([
   "channels",
@@ -51,6 +52,7 @@ const ORG_LISTS = new Set([
   "detail",
   "sidebar-items",
   "overview",
+  "issues-view",
 ]);
 /** `["org", orgId, "channel", channelId, <part>]`: kept for the chats in the snapshot. */
 const CHAT_PARTS = new Set(["messages", "roster", "members"]);

@@ -4209,7 +4209,6 @@
     }
   },
   "issues": {
-    "moreFilters": "担当者と優先度で絞り込む",
     "assigneeFilter": "担当者",
     "priorityFilter": "優先度",
     "title": "タスク",
@@ -4220,19 +4219,11 @@
     "list": "リスト",
     "new": "新しいタスク",
     "filters": "タスクを絞り込む",
-    "filter": {
-      "all": "すべて",
-      "agents": "エージェント担当",
-      "people": "人が担当",
-      "mine": "自分の担当",
-      "none": "未割り当て"
-    },
     "unassigned_other": "未割り当て{{count}}件",
     "emptyTitle": "タスクはまだありません",
     "panelLabel": "タスク #{{number}}",
     "openPage": "タスクのページを開く",
     "close": "閉じる",
-    "dropHere": "ここにドロップ",
     "moved": "#{{number}}を{{status}}に移動しました。",
     "movedTo": "{{column}}に移動しました",
     "newIn": "{{column}}に新しいタスク",
@@ -4242,6 +4233,54 @@
     "flowHint": "タスクは各段階の最初の列へ自動で移動します。エージェントが始めると「進行中」、確認の準備ができると「レビュー中」、あなたが承認すると「完了」へ。",
     "moreOptions": "その他のオプション",
     "showCanceled": "キャンセル済みを表示",
+    "filterButton": "フィルター",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "自分",
+    "display": {
+      "title": "表示設定",
+      "label": "表示設定：{{layout}} · {{group}}",
+      "layout": "レイアウト",
+      "group": "グループ化",
+      "sort": "並べ替え",
+      "fields": "カードに表示",
+      "saved": "このワークスペースであなた用に保存されます",
+      "reset": "デフォルトに戻す",
+      "by": {
+        "stage": "段階",
+        "assignee": "担当者",
+        "priority": "優先度"
+      },
+      "order": {
+        "manual": "手動",
+        "priority": "優先度",
+        "due": "期日"
+      },
+      "field": {
+        "assignee": "担当者",
+        "priority": "優先度",
+        "due": "期日",
+        "criteria": "条件",
+        "pullRequest": "プルリクエスト",
+        "label": "ラベル"
+      }
+    },
+    "drop": {
+      "stage": "{{name}}にドロップ",
+      "assignee": "ドロップして{{name}}に渡す",
+      "unassign": "ドロップして担当者を外す",
+      "priority": "ドロップして優先度を{{priority}}にする"
+    },
+    "drag": {
+      "role": "ドラッグできるタスク",
+      "help": "スペースでタスクを持ち上げ、矢印キーで移動し、スペースで置き、Escでキャンセルします。",
+      "picked": "#{{number}}を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
+      "moved": "#{{number}}：{{group}}、{{total}}件中{{position}}番目。",
+      "dropped": "#{{number}}を{{group}}に置きました。",
+      "canceled": "#{{number}}は元の場所に戻りました。",
+      "assigned": "#{{number}}の担当は{{name}}になりました。",
+      "unassigned": "#{{number}}の担当者がいなくなりました。",
+      "prioritized": "#{{number}}の優先度は{{priority}}になりました。"
+    },
     "canceledColumn": "キャンセル済み",
     "columns": {
       "add": "列を追加",
