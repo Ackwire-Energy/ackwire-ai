@@ -1941,6 +1941,9 @@
       "created": "把学到的内容整理成了技能 <b>{{name}}</b>",
       "updated": "修正了技能 <b>{{name}}</b>"
     },
+    "agent": {
+      "settings_changed": "更改了 <b>{{agentName}}</b> 的设置"
+    },
     "other": "做了一项更改",
     "copyWebhook": "复制 Webhook 地址",
     "issueFields": {
@@ -2878,6 +2881,14 @@
     "nameLabel": "名称",
     "roleLabel": "角色",
     "roleHelp": "它为团队做什么，例如：邮件和日历助理。",
+    "editName": "编辑名称：{{name}}",
+    "editHandle": "编辑提及：@{{handle}}",
+    "editRole": "编辑角色：{{role}}",
+    "noRole": "无角色",
+    "rolePlaceholder": "例如：客服",
+    "roleList": "角色列表",
+    "roleUse": "使用“{{role}}”",
+    "roleCurrent": "当前",
     "edit": "编辑",
     "chat": "聊天",
     "moreActions": "更多操作",
@@ -2926,15 +2937,7 @@
     "budgetDefaultHelp": "留空：使用工作区默认值。",
     "budgetDefaultHelpAmount": "留空：使用工作区默认值（{{amount}}）。",
     "budgetInvalid": "请输入大于零的值。",
-    "notFound": "该智能体不存在或已归档。",
-    "editName": "编辑名称：{{name}}",
-    "editHandle": "编辑提及：@{{handle}}",
-    "editRole": "编辑角色：{{role}}",
-    "noRole": "无角色",
-    "rolePlaceholder": "例如：客服",
-    "roleList": "角色列表",
-    "roleUse": "使用“{{role}}”",
-    "roleCurrent": "当前"
+    "notFound": "该智能体不存在或已归档。"
   },
   "agentPage": {
     "work": {
@@ -4018,20 +4021,6 @@
     },
     "dialog": {
       "title": "邀请加入 {{org}}",
-      "emails": "邮箱",
-      "moreEmails": "更多邮箱…",
-      "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
-      "withNote": "附带留言",
-      "alsoJoin": "同时加入",
-      "generalAlways": "所有人都会加入 #{{channel}}",
-      "note": "邮件中的留言",
-      "optional": "（可选）",
-      "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
-      "or": "或发送链接",
-      "send_other": "邀请 {{count}} 人",
-      "sent": "已向 {{email}} 发送邀请。",
-      "sentMany": "已发送 {{count}} 份邀请。",
-      "alsoIn": "他们也会加入 {{channels}}。",
       "stepOf": "第 {{n}} 步，共 {{total}} 步 · {{step}}",
       "steps": {
         "who": "邀请谁",
@@ -4039,9 +4028,23 @@
         "where": "加入频道",
         "note": "留言"
       },
+      "emails": "邮箱",
+      "moreEmails": "更多邮箱…",
+      "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
       "pasteHelp": "也可以粘贴一个列表：用逗号、空格分隔，或每行一个。",
       "leftOut": "已经在这里或已被邀请的人不会再收到邀请。",
+      "withNote": "附带留言",
+      "alsoJoin": "同时加入",
+      "generalAlways": "所有人都会加入 #{{channel}}",
+      "note": "邮件中的留言",
+      "optional": "（可选）",
+      "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
+      "or": "或发送链接",
       "continueWith": "继续（{{count}} 人）",
+      "send_other": "邀请 {{count}} 人",
+      "sent": "已向 {{email}} 发送邀请。",
+      "sentMany": "已发送 {{count}} 份邀请。",
+      "alsoIn": "他们也会加入 {{channels}}。",
       "who": {
         "title": "你想邀请谁？",
         "lead": "把邮箱告诉我。每个人都会收到邀请，并直接加入。"
@@ -4425,6 +4428,54 @@
     "flowHint": "任务会自动移到每个阶段的第一列：智能体开始时移到“进行中”，可以检查时移到“审核中”，你批准后移到“已完成”。",
     "moreOptions": "更多选项",
     "showCanceled": "显示已取消",
+    "filterButton": "筛选",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "我",
+    "display": {
+      "title": "显示",
+      "label": "显示：{{layout}} · {{group}}",
+      "layout": "布局",
+      "group": "分组依据",
+      "sort": "排序依据",
+      "fields": "卡片上显示",
+      "saved": "已在此工作区为你保存",
+      "reset": "恢复默认",
+      "by": {
+        "stage": "阶段",
+        "assignee": "负责人",
+        "priority": "优先级"
+      },
+      "order": {
+        "manual": "手动",
+        "priority": "优先级",
+        "due": "截止日期"
+      },
+      "field": {
+        "assignee": "负责人",
+        "priority": "优先级",
+        "due": "截止日期",
+        "criteria": "标准",
+        "pullRequest": "拉取请求",
+        "label": "标签"
+      }
+    },
+    "drop": {
+      "stage": "放到{{name}}",
+      "assignee": "放下以交给{{name}}",
+      "unassign": "放下以移除负责人",
+      "priority": "放下以设为{{priority}}优先级"
+    },
+    "drag": {
+      "role": "可拖动的任务",
+      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
+      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
+      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
+      "dropped": "你把 #{{number}} 放到了{{group}}。",
+      "canceled": "#{{number}} 回到了原位。",
+      "assigned": "#{{number}} 现在由{{name}}负责。",
+      "unassigned": "#{{number}} 现在没有负责人。",
+      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
+    },
     "canceledColumn": "已取消",
     "columns": {
       "add": "添加列",
@@ -4667,54 +4718,6 @@
       "agent_asked": "请 {{name}} 来完成",
       "forum_opened": "将它提交到论坛：{{title}}",
       "forum_evaluated": "带回了论坛的结果：{{title}}"
-    },
-    "filterButton": "筛选",
-    "filterValue": "{{filter}}：{{value}}",
-    "me": "我",
-    "display": {
-      "title": "显示",
-      "label": "显示：{{layout}} · {{group}}",
-      "layout": "布局",
-      "group": "分组依据",
-      "sort": "排序依据",
-      "fields": "卡片上显示",
-      "saved": "已在此工作区为你保存",
-      "reset": "恢复默认",
-      "by": {
-        "stage": "阶段",
-        "assignee": "负责人",
-        "priority": "优先级"
-      },
-      "order": {
-        "manual": "手动",
-        "priority": "优先级",
-        "due": "截止日期"
-      },
-      "field": {
-        "assignee": "负责人",
-        "priority": "优先级",
-        "due": "截止日期",
-        "criteria": "标准",
-        "pullRequest": "拉取请求",
-        "label": "标签"
-      }
-    },
-    "drop": {
-      "stage": "放到{{name}}",
-      "assignee": "放下以交给{{name}}",
-      "unassign": "放下以移除负责人",
-      "priority": "放下以设为{{priority}}优先级"
-    },
-    "drag": {
-      "role": "可拖动的任务",
-      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
-      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
-      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
-      "dropped": "你把 #{{number}} 放到了{{group}}。",
-      "canceled": "#{{number}} 回到了原位。",
-      "assigned": "#{{number}} 现在由{{name}}负责。",
-      "unassigned": "#{{number}} 现在没有负责人。",
-      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
     }
   },
   "routines": {
@@ -4898,7 +4901,6 @@
         "artifact": "生成 Drive 中的文档"
       },
       "ahead": "为之后准备好的",
-      "ownActions": "自动执行",
       "createdBy": "由 {{name}} 创建 · {{date}}",
       "nameLabel": "例行工作名称",
       "editName": "编辑名称",
@@ -4915,7 +4917,8 @@
       "reportHint": {
         "always": "即使没有新内容",
         "when_new": "没有新内容时保持安静"
-      }
+      },
+      "ownActions": "自动执行"
     },
     "ownActions": {
       "hint": "每次运行都会在你已连接的应用中直接执行这些操作，无需询问。其中的其他操作会先请人审批，合并、部署和回滚始终需要审批。",

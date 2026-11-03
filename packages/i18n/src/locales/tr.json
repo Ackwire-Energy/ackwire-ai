@@ -1996,6 +1996,9 @@
       "created": "Öğrendiklerimi <b>{{name}}</b> becerisine dönüştürdüm",
       "updated": "<b>{{name}}</b> becerisini düzelttim"
     },
+    "agent": {
+      "settings_changed": "<b>{{agentName}}</b> ayarlarını değiştirdim"
+    },
     "other": "Bir değişiklik yaptım",
     "copyWebhook": "Webhook adresini kopyala",
     "issueFields": {
@@ -2958,6 +2961,14 @@
     "nameLabel": "Ad",
     "roleLabel": "Rol",
     "roleHelp": "Ekip için ne yaptığı, örneğin E-posta ve takvim asistanı.",
+    "editName": "Adı düzenle: {{name}}",
+    "editHandle": "Bahsetmeleri düzenle: @{{handle}}",
+    "editRole": "Rolü düzenle: {{role}}",
+    "noRole": "Rol yok",
+    "rolePlaceholder": "Örn.: Destek",
+    "roleList": "Roller",
+    "roleUse": "“{{role}}” kullan",
+    "roleCurrent": "mevcut",
     "edit": "Düzenle",
     "chat": "Sohbet et",
     "moreActions": "Diğer işlemler",
@@ -3003,15 +3014,7 @@
     "budgetDefaultHelp": "Boş: çalışma alanı varsayılanı.",
     "budgetDefaultHelpAmount": "Boş: çalışma alanı varsayılanı ({{amount}}).",
     "budgetInvalid": "Sıfırdan büyük bir değer girin.",
-    "notFound": "Bu ajan yok ya da arşivlendi.",
-    "editName": "Adı düzenle: {{name}}",
-    "editHandle": "Bahsetmeleri düzenle: @{{handle}}",
-    "editRole": "Rolü düzenle: {{role}}",
-    "noRole": "Rol yok",
-    "rolePlaceholder": "Örn.: Destek",
-    "roleList": "Roller",
-    "roleUse": "“{{role}}” kullan",
-    "roleCurrent": "mevcut"
+    "notFound": "Bu ajan yok ya da arşivlendi."
   },
   "agentPage": {
     "work": {
@@ -4097,21 +4100,6 @@
     },
     "dialog": {
       "title": "{{org}} çalışma alanına davet et",
-      "emails": "E-postalar",
-      "moreEmails": "Daha fazla e-posta…",
-      "checkMarked": "İşaretli e-postaları kontrol edin: bunlara davet gitmeyecek.",
-      "withNote": "notla",
-      "alsoJoin": "Ayrıca şunlara katılırlar",
-      "generalAlways": "Herkes #{{channel}} kanalına katılır",
-      "note": "E-postadaki not",
-      "optional": "(isteğe bağlı)",
-      "notePlaceholder": "Merhaba. {{org}} çalışma alanına katılın: ekip ve ajanlar burada.",
-      "or": "ya da bağlantıyı gönderin",
-      "send_one": "{{count}} kişiyi davet et",
-      "send_other": "{{count}} kişiyi davet et",
-      "sent": "Davet gönderildi: {{email}}.",
-      "sentMany": "{{count}} davet gönderildi.",
-      "alsoIn": "Ayrıca şunlara katılırlar: {{channels}}.",
       "stepOf": "Adım {{n}}/{{total}} · {{step}}",
       "steps": {
         "who": "Kim",
@@ -4119,9 +4107,24 @@
         "where": "Başlangıç kanalları",
         "note": "Not"
       },
+      "emails": "E-postalar",
+      "moreEmails": "Daha fazla e-posta…",
+      "checkMarked": "İşaretli e-postaları kontrol edin: bunlara davet gitmeyecek.",
       "pasteHelp": "İsterseniz bir liste yapıştırın: virgül, boşluk ya da satır başına bir adres.",
       "leftOut": "Zaten katılmış ya da davet edilmiş olanlar dışarıda kalır.",
+      "withNote": "notla",
+      "alsoJoin": "Ayrıca şunlara katılırlar",
+      "generalAlways": "Herkes #{{channel}} kanalına katılır",
+      "note": "E-postadaki not",
+      "optional": "(isteğe bağlı)",
+      "notePlaceholder": "Merhaba. {{org}} çalışma alanına katılın: ekip ve ajanlar burada.",
+      "or": "ya da bağlantıyı gönderin",
       "continueWith": "{{count}} kişiyle devam et",
+      "send_one": "{{count}} kişiyi davet et",
+      "send_other": "{{count}} kişiyi davet et",
+      "sent": "Davet gönderildi: {{email}}.",
+      "sentMany": "{{count}} davet gönderildi.",
+      "alsoIn": "Ayrıca şunlara katılırlar: {{channels}}.",
       "who": {
         "title": "Kimi getirmek istiyorsunuz?",
         "lead": "E-postaları bana verin. Her kişi bir davet alır ve doğrudan katılır."
@@ -4511,6 +4514,54 @@
     "flowHint": "Görev kendiliğinden her aşamanın ilk sütununa geçer: bir ajan başladığında Devam ediyor, kontrole hazır olduğunda İncelemede, siz onayladığınızda Tamamlandı.",
     "moreOptions": "Diğer seçenekler",
     "showCanceled": "İptal edilenleri göster",
+    "filterButton": "Filtre",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ben",
+    "display": {
+      "title": "Görünüm",
+      "label": "Görünüm: {{layout}} · {{group}}",
+      "layout": "Düzen",
+      "group": "Gruplama ölçütü",
+      "sort": "Sıralama ölçütü",
+      "fields": "Kartlarda",
+      "saved": "Bu çalışma alanında sizin için kaydedildi",
+      "reset": "Varsayılana dön",
+      "by": {
+        "stage": "Aşama",
+        "assignee": "Atanan",
+        "priority": "Öncelik"
+      },
+      "order": {
+        "manual": "Elle",
+        "priority": "Öncelik",
+        "due": "Son tarih"
+      },
+      "field": {
+        "assignee": "Atanan",
+        "priority": "Öncelik",
+        "due": "Son tarih",
+        "criteria": "Kriterler",
+        "pullRequest": "Pull request",
+        "label": "Etiket"
+      }
+    },
+    "drop": {
+      "stage": "{{name}} sütununa bırakın",
+      "assignee": "Bırakın, {{name}} üstlensin",
+      "unassign": "Atananı kaldırmak için bırakın",
+      "priority": "Önceliği {{priority}} yapmak için bırakın"
+    },
+    "drag": {
+      "role": "sürüklenebilir görev",
+      "help": "Boşluk tuşu görevi alır, ok tuşları taşır, Boşluk tuşu bırakır ve Esc iptal eder.",
+      "picked": "#{{number}} görevini aldınız. Ok tuşları taşır, Boşluk bırakır, Esc iptal eder.",
+      "moved": "#{{number}}: {{group}}, {{total}} içinde {{position}}. sıra.",
+      "dropped": "#{{number}} bırakıldı: {{group}}.",
+      "canceled": "#{{number}} yerine döndü.",
+      "assigned": "#{{number}} artık {{name}} üzerinde.",
+      "unassigned": "#{{number}} artık kimseye atanmamış.",
+      "prioritized": "#{{number}} artık {{priority}} öncelikli."
+    },
     "canceledColumn": "İptal edildi",
     "columns": {
       "add": "Sütun ekle",
@@ -4749,54 +4800,6 @@
       "agent_asked": "{{name}} ajanından yapmasını istedi",
       "forum_opened": "foruma taşıdı: {{title}}",
       "forum_evaluated": "forumun sonucunu geri getirdi: {{title}}"
-    },
-    "filterButton": "Filtre",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Ben",
-    "display": {
-      "title": "Görünüm",
-      "label": "Görünüm: {{layout}} · {{group}}",
-      "layout": "Düzen",
-      "group": "Gruplama ölçütü",
-      "sort": "Sıralama ölçütü",
-      "fields": "Kartlarda",
-      "saved": "Bu çalışma alanında sizin için kaydedildi",
-      "reset": "Varsayılana dön",
-      "by": {
-        "stage": "Aşama",
-        "assignee": "Atanan",
-        "priority": "Öncelik"
-      },
-      "order": {
-        "manual": "Elle",
-        "priority": "Öncelik",
-        "due": "Son tarih"
-      },
-      "field": {
-        "assignee": "Atanan",
-        "priority": "Öncelik",
-        "due": "Son tarih",
-        "criteria": "Kriterler",
-        "pullRequest": "Pull request",
-        "label": "Etiket"
-      }
-    },
-    "drop": {
-      "stage": "{{name}} sütununa bırakın",
-      "assignee": "Bırakın, {{name}} üstlensin",
-      "unassign": "Atananı kaldırmak için bırakın",
-      "priority": "Önceliği {{priority}} yapmak için bırakın"
-    },
-    "drag": {
-      "role": "sürüklenebilir görev",
-      "help": "Boşluk tuşu görevi alır, ok tuşları taşır, Boşluk tuşu bırakır ve Esc iptal eder.",
-      "picked": "#{{number}} görevini aldınız. Ok tuşları taşır, Boşluk bırakır, Esc iptal eder.",
-      "moved": "#{{number}}: {{group}}, {{total}} içinde {{position}}. sıra.",
-      "dropped": "#{{number}} bırakıldı: {{group}}.",
-      "canceled": "#{{number}} yerine döndü.",
-      "assigned": "#{{number}} artık {{name}} üzerinde.",
-      "unassigned": "#{{number}} artık kimseye atanmamış.",
-      "prioritized": "#{{number}} artık {{priority}} öncelikli."
     }
   },
   "routines": {
@@ -4982,7 +4985,6 @@
         "artifact": "Drive'da bir belgeye dönüşür"
       },
       "ahead": "Sonrası için hazırlandı",
-      "ownActions": "Kendisi yapar",
       "createdBy": "Oluşturan: {{name}} · {{date}}",
       "nameLabel": "Rutinin adı",
       "editName": "Adı düzenle",
@@ -4999,7 +5001,8 @@
       "reportHint": {
         "always": "Yeni bir şey olmasa da",
         "when_new": "Yeni bir şey yoksa sessiz kalır"
-      }
+      },
+      "ownActions": "Kendisi yapar"
     },
     "ownActions": {
       "hint": "Her çalıştırma bunları bağlı uygulamalarında sormadan yapar. Oradaki diğer her işlem önce bir kişinin onayını ister, merge, deploy ve rollback ise her zaman onay ister.",

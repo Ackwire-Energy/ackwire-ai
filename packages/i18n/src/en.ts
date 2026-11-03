@@ -1956,6 +1956,10 @@ export const en = {
       created: "Turned what I learned into the skill <b>{{name}}</b>",
       updated: "Fixed the skill <b>{{name}}</b>",
     },
+    /** A teammate's settings changed from the right hand's card, by the person who clicked Aplicar (ADR 0134). */
+    agent: {
+      settings_changed: "Changed the settings of <b>{{agentName}}</b>",
+    },
     other: "Made a change",
     /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */
     copyWebhook: "Copy webhook address",

@@ -1,6 +1,7 @@
-import { and, type Database, eq, inArray, schema } from "@agenteschat/db";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import {
   announceMessageMemories,
+  askProposal,
   type ContextItem,
   decideProposal,
   editContextItem,
@@ -16,6 +17,8 @@ import {
   type Proposal as ProposalRow,
   requirePermission,
   revertMemoryChange,
+  SETTING_GROUP,
+  settingsGroup,
   userVisibleChannels,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -97,6 +100,9 @@ const Proposal = z
       z.object({ type: z.literal("org_context") }),
       z.object({ type: z.literal("agent_role"), agentId: z.string() }),
       z.object({ type: z.literal("agent_access"), agentId: z.string() }),
+      z.object({ type: z.literal("agent_settings"), agentId: z.string() }).openapi({
+        description: "A teammate's settings, from the right hand's card (ADR 0134): the lines in `settings`.",
+      }),
       z
         .object({
           type: z.literal("skill"),
@@ -113,6 +119,32 @@ const Proposal = z
         description:
           "`agent_access`: each app turned on or off, as `request_permission` names it (a built-in scope or `connector:<connectionId>`, `label` in English).",
       }),
+    settings: z
+      .array(
+        z.object({
+          field: z.enum(Object.keys(SETTING_GROUP) as [keyof typeof SETTING_GROUP, ...(keyof typeof SETTING_GROUP)[]]),
+          from: z.unknown(),
+          to: z.unknown(),
+          channelId: z.string().optional(),
+          label: z.object({ from: z.string().optional(), to: z.string().optional() }).optional(),
+        }),
+      )
+      .nullable()
+      .openapi({
+        description:
+          "`agent_settings`: each setting then (`from`) and proposed (`to`): `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` / `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a mention); `archive` true. `label`: names for ids.",
+      }),
+    requestedBy: z
+      .object({ userId: z.string(), name: z.string() })
+      .nullable()
+      .openapi({ description: "The person who asked for it in conversation (null: memory promotions, older rows)." }),
+    askedAt: z.string().nullable().openapi({
+      description: 'When the person who asked sent it to whoever may decide it (`POST …/ask`, "Pedir a um admin").',
+    }),
+    undoActionId: z.string().nullable().openapi({
+      description:
+        "`agent_settings` once applied: its receipt on the card, for Desfazer (`POST …/agent-actions/{id}/undo`).",
+    }),
     title: z.string(),
     why: z.string(),
     evidence: z.array(
@@ -134,6 +166,9 @@ const Proposal = z
     decider: z.union([
       z.object({ type: z.literal("user"), userId: z.string(), name: z.string() }),
       z.object({ type: z.literal("admins") }),
+      z
+        .object({ type: z.literal("account_owner") })
+        .openapi({ description: "`agent_settings` of an AI account: only the account's owner gives it." }),
     ]),
     canDecide: z.boolean(),
     createdAt: z.string(),
@@ -293,6 +328,7 @@ const TITLE: Record<ProposalRow["target"], (name: string) => string> = {
   agent_access: (name) => `Change ${name}'s access`,
   org_context: () => "Update the organization context",
   skill: (name) => `Fix the skill ${name}`,
+  agent_settings: (name) => `Change ${name}'s settings`,
 };
 
 const beforeOf = (diff: string) =>
@@ -312,6 +348,7 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
     ...new Set([
       ...agents.flatMap((a) => (a.ownerUserId ? [a.ownerUserId] : [])),
       ...rows.flatMap((r) => (r.decidedByUserId ? [r.decidedByUserId] : [])),
+      ...rows.flatMap((r) => (r.requestedByUserId ? [r.requestedByUserId] : [])),
     ]),
   ];
   const users = new Map(
@@ -328,6 +365,19 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
     ? await db.select().from(schema.contextItems).where(inArray(schema.contextItems.id, itemIds))
     : [];
   const itemById = new Map(items.map((i) => [i.id, i]));
+  const applied = rows.filter((r) => r.target === "agent_settings" && r.status === "accepted").map((r) => r.id);
+  const receipts = applied.length
+    ? await db
+        .select({ id: schema.agentActions.id, proposalId: sql<string>`${schema.agentActions.params}->>'proposalId'` })
+        .from(schema.agentActions)
+        .where(
+          and(
+            eq(schema.agentActions.kind, "agent.settings_changed"),
+            inArray(sql`${schema.agentActions.params}->>'proposalId'`, applied),
+          ),
+        )
+    : [];
+  const receiptOf = new Map(receipts.map((r) => [r.proposalId, r.id]));
   const evidenceLabel = {
     outcome: "Observed outcome",
     human: "A person",
@@ -356,6 +406,12 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
             ? { type: r.target, agentId: r.agentId }
             : { type: "org_context" as const },
       access: r.target === "agent_access" ? (r.access ?? []) : null,
+      settings: r.target === "agent_settings" ? (r.settings ?? []) : null,
+      requestedBy: r.requestedByUserId
+        ? { userId: r.requestedByUserId, name: users.get(r.requestedByUserId) ?? "" }
+        : null,
+      askedAt: r.askedAt ? r.askedAt.toISOString() : null,
+      undoActionId: receiptOf.get(r.id) ?? null,
       title: TITLE[r.target](r.target === "skill" ? (r.access?.[0]?.label ?? "") : name),
       why: sourceItems.map((i) => i.content).join(" ") || r.rationale,
       evidence: sourceItems.flatMap((i) =>
@@ -378,7 +434,9 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
       decider:
         ownerDecides(r) && owner
           ? { type: "user" as const, userId: owner, name: users.get(owner) ?? "" }
-          : { type: "admins" as const },
+          : r.target === "agent_settings" && settingsGroup(r) === "account"
+            ? { type: "account_owner" as const }
+            : { type: "admins" as const },
       canDecide: r.canDecide,
       createdAt: r.createdAt.toISOString(),
       decidedBy: r.decidedByUserId ? { userId: r.decidedByUserId, name: users.get(r.decidedByUserId) ?? "" } : null,
@@ -533,6 +591,29 @@ export function memoryRoutes(deps: AppDeps) {
         ids: q.ids?.split(",").filter((id) => z.uuid().safeParse(id).success),
       });
       return c.json({ proposals: await proposalViews(db, rows) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/proposals/{proposalId}/ask",
+      tags,
+      security,
+      summary: 'Send a proposal you asked for and can\'t decide to whoever may ("Pedir a um admin")',
+      description:
+        "Only the person who asked for it (403 `proposal.not_requester`), once (409 `proposal.asked`), while it is open (409 `proposal.decided`) and only when they can't decide it themselves (409 `proposal.yours`). Each person who may decide it gets a waiting inbox entry (`change_request`).",
+      request: { params: OrgParams.extend({ proposalId: z.uuid() }) },
+      responses: { 200: json(Proposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, proposalId } = c.req.valid("param");
+      const actorId = c.get("user").id;
+      await askProposal({ db, pubsub: deps.adapters.pubsub }, actorId, orgId, proposalId);
+      const [row] = await listProposals(db, actorId, orgId, { ids: [proposalId] });
+      if (!row) throw new NotFoundError("Proposal not found");
+      const [view] = await proposalViews(db, [row]);
+      return c.json(view, 200);
     },
   );
 

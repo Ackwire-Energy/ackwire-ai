@@ -1987,6 +1987,9 @@ export const ptBR = {
       created: "Transformei o que aprendi na skill <b>{{name}}</b>",
       updated: "Corrigi a skill <b>{{name}}</b>",
     },
+    agent: {
+      settings_changed: "Mudei as configurações de <b>{{agentName}}</b>",
+    },
     /** A kind this app doesn't know yet (a newer server's). */
     other: "Fiz uma mudança",
     /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */

@@ -67,6 +67,7 @@ export const RECEIPT_ICONS: Record<AgentAction["kind"], IconName> = {
   "thread.closed": "thread",
   "skill.created": "book",
   "skill.updated": "book",
+  "agent.settings_changed": "settings",
 };
 
 /** A kind a newer server sends that this build doesn't know yet gets the plain check. */

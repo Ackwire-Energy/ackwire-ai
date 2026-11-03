@@ -2008,6 +2008,9 @@
       "created": "Das Gelernte in den Skill <b>{{name}}</b> verwandelt",
       "updated": "Skill <b>{{name}}</b> korrigiert"
     },
+    "agent": {
+      "settings_changed": "Einstellungen von <b>{{agentName}}</b> geändert"
+    },
     "other": "Eine Änderung vorgenommen",
     "copyWebhook": "Webhook-Adresse kopieren",
     "issueFields": {
@@ -2973,6 +2976,14 @@
     "nameLabel": "Name",
     "roleLabel": "Rolle",
     "roleHelp": "Was er für das Team tut, z. B. Assistent für E-Mail und Kalender.",
+    "editName": "Namen bearbeiten: {{name}}",
+    "editHandle": "Erwähnungen bearbeiten: @{{handle}}",
+    "editRole": "Rolle bearbeiten: {{role}}",
+    "noRole": "Keine Rolle",
+    "rolePlaceholder": "z. B. Kundenservice",
+    "roleList": "Rollen",
+    "roleUse": "„{{role}}“ verwenden",
+    "roleCurrent": "aktuell",
     "edit": "Bearbeiten",
     "chat": "Chatten",
     "moreActions": "Weitere Aktionen",
@@ -3018,15 +3029,7 @@
     "budgetDefaultHelp": "Leer: der Standard des Workspace.",
     "budgetDefaultHelpAmount": "Leer: der Standard des Workspace ({{amount}}).",
     "budgetInvalid": "Gib einen Wert über null ein.",
-    "notFound": "Diesen Agenten gibt es nicht oder er wurde archiviert.",
-    "editName": "Namen bearbeiten: {{name}}",
-    "editHandle": "Erwähnungen bearbeiten: @{{handle}}",
-    "editRole": "Rolle bearbeiten: {{role}}",
-    "noRole": "Keine Rolle",
-    "rolePlaceholder": "z. B. Kundenservice",
-    "roleList": "Rollen",
-    "roleUse": "„{{role}}“ verwenden",
-    "roleCurrent": "aktuell"
+    "notFound": "Diesen Agenten gibt es nicht oder er wurde archiviert."
   },
   "agentPage": {
     "work": {
@@ -4134,21 +4137,6 @@
     },
     "dialog": {
       "title": "Zu {{org}} einladen",
-      "emails": "E-Mails",
-      "moreEmails": "Weitere E-Mails…",
-      "checkMarked": "Prüfe die markierten E-Mail-Adressen: Sie bekommen keine Einladung.",
-      "withNote": "mit einer Notiz",
-      "alsoJoin": "Sie treten auch bei",
-      "generalAlways": "Alle treten #{{channel}} bei",
-      "note": "Notiz in der E-Mail",
-      "optional": "(optional)",
-      "notePlaceholder": "Hallo! Komm zu {{org}}: Das Team und die Agenten sind alle hier.",
-      "or": "oder sende den Link",
-      "send_one": "{{count}} Person einladen",
-      "send_other": "{{count}} Personen einladen",
-      "sent": "Einladung an {{email}} gesendet.",
-      "sentMany": "{{count}} Einladungen gesendet.",
-      "alsoIn": "Sie treten auch {{channels}} bei.",
       "stepOf": "Schritt {{n}} von {{total}} · {{step}}",
       "steps": {
         "who": "Wer",
@@ -4156,9 +4144,24 @@
         "where": "Wo es losgeht",
         "note": "Notiz"
       },
+      "emails": "E-Mails",
+      "moreEmails": "Weitere E-Mails…",
+      "checkMarked": "Prüfe die markierten E-Mail-Adressen: Sie bekommen keine Einladung.",
       "pasteHelp": "Füge eine Liste ein, wenn du willst: Kommas, Leerzeichen oder eine pro Zeile.",
       "leftOut": "Wer schon dabei oder schon eingeladen ist, bleibt außen vor.",
+      "withNote": "mit einer Notiz",
+      "alsoJoin": "Sie treten auch bei",
+      "generalAlways": "Alle treten #{{channel}} bei",
+      "note": "Notiz in der E-Mail",
+      "optional": "(optional)",
+      "notePlaceholder": "Hallo! Komm zu {{org}}: Das Team und die Agenten sind alle hier.",
+      "or": "oder sende den Link",
       "continueWith": "Weiter mit {{count}}",
+      "send_one": "{{count}} Person einladen",
+      "send_other": "{{count}} Personen einladen",
+      "sent": "Einladung an {{email}} gesendet.",
+      "sentMany": "{{count}} Einladungen gesendet.",
+      "alsoIn": "Sie treten auch {{channels}} bei.",
       "who": {
         "title": "Wen möchtest du dazuholen?",
         "lead": "Gib mir die E-Mail-Adressen. Jede Person bekommt eine Einladung und tritt direkt bei."
@@ -4549,6 +4552,54 @@
     "flowHint": "Die Aufgabe wandert von selbst in die erste Spalte jeder Phase: In Arbeit, wenn ein Agent beginnt, In Prüfung, wenn sie bereit zur Prüfung ist, Erledigt, wenn du freigibst.",
     "moreOptions": "Weitere Optionen",
     "showCanceled": "Abgebrochene anzeigen",
+    "filterButton": "Filtern",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ich",
+    "display": {
+      "title": "Darstellung",
+      "label": "Darstellung: {{layout}} · {{group}}",
+      "layout": "Anordnung",
+      "group": "Gruppieren nach",
+      "sort": "Sortieren nach",
+      "fields": "Auf den Karten",
+      "saved": "Für dich in diesem Workspace gespeichert",
+      "reset": "Zurück zum Standard",
+      "by": {
+        "stage": "Phase",
+        "assignee": "Zuständig",
+        "priority": "Priorität"
+      },
+      "order": {
+        "manual": "Manuell",
+        "priority": "Priorität",
+        "due": "Fälligkeit"
+      },
+      "field": {
+        "assignee": "Zuständig",
+        "priority": "Priorität",
+        "due": "Fälligkeit",
+        "criteria": "Kriterien",
+        "pullRequest": "Pull-Request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "In {{name}} ablegen",
+      "assignee": "Ablegen, um sie {{name}} zu geben",
+      "unassign": "Ablegen, um die Zuständigkeit zu entfernen",
+      "priority": "Ablegen für Priorität {{priority}}"
+    },
+    "drag": {
+      "role": "verschiebbare Aufgabe",
+      "help": "Leertaste nimmt die Aufgabe, die Pfeiltasten verschieben sie, Leertaste legt sie ab und Esc bricht ab.",
+      "picked": "Du hast #{{number}} aufgenommen. Die Pfeiltasten verschieben sie, Leertaste legt sie ab, Esc bricht ab.",
+      "moved": "#{{number}}: {{group}}, Position {{position}} von {{total}}.",
+      "dropped": "Du hast #{{number}} in {{group}} abgelegt.",
+      "canceled": "#{{number}} ist wieder an ihrem Platz.",
+      "assigned": "#{{number}} liegt jetzt bei {{name}}.",
+      "unassigned": "#{{number}} ist jetzt niemandem zugewiesen.",
+      "prioritized": "#{{number}} hat jetzt Priorität {{priority}}."
+    },
     "canceledColumn": "Abgebrochen",
     "columns": {
       "add": "Spalte hinzufügen",
@@ -4787,54 +4838,6 @@
       "agent_asked": "hat {{name}} gebeten, sie zu erledigen",
       "forum_opened": "hat sie ins Forum gebracht: {{title}}",
       "forum_evaluated": "hat das Ergebnis aus dem Forum zurückgebracht: {{title}}"
-    },
-    "filterButton": "Filtern",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Ich",
-    "display": {
-      "title": "Darstellung",
-      "label": "Darstellung: {{layout}} · {{group}}",
-      "layout": "Anordnung",
-      "group": "Gruppieren nach",
-      "sort": "Sortieren nach",
-      "fields": "Auf den Karten",
-      "saved": "Für dich in diesem Workspace gespeichert",
-      "reset": "Zurück zum Standard",
-      "by": {
-        "stage": "Phase",
-        "assignee": "Zuständig",
-        "priority": "Priorität"
-      },
-      "order": {
-        "manual": "Manuell",
-        "priority": "Priorität",
-        "due": "Fälligkeit"
-      },
-      "field": {
-        "assignee": "Zuständig",
-        "priority": "Priorität",
-        "due": "Fälligkeit",
-        "criteria": "Kriterien",
-        "pullRequest": "Pull-Request",
-        "label": "Label"
-      }
-    },
-    "drop": {
-      "stage": "In {{name}} ablegen",
-      "assignee": "Ablegen, um sie {{name}} zu geben",
-      "unassign": "Ablegen, um die Zuständigkeit zu entfernen",
-      "priority": "Ablegen für Priorität {{priority}}"
-    },
-    "drag": {
-      "role": "verschiebbare Aufgabe",
-      "help": "Leertaste nimmt die Aufgabe, die Pfeiltasten verschieben sie, Leertaste legt sie ab und Esc bricht ab.",
-      "picked": "Du hast #{{number}} aufgenommen. Die Pfeiltasten verschieben sie, Leertaste legt sie ab, Esc bricht ab.",
-      "moved": "#{{number}}: {{group}}, Position {{position}} von {{total}}.",
-      "dropped": "Du hast #{{number}} in {{group}} abgelegt.",
-      "canceled": "#{{number}} ist wieder an ihrem Platz.",
-      "assigned": "#{{number}} liegt jetzt bei {{name}}.",
-      "unassigned": "#{{number}} ist jetzt niemandem zugewiesen.",
-      "prioritized": "#{{number}} hat jetzt Priorität {{priority}}."
     }
   },
   "routines": {
@@ -5023,7 +5026,6 @@
         "artifact": "Wird zu einem Dokument im Drive"
       },
       "ahead": "Für später vorbereitet",
-      "ownActions": "Macht selbst",
       "createdBy": "Erstellt von {{name}} · {{date}}",
       "nameLabel": "Name der Routine",
       "editName": "Namen bearbeiten",
@@ -5040,7 +5042,8 @@
       "reportHint": {
         "always": "Auch wenn es nichts Neues gibt",
         "when_new": "Still, wenn es nichts Neues gibt"
-      }
+      },
+      "ownActions": "Macht selbst"
     },
     "ownActions": {
       "hint": "Jeder Lauf erledigt das in deinen verbundenen Apps, ohne zu fragen. Jede andere Aktion dort fragt zuerst eine Person, und Merge, Deploy und Rollback fragen immer.",

@@ -2127,6 +2127,9 @@
       "created": "Zamieniono zdobytą wiedzę w umiejętność <b>{{name}}</b>",
       "updated": "Poprawiono umiejętność <b>{{name}}</b>"
     },
+    "agent": {
+      "settings_changed": "Zmieniono ustawienia <b>{{agentName}}</b>"
+    },
     "other": "Wprowadzono zmianę",
     "copyWebhook": "Kopiuj adres webhooka",
     "issueFields": {
@@ -3158,6 +3161,14 @@
     "nameLabel": "Nazwa",
     "roleLabel": "Rola",
     "roleHelp": "Co robi dla zespołu, np. Asystent poczty i kalendarza.",
+    "editName": "Edytuj nazwę: {{name}}",
+    "editHandle": "Edytuj wzmianki: @{{handle}}",
+    "editRole": "Edytuj rolę: {{role}}",
+    "noRole": "Brak roli",
+    "rolePlaceholder": "Np. Wsparcie",
+    "roleList": "Role",
+    "roleUse": "Użyj „{{role}}”",
+    "roleCurrent": "obecna",
     "edit": "Edytuj",
     "chat": "Czat",
     "moreActions": "Więcej akcji",
@@ -3209,15 +3220,7 @@
     "budgetDefaultHelp": "Puste: domyślny dla przestrzeni roboczej.",
     "budgetDefaultHelpAmount": "Puste: domyślny dla przestrzeni roboczej ({{amount}}).",
     "budgetInvalid": "Podaj wartość większą od zera.",
-    "notFound": "Ten agent nie istnieje albo został zarchiwizowany.",
-    "editName": "Edytuj nazwę: {{name}}",
-    "editHandle": "Edytuj wzmianki: @{{handle}}",
-    "editRole": "Edytuj rolę: {{role}}",
-    "noRole": "Brak roli",
-    "rolePlaceholder": "Np. Wsparcie",
-    "roleList": "Role",
-    "roleUse": "Użyj „{{role}}”",
-    "roleCurrent": "obecna"
+    "notFound": "Ten agent nie istnieje albo został zarchiwizowany."
   },
   "agentPage": {
     "work": {
@@ -4423,23 +4426,6 @@
     },
     "dialog": {
       "title": "Zaproś do {{org}}",
-      "emails": "Adresy e-mail",
-      "moreEmails": "Więcej adresów…",
-      "checkMarked": "Sprawdź zaznaczone adresy: nie dostaną zaproszenia.",
-      "withNote": "z notatką",
-      "alsoJoin": "Dołączą też do",
-      "generalAlways": "Wszyscy dołączają do #{{channel}}",
-      "note": "Notatka w e-mailu",
-      "optional": "(opcjonalnie)",
-      "notePlaceholder": "Cześć. Dołącz do {{org}}: jest tu cały zespół i agenci.",
-      "or": "albo wyślij link",
-      "send_one": "Zaproś {{count}} osobę",
-      "send_few": "Zaproś {{count}} osoby",
-      "send_many": "Zaproś {{count}} osób",
-      "send_other": "Zaproś {{count}} osoby",
-      "sent": "Wysłano zaproszenie do {{email}}.",
-      "sentMany": "Wysłane zaproszenia: {{count}}.",
-      "alsoIn": "Dołączą też do: {{channels}}.",
       "stepOf": "Krok {{n}} z {{total}} · {{step}}",
       "steps": {
         "who": "Kto",
@@ -4447,9 +4433,26 @@
         "where": "Na start",
         "note": "Notatka"
       },
+      "emails": "Adresy e-mail",
+      "moreEmails": "Więcej adresów…",
+      "checkMarked": "Sprawdź zaznaczone adresy: nie dostaną zaproszenia.",
       "pasteHelp": "Możesz wkleić listę: przecinki, spacje albo jeden adres w wierszu.",
       "leftOut": "Osoby, które już są albo mają zaproszenie, zostają pominięte.",
+      "withNote": "z notatką",
+      "alsoJoin": "Dołączą też do",
+      "generalAlways": "Wszyscy dołączają do #{{channel}}",
+      "note": "Notatka w e-mailu",
+      "optional": "(opcjonalnie)",
+      "notePlaceholder": "Cześć. Dołącz do {{org}}: jest tu cały zespół i agenci.",
+      "or": "albo wyślij link",
       "continueWith": "Kontynuuj ({{count}})",
+      "send_one": "Zaproś {{count}} osobę",
+      "send_few": "Zaproś {{count}} osoby",
+      "send_many": "Zaproś {{count}} osób",
+      "send_other": "Zaproś {{count}} osoby",
+      "sent": "Wysłano zaproszenie do {{email}}.",
+      "sentMany": "Wysłane zaproszenia: {{count}}.",
+      "alsoIn": "Dołączą też do: {{channels}}.",
       "who": {
         "title": "Kogo chcesz zaprosić?",
         "lead": "Podaj mi adresy e-mail. Każda osoba dostanie zaproszenie i dołączy od razu."
@@ -4851,6 +4854,54 @@
     "flowHint": "Zadanie przesuwa się samo do pierwszej kolumny każdego etapu: W toku, gdy agent zaczyna, Do przeglądu, gdy jest gotowe do sprawdzenia, Gotowe, gdy zatwierdzisz pracę.",
     "moreOptions": "Więcej opcji",
     "showCanceled": "Pokaż anulowane",
+    "filterButton": "Filtr",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ja",
+    "display": {
+      "title": "Wyświetlanie",
+      "label": "Wyświetlanie: {{layout}} · {{group}}",
+      "layout": "Układ",
+      "group": "Grupuj według",
+      "sort": "Sortuj według",
+      "fields": "Na kartach",
+      "saved": "Zapisane dla ciebie w tej przestrzeni roboczej",
+      "reset": "Wróć do domyślnych",
+      "by": {
+        "stage": "Etap",
+        "assignee": "Przypisana osoba",
+        "priority": "Priorytet"
+      },
+      "order": {
+        "manual": "Ręcznie",
+        "priority": "Priorytet",
+        "due": "Termin"
+      },
+      "field": {
+        "assignee": "Przypisana osoba",
+        "priority": "Priorytet",
+        "due": "Termin",
+        "criteria": "Kryteria",
+        "pullRequest": "Pull request",
+        "label": "Etykieta"
+      }
+    },
+    "drop": {
+      "stage": "Upuść w: {{name}}",
+      "assignee": "Upuść, aby dać: {{name}}",
+      "unassign": "Upuść, aby usunąć przypisanie",
+      "priority": "Upuść, aby ustawić priorytet {{priority}}"
+    },
+    "drag": {
+      "role": "zadanie do przeciągania",
+      "help": "Spacja podnosi zadanie, strzałki je przesuwają, Spacja je upuszcza, a Esc anuluje.",
+      "picked": "Podnosisz #{{number}}. Strzałki przesuwają, Spacja upuszcza, Esc anuluje.",
+      "moved": "#{{number}}: {{group}}, pozycja {{position}} z {{total}}.",
+      "dropped": "Upuszczono #{{number}} w: {{group}}.",
+      "canceled": "#{{number}} wróciło na miejsce.",
+      "assigned": "#{{number}} jest teraz u: {{name}}.",
+      "unassigned": "#{{number}} nie ma teraz przypisanej osoby.",
+      "prioritized": "#{{number}} ma teraz priorytet {{priority}}."
+    },
     "canceledColumn": "Anulowane",
     "columns": {
       "add": "Dodaj kolumnę",
@@ -5099,54 +5150,6 @@
       "agent_asked": "poprosił(a) o wykonanie: {{name}}",
       "forum_opened": "przeniósł(osła) na forum: {{title}}",
       "forum_evaluated": "przyniósł(osła) wynik z forum: {{title}}"
-    },
-    "filterButton": "Filtr",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Ja",
-    "display": {
-      "title": "Wyświetlanie",
-      "label": "Wyświetlanie: {{layout}} · {{group}}",
-      "layout": "Układ",
-      "group": "Grupuj według",
-      "sort": "Sortuj według",
-      "fields": "Na kartach",
-      "saved": "Zapisane dla ciebie w tej przestrzeni roboczej",
-      "reset": "Wróć do domyślnych",
-      "by": {
-        "stage": "Etap",
-        "assignee": "Przypisana osoba",
-        "priority": "Priorytet"
-      },
-      "order": {
-        "manual": "Ręcznie",
-        "priority": "Priorytet",
-        "due": "Termin"
-      },
-      "field": {
-        "assignee": "Przypisana osoba",
-        "priority": "Priorytet",
-        "due": "Termin",
-        "criteria": "Kryteria",
-        "pullRequest": "Pull request",
-        "label": "Etykieta"
-      }
-    },
-    "drop": {
-      "stage": "Upuść w: {{name}}",
-      "assignee": "Upuść, aby dać: {{name}}",
-      "unassign": "Upuść, aby usunąć przypisanie",
-      "priority": "Upuść, aby ustawić priorytet {{priority}}"
-    },
-    "drag": {
-      "role": "zadanie do przeciągania",
-      "help": "Spacja podnosi zadanie, strzałki je przesuwają, Spacja je upuszcza, a Esc anuluje.",
-      "picked": "Podnosisz #{{number}}. Strzałki przesuwają, Spacja upuszcza, Esc anuluje.",
-      "moved": "#{{number}}: {{group}}, pozycja {{position}} z {{total}}.",
-      "dropped": "Upuszczono #{{number}} w: {{group}}.",
-      "canceled": "#{{number}} wróciło na miejsce.",
-      "assigned": "#{{number}} jest teraz u: {{name}}.",
-      "unassigned": "#{{number}} nie ma teraz przypisanej osoby.",
-      "prioritized": "#{{number}} ma teraz priorytet {{priority}}."
     }
   },
   "routines": {
@@ -5336,7 +5339,6 @@
         "artifact": "Staje się dokumentem na Drive"
       },
       "ahead": "Przygotowane na później",
-      "ownActions": "Robi sama",
       "createdBy": "Utworzona przez: {{name}} · {{date}}",
       "nameLabel": "Nazwa rutyny",
       "editName": "Edytuj nazwę",
@@ -5353,7 +5355,8 @@
       "reportHint": {
         "always": "Nawet gdy nie ma nic nowego",
         "when_new": "Cisza, gdy nie ma nic nowego"
-      }
+      },
+      "ownActions": "Robi sama"
     },
     "ownActions": {
       "hint": "Każde uruchomienie robi to w twoich połączonych aplikacjach bez pytania. Każda inna akcja w nich najpierw prosi osobę o zgodę, a merge, deploy i rollback zawsze o nią proszą.",

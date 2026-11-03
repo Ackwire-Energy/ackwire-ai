@@ -2371,12 +2371,13 @@ export const AGENT_ACTION_KINDS = [
   "thread.closed",
   "skill.created",
   "skill.updated",
+  "agent.settings_changed",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill";
+  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill" | "agent";
   id: string;
   /** Issues. */
   number?: number;
@@ -2402,6 +2403,8 @@ export interface AgentActionTarget {
  * - `channel.created`: `name` (undo archives it)
  * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
  * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
+ * - `agent.settings_changed` (ADR 0134): `agentName`, `fields`, `proposalId` (the right hand's card, applied by the
+ *   person who clicked: Undo puts each setting back)
  */
 export type AgentActionParams = Record<string, string | number | boolean | null | string[] | ApiRule>;
 
@@ -5473,7 +5476,13 @@ export type NotificationKind =
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
-  | "app_created";
+  | "app_created"
+  /**
+   * ADR 0134: someone asked the right hand for a change only others decide and sent it ("Pedir a um admin"). Waiting;
+   * `source.proposalId` (or `source.messageId` for a new agent's card), `source.agentId` and `label` the agent,
+   * `latest.text` why. Done once someone decides.
+   */
+  | "change_request";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5498,6 +5507,8 @@ export interface NotificationSource {
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */
   handoffId?: string;
+  /** `change_request`: the proposal to decide. */
+  proposalId?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
