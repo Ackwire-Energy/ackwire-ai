@@ -681,6 +681,8 @@ export const agentQuestionStatusEnum = pgEnum("agent_question_status", [
   "expired",
   /** Its run was canceled. */
   "canceled",
+  /** A person skipped it: the run goes on without an answer. */
+  "dismissed",
 ]);
 
 /**

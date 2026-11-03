@@ -2911,6 +2911,20 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         Object.assign(q, { status: "answered", answer, answeredByUserId: state.me?.user.id ?? null });
         return structuredClone(q);
       },
+      dismiss: async (orgId, questionId) => {
+        log("questions.dismiss", orgId, questionId);
+        const msg = state.messages.find((m) => (m.meta?.question as AgentQuestion | undefined)?.id === questionId);
+        const q = msg?.meta?.question as AgentQuestion | undefined;
+        if (!q) throw new ApiError(404, "not_found", "Question not found");
+        if (q.status === "answered") throw new ApiError(409, "conflict", "This question was already answered");
+        Object.assign(q, {
+          status: "answered",
+          answer: null,
+          answeredByUserId: state.me?.user.id ?? null,
+          dismissed: true,
+        });
+        return structuredClone(q);
+      },
     },
     secrets: {
       // Like the server: only the person asked answers, once; the fake keeps the box to check it was sealed.

@@ -34,6 +34,8 @@ export interface AgentQuestion {
   answeredByUserId: string | null;
   /** The agent took it back (`withdraw_request`): it no longer needs an answer. Kept on the card by later syncs. */
   withdrawn?: true;
+  /** A person skipped it (`answeredByUserId`): the agent went on without an answer. */
+  dismissed?: true;
 }
 
 export function questionView(q: AgentQuestionRow): AgentQuestion {
@@ -50,6 +52,7 @@ export function questionView(q: AgentQuestionRow): AgentQuestion {
     status: q.status === "open" ? "open" : "answered",
     answer: q.answer,
     answeredByUserId: q.answeredByUserId,
+    ...(q.status === "dismissed" ? { dismissed: true as const } : {}),
   };
 }
 
@@ -121,6 +124,11 @@ export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource 
 export function questionResult(q: AgentQuestionRow | undefined): { content: string; isError?: boolean } {
   if (q?.status === "answered" && q.answer !== null) return { content: `The person answered: ${q.answer}` };
   if (q?.status === "canceled") return { content: "You withdrew this question: nobody will answer it." };
+  if (q?.status === "dismissed")
+    return {
+      content:
+        "The person skipped this question: go on without an answer, with your best judgement if it is safe, or say what you still need.",
+    };
   return {
     content:
       "No one answered within 24 hours. Go on with your best judgement if it is safe, or say what you still need.",
@@ -179,13 +187,22 @@ export async function answerQuestion(
   if (!choice && !text) throw new ValidationError("Send a choice or a text answer");
   if (choice && !(current.choices ?? []).includes(choice)) throw new ValidationError("That is not one of the choices");
   const answer = choice && text ? `${choice} (${text})` : (choice ?? text ?? "");
-  const answered = await db.transaction(async (tx) => {
+  return closeByPerson(deps, current, { status: "answered", answer, answeredByUserId: actorId });
+}
+
+/** A person closes an open question (answer or skip): the card changes, the run resumes, the inbox clears. */
+async function closeByPerson(
+  deps: { db: Database; pubsub?: PubSub },
+  current: AgentQuestionRow,
+  set: { status: "answered" | "dismissed"; answer?: string; answeredByUserId: string },
+): Promise<AgentQuestion> {
+  const closed = await deps.db.transaction(async (tx) => {
     const [row] = await tx
       .update(agentQuestions)
-      .set({ status: "answered", answer, answeredByUserId: actorId, answeredAt: new Date() })
+      .set({ ...set, answeredAt: new Date() })
       .where(
         and(
-          eq(agentQuestions.id, questionId),
+          eq(agentQuestions.id, current.id),
           eq(agentQuestions.status, "open"),
           sql`${agentQuestions.expiresAt} > now()`,
         ),
@@ -196,10 +213,30 @@ export async function answerQuestion(
     await enqueue(tx, resumeJob(row));
     return row;
   });
-  if (!answered) throw new ConflictError("This question was already answered or expired");
-  await publishQuestion(deps.pubsub, answered, "question.answered");
-  await resolveQuestionNotifications(deps, orgId, answered.id).catch(() => {});
-  return questionView(answered);
+  if (!closed) throw new ConflictError("This question was already answered or expired");
+  await publishQuestion(deps.pubsub, closed, "question.answered");
+  await resolveQuestionNotifications(deps, closed.orgId, closed.id).catch(() => {});
+  return questionView(closed);
+}
+
+/**
+ * A person skips a question: it closes without an answer and the run goes on. Whoever may answer it (anyone who
+ * can read the channel) may skip it.
+ */
+export async function dismissQuestion(
+  deps: { db: Database; pubsub?: PubSub },
+  actorId: string,
+  orgId: string,
+  questionId: string,
+): Promise<AgentQuestion> {
+  const { db } = deps;
+  const [current] = await db
+    .select()
+    .from(agentQuestions)
+    .where(and(eq(agentQuestions.id, questionId), eq(agentQuestions.orgId, orgId)));
+  if (!current) throw new NotFoundError("Question not found");
+  await requireChannelAccess(db, actorId, orgId, current.channelId);
+  return closeByPerson(deps, current, { status: "dismissed", answeredByUserId: actorId });
 }
 
 /**

@@ -2300,7 +2300,11 @@
     "closed": "Ditutup tanpa jawaban.",
     "failed": "Jawaban tidak bisa dikirim. Coba lagi.",
     "withdrawn": "{{name}} tidak butuh jawaban lagi.",
-    "withdrawn_female": "{{name}} tidak butuh jawaban lagi."
+    "withdrawn_female": "{{name}} tidak butuh jawaban lagi.",
+    "skip": "Lewati",
+    "skipFailed": "Tidak dapat melewati pertanyaan. Coba lagi.",
+    "dismissed": "{{name}} melewati pertanyaan ini.",
+    "dismissedByYou": "Kamu melewati pertanyaan ini."
   },
   "ask": {
     "kind": {

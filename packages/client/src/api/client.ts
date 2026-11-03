@@ -935,6 +935,8 @@ export interface ApiClient {
   questions: {
     /** Answers an agent's question with a choice or free text. */
     answer(orgId: string, questionId: string, input: { choice?: string; text?: string }): Promise<AgentQuestion>;
+    /** Skips it: the agent goes on without an answer. */
+    dismiss(orgId: string, questionId: string): Promise<AgentQuestion>;
   };
   /** Secrets agents ask for (ADR 0027): only the person asked answers; the value goes sealed. */
   secrets: {

@@ -2289,7 +2289,11 @@
     "closed": "回答なしで終了しました。",
     "failed": "回答を送信できませんでした。もう一度お試しください。",
     "withdrawn": "{{name}}は回答を必要としなくなりました。",
-    "withdrawn_female": "{{name}}は回答を必要としなくなりました。"
+    "withdrawn_female": "{{name}}は回答を必要としなくなりました。",
+    "skip": "スキップ",
+    "skipFailed": "質問をスキップできませんでした。もう一度お試しください。",
+    "dismissed": "{{name}}がこの質問をスキップしました。",
+    "dismissedByYou": "この質問をスキップしました。"
   },
   "ask": {
     "kind": {

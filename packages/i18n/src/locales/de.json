@@ -2367,7 +2367,11 @@
     "closed": "Ohne Antwort geschlossen.",
     "failed": "Die Antwort konnte nicht gesendet werden. Versuch es noch einmal.",
     "withdrawn": "{{name}} braucht keine Antwort mehr.",
-    "withdrawn_female": "{{name}} braucht keine Antwort mehr."
+    "withdrawn_female": "{{name}} braucht keine Antwort mehr.",
+    "skip": "Überspringen",
+    "skipFailed": "Die Frage konnte nicht übersprungen werden. Versuch es noch einmal.",
+    "dismissed": "{{name}} hat diese Frage übersprungen.",
+    "dismissedByYou": "Du hast diese Frage übersprungen."
   },
   "ask": {
     "kind": {

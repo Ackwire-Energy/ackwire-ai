@@ -2342,6 +2342,10 @@ export const ptBR = {
     withdrawn: "O {{name}} não precisa mais da resposta.",
     withdrawn_female: "A {{name}} não precisa mais da resposta.",
     failed: "Não foi possível enviar a resposta. Tente de novo.",
+    skip: "Pular",
+    skipFailed: "Não foi possível pular a pergunta. Tente de novo.",
+    dismissed: "{{name}} pulou esta pergunta.",
+    dismissedByYou: "Você pulou esta pergunta.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
   ask: {
