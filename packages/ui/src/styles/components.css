@@ -1144,6 +1144,17 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   font-size: 14px;
   line-height: 20px;
 }
+/* An error line with its × after it: the × stays out of the .ac-iconline, centred on the whole line. */
+.ac-msg__error-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+}
+.ac-msg__error-row > .ac-msg__error {
+  flex: 1;
+  margin: 0;
+}
 .ac-mention {
   color: var(--ink);
   background: var(--surface-sunken);

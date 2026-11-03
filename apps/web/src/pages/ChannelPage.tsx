@@ -3805,18 +3805,20 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             )}
             {liveFailed && (
-              <p className="ac-msg__error ac-iconline" role="alert">
-                <Icon name="alert" size={16} />
-                {/* A known code is said in words; the stored error (a computer's code) only on hover. */}
-                <span style={{ flex: 1 }} title={!refusal && failedWhy ? live.error : undefined}>
-                  {refusal
-                    ? t("channel.runRefused", { agent: name, reason: refusal })
-                    : live.errorCode === "run.computer_busy"
-                      ? t("channel.runBusy", { agent: name })
-                      : failedWhy || live.error
-                        ? t("channel.runFailed", { agent: name, reason: failedReason || live.error })
-                        : t("channel.runFailedNoReason", { agent: name })}
-                </span>
+              <div className="ac-msg__error-row" role="alert">
+                <p className="ac-msg__error ac-iconline">
+                  <Icon name="alert" size={16} />
+                  {/* A known code is said in words; the stored error (a computer's code) only on hover. */}
+                  <span title={!refusal && failedWhy ? live.error : undefined}>
+                    {refusal
+                      ? t("channel.runRefused", { agent: name, reason: refusal })
+                      : live.errorCode === "run.computer_busy"
+                        ? t("channel.runBusy", { agent: name })
+                        : failedWhy || live.error
+                          ? t("channel.runFailed", { agent: name, reason: failedReason || live.error })
+                          : t("channel.runFailedNoReason", { agent: name })}
+                  </span>
+                </p>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -3825,7 +3827,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                   aria-label={t("common.close")}
                   onClick={() => dismissRun(live.runId)}
                 />
-              </p>
+              </div>
             )}
             {liveStopped ? (
               <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
