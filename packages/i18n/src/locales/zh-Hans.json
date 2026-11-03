@@ -1863,6 +1863,9 @@
     "dontRunThese": "不运行这 {{count}} 个",
     "dontRunHint": "取消后，限额重置时不会运行任何内容",
     "dontRunForbidden": "只有提出请求的人、智能体的负责人或管理员可以取消",
+    "answerAnyway": "仍然回复",
+    "answerAnywayHint": "读完之后发的所有内容，现在回复",
+    "answerAnywayForbidden": "只有提出请求的人、智能体的负责人或管理员可以这样要求",
     "extraTitle": "长时间工作可以使用付费的额外用量",
     "extraHint": "如果套餐开启了额外用量，长时间工作在超过 95% 后仍会继续。关闭时，会在 95% 时暂停，并在套餐重置后继续。"
   },
@@ -1891,7 +1894,11 @@
     "keep": "保留",
     "canceledAll_other": "已取消 {{count}} 个对话。限额恢复后 {{agent}} 不会再回复。",
     "empty": "没有等待继续的内容。",
-    "waiting_other": "{{count}} 个对话在等待"
+    "waiting_other": "{{count}} 个对话在等待",
+    "closedTitle_other": "{{count}} 个对话无需回复",
+    "closedLine": "它们看起来已经解决，所以 {{agent}} 没有回复。如果还有需要回复的，请选择“仍然回复”。",
+    "seeConversation": "查看对话",
+    "answeredAnyway": "有人要求仍然回复"
   },
   "actionCard": {
     "connect_ai": {
@@ -2753,6 +2760,11 @@
       "browserProfileRequest": "<b>{{name}}</b> 申请为 <b>{{agent}}</b> 再添加一个浏览器配置文件",
       "routineWaitingPlan": "<b>{{name}}</b> 正在等待套餐额度重置后运行例行工作",
       "planResetUnknown": "{{plan}} 没有说明额度何时重置。<b>{{name}}</b> 的工作仍在等待。",
+      "catchUpClosed_other": "<b>{{name}}</b> 已恢复，并跳过了 {{count}} 个无需回复的对话",
+      "catchUpClosedAsker": "<b>{{name}}</b> 没有在 {{label}} 中回复：{{who}} 已经处理好了",
+      "catchUpClosedAskerAny": "<b>{{name}}</b> 没有回复：{{who}} 已经处理好了",
+      "catchUpClosedAskerTask": "<b>{{name}}</b> 没有在 {{label}} 中回复：{{who}} 取消了任务",
+      "catchUpClosedAskerTaskAny": "<b>{{name}}</b> 没有回复：{{who}} 取消了任务",
       "machineConnected": "<b>{{name}}</b> 连接了电脑 <b>{{label}}</b>",
       "machineConnectedAny": "<b>{{name}}</b> 连接了一台电脑",
       "browserHandoff": "<b>{{name}}</b> 需要你在浏览器中协助",
@@ -11622,6 +11634,11 @@
       "budget_wait": "我本月的预算用完了。我会在{{when}}继续，如果管理员提高预算会更早。",
       "usage_wait_canceled": "已取消。限额重置后不会运行。",
       "usage_wait_archived": "不会运行：该智能体已归档。",
+      "usage_wait_closed_solved": "我没有回复：{{name}} 已经处理好了。",
+      "usage_wait_closed_withdrawn": "我没有回复：{{name}} 说已经不需要了。",
+      "usage_wait_closed_task_canceled": "我没有回复：{{name}} 取消了任务。",
+      "usage_wait_closed_mixed": "我没有回复：这里提出的事情已经解决了。",
+      "usage_wait_anyway": "{{name}} 请我还是回复一下。",
       "usage_paused": "{{agent}} 暂停了这项工作 · {{plan}} 套餐已用 {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} 暂停了这项工作 · 每月预算已用 {{percent}}%",
       "work_auto_moved": "这需要一些时间，所以我会在后台继续。我会在这里发布进展，下一次大约在 {{minutes}} 分钟后。",

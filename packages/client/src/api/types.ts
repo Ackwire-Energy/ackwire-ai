@@ -3886,6 +3886,31 @@ export interface UsageQueue {
   hidden: number;
   /** "Don't run any": the agent's owner and admins. */
   mayStopAll: boolean;
+  /** Skipped in the last day as already handled (ADR 0136), newest first. */
+  closed: UsageQueueClosedRow[];
+}
+
+/** Why a catch-up was skipped (`meta.usageWait.closed`), and who may answer it anyway. */
+export interface CatchUpClosed {
+  reason: "solved" | "withdrawn" | "task_canceled" | "mixed";
+  who?: { name: string; userId?: string; agentId?: string };
+  askers: string[];
+  at: string;
+}
+
+export interface UsageQueueClosedRow {
+  runId: string;
+  channelId: string;
+  threadId: string | null;
+  channelKind: string;
+  channelName: string | null;
+  /** The skipped note ("Ver conversa" opens it). */
+  messageId: string;
+  closed: CatchUpClosed;
+  /** Someone asked it to answer anyway. */
+  continuedRunId: string | null;
+  /** The viewer may press "Responder mesmo assim". */
+  mayAnswer: boolean;
 }
 
 export interface ComputerQueue {
@@ -5558,6 +5583,10 @@ export type NotificationKind =
   /** A routine's run waits for its agent's plan to reset (once per outage). Opens it in Rotinas. */
   | "routine_waiting_plan"
   | "plan_reset_unknown"
+  /** ADR 0136: an agent back from its plan or budget skipped catch-ups that looked handled (its owner; `count`). */
+  | "catch_up_closed"
+  /** ADR 0136: who asked, when their catch-up was skipped crediting someone else (`latest.title` who, `latest.reason`). */
+  | "catch_up_closed_asker"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"

@@ -1930,6 +1930,9 @@
     "dontRunThese": "Diese {{count}} nicht ausführen",
     "dontRunHint": "Abbrechen: Nichts läuft, wenn das Limit zurückgesetzt ist",
     "dontRunForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann es abbrechen",
+    "answerAnyway": "Trotzdem antworten",
+    "answerAnywayHint": "Antwortet jetzt und liest alles, was seitdem geschrieben wurde",
+    "answerAnywayForbidden": "Nur wer gefragt hat, der Inhaber des Agenten oder ein Admin kann darum bitten",
     "extraTitle": "Längere Arbeit darf bezahlte Zusatznutzung verwenden",
     "extraHint": "Mit eingeschalteter Zusatznutzung im Abo läuft längere Arbeit über 95 % hinaus weiter. Ausgeschaltet pausiert sie bei 95 % und geht weiter, wenn sich das Abo zurücksetzt."
   },
@@ -1965,7 +1968,12 @@
     "canceledAll_other": "{{count}} Unterhaltungen abgebrochen. {{agent}} antwortet nicht darauf, wenn das Limit zurück ist.",
     "empty": "Nichts wartet darauf, wieder aufgenommen zu werden.",
     "waiting_one": "{{count}} Unterhaltung wartet",
-    "waiting_other": "{{count}} Unterhaltungen warten"
+    "waiting_other": "{{count}} Unterhaltungen warten",
+    "closedTitle_one": "{{count}} brauchte keine Antwort",
+    "closedTitle_other": "{{count}} brauchten keine Antwort",
+    "closedLine": "Sie schienen erledigt, also hat {{agent}} nicht geantwortet. Wenn eine noch eine Antwort braucht, wähle Trotzdem antworten.",
+    "seeConversation": "Unterhaltung ansehen",
+    "answeredAnyway": "Jemand hat trotzdem um eine Antwort gebeten"
   },
   "actionCard": {
     "connect_ai": {
@@ -2854,6 +2862,12 @@
       "browserProfileRequest": "<b>{{name}}</b> bittet um ein weiteres Browserprofil für <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> wartet, bis sein Abo zurückgesetzt wird, um eine Routine auszuführen",
       "planResetUnknown": "{{plan}} hat nicht gesagt, wann das Limit zurückgesetzt wird. Die Arbeit von <b>{{name}}</b> wartet noch.",
+      "catchUpClosed_one": "<b>{{name}}</b> ist zurück und hat {{count}} Unterhaltung übersprungen, die keine Antwort brauchte",
+      "catchUpClosed_other": "<b>{{name}}</b> ist zurück und hat {{count}} Unterhaltungen übersprungen, die keine Antwort brauchten",
+      "catchUpClosedAsker": "<b>{{name}}</b> hat in {{label}} nicht geantwortet: {{who}} hat sich schon darum gekümmert",
+      "catchUpClosedAskerAny": "<b>{{name}}</b> hat nicht geantwortet: {{who}} hat sich schon darum gekümmert",
+      "catchUpClosedAskerTask": "<b>{{name}}</b> hat in {{label}} nicht geantwortet: {{who}} hat die Aufgabe abgebrochen",
+      "catchUpClosedAskerTaskAny": "<b>{{name}}</b> hat nicht geantwortet: {{who}} hat die Aufgabe abgebrochen",
       "machineConnected": "<b>{{name}}</b> hat den Computer <b>{{label}}</b> verbunden",
       "machineConnectedAny": "<b>{{name}}</b> hat einen Computer verbunden",
       "browserHandoff": "<b>{{name}}</b> braucht dich im Browser",
@@ -11971,6 +11985,11 @@
       "budget_wait": "Mein Monatsbudget ist aufgebraucht. Ich mache {{when}} weiter, oder früher, wenn ein Admin es erhöht.",
       "usage_wait_canceled": "Abgebrochen. Es läuft nicht, wenn das Limit zurückgesetzt ist.",
       "usage_wait_archived": "Es läuft nicht: Der Agent wurde archiviert.",
+      "usage_wait_closed_solved": "Ich habe nicht geantwortet: {{name}} hat sich schon darum gekümmert.",
+      "usage_wait_closed_withdrawn": "Ich habe nicht geantwortet: {{name}} sagte, dass es nicht mehr nötig ist.",
+      "usage_wait_closed_task_canceled": "Ich habe nicht geantwortet: {{name}} hat die Aufgabe abgebrochen.",
+      "usage_wait_closed_mixed": "Ich habe nicht geantwortet: Was hier gefragt wurde, ist schon erledigt.",
+      "usage_wait_anyway": "{{name}} hat mich gebeten, trotzdem zu antworten.",
       "usage_paused": "{{agent}} hat diese Arbeit pausiert · {{plan}}-Abo bei {{percent}} % {{window}}",
       "usage_paused_budget": "{{agent}} hat diese Arbeit pausiert · Monatsbudget bei {{percent}} %",
       "work_auto_moved": "Das dauert eine Weile, also mache ich im Hintergrund weiter. Ich poste hier Updates, das nächste in etwa {{minutes}} Min.",

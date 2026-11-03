@@ -66,7 +66,15 @@ test("a run waiting on its limit can be canceled: its note names the run, and sa
     bodyParams: { plan: "Claude" },
     usageWait: { code: "plan_limit", runId: "r1", forUserId: "bia" },
   };
-  expect(usageWaitOf(note)).toEqual({ runId: "r1", count: 1, forUserId: "bia", canceled: false, ended: false });
+  expect(usageWaitOf(note)).toEqual({
+    runId: "r1",
+    count: 1,
+    forUserId: "bia",
+    canceled: false,
+    ended: false,
+    closed: null,
+    continuedByUserId: null,
+  });
   // Later turns in its conversation it speaks for: its "Don't run it" says how many.
   expect(usageWaitOf({ ...note, usageWait: { ...note.usageWait, runIds: ["r2", "r3"] } })?.count).toBe(3);
   // Back at work: nothing waits to cancel.

@@ -1915,6 +1915,9 @@ export const ptBR = {
     dontRunThese: "Não rodar estas {{count}}",
     dontRunHint: "Cancelar: nada roda quando o limite voltar",
     dontRunForbidden: "Só quem pediu, o dono do agente ou um admin pode cancelar",
+    answerAnyway: "Responder mesmo assim",
+    answerAnywayHint: "Responde agora, lendo tudo o que veio depois",
+    answerAnywayForbidden: "Só quem pediu, o dono do agente ou um admin pode pedir isso",
     extraTitle: "Trabalho longo pode usar o uso extra pago",
     extraHint:
       "Com o uso extra ligado no plano, o trabalho longo segue depois de 95%. Desligado, ele pausa em 95% e retoma quando o plano renovar.",
@@ -1954,6 +1957,12 @@ export const ptBR = {
     empty: "Nada esperando para retomar.",
     waiting_one: "{{count}} conversa esperando",
     waiting_other: "{{count}} conversas esperando",
+    closedTitle_one: "{{count}} não precisou de resposta",
+    closedTitle_other: "{{count}} não precisaram de resposta",
+    closedLine:
+      "Pareciam resolvidas, então {{agent}} não respondeu. Se alguma ainda precisa de resposta, escolha Responder mesmo assim.",
+    seeConversation: "Ver conversa",
+    answeredAnyway: "Pediram para responder mesmo assim",
   },
   actionCard: {
     connect_ai: {
@@ -2847,6 +2856,12 @@ export const ptBR = {
       browserProfileRequest: "<b>{{name}}</b> pede mais um perfil do navegador para <b>{{agent}}</b>",
       routineWaitingPlan: "<b>{{name}}</b> espera o plano renovar para rodar uma rotina",
       planResetUnknown: "O {{plan}} não disse quando o limite renova. O trabalho de <b>{{name}}</b> segue esperando.",
+      catchUpClosed_one: "<b>{{name}}</b> retomou e pulou {{count}} conversa que não precisava de resposta",
+      catchUpClosed_other: "<b>{{name}}</b> retomou e pulou {{count}} conversas que não precisavam de resposta",
+      catchUpClosedAsker: "<b>{{name}}</b> não respondeu em {{label}}: {{who}} já cuidou disso",
+      catchUpClosedAskerAny: "<b>{{name}}</b> não respondeu: {{who}} já cuidou disso",
+      catchUpClosedAskerTask: "<b>{{name}}</b> não respondeu em {{label}}: {{who}} cancelou a tarefa",
+      catchUpClosedAskerTaskAny: "<b>{{name}}</b> não respondeu: {{who}} cancelou a tarefa",
       machineConnected: "<b>{{name}}</b> conectou o computador <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> conectou um computador",
       browserHandoff: "<b>{{name}}</b> precisa de você no navegador",
@@ -11640,6 +11655,11 @@ export const ptBR = {
       budget_wait: "Meu orçamento do mês acabou. Continuo {{when}}, ou antes se um admin aumentar o limite.",
       usage_wait_canceled: "Cancelado. Não vai rodar quando o limite voltar.",
       usage_wait_archived: "Não vai rodar: o agente foi arquivado.",
+      usage_wait_closed_solved: "Não respondi: {{name}} já cuidou disso.",
+      usage_wait_closed_withdrawn: "Não respondi: {{name}} disse que não precisa mais.",
+      usage_wait_closed_task_canceled: "Não respondi: {{name}} cancelou a tarefa.",
+      usage_wait_closed_mixed: "Não respondi: o que pediram aqui já foi resolvido.",
+      usage_wait_anyway: "{{name}} pediu para eu responder mesmo assim.",
       usage_paused: "{{agent}} pausou este trabalho · plano do {{plan}} em {{percent}}% {{window}}",
       usage_paused_budget: "{{agent}} pausou este trabalho · orçamento do mês em {{percent}}%",
       work_auto_moved:

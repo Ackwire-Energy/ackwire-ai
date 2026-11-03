@@ -4684,6 +4684,15 @@
   "usageCard.dontRunForbidden": {
     "value": "Only who asked, the agent's owner or an admin can cancel it"
   },
+  "usageCard.answerAnyway": {
+    "value": "Answer anyway"
+  },
+  "usageCard.answerAnywayHint": {
+    "value": "Answers now, reading everything posted since"
+  },
+  "usageCard.answerAnywayForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can ask for this"
+  },
   "usageCard.extraTitle": {
     "value": "Long work may use paid extra usage"
   },
@@ -4785,6 +4794,21 @@
       "one": "{{count}} conversation waiting",
       "other": "{{count}} conversations waiting"
     }
+  },
+  "usageQueue.closedTitle": {
+    "value": {
+      "one": "{{count}} didn't need an answer",
+      "other": "{{count}} didn't need an answer"
+    }
+  },
+  "usageQueue.closedLine": {
+    "value": "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway."
+  },
+  "usageQueue.seeConversation": {
+    "value": "See conversation"
+  },
+  "usageQueue.answeredAnyway": {
+    "value": "Someone asked for an answer anyway"
   },
   "actionCard.connect_ai.title": {
     "value": "Connect an AI for {{agents}}"
@@ -6926,6 +6950,24 @@
   },
   "notifications.what.planResetUnknown": {
     "value": "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting."
+  },
+  "notifications.what.catchUpClosed": {
+    "value": {
+      "one": "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
+      "other": "<b>{{name}}</b> is back and skipped {{count}} conversations that didn't need an answer"
+    }
+  },
+  "notifications.what.catchUpClosedAsker": {
+    "value": "<b>{{name}}</b> didn't answer in {{label}}: {{who}} already took care of it"
+  },
+  "notifications.what.catchUpClosedAskerAny": {
+    "value": "<b>{{name}}</b> didn't answer: {{who}} already took care of it"
+  },
+  "notifications.what.catchUpClosedAskerTask": {
+    "value": "<b>{{name}}</b> didn't answer in {{label}}: {{who}} canceled the task"
+  },
+  "notifications.what.catchUpClosedAskerTaskAny": {
+    "value": "<b>{{name}}</b> didn't answer: {{who}} canceled the task"
   },
   "notifications.what.machineConnected": {
     "value": "<b>{{name}}</b> connected the computer <b>{{label}}</b>"
@@ -29158,6 +29200,21 @@
   },
   "chat.body.usage_wait_archived": {
     "value": "It won't run: the agent was archived."
+  },
+  "chat.body.usage_wait_closed_solved": {
+    "value": "I didn't answer: {{name}} already took care of it."
+  },
+  "chat.body.usage_wait_closed_withdrawn": {
+    "value": "I didn't answer: {{name}} said it's no longer needed."
+  },
+  "chat.body.usage_wait_closed_task_canceled": {
+    "value": "I didn't answer: {{name}} canceled the task."
+  },
+  "chat.body.usage_wait_closed_mixed": {
+    "value": "I didn't answer: what was asked here was already handled."
+  },
+  "chat.body.usage_wait_anyway": {
+    "value": "{{name}} asked me to answer anyway."
   },
   "chat.body.usage_paused": {
     "value": "{{agent}} paused this work · {{plan}} plan at {{percent}}% {{window}}"

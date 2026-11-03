@@ -330,6 +330,7 @@ describe("what waits on a plan's limit: Não rodar", () => {
         rows: [row("r-a", { state: "answering" }), row("r-b", { after: { count: 0, names: [] } })],
         hidden: 1,
         mayStopAll: true,
+        closed: [],
       },
     };
     await open(state);
@@ -353,6 +354,78 @@ describe("what waits on a plan's limit: Não rodar", () => {
     expect(dialog.textContent).toContain("Não rodar as 2 conversas?");
     await click(within(dialog).getByRole("button", { name: "Sim, não rodar" }));
     expect(state.calls.some((c) => c.method === "agents.cancelUsageQueue" && c.args[1] === ATLAS_ID)).toBe(true);
+  });
+
+  test("a catch-up skipped as already handled says why, with Responder mesmo assim; pressed, it says who asked", async () => {
+    const state = seedState();
+    const at = new Date().toISOString();
+    const closed = { reason: "solved", who: { name: "Nina", userId: "u-nina" }, askers: ["u-joao"], at };
+    state.messages.push(
+      note("w-skip", { ended: true, closed }),
+      note(
+        "w-asked",
+        { ended: true, closed, continuedRunId: "r-new", continuedByUserId: "u-joao", continuedByName: "João" },
+        1,
+      ),
+    );
+    await open(state);
+    const rows = screen().getAllByRole("article");
+    const skipped = rows.find(
+      (a) => a.textContent?.includes("Não respondi: Nina já cuidou disso.") && !a.textContent.includes("pediu"),
+    ) as HTMLElement;
+    expect(within(skipped).queryByRole("button", { name: "Não rodar" })).toBeNull();
+    await click(within(skipped).getByRole("button", { name: "Responder mesmo assim" }));
+    expect(state.calls.some((c) => c.method === "agents.continueRun" && c.args[1] === "r-w-skip")).toBe(true);
+    const asked = rows.find((a) => a.textContent?.includes("João pediu para eu responder mesmo assim.")) as HTMLElement;
+    expect(asked).toBeTruthy();
+    expect(within(asked).queryByRole("button", { name: "Responder mesmo assim" })).toBeNull();
+  });
+
+  test("the queue lists what it skipped in the last day, why, and Responder mesmo assim for who may", async () => {
+    const state = seedState();
+    state.messages.push(note("w-q", {}));
+    const at = new Date().toISOString();
+    const skipped = (runId: string, closed: Record<string, unknown>, mayAnswer: boolean) => ({
+      runId,
+      channelId: ENG_ID,
+      threadId: null,
+      channelKind: "channel",
+      channelName: "eng",
+      messageId: `m-${runId}`,
+      closed: { askers: ["u-joao"], at, ...closed } as never,
+      continuedRunId: null,
+      mayAnswer,
+    });
+    state.usageQueues = {
+      [ATLAS_ID]: {
+        agentId: ATLAS_ID,
+        reason: "plan",
+        plan: "Claude",
+        resetsAt: null,
+        sharedWith: [],
+        rows: [],
+        hidden: 0,
+        mayStopAll: true,
+        closed: [
+          skipped("r-s1", { reason: "solved", who: { name: "Nina" } }, true),
+          skipped("r-s2", { reason: "withdrawn", who: { name: "João" } }, false),
+        ],
+      },
+    };
+    await open(state);
+    const note_ = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Respondo assim que ele renovar")) as HTMLElement;
+    await click(within(note_).getByRole("button", { name: "Ver fila" }));
+    const dialog = await screen().findByRole("dialog");
+    expect(dialog.textContent).toContain("2 não precisaram de resposta");
+    expect(dialog.textContent).toContain("Pareciam resolvidas, então Atlas não respondeu.");
+    expect(dialog.textContent).toContain("Não respondi: Nina já cuidou disso.");
+    expect(dialog.textContent).toContain("Não respondi: João disse que não precisa mais.");
+    expect(dialog.textContent).not.toContain("Nada esperando");
+    expect(within(dialog).getAllByRole("button", { name: "Ver conversa" })).toHaveLength(2);
+    await click(within(dialog).getByRole("button", { name: "Responder mesmo assim" }));
+    expect(state.calls.some((c) => c.method === "agents.continueRun" && c.args[1] === "r-s1")).toBe(true);
   });
 
   test("back at work, the note offers nothing to cancel", async () => {

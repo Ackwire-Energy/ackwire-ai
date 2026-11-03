@@ -823,6 +823,28 @@ export function agentRoutes(deps: AppDeps) {
     title: z.string().nullable().openapi({ description: "A routine's or a long work's title." }),
     mayStop: z.boolean().openapi({ description: "The viewer may say not to run it (who asked, the owner, an admin)." }),
   });
+  const UsageQueueClosedRow = z.object({
+    runId: z.uuid(),
+    channelId: z.uuid(),
+    threadId: z.uuid().nullable(),
+    channelKind: z.string(),
+    channelName: z.string().nullable(),
+    messageId: z.uuid().openapi({ description: "The skipped note." }),
+    closed: z.object({
+      reason: z.enum(["solved", "withdrawn", "task_canceled", "mixed"]),
+      who: z
+        .object({ name: z.string(), userId: z.string().optional(), agentId: z.string().optional() })
+        .optional()
+        .openapi({ description: "Who was credited: the asker (withdrawn), who answered, or who canceled the task." }),
+      askers: z.array(z.string()).openapi({ description: "Who asked: they may answer it anyway." }),
+      at: z.string(),
+    }),
+    continuedRunId: z.uuid().nullable().openapi({ description: "Someone asked it to answer anyway: that run." }),
+    mayAnswer: z.boolean().openapi({
+      description:
+        'The viewer may press "Responder mesmo assim" (`POST …/runs/{runId}/continue`): who asked, the owner, an admin, for 7 days.',
+    }),
+  });
   const UsageQueue = z
     .object({
       agentId: z.uuid(),
@@ -833,6 +855,9 @@ export function agentRoutes(deps: AppDeps) {
       rows: z.array(UsageQueueRow),
       hidden: z.number().int().openapi({ description: "Waiting in conversations the viewer can't read." }),
       mayStopAll: z.boolean().openapi({ description: "\"Don't run any\": the agent's owner and admins." }),
+      closed: z.array(UsageQueueClosedRow).openapi({
+        description: "Catch-ups skipped in the last day as already handled (ADR 0136), newest first.",
+      }),
     })
     .openapi("UsageQueue");
   app.openapi(

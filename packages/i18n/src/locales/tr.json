@@ -1921,6 +1921,9 @@
     "dontRunThese": "Bu {{count}} tanesini çalıştırma",
     "dontRunHint": "İptal edin, sınır sıfırlanınca hiçbir şey çalışmaz",
     "dontRunForbidden": "Yalnızca isteyen kişi, ajanın sahibi ya da bir yönetici iptal edebilir",
+    "answerAnyway": "Yine de yanıtla",
+    "answerAnywayHint": "Sonradan yazılan her şeyi okuyup şimdi yanıt verir",
+    "answerAnywayForbidden": "Bunu yalnızca isteyen kişi, ajanın sahibi ya da bir yönetici isteyebilir",
     "extraTitle": "Uzun işler ücretli ek kullanımı kullanabilir",
     "extraHint": "Planda ek kullanım açıkken uzun işler %95'in ötesinde sürer. Kapalıyken %95'te duraklar ve plan sıfırlanınca devam eder."
   },
@@ -1956,7 +1959,12 @@
     "canceledAll_other": "{{count}} konuşma iptal edildi. Sınır geri gelince {{agent}} yanıtlamayacak.",
     "empty": "Kaldığı yerden sürecek bir şey yok.",
     "waiting_one": "{{count}} konuşma bekliyor",
-    "waiting_other": "{{count}} konuşma bekliyor"
+    "waiting_other": "{{count}} konuşma bekliyor",
+    "closedTitle_one": "{{count}} konuşma yanıt gerektirmedi",
+    "closedTitle_other": "{{count}} konuşma yanıt gerektirmedi",
+    "closedLine": "Çözülmüş göründükleri için {{agent}} yanıt vermedi. Hâlâ yanıt bekleyen varsa Yine de yanıtla seçeneğini seçin.",
+    "seeConversation": "Konuşmayı gör",
+    "answeredAnyway": "Biri yine de yanıt istedi"
   },
   "actionCard": {
     "connect_ai": {
@@ -2840,6 +2848,12 @@
       "browserProfileRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir tarayıcı profili daha istiyor",
       "routineWaitingPlan": "<b>{{name}}</b> bir rutini çalıştırmak için planının sıfırlanmasını bekliyor",
       "planResetUnknown": "{{plan}} sınırının ne zaman sıfırlanacağını söylemedi. <b>{{name}}</b> ajanının işi hâlâ bekliyor.",
+      "catchUpClosed_one": "<b>{{name}}</b> döndü ve yanıt gerektirmeyen {{count}} konuşmayı atladı",
+      "catchUpClosed_other": "<b>{{name}}</b> döndü ve yanıt gerektirmeyen {{count}} konuşmayı atladı",
+      "catchUpClosedAsker": "<b>{{name}}</b> {{label}} içinde yanıt vermedi: {{who}} bununla zaten ilgilendi",
+      "catchUpClosedAskerAny": "<b>{{name}}</b> yanıt vermedi: {{who}} bununla zaten ilgilendi",
+      "catchUpClosedAskerTask": "<b>{{name}}</b> {{label}} içinde yanıt vermedi: {{who}} görevi iptal etti",
+      "catchUpClosedAskerTaskAny": "<b>{{name}}</b> yanıt vermedi: {{who}} görevi iptal etti",
       "machineConnected": "<b>{{name}}</b>, <b>{{label}}</b> bilgisayarını bağladı",
       "machineConnectedAny": "<b>{{name}}</b> bir bilgisayar bağladı",
       "browserHandoff": "<b>{{name}}</b> tarayıcıda size ihtiyaç duyuyor",
@@ -11902,6 +11916,11 @@
       "budget_wait": "Bu ayki bütçem bitti. {{when}} devam edeceğim, bir yönetici artırırsa daha erken.",
       "usage_wait_canceled": "İptal edildi. Sınır sıfırlanınca çalışmayacak.",
       "usage_wait_archived": "Çalışmayacak: ajan arşivlendi.",
+      "usage_wait_closed_solved": "Yanıt vermedim: {{name}} bununla zaten ilgilendi.",
+      "usage_wait_closed_withdrawn": "Yanıt vermedim: {{name}} artık gerek olmadığını söyledi.",
+      "usage_wait_closed_task_canceled": "Yanıt vermedim: {{name}} görevi iptal etti.",
+      "usage_wait_closed_mixed": "Yanıt vermedim: burada istenen zaten çözüldü.",
+      "usage_wait_anyway": "{{name}} yine de yanıt vermemi istedi.",
       "usage_paused": "{{agent}} bu işi duraklattı · {{plan}} planı %{{percent}} {{window}}",
       "usage_paused_budget": "{{agent}} bu işi duraklattı · aylık bütçe %{{percent}}",
       "work_auto_moved": "Bu biraz sürecek, o yüzden arka planda devam ediyorum. Güncellemeleri buraya yazacağım, bir sonraki yaklaşık {{minutes}} dk içinde.",

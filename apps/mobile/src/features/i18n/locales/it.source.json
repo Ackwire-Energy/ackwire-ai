@@ -1889,6 +1889,24 @@
       "other": "{{plan}} didn't say when its limit resets"
     }
   },
+  "activity.kind.catch_up_closed": {
+    "value": {
+      "one": "{{names}} skipped {{count}} conversation that didn't need an answer",
+      "other": "{{names}} skipped {{count}} conversations that didn't need an answer"
+    }
+  },
+  "activity.kind.catch_up_closed_asker": {
+    "value": {
+      "one": "{{names}} didn't answer: {{who}} already took care of it",
+      "other": "{{names}} didn't answer: {{who}} already took care of it"
+    }
+  },
+  "activity.kind.catch_up_closed_asker_task": {
+    "value": {
+      "one": "{{names}} didn't answer: {{who}} canceled the task",
+      "other": "{{names}} didn't answer: {{who}} canceled the task"
+    }
+  },
   "activity.kind.reaction": {
     "value": {
       "one": "{{names}} reacted",

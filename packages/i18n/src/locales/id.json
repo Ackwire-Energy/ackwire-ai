@@ -1869,6 +1869,9 @@
     "dontRunThese": "Jangan jalankan {{count}} ini",
     "dontRunHint": "Batalkan: tidak ada yang berjalan saat batasnya diatur ulang",
     "dontRunForbidden": "Hanya yang meminta, pemilik agen, atau admin yang bisa membatalkannya",
+    "answerAnyway": "Tetap jawab",
+    "answerAnywayHint": "Menjawab sekarang, setelah membaca semua yang ditulis sejak itu",
+    "answerAnywayForbidden": "Hanya yang meminta, pemilik agen, atau admin yang bisa memintanya",
     "extraTitle": "Pekerjaan panjang bisa memakai penggunaan ekstra berbayar",
     "extraHint": "Kalau penggunaan ekstra di paket aktif, pekerjaan panjang terus berjalan melewati 95%. Kalau mati, pekerjaan dijeda di 95% dan lanjut saat paket diatur ulang."
   },
@@ -1897,7 +1900,11 @@
     "keep": "Biarkan",
     "canceledAll_other": "{{count}} percakapan dibatalkan. {{agent}} tidak akan menjawabnya saat batasnya kembali.",
     "empty": "Tidak ada yang menunggu untuk dilanjutkan.",
-    "waiting_other": "{{count}} percakapan menunggu"
+    "waiting_other": "{{count}} percakapan menunggu",
+    "closedTitle_other": "{{count}} tidak perlu dijawab",
+    "closedLine": "Semuanya tampak sudah beres, jadi {{agent}} tidak menjawab. Kalau ada yang masih perlu dijawab, pilih Tetap jawab.",
+    "seeConversation": "Lihat percakapan",
+    "answeredAnyway": "Seseorang tetap meminta jawaban"
   },
   "actionCard": {
     "connect_ai": {
@@ -2763,6 +2770,11 @@
       "browserProfileRequest": "<b>{{name}}</b> meminta satu profil browser lagi untuk <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> menunggu paketnya direset untuk menjalankan rutinitas",
       "planResetUnknown": "{{plan}} tidak memberi tahu kapan batasnya direset. Pekerjaan <b>{{name}}</b> masih menunggu.",
+      "catchUpClosed_other": "<b>{{name}}</b> kembali dan melewati {{count}} percakapan yang tidak perlu dijawab",
+      "catchUpClosedAsker": "<b>{{name}}</b> tidak menjawab di {{label}}: {{who}} sudah menanganinya",
+      "catchUpClosedAskerAny": "<b>{{name}}</b> tidak menjawab: {{who}} sudah menanganinya",
+      "catchUpClosedAskerTask": "<b>{{name}}</b> tidak menjawab di {{label}}: {{who}} membatalkan tugasnya",
+      "catchUpClosedAskerTaskAny": "<b>{{name}}</b> tidak menjawab: {{who}} membatalkan tugasnya",
       "machineConnected": "<b>{{name}}</b> menghubungkan komputer <b>{{label}}</b>",
       "machineConnectedAny": "<b>{{name}}</b> menghubungkan komputer",
       "browserHandoff": "<b>{{name}}</b> butuh kamu di browser",
@@ -11606,6 +11618,11 @@
       "budget_wait": "Anggaranku untuk bulan ini sudah habis. Aku akan lanjut {{when}}, atau lebih cepat jika admin menaikkannya.",
       "usage_wait_canceled": "Dibatalkan. Tidak akan berjalan saat batasnya diatur ulang.",
       "usage_wait_archived": "Tidak akan berjalan: agennya diarsipkan.",
+      "usage_wait_closed_solved": "Aku tidak menjawab: {{name}} sudah menanganinya.",
+      "usage_wait_closed_withdrawn": "Aku tidak menjawab: {{name}} bilang itu sudah tidak perlu.",
+      "usage_wait_closed_task_canceled": "Aku tidak menjawab: {{name}} membatalkan tugasnya.",
+      "usage_wait_closed_mixed": "Aku tidak menjawab: yang diminta di sini sudah beres.",
+      "usage_wait_anyway": "{{name}} memintaku tetap menjawab.",
       "usage_paused": "{{agent}} menjeda pekerjaan ini · paket {{plan}} di {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} menjeda pekerjaan ini · anggaran bulanan di {{percent}}%",
       "work_auto_moved": "Ini akan makan waktu, jadi aku lanjutkan di latar belakang. Aku akan memposting kabar di sini, berikutnya sekitar {{minutes}} menit lagi.",

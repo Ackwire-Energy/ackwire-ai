@@ -43,6 +43,7 @@ const queue = (over: Partial<UsageQueue> = {}): UsageQueue => ({
   plan: "Claude",
   resetsAt: "2026-11-03T15:00:00Z",
   sharedWith: [],
+  closed: [],
   rows: [row()],
   hidden: 0,
   mayStopAll: true,

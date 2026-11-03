@@ -120,6 +120,14 @@ html:not([data-pointer]) .cq-link:focus-visible {
 .cq__row[data-mine] .cq__l2 {
   color: var(--ink2);
 }
+/* A skipped catch-up's actions: "Responder mesmo assim", then "Ver conversa". */
+.cq__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 4px;
+}
 .cq__text > .cq-first {
   margin-top: 4px;
 }

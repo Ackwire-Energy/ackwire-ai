@@ -2110,6 +2110,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             rows: [],
             hidden: 0,
             mayStopAll: false,
+            closed: [],
           },
         );
       },

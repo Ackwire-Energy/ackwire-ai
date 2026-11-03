@@ -1,7 +1,14 @@
-import { type Message, useApi } from "@agenteschat/client";
+import { type CatchUpClosed, type Message, useApi } from "@agenteschat/client";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { mayContinueUsage, usagePauseCardOf, usagePauseText, usageWaitOf } from "@agenteschat/client/lib/usage-pause";
+import {
+  answerAnywayOpen,
+  mayAnswerAnyway,
+  mayContinueUsage,
+  usagePauseCardOf,
+  usagePauseText,
+  usageWaitOf,
+} from "@agenteschat/client/lib/usage-pause";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -52,7 +59,58 @@ function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: b
   );
 }
 
-/** Under an agent's "I'll answer when the plan resets" (the web's): "Don't run it" while the run still waits. */
+/**
+ * "Responder mesmo assim" on a catch-up skipped as already handled (ADR 0136, the web's): the agent answers now. Anyone
+ * who asked in it, the agent's owner and admins, for a week; anyone else sees it greyed, with who may.
+ */
+export function AnswerAnywayButton({
+  runId,
+  agentId,
+  closed,
+}: {
+  runId: string;
+  agentId: string | null;
+  closed: CatchUpClosed;
+}) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const { orgId, org } = useOrg();
+  const dir = useDirectory();
+  const meId = useMeId();
+  const failed = useFailed();
+  const [pending, setPending] = useState(false);
+  if (!answerAnywayOpen(closed)) return null;
+  const owner = dir.agentById.get(agentId ?? "")?.ownerUserId;
+  const may = mayAnswerAnyway(closed, meId, owner, can(org, "manage_agents"));
+  return (
+    <>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon="reply"
+        label={t("usageCard.answerAnyway")}
+        disabled={pending || !may}
+        onPress={() => {
+          setPending(true);
+          api.agents
+            .continueRun(orgId, runId)
+            .catch(failed)
+            .finally(() => setPending(false));
+        }}
+      />
+      {!may ? (
+        <Text variant="footnote" tone="faint">
+          {t("usageCard.answerAnywayForbidden")}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Under an agent's "I'll answer when the plan resets" (the web's): "Don't run it" while the run still waits; once the
+ * catch-up was skipped as already handled, "Responder mesmo assim" until someone presses it.
+ */
 export function UsageWaitCancel({ message: m }: { message: Message }) {
   const { t } = useTranslation();
   const sheet = useSheetIfAny();
@@ -60,15 +118,20 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
   const dir = useDirectory();
   const meId = useMeId();
   const wait = m.author.type === "agent" ? usageWaitOf(m.meta) : null;
-  if (!wait || wait.canceled || wait.ended) return null;
+  const skipped = wait?.closed && !wait.continuedByUserId ? wait.closed : null;
+  if (!wait || (!skipped && (wait.canceled || wait.ended))) return null;
   const owner = dir.agentById.get(m.author.id ?? "")?.ownerUserId;
   return (
     <View style={styles.acts}>
-      <DontRunButton
-        runId={wait.runId}
-        may={mayContinueUsage(wait, meId, owner, can(org, "manage_agents"))}
-        count={wait.count}
-      />
+      {skipped ? (
+        <AnswerAnywayButton runId={wait.runId} agentId={m.author.id ?? null} closed={skipped} />
+      ) : (
+        <DontRunButton
+          runId={wait.runId}
+          may={mayContinueUsage(wait, meId, owner, can(org, "manage_agents"))}
+          count={wait.count}
+        />
+      )}
       {m.author.id && sheet ? (
         <Button
           variant="secondary"

@@ -1934,6 +1934,9 @@
     "dontRunThese": "Deze {{count}} niet uitvoeren",
     "dontRunHint": "Annuleren: er draait niets als de limiet opnieuw begint",
     "dontRunForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het annuleren",
+    "answerAnyway": "Toch antwoorden",
+    "answerAnywayHint": "Antwoordt nu en leest alles wat sindsdien is geschreven",
+    "answerAnywayForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dit vragen",
     "extraTitle": "Lang werk mag betaald extra gebruik gebruiken",
     "extraHint": "Met extra gebruik aan in het abonnement gaat lang werk door na 95%. Uit pauzeert het bij 95% en gaat het verder als het abonnement opnieuw begint."
   },
@@ -1969,7 +1972,12 @@
     "canceledAll_other": "{{count}} gesprekken geannuleerd. {{agent}} beantwoordt ze niet als de limiet terug is.",
     "empty": "Niets wacht om opgepakt te worden.",
     "waiting_one": "{{count}} gesprek wacht",
-    "waiting_other": "{{count}} gesprekken wachten"
+    "waiting_other": "{{count}} gesprekken wachten",
+    "closedTitle_one": "{{count}} had geen antwoord nodig",
+    "closedTitle_other": "{{count}} hadden geen antwoord nodig",
+    "closedLine": "Ze leken geregeld, dus {{agent}} heeft niet geantwoord. Heeft er een nog een antwoord nodig, kies dan Toch antwoorden.",
+    "seeConversation": "Gesprek bekijken",
+    "answeredAnyway": "Iemand vroeg toch om een antwoord"
   },
   "actionCard": {
     "connect_ai": {
@@ -2858,6 +2866,12 @@
       "browserProfileRequest": "<b>{{name}}</b> vraagt om nog een browserprofiel voor <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> wacht tot zijn abonnement wordt gereset om een routine uit te voeren",
       "planResetUnknown": "{{plan}} heeft niet gezegd wanneer de limiet wordt gereset. Het werk van <b>{{name}}</b> wacht nog.",
+      "catchUpClosed_one": "<b>{{name}}</b> is terug en heeft {{count}} gesprek overgeslagen dat geen antwoord nodig had",
+      "catchUpClosed_other": "<b>{{name}}</b> is terug en heeft {{count}} gesprekken overgeslagen die geen antwoord nodig hadden",
+      "catchUpClosedAsker": "<b>{{name}}</b> heeft niet geantwoord in {{label}}: {{who}} heeft het al geregeld",
+      "catchUpClosedAskerAny": "<b>{{name}}</b> heeft niet geantwoord: {{who}} heeft het al geregeld",
+      "catchUpClosedAskerTask": "<b>{{name}}</b> heeft niet geantwoord in {{label}}: {{who}} heeft de taak geannuleerd",
+      "catchUpClosedAskerTaskAny": "<b>{{name}}</b> heeft niet geantwoord: {{who}} heeft de taak geannuleerd",
       "machineConnected": "<b>{{name}}</b> heeft de computer <b>{{label}}</b> gekoppeld",
       "machineConnectedAny": "<b>{{name}}</b> heeft een computer gekoppeld",
       "browserHandoff": "<b>{{name}}</b> heeft je nodig in de browser",
@@ -12055,6 +12069,11 @@
       "budget_wait": "Mijn budget voor deze maand is op. Ik ga {{when}} verder, of eerder als een beheerder het verhoogt.",
       "usage_wait_canceled": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
       "usage_wait_archived": "Het draait niet: de agent is gearchiveerd.",
+      "usage_wait_closed_solved": "Ik heb niet geantwoord: {{name}} heeft het al geregeld.",
+      "usage_wait_closed_withdrawn": "Ik heb niet geantwoord: {{name}} zei dat het niet meer nodig is.",
+      "usage_wait_closed_task_canceled": "Ik heb niet geantwoord: {{name}} heeft de taak geannuleerd.",
+      "usage_wait_closed_mixed": "Ik heb niet geantwoord: wat hier gevraagd werd, is al geregeld.",
+      "usage_wait_anyway": "{{name}} vroeg me om toch te antwoorden.",
       "usage_paused": "{{agent}} heeft dit werk gepauzeerd · {{plan}}-abonnement op {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} heeft dit werk gepauzeerd · maandbudget op {{percent}}%",
       "work_auto_moved": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates, de volgende over ongeveer {{minutes}} min.",

@@ -1,9 +1,11 @@
-import type { Message } from "@agenteschat/client";
+import type { CatchUpClosed, Message } from "@agenteschat/client";
 import { useApi } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
+  answerAnywayOpen,
+  mayAnswerAnyway,
   mayContinueUsage,
   type UsagePauseCard,
   type UsageWait,
@@ -73,6 +75,64 @@ export function UsageWaitCancel({ message, wait }: { message: Message; wait: Usa
   return (
     <span className="waitcard__acts">
       <DontRunButton runId={wait.runId} may={may} count={wait.count} />
+      {message.author.id && <SeeUsageQueue agentId={message.author.id} />}
+    </span>
+  );
+}
+
+/**
+ * "Responder mesmo assim" on a catch-up skipped as already handled (ADR 0136): the agent answers now, reading what was
+ * posted since. Anyone who asked in it, the agent's owner and admins, for a week; anyone else sees it greyed.
+ */
+export function AnswerAnywayButton({
+  runId,
+  agentId,
+  closed,
+}: {
+  runId: string;
+  agentId: string | null;
+  closed: CatchUpClosed;
+}) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const api = useApi();
+  const toast = useToast();
+  const [pending, setPending] = useState(false);
+  const owner = dir.agentById.get(agentId ?? "")?.ownerUserId;
+  const may = mayAnswerAnyway(closed, me.user.id, owner, can(org, "manage_agents"));
+  if (!answerAnywayOpen(closed)) return null;
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      icon="reply"
+      loading={pending}
+      disabled={!may}
+      title={t(may ? "usageCard.answerAnywayHint" : "usageCard.answerAnywayForbidden")}
+      onClick={async () => {
+        setPending(true);
+        try {
+          await api.agents.continueRun(org.id, runId);
+        } catch (error) {
+          toast.show(errorText(t, error), "error");
+        } finally {
+          setPending(false);
+        }
+      }}
+    >
+      {t("usageCard.answerAnyway")}
+    </Button>
+  );
+}
+
+/** Under a skipped catch-up's note: "Responder mesmo assim" until someone presses it, and "Ver fila". */
+export function UsageWaitClosed({ message, wait }: { message: Message; wait: UsageWait & { closed: CatchUpClosed } }) {
+  return (
+    <span className="waitcard__acts">
+      {!wait.continuedByUserId && (
+        <AnswerAnywayButton runId={wait.runId} agentId={message.author.id ?? null} closed={wait.closed} />
+      )}
       {message.author.id && <SeeUsageQueue agentId={message.author.id} />}
     </span>
   );

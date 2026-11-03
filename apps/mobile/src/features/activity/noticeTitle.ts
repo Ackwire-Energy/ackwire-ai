@@ -27,7 +27,12 @@ export function useNoticeTitle(n: AppNotification) {
         ? t("mobile.names.more", { first: who.first, second: who.second, count: who.more })
         : t("mobile.names.two", { first: who.first, second: who.second })
       : who.first;
-  const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
+  const kind =
+    n.kind === "browser_handoff" && n.source.screen === "desktop"
+      ? "desktop_handoff"
+      : n.kind === "catch_up_closed_asker" && n.latest.reason === "task_canceled"
+        ? "catch_up_closed_asker_task"
+        : n.kind;
   const template = held
     ? t("standing.notification.agentHold", { name: NAMES })
     : n.kind === "app_created"
@@ -36,9 +41,12 @@ export function useNoticeTitle(n: AppNotification) {
         ? t(workspaceHeadline(n) ?? "skills.notice.updated", { name: n.source.label ?? "" })
         : t(`mobile.activity.kind.${kind}`, {
             names: NAMES,
-            count: who.total,
+            // `catch_up_closed`: the conversations it skipped.
+            count: n.kind === "catch_up_closed" ? n.count : who.total,
             // `plan_reset_unknown`: the plan's name.
             plan: n.latest.title ?? "",
+            // `catch_up_closed_asker`: who was credited.
+            who: n.latest.title ?? "",
             defaultValue: NAMES,
           });
   // Agents that failed for one cause close together: one line for all, who they are under it.

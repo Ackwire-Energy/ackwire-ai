@@ -1859,6 +1859,9 @@
     "dontRunThese": "この{{count}}件を実行しない",
     "dontRunHint": "キャンセルします。上限がリセットされても何も実行されません",
     "dontRunForbidden": "キャンセルできるのは、依頼した人、エージェントのオーナー、管理者だけです",
+    "answerAnyway": "それでも返信する",
+    "answerAnywayHint": "その後に書かれたことをすべて読んで、いま返信します",
+    "answerAnywayForbidden": "これを頼めるのは、依頼した人、エージェントのオーナー、管理者だけです",
     "extraTitle": "長い作業で有料の追加使用量を使う場合があります",
     "extraHint": "プランで追加使用量がオンの場合、長い作業は95%を超えても続きます。オフの場合は95%で一時停止し、プランのリセット後に再開します。"
   },
@@ -1887,7 +1890,11 @@
     "keep": "そのままにする",
     "canceledAll_other": "{{count}}件の会話をキャンセルしました。上限が戻っても{{agent}}は返信しません。",
     "empty": "再開を待っているものはありません。",
-    "waiting_other": "{{count}}件の会話が待機中"
+    "waiting_other": "{{count}}件の会話が待機中",
+    "closedTitle_other": "返信が不要だった会話{{count}}件",
+    "closedLine": "解決済みに見えたため、{{agent}}は返信しませんでした。まだ返信が必要なものがあれば、「それでも返信する」を選んでください。",
+    "seeConversation": "会話を見る",
+    "answeredAnyway": "それでも返信してほしいと頼まれました"
   },
   "actionCard": {
     "connect_ai": {
@@ -2749,6 +2756,11 @@
       "browserProfileRequest": "<b>{{name}}</b>が<b>{{agent}}</b>用のブラウザプロファイルの追加を求めています",
       "routineWaitingPlan": "<b>{{name}}</b>はルーティンを実行するため、プランのリセットを待っています",
       "planResetUnknown": "{{plan}}は上限がいつリセットされるかを伝えませんでした。<b>{{name}}</b>の作業はまだ待機中です。",
+      "catchUpClosed_other": "<b>{{name}}</b>が再開し、返信が不要だった会話{{count}}件をスキップしました",
+      "catchUpClosedAsker": "<b>{{name}}</b>は{{label}}で返信しませんでした。{{who}}がすでに対応済みです",
+      "catchUpClosedAskerAny": "<b>{{name}}</b>は返信しませんでした。{{who}}がすでに対応済みです",
+      "catchUpClosedAskerTask": "<b>{{name}}</b>は{{label}}で返信しませんでした。{{who}}がタスクをキャンセルしました",
+      "catchUpClosedAskerTaskAny": "<b>{{name}}</b>は返信しませんでした。{{who}}がタスクをキャンセルしました",
       "machineConnected": "<b>{{name}}</b>がコンピューター<b>{{label}}</b>を接続しました",
       "machineConnectedAny": "<b>{{name}}</b>がコンピューターを接続しました",
       "browserHandoff": "<b>{{name}}</b>がブラウザであなたの手助けを必要としています",
@@ -11538,6 +11550,11 @@
       "budget_wait": "今月の予算を使い切りました。{{when}}に再開します。管理者が予算を引き上げればもっと早く再開します。",
       "usage_wait_canceled": "キャンセルしました。上限がリセットされても実行されません。",
       "usage_wait_archived": "実行されません。エージェントがアーカイブされました。",
+      "usage_wait_closed_solved": "返信しませんでした。{{name}}がすでに対応済みです。",
+      "usage_wait_closed_withdrawn": "返信しませんでした。{{name}}がもう必要ないと言いました。",
+      "usage_wait_closed_task_canceled": "返信しませんでした。{{name}}がタスクをキャンセルしました。",
+      "usage_wait_closed_mixed": "返信しませんでした。ここで頼まれたことはすでに解決済みです。",
+      "usage_wait_anyway": "{{name}}から、それでも返信するよう頼まれました。",
       "usage_paused": "{{agent}}がこの作業を一時停止しました · {{plan}}プラン {{window}} {{percent}}%",
       "usage_paused_budget": "{{agent}}がこの作業を一時停止しました · 月間予算 {{percent}}%",
       "work_auto_moved": "時間がかかりそうなので、バックグラウンドで続けます。ここに進捗を投稿します。次回は約{{minutes}}分後です。",

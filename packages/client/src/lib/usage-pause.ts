@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { CatchUpClosed } from "../api/types";
 import { usageWhen } from "./plan-usage";
 
 /**
@@ -94,6 +95,10 @@ export interface UsageWait {
   canceled: boolean;
   /** Its run is back at work, or over: nothing waits to cancel. */
   ended: boolean;
+  /** Skipped as already handled (ADR 0136): why, and who may answer it anyway. */
+  closed: CatchUpClosed | null;
+  /** Someone pressed "Responder mesmo assim": who. */
+  continuedByUserId: string | null;
 }
 
 /**
@@ -111,5 +116,44 @@ export function usageWaitOf(meta: Record<string, unknown> | null | undefined): U
     forUserId: str(raw?.forUserId),
     canceled: raw?.canceled === true,
     ended: raw?.ended === true,
+    closed: closedOf(raw?.closed),
+    continuedByUserId: str(raw?.continuedByUserId),
   };
 }
+
+const CLOSED_REASONS = new Set(["solved", "withdrawn", "task_canceled", "mixed"]);
+
+function closedOf(raw: unknown): CatchUpClosed | null {
+  const c = raw as Partial<CatchUpClosed> | null | undefined;
+  if (!c || typeof c !== "object" || !CLOSED_REASONS.has(c.reason ?? "")) return null;
+  return {
+    reason: c.reason as CatchUpClosed["reason"],
+    ...(c.who && typeof c.who.name === "string" ? { who: c.who } : {}),
+    askers: Array.isArray(c.askers) ? c.askers.filter((a): a is string => typeof a === "string") : [],
+    at: typeof c.at === "string" ? c.at : "",
+  };
+}
+
+/** "Responder mesmo assim" stays this long after a skip (the server's `ANSWER_ANYWAY_MS`). */
+export const ANSWER_ANYWAY_MS = 7 * 24 * 3600_000;
+
+/** Who may press "Responder mesmo assim": anyone who asked in it, the agent's owner and admins, for 7 days. */
+export const mayAnswerAnyway = (
+  closed: CatchUpClosed,
+  meId: string | null,
+  ownerId: string | null | undefined,
+  admin: boolean,
+) => admin || (meId !== null && (closed.askers.includes(meId) || ownerId === meId));
+
+/** Whether the skip is recent enough to answer it anyway. */
+export const answerAnywayOpen = (closed: CatchUpClosed, now = Date.now()) =>
+  now - Date.parse(closed.at) < ANSWER_ANYWAY_MS;
+
+/** A skipped catch-up's line: "Não respondi: Nina já cuidou disso." */
+export const closedNoteText = (t: TFunction, closed: CatchUpClosed) =>
+  (t as unknown as (key: string, o?: Record<string, unknown>) => string)(
+    `chat.body.usage_wait_closed_${closed.reason}`,
+    {
+      name: closed.who?.name ?? "",
+    },
+  );
