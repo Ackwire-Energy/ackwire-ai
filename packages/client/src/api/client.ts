@@ -1,4 +1,5 @@
 import type { AppLocale } from "@agenteschat/i18n/locale";
+import type { DashboardsApi } from "../dashboards/api";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { WikiAccess } from "../lib/wiki";
 import type {
@@ -984,6 +985,8 @@ export interface ApiClient {
     /** Tirar do canal / Devolver ao canal / Fechar / Reabrir / Arquivar / Desarquivar. */
     act(orgId: string, threadId: string, action: ThreadAction): Promise<ThreadInfo>;
   };
+  /** Boards and widgets (ADR 0134). */
+  dashboards: DashboardsApi;
   /** Missions (ADR 0029): long work by the agent's executor on a connected computer, in one thread. */
   missions: {
     /** Missions you can see (the Missões tab), most recently changed first, with the counts for the tabs. */

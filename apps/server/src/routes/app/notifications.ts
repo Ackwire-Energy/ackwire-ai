@@ -50,6 +50,11 @@ const Notification = z
         .string()
         .optional()
         .openapi({ description: "`agent_unreached`: the routine's creator, whom the agent's owner may let in." }),
+      dashboardId: z
+        .string()
+        .optional()
+        .openapi({ description: "`widget_alert`, `widget_failed`, `dashboard_proposal`: the board (ADR 0134)." }),
+      widgetId: z.string().optional().openapi({ description: "`widget_alert`, `widget_failed`: the widget." }),
       label: z.string().optional(),
     }),
     latest: z.object({

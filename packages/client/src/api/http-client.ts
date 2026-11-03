@@ -1,3 +1,4 @@
+import { createDashboardsApi } from "../dashboards/api";
 import { humanCheckHeaders } from "../lib/human-check";
 import type { OnboardingStepId } from "../lib/onboarding";
 import { CLOUD_SERVER } from "../lib/server";
@@ -1178,6 +1179,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       act: (orgId, threadId, action) =>
         request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}/${action}`, { json: {} }),
     },
+    dashboards: createDashboardsApi(request),
     missions: ((): HttpApi["missions"] => {
       const one = (orgId: string, missionId: string) => `${org(orgId)}/missions/${enc(missionId)}`;
       return {

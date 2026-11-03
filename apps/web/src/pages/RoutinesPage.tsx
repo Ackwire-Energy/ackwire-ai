@@ -1099,7 +1099,7 @@ export function RoutineDetailsDialog({ routineId, onClose }: { routineId: string
 function useWhereHint() {
   const { org } = useOrg();
   const dms = useDms(org.id);
-  return (target: RoutineTarget): "thread" | "channel" | "dm" | "forum" | "artifact" => {
+  return (target: RoutineTarget): "thread" | "channel" | "dm" | "forum" | "artifact" | "widget" => {
     if (target.type !== "conversation") return target.type;
     if (dms.data?.some((d) => d.channelId === target.channelId)) return "dm";
     return target.threadId ? "thread" : "channel";
