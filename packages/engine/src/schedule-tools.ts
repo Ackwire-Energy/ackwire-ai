@@ -906,9 +906,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           return {
             content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.${
               Array.isArray(input.own_actions) ? ownActionsText(routine) : ""
-            }${needsText(routine)}${
-              trigger?.type === "webhook" && receipt ? WEBHOOK_HINT : ""
-            }`,
+            }${needsText(routine)}${trigger?.type === "webhook" && receipt ? WEBHOOK_HINT : ""}`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {
