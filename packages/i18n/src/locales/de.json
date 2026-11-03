@@ -10736,7 +10736,6 @@
         "loginType": "Zum Anmelden gib in der App <code>{{command}}</code> ein.",
         "signIn": "Melde dich auf der Seite, die sich öffnet, mit deinem agentes.chat-Konto an.",
         "signInFirst": "Die App bittet dich beim ersten Mal, dich anzumelden.",
-        "signInBrowser": "Die App öffnet deinen Browser, damit du dich anmeldest.",
         "token": "Erstelle einen persönlichen Token und setze ihn anstelle von {{placeholder}} ein.",
         "install": "Zu {{app}} hinzufügen"
       },

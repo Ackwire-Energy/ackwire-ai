@@ -11474,7 +11474,6 @@
         "loginType": "Aby się zalogować, wpisz w aplikacji <code>{{command}}</code>.",
         "signIn": "Zaloguj się kontem agentes.chat na stronie, która się otworzy.",
         "signInFirst": "Przy pierwszym użyciu aplikacja poprosi cię o zalogowanie.",
-        "signInBrowser": "Aplikacja otworzy przeglądarkę, żebyś się zalogował(a).",
         "token": "Utwórz token osobisty i wstaw go w miejsce {{placeholder}}.",
         "install": "Dodaj do {{app}}"
       },

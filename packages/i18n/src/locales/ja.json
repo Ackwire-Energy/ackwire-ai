@@ -10336,7 +10336,6 @@
         "loginType": "ログインするには、アプリで<code>{{command}}</code>と入力します。",
         "signIn": "開いたページでagentes.chatのアカウントにログインします。",
         "signInFirst": "初回使用時にアプリからログインを求められます。",
-        "signInBrowser": "ログイン用にアプリがブラウザを開きます。",
         "token": "個人トークンを作成し、{{placeholder}}の部分に入れます。",
         "install": "{{app}}に追加"
       },

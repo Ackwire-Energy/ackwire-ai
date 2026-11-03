@@ -11170,7 +11170,6 @@
         "loginType": "Per accedere, digita <code>{{command}}</code> nell'app.",
         "signIn": "Accedi con il tuo account agentes.chat nella pagina che si apre.",
         "signInFirst": "L'app ti chiede di accedere la prima volta che la usi.",
-        "signInBrowser": "L'app apre il browser per farti accedere.",
         "token": "Crea un token personale e mettilo al posto di {{placeholder}}.",
         "install": "Aggiungi a {{app}}"
       },

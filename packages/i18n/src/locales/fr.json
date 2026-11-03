@@ -11164,7 +11164,6 @@
         "loginType": "Pour vous connecter, tapez <code>{{command}}</code> dans l'app.",
         "signIn": "Connectez-vous avec votre compte agentes.chat sur la page qui s'ouvre.",
         "signInFirst": "L'app vous demande de vous connecter la première fois que vous l'utilisez.",
-        "signInBrowser": "L'app ouvre votre navigateur pour que vous vous connectiez.",
         "token": "Créez un jeton personnel et mettez-le à la place de {{placeholder}}.",
         "install": "Ajouter à {{app}}"
       },

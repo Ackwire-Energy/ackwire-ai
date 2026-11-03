@@ -10674,7 +10674,6 @@
         "loginType": "Giriş yapmak için uygulamada <code>{{command}}</code> yazın.",
         "signIn": "Açılan sayfada agentes.chat hesabınızla giriş yapın.",
         "signInFirst": "Uygulama, ilk kullandığınızda giriş yapmanızı ister.",
-        "signInBrowser": "Uygulama, giriş yapmanız için tarayıcınızı açar.",
         "token": "Kişisel bir token oluşturup {{placeholder}} yerine koyun.",
         "install": "{{app}} uygulamasına ekle"
       },

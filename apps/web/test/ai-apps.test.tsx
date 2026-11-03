@@ -101,7 +101,7 @@ describe("the client facts: one command, link or file per app, with this server'
     expect(codexConfig(url)).toBe('[mcp_servers.agentes]\nurl = "https://agentes.example/mcp"');
     expect(JSON.parse(geminiCliConfig(url))).toEqual({ mcpServers: { agentes: { httpUrl: url } } });
     expect(JSON.parse(zedConfig(url))).toEqual({ context_servers: { agentes: { url } } });
-    expect(JSON.parse(warpConfig(url))).toEqual({ agentes: { url } });
+    expect(JSON.parse(warpConfig(url))).toEqual({ agentes: { url, headers: { Authorization: "Bearer <token>" } } });
     expect(JSON.parse(opencodeConfig(url)).mcp).toEqual({ agentes: { type: "remote", url } });
     expect(JSON.parse(copilotIdesConfig(url))).toEqual({
       servers: { agentes: { url, requestInit: { headers: { Authorization: "Bearer <token>" } } } },
@@ -115,7 +115,7 @@ describe("the client facts: one command, link or file per app, with this server'
 
   test("every guide carries the address, and a step that signs in", () => {
     const signIn =
-      /^(step\.(signIn|signInFirst|signInBrowser|loginRun|loginType|token)|claude\.step3|claudeCode\.step2|codex\.step|other\.anyStep)$/;
+      /^(step\.(signIn|signInFirst|loginRun|loginType|token)|claude\.step3|claudeCode\.step2|codex\.step|other\.anyStep)$/;
     for (const client of APP_CLIENTS) {
       const guide = client.guide(url);
       const carries = guide.steps.some(
@@ -365,8 +365,8 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
       "JetBrains AI Assistant": FIRST,
       "GitHub Copilot": TOKEN,
       Zed: FIRST,
-      Cline: SIGN_IN,
-      Warp: "O app abre o navegador para você entrar.",
+      Cline: FIRST,
+      Warp: TOKEN,
       Goose: FIRST,
       OpenCode: "Para entrar, rode opencode mcp auth agentes.",
       "Visual Studio": SIGN_IN,
@@ -378,10 +378,14 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
       "ChatGPT",
       "Gemini",
       "Grok",
+      "Perplexity",
       "Le Chat",
       "Raycast",
       "Codex",
+      "Devin Desktop",
       "JetBrains AI Assistant",
+      "Zed",
+      "Cline",
       "Copilot CLI",
     ];
     const names = [...document.querySelectorAll(".apps-client__name")].map((n) => n.textContent ?? "");

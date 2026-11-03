@@ -10413,7 +10413,6 @@
         "loginType": "要登录，请在应用中输入 <code>{{command}}</code>。",
         "signIn": "在打开的页面中用你的 agentes.chat 账号登录。",
         "signInFirst": "首次使用时，应用会要求你登录。",
-        "signInBrowser": "应用会打开浏览器让你登录。",
         "token": "创建一个个人令牌，替换 {{placeholder}}。",
         "install": "添加到 {{app}}"
       },

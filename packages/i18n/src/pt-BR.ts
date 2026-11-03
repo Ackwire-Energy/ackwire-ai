@@ -10328,7 +10328,6 @@ export const ptBR = {
         loginType: "Para entrar, digite <code>{{command}}</code> no app.",
         signIn: "Entre com sua conta do agentes.chat na página que abrir.",
         signInFirst: "O app pede para você entrar na primeira vez que usar.",
-        signInBrowser: "O app abre o navegador para você entrar.",
         token: "Crie um token pessoal e coloque no lugar de {{placeholder}}.",
         install: "Adicionar ao {{app}}",
       },

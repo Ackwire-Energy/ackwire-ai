@@ -10132,7 +10132,6 @@ export const en = {
         loginType: "To sign in, type <code>{{command}}</code> in the app.",
         signIn: "Sign in with your agentes.chat account on the page that opens.",
         signInFirst: "The app asks you to sign in the first time you use it.",
-        signInBrowser: "The app opens your browser for you to sign in.",
         /** {{placeholder}} is the spot in the config above where the token goes. */
         token: "Create a personal token and put it in place of {{placeholder}}.",
         /** A button. */

@@ -114,7 +114,8 @@ export const zedConfig = (url: string) => json({ context_servers: { [MCP_SERVER_
 
 export const clineCommand = (url: string) => `cline mcp add ${MCP_SERVER_NAME} ${url} --transport http`;
 
-export const warpConfig = (url: string) => json({ [MCP_SERVER_NAME]: { url } });
+/** Warp's sign-in returns to `warp://mcp/oauth2callback`, a custom scheme this server refuses, so a token. */
+export const warpConfig = (url: string) => json({ [MCP_SERVER_NAME]: { url, headers: { Authorization: BEARER } } });
 
 export const gooseInstallLink = (url: string) =>
   `goose://extension?url=${encodeURIComponent(url)}&type=streamable_http&id=${MCP_SERVER_NAME}&name=agentes.chat`;
@@ -240,6 +241,7 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "perplexity",
     group: "chat",
     site: "perplexity.ai",
+    untested: true,
     guide: () => ({
       steps: [
         step("open", { vars: { place: "Settings\u00a0›\u00a0Connectors" } }),
@@ -281,7 +283,7 @@ export const APP_CLIENTS: readonly AppClient[] = [
         step("choose", { vars: { option: "HTTP" } }),
         step("name", { address: true }),
         step("auth", { vars: { option: "Dynamic" } }),
-        step("clickThen", { vars: { button: "Install", next: "Sign In" } }),
+        step("clickThen", { vars: { button: "Install MCP Server", next: "Sign In" } }),
         SIGN_IN,
       ],
       notes: [note("raycastPro", "members")],
@@ -363,6 +365,7 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "devin",
     group: "code",
     site: "Windsurf",
+    untested: true,
     guide: (url) => ({
       steps: [
         step("file", { vars: { file: "~/.config/devin/mcp_config.json" }, code: devinConfig(url) }),
@@ -406,13 +409,13 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "zed",
     group: "code",
     kind: "editor",
+    untested: true,
     guide: (url) => ({
       steps: [
         step("open", { vars: { place: "Settings\u00a0›\u00a0AI\u00a0›\u00a0MCP Servers" } }),
         step("clickThen", { vars: { button: "Add Server", next: "Add Remote Server" } }),
-        step("name", { address: true }),
+        step("pasteConfig", { code: zedConfig(url) }),
         SIGN_IN_FIRST,
-        step("orFile", { vars: { file: "settings.json" }, code: zedConfig(url) }),
       ],
       notes: [],
     }),
@@ -423,12 +426,14 @@ export const APP_CLIENTS: readonly AppClient[] = [
     mark: "cline",
     group: "code",
     kind: "extension",
+    untested: true,
     guide: (url) => ({
       steps: [
-        step("open", { vars: { place: "MCP\u00a0›\u00a0Remote Servers" } }),
+        step("open", { vars: { place: "MCP Servers\u00a0›\u00a0Remote Servers" } }),
         step("name", { address: true }),
-        step("chooseThen", { vars: { option: "Streamable HTTP", button: "Add Server", next: "Authorize OAuth" } }),
-        SIGN_IN,
+        step("choose", { vars: { option: "Streamable HTTP" } }),
+        step("click", { vars: { button: "Add Server" } }),
+        SIGN_IN_FIRST,
         step("orRun", { code: clineCommand(url) }),
       ],
       notes: [],
@@ -445,7 +450,7 @@ export const APP_CLIENTS: readonly AppClient[] = [
         step("open", { vars: { place: "Settings\u00a0›\u00a0Agents\u00a0›\u00a0MCP servers" } }),
         step("click", { vars: { button: "+ Add" } }),
         step("pasteConfig", { code: warpConfig(url) }),
-        step("signInBrowser"),
+        TOKEN,
       ],
       notes: [],
     }),

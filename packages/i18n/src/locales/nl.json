@@ -10814,7 +10814,6 @@
         "loginType": "Typ <code>{{command}}</code> in de app om in te loggen.",
         "signIn": "Log in met je agentes.chat-account op de pagina die opent.",
         "signInFirst": "De app vraagt je in te loggen als je hem voor het eerst gebruikt.",
-        "signInBrowser": "De app opent je browser zodat je kunt inloggen.",
         "token": "Maak een persoonlijk token en zet het op de plek van {{placeholder}}.",
         "install": "Toevoegen aan {{app}}"
       },

@@ -11093,7 +11093,6 @@
         "loginType": "Para iniciar sesión, escribe <code>{{command}}</code> en la app.",
         "signIn": "Inicia sesión con tu cuenta de agentes.chat en la página que se abre.",
         "signInFirst": "La app te pide iniciar sesión la primera vez que la usas.",
-        "signInBrowser": "La app abre tu navegador para que inicies sesión.",
         "token": "Crea un token personal y ponlo en lugar de {{placeholder}}.",
         "install": "Agregar a {{app}}"
       },

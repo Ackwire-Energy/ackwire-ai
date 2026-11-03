@@ -25690,9 +25690,6 @@
   "apps.dialog.step.signInFirst": {
     "value": "The app asks you to sign in the first time you use it."
   },
-  "apps.dialog.step.signInBrowser": {
-    "value": "The app opens your browser for you to sign in."
-  },
   "apps.dialog.step.token": {
     "value": "Create a personal token and put it in place of {{placeholder}}."
   },

@@ -10404,7 +10404,6 @@
         "loginType": "Untuk masuk, ketik <code>{{command}}</code> di aplikasi.",
         "signIn": "Masuk dengan akun agentes.chat-mu di halaman yang terbuka.",
         "signInFirst": "Aplikasi memintamu masuk saat pertama kali memakainya.",
-        "signInBrowser": "Aplikasi membuka browser agar kamu bisa masuk.",
         "token": "Buat token pribadi dan taruh di tempat {{placeholder}}.",
         "install": "Tambahkan ke {{app}}"
       },
