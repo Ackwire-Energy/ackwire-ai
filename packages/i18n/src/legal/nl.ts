@@ -7,8 +7,8 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "De overeenkomst voor het gebruik van agentes.chat: uw werkruimte, uw agents en waarvoor elke partij verantwoordelijk is.",
     courtesy:
-      "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt; indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
-    updated: "2026-11-02",
+      "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt. Indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. De Dienst",
         blocks: [
-          "De Dienst is een werkruimte waarin mensen en AI-agents samenwerken: kanalen, threads en directe berichten; agents met hun eigen rollen, instructies, geheugen en budgetten; taken, wiki, Drive, forum, agenda en routines; goedkeuringen; connectoren met andere diensten; en de mogelijkheid om computers te koppelen waarop agents kunnen werken.",
+          "De Dienst is een werkruimte waarin mensen en AI-agents samenwerken. Deze omvat kanalen, threads en directe berichten, en agents met hun eigen rollen, instructies, geheugen en budgetten. Daarnaast omvat deze taken, wiki, Drive, forum, agenda en routines, goedkeuringen, connectoren met andere diensten en de mogelijkheid om computers te koppelen waarop agents kunnen werken.",
           "De Dienst is nieuw en nog in ontwikkeling: functies kunnen worden gewijzigd, beperkt of verwijderd. Wij kunnen nieuwe accounts gedurende een bepaalde tijd uitsluitend op uitnodiging openstellen, of voor iedereen die zich aanmeldt. Voordat wij iets verwijderen waarop u vertrouwt, stellen wij u daarvan vooraf op de hoogte, voor zover redelijkerwijs mogelijk.",
         ],
       },
@@ -38,7 +38,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Agents en wat zij doen",
         blocks: [
           "Agents handelen op basis van de instructies, machtigingen, connectoren, budgetten en computers die u en uw werkruimte hun geven. Wat een agent binnen die machtigingen doet, met inbegrip van de berichten die hij verstuurt, de code die hij wijzigt, de gegevens die hij leest, schrijft of verwijdert en de opdrachten die hij op een computer uitvoert, geschiedt namens uw werkruimte, en uw werkruimte is daarvoor op grond van deze Voorwaarden verantwoordelijk. Voor elke agent is een persoon verantwoordelijk.",
-          "Handelingen die moeilijk ongedaan te maken zijn, worden een goedkeuringsverzoek aan een persoon voordat zij plaatsvinden. Het goedkeuren daarvan is uw beslissing; de Dienst toont wat er zal gebeuren, maar u bent verantwoordelijk voor de beoordeling daarvan.",
+          "Handelingen die moeilijk ongedaan te maken zijn, worden een goedkeuringsverzoek aan een persoon voordat zij plaatsvinden. Het goedkeuren daarvan is uw beslissing. De Dienst toont wat er zal gebeuren, maar u bent verantwoordelijk voor de beoordeling daarvan.",
           "AI-uitvoer kan onjuist, onvolledig of verouderd zijn, ook wanneer deze overtuigend klinkt. Controleer wat agents produceren voordat u erop vertrouwt, en gebruik het niet als vervanging van professioneel advies (juridisch, medisch, financieel of anderszins) of als enige grondslag voor beslissingen met rechtsgevolgen of vergelijkbaar ingrijpende gevolgen voor personen.",
         ],
       },
@@ -49,12 +49,12 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
           "U verbindt zich ertoe de Dienst niet te gebruiken, en niet toe te staan dat agents worden gebruikt, om:",
           {
             list: [
-              "de wet te overtreden, inbreuk te maken op rechten van anderen of persoonsgegevens te verwerken zonder rechtmatige grondslag;",
-              "spam of ongevraagde berichten te verzenden, of iemand te intimideren, te bedreigen, te misleiden of zich als iemand anders voor te doen;",
-              "malware, phishing of inhoud te maken of te verspreiden die minderjarigen seksualiseert, geweld bevordert of anderszins onrechtmatig is;",
-              "de limieten en waarborgen van de Dienst te omzeilen, zoals budgetten, snelheidslimieten, goedkeuringen, machtigingen of de controles op gekoppelde computers en databases;",
-              "de Dienst aan te vallen of via de Dienst anderen aan te vallen, met inbegrip van het zoeken naar kwetsbaarheden, het overbelasten ervan of het plaatsen van instructies die bedoeld zijn om de agents van anderen over te nemen;",
-              "toegang te verkrijgen tot een dienst, computer of gegevens die u niet bevoegd bent te gebruiken, of een gekoppelde dienst in strijd met diens eigen voorwaarden te gebruiken;",
+              "de wet te overtreden, inbreuk te maken op rechten van anderen of persoonsgegevens te verwerken zonder rechtmatige grondslag",
+              "spam of ongevraagde berichten te verzenden, of iemand te intimideren, te bedreigen, te misleiden of zich als iemand anders voor te doen",
+              "malware, phishing of inhoud te maken of te verspreiden die minderjarigen seksualiseert, geweld bevordert of anderszins onrechtmatig is",
+              "de limieten en waarborgen van de Dienst te omzeilen, zoals budgetten, snelheidslimieten, goedkeuringen, machtigingen of de controles op gekoppelde computers en databases",
+              "de Dienst aan te vallen of via de Dienst anderen aan te vallen, met inbegrip van het zoeken naar kwetsbaarheden, het overbelasten ervan of het plaatsen van instructies die bedoeld zijn om de agents van anderen over te nemen",
+              "toegang te verkrijgen tot een dienst, computer of gegevens die u niet bevoegd bent te gebruiken, of een gekoppelde dienst in strijd met diens eigen voorwaarden te gebruiken",
               "het gebruiksbeleid te schenden van de aanbieders van AI-modellen waarop uw agents draaien.",
             ],
           },
@@ -75,7 +75,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "7. Modelaanbieders, connectoren en uw eigen accounts",
         blocks: [
           "Agents draaien op AI-modellen van derden (zoals Anthropic, de maker van Claude, en OpenAI), via een API-sleutel die uw werkruimte toevoegt of een AI-abonnement, zoals Claude of ChatGPT, dat iemand in uw werkruimte koppelt. Het gebruik van die sleutel of dat abonnement valt tevens onder uw overeenkomst met de betreffende aanbieder, en u bent verantwoordelijk voor de naleving van diens voorwaarden en voor diens kosten.",
-          "Connectoren geven agents toegang tot andere diensten (zoals GitHub, Google, Linear, Sentry of een e-mailinbox). Die diensten worden door derden onder hun eigen voorwaarden aangeboden; hun beschikbaarheid en wat zij met gegevens doen, vallen buiten onze invloed.",
+          "Connectoren geven agents toegang tot andere diensten (zoals GitHub, Google, Linear, Sentry of een e-mailinbox). Die diensten worden door derden onder hun eigen voorwaarden aangeboden. Hun beschikbaarheid en wat zij met gegevens doen, vallen buiten onze invloed.",
         ],
       },
       {
@@ -106,7 +106,6 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Mislukte betalingen.** Indien een betaling mislukt, proberen wij het in de daaropvolgende dagen opnieuw. Mislukt deze dan nog steeds, dan wordt de werkruimte gepauzeerd: haar agents stoppen, en mensen kunnen er nog steeds in lezen en schrijven. Haar computer wordt 7 dagen bewaard en daarna vrijgegeven en gewist. Na betaling wordt de werkruimte hersteld, op een nieuwe computer indien de oude is vrijgegeven.",
               "**Prijswijzigingen.** Wij kunnen de prijzen voor nieuwe klanten op elk moment wijzigen. De prijs van een abonnement dat u al heeft, wijzigt uitsluitend als gevolg van nieuwe belastingen, met ingang van de eerstvolgende verlenging, met een kennisgeving van ten minste 30 dagen.",
               "**Redelijk gebruik.** Sommige functies draaien op AI-diensten die wij zonder extra kosten leveren, zoals het kiezen welke agent antwoordt, het beoordelen van herinneringen en handelingen, en het vinden van waar op een scherm moet worden geklikt. Wij kunnen deze beperken voor een werkruimte waarvan het gebruik ver boven het normale ligt.",
-              "**Vroege toegang.** Wij geven een kennisgeving van ten minste 30 dagen voordat wij kosten in rekening brengen voor iets dat tijdens de vroege toegang gratis was.",
               "**Budgetten.** Budgetten die per werkruimte en per agent zijn ingesteld, stoppen het modelgebruik van agents wanneer zij zijn bereikt. Zij maken deel uit van de Dienst en vormen geen gebrek daarvan. Kosten die een aanbieder in rekening brengt voor uw eigen sleutel of AI-abonnement, zijn een zaak tussen u en die aanbieder.",
             ],
           },
@@ -137,7 +136,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "liability",
         heading: "14. Beperking van aansprakelijkheid",
         blocks: [
-          "Voor zover maximaal toegestaan door de wet: geen van de partijen is aansprakelijk voor indirecte, incidentele of bijzondere schade, gevolgschade of punitieve schadevergoeding, of voor gederfde winst, omzet of verloren gegevens; en onze totale aansprakelijkheid voortvloeiend uit de Dienst is beperkt tot de bedragen die u ons hebt betaald in de twaalf maanden voorafgaand aan de gebeurtenis die tot de vordering heeft geleid (of USD 100 indien u niets hebt betaald). Deze beperkingen gelden niet voor uw betalingsverplichtingen, uw schending van artikel 5 of aansprakelijkheid die wettelijk niet kan worden beperkt.",
+          "Voor zover maximaal toegestaan door de wet: geen van de partijen is aansprakelijk voor indirecte, incidentele of bijzondere schade, gevolgschade of punitieve schadevergoeding, of voor gederfde winst, omzet of verloren gegevens. In dezelfde mate is onze totale aansprakelijkheid voortvloeiend uit de Dienst beperkt tot de bedragen die u ons hebt betaald in de twaalf maanden voorafgaand aan de gebeurtenis die tot de vordering heeft geleid (of USD 100 indien u niets hebt betaald). Deze beperkingen gelden niet voor uw betalingsverplichtingen, uw schending van artikel 5 of aansprakelijkheid die wettelijk niet kan worden beperkt.",
         ],
       },
       {
@@ -158,7 +157,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "17. Wijzigingen van deze Voorwaarden",
         blocks: [
-          "Wij kunnen deze Voorwaarden bijwerken. Wezenlijke wijzigingen worden ten minste 14 dagen voordat zij in werking treden per e-mail of in de app aangekondigd; voortgezet gebruik na de ingangsdatum geldt als aanvaarding. De actuele versie staat altijd op deze pagina. Indien een vertaling afwijkt van de Engelse versie, prevaleert de Engelse versie, behalve waar de wet anders voorschrijft.",
+          "Wij kunnen deze Voorwaarden bijwerken. Wezenlijke wijzigingen worden ten minste 14 dagen voordat zij in werking treden per e-mail of in de app aangekondigd. Voortgezet gebruik na de ingangsdatum geldt als aanvaarding. De actuele versie staat altijd op deze pagina. Indien een vertaling afwijkt van de Engelse versie, prevaleert de Engelse versie, behalve waar de wet anders voorschrijft.",
         ],
       },
       {
@@ -174,8 +173,8 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
     title: "Privacybeleid",
     summary: "Wat wij verzamelen, wat agents waarheen sturen, wie uw werkruimte kan zien en welke rechten u hebt.",
     courtesy:
-      "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt; indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
-    updated: "2026-11-02",
+      "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt. Indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "overview",
@@ -200,7 +199,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Werkruimtegegevens:** de naam, leden, rollen en uitnodigingen van de werkruimte.",
               "**Factuurgegevens:** voor een werkruimte met een agentes.chat-abonnement de naam, het e-mailadres, het factuuradres en het fiscaal identificatienummer van de persoon die betaalt, het abonnement en de bijbehorende facturen en betalingen. Betalingen worden verwerkt door Stripe, dat de kaartgegevens verwerkt: deze bereiken ons nooit.",
               "**Gebruiks- en loggegevens:** IP-adressen, browser en apparaat, aanmeldsessies, beveiligingsgebeurtenissen, API-verzoeken en de registratie van elke modelaanroep (model, tokens en kosten, met de werkruimte en de agent waartoe deze behoort), die wij bewaren om budgetten te handhaven en het gebruik te tonen. Wanneer er iets misgaat, registreren wij de fout, zonder berichtinhoud, om deze te verhelpen.",
-              "**Apparaten:** voor de telefoonapp het pushmeldingstoken van elk apparaat waarop u zich aanmeldt; voor gekoppelde computers en de Mac-app de naam, het besturingssysteem en de appversie van de computer.",
+              "**Apparaten:** voor de telefoonapp het pushmeldingstoken van elk apparaat waarop u zich aanmeldt. Voor gekoppelde computers en de Mac-app de naam, het besturingssysteem en de appversie van de computer.",
               "**Wachtlijst:** het e-mailadres en de taal die u ons op agentes.chat opgeeft, en of u het adres hebt bevestigd.",
               "**Websiteanalyse:** op agentes.chat (de openbare website, niet de werkruimte) de bekeken pagina's, de verwijzende website, het type apparaat en een bij benadering bepaalde locatie afgeleid van het IP-adres, verzameld met Himetrica.",
             ],
@@ -219,7 +218,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Werkruimte-inhoud, verwerkt namens werkruimten",
         blocks: [
-          "Werkruimte-inhoud omvat berichten in kanalen, threads en directe berichten; bestanden in de Drive; wikipagina's; taken, forumonderwerpen, routines en agenda-items; goedkeuringen; de instructies, instellingen en het geheugen van agents; wat agents schrijven en doen; en de gegevens die agents lezen via de connectoren, databases en computers die de werkruimte koppelt. Wij verwerken deze uitsluitend om de werkruimte en haar agents te laten functioneren zoals de werkruimte die configureert, om deze te tonen aan de leden van de werkruimte, om de meldingen te versturen waarom zij vragen, en om ondersteuning te verlenen.",
+          "Werkruimte-inhoud omvat berichten in kanalen, threads en directe berichten, bestanden in de Drive en wikipagina's. Daarnaast omvat deze taken, forumonderwerpen, routines, agenda-items en goedkeuringen, de instructies, instellingen en het geheugen van agents, wat agents schrijven en doen, en de gegevens die agents lezen via de connectoren, databases en computers die de werkruimte koppelt. Wij verwerken deze uitsluitend om de werkruimte en haar agents te laten functioneren zoals de werkruimte die configureert, om deze te tonen aan de leden van de werkruimte, om de meldingen te versturen waarom zij vragen, en om ondersteuning te verlenen.",
           "Werkruimte-inhoud behoort toe aan de werkruimte: leden zien wat de kanalen en machtigingen van de werkruimte toestaan, en de eigenaren en beheerders ervan beheren deze. Berichten die u hebt geplaatst, blijven in de werkruimte nadat u deze verlaat of uw account verwijdert, tenzij de werkruimte ze verwijdert.",
         ],
       },
@@ -236,8 +235,8 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Geheugen.** Agents bewaren geheugen uit gesprekken (samenvattingen, feiten en lessen) zodat zij in de loop van de tijd beter worden. Sommige oordelen over het geheugen (of iets het bewaren waard is, of strijdig is met wat een agent al weet) worden door TypeSafe gemaakt. Het geheugen kan op de pagina van de agent worden bekeken en verwijderd, en wordt samen met de werkruimte verwijderd.",
               "**Zoeken.** Om verwante berichten en documenten te vinden, kan tekst door Voyage AI worden omgezet in vectoren (embeddings).",
               "**Connectoren.** Wanneer de werkruimte een dienst koppelt (zoals GitHub, Google, Linear, Sentry, een e-mailinbox of een MCP-server), slaan wij de toegangstokens daarvan versleuteld op en lezen of schrijven wij in die dienst uitsluitend binnen de bereiken (scopes) die de werkruimte aan elke agent heeft gegeven. De gekoppelde dienst verwerkt die gegevens onder zijn eigen voorwaarden. Koppelingen met Gmail- en Outlook-inboxen, en met Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox en Square, lopen via Composio, dat verwerkt wat agents daar lezen en schrijven.",
-              "**Databases.** Databaseverbindingen zijn alleen-lezen; inloggegevens worden versleuteld opgeslagen en elke query wordt gecontroleerd voordat deze wordt uitgevoerd.",
-              "**Gekoppelde computers.** Wanneer iemand een computer koppelt, kunnen agents daar opdrachten uitvoeren en een browser gebruiken, binnen de mappen en machtigingen die op die computer zijn ingesteld. De live weergave van de browser van een agent gaat via Cloudflare en via het geheugen van onze servers, en wordt niet opgenomen; een samenvatting van de stappen die de agent heeft gezet (zoals bezochte adressen en handelingen) wordt bij zijn werk bewaard, zodat het team kan zien wat hij heeft gedaan.",
+              "**Databases.** Databaseverbindingen zijn alleen-lezen. Inloggegevens worden versleuteld opgeslagen en elke query wordt gecontroleerd voordat deze wordt uitgevoerd.",
+              "**Gekoppelde computers.** Wanneer iemand een computer koppelt, kunnen agents daar opdrachten uitvoeren en een browser gebruiken, binnen de mappen en machtigingen die op die computer zijn ingesteld. De live weergave van de browser van een agent gaat via Cloudflare en via het geheugen van onze servers, en wordt niet opgenomen. Een samenvatting van de stappen die de agent heeft gezet (zoals bezochte adressen en handelingen) wordt bij zijn werk bewaard, zodat het team kan zien wat hij heeft gedaan.",
               "**De computer van de werkruimte.** Op agentes.chat Cloud werken de agents van een werkruimte op een computer die wij voor die werkruimte beheren, gehost door Contabo in de Europese Unie. Wij meten per dag hoeveel gegevens de browser, de AI-tools en andere programma's van elke agent daar verzenden en ontvangen. De computer wordt gewist nadat het agentes.chat-abonnement van de werkruimte is beëindigd, zoals beschreven in de Gebruiksvoorwaarden.",
             ],
           },
@@ -256,7 +255,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Wanneer de wet dit vereist.**",
             ],
           },
-          "De personen die onze infrastructuur beheren, hebben toegang tot de servers en databases waarin Werkruimte-inhoud is opgeslagen; zij gebruiken die toegang uitsluitend om de Dienst draaiende te houden, zoals het opsporen van storingen en het terugzetten van back-ups, of om aan een wettelijke verplichting te voldoen. Geen van deze wegen wordt gebruikt voor het opstellen van profielen, voor advertenties of voor trainingsgegevens.",
+          "De personen die onze infrastructuur beheren, hebben toegang tot de servers en databases waarin Werkruimte-inhoud is opgeslagen. Zij gebruiken die toegang uitsluitend om de Dienst draaiende te houden, zoals het opsporen van storingen en het terugzetten van back-ups, of om aan een wettelijke verplichting te voldoen. Geen van deze wegen wordt gebruikt voor het opstellen van profielen, voor advertenties of voor trainingsgegevens.",
         ],
       },
       {
@@ -293,14 +292,14 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "apps",
         heading: "10. Telefoon- en Mac-apps",
         blocks: [
-          "De telefoonapp verstuurt meldingen via Expo, Apple en Google; een melding kan de naam tonen van degene die heeft geschreven en het begin van het bericht, en u kiest welke meldingen u ontvangt. De Mac-app en gekoppelde computers bewaren hun aanmelding op het apparaat; het verwijderen van uw account (ook mogelijk in de apps) meldt elk apparaat af.",
+          "De telefoonapp verstuurt meldingen via Expo, Apple en Google. Een melding kan de naam tonen van degene die heeft geschreven en het begin van het bericht, en u kiest welke meldingen u ontvangt. De Mac-app en gekoppelde computers bewaren hun aanmelding op het apparaat. Het verwijderen van uw account (ook mogelijk in de apps) meldt elk apparaat af.",
         ],
       },
       {
         id: "gdpr",
         heading: "11. Uw rechten op grond van de AVG (GDPR)",
         blocks: [
-          "Indien u zich in de EER of het Verenigd Koninkrijk bevindt, kunt u verzoeken om inzage, rectificatie, wissing, beperking van de verwerking en overdraagbaarheid, en bezwaar maken tegen de verwerking, en kunt u een klacht indienen bij uw toezichthoudende autoriteit. Neem voor accountgegevens rechtstreeks contact met ons op; u kunt uw profiel ook zelf corrigeren en uw account zelf verwijderen in de app. Neem voor persoonsgegevens in Werkruimte-inhoud contact op met de eigenaren of beheerders van de werkruimte, die daarvoor verwerkingsverantwoordelijke is. Verzoeken die wij ontvangen, verwijzen wij door naar die werkruimte, en wij staan haar als verwerker bij.",
+          "Indien u zich in de EER of het Verenigd Koninkrijk bevindt, kunt u verzoeken om inzage, rectificatie, wissing, beperking van de verwerking en overdraagbaarheid, en bezwaar maken tegen de verwerking, en kunt u een klacht indienen bij uw toezichthoudende autoriteit. Neem voor accountgegevens rechtstreeks contact met ons op. U kunt uw profiel ook zelf corrigeren en uw account zelf verwijderen in de app. Neem voor persoonsgegevens in Werkruimte-inhoud contact op met de eigenaren of beheerders van de werkruimte, die daarvoor verwerkingsverantwoordelijke is. Verzoeken die wij ontvangen, verwijzen wij door naar die werkruimte, en wij staan haar als verwerker bij.",
         ],
       },
       {
@@ -335,7 +334,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "16. Wijzigingen van dit beleid",
         blocks: [
-          "Wij kunnen dit beleid bijwerken; wezenlijke wijzigingen worden per e-mail of in de app aangekondigd voordat zij in werking treden. De actuele versie staat altijd op deze pagina. Indien een vertaling afwijkt van de Engelse versie, prevaleert de Engelse versie, behalve waar de wet anders voorschrijft.",
+          "Wij kunnen dit beleid bijwerken. Wezenlijke wijzigingen worden per e-mail of in de app aangekondigd voordat zij in werking treden. De actuele versie staat altijd op deze pagina. Indien een vertaling afwijkt van de Engelse versie, prevaleert de Engelse versie, behalve waar de wet anders voorschrijft.",
         ],
       },
       {

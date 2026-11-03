@@ -5,8 +5,8 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "Términos de uso",
     summary: "El acuerdo para usar agentes.chat: su espacio de trabajo, sus agentes y de qué responde cada parte.",
-    courtesy: "Esta es una traducción de cortesía; si difiere de la versión en inglés, prevalece la versión en inglés.",
-    updated: "2026-11-02",
+    courtesy: "Esta es una traducción de cortesía. Si difiere de la versión en inglés, prevalece la versión en inglés.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "agreement",
@@ -20,7 +20,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. El Servicio",
         blocks: [
-          "El Servicio es un espacio de trabajo donde personas y agentes de IA trabajan juntos: canales, hilos y mensajes directos; agentes con sus propios roles, instrucciones, memoria y presupuestos; tareas, wiki, Drive, foro, calendario y rutinas; aprobaciones; conectores con otros servicios; y la opción de conectar computadoras en las que los agentes pueden trabajar.",
+          "El Servicio es un espacio de trabajo donde personas y agentes de IA trabajan juntos. Incluye canales, hilos y mensajes directos, y agentes con sus propios roles, instrucciones, memoria y presupuestos. También incluye tareas, wiki, Drive, foro, calendario y rutinas, aprobaciones, conectores con otros servicios y la opción de conectar computadoras en las que los agentes pueden trabajar.",
           "El Servicio es nuevo y sigue evolucionando: las funciones pueden cambiar, limitarse o eliminarse. Podemos abrir nuevas cuentas solo por invitación durante un tiempo, o a cualquier persona que se registre. Le avisaremos con antelación antes de eliminar algo de lo que usted dependa, cuando sea razonablemente posible.",
         ],
       },
@@ -36,7 +36,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Los agentes y lo que hacen",
         blocks: [
           "Los agentes actúan según las instrucciones, los permisos, los conectores, los presupuestos y las computadoras que usted y su espacio de trabajo les otorgan. Lo que un agente hace dentro de esos permisos, incluidos los mensajes que envía, el código que modifica, los datos que lee, escribe o elimina y los comandos que ejecuta en una computadora, se hace en nombre de su espacio de trabajo, y su espacio de trabajo es responsable de ello conforme a estos Términos. Cada agente tiene una persona responsable de él.",
-          "Las acciones difíciles de deshacer se convierten en una solicitud de aprobación dirigida a una persona antes de ejecutarse. Aprobar una es decisión suya; el Servicio muestra lo que se va a hacer, pero usted es responsable de revisarlo.",
+          "Las acciones difíciles de deshacer se convierten en una solicitud de aprobación dirigida a una persona antes de ejecutarse. Aprobar una es decisión suya. El Servicio muestra lo que se va a hacer, pero usted es responsable de revisarlo.",
           "Los resultados de la IA pueden ser erróneos, incompletos o estar desactualizados, incluso cuando parecen seguros. Revise lo que producen los agentes antes de confiar en ello, y no lo utilice como sustituto de asesoramiento profesional (jurídico, médico, financiero o de otro tipo) ni como único fundamento de decisiones que produzcan efectos jurídicos o efectos igualmente significativos sobre las personas.",
         ],
       },
@@ -47,12 +47,12 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
           "Usted se compromete a no utilizar el Servicio, ni permitir que se utilicen los agentes, para:",
           {
             list: [
-              "infringir la ley, vulnerar derechos de terceros o tratar datos personales sin una base jurídica válida;",
-              "enviar spam o mensajes no solicitados, o acosar, amenazar, engañar o suplantar a cualquier persona;",
-              "crear o distribuir malware, phishing o contenido que sexualice a menores, promueva la violencia o sea ilícito de cualquier otro modo;",
-              "eludir los límites y las salvaguardas del Servicio, como los presupuestos, los límites de frecuencia, las aprobaciones, los permisos o los controles sobre las computadoras y bases de datos conectadas;",
-              "atacar el Servicio o a terceros a través de él, lo que incluye buscar vulnerabilidades, sobrecargarlo o introducir instrucciones destinadas a tomar el control de los agentes de otras personas;",
-              "acceder a un servicio, una computadora o datos que no está autorizado a utilizar, o utilizar un servicio conectado en contra de sus propios términos;",
+              "infringir la ley, vulnerar derechos de terceros o tratar datos personales sin una base jurídica válida",
+              "enviar spam o mensajes no solicitados, o acosar, amenazar, engañar o suplantar a cualquier persona",
+              "crear o distribuir malware, phishing o contenido que sexualice a menores, promueva la violencia o sea ilícito de cualquier otro modo",
+              "eludir los límites y las salvaguardas del Servicio, como los presupuestos, los límites de frecuencia, las aprobaciones, los permisos o los controles sobre las computadoras y bases de datos conectadas",
+              "atacar el Servicio o a terceros a través de él, lo que incluye buscar vulnerabilidades, sobrecargarlo o introducir instrucciones destinadas a tomar el control de los agentes de otras personas",
+              "acceder a un servicio, una computadora o datos que no está autorizado a utilizar, o utilizar un servicio conectado en contra de sus propios términos",
               "infringir las políticas de uso de los proveedores de modelos de IA que ejecutan sus agentes.",
             ],
           },
@@ -73,7 +73,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "7. Proveedores de modelos, conectores y sus propias cuentas",
         blocks: [
           "Los agentes funcionan con modelos de IA de terceros (como Anthropic, que crea Claude, y OpenAI), mediante una clave de API que su espacio de trabajo añade o un plan de IA, como Claude o ChatGPT, que alguien de su espacio de trabajo conecta. El uso de esa clave o de ese plan se rige también por su acuerdo con el proveedor correspondiente, y usted es responsable de cumplir sus términos y de pagar sus cargos.",
-          "Los conectores dan a los agentes acceso a otros servicios (como GitHub, Google, Linear, Sentry o una bandeja de entrada de correo electrónico). Esos servicios son prestados por terceros conforme a sus propios términos; su disponibilidad y lo que hacen con los datos están fuera de nuestro control.",
+          "Los conectores dan a los agentes acceso a otros servicios (como GitHub, Google, Linear, Sentry o una bandeja de entrada de correo electrónico). Esos servicios son prestados por terceros conforme a sus propios términos. Su disponibilidad y lo que hacen con los datos están fuera de nuestro control.",
         ],
       },
       {
@@ -104,7 +104,6 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
               "**Pagos fallidos.** Si un pago falla, lo intentamos de nuevo durante los días siguientes. Si sigue fallando, el espacio de trabajo queda en suspenso: sus agentes se detienen y las personas aún pueden leer y escribir en él. Su computadora se conserva durante 7 días y después se libera y se borra. Al pagar, el espacio de trabajo se restablece, en una computadora nueva si la anterior fue liberada.",
               "**Cambios de precio.** Podemos cambiar los precios para nuevos clientes en cualquier momento. El precio de un plan que usted ya tiene solo cambia a causa de nuevos impuestos, a partir de su siguiente renovación y con un aviso previo de al menos 30 días.",
               "**Uso razonable.** Algunas funciones se ejecutan con servicios de IA que ofrecemos sin cargo adicional, como elegir qué agente responde, evaluar memorias y acciones, y encontrar dónde hacer clic en una pantalla. Podemos limitarlas para un espacio de trabajo cuyo uso esté muy por encima de lo normal.",
-              "**Acceso anticipado.** Avisaremos con al menos 30 días de antelación antes de cobrar por algo que era gratuito durante el acceso anticipado.",
               "**Presupuestos.** Los presupuestos establecidos por espacio de trabajo y por agente detienen el uso de modelos por parte de los agentes cuando se alcanzan. Forman parte del Servicio y no constituyen un defecto de este. Los cargos que un proveedor aplique por su propia clave o plan de IA son un asunto entre usted y ese proveedor.",
             ],
           },
@@ -135,7 +134,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "liability",
         heading: "14. Limitación de responsabilidad",
         blocks: [
-          "En la máxima medida permitida por la ley: ninguna de las partes será responsable de daños indirectos, incidentales, especiales, consecuentes o punitivos, ni del lucro cesante o la pérdida de ingresos o de datos; y nuestra responsabilidad total derivada del Servicio se limita a los importes que usted nos haya pagado en los doce meses anteriores al hecho que dé origen a la reclamación (o USD 100 si no pagó nada). Estas limitaciones no se aplican a sus obligaciones de pago, a su incumplimiento de la Sección 5 ni a la responsabilidad que no pueda limitarse por ley.",
+          "En la máxima medida permitida por la ley, ninguna de las partes será responsable de daños indirectos, incidentales, especiales, consecuentes o punitivos, ni del lucro cesante o la pérdida de ingresos o de datos. En la misma medida, nuestra responsabilidad total derivada del Servicio se limita a los importes que usted nos haya pagado en los doce meses anteriores al hecho que dé origen a la reclamación (o USD 100 si no pagó nada). Estas limitaciones no se aplican a sus obligaciones de pago, a su incumplimiento de la Sección 5 ni a la responsabilidad que no pueda limitarse por ley.",
         ],
       },
       {
@@ -156,7 +155,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "17. Cambios en estos Términos",
         blocks: [
-          "Podemos actualizar estos Términos. Los cambios sustanciales se anunciarán por correo electrónico o en la aplicación al menos 14 días antes de que entren en vigor; el uso continuado después de la fecha de entrada en vigor implica su aceptación. La versión vigente se encuentra siempre en esta página. Si una traducción difiere de la versión en inglés, prevalece la versión en inglés, salvo que la ley disponga otra cosa.",
+          "Podemos actualizar estos Términos. Los cambios sustanciales se anunciarán por correo electrónico o en la aplicación al menos 14 días antes de que entren en vigor. El uso continuado después de la fecha de entrada en vigor implica su aceptación. La versión vigente se encuentra siempre en esta página. Si una traducción difiere de la versión en inglés, prevalece la versión en inglés, salvo que la ley disponga otra cosa.",
         ],
       },
       {
@@ -172,8 +171,8 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
     title: "Política de privacidad",
     summary:
       "Qué recopilamos, qué envían los agentes y adónde, quién puede ver su espacio de trabajo y qué derechos tiene usted.",
-    courtesy: "Esta es una traducción de cortesía; si difiere de la versión en inglés, prevalece la versión en inglés.",
-    updated: "2026-11-02",
+    courtesy: "Esta es una traducción de cortesía. Si difiere de la versión en inglés, prevalece la versión en inglés.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "overview",
@@ -198,7 +197,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
               "**Datos del espacio de trabajo:** el nombre del espacio de trabajo, sus miembros, roles e invitaciones.",
               "**Datos de facturación:** para un espacio de trabajo con un plan de agentes.chat, el nombre, la dirección de correo electrónico, la dirección de facturación y el número de identificación fiscal de la persona que paga, el plan, y sus facturas y pagos. Los pagos son procesados por Stripe, que gestiona los datos de la tarjeta: estos nunca llegan a nosotros.",
               "**Datos de uso y registros:** direcciones IP, navegador y dispositivo, sesiones iniciadas, eventos de seguridad, solicitudes a la API y el registro de cada llamada a un modelo (modelo, tokens y costo, con el espacio de trabajo y el agente a los que corresponde), que conservamos para aplicar los presupuestos y mostrar el uso. Cuando algo falla, registramos el error, sin el contenido de los mensajes, para corregirlo.",
-              "**Dispositivos:** para la aplicación para teléfono, el token de notificaciones push de cada dispositivo en el que inicia sesión; para las computadoras conectadas y la aplicación para Mac, el nombre de la computadora, el sistema operativo y la versión de la aplicación.",
+              "**Dispositivos:** para la aplicación para teléfono, el token de notificaciones push de cada dispositivo en el que inicia sesión. Para las computadoras conectadas y la aplicación para Mac, el nombre de la computadora, el sistema operativo y la versión de la aplicación.",
               "**Lista de espera:** la dirección de correo electrónico y el idioma que nos proporciona en agentes.chat, y si la confirmó.",
               "**Analítica del sitio:** en agentes.chat (el sitio público, no el espacio de trabajo), las páginas vistas, el sitio de referencia, el tipo de dispositivo y una ubicación aproximada derivada de la dirección IP, recopilados con Himetrica.",
             ],
@@ -217,7 +216,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Contenido del Espacio de Trabajo, tratado por cuenta de los espacios de trabajo",
         blocks: [
-          "El Contenido del Espacio de Trabajo incluye los mensajes de canales, hilos y mensajes directos; los archivos del Drive; las páginas de la wiki; las tareas, los temas del foro, las rutinas y los eventos del calendario; las aprobaciones; las instrucciones, la configuración y la memoria de los agentes; lo que los agentes escriben y hacen; y los datos que los agentes leen a través de los conectores, las bases de datos y las computadoras que conecta el espacio de trabajo. Lo tratamos únicamente para hacer funcionar el espacio de trabajo y sus agentes tal como el espacio de trabajo los configure, mostrarlo a los miembros del espacio de trabajo, enviar las notificaciones que soliciten y prestar soporte.",
+          "El Contenido del Espacio de Trabajo incluye los mensajes de canales, hilos y mensajes directos, los archivos del Drive y las páginas de la wiki. También incluye las tareas, los temas del foro, las rutinas, los eventos del calendario y las aprobaciones, las instrucciones, la configuración y la memoria de los agentes, lo que los agentes escriben y hacen, y los datos que los agentes leen a través de los conectores, las bases de datos y las computadoras que conecta el espacio de trabajo. Lo tratamos únicamente para hacer funcionar el espacio de trabajo y sus agentes tal como el espacio de trabajo los configure, mostrarlo a los miembros del espacio de trabajo, enviar las notificaciones que soliciten y prestar soporte.",
           "El Contenido del Espacio de Trabajo pertenece al espacio de trabajo: los miembros ven lo que sus canales y permisos permiten, y sus propietarios y administradores lo gestionan. Los mensajes que usted publicó permanecen en el espacio de trabajo después de que usted lo abandone o elimine su cuenta, salvo que el espacio de trabajo los elimine.",
         ],
       },
@@ -234,8 +233,8 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
               "**Memoria.** Los agentes conservan memoria de las conversaciones (resúmenes, hechos y lecciones) para mejorar con el tiempo. Algunas evaluaciones sobre la memoria (si algo merece conservarse o si contradice lo que un agente ya sabe) las realiza TypeSafe. La memoria puede verse y eliminarse en la página del agente, y se elimina junto con el espacio de trabajo.",
               "**Búsqueda.** Para encontrar mensajes y documentos relacionados, el texto puede convertirse en vectores (embeddings) mediante Voyage AI.",
               "**Conectores.** Cuando el espacio de trabajo conecta un servicio (como GitHub, Google, Linear, Sentry, una bandeja de entrada de correo electrónico o cualquier servidor MCP), almacenamos sus tokens de acceso cifrados y leemos o escribimos en ese servicio solo dentro de los alcances que el espacio de trabajo otorgó a cada agente. El servicio conectado trata esos datos conforme a sus propios términos. Las conexiones con bandejas de entrada de Gmail y Outlook, y con Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox y Square, pasan por Composio, que trata lo que los agentes leen y escriben en ellas.",
-              "**Bases de datos.** Las conexiones con bases de datos son de solo lectura; las credenciales se almacenan cifradas y cada consulta se verifica antes de ejecutarse.",
-              "**Computadoras conectadas.** Cuando alguien conecta una computadora, los agentes pueden ejecutar comandos y utilizar un navegador en ella, dentro de las carpetas y los permisos establecidos en esa computadora. La vista en directo del navegador de un agente pasa por Cloudflare y por la memoria de nuestros servidores, y no se graba; un resumen de los pasos que siguió el agente (como las direcciones visitadas y las acciones) se conserva junto con su trabajo para que el equipo pueda ver lo que hizo.",
+              "**Bases de datos.** Las conexiones con bases de datos son de solo lectura. Las credenciales se almacenan cifradas y cada consulta se verifica antes de ejecutarse.",
+              "**Computadoras conectadas.** Cuando alguien conecta una computadora, los agentes pueden ejecutar comandos y utilizar un navegador en ella, dentro de las carpetas y los permisos establecidos en esa computadora. La vista en directo del navegador de un agente pasa por Cloudflare y por la memoria de nuestros servidores, y no se graba. Un resumen de los pasos que siguió el agente (como las direcciones visitadas y las acciones) se conserva junto con su trabajo para que el equipo pueda ver lo que hizo.",
               "**La computadora del espacio de trabajo.** En agentes.chat Cloud, los agentes de un espacio de trabajo trabajan en una computadora que operamos para ese espacio de trabajo, alojada por Contabo en la Unión Europea. Contabilizamos, por día, cuántos datos envían y reciben allí el navegador, las herramientas de IA y los demás programas de cada agente. La computadora se borra después de que finaliza el plan de agentes.chat del espacio de trabajo, según se describe en los Términos de uso.",
             ],
           },
@@ -254,7 +253,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
               "**Cuando la ley lo exija.**",
             ],
           },
-          "Las personas que operan nuestra infraestructura pueden acceder a los servidores y bases de datos que almacenan el Contenido del Espacio de Trabajo; utilizan ese acceso únicamente para mantener el Servicio en funcionamiento, por ejemplo para diagnosticar fallos y restaurar copias de seguridad, o para cumplir una obligación legal. Ninguna de estas vías se utiliza para elaborar perfiles, publicidad o datos de entrenamiento.",
+          "Las personas que operan nuestra infraestructura pueden acceder a los servidores y bases de datos que almacenan el Contenido del Espacio de Trabajo. Utilizan ese acceso únicamente para mantener el Servicio en funcionamiento, por ejemplo para diagnosticar fallos y restaurar copias de seguridad, o para cumplir una obligación legal. Ninguna de estas vías se utiliza para elaborar perfiles, publicidad o datos de entrenamiento.",
         ],
       },
       {
@@ -291,14 +290,14 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "apps",
         heading: "10. Aplicaciones para teléfono y Mac",
         blocks: [
-          "La aplicación para teléfono envía notificaciones a través de Expo, Apple y Google; una notificación puede mostrar el nombre de quien escribió y el comienzo del mensaje, y usted elige qué notificaciones recibe. La aplicación para Mac y las computadoras conectadas mantienen la sesión iniciada en el dispositivo; al eliminar su cuenta (opción también disponible en las aplicaciones) se cierra la sesión en todos los dispositivos.",
+          "La aplicación para teléfono envía notificaciones a través de Expo, Apple y Google. Una notificación puede mostrar el nombre de quien escribió y el comienzo del mensaje, y usted elige qué notificaciones recibe. La aplicación para Mac y las computadoras conectadas mantienen la sesión iniciada en el dispositivo. Al eliminar su cuenta (opción también disponible en las aplicaciones) se cierra la sesión en todos los dispositivos.",
         ],
       },
       {
         id: "gdpr",
         heading: "11. Sus derechos conforme al RGPD",
         blocks: [
-          "Si se encuentra en el EEE o en el Reino Unido, puede solicitar el acceso, la rectificación, la supresión, la limitación del tratamiento y la portabilidad, así como oponerse al tratamiento, y puede presentar una reclamación ante su autoridad de control. Para los datos de cuenta, contáctenos directamente; también puede corregir su perfil y eliminar su cuenta usted mismo desde la aplicación. Para los datos personales contenidos en el Contenido del Espacio de Trabajo, contacte con los propietarios o administradores del espacio de trabajo, que es su responsable del tratamiento. Remitiremos a ese espacio de trabajo las solicitudes que recibamos y le prestaremos asistencia como encargado del tratamiento.",
+          "Si se encuentra en el EEE o en el Reino Unido, puede solicitar el acceso, la rectificación, la supresión, la limitación del tratamiento y la portabilidad, así como oponerse al tratamiento, y puede presentar una reclamación ante su autoridad de control. Para los datos de cuenta, contáctenos directamente. También puede corregir su perfil y eliminar su cuenta usted mismo desde la aplicación. Para los datos personales contenidos en el Contenido del Espacio de Trabajo, contacte con los propietarios o administradores del espacio de trabajo, que es su responsable del tratamiento. Remitiremos a ese espacio de trabajo las solicitudes que recibamos y le prestaremos asistencia como encargado del tratamiento.",
         ],
       },
       {
@@ -333,7 +332,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "16. Cambios en esta política",
         blocks: [
-          "Podemos actualizar esta política; los cambios sustanciales se anunciarán por correo electrónico o en la aplicación antes de que entren en vigor. La versión vigente se encuentra siempre en esta página. Si una traducción difiere de la versión en inglés, prevalece la versión en inglés, salvo que la ley disponga otra cosa.",
+          "Podemos actualizar esta política. Los cambios sustanciales se anunciarán por correo electrónico o en la aplicación antes de que entren en vigor. La versión vigente se encuentra siempre en esta página. Si una traducción difiere de la versión en inglés, prevalece la versión en inglés, salvo que la ley disponga otra cosa.",
         ],
       },
       {

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { en, ptBR } from "../src/index";
 import { type LegalKind, legalDocument, legalDocuments, legalInline } from "../src/legal";
+import { leaves } from "./leaves";
 
 describe("legal pages", () => {
   for (const [kind, byLocale] of Object.entries(legalDocuments)) {
@@ -88,4 +89,11 @@ describe("legal pages in every language", () => {
       expect(legalDocument(kind as LegalKind, "ja")).toBe(byLocale.ja ?? english);
     });
   }
+});
+
+// Semicolons only, not plain-marks' em dash: Russian legal style writes "далее — «Условия»". The landing's copy test
+// runs the same check on its copy of these pages.
+test("legal pages in every language: no semicolon", () => {
+  const found = leaves(legalDocuments).filter(([, text]) => typeof text === "string" && /[;；]/.test(text));
+  expect(found).toEqual([]);
 });

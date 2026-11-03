@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyPtBR: LegalDocument = {
   title: "Política de privacidade",
   summary: "O que coletamos, o que os agentes enviam e para onde, quem pode ver o seu workspace e os seus direitos.",
-  updated: "2026-11-02",
+  updated: "2026-11-03",
   sections: [
     {
       id: "overview",
@@ -28,7 +28,7 @@ export const privacyPtBR: LegalDocument = {
             "**Dados do workspace:** nome do workspace, membros, papéis e convites.",
             "**Dados de cobrança:** num workspace com plano do agentes.chat, o nome, o e-mail, o endereço de cobrança e o número de identificação fiscal de quem paga, o plano e as faturas e os pagamentos dele. Os pagamentos são processados pelo Stripe, que cuida dos dados do cartão: eles nunca chegam até nós.",
             "**Dados de uso e registros:** endereços IP, navegador e aparelho, sessões de login, eventos de segurança, requisições à API e o registro de cada chamada de modelo (modelo, tokens e custo, com o workspace e o agente a que pertence), que guardamos para aplicar orçamentos e mostrar o uso. Quando algo quebra, registramos o erro, sem o conteúdo das mensagens, para corrigi-lo.",
-            "**Aparelhos:** no app de celular, o token de notificações de cada aparelho em que você entra; em computadores conectados e no app de Mac, o nome do computador, o sistema operacional e a versão do app.",
+            "**Aparelhos:** no app de celular, o token de notificações de cada aparelho em que você entra. Em computadores conectados e no app de Mac, o nome do computador, o sistema operacional e a versão do app.",
             "**Lista de espera:** o e-mail e o idioma que você informa no agentes.chat, e se você confirmou o e-mail.",
             "**Análise do site:** no agentes.chat (o site público, não o workspace), as páginas vistas, o site de origem, o tipo de aparelho e uma localização aproximada derivada do IP, coletados com a Himetrica.",
           ],
@@ -47,7 +47,7 @@ export const privacyPtBR: LegalDocument = {
       id: "workspace-content",
       heading: "4. Conteúdo do Workspace, tratado em nome dos workspaces",
       blocks: [
-        "O Conteúdo do Workspace inclui mensagens em canais, threads e mensagens diretas; arquivos do Drive; páginas da wiki; tarefas, tópicos do fórum, rotinas e eventos do calendário; aprovações; as instruções, configurações e a memória dos agentes; o que os agentes escrevem e fazem; e os dados que os agentes leem pelos conectores, bancos de dados e computadores que o workspace conecta. Nós o tratamos só para fazer funcionar o workspace e os agentes como o workspace os configurou, mostrá-lo aos membros do workspace, enviar as notificações que eles pedem e prestar suporte.",
+        "O Conteúdo do Workspace inclui mensagens em canais, threads e mensagens diretas, arquivos do Drive e páginas da wiki. Inclui também tarefas, tópicos do fórum, rotinas, eventos do calendário e aprovações, as instruções, configurações e a memória dos agentes, o que os agentes escrevem e fazem, e os dados que os agentes leem pelos conectores, bancos de dados e computadores que o workspace conecta. Nós o tratamos só para fazer funcionar o workspace e os agentes como o workspace os configurou, mostrá-lo aos membros do workspace, enviar as notificações que eles pedem e prestar suporte.",
         "O Conteúdo do Workspace pertence ao workspace: os membros veem o que os canais e as permissões dele permitem, e os donos e administradores dele o gerenciam. As mensagens que você escreveu continuam no workspace depois que você sai dele ou exclui a sua conta, a não ser que o workspace as apague.",
       ],
     },
@@ -64,8 +64,8 @@ export const privacyPtBR: LegalDocument = {
             "**Memória.** Os agentes guardam memória das conversas (resumos, fatos e lições) para melhorar com o tempo. Algumas avaliações sobre a memória (se algo vale ser guardado, ou se contradiz o que o agente já sabe) são feitas pela TypeSafe. A memória pode ser vista e apagada na página do agente, e é apagada junto com o workspace.",
             "**Busca.** Para encontrar mensagens e documentos relacionados, o texto pode ser transformado em vetores (embeddings) pela Voyage AI.",
             "**Conectores.** Quando o workspace conecta um serviço (como GitHub, Google, Linear, Sentry, uma caixa de e-mail ou qualquer servidor MCP), guardamos os tokens de acesso cifrados e lemos ou escrevemos nesse serviço só dentro dos escopos que o workspace deu a cada agente. O serviço conectado trata esses dados sob os próprios termos. Conexões com caixas do Gmail e do Outlook, e com Google Drive, Google Agenda, Google Planilhas, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox e Square, passam pela Composio, que trata o que os agentes leem e escrevem nesses serviços.",
-            "**Bancos de dados.** Conexões com bancos de dados são só de leitura; as credenciais ficam cifradas e cada consulta é verificada antes de rodar.",
-            "**Computadores conectados.** Quando alguém conecta um computador, os agentes podem rodar comandos e usar um navegador nele, dentro das pastas e permissões definidas nesse computador. A visão ao vivo do navegador de um agente passa pela Cloudflare e pela memória dos nossos servidores, e não é gravada; um resumo dos passos que o agente deu (como os endereços visitados e as ações) fica junto do trabalho dele, para a equipe ver o que ele fez.",
+            "**Bancos de dados.** Conexões com bancos de dados são só de leitura. As credenciais ficam cifradas e cada consulta é verificada antes de rodar.",
+            "**Computadores conectados.** Quando alguém conecta um computador, os agentes podem rodar comandos e usar um navegador nele, dentro das pastas e permissões definidas nesse computador. A visão ao vivo do navegador de um agente passa pela Cloudflare e pela memória dos nossos servidores, e não é gravada. Um resumo dos passos que o agente deu (como os endereços visitados e as ações) fica junto do trabalho dele, para a equipe ver o que ele fez.",
             "**O computador do workspace.** Na agentes.chat Cloud, os agentes de um workspace trabalham num computador que mantemos para esse workspace, hospedado pela Contabo na União Europeia. Contamos o volume de dados que o navegador, as ferramentas de IA e os outros programas de cada agente enviam e recebem nele, por dia. O computador é apagado depois que o plano do agentes.chat do workspace termina, como os Termos de uso descrevem.",
           ],
         },
@@ -84,7 +84,7 @@ export const privacyPtBR: LegalDocument = {
             "**Quando a lei exige.**",
           ],
         },
-        "As pessoas que operam a nossa infraestrutura conseguem chegar aos servidores e bancos de dados que guardam o Conteúdo do Workspace; elas usam esse acesso só para manter o Serviço funcionando, como diagnosticar falhas e restaurar backups, ou para cumprir uma obrigação legal. Nenhum desses caminhos é usado para criar perfis, publicidade ou dados de treino.",
+        "As pessoas que operam a nossa infraestrutura conseguem chegar aos servidores e bancos de dados que guardam o Conteúdo do Workspace. Elas usam esse acesso só para manter o Serviço funcionando, como diagnosticar falhas e restaurar backups, ou para cumprir uma obrigação legal. Nenhum desses caminhos é usado para criar perfis, publicidade ou dados de treino.",
       ],
     },
     {
@@ -121,14 +121,14 @@ export const privacyPtBR: LegalDocument = {
       id: "apps",
       heading: "10. Apps de celular e de Mac",
       blocks: [
-        "O app de celular envia notificações pela Expo, pela Apple e pelo Google; uma notificação pode mostrar o nome de quem escreveu e o começo da mensagem, e você escolhe quais notificações recebe. O app de Mac e os computadores conectados guardam o login no próprio aparelho; excluir a sua conta (o que também dá para fazer nos apps) desconecta todos os aparelhos.",
+        "O app de celular envia notificações pela Expo, pela Apple e pelo Google. Uma notificação pode mostrar o nome de quem escreveu e o começo da mensagem, e você escolhe quais notificações recebe. O app de Mac e os computadores conectados guardam o login no próprio aparelho. Excluir a sua conta (o que também dá para fazer nos apps) desconecta todos os aparelhos.",
       ],
     },
     {
       id: "gdpr",
       heading: "11. Seus direitos pelo GDPR",
       blocks: [
-        "Se você está no Espaço Econômico Europeu ou no Reino Unido, pode pedir acesso, retificação, exclusão, limitação e portabilidade, se opor ao tratamento e apresentar reclamação à autoridade de controle. Para dados de conta, fale direto conosco; você também pode corrigir o seu perfil e excluir a sua conta sozinho no app. Para dados pessoais no Conteúdo do Workspace, fale com os donos ou administradores do workspace, que os controla. Encaminharemos ao workspace os pedidos que recebermos e o ajudaremos como operador.",
+        "Se você está no Espaço Econômico Europeu ou no Reino Unido, pode pedir acesso, retificação, exclusão, limitação e portabilidade, se opor ao tratamento e apresentar reclamação à autoridade de controle. Para dados de conta, fale direto conosco. Você também pode corrigir o seu perfil e excluir a sua conta sozinho no app. Para dados pessoais no Conteúdo do Workspace, fale com os donos ou administradores do workspace, que os controla. Encaminharemos ao workspace os pedidos que recebermos e o ajudaremos como operador.",
       ],
     },
     {
@@ -163,7 +163,7 @@ export const privacyPtBR: LegalDocument = {
       id: "changes",
       heading: "16. Mudanças nesta política",
       blocks: [
-        "Podemos atualizar esta política; mudanças relevantes serão anunciadas por e-mail ou no app antes de entrarem em vigor. A versão atual fica sempre nesta página. Se uma tradução divergir da versão em inglês, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
+        "Podemos atualizar esta política. Mudanças relevantes serão anunciadas por e-mail ou no app antes de entrarem em vigor. A versão atual fica sempre nesta página. Se uma tradução divergir da versão em inglês, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
       ],
     },
     {
