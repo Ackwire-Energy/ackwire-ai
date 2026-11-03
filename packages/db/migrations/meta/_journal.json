@@ -1373,6 +1373,13 @@
       "when": 1793731584844,
       "tag": "0197_skill_edited_since_source",
       "breakpoints": true
+    },
+    {
+      "idx": 197,
+      "version": "7",
+      "when": 1793733666011,
+      "tag": "0198_command_rules",
+      "breakpoints": true
     }
   ]
 }

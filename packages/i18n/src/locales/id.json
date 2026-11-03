@@ -2445,6 +2445,8 @@
       "reads": "Selalu setujui pembacaan",
       "note": "Mencakup {{actions}} mulai sekarang, dengan nilai apa pun. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
       "noteTarget": "Mencakup {{actions}} mulai sekarang. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "noteCommand": "Mencakup {{actions}} di komputer mulai sekarang, dengan argumen apa pun. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
+      "computer": "Perintah di komputer",
       "noteReads": "Hanya mencakup pembacaan oleh {{actions}} di proyek ini ({{target}}) mulai sekarang. Yang mengubah data tetap meminta persetujuan. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
       "noteReadsAll": "Hanya mencakup pembacaan oleh {{actions}} di koneksi ini mulai sekarang. Yang mengubah data tetap meminta persetujuan. Untuk membatalkan: Alat dan akses, di halaman {{name}}.",
       "readsRule": "Pembacaan oleh {{tool}}",
@@ -4385,6 +4387,18 @@
       "label": "Tulis issue",
       "description": "Buat issue dan beri komentar."
     },
+    "github_actions_read": {
+      "label": "Baca Actions",
+      "description": "Mencantumkan workflow dan run serta membaca job dan log-nya."
+    },
+    "github_projects_read": {
+      "label": "Baca Projects",
+      "description": "Mencantumkan dan membaca GitHub Projects, beserta field dan item-nya."
+    },
+    "github_projects_write": {
+      "label": "Ubah Projects",
+      "description": "Menambahkan item ke GitHub Projects dan memindahkan atau mengubahnya."
+    },
     "github_actions_run": {
       "label": "Jalankan workflow",
       "description": "Mulai workflow GitHub Actions (bisa melakukan deploy). Selalu minta persetujuan."
@@ -5484,6 +5498,9 @@
       "allowedBy": "Disetujui oleh {{name}} · {{time}}",
       "deniedBy": "Ditolak oleh {{name}} · {{time}}",
       "alwaysBy": "Diizinkan di misi ini oleh {{name}} · {{time}}: {{rules}}",
+      "alwaysAgent": "Selalu setujui untuk agen ini",
+      "alwaysAgentHint": "Selalu setujui untuk agen ini mengizinkan {{kind}} dengan argumen apa pun, di setiap misi dan percakapan. Untuk membatalkan: Alat dan akses, di halaman agen.",
+      "alwaysAgentBy": "Diizinkan untuk agen ini oleh {{name}} · {{time}}: {{kind}}",
       "state": {
         "allowed": "Disetujui",
         "denied": "Ditolak",
@@ -8941,6 +8958,10 @@
     "connectedList": "Terhubung",
     "connected": "Terhubung",
     "connectedAs": "Terhubung sebagai {{account}}",
+    "reconnectAdds": "Hubungkan ulang {{name}} agar agen juga bisa {{what}}.",
+    "adds": {
+      "github_project": "memakai GitHub Projects (membaca papan dan memindahkan kartu)"
+    },
     "toolsCount_other": "{{count}} alat",
     "active": "Aktif",
     "notReviewed": "Menunggu ditinjau",

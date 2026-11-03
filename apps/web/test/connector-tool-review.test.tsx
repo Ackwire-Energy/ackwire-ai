@@ -268,6 +268,7 @@ describe("the agent page: one line, never a paragraph of tool names", () => {
       account: "ads.example.com",
       viaComposio: false,
       needsReconnect: false,
+      reconnectAdds: [],
       createdAt: SERVER.createdAt,
       tools: 7,
       pending: 0,

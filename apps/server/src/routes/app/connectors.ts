@@ -74,6 +74,10 @@ const Connection = z
     tokenExpiresAt: z.string().nullable(),
     createdAt: z.string(),
     revokedAt: z.string().nullable(),
+    reconnectAdds: z.array(z.string()).openapi({
+      description:
+        "OAuth scopes this sign-in lacks that the connector asks for now (GitHub's `project`): reconnecting adds them.",
+    }),
   })
   .openapi("ConnectorConnection");
 

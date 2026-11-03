@@ -127,8 +127,14 @@ export const Approval = z
 export const ApprovalRule = z
   .object({
     id: z.uuid(),
-    connectionId: z.uuid(),
-    server: z.string().openapi({ description: "The connection's name.", example: "Composio" }),
+    connectionId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "Null: a command on the agent's computer (`tool` is `command`)." }),
+    server: z
+      .string()
+      .nullable()
+      .openapi({ description: "The connection's name; null for a command.", example: "Composio" }),
     tool: z.string().openapi({ description: "The server's own tool name.", example: "COMPOSIO_MULTI_EXECUTE_TOOL" }),
     toolLabel: z.string().openapi({ description: "How the workspace labelled that tool." }),
     action: z.string().openapi({

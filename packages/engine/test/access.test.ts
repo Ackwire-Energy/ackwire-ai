@@ -85,7 +85,7 @@ describe("agent access", () => {
       apiKey: "ghp_secret_123456",
     });
     const names = (await gateway.list(ctx)).map((t) => t.name);
-    expect(names).toContain("github_get_pull_request");
+    expect(names).toContain("github_pull_request_read");
     expect(names).toContain("github_merge_pull_request");
 
     const merge = await gateway.invoke(ctx, {
@@ -128,7 +128,7 @@ describe("agent access", () => {
       state: "denied",
       sensitive: true,
     });
-    expect(tools.find((t) => t.name === "github_get_pull_request")?.state).toBe("inherited");
+    expect(tools.find((t) => t.name === "github_pull_request_read")?.state).toBe("inherited");
     expect(tree.builtins.find((b) => b.scope === "drive:write")?.state).toBe("inherited");
     // The two changes here, and GitHub given to the agent when it was connected.
     const audit = await f.db.select().from(schema.auditLog);

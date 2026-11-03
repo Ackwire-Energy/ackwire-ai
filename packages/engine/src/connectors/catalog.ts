@@ -50,6 +50,8 @@ export interface ConnectorDefinition {
   serverUrl: string;
   auth: ("oauth" | "api_key")[];
   oauth?: { authorizeUrl: string; tokenUrl: string; scopes: string[]; scopeSeparator?: string };
+  /** Sent with every request to its MCP server, besides the sign-in. */
+  headers?: Record<string, string>;
   scopes: Record<string, ConnectorScope>;
   tools: Record<string, ConnectorTool>;
 }
@@ -67,9 +69,11 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
     oauth: {
       authorizeUrl: "https://github.com/login/oauth/authorize",
       tokenUrl: "https://github.com/login/oauth/access_token",
-      scopes: ["repo", "read:org", "workflow"],
+      scopes: ["repo", "read:org", "workflow", "project"],
       scopeSeparator: " ",
     },
+    // The remote server loads only context, repos, issues, pull_requests and users unless asked (its docs/remote-server.md).
+    headers: { "X-MCP-Toolsets": "context,repos,issues,pull_requests,users,actions,projects" },
     scopes: {
       "repo.read": s("Read code", "Read files and commits and search the code."),
       "repo.write": s("Write code", "Create branches and push commits (never to the default branch without a PR)."),
@@ -86,7 +90,10 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       "pr.merge": s("Merge pull requests", "Merge a pull request. Always asks for approval."),
       "issues.read": s("Read issues", "List and read GitHub issues."),
       "issues.write": s("Write issues", "Create issues and comment."),
+      "actions.read": s("Read Actions", "List workflows and runs and read their jobs and logs."),
       "actions.run": s("Run workflows", "Start GitHub Actions workflows (they may deploy). Always asks for approval."),
+      "projects.read": s("Read Projects", "List and read GitHub Projects, their fields and items."),
+      "projects.write": s("Write Projects", "Add items to GitHub Projects and move or edit them."),
     },
     tools: {
       git_clone: { scope: "git.read", ours: true },
@@ -95,32 +102,57 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       request_branch_push: { scope: "git.write", ours: true },
       get_file_contents: { scope: "repo.read" },
       search_code: { scope: "repo.read" },
+      search_commits: { scope: "repo.read" },
+      search_repositories: { scope: "repo.read" },
       list_commits: { scope: "repo.read" },
+      get_commit: { scope: "repo.read" },
+      list_branches: { scope: "repo.read" },
+      list_tags: { scope: "repo.read" },
+      list_releases: { scope: "repo.read" },
+      get_latest_release: { scope: "repo.read" },
       create_branch: { scope: "repo.write" },
       push_files: { scope: "repo.write" },
       create_or_update_file: { scope: "repo.write" },
-      get_pull_request: { scope: "pr.read" },
+      pull_request_read: { scope: "pr.read" },
       list_pull_requests: { scope: "pr.read" },
-      get_pull_request_status: { scope: "pr.read" },
-      get_pull_request_diff: { scope: "pr.read" },
+      search_pull_requests: { scope: "pr.read" },
       create_pull_request: { scope: "pr.write" },
-      add_pull_request_review_comment: { scope: "pr.write" },
+      update_pull_request: { scope: "pr.write" },
+      update_pull_request_branch: { scope: "pr.write" },
+      add_comment_to_pending_review: { scope: "pr.write" },
+      add_reply_to_pull_request_comment: { scope: "pr.write" },
+      // Its `submit_pending` and `create` methods can approve a pull request: never approved for good.
+      pull_request_review_write: {
+        scope: "pr.write",
+        sensitive: true,
+        title: "Review PR #{pullNumber} in {owner}/{repo}",
+      },
       merge_pull_request: {
         scope: "pr.merge",
         sensitive: true,
         title: "Merge PR #{pullNumber} in {owner}/{repo}",
         onSuccess: { kind: "pr_merged", subject: "{owner}/{repo}#{pullNumber}" },
       },
-      get_issue: { scope: "issues.read" },
+      issue_read: { scope: "issues.read" },
       list_issues: { scope: "issues.read" },
-      create_issue: { scope: "issues.write" },
+      search_issues: { scope: "issues.read" },
+      list_issue_types: { scope: "issues.read" },
+      get_label: { scope: "issues.read" },
+      issue_write: { scope: "issues.write" },
+      sub_issue_write: { scope: "issues.write" },
       add_issue_comment: { scope: "issues.write" },
-      run_workflow: {
+      update_issue_comment: { scope: "issues.write" },
+      actions_list: { scope: "actions.read" },
+      actions_get: { scope: "actions.read" },
+      get_job_logs: { scope: "actions.read" },
+      actions_run_trigger: {
         scope: "actions.run",
         sensitive: true,
-        title: "Run workflow {workflow_id} in {owner}/{repo}",
+        title: "Run {method} in {owner}/{repo}",
       },
-      list_workflow_runs: { scope: "repo.read" },
+      projects_list: { scope: "projects.read" },
+      projects_get: { scope: "projects.read" },
+      projects_write: { scope: "projects.write" },
     },
   },
   sentry: {

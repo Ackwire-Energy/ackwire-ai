@@ -13,7 +13,7 @@ import {
   useRemoveApprovalRule,
   useUsage,
 } from "@agenteschat/client";
-import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
+import { approvalRuleServer, approvalRuleWords } from "@agenteschat/client/lib/approval-words";
 import { listsAgent, seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
@@ -650,9 +650,9 @@ function AlwaysApproved({ agentId, name, mayRemove }: { agentId: string; name: s
               key={rule.id}
               leading={
                 <ConnectorIcon
-                  def={connected.get(rule.connectionId)?.def ?? null}
-                  image={connected.get(rule.connectionId)?.image}
-                  label={rule.server}
+                  def={(rule.connectionId && connected.get(rule.connectionId)?.def) || null}
+                  image={rule.connectionId ? connected.get(rule.connectionId)?.image : null}
+                  label={approvalRuleServer(t, rule)}
                   size={36}
                 />
               }

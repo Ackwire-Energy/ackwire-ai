@@ -2435,6 +2435,8 @@
       "reads": "始终批准读取",
       "note": "从现在起涵盖 {{actions}}，任何值都适用。如需撤销：{{name}} 页面的“工具和权限”。",
       "noteTarget": "从现在起涵盖 {{actions}}。如需撤销：{{name}} 页面的“工具和权限”。",
+      "noteCommand": "从现在起涵盖计算机上的 {{actions}}，参数不限。如需撤销：{{name}} 页面的“工具和权限”。",
+      "computer": "计算机上的命令",
       "noteReads": "从现在起仅涵盖 {{actions}} 在此项目（{{target}}）中的读取。会更改数据的操作仍需批准。如需撤销：{{name}} 页面的“工具和权限”。",
       "noteReadsAll": "从现在起仅涵盖 {{actions}} 在此连接中的读取。会更改数据的操作仍需批准。如需撤销：{{name}} 页面的“工具和权限”。",
       "readsRule": "{{tool}} 的读取",
@@ -4400,6 +4402,18 @@
       "label": "写入 Issue",
       "description": "创建 Issue 并发表评论。"
     },
+    "github_actions_read": {
+      "label": "读取 Actions",
+      "description": "列出工作流和运行，并读取其作业和日志。"
+    },
+    "github_projects_read": {
+      "label": "读取 Projects",
+      "description": "列出并读取 GitHub Projects 及其字段和条目。"
+    },
+    "github_projects_write": {
+      "label": "编辑 Projects",
+      "description": "向 GitHub Projects 添加条目，并移动或编辑条目。"
+    },
     "github_actions_run": {
       "label": "运行工作流",
       "description": "启动 GitHub Actions 工作流（可能会部署）。始终需要审批。"
@@ -5492,6 +5506,9 @@
       "allowedBy": "由 {{name}} 批准 · {{time}}",
       "deniedBy": "由 {{name}} 拒绝 · {{time}}",
       "alwaysBy": "由 {{name}} 在此专项任务中允许 · {{time}}：{{rules}}",
+      "alwaysAgent": "对此智能体始终批准",
+      "alwaysAgentHint": "“对此智能体始终批准”会在每个任务和对话中允许 {{kind}}，参数不限。如需撤销：智能体页面的“工具和权限”。",
+      "alwaysAgentBy": "{{name}} 已为此智能体允许 · {{time}}：{{kind}}",
       "state": {
         "allowed": "已批准",
         "denied": "已拒绝",
@@ -8951,6 +8968,10 @@
     "connectedList": "已连接",
     "connected": "已连接",
     "connectedAs": "已连接为 {{account}}",
+    "reconnectAdds": "重新连接 {{name}}，让智能体也能{{what}}。",
+    "adds": {
+      "github_project": "使用 GitHub Projects（读取看板并移动卡片）"
+    },
     "toolsCount_other": "{{count}} 个工具",
     "active": "已启用",
     "notReviewed": "等待审核",

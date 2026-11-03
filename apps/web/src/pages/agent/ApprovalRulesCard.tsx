@@ -1,5 +1,5 @@
 import { useApprovalRules, useRemoveApprovalRule } from "@agenteschat/client";
-import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
+import { approvalRuleServer, approvalRuleWords } from "@agenteschat/client/lib/approval-words";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Card } from "@agenteschat/ui";
@@ -43,12 +43,12 @@ export function ApprovalRulesCard() {
           return (
             <li key={rule.id} className="level-row ac-faceline">
               <ResourceIcon
-                resource={{ connectionId: rule.connectionId, area: null }}
+                resource={{ connectionId: rule.connectionId, area: rule.connectionId ? null : "sandbox" }}
                 items={items}
-                name={rule.server}
+                name={approvalRuleServer(t, rule)}
               />
               <span className="level-row__text">
-                <span className="level-row__name ac-captop">{rule.server}</span>
+                <span className="level-row__name ac-captop">{approvalRuleServer(t, rule)}</span>
                 <span title={rule.action || rule.tool}>{what}</span>
                 <span className="small muted">
                   {who

@@ -162,6 +162,12 @@ export interface ToolDefinition {
    */
   rememberTarget?(input: Record<string, unknown>): string | null;
   /**
+   * A tool that runs one shell command on the agent's computer (`run_code` in bash, a shell task): the command, so
+   * "Aprovar sempre" may keep its kind for the agent (`commandKind`, no connection). Null: this call runs no plain
+   * command.
+   */
+  rememberCommand?(input: Record<string, unknown>): string | null;
+  /**
    * A connected server's tool that runs the SQL in `arg` (Supabase's `execute_sql`), by the server's own name `tool`:
    * "Aprovar sempre leituras" may cover its calls the Postgres guard proves read-only (`provenReadOnly`), one rule per
    * set of other arguments (the project or database the call names). A call it can't prove still asks.

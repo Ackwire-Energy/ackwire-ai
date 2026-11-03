@@ -156,6 +156,7 @@ import type {
   Mission,
   MissionBrain,
   MissionCommand,
+  MissionCommandDecision,
   MissionCommandRule,
   MissionControl,
   MissionCreateInput,
@@ -1098,7 +1099,7 @@ export interface ApiClient {
       orgId: string,
       missionId: string,
       commandId: string,
-      decision: "allow" | "deny" | "always",
+      decision: MissionCommandDecision,
     ): Promise<MissionCommand>;
     /** "Liberar e continuar": allow the commands a task was refused (one or several) and resume it once. */
     retryCommand(

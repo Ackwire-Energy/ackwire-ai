@@ -2516,6 +2516,8 @@
       "reads": "Lesezugriffe immer freigeben",
       "note": "Gilt ab jetzt für {{actions}}, mit beliebigen Werten. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
       "noteTarget": "Gilt ab jetzt für {{actions}}. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
+      "noteCommand": "Gilt ab jetzt für {{actions}} auf dem Computer, mit beliebigen Argumenten. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
+      "computer": "Befehle auf dem Computer",
       "noteReads": "Gilt ab jetzt nur für Lesezugriffe von {{actions}} in diesem Projekt ({{target}}). Was Daten ändert, fragt weiter nach. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
       "noteReadsAll": "Gilt ab jetzt nur für Lesezugriffe von {{actions}} über diese Verbindung. Was Daten ändert, fragt weiter nach. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
       "readsRule": "Lesezugriffe von {{tool}}",
@@ -4524,6 +4526,18 @@
       "label": "Issues schreiben",
       "description": "Issues erstellen und kommentieren."
     },
+    "github_actions_read": {
+      "label": "Actions lesen",
+      "description": "Workflows und Läufe auflisten und ihre Jobs und Logs lesen."
+    },
+    "github_projects_read": {
+      "label": "Projects lesen",
+      "description": "GitHub Projects mit ihren Feldern und Einträgen auflisten und lesen."
+    },
+    "github_projects_write": {
+      "label": "Projects bearbeiten",
+      "description": "Einträge zu GitHub Projects hinzufügen, verschieben oder bearbeiten."
+    },
     "github_actions_run": {
       "label": "Workflows ausführen",
       "description": "GitHub-Actions-Workflows starten (können deployen). Fragt immer nach Freigabe."
@@ -5656,6 +5670,9 @@
       "allowedBy": "Freigegeben von {{name}} · {{time}}",
       "deniedBy": "Abgelehnt von {{name}} · {{time}}",
       "alwaysBy": "In dieser Mission erlaubt von {{name}} · {{time}}: {{rules}}",
+      "alwaysAgent": "Immer für diesen Agenten genehmigen",
+      "alwaysAgentHint": "Immer für diesen Agenten genehmigen erlaubt {{kind}} mit beliebigen Argumenten, in jeder Mission und jedem Gespräch. Rückgängig: Tools und Zugriff, auf der Seite des Agenten.",
+      "alwaysAgentBy": "Für diesen Agenten erlaubt von {{name}} · {{time}}: {{kind}}",
       "state": {
         "allowed": "Freigegeben",
         "denied": "Abgelehnt",
@@ -9227,6 +9244,10 @@
     "connectedList": "Verbunden",
     "connected": "Verbunden",
     "connectedAs": "Verbunden als {{account}}",
+    "reconnectAdds": "Verbinde {{name}} neu, damit Agenten auch {{what}} können.",
+    "adds": {
+      "github_project": "GitHub Projects nutzen (Boards lesen und Karten verschieben)"
+    },
     "toolsCount_one": "{{count}} Tool",
     "toolsCount_other": "{{count}} Tools",
     "active": "Aktiv",

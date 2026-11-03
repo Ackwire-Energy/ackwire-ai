@@ -892,6 +892,10 @@ export function missionRoutes(deps: AppDeps) {
       decidedBy: z.string().nullable(),
       decidedAt: z.string().nullable(),
       always: z.boolean(),
+      agentKind: z.string().nullable().openapi({
+        description: '"Aprovar sempre para o agente" is offered: the kind of command it keeps (`gh issue create`).',
+      }),
+      forAgent: z.boolean(),
       createdAt: z.string(),
       expiresAt: z.string(),
     })
@@ -925,10 +929,10 @@ export function missionRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "Aprovar / Recusar / Aprovar sempre nesta missão (owner or deciders); the waiting executor gets the answer within seconds",
+        "Aprovar / Recusar / Aprovar sempre nesta missão (owner or deciders) / Aprovar sempre para o agente (`agent`: its owner or an admin); the waiting executor gets the answer within seconds",
       request: {
         params: CommandParams,
-        body: body(z.object({ decision: z.enum(["allow", "deny", "always"]) })),
+        body: body(z.object({ decision: z.enum(["allow", "deny", "always", "agent"]) })),
       },
       responses: { 200: json(Command), ...errors },
     }),

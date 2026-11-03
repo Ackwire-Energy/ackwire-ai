@@ -6117,6 +6117,12 @@
   "approval.always.noteTarget": {
     "value": "Covers {{actions}} from now on. To undo: Tools and access, on {{name}}'s page."
   },
+  "approval.always.noteCommand": {
+    "value": "Covers {{actions}} on the computer from now on, with any arguments. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.computer": {
+    "value": "Commands on the computer"
+  },
   "approval.always.noteReads": {
     "value": "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page."
   },
@@ -10983,6 +10989,24 @@
   "scopes.github_issues_write.description": {
     "value": "Create issues and comment."
   },
+  "scopes.github_actions_read.label": {
+    "value": "Read Actions"
+  },
+  "scopes.github_actions_read.description": {
+    "value": "List workflows and runs and read their jobs and logs."
+  },
+  "scopes.github_projects_read.label": {
+    "value": "Read Projects"
+  },
+  "scopes.github_projects_read.description": {
+    "value": "List and read GitHub Projects, their fields and items."
+  },
+  "scopes.github_projects_write.label": {
+    "value": "Write Projects"
+  },
+  "scopes.github_projects_write.description": {
+    "value": "Add items to GitHub Projects and move or edit them."
+  },
   "scopes.github_actions_run.label": {
     "value": "Run workflows"
   },
@@ -13710,6 +13734,15 @@
   },
   "missions.command.alwaysBy": {
     "value": "Allowed in this mission by {{name}} · {{time}}: {{rules}}"
+  },
+  "missions.command.alwaysAgent": {
+    "value": "Always approve for this agent"
+  },
+  "missions.command.alwaysAgentHint": {
+    "value": "Always approve for this agent allows {{kind}} with any arguments, in every mission and conversation. To undo: Tools and access, on the agent's page."
+  },
+  "missions.command.alwaysAgentBy": {
+    "value": "Allowed for this agent by {{name}} · {{time}}: {{kind}}"
   },
   "missions.command.state.allowed": {
     "value": "Approved"
@@ -22314,6 +22347,12 @@
   },
   "connectors.connectedAs": {
     "value": "Connected as {{account}}"
+  },
+  "connectors.reconnectAdds": {
+    "value": "Reconnect {{name}} so agents can also {{what}}."
+  },
+  "connectors.adds.github_project": {
+    "value": "use GitHub Projects (read boards and move cards)"
   },
   "connectors.toolsCount": {
     "value": {
