@@ -55,7 +55,9 @@
   border-radius: 6px var(--radius-section) var(--radius-section) var(--radius-section);
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);
-  animation: auth-in 0.3s var(--out) both;
+  transition:
+    opacity 0.3s var(--out),
+    transform 0.3s var(--out);
 }
 .auth__title {
   margin: 0;
@@ -74,16 +76,20 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  animation: auth-in 0.36s var(--out) 0.06s both;
+  transition:
+    opacity 0.36s var(--out) 0.06s,
+    transform 0.36s var(--out) 0.06s;
 }
-@keyframes auth-in {
-  from {
+/* The entrance is a transition from the starting style, not a keyframe animation: it plays once, when the element is
+   inserted (a new step by its key). A keyframe animation replays whenever its `animation` is reset, and password
+   managers do that to an input's container while they place their icon in the field (Proton Pass sets
+   `animation: none !important` inline, then removes it), so the step faded in again on every empty <-> typed edge. */
+@starting-style {
+  .auth__bubble,
+  .auth__step,
+  .auth__fix {
     opacity: 0;
     transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
   }
 }
 .auth__field {
@@ -158,7 +164,9 @@
   font-size: 13px;
   font-weight: 500;
   color: var(--ink);
-  animation: auth-in 0.25s var(--out) both;
+  transition:
+    opacity 0.25s var(--out),
+    transform 0.25s var(--out);
 }
 .auth__fix:hover {
   background: var(--plate);
