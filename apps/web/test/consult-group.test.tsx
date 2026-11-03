@@ -362,6 +362,22 @@ describe("the pair row before the reply that asked (ConsultPairRow)", () => {
     expect(panel()?.textContent).not.toContain("mentioned you");
   });
 
+  test("a hand-off older than the conversation's list goes back is still the pair row, never 'Entregue ao'", async () => {
+    const c = consultation({ kind: "note", status: "answered", answer: ANSWER, answeredAt: ago(5) });
+    // The list holds only the latest questions: this one is loaded on its own.
+    const state = withTalk(withAsk([]), c);
+    const ask = state.messages.find((m) => m.id === "msg-asked");
+    if (ask)
+      ask.meta = { reach: [{ agentId: ATLAS_ID, handle: "atlas", reason: "not_in_channel", consultationId: "q1" }] };
+    await open(state);
+    await settle(3);
+    expect(document.body.textContent).not.toContain("Entregue ao");
+    const reach = screen().getByRole("group", { name: "Quem a mensagem não chamou direto" });
+    const r = reach.querySelector(".consult-pair") as HTMLElement;
+    expect([...r.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
+  });
+
   test("without questions the reply has no row before it; the notice draws its own, with no answer in it", async () => {
     await open(withAsk([], true));
     expect(asked().previousElementSibling?.classList.contains("consult-pair")).toBe(false);

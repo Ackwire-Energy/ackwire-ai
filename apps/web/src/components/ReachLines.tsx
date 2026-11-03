@@ -65,7 +65,7 @@ function ReachRow({
   const g = agentGrammar(agent?.name ?? `@${e.handle}`);
   const values = { ...g, place };
   const handed = Boolean(e.consultationId);
-  const talk = useConsultById(reachOpens(e) ? e.consultationId : undefined);
+  const talk = useConsultById(channelId, reachOpens(e) ? e.consultationId : undefined);
   const detail = [
     !handed && e.outside ? t("reach.outside", { place }) : null,
     e.routine ? t("reach.routine", { name: e.routine.name }) : null,

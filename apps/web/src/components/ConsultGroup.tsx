@@ -3,6 +3,7 @@ import {
   type Message,
   type MessageConsultation,
   type RunConsultation,
+  useConsultationConversation,
   useConsultations,
 } from "@agenteschat/client";
 import {
@@ -136,13 +137,16 @@ export function useReplyConsults(
   }, [groups.byRun, groups.live, runId, consulted, saved, reached]);
 }
 
-/** The conversation's question with this id, as its list loaded it (a hand-off a reach line shows). */
-export function useConsultById(id: string | undefined): RunConsultation | null {
-  const { byRun } = useContext(ConsultGroupsContext);
-  return useMemo(() => {
-    for (const group of byRun.values()) for (const c of group) if (c.id === id) return c;
-    return null;
-  }, [byRun, id]);
+/**
+ * The conversation's question with this id (a hand-off a reach line shows): from its list, or, older than the list
+ * goes back, on its own.
+ */
+export function useConsultById(channelId: string, id: string | undefined): RunConsultation | null {
+  const { org } = useOrg();
+  const list = useConsultations(org.id, channelId, Boolean(id));
+  const listed = useMemo(() => (id && list.data?.find((c) => c.id === id)) || null, [list.data, id]);
+  const alone = useConsultationConversation(org.id, channelId, id && list.isSuccess && !listed ? id : null);
+  return listed ?? alone.data?.consultation ?? null;
 }
 
 /**

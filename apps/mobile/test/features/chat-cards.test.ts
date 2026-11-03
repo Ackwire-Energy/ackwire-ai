@@ -109,6 +109,10 @@ describe("agents it asked first: one pair row right before the reply, never insi
     const reach = source("ReachLines.tsx");
     expect(reach).toContain("<ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />");
     expect(reach).not.toContain("reach.see");
+    // One older than the conversation's list goes back is loaded on its own, never the "Entregue ao" text.
+    expect(source("ConsultGroup.tsx")).toContain(
+      "useConsultationConversation(orgId, channelId, id && list.isSuccess && !listed ? id : null)",
+    );
     const row = source("MessageRow.tsx");
     expect(row).toContain("const reached = useMemo(() => reachHandoffs(m.meta), [m.meta]);");
     expect(row).toContain("    consulted,\n    reached,\n  );");
