@@ -1649,7 +1649,7 @@ export async function endHandoffForRestart(deps: HandoffDeps, ctx: { orgId: stri
   return row;
 }
 
-/** "Ada restarted its browser. Otto's control ended.", where the turn was (else the restarting run's conversation). */
+/** "Ada restarted its browser. Marta's control ended.", where the turn was (else the restarting run's conversation). */
 async function postRestarted(deps: HandoffDeps, row: BrowserHandoffRow, controller: string, runId: string) {
   const where = (await handoffPlace(deps.db, row)) ?? (await runPlace(deps.db, row.orgId, runId));
   const agent = await getAgentCached(deps.db, row.orgId, row.agentId);

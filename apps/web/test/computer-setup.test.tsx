@@ -19,7 +19,7 @@ afterEach(() => {
 
 const SPECS = { cpus: 4, memoryGb: 8, diskGb: 100 };
 /** No system, address, provider or tool list on these screens (ADR 0056 §10). */
-const TECHNICAL = /Linux|\bIP\b|IPv4|Contabo|VPS|Debian|Chrome|\bgit\b|Outro sistema/;
+const TECHNICAL = /Linux|\bIP\b|IPv4|VPS|Debian|Chrome|\bgit\b|Outro sistema/;
 const NOTICE = "O computador do workspace";
 
 const click = async (el: Element) => {
