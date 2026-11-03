@@ -1,5 +1,11 @@
 import { and, desc, eq, gte, isNotNull, isNull, like, schema } from "@agenteschat/db";
-import { chartBlocksOf, chartBlockToWidgetSpec, isWidgetSchedule, isWidgetSize } from "@agenteschat/ui/widgets/spec";
+import {
+  chartBlocksOf,
+  chartBlockToWidgetSpec,
+  clipText,
+  isWidgetSchedule,
+  isWidgetSize,
+} from "@agenteschat/ui/widgets/spec";
 import { getAgent } from "../agents";
 import { canTalkTo, speakerOf } from "../audience";
 import { requireChannelAccess } from "../channels";
@@ -112,7 +118,7 @@ export async function pinMessageAsWidget(
       });
     }
   }
-  const title = (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, WIDGET_TITLE_MAX).trim() || chart.title;
+  const title = clipText((input.title ?? "").replace(/\s+/g, " ").trim(), WIDGET_TITLE_MAX) || chart.title;
   const row = await insertWidget(deps, {
     orgId,
     dashboardId: board.id,
@@ -125,6 +131,8 @@ export async function pinMessageAsWidget(
     spec: chart.spec,
     sourceMessageId: message.id,
     createdByUserId: actorId,
+    // A title the person typed is theirs; the chart's own is its agent's (ADR 0134 §17).
+    titleSetByUser: Boolean(input.title?.trim()),
   });
   return widgetView(deps.db, row);
 }

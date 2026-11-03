@@ -57,6 +57,12 @@ export const WIDGET_TITLE_MAX = 80;
 export const WIDGET_PROMPT_MAX = 2000;
 export const WIDGET_ALERT_CONDITION_MAX = 200;
 export const WIDGET_CHANGE_MAX = 1000;
+/** The title an agent writes on a first build or a change: short, in the person's language (ADR 0134 §17). */
+export const WIDGET_AGENT_TITLE_MAX = 40;
+/** Drafts a person keeps per workspace ("Test" in New widget); one more drops their oldest (ADR 0134 §16). */
+export const WIDGET_DRAFTS_MAX = 5;
+/** A draft nobody confirmed is deleted after this long (ADR 0134 §16). */
+export const WIDGET_DRAFT_TTL_MS = 24 * 3600_000;
 
 /** The error codes the engine throws (the apps translate them under `dashboards.errors.*`). */
 export const DASHBOARD_ERRORS = {
@@ -96,6 +102,8 @@ export const DASHBOARD_ERRORS = {
   notAgentMessage: "widget.not_agent_message",
   /** 400. */
   promptRequired: "widget.prompt_required",
+  /** 409: a draft is confirmed only once its test build worked (`ok`, ADR 0134 §16). */
+  notTested: "widget.not_tested",
 } as const;
 
 /**
@@ -197,6 +205,10 @@ export interface WidgetView {
   routineId: string | null;
   sourceMessageId: string | null;
   createdBy: { kind: "person" | "agent"; id: string } | null;
+  /** A test not created yet (ADR 0134 §16): only its creator sees it, on no board. */
+  draft: boolean;
+  /** What its latest update cost ("This test cost $0.01"); null on a plan, or before it is known. */
+  lastCostUsd: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -316,6 +328,16 @@ export interface CreateWidgetInput {
   alert?: { enabled: boolean; condition: string };
   /** Default: `defaultSize` of its format. */
   size?: WidgetSize;
+}
+
+/** "Create widget" after a test: where the draft goes and how it updates (ADR 0134 §16). */
+export interface ConfirmWidgetInput {
+  dashboardId: string;
+  /** A person's title (kept from then on); absent: the one its agent wrote on the test. */
+  title?: string;
+  size: WidgetSize;
+  schedule: WidgetSchedule;
+  alert: { enabled: boolean; condition: string };
 }
 
 export interface PinWidgetInput {

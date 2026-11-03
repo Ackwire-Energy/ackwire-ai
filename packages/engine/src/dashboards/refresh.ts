@@ -16,7 +16,7 @@ import { type EventMerge, queueEventRun, routineInFlight } from "../routine-even
 import { haltRoutineRuns } from "../routine-firing";
 import { queueRoutineRun } from "../routines";
 import { dashboardRights, requireWidget, viewerOf } from "./access";
-import { publishWidgetChanged } from "./events";
+import { publishWidgetChanged, widgetEvent } from "./events";
 import { WIDGET_CHANGE_EVENT } from "./refresh-fire";
 import { failWidget, trimWidgetHistory, widgetChangeOf, widgetNoticesDone } from "./refresh-ledger";
 import { widgetView } from "./service";
@@ -24,10 +24,10 @@ import {
   DASHBOARD_ERRORS,
   type DashboardDeps,
   type DashboardRow,
+  WIDGET_AGENT_TITLE_MAX,
   WIDGET_CHANGE_MAX,
   WIDGET_FAILURES,
   WIDGET_PROMPT_MAX,
-  WIDGET_TITLE_MAX,
   type WidgetRow,
   type WidgetStatus,
   type WidgetUpdateInput,
@@ -148,7 +148,8 @@ export async function syncWidgetRoutine(
 ): Promise<string | null> {
   const { db } = deps;
   const { widget, board } = await loadWidget(db, orgId, widgetId);
-  const schedule: WidgetSchedule = isWidgetSchedule(widget.schedule) ? widget.schedule : "manual";
+  // A draft's routine runs only its test build: never on a schedule (ADR 0134 §16).
+  const schedule: WidgetSchedule = !widget.draft && isWidgetSchedule(widget.schedule) ? widget.schedule : "manual";
   const [existing] = widget.routineId
     ? await db
         .select()
@@ -320,7 +321,7 @@ async function markBusy(deps: DashboardDeps, widget: WidgetRow, board: Dashboard
     .set({ status, updatedAt: nowOf(deps) })
     .where(eq(dashboardWidgets.id, widget.id))
     .returning();
-  await publishWidgetChanged(deps.pubsub, board, { id: widget.id, status }).catch(() => {});
+  await publishWidgetChanged(deps.pubsub, board, widgetEvent(widget, status)).catch(() => {});
   return row ?? widget;
 }
 
@@ -420,10 +421,15 @@ async function markInvalid(db: Database, routineRunId: string) {
     .where(and(eq(routineRuns.id, routineRunId), inArray(routineRuns.status, OPEN_RUN)));
 }
 
-/** Refuses data the agent must fix, and remembers it on the run. */
-async function refuseData(db: Database, routineRunId: string, message: string): Promise<never> {
+/** Refuses data (or a title, `widget.invalid_title`) the agent must fix, and remembers it on the run. */
+async function refuseData(
+  db: Database,
+  routineRunId: string,
+  message: string,
+  code: "widget.invalid_data" | "widget.invalid_title" = "widget.invalid_data",
+): Promise<never> {
   await markInvalid(db, routineRunId);
-  throw new ValidationError(message, "widget.invalid_data");
+  throw new ValidationError(message, code);
 }
 
 /**
@@ -481,6 +487,26 @@ export async function applyWidgetUpdate(
   if (!check.ok) return refuseData(db, rr.id, check.error);
   const spec = check.spec;
   const firstBuild = widget.spec === null || widget.kind === null;
+  // The agent names it on its first build (a draft's test too) and on a change request, never over a person's title
+  // and never on a plain refresh (ADR 0134 §17). Too long is refused, never cut mid-word.
+  const naming = (firstBuild || change !== null) && !widget.titleSetByUser;
+  const named = (update.title ?? "").replace(/\s+/g, " ").trim().replace(/(?<!\.)\.$/, "").trim();
+  if (naming && named.length > WIDGET_AGENT_TITLE_MAX) {
+    return refuseData(
+      db,
+      rr.id,
+      `The \`title\` is at most ${WIDGET_AGENT_TITLE_MAX} characters: write a shorter one (a few words, like "Site visits").`,
+      "widget.invalid_title",
+    );
+  }
+  if (naming && firstBuild && !named) {
+    return refuseData(
+      db,
+      rr.id,
+      `Give the widget a short \`title\` (at most ${WIDGET_AGENT_TITLE_MAX} characters, sentence case, in the person's language, no period at the end), like "Site visits": its first build names it.`,
+      "widget.invalid_title",
+    );
+  }
   if (!change && widget.format !== "auto" && spec.kind !== widget.format) {
     return refuseData(db, rr.id, `This widget shows a ${widget.format}: send data of kind "${widget.format}".`);
   }
@@ -491,12 +517,13 @@ export async function applyWidgetUpdate(
       `This widget shows a ${widget.kind}: keep that kind (only a person's change request moves it to another).`,
     );
   }
-  const naming = firstBuild || change !== null;
-  const title = naming && update.title?.trim() ? update.title.trim().slice(0, WIDGET_TITLE_MAX) : widget.title;
+  const title = naming && named ? named : widget.title;
   const prompt = change && update.prompt?.trim() ? update.prompt.trim().slice(0, WIDGET_PROMPT_MAX) : widget.prompt;
   // A change that asked for another kind moves a fixed format with it.
   const format = change && widget.format !== "auto" && spec.kind !== widget.format ? spec.kind : widget.format;
-  const alert = widget.alertEnabled && update.alert?.trim() ? update.alert.trim().slice(0, ALERT_MAX) : null;
+  // A draft raises no alert: nobody is watching it yet (ADR 0134 §16).
+  const alert =
+    widget.alertEnabled && !widget.draft && update.alert?.trim() ? update.alert.trim().slice(0, ALERT_MAX) : null;
   const summary = (update.summary ?? "").replace(/\s+/g, " ").trim().slice(0, SUMMARY_MAX);
   const now = nowOf(deps);
 
@@ -554,6 +581,6 @@ export async function applyWidgetUpdate(
   }
   // Its routine follows a new title or instructions.
   if (title !== widget.title || prompt !== widget.prompt) await syncWidgetRoutine(deps, orgId, widget.id);
-  await publishWidgetChanged(deps.pubsub, board, { id: widget.id, status: "ok" }).catch(() => {});
+  await publishWidgetChanged(deps.pubsub, board, widgetEvent(row, "ok")).catch(() => {});
   return widgetView(db, row);
 }

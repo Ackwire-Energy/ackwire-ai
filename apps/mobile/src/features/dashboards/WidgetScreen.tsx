@@ -9,7 +9,7 @@ import {
   type WidgetUpdate,
 } from "@agenteschat/client";
 import { upcomingAt, whenAt } from "@agenteschat/client/lib/format";
-import { WIDGET_SCHEDULES } from "@agenteschat/ui/widgets/spec";
+import { WIDGET_LIMITS, WIDGET_SCHEDULES } from "@agenteschat/ui/widgets/spec";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -36,7 +36,7 @@ import { useOrgId, usePullRefresh } from "../shared/hooks";
 import { FocusLive, goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { useAgentLook, useWidgetWords } from "./hooks";
-import { HOME } from "./logic";
+import { HOME, shownWidgetTitle } from "./logic";
 import { WidgetCard } from "./WidgetView";
 
 /** Rows of the history shown (the server keeps the latest 20). */
@@ -45,7 +45,8 @@ const HISTORY_SHOWN = 10;
 const CONDITION_MAX = 200;
 
 /**
- * A widget, pushed from its board (ADR 0134): the widget big, why it didn't update (with Resolve), how it updates
+ * A widget, pushed from its board (ADR 0134): the widget big, why it didn't update (with Resolve), its title (renamed
+ * in place; a person's title is kept: the agent no longer changes it), how it updates
  * (its schedule, picked in place; the alert and its condition; what the agent reads; its routine), the latest updates,
  * "Update now" and the remove; at the bottom, "Ask <agent> for a change" goes to the agent, who redoes it in place.
  */
@@ -87,12 +88,18 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
   const refresh = useRefreshWidget(orgId);
   const update = useUpdateWidget(orgId);
   const remove = useRemoveWidget(orgId);
-  const [open, setOpen] = useState<"schedule" | "alert" | null>(null);
+  const [open, setOpen] = useState<"title" | "schedule" | "alert" | null>(null);
   const [alertOn, setAlertOn] = useState(w.alert.enabled);
   const [condition, setCondition] = useState(w.alert.condition);
+  const [title, setTitle] = useState(w.title);
   const home = w.dashboard.kind === "home";
   const busy = w.status === "building" || w.status === "updating";
-  const toggle = (what: "schedule" | "alert") => setOpen((v) => (v === what ? null : what));
+  const shown = shownWidgetTitle(w.title, w.kind, (k) => t(k));
+  const toggle = (what: "title" | "schedule" | "alert") => {
+    // The title field opens with the widget's title as it is now (the agent may have named it meanwhile).
+    if (what === "title" && open !== "title") setTitle(w.title);
+    setOpen((v) => (v === what ? null : what));
+  };
 
   const updateNow = () =>
     refresh.mutate(w.id, {
@@ -114,6 +121,25 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
       },
     );
   };
+  const saveTitle = () => {
+    const next = title.trim();
+    if (!next || update.isPending) return;
+    if (next === w.title) {
+      setOpen(null);
+      return;
+    }
+    update.mutate(
+      { widgetId: w.id, title: next },
+      {
+        onSuccess: () => {
+          successHaptic();
+          setOpen(null);
+          toast({ title: t("mobile.dashboards.widget.titleSaved") });
+        },
+        onError: failed,
+      },
+    );
+  };
   const saveAlert = () =>
     update.mutate(
       { widgetId: w.id, alert: { enabled: alertOn, condition: condition.trim() } },
@@ -128,7 +154,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
     );
   const confirmRemove = () =>
     Alert.alert(
-      t("mobile.dashboards.widget.removeTitle", { title: w.title }),
+      t("mobile.dashboards.widget.removeTitle", { title: shown }),
       t("mobile.dashboards.widget.removeText"),
       [
         { text: t("mobile.common.cancel"), style: "cancel" },
@@ -168,7 +194,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader
-        title={w.title}
+        title={shown}
         subtitle={t("mobile.dashboards.widget.caresFor", { name: look.name })}
         solid={false}
         grouped
@@ -191,6 +217,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
             big
             widget={{
               title: w.title,
+              kind: w.kind,
               spec: w.spec,
               status: w.status,
               agentId: w.agentId,
@@ -215,6 +242,48 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
                 />
               ) : null}
             </View>
+          ) : null}
+
+          {w.canEdit ? (
+            <>
+              <View style={styles.gap} />
+              <GroupedList>
+                <GroupedRow
+                  icon="pen"
+                  label={t("mobile.dashboards.widget.title")}
+                  value={shown}
+                  chevron
+                  onPress={() => toggle("title")}
+                />
+                {open === "title" ? (
+                  <View style={styles.alert}>
+                    <TextArea
+                      value={title}
+                      onChangeText={setTitle}
+                      placeholder={t("mobile.dashboards.widget.titlePlaceholder")}
+                      accessibilityLabel={t("mobile.dashboards.widget.title")}
+                      multiline={false}
+                      minHeight={46}
+                      style={styles.condition}
+                      maxLength={WIDGET_LIMITS.title}
+                      returnKeyType="done"
+                      autoFocus
+                      onSubmitEditing={saveTitle}
+                    />
+                    <View style={styles.alertSave}>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        label={t("common.save")}
+                        loading={update.isPending}
+                        disabled={!title.trim()}
+                        onPress={saveTitle}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+              </GroupedList>
+            </>
           ) : null}
 
           <GroupedHeader>{t("widgets.panel.how")}</GroupedHeader>

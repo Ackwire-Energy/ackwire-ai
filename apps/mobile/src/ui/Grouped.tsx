@@ -77,6 +77,8 @@ export interface GroupedRowProps {
   leading?: ReactNode;
   /** The value on the right, faint ("Ligadas"). */
   value?: string;
+  /** Drawn just before the value (a picked agent's face, a format's glyph). */
+  valueLeading?: ReactNode;
   /** A chevron: it opens a screen. */
   chevron?: boolean;
   /** Three dots: it opens a sheet of actions. */
@@ -120,6 +122,7 @@ function Row({
   icon,
   leading,
   value,
+  valueLeading,
   chevron = false,
   more = false,
   checked,
@@ -168,7 +171,16 @@ function Row({
           </Text>
         ) : null}
       </View>
-      {value ? (
+      {valueLeading ? (
+        <View style={[styles.value, styles.valued]}>
+          {valueLeading}
+          {value ? (
+            <Text variant="callout" tone="faint" numberOfLines={1} style={styles.shrink}>
+              {value}
+            </Text>
+          ) : null}
+        </View>
+      ) : value ? (
         <Text variant="callout" tone="faint" numberOfLines={1} style={styles.value}>
           {value}
         </Text>
@@ -286,6 +298,7 @@ const styles = StyleSheet.create({
   tile: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, minWidth: 0 },
   value: { flexShrink: 1, maxWidth: "50%" },
+  valued: { flexDirection: "row", alignItems: "center", gap: 6 },
   field: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 50, paddingHorizontal: 14 },
   key: { width: 96 },
   keyLine: { flexDirection: "row", alignItems: "flex-start", gap: 4 },

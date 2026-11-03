@@ -1728,7 +1728,9 @@ export const featureKeysPtBR = {
       which: "Qual gráfico",
     },
     organize: {
-      hint: "Mude os widgets de lugar e escolha o tamanho de cada um. Pronto salva a ordem.",
+      hint:
+        "Segure um widget e arraste para o novo lugar, ou use as setas, e escolha o tamanho de cada um. Pronto salva a ordem.",
+      holdHint: "Segure e arraste para mudar de lugar.",
       up: "Subir",
       down: "Descer",
       position: "{{at}} de {{count}}",
@@ -1754,7 +1756,11 @@ export const featureKeysPtBR = {
       removed: "Widget tirado. A rotina parou.",
       routine: "A rotina dele",
       onBoard: "Onde está",
+      title: "Título",
+      titlePlaceholder: "Um nome curto para o widget",
+      titleSaved: "Título salvo",
     },
+    formatAuto: "{{name}} escolhe o melhor",
     notice: {
       widget_alert_one: "{{names}} sinalizou um widget",
       widget_alert_other: "{{names}} sinalizaram um widget",

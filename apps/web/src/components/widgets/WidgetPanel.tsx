@@ -16,17 +16,19 @@ import {
 } from "@agenteschat/ui";
 import { WIDGET_SCHEDULES } from "@agenteschat/ui/widgets/spec";
 import type { TFunction } from "i18next";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useFocusAtEnd, useSent } from "@/components/EditInPlace";
 import { useNow } from "@/hooks/useNow";
 import { useToast } from "@/lib/toast";
-import { failureText, useWidgetAgent, WidgetFoot } from "./parts";
+import { failureText, useWidgetAgent, WidgetFoot, widgetTitle } from "./parts";
 import "./widgets.css";
 
 /**
  * A widget's side panel (ADR 0134): the widget big, how it updates (its schedule and next run, its alert, what its
- * agent reads), its latest updates, Update now, Remove, and "Ask for a change" to its agent. Opened from a board
+ * agent reads), its latest updates, Update now, Remove, and "Ask for a change" to its agent. Whoever edits it renames
+ * it in place: a press on the title (or its pencil) opens the field, Enter saves, Esc cancels. Opened from a board
  * (`?widget=<id>`), a notification or a push.
  */
 export function WidgetPanel({
@@ -44,13 +46,71 @@ export function WidgetPanel({
   const { name } = useWidgetAgent(widget?.agentId ?? "");
   const refresh = useRefreshWidget(orgId);
   const toast = useToast();
+  const update = useUpdateWidget(orgId);
   const busy = widget?.status === "building" || widget?.status === "updating" || refresh.isPending;
   const gone = query.isError && widgetId !== null;
+  // Renaming: the field's text while it is open, then what was sent until the widget comes back with it.
+  const [naming, setNaming] = useState<string | null>(null);
+  const sent = useSent<string>(widget?.title ?? "");
+  const field = useFocusAtEnd<HTMLInputElement>(naming !== null);
+  const cancelled = useRef(false);
+  const shown = widget ? (sent.pending ?? widgetTitle(t, widget)) : gone ? t("dashboards.errors.widgetNotFound") : "";
+  const startNaming = () => {
+    if (!widget?.canEdit) return;
+    cancelled.current = false;
+    // A widget its agent hasn't named yet starts empty, not with the name it shows meanwhile.
+    setNaming(sent.pending ?? (widgetTitle(t, widget) === widget.title ? widget.title : ""));
+  };
+  const saveName = () => {
+    if (naming === null || !widget) return;
+    const next = naming.trim();
+    setNaming(null);
+    if (cancelled.current || !next || next === widget.title) return;
+    sent.send(next);
+    update.mutate(
+      { widgetId: widget.id, title: next },
+      {
+        onError: (e) => {
+          sent.clear();
+          toast.show(errorText(t, e, i18n.language), "error");
+        },
+      },
+    );
+  };
+  const title: ReactNode =
+    naming !== null ? (
+      <input
+        ref={field}
+        className="wd__title-input"
+        value={naming}
+        maxLength={80}
+        aria-label={t("widgets.panel.titleLabel")}
+        onChange={(e) => setNaming(e.target.value)}
+        onBlur={saveName}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== "Escape") return;
+          e.preventDefault();
+          cancelled.current = e.key === "Escape";
+          e.currentTarget.blur();
+        }}
+      />
+    ) : widget?.canEdit ? (
+      // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a pointer shortcut; the pencil is the keyboard way
+      <span className="wd__title" onClick={startNaming}>
+        {shown}
+      </span>
+    ) : (
+      shown
+    );
   return (
     <Dialog
       open={widgetId !== null}
       onOpenChange={(open) => !open && onClose()}
-      title={widget?.title ?? (gone ? t("dashboards.errors.widgetNotFound") : "")}
+      title={title}
+      // Esc while renaming cancels the name, not the panel.
+      onEscapeKeyDown={(e) => {
+        if (naming !== null) e.preventDefault();
+      }}
       description={
         widget
           ? widget.dashboard.kind === "home" || !widget.dashboard.title
@@ -63,18 +123,32 @@ export function WidgetPanel({
       className="wd"
       actions={
         widget?.canEdit ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            icon="refresh"
-            aria-label={t("widgets.menu.refresh")}
-            title={t("widgets.menu.refresh")}
-            disabled={busy}
-            onClick={() =>
-              refresh.mutate(widget.id, { onError: (e) => toast.show(errorText(t, e, i18n.language), "error") })
-            }
-          />
+          <>
+            {naming === null && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="edit"
+                className="wd__pen"
+                aria-label={t("widgets.panel.rename")}
+                title={t("widgets.panel.rename")}
+                onClick={startNaming}
+              />
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon="refresh"
+              aria-label={t("widgets.menu.refresh")}
+              title={t("widgets.menu.refresh")}
+              disabled={busy}
+              onClick={() =>
+                refresh.mutate(widget.id, { onError: (e) => toast.show(errorText(t, e, i18n.language), "error") })
+              }
+            />
+          </>
         ) : undefined
       }
     >
@@ -106,7 +180,7 @@ function PanelBody({ orgId, widget, onClose }: { orgId: string; widget: WidgetDe
     <>
       <WidgetCard
         className="wd__big"
-        title={widget.title}
+        title={widgetTitle(t, widget)}
         spec={widget.spec}
         status={widget.status}
         color={color}
@@ -151,7 +225,7 @@ function PanelBody({ orgId, widget, onClose }: { orgId: string; widget: WidgetDe
                 onSuccess: () => {
                   toast.show(
                     t(widget.dashboard.kind === "home" ? "widgets.removed.home" : "widgets.removed.board", {
-                      title: widget.title,
+                      title: widgetTitle(t, widget),
                       name,
                     }),
                   );

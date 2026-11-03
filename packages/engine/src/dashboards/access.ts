@@ -115,7 +115,10 @@ export async function requireDashboard(
   return { board, viewer, membership };
 }
 
-/** A widget and its board, with the same rule on the board (`widget.not_found` when the board is hidden). */
+/**
+ * A widget and its board, with the same rule on the board (`widget.not_found` when the board is hidden). A draft
+ * (ADR 0134 §16) is its creator's alone, whatever the board's audience: anyone else gets `widget.not_found`.
+ */
 export async function requireWidget(
   db: Database,
   actorId: string,
@@ -137,7 +140,13 @@ export async function requireWidget(
         isNull(dashboards.deletedAt),
       ),
     );
-  const rights = row ? dashboardRights(row.board, viewer) : NO_RIGHTS;
+  const rights = !row
+    ? NO_RIGHTS
+    : row.widget.draft
+      ? row.widget.createdByUserId === actorId
+        ? { see: true, edit: true, manage: true }
+        : NO_RIGHTS
+      : dashboardRights(row.board, viewer);
   if (!row || !rights.see) throw new NotFoundError("Widget not found", DASHBOARD_ERRORS.widgetNotFound);
   if (!rights[need]) throw forbidden();
   return { widget: row.widget, board: row.board, viewer, membership };

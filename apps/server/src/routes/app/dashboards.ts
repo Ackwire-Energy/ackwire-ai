@@ -1,5 +1,6 @@
 import {
   askWidgetChange,
+  confirmWidget,
   createDashboard,
   createWidget,
   type DashboardDeps,
@@ -16,6 +17,7 @@ import {
   removeWidget,
   saveDashboardLayout,
   shareDashboard,
+  testWidget,
   updateDashboard,
   updateWidget,
   widgetSuggestions,
@@ -33,6 +35,7 @@ import {
   security,
 } from "./context";
 import {
+  ConfirmWidgetBody,
   CreateDashboardBody,
   CreateWidgetBody,
   Dashboard,
@@ -247,6 +250,47 @@ export function dashboardRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "post",
+      path: "/organizations/{orgId}/dashboards/{dashboardId}/widgets/test",
+      tags,
+      security,
+      summary: "Test: a draft of the widget, built at once with real data by its agent, seen only by me",
+      description:
+        "The same checks as + Widget (I edit the board, I may talk to the agent). The draft (`draft: true`) is on no board and under no cap; it starts `building` and its events go to me alone. I keep at most 5 drafts (the oldest go); unconfirmed ones go after a day. Confirm it with `POST …/widgets/{widgetId}/confirm` once it is `ok`; `DELETE …/widgets/{widgetId}` drops it and stops its run (ADR 0134 §16).",
+      request: { params: DashboardParams, body: body(CreateWidgetBody) },
+      responses: { 202: json(Widget, "Accepted: its test build started"), ...errors },
+    }),
+    async (c) => {
+      const { orgId, dashboardId } = c.req.valid("param");
+      const widget = await testWidget(boards, c.get("user").id, orgId, dashboardId, c.req.valid("json"));
+      wake();
+      return c.json(widget, 202);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/widgets/{widgetId}/confirm",
+      tags,
+      security,
+      summary: "Create widget after a test: the draft goes first on the board, keeping its data and history",
+      description:
+        "Only my own draft (`widget.not_found` otherwise), only once its test worked (`widget.not_tested`, 409); the board's room and the scheduled cap hold as on + Widget. A title that differs from its agent's is mine from then on.",
+      request: { params: WidgetParams, body: body(ConfirmWidgetBody) },
+      responses: { 200: json(Widget), ...errors },
+    }),
+    async (c) => {
+      const { orgId, widgetId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      const widget = await confirmWidget(boards, c.get("user").id, orgId, widgetId, input);
+      if (input.schedule !== "manual") wake();
+      return c.json(widget, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/organizations/{orgId}/dashboards/{dashboardId}/widgets/pin",
       tags,
       security,
@@ -304,7 +348,7 @@ export function dashboardRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/widgets/{widgetId}",
       tags,
       security,
-      summary: "Remove a widget and its routine",
+      summary: "Remove a widget and its routine (a draft too: only its creator, and its test run stops)",
       request: { params: WidgetParams },
       responses: { 204: noContent[204], ...errors },
     }),

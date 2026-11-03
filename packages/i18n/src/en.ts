@@ -12487,6 +12487,13 @@ export const en = {
       remove: "Remove",
       drag: "Drag to move",
       fixed: "Fixed",
+      role: "movable widget",
+      help:
+        "Space or Enter picks the card up, the arrows move it, Space or Enter drops it and Esc cancels. The arrows alone move it one place.",
+      picked: "You picked up “{{title}}”. The arrows move it, Space drops it, Esc cancels.",
+      moved: "“{{title}}”: position {{position}} of {{total}}.",
+      dropped: "You dropped “{{title}}” at position {{position}} of {{total}}.",
+      canceled: "“{{title}}” went back to its place.",
     },
     add: { tile: "Widget", label: "Add widget" },
     alert: {
@@ -12528,6 +12535,8 @@ export const en = {
       send: "Send",
       sent: "{{name}} is redoing the widget.",
       updated: "Updated",
+      rename: "Rename",
+      titleLabel: "Widget title",
     },
     notice: {
       alert: "<b>{{name}}</b> flagged “{{title}}”",
@@ -12564,6 +12573,8 @@ export const en = {
       open: "Open",
     },
     home: "My Home",
+    /** A widget's name until its agent names it, when its kind isn't known yet. */
+    untitled: "New widget",
     updatedAgo: "updated {{when}}",
     removed: {
       home: "“{{title}}” left Home and {{name}}'s routine stopped",
@@ -12666,9 +12677,7 @@ export const en = {
       what: "What do you want to follow?",
       whatPlaceholder: "E.g.: today's sales compared with yesterday",
       who: "Who looks after it",
-      reads: "{{role}} · reads {{sources}}",
       format: "Format",
-      autoHint: "{{name}} picks the format that best shows what you asked.",
       updates: "Updates",
       destination: "Add to",
       create: "Create widget",
@@ -12707,6 +12716,27 @@ export const en = {
         noRedoHint: "You can ask for an update in the menu",
       },
       created: "Widget added to {{where}}",
+      /** Asking is tested first (ADR 0134): the agent builds a draft with real data before the widget is created. */
+      test: "Test",
+      testAgain: "Test again",
+      testing: "{{name}} is building it with real data…",
+      tested: "Real data · {{when}}",
+      stale: "Changed since the test",
+      testFailed: "It didn't work: {{reason}}",
+      tryAgain: "Try again",
+      testCost: "This test cost {{cost}}",
+      testFirst: "Test it first to see the real result",
+      titleField: "Title",
+      /** Under each format in the "Format" dropdown. */
+      formatHints: {
+        auto: "{{name}} picks the one that shows it best",
+        kpi: "One big number and how it moved",
+        goal: "Progress toward a target",
+        bars: "A few values side by side",
+        line: "How it changed over time",
+        list: "A short list of items",
+        text: "A few sentences that sum it up",
+      },
     },
     pinTop: "Pin to the top",
     unpin: "Unpin",
@@ -12740,6 +12770,7 @@ export const en = {
       blockNotFound: "That chart isn't in the message anymore.",
       notAgentMessage: "Only an agent's chart can be pinned.",
       promptRequired: "Say what the widget should show.",
+      notTested: "Test it first: the widget is created once its test works.",
     },
     // end of dashboards
   },

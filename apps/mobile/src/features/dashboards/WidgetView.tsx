@@ -5,6 +5,7 @@ import type {
   LineWidgetSpec,
   ListWidgetSpec,
   TextWidgetSpec,
+  WidgetKind,
   WidgetSchedule,
   WidgetSpec,
   WidgetStatus,
@@ -36,6 +37,7 @@ import {
   goalShare,
   isTall,
   roundRectPath,
+  shownWidgetTitle,
   topRoundedPath,
   widgetTones,
 } from "./logic";
@@ -128,7 +130,7 @@ function Kpi({ spec, color, big }: { spec: KpiWidgetSpec; color: AgentColorName;
         {spec.suffix ? <Text style={[styles.affix, { color: c.muted }]}>{` ${spec.suffix}`}</Text> : null}
       </Text>
       {spec.delta || spec.note ? (
-        <Text variant="footnote" tone="ink2" numberOfLines={1}>
+        <Text variant="footnote" tone="ink2" numberOfLines={2}>
           {spec.delta ? (
             <Text variant="footnote" style={[styles.strong, { color: spec.delta.up ? c.ok : c.warn }]}>
               {spec.delta.text}
@@ -373,7 +375,10 @@ export function BuildingSweep({ color, text, height = 56 }: { color: AgentColorN
 }
 
 export interface WidgetCardData {
+  /** Empty while the agent hasn't named it yet: the card says the kind's word or "New widget". */
   title: string;
+  /** What it shows, when known (the word a widget without a title shows). */
+  kind?: WidgetKind | null;
   spec: WidgetSpec | null;
   status: WidgetStatus;
   agentId: string;
@@ -404,13 +409,15 @@ export function WidgetCard({
   /** What a screen reader says for the whole card when it opens. */
   label?: string;
 }) {
+  const { t } = useTranslation();
   const surface = useSurface();
   // A 2-high (L) widget on a board draws its data big, as on its own screen.
   const large = big || isTall(w.h ?? 1);
+  const title = shownWidgetTitle(w.title, w.kind, (key) => t(key));
   const content = (
     <>
       <Text variant="footnote" tone="muted" numberOfLines={large ? 2 : 1} style={styles.title}>
-        {w.title}
+        {title}
       </Text>
       <View style={styles.body}>
         <WidgetBody spec={w.spec} status={w.status} agentId={w.agentId} big={large} />
@@ -424,7 +431,7 @@ export function WidgetCard({
       to={0.98}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={label ?? w.title}
+      accessibilityLabel={label ?? title}
       style={[styles.card, surface]}
       contentStyle={styles.cardIn}
       fill={false}

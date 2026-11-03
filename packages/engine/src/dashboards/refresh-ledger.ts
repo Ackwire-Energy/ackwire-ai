@@ -6,7 +6,7 @@ import { getMembership } from "../organizations";
 import type { RoutineRunEndStatus } from "../routine-ledger";
 import { ROUTINE_FATIGUE_LIMIT } from "../routine-state";
 import { dashboardRights, viewerOf } from "./access";
-import { publishWidgetChanged } from "./events";
+import { publishWidgetChanged, widgetEvent } from "./events";
 import { type DashboardRow, WIDGET_FAILURES, type WidgetRow, type WidgetStatus } from "./types";
 
 const { dashboards, dashboardWidgets, dashboardWidgetUpdates, routines, routineRuns, usageRecords, agents } = schema;
@@ -186,7 +186,8 @@ export async function failWidget(
     change: failure.change ?? null,
   });
   await trimWidgetHistory(db, widget.orgId, widget.id);
-  if (firstOfStreak) {
+  // A draft's failure shows in the test's preview only: nobody is told (ADR 0134 §16).
+  if (firstOfStreak && !widget.draft) {
     await notifyWidgetFailed(
       deps,
       {
@@ -202,7 +203,7 @@ export async function failWidget(
       },
     ).catch(() => {});
   }
-  await publishWidgetChanged(deps.pubsub, board, { id: widget.id, status: "failed" }).catch(() => {});
+  await publishWidgetChanged(deps.pubsub, board, widgetEvent(widget, "failed")).catch(() => {});
   return row;
 }
 
@@ -221,7 +222,7 @@ async function settleWidget(deps: LedgerDeps, widget: WidgetRow, board: Dashboar
     .update(dashboardWidgets)
     .set({ status, updatedAt: new Date() })
     .where(and(eq(dashboardWidgets.id, widget.id), eq(dashboardWidgets.orgId, widget.orgId)));
-  await publishWidgetChanged(deps.pubsub, board, { id: widget.id, status }).catch(() => {});
+  await publishWidgetChanged(deps.pubsub, board, widgetEvent(widget, status)).catch(() => {});
 }
 
 /** What the run cost and how many tokens it used, written on the update it made (known only once it ended). */
@@ -289,6 +290,15 @@ export async function widgetRoutineEnded(
         and(eq(dashboardWidgetUpdates.orgId, end.orgId), eq(dashboardWidgetUpdates.routineRunId, end.routineRunId)),
       )
       .limit(1);
+    if (applied && widget.draft) {
+      // The test's cost is known only now: its creator's preview reads it again ("This test cost …", ADR 0134 §16).
+      const [current] = await db
+        .select({ status: dashboardWidgets.status })
+        .from(dashboardWidgets)
+        .where(eq(dashboardWidgets.id, widget.id));
+      const status = (current?.status ?? widget.status) as WidgetStatus;
+      await publishWidgetChanged(deps.pubsub, board, widgetEvent(widget, status)).catch(() => {});
+    }
     const change = widgetChangeOf(rr?.event ?? null)?.text ?? null;
     // This failure is the one that pauses the routine (the ledger counts it next).
     const fatigued = routine.active && routine.failuresInRow + 1 >= ROUTINE_FATIGUE_LIMIT;
@@ -395,7 +405,7 @@ export async function widgetRoutineGone(deps: LedgerDeps, orgId: string, routine
     .from(dashboards)
     .where(and(eq(dashboards.id, row.dashboardId), isNull(dashboards.deletedAt)));
   if (board) {
-    await publishWidgetChanged(deps.pubsub, board, { id: row.id, status: row.status as WidgetStatus }).catch(() => {});
+    await publishWidgetChanged(deps.pubsub, board, widgetEvent(row, row.status as WidgetStatus)).catch(() => {});
   }
 }
 

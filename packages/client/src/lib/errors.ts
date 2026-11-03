@@ -207,6 +207,7 @@ const KNOWN = {
   "widget.block_not_found": "dashboards.errors.blockNotFound",
   "widget.not_agent_message": "dashboards.errors.notAgentMessage",
   "widget.prompt_required": "dashboards.errors.promptRequired",
+  "widget.not_tested": "dashboards.errors.notTested",
 } as const;
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */

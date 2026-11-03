@@ -155,6 +155,12 @@ export const Widget = z
     routineId: z.uuid().nullable(),
     sourceMessageId: z.uuid().nullable(),
     createdBy: z.object({ kind: z.enum(["person", "agent"]), id: z.string() }).nullable(),
+    draft: z.boolean().openapi({
+      description: "A test not created yet (“Test” in New widget): only its creator sees it, on no board.",
+    }),
+    lastCostUsd: z.number().nullable().openapi({
+      description: "What its latest update cost (“This test cost $0.01”); null on a plan or before it is known.",
+    }),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -297,6 +303,22 @@ export const UpdateWidgetBody = z
     dashboardId: z.uuid().optional().openapi({ description: "Move it to another board the caller edits." }),
   })
   .openapi("UpdateWidget");
+
+export const ConfirmWidgetBody = z
+  .object({
+    dashboardId: z.uuid().openapi({ description: "The board it goes on, first (one the caller edits)." }),
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .optional()
+      .openapi({ description: "A title the caller gave (kept from then on); absent: the one its agent wrote." }),
+    size: WidgetSize,
+    schedule: WidgetSchedule,
+    alert: AlertInput,
+  })
+  .openapi("ConfirmWidget");
 
 export const WidgetChangeBody = z.object({ text: z.string().trim().min(1).max(1000) }).openapi("WidgetChange");
 

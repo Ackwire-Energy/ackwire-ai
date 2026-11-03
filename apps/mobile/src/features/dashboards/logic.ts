@@ -9,6 +9,7 @@ import type {
   NotificationKind,
   OrgRole,
   ShareDashboardInput,
+  Widget,
   WidgetFormat,
   WidgetKind,
   WidgetSpec,
@@ -22,7 +23,6 @@ import {
   type ExampleWords,
   phoneSpan,
   sizeToLayout,
-  WIDGET_LIMITS,
   type WidgetSize,
 } from "@agenteschat/ui/widgets/spec";
 
@@ -296,19 +296,27 @@ export function exampleWordsOf(say: (key: string) => string): ExampleWords {
 export const previewKind = (format: WidgetFormat, suggested: WidgetKind | null): WidgetKind =>
   format === "auto" ? (suggested ?? "kpi") : format;
 
-/** The title a new widget starts with: the ask's first line, capitalized and cut short. */
-export function draftTitle(text: string, max = 60): string {
-  const first = (text.trim().split("\n")[0] ?? "").trim();
-  const cut = first.length > max ? `${first.slice(0, max - 1).trimEnd()}…` : first;
-  return cut ? cut.charAt(0).toLocaleUpperCase() + cut.slice(1) : "";
+/**
+ * The title a widget shows: its own (the agent writes it on the first build, a person may rename it), else, while it is
+ * still being built, the kind's word ("Line") or "New widget". Never the ask: a prompt is not a title.
+ */
+export function shownWidgetTitle(
+  title: string | null | undefined,
+  kind: WidgetFormat | null | undefined,
+  say: (key: string) => string,
+): string {
+  const own = (title ?? "").trim();
+  if (own) return own;
+  return kind && kind !== "auto" ? say(`widgets.kinds.${kind}`) : say("dashboards.newWidget.title");
 }
 
 /** A new widget's size: the one picked, else the web's default for its kind (S for a number or a goal, else M). */
 export const sizeFor = (kind: WidgetKind, picked: WidgetSize | null): WidgetSize => picked ?? defaultSize(kind);
 
 /**
- * What "New widget" shows on top while the person types: the widget with example data of the kind it will be, at
- * the size it will take on the phone. Null until something is asked.
+ * What "New widget" shows on top while the person types, before a test: the widget with example data of the kind it
+ * will be, at the size it will take on the phone. Null until something is asked. Its title is the caller's (a picked
+ * suggestion's, else the kind's word): the ask is not a title.
  */
 export function widgetPreview(
   text: string,
@@ -316,12 +324,11 @@ export function widgetPreview(
   suggested: WidgetKind | null,
   words: ExampleWords,
   size: WidgetSize | null = null,
-): { title: string; kind: WidgetKind; spec: WidgetSpec; size: WidgetSize; w: 1 | 2; h: 1 | 2 } | null {
+): { kind: WidgetKind; spec: WidgetSpec; size: WidgetSize; w: 1 | 2; h: 1 | 2 } | null {
   if (!text.trim()) return null;
   const kind = previewKind(format, suggested);
   const picked = sizeFor(kind, size);
   return {
-    title: draftTitle(text, WIDGET_LIMITS.title),
     kind,
     spec: exampleWidgetSpec(kind, words),
     size: picked,
@@ -345,6 +352,56 @@ export const HOME = "home";
 /** A board id from a route or a picker: My Home's real id when `HOME` and the home board is loaded. */
 export const realBoardId = (id: string, homeId: string | null | undefined): string | null =>
   id === HOME ? (homeId ?? null) : id;
+
+// ── Test before creating ─────────────────────────────────────────────────────
+
+/**
+ * What a test covers (ADR 0134): the ask, the agent and the format. Changing any of them makes the test stale; the
+ * schedule, the alert, the size and the destination don't (Create sends them).
+ */
+export const testKeyOf = (prompt: string, agentId: string | null, format: WidgetFormat): string =>
+  JSON.stringify([prompt.trim(), agentId ?? "", format]);
+
+/**
+ * Where "New widget"'s test stands: not tested yet, the draft being built with real data, built (Create can confirm
+ * it), failed (Try again), or stale (the ask, the agent or the format changed since: Test again).
+ */
+export type TestPhase = "untested" | "testing" | "ok" | "failed" | "stale";
+
+export function testPhase({
+  pending,
+  draft,
+  testedKey,
+  currentKey,
+}: {
+  /** The test was asked for and the draft hasn't come back yet. */
+  pending: boolean;
+  draft: Pick<Widget, "status"> | null | undefined;
+  testedKey: string | null;
+  currentKey: string;
+}): TestPhase {
+  if (pending) return "testing";
+  if (!draft || testedKey === null) return "untested";
+  if (testedKey !== currentKey) return "stale";
+  if (draft.status === "ok") return "ok";
+  if (draft.status === "failed") return "failed";
+  return "testing";
+}
+
+/** The primary word of "New widget": Create only after a successful test of what is asked now, else Test. */
+export const newWidgetAction = (phase: TestPhase): "create" | "test" => (phase === "ok" ? "create" : "test");
+
+/**
+ * The title Create sends: the person's edit, trimmed, when it differs from the agent's tested title; else nothing
+ * (the agent's stays, and stays the agent's to fix).
+ */
+export function confirmTitle(edited: string | null, tested: string): string | undefined {
+  const next = edited?.trim() ?? "";
+  return next && next !== tested.trim() ? next : undefined;
+}
+
+/** An item of a pick menu as the system's action sheet writes it (one line): "Theo · Sales analyst". */
+export const pickMenuLabel = (label: string, hint?: string | null): string => (hint ? `${label} · ${hint}` : label);
 
 // ── Who sees, who edits ──────────────────────────────────────────────────────
 

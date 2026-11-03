@@ -2,6 +2,7 @@ import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tansta
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
 import type {
+  ConfirmWidgetInput,
   CreateDashboardInput,
   CreateWidgetInput,
   Dashboard,
@@ -108,6 +109,27 @@ export function useWidget(orgId: string, widgetId: string | null | undefined) {
     queryFn: () => api.dashboards.widget(orgId, widgetId ?? ""),
     enabled: Boolean(widgetId),
     staleTime: 15_000,
+  });
+}
+
+/** How often a draft's preview asks again while its test build works, in case an event was missed. */
+export const WIDGET_DRAFT_POLL_MS = 2000;
+
+/**
+ * The live view of a widget being tested ("Test" in New widget): the draft, kept fresh by its `dashboard.widget`
+ * events (to its creator only) and, while it is `building` or `updating`, asked again every `WIDGET_DRAFT_POLL_MS`.
+ * Null id: nothing tested.
+ */
+export function useWidgetDraft(orgId: string, widgetId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.widget(orgId, widgetId ?? ""),
+    queryFn: () => api.dashboards.widget(orgId, widgetId ?? ""),
+    enabled: Boolean(widgetId),
+    staleTime: 0,
+    retry: false,
+    refetchInterval: (q) =>
+      q.state.data?.status === "building" || q.state.data?.status === "updating" ? WIDGET_DRAFT_POLL_MS : false,
   });
 }
 
@@ -252,6 +274,39 @@ export function useCreateWidget(orgId: string) {
     mutationFn: ({ dashboardId, ...input }: CreateWidgetInput & { dashboardId: string }) =>
       api.dashboards.createWidget(orgId, dashboardId, input),
     onSuccess: (widget) => cacheWidget(qc, orgId, widget),
+  });
+}
+
+/**
+ * "Test" in New widget: a draft built at once with real data (`{ dashboardId, ...CreateWidgetInput }`). It lands on
+ * no board, so only its own query is seeded; drop it with `useRemoveWidget` when the dialog closes or tests again.
+ */
+export function useTestWidget(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: ({ dashboardId, ...input }: CreateWidgetInput & { dashboardId: string }) =>
+      api.dashboards.testWidget(orgId, dashboardId, input),
+    onSuccess: (draft) => {
+      void qc.invalidateQueries({ queryKey: keys.widget(orgId, draft.id) });
+    },
+  });
+}
+
+/** "Create widget" after a test that worked (`{ widgetId, ...ConfirmWidgetInput }`): it goes first on that board. */
+export function useConfirmWidget(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: ({ widgetId, ...input }: ConfirmWidgetInput & { widgetId: string }) =>
+      api.dashboards.confirmWidget(orgId, widgetId, input),
+    onSuccess: (widget) => {
+      cacheWidget(qc, orgId, widget);
+      void qc.invalidateQueries({ queryKey: keys.dashboard(orgId, widget.dashboardId) });
+      void qc.invalidateQueries({ queryKey: keys.dashboardHome(orgId) });
+    },
   });
 }
 

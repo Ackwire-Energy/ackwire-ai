@@ -9,10 +9,10 @@ import {
   audienceReady,
   barWords,
   boardMenuKeys,
+  confirmTitle,
   dashboardWaitingCard,
   destinationsOf,
   ditherCells,
-  draftTitle,
   exampleWordsOf,
   formatWidgetNumber,
   formatWithUnit,
@@ -22,7 +22,9 @@ import {
   isTall,
   layoutChanged,
   moveWidgetItem,
+  newWidgetAction,
   phoneRows,
+  pickMenuLabel,
   pinDraftNow,
   previewKind,
   realBoardId,
@@ -30,7 +32,10 @@ import {
   roundRectPath,
   setPinDraft,
   shareInputOf,
+  shownWidgetTitle,
   sizeFor,
+  testKeyOf,
+  testPhase,
   thumbRects,
   toggleRole,
   topRoundedPath,
@@ -220,14 +225,64 @@ describe("dashboards on the phone (ADR 0134)", () => {
     expect(previewKind("auto", "bars")).toBe("bars");
     expect(previewKind("line", "bars")).toBe("line");
     const kpi = widgetPreview("today's sales vs. yesterday", "auto", null, words);
-    expect(kpi).toMatchObject({ title: "Today's sales vs. yesterday", kind: "kpi", w: 1 });
+    expect(kpi).toMatchObject({ kind: "kpi", w: 1 });
+    // The ask is never the title: the screen names the preview (a suggestion's title, else the kind's word).
+    expect(kpi).not.toHaveProperty("title");
     expect(kpi?.spec).toMatchObject({ kind: "kpi", note: "vsYesterday" });
     const line = widgetPreview("visits", "line", null, words);
     expect(line).toMatchObject({ kind: "line", w: 2 });
     const days = [1, 2, 3, 4, 5, 6, 7].map((i) => `days.d${i}`);
     expect(line?.spec.kind === "line" ? line.spec.labels : []).toEqual(days);
-    expect(draftTitle("first line\nsecond")).toBe("First line");
-    expect(draftTitle("x".repeat(90), 60)).toHaveLength(60);
+  });
+
+  test("a widget's title: its own, else the kind's word or New widget while it is built, never the ask", () => {
+    const say = (key: string) => `<${key}>`;
+    expect(shownWidgetTitle("Visits on the site", "line", say)).toBe("Visits on the site");
+    expect(shownWidgetTitle("  ", "line", say)).toBe("<widgets.kinds.line>");
+    expect(shownWidgetTitle("", null, say)).toBe("<dashboards.newWidget.title>");
+    expect(shownWidgetTitle(undefined, "auto", say)).toBe("<dashboards.newWidget.title>");
+  });
+
+  test("a test covers the ask, the agent and the format, nothing else", () => {
+    const key = testKeyOf(" visits today ", "a1", "auto");
+    expect(testKeyOf("visits today", "a1", "auto")).toBe(key);
+    expect(testKeyOf("visits this week", "a1", "auto")).not.toBe(key);
+    expect(testKeyOf("visits today", "a2", "auto")).not.toBe(key);
+    expect(testKeyOf("visits today", "a1", "line")).not.toBe(key);
+    expect(testKeyOf("visits today", null, "auto")).not.toBe(key);
+  });
+
+  test("New widget's test: testing, built, failed, or stale once the ask, agent or format changed", () => {
+    const key = testKeyOf("visits", "a1", "auto");
+    const at = (status: "building" | "updating" | "ok" | "failed", currentKey = key, pending = false) =>
+      testPhase({ pending, draft: { status }, testedKey: key, currentKey });
+    expect(testPhase({ pending: false, draft: null, testedKey: null, currentKey: key })).toBe("untested");
+    expect(testPhase({ pending: true, draft: null, testedKey: null, currentKey: key })).toBe("testing");
+    expect(at("building")).toBe("testing");
+    expect(at("updating")).toBe("testing");
+    expect(at("ok")).toBe("ok");
+    expect(at("failed")).toBe("failed");
+    expect(at("ok", testKeyOf("visits", "a1", "line"))).toBe("stale");
+    expect(at("failed", testKeyOf("visits", "a2", "auto"))).toBe("stale");
+    // Testing again: the new test is under way whatever the old draft was.
+    expect(at("ok", key, true)).toBe("testing");
+    // Create only after a successful test of what is asked now.
+    expect(newWidgetAction("ok")).toBe("create");
+    const others = (["untested", "testing", "failed", "stale"] as const).map(newWidgetAction);
+    expect(others).toEqual(["test", "test", "test", "test"]);
+  });
+
+  test("Create sends the person's title only when it differs from the agent's", () => {
+    expect(confirmTitle(null, "Visits on the site")).toBeUndefined();
+    expect(confirmTitle("  Visits on the site ", "Visits on the site")).toBeUndefined();
+    expect(confirmTitle("   ", "Visits on the site")).toBeUndefined();
+    expect(confirmTitle(" Site visits ", "Visits on the site")).toBe("Site visits");
+  });
+
+  test("a pick menu's item on one line: the name, then its role", () => {
+    expect(pickMenuLabel("Theo", "Sales analyst")).toBe("Theo · Sales analyst");
+    expect(pickMenuLabel("Theo", null)).toBe("Theo");
+    expect(pickMenuLabel("Theo", "")).toBe("Theo");
   });
 
   test("where a new widget goes: My Home first, then the boards the person edits", () => {

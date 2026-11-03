@@ -53,16 +53,31 @@ export function publishDashboardChanged(
   return publish(pubsub, board, event, options.wide === true || options.deleted === true);
 }
 
-/** A widget of `board` changed (`removed`: it was taken off). */
-export function publishWidgetChanged(
+/**
+ * A widget of `board` changed (`removed`: it was taken off). A draft's (`draft` with its `createdByUserId`, ADR 0134
+ * §16) goes to its creator alone, whoever sees the board: nobody else knows it exists.
+ */
+export async function publishWidgetChanged(
   pubsub: PubSub | undefined,
   board: Target,
-  widget: { id: string; status: WidgetStatus | "removed" },
+  widget: { id: string; status: WidgetStatus | "removed"; draft?: boolean; createdByUserId?: string | null },
 ) {
-  return publish(
-    pubsub,
-    board,
-    { type: DASHBOARD_WIDGET, orgId: board.orgId, dashboardId: board.id, widgetId: widget.id, status: widget.status },
-    false,
-  );
+  const event: DashboardEvent = {
+    type: DASHBOARD_WIDGET,
+    orgId: board.orgId,
+    dashboardId: board.id,
+    widgetId: widget.id,
+    status: widget.status,
+  };
+  if (widget.draft) {
+    if (widget.createdByUserId) await publishUserEvent(pubsub, board.orgId, widget.createdByUserId, event);
+    return;
+  }
+  await publish(pubsub, board, event, false);
 }
+
+/** A widget row's event fields (its draft flag and creator included). */
+export const widgetEvent = (
+  row: { id: string; draft: boolean; createdByUserId: string | null },
+  status: WidgetStatus | "removed",
+) => ({ id: row.id, status, draft: row.draft, createdByUserId: row.createdByUserId });

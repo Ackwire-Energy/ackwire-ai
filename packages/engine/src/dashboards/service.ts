@@ -1,5 +1,6 @@
-import { and, type Database, desc, type Executor, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, isNull, lt, ne, schema, sql } from "@agenteschat/db";
 import {
+  clipText,
   DASHBOARDS_MAX,
   defaultSize,
   isWidgetFormat,
@@ -17,7 +18,7 @@ import {
 import { type Agent, getAgent } from "../agents";
 import { canTalkTo, speakerOf } from "../audience";
 import { openDm } from "../dms";
-import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { postPersonMessage } from "../messages";
 import { resolveDashboardProposal, resolveWidgetNotices } from "../notification-producers";
 import { getMembership, type Membership, requireActiveMembership } from "../organizations";
@@ -33,10 +34,11 @@ import {
   requireWidget,
   viewerOf,
 } from "./access";
-import { publishDashboardChanged, publishWidgetChanged } from "./events";
+import { publishDashboardChanged, publishWidgetChanged, widgetEvent } from "./events";
 import { dropWidgetRoutine, refreshWidgetNow, syncWidgetRoutine } from "./refresh";
 import {
   type AgentMaker,
+  type ConfirmWidgetInput,
   type CreateDashboardInput,
   type CreateWidgetInput,
   DASHBOARD_ABOUT_MAX,
@@ -60,6 +62,8 @@ import {
   type UpdateDashboardInput,
   type UpdateWidgetInput,
   WIDGET_ALERT_CONDITION_MAX,
+  WIDGET_DRAFT_TTL_MS,
+  WIDGET_DRAFTS_MAX,
   WIDGET_FAILURES,
   WIDGET_PROMPT_MAX,
   WIDGET_TITLE_MAX,
@@ -199,12 +203,18 @@ const tooManyWidgets = () =>
 /** How many widgets a board holds and the position after its last one (and a home board's tiles). */
 async function boardFill(db: Executor, board: Pick<DashboardRow, "id" | "kind" | "homeTiles">) {
   const [row] = await db
-    .select({ n: sql<number>`count(*)::int`, top: sql<number | null>`max(${dashboardWidgets.position})` })
+    .select({
+      n: sql<number>`count(*)::int`,
+      top: sql<number | null>`max(${dashboardWidgets.position})`,
+      low: sql<number | null>`min(${dashboardWidgets.position})`,
+    })
     .from(dashboardWidgets)
-    .where(eq(dashboardWidgets.dashboardId, board.id));
+    // Drafts sit on no board: they take no place (ADR 0134 §16).
+    .where(and(eq(dashboardWidgets.dashboardId, board.id), eq(dashboardWidgets.draft, false)));
   const tiles = board.kind === "home" ? tilesOf(board.homeTiles) : [];
   const top = Math.max(row?.top == null ? -1 : Number(row.top), ...tiles.map((t) => t.position));
-  return { count: Number(row?.n ?? 0), next: Math.floor(top) + 1 };
+  const low = Math.min(row?.low == null ? 0 : Number(row.low), ...tiles.map((t) => t.position));
+  return { count: Number(row?.n ?? 0), next: Math.floor(top) + 1, first: Math.floor(low) - 1 };
 }
 
 /** A home board's tiles as stored, cleaned (unknown keys and repeats dropped). */
@@ -229,7 +239,7 @@ const span = (n: number): 1 | 2 => (n >= 2 ? 2 : 1);
 
 const isStatus = (v: string): v is WidgetStatus => (WIDGET_STATUSES as readonly string[]).includes(v);
 
-function toWidgetView(row: WidgetRow, nextRunAt: Date | null): WidgetView {
+function toWidgetView(row: WidgetRow, nextRunAt: Date | null, lastCostNano: number | null): WidgetView {
   const schedule: WidgetSchedule = isWidgetSchedule(row.schedule) ? row.schedule : "manual";
   const status: WidgetStatus = isStatus(row.status) ? row.status : "building";
   return {
@@ -259,12 +269,17 @@ function toWidgetView(row: WidgetRow, nextRunAt: Date | null): WidgetView {
       : row.createdByRunId
         ? { kind: "agent", id: row.agentId }
         : null,
+    draft: row.draft,
+    lastCostUsd: lastCostNano && lastCostNano > 0 ? lastCostNano / 1e9 : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-/** Widget rows as the apps see them, their routines' next runs read in one query. */
+/**
+ * Widget rows as the apps see them, their routines' next runs and their latest updates' cost (`lastCostUsd`, "This
+ * test cost …") read in one query each.
+ */
 export async function widgetViews(db: Executor, rows: readonly WidgetRow[]): Promise<WidgetView[]> {
   const routineIds = [...new Set(rows.flatMap((r) => (r.routineId && r.schedule !== "manual" ? [r.routineId] : [])))];
   const next = new Map<string, Date | null>();
@@ -275,7 +290,24 @@ export async function widgetViews(db: Executor, rows: readonly WidgetRow[]): Pro
       .where(and(inArray(routines.id, routineIds), isNull(routines.deletedAt), eq(routines.active, true))))
       next.set(r.id, r.nextRunAt);
   }
-  return rows.map((r) => toWidgetView(r, r.routineId ? (next.get(r.routineId) ?? null) : null));
+  const cost = new Map<string, number>();
+  const ids = rows.map((r) => r.id);
+  if (ids.length > 0) {
+    const latest = await db
+      .selectDistinctOn([dashboardWidgetUpdates.widgetId], {
+        widgetId: dashboardWidgetUpdates.widgetId,
+        costNanoUsd: dashboardWidgetUpdates.costNanoUsd,
+      })
+      .from(dashboardWidgetUpdates)
+      .where(inArray(dashboardWidgetUpdates.widgetId, ids))
+      .orderBy(
+        dashboardWidgetUpdates.widgetId,
+        desc(dashboardWidgetUpdates.createdAt),
+        desc(dashboardWidgetUpdates.id),
+      );
+    for (const u of latest) cost.set(u.widgetId, Number(u.costNanoUsd));
+  }
+  return rows.map((r) => toWidgetView(r, r.routineId ? (next.get(r.routineId) ?? null) : null, cost.get(r.id) ?? null));
 }
 
 /** A widget row as the apps see it (its routine's next run read with it). */
@@ -285,14 +317,14 @@ export async function widgetView(db: Executor, row: WidgetRow): Promise<WidgetVi
   return view;
 }
 
-/** Each board's widgets, in board order. */
+/** Each board's widgets, in board order (never a draft: it is on no board until confirmed, ADR 0134 §16). */
 async function widgetsOf(db: Executor, boardIds: readonly string[]): Promise<Map<string, WidgetRow[]>> {
   const out = new Map<string, WidgetRow[]>(boardIds.map((id) => [id, []]));
   if (boardIds.length === 0) return out;
   const rows = await db
     .select()
     .from(dashboardWidgets)
-    .where(inArray(dashboardWidgets.dashboardId, [...boardIds]))
+    .where(and(inArray(dashboardWidgets.dashboardId, [...boardIds]), eq(dashboardWidgets.draft, false)))
     .orderBy(dashboardWidgets.position, dashboardWidgets.createdAt, dashboardWidgets.id);
   for (const r of rows) out.get(r.dashboardId)?.push(r);
   return out;
@@ -712,7 +744,7 @@ export async function saveDashboardLayout(
       await deps.db
         .select({ id: dashboardWidgets.id })
         .from(dashboardWidgets)
-        .where(eq(dashboardWidgets.dashboardId, board.id))
+        .where(and(eq(dashboardWidgets.dashboardId, board.id), eq(dashboardWidgets.draft, false)))
     ).map((r) => r.id),
   );
   if (items.some((i) => !own.has(i.id))) {
@@ -739,8 +771,9 @@ export async function saveDashboardLayout(
 
 // ── Widgets ──────────────────────────────────────────────────────────────────
 
+/** A title in one line, clipped at a word's end (never mid-word, ADR 0134 §17). */
 function widgetTitle(raw: string | undefined): string {
-  return oneLine(raw ?? "").slice(0, WIDGET_TITLE_MAX).trim();
+  return clipText(oneLine(raw ?? ""), WIDGET_TITLE_MAX);
 }
 
 function widgetPrompt(raw: string | undefined): string {
@@ -781,12 +814,14 @@ export async function createWidget(
   const size = sizeOf(input.size);
   const agent = await requireReachableAgent(deps.db, orgId, input.agentId, actorId, membership);
   const alertOn = input.alert?.enabled === true;
+  const title = widgetTitle(input.title);
   const row = await insertWidget(deps, {
     orgId,
     dashboardId: board.id,
     agentId: agent.id,
-    // Until the agent names it on its first run: the person's words.
-    title: widgetTitle(input.title) || widgetTitle(prompt),
+    // Empty until its agent names it on its first run, unless the person named it (ADR 0134 §17).
+    title,
+    titleSetByUser: title !== "",
     prompt,
     format: input.format,
     schedule,
@@ -807,6 +842,7 @@ export async function assertScheduledRoom(db: Executor, orgId: string, excluding
       and(
         eq(dashboardWidgets.orgId, orgId),
         ne(dashboardWidgets.schedule, "manual"),
+        eq(dashboardWidgets.draft, false),
         isNull(dashboards.deletedAt),
         excludingWidgetId ? ne(dashboardWidgets.id, excludingWidgetId) : undefined,
       ),
@@ -824,6 +860,8 @@ export async function assertScheduledRoom(db: Executor, orgId: string, excluding
  * A widget made without a person's request in front of it (`create_widget`, a pin): the caps and the board's room are
  * checked, its routine made and, without `spec`, its first build queued. With `spec` it starts `ok` with that data.
  * `routineCreatorUserId`: who its routine runs for (ADR 0053 §1); default its creator, else the board's owner.
+ * `draft` (a person's "Test", ADR 0134 §16): on no board and under no cap, never scheduled, its events to its creator
+ * alone. `titleSetByUser`: a person named it, so its agent never renames it (ADR 0134 §17).
  */
 export async function insertWidget(
   deps: DashboardDeps,
@@ -843,9 +881,12 @@ export async function insertWidget(
     createdByUserId: string | null;
     createdByRunId?: string | null;
     routineCreatorUserId?: string | null;
+    titleSetByUser?: boolean;
+    draft?: boolean;
   },
 ): Promise<WidgetRow> {
   const { orgId } = input;
+  const draft = input.draft === true;
   const board = await loadBoard(deps.db, orgId, input.dashboardId);
   let spec: WidgetSpec | null = null;
   if (input.spec) {
@@ -854,15 +895,16 @@ export async function insertWidget(
     spec = checked.spec;
   }
   const format: WidgetFormat = isWidgetFormat(input.format) ? input.format : "auto";
-  const schedule = scheduleOf(input.schedule);
+  const schedule = draft ? "manual" : scheduleOf(input.schedule);
   const layout = sizeToLayout(input.size ?? defaultSize(format === "auto" ? (spec?.kind ?? null) : format));
   const at = nowOf(deps);
-  const title = widgetTitle(input.title) || widgetTitle(input.prompt);
+  // Never the ask itself: its agent names it on its first build (ADR 0134 §17).
+  const title = widgetTitle(input.title);
   const row = await deps.db.transaction(async (tx) => {
     // One insert at a time per board, so two can't both take its last place.
     await tx.execute(sql`select id from dashboards where id = ${board.id}::uuid for update`);
     const fill = await boardFill(tx, board);
-    if (fill.count >= WIDGETS_PER_DASHBOARD_MAX) throw tooManyWidgets();
+    if (!draft && fill.count >= WIDGETS_PER_DASHBOARD_MAX) throw tooManyWidgets();
     if (schedule !== "manual") await assertScheduledRoom(tx, orgId);
     const [made] = await tx
       .insert(dashboardWidgets)
@@ -871,6 +913,8 @@ export async function insertWidget(
         dashboardId: board.id,
         agentId: input.agentId,
         title,
+        titleSetByUser: input.titleSetByUser === true && title !== "",
+        draft,
         prompt: input.prompt.trim().slice(0, WIDGET_PROMPT_MAX),
         format,
         kind: spec ? spec.kind : format === "auto" ? null : format,
@@ -893,11 +937,11 @@ export async function insertWidget(
       })
       .returning();
     if (!made) throw new Error("widget insert failed");
-    await tx.update(dashboards).set({ updatedAt: at }).where(eq(dashboards.id, board.id));
+    if (!draft) await tx.update(dashboards).set({ updatedAt: at }).where(eq(dashboards.id, board.id));
     return made;
   });
-  await publishWidgetChanged(deps.pubsub, board, { id: row.id, status: row.status as WidgetStatus });
-  await publishDashboardChanged(deps.pubsub, board);
+  await publishWidgetChanged(deps.pubsub, board, widgetEvent(row, row.status as WidgetStatus));
+  if (!draft) await publishDashboardChanged(deps.pubsub, board);
   const creator = input.routineCreatorUserId ?? input.createdByUserId ?? board.ownerUserId;
   // A scheduled widget gets its routine now; one without data gets one for its first build (ADR 0134 §4).
   const routineId = await syncWidgetRoutine(deps, orgId, row.id, {
@@ -923,11 +967,15 @@ export async function updateWidget(
   patch: UpdateWidgetInput,
 ): Promise<WidgetView> {
   const { widget, board, membership } = await requireWidget(deps.db, actorId, orgId, widgetId, "edit");
+  // A draft changes only by being tested again or confirmed (ADR 0134 §16).
+  if (widget.draft) throw new NotFoundError("Widget not found", DASHBOARD_ERRORS.widgetNotFound);
   const set: Partial<typeof dashboardWidgets.$inferInsert> = {};
   let routineChanged = false;
   if (patch.title !== undefined) {
     const title = widgetTitle(patch.title);
     if (!title) throw new ValidationError("A widget needs a title", DASHBOARD_ERRORS.titleRequired);
+    // A person's title stays: its agent no longer renames it (ADR 0134 §17).
+    if (!widget.titleSetByUser) set.titleSetByUser = true;
     if (title !== widget.title) {
       set.title = title;
       routineChanged = true;
@@ -1011,12 +1059,174 @@ export async function removeWidget(
   widgetId: string,
 ): Promise<void> {
   const { widget, board } = await requireWidget(deps.db, actorId, orgId, widgetId, "edit");
+  await discardWidget(deps, orgId, widget, board);
+}
+
+/**
+ * A widget goes: its routine deleted (a run in progress stops quietly), the row with its history, its notices
+ * resolved. A draft's board is left as it was (it was never on it) and only its creator hears it went.
+ */
+async function discardWidget(deps: DashboardDeps, orgId: string, widget: WidgetRow, board: DashboardRow) {
   await dropWidgetRoutine(deps, orgId, widget.id);
   await deps.db.delete(dashboardWidgets).where(eq(dashboardWidgets.id, widget.id));
-  await deps.db.update(dashboards).set({ updatedAt: nowOf(deps) }).where(eq(dashboards.id, board.id));
+  if (!widget.draft) {
+    await deps.db.update(dashboards).set({ updatedAt: nowOf(deps) }).where(eq(dashboards.id, board.id));
+  }
   await resolveWidgetNotices({ db: deps.db, pubsub: deps.pubsub, now: deps.now }, orgId, widget.id);
-  await publishWidgetChanged(deps.pubsub, board, { id: widget.id, status: "removed" });
+  await publishWidgetChanged(deps.pubsub, board, widgetEvent(widget, "removed"));
+  if (!widget.draft) await publishDashboardChanged(deps.pubsub, board);
+}
+
+// ── Test before creating (ADR 0134 §16) ──────────────────────────────────────
+
+/**
+ * "Test" in New widget: a draft of the widget the person asks for, built at once with real data by its agent (the
+ * same refresh run as any widget's: `update_widget`, a history row, failure reasons, its cost recorded). The draft is
+ * on no board, under no cap and in no list; only its creator sees it (by id) and hears its events; its routine is
+ * never scheduled and it raises no alert or notice. The checks are create's: the person edits the board it is meant
+ * for and may talk to the agent. A person keeps at most `WIDGET_DRAFTS_MAX` drafts: past that their oldest go.
+ * Schedule and alert are checked but wait for `confirmWidget`.
+ */
+export async function testWidget(
+  deps: DashboardDeps,
+  actorId: string,
+  orgId: string,
+  dashboardId: string,
+  input: CreateWidgetInput,
+): Promise<WidgetView> {
+  const { board, membership } = await requireDashboard(deps.db, actorId, orgId, dashboardId, "edit");
+  const prompt = widgetPrompt(input.prompt);
+  if (!isWidgetFormat(input.format)) throw new ValidationError("Unknown format");
+  scheduleOf(input.schedule);
+  const size = sizeOf(input.size);
+  const agent = await requireReachableAgent(deps.db, orgId, input.agentId, actorId, membership);
+  const title = widgetTitle(input.title);
+  const row = await insertWidget(deps, {
+    orgId,
+    dashboardId: board.id,
+    agentId: agent.id,
+    title,
+    titleSetByUser: title !== "",
+    prompt,
+    format: input.format,
+    schedule: "manual",
+    ...(size ? { size } : {}),
+    createdByUserId: actorId,
+    routineCreatorUserId: actorId,
+    draft: true,
+  });
+  await dropOldDrafts(deps, orgId, actorId);
+  return widgetView(deps.db, row);
+}
+
+/** A person's drafts past `WIDGET_DRAFTS_MAX` go, oldest first. */
+async function dropOldDrafts(deps: DashboardDeps, orgId: string, userId: string) {
+  const drafts = await deps.db
+    .select({ widget: dashboardWidgets, board: dashboards })
+    .from(dashboardWidgets)
+    .innerJoin(dashboards, eq(dashboards.id, dashboardWidgets.dashboardId))
+    .where(
+      and(
+        eq(dashboardWidgets.orgId, orgId),
+        eq(dashboardWidgets.createdByUserId, userId),
+        eq(dashboardWidgets.draft, true),
+      ),
+    )
+    .orderBy(desc(dashboardWidgets.createdAt), desc(dashboardWidgets.id));
+  for (const d of drafts.slice(WIDGET_DRAFTS_MAX)) await discardWidget(deps, orgId, d.widget, d.board);
+}
+
+/**
+ * "Create widget" after a test: the draft becomes a widget on `input.dashboardId` (a board the person edits, which may
+ * not be the one it was tested for), first on it, with the size, schedule and alert chosen now; it keeps the data and
+ * history its test made (no new build), and its routine gets its schedule. A title given that differs from the one
+ * its agent wrote is the person's (kept from then on). Only its creator confirms, only a draft (`widget.not_found`
+ * otherwise), only once its test worked (`widget.not_tested`, 409); the board's room and the scheduled cap hold as on
+ * create.
+ */
+export async function confirmWidget(
+  deps: DashboardDeps,
+  actorId: string,
+  orgId: string,
+  widgetId: string,
+  input: ConfirmWidgetInput,
+): Promise<WidgetView> {
+  const membership = await requireActiveMembership(deps.db, actorId, orgId);
+  const notFound = () => new NotFoundError("Widget not found", DASHBOARD_ERRORS.widgetNotFound);
+  if (!UUID.test(widgetId)) throw notFound();
+  const [draft] = await deps.db
+    .select()
+    .from(dashboardWidgets)
+    .where(
+      and(
+        eq(dashboardWidgets.orgId, orgId),
+        eq(dashboardWidgets.id, widgetId),
+        eq(dashboardWidgets.draft, true),
+        eq(dashboardWidgets.createdByUserId, actorId),
+      ),
+    );
+  if (!draft) throw notFound();
+  if (draft.status !== "ok" || !draft.spec) {
+    throw new ConflictError("Test it first: the widget is confirmed once its test worked", DASHBOARD_ERRORS.notTested);
+  }
+  const { board } = await requireDashboard(deps.db, actorId, orgId, input.dashboardId, "edit");
+  await requireReachableAgent(deps.db, orgId, draft.agentId, actorId, membership);
+  const schedule = scheduleOf(input.schedule);
+  const size = sizeOf(input.size);
+  const layout = sizeToLayout(size ?? defaultSize(isWidgetKind(draft.kind) ? draft.kind : null));
+  const title = widgetTitle(input.title);
+  const renamed = title !== "" && title !== draft.title;
+  const alertOn = input.alert?.enabled === true;
+  const at = nowOf(deps);
+  const row = await deps.db.transaction(async (tx) => {
+    // One at a time per board, as `insertWidget`, so two can't both take its last place.
+    await tx.execute(sql`select id from dashboards where id = ${board.id}::uuid for update`);
+    const fill = await boardFill(tx, board);
+    if (fill.count >= WIDGETS_PER_DASHBOARD_MAX) throw tooManyWidgets();
+    if (schedule !== "manual") await assertScheduledRoom(tx, orgId, draft.id);
+    const [made] = await tx
+      .update(dashboardWidgets)
+      .set({
+        draft: false,
+        dashboardId: board.id,
+        position: fill.first,
+        w: layout.w,
+        h: layout.h,
+        schedule,
+        alertEnabled: alertOn,
+        alertCondition: alertCondition(input.alert?.condition),
+        alertUserId: alertOn ? actorId : null,
+        ...(renamed ? { title, titleSetByUser: true } : {}),
+        updatedAt: at,
+      })
+      .where(and(eq(dashboardWidgets.id, draft.id), eq(dashboardWidgets.draft, true)))
+      .returning();
+    if (!made) throw notFound();
+    await tx.update(dashboards).set({ updatedAt: at }).where(eq(dashboards.id, board.id));
+    return made;
+  });
+  // Its routine (made for the test) now follows its schedule, on its board.
+  const routineId = await syncWidgetRoutine(deps, orgId, row.id, { creatorUserId: actorId });
+  const placed = routineId === row.routineId ? row : await loadWidgetRow(deps.db, row.id);
+  await publishWidgetChanged(deps.pubsub, board, widgetEvent(placed, placed.status as WidgetStatus));
   await publishDashboardChanged(deps.pubsub, board);
+  return widgetView(deps.db, placed);
+}
+
+/**
+ * Drafts nobody confirmed for `WIDGET_DRAFT_TTL_MS` (a dialog closed without cancelling, an app that quit) go with
+ * their routines (ADR 0134 §16). Run by the server's workers; returns how many went.
+ */
+export async function sweepWidgetDrafts(deps: DashboardDeps, limit = 200): Promise<number> {
+  const before = new Date(nowOf(deps).getTime() - WIDGET_DRAFT_TTL_MS);
+  const old = await deps.db
+    .select({ widget: dashboardWidgets, board: dashboards })
+    .from(dashboardWidgets)
+    .innerJoin(dashboards, eq(dashboards.id, dashboardWidgets.dashboardId))
+    .where(and(eq(dashboardWidgets.draft, true), lt(dashboardWidgets.createdAt, before)))
+    .limit(limit);
+  for (const d of old) await discardWidget(deps, d.widget.orgId, d.widget, d.board);
+  return old.length;
 }
 
 /** One widget with its board, the viewer's right to edit and its latest updates (the widget panel and screen). */
@@ -1139,6 +1349,24 @@ export async function dropMemberDashboards(tx: Executor, orgId: string, userId: 
       ),
     )
     .returning({ id: dashboards.id });
+  // Their drafts go too (ADR 0134 §16): their routines with them, so none runs for someone who left.
+  const drafts = await tx
+    .delete(dashboardWidgets)
+    .where(
+      and(
+        eq(dashboardWidgets.orgId, orgId),
+        eq(dashboardWidgets.createdByUserId, userId),
+        eq(dashboardWidgets.draft, true),
+      ),
+    )
+    .returning({ routineId: dashboardWidgets.routineId });
+  const draftRoutines = drafts.flatMap((d) => (d.routineId ? [d.routineId] : []));
+  if (draftRoutines.length > 0) {
+    await tx
+      .update(routines)
+      .set({ active: false, nextRunAt: null, deletedAt: at, updatedAt: at })
+      .where(and(eq(routines.orgId, orgId), inArray(routines.id, draftRoutines), isNull(routines.deletedAt)));
+  }
   if (gone.length === 0) return;
   const ids = gone.map((b) => b.id);
   // Their widgets' routines never fire again (as `dropRoutine` leaves a routine): nobody sees those boards.

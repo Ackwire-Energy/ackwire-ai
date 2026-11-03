@@ -32,7 +32,8 @@ export interface WidgetBodyProps {
 /**
  * What a widget draws (ADR 0134), by kind: one big number with how it moved and its trend, a goal's progress, bars,
  * a line, a short list, a few sentences. Charts in the chat's style (a clean stroke over a 2px dither in the agent's
- * tones); numbers in the app's font, bold, tabular. Being built, the agent's dither moves under the words.
+ * tones); numbers in the app's font, bold, tabular. Being built, the agent's dither moves under the words. A note
+ * keeps to two lines and ends in an ellipsis past them (`wk-clamp`), never cut inside a word.
  */
 export function WidgetBody({ spec, status, color, size, locale, buildingText }: WidgetBodyProps) {
   if (status === "building" || !spec) {
@@ -69,7 +70,7 @@ function KpiBody({ spec, color, locale }: { spec: KpiWidgetSpec; color: string; 
         {spec.suffix && <small className="wk-num__suf">{spec.suffix}</small>}
       </div>
       {(spec.delta || spec.note) && (
-        <div className="wk-sub">
+        <div className="wk-sub wk-clamp">
           {spec.delta && <b className={spec.delta.up ? "wk-up" : "wk-down"}>{spec.delta.text}</b>}
           {spec.delta && spec.note ? " " : null}
           {spec.note}
@@ -96,7 +97,7 @@ function GoalBody({ spec, locale }: { spec: GoalWidgetSpec; locale: string }) {
       </div>
       <div className="wk-sub">
         {spec.line}
-        {spec.note && <span className="wk-sub__note">{spec.note}</span>}
+        {spec.note && <span className="wk-sub__note wk-clamp">{spec.note}</span>}
       </div>
     </>
   );
@@ -132,7 +133,7 @@ function BarsBody({ spec, size, locale }: { spec: BarsWidgetSpec; size: { w: 1 |
           <span key={i}>{label}</span>
         ))}
       </div>
-      {spec.note && <div className="wk-sub">{spec.note}</div>}
+      {spec.note && <div className="wk-sub wk-clamp">{spec.note}</div>}
     </>
   );
 }
@@ -163,7 +164,7 @@ function LineBody({
         )}
       </div>
       {spec.note ? (
-        <div className="wk-sub">{spec.note}</div>
+        <div className="wk-sub wk-clamp">{spec.note}</div>
       ) : last !== undefined ? (
         <div className="wk-sub">{formatWithUnit(last, spec.unit, locale)}</div>
       ) : null}

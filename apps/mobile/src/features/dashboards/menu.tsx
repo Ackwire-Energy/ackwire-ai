@@ -1,13 +1,14 @@
 import { type Dashboard, useDeleteDashboard, useUpdateDashboard } from "@agenteschat/client";
 import { router } from "expo-router";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, Platform } from "react-native";
-import { type IconName, useToast } from "@/ui";
+import { Icon, type IconName, useTheme, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useOrgId } from "../shared/hooks";
 import { type ActionItem, ActionList, goBack, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { type BoardMenuKey, boardMenuKeys, HOME } from "./logic";
+import { type BoardMenuKey, boardMenuKeys, HOME, pickMenuLabel } from "./logic";
 
 interface MenuItem {
   key: BoardMenuKey;
@@ -101,4 +102,58 @@ export function useBoardMenu(board: Dashboard | undefined) {
     sheet.open(<ActionList items={list} />);
   };
   return { any: items.length > 0, open, label: t("widgets.menu.label") };
+}
+
+/** One choice of a pick menu: its word, a second line (an agent's role), and what goes before it on Android. */
+export interface PickItem<K extends string> {
+  key: K;
+  label: string;
+  hint?: string | null;
+  leading?: ReactNode;
+}
+
+/**
+ * A short pick list from a form row ("Who looks after it", "Format"), as the boards' "…": the system's action sheet on
+ * iOS (one line per choice, its hint after a dot), the app's own list in a sheet on Android with what goes before each
+ * choice and a check on the current one (the screen hosts it: `SheetHostProvider`).
+ */
+export function usePickMenu() {
+  const { t } = useTranslation();
+  const { colors: c } = useTheme();
+  const sheet = useSheet();
+  return function open<K extends string>(
+    title: string,
+    items: readonly PickItem<K>[],
+    value: K | null,
+    onPick: (key: K) => void,
+  ) {
+    if (items.length === 0) return;
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title,
+          options: [...items.map((i) => pickMenuLabel(i.label, i.hint)), t("mobile.common.cancel")],
+          cancelButtonIndex: items.length,
+        },
+        (i) => {
+          const item = items[i];
+          if (item) onPick(item.key);
+        },
+      );
+      return;
+    }
+    const list: ActionItem[] = items.map((i) => ({
+      key: i.key,
+      label: i.label,
+      oneLine: true,
+      ...(i.hint ? { hint: i.hint } : {}),
+      ...(i.leading ? { leading: i.leading } : {}),
+      ...(i.key === value ? { trailing: <Icon name="check" size={18} color={c.ink} /> } : {}),
+      onPress: () => {
+        sheet.close();
+        onPick(i.key);
+      },
+    }));
+    sheet.open(<ActionList items={list} />);
+  };
 }

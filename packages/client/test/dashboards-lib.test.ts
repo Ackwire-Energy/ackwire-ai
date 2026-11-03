@@ -61,6 +61,8 @@ const widget = (id: string, position: number, w: 1 | 2 = 1): Widget => ({
   routineId: null,
   sourceMessageId: null,
   createdBy: null,
+  draft: false,
+  lastCostUsd: null,
   createdAt: "2026-11-03T10:00:00.000Z",
   updatedAt: "2026-11-03T10:00:00.000Z",
 });
@@ -204,9 +206,46 @@ describe("dashboards API", () => {
     expect(calls[4]?.body).toBe('{"decision":"publish"}');
     expect(calls[7]?.body).toBe('{"text":"split by channel"}');
   });
+
+  test("Test and Create widget (ADR 0134 §16)", async () => {
+    const calls: { url: string; method: string; body: string | null }[] = [];
+    const api = createHttpApi({
+      fetch: async (url, init) => {
+        calls.push({ url, method: init.method ?? "GET", body: (init.body as string | undefined) ?? null });
+        return new Response(JSON.stringify(widget("w1", 0)), {
+          status: url.endsWith("/test") ? 202 : 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    const ask = { agentId: "a1", prompt: "Site visits", format: "auto" as const, schedule: "hour" as const };
+    expect((await api.dashboards.testWidget("o1", "d1", ask)).id).toBe("w1");
+    const confirm = {
+      dashboardId: "d2",
+      title: "Visits",
+      size: "s" as const,
+      schedule: "day" as const,
+      alert: { enabled: false, condition: "" },
+    };
+    await api.dashboards.confirmWidget("o1", "w1", confirm);
+    expect(calls.map((c) => `${c.method} ${c.url.replace("/api/app/organizations/o1", "")}`)).toEqual([
+      "POST /dashboards/d1/widgets/test",
+      "POST /widgets/w1/confirm",
+    ]);
+    expect(JSON.parse(calls[0]?.body ?? "{}")).toEqual(ask);
+    expect(JSON.parse(calls[1]?.body ?? "{}")).toEqual(confirm);
+  });
 });
 
 describe("dashboard events", () => {
+  test("a draft's event refreshes its live view (Test in New widget)", () => {
+    const qc = new QueryClient();
+    qc.setQueryData(keys.widget("o1", "w9"), { ...widget("w9", 0), draft: true, status: "building" });
+    const event = { type: "dashboard.widget", orgId: "o1", dashboardId: "d1", widgetId: "w9", status: "ok" };
+    expect(applyDashboardEvent(qc, "o1", event as { type: string })).toBe(true);
+    expect(qc.getQueryState(keys.widget("o1", "w9"))?.isInvalidated).toBe(true);
+  });
+
   test("refetch what the event touches; other events pass", () => {
     const qc = new QueryClient();
     const board = { id: "d1", widgets: [] } as unknown as Dashboard;

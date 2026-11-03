@@ -1,18 +1,29 @@
-import type { Agent, PinnableBlock, WidgetFormat, WidgetKind, WidgetSchedule, WidgetSize } from "@agenteschat/client";
+import type {
+  Agent,
+  PinnableBlock,
+  Widget,
+  WidgetFormat,
+  WidgetKind,
+  WidgetSchedule,
+  WidgetSize,
+} from "@agenteschat/client";
 import {
   useAgents,
-  useCreateWidget,
+  useConfirmWidget,
   useDashboards,
   useHomeDashboard,
   usePinnableBlocks,
   usePinWidget,
+  useRemoveWidget,
+  useTestWidget,
   useWidgetCost,
+  useWidgetDraft,
   useWidgetSuggestions,
   widgetCostLine,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { capitalize, formatUsd, joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { formatUsd, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import {
   Button,
   Dialog,
@@ -27,6 +38,7 @@ import {
   Tabs,
   Textarea,
   useDarkTheme,
+  useNow,
   WidgetCard,
   WidgetGlyph,
   widgetTileVars,
@@ -41,11 +53,12 @@ import {
   type WidgetSpec,
 } from "@agenteschat/ui/widgets/spec";
 import type { TFunction } from "i18next";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { failureText, neutralWidgetTitle } from "@/components/widgets/parts";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import "@/pages/dashboards.css";
@@ -54,8 +67,8 @@ import "@/pages/dashboards.css";
 const HOME = "home";
 /** What "Pin from chat" offers for keeping a block updated: daily, hourly, or not at all. */
 const PIN_SCHEDULES: readonly WidgetSchedule[] = ["day", "hour", "manual"];
-/** The preview's title until the agent names the widget: what was asked, cut like a widget's title fits. */
-const PREVIEW_TITLE_MAX = 44;
+/** A widget's title, as long as the server takes it (ADR 0134). */
+const TITLE_MAX = 80;
 
 /** The words of a preview's example data in the reader's language (`widgets.example.*`). */
 export function exampleWordsOf(t: TFunction): ExampleWords {
@@ -84,8 +97,9 @@ export interface NewWidgetDialogProps {
 /**
  * New widget (ADR 0134 §3): ask an agent the person can talk to for a number, chart or list it keeps up to date —
  * what to follow (with the agent's suggestions), who looks after it, the format, how often it updates, an alert and
- * its condition — or pin a chart an agent already sent. Beside the form, the preview at its size (example data of
- * the kind until the agent builds it), the steps it will take and what it costs; under it, the board it goes on.
+ * its condition — or pin a chart an agent already sent. Beside the form, the preview at its size, the steps it will
+ * take and what it costs; under it, the board it goes on. Asking is tested first: Test has the agent build a draft
+ * with real data, shown live in the preview, and only a draft that worked for what is asked now can be created.
  * Used by a board's page and by Home.
  */
 export function NewWidgetDialog({ orgId, open, onClose, dashboardId, tab = "ask" }: NewWidgetDialogProps) {
@@ -107,6 +121,20 @@ export function NewWidgetDialog({ orgId, open, onClose, dashboardId, tab = "ask"
 
 type Tab = "ask" | "pin";
 
+/**
+ * Where the test of what is asked stands: none yet, the draft being built (or the test being sent), built (`ok`),
+ * failed, or made for an ask that changed since (`stale`: its prompt, agent or format).
+ */
+type TestPhase = "none" | "testing" | "ok" | "failed" | "stale";
+
+function phaseOf(sending: boolean, draft: Widget | undefined, draftId: string | null, stale: boolean): TestPhase {
+  if (sending) return "testing";
+  if (!draftId) return "none";
+  if (stale) return "stale";
+  if (!draft || draft.status === "building" || draft.status === "updating") return "testing";
+  return draft.status === "ok" ? "ok" : "failed";
+}
+
 function NewWidgetBody({
   orgId,
   dashboardId,
@@ -123,6 +151,7 @@ function NewWidgetBody({
   const dir = useDirectory(org.id);
   const toast = useToast();
   const dark = useDarkTheme();
+  const now = useNow(30_000);
   const id = useId();
   const agents = (useAgents(orgId).data ?? []).filter((a) => !a.former && canTalk(a));
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -136,6 +165,10 @@ function NewWidgetBody({
   const [size, setSize] = useState<WidgetSize>("m");
   const [dest, setDest] = useState<string>(dashboardId ?? HOME);
   const [block, setBlock] = useState<number | null>(null);
+  // The test: the draft it made, the ask it was made for, and the title as the person edits it (null = the agent's).
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [testedFor, setTestedFor] = useState<string | null>(null);
+  const [titleEdit, setTitleEdit] = useState<string | null>(null);
 
   const agent = agents.find((a) => a.id === agentId) ?? agents[0];
   const suggestions = useWidgetSuggestions(orgId, agent?.id, tab === "ask");
@@ -143,8 +176,28 @@ function NewWidgetBody({
   const boards = useDashboards(orgId);
   const home = useHomeDashboard(orgId, dest === HOME);
   const pinnable = usePinnableBlocks(orgId, tab === "pin");
-  const create = useCreateWidget(orgId);
+  const test = useTestWidget(orgId);
+  const confirm = useConfirmWidget(orgId);
+  const remove = useRemoveWidget(orgId);
   const pin = usePinWidget(orgId);
+  const live = useWidgetDraft(orgId, draftId).data ?? (test.data?.id === draftId ? test.data : undefined);
+  const draft = draftId && live?.id === draftId ? live : undefined;
+
+  // A draft nobody created is deleted when the dialog closes or another test replaces it (the server sweeps any
+  // left behind after a day). `pending` is the draft still to delete; one being created is kept.
+  const pending = useRef<string | null>(null);
+  const confirming = useRef(false);
+  const alive = useRef(true);
+  const drop = useRef(remove.mutate);
+  drop.current = remove.mutate;
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      if (pending.current && !confirming.current) drop.current(pending.current);
+      pending.current = null;
+    };
+  }, []);
 
   const sources = suggestions.data?.sources ?? [];
   const sugs = suggestions.data?.suggestions ?? [];
@@ -160,55 +213,119 @@ function NewWidgetBody({
   const targetId = dest === HOME ? (home.data?.id ?? null) : dest;
   const words = exampleWordsOf(t);
 
-  // The preview: the chosen block as it is, or example data of the kind asked (the agent's pick for "auto").
   const asked = text.trim();
+  // What a test answers for: what is asked, of whom, in what format (schedule, alert, size and board don't count).
+  const askKey = JSON.stringify([asked, agent?.id ?? "", format]);
+  const phase: TestPhase =
+    tab === "ask" ? phaseOf(test.isPending, draft, draftId, draftId !== null && testedFor !== askKey) : "none";
+  const tested = phase === "ok" && draft !== undefined ? draft : null;
+  const title = tested ? (titleEdit ?? tested.title) : "";
+  const testedWhen = tested?.refreshedAt
+    ? relativeTime(t, i18n.language, tested.refreshedAt, new Date(now))
+    : t("common.now");
+
+  // The preview: the chosen block as it is; the draft as the agent built it; or example data of the kind asked (the
+  // agent's pick for "auto"), named by its format until the agent names it.
   const previewAgent: Agent | undefined = tab === "pin" ? (chosen ? dir.anyAgent(chosen.agentId) : undefined) : agent;
   const previewKind: WidgetKind = format === "auto" ? (sug?.kind ?? sugs[0]?.kind ?? "kpi") : format;
+  const unnamed = neutralWidgetTitle(t, format === "auto" ? null : format);
   const preview: { title: string; spec: WidgetSpec } | null =
     tab === "pin"
       ? chosen && { title: chosen.title, spec: chosen.spec as WidgetSpec }
-      : asked
-        ? {
-            title: sug ? sug.title : capitalize(asked, i18n.language).slice(0, PREVIEW_TITLE_MAX),
-            spec: exampleWidgetSpec(previewKind, words),
-          }
-        : null;
+      : tested?.spec
+        ? { title: title.trim() || neutralWidgetTitle(t, tested.kind), spec: tested.spec }
+        : asked && phase !== "testing" && phase !== "failed"
+          ? { title: sug ? sug.title : unnamed, spec: exampleWidgetSpec(previewKind, words) }
+          : null;
   const name = previewAgent?.name ?? agent?.name ?? "";
+  const agentName = agent?.name ?? t("dashboards.newWidget.theAgent");
 
-  const ready =
-    targetId !== null &&
-    (tab === "pin" ? chosen !== null : Boolean(agent) && asked.length > 0) &&
-    !create.isPending &&
-    !pin.isPending;
-
-  const done = () => {
-    toast.show(t("dashboards.newWidget.created", { where }));
-    onClose();
-  };
   const failed = (error: unknown) => toast.show(errorText(t, error, i18n.language), "error");
+  const canTest = tab === "ask" && Boolean(agent) && asked.length > 0 && targetId !== null && phase !== "testing";
+  const busy = confirm.isPending || pin.isPending;
+  const alertInput = { enabled: alertOn, condition: alertOn ? condition.trim() : "" };
+
+  /** Test: the agent builds a draft now, with real data; the draft before it goes. */
+  const runTest = () => {
+    if (!canTest || !agent || targetId === null) return;
+    const before = pending.current;
+    pending.current = null;
+    if (before) remove.mutate(before);
+    setDraftId(null);
+    setTitleEdit(null);
+    const forAsk = askKey;
+    const made = (draftMade: Widget) => {
+      // Closed while it was sent: nobody will create it.
+      if (!alive.current) {
+        drop.current(draftMade.id);
+        return;
+      }
+      pending.current = draftMade.id;
+      setDraftId(draftMade.id);
+      setTestedFor(forAsk);
+    };
+    const refused = (error: unknown) => {
+      if (alive.current) failed(error);
+    };
+    const input = {
+      dashboardId: targetId,
+      agentId: agent.id,
+      prompt: asked,
+      ...(sug && asked === (sug.prompt || sug.title) ? { title: sug.title } : {}),
+      format,
+      schedule,
+      alert: alertInput,
+      size,
+    };
+    // Its promise, not the mutation's callbacks: those don't run once the dialog is gone, and the draft must go then.
+    void test.mutateAsync(input).then(made, refused);
+  };
+
+  /** Create widget: the tested draft goes on the board, with the title, size, schedule and alert chosen now. */
+  const create = () => {
+    if (!tested || targetId === null || busy) return;
+    confirming.current = true;
+    confirm.mutate(
+      {
+        widgetId: tested.id,
+        dashboardId: targetId,
+        // Only a title the person wrote: theirs is kept from then on; otherwise the agent's from the test stays.
+        ...(titleEdit?.trim() && titleEdit.trim() !== tested.title ? { title: titleEdit.trim() } : {}),
+        size,
+        schedule,
+        alert: alertInput,
+      },
+      {
+        onSuccess: () => {
+          pending.current = null;
+          toast.show(t("dashboards.newWidget.created", { where }));
+          onClose();
+        },
+        onError: (error) => {
+          confirming.current = false;
+          failed(error);
+        },
+      },
+    );
+  };
+
   const submit = () => {
-    if (!ready || targetId === null) return;
-    if (tab === "pin" && chosen) {
+    if (tab === "pin") {
+      if (!chosen || targetId === null || busy) return;
       pin.mutate(
         { dashboardId: targetId, messageId: chosen.messageId, block: chosen.block, schedule, size },
-        { onSuccess: done, onError: failed },
+        {
+          onSuccess: () => {
+            toast.show(t("dashboards.newWidget.created", { where }));
+            onClose();
+          },
+          onError: failed,
+        },
       );
       return;
     }
-    if (!agent) return;
-    create.mutate(
-      {
-        dashboardId: targetId,
-        agentId: agent.id,
-        prompt: asked,
-        ...(sug && asked === (sug.prompt || sug.title) ? { title: sug.title } : {}),
-        format,
-        schedule,
-        alert: { enabled: alertOn, condition: alertOn ? condition.trim() : "" },
-        size,
-      },
-      { onSuccess: done, onError: failed },
-    );
+    if (tested) create();
+    else runTest();
   };
 
   const pickTab = (next: Tab) => {
@@ -229,6 +346,20 @@ function NewWidgetBody({
 
   const tones = (who: { appearance?: unknown } | undefined) => widgetTileVars(colorOf(who), dark);
   const scheduleInline = t(`widgets.schedulesInline.${schedule}`);
+
+  // "Who looks after it": face, name and role (what it reads shows in the steps, beside the preview).
+  const agentOptions = agents.map((a) => ({
+    value: a.id,
+    label: a.name,
+    description: a.role || undefined,
+    leading: <AgentAvatar agentId={a.id} name={a.name} size="xs" />,
+  }));
+  const formatOptions = WIDGET_FORMATS.map((f) => ({
+    value: f,
+    label: t(`widgets.kinds.${f}`),
+    description: t(`dashboards.newWidget.formatHints.${f}`, { name: agentName }),
+    leading: <WidgetGlyph kind={f} size={20} />,
+  }));
 
   const askForm = (
     <>
@@ -268,35 +399,60 @@ function NewWidgetBody({
           </div>
         )}
       </div>
-      <div className="db-f">
-        <span className="db-lbl" id={`${id}-who`}>
-          {t("dashboards.newWidget.who")}
-        </span>
-        {/* biome-ignore lint/a11y/useSemanticElements: toggle buttons under a field's label, not a fieldset */}
-        <div className="db-agents" role="group" aria-labelledby={`${id}-who`}>
-          {agents.length === 0 && <p className="db-hint">{t("dashboards.newWidget.noAgents")}</p>}
-          {agents.map((a) => (
-            <AgentChoice key={a.id} orgId={orgId} agent={a} on={a.id === agent?.id} onPick={() => pickAgent(a.id)} />
-          ))}
+      <div className="db-pair">
+        <div className="db-f">
+          <span className="db-lbl" aria-hidden="true">
+            {t("dashboards.newWidget.who")}
+          </span>
+          {agents.length === 0 ? (
+            <p className="db-hint">{t("dashboards.newWidget.noAgents")}</p>
+          ) : (
+            <Select
+              aria-label={t("dashboards.newWidget.who")}
+              value={agent?.id}
+              onValueChange={pickAgent}
+              options={agentOptions}
+              renderValue={(o) => (
+                <span className="db-dd">
+                  <AgentAvatar agentId={o.value} name={o.label} size="xs" />
+                  {o.label}
+                </span>
+              )}
+            />
+          )}
+        </div>
+        <div className="db-f">
+          <span className="db-lbl" aria-hidden="true">
+            {t("dashboards.newWidget.format")}
+          </span>
+          <Select<WidgetFormat>
+            aria-label={t("dashboards.newWidget.format")}
+            value={format}
+            onValueChange={setFormat}
+            options={formatOptions}
+            renderValue={(o) => (
+              <span className="db-dd">
+                <WidgetGlyph kind={o.value} size={20} />
+                {o.label}
+              </span>
+            )}
+          />
         </div>
       </div>
-      <div className="db-f">
-        <span className="db-lbl" id={`${id}-format`}>
-          {t("dashboards.newWidget.format")}
-        </span>
-        {/* biome-ignore lint/a11y/useSemanticElements: toggle buttons under a field's label, not a fieldset */}
-        <div className="db-kinds" role="group" aria-labelledby={`${id}-format`}>
-          {WIDGET_FORMATS.map((f) => (
-            <button key={f} type="button" className="db-kind" aria-pressed={format === f} onClick={() => setFormat(f)}>
-              <WidgetGlyph kind={f} size={28} />
-              <span>{t(`widgets.kinds.${f}`)}</span>
-            </button>
-          ))}
+      {tested && (
+        <div className="db-f">
+          <label className="db-lbl" htmlFor={`${id}-title`}>
+            {t("dashboards.newWidget.titleField")}
+          </label>
+          <Input
+            id={`${id}-title`}
+            value={title}
+            maxLength={TITLE_MAX}
+            placeholder={neutralWidgetTitle(t, tested.kind)}
+            onChange={(e) => setTitleEdit(e.target.value)}
+          />
         </div>
-        {format === "auto" && agent && (
-          <small className="db-hint">{t("dashboards.newWidget.autoHint", { name: agent.name })}</small>
-        )}
-      </div>
+      )}
       <div className="db-f">
         <span className="db-lbl">{t("dashboards.newWidget.updates")}</span>
         <Segmented
@@ -390,12 +546,16 @@ function NewWidgetBody({
     </>
   );
 
-  // What happens once it's made, in order: who builds it and from what, its routine, its alert, its cost.
+  // What happens once it's made, in order: who builds it and from what, its routine, its alert, its cost (and what
+  // the test cost, once there was one).
   const costLine = widgetCostLine(schedule, cost.data);
   const costText =
     costLine.kind === "day" || costLine.kind === "week"
       ? t(`widgets.cost.${costLine.kind}`, { amount: formatUsd(i18n.language, costLine.usd), name })
       : t(`widgets.cost.${costLine.kind}`, { name });
+  const lastCost = phase === "ok" || phase === "failed" ? (draft?.lastCostUsd ?? null) : null;
+  const testCost =
+    lastCost === null ? undefined : t("dashboards.newWidget.testCost", { cost: formatUsd(i18n.language, lastCost) });
   const steps: { icon: IconName; title: string; hint?: string }[] =
     tab === "ask"
       ? [
@@ -410,7 +570,7 @@ function NewWidgetBody({
             ? { icon: "routines", title: t("dashboards.newWidget.steps.noRoutine") }
             : {
                 icon: "routines",
-                title: t("dashboards.newWidget.steps.routine", { title: preview?.title ?? "…" }),
+                title: t("dashboards.newWidget.steps.routine", { title: preview?.title ?? unnamed }),
                 hint: t("dashboards.newWidget.steps.routineHint", { schedule: t(`widgets.schedules.${schedule}`) }),
               },
           alertOn
@@ -426,7 +586,7 @@ function NewWidgetBody({
                 title: t("dashboards.newWidget.steps.noAlert"),
                 hint: t("dashboards.newWidget.steps.noAlertHint"),
               },
-          { icon: "coin", title: costText },
+          { icon: "coin", title: costText, hint: testCost },
         ]
       : [
           {
@@ -450,11 +610,92 @@ function NewWidgetBody({
               },
         ];
 
+  // Over the preview: example data, real data and when it came, or that the ask changed since the test.
+  const note =
+    tab !== "ask"
+      ? ""
+      : tested
+        ? t("dashboards.newWidget.tested", { when: testedWhen })
+        : phase === "stale"
+          ? t("dashboards.newWidget.stale")
+          : preview && phase === "none"
+            ? t("widgets.preview.example")
+            : "";
+
+  const stage: ReactNode =
+    tab === "ask" && (phase === "testing" || phase === "failed") ? (
+      // The draft being built with real data, or why it didn't work, with Try again.
+      <WidgetCard
+        key={`test:${phase}:${size}`}
+        className="db-pv__card"
+        data-size={size}
+        title={unnamed}
+        spec={null}
+        status={phase === "testing" ? "building" : "failed"}
+        color={colorOf(agent)}
+        size={sizeToLayout(size)}
+        locale={i18n.language}
+        buildingText={phase === "testing" ? t("dashboards.newWidget.testing", { name }) : undefined}
+        footer={
+          phase === "failed" ? (
+            <span className="wg__warn" role="status">
+              <Icon name="alert" size={14} />
+              <span>
+                {t("dashboards.newWidget.testFailed", { reason: failureText(t, draft?.failure ?? null, name) })}{" "}
+                <button type="button" className="wg__resolve" disabled={!canTest} onClick={runTest}>
+                  {t("dashboards.newWidget.tryAgain")}
+                </button>
+              </span>
+            </span>
+          ) : null
+        }
+      />
+    ) : preview ? (
+      <WidgetCard
+        key={`${tested ? "real" : "example"}:${preview.spec.kind}:${size}`}
+        className="db-pv__card"
+        data-size={size}
+        title={preview.title}
+        spec={preview.spec}
+        status="ok"
+        color={colorOf(previewAgent)}
+        size={sizeToLayout(size)}
+        locale={i18n.language}
+        footer={
+          <>
+            {previewAgent && <AgentAvatar agentId={previewAgent.id} name={previewAgent.name} size="xs" />}
+            <span className="db-pv__when">
+              {t("widgets.foot", { name, when: tested ? testedWhen : t("common.now"), schedule: scheduleInline })}
+            </span>
+          </>
+        }
+      />
+    ) : (
+      <WidgetCard
+        className="db-pv__card db-pv__card--empty"
+        data-size={size}
+        title=""
+        spec={null}
+        status="building"
+        color={colorOf(previewAgent ?? agent)}
+        size={sizeToLayout(size)}
+        locale={i18n.language}
+        buildingText={
+          tab === "pin"
+            ? t("dashboards.newWidget.pickBlock")
+            : t("dashboards.newWidget.emptyPreview", { name: agent?.name ?? "" })
+        }
+        footer={null}
+      />
+    );
+
   const previewPane: ReactNode = (
     <aside className="db-pv" aria-label={t("widgets.preview.label")}>
       <div className="db-pv__label">
         <span>{t("widgets.preview.label")}</span>
-        <span className="db-pv__note">{preview && tab === "ask" ? t("widgets.preview.example") : ""}</span>
+        <span className="db-pv__note" data-tone={phase === "stale" ? "warn" : undefined}>
+          {note}
+        </span>
         <Segmented
           size="sm"
           label={t("widgets.sizes.label")}
@@ -464,45 +705,14 @@ function NewWidgetBody({
         />
       </div>
       <div className="db-pv__stage" data-size={size}>
-        {preview ? (
-          <WidgetCard
-            key={`${preview.spec.kind}:${size}`}
-            className="db-pv__card"
-            data-size={size}
-            title={preview.title}
-            spec={preview.spec}
-            status="ok"
-            color={colorOf(previewAgent)}
-            size={sizeToLayout(size)}
-            locale={i18n.language}
-            footer={
-              <>
-                {previewAgent && <AgentAvatar agentId={previewAgent.id} name={previewAgent.name} size="xs" />}
-                <span className="db-pv__when">
-                  {t("widgets.foot", { name, when: t("common.now"), schedule: scheduleInline })}
-                </span>
-              </>
-            }
-          />
-        ) : (
-          <WidgetCard
-            className="db-pv__card db-pv__card--empty"
-            data-size={size}
-            title=""
-            spec={null}
-            status="building"
-            color={colorOf(previewAgent ?? agent)}
-            size={sizeToLayout(size)}
-            locale={i18n.language}
-            buildingText={
-              tab === "pin"
-                ? t("dashboards.newWidget.pickBlock")
-                : t("dashboards.newWidget.emptyPreview", { name: agent?.name ?? "" })
-            }
-            footer={null}
-          />
-        )}
+        {stage}
       </div>
+      {tab === "ask" && asked && (phase === "none" || phase === "stale") && (
+        <p className="db-hint db-pv__first">
+          <Icon name="info" size={14} />
+          {t("dashboards.newWidget.testFirst")}
+        </p>
+      )}
       <ul className="db-steps">
         {steps.map((s) => (
           <li key={`${s.icon}:${s.title}`}>
@@ -555,9 +765,29 @@ function NewWidgetBody({
         <Button variant="ghost" onClick={onClose}>
           {t("common.cancel")}
         </Button>
-        <Button type="submit" variant="primary" disabled={!ready} loading={create.isPending || pin.isPending}>
-          {tab === "pin" ? t("dashboards.newWidget.pin") : t("dashboards.newWidget.create")}
-        </Button>
+        {tab === "pin" ? (
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!chosen || targetId === null || busy}
+            loading={pin.isPending}
+          >
+            {t("dashboards.newWidget.pin")}
+          </Button>
+        ) : tested ? (
+          <>
+            <Button icon="refresh" disabled={!canTest || busy} onClick={runTest}>
+              {t("dashboards.newWidget.testAgain")}
+            </Button>
+            <Button type="submit" variant="primary" disabled={busy || targetId === null} loading={confirm.isPending}>
+              {t("dashboards.newWidget.create")}
+            </Button>
+          </>
+        ) : (
+          <Button type="submit" variant="primary" icon="bolt" disabled={!canTest} loading={phase === "testing"}>
+            {t("dashboards.newWidget.test")}
+          </Button>
+        )}
       </DialogFooter>
     </form>
   );
@@ -573,39 +803,4 @@ function placeOf(t: TFunction, locale: string, b: PinnableBlock, agentName: stri
     channel: b.place.name,
     when,
   });
-}
-
-/**
- * One agent in "Who looks after it": its face, name, and its role with what it reads (the connections it may read,
- * known once its suggestions were asked for; only the chosen one asks).
- */
-function AgentChoice({
-  orgId,
-  agent,
-  on,
-  onPick,
-}: {
-  orgId: string;
-  agent: Agent;
-  on: boolean;
-  onPick: () => void;
-}) {
-  const { t } = useTranslation();
-  // Read only for the chosen agent; the others show what an earlier pick already brought.
-  const read = useWidgetSuggestions(orgId, agent.id, on);
-  const sources = read.data?.sources ?? [];
-  const line = sources.length
-    ? agent.role
-      ? t("dashboards.newWidget.reads", { role: agent.role, sources: joinNames(sources, t) })
-      : t("dashboards.newWidget.steps.reads", { sources: joinNames(sources, t) })
-    : agent.role;
-  return (
-    <button type="button" className="db-agent" aria-pressed={on} onClick={onPick}>
-      <AgentAvatar agentId={agent.id} name={agent.name} size="sm" />
-      <span>
-        <b>{agent.name}</b>
-        {line && <small>{line}</small>}
-      </span>
-    </button>
-  );
 }

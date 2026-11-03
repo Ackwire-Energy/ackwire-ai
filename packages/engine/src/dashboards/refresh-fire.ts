@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, schema, sql } from "@agenteschat/db";
 import type { Membership } from "../organizations";
 import { dashboardRights, viewerOf } from "./access";
-import { publishWidgetChanged } from "./events";
+import { publishWidgetChanged, widgetEvent } from "./events";
 import type { WidgetStatus } from "./types";
 
 const { dashboards, dashboardWidgets } = schema;
@@ -58,10 +58,16 @@ export async function widgetRunStarting(deps: { db: Database; pubsub?: PubSub },
       updatedAt: new Date(),
     })
     .where(and(eq(dashboardWidgets.orgId, orgId), eq(dashboardWidgets.id, widgetId)))
-    .returning({ id: dashboardWidgets.id, status: dashboardWidgets.status, dashboardId: dashboardWidgets.dashboardId });
+    .returning({
+      id: dashboardWidgets.id,
+      status: dashboardWidgets.status,
+      dashboardId: dashboardWidgets.dashboardId,
+      draft: dashboardWidgets.draft,
+      createdByUserId: dashboardWidgets.createdByUserId,
+    });
   if (!row) return;
   const [board] = await deps.db.select().from(dashboards).where(eq(dashboards.id, row.dashboardId));
   if (board) {
-    await publishWidgetChanged(deps.pubsub, board, { id: row.id, status: row.status as WidgetStatus }).catch(() => {});
+    await publishWidgetChanged(deps.pubsub, board, widgetEvent(row, row.status as WidgetStatus)).catch(() => {});
   }
 }

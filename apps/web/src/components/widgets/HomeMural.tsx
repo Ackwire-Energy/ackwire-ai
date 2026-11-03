@@ -73,6 +73,7 @@ export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting:
         board={board}
         arranging={arranging && editable}
         tiles={{ waiting: tile(waiting), working: tile(working) }}
+        tileNames={{ waiting: waiting.title, working: working.title }}
         onAdd={() => setAdding(true)}
         onOpen={(id) => setWidgetId(id)}
       />

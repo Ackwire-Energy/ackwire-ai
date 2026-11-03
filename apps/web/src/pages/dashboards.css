@@ -391,7 +391,7 @@ html:not([data-pointer]) .db-card:focus-visible {
 .db-role[aria-pressed="true"] .ac-rolemark {
   opacity: 1;
 }
-html:not([data-pointer]) :is(.db-role, .db-agent-chip, .db-agent, .db-sug, .db-kind, .db-pick):focus-visible {
+html:not([data-pointer]) :is(.db-role, .db-agent-chip, .db-sug, .db-pick):focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -543,78 +543,21 @@ html:not([data-pointer]) :is(.db-role, .db-agent-chip, .db-agent, .db-sug, .db-k
   height: 22px;
   border-radius: 999px;
 }
-.db-agents {
+/* "Who looks after it" and "Format", side by side: each a select of the design system with its face or glyph. */
+.db-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.db-dd {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-}
-.db-agent {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  box-shadow: inset 0 0 0 1px var(--line);
-  font: inherit;
-  color: var(--ink);
-  text-align: start;
-  cursor: pointer;
-}
-.db-agent:hover {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-.db-agent[aria-pressed="true"] {
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1.5px var(--ink);
-}
-.db-agent > span:last-child {
-  display: flex;
-  flex-direction: column;
   min-width: 0;
 }
-.db-agent b {
-  font-size: 14px;
-  font-weight: 650;
-}
-.db-agent small {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.db-kinds {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-}
-.db-kind {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 4px 8px;
-  border: 0;
-  border-radius: 12px;
-  background: none;
-  box-shadow: inset 0 0 0 1px var(--line);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
+.db-dd > .ac-wglyph {
+  flex: none;
   color: var(--ink2);
-  cursor: pointer;
-}
-.db-kind:hover {
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-.db-kind[aria-pressed="true"] {
-  color: var(--ink);
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1.5px var(--ink);
 }
 .db-alert__row {
   display: flex;
@@ -730,6 +673,13 @@ html:not([data-pointer]) :is(.db-role, .db-agent-chip, .db-agent, .db-sug, .db-k
   font-weight: 500;
   color: var(--muted);
 }
+/* The ask changed since the test: the preview no longer shows what Create would make. */
+.db-pv__note[data-tone="warn"] {
+  color: var(--warn);
+}
+.db-pv__first {
+  margin-top: -4px;
+}
 .db-pv__stage {
   display: flex;
   justify-content: center;
@@ -811,10 +761,7 @@ html:not([data-pointer]) :is(.db-role, .db-agent-chip, .db-agent, .db-sug, .db-k
     border-left: 0;
     border-bottom: 1px solid var(--line);
   }
-  .db-kinds {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .db-agents {
+  .db-pair {
     grid-template-columns: minmax(0, 1fr);
   }
 }

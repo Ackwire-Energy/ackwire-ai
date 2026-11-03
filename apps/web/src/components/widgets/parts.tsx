@@ -1,4 +1,4 @@
-import type { Widget, WidgetFailure } from "@agenteschat/client";
+import type { Widget, WidgetFailure, WidgetKind } from "@agenteschat/client";
 import { widgetFailureKey } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { type AgentColor, Icon, PixelSpinner } from "@agenteschat/ui";
@@ -16,6 +16,22 @@ export function useWidgetAgent(agentId: string) {
   const dir = useDirectory(org.id);
   const agent = dir.anyAgent(agentId);
   return { agent, name: agent?.name ?? t("channel.unknownAgent"), color: colorOf(agent) };
+}
+
+/** What a widget is called until its agent names it: its kind ("Number", "Bars"…), or "New widget" (ADR 0134). */
+export function neutralWidgetTitle(t: TFunction, kind: WidgetKind | null): string {
+  return kind ? t(`widgets.kinds.${kind}`) : t("widgets.untitled");
+}
+
+/**
+ * A widget's title as boards and its panel show it. The agent names it on its first build; until then (or when an
+ * older widget still holds the start of what was asked) the neutral name, never the raw ask (ADR 0134).
+ */
+export function widgetTitle(t: TFunction, w: Pick<Widget, "title" | "prompt" | "spec" | "kind" | "format">): string {
+  const title = w.title.trim();
+  const ask = w.prompt.trim();
+  if (title && (w.spec || !ask || !ask.startsWith(title))) return w.title;
+  return neutralWidgetTitle(t, w.kind ?? (w.format === "auto" ? null : w.format));
 }
 
 /** Why a widget stopped updating, in the reader's words (the agent's own when it said why). */

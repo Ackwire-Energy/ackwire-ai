@@ -1723,7 +1723,9 @@ export const featureKeysEn = {
       which: "Which chart",
     },
     organize: {
-      hint: "Move the widgets and pick each one's size. Done saves the order.",
+      hint:
+        "Hold a widget and drag it to its new place, or use the arrows, and pick each one's size. Done saves the order.",
+      holdHint: "Hold and drag to move it.",
       up: "Move up",
       down: "Move down",
       position: "{{at}} of {{count}}",
@@ -1749,7 +1751,12 @@ export const featureKeysEn = {
       removed: "Widget removed. Its routine stopped.",
       routine: "Its routine",
       onBoard: "Where it is",
+      title: "Title",
+      titlePlaceholder: "A short name for the widget",
+      titleSaved: "Title saved",
     },
+    /** The second line of "Automatic" in New widget's Format menu. */
+    formatAuto: "{{name}} picks the best one",
     notice: {
       widget_alert_one: "{{names}} flagged a widget",
       widget_alert_other: "{{names}} flagged a widget",

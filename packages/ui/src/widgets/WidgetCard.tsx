@@ -1,4 +1,12 @@
-import { type HTMLAttributes, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "../components/Button";
 import { cx } from "../cx";
 import { useDarkTheme } from "../hooks/useDarkTheme";
@@ -18,8 +26,10 @@ export interface WidgetOrganize {
   dragLabel: string;
   onSize: () => void;
   onRemove: () => void;
-  /** The grip's arrow keys: one place earlier (-1) or later (1). Without it, the grip is only for the pointer. */
+  /** The grip's arrow keys: one place earlier (-1) or later (1). Without it (or `grip`), only for the pointer. */
   onMove?: (delta: -1 | 1) => void;
+  /** The board's drag on the grip (its keys, `data-grip`), in place of `onMove`'s arrows. */
+  grip?: ButtonHTMLAttributes<HTMLButtonElement> & { "data-grip"?: string };
 }
 
 export type WidgetCardProps = {
@@ -115,13 +125,14 @@ export function WidgetCard({
               title={organize.removeLabel}
               onClick={organize.onRemove}
             />
-            {organize.onMove ? (
+            {organize.onMove || organize.grip ? (
               <button
                 type="button"
                 className="wg__grip"
                 aria-label={organize.dragLabel}
                 title={organize.dragLabel}
-                onKeyDown={grip}
+                {...organize.grip}
+                onKeyDown={organize.grip?.onKeyDown ?? grip}
               >
                 <Icon name="grip" size={16} />
               </button>

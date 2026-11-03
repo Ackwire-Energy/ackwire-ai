@@ -149,6 +149,13 @@ export const dashboardWidgets = pgTable(
     /** Its last good update. */
     refreshedAt: timestamp({ withTimezone: true }),
     lastAlertAt: timestamp({ withTimezone: true }),
+    /** A person named it (on create, on confirm or with Rename): its agent never renames it (ADR 0134 §17). */
+    titleSetByUser: boolean().notNull().default(false),
+    /**
+     * A test of a widget not made yet ("Test" in New widget, ADR 0134 §16): on no board's list, seen only by its
+     * creator, its routine never scheduled; confirmed (moved onto a board) or deleted within a day.
+     */
+    draft: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
@@ -159,6 +166,8 @@ export const dashboardWidgets = pgTable(
     // The workspace's cap on scheduled widgets counts these.
     index("dashboard_widgets_scheduled").on(t.orgId).where(sql`${t.schedule} <> 'manual'`),
     index("dashboard_widgets_routine").on(t.routineId).where(sql`${t.routineId} is not null`),
+    // A person's drafts (their cap) and the sweep of old ones.
+    index("dashboard_widgets_drafts").on(t.orgId, t.createdByUserId).where(sql`${t.draft} = true`),
   ],
 );
 

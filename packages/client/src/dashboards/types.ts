@@ -149,6 +149,10 @@ export interface Widget {
   routineId: string | null;
   sourceMessageId: string | null;
   createdBy: { kind: "person" | "agent"; id: string } | null;
+  /** A test not created yet ("Test" in New widget): only its creator sees it, on no board. */
+  draft: boolean;
+  /** What its latest update cost ("This test cost $0.01"); null on a plan, or before it is known. */
+  lastCostUsd: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -244,6 +248,16 @@ export interface ShareDashboardInput {
 export interface DashboardLayoutInput {
   widgets: { id: string; position: number; w: 1 | 2; h: 1 | 2 }[];
   tiles?: HomeTile[];
+}
+
+/** "Create widget" after a test: the board it goes on (first) and how it updates. */
+export interface ConfirmWidgetInput {
+  dashboardId: string;
+  /** The person's title (kept from then on); absent: the one its agent wrote on the test. */
+  title?: string;
+  size: WidgetSize;
+  schedule: WidgetSchedule;
+  alert: { enabled: boolean; condition: string };
 }
 
 export interface CreateWidgetInput {

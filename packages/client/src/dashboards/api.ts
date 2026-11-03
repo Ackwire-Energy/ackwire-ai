@@ -1,5 +1,6 @@
 import { enc, type Requester } from "../api/http";
 import type {
+  ConfirmWidgetInput,
   CreateDashboardInput,
   CreateWidgetInput,
   Dashboard,
@@ -39,6 +40,13 @@ export interface DashboardsApi {
   decideProposal(orgId: string, dashboardId: string, decision: DashboardProposalDecision): Promise<Dashboard>;
   /** "+ Widget": the agent builds it (`building`). */
   createWidget(orgId: string, dashboardId: string, input: CreateWidgetInput): Promise<Widget>;
+  /**
+   * "Test": a draft of the widget (`draft: true`, `building`), built at once with real data, seen only by me. Testing
+   * again or closing the dialog drops it (`removeWidget`).
+   */
+  testWidget(orgId: string, dashboardId: string, input: CreateWidgetInput): Promise<Widget>;
+  /** "Create widget" after a test that worked: the draft goes first on `input.dashboardId`. */
+  confirmWidget(orgId: string, widgetId: string, input: ConfirmWidgetInput): Promise<Widget>;
   /** "Pin" a chart an agent sent in chat. */
   pinWidget(orgId: string, dashboardId: string, input: PinWidgetInput): Promise<Widget>;
   widget(orgId: string, widgetId: string): Promise<WidgetDetail>;
@@ -77,6 +85,10 @@ export function createDashboardsApi(request: Requester): DashboardsApi {
       request<Dashboard>(`${board(orgId, dashboardId)}/proposal`, { json: { decision } }),
     createWidget: (orgId, dashboardId, input) =>
       request<Widget>(`${board(orgId, dashboardId)}/widgets`, { json: input }),
+    testWidget: (orgId, dashboardId, input) =>
+      request<Widget>(`${board(orgId, dashboardId)}/widgets/test`, { json: input }),
+    confirmWidget: (orgId, widgetId, input) =>
+      request<Widget>(`${widget(orgId, widgetId)}/confirm`, { json: input }),
     pinWidget: (orgId, dashboardId, input) =>
       request<Widget>(`${board(orgId, dashboardId)}/widgets/pin`, { json: input }),
     widget: (orgId, widgetId) => request<WidgetDetail>(widget(orgId, widgetId)),

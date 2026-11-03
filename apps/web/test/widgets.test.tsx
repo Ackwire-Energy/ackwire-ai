@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Dashboard, Widget, WidgetSpec } from "@agenteschat/client";
+import { box, place } from "@agenteschat/ui/testing";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, type FakeState, fakeDashboardsOf, ORG_ID, seedState } from "./fake-api";
 import type { FakeDashboards } from "./fakes/dashboards";
@@ -83,6 +84,35 @@ const widget = (title: string) => within(mural()).getByRole("article", { name: t
 const cellOf = (id: string) => mural().querySelector(`.wb-cell[data-item="${id}"]`) as HTMLElement;
 const calls = (state: FakeState, method: string) => state.calls.filter((c) => c.method === method);
 const last = (state: FakeState, method: string) => calls(state, method).at(-1)?.args;
+const live = () => mural().querySelector("p.ac-visually-hidden[aria-live]")?.textContent ?? "";
+/** The click a drop swallows (only on the board) waits a moment for its click; tests send none. */
+const pause = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
+const gripIn = (title: string) => within(widget(title)).getByRole("button", { name: "Arraste para mover" });
+
+/** happy-dom lays nothing out: the cells in the board's order, 4 a row, 200×160 with 10px between them. */
+function layGrid() {
+  order().forEach((id, k) => {
+    place(cellOf(id ?? ""), box((k % 4) * 210, 300 + Math.floor(k / 4) * 170, 200, 160));
+  });
+}
+const at = (x: number, y: number) => ({ clientX: x, clientY: y, button: 0, pointerId: 1, pointerType: "mouse" });
+/** A mouse press on a cell, a move past the slop (it lifts), then on to the point. */
+async function dragTo(cell: HTMLElement, x: number, y: number) {
+  await act(async () => {
+    fireEvent.pointerDown(cell, at(100, 550));
+    fireEvent.pointerMove(document, at(110, 560));
+    fireEvent.pointerMove(document, at(x, y));
+  });
+  await settle(2);
+}
+const press = async (key: string, el: Element = document.activeElement ?? document.body) => {
+  await act(async () => fireEvent.keyDown(el, { key }));
+  await settle(3);
+};
+/** Each widget's saved place and size, by id. */
+const savedWidgets = (state: FakeState) =>
+  (last(state, "dashboards.saveLayout") as [string, string, { widgets: { id: string; position: number }[] }])[2]
+    .widgets;
 
 describe("My Home as a mural (ADR 0134)", () => {
   test("Waiting on you and Working now are fixed tiles among my widgets, in the board's order", async () => {
@@ -147,12 +177,32 @@ describe("My Home as a mural (ADR 0134)", () => {
       { key: "working", position: 3, w: 2, h: 1 },
     ]);
 
-    // Dragged onto another: it takes that place.
-    await act(async () => fireEvent.dragStart(cellOf(builds.id)));
-    await act(async () => fireEvent.dragOver(cellOf(orders.id)));
-    await act(async () => fireEvent.drop(cellOf(orders.id)));
-    await settle(3);
+    // Dragged with the pointer onto another: a copy lifts, a well with its span (M: 2 wide) marks where it lands,
+    // and on the drop it takes that place, saved once.
+    layGrid();
+    const before = calls(state, "dashboards.saveLayout").length;
+    await dragTo(cellOf(builds.id), 520, 380);
+    expect(document.querySelector(".wb-ghost")).toBeTruthy();
+    expect(cellOf(builds.id).hidden).toBe(true);
+    const spot = mural().querySelector("[data-spot]") as HTMLElement;
+    expect(spot.getAttribute("data-w")).toBe("2");
+    expect([...mural().querySelectorAll(".wgrid > *")].map((c) => c.getAttribute("data-item") ?? "spot")).toEqual([
+      sales.id,
+      "waiting",
+      "spot",
+      orders.id,
+      "working",
+      builds.id,
+    ]);
+    expect(calls(state, "dashboards.saveLayout")).toHaveLength(before);
+    await act(async () => fireEvent.pointerUp(document, at(520, 380)));
+    await settle(6);
+    expect(document.querySelector(".wb-ghost")).toBeNull();
+    expect(mural().querySelector("[data-spot]")).toBeNull();
     expect(order()).toEqual([sales.id, "waiting", builds.id, orders.id, "working"]);
+    expect(calls(state, "dashboards.saveLayout")).toHaveLength(before + 1);
+    expect(savedWidgets(state).find((w) => w.id === builds.id)?.position).toBe(2);
+    await pause(80);
 
     // Remove: it leaves, and its routine with it.
     await click(within(widget("Pedidos por status")).getByRole("button", { name: "Tirar do Início" }));
@@ -163,6 +213,63 @@ describe("My Home as a mural (ADR 0134)", () => {
 
     await click(within(mural()).getByRole("button", { name: "Pronto" }));
     expect(within(mural()).getByRole("button", { name: "Adicionar widget" })).toBeTruthy();
+  });
+
+  test("Organize with the keys: Space picks a widget up, the arrows carry it, Enter drops it and saves", async () => {
+    const { state, sales, orders, builds } = await open(`/org/${ORG_ID}/home`);
+    await click(within(mural()).getByRole("button", { name: "Organizar" }));
+    const grip = gripIn("Pedidos por status");
+    grip.focus();
+    await press(" ", grip);
+    expect(cellOf(orders.id).classList.contains("is-picked")).toBe(true);
+    expect(live()).toBe("Você pegou “Pedidos por status”. As setas movem, Espaço solta, Esc cancela.");
+    const before = calls(state, "dashboards.saveLayout").length;
+    await press("ArrowLeft");
+    // Carried, not saved yet: before the sales widget, second of five.
+    expect(order()).toEqual(["waiting", orders.id, sales.id, "working", builds.id]);
+    expect(live()).toBe("“Pedidos por status”: posição 2 de 5.");
+    expect(document.activeElement).toBe(gripIn("Pedidos por status"));
+    expect(calls(state, "dashboards.saveLayout")).toHaveLength(before);
+    await press("Enter");
+    expect(live()).toBe("Você soltou “Pedidos por status” na posição 2 de 5.");
+    expect(cellOf(orders.id).classList.contains("is-picked")).toBe(false);
+    expect(calls(state, "dashboards.saveLayout")).toHaveLength(before + 1);
+    expect(savedWidgets(state).find((w) => w.id === orders.id)?.position).toBe(1);
+    expect(order()).toEqual(["waiting", orders.id, sales.id, "working", builds.id]);
+
+    // Esc puts it back and saves nothing.
+    const sold = gripIn("Vendas hoje");
+    sold.focus();
+    await press("Enter", sold);
+    await press("ArrowRight");
+    expect(order()).toEqual(["waiting", orders.id, "working", sales.id, builds.id]);
+    await press("Escape");
+    expect(live()).toBe("“Vendas hoje” voltou para o lugar.");
+    expect(order()).toEqual(["waiting", orders.id, sales.id, "working", builds.id]);
+    expect(document.activeElement).toBe(gripIn("Vendas hoje"));
+    expect(calls(state, "dashboards.saveLayout")).toHaveLength(before + 1);
+  });
+
+  test("Organize: Esc while dragging sends the widget back and saves nothing", async () => {
+    const { state, sales, orders, builds } = await open(`/org/${ORG_ID}/home`);
+    await click(within(mural()).getByRole("button", { name: "Organizar" }));
+    layGrid();
+    await dragTo(cellOf(builds.id), 110, 380);
+    expect(mural().querySelector("[data-spot]")).toBeTruthy();
+    await press("Escape", document.body);
+    await settle(4);
+    expect(document.querySelector(".wb-ghost")).toBeNull();
+    expect(mural().querySelector("[data-spot]")).toBeNull();
+    expect(order()).toEqual(["waiting", sales.id, orders.id, "working", builds.id]);
+    // The release after Esc drops nothing.
+    await act(async () => fireEvent.pointerUp(document, at(110, 380)));
+    await settle(4);
+    expect(calls(state, "dashboards.saveLayout")).toHaveLength(0);
+    // Outside Organize nothing lifts.
+    await click(within(mural()).getByRole("button", { name: "Pronto" }));
+    await dragTo(cellOf(builds.id), 110, 380);
+    expect(document.querySelector(".wb-ghost")).toBeNull();
+    await act(async () => fireEvent.pointerUp(document, at(110, 380)));
   });
 });
 
@@ -226,6 +333,44 @@ describe("a widget's side panel", () => {
     await click(within(panel).getByRole("button", { name: "Fechar" }));
     await settle(2);
     expect((router.state.location.search as { widget?: string }).widget).toBeUndefined();
+  });
+
+  test("its title is renamed in place: Enter saves, Esc cancels and keeps the panel open", async () => {
+    const s = setup();
+    const { state } = await open(`/org/${ORG_ID}/home?widget=${s.sales.id}`, s);
+    const panel = screen().getByRole("dialog", { name: "Vendas hoje" });
+    await click(within(panel).getByRole("button", { name: "Renomear" }));
+    const field = within(panel).getByRole("textbox", { name: "Título do widget" }) as HTMLInputElement;
+    expect(field.value).toBe("Vendas hoje");
+    await act(async () => fireEvent.change(field, { target: { value: "Vendas do dia" } }));
+    await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+    await settle(4);
+    expect(last(state, "dashboards.updateWidget")).toEqual([ORG_ID, s.sales.id, { title: "Vendas do dia" }]);
+    expect(within(panel).queryByRole("textbox", { name: "Título do widget" })).toBeNull();
+    expect(screen().getByRole("dialog", { name: "Vendas do dia" })).toBeTruthy();
+
+    // A press on the title opens the field too; Esc leaves it as it was.
+    await click(panel.querySelector(".wd__title") as HTMLElement);
+    const again = within(panel).getByRole("textbox", { name: "Título do widget" });
+    await act(async () => fireEvent.change(again, { target: { value: "Outra coisa" } }));
+    await act(async () => fireEvent.keyDown(again, { key: "Escape" }));
+    await settle(4);
+    expect(calls(state, "dashboards.updateWidget")).toHaveLength(1);
+    expect(screen().getByRole("dialog", { name: "Vendas do dia" })).toBeTruthy();
+  });
+
+  test("a widget its agent hasn't named yet shows its format's name, never the ask", async () => {
+    const s = setup();
+    s.fake.addWidget(s.home.id, {
+      agentId: ADA_ID,
+      title: "ultimas visitas no site",
+      prompt: "ultimas visitas no site",
+      format: "line",
+      layout: { position: 5, w: 2, h: 1 },
+    });
+    await open(`/org/${ORG_ID}/home`, s);
+    expect(within(mural()).queryByRole("article", { name: "ultimas visitas no site" })).toBeNull();
+    expect(within(mural()).getByRole("article", { name: "Linha" }).getAttribute("data-state")).toBe("building");
   });
 
   test("opened by its address; Remove takes it off My Home and closes", async () => {

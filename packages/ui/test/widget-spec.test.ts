@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   chartBlocksOf,
   chartBlockToWidgetSpec,
+  clipText,
   defaultSize,
   type ExampleWords,
   exampleWidgetSpec,
@@ -231,5 +232,44 @@ describe("examples", () => {
       "R$ 18420 · +12%",
     );
     expect(specHeadline({ kind: "goal", pct: 61.6, line: "R$ 248k of R$ 400k" })).toBe("62% · R$ 248k of R$ 400k");
+  });
+});
+
+describe("notes and text are never cut mid-word (ADR 0134 §17)", () => {
+  const long = `${"visitantes únicos no site ".repeat(6)}(1.012 visitantes)`;
+
+  test("an agent's note longer than one short sentence is refused, so it writes a shorter one", () => {
+    expect(long.length).toBeGreaterThan(WIDGET_LIMITS.note);
+    for (const kind of ["kpi", "goal", "bars", "line"] as const) {
+      const raw = { kind, value: 1, pct: 10, line: "1 of 10", labels: ["a", "b"], values: [1, 2], note: long };
+      const out = validateWidgetSpec(raw);
+      expect(out.ok).toBe(false);
+      if (!out.ok) expect(out.error).toContain(`at most ${WIDGET_LIMITS.note} characters`);
+    }
+    expect(validateWidgetSpec({ kind: "kpi", value: 1, note: "x".repeat(WIDGET_LIMITS.note) }).ok).toBe(true);
+  });
+
+  test("data read back, and a chat chart's subtitle, end at a whole word", () => {
+    const spec = widgetSpecOf({ kind: "line", labels: ["a", "b"], values: [1, 2], note: long });
+    const note = spec?.kind === "line" ? (spec.note ?? "") : "";
+    expect(note.length).toBeLessThanOrEqual(WIDGET_LIMITS.note);
+    expect(note.endsWith("…")).toBe(true);
+    expect(long.startsWith(note.slice(0, -1))).toBe(true);
+    expect(long.charAt(note.length - 1)).toBe(" ");
+    const chart = chartBlockToWidgetSpec({
+      type: "line",
+      title: "Visits",
+      subtitle: long,
+      labels: ["a", "b"],
+      series: [{ values: [1, 2] }],
+    });
+    expect(chart?.spec.kind === "line" && chart.spec.note?.endsWith("…")).toBe(true);
+  });
+
+  test("clipText keeps whole words, and cuts inside one only when a single word is too long", () => {
+    expect(clipText("short", 10)).toBe("short");
+    expect(clipText("one two three four", 12)).toBe("one two…");
+    expect(clipText("one two, three", 10)).toBe("one two…");
+    expect(clipText("x".repeat(20), 10)).toBe(`${"x".repeat(9)}…`);
   });
 });

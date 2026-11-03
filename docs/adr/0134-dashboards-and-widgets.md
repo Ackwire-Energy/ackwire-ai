@@ -24,7 +24,8 @@ people than asked.
    `WidgetSpec` of one of six kinds: `kpi` (one number with its move, a note and a small trend), `goal` (progress to a
    goal), `bars`, `line`, `list` (rows with a word each, `ok` or `warn`) and `text` (a few sentences). The spec is data
    only, checked by one function every package shares (`validateWidgetSpec` in `@agenteschat/ui/widgets/spec`): the
-   kind's fields, text trimmed and cut, numbers finite, one value per label, at most 24 points, 8 rows, 6 sentences.
+   kind's fields, text trimmed and clipped at a word's end, numbers finite, one value per label, at most 24 points,
+   8 rows, 6 sentences; a `note` is one short sentence of at most 140 characters (§17).
    The person asks for a kind or `auto` (the agent picks). A chat chart reads as a widget (`chartBlockToWidgetSpec`:
    `number` → kpi, `bar` and `pie` → bars, `line` → line). Big numbers use the app's sans font, bold, tabular figures;
    charts are the chat's own drawing (a clean stroke in the agent's deep tone over a 2-pixel dither in its light tone).
@@ -126,6 +127,26 @@ people than asked.
     button there; on Android and on iOS before 26 search leaves the bar for a header button that pushes the search
     screen (`/find`), and links to search open that screen (`barTabs`, `searchInBar` in `apps/mobile/src/lib/nav.ts`,
     `searchHref`).
+16. **Test before creating.** "+ Widget" asks the agent first and creates after: "Test" makes a draft
+    (`dashboard_widgets.draft`) that its agent builds at once with real data, through the same refresh run as any
+    widget (`update_widget`, a history row, failure reasons, its cost recorded); the preview shows it building, then
+    the real result and what the test cost (`lastCostUsd`), or why it failed with "Try again". Only when it worked
+    does "Create widget" confirm it (`POST …/widgets/{id}/confirm`; `widget.not_tested`, 409, before that): it goes
+    first on the board chosen then, with the size, schedule and alert chosen then, keeping the tested data and its
+    history (no second build), and its routine gets its schedule. Changing the ask, the agent or the format makes the
+    test stale; schedule, alert, size and board don't. A draft is on no board, under no cap, in no list (boards, Home,
+    Routines, the agents' tools), raises no alert or notice, and is its creator's alone: anyone else gets
+    `widget.not_found`, and its events go to the creator's own topic. Its routine never has a schedule. Testing again or
+    closing the dialog deletes it with its routine and stops its run; a person keeps five at most (the oldest go), and
+    the server's workers delete those nobody confirmed within a day. Pinning a chart needs no test: its data is
+    already real. Agents' `create_widget` is unchanged.
+17. **Who names a widget, and notes that fit.** The ask is never the title. The agent names the widget on its first
+    build (a draft's test included): `update_widget` requires a short `title` then (at most 40 characters, sentence
+    case, in the person's language, no period at the end) and refuses a longer one rather than cutting it; it may rename
+    it again only on a change request, and never once a person named it (`dashboard_widgets.title_set_by_user`: a title
+    given on create, a different title on confirm, or Rename). Until it is named the apps show a generic "New widget".
+    A `note` longer than one short sentence (140 characters) is a tool error the agent fixes; the apps clamp a note to
+    two lines with an ellipsis instead of cutting characters, and text the server keeps is clipped only at a word's end.
 
 ## Consequences
 
@@ -140,7 +161,8 @@ people than asked.
 - Someone leaving the workspace loses their home board and private boards (their widgets' routines are deleted);
   boards others see stay, and admins manage them. Widget routines whose creator left pause (`creator_left`) until an
   editor presses Resolve.
-- Migration 0193 adds the three tables; notifications gain three kinds.
+- Migration 0193 adds the three tables; notifications gain three kinds. Migration 0194 adds `draft` and
+  `title_set_by_user` to widgets (§16, §17).
 - Live blocks (ADR 0113) are not pinnable: they are for using now, and run code a board shouldn't keep running.
 
 ## Alternatives considered

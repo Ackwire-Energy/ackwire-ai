@@ -29,6 +29,8 @@ type Widget = {
   routineId: string | null;
   sourceMessageId: string | null;
   createdBy: { kind: string; id: string } | null;
+  draft: boolean;
+  lastCostUsd: number | null;
 };
 type Tile = { key: "waiting" | "working" } & Layout;
 type Proposal = { audience: string; roleIds: string[]; agentId: string; why: string; canDecide: boolean };
@@ -350,7 +352,8 @@ test("+ Widget: checked input, an agent the person may talk to, room on the boar
   expect(made).toMatchObject({
     dashboardId: sales.id,
     agentId: s.agentId,
-    title: "Today's sales vs. yesterday",
+    // Untitled until its agent names it on its first build (ADR 0134 §17).
+    title: "",
     prompt: "Today's sales vs. yesterday",
     format: "auto",
     spec: null,
@@ -872,6 +875,8 @@ test("the OpenAPI document lists the dashboards routes", async () => {
     [`${org}/dashboards/{dashboardId}/proposal`, ["post"]],
     [`${org}/dashboards/{dashboardId}/widgets`, ["post"]],
     [`${org}/dashboards/{dashboardId}/widgets/pin`, ["post"]],
+    [`${org}/dashboards/{dashboardId}/widgets/test`, ["post"]],
+    [`${org}/widgets/{widgetId}/confirm`, ["post"]],
     [`${org}/widgets/{widgetId}`, ["get", "patch", "delete"]],
     [`${org}/widgets/{widgetId}/refresh`, ["post"]],
     [`${org}/widgets/{widgetId}/change`, ["post"]],
@@ -882,4 +887,93 @@ test("the OpenAPI document lists the dashboards routes", async () => {
   for (const [path, methods] of expected) {
     expect(Object.keys(doc.paths[path] ?? {}).sort()).toEqual([...methods].sort());
   }
+});
+
+test("Test, then Create widget: a draft only its creator sees, confirmed once its test worked", async () => {
+  const s = await start();
+  const sales = await s.newBoard(s.owner, { title: "Sales", editPolicy: "viewers" });
+  const ask = { agentId: s.agentId, prompt: "Site visits this week", format: "auto", schedule: "hour" };
+  // The same checks as + Widget.
+  const blank = await s.api(s.owner, `/dashboards/${sales.id}/widgets/test`, { json: { ...ask, prompt: " " } });
+  expect(blank.status).toBe(400);
+  const closed = await s.newBoard(s.owner, { title: "Closed" });
+  const refused = await s.api(s.ana, `/dashboards/${closed.id}/widgets/test`, { json: ask });
+  expect(refused.status).toBe(403);
+
+  const draft = await read<Widget>(await s.api(s.ana, `/dashboards/${sales.id}/widgets/test`, { json: ask }), 202);
+  expect(draft).toMatchObject({ draft: true, status: "building", dashboardId: sales.id, title: "", lastCostUsd: null });
+  // On no board; nobody but Ana knows it exists.
+  expect((await read<Board>(await s.board(s.owner, sales.id))).widgets).toEqual([]);
+  expect((await s.api(s.owner, `/widgets/${draft.id}`)).status).toBe(404);
+  expect((await s.api(s.owner, `/widgets/${draft.id}`, { method: "DELETE" })).status).toBe(404);
+  expect((await read<Detail>(await s.api(s.ana, `/widgets/${draft.id}`))).draft).toBe(true);
+
+  const confirm = {
+    dashboardId: sales.id,
+    size: "s",
+    schedule: "day",
+    alert: { enabled: true, condition: "drops 20%" },
+  };
+  // Not tested yet.
+  const early = await s.api(s.ana, `/widgets/${draft.id}/confirm`, { json: confirm });
+  expect(early.status).toBe(409);
+  expect(await codeOf(early)).toBe("widget.not_tested");
+
+  // Its test build worked (as an agent's `update_widget` leaves it).
+  await t.db
+    .update(schema.dashboardWidgets)
+    .set({ status: "ok", kind: "kpi", spec: { kind: "kpi", value: 1284 }, title: "Site visits" })
+    .where(eq(schema.dashboardWidgets.id, draft.id));
+  // Only its creator confirms it, on a board they edit.
+  expect((await s.api(s.owner, `/widgets/${draft.id}/confirm`, { json: confirm })).status).toBe(404);
+  const toClosed = { ...confirm, dashboardId: closed.id };
+  const elsewhere = await s.api(s.ana, `/widgets/${draft.id}/confirm`, { json: toClosed });
+  expect(elsewhere.status).toBe(403);
+  const bad = await s.api(s.ana, `/widgets/${draft.id}/confirm`, { json: { ...confirm, size: "xl" } });
+  expect(bad.status).toBe(400);
+
+  const made = await read<Widget>(await s.api(s.ana, `/widgets/${draft.id}/confirm`, { json: confirm }));
+  expect(made).toMatchObject({
+    id: draft.id,
+    draft: false,
+    dashboardId: sales.id,
+    title: "Site visits",
+    schedule: "day",
+    alert: { enabled: true, condition: "drops 20%" },
+    layout: { w: 1, h: 1 },
+  });
+  const shown = await read<Board>(await s.board(s.owner, sales.id));
+  expect(shown.widgets.map((w) => w.id)).toEqual([draft.id]);
+  expect((await s.api(s.ana, `/widgets/${draft.id}/confirm`, { json: confirm })).status).toBe(404);
+});
+
+test("cancelling a test deletes the draft; a person keeps five", async () => {
+  const s = await start();
+  const sales = await s.newBoard(s.owner, { title: "Sales" });
+  const ask = { agentId: s.agentId, prompt: "Open orders", format: "list", schedule: "manual" };
+  const ids: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const res = await s.api(s.owner, `/dashboards/${sales.id}/widgets/test`, { json: ask });
+    ids.push((await read<Widget>(res, 202)).id);
+  }
+  // The oldest went.
+  expect((await s.api(s.owner, `/widgets/${ids[0]}`)).status).toBe(404);
+  const last = ids.at(-1) ?? "";
+  expect((await s.api(s.owner, `/widgets/${last}`, { method: "DELETE" })).status).toBe(204);
+  expect((await s.api(s.owner, `/widgets/${last}`)).status).toBe(404);
+  const drafts = await t.db.select().from(schema.dashboardWidgets).where(eq(schema.dashboardWidgets.draft, true));
+  expect(drafts).toHaveLength(4);
+});
+
+test("Rename keeps a person's title (ADR 0134 §17)", async () => {
+  const s = await start();
+  const sales = await s.newBoard(s.owner, { title: "Sales" });
+  const w = await s.newWidget(s.owner, sales.id, { prompt: "Open orders by channel" });
+  expect(w.title).toBe("");
+  const renamed = await read<Widget>(
+    await s.api(s.owner, `/widgets/${w.id}`, { method: "PATCH", json: { title: "Open orders" } }),
+  );
+  expect(renamed.title).toBe("Open orders");
+  const [row] = await t.db.select().from(schema.dashboardWidgets).where(eq(schema.dashboardWidgets.id, w.id));
+  expect(row?.titleSetByUser).toBe(true);
 });

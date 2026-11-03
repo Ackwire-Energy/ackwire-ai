@@ -474,7 +474,7 @@ describe("layout", () => {
 });
 
 describe("widgets", () => {
-  test("+ Widget: the agent builds it, titled by the ask until it names it; the alert is for who set it", async () => {
+  test("+ Widget: the agent builds it, untitled until it names it; the alert is for who set it", async () => {
     const made = await board(f.owner.id);
     const prompt = "Today's sales compared with yesterday at the same hour, from the store's orders";
     const view = await createWidget(deps, f.owner.id, f.org.id, made.id, {
@@ -487,7 +487,7 @@ describe("widgets", () => {
     expect(view).toMatchObject({
       dashboardId: made.id,
       agentId: f.agent.id,
-      title: prompt.slice(0, 80).trim(),
+      title: "",
       prompt,
       format: "auto",
       kind: null,

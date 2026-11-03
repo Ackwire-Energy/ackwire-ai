@@ -129,6 +129,7 @@ function Board({ id }: { id: string }) {
                       <WidgetCard
                         widget={{
                           title: w.title,
+                          kind: w.kind,
                           spec: w.spec,
                           status: w.status,
                           agentId: w.agentId,

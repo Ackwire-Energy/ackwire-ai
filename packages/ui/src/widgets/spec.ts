@@ -118,7 +118,8 @@ export const WIDGET_LIMITS = {
   rowText: 120,
   rowMeta: 40,
   item: 280,
-  note: 160,
+  /** One short sentence: an agent's longer note is refused, never cut (`validateWidgetSpec`). */
+  note: 140,
   line: 120,
   delta: 40,
   affix: 12,
@@ -197,12 +198,36 @@ export type SpecCheck = { ok: true; spec: WidgetSpec } | { ok: false; error: str
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
-/** A trimmed string cut to `max`, or null when it isn't text. Numbers are taken as text (a label "2024"). */
+/**
+ * `text` at most `max` characters long: a longer one ends at the last whole word that fits, with "…" (cut inside a
+ * word only when one word alone is longer than half of `max`). Nothing is ever cut mid-word to fit a box.
+ */
+export function clipText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, Math.max(0, max - 1));
+  const space = cut.lastIndexOf(" ");
+  const kept = space >= max / 2 ? cut.slice(0, space) : cut;
+  return `${kept.replace(/[\s,;:–—-]+$/, "")}…`;
+}
+
+/** A trimmed string clipped to `max` (`clipText`), or null when it isn't text. Numbers are taken as text ("2024"). */
 function str(v: unknown, max: number): string | null {
-  if (typeof v === "number" && Number.isFinite(v)) return String(v).slice(0, max);
+  if (typeof v === "number" && Number.isFinite(v)) return clipText(String(v), max);
   if (typeof v !== "string") return null;
   const t = v.replace(/\s+/g, " ").trim();
-  return t ? t.slice(0, max) : null;
+  return t ? clipText(t, max) : null;
+}
+
+const NOTE_TOO_LONG: SpecCheck = {
+  ok: false,
+  error: `A \`note\` is one short sentence of at most ${WIDGET_LIMITS.note} characters: write a shorter one.`,
+};
+
+/** A spec's `note`: null when absent, false when longer than `WIDGET_LIMITS.note` (unless `clip`, for stored data). */
+function noteOf(v: unknown, clip: boolean): string | null | false {
+  const t = str(v, Number.POSITIVE_INFINITY);
+  if (t === null || t.length <= WIDGET_LIMITS.note) return t;
+  return clip ? clipText(t, WIDGET_LIMITS.note) : false;
 }
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -235,10 +260,12 @@ function put<T extends object, K extends keyof T>(out: T, key: K, value: T[K] | 
 }
 
 /**
- * A spec as the server keeps it, or why not: the kind's fields only, text trimmed and cut to its limit, numbers
- * finite, one value per label. Anything unknown is dropped. Never throws.
+ * A spec as the server keeps it, or why not: the kind's fields only, text trimmed and clipped to its limit at a word's
+ * end, numbers finite, one value per label. Anything unknown is dropped. A `note` longer than `WIDGET_LIMITS.note` is
+ * refused so its agent writes a shorter one (`options.clipNotes`: clipped instead, for data read back). Never throws.
  */
-export function validateWidgetSpec(raw: unknown): SpecCheck {
+export function validateWidgetSpec(raw: unknown, options: { clipNotes?: boolean } = {}): SpecCheck {
+  const clip = options.clipNotes === true;
   if (!isObject(raw)) return { ok: false, error: "The widget's data must be an object with a `kind`." };
   const kind = raw.kind;
   if (!isWidgetKind(kind)) return { ok: false, error: `Unknown kind: use one of ${WIDGET_KINDS.join(", ")}.` };
@@ -257,7 +284,9 @@ export function validateWidgetSpec(raw: unknown): SpecCheck {
         }
         spec.delta = { text, up: raw.delta.up };
       }
-      put(spec, "note", str(raw.note, WIDGET_LIMITS.note));
+      const note = noteOf(raw.note, clip);
+      if (note === false) return NOTE_TOO_LONG;
+      put(spec, "note", note);
       if (raw.spark !== undefined && raw.spark !== null) {
         const spark = numbers(raw.spark, WIDGET_LIMITS.spark);
         if (spark === null) return { ok: false, error: `\`spark\` is at most ${WIDGET_LIMITS.spark} numbers.` };
@@ -270,7 +299,9 @@ export function validateWidgetSpec(raw: unknown): SpecCheck {
       const line = str(raw.line, WIDGET_LIMITS.line);
       if (pct === null || line === null) return { ok: false, error: "A goal needs `pct` (0–100) and `line`." };
       const spec: GoalWidgetSpec = { kind, pct: Math.max(0, Math.min(100, pct)), line };
-      put(spec, "note", str(raw.note, WIDGET_LIMITS.note));
+      const note = noteOf(raw.note, clip);
+      if (note === false) return NOTE_TOO_LONG;
+      put(spec, "note", note);
       return { ok: true, spec };
     }
     case "bars":
@@ -283,17 +314,19 @@ export function validateWidgetSpec(raw: unknown): SpecCheck {
           error: `A ${kind} widget needs \`labels\` and \`values\` of one length (at most ${WIDGET_LIMITS.points}).`,
         };
       }
+      const note = noteOf(raw.note, clip);
+      if (note === false) return NOTE_TOO_LONG;
       if (kind === "bars") {
         const spec: BarsWidgetSpec = { kind, labels: ls, values };
         const at = num(raw.alertIndex);
         if (at !== null && Number.isInteger(at) && at >= 0 && at < values.length) spec.alertIndex = at;
         put(spec, "unit", str(raw.unit, WIDGET_LIMITS.unit));
-        put(spec, "note", str(raw.note, WIDGET_LIMITS.note));
+        put(spec, "note", note);
         return { ok: true, spec };
       }
       const spec: LineWidgetSpec = { kind, labels: ls, values };
       put(spec, "unit", str(raw.unit, WIDGET_LIMITS.unit));
-      put(spec, "note", str(raw.note, WIDGET_LIMITS.note));
+      put(spec, "note", note);
       return { ok: true, spec };
     }
     case "list": {
@@ -330,7 +363,7 @@ export function validateWidgetSpec(raw: unknown): SpecCheck {
 
 /** The spec, or null when it isn't one (for stored data read back). */
 export const widgetSpecOf = (raw: unknown): WidgetSpec | null => {
-  const checked = validateWidgetSpec(raw);
+  const checked = validateWidgetSpec(raw, { clipNotes: true });
   return checked.ok ? checked.spec : null;
 };
 
@@ -348,12 +381,12 @@ export function splitDelta(delta: string): { text: string; up: boolean; note?: s
   const t = delta.replace(/\s+/g, " ").trim();
   const m = /^([+\-−–]?\s?[\d.,]+\s?(?:%|pp|p\.p\.)?)(?:\s+(.*))?$/.exec(t);
   const down = /^[-−–]/.test(t);
-  if (!m?.[1]) return { text: t.slice(0, WIDGET_LIMITS.delta), up: !down };
+  if (!m?.[1]) return { text: clipText(t, WIDGET_LIMITS.delta), up: !down };
   const out: { text: string; up: boolean; note?: string } = {
-    text: m[1].trim().slice(0, WIDGET_LIMITS.delta),
+    text: clipText(m[1].trim(), WIDGET_LIMITS.delta),
     up: !down,
   };
-  if (m[2]) out.note = m[2].slice(0, WIDGET_LIMITS.note);
+  if (m[2]) out.note = clipText(m[2], WIDGET_LIMITS.note);
   return out;
 }
 
@@ -400,7 +433,8 @@ export function chartBlockToWidgetSpec(chart: unknown): { title: string; spec: W
   } else if (type === "line") {
     candidate = { kind: "line", labels: raw.labels, values: first, unit, note: subtitle };
   } else return null;
-  const checked = validateWidgetSpec(candidate);
+  // A chat chart's subtitle was written for the chat: clipped at a word's end rather than refused.
+  const checked = validateWidgetSpec(candidate, { clipNotes: true });
   return checked.ok ? { title, spec: checked.spec } : null;
 }
 

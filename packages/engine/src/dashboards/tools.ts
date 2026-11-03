@@ -37,9 +37,9 @@ import {
   type DashboardAudience,
   type DashboardDeps,
   type DashboardRow,
+  WIDGET_AGENT_TITLE_MAX,
   WIDGET_ALERT_CONDITION_MAX,
   WIDGET_PROMPT_MAX,
-  WIDGET_TITLE_MAX,
 } from "./types";
 
 const { dashboards, dashboardWidgets, messages, orgRoles, users, agents } = schema;
@@ -230,7 +230,14 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
                 status: dashboardWidgets.status,
               })
               .from(dashboardWidgets)
-              .where(and(eq(dashboardWidgets.orgId, ctx.orgId), inArray(dashboardWidgets.dashboardId, ids)))
+              // A person's draft (a test not created yet) is on no board (ADR 0134 §16).
+              .where(
+                and(
+                  eq(dashboardWidgets.orgId, ctx.orgId),
+                  inArray(dashboardWidgets.dashboardId, ids),
+                  eq(dashboardWidgets.draft, false),
+                ),
+              )
               .orderBy(asc(dashboardWidgets.position));
       const lines: string[] = [];
       for (const b of editable) {
@@ -329,7 +336,12 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
       type: "object",
       properties: {
         dashboard_id: { type: "string", maxLength: 36 },
-        title: { type: "string", minLength: 1, maxLength: WIDGET_TITLE_MAX },
+        title: {
+          type: "string",
+          minLength: 1,
+          maxLength: WIDGET_AGENT_TITLE_MAX,
+          description: "A short name: sentence case, in their language, no period at the end, never the ask itself",
+        },
         prompt: { type: "string", minLength: 1, maxLength: WIDGET_PROMPT_MAX },
         kind: {
           type: "string",
@@ -489,7 +501,7 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
   const updateWidget: ToolDefinition = {
     name: UPDATE_WIDGET_TOOL,
     description:
-      "Redo the widget this run keeps up to date, in place: its new `data` (one kind's shape, as this run's instructions say), a one-line `summary` of what changed for its history, and the `sources` you read. Set `alert` (one sentence for the person) only when its alert condition is met. `title` and `prompt` only on its first build or when a person asked for a change. If you couldn't get the data, give `failed` with why, in the person's words, instead of `data`. Call it once; nothing goes to any chat.",
+      "Redo the widget this run keeps up to date, in place: its new `data` (one kind's shape, as this run's instructions say; every `note` one short sentence of at most 140 characters), a one-line `summary` of what changed for its history, and the `sources` you read. Set `alert` (one sentence for the person) only when its alert condition is met. `title` is required on its first build (a short name of at most 40 characters, sentence case, in the person's language, no period at the end, never the ask itself) and allowed only then or when a person asked for a change, never over a title a person gave it; `prompt` only on a change. If you couldn't get the data, give `failed` with why, in the person's words, instead of `data`. Call it once; nothing goes to any chat.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -497,7 +509,7 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
         data: { ...dataSchema, description: "The widget's new data (see this run's instructions)" },
         summary: { type: "string", maxLength: 280 },
         sources: { type: "array", items: { type: "string", maxLength: 80 }, maxItems: 12 },
-        title: { type: "string", minLength: 1, maxLength: WIDGET_TITLE_MAX },
+        title: { type: "string", minLength: 1, maxLength: WIDGET_AGENT_TITLE_MAX },
         prompt: { type: "string", minLength: 1, maxLength: WIDGET_PROMPT_MAX },
         alert: { type: "string", maxLength: 280 },
         failed: { type: "string", minLength: 1, maxLength: 500 },
@@ -541,6 +553,9 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
         if (error instanceof ConflictError) return refusal("This run already updated its widget. Finish now.");
         if (error instanceof ValidationError && error.code === "widget.invalid_data") {
           return refusal(`The data isn't valid: ${error.message} Fix it and call update_widget again.`);
+        }
+        if (error instanceof ValidationError && error.code === "widget.invalid_title") {
+          return refusal(`Not saved: ${error.message} Call update_widget again with it.`);
         }
         if (explained(error)) return failed(error);
         throw error;

@@ -274,7 +274,8 @@ describe("the refresh run", () => {
       if (last.includes("Updated:")) return { chunks: ["Feito."] };
       if (call > 0) results.push(last);
       const data = call === 0 ? { kind: "kpi", value: "muito" } : KPI;
-      return { chunks: [], toolUses: [{ name: "update_widget", input: { data, summary: "Vendas" } }] };
+      // A first build names the widget (ADR 0134 §17).
+      return { chunks: [], toolUses: [{ name: "update_widget", input: { data, summary: "Vendas", title: "Vendas" } }] };
     });
     const b = await board();
     const w = await createWidget(dash(), f.owner.id, f.org.id, b.id, {
