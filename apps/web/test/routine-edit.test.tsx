@@ -82,13 +82,14 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     expect(page.textContent).toContain("De segunda a sexta, às 08:30");
   });
 
-  test("the form says what it does on its own in connected apps, editing and new", async () => {
+  test("what it does on its own in connected apps: on its page, and in the new-routine form", async () => {
     await open();
+    // "Editar" opens the routine's page, where everything edits in place; Faz sozinha is under what it does.
     await menu("Resumo da semana", "Editar");
-    const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
-    expect(within(dialog).getByRole("list", { name: "Faz sozinha" }).textContent).toBe("Enviar mensagem (Slack)");
-    expect(dialog.textContent).toContain("Qualquer outra ação neles pede aprovação antes");
-    await click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    const page = screen().getByRole("dialog", { name: "Resumo da semana" });
+    expect(within(page).getByRole("list", { name: "Faz sozinha" }).textContent).toBe("Enviar mensagem (Slack)");
+    expect(page.textContent).toContain("Qualquer outra ação neles pede aprovação antes");
+    await click(within(page).getByRole("button", { name: "Fechar detalhes" }));
     await settle(3);
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     await settle(3);
