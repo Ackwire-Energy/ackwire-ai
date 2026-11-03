@@ -307,9 +307,11 @@ export function createApp(options: AppOptions) {
     );
   }
   // The help pages moved to the public docs site: old links (`?lang=` or the browser's language) land on the same
-  // page there; the browser keeps the #section across the redirect.
+  // page there; the browser keeps the #section across the redirect. Vary: a 301 is cached, by browsers and by a CDN
+  // in front, and without `?lang=` the target is the browser's language.
   for (const path of ["/help", "/help/", "/help/:slug"]) {
     app.get(path, (c) => {
+      c.header("vary", "accept-language");
       const locale = appLocale([c.req.query("lang")], true) ?? requestLocale(c.req.header("accept-language")) ?? "en";
       return c.redirect(helpDocsUrl(c.req.param("slug"), locale), 301);
     });

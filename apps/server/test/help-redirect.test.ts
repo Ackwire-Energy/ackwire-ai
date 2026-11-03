@@ -25,4 +25,9 @@ describe("the old help pages", () => {
     expect(await go("/help/nope?lang=pt-BR")).toEqual([301, "https://agentes.chat/pt/docs"]);
     expect(await go("/help/toString?lang=en")).toEqual([301, "https://agentes.chat/docs"]);
   });
+
+  test("vary by the browser's language, so no cache hands one language's redirect to everyone", async () => {
+    const res = await app.request("/help/memory", { headers: { "accept-language": "pt-BR" } });
+    expect(res.headers.get("vary")).toBe("accept-language");
+  });
 });
