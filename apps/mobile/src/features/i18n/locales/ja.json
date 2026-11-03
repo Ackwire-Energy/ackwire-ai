@@ -81,6 +81,7 @@
   },
   "tabs": {
     "chats": "チャット",
+    "dashboards": "ダッシュボード",
     "threads": "スレッド",
     "agents": "エージェント",
     "activity": "アクティビティ",
@@ -1630,5 +1631,52 @@
     "noEmoji": "絵文字なし",
     "cleared": "ステータスをクリアしました",
     "bySelfUntil": "{{name}}が設定 · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "あなただけ · 自分のウィジェット",
+    "loadFailed": "ダッシュボードを読み込めませんでした。",
+    "create": "作成",
+    "routineTarget": "そのウィジェット",
+    "pin": {
+      "which": "どのグラフ"
+    },
+    "organize": {
+      "hint": "ウィジェットを移動して、それぞれのサイズを選びます。「完了」で順番を保存します。",
+      "up": "上へ移動",
+      "down": "下へ移動",
+      "position": "{{count}}個中{{at}}番目",
+      "saved": "ダッシュボードを並べ替えました"
+    },
+    "edit": {
+      "saved": "ダッシュボードを保存しました"
+    },
+    "pinned": "上部に固定しました",
+    "unpinned": "固定を解除しました",
+    "sizeHint": {
+      "s": "スマートフォンでは半列、Webではダッシュボードの4分の1。",
+      "m": "スマートフォンでは1列全体、Webではダッシュボードの半分。",
+      "l": "1列全体に大きく表示。Webではダッシュボードの半分で、高さは2倍。"
+    },
+    "widget": {
+      "caresFor": "{{name}}が担当しています",
+      "refreshing": "{{name}}が更新しています。",
+      "scheduleSaved": "{{schedule}}更新するようにしました",
+      "alertSaved": "アラートを保存しました",
+      "removeTitle": "「{{title}}」を削除しますか？",
+      "removeText": "ルーティンが停止し、表示している内容も消えます。",
+      "removed": "ウィジェットを削除しました。ルーティンは停止しました。",
+      "routine": "ルーティン",
+      "onBoard": "配置場所"
+    },
+    "notice": {
+      "widget_alert_other": "{{names}}がウィジェットでアラートを出しました",
+      "widget_failed_other": "{{names}}がウィジェットを更新できませんでした",
+      "dashboard_proposal_other": "{{names}}がダッシュボードの公開を提案しています",
+      "card": {
+        "alert": "アラート",
+        "failed": "更新されませんでした",
+        "proposal": "ダッシュボード"
+      }
+    }
   }
 }

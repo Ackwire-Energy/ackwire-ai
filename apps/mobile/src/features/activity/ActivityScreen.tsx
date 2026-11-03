@@ -34,6 +34,7 @@ import {
 } from "@/ui";
 import { openPage } from "../ai/parts";
 import { ApprovalWhy } from "../approvals/parts";
+import { dashboardWaitingCard } from "../dashboards/logic";
 import { notificationHref, notificationWebPath, routineHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
@@ -145,6 +146,8 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const surface = useSurface();
   const act = useNotificationAction(orgId);
   const card = waitingCardOf(n);
+  // A widget's alert, or an agent asking to publish a dashboard (ADR 0134): its own word, line and "Open".
+  const dash = dashboardWaitingCard(n, t as unknown as (key: string, values?: Record<string, unknown>) => string);
   // A request's title in words, from the request itself (the notification keeps the tool's raw title).
   const waitingApprovals = useWaitingApprovals();
   const request = waitingApprovals.find((a) => a.id === n.source.approvalId);
@@ -159,7 +162,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
           .join(" · ")
       : join
         ? join.text
-        : card.title;
+        : (dash?.title ?? card.title);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
   const href = notificationHref(n, ai);
@@ -168,13 +171,13 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const actor = n.actors[0];
   const who = actor ? { type: actor.type === "agent" ? "agent" : "person", id: actor.id } : null;
   const name = dir.nameOf(who);
-  const kind = t(`mobile.activityNow.kind.${card.kind}`);
+  const kind = dash ? dash.kind : t(`mobile.activityNow.kind.${card.kind}`);
   const left = card.expiresAt ? timeLeft(t, card.expiresAt, new Date(now)) : null;
   const place = placeOf(n);
   const where = [place ? t("mobile.chats.waitIn", { where: place }) : null, when.short(n.updatedAt)]
     .filter(Boolean)
     .join(" · ");
-  const button = t(`mobile.activityNow.${card.action}`);
+  const button = dash ? t("mobile.activityNow.open") : t(`mobile.activityNow.${card.action}`);
   const open = () => {
     if (n.readAt === null) act.mutate({ type: "read", item: n, read: true });
     if (href) router.push(href);
@@ -207,7 +210,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         ) : null}
         <View style={styles.grow} />
         <View style={styles.kind}>
-          <LineIcon name={KIND_ICON[card.kind]} size={13} color={c.amber} variant="footnote" />
+          <LineIcon name={dash ? "chart" : KIND_ICON[card.kind]} size={13} color={c.amber} variant="footnote" />
           <Text variant="footnote" style={[styles.semibold, { color: c.amber }]}>
             {kind}
           </Text>

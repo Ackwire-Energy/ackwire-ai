@@ -25,6 +25,7 @@ import {
 import { textOrMedia } from "@agenteschat/client/lib/media";
 import { summaryParts } from "@agenteschat/client/lib/missions";
 import { voiceOf } from "@agenteschat/client/lib/voice";
+import { chartBlocksOf } from "@agenteschat/ui/widgets/spec";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
@@ -34,6 +35,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
 import { useMovesChannel } from "../categories/CategoryScreens";
 import { categoryHrefs } from "../categories/logic";
+import { setPinDraft } from "../dashboards/logic";
 import { chatHref } from "../links/logic";
 import { missionComputerText } from "../missions/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -100,6 +102,13 @@ export function MessageActions({
   const rootId = m.threadId ?? m.id;
   // A voice message is its audio: no words to preview or copy here.
   const text = voiceOf(m.meta) ? "" : previewOf(m.body);
+  // An agent's charts can be pinned to a dashboard as widgets (ADR 0134).
+  const charts = m.local || m.author.type !== "agent" ? [] : chartBlocksOf(m.body);
+  const pinChart = () => {
+    sheet.close();
+    setPinDraft({ messageId: m.id, agentId: m.author.id ?? "", blocks: charts });
+    router.push("/widget-pin");
+  };
   const react = (emoji: string) => {
     tapHaptic();
     const reaction = reactionName(emoji);
@@ -191,6 +200,9 @@ export function MessageActions({
                   onPress: () => onRemind(m),
                 },
               ]
+            : []),
+          ...(charts.length > 0 && m.author.id
+            ? [{ key: "dashboard", icon: "chart" as const, label: t("widgets.pin.label"), onPress: pinChart }]
             : []),
           ...(m.author.type === "agent" && m.author.id
             ? [

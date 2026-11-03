@@ -81,6 +81,7 @@
   },
   "tabs": {
     "chats": "Obrolan",
+    "dashboards": "Dasbor",
     "threads": "Utas",
     "agents": "Agen",
     "activity": "Aktivitas",
@@ -1630,5 +1631,52 @@
     "noEmoji": "Tanpa emoji",
     "cleared": "Status dihapus",
     "bySelfUntil": "Ditulis oleh {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Hanya kamu · widget milikmu sendiri",
+    "loadFailed": "Dasbor tidak bisa dimuat.",
+    "create": "Buat",
+    "routineTarget": "widget-nya",
+    "pin": {
+      "which": "Grafik yang mana"
+    },
+    "organize": {
+      "hint": "Pindahkan widget dan pilih ukuran masing-masing. Selesai menyimpan urutannya.",
+      "up": "Pindah ke atas",
+      "down": "Pindah ke bawah",
+      "position": "{{at}} dari {{count}}",
+      "saved": "Dasbor sudah diatur"
+    },
+    "edit": {
+      "saved": "Dasbor disimpan"
+    },
+    "pinned": "Disematkan di atas",
+    "unpinned": "Sematan dilepas",
+    "sizeHint": {
+      "s": "Setengah baris di ponsel, seperempat dasbor di web.",
+      "m": "Satu baris penuh di ponsel, setengah dasbor di web.",
+      "l": "Satu baris penuh, digambar besar. Setengah dasbor dan dua kali lebih tinggi di web."
+    },
+    "widget": {
+      "caresFor": "{{name}} mengurusnya",
+      "refreshing": "{{name}} sedang memperbaruinya.",
+      "scheduleSaved": "Sekarang diperbarui {{schedule}}",
+      "alertSaved": "Peringatan disimpan",
+      "removeTitle": "Hapus “{{title}}”?",
+      "removeText": "Rutinitasnya berhenti, dan yang ditampilkannya ikut hilang.",
+      "removed": "Widget dihapus. Rutinitasnya berhenti.",
+      "routine": "Rutinitasnya",
+      "onBoard": "Lokasinya"
+    },
+    "notice": {
+      "widget_alert_other": "{{names}} menandai sebuah widget",
+      "widget_failed_other": "{{names}} tidak bisa memperbarui sebuah widget",
+      "dashboard_proposal_other": "{{names}} ingin memublikasikan dasbor",
+      "card": {
+        "alert": "Peringatan",
+        "failed": "Tidak diperbarui",
+        "proposal": "Dasbor"
+      }
+    }
   }
 }

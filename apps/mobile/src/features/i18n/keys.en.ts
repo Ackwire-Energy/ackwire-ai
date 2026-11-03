@@ -89,6 +89,7 @@ export const featureKeysEn = {
   },
   tabs: {
     chats: "Chats",
+    dashboards: "Dashboards",
     threads: "Threads",
     agents: "Agents",
     activity: "Activity",
@@ -1711,6 +1712,57 @@ export const featureKeysEn = {
     noEmoji: "No emoji",
     cleared: "Status cleared",
     bySelfUntil: "Written by {{name}} · {{when}}",
+  },
+  // Dashboards on the phone (ADR 0134); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
+  dashboards: {
+    homeRow: "Only you · your own widgets",
+    loadFailed: "Couldn't load the dashboards.",
+    create: "Create",
+    routineTarget: "its widget",
+    pin: {
+      which: "Which chart",
+    },
+    organize: {
+      hint: "Move the widgets and pick each one's size. Done saves the order.",
+      up: "Move up",
+      down: "Move down",
+      position: "{{at}} of {{count}}",
+      saved: "Dashboard organized",
+    },
+    edit: {
+      saved: "Dashboard saved",
+    },
+    pinned: "Pinned to the top",
+    unpinned: "Unpinned",
+    sizeHint: {
+      s: "Half a row on the phone, a quarter of the board on the web.",
+      m: "The whole row on the phone, half the board on the web.",
+      l: "The whole row, drawn big. Half the board and twice as tall on the web.",
+    },
+    widget: {
+      caresFor: "{{name}} looks after it",
+      refreshing: "{{name}} is updating it.",
+      scheduleSaved: "It updates {{schedule}} now",
+      alertSaved: "Alert saved",
+      removeTitle: "Remove “{{title}}”?",
+      removeText: "Its routine stops, and what it shows goes with it.",
+      removed: "Widget removed. Its routine stopped.",
+      routine: "Its routine",
+      onBoard: "Where it is",
+    },
+    notice: {
+      widget_alert_one: "{{names}} flagged a widget",
+      widget_alert_other: "{{names}} flagged a widget",
+      widget_failed_one: "{{names}} couldn't update a widget",
+      widget_failed_other: "{{names}} couldn't update a widget",
+      dashboard_proposal_one: "{{names}} wants to publish a dashboard",
+      dashboard_proposal_other: "{{names}} want to publish a dashboard",
+      card: {
+        alert: "Alert",
+        failed: "Didn't update",
+        proposal: "Dashboard",
+      },
+    },
   },
 };
 

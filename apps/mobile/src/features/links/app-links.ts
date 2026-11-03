@@ -74,10 +74,16 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
   const [page = "", id, sub] = rest;
   const m = isSafeId(q.m) ? q.m : null;
   const open = isSafeId(q.open) ? q.open : null;
+  // A widget open on Home or on its dashboard (`?widget=`, ADR 0134): its own screen.
+  const widget = isSafeId(q.widget) ? q.widget : null;
   switch (page) {
     case "":
     case "home":
-      return "/";
+      return widget ? `/widget/${widget}` : "/";
+    case "dashboards":
+      if (widget) return `/widget/${widget}`;
+      if (id === undefined) return "/dashboards";
+      return isSafeId(id) ? `/board/${id}` : null;
     case "c":
       return isSafeId(id) ? { to: m ? `/chat/${id}?m=${m}` : `/chat/${id}` } : null;
     case "dm":
@@ -120,6 +126,17 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
     default:
       return null;
   }
+}
+
+/**
+ * Where an address of the search tab opens (`/search`, `agenteschat://search`, with its query): the tab while search
+ * is in the bar (`inBar`), else the pushed search screen, `/find` (past five tabs search leaves the bar on Android and
+ * iOS before 26). Any other address as it is.
+ */
+export function searchHref(href: string, inBar: boolean): string {
+  if (inBar) return href;
+  const m = /^(?:agenteschat:\/\/\/?|\/)search\/?([?#].*)?$/i.exec(href.trim());
+  return m ? `/find${m[1] ?? ""}` : href;
 }
 
 /**

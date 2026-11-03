@@ -16,7 +16,7 @@ import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionSheetIOS, Alert, Platform } from "react-native";
 import { type IconName, useToast } from "@/ui";
-import { routineHref } from "../links/logic";
+import { routineHref, widgetHref } from "../links/logic";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { type ActionItem, ActionList, copyText, successHaptic } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
@@ -180,6 +180,8 @@ export function useTargetLabel() {
           : t("routines.inChannel", { channel: c.name });
       }
       if (target.type === "forum") return t("routines.target.forumShort");
+      // A widget's own routine (ADR 0134): it redoes its widget, with no message.
+      if (target.type === "widget") return t("mobile.dashboards.routineTarget");
       return target.type === "dm" ? t("routines.target.dmShort") : t("routines.target.artifactShort");
     },
     [t, channels.data, dms.data],
@@ -328,7 +330,16 @@ export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: 
     toast(ok ? { title: t("routines.webhookCopied") } : { title: t("mobile.app.failed"), icon: "x" });
   };
   const items: MenuItem[] = [];
-  if (r.canManage)
+  // A widget's routine is changed from its widget (ADR 0134): "Open widget" stands for Edit, and it isn't duplicated.
+  const widget = r.target.type === "widget" ? r.target : null;
+  if (widget)
+    items.push({
+      key: "widget",
+      icon: "chart",
+      label: t("widgets.notice.openWidget"),
+      run: () => router.push(widgetHref(widget.widgetId, widget.dashboardId)),
+    });
+  else if (r.canManage)
     items.push({
       key: "edit",
       icon: "pen",
@@ -343,7 +354,8 @@ export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: 
       label: t("routines.runs"),
       run: () => router.push(routineHref(r.id)),
     });
-  if (r.canManage) items.push({ key: "duplicate", icon: "copy", label: t("routines.duplicate"), run: duplicate });
+  if (r.canManage && !widget)
+    items.push({ key: "duplicate", icon: "copy", label: t("routines.duplicate"), run: duplicate });
   if (r.canManage && hookUrl)
     items.push({
       key: "webhook",

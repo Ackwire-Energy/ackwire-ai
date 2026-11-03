@@ -2,6 +2,7 @@ import type { AppNotification } from "@agenteschat/client";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { restrictionOf } from "@agenteschat/client/lib/notifications";
 import { useTranslation } from "react-i18next";
+import { isDashboardNotice } from "../dashboards/logic";
 import { useDirectory } from "../shared/hooks";
 import { runFailedLines, whoOf } from "./logic";
 
@@ -28,17 +29,20 @@ export function useNoticeTitle(n: AppNotification) {
         : t("mobile.names.two", { first: who.first, second: who.second })
       : who.first;
   const kind = n.kind === "browser_handoff" && n.source.screen === "desktop" ? "desktop_handoff" : n.kind;
+  // A widget's alert or failure, an agent asking to publish a dashboard (ADR 0134): the dashboards' own words.
   const template = held
     ? t("standing.notification.agentHold", { name: NAMES })
     : n.kind === "app_created"
       ? appCreatedLine(t, n)
-      : t(`mobile.activity.kind.${kind}`, {
-          names: NAMES,
-          count: who.total,
-          // `plan_reset_unknown`: the plan's name.
-          plan: n.latest.title ?? "",
-          defaultValue: NAMES,
-        });
+      : isDashboardNotice(n.kind)
+        ? t(`mobile.dashboards.notice.${n.kind}`, { names: NAMES, count: who.total, defaultValue: NAMES })
+        : t(`mobile.activity.kind.${kind}`, {
+            names: NAMES,
+            count: who.total,
+            // `plan_reset_unknown`: the plan's name.
+            plan: n.latest.title ?? "",
+            defaultValue: NAMES,
+          });
   // Agents that failed for one cause close together: one line for all, who they are under it.
   const failed = runFailedLines(t, n, (id) => dir.nameOf({ type: "agent", id }));
   const parts = failed ? [failed.title] : template.split(NAMES);

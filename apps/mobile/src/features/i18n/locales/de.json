@@ -86,6 +86,7 @@
   },
   "tabs": {
     "chats": "Chats",
+    "dashboards": "Dashboards",
     "threads": "Threads",
     "agents": "Agenten",
     "activity": "Aktivität",
@@ -1712,5 +1713,55 @@
     "noEmoji": "Kein Emoji",
     "cleared": "Status gelöscht",
     "bySelfUntil": "Geschrieben von {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Nur du · deine eigenen Widgets",
+    "loadFailed": "Die Dashboards konnten nicht geladen werden.",
+    "create": "Erstellen",
+    "routineTarget": "sein Widget",
+    "pin": {
+      "which": "Welches Diagramm"
+    },
+    "organize": {
+      "hint": "Verschiebe die Widgets und wähle die Größe von jedem. Fertig speichert die Reihenfolge.",
+      "up": "Nach oben",
+      "down": "Nach unten",
+      "position": "{{at}} von {{count}}",
+      "saved": "Dashboard angeordnet"
+    },
+    "edit": {
+      "saved": "Dashboard gespeichert"
+    },
+    "pinned": "Oben angeheftet",
+    "unpinned": "Gelöst",
+    "sizeHint": {
+      "s": "Eine halbe Zeile auf dem Handy, ein Viertel des Dashboards im Web.",
+      "m": "Die ganze Zeile auf dem Handy, das halbe Dashboard im Web.",
+      "l": "Die ganze Zeile, groß dargestellt. Das halbe Dashboard und doppelt so hoch im Web."
+    },
+    "widget": {
+      "caresFor": "{{name}} kümmert sich darum",
+      "refreshing": "{{name}} aktualisiert es.",
+      "scheduleSaved": "Es aktualisiert sich jetzt {{schedule}}",
+      "alertSaved": "Alarm gespeichert",
+      "removeTitle": "„{{title}}“ entfernen?",
+      "removeText": "Seine Routine stoppt, und was es zeigt, verschwindet mit ihm.",
+      "removed": "Widget entfernt. Seine Routine wurde gestoppt.",
+      "routine": "Seine Routine",
+      "onBoard": "Wo es ist"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} hat ein Widget markiert",
+      "widget_alert_other": "{{names}} haben ein Widget markiert",
+      "widget_failed_one": "{{names}} konnte ein Widget nicht aktualisieren",
+      "widget_failed_other": "{{names}} konnten ein Widget nicht aktualisieren",
+      "dashboard_proposal_one": "{{names}} möchte ein Dashboard veröffentlichen",
+      "dashboard_proposal_other": "{{names}} möchten ein Dashboard veröffentlichen",
+      "card": {
+        "alert": "Alarm",
+        "failed": "Nicht aktualisiert",
+        "proposal": "Dashboard"
+      }
+    }
   }
 }

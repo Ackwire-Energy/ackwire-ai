@@ -91,6 +91,7 @@
   },
   "tabs": {
     "chats": "Chat",
+    "dashboards": "Dashboard",
     "threads": "Thread",
     "agents": "Agenti",
     "activity": "Attività recenti",
@@ -1794,5 +1795,58 @@
     "noEmoji": "Nessuna emoji",
     "cleared": "Stato cancellato",
     "bySelfUntil": "Scritto da {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Solo tu · i tuoi widget",
+    "loadFailed": "Impossibile caricare le dashboard.",
+    "create": "Crea",
+    "routineTarget": "il suo widget",
+    "pin": {
+      "which": "Quale grafico"
+    },
+    "organize": {
+      "hint": "Sposta i widget e scegli la dimensione di ciascuno. Fatto salva l'ordine.",
+      "up": "Sposta su",
+      "down": "Sposta giù",
+      "position": "{{at}} di {{count}}",
+      "saved": "Dashboard organizzata"
+    },
+    "edit": {
+      "saved": "Dashboard salvata"
+    },
+    "pinned": "Fissata in alto",
+    "unpinned": "Rimossa dai fissati",
+    "sizeHint": {
+      "s": "Mezza riga sul telefono, un quarto della dashboard sul web.",
+      "m": "Tutta la riga sul telefono, metà della dashboard sul web.",
+      "l": "Tutta la riga, in grande. Metà della dashboard e alto il doppio sul web."
+    },
+    "widget": {
+      "caresFor": "{{name}} se ne occupa",
+      "refreshing": "{{name}} lo sta aggiornando.",
+      "scheduleSaved": "Ora si aggiorna {{schedule}}",
+      "alertSaved": "Avviso salvato",
+      "removeTitle": "Rimuovere “{{title}}”?",
+      "removeText": "La sua routine si ferma, e quello che mostra se ne va con lui.",
+      "removed": "Widget rimosso. La sua routine si è fermata.",
+      "routine": "La sua routine",
+      "onBoard": "Dove si trova"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} ha segnalato un widget",
+      "widget_alert_many": "{{names}} hanno segnalato un widget",
+      "widget_alert_other": "{{names}} hanno segnalato un widget",
+      "widget_failed_one": "{{names}} non è riuscito ad aggiornare un widget",
+      "widget_failed_many": "{{names}} non sono riusciti ad aggiornare un widget",
+      "widget_failed_other": "{{names}} non sono riusciti ad aggiornare un widget",
+      "dashboard_proposal_one": "{{names}} vuole pubblicare una dashboard",
+      "dashboard_proposal_many": "{{names}} vogliono pubblicare una dashboard",
+      "dashboard_proposal_other": "{{names}} vogliono pubblicare una dashboard",
+      "card": {
+        "alert": "Avviso",
+        "failed": "Non aggiornato",
+        "proposal": "Dashboard"
+      }
+    }
   }
 }

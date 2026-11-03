@@ -34,7 +34,10 @@ export type AppHref =
   | "/join-requests"
   | "/computer-setup"
   | "/connect-ai?ready=1"
-  | "/usage";
+  | "/usage"
+  | "/dashboards"
+  | `/board/${string}`
+  | `/widget/${string}`;
 
 /** `messageId`: open at that message (`m=`: paged in, scrolled to and lit for a moment). */
 export const chatHref = (channelId: string, threadId?: string | null, messageId?: string | null): AppHref => {
@@ -52,6 +55,14 @@ export const consultationHref = (consultationId: string, channelId: string): App
 /** A routine's screen, or Rotinas when the id isn't one. */
 export const routineHref = (routineId: unknown): AppHref =>
   isSafeId(routineId) ? `/routines/${routineId}` : "/routines";
+
+/** A dashboard (ADR 0134), "home" for My Home, or the Dashboards tab when the id isn't one. */
+export const boardHref = (dashboardId: unknown): AppHref =>
+  isSafeId(dashboardId) ? `/board/${dashboardId}` : "/dashboards";
+
+/** A widget's screen, else its dashboard, else the Dashboards tab. */
+export const widgetHref = (widgetId: unknown, dashboardId?: unknown): AppHref =>
+  isSafeId(widgetId) ? `/widget/${widgetId}` : boardHref(dashboardId);
 
 /**
  * An agent's request for help in its browser opens in its conversation, with its card in control:
@@ -82,6 +93,8 @@ export interface PushPayload {
   machineId?: unknown;
   topicId?: unknown;
   issueNumber?: unknown;
+  dashboardId?: unknown;
+  widgetId?: unknown;
 }
 
 const PUSH_IDS = [
@@ -96,6 +109,8 @@ const PUSH_IDS = [
   "agentId",
   "machineId",
   "topicId",
+  "dashboardId",
+  "widgetId",
 ] as const;
 
 /** A push as the notification it names, from the ids it carried (checked), so it opens where its inbox row opens. */
@@ -165,6 +180,12 @@ export function hrefFromUrl(url: string): AppHref | null {
       return isSafeId(id) ? `/handoff/${id}` : null;
     case "routines":
       return id === undefined ? "/routines" : isSafeId(id) ? `/routines/${id}` : null;
+    case "dashboards":
+      return "/dashboards";
+    case "board":
+      return isSafeId(id) ? `/board/${id}` : null;
+    case "widget":
+      return isSafeId(id) ? `/widget/${id}` : null;
     default:
       return null;
   }
@@ -220,6 +241,9 @@ export function notificationHref(
   if (n.kind === "org_standing") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";
+  // A widget's alert or failure opens the widget; an agent asking to publish a dashboard, the dashboard (ADR 0134).
+  if (n.kind === "widget_alert" || n.kind === "widget_failed") return widgetHref(s.widgetId, s.dashboardId);
+  if (n.kind === "dashboard_proposal") return boardHref(s.dashboardId);
   // A computer's disk is almost full (ADR 0115): that computer, where its shared folder's size shows.
   if (n.kind === "computer_disk_full" || n.kind === "computer_no_chrome")
     return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : null;

@@ -95,6 +95,7 @@ export const featureKeysPtBR = {
   },
   tabs: {
     chats: "Conversas",
+    dashboards: "Painéis",
     threads: "Threads",
     agents: "Agentes",
     activity: "Atividade",
@@ -1716,5 +1717,56 @@ export const featureKeysPtBR = {
     noEmoji: "Sem emoji",
     cleared: "Status limpo",
     bySelfUntil: "Escrito por {{name}} · {{when}}",
+  },
+  // Dashboards on the phone (ADR 0134); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
+  dashboards: {
+    homeRow: "Só você · seus próprios widgets",
+    loadFailed: "Não deu para carregar os painéis.",
+    create: "Criar",
+    routineTarget: "o widget dela",
+    pin: {
+      which: "Qual gráfico",
+    },
+    organize: {
+      hint: "Mude os widgets de lugar e escolha o tamanho de cada um. Pronto salva a ordem.",
+      up: "Subir",
+      down: "Descer",
+      position: "{{at}} de {{count}}",
+      saved: "Painel organizado",
+    },
+    edit: {
+      saved: "Painel salvo",
+    },
+    pinned: "Fixado no topo",
+    unpinned: "Desafixado",
+    sizeHint: {
+      s: "Meia linha no celular, um quarto do painel no web.",
+      m: "A linha inteira no celular, metade do painel no web.",
+      l: "A linha inteira, desenhado grande. Metade do painel e o dobro da altura no web.",
+    },
+    widget: {
+      caresFor: "{{name}} cuida",
+      refreshing: "{{name}} está atualizando.",
+      scheduleSaved: "Agora atualiza {{schedule}}",
+      alertSaved: "Aviso salvo",
+      removeTitle: "Tirar “{{title}}”?",
+      removeText: "A rotina dele para, e o que ele mostra vai junto.",
+      removed: "Widget tirado. A rotina parou.",
+      routine: "A rotina dele",
+      onBoard: "Onde está",
+    },
+    notice: {
+      widget_alert_one: "{{names}} sinalizou um widget",
+      widget_alert_other: "{{names}} sinalizaram um widget",
+      widget_failed_one: "{{names}} não conseguiu atualizar um widget",
+      widget_failed_other: "{{names}} não conseguiram atualizar um widget",
+      dashboard_proposal_one: "{{names}} quer publicar um painel",
+      dashboard_proposal_other: "{{names}} querem publicar um painel",
+      card: {
+        alert: "Aviso",
+        failed: "Não atualizou",
+        proposal: "Painel",
+      },
+    },
   },
 } satisfies LocaleStrings;

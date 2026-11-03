@@ -91,6 +91,7 @@
   },
   "tabs": {
     "chats": "Chats",
+    "dashboards": "Paneles",
     "threads": "Hilos",
     "agents": "Agentes",
     "activity": "Actividad",
@@ -1794,5 +1795,58 @@
     "noEmoji": "Sin emoji",
     "cleared": "Estado borrado",
     "bySelfUntil": "Escrito por {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Solo tú · tus propios widgets",
+    "loadFailed": "No se pudieron cargar los paneles.",
+    "create": "Crear",
+    "routineTarget": "su widget",
+    "pin": {
+      "which": "Qué gráfico"
+    },
+    "organize": {
+      "hint": "Mueve los widgets y elige el tamaño de cada uno. Listo guarda el orden.",
+      "up": "Subir",
+      "down": "Bajar",
+      "position": "{{at}} de {{count}}",
+      "saved": "Panel organizado"
+    },
+    "edit": {
+      "saved": "Panel guardado"
+    },
+    "pinned": "Fijado arriba",
+    "unpinned": "Ya no está fijado",
+    "sizeHint": {
+      "s": "Media fila en el teléfono, un cuarto del panel en la web.",
+      "m": "La fila entera en el teléfono, la mitad del panel en la web.",
+      "l": "La fila entera, en grande. La mitad del panel y el doble de alto en la web."
+    },
+    "widget": {
+      "caresFor": "{{name}} lo cuida",
+      "refreshing": "{{name}} lo está actualizando.",
+      "scheduleSaved": "Ahora se actualiza {{schedule}}",
+      "alertSaved": "Alerta guardada",
+      "removeTitle": "¿Quitar “{{title}}”?",
+      "removeText": "Su rutina se detiene, y lo que muestra se va con él.",
+      "removed": "Widget quitado. Su rutina se detuvo.",
+      "routine": "Su rutina",
+      "onBoard": "Dónde está"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} marcó un widget",
+      "widget_alert_many": "{{names}} marcaron un widget",
+      "widget_alert_other": "{{names}} marcaron un widget",
+      "widget_failed_one": "{{names}} no pudo actualizar un widget",
+      "widget_failed_many": "{{names}} no pudieron actualizar un widget",
+      "widget_failed_other": "{{names}} no pudieron actualizar un widget",
+      "dashboard_proposal_one": "{{names}} quiere publicar un panel",
+      "dashboard_proposal_many": "{{names}} quieren publicar un panel",
+      "dashboard_proposal_other": "{{names}} quieren publicar un panel",
+      "card": {
+        "alert": "Alerta",
+        "failed": "No se actualizó",
+        "proposal": "Panel"
+      }
+    }
   }
 }

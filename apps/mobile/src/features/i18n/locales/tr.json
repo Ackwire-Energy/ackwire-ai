@@ -86,6 +86,7 @@
   },
   "tabs": {
     "chats": "Sohbetler",
+    "dashboards": "Panolar",
     "threads": "İleti dizileri",
     "agents": "Ajanlar",
     "activity": "Etkinlik",
@@ -1712,5 +1713,55 @@
     "noEmoji": "Emoji yok",
     "cleared": "Durum temizlendi",
     "bySelfUntil": "Yazan: {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Yalnızca siz · kendi widget'larınız",
+    "loadFailed": "Panolar yüklenemedi.",
+    "create": "Oluştur",
+    "routineTarget": "widget'ı",
+    "pin": {
+      "which": "Hangi grafik"
+    },
+    "organize": {
+      "hint": "Widget'ları taşıyın ve her birinin boyutunu seçin. Bitti sırayı kaydeder.",
+      "up": "Yukarı taşı",
+      "down": "Aşağı taşı",
+      "position": "{{at}}/{{count}}",
+      "saved": "Pano düzenlendi"
+    },
+    "edit": {
+      "saved": "Pano kaydedildi"
+    },
+    "pinned": "En üste sabitlendi",
+    "unpinned": "Sabitleme kaldırıldı",
+    "sizeHint": {
+      "s": "Telefonda yarım satır, web'de panonun dörtte biri.",
+      "m": "Telefonda tam satır, web'de panonun yarısı.",
+      "l": "Tam satır, büyük çizilir. Web'de panonun yarısı ve iki kat yüksek."
+    },
+    "widget": {
+      "caresFor": "Onunla {{name}} ilgileniyor",
+      "refreshing": "{{name}} onu güncelliyor.",
+      "scheduleSaved": "Artık {{schedule}} güncelleniyor",
+      "alertSaved": "Uyarı kaydedildi",
+      "removeTitle": "“{{title}}” kaldırılsın mı?",
+      "removeText": "Rutini durur ve gösterdikleri de onunla birlikte gider.",
+      "removed": "Widget kaldırıldı. Rutini durdu.",
+      "routine": "Rutini",
+      "onBoard": "Bulunduğu yer"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} bir widget için uyardı",
+      "widget_alert_other": "{{names}} bir widget için uyardı",
+      "widget_failed_one": "{{names}} bir widget'ı güncelleyemedi",
+      "widget_failed_other": "{{names}} bir widget'ı güncelleyemedi",
+      "dashboard_proposal_one": "{{names}} bir pano yayımlamak istiyor",
+      "dashboard_proposal_other": "{{names}} bir pano yayımlamak istiyor",
+      "card": {
+        "alert": "Uyarı",
+        "failed": "Güncellenmedi",
+        "proposal": "Pano"
+      }
+    }
   }
 }

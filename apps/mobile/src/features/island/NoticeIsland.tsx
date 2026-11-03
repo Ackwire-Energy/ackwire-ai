@@ -27,6 +27,7 @@ import { haptics, Icon, type IconName, Text, useTheme } from "@/ui";
 import { variantStyle } from "@/ui/Text";
 import { useNoticeTitle } from "../activity/noticeTitle";
 import { openPage } from "../ai/parts";
+import { isDashboardNotice } from "../dashboards/logic";
 import { notificationHref, notificationWebPath } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useOrgId } from "../shared/hooks";
@@ -287,7 +288,8 @@ function SmallIsland({
 }) {
   const { t } = useTranslation();
   const { title } = useNoticeTitle(item.n);
-  const ask = item.n.waiting ? waitingCardOf(item.n).action : "open";
+  // A widget's alert or an agent asking to publish a dashboard (ADR 0134) is opened, never answered here.
+  const ask = item.n.waiting && !isDashboardNotice(item.n.kind) ? waitingCardOf(item.n).action : "open";
   const label = ask === "review" ? t("island.review") : ask === "answer" ? t("island.reply") : t("island.open");
   return (
     <Pressable
@@ -360,7 +362,7 @@ function IslandRow({ n, onOpened }: { n: AppNotification; onOpened: () => void }
     );
   };
   const canOpen = Boolean(href || web);
-  const primary = waiting && waiting.action !== "answer" && canOpen;
+  const primary = waiting && (waiting.action !== "answer" || isDashboardNotice(n.kind)) && canOpen;
 
   return (
     <View style={styles.row}>

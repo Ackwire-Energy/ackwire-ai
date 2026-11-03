@@ -328,7 +328,8 @@ function Bar({
 
 /* ---------- line ---------- */
 
-function Line({
+/** The line and its dithered area; `spark` draws it bare (no points, no labels), as a widget's trend (ADR 0134). */
+export function Line({
   spec,
   accent,
   big,
