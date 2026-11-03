@@ -1,14 +1,17 @@
+import { parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { useState } from "react";
 import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
+import { serverUrl } from "@/lib/server";
 import { Text } from "@/ui";
 import { openPage } from "../ai/parts";
 import { useColors, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
 import type { Block, Inline } from "./logic";
+import { MessageRefText } from "./MessageRefText";
 
 /**
- * Inline marks of a message (bold, italic, `code`, links, @mentions, #channels), inside a Text. `channelRefs`: the
+ * Inline marks of a message (bold, italic, `code`, links, a message's link as its pill, @mentions, #channels), inside a Text. `channelRefs`: the
  * message's `meta.channelRefs` (a renamed channel still links).
  */
 export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?: Record<string, string> }) {
@@ -37,13 +40,17 @@ export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?:
                 {s.text}
               </RNText>
             );
-          case "link":
+          case "link": {
+            // A message here: its pill, opening it in the app.
+            const message = parseMessageLink(s.href, [serverUrl()]);
+            if (message) return <MessageRefText key={key} link={message} />;
             // Opens in the in-app browser; a press on a link wins over the row's long press.
             return (
               <RNText key={key} accessibilityRole="link" onPress={() => openPage(s.href)} style={styles.link}>
                 {s.text}
               </RNText>
             );
+          }
           case "channel":
             return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
           case "mention":
