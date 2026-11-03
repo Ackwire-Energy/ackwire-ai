@@ -12,7 +12,6 @@ import {
   importSkillZip,
   listSkills,
   parseSkillMarkdown,
-  reimportSkill,
   restoreSkill,
   revertSkillChange,
   SKILL_LIMITS,
@@ -415,7 +414,7 @@ export function skillRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/skills/{skillId}/reimport",
       tags,
       security,
-      summary: "Import again from its URL (a new version)",
+      summary: "Import again from its URL (a new version); files that run wait for approval, as `…/update`",
       request: { params: SkillParams },
       responses: {
         200: json(SkillDetail),
@@ -427,7 +426,8 @@ export function skillRoutes(deps: AppDeps) {
       const { orgId, skillId } = c.req.valid("param");
       const actor = c.get("user").id;
       if (!(await linkReadAllowed(actor))) return apiError(c, 429, "rate_limited", tooManyReads);
-      return c.json(await reimportSkill(skills(), actor, orgId, skillId), 200);
+      // Apps released before `…/update` still call this: the same gate on files that run.
+      return c.json((await updateSkillFromSource(skills(), actor, orgId, skillId)).skill, 200);
     },
   );
 

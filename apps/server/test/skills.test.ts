@@ -181,6 +181,11 @@ test("updating from its link: text applies and is undone, a new script waits for
   });
 
   repo["skills-main/deploy/run.sh"] = "echo hi";
+  // The route of apps released before `/update`: the same gate.
+  expect(await (await owner(at(`/${id}/reimport`), { json: {} })).json()).toMatchObject({
+    version: 3,
+    pendingUpdate: { scripts: ["run.sh"] },
+  });
   expect(await (await owner(at(`/${id}/update`), { json: {} })).json()).toMatchObject({
     status: "waiting",
     scripts: ["run.sh"],

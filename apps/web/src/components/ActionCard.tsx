@@ -39,6 +39,7 @@ import { hostOf } from "@agenteschat/client/lib/import/shared";
 import { choiceOf } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName } from "@agenteschat/client/lib/scopes";
+import { SKILL_UPDATE_TOAST } from "@agenteschat/client/lib/skills";
 import { Button, Dialog, Icon, Spinner } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { lazy, type ReactNode, Suspense, useState } from "react";
@@ -54,7 +55,7 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
-import { InstallSkillDialog, SkillSheet, UPDATE_TOAST } from "@/components/Skills";
+import { InstallSkillDialog, SkillSheet } from "@/components/Skills";
 import { StretchCardView } from "@/components/StretchCard";
 import { UsagePauseCardView } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -296,7 +297,7 @@ function UpdateSkillsCardView({ message, card }: { message: Message; card: Updat
                       { type: "updateFromSource", id: r.id },
                       {
                         onSuccess: (u) =>
-                          toast.show(t(UPDATE_TOAST[(u as SkillSourceUpdate).status], { name: r.name })),
+                          toast.show(t(SKILL_UPDATE_TOAST[(u as SkillSourceUpdate).status], { name: r.name })),
                       },
                     )
                   }

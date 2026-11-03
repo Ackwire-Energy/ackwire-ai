@@ -47,22 +47,28 @@ const snapshot = (s: SkillRow): SkillSnapshot => ({
   metadata: s.metadata,
 });
 
-/** Installed before links kept their hash: the same text and the same files by path and size. */
+/** Installed before links kept their hash: the same text and the same files, byte for byte. */
 async function sameAsInstalled(
-  db: Database,
+  deps: SkillDeps,
   s: SkillRow,
   incoming: { description: string; body: string; files: SkillFileInput[] },
 ) {
   if (incoming.body !== s.body || incoming.description !== s.description) return false;
-  const now = await skillFilesOf(db, s);
+  const now = await skillFilesOf(deps.db, s);
   const sized = (f: SkillFileInput) => `${f.path}:${f.skippedSize ?? f.data.byteLength}`;
-  return (
+  const sameSizes =
     now.length === incoming.files.length &&
     now
       .map((f) => `${f.path}:${f.size}`)
       .sort()
-      .join("\n") === incoming.files.map(sized).sort().join("\n")
-  );
+      .join("\n") === incoming.files.map(sized).sort().join("\n");
+  if (!sameSizes) return false;
+  // Same sizes can still hide a changed script (a version bump): compare what is kept.
+  const kept = new Map((await skillFolderFiles(deps, s)).map((f) => [f.path, f.data]));
+  return incoming.files.every((f) => {
+    const was = kept.get(f.path);
+    return f.skippedSize !== undefined || (was !== undefined && Buffer.compare(was, f.data) === 0);
+  });
 }
 
 /** The files of `incoming` that run (`runsCode`) and are new or not byte for byte what the skill has now. */
@@ -109,7 +115,7 @@ export async function updateSkillFromSource(
       .returning();
     return skillDetail(deps.db, row ?? s);
   };
-  if (hash === s.sourceHash || (!s.sourceHash && (await sameAsInstalled(deps.db, s, incoming)))) {
+  if (hash === s.sourceHash || (!s.sourceHash && (await sameAsInstalled(deps, s, incoming)))) {
     if (s.pendingUpdate && !s.pendingUpdate.dismissed) await resolveSkillWaiting(deps, orgId, s.id);
     return { status: "unchanged", skill: await mark({ sourceHash: hash, pendingUpdate: null }) };
   }
@@ -188,7 +194,7 @@ export async function undoSkillUpdate(deps: SkillDeps, actorId: string, orgId: s
 export async function setSkillAutoUpdate(db: Database, actorId: string, orgId: string, id: string, on: boolean) {
   await requirePermission(db, actorId, orgId, "manage_agents");
   const s = await loadSkill(db, orgId, id);
-  if (on && !s.sourceUrl)
+  if (on && (s.source !== "url" || !s.sourceUrl))
     throw new ValidationError("Only a skill installed from a link can update by itself", "skill.no_link");
   const [row] = await db
     .update(skills)
@@ -212,14 +218,22 @@ const refusalCode = (error: unknown) =>
     : null;
 
 /**
+ * Skills that update by themselves, still as their link made them: an edit by hand (`source` manual, its link kept)
+ * hides "Atualizar sozinha" in the app, so it stops until the skill is installed from its link again.
+ */
+const dueForUpdate = and(
+  eq(skills.autoUpdate, true),
+  eq(skills.source, "url"),
+  isNull(skills.deletedAt),
+  isNotNull(skills.sourceUrl),
+);
+
+/**
  * Every workspace with a skill that updates by itself, queued once a day (the date in its dedupe key), each at a time
  * of its own within `SKILL_UPDATES_SPREAD_MS`.
  */
 export async function enqueueSkillUpdates(db: Database, now = new Date()) {
-  const orgs = await db
-    .selectDistinct({ orgId: skills.orgId })
-    .from(skills)
-    .where(and(eq(skills.autoUpdate, true), isNull(skills.deletedAt), isNotNull(skills.sourceUrl)));
+  const orgs = await db.selectDistinct({ orgId: skills.orgId }).from(skills).where(dueForUpdate);
   const day = now.toISOString().slice(0, 10);
   for (const { orgId } of orgs) {
     const offset = Number.parseInt(sha256(orgId).slice(0, 8), 16) % SKILL_UPDATES_SPREAD_MS;
@@ -245,9 +259,7 @@ export async function runSkillUpdates(deps: SkillDeps, orgId: string) {
   const due = await deps.db
     .select()
     .from(skills)
-    .where(
-      and(eq(skills.orgId, orgId), eq(skills.autoUpdate, true), isNull(skills.deletedAt), isNotNull(skills.sourceUrl)),
-    );
+    .where(and(eq(skills.orgId, orgId), dueForUpdate));
   const done = { updated: 0, waiting: 0, failed: 0 };
   for (const s of due) {
     try {

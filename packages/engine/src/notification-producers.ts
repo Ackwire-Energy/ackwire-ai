@@ -1160,7 +1160,8 @@ const skillWaitingGroup = (skillId: string) => `skill_update:waiting:${skillId}:
 
 /**
  * An update of a skill from its link: applied (`updated`), waiting because it changes what runs (`waiting`, the files),
- * or refused (`failed`, its code). Who hears it: `to`, or else who manages skills.
+ * or refused (`failed`, its code). Who hears it: `to` an update, who manages skills a waiting one, both a refusal
+ * (`to` may have lost the right or left the workspace, which only who manages skills can fix).
  */
 export async function notifySkillUpdate(
   deps: NotificationDeps,
@@ -1177,7 +1178,10 @@ export async function notifySkillUpdate(
       : `skill_update:${what.state}:${skill.id}:${what.state === "updated" ? what.version : what.reason}:${Date.now()}`;
   await notify(deps, {
     orgId: skill.orgId,
-    userIds: to && what.state !== "waiting" ? [to] : await adminsOf(deps, skill.orgId, "manage_agents"),
+    userIds:
+      to && what.state === "updated"
+        ? [to]
+        : [...(await adminsOf(deps, skill.orgId, "manage_agents")), ...(to && what.state === "failed" ? [to] : [])],
     kind: "skill_update",
     groupKey: key,
     waiting: what.state === "waiting",

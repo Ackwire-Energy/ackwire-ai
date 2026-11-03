@@ -25,6 +25,7 @@ import {
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
+  SKILL_UPDATE_TOAST,
   searchRepos,
   skillPickOf,
   skillRefusalText,
@@ -183,7 +184,7 @@ export function SkillScreen({ id }: { id: string }) {
       {
         onSuccess: (r) => {
           successHaptic();
-          toast({ title: t(UPDATE_TOAST[(r as SkillSourceUpdate).status], { name: item.name }), icon: "check" });
+          toast({ title: t(SKILL_UPDATE_TOAST[(r as SkillSourceUpdate).status], { name: item.name }), icon: "check" });
         },
         // A repository none of the workspace's GitHub reads, as Instalar skill says it.
         onError: (e) => toast({ title: skillRefusalText(t, e, can(org, "manage_connectors")), icon: "x" }),
@@ -295,13 +296,6 @@ export function SkillScreen({ id }: { id: string }) {
     </SettingsPage>
   );
 }
-
-/** What "Atualizar do link" says, by what it did. */
-const UPDATE_TOAST = {
-  updated: "skills.refreshed",
-  unchanged: "skills.upToDate",
-  waiting: "skills.waitingToast",
-} as const;
 
 /**
  * A skill from a link, as the web's sheet: an update waiting because it changes files that run (applied or refused

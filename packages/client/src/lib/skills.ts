@@ -107,6 +107,13 @@ export function searchRepos(listing: GitHubRepositories | undefined, query: stri
     .filter((a) => a.repositories.length > 0);
 }
 
+/** What "Atualizar do link" says, by what it did (`SkillSourceUpdate.status`). */
+export const SKILL_UPDATE_TOAST = {
+  updated: "skills.refreshed",
+  unchanged: "skills.upToDate",
+  waiting: "skills.waitingToast",
+} as const;
+
 /** Why a skill's last update from its link failed (`updateError`), in the reader's words. */
 export function skillUpdateErrorText(t: TFunction, code: string) {
   const key = code.replace(/^skill\./, "");

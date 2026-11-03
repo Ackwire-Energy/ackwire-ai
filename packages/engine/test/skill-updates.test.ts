@@ -21,6 +21,7 @@ import {
   type ToolContext,
   undoAgentAction,
   undoSkillUpdate,
+  updateSkill,
   updateSkillFromSource,
   zip,
 } from "../src";
@@ -204,6 +205,39 @@ describe("updating by itself, every day", () => {
     gh.state.files = { "deploy/SKILL.md": skillMd("# v2"), "deploy/x.js": "1" };
     expect(await runSkillUpdates(deps, f.org.id)).toEqual({ updated: 0, waiting: 1, failed: 0 });
     expect((await getSkill(f.db, f.owner.id, f.org.id, skill.id)).updateError).toBeNull();
+  });
+});
+
+describe("edge cases of updating from a link", () => {
+  test("installed before links kept their hash: a same-size script change still waits", async () => {
+    f = await setup();
+    const { gh, deps, skill } = await install(f, { "deploy/SKILL.md": skillMd("# v1"), "deploy/run.sh": "echo 1" });
+    await f.db.update(schema.skills).set({ sourceHash: null }).where(eq(schema.skills.id, skill.id));
+    gh.state.files = { "deploy/SKILL.md": skillMd("# v1"), "deploy/run.sh": "echo 2" };
+    expect(await updateSkillFromSource(deps, f.owner.id, f.org.id, skill.id)).toMatchObject({
+      status: "waiting",
+      scripts: ["run.sh"],
+    });
+  });
+
+  test("a refusal reaches who manages skills too; an edit by hand stops the daily update", async () => {
+    f = await setup();
+    const admin = await addMember(f.db, f.org.id, "admin");
+    const { gh, deps, skill } = await install(f, { "deploy/SKILL.md": skillMd("# v1") });
+    await setSkillAutoUpdate(f.db, admin.id, f.org.id, skill.id, true);
+    await f.db
+      .delete(schema.organizationMembers)
+      .where(and(eq(schema.organizationMembers.orgId, f.org.id), eq(schema.organizationMembers.userId, admin.id)));
+    gh.state.files = { "deploy/SKILL.md": skillMd("# v2") };
+    expect(await runSkillUpdates(deps, f.org.id)).toMatchObject({ failed: 1 });
+    expect((await inbox(f, f.owner.id)).map((n) => n.latest)).toMatchObject([
+      { statusTo: "failed", reason: "forbidden" },
+    ]);
+
+    await updateSkill(deps, f.owner.id, f.org.id, skill.id, { body: "# mine" });
+    expect(await enqueueSkillUpdates(f.db, new Date("2026-11-04T10:00:00Z"))).toBe(0);
+    expect(await runSkillUpdates(deps, f.org.id)).toEqual({ updated: 0, waiting: 0, failed: 0 });
+    expect((await getSkill(f.db, f.owner.id, f.org.id, skill.id)).body).toBe("# mine");
   });
 });
 

@@ -26,6 +26,7 @@ import {
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
+  SKILL_UPDATE_TOAST,
   searchRepos,
   skillPickOf,
   skillRefusalText,
@@ -675,13 +676,6 @@ function ConnectedRepos({ onPick, onBack }: { onPick: (fullName: string) => void
   );
 }
 
-/** What "Atualizar do link" says, by what it did. */
-export const UPDATE_TOAST = {
-  updated: "skills.refreshed",
-  unchanged: "skills.upToDate",
-  waiting: "skills.waitingToast",
-} as const;
-
 /**
  * A skill from a link, as it updates from it: "Atualizar sozinha", an update waiting because it changes files that run
  * (applied or refused here, the files named), why its last update failed, and Desfazer for the last one.
@@ -839,7 +833,8 @@ export function SkillSheet({
                   refresh.mutate(
                     { type: "updateFromSource", id: s.id },
                     {
-                      onSuccess: (r) => toast.show(t(UPDATE_TOAST[(r as SkillSourceUpdate).status], { name: s.name })),
+                      onSuccess: (r) =>
+                        toast.show(t(SKILL_UPDATE_TOAST[(r as SkillSourceUpdate).status], { name: s.name })),
                       onError: (e) => toast.show(skillRefusalText(t, e, can(org, "manage_connectors")), "error"),
                     },
                   )
