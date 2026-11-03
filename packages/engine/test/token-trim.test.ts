@@ -386,6 +386,13 @@ async function claudeCodeTurns(fx: Fixture, loadIssues: () => void) {
           );
           seen.push({ turn, prompt: computerPrompt(turn), tools: JSON.stringify(tools) });
           yield {
+            type: "tool_call",
+            id: `ts-${seen.length}`,
+            name: "ToolSearch",
+            input: { query: "select:mcp__agentes__list_issues" },
+            executed: { content: "list_issues" },
+          };
+          yield {
             type: "usage",
             input: 9040,
             output: 5,
@@ -430,8 +437,14 @@ const ruleLines = (t: BrainTurn) =>
       `${t.system}\n${conversationOf(t)}`
         .split("\n")
         .map((l) => l.replace(/^#+ /, "").trim())
-        // Where those sections come from (the line that names them), not a rule of the agent's.
-        .filter((l) => l && l !== "This conversation" && !l.startsWith('"# This turn" and "# This conversation"')),
+        // Where those sections come from (the line that names them, the choices line's own heading), not a rule.
+        .filter(
+          (l) =>
+            l &&
+            l !== "This conversation" &&
+            l !== "Options to pick from" &&
+            !l.startsWith('"# This turn" and "# This conversation"'),
+        ),
     ),
   ].sort();
 
@@ -519,7 +532,8 @@ test("Claude Code: the system text is the same in every conversation; what holds
   for (const t of [dmTurn, channelTurn]) {
     const conversation = conversationOf(t.turn);
     expect(conversation).toStartWith("# This conversation\n\n## Your team\n");
-    expect(conversation).toContain("put them on a card with ask_choices");
+    // Under a heading of its own, not read as part of "## Your team".
+    expect(conversation).toContain("\n\n## Options to pick from\n- When you end by asking the person to pick");
     expect(t.turn.system).not.toContain("# Your team");
     expect(t.turn.system).not.toContain("put them on a card with ask_choices");
     expect(t.turn.system).toContain('"# This turn" and "# This conversation" in your messages come from agentes.chat');
@@ -531,7 +545,7 @@ test("Claude Code: the system text is the same in every conversation; what holds
   // The turn's calls and its largest uncached one stay on its step, to tell more calls from bigger ones.
   const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "model_call"));
   expect(steps).toHaveLength(3);
-  for (const step of steps) expect(step.data).toMatchObject({ calls: 3, maxUncached: 700 });
+  for (const step of steps) expect(step.data).toMatchObject({ calls: 3, maxUncached: 700, toolSearches: 1 });
 }, 20_000);
 
 test("Claude Code: no rule is lost moving what holds for one conversation out of the system text", async () => {

@@ -971,6 +971,29 @@ test("a plan limit falls back to the model brain; the reply carries a quiet note
   expect(computerBrainUnavailable("claude_code", machineId, statusOf(machineId))?.code).toBe("plan_limit");
 });
 
+test("Claude Code lists every tool; the model brain standing in lists the core ones and finds the rest", async () => {
+  f = await setup({ toolsOnDemand: true, issueTools: true, reply: () => ({ chunks: ["Respondi pela API."] }) });
+  await computerAgent(f);
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "issues:read" }]);
+  const { brain, seen } = scriptedComputerBrain(() => [
+    { type: "error", code: "plan_limit", message: "You've hit your limit.", worked: false },
+  ]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+
+  expect(seen[0]?.tools.map((t) => t.name)).toContain("list_issues");
+  const names = f.provider.calls.at(-1)?.request.tools?.map((t) => t.name) ?? [];
+  expect(names).toContain("find_tools");
+  expect(names).not.toContain("list_issues");
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect((run?.transcript as { toolGroups?: string[] } | null)?.toolGroups).toEqual([]);
+});
+
 test("the agent's account and effort reach its turn; a refused sign-in falls back and the computer decides the status", async () => {
   f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
   const ACCOUNT = "0193dddd-0000-4000-8000-000000000001";

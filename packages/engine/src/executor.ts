@@ -1252,6 +1252,16 @@ async function executeRunInner(
     deps.tools ? deps.tools.granted(ctx, heldBack) : Promise.resolve([]),
   ]);
   let tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+  /**
+   * Only Claude Code defers our tools itself: a run that lists every tool and thinks with another brain (the model
+   * brain standing in, a mission's Codex) lists the core tools instead, the rest behind `find_tools`.
+   */
+  const onDemandForOtherBrain = (t: Transcript) => {
+    if (!listsEveryTool(ctx)) return;
+    ctx.loadedGroups = [];
+    t.toolGroups = [];
+    tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+  };
   const trigger = triggerRows[0];
   if (fresh && trigger)
     deps.onTiming?.("trigger_to_claim_ms", claimedAt - trigger.createdAt.getTime(), { runId: run.id });
@@ -2047,6 +2057,7 @@ async function executeRunInner(
   if (brainPlan.kind !== "model" && run.brain === "model" && transcript.fallback) {
     brainPlan = { kind: "model", ...(brainPlan.missionId ? { missionId: brainPlan.missionId } : {}) };
   }
+  if (brainPlan.kind !== "claude_code") onDemandForOtherBrain(transcript);
   // The run's effective brain (ADR 0053 §10): shared code reads it, never the agent's stored brain.
   if (run.brain !== brainPlan.kind) {
     await recordRunBrain(db, run.id, brainPlan.kind);
@@ -2341,6 +2352,7 @@ async function executeRunInner(
         ...(autoEffort ? { effort: autoEffort } : {}),
       };
       brain = createBrain(deps, thinker, run, "model", turnToken, () => transcript as Transcript);
+      onDemandForOtherBrain(t);
       await saveTranscript(db, t);
       await recordRunBrain(db, run.id, "model");
       run = { ...run, brain: "model" };
@@ -3557,6 +3569,9 @@ async function executeRunInner(
       const ours = new Set(turnTools.map((t) => t.name));
       const own = executedNow.filter((c) => !ours.has(c.name));
       const ranItself = own.length;
+      // Claude Code's lookups of our deferred tools have no step of their own: ADR 0043's uncached-input query
+      // splits turns by them.
+      const toolSearches = own.filter((c) => c.name === "ToolSearch").length;
       if (own.length > 0)
         transcript.harnessTried = [
           ...(transcript.harnessTried ?? []),
@@ -3572,6 +3587,7 @@ async function executeRunInner(
         addRunStep(db, run, "model_call", {
           model: result.model,
           ...(ranItself > 0 ? { executed: ranItself } : {}),
+          ...(toolSearches > 0 ? { toolSearches } : {}),
           stopReason: result.stopReason,
           usageRecordId: result.usageRecordId,
           costNanoUsd: result.costNanoUsd,

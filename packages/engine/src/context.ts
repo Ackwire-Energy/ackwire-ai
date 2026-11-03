@@ -903,7 +903,8 @@ export async function buildRunContext(
         ]
       : []),
     // Only when a person is behind the run: like the team, it follows the requester.
-    ...(options.choices ? [{ conversation: true, text: ASK_CHOICES_LINE }] : []),
+    // A heading of its own: on its own, the line would read as part of the section before it ("# Your team").
+    ...(options.choices ? [{ conversation: true, text: `# Options to pick from\n${ASK_CHOICES_LINE}` }] : []),
     ...(recentActions.length > 0
       ? [
           {
