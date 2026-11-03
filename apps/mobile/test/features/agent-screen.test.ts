@@ -16,8 +16,8 @@ import {
   controlScale,
   cursorGain,
   DEFAULT_DESKTOP,
-  type Drag,
   DRAG_REST,
+  type Drag,
   type DragEvent,
   dragStep,
   dragView,
@@ -275,12 +275,25 @@ describe("pressing and dragging with one finger", () => {
 
   test("a tap clicks; a swipe only moves", () => {
     expect(acts(tapped)).toEqual(["click"]);
-    expect(acts([["touch", 0], ["move", 50], ["lift", 400]])).toEqual([]);
+    expect(
+      acts([
+        ["touch", 0],
+        ["move", 50],
+        ["lift", 400],
+      ]),
+    ).toEqual([]);
   });
 
   test("a hold presses, and the lift lets go however far the finger went after", () => {
     // The hold's own gesture ends a few points into the move: only the lift lets go.
-    expect(acts([["touch", 0], ["hold", 320], ["move", 400], ["lift", 900]])).toEqual(["press", "release"]);
+    expect(
+      acts([
+        ["touch", 0],
+        ["hold", 320],
+        ["move", 400],
+        ["lift", 900],
+      ]),
+    ).toEqual(["press", "release"]);
   });
 
   test("tap, then touch again soon and move: pressed from the move to the lift", () => {
@@ -301,8 +314,24 @@ describe("pressing and dragging with one finger", () => {
   test("a touch that pressed and lifted quickly lets go once and never also clicks, whichever comes first", () => {
     const armed = dragStep(dragStep(DRAG_REST, "tap", 0).drag, "touch", 100).drag;
     const pressed = dragStep(armed, "move", 120).drag;
-    expect(acts([["tap", 180], ["lift", 180]], pressed)).toEqual(["release"]);
-    expect(acts([["lift", 180], ["tap", 180]], pressed)).toEqual(["release"]);
+    expect(
+      acts(
+        [
+          ["tap", 180],
+          ["lift", 180],
+        ],
+        pressed,
+      ),
+    ).toEqual(["release"]);
+    expect(
+      acts(
+        [
+          ["lift", 180],
+          ["tap", 180],
+        ],
+        pressed,
+      ),
+    ).toEqual(["release"]);
     // That tap doesn't arm the next touch: a third quick touch that moves only moves.
     const third: [DragEvent, number][] = [
       ["tap", 180],
