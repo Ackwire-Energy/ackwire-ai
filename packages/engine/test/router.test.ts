@@ -996,6 +996,41 @@ describe("a person alone with the team (R2, ADR 0134)", () => {
     expect(await route(scored({ ada: 0.3 }, greet), more.id)).toMatchObject({ selected: [], runs: [] });
   });
 
+  test("never on an agent's greeting, a reply in another person's thread, or a greeting to a person", async () => {
+    const { ada } = await team();
+    const nobody = { selected: [], runs: [] };
+    const agentSaid = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: ada.id, runId: null, hop: 1, stretchId: null },
+      body: "Bom dia!",
+    });
+    expect((await route(scored({ theo: 0.3 }, greet), agentSaid.id)).selected ?? []).toEqual([]);
+    // Bia wrote the thread's first message and left the channel since.
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const hers = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: bia.id },
+      body: "deploy de hoje às 18h",
+    });
+    const inHers = await post("bom dia!", hers.id);
+    expect(await route(scored({ ada: 0.3 }, greet), inHers.id)).toMatchObject(nobody);
+    const toBia = await post("bom dia bia");
+    expect(await route(scored({ ada: 0.3 }, greet), toBia.id)).toMatchObject(nobody);
+  });
+
+  test("never an agent the person can't talk to, however well it scores", async () => {
+    const { theo, ada } = await team();
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: null, audienceMode: "owner" })
+      .where(eq(schema.agents.id, ada.id));
+    const greeting = await post("bom dia!");
+    const result = await route(scored({ ada: 0.9, theo: 0.3 }, greet), greeting.id);
+    expect(result).toMatchObject({ selected: [theo.id], decidedBy: ALONE });
+  });
+
   test("when no step can read it, the best placed agent answers, in a run it may pass on", async () => {
     await team();
     const failing: RouterStrategy = { name: "boom", decide: async () => Promise.reject(new Error("down")) };
