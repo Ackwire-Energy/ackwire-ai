@@ -2974,7 +2974,7 @@
         "none": "이 계정이 있는 컴퓨터가 없어요",
         "planModel": "모델",
         "account": "계정",
-        "accountLocked": "{{name}}님만 바꿀 수 있어요",
+        "accountWho": "{{name}} 담당자인 {{owner}}님의 계정만 있어요. 플랜은 주인의 에이전트를 위해서만 생각해요.",
         "accountSignedOut": "로그아웃됨, 다시 로그인하세요",
         "thisComputer": "{{computer}}의 계정",
         "accountMove": "{{agents}}이(가) 사용 중 · 여기로 옮기기",
@@ -6330,15 +6330,16 @@
     "share": {
       "switch": "다른 사람에게도 답해요",
       "switchAll": "다른 사람에게도 답하기",
-      "switchOther": "{{owner}}님에게만 답해요",
-      "onOther": "{{name}}은(는) {{owner}}님의 요금제로 생각해요. 다른 사람이 대화할 수 있게 하는 건 {{owner}}님만 할 수 있어요.",
-      "onOther_female": "{{name}}은(는) {{owner}}님의 요금제로 생각해요. 다른 사람이 대화할 수 있게 하는 건 {{owner}}님만 할 수 있어요.",
       "line": {
         "off": "{{name}}은(는) 내 {{plan}}(으)로 나에게만 답해요.",
         "on": "{{name}}은(는) 내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요.",
         "on_female": "{{name}}은(는) 내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요.",
         "offAll": "내 {{plan}}(으)로 나에게만 답해요.",
         "onAll": "내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요."
+      },
+      "lineOf": {
+        "off": "{{name}}은(는) {{owner}}님의 {{plan}}(으)로 {{owner}}님에게만 답해요.",
+        "on": "{{name}}은(는) {{owner}}님의 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요."
       },
       "plan": {
         "own": "{{provider}} 요금제",
@@ -6353,13 +6354,11 @@
       },
       "savedEveryone": "이제 {{name}}은(는) 다른 사람에게도 답해요.",
       "savedOwner": "이제 {{name}}은(는) 나에게만 답해요.",
+      "savedOwnerOf": "이제 {{name}}은(는) {{owner}}님에게만 답해요.",
       "backOnApi": "{{name}}은(는) 다시 API를 쓰고 여전히 나에게만 답해요.",
       "letEveryone": "{{name}}이(가) 모두에게 답하게 하기",
       "letPeople": "{{name}}이(가) 다른 사람에게도 답하게 하기",
       "pickPeople": "{{name}}은(는) 선택한 사람에게만 답하는데, 아직 선택한 사람이 없어요. 대화할 수 있는 사람에서 선택하세요."
-    },
-    "errors": {
-      "planOwnerOnly": "{{agentName}}의 책임자만 더 많은 사람을 허용할 수 있어요. {{agentName}}은(는) 그 사람의 요금제로 답해요."
     },
     "add": {
       "paste": "붙여넣기",

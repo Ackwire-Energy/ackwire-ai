@@ -3104,7 +3104,7 @@
         "none": "Geen computer heeft het",
         "planModel": "Model",
         "account": "Account",
-        "accountLocked": "Alleen {{name}} wijzigt dit",
+        "accountWho": "Alleen accounts van {{owner}}, verantwoordelijk voor {{name}}: een abonnement denkt alleen voor de agents van de eigenaar.",
         "accountSignedOut": "Uitgelogd, log opnieuw in",
         "thisComputer": "Account van {{computer}}",
         "accountMove": "In gebruik door {{agents}} · Hierheen verplaatsen",
@@ -6668,9 +6668,6 @@
     "share": {
       "switch": "Antwoordt andere mensen",
       "switchAll": "Andere mensen antwoorden",
-      "switchOther": "Antwoordt alleen {{owner}}",
-      "onOther": "{{name}} denkt met het abonnement van {{owner}}. Alleen {{owner}} kan andere mensen met hem laten praten.",
-      "onOther_female": "{{name}} denkt met het abonnement van {{owner}}. Alleen {{owner}} kan andere mensen met haar laten praten.",
       "line": {
         "off": "{{name}} antwoordt alleen jou, op je {{plan}}.",
         "off_female": "{{name}} antwoordt alleen jou, op je {{plan}}.",
@@ -6678,6 +6675,11 @@
         "on_female": "{{name}} antwoordt iedereen die met haar mag praten, op je {{plan}}.",
         "offAll": "Ze antwoorden alleen jou, op je {{plan}}.",
         "onAll": "Ze antwoorden iedereen die met ze mag praten, op je {{plan}}."
+      },
+      "lineOf": {
+        "off": "{{name}} antwoordt alleen {{owner}}, op het {{plan}} van {{owner}}.",
+        "on": "{{name}} antwoordt iedereen die met hem mag praten, op het {{plan}} van {{owner}}.",
+        "on_female": "{{name}} antwoordt iedereen die met haar mag praten, op het {{plan}} van {{owner}}."
       },
       "plan": {
         "own": "{{provider}}-abonnement",
@@ -6693,6 +6695,7 @@
       "savedEveryone": "{{name}} antwoordt nu ook andere mensen.",
       "savedEveryone_female": "{{name}} antwoordt nu ook andere mensen.",
       "savedOwner": "{{name}} antwoordt nu alleen jou.",
+      "savedOwnerOf": "{{name}} antwoordt nu alleen {{owner}}.",
       "savedOwner_female": "{{name}} antwoordt nu alleen jou.",
       "backOnApi": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
       "backOnApi_female": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
@@ -6702,9 +6705,6 @@
       "letPeople_female": "Laat {{name}} andere mensen antwoorden",
       "pickPeople": "{{name}} antwoordt alleen de gekozen mensen, en er is nog niemand gekozen. Kies ze bij Wie mag praten.",
       "pickPeople_female": "{{name}} antwoordt alleen de gekozen mensen, en er is nog niemand gekozen. Kies ze bij Wie mag praten."
-    },
-    "errors": {
-      "planOwnerOnly": "Alleen wie verantwoordelijk is voor {{agentName}} kan meer mensen toelaten: {{agentName}} antwoordt op diens abonnement."
     },
     "add": {
       "paste": "Plakken",

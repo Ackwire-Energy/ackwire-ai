@@ -244,6 +244,9 @@ describe("the computers' own sign-ins", () => {
     expect(ownSignInListed({ ...theirs, brain: "codex" }, undefined, "codex")).toBe(true);
     expect(ownSignInListed({ ...theirs, brain: "codex", account: "acct_1" }, undefined, "codex")).toBe(false);
     expect(ownSignInListed({ ...nobodys, brain: "codex", canUsePlans: false }, undefined, "codex")).toBe(true);
+    // To an admin on the computer its owner connected, always: only that person sees what its CLIs report.
+    expect(ownSignInListed({ ...theirs, canUsePlans: false }, undefined, "codex")).toBe(true);
+    expect(ownSignInListed({ ...nobodys, canUsePlans: false }, undefined, "codex")).toBe(false);
   });
 
   test("the plan's word", () => {

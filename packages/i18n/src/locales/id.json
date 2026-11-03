@@ -2991,7 +2991,7 @@
         "none": "Tidak ada komputer yang memilikinya",
         "planModel": "Model",
         "account": "Akun",
-        "accountLocked": "Hanya {{name}} yang bisa mengubahnya",
+        "accountWho": "Hanya akun {{owner}}, penanggung jawab {{name}}: paket hanya berpikir untuk agen milik pemiliknya.",
         "accountSignedOut": "Keluar, masuk lagi",
         "thisComputer": "Akun {{computer}}",
         "accountMove": "Dipakai oleh {{agents}} · Pindahkan ke sini",
@@ -6386,15 +6386,16 @@
     "share": {
       "switch": "Menjawab orang lain",
       "switchAll": "Jawab orang lain",
-      "switchOther": "Hanya menjawab {{owner}}",
-      "onOther": "{{name}} berpikir dengan paket milik {{owner}}. Hanya {{owner}} yang bisa mengizinkan orang lain berbicara dengannya.",
-      "onOther_female": "{{name}} berpikir dengan paket milik {{owner}}. Hanya {{owner}} yang bisa mengizinkan orang lain berbicara dengannya.",
       "line": {
         "off": "{{name}} hanya menjawab kamu, dengan {{plan}} kamu.",
         "on": "{{name}} menjawab siapa pun yang bisa berbicara dengannya, dengan {{plan}} kamu.",
         "on_female": "{{name}} menjawab siapa pun yang bisa berbicara dengannya, dengan {{plan}} kamu.",
         "offAll": "Mereka hanya menjawab kamu, dengan {{plan}} kamu.",
         "onAll": "Mereka menjawab siapa pun yang bisa berbicara dengan mereka, dengan {{plan}} kamu."
+      },
+      "lineOf": {
+        "off": "{{name}} hanya menjawab {{owner}}, dengan {{plan}} milik {{owner}}.",
+        "on": "{{name}} menjawab siapa pun yang bisa berbicara dengannya, dengan {{plan}} milik {{owner}}."
       },
       "plan": {
         "own": "paket {{provider}}",
@@ -6409,13 +6410,11 @@
       },
       "savedEveryone": "Sekarang {{name}} menjawab orang lain.",
       "savedOwner": "{{name}} sekarang hanya menjawab kamu.",
+      "savedOwnerOf": "{{name}} sekarang hanya menjawab {{owner}}.",
       "backOnApi": "{{name}} kembali memakai API dan tetap hanya menjawab kamu.",
       "letEveryone": "Izinkan {{name}} menjawab semua orang",
       "letPeople": "Izinkan {{name}} menjawab orang lain",
       "pickPeople": "{{name}} hanya menjawab orang yang dipilih, dan belum ada yang dipilih. Pilih mereka di Siapa yang bisa bicara."
-    },
-    "errors": {
-      "planOwnerOnly": "Hanya penanggung jawab {{agentName}} yang bisa mengizinkan lebih banyak orang: {{agentName}} menjawab dengan paket miliknya."
     },
     "add": {
       "paste": "Tempel",

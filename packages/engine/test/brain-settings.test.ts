@@ -312,22 +312,22 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
   });
 
-  test("only the plan's owner lets more people in; an admin only narrows; a member can't touch it", async () => {
+  test("its owner or an admin lets more people in and keeps them out, on a plan too; a member can't touch it", async () => {
     const { fx, deps, bia, caio, row } = await world();
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
     expect(await getAgentBrain(deps, caio.id, fx.org.id, fx.agent.id)).toMatchObject({
       onlyOwner: true,
       canUsePlans: false,
     });
-    const refused = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { onlyOwner: false }).catch((e) => e);
-    expect(refused).toBeInstanceOf(ForbiddenError);
-    expect(refused.code).toBe("audience.plan_owner_only");
-    const member = await setAgentBrain(deps, bia.id, fx.org.id, fx.agent.id, { onlyOwner: true }).catch((e) => e);
+    const member = await setAgentBrain(deps, bia.id, fx.org.id, fx.agent.id, { onlyOwner: false }).catch((e) => e);
     expect(member).toBeInstanceOf(ForbiddenError);
     // With no "who can talk" list, on means everyone.
-    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
+    expect((await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { onlyOwner: false })).onlyOwner).toBe(false);
     expect(await row()).toMatchObject({ audienceMode: "everyone", audienceUserIds: [] });
     expect((await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { onlyOwner: true })).onlyOwner).toBe(true);
+    expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false })).onlyOwner).toBe(
+      false,
+    );
   });
 
   test("back on the API it still answers only its owner; letting it out brings back whoever it answered", async () => {
@@ -342,7 +342,7 @@ describe("a plan answers its owner until it answers other people (Atende outras 
 });
 
 describe("a plan thinks only for its owner's agents, one account each", () => {
-  test("the owner's accounts only; both the account and the agent the caller's; another agent's with moveAccount, unless for all", async () => {
+  test("the agent's owner's accounts only, picked by its owner or an admin; another agent's with moveAccount, unless for all", async () => {
     const { fx, deps, machineId, bia, caio, account, row, audits } = await world();
     await account(ANAS, fx.owner.id);
     await account(BIAS, bia.id);
@@ -370,11 +370,10 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
     }).catch((e) => e);
     expect(theirs).toBeInstanceOf(ForbiddenError);
     expect(theirs.code).toBe("account.not_owner");
-    // An admin owns neither.
+    // Nor an admin: Bia's plan thinks only for Bia's agents.
     const admin = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, {
       brain: "claude_code",
-      account: ANAS,
-      moveAccount: true,
+      account: BIAS,
     }).catch((e) => e);
     expect(admin.code).toBe("account.not_owner");
     const taken = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, {
@@ -384,7 +383,8 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
     expect(taken).toBeInstanceOf(ConflictError);
     expect(taken).toMatchObject({ code: "account.in_use", params: { agent: "Theo", agentId: theo.id } });
 
-    const moved = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, {
+    // An admin picks among Ana's own, as she would.
+    const moved = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, {
       brain: "claude_code",
       account: ANAS,
       moveAccount: true,
@@ -406,7 +406,7 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
   });
 
   test("the computer's own sign-in: only for its pairer's agents; an account that goes sends the others to the API", async () => {
-    const { fx, deps, bia, account, row } = await world();
+    const { fx, deps, bia, caio, account, row } = await world();
     await account(BIAS, bia.id);
     await fx.db
       .update(schema.agents)
@@ -420,6 +420,8 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
     const own = await setAgentBrain(deps, bia.id, fx.org.id, fx.agent.id, { account: null }).catch((e) => e);
     expect(own).toBeInstanceOf(ForbiddenError);
     expect(own.code).toBe("account.not_owner");
+    const admin = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { account: null }).catch((e) => e);
+    expect(admin.code).toBe("account.not_owner");
     // Her account goes: the computer's own sign-in is Ana's, so Bia's agent goes back to the API.
     expect(await releaseAgents(fx.db, fx.org.id, [BIAS])).toEqual([fx.agent.id]);
     expect(await row()).toMatchObject({ brain: "model", brainAccountId: null });

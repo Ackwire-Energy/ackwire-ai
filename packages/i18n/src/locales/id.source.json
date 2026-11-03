@@ -7534,8 +7534,8 @@
   "agentPage.work.brain.account": {
     "value": "Account"
   },
-  "agentPage.work.brain.accountLocked": {
-    "value": "Only {{name}} changes it"
+  "agentPage.work.brain.accountWho": {
+    "value": "Only accounts of {{owner}}, who is responsible for {{name}}: a plan thinks only for its owner's agents."
   },
   "agentPage.work.brain.accountSignedOut": {
     "value": "Signed out, sign in again"
@@ -15746,13 +15746,6 @@
   "aiAccounts.share.switchAll": {
     "value": "Answer other people"
   },
-  "aiAccounts.share.switchOther": {
-    "value": "Answers only {{owner}}"
-  },
-  "aiAccounts.share.onOther": {
-    "value": "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to him.",
-    "female": "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to her."
-  },
   "aiAccounts.share.line.off": {
     "value": "{{name}} answers only you, on your {{plan}}."
   },
@@ -15765,6 +15758,13 @@
   },
   "aiAccounts.share.line.onAll": {
     "value": "They answer anyone who can talk to them, on your {{plan}}."
+  },
+  "aiAccounts.share.lineOf.off": {
+    "value": "{{name}} answers only {{owner}}, on {{owner}}'s {{plan}}."
+  },
+  "aiAccounts.share.lineOf.on": {
+    "value": "{{name}} answers anyone who can talk to him, on {{owner}}'s {{plan}}.",
+    "female": "{{name}} answers anyone who can talk to her, on {{owner}}'s {{plan}}."
   },
   "aiAccounts.share.plan.own": {
     "value": "{{provider}} plan"
@@ -15793,6 +15793,9 @@
   "aiAccounts.share.savedOwner": {
     "value": "{{name}} now answers only you."
   },
+  "aiAccounts.share.savedOwnerOf": {
+    "value": "{{name}} now answers only {{owner}}."
+  },
   "aiAccounts.share.backOnApi": {
     "value": "{{name}} is back on the API and still answers only you."
   },
@@ -15804,9 +15807,6 @@
   },
   "aiAccounts.share.pickPeople": {
     "value": "{{name}} answers only the people picked, and nobody is picked yet. Pick them under Who can talk."
-  },
-  "aiAccounts.errors.planOwnerOnly": {
-    "value": "Only the person responsible for {{agentName}} can let more people in: {{agentName}} answers on their plan."
   },
   "aiAccounts.add.paste": {
     "value": "Paste"

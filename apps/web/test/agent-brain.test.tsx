@@ -693,14 +693,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(within(d).queryByRole("button", { name: "Conectar outra conta" })).toBeNull();
   });
 
-  test("only the agent's owner changes the account; an old app on the computer shows nothing about it", async () => {
+  test("an admin changes the account among its owner's, told whose they are; an old app on the computer shows nothing about it", async () => {
     await onMac({ canUsePlans: false, canManageAccounts: false });
     let d = await brainDialog();
-    const locked = within(d).getByRole("combobox", { name: "Conta" });
-    expect(locked.hasAttribute("disabled")).toBe(true);
+    const picker = within(d).getByRole("combobox", { name: "Conta" });
+    expect(picker.hasAttribute("disabled")).toBe(false);
     // Someone else's agents don't share the viewer's sign-in: to them it is the computer's.
-    expect(locked.textContent).toContain("Conta deste MacBook");
-    expect(d.textContent).toContain("Só João troca");
+    expect(picker.textContent).toContain("Conta deste MacBook");
+    expect(d.textContent).toContain(
+      "Só contas de João, responsável pela Ada: um plano só pensa pelos agentes do seu dono.",
+    );
+    expect(d.textContent).not.toMatch(/Só João troca|Adicionar conta/);
     cleanup();
     await onMac({ accountsSupported: false });
     expect(sentence().textContent).not.toMatch(/Conta deste MacBook|A conta que os seus agentes dividem/);
@@ -1580,13 +1583,13 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(within(await brainDialog()).queryByRole("button", { name: "Conectar outro plano" })).toBeNull();
   });
 
-  test("someone who isn't its owner can't swap its owner's coding plan for Claude: another account is the owner's pick", async () => {
+  test("an admin moves its owner's agent off the owner's coding plan, onto the owner's other plans or the API", async () => {
     await onPlan("opencode", { canUsePlans: false, canManageAccounts: false }, { mine: false });
     const d = await brainDialog();
     const claude = card(d, /^Claude/);
-    expect(claude.hasAttribute("disabled")).toBe(true);
-    expect(claude.textContent).toContain("Só João troca");
-    // Another program, or the API, stays theirs to choose.
+    expect(claude.hasAttribute("disabled")).toBe(false);
+    expect(claude.textContent).toContain("Usa o plano do Claude de João");
+    expect(d.textContent).not.toContain("Só João troca");
     expect(card(d, /^ChatGPT/).hasAttribute("disabled")).toBe(false);
     expect(card(d, /^Chave de API/).hasAttribute("disabled")).toBe(false);
     expect(card(d, /^OpenCode Go/).textContent).toContain("Usa o plano do OpenCode Go de João");

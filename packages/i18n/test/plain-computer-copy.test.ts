@@ -84,8 +84,7 @@ const PLAN_TERMS = ["own", "seat", "other"].map((k) => `aiAccounts.share.terms.$
 const PLAN_REPLIES = [
   "aiAccounts.share.switch",
   "aiAccounts.share.switchAll",
-  "aiAccounts.share.switchOther",
-  "aiAccounts.share.onOther",
+  ...["off", "on"].map((k) => `aiAccounts.share.lineOf.${k}`),
   ...PLAN_LINES,
   ...["own", "seat", "coding"].map((k) => `aiAccounts.share.plan.${k}`),
   "aiAccounts.share.terms.about",

@@ -2976,7 +2976,7 @@
         "none": "このAIを持つコンピューターはありません",
         "planModel": "モデル",
         "account": "アカウント",
-        "accountLocked": "変更できるのは{{name}}だけです",
+        "accountWho": "{{name}}の担当者である{{owner}}さんのアカウントだけです。プランはその持ち主のエージェントのためにだけ考えます。",
         "accountSignedOut": "ログアウトされています。もう一度ログインしてください",
         "thisComputer": "{{computer}}のアカウント",
         "accountMove": "{{agents}}が使用中 · ここに移動",
@@ -6337,15 +6337,16 @@
     "share": {
       "switch": "他の人にも返信する",
       "switchAll": "他の人にも返信する",
-      "switchOther": "{{owner}}にだけ返信します",
-      "onOther": "{{name}}は{{owner}}のプランで考えています。他の人と話せるようにできるのは{{owner}}だけです。",
-      "onOther_female": "{{name}}は{{owner}}のプランで考えています。他の人と話せるようにできるのは{{owner}}だけです。",
       "line": {
         "off": "{{name}}はあなたの{{plan}}で、あなたにだけ返信します。",
         "on": "{{name}}はあなたの{{plan}}で、話しかけられる人全員に返信します。",
         "on_female": "{{name}}はあなたの{{plan}}で、話しかけられる人全員に返信します。",
         "offAll": "あなたの{{plan}}で、あなたにだけ返信します。",
         "onAll": "あなたの{{plan}}で、話しかけられる人全員に返信します。"
+      },
+      "lineOf": {
+        "off": "{{name}}は{{owner}}さんの{{plan}}で、{{owner}}さんにだけ返信します。",
+        "on": "{{name}}は{{owner}}さんの{{plan}}で、話しかけられる人全員に返信します。"
       },
       "plan": {
         "own": "{{provider}}プラン",
@@ -6360,13 +6361,11 @@
       },
       "savedEveryone": "{{name}}は他の人にも返信するようになりました。",
       "savedOwner": "{{name}}はあなたにだけ返信するようになりました。",
+      "savedOwnerOf": "{{name}}は{{owner}}さんにだけ返信するようになりました。",
       "backOnApi": "{{name}}はAPIに戻りましたが、引き続きあなたにだけ返信します。",
       "letEveryone": "{{name}}が全員に返信できるようにする",
       "letPeople": "{{name}}が他の人にも返信できるようにする",
       "pickPeople": "{{name}}は選ばれた人にだけ返信しますが、まだ誰も選ばれていません。「話せる人」で選んでください。"
-    },
-    "errors": {
-      "planOwnerOnly": "{{agentName}}の責任者だけが、話せる人を増やせます。{{agentName}}はその人のプランで返信しているためです。"
     },
     "add": {
       "paste": "貼り付け",

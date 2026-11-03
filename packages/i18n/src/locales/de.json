@@ -3080,7 +3080,7 @@
         "none": "Kein Computer hat es",
         "planModel": "Modell",
         "account": "Konto",
-        "accountLocked": "Nur {{name}} kann es ändern",
+        "accountWho": "Nur Konten von {{owner}}, verantwortlich für {{name}}: Ein Plan denkt nur für die Agenten seines Inhabers.",
         "accountSignedOut": "Abgemeldet, melde dich erneut an",
         "thisComputer": "Konto von {{computer}}",
         "accountMove": "Genutzt von {{agents}} · Hierher verschieben",
@@ -6618,15 +6618,17 @@
     "share": {
       "switch": "Antwortet anderen Personen",
       "switchAll": "Anderen Personen antworten",
-      "switchOther": "Antwortet nur {{owner}}",
-      "onOther": "{{name}} denkt mit dem Abo von {{owner}}. Nur {{owner}} kann anderen Personen erlauben, mit ihm zu schreiben.",
-      "onOther_female": "{{name}} denkt mit dem Abo von {{owner}}. Nur {{owner}} kann anderen Personen erlauben, mit ihr zu schreiben.",
       "line": {
         "off": "{{name}} antwortet nur dir, über dein {{plan}}.",
         "on": "{{name}} antwortet allen, die mit ihm schreiben dürfen, über dein {{plan}}.",
         "on_female": "{{name}} antwortet allen, die mit ihr schreiben dürfen, über dein {{plan}}.",
         "offAll": "Sie antworten nur dir, über dein {{plan}}.",
         "onAll": "Sie antworten allen, die mit ihnen schreiben dürfen, über dein {{plan}}."
+      },
+      "lineOf": {
+        "off": "{{name}} antwortet nur {{owner}}, über das {{plan}} von {{owner}}.",
+        "on": "{{name}} antwortet allen, die mit ihm schreiben dürfen, über das {{plan}} von {{owner}}.",
+        "on_female": "{{name}} antwortet allen, die mit ihr schreiben dürfen, über das {{plan}} von {{owner}}."
       },
       "plan": {
         "own": "{{provider}}-Abo",
@@ -6641,13 +6643,11 @@
       },
       "savedEveryone": "{{name}} antwortet jetzt anderen Personen.",
       "savedOwner": "{{name}} antwortet jetzt nur dir.",
+      "savedOwnerOf": "{{name}} antwortet jetzt nur {{owner}}.",
       "backOnApi": "{{name}} ist zurück auf der API und antwortet weiterhin nur dir.",
       "letEveryone": "{{name}} allen antworten lassen",
       "letPeople": "{{name}} anderen Personen antworten lassen",
       "pickPeople": "{{name}} antwortet nur den ausgewählten Personen, und noch ist niemand ausgewählt. Wähle sie unter Wer schreiben darf."
-    },
-    "errors": {
-      "planOwnerOnly": "Nur die verantwortliche Person für {{agentName}} kann weitere Personen zulassen: {{agentName}} antwortet über ihr Abo."
     },
     "add": {
       "paste": "Einfügen",

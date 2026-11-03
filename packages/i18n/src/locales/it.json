@@ -3199,7 +3199,7 @@
         "none": "Nessun computer lo ha",
         "planModel": "Modello",
         "account": "Account",
-        "accountLocked": "Solo {{name}} può cambiarlo",
+        "accountWho": "Solo account di {{owner}}, responsabile di {{name}}: un piano pensa solo per gli agenti del suo proprietario.",
         "accountSignedOut": "Disconnesso, accedi di nuovo",
         "thisComputer": "Account di {{computer}}",
         "accountMove": "In uso da {{agents}} · Spostalo qui",
@@ -6912,9 +6912,6 @@
     "share": {
       "switch": "Risponde ad altre persone",
       "switchAll": "Rispondono ad altre persone",
-      "switchOther": "Risponde solo a {{owner}}",
-      "onOther": "{{name}} pensa con il piano di {{owner}}. Solo {{owner}} può permettere ad altre persone di parlargli.",
-      "onOther_female": "{{name}} pensa con il piano di {{owner}}. Solo {{owner}} può permettere ad altre persone di parlarle.",
       "line": {
         "off": "{{name}} risponde solo a te, con il tuo {{plan}}.",
         "off_female": "{{name}} risponde solo a te, con il tuo {{plan}}.",
@@ -6922,6 +6919,11 @@
         "on_female": "{{name}} risponde a chiunque possa parlarle, con il tuo {{plan}}.",
         "offAll": "Rispondono solo a te, con il tuo {{plan}}.",
         "onAll": "Rispondono a chiunque possa parlare con loro, con il tuo {{plan}}."
+      },
+      "lineOf": {
+        "off": "{{name}} risponde solo a {{owner}}, con il {{plan}} di {{owner}}.",
+        "on": "{{name}} risponde a chiunque possa parlargli, con il {{plan}} di {{owner}}.",
+        "on_female": "{{name}} risponde a chiunque possa parlarle, con il {{plan}} di {{owner}}."
       },
       "plan": {
         "own": "piano {{provider}}",
@@ -6937,6 +6939,7 @@
       "savedEveryone": "Ora {{name}} risponde ad altre persone.",
       "savedEveryone_female": "Ora {{name}} risponde ad altre persone.",
       "savedOwner": "Ora {{name}} risponde solo a te.",
+      "savedOwnerOf": "Ora {{name}} risponde solo a {{owner}}.",
       "savedOwner_female": "Ora {{name}} risponde solo a te.",
       "backOnApi": "{{name}} è tornato sull'API e risponde ancora solo a te.",
       "backOnApi_female": "{{name}} è tornata sull'API e risponde ancora solo a te.",
@@ -6946,9 +6949,6 @@
       "letPeople_female": "Lascia che {{name}} risponda ad altre persone",
       "pickPeople": "{{name}} risponde solo alle persone scelte, e non ne è stata scelta ancora nessuna. Sceglile in Chi può parlare.",
       "pickPeople_female": "{{name}} risponde solo alle persone scelte, e non ne è stata scelta ancora nessuna. Sceglile in Chi può parlare."
-    },
-    "errors": {
-      "planOwnerOnly": "Solo il responsabile di {{agentName}} può far entrare altre persone: {{agentName}} risponde con il suo piano."
     },
     "add": {
       "paste": "Incolla",

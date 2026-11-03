@@ -131,7 +131,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const models = useModels().data?.models;
   const thinksMark = thinks.mark ?? apiProviderOf(agent?.model, models ?? []);
   const model = view && kind ? modelRows(t, view, brainPlan(view)).find((r) => r.checked) : undefined;
-  const accounts = view && kind ? agentAccounts(view, kind) : [];
+  const accounts = view && kind ? agentAccounts(view, kind, agent?.ownerUserId) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
   // Another account, or one more login of `a` other agents use (`also`, its email Claude's hint): Connect an AI on that
   // plan's page (a coding plan's key, on its first page).
@@ -142,7 +142,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
       ...(also && a?.email ? { email: a.email } : {}),
     });
   const computer = view?.computer?.name ?? "";
-  const mayPick = view?.canUsePlans === true && !busy;
+  const mayPick = view !== undefined && !busy;
   const choose = (a: MachineAccount | null) => {
     if (!view || !mayPick || (a?.id ?? null) === view.account) return;
     const input = accountInput(view, a);
@@ -159,14 +159,14 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const apiKey = useAiStatus(orgId).data?.apiKey !== false;
   const usage = view && kind ? thinkingUsage(view, kind) : undefined;
   const limited = usage ? planState(usage).state === "limited" : false;
-  const offers = limited && kind && view?.canUsePlans ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
+  const offers = limited && kind && view ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
   const signedOut = current?.status === "signed_out" && current.mine;
   // A coding plan's key that its endpoint refused: a new key, on that plan's page.
   const refused = signedOut && current && isPlanId(current.provider) ? current.provider : null;
   const accountNote = signedOut
     ? t(refused ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
     : view && !view.canUsePlans && ownerFirst
-      ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
+      ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
       : null;
   const ownRow = view !== undefined && kind !== null && ownSignInListed(view, row, kind);
   const choices = view ? accountChoices(accounts, [view.account]) : [];
@@ -216,7 +216,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       key={c.login.id}
                       row={accountRow(t, c, name)}
                       checked={c.login.id === view.account}
-                      disabled={!mayPick || !c.login.mine}
+                      disabled={!mayPick}
                       onPress={() => (c.also ? connect(c.login, true) : choose(c.login))}
                     />
                   ))}

@@ -114,12 +114,15 @@ export function planReplies(
   {
     on,
     agent,
+    owner,
     brain,
     plan,
     coding,
   }: {
     on: boolean;
     agent: string | null;
+    /** The plan's owner, to anyone else (an admin): "pelo plano do Claude de Walter". Absent: the viewer's own. */
+    owner?: string;
     brain: "claude_code" | "codex" | "cursor" | "opencode";
     /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
     plan?: string | null;
@@ -135,7 +138,13 @@ export function planReplies(
     line:
       agent === null
         ? t(on ? "aiAccounts.share.line.onAll" : "aiAccounts.share.line.offAll", { plan: which })
-        : t(on ? "aiAccounts.share.line.on" : "aiAccounts.share.line.off", { ...agentGrammar(agent), plan: which }),
+        : owner
+          ? t(on ? "aiAccounts.share.lineOf.on" : "aiAccounts.share.lineOf.off", {
+              ...agentGrammar(agent),
+              plan: which,
+              owner,
+            })
+          : t(on ? "aiAccounts.share.line.on" : "aiAccounts.share.line.off", { ...agentGrammar(agent), plan: which }),
     about: t("common.about", { label: t("aiAccounts.share.terms.about") }),
     text: coding
       ? t("aiAccounts.share.terms.other", { maker: coding.maker })

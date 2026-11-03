@@ -1097,7 +1097,7 @@ export function agentRoutes(deps: AppDeps) {
             }),
             onlyOwner: z.boolean().optional().openapi({
               description:
-                "\"Atende outras pessoas\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
+                "\"Atende outras pessoas\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (its owner or an admin, on a plan too). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,
@@ -1105,7 +1105,7 @@ export function agentRoutes(deps: AppDeps) {
             }),
             account: z.uuid().nullable().optional().openapi({
               description:
-                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). Only the owner of both the agent and the account chooses it (`account.not_owner`).",
+                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). One of the agent's owner's accounts, chosen by its owner or an admin (`account.not_owner`).",
             }),
             moveAccount: z.boolean().optional().openapi({
               description: "The account thinks for another agent (`account.in_use`): take it from that one (audited).",

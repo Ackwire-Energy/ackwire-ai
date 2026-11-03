@@ -1,6 +1,5 @@
 import type { TFunction } from "i18next";
 import type { Agent, AgentAudience, AudienceMode, OrgRole, OrgSummary } from "../api/types";
-import { engineOfBrain } from "./brain";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 import { can } from "./permissions";
@@ -111,12 +110,6 @@ export const audiencePatch = (a: AgentAudience): AgentAudience => ({
   roleIds: a.mode === "people" ? (a.roleIds ?? []) : [],
   consultable: a.consultable ?? true,
 });
-
-/** On a plan (ADR 0059 §5) only its owner lets more people in: anyone else choosing `next` is stopped. */
-export const audienceBlocked = (agent: Agent, next: AgentAudience, myUserId: string) =>
-  engineOfBrain(agent.brain?.kind) !== "agent" &&
-  agent.ownerUserId !== myUserId &&
-  audienceWidens(audienceOf(agent), next, agent.ownerUserId);
 
 /** One line of "Quem pode falar": the whole workspace (its `everyone` role's mark), a role, or a person. */
 export type AudienceLine<P> =

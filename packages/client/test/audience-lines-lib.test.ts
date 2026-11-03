@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Agent, OrgRole } from "../src/api/types";
-import { audienceBlocked, audienceLines, audiencePatch } from "../src/lib/audience";
+import { audienceLines, audiencePatch } from "../src/lib/audience";
 import { agentWorkingIn, type StreamsState } from "../src/realtime/streams";
 
 const role = (id: string, position: number, kind: OrgRole["kind"] = "custom") =>
@@ -49,20 +49,6 @@ describe("audiencePatch", () => {
       roleIds: [],
       consultable: false,
     });
-  });
-});
-
-describe("audienceBlocked", () => {
-  const onPlan = agent({ audience: { mode: "owner", userIds: [] }, brain: { kind: "claude_code" } as Agent["brain"] });
-  const wider = { mode: "people" as const, userIds: ["u-caio"] };
-  test("on a plan only its owner lets more people in", () => {
-    expect(audienceBlocked(onPlan, wider, "u-bia")).toBe(true);
-    expect(audienceBlocked(onPlan, wider, "u-heitor")).toBe(false);
-    expect(audienceBlocked(onPlan, { mode: "owner", userIds: [] }, "u-bia")).toBe(false);
-  });
-
-  test("on the API anyone who may edit it may widen it", () => {
-    expect(audienceBlocked({ ...onPlan, brain: undefined }, wider, "u-bia")).toBe(false);
   });
 });
 

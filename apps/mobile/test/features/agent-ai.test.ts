@@ -56,7 +56,7 @@ describe("the agent's AI", () => {
     expect(accountKindOf(undefined)).toBeNull();
   });
 
-  test("its page lists the viewer's own accounts of that kind, and someone else's only while it's this agent's", () => {
+  test("its page lists its owner's accounts of that kind, to an admin too, and someone else's only while it's this agent's", () => {
     const view: View = {
       account: "theirs-now",
       ownSignIn: false,
@@ -64,12 +64,16 @@ describe("the agent's AI", () => {
       accounts: [
         account("mine"),
         account("codex", { kind: "codex" }),
-        account("theirs", { mine: false }),
-        account("theirs-now", { mine: false }),
+        account("theirs", { mine: false, ownerId: "u2" }),
+        account("theirs-now", { mine: false, ownerId: "u2" }),
       ],
     };
-    expect(agentAccounts(view, "claude_code").map((a) => a.id)).toEqual(["mine", "theirs-now"]);
-    expect(agentAccounts(view, "codex").map((a) => a.id)).toEqual(["codex"]);
+    const owner = { ...view, canUsePlans: true };
+    expect(agentAccounts(owner, "claude_code", "u1").map((a) => a.id)).toEqual(["mine", "theirs-now"]);
+    expect(agentAccounts(owner, "codex", "u1").map((a) => a.id)).toEqual(["codex"]);
+    // An admin of u1's agent: u1's, never their own.
+    const admin = { ...view, account: null, canUsePlans: false };
+    expect(agentAccounts(admin, "claude_code", "u1").map((a) => a.id)).toEqual(["mine"]);
   });
 
   test("the usage shown is its account's, or the computer's own sign-in's only where that thinks for it", () => {
@@ -179,15 +183,16 @@ describe("the agent's AI", () => {
     }
     // One switch, its line under it saying what its state does, with the ⓘ, the plan's words behind it.
     expect(parts).toContain('label={t("aiAccounts.share.switch")}');
-    expect(parts).toContain("planReplies(t, { on, agent, brain, plan, coding })");
+    expect(parts).toContain("planReplies(t, { on, agent, owner, brain, plan, coding })");
     expect(parts).toMatch(
       /<InfoHint\s+name=\{t\("common\.about", \{ label: t\("aiAccounts\.share\.terms\.about"\) \}\)\}\s+text=\{says\.text\}[^>]*>\s*<Text[^>]*>\s*\{says\.line\}/,
     );
     // The line names the agent.
     expect(screen).toMatch(/<PlanReplies\s+agent=\{name\}/);
     expect(connect).toMatch(/<PlanReplies\s+agent=\{done\?\.agent \?\? agent\?\.name \?\? ""\}/);
-    // Someone who isn't the plan's owner: whom it answers and who decides, no switch.
-    expect(screen).toMatch(/view\.canUsePlans \? \(\s*<PlanReplies[\s\S]*?\) : \(\s*<PlanRepliesOf/);
+    // An admin who isn't the plan's owner gets the same switch, its line naming whose plan it is.
+    expect(screen).toContain("owner={view.canUsePlans ? undefined : ownerFirst}");
+    expect(screen).not.toContain("PlanRepliesOf");
     // On a plan's page: under its steps or the account cards, and on the page that says it's done.
     expect(connect).toContain("{steps || ownable ? repliesRow : null}");
     expect(connect).toContain("<View style={styles.doneReplies}>{repliesRow}</View>");

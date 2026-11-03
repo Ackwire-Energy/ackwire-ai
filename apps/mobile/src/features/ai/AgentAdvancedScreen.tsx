@@ -25,7 +25,7 @@ import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { EffortRamp, useEffortChoice } from "./EffortRamp";
 import { accountKindOf, agentAccounts } from "./logic";
-import { Note, PlanReplies, PlanRepliesOf } from "./parts";
+import { Note, PlanReplies } from "./parts";
 
 /*
  * An agent's "Configuração avançada" on the phone (ADR 0086), the web's dialog over "Quem pensa" as a screen of its
@@ -72,7 +72,8 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const row = useAiAccounts(orgId, view?.canUsePlans === true && kind !== null).data?.computers.find(
     (r) => r.machineId === view?.computer?.machineId,
   );
-  const current = view && kind ? agentAccounts(view, kind).find((a) => a.id === view.account) : undefined;
+  const current =
+    view && kind ? agentAccounts(view, kind, agent?.ownerUserId).find((a) => a.id === view.account) : undefined;
   const autoModel = view?.brain === "model" ? isAuto(agent?.model) : isAuto(view?.effectiveModel);
   // The sizes under the window of the model it thinks with ("Automático": any of its line).
   const options = !view
@@ -186,25 +187,26 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
               <>
                 <GroupedHeader>{t("agentPage.work.brain.advanced.answers")}</GroupedHeader>
                 {agent?.ownerUserId ? (
-                  view.canUsePlans ? (
-                    <PlanReplies
-                      agent={name}
-                      on={!view.onlyOwner}
-                      onChange={(on) => {
-                        if (busy) return;
-                        void save(
-                          { onlyOwner: !on },
-                          t(on ? "aiAccounts.share.savedEveryone" : "aiAccounts.share.savedOwner", g),
-                        );
-                      }}
-                      brain={kind}
-                      plan={signInPlan(view, row, kind)}
-                      coding={planOf(current?.provider)}
-                      disabled={busy}
-                    />
-                  ) : (
-                    <PlanRepliesOf on={!view.onlyOwner} owner={ownerFirst ?? ""} agentName={name} />
-                  )
+                  <PlanReplies
+                    agent={name}
+                    owner={view.canUsePlans ? undefined : ownerFirst}
+                    on={!view.onlyOwner}
+                    onChange={(on) => {
+                      if (busy) return;
+                      void save(
+                        { onlyOwner: !on },
+                        on
+                          ? t("aiAccounts.share.savedEveryone", g)
+                          : view.canUsePlans
+                            ? t("aiAccounts.share.savedOwner", g)
+                            : t("aiAccounts.share.savedOwnerOf", { ...g, owner: ownerFirst ?? "" }),
+                      );
+                    }}
+                    brain={kind}
+                    plan={signInPlan(view, row, kind)}
+                    coding={planOf(current?.provider)}
+                    disabled={busy}
+                  />
                 ) : null}
                 {apiKey ? (
                   <View style={styles.gap}>
