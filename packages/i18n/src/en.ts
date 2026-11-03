@@ -2966,6 +2966,7 @@ export const en = {
         label_female: "How she works",
         computer: "Works on",
         brain: "Thinks with",
+        brainWith: "Thinks with {{plan}}",
         browser: "Browser",
         effort: "{{level}} effort",
       },

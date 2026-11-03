@@ -2932,6 +2932,7 @@
         "label_female": "작동 방식",
         "computer": "작업 위치",
         "brain": "생각하는 AI",
+        "brainWith": "{{plan}}(으)로 생각해요",
         "browser": "브라우저",
         "effort": "사고 수준 {{level}}"
       },

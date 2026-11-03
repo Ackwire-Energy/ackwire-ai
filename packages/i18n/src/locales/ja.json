@@ -2934,6 +2934,7 @@
         "label_female": "働き方",
         "computer": "作業場所",
         "brain": "考えるAI",
+        "brainWith": "{{plan}}で考える",
         "browser": "ブラウザ",
         "effort": "思考レベル: {{level}}"
       },

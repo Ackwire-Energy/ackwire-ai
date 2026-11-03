@@ -2949,6 +2949,7 @@
         "label_female": "Cara kerjanya",
         "computer": "Bekerja di",
         "brain": "Berpikir dengan",
+        "brainWith": "Berpikir dengan {{plan}}",
         "browser": "Browser",
         "effort": "Upaya {{level}}"
       },

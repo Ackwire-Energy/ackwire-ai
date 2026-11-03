@@ -8704,11 +8704,10 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   font-weight: 500;
   line-height: 16px;
 }
+/* What a cell says wraps, never cut: the model and its effort, the account and its usage. */
 .agp-cell__value,
 .agp-cell__sub {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .agp-cell__value {
   display: block;

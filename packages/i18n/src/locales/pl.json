@@ -3229,6 +3229,7 @@
         "label_female": "Jak pracuje",
         "computer": "Pracuje na",
         "brain": "Myśli z",
+        "brainWith": "Myśli z {{plan}}",
         "browser": "Przeglądarka",
         "effort": "wysiłek: {{level}}"
       },

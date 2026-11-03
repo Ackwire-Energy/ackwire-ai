@@ -55,6 +55,7 @@ const sentence = () => screen().getByRole("region", { name: "Como trabalha" });
 const brainCell = () => {
   const cell = within(sentence()).getByRole("button", { name: "Mudar quem pensa" });
   return {
+    label: cell.querySelector("small")?.textContent,
     value: cell.querySelector(".agp-cell__value")?.textContent,
     sub: cell.querySelector(".agp-cell__sub")?.textContent,
   };
@@ -126,7 +127,7 @@ describe("Como trabalha under the name", () => {
     expect(sentence().textContent).toContain("ComputadorNenhum computador");
     expect(sentence().textContent).toContain("Pensa com");
     // On the API: its model, then that it pays per use.
-    expect(brainCell()).toEqual({ value: "Claude Sonnet 5.5", sub: "Pela API" });
+    expect(brainCell()).toEqual({ label: "Pensa com", value: "Claude Sonnet 5.5", sub: "Pela API" });
     expect(sentence().textContent).toContain("Navegadornão navega em sites");
     expect(sentence().textContent?.indexOf("Computador")).toBeLessThan(
       sentence().textContent?.indexOf("Pensa com") ?? 0,
@@ -337,8 +338,8 @@ describe("Quem pensa (its dialog)", () => {
     const api = createFakeApi(state);
     api.agents.brain = async () => fakeAgentBrain(ADA_ID, { brain: "codex", model: null, effectiveModel: "gpt-6-sol" });
     await open(state, api);
-    // The model it runs and its effort, over the plan that pays for it.
-    expect(brainCell()).toEqual({ value: "GPT-6 Sol · esforço médio", sub: "ChatGPT" });
+    // The plan that pays for it in the label, the model it runs and its effort under it.
+    expect(brainCell()).toEqual({ label: "Pensa com ChatGPT", value: "GPT-6 Sol · esforço médio", sub: undefined });
     const d = await brainDialog();
     expect(card(d, /^ChatGPT/).getAttribute("aria-checked")).toBe("true");
     await model(d, /Luna/);
@@ -449,7 +450,11 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   test("the cell names the account when the computer has more than one; Usar saves the account and the effort", async () => {
     const { state } = await onMac();
     // The computer's own sign-in by the name the Connect cards give it, never the computer's.
-    expect(brainCell()).toEqual({ value: "Sonnet · esforço médio", sub: "A conta que os seus agentes dividem" });
+    expect(brainCell()).toEqual({
+      label: "Pensa com Claude",
+      value: "Sonnet · esforço médio",
+      sub: "A conta que os seus agentes dividem",
+    });
     expect(sentence().textContent).not.toContain("Conta deste MacBook");
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta" });
@@ -1560,9 +1565,13 @@ describe("Quem pensa: a coding plan's models", () => {
     ]);
   });
 
-  test("the cell: the model and its effort, under them the plan that pays, or its account among two of that plan", async () => {
+  test("the cell: the plan that pays in its label, the model and its effort under it, its account among two of that plan", async () => {
     await onPlan("opencode", { model: "deepseek-v4.1-flash", effectiveModel: "deepseek-v4.1-flash", effort: "max" });
-    expect(brainCell()).toEqual({ value: "DeepSeek V4.1 Flash · esforço máximo", sub: "OpenCode Go" });
+    expect(brainCell()).toEqual({
+      label: "Pensa com OpenCode Go",
+      value: "DeepSeek V4.1 Flash · esforço máximo",
+      sub: undefined,
+    });
     expect(sentence().querySelector(".ac-brand[data-mark='opencode']")).not.toBeNull();
     cleanup();
     await onPlan("opencode", {
@@ -1885,8 +1894,9 @@ describe("Quem pensa: Automático", () => {
 
   test("a saved Automático reads as such in the cell", async () => {
     await onClaude({ model: "auto", effectiveModel: "auto", effort: "auto" });
-    // The only Claude account there is the computer's own: the plan's name, not the account's.
-    expect(brainCell()).toEqual({ value: "Automático · esforço automático", sub: "Claude" });
+    // The only Claude account there is the computer's own: the plan's name, not the account's. Automático picks the
+    // effort too, so no effort follows it.
+    expect(brainCell()).toEqual({ label: "Pensa com Claude", value: "Automático", sub: undefined });
   });
 
   test("the organization's model: Automático is the first choice, and Usar saves the agent's model as auto", async () => {

@@ -3038,6 +3038,7 @@
         "label_female": "So arbeitet sie",
         "computer": "Arbeitet auf",
         "brain": "Denkt mit",
+        "brainWith": "Denkt mit {{plan}}",
         "browser": "Browser",
         "effort": "Aufwand {{level}}"
       },

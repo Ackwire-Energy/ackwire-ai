@@ -3050,6 +3050,7 @@
         "label_female": "Hoe zij werkt",
         "computer": "Werkt op",
         "brain": "Denkt met",
+        "brainWith": "Denkt met {{plan}}",
         "browser": "Browser",
         "effort": "Inspanning: {{level}}"
       },

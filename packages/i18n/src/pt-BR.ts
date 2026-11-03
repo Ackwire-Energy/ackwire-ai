@@ -3014,6 +3014,8 @@ export const ptBR = {
         label: "Como trabalha",
         computer: "Trabalha no",
         brain: "Pensa com",
+        /** On a plan: the plan in the label, the model and its effort on the line under it. */
+        brainWith: "Pensa com {{plan}}",
         browser: "Navegador",
         effort: "esforço {{level}}",
       },

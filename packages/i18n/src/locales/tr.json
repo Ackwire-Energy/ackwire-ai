@@ -3023,6 +3023,7 @@
         "label_female": "Nasıl çalışır",
         "computer": "Çalıştığı yer",
         "brain": "Düşündüğü yapay zeka",
+        "brainWith": "{{plan}} ile düşünür",
         "browser": "Tarayıcı",
         "effort": "{{level}} çaba"
       },

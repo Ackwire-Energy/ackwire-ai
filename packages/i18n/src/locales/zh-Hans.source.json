@@ -7434,6 +7434,9 @@
   "agentPage.work.cell.brain": {
     "value": "Thinks with"
   },
+  "agentPage.work.cell.brainWith": {
+    "value": "Thinks with {{plan}}"
+  },
   "agentPage.work.cell.browser": {
     "value": "Browser"
   },

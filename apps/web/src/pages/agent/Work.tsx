@@ -288,14 +288,16 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       : view.account
         ? view.accounts.find((a) => a.id === view.account)?.usage
         : view.ownUsage[kind];
+  // On a plan the label names it ("Pensa com Claude"), so the line under it is the account and its usage alone.
   const sub =
     ai === "key"
       ? t("brain.foot.api")
-      : [accountWord ?? planLabel(t, ai), planWord(t, i18n.language, usage)].filter(Boolean).join(" · ");
+      : [accountWord, planWord(t, i18n.language, usage)].filter(Boolean).join(" · ") || null;
+  // Automático picks the effort with the model: only a fixed model says its effort.
   const effort =
-    kind !== "model" && view
+    kind !== "model" && view && !isAuto(shownPlanModel)
       ? t("agentPage.work.cell.effort", {
-          level: t(`agentPage.work.brain.effortsLower.${isAuto(view.effort) ? AUTO : shownEffort(view.effort)}`),
+          level: t(`agentPage.work.brain.effortsLower.${shownEffort(view.effort)}`),
         })
       : null;
   const target = work.target;
@@ -349,7 +351,11 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
                   <Icon name="brainAgent" size={16} />
                 )
               }
-              label={t("agentPage.work.cell.brain")}
+              label={
+                ai === "key"
+                  ? t("agentPage.work.cell.brain")
+                  : t("agentPage.work.cell.brainWith", { plan: planLabel(t, ai) })
+              }
               value={ai === "key" ? orgModel : planModel}
               more={ai === "key" ? null : effort}
               sub={sub}

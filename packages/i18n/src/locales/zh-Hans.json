@@ -2946,6 +2946,7 @@
         "label_female": "她的工作方式",
         "computer": "工作位置",
         "brain": "思考方式",
+        "brainWith": "用 {{plan}} 思考",
         "browser": "浏览器",
         "effort": "{{level}}投入"
       },
