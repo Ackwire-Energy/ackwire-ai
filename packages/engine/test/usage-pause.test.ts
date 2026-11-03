@@ -7,13 +7,19 @@ import {
   type Brain,
   type BrainEvent,
   type BrainTurn,
+  BUSY_RETRIES,
   CANCELED_NOTE_QUIET_MS,
   cancelRun,
   cancelUsageQueue,
   clearPlanLimits,
+  continueRun,
+  createAgent,
+  createChannel,
+  createFakeJudge,
   createJobHandlers,
   createRoutine,
   drainOutbox,
+  type Judge,
   LINE_SAFETY_MS,
   listMessages,
   listRoutines,
@@ -21,6 +27,8 @@ import {
   loadReplyPolicy,
   type MachineStatus,
   nextMonthStart,
+  noticeCategoryOf,
+  overruledHere,
   postPersonMessage,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
@@ -33,6 +41,7 @@ import {
   usageQueue,
   usageWaitKey,
   usageWaitPlace,
+  wakeNextInLine,
   wakePlanWaits,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -1188,4 +1197,371 @@ test("a catch-up cut mid-work reads what it missed but owes what it started: no 
   expect(prompt).toContain("# Catching up");
   expect(prompt).not.toContain("call `pass`");
   expect(await loadReplyPolicy(f.db, f.org.id, run?.id ?? "")).toMatchObject({ mayPass: false });
+});
+
+// ── The check before a catch-up (ADR 0136) ─────────────────────────────────────────────────────────────────────
+
+type JudgeFn = NonNullable<Parameters<typeof setup>[0]>["judge"];
+
+/** A check that answers every asker the same: `status` sure at `p`, and `who` the participant named so. */
+const checks =
+  (status: "solved" | "not_needed" | "needs_agent", who: string | null, p = 0.95): JudgeFn =>
+  (kind, id, state) => {
+    if (kind !== "catch_up_triage") return undefined;
+    if (id.startsWith("status_")) {
+      const rest = (1 - p) / 2;
+      const probabilities = { needs_agent: rest, solved: rest, not_needed: rest, [status]: p };
+      return { choice: status, probabilities };
+    }
+    const people = state.participants as Record<string, { name: string }>;
+    const key = Object.entries(people).find(([, x]) => x.name === who)?.[0] ?? "nobody";
+    return { choice: key, probabilities: { [key]: 0.95 } };
+  };
+
+const triageCalls = (fx: Fixture) =>
+  (fx.jobDeps.context.judge as unknown as { calls: { kind: string }[] }).calls.filter(
+    (c) => c.kind === "catch_up_triage",
+  );
+
+/**
+ * Bia asks @dev in #general and the plan is out; Nina answers meanwhile (`answered`); the pause started two days ago.
+ * `resume` drains past the reset.
+ */
+async function pausedAsk(judge: JudgeFn, o: { answered?: boolean; judgeOverride?: Judge } = {}) {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }), judge });
+  await computerAgent(f, { brainFallback: false });
+  const { brain, seen } = scripted((n) =>
+    n === 0
+      ? [
+          { type: "limit", resetsAt: later(3600_000).toISOString() },
+          { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+        ]
+      : [{ type: "done", text: "Respondido." }],
+  );
+  const handlers = o.judgeOverride
+    ? createJobHandlers({
+        ...f.jobDeps,
+        context: { ...f.jobDeps.context, judge: o.judgeOverride },
+        brains: { claude_code: () => brain },
+        machines: { status: async (id) => statusOf(id) },
+        planLimitGraceMs: 50,
+      })
+    : handlersWith(f, brain);
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const nina = await addMember(f.db, f.org.id, "member", "nina");
+  for (const u of [bia, nina]) await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: u.id });
+  const asked = await postPersonMessage(deps, bia.id, f.org.id, f.general.id, { body: "@dev o deploy saiu?" });
+  await drainOutbox(f.db, handlers);
+  if (o.answered !== false)
+    await postPersonMessage(deps, nina.id, f.org.id, f.general.id, { body: "Saiu às 14h, está em produção." });
+  await drainOutbox(f.db, handlers);
+  await pausedLongAgo(f);
+  clearPlanLimits();
+  const resume = () => drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+  return { handlers, seen, bia, nina, asked, deps, resume };
+}
+
+/** Every waiting run paused two days ago. */
+async function pausedLongAgo(fx: Fixture) {
+  for (const run of await runs(fx)) {
+    if (run.status !== "waiting_input") continue;
+    const t = run.transcript as { usageWait: { since: number } };
+    t.usageWait.since = Date.now() - 2 * 24 * 3600_000;
+    await fx.db
+      .update(schema.agentRuns)
+      .set({ transcript: t as never })
+      .where(eq(schema.agentRuns.id, run.id));
+  }
+}
+
+const triageSteps = async (fx: Fixture, runId: string) =>
+  (await fx.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, runId)))
+    .map((s) => (s.data as { catchUpTriage?: { outcome: string } }).catchUpTriage)
+    .filter(Boolean);
+
+const noticesOf = (fx: Fixture, kind: string) =>
+  fx.db.select().from(schema.notifications).where(eq(schema.notifications.kind, kind));
+
+test("a catch-up someone else already answered ends quietly: no turn, the note says who, who asked and the owner hear it", async () => {
+  const { seen, bia, resume } = await pausedAsk(checks("solved", "nina"));
+  const [run] = await runs(f);
+  await resume();
+  // Zero turns at the resume: the only one is the turn that hit the limit.
+  expect(seen).toHaveLength(1);
+  expect(triageCalls(f)).toHaveLength(1);
+  const [done] = await runs(f);
+  expect(done?.status).toBe("done");
+  expect(done?.pendingMessageIds).toEqual([]);
+  const [note] = await notes(f, "plan_limit_wait");
+  expect(note?.meta.usageWait).toMatchObject({
+    ended: true,
+    closed: { reason: "solved", who: { name: "nina" }, askers: [bia.id] },
+  });
+  expect(await triageSteps(f, run?.id ?? "")).toEqual([expect.objectContaining({ outcome: "closed", calls: 1 })]);
+  // Who asked hears someone else was credited; the owner hears the line skipped one. Neither pushes.
+  const [asker] = await noticesOf(f, "catch_up_closed_asker");
+  expect(asker).toMatchObject({ userId: bia.id, latest: { title: "nina", reason: "solved" } });
+  expect((await noticesOf(f, "catch_up_closed")).map((n) => [n.userId, n.count])).toEqual([[f.owner.id, 1]]);
+  expect(noticeCategoryOf("catch_up_closed", false)).toBeNull();
+  expect(noticeCategoryOf("catch_up_closed_asker", false)).toBeNull();
+  // The queue keeps it for a day, with "Responder mesmo assim" for who asked.
+  const queue = await usageQueue(f.db, bia.id, f.org.id, f.agent.id);
+  expect(queue.closed).toEqual([
+    expect.objectContaining({ runId: run?.id, messageId: note?.id, mayAnswer: true, continuedRunId: null }),
+  ]);
+});
+
+test("Responder mesmo assim: one run that reads the catch-up and can't pass; who asked may press it, once, and the conversation isn't skipped again", async () => {
+  const { seen, bia, nina, deps, resume, handlers } = await pausedAsk(checks("solved", "nina"));
+  await resume();
+  const [closed] = await runs(f);
+  // Nina neither asked nor owns the agent.
+  await expect(continueRun(deps, nina.id, f.org.id, closed?.id ?? "")).rejects.toThrow();
+  const { runId } = await continueRun(deps, bia.id, f.org.id, closed?.id ?? "");
+  await expect(continueRun(deps, f.owner.id, f.org.id, closed?.id ?? "")).rejects.toThrow();
+  expect(await loadReplyPolicy(f.db, f.org.id, runId)).toMatchObject({ mayPass: false });
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(2);
+  const prompt = JSON.stringify(seen[1]);
+  expect(prompt).toContain("bia asked you to answer this anyway. A quick check had judged it already handled by nina.");
+  expect(prompt).toContain("# Catching up");
+  expect(prompt).toContain("Saiu às 14h");
+  expect(prompt).not.toContain("call `pass`");
+  const [note] = await notes(f, "plan_limit_wait");
+  expect(note?.meta.usageWait).toMatchObject({ continuedRunId: runId, continuedByUserId: bia.id });
+  // Overruled: for a week no check skips this agent's catch-ups in this conversation.
+  const [old] = await f.db
+    .select()
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, closed?.id ?? ""));
+  expect((old?.transcript as { catchUpTriage?: { overruledBy: string } } | undefined)?.catchUpTriage?.overruledBy).toBe(
+    bia.id,
+  );
+  const another = {
+    ...(old as NonNullable<typeof old>),
+    id: Bun.randomUUIDv7(),
+    threadRootId: "x",
+    triggerMessageId: "x",
+  };
+  another.threadRootId = another.triggerMessageId = Bun.randomUUIDv7();
+  expect(await overruledHere(f.db, another)).toBe(true);
+  expect((await usageQueue(f.db, bia.id, f.org.id, f.agent.id)).closed[0]).toMatchObject({
+    mayAnswer: false,
+    continuedRunId: runId,
+  });
+});
+
+test("still open: the agent runs, told whose ask the check judged open", async () => {
+  const { seen, resume } = await pausedAsk(checks("needs_agent", null));
+  await resume();
+  expect(seen).toHaveLength(2);
+  expect(String(seen[1]?.trigger)).toContain(
+    "A quick check judged bia's ask still open. It can be wrong, so read below.",
+  );
+  const [run] = await runs(f);
+  expect(await triageSteps(f, run?.id ?? "")).toEqual([expect.objectContaining({ outcome: "run" })]);
+});
+
+test("a third party saying it's solved, with no source code can check, never closes: it runs", async () => {
+  // The judge is fooled and sure, but credits Carla, who never posted, reacted or moved the task.
+  const { seen, resume } = await pausedAsk(checks("solved", "carla"));
+  await addMember(f.db, f.org.id, "member", "carla");
+  await resume();
+  expect(seen).toHaveLength(2);
+  expect(String(seen[1]?.trigger)).toContain("A quick check couldn't tell whether this is still open.");
+});
+
+test("the check failing runs the catch-up as before, with no verdict", async () => {
+  const throwing: Judge = {
+    name: "jev",
+    ask: async (r) => {
+      if (r.kind === "catch_up_triage") throw new Error("TypeSafe didn't answer");
+      return createFakeJudge().ask(r);
+    },
+  };
+  const { seen, resume } = await pausedAsk(undefined, { judgeOverride: throwing });
+  await resume();
+  expect(seen).toHaveLength(2);
+  expect(String(seen[1]?.trigger)).not.toContain("A quick check");
+  const [run] = await runs(f);
+  expect(await triageSteps(f, run?.id ?? "")).toEqual([expect.objectContaining({ outcome: "judge_error" })]);
+});
+
+test("nothing posted since the pause: no call, the agent just answers", async () => {
+  const { seen, resume } = await pausedAsk(checks("solved", "nina"), { answered: false });
+  await resume();
+  expect(triageCalls(f)).toHaveLength(0);
+  expect(seen).toHaveLength(2);
+  const [run] = await runs(f);
+  expect(await triageSteps(f, run?.id ?? "")).toEqual([expect.objectContaining({ outcome: "skipped_quiet" })]);
+});
+
+test("a message joining while the check answers makes it run", async () => {
+  let posted = false;
+  const fake = createFakeJudge(checks("solved", "nina"));
+  const joining: Judge = {
+    name: "jev",
+    ask: async (r) => {
+      if (r.kind === "catch_up_triage" && !posted) {
+        posted = true;
+        const [u] = await f.db.select().from(schema.users).where(eq(schema.users.name, "bia"));
+        await postPersonMessage({ db: f.db, pubsub: f.pubsub }, u?.id ?? "", f.org.id, f.general.id, {
+          body: "@dev ah, e o rollback?",
+        });
+      }
+      return fake.ask(r);
+    },
+  };
+  const { seen, resume } = await pausedAsk(undefined, { judgeOverride: joining });
+  await resume();
+  expect(posted).toBe(true);
+  expect(seen).toHaveLength(2);
+  const [run] = await runs(f);
+  expect(run?.status).toBe("done");
+  expect((await triageSteps(f, run?.id ?? "")).at(-1)).toMatchObject({ outcome: "unsure" });
+});
+
+test("another agent still answering in the conversation: the check waits 60 s with no call, then checks after 5 tries", async () => {
+  const { handlers } = await pausedAsk(checks("solved", "nina"));
+  const ada = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada" },
+    { model: "claude-sonnet-5-5" },
+  );
+  const said = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "pergunta para a Ada",
+  });
+  await f.db.insert(schema.agentRuns).values({
+    orgId: f.org.id,
+    agentId: ada.id,
+    channelId: f.general.id,
+    threadRootId: said.id,
+    triggerMessageId: said.id,
+    trigger: "mention",
+    hop: 1,
+    stretchId: said.id,
+    status: "running",
+    heartbeatAt: later(3600_000 * 10),
+  });
+  const [waiting] = (await runs(f)).filter((r) => r.agentId === f.agent.id);
+  const at = later(3600_000 + RESUME_AFTER_MS + 1000);
+  setSystemTime(at);
+  await drainOutbox(f.db, handlers);
+  expect(triageCalls(f)).toHaveLength(0);
+  expect((await resumeJob(f, waiting?.id ?? ""))?.nextAttemptAt.getTime()).toBe(at.getTime() + 60_000);
+  const [still] = await f.db
+    .select()
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, waiting?.id ?? ""));
+  expect(still?.status).toBe("waiting_input");
+  expect(
+    (still?.transcript as { catchUpTriage?: { busyRetries: number } } | undefined)?.catchUpTriage?.busyRetries,
+  ).toBe(1);
+  // Ada is still at it after every try: the check goes ahead and reads what is there.
+  await f.db
+    .update(schema.agentRuns)
+    .set({ transcript: { ...(still?.transcript as object), catchUpTriage: { calls: 0, busyRetries: BUSY_RETRIES } } })
+    .where(eq(schema.agentRuns.id, waiting?.id ?? ""));
+  setSystemTime(new Date(at.getTime() + 2 * 60_000));
+  await drainOutbox(f.db, handlers);
+  expect(triageCalls(f)).toHaveLength(1);
+});
+
+test("a skip wakes the next in line only while the line drains; a line paused on another reset keeps its slots", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const machineId = await computerAgent(f, { brainFallback: false });
+  const resetsAt = later(3600_000);
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt: resetsAt.toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev um");
+  await drainOutbox(f.db, handlers);
+  const other = await createChannel(f.db, f.owner.id, f.org.id, { name: "outro" });
+  await addChannelMember(f.db, f.owner.id, f.org.id, other.id, { agentId: f.agent.id });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, other.id, { body: "@dev dois" });
+  await drainOutbox(f.db, handlers);
+  const [a, b] = await runs(f);
+  const key = usageWaitKey({ code: "plan_limit", machineId, kind: "claude_code" });
+  // The line waits for a reset an hour away: nothing moves.
+  expect(await wakeNextInLine(f.db, f.org.id, key, "sonnet")).toBeNull();
+  // At the reset the first is done (skipped): the second goes now instead of a minute later.
+  await f.db
+    .update(schema.agentRuns)
+    .set({ status: "done" })
+    .where(eq(schema.agentRuns.id, a?.id ?? ""));
+  const at = resetsAt.getTime() + RESUME_AFTER_MS + 1000;
+  expect(await wakeNextInLine(f.db, f.org.id, key, "sonnet", at)).toBe(b?.id ?? "");
+  expect((await resumeJob(f, b?.id ?? ""))?.nextAttemptAt.getTime()).toBe(at);
+});
+
+test("two skips on one line make one owner notice counting both; one in a conversation the owner can't read isn't counted", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }), judge: checks("solved", "nina") });
+  await computerAgent(f, { brainFallback: false });
+  const { brain, seen } = scripted((n) =>
+    n < 3
+      ? [
+          { type: "limit", resetsAt: later(3600_000).toISOString() },
+          { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+        ]
+      : [{ type: "done", text: "Respondido." }],
+  );
+  const handlers = handlersWith(f, brain);
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const nina = await addMember(f.db, f.org.id, "member", "nina");
+  for (const u of [bia, nina]) await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: u.id });
+  const ops = await createChannel(f.db, f.owner.id, f.org.id, { name: "ops" });
+  for (const u of [bia, nina]) await addChannelMember(f.db, f.owner.id, f.org.id, ops.id, { userId: u.id });
+  await addChannelMember(f.db, f.owner.id, f.org.id, ops.id, { agentId: f.agent.id });
+  const theirs = await createChannel(f.db, bia.id, f.org.id, { name: "bia-nina", visibility: "private" });
+  await addChannelMember(f.db, bia.id, f.org.id, theirs.id, { userId: nina.id });
+  await addChannelMember(f.db, f.owner.id, f.org.id, theirs.id, { agentId: f.agent.id });
+  await postPersonMessage(deps, bia.id, f.org.id, f.general.id, { body: "@dev o deploy saiu?" });
+  await drainOutbox(f.db, handlers);
+  await postPersonMessage(deps, bia.id, f.org.id, ops.id, { body: "@dev e o relatório?" });
+  await drainOutbox(f.db, handlers);
+  await postPersonMessage(deps, bia.id, f.org.id, theirs.id, { body: "@dev e a fatura?" });
+  await drainOutbox(f.db, handlers);
+  await postPersonMessage(deps, nina.id, f.org.id, f.general.id, { body: "Saiu às 14h." });
+  await postPersonMessage(deps, nina.id, f.org.id, ops.id, { body: "Relatório no Drive." });
+  await postPersonMessage(deps, nina.id, f.org.id, theirs.id, { body: "Fatura paga." });
+  await drainOutbox(f.db, handlers);
+  await pausedLongAgo(f);
+  clearPlanLimits();
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 5 * RESUME_GAP_MS) });
+  // One turn hit the limit; the other two parked on the stored limit, and none ran at the resume.
+  expect(seen).toHaveLength(1);
+  expect((await runs(f)).map((r) => r.status)).toEqual(["done", "done", "done"]);
+  const owner = await noticesOf(f, "catch_up_closed");
+  expect(owner.map((n) => [n.userId, n.count])).toEqual([[f.owner.id, 2]]);
+  expect(await noticesOf(f, "catch_up_closed_asker")).toHaveLength(3);
+});
+
+test("who asked withdrawing it closes it with no notice to them", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }), judge: checks("not_needed", "bia") });
+  await computerAgent(f, { brainFallback: false });
+  const { brain, seen } = scripted(() => [
+    { type: "limit", resetsAt: later(3600_000).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await postPersonMessage(deps, bia.id, f.org.id, f.general.id, { body: "@dev o deploy saiu?" });
+  await drainOutbox(f.db, handlers);
+  await postPersonMessage(deps, bia.id, f.org.id, f.general.id, { body: "deixa, já vi aqui" });
+  await drainOutbox(f.db, handlers);
+  await pausedLongAgo(f);
+  clearPlanLimits();
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+  expect(seen).toHaveLength(1);
+  const [note] = await notes(f, "plan_limit_wait");
+  expect(note?.meta.usageWait).toMatchObject({ closed: { reason: "withdrawn", who: { name: "bia", userId: bia.id } } });
+  expect(await noticesOf(f, "catch_up_closed_asker")).toHaveLength(0);
 });

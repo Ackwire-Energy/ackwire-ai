@@ -1,7 +1,8 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, eq, gt, gte, inArray, ne, schema, sql } from "@agenteschat/db";
 import { cancelRun, mayStopRun, runRequester } from "./cancel";
 import { writtenSince } from "./catch-up";
+import { ANSWER_ANYWAY_MS, type ClosedNote } from "./catch-up-triage";
 import { readableChannelIds } from "./channels";
 import { ForbiddenError, NotFoundError } from "./errors";
 import { can, requirePermission } from "./organizations";
@@ -32,6 +33,22 @@ export interface UsageQueueRow {
   mayStop: boolean;
 }
 
+/** A catch-up the check skipped as already handled (ADR 0136), in the queue for a day with "Responder mesmo assim". */
+export interface UsageQueueClosedRow {
+  runId: string;
+  channelId: string;
+  threadId: string | null;
+  channelKind: string;
+  channelName: string | null;
+  /** The skipped note: where "Ver conversa" goes, and what it says. */
+  messageId: string;
+  closed: ClosedNote;
+  /** Someone asked it to answer anyway: the run that does. */
+  continuedRunId: string | null;
+  /** The viewer may press "Responder mesmo assim": who asked, the agent's owner, an admin; for 7 days. */
+  mayAnswer: boolean;
+}
+
 /** An agent's line of work waiting on its plan or budget (ADR 0118): what it picks up, in order, when it is back. */
 export interface UsageQueue {
   agentId: string;
@@ -47,6 +64,8 @@ export interface UsageQueue {
   hidden: number;
   /** "Don't run any": the agent's owner and admins. */
   mayStopAll: boolean;
+  /** Skipped in the last day as already handled, newest first (readable conversations only). */
+  closed: UsageQueueClosedRow[];
 }
 
 const USAGE_CODES = sql`(${agentRuns.transcript}->'waitingForBrain'->>'code' in ('plan_limit', 'budget', 'usage_pause'))`;
@@ -189,6 +208,7 @@ export async function usageQueue(db: Database, viewerId: string, orgId: string, 
         )
     : [];
   const budget = head?.code === "budget" || head?.source === "budget";
+  const mayAll = agent.ownerUserId === viewerId || can(membership, "manage_agents");
   return {
     agentId,
     reason: head ? (budget ? "budget" : "plan") : null,
@@ -197,8 +217,82 @@ export async function usageQueue(db: Database, viewerId: string, orgId: string, 
     sharedWith: shared.map((s) => s.agentId),
     rows,
     hidden: ordered.length - shown.length,
-    mayStopAll: agent.ownerUserId === viewerId || can(membership, "manage_agents"),
+    mayStopAll: mayAll,
+    closed: await closedRows(db, viewerId, orgId, agentId, mayAll),
   };
+}
+
+const CLOSED_SHOWN_MS = 24 * 3600_000;
+
+/** The catch-ups the check skipped in the last day, newest first, in conversations the viewer reads. */
+async function closedRows(
+  db: Database,
+  viewerId: string,
+  orgId: string,
+  agentId: string,
+  mayAll: boolean,
+  now = Date.now(),
+): Promise<UsageQueueClosedRow[]> {
+  const found = await db
+    .select({ run: agentRuns, channelKind: channels.kind, channelName: channels.name })
+    .from(agentRuns)
+    .innerJoin(channels, eq(channels.id, agentRuns.channelId))
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        eq(agentRuns.agentId, agentId),
+        eq(agentRuns.status, "done"),
+        gt(agentRuns.finishedAt, new Date(now - CLOSED_SHOWN_MS)),
+        sql`${agentRuns.transcript}->'catchUpTriage'->>'outcome' = 'closed'`,
+      ),
+    )
+    .orderBy(desc(agentRuns.finishedAt))
+    .limit(50);
+  const readable = await readableChannelIds(
+    db,
+    orgId,
+    viewerId,
+    found.map((r) => r.run.channelId),
+  );
+  const out: UsageQueueClosedRow[] = [];
+  for (const r of found) {
+    if (!readable.has(r.run.channelId)) continue;
+    const [note] = await db
+      .select({
+        id: messages.id,
+        threadId: messages.threadId,
+        wait: sql<Record<string, unknown>>`${messages.meta}->'usageWait'`,
+      })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, orgId),
+          eq(messages.channelId, r.run.channelId),
+          gte(messages.createdAt, r.run.createdAt),
+          sql`${messages.meta}->'usageWait'->>'runId' = ${r.run.id}`,
+          sql`${messages.meta}->'usageWait'->'closed' is not null`,
+        ),
+      )
+      .limit(1);
+    if (!note) continue;
+    const closed = note.wait.closed as ClosedNote;
+    const continuedRunId = typeof note.wait.continuedRunId === "string" ? note.wait.continuedRunId : null;
+    out.push({
+      runId: r.run.id,
+      channelId: r.run.channelId,
+      threadId: note.threadId,
+      channelKind: r.channelKind,
+      channelName: r.channelKind === "dm" ? null : r.channelName,
+      messageId: note.id,
+      closed,
+      continuedRunId,
+      mayAnswer:
+        !continuedRunId &&
+        now - Date.parse(closed.at) < ANSWER_ANYWAY_MS &&
+        (mayAll || closed.askers.includes(viewerId)),
+    });
+  }
+  return out;
 }
 
 /**

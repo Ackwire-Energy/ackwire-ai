@@ -37,7 +37,16 @@ export async function catchUpText(
   db: Executor,
   run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "pendingMessageIds">,
   trigger: { createdAt: Date },
-  w: { since: number; why: "plan" | "budget"; plan?: string; mayPass: boolean },
+  w: {
+    since: number;
+    why: "plan" | "budget";
+    plan?: string;
+    mayPass: boolean;
+    /** What the check before it found (`triageBrief`). */
+    brief?: string;
+    /** A person asked it to answer anyway (`continueRun`): said first; the caller passes `mayPass: false`. */
+    anyway?: string;
+  },
   now = Date.now(),
 ): Promise<string> {
   const threadId = replyThreadOf(run);
@@ -78,6 +87,7 @@ export async function catchUpText(
       (rows.length > 0
         ? " Below is what was posted in this conversation after the message you were answering; the messages sent to you come after it."
         : " Nothing else was posted here meanwhile; the messages sent to you come after this."),
+    ...(w.anyway ? [w.anyway] : []),
     "Reply once, covering only what is still open. If more than one person asked, name each person whose ask is still open and answer each." +
       (w.mayPass ? " If someone already answered it or it no longer applies, call `pass`." : ""),
     ...(now - w.since >= CATCH_UP_CONFIRM_AFTER_MS
@@ -86,10 +96,12 @@ export async function catchUpText(
         ]
       : []),
   ];
+  if (rows.length === 0 && w.brief) lines.push(w.brief);
   if (rows.length > 0) {
     const who = [...counts].map(([name, n]) => `${name} ${n}`).join(", ");
     lines.push(
       `Since you paused: ${rows.length} message${rows.length === 1 ? "" : "s"} (${who}).`,
+      ...(w.brief ? [w.brief] : []),
       "",
       ...rows.map((r) => `[${from(r)}, ${ago(r.at, now)}]: ${cutText(stripSentinel(r.body), 600)}`),
     );

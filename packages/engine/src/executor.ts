@@ -94,7 +94,24 @@ import {
   unregisterTurnAbort,
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
-import { catchUpText, isCatchUp } from "./catch-up";
+import { CATCH_UP_AFTER_MS, catchUpText, isCatchUp } from "./catch-up";
+import {
+  askCatchUp,
+  BUSY_RETRIES,
+  BUSY_RETRY_MS,
+  CATCH_UP_CLOSE_AT,
+  catchUpBar,
+  catchUpDecision,
+  closedNoteOf,
+  otherAgentAnswering,
+  overruledHere,
+  type TriageRecord,
+  type TriageVerdict,
+  triageBrief,
+  triageGate,
+  triageRecordOf,
+  triageSnapshot,
+} from "./catch-up-triage";
 import { REACT_TOOL } from "./chat-tools";
 import { kickRoomQueue, publishQueueChanged, roomGate, roomHead } from "./computer-queue";
 import { announceConsultationChange, answersOpen, onConsultedRunFinished } from "./consultations";
@@ -158,7 +175,12 @@ import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { postNoAiCard } from "./no-ai";
-import { notifyPlanResetUnknown, resolveRunFailed } from "./notification-producers";
+import {
+  notifyCatchUpClosed,
+  notifyCatchUpClosedAsker,
+  notifyPlanResetUnknown,
+  resolveRunFailed,
+} from "./notification-producers";
 import { openRequestNudge, openRequestsOf, WITHDRAW_REQUEST_TOOL } from "./open-requests";
 import { enqueue, PermanentJobError } from "./outbox";
 import { type OutsideMemo, personWords, runReadOutside } from "./outside";
@@ -267,9 +289,11 @@ import {
   usageCardResumed,
   usageNoteHandOn,
   usageNoticeText,
+  usageWaitClosed,
   usageWaitKey,
   usageWaitNoteEnded,
   usageWaitPlace,
+  wakeNextInLine,
   wakePlanWaits,
 } from "./usage-pause";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
@@ -555,6 +579,8 @@ export interface Transcript {
   roomAsk?: { machineId: string; at: number };
   /** Caught up after a long wait on its plan or budget (`catch-up.ts`): since when it paused; whether it may pass. */
   catchUp?: { since: number; mayPass?: true };
+  /** The check before that catch-up (`catch-up-triage.ts`): its last verdict, reused while nothing new came in. */
+  catchUpTriage?: TriageRecord;
   /** Time spent working before this claim (ms), without its waits: the long-work safety net counts it (ADR 0121). */
   activeMs?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
@@ -859,10 +885,50 @@ async function executeRunInner(
         cut: sql<string | null>`${agentRuns.transcript}->'interruptedTurn'->>'cause'`,
         orgId: agentRuns.orgId,
         machineId: agentRuns.waitingMachineId,
+        agentId: agentRuns.agentId,
+        channelId: agentRuns.channelId,
+        threadRootId: agentRuns.threadRootId,
+        triggerMessageId: agentRuns.triggerMessageId,
+        workId: agentRuns.workId,
+        since: sql<
+          string | null
+        >`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'since', ${agentRuns.transcript}->'usageWait'->>'since')`,
+        busyRetries: sql<number | null>`(${agentRuns.transcript}->'catchUpTriage'->>'busyRetries')::int`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
+    // A catch-up about to be checked while another agent still answers in its conversation: it waits for that answer
+    // (60 s at a time, `BUSY_RETRIES` times), so the check reads it whole instead of half of it. Its place holds.
+    const busyTries = row.busyRetries ?? 0;
+    if (
+      (row.code === "plan_limit" || row.code === "budget") &&
+      !row.background &&
+      !row.workId &&
+      !row.cut &&
+      deps.context?.judge &&
+      deps.context.judge.name !== "llm" &&
+      Date.now() - Number(row.since ?? Date.now()) >= CATCH_UP_AFTER_MS &&
+      busyTries < BUSY_RETRIES &&
+      (await otherAgentAnswering(db, row).catch(() => false))
+    ) {
+      await db
+        .update(agentRuns)
+        .set({
+          transcript: sql`jsonb_set(${agentRuns.transcript}, '{catchUpTriage}', coalesce(${agentRuns.transcript}->'catchUpTriage', '{"calls":0}'::jsonb)
+            || jsonb_build_object('busyRetries', ${busyTries + 1}::int, 'outcome', 'skipped_busy', 'at', ${Date.now()}::bigint))`,
+        })
+        .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, "waiting_input")));
+      await enqueue(db, {
+        orgId: row.orgId,
+        kind: "agent_run.execute",
+        payload: { runId, wait: options.wait },
+        dedupeKey: `agent_run.execute:${runId}:busy:${options.wait}:${busyTries + 1}`,
+        runAt: new Date(Date.now() + BUSY_RETRY_MS),
+        maxAttempts: 4,
+      });
+      return;
+    }
     // A routine's slot that waited on usage for more than 12 hours doesn't run late: it is missed. One the plan
     // cut mid-work finishes what it started (only the next slot replaces it).
     if (row.background && USAGE_WAIT_CODES.has(row.code ?? "") && row.cut !== "plan_limit") {
@@ -901,8 +967,9 @@ async function executeRunInner(
   /** And since when, and on which plan in words, for its catch-up (`catch-up.ts`). */
   let waitedSince: number | undefined;
   let waitedPlan: string | undefined;
-  /** And the line it waited in (`usageWaitKey`). */
+  /** And the line it waited in (`usageWaitKey`), on which model. */
   let waitedKey: string | undefined;
+  let waitedModel: string | null | undefined;
   const started = await transitionRun(db, runId, "queued", "running");
   if (started) {
     run = started;
@@ -938,6 +1005,7 @@ async function executeRunInner(
       waitedSince = stored?.usageWait?.since;
       waitedPlan = stored?.waitingForBrain?.plan;
       waitedKey = stored?.waitingForBrain?.waitKey;
+      waitedModel = stored?.waitingForBrain?.model;
       // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
       // run instead of finding it no longer waiting and doing nothing.
       if (options.wait && options.jobId) {
@@ -1418,6 +1486,127 @@ async function executeRunInner(
     answerOwed: Boolean(atClaim?.answerOwed),
     catchUp: catchUpMayPass,
   });
+
+  // Before a catch-up, one Jev call per asker: is what they asked still open (`catch-up-triage.ts`)? It ends here,
+  // quietly, only when every ask was closed by a source code checks; in any doubt the agent runs, told what was found.
+  /** What the check found, for the agent's catch-up block. */
+  let catchUpBrief = atClaim?.catchUpTriage?.brief;
+  if (catchUpSince !== undefined && catchUpMayPass && triggerMessage && judge) {
+    const snapshot = await triageSnapshot(db, run, triggerMessage, agent.name, catchUpSince).catch(() => null);
+    const prior = atClaim?.catchUpTriage;
+    const gate = snapshot
+      ? triageGate({
+          snapshot,
+          prior,
+          owed: Boolean(atClaim?.answerOwed),
+          mission: await inMission(db, run).catch(() => false),
+          overruled: await overruledHere(db, run).catch(() => true),
+          noJev: judge.name === "llm",
+        })
+      : ({ skip: "skipped_rule" } as const);
+    const at = Date.now();
+    const base = { calls: prior?.calls ?? 0, ...(prior?.busyRetries ? { busyRetries: prior.busyRetries } : {}) };
+    let record: TriageRecord | null = null;
+    let verdict: TriageVerdict | null = null;
+    if (gate && "skip" in gate) {
+      record = { at, outcome: gate.skip, ...base };
+      catchUpBrief = snapshot ? triageBrief(snapshot, null) || undefined : undefined;
+    } else if (!gate && snapshot) {
+      const bar = await catchUpBar(db, run.orgId).catch(() => CATCH_UP_CLOSE_AT);
+      const facts = { at, bar, judge: judge.name, calls: base.calls + 1, seenThrough: snapshot.latest };
+      try {
+        const answers = await askCatchUp(judge, snapshot, { orgId: run.orgId, agentId: agent.id, runId: run.id });
+        verdict = catchUpDecision(answers, snapshot, bar);
+        catchUpBrief = triageBrief(snapshot, verdict) || undefined;
+        record = triageRecordOf(verdict, { ...facts, ...base, calls: facts.calls }, catchUpBrief ?? "");
+      } catch {
+        catchUpBrief = triageBrief(snapshot, null) || undefined;
+        record = { ...base, ...facts, outcome: "judge_error" };
+      }
+    }
+    if (record && verdict?.outcome === "closed" && snapshot) {
+      const pending = run.pendingMessageIds;
+      // Compare-and-set: a message that joined while Jev answered makes it run instead.
+      const done = await db.transaction(async (tx) => {
+        const [cleared] = await tx
+          .update(agentRuns)
+          .set({ pendingMessageIds: [] })
+          .where(
+            and(
+              eq(agentRuns.id, run.id),
+              eq(agentRuns.status, "running"),
+              sql`${agentRuns.pendingMessageIds} = ${`{${pending.join(",")}}`}::uuid[]`,
+            ),
+          )
+          .returning({ id: agentRuns.id });
+        if (!cleared) return null;
+        return transitionRun(tx, run.id, "running", "done", {
+          error: null,
+          transcript: sql`jsonb_set(coalesce(${agentRuns.transcript}, '{}'::jsonb), '{catchUpTriage}', ${JSON.stringify(record)}::jsonb)`,
+        });
+      });
+      if (done) {
+        turnEnd = { outcome: "done", rule: "catch_up_closed" };
+        const { brief: _, ...step } = record;
+        await addRunStep(db, run, "context", {
+          continuation: { outcome: "done", rule: "catch_up_closed" },
+          catchUpTriage: step,
+        }).catch(() => {});
+        withReceipts.push(...pending);
+        await publishChannelEvent(deps.pubsub, { type: "agent.passed", ...where });
+        await publishChannelEvent(deps.pubsub, event("done"));
+        await finished("done", undefined, undefined, undefined, true);
+        // After `finished`: a note that also speaks for other waiting turns was handed on to them and keeps its promise.
+        const closed = closedNoteOf(snapshot, verdict);
+        const note = await usageWaitClosed(deps, run, closed as unknown as Record<string, unknown>).catch(() => null);
+        if (note) {
+          const nd = { db, pubsub: deps.pubsub };
+          const at = { channelId: run.channelId, threadId: note.threadId, messageId: note.id };
+          if (waitedKey)
+            await notifyCatchUpClosed(nd, {
+              orgId: run.orgId,
+              agentId: agent.id,
+              agentName: agent.name,
+              waitKey: waitedKey,
+              ...at,
+            }).catch(() => {});
+          // Who asked hears it when someone else was credited: a wrong skip reaches who would miss the answer.
+          const label = channelRow && channelRow.kind !== "dm" && channelRow.name ? `#${channelRow.name}` : null;
+          for (const a of verdict.askers) {
+            const who = snapshot.participants.find((p) => p.key === a.who);
+            if (!who || (who.kind === "person" && who.id === a.userId)) continue;
+            if (a.reason !== "solved" && a.reason !== "task_canceled") continue;
+            await notifyCatchUpClosedAsker(nd, {
+              orgId: run.orgId,
+              userId: a.userId,
+              agentId: agent.id,
+              runId: run.id,
+              reason: a.reason,
+              who: who.name,
+              label,
+              ...at,
+            }).catch(() => {});
+          }
+        }
+        if (waitedKey) await wakeNextInLine(db, run.orgId, waitedKey, waitedModel).catch(() => null);
+        return;
+      }
+      record = { ...record, outcome: "unsure" };
+      catchUpBrief = triageBrief(snapshot, null) || undefined;
+    }
+    if (record) {
+      const { brief: _, ...step } = record;
+      await addRunStep(db, run, "context", { catchUpTriage: step }).catch(() => {});
+      if (transcript) transcript.catchUpTriage = record;
+      await db
+        .update(agentRuns)
+        .set({
+          transcript: sql`jsonb_set(coalesce(${agentRuns.transcript}, '{}'::jsonb), '{catchUpTriage}', ${JSON.stringify(record)}::jsonb)`,
+        })
+        .where(eq(agentRuns.id, run.id))
+        .catch(() => {});
+    }
+  }
   /** Whether this run read outside content (`runReadOutside`): sticky once true. */
   let readOutside = false;
   const outsideMemo: OutsideMemo = {};
@@ -2227,6 +2416,7 @@ async function executeRunInner(
       why,
       ...(waitedPlan ? { plan: waitedPlan } : {}),
       mayPass: policy.mayPass,
+      ...(catchUpBrief ? { brief: catchUpBrief } : {}),
     }).catch(() => null);
     if (text) {
       if (!transcript.catchUp) appendUserText(transcript, text);

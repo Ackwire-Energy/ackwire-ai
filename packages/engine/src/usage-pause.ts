@@ -544,6 +544,68 @@ export async function usageWaitNoteEnded(
   if (deps.pubsub) for (const row of rows) await publishMessageCreated(deps.pubsub, messageView(row));
 }
 
+/**
+ * A catch-up the check closed (`catch-up-triage.ts`): its note says why instead of its promise (`usageWait.closed`), with
+ * "Responder mesmo assim" for who asked, the agent's owner and admins. Returns the note, for the notices to open.
+ */
+export async function usageWaitClosed(
+  deps: { db: Database; pubsub?: PubSub },
+  run: { id: string; orgId: string; channelId: string; createdAt: Date },
+  closed: Record<string, unknown>,
+): Promise<{ id: string; threadId: string | null } | null> {
+  const { messages } = schema;
+  const rows = await deps.db
+    .update(messages)
+    .set({
+      meta: sql`jsonb_set(${messages.meta}, '{usageWait}', (${messages.meta}->'usageWait')
+        || jsonb_build_object('ended', true, 'closed', ${JSON.stringify(closed)}::jsonb))`,
+    })
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        noteSince(run),
+        sql`${messages.meta}->'usageWait'->>'runId' = ${run.id}`,
+        sql`${messages.meta}->'usageWait'->'canceled' is null`,
+        sql`${messages.meta}->'actionCard' is null`,
+      ),
+    )
+    .returning();
+  if (deps.pubsub) for (const row of rows) await publishMessageCreated(deps.pubsub, messageView(row));
+  return rows[0] ?? null;
+}
+
+/**
+ * A catch-up ended without a turn (closed by the check): the next one in its line goes now instead of leaving a dead
+ * minute. Only while the line drains: a next one timed further than the line's own spacing waits for another reset (a
+ * second hit re-timed it) or for its head (an unknown reset), and keeps its time.
+ */
+export async function wakeNextInLine(
+  db: Executor,
+  orgId: string,
+  key: string,
+  model: string | null | undefined,
+  now = Date.now(),
+): Promise<string | null> {
+  const rows = await lineRows(db, orgId, key);
+  const next = rows.find((r) => sameReset(r, model));
+  if (!next) return null;
+  const { outbox } = schema;
+  const moved = await db
+    .update(outbox)
+    .set({ nextAttemptAt: new Date(now) })
+    .where(
+      and(
+        eq(outbox.kind, "agent_run.execute"),
+        eq(outbox.status, "pending"),
+        sql`${outbox.payload} ? 'wait' and ${outbox.payload}->>'runId' = ${next.id}`,
+        sql`${outbox.nextAttemptAt} <= ${new Date(now + RESUME_AFTER_MS + RESUME_GAP_MS * (rows.length + 1)).toISOString()}::timestamptz`,
+      ),
+    )
+    .returning({ id: outbox.id });
+  return moved.length > 0 ? next.id : null;
+}
+
 /** A note cancelled this recently still speaks for its conversation: a new ask there shows only its receipt. */
 export const CANCELED_NOTE_QUIET_MS = 15 * 60_000;
 
