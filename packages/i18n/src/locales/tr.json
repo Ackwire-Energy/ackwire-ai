@@ -1887,6 +1887,21 @@
       "done": "Davet gönderildi",
       "adminOnly": "Davet etme yetkisi olan biri gönderir"
     },
+    "install_skill": {
+      "title": "Beceri yükle",
+      "open": "Yükle",
+      "done": "Yüklendi",
+      "adminOnly": "Ajanları yöneten biri yükler"
+    },
+    "update_skills": {
+      "title_one": "Bir beceriyi güncelle",
+      "title_other": "{{count}} beceriyi güncelle",
+      "update": "Güncelle",
+      "review": "İncele",
+      "done": "Güncel",
+      "waiting": "İnceleme bekliyor",
+      "adminOnly": "Ajanları yöneten biri günceller"
+    },
     "agentProposal": {
       "title": "{{agent}} yeni bir ajan öneriyor",
       "review": "İncele",
@@ -2958,6 +2973,14 @@
     "nameLabel": "Ad",
     "roleLabel": "Rol",
     "roleHelp": "Ekip için ne yaptığı, örneğin E-posta ve takvim asistanı.",
+    "editName": "Adı düzenle: {{name}}",
+    "editHandle": "Bahsetmeleri düzenle: @{{handle}}",
+    "editRole": "Rolü düzenle: {{role}}",
+    "noRole": "Rol yok",
+    "rolePlaceholder": "Örn.: Destek",
+    "roleList": "Roller",
+    "roleUse": "“{{role}}” kullan",
+    "roleCurrent": "mevcut",
     "edit": "Düzenle",
     "chat": "Sohbet et",
     "moreActions": "Diğer işlemler",
@@ -3003,15 +3026,7 @@
     "budgetDefaultHelp": "Boş: çalışma alanı varsayılanı.",
     "budgetDefaultHelpAmount": "Boş: çalışma alanı varsayılanı ({{amount}}).",
     "budgetInvalid": "Sıfırdan büyük bir değer girin.",
-    "notFound": "Bu ajan yok ya da arşivlendi.",
-    "editName": "Adı düzenle: {{name}}",
-    "editHandle": "Bahsetmeleri düzenle: @{{handle}}",
-    "editRole": "Rolü düzenle: {{role}}",
-    "noRole": "Rol yok",
-    "rolePlaceholder": "Örn.: Destek",
-    "roleList": "Roller",
-    "roleUse": "“{{role}}” kullan",
-    "roleCurrent": "mevcut"
+    "notFound": "Bu ajan yok ya da arşivlendi."
   },
   "agentPage": {
     "work": {
@@ -4097,21 +4112,6 @@
     },
     "dialog": {
       "title": "{{org}} çalışma alanına davet et",
-      "emails": "E-postalar",
-      "moreEmails": "Daha fazla e-posta…",
-      "checkMarked": "İşaretli e-postaları kontrol edin: bunlara davet gitmeyecek.",
-      "withNote": "notla",
-      "alsoJoin": "Ayrıca şunlara katılırlar",
-      "generalAlways": "Herkes #{{channel}} kanalına katılır",
-      "note": "E-postadaki not",
-      "optional": "(isteğe bağlı)",
-      "notePlaceholder": "Merhaba. {{org}} çalışma alanına katılın: ekip ve ajanlar burada.",
-      "or": "ya da bağlantıyı gönderin",
-      "send_one": "{{count}} kişiyi davet et",
-      "send_other": "{{count}} kişiyi davet et",
-      "sent": "Davet gönderildi: {{email}}.",
-      "sentMany": "{{count}} davet gönderildi.",
-      "alsoIn": "Ayrıca şunlara katılırlar: {{channels}}.",
       "stepOf": "Adım {{n}}/{{total}} · {{step}}",
       "steps": {
         "who": "Kim",
@@ -4119,9 +4119,24 @@
         "where": "Başlangıç kanalları",
         "note": "Not"
       },
+      "emails": "E-postalar",
+      "moreEmails": "Daha fazla e-posta…",
+      "checkMarked": "İşaretli e-postaları kontrol edin: bunlara davet gitmeyecek.",
       "pasteHelp": "İsterseniz bir liste yapıştırın: virgül, boşluk ya da satır başına bir adres.",
       "leftOut": "Zaten katılmış ya da davet edilmiş olanlar dışarıda kalır.",
+      "withNote": "notla",
+      "alsoJoin": "Ayrıca şunlara katılırlar",
+      "generalAlways": "Herkes #{{channel}} kanalına katılır",
+      "note": "E-postadaki not",
+      "optional": "(isteğe bağlı)",
+      "notePlaceholder": "Merhaba. {{org}} çalışma alanına katılın: ekip ve ajanlar burada.",
+      "or": "ya da bağlantıyı gönderin",
       "continueWith": "{{count}} kişiyle devam et",
+      "send_one": "{{count}} kişiyi davet et",
+      "send_other": "{{count}} kişiyi davet et",
+      "sent": "Davet gönderildi: {{email}}.",
+      "sentMany": "{{count}} davet gönderildi.",
+      "alsoIn": "Ayrıca şunlara katılırlar: {{channels}}.",
       "who": {
         "title": "Kimi getirmek istiyorsunuz?",
         "lead": "E-postaları bana verin. Her kişi bir davet alır ve doğrudan katılır."
@@ -4511,6 +4526,54 @@
     "flowHint": "Görev kendiliğinden her aşamanın ilk sütununa geçer: bir ajan başladığında Devam ediyor, kontrole hazır olduğunda İncelemede, siz onayladığınızda Tamamlandı.",
     "moreOptions": "Diğer seçenekler",
     "showCanceled": "İptal edilenleri göster",
+    "filterButton": "Filtre",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ben",
+    "display": {
+      "title": "Görünüm",
+      "label": "Görünüm: {{layout}} · {{group}}",
+      "layout": "Düzen",
+      "group": "Gruplama ölçütü",
+      "sort": "Sıralama ölçütü",
+      "fields": "Kartlarda",
+      "saved": "Bu çalışma alanında sizin için kaydedildi",
+      "reset": "Varsayılana dön",
+      "by": {
+        "stage": "Aşama",
+        "assignee": "Atanan",
+        "priority": "Öncelik"
+      },
+      "order": {
+        "manual": "Elle",
+        "priority": "Öncelik",
+        "due": "Son tarih"
+      },
+      "field": {
+        "assignee": "Atanan",
+        "priority": "Öncelik",
+        "due": "Son tarih",
+        "criteria": "Kriterler",
+        "pullRequest": "Pull request",
+        "label": "Etiket"
+      }
+    },
+    "drop": {
+      "stage": "{{name}} sütununa bırakın",
+      "assignee": "Bırakın, {{name}} üstlensin",
+      "unassign": "Atananı kaldırmak için bırakın",
+      "priority": "Önceliği {{priority}} yapmak için bırakın"
+    },
+    "drag": {
+      "role": "sürüklenebilir görev",
+      "help": "Boşluk tuşu görevi alır, ok tuşları taşır, Boşluk tuşu bırakır ve Esc iptal eder.",
+      "picked": "#{{number}} görevini aldınız. Ok tuşları taşır, Boşluk bırakır, Esc iptal eder.",
+      "moved": "#{{number}}: {{group}}, {{total}} içinde {{position}}. sıra.",
+      "dropped": "#{{number}} bırakıldı: {{group}}.",
+      "canceled": "#{{number}} yerine döndü.",
+      "assigned": "#{{number}} artık {{name}} üzerinde.",
+      "unassigned": "#{{number}} artık kimseye atanmamış.",
+      "prioritized": "#{{number}} artık {{priority}} öncelikli."
+    },
     "canceledColumn": "İptal edildi",
     "columns": {
       "add": "Sütun ekle",
@@ -4749,54 +4812,6 @@
       "agent_asked": "{{name}} ajanından yapmasını istedi",
       "forum_opened": "foruma taşıdı: {{title}}",
       "forum_evaluated": "forumun sonucunu geri getirdi: {{title}}"
-    },
-    "filterButton": "Filtre",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Ben",
-    "display": {
-      "title": "Görünüm",
-      "label": "Görünüm: {{layout}} · {{group}}",
-      "layout": "Düzen",
-      "group": "Gruplama ölçütü",
-      "sort": "Sıralama ölçütü",
-      "fields": "Kartlarda",
-      "saved": "Bu çalışma alanında sizin için kaydedildi",
-      "reset": "Varsayılana dön",
-      "by": {
-        "stage": "Aşama",
-        "assignee": "Atanan",
-        "priority": "Öncelik"
-      },
-      "order": {
-        "manual": "Elle",
-        "priority": "Öncelik",
-        "due": "Son tarih"
-      },
-      "field": {
-        "assignee": "Atanan",
-        "priority": "Öncelik",
-        "due": "Son tarih",
-        "criteria": "Kriterler",
-        "pullRequest": "Pull request",
-        "label": "Etiket"
-      }
-    },
-    "drop": {
-      "stage": "{{name}} sütununa bırakın",
-      "assignee": "Bırakın, {{name}} üstlensin",
-      "unassign": "Atananı kaldırmak için bırakın",
-      "priority": "Önceliği {{priority}} yapmak için bırakın"
-    },
-    "drag": {
-      "role": "sürüklenebilir görev",
-      "help": "Boşluk tuşu görevi alır, ok tuşları taşır, Boşluk tuşu bırakır ve Esc iptal eder.",
-      "picked": "#{{number}} görevini aldınız. Ok tuşları taşır, Boşluk bırakır, Esc iptal eder.",
-      "moved": "#{{number}}: {{group}}, {{total}} içinde {{position}}. sıra.",
-      "dropped": "#{{number}} bırakıldı: {{group}}.",
-      "canceled": "#{{number}} yerine döndü.",
-      "assigned": "#{{number}} artık {{name}} üzerinde.",
-      "unassigned": "#{{number}} artık kimseye atanmamış.",
-      "prioritized": "#{{number}} artık {{priority}} öncelikli."
     }
   },
   "routines": {
@@ -4982,7 +4997,6 @@
         "artifact": "Drive'da bir belgeye dönüşür"
       },
       "ahead": "Sonrası için hazırlandı",
-      "ownActions": "Kendisi yapar",
       "createdBy": "Oluşturan: {{name}} · {{date}}",
       "nameLabel": "Rutinin adı",
       "editName": "Adı düzenle",
@@ -4999,7 +5013,8 @@
       "reportHint": {
         "always": "Yeni bir şey olmasa da",
         "when_new": "Yeni bir şey yoksa sessiz kalır"
-      }
+      },
+      "ownActions": "Kendisi yapar"
     },
     "ownActions": {
       "hint": "Her çalıştırma bunları bağlı uygulamalarında sormadan yapar. Oradaki diğer her işlem önce bir kişinin onayını ister, merge, deploy ve rollback ise her zaman onay ister.",
@@ -6496,6 +6511,37 @@
     "saved": "{{name}} kaydedildi.",
     "refresh": "Bağlantıdan güncelle",
     "refreshed": "{{name}} bağlantısından güncellendi.",
+    "upToDate": "{{name}} zaten bağlantısındakiyle aynı.",
+    "waitingToast": "{{name}} güncellemesi çalışan dosyaları değiştiriyor, bu yüzden inceleme bekliyor.",
+    "autoUpdate": "Kendi kendine güncelle",
+    "autoUpdateHelp": "Bağlantısını her gün okur. Yeni metin Geri al ile gelir. Betik değişiklikleri becerileri yöneten birini bekler.",
+    "autoChip": "Kendi kendine güncellenir",
+    "waitingChip": "Güncelleme bekliyor",
+    "lastUpdate": "{{when}} bağlantısından güncellendi",
+    "undoUpdate": "Güncellemeyi geri al",
+    "undone": "{{name}} {{version}} sürümüne döndü.",
+    "pending": {
+      "title": "Bağlantısından gelen güncelleme çalışan dosyaları değiştiriyor: {{files}}",
+      "lead": "Yalnızca bu dosyalara güveniyorsanız uygulayın. Ajanlar bunları kendi bilgisayarlarında çalıştırır.",
+      "apply": "Güncellemeyi uygula",
+      "dismiss": "Uygulama",
+      "applied": "{{name}} bağlantısından güncellendi.",
+      "changedAgain": "Bağlantısı yine değişti. Yeni dosyaları inceleyin.",
+      "dismissed": "Güncelleme uygulanmadı. Bağlantısındaki yeni bir değişiklik yeniden sorar."
+    },
+    "updateFailed": {
+      "no_skill_md": "Güncellenemedi: bağlantısında artık SKILL.md yok.",
+      "connection_gone": "Güncellenemedi: onu okuyan GitHub bağlantısı artık yok.",
+      "link_holds_several": "Güncellenemedi: bağlantısında artık birden fazla beceri var.",
+      "link_renamed": "Güncellenemedi: bağlantısında artık başka bir beceri var.",
+      "owner_gone": "Güncellenemedi: kendi kendine güncellemeyi açan kişi artık becerileri yönetemiyor. Yeniden açın.",
+      "other": "Bağlantısından güncellenemedi."
+    },
+    "notice": {
+      "updated": "{{name}} bağlantısından güncellendi",
+      "waiting": "{{name}} güncellemesi betiklerini değiştiriyor",
+      "failed": "{{name}} bağlantısından güncellenemedi"
+    },
     "remove": "Kaldır",
     "removeTitle": "{{name}} kaldırılsın mı?",
     "removeAgents_one": "{{names}} bu beceriyi kullanıyor ve erişimini kaybeder.",
@@ -10200,7 +10246,11 @@
       "invalidDescription": "Açıklama 1 ile {{max}} karakter arasında olmalı.",
       "tooLarge": "Beceri çok büyük (en fazla {{max}} MB).",
       "tooManyFiles": "Becerinin çok fazla dosyası var (en fazla {{max}}).",
-      "connectionGone": "{{repo}} deposunu okuyan GitHub bağlantısı artık yok. Bu beceriyi güncellemek için GitHub'ı yeniden bağlayın."
+      "connectionGone": "{{repo}} deposunu okuyan GitHub bağlantısı artık yok. Bu beceriyi güncellemek için GitHub'ı yeniden bağlayın.",
+      "linkHoldsSeveral": "Bağlantısında artık birden fazla beceri var. Bunu kendi klasöründen yeniden yükleyin.",
+      "linkRenamed": "Bağlantısında artık {{name}} becerisi var.",
+      "noLink": "Yalnızca bağlantıdan yüklenen bir beceri oradan güncellenir.",
+      "noPendingUpdate": "Bu beceri için bekleyen güncelleme yok."
     },
     "agentGroup": {
       "notFound": "Bu grup artık yok.",
@@ -11475,6 +11525,8 @@
         "creatingChannel": "Bir kanal oluşturdu",
         "offeringConnectAi": "Bir yapay zeka bağlamayı önerdi",
         "offeringConnectApp": "Bir uygulama bağlamayı önerdi",
+        "offeringSkill": "Bir beceri yüklemeyi önerdi",
+        "updatingSkills": "Becerileri güncelledi",
         "offeringInvites": "Kişileri davet etmeyi önerdi",
         "proposingAgent": "Bir ajan önerdi",
         "askingAgent": "Başka bir ajana sordu",
@@ -11559,6 +11611,8 @@
       "creatingChannel": "kanal oluşturuyor",
       "offeringConnectAi": "yapay zeka bağlantısını hazırlıyor",
       "offeringConnectApp": "uygulama bağlantısını hazırlıyor",
+      "offeringSkill": "bir beceriyi yüklemeye hazırlıyor",
+      "updatingSkills": "becerileri güncelliyor",
       "offeringInvites": "davetleri hazırlıyor",
       "proposingAgent": "ajan öneriyor",
       "askingAgent": "başka bir ajana soruyor",
@@ -11669,6 +11723,8 @@
       "action_connect_app": "{{name}} bağla",
       "action_add_mcp": "Bir MCP sunucusu ekle",
       "action_invite_people": "Kişileri davet et",
+      "action_install_skill": "Beceri yükle",
+      "action_update_skills": "Becerileri güncelle",
       "agent_proposal": "Yeni bir ajan önerdi: {{name}}",
       "approval_request": "Onay isteği: {{title}}",
       "secret_request": "{{agent}} bir anahtar istedi: {{name}}",
@@ -11876,6 +11932,14 @@
     "offer_invites": {
       "label": "Kişileri davet etmeyi öner",
       "description": "Düğmesi adresleri doldurulmuş davet penceresini açan bir kart paylaşır."
+    },
+    "offer_install_skill": {
+      "label": "Beceri yüklemeyi öner",
+      "description": "Düğmesi, becerinin bağlantısı doldurulmuş yükleme penceresini açan bir kart paylaşır."
+    },
+    "update_skill_from_source": {
+      "label": "Becerileri bağlantılarından güncelle",
+      "description": "Becerileri yüklendikleri yerden günceller. Betik değişiklikleri bir kişiyi bekler."
     },
     "propose_agent": {
       "label": "Ajan öner",

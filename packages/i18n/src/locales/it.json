@@ -1962,6 +1962,22 @@
       "done": "Invito inviato",
       "adminOnly": "Lo invia chi può invitare"
     },
+    "install_skill": {
+      "title": "Installa una skill",
+      "open": "Installa",
+      "done": "Installata",
+      "adminOnly": "La installa chi gestisce gli agenti"
+    },
+    "update_skills": {
+      "title_one": "Aggiorna una skill",
+      "title_many": "Aggiorna {{count}} skill",
+      "title_other": "Aggiorna {{count}} skill",
+      "update": "Aggiorna",
+      "review": "Rivedi",
+      "done": "Aggiornata",
+      "waiting": "Aspetta una revisione",
+      "adminOnly": "La aggiorna chi gestisce gli agenti"
+    },
     "agentProposal": {
       "title": "{{agent}} propone un nuovo agente",
       "review": "Rivedi",
@@ -3075,6 +3091,14 @@
     "nameLabel": "Nome",
     "roleLabel": "Ruolo",
     "roleHelp": "Cosa fa per il team, ad es. Assistente per email e calendario.",
+    "editName": "Modifica nome: {{name}}",
+    "editHandle": "Modifica menzioni: @{{handle}}",
+    "editRole": "Modifica ruolo: {{role}}",
+    "noRole": "Nessun ruolo",
+    "rolePlaceholder": "Es.: Supporto",
+    "roleList": "Ruoli",
+    "roleUse": "Usa “{{role}}”",
+    "roleCurrent": "attuale",
     "edit": "Modifica",
     "chat": "Chat",
     "moreActions": "Altre azioni",
@@ -3125,15 +3149,7 @@
     "budgetDefaultHelp": "Vuoto: il predefinito dello spazio di lavoro.",
     "budgetDefaultHelpAmount": "Vuoto: il predefinito dello spazio di lavoro ({{amount}}).",
     "budgetInvalid": "Usa un valore maggiore di zero.",
-    "notFound": "Questo agente non esiste o è stato archiviato.",
-    "editName": "Modifica nome: {{name}}",
-    "editHandle": "Modifica menzioni: @{{handle}}",
-    "editRole": "Modifica ruolo: {{role}}",
-    "noRole": "Nessun ruolo",
-    "rolePlaceholder": "Es.: Supporto",
-    "roleList": "Ruoli",
-    "roleUse": "Usa “{{role}}”",
-    "roleCurrent": "attuale"
+    "notFound": "Questo agente non esiste o è stato archiviato."
   },
   "agentPage": {
     "work": {
@@ -4314,22 +4330,6 @@
     },
     "dialog": {
       "title": "Invita in {{org}}",
-      "emails": "Email",
-      "moreEmails": "Altre email…",
-      "checkMarked": "Controlla le email segnate: non riceveranno l'invito.",
-      "withNote": "con una nota",
-      "alsoJoin": "Entrano anche in",
-      "generalAlways": "Tutti entrano in #{{channel}}",
-      "note": "Nota nell'email",
-      "optional": "(facoltativa)",
-      "notePlaceholder": "Ciao. Vieni in {{org}}: il team e gli agenti sono tutti qui.",
-      "or": "oppure invia il link",
-      "send_one": "Invita {{count}} persona",
-      "send_many": "Invita {{count}} persone",
-      "send_other": "Invita {{count}} persone",
-      "sent": "Invito inviato a {{email}}.",
-      "sentMany": "{{count}} inviti inviati.",
-      "alsoIn": "Entrano anche in {{channels}}.",
       "stepOf": "Passo {{n}} di {{total}} · {{step}}",
       "steps": {
         "who": "Chi",
@@ -4337,9 +4337,25 @@
         "where": "Da dove si parte",
         "note": "Nota"
       },
+      "emails": "Email",
+      "moreEmails": "Altre email…",
+      "checkMarked": "Controlla le email segnate: non riceveranno l'invito.",
       "pasteHelp": "Incolla una lista, se vuoi: virgole, spazi o una per riga.",
       "leftOut": "Chi è già dentro o ha già un invito resta fuori.",
+      "withNote": "con una nota",
+      "alsoJoin": "Entrano anche in",
+      "generalAlways": "Tutti entrano in #{{channel}}",
+      "note": "Nota nell'email",
+      "optional": "(facoltativa)",
+      "notePlaceholder": "Ciao. Vieni in {{org}}: il team e gli agenti sono tutti qui.",
+      "or": "oppure invia il link",
       "continueWith": "Continua con {{count}}",
+      "send_one": "Invita {{count}} persona",
+      "send_many": "Invita {{count}} persone",
+      "send_other": "Invita {{count}} persone",
+      "sent": "Invito inviato a {{email}}.",
+      "sentMany": "{{count}} inviti inviati.",
+      "alsoIn": "Entrano anche in {{channels}}.",
       "who": {
         "title": "Chi vuoi portare qui?",
         "lead": "Dammi le email. Ogni persona riceve un invito ed entra subito."
@@ -4735,6 +4751,54 @@
     "flowHint": "L'attività si sposta da sola, nella prima colonna di ogni fase: In corso quando un agente inizia, In revisione quando è pronta da verificare, Fatto quando approvi.",
     "moreOptions": "Altre opzioni",
     "showCanceled": "Mostra annullate",
+    "filterButton": "Filtro",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Io",
+    "display": {
+      "title": "Visualizzazione",
+      "label": "Visualizzazione: {{layout}} · {{group}}",
+      "layout": "Disposizione",
+      "group": "Raggruppa per",
+      "sort": "Ordina per",
+      "fields": "Sulle schede",
+      "saved": "Salvato per te in questo spazio di lavoro",
+      "reset": "Torna all'impostazione predefinita",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Assegnatario",
+        "priority": "Priorità"
+      },
+      "order": {
+        "manual": "Manuale",
+        "priority": "Priorità",
+        "due": "Scadenza"
+      },
+      "field": {
+        "assignee": "Assegnatario",
+        "priority": "Priorità",
+        "due": "Scadenza",
+        "criteria": "Criteri",
+        "pullRequest": "Pull request",
+        "label": "Etichetta"
+      }
+    },
+    "drop": {
+      "stage": "Rilascia in {{name}}",
+      "assignee": "Rilascia per assegnarla a {{name}}",
+      "unassign": "Rilascia per togliere l'assegnatario",
+      "priority": "Rilascia per priorità {{priority}}"
+    },
+    "drag": {
+      "role": "attività trascinabile",
+      "help": "Spazio prende l'attività, le frecce la spostano, Spazio la rilascia ed Esc annulla.",
+      "picked": "Hai preso la #{{number}}. Le frecce la spostano, Spazio la rilascia, Esc annulla.",
+      "moved": "#{{number}}: {{group}}, posizione {{position}} di {{total}}.",
+      "dropped": "Hai rilasciato la #{{number}} in {{group}}.",
+      "canceled": "La #{{number}} è tornata al suo posto.",
+      "assigned": "La #{{number}} ora è di {{name}}.",
+      "unassigned": "La #{{number}} ora non ha un assegnatario.",
+      "prioritized": "La #{{number}} ora ha priorità {{priority}}."
+    },
     "canceledColumn": "Annullate",
     "columns": {
       "add": "Aggiungi colonna",
@@ -4987,54 +5051,6 @@
       "agent_asked": "ha chiesto a {{name}} di farla",
       "forum_opened": "l'ha portata nel forum: {{title}}",
       "forum_evaluated": "ha riportato il risultato del forum: {{title}}"
-    },
-    "filterButton": "Filtro",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Io",
-    "display": {
-      "title": "Visualizzazione",
-      "label": "Visualizzazione: {{layout}} · {{group}}",
-      "layout": "Disposizione",
-      "group": "Raggruppa per",
-      "sort": "Ordina per",
-      "fields": "Sulle schede",
-      "saved": "Salvato per te in questo spazio di lavoro",
-      "reset": "Torna all'impostazione predefinita",
-      "by": {
-        "stage": "Fase",
-        "assignee": "Assegnatario",
-        "priority": "Priorità"
-      },
-      "order": {
-        "manual": "Manuale",
-        "priority": "Priorità",
-        "due": "Scadenza"
-      },
-      "field": {
-        "assignee": "Assegnatario",
-        "priority": "Priorità",
-        "due": "Scadenza",
-        "criteria": "Criteri",
-        "pullRequest": "Pull request",
-        "label": "Etichetta"
-      }
-    },
-    "drop": {
-      "stage": "Rilascia in {{name}}",
-      "assignee": "Rilascia per assegnarla a {{name}}",
-      "unassign": "Rilascia per togliere l'assegnatario",
-      "priority": "Rilascia per priorità {{priority}}"
-    },
-    "drag": {
-      "role": "attività trascinabile",
-      "help": "Spazio prende l'attività, le frecce la spostano, Spazio la rilascia ed Esc annulla.",
-      "picked": "Hai preso la #{{number}}. Le frecce la spostano, Spazio la rilascia, Esc annulla.",
-      "moved": "#{{number}}: {{group}}, posizione {{position}} di {{total}}.",
-      "dropped": "Hai rilasciato la #{{number}} in {{group}}.",
-      "canceled": "La #{{number}} è tornata al suo posto.",
-      "assigned": "La #{{number}} ora è di {{name}}.",
-      "unassigned": "La #{{number}} ora non ha un assegnatario.",
-      "prioritized": "La #{{number}} ora ha priorità {{priority}}."
     }
   },
   "routines": {
@@ -5222,7 +5238,6 @@
         "artifact": "Diventa un documento nel Drive"
       },
       "ahead": "Preparate per dopo",
-      "ownActions": "Fa da sola",
       "createdBy": "Creata da {{name}} · {{date}}",
       "nameLabel": "Nome della routine",
       "editName": "Modifica il nome",
@@ -5239,7 +5254,8 @@
       "reportHint": {
         "always": "Anche senza novità",
         "when_new": "In silenzio quando non c'è nulla di nuovo"
-      }
+      },
+      "ownActions": "Fa da sola"
     },
     "ownActions": {
       "hint": "Ogni esecuzione fa queste azioni nelle tue app collegate senza chiedere. Qualsiasi altra azione lì chiede prima l’approvazione di una persona, e merge, deploy e rollback la chiedono sempre.",
@@ -6841,6 +6857,37 @@
     "saved": "{{name}} salvata.",
     "refresh": "Aggiorna dal link",
     "refreshed": "{{name}} aggiornata dal suo link.",
+    "upToDate": "{{name}} ha già quello che c'è nel suo link.",
+    "waitingToast": "L'aggiornamento di {{name}} cambia file che vengono eseguiti, quindi aspetta una revisione.",
+    "autoUpdate": "Aggiorna da sola",
+    "autoUpdateHelp": "Legge il suo link ogni giorno. Il testo nuovo entra con Annulla. Le modifiche agli script aspettano chi gestisce le skill.",
+    "autoChip": "Si aggiorna da sola",
+    "waitingChip": "Aggiornamento in attesa",
+    "lastUpdate": "Aggiornata dal suo link {{when}}",
+    "undoUpdate": "Annulla aggiornamento",
+    "undone": "{{name}} è tornata alla versione {{version}}.",
+    "pending": {
+      "title": "L'aggiornamento dal suo link cambia file che vengono eseguiti: {{files}}",
+      "lead": "Applicalo solo se ti fidi di questi file. Gli agenti li eseguono sui loro computer.",
+      "apply": "Applica aggiornamento",
+      "dismiss": "Non applicare",
+      "applied": "{{name}} aggiornata dal suo link.",
+      "changedAgain": "Il suo link è cambiato di nuovo. Rivedi i file nuovi.",
+      "dismissed": "Aggiornamento non applicato. Una nuova modifica al suo link chiederà di nuovo."
+    },
+    "updateFailed": {
+      "no_skill_md": "Impossibile aggiornarla: il suo link non ha più un SKILL.md.",
+      "connection_gone": "Impossibile aggiornarla: il collegamento GitHub che l'ha letta non c'è più.",
+      "link_holds_several": "Impossibile aggiornarla: il suo link ora contiene più skill.",
+      "link_renamed": "Impossibile aggiornarla: il suo link ora contiene un'altra skill.",
+      "owner_gone": "Impossibile aggiornarla: chi ha attivato l'aggiornamento automatico non può più gestire le skill. Riattivalo.",
+      "other": "Impossibile aggiornarla dal suo link."
+    },
+    "notice": {
+      "updated": "{{name}} è stata aggiornata dal suo link",
+      "waiting": "Un aggiornamento di {{name}} cambia i suoi script",
+      "failed": "{{name}} non è riuscita ad aggiornarsi dal suo link"
+    },
     "remove": "Rimuovi",
     "removeTitle": "Rimuovere {{name}}?",
     "removeAgents_one": "{{names}} usa questa skill e non potrà più accedervi.",
@@ -10682,7 +10729,11 @@
       "invalidDescription": "La descrizione deve avere da 1 a {{max}} caratteri.",
       "tooLarge": "La skill è troppo grande (massimo {{max}} MB).",
       "tooManyFiles": "La skill ha troppi file (massimo {{max}}).",
-      "connectionGone": "Il collegamento GitHub che ha letto {{repo}} non c'è più. Ricollega GitHub per aggiornare questa skill."
+      "connectionGone": "Il collegamento GitHub che ha letto {{repo}} non c'è più. Ricollega GitHub per aggiornare questa skill.",
+      "linkHoldsSeveral": "Il suo link ora contiene più skill. Installa di nuovo questa dalla sua cartella.",
+      "linkRenamed": "Il suo link ora contiene la skill {{name}}.",
+      "noLink": "Solo una skill installata da un link si aggiorna da lì.",
+      "noPendingUpdate": "Nessun aggiornamento di questa skill è in attesa."
     },
     "agentGroup": {
       "notFound": "Questo gruppo non esiste più.",
@@ -12001,6 +12052,8 @@
         "creatingChannel": "Ha creato un canale",
         "offeringConnectAi": "Ha proposto di collegare un'IA",
         "offeringConnectApp": "Ha proposto di collegare un'app",
+        "offeringSkill": "Ha proposto di installare una skill",
+        "updatingSkills": "Ha aggiornato le skill",
         "offeringInvites": "Ha proposto di invitare persone",
         "proposingAgent": "Ha proposto un agente",
         "askingAgent": "Ha chiesto a un altro agente",
@@ -12085,6 +12138,8 @@
       "creatingChannel": "creando un canale",
       "offeringConnectAi": "preparando il collegamento di un'IA",
       "offeringConnectApp": "preparando il collegamento di un'app",
+      "offeringSkill": "preparando l'installazione di una skill",
+      "updatingSkills": "aggiornando le skill",
       "offeringInvites": "preparando gli inviti",
       "proposingAgent": "proponendo un agente",
       "askingAgent": "chiedendo a un altro agente",
@@ -12197,6 +12252,8 @@
       "action_connect_app": "Collega {{name}}",
       "action_add_mcp": "Aggiungi un server MCP",
       "action_invite_people": "Invita persone",
+      "action_install_skill": "Installa una skill",
+      "action_update_skills": "Aggiorna le skill",
       "agent_proposal": "Ha proposto un nuovo agente: {{name}}",
       "approval_request": "Richiesta di approvazione: {{title}}",
       "secret_request": "{{agent}} ha chiesto una chiave: {{name}}",
@@ -12407,6 +12464,14 @@
     "offer_invites": {
       "label": "Proponi di invitare persone",
       "description": "Pubblica una scheda il cui pulsante apre la finestra di invito con gli indirizzi già compilati."
+    },
+    "offer_install_skill": {
+      "label": "Proponi di installare una skill",
+      "description": "Pubblica una scheda il cui pulsante apre l'installazione con il link della skill già inserito."
+    },
+    "update_skill_from_source": {
+      "label": "Aggiorna le skill dai loro link",
+      "description": "Aggiorna le skill da dove sono state installate. Le modifiche agli script aspettano una persona."
     },
     "propose_agent": {
       "label": "Proponi un agente",

@@ -4606,6 +4606,39 @@
   "actionCard.invite.adminOnly": {
     "value": "Someone who may invite sends it"
   },
+  "actionCard.install_skill.title": {
+    "value": "Install a skill"
+  },
+  "actionCard.install_skill.open": {
+    "value": "Install"
+  },
+  "actionCard.install_skill.done": {
+    "value": "Installed"
+  },
+  "actionCard.install_skill.adminOnly": {
+    "value": "Someone who manages agents installs it"
+  },
+  "actionCard.update_skills.title": {
+    "value": {
+      "one": "Update a skill",
+      "other": "Update {{count}} skills"
+    }
+  },
+  "actionCard.update_skills.update": {
+    "value": "Update"
+  },
+  "actionCard.update_skills.review": {
+    "value": "Review"
+  },
+  "actionCard.update_skills.done": {
+    "value": "Up to date"
+  },
+  "actionCard.update_skills.waiting": {
+    "value": "Waits for review"
+  },
+  "actionCard.update_skills.adminOnly": {
+    "value": "Someone who manages agents updates it"
+  },
   "actionCard.agentProposal.title": {
     "value": "{{agent}} proposes a new agent"
   },
@@ -7278,6 +7311,30 @@
   },
   "agent.roleHelp": {
     "value": "What it does for the team, e.g. Email and calendar assistant."
+  },
+  "agent.editName": {
+    "value": "Edit name: {{name}}"
+  },
+  "agent.editHandle": {
+    "value": "Edit mentions: @{{handle}}"
+  },
+  "agent.editRole": {
+    "value": "Edit role: {{role}}"
+  },
+  "agent.noRole": {
+    "value": "No role"
+  },
+  "agent.rolePlaceholder": {
+    "value": "E.g. Support"
+  },
+  "agent.roleList": {
+    "value": "Roles"
+  },
+  "agent.roleUse": {
+    "value": "Use “{{role}}”"
+  },
+  "agent.roleCurrent": {
+    "value": "current"
   },
   "agent.edit": {
     "value": "Edit"
@@ -10080,6 +10137,21 @@
   "members.dialog.title": {
     "value": "Invite to {{org}}"
   },
+  "members.dialog.stepOf": {
+    "value": "Step {{n}} of {{total}} · {{step}}"
+  },
+  "members.dialog.steps.who": {
+    "value": "Who"
+  },
+  "members.dialog.steps.role": {
+    "value": "Role"
+  },
+  "members.dialog.steps.where": {
+    "value": "Where they start"
+  },
+  "members.dialog.steps.note": {
+    "value": "Note"
+  },
   "members.dialog.emails": {
     "value": "Emails"
   },
@@ -10088,6 +10160,12 @@
   },
   "members.dialog.checkMarked": {
     "value": "Check the marked emails: they won't get an invitation."
+  },
+  "members.dialog.pasteHelp": {
+    "value": "Paste a list if you like: commas, spaces or one per line."
+  },
+  "members.dialog.leftOut": {
+    "value": "Whoever is already in or already invited stays out."
   },
   "members.dialog.withNote": {
     "value": "with a note"
@@ -10110,6 +10188,9 @@
   "members.dialog.or": {
     "value": "or send the link"
   },
+  "members.dialog.continueWith": {
+    "value": "Continue with {{count}}"
+  },
   "members.dialog.send": {
     "value": {
       "one": "Invite {{count}} person",
@@ -10124,6 +10205,159 @@
   },
   "members.dialog.alsoIn": {
     "value": "They also join {{channels}}."
+  },
+  "members.dialog.who.title": {
+    "value": "Who do you want to bring in?"
+  },
+  "members.dialog.who.lead": {
+    "value": "Give me their emails. Each person gets an invitation and joins directly."
+  },
+  "members.dialog.orLink.title": {
+    "value": "Rather send a link?"
+  },
+  "members.dialog.orLink.text": {
+    "value": "Whoever opens it asks to join, and you approve."
+  },
+  "members.dialog.orLink.open": {
+    "value": "See the link"
+  },
+  "members.dialog.role.titleOne": {
+    "value": "What role does {{name}} join with?"
+  },
+  "members.dialog.role.titleMany": {
+    "value": "What role do these people join with?"
+  },
+  "members.dialog.role.lead": {
+    "value": "The role says what each person can do. You can change it later."
+  },
+  "members.dialog.role.each": {
+    "value": "A role for each person"
+  },
+  "members.dialog.role.same": {
+    "value": "The same role for everyone"
+  },
+  "members.dialog.where.titleOne": {
+    "value": "Which channels does {{name}} join right away?"
+  },
+  "members.dialog.where.titleMany": {
+    "value": "Which channels do these people join right away?"
+  },
+  "members.dialog.where.lead": {
+    "value": "Everyone starts in #{{channel}}. You pick the others."
+  },
+  "members.dialog.where.label": {
+    "value": "Channels"
+  },
+  "members.dialog.where.everyone": {
+    "value": "Everyone joins"
+  },
+  "members.dialog.where.private": {
+    "value": "Private · you're in it"
+  },
+  "members.dialog.where.people": {
+    "value": {
+      "one": "{{count}} person",
+      "other": "{{count}} people"
+    }
+  },
+  "members.dialog.where.fromChannel": {
+    "value": "#{{channel}} comes checked: you invited from there."
+  },
+  "members.dialog.noteStep.title": {
+    "value": "Want me to say something in the invitation?"
+  },
+  "members.dialog.noteStep.lead": {
+    "value": "It goes in the email. If not, I'll send it as it is."
+  },
+  "members.dialog.mailFor": {
+    "value": "This is how it reaches {{names}}"
+  },
+  "members.dialog.mail.from": {
+    "value": "agentes.chat · to {{to}}"
+  },
+  "members.dialog.mail.toMany": {
+    "value": "{{email}} and {{count}} more"
+  },
+  "members.dialog.mail.subject": {
+    "value": "You're invited to a workspace on agentes.chat"
+  },
+  "members.dialog.mail.headline": {
+    "value": "You're invited to a workspace"
+  },
+  "members.dialog.mail.body": {
+    "value": "<b>{{name}}</b> ({{email}}) invited you to join <b>{{org}}</b> as a member."
+  },
+  "members.dialog.mail.noteFrom": {
+    "value": "<b>{{name}}:</b> “{{note}}”"
+  },
+  "members.dialog.mail.what": {
+    "value": "agentes.chat is where people and AI agents work together."
+  },
+  "members.dialog.mail.button": {
+    "value": "Accept invitation"
+  },
+  "members.dialog.mail.small": {
+    "value": "The invitation works for 7 days. Accept it with this email address."
+  },
+  "members.dialog.done.title": {
+    "value": "Done, I sent the invitation to {{names}}."
+  },
+  "members.dialog.done.leadOne": {
+    "value": "When {{name}} joins, I'll greet them in {{channels}} and let you know."
+  },
+  "members.dialog.done.leadMany": {
+    "value": "When each person joins, I'll greet them in {{channels}} and let you know."
+  },
+  "members.dialog.done.none": {
+    "value": "No invitation went out this time."
+  },
+  "members.dialog.done.noneLead": {
+    "value": "Each address's reason is below."
+  },
+  "members.dialog.result.invited": {
+    "value": "Sent"
+  },
+  "members.dialog.result.already_member": {
+    "value": "already in {{org}}"
+  },
+  "members.dialog.result.already_invited": {
+    "value": "already had an invitation"
+  },
+  "members.dialog.result.invalid_email": {
+    "value": "invalid email"
+  },
+  "members.dialog.again": {
+    "value": "Invite more people"
+  },
+  "members.dialog.finish": {
+    "value": "Done"
+  },
+  "members.dialog.linkStep.title": {
+    "value": "This is {{org}}'s link."
+  },
+  "members.dialog.linkStep.lead": {
+    "value": "Whoever opens it asks to join. I'll show you each request, and you approve."
+  },
+  "members.dialog.linkStep.how1": {
+    "value": "The person opens the link and says who they are."
+  },
+  "members.dialog.linkStep.how2": {
+    "value": "The request reaches whoever invites, here and on the phone."
+  },
+  "members.dialog.linkStep.how3": {
+    "value": "You approve and pick the role they join with."
+  },
+  "members.dialog.linkStep.waiting": {
+    "value": {
+      "one": "One request waiting for you",
+      "other": "{{count}} requests waiting for you"
+    }
+  },
+  "members.dialog.linkStep.seeRequests": {
+    "value": "See requests"
+  },
+  "members.dialog.linkStep.byEmail": {
+    "value": "Invite by email"
   },
   "members.invitations.title": {
     "value": "Sent invitations"
@@ -10794,6 +11028,114 @@
   },
   "issues.showCanceled": {
     "value": "Show canceled"
+  },
+  "issues.filterButton": {
+    "value": "Filter"
+  },
+  "issues.filterValue": {
+    "value": "{{filter}}: {{value}}"
+  },
+  "issues.me": {
+    "value": "Me"
+  },
+  "issues.display.title": {
+    "value": "Display"
+  },
+  "issues.display.label": {
+    "value": "Display: {{layout}} · {{group}}"
+  },
+  "issues.display.layout": {
+    "value": "Layout"
+  },
+  "issues.display.group": {
+    "value": "Group by"
+  },
+  "issues.display.sort": {
+    "value": "Sort by"
+  },
+  "issues.display.fields": {
+    "value": "On the cards"
+  },
+  "issues.display.saved": {
+    "value": "Saved for you in this workspace"
+  },
+  "issues.display.reset": {
+    "value": "Back to default"
+  },
+  "issues.display.by.stage": {
+    "value": "Stage"
+  },
+  "issues.display.by.assignee": {
+    "value": "Assignee"
+  },
+  "issues.display.by.priority": {
+    "value": "Priority"
+  },
+  "issues.display.order.manual": {
+    "value": "Manual"
+  },
+  "issues.display.order.priority": {
+    "value": "Priority"
+  },
+  "issues.display.order.due": {
+    "value": "Due date"
+  },
+  "issues.display.field.assignee": {
+    "value": "Assignee"
+  },
+  "issues.display.field.priority": {
+    "value": "Priority"
+  },
+  "issues.display.field.due": {
+    "value": "Due date"
+  },
+  "issues.display.field.criteria": {
+    "value": "Criteria"
+  },
+  "issues.display.field.pullRequest": {
+    "value": "Pull request"
+  },
+  "issues.display.field.label": {
+    "value": "Label"
+  },
+  "issues.drop.stage": {
+    "value": "Drop in {{name}}"
+  },
+  "issues.drop.assignee": {
+    "value": "Drop to give it to {{name}}"
+  },
+  "issues.drop.unassign": {
+    "value": "Drop to unassign"
+  },
+  "issues.drop.priority": {
+    "value": "Drop for {{priority}} priority"
+  },
+  "issues.drag.role": {
+    "value": "draggable task"
+  },
+  "issues.drag.help": {
+    "value": "Space picks the task up, the arrows move it, Space drops it and Esc cancels."
+  },
+  "issues.drag.picked": {
+    "value": "You picked up #{{number}}. The arrows move it, Space drops it, Esc cancels."
+  },
+  "issues.drag.moved": {
+    "value": "#{{number}}: {{group}}, position {{position}} of {{total}}."
+  },
+  "issues.drag.dropped": {
+    "value": "You dropped #{{number}} in {{group}}."
+  },
+  "issues.drag.canceled": {
+    "value": "#{{number}} went back to its place."
+  },
+  "issues.drag.assigned": {
+    "value": "#{{number}} is now with {{name}}."
+  },
+  "issues.drag.unassigned": {
+    "value": "#{{number}} has no assignee now."
+  },
+  "issues.drag.prioritized": {
+    "value": "#{{number}} now has {{priority}} priority."
   },
   "issues.canceledColumn": {
     "value": "Canceled"
@@ -11888,6 +12230,45 @@
   },
   "routines.panel.ahead": {
     "value": "Prepared for later"
+  },
+  "routines.panel.createdBy": {
+    "value": "Created by {{name}} · {{date}}"
+  },
+  "routines.panel.nameLabel": {
+    "value": "Routine name"
+  },
+  "routines.panel.editName": {
+    "value": "Edit the name"
+  },
+  "routines.panel.editWhat": {
+    "value": "Edit what it does"
+  },
+  "routines.panel.tabs.label": {
+    "value": "Parts of the routine"
+  },
+  "routines.panel.tabs.details": {
+    "value": "Details"
+  },
+  "routines.panel.tabs.runs": {
+    "value": "Runs"
+  },
+  "routines.panel.nexts": {
+    "value": "Next runs"
+  },
+  "routines.panel.who": {
+    "value": "Who does it"
+  },
+  "routines.panel.onAirLine": {
+    "value": "Runs by itself when it's time"
+  },
+  "routines.panel.offAirLine": {
+    "value": "Doesn't run until you turn it on"
+  },
+  "routines.panel.reportHint.always": {
+    "value": "Even with nothing new"
+  },
+  "routines.panel.reportHint.when_new": {
+    "value": "Quiet when there's nothing new"
   },
   "routines.panel.ownActions": {
     "value": "Does on its own"
@@ -15589,6 +15970,81 @@
   },
   "skills.refreshed": {
     "value": "{{name}} updated from its link."
+  },
+  "skills.upToDate": {
+    "value": "{{name}} already has what its link has."
+  },
+  "skills.waitingToast": {
+    "value": "The update of {{name}} changes files that run, so it waits for a review."
+  },
+  "skills.autoUpdate": {
+    "value": "Update by itself"
+  },
+  "skills.autoUpdateHelp": {
+    "value": "Reads its link every day. New text goes in with Undo. Changes to scripts wait for someone who manages skills."
+  },
+  "skills.autoChip": {
+    "value": "Updates by itself"
+  },
+  "skills.waitingChip": {
+    "value": "Update waiting"
+  },
+  "skills.lastUpdate": {
+    "value": "Updated from its link {{when}}"
+  },
+  "skills.undoUpdate": {
+    "value": "Undo update"
+  },
+  "skills.undone": {
+    "value": "{{name}} is back to version {{version}}."
+  },
+  "skills.pending.title": {
+    "value": "The update from its link changes files that run: {{files}}"
+  },
+  "skills.pending.lead": {
+    "value": "Apply it only if you trust these files. Agents run them on their computers."
+  },
+  "skills.pending.apply": {
+    "value": "Apply update"
+  },
+  "skills.pending.dismiss": {
+    "value": "Don't apply"
+  },
+  "skills.pending.applied": {
+    "value": "{{name}} updated from its link."
+  },
+  "skills.pending.changedAgain": {
+    "value": "Its link changed again. Review the new files."
+  },
+  "skills.pending.dismissed": {
+    "value": "Update not applied. A new change to its link asks again."
+  },
+  "skills.updateFailed.no_skill_md": {
+    "value": "Couldn't update it: its link no longer has a SKILL.md."
+  },
+  "skills.updateFailed.connection_gone": {
+    "value": "Couldn't update it: the GitHub connection that read it is gone."
+  },
+  "skills.updateFailed.link_holds_several": {
+    "value": "Couldn't update it: its link holds several skills now."
+  },
+  "skills.updateFailed.link_renamed": {
+    "value": "Couldn't update it: its link holds another skill now."
+  },
+  "skills.updateFailed.owner_gone": {
+    "value": "Couldn't update it: whoever turned on updating by itself can no longer manage skills. Turn it on again."
+  },
+  "skills.updateFailed.other": {
+    "value": "Couldn't update it from its link."
+  },
+  "skills.notice.updated": {
+    "value": "{{name}} was updated from its link"
+  },
+  "skills.notice.waiting": {
+    "value": "An update of {{name}} changes its scripts"
+  },
+  "skills.notice.failed": {
+    "value": "{{name}} couldn't update from its link"
   },
   "skills.remove": {
     "value": "Remove"
@@ -24548,6 +25004,18 @@
   "errors.skill.connectionGone": {
     "value": "The GitHub connection that read {{repo}} is gone. Connect GitHub again to update this skill."
   },
+  "errors.skill.linkHoldsSeveral": {
+    "value": "Its link holds several skills now. Install this one again from its own folder."
+  },
+  "errors.skill.linkRenamed": {
+    "value": "Its link holds the skill {{name}} now."
+  },
+  "errors.skill.noLink": {
+    "value": "Only a skill installed from a link updates from it."
+  },
+  "errors.skill.noPendingUpdate": {
+    "value": "No update of this skill is waiting."
+  },
   "errors.agentGroup.notFound": {
     "value": "This group no longer exists."
   },
@@ -27729,6 +28197,12 @@
   "chat.work.step.offeringConnectApp": {
     "value": "Offered to connect an app"
   },
+  "chat.work.step.offeringSkill": {
+    "value": "Offered to install a skill"
+  },
+  "chat.work.step.updatingSkills": {
+    "value": "Updated skills"
+  },
   "chat.work.step.offeringInvites": {
     "value": "Offered to invite people"
   },
@@ -27971,6 +28445,12 @@
   },
   "chat.activity.offeringConnectApp": {
     "value": "getting an app ready to connect"
+  },
+  "chat.activity.offeringSkill": {
+    "value": "getting a skill ready to install"
+  },
+  "chat.activity.updatingSkills": {
+    "value": "updating skills"
   },
   "chat.activity.offeringInvites": {
     "value": "getting invitations ready"
@@ -28277,6 +28757,12 @@
   },
   "chat.body.action_invite_people": {
     "value": "Invite people"
+  },
+  "chat.body.action_install_skill": {
+    "value": "Install a skill"
+  },
+  "chat.body.action_update_skills": {
+    "value": "Update skills"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"
@@ -28622,6 +29108,18 @@
   },
   "builtinTools.offer_invites.description": {
     "value": "Posts a card whose button opens the invite dialog with the addresses filled in."
+  },
+  "builtinTools.offer_install_skill.label": {
+    "value": "Offer to install a skill"
+  },
+  "builtinTools.offer_install_skill.description": {
+    "value": "Posts a card whose button opens the install dialog with the skill's link filled in."
+  },
+  "builtinTools.update_skill_from_source.label": {
+    "value": "Update skills from their links"
+  },
+  "builtinTools.update_skill_from_source.description": {
+    "value": "Updates skills from where they were installed. Changes to scripts wait for a person."
   },
   "builtinTools.propose_agent.label": {
     "value": "Propose an agent"
@@ -30919,353 +31417,5 @@
   },
   "taskManager.agentPanel.none": {
     "value": "{{name}} is free now."
-  },
-  "agent.editName": {
-    "value": "Edit name: {{name}}"
-  },
-  "agent.editHandle": {
-    "value": "Edit mentions: @{{handle}}"
-  },
-  "agent.editRole": {
-    "value": "Edit role: {{role}}"
-  },
-  "agent.noRole": {
-    "value": "No role"
-  },
-  "agent.rolePlaceholder": {
-    "value": "E.g. Support"
-  },
-  "agent.roleList": {
-    "value": "Roles"
-  },
-  "agent.roleUse": {
-    "value": "Use “{{role}}”"
-  },
-  "agent.roleCurrent": {
-    "value": "current"
-  },
-  "members.dialog.stepOf": {
-    "value": "Step {{n}} of {{total}} · {{step}}"
-  },
-  "members.dialog.steps.who": {
-    "value": "Who"
-  },
-  "members.dialog.steps.role": {
-    "value": "Role"
-  },
-  "members.dialog.steps.where": {
-    "value": "Where they start"
-  },
-  "members.dialog.steps.note": {
-    "value": "Note"
-  },
-  "members.dialog.pasteHelp": {
-    "value": "Paste a list if you like: commas, spaces or one per line."
-  },
-  "members.dialog.leftOut": {
-    "value": "Whoever is already in or already invited stays out."
-  },
-  "members.dialog.continueWith": {
-    "value": "Continue with {{count}}"
-  },
-  "members.dialog.who.title": {
-    "value": "Who do you want to bring in?"
-  },
-  "members.dialog.who.lead": {
-    "value": "Give me their emails. Each person gets an invitation and joins directly."
-  },
-  "members.dialog.orLink.title": {
-    "value": "Rather send a link?"
-  },
-  "members.dialog.orLink.text": {
-    "value": "Whoever opens it asks to join, and you approve."
-  },
-  "members.dialog.orLink.open": {
-    "value": "See the link"
-  },
-  "members.dialog.role.titleOne": {
-    "value": "What role does {{name}} join with?"
-  },
-  "members.dialog.role.titleMany": {
-    "value": "What role do these people join with?"
-  },
-  "members.dialog.role.lead": {
-    "value": "The role says what each person can do. You can change it later."
-  },
-  "members.dialog.role.each": {
-    "value": "A role for each person"
-  },
-  "members.dialog.role.same": {
-    "value": "The same role for everyone"
-  },
-  "members.dialog.where.titleOne": {
-    "value": "Which channels does {{name}} join right away?"
-  },
-  "members.dialog.where.titleMany": {
-    "value": "Which channels do these people join right away?"
-  },
-  "members.dialog.where.lead": {
-    "value": "Everyone starts in #{{channel}}. You pick the others."
-  },
-  "members.dialog.where.label": {
-    "value": "Channels"
-  },
-  "members.dialog.where.everyone": {
-    "value": "Everyone joins"
-  },
-  "members.dialog.where.private": {
-    "value": "Private · you're in it"
-  },
-  "members.dialog.where.people": {
-    "value": {
-      "one": "{{count}} person",
-      "other": "{{count}} people"
-    }
-  },
-  "members.dialog.where.fromChannel": {
-    "value": "#{{channel}} comes checked: you invited from there."
-  },
-  "members.dialog.noteStep.title": {
-    "value": "Want me to say something in the invitation?"
-  },
-  "members.dialog.noteStep.lead": {
-    "value": "It goes in the email. If not, I'll send it as it is."
-  },
-  "members.dialog.mailFor": {
-    "value": "This is how it reaches {{names}}"
-  },
-  "members.dialog.mail.from": {
-    "value": "agentes.chat · to {{to}}"
-  },
-  "members.dialog.mail.toMany": {
-    "value": "{{email}} and {{count}} more"
-  },
-  "members.dialog.mail.subject": {
-    "value": "You're invited to a workspace on agentes.chat"
-  },
-  "members.dialog.mail.headline": {
-    "value": "You're invited to a workspace"
-  },
-  "members.dialog.mail.body": {
-    "value": "<b>{{name}}</b> ({{email}}) invited you to join <b>{{org}}</b> as a member."
-  },
-  "members.dialog.mail.noteFrom": {
-    "value": "<b>{{name}}:</b> “{{note}}”"
-  },
-  "members.dialog.mail.what": {
-    "value": "agentes.chat is where people and AI agents work together."
-  },
-  "members.dialog.mail.button": {
-    "value": "Accept invitation"
-  },
-  "members.dialog.mail.small": {
-    "value": "The invitation works for 7 days. Accept it with this email address."
-  },
-  "members.dialog.done.title": {
-    "value": "Done, I sent the invitation to {{names}}."
-  },
-  "members.dialog.done.leadOne": {
-    "value": "When {{name}} joins, I'll greet them in {{channels}} and let you know."
-  },
-  "members.dialog.done.leadMany": {
-    "value": "When each person joins, I'll greet them in {{channels}} and let you know."
-  },
-  "members.dialog.done.none": {
-    "value": "No invitation went out this time."
-  },
-  "members.dialog.done.noneLead": {
-    "value": "Each address's reason is below."
-  },
-  "members.dialog.result.invited": {
-    "value": "Sent"
-  },
-  "members.dialog.result.already_member": {
-    "value": "already in {{org}}"
-  },
-  "members.dialog.result.already_invited": {
-    "value": "already had an invitation"
-  },
-  "members.dialog.result.invalid_email": {
-    "value": "invalid email"
-  },
-  "members.dialog.again": {
-    "value": "Invite more people"
-  },
-  "members.dialog.finish": {
-    "value": "Done"
-  },
-  "members.dialog.linkStep.title": {
-    "value": "This is {{org}}'s link."
-  },
-  "members.dialog.linkStep.lead": {
-    "value": "Whoever opens it asks to join. I'll show you each request, and you approve."
-  },
-  "members.dialog.linkStep.how1": {
-    "value": "The person opens the link and says who they are."
-  },
-  "members.dialog.linkStep.how2": {
-    "value": "The request reaches whoever invites, here and on the phone."
-  },
-  "members.dialog.linkStep.how3": {
-    "value": "You approve and pick the role they join with."
-  },
-  "members.dialog.linkStep.waiting": {
-    "value": {
-      "one": "One request waiting for you",
-      "other": "{{count}} requests waiting for you"
-    }
-  },
-  "members.dialog.linkStep.seeRequests": {
-    "value": "See requests"
-  },
-  "members.dialog.linkStep.byEmail": {
-    "value": "Invite by email"
-  },
-  "issues.filterButton": {
-    "value": "Filter"
-  },
-  "issues.filterValue": {
-    "value": "{{filter}}: {{value}}"
-  },
-  "issues.me": {
-    "value": "Me"
-  },
-  "issues.display.title": {
-    "value": "Display"
-  },
-  "issues.display.label": {
-    "value": "Display: {{layout}} · {{group}}"
-  },
-  "issues.display.layout": {
-    "value": "Layout"
-  },
-  "issues.display.group": {
-    "value": "Group by"
-  },
-  "issues.display.sort": {
-    "value": "Sort by"
-  },
-  "issues.display.fields": {
-    "value": "On the cards"
-  },
-  "issues.display.saved": {
-    "value": "Saved for you in this workspace"
-  },
-  "issues.display.reset": {
-    "value": "Back to default"
-  },
-  "issues.display.by.stage": {
-    "value": "Stage"
-  },
-  "issues.display.by.assignee": {
-    "value": "Assignee"
-  },
-  "issues.display.by.priority": {
-    "value": "Priority"
-  },
-  "issues.display.order.manual": {
-    "value": "Manual"
-  },
-  "issues.display.order.priority": {
-    "value": "Priority"
-  },
-  "issues.display.order.due": {
-    "value": "Due date"
-  },
-  "issues.display.field.assignee": {
-    "value": "Assignee"
-  },
-  "issues.display.field.priority": {
-    "value": "Priority"
-  },
-  "issues.display.field.due": {
-    "value": "Due date"
-  },
-  "issues.display.field.criteria": {
-    "value": "Criteria"
-  },
-  "issues.display.field.pullRequest": {
-    "value": "Pull request"
-  },
-  "issues.display.field.label": {
-    "value": "Label"
-  },
-  "issues.drop.stage": {
-    "value": "Drop in {{name}}"
-  },
-  "issues.drop.assignee": {
-    "value": "Drop to give it to {{name}}"
-  },
-  "issues.drop.unassign": {
-    "value": "Drop to unassign"
-  },
-  "issues.drop.priority": {
-    "value": "Drop for {{priority}} priority"
-  },
-  "issues.drag.role": {
-    "value": "draggable task"
-  },
-  "issues.drag.help": {
-    "value": "Space picks the task up, the arrows move it, Space drops it and Esc cancels."
-  },
-  "issues.drag.picked": {
-    "value": "You picked up #{{number}}. The arrows move it, Space drops it, Esc cancels."
-  },
-  "issues.drag.moved": {
-    "value": "#{{number}}: {{group}}, position {{position}} of {{total}}."
-  },
-  "issues.drag.dropped": {
-    "value": "You dropped #{{number}} in {{group}}."
-  },
-  "issues.drag.canceled": {
-    "value": "#{{number}} went back to its place."
-  },
-  "issues.drag.assigned": {
-    "value": "#{{number}} is now with {{name}}."
-  },
-  "issues.drag.unassigned": {
-    "value": "#{{number}} has no assignee now."
-  },
-  "issues.drag.prioritized": {
-    "value": "#{{number}} now has {{priority}} priority."
-  },
-  "routines.panel.createdBy": {
-    "value": "Created by {{name}} · {{date}}"
-  },
-  "routines.panel.nameLabel": {
-    "value": "Routine name"
-  },
-  "routines.panel.editName": {
-    "value": "Edit the name"
-  },
-  "routines.panel.editWhat": {
-    "value": "Edit what it does"
-  },
-  "routines.panel.tabs.label": {
-    "value": "Parts of the routine"
-  },
-  "routines.panel.tabs.details": {
-    "value": "Details"
-  },
-  "routines.panel.tabs.runs": {
-    "value": "Runs"
-  },
-  "routines.panel.nexts": {
-    "value": "Next runs"
-  },
-  "routines.panel.who": {
-    "value": "Who does it"
-  },
-  "routines.panel.onAirLine": {
-    "value": "Runs by itself when it's time"
-  },
-  "routines.panel.offAirLine": {
-    "value": "Doesn't run until you turn it on"
-  },
-  "routines.panel.reportHint.always": {
-    "value": "Even with nothing new"
-  },
-  "routines.panel.reportHint.when_new": {
-    "value": "Quiet when there's nothing new"
   }
 }

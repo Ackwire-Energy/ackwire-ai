@@ -1828,6 +1828,20 @@
       "done": "招待を送信済み",
       "adminOnly": "招待できる人が送信します"
     },
+    "install_skill": {
+      "title": "スキルをインストール",
+      "open": "インストール",
+      "done": "インストール済み",
+      "adminOnly": "エージェントを管理する人がインストールします"
+    },
+    "update_skills": {
+      "title_other": "{{count}}個のスキルを更新",
+      "update": "更新",
+      "review": "確認",
+      "done": "最新です",
+      "waiting": "確認待ち",
+      "adminOnly": "エージェントを管理する人が更新します"
+    },
     "agentProposal": {
       "title": "{{agent}}が新しいエージェントを提案しています",
       "review": "確認する",
@@ -2870,6 +2884,14 @@
     "nameLabel": "名前",
     "roleLabel": "役割",
     "roleHelp": "チームのために何をするか。例: メールとカレンダーのアシスタント",
+    "editName": "名前を編集: {{name}}",
+    "editHandle": "メンションを編集: @{{handle}}",
+    "editRole": "役割を編集: {{role}}",
+    "noRole": "役割なし",
+    "rolePlaceholder": "例: サポート",
+    "roleList": "役割の一覧",
+    "roleUse": "「{{role}}」を使う",
+    "roleCurrent": "現在",
     "edit": "編集",
     "chat": "チャット",
     "moreActions": "その他の操作",
@@ -2914,15 +2936,7 @@
     "budgetDefaultHelp": "空欄: ワークスペースのデフォルト。",
     "budgetDefaultHelpAmount": "空欄: ワークスペースのデフォルト（{{amount}}）。",
     "budgetInvalid": "0より大きい値を入力してください。",
-    "notFound": "このエージェントは存在しないか、アーカイブされています。",
-    "editName": "名前を編集: {{name}}",
-    "editHandle": "メンションを編集: @{{handle}}",
-    "editRole": "役割を編集: {{role}}",
-    "noRole": "役割なし",
-    "rolePlaceholder": "例: サポート",
-    "roleList": "役割の一覧",
-    "roleUse": "「{{role}}」を使う",
-    "roleCurrent": "現在"
+    "notFound": "このエージェントは存在しないか、アーカイブされています。"
   },
   "agentPage": {
     "work": {
@@ -3975,20 +3989,6 @@
     },
     "dialog": {
       "title": "{{org}}に招待",
-      "emails": "メールアドレス",
-      "moreEmails": "メールアドレスを追加…",
-      "checkMarked": "マークされたメールアドレスを確認してください。招待は届きません。",
-      "withNote": "メッセージ付き",
-      "alsoJoin": "あわせて参加するチャンネル",
-      "generalAlways": "全員が#{{channel}}に参加します",
-      "note": "メールに添えるメッセージ",
-      "optional": "（任意）",
-      "notePlaceholder": "こんにちは。{{org}}に参加しませんか。チームもエージェントもみんなここにいます。",
-      "or": "またはリンクを送信",
-      "send_other": "{{count}}人を招待",
-      "sent": "{{email}}に招待を送信しました。",
-      "sentMany": "{{count}}件の招待を送信しました。",
-      "alsoIn": "{{channels}}にもあわせて参加します。",
       "stepOf": "ステップ {{n}}/{{total}} · {{step}}",
       "steps": {
         "who": "招待する人",
@@ -3996,9 +3996,23 @@
         "where": "参加チャンネル",
         "note": "メッセージ"
       },
+      "emails": "メールアドレス",
+      "moreEmails": "メールアドレスを追加…",
+      "checkMarked": "マークされたメールアドレスを確認してください。招待は届きません。",
       "pasteHelp": "リストを貼り付けることもできます。カンマ、スペース、または1行に1件で区切ってください。",
       "leftOut": "すでに参加している人や招待済みの人は除かれます。",
+      "withNote": "メッセージ付き",
+      "alsoJoin": "あわせて参加するチャンネル",
+      "generalAlways": "全員が#{{channel}}に参加します",
+      "note": "メールに添えるメッセージ",
+      "optional": "（任意）",
+      "notePlaceholder": "こんにちは。{{org}}に参加しませんか。チームもエージェントもみんなここにいます。",
+      "or": "またはリンクを送信",
       "continueWith": "{{count}}人で続ける",
+      "send_other": "{{count}}人を招待",
+      "sent": "{{email}}に招待を送信しました。",
+      "sentMany": "{{count}}件の招待を送信しました。",
+      "alsoIn": "{{channels}}にもあわせて参加します。",
       "who": {
         "title": "だれを招待しますか？",
         "lead": "メールアドレスを教えてください。それぞれに招待が届き、そのまま参加できます。"
@@ -4382,6 +4396,54 @@
     "flowHint": "タスクは各段階の最初の列へ自動で移動します。エージェントが始めると「進行中」、確認の準備ができると「レビュー中」、あなたが承認すると「完了」へ。",
     "moreOptions": "その他のオプション",
     "showCanceled": "キャンセル済みを表示",
+    "filterButton": "フィルター",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "自分",
+    "display": {
+      "title": "表示設定",
+      "label": "表示設定：{{layout}} · {{group}}",
+      "layout": "レイアウト",
+      "group": "グループ化",
+      "sort": "並べ替え",
+      "fields": "カードに表示",
+      "saved": "このワークスペースであなた用に保存されます",
+      "reset": "デフォルトに戻す",
+      "by": {
+        "stage": "段階",
+        "assignee": "担当者",
+        "priority": "優先度"
+      },
+      "order": {
+        "manual": "手動",
+        "priority": "優先度",
+        "due": "期日"
+      },
+      "field": {
+        "assignee": "担当者",
+        "priority": "優先度",
+        "due": "期日",
+        "criteria": "条件",
+        "pullRequest": "プルリクエスト",
+        "label": "ラベル"
+      }
+    },
+    "drop": {
+      "stage": "{{name}}にドロップ",
+      "assignee": "ドロップして{{name}}に渡す",
+      "unassign": "ドロップして担当者を外す",
+      "priority": "ドロップして優先度を{{priority}}にする"
+    },
+    "drag": {
+      "role": "ドラッグできるタスク",
+      "help": "スペースでタスクを持ち上げ、矢印キーで移動し、スペースで置き、Escでキャンセルします。",
+      "picked": "#{{number}}を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
+      "moved": "#{{number}}：{{group}}、{{total}}件中{{position}}番目。",
+      "dropped": "#{{number}}を{{group}}に置きました。",
+      "canceled": "#{{number}}は元の場所に戻りました。",
+      "assigned": "#{{number}}の担当は{{name}}になりました。",
+      "unassigned": "#{{number}}の担当者がいなくなりました。",
+      "prioritized": "#{{number}}の優先度は{{priority}}になりました。"
+    },
     "canceledColumn": "キャンセル済み",
     "columns": {
       "add": "列を追加",
@@ -4615,54 +4677,6 @@
       "agent_asked": "{{name}}に作業を頼みました",
       "forum_opened": "フォーラムに持ち込みました: {{title}}",
       "forum_evaluated": "フォーラムの結果を戻しました: {{title}}"
-    },
-    "filterButton": "フィルター",
-    "filterValue": "{{filter}}：{{value}}",
-    "me": "自分",
-    "display": {
-      "title": "表示設定",
-      "label": "表示設定：{{layout}} · {{group}}",
-      "layout": "レイアウト",
-      "group": "グループ化",
-      "sort": "並べ替え",
-      "fields": "カードに表示",
-      "saved": "このワークスペースであなた用に保存されます",
-      "reset": "デフォルトに戻す",
-      "by": {
-        "stage": "段階",
-        "assignee": "担当者",
-        "priority": "優先度"
-      },
-      "order": {
-        "manual": "手動",
-        "priority": "優先度",
-        "due": "期日"
-      },
-      "field": {
-        "assignee": "担当者",
-        "priority": "優先度",
-        "due": "期日",
-        "criteria": "条件",
-        "pullRequest": "プルリクエスト",
-        "label": "ラベル"
-      }
-    },
-    "drop": {
-      "stage": "{{name}}にドロップ",
-      "assignee": "ドロップして{{name}}に渡す",
-      "unassign": "ドロップして担当者を外す",
-      "priority": "ドロップして優先度を{{priority}}にする"
-    },
-    "drag": {
-      "role": "ドラッグできるタスク",
-      "help": "スペースでタスクを持ち上げ、矢印キーで移動し、スペースで置き、Escでキャンセルします。",
-      "picked": "#{{number}}を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
-      "moved": "#{{number}}：{{group}}、{{total}}件中{{position}}番目。",
-      "dropped": "#{{number}}を{{group}}に置きました。",
-      "canceled": "#{{number}}は元の場所に戻りました。",
-      "assigned": "#{{number}}の担当は{{name}}になりました。",
-      "unassigned": "#{{number}}の担当者がいなくなりました。",
-      "prioritized": "#{{number}}の優先度は{{priority}}になりました。"
     }
   },
   "routines": {
@@ -4849,7 +4863,6 @@
         "artifact": "Driveのドキュメントになります"
       },
       "ahead": "あとで実行する準備済み",
-      "ownActions": "自動で行うこと",
       "createdBy": "作成者: {{name}} · {{date}}",
       "nameLabel": "ルーティンの名前",
       "editName": "名前を編集",
@@ -4866,7 +4879,8 @@
       "reportHint": {
         "always": "新しい情報がなくても",
         "when_new": "新しい情報がなければ投稿しません"
-      }
+      },
+      "ownActions": "自動で行うこと"
     },
     "ownActions": {
       "hint": "毎回の実行で、接続済みアプリでこれらを確認なしで行います。それ以外の操作は先に人の承認を求め、マージ、デプロイ、ロールバックは常に承認を求めます。",
@@ -6270,6 +6284,37 @@
     "saved": "{{name}}を保存しました。",
     "refresh": "リンクから更新",
     "refreshed": "{{name}}をリンクから更新しました。",
+    "upToDate": "{{name}}はすでにリンクと同じ内容です。",
+    "waitingToast": "{{name}}の更新は実行されるファイルを変更するため、確認待ちです。",
+    "autoUpdate": "自動で更新",
+    "autoUpdateHelp": "毎日リンクを読み込みます。新しいテキストは元に戻せる形で反映されます。スクリプトの変更は、スキルを管理する人の確認を待ちます。",
+    "autoChip": "自動で更新",
+    "waitingChip": "更新待ち",
+    "lastUpdate": "{{when}}にリンクから更新",
+    "undoUpdate": "更新を元に戻す",
+    "undone": "{{name}}をバージョン{{version}}に戻しました。",
+    "pending": {
+      "title": "リンクからの更新で、実行されるファイルが変わります: {{files}}",
+      "lead": "これらのファイルを信頼できる場合にだけ適用してください。エージェントは自分のコンピューターでこれらを実行します。",
+      "apply": "更新を適用",
+      "dismiss": "適用しない",
+      "applied": "{{name}}をリンクから更新しました。",
+      "changedAgain": "リンクがまた変わりました。新しいファイルを確認してください。",
+      "dismissed": "更新は適用されませんでした。リンクに新しい変更があれば、また確認します。"
+    },
+    "updateFailed": {
+      "no_skill_md": "更新できません: リンクにSKILL.mdがなくなりました。",
+      "connection_gone": "更新できません: 読み込んだGitHubの接続がなくなりました。",
+      "link_holds_several": "更新できません: リンクに複数のスキルが含まれるようになりました。",
+      "link_renamed": "更新できません: リンクが別のスキルになりました。",
+      "owner_gone": "更新できません: 自動更新をオンにした人がスキルを管理できなくなりました。もう一度オンにしてください。",
+      "other": "リンクから更新できませんでした。"
+    },
+    "notice": {
+      "updated": "{{name}}がリンクから更新されました",
+      "waiting": "{{name}}の更新でスクリプトが変わります",
+      "failed": "{{name}}をリンクから更新できませんでした"
+    },
     "remove": "削除",
     "removeTitle": "{{name}}を削除しますか？",
     "removeAgents_other": "{{names}}はこのスキルを使っており、使えなくなります。",
@@ -9876,7 +9921,11 @@
       "invalidDescription": "説明は1〜{{max}}文字にしてください。",
       "tooLarge": "スキルが大きすぎます（最大{{max}} MB）。",
       "tooManyFiles": "スキルのファイルが多すぎます（最大{{max}}個）。",
-      "connectionGone": "{{repo}}を読み込んだGitHubの接続がなくなりました。このスキルを更新するには、GitHubをもう一度接続してください。"
+      "connectionGone": "{{repo}}を読み込んだGitHubの接続がなくなりました。このスキルを更新するには、GitHubをもう一度接続してください。",
+      "linkHoldsSeveral": "リンクに複数のスキルが含まれるようになりました。このスキル専用のフォルダーからもう一度インストールしてください。",
+      "linkRenamed": "リンクのスキルが{{name}}になりました。",
+      "noLink": "リンクからインストールしたスキルだけが、そのリンクから更新されます。",
+      "noPendingUpdate": "このスキルの更新待ちはありません。"
     },
     "agentGroup": {
       "notFound": "このグループはもう存在しません。",
@@ -11124,6 +11173,8 @@
         "creatingChannel": "チャンネルを作成しました",
         "offeringConnectAi": "AIの接続を提案しました",
         "offeringConnectApp": "アプリの接続を提案しました",
+        "offeringSkill": "スキルのインストールを提案しました",
+        "updatingSkills": "スキルを更新しました",
         "offeringInvites": "メンバーの招待を提案しました",
         "proposingAgent": "エージェントを提案しました",
         "askingAgent": "別のエージェントに質問しました",
@@ -11208,6 +11259,8 @@
       "creatingChannel": "チャンネルを作成中",
       "offeringConnectAi": "AIの接続を準備中",
       "offeringConnectApp": "アプリの接続を準備中",
+      "offeringSkill": "スキルのインストールを準備中",
+      "updatingSkills": "スキルを更新中",
       "offeringInvites": "招待を準備中",
       "proposingAgent": "エージェントを提案中",
       "askingAgent": "別のエージェントに質問中",
@@ -11317,6 +11370,8 @@
       "action_connect_app": "{{name}}を接続",
       "action_add_mcp": "MCPサーバーを追加",
       "action_invite_people": "メンバーを招待",
+      "action_install_skill": "スキルをインストール",
+      "action_update_skills": "スキルを更新",
       "agent_proposal": "新しいエージェントを提案しました: {{name}}",
       "approval_request": "承認リクエスト: {{title}}",
       "secret_request": "{{agent}}がキーを求めました: {{name}}",
@@ -11521,6 +11576,14 @@
     "offer_invites": {
       "label": "メンバーの招待を提案",
       "description": "アドレスが入力済みの招待ダイアログを開くボタン付きのカードを投稿します。"
+    },
+    "offer_install_skill": {
+      "label": "スキルのインストールを提案",
+      "description": "スキルのリンクを入力済みのインストール画面を開くボタン付きのカードを投稿します。"
+    },
+    "update_skill_from_source": {
+      "label": "スキルをリンクから更新",
+      "description": "スキルをインストール元から更新します。スクリプトの変更は人の確認を待ちます。"
     },
     "propose_agent": {
       "label": "エージェントを提案",

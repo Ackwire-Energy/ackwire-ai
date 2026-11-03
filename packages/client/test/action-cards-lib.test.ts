@@ -7,10 +7,12 @@ import {
   connectAppDone,
   draftLevels,
   draftMailLevels,
+  installSkillDone,
   inviteDone,
   mayContinueStretch,
   proposalLines,
   proposalStatus,
+  skillUpdateState,
   stretchCardOf,
   stretchCardText,
   suggestedAiText,
@@ -220,4 +222,31 @@ test("connect-an-app and invite cards: read from the message, a plain http addre
   if (invite?.kind !== "invite_people") throw new Error("not an invite card");
   expect(inviteDone(invite, [])).toBe(false);
   expect(inviteDone(invite, ["ANA@x.com"])).toBe(true);
+});
+
+test("skill cards: install done once a skill has its link; each update's state from live data after the card", () => {
+  const link = "https://github.com/acme/skills/tree/main/deploy";
+  const install = actionCardOf({
+    actionCard: { kind: "install_skill", forUserId: "u1", params: { url: link, why: "Deploys" } },
+  });
+  expect(install).toEqual({ kind: "install_skill", forUserId: "u1", url: link, why: "Deploys" });
+  expect(
+    actionCardOf({ actionCard: { kind: "install_skill", forUserId: null, params: { url: "http://x" } } }),
+  ).toBeNull();
+  if (install?.kind !== "install_skill") throw new Error("no card");
+  expect(installSkillDone(install, [{ sourceUrl: null }])).toBe(false);
+  expect(installSkillDone(install, [{ sourceUrl: link }])).toBe(true);
+
+  expect(
+    actionCardOf({ actionCard: { kind: "update_skills", forUserId: null, params: { skillIds: ["s1", 2], why: "" } } }),
+  ).toEqual({ kind: "update_skills", forUserId: null, skillIds: ["s1"], why: "" });
+  const posted = "2026-11-03T10:00:00.000Z";
+  const waiting = { scripts: ["run.sh"], at: posted, dismissed: false };
+  expect(skillUpdateState({ checkedAt: null, pendingUpdate: null }, posted)).toBe("open");
+  expect(skillUpdateState({ checkedAt: "2026-11-03T09:00:00.000Z", pendingUpdate: null }, posted)).toBe("open");
+  expect(skillUpdateState({ checkedAt: "2026-11-03T11:00:00.000Z", pendingUpdate: waiting }, posted)).toBe("waiting");
+  expect(
+    skillUpdateState({ checkedAt: "2026-11-03T11:00:00.000Z", pendingUpdate: { ...waiting, dismissed: true } }, posted),
+  ).toBe("done");
+  expect(skillUpdateState(undefined, posted)).toBe("done");
 });

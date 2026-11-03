@@ -1,4 +1,12 @@
-import type { Connection, SkillChoice, SkillDetail, SkillFile, SkillSkipped, SkillVia } from "@agenteschat/client";
+import type {
+  Connection,
+  SkillChoice,
+  SkillDetail,
+  SkillFile,
+  SkillSkipped,
+  SkillSourceUpdate,
+  SkillVia,
+} from "@agenteschat/client";
 import {
   keys,
   useCatalog,
@@ -21,6 +29,7 @@ import {
   skillPickOf,
   skillRefusalText,
   skillSourceViaText,
+  skillUpdateErrorText,
   skillViaText,
   skippedSkillText,
 } from "@agenteschat/client/lib/skills";
@@ -170,11 +179,11 @@ export function SkillScreen({ id }: { id: string }) {
 
   const refresh = (item: SkillDetail) =>
     action.mutate(
-      { type: "reimport", id: item.id },
+      { type: "updateFromSource", id: item.id },
       {
-        onSuccess: () => {
+        onSuccess: (r) => {
           successHaptic();
-          toast({ title: t("skills.refreshed", { name: item.name }), icon: "check" });
+          toast({ title: t(UPDATE_TOAST[(r as SkillSourceUpdate).status], { name: item.name }), icon: "check" });
         },
         // A repository none of the workspace's GitHub reads, as Instalar skill says it.
         onError: (e) => toast({ title: skillRefusalText(t, e, can(org, "manage_connectors")), icon: "x" }),
@@ -236,6 +245,7 @@ export function SkillScreen({ id }: { id: string }) {
               <Note icon={<SocialMark provider="github" color={c.muted} size={15} />}>{via}</Note>
             </View>
           ) : null}
+          {admin ? <SourceUpdate skill={s} /> : null}
           <Gap />
           <GroupedList>
             <View style={styles.page}>
@@ -286,6 +296,107 @@ export function SkillScreen({ id }: { id: string }) {
   );
 }
 
+/** What "Atualizar do link" says, by what it did. */
+const UPDATE_TOAST = {
+  updated: "skills.refreshed",
+  unchanged: "skills.upToDate",
+  waiting: "skills.waitingToast",
+} as const;
+
+/**
+ * A skill from a link, as the web's sheet: an update waiting because it changes files that run (applied or refused
+ * here, the files named), why its last update failed, Desfazer for the last one, and "Atualizar sozinha".
+ */
+function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const { orgId } = useOrg();
+  const action = useSkillAction(orgId);
+  if (s.source !== "url" || !s.sourceUrl) return null;
+  const pending = s.pendingUpdate && !s.pendingUpdate.dismissed ? s.pendingUpdate : null;
+  const said = (title: string) => {
+    successHaptic();
+    toast({ title, icon: "check" });
+  };
+  return (
+    <>
+      {pending ? (
+        <>
+          <View style={styles.note}>
+            <Note icon="shield">{t("skills.pending.title", { files: pending.scripts.join(", ") })}</Note>
+          </View>
+          <GroupedList>
+            <GroupedRow
+              icon="check"
+              label={t("skills.pending.apply")}
+              disabled={action.isPending}
+              onPress={() =>
+                action.mutate(
+                  { type: "approveUpdate", id: s.id },
+                  {
+                    onSuccess: (r) =>
+                      said(
+                        t(
+                          (r as SkillSourceUpdate).status === "waiting"
+                            ? "skills.pending.changedAgain"
+                            : "skills.pending.applied",
+                          { name: s.name },
+                        ),
+                      ),
+                  },
+                )
+              }
+            />
+            <GroupedRow
+              icon="x"
+              label={t("skills.pending.dismiss")}
+              disabled={action.isPending}
+              onPress={() =>
+                action.mutate(
+                  { type: "dismissUpdate", id: s.id },
+                  { onSuccess: () => said(t("skills.pending.dismissed")) },
+                )
+              }
+            />
+          </GroupedList>
+          <GroupedFooter>{t("skills.pending.lead")}</GroupedFooter>
+        </>
+      ) : null}
+      {s.updateError ? (
+        <View style={styles.note}>
+          <Note icon="x">{skillUpdateErrorText(t, s.updateError)}</Note>
+        </View>
+      ) : null}
+      <Gap />
+      <GroupedList>
+        <GroupedRow
+          label={t("skills.autoUpdate")}
+          toggle={s.autoUpdate ?? false}
+          disabled={action.isPending}
+          onPress={() => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: !s.autoUpdate } })}
+        />
+        {s.lastUpdate ? (
+          <GroupedRow
+            icon="undo"
+            label={t("skills.undoUpdate")}
+            sub={t("skills.lastUpdate", { when: relativeTime(t, i18n.language, s.lastUpdate.at) })}
+            disabled={action.isPending}
+            onPress={() =>
+              action.mutate(
+                { type: "undoUpdate", id: s.id },
+                {
+                  onSuccess: () => said(t("skills.undone", { name: s.name, version: s.lastUpdate?.fromVersion ?? 0 })),
+                },
+              )
+            }
+          />
+        ) : null}
+      </GroupedList>
+      <GroupedFooter>{t("skills.autoUpdateHelp")}</GroupedFooter>
+    </>
+  );
+}
+
 type InstallTab = "github" | "zip" | "write";
 
 /** How many of the connected GitHub's repositories show at once: the search finds the rest. */
@@ -300,15 +411,15 @@ const REPOS_SHOWN = 30;
  * connection read it; when none can, "Conectar o GitHub" opens the connect sheet over it (or it says whom to ask),
  * and the link is read again once GitHub is connected.
  */
-export function InstallSkillScreen() {
+export function InstallSkillScreen({ initialUrl }: { initialUrl?: string }) {
   return (
     <SheetHostProvider>
-      <InstallSkill />
+      <InstallSkill initialUrl={initialUrl} />
     </SheetHostProvider>
   );
 }
 
-function InstallSkill() {
+function InstallSkill({ initialUrl }: { initialUrl?: string }) {
   const { t } = useTranslation();
   const c = useColors();
   const toast = useToast();
@@ -369,6 +480,13 @@ function InstallSkill() {
       },
     );
   };
+  // An agent's card: its link read once, its skills listed to pick.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on opening only
+  useEffect(() => {
+    if (!initialUrl || !isGithubSkillLink(initialUrl)) return;
+    setUrl(initialUrl);
+    read(initialUrl, true);
+  }, []);
   const pickRepo = (fullName: string) => {
     const link = githubRepoLink(fullName);
     setUrl(link);

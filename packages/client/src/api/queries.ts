@@ -3374,6 +3374,7 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         | { type: "remove"; id: string }
         | { type: "revert"; id: string }
         | { type: "restore"; id: string }
+        | { type: "updateFromSource" | "approveUpdate" | "dismissUpdate" | "undoUpdate"; id: string }
         | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
     ): Promise<unknown> => {
       switch (action.type) {
@@ -3395,6 +3396,11 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
           return api.skills.revert?.(orgId, action.id) ?? Promise.resolve();
         case "restore":
           return api.skills.restore?.(orgId, action.id) ?? Promise.resolve();
+        case "updateFromSource":
+        case "approveUpdate":
+        case "dismissUpdate":
+        case "undoUpdate":
+          return api.skills[action.type]?.(orgId, action.id) ?? Promise.resolve();
       }
     },
     // The library and every agent's lists (`keys.skills` is their prefix).

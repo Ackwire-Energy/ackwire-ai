@@ -1900,6 +1900,21 @@
       "done": "Uitnodiging verstuurd",
       "adminOnly": "Wie mag uitnodigen, verstuurt het"
     },
+    "install_skill": {
+      "title": "Een skill installeren",
+      "open": "Installeren",
+      "done": "Geïnstalleerd",
+      "adminOnly": "Wie agents beheert, installeert het"
+    },
+    "update_skills": {
+      "title_one": "Een skill bijwerken",
+      "title_other": "{{count}} skills bijwerken",
+      "update": "Bijwerken",
+      "review": "Bekijken",
+      "done": "Bijgewerkt",
+      "waiting": "Wacht op controle",
+      "adminOnly": "Wie agents beheert, werkt het bij"
+    },
     "agentProposal": {
       "title": "{{agent}} stelt een nieuwe agent voor",
       "review": "Bekijken",
@@ -2981,6 +2996,14 @@
     "nameLabel": "Naam",
     "roleLabel": "Rol",
     "roleHelp": "Wat de agent voor het team doet, bijv. assistent voor e-mail en agenda.",
+    "editName": "Naam bewerken: {{name}}",
+    "editHandle": "Vermeldingen bewerken: @{{handle}}",
+    "editRole": "Rol bewerken: {{role}}",
+    "noRole": "Geen rol",
+    "rolePlaceholder": "Bijv. Support",
+    "roleList": "Rollen",
+    "roleUse": "“{{role}}” gebruiken",
+    "roleCurrent": "huidig",
     "edit": "Bewerken",
     "chat": "Chatten",
     "moreActions": "Meer acties",
@@ -3030,15 +3053,7 @@
     "budgetDefaultHelp": "Leeg: de standaard van de werkruimte.",
     "budgetDefaultHelpAmount": "Leeg: de standaard van de werkruimte ({{amount}}).",
     "budgetInvalid": "Gebruik een waarde groter dan nul.",
-    "notFound": "Deze agent bestaat niet of is gearchiveerd.",
-    "editName": "Naam bewerken: {{name}}",
-    "editHandle": "Vermeldingen bewerken: @{{handle}}",
-    "editRole": "Rol bewerken: {{role}}",
-    "noRole": "Geen rol",
-    "rolePlaceholder": "Bijv. Support",
-    "roleList": "Rollen",
-    "roleUse": "“{{role}}” gebruiken",
-    "roleCurrent": "huidig"
+    "notFound": "Deze agent bestaat niet of is gearchiveerd."
   },
   "agentPage": {
     "work": {
@@ -4178,21 +4193,6 @@
     },
     "dialog": {
       "title": "Uitnodigen voor {{org}}",
-      "emails": "E-mailadressen",
-      "moreEmails": "Meer e-mailadressen…",
-      "checkMarked": "Controleer de gemarkeerde e-mailadressen: die krijgen geen uitnodiging.",
-      "withNote": "met een notitie",
-      "alsoJoin": "Ze komen ook in",
-      "generalAlways": "Iedereen komt in #{{channel}}",
-      "note": "Notitie in de e-mail",
-      "optional": "(optioneel)",
-      "notePlaceholder": "Hoi. Kom erbij in {{org}}: het team en de agents zijn er allemaal.",
-      "or": "of stuur de link",
-      "send_one": "{{count}} persoon uitnodigen",
-      "send_other": "{{count}} mensen uitnodigen",
-      "sent": "Uitnodiging verstuurd naar {{email}}.",
-      "sentMany": "{{count}} uitnodigingen verstuurd.",
-      "alsoIn": "Ze komen ook in {{channels}}.",
       "stepOf": "Stap {{n}} van {{total}} · {{step}}",
       "steps": {
         "who": "Wie",
@@ -4200,9 +4200,24 @@
         "where": "Waar ze beginnen",
         "note": "Notitie"
       },
+      "emails": "E-mailadressen",
+      "moreEmails": "Meer e-mailadressen…",
+      "checkMarked": "Controleer de gemarkeerde e-mailadressen: die krijgen geen uitnodiging.",
       "pasteHelp": "Plak een lijst als je wilt: komma's, spaties of één per regel.",
       "leftOut": "Wie er al is of al is uitgenodigd, valt erbuiten.",
+      "withNote": "met een notitie",
+      "alsoJoin": "Ze komen ook in",
+      "generalAlways": "Iedereen komt in #{{channel}}",
+      "note": "Notitie in de e-mail",
+      "optional": "(optioneel)",
+      "notePlaceholder": "Hoi. Kom erbij in {{org}}: het team en de agents zijn er allemaal.",
+      "or": "of stuur de link",
       "continueWith": "Doorgaan met {{count}}",
+      "send_one": "{{count}} persoon uitnodigen",
+      "send_other": "{{count}} mensen uitnodigen",
+      "sent": "Uitnodiging verstuurd naar {{email}}.",
+      "sentMany": "{{count}} uitnodigingen verstuurd.",
+      "alsoIn": "Ze komen ook in {{channels}}.",
       "who": {
         "title": "Wie wil je erbij halen?",
         "lead": "Geef me de e-mailadressen. Elke persoon krijgt een uitnodiging en doet direct mee."
@@ -4593,6 +4608,54 @@
     "flowHint": "De taak verschuift vanzelf naar de eerste kolom van elke fase: Bezig als een agent begint, Ter controle als hij klaar is om te checken, Klaar als jij hem goedkeurt.",
     "moreOptions": "Meer opties",
     "showCanceled": "Geannuleerde tonen",
+    "filterButton": "Filteren",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ik",
+    "display": {
+      "title": "Weergave",
+      "label": "Weergave: {{layout}} · {{group}}",
+      "layout": "Indeling",
+      "group": "Groeperen op",
+      "sort": "Sorteren op",
+      "fields": "Op de kaarten",
+      "saved": "Voor jou bewaard in deze werkruimte",
+      "reset": "Terug naar standaard",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit"
+      },
+      "order": {
+        "manual": "Handmatig",
+        "priority": "Prioriteit",
+        "due": "Deadline"
+      },
+      "field": {
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit",
+        "due": "Deadline",
+        "criteria": "Voorwaarden",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Loslaten in {{name}}",
+      "assignee": "Loslaten om aan {{name}} te geven",
+      "unassign": "Loslaten om de toewijzing weg te halen",
+      "priority": "Loslaten voor prioriteit {{priority}}"
+    },
+    "drag": {
+      "role": "versleepbare taak",
+      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
+      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
+      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
+      "canceled": "#{{number}} staat weer op zijn plek.",
+      "assigned": "#{{number}} ligt nu bij {{name}}.",
+      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
+      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
+    },
     "canceledColumn": "Geannuleerd",
     "columns": {
       "add": "Kolom toevoegen",
@@ -4840,54 +4903,6 @@
       "agent_asked": "heeft {{name}} gevraagd het te doen",
       "forum_opened": "heeft het naar het forum gebracht: {{title}}",
       "forum_evaluated": "heeft het resultaat van het forum teruggebracht: {{title}}"
-    },
-    "filterButton": "Filteren",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Ik",
-    "display": {
-      "title": "Weergave",
-      "label": "Weergave: {{layout}} · {{group}}",
-      "layout": "Indeling",
-      "group": "Groeperen op",
-      "sort": "Sorteren op",
-      "fields": "Op de kaarten",
-      "saved": "Voor jou bewaard in deze werkruimte",
-      "reset": "Terug naar standaard",
-      "by": {
-        "stage": "Fase",
-        "assignee": "Toegewezen aan",
-        "priority": "Prioriteit"
-      },
-      "order": {
-        "manual": "Handmatig",
-        "priority": "Prioriteit",
-        "due": "Deadline"
-      },
-      "field": {
-        "assignee": "Toegewezen aan",
-        "priority": "Prioriteit",
-        "due": "Deadline",
-        "criteria": "Voorwaarden",
-        "pullRequest": "Pull request",
-        "label": "Label"
-      }
-    },
-    "drop": {
-      "stage": "Loslaten in {{name}}",
-      "assignee": "Loslaten om aan {{name}} te geven",
-      "unassign": "Loslaten om de toewijzing weg te halen",
-      "priority": "Loslaten voor prioriteit {{priority}}"
-    },
-    "drag": {
-      "role": "versleepbare taak",
-      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
-      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
-      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
-      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
-      "canceled": "#{{number}} staat weer op zijn plek.",
-      "assigned": "#{{number}} ligt nu bij {{name}}.",
-      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
-      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
     }
   },
   "routines": {
@@ -5073,7 +5088,6 @@
         "artifact": "Wordt een document in de Drive"
       },
       "ahead": "Klaargezet voor later",
-      "ownActions": "Doet zelf",
       "createdBy": "Gemaakt door {{name}} · {{date}}",
       "nameLabel": "Naam van de routine",
       "editName": "Naam bewerken",
@@ -5090,7 +5104,8 @@
       "reportHint": {
         "always": "Ook als er niets nieuws is",
         "when_new": "Stil als er niets nieuws is"
-      }
+      },
+      "ownActions": "Doet zelf"
     },
     "ownActions": {
       "hint": "Elke run doet dit in je gekoppelde apps zonder te vragen. Elke andere actie daar vraagt eerst een persoon om goedkeuring, en merge, deploy en rollback vragen dat altijd.",
@@ -6599,6 +6614,37 @@
     "saved": "{{name}} opgeslagen.",
     "refresh": "Bijwerken vanaf link",
     "refreshed": "{{name}} bijgewerkt vanaf de link.",
+    "upToDate": "{{name}} heeft al wat de link bevat.",
+    "waitingToast": "De update van {{name}} wijzigt bestanden die worden uitgevoerd, dus die wacht op een controle.",
+    "autoUpdate": "Zelf bijwerken",
+    "autoUpdateHelp": "Leest de link elke dag. Nieuwe tekst komt erin met Ongedaan maken. Wijzigingen in scripts wachten op iemand die skills beheert.",
+    "autoChip": "Werkt zichzelf bij",
+    "waitingChip": "Update wacht",
+    "lastUpdate": "Bijgewerkt vanaf de link {{when}}",
+    "undoUpdate": "Update ongedaan maken",
+    "undone": "{{name}} is terug naar versie {{version}}.",
+    "pending": {
+      "title": "De update vanaf de link wijzigt bestanden die worden uitgevoerd: {{files}}",
+      "lead": "Pas het alleen toe als je deze bestanden vertrouwt. Agents voeren ze uit op hun computers.",
+      "apply": "Update toepassen",
+      "dismiss": "Niet toepassen",
+      "applied": "{{name}} bijgewerkt vanaf de link.",
+      "changedAgain": "De link is weer gewijzigd. Bekijk de nieuwe bestanden.",
+      "dismissed": "Update niet toegepast. Een nieuwe wijziging in de link vraagt het opnieuw."
+    },
+    "updateFailed": {
+      "no_skill_md": "Bijwerken lukte niet: de link heeft geen SKILL.md meer.",
+      "connection_gone": "Bijwerken lukte niet: de GitHub-koppeling die het las, bestaat niet meer.",
+      "link_holds_several": "Bijwerken lukte niet: de link bevat nu meerdere skills.",
+      "link_renamed": "Bijwerken lukte niet: de link bevat nu een andere skill.",
+      "owner_gone": "Bijwerken lukte niet: wie zelf bijwerken aanzette, kan geen skills meer beheren. Zet het opnieuw aan.",
+      "other": "Bijwerken vanaf de link lukte niet."
+    },
+    "notice": {
+      "updated": "{{name}} is bijgewerkt vanaf de link",
+      "waiting": "Een update van {{name}} wijzigt de scripts",
+      "failed": "{{name}} kon niet bijwerken vanaf de link"
+    },
     "remove": "Verwijderen",
     "removeTitle": "{{name}} verwijderen?",
     "removeAgents_one": "{{names}} gebruikt deze skill en verliest de toegang ertoe.",
@@ -10340,7 +10386,11 @@
       "invalidDescription": "De beschrijving moet 1 tot {{max}} tekens hebben.",
       "tooLarge": "De skill is te groot (max. {{max}} MB).",
       "tooManyFiles": "De skill heeft te veel bestanden (max. {{max}}).",
-      "connectionGone": "De GitHub-koppeling die {{repo}} las, bestaat niet meer. Koppel GitHub opnieuw om deze skill bij te werken."
+      "connectionGone": "De GitHub-koppeling die {{repo}} las, bestaat niet meer. Koppel GitHub opnieuw om deze skill bij te werken.",
+      "linkHoldsSeveral": "De link bevat nu meerdere skills. Installeer deze opnieuw vanuit de eigen map.",
+      "linkRenamed": "De link bevat nu de skill {{name}}.",
+      "noLink": "Alleen een skill die vanaf een link is geïnstalleerd, werkt daarvandaan bij.",
+      "noPendingUpdate": "Er wacht geen update van deze skill."
     },
     "agentGroup": {
       "notFound": "Deze groep bestaat niet meer.",
@@ -11626,6 +11676,8 @@
         "creatingChannel": "Een kanaal gemaakt",
         "offeringConnectAi": "Aangeboden een AI te koppelen",
         "offeringConnectApp": "Aangeboden een app te koppelen",
+        "offeringSkill": "Aangeboden een skill te installeren",
+        "updatingSkills": "Skills bijgewerkt",
         "offeringInvites": "Aangeboden mensen uit te nodigen",
         "proposingAgent": "Een agent voorgesteld",
         "askingAgent": "Een andere agent iets gevraagd",
@@ -11710,6 +11762,8 @@
       "creatingChannel": "een kanaal aan het maken",
       "offeringConnectAi": "een AI klaar aan het zetten om te koppelen",
       "offeringConnectApp": "een app klaar aan het zetten om te koppelen",
+      "offeringSkill": "een skill klaarzetten om te installeren",
+      "updatingSkills": "skills bijwerken",
       "offeringInvites": "uitnodigingen klaar aan het zetten",
       "proposingAgent": "een agent aan het voorstellen",
       "askingAgent": "een andere agent iets aan het vragen",
@@ -11821,6 +11875,8 @@
       "action_connect_app": "{{name}} koppelen",
       "action_add_mcp": "Een MCP-server toevoegen",
       "action_invite_people": "Mensen uitnodigen",
+      "action_install_skill": "Een skill installeren",
+      "action_update_skills": "Skills bijwerken",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
       "secret_request": "{{agent}} vroeg om een sleutel: {{name}}",
@@ -12028,6 +12084,14 @@
     "offer_invites": {
       "label": "Aanbieden mensen uit te nodigen",
       "description": "Plaatst een kaart met een knop die het uitnodigingsvenster opent met de adressen al ingevuld."
+    },
+    "offer_install_skill": {
+      "label": "Aanbieden een skill te installeren",
+      "description": "Plaatst een kaart waarvan de knop de installatie opent met de link van de skill ingevuld."
+    },
+    "update_skill_from_source": {
+      "label": "Skills bijwerken vanaf hun links",
+      "description": "Werkt skills bij vanaf waar ze zijn geïnstalleerd. Wijzigingen in scripts wachten op een persoon."
     },
     "propose_agent": {
       "label": "Agent voorstellen",

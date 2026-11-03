@@ -85,6 +85,12 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
         <Icon name="plug" size={16} />
       </span>
     );
+  if (n.kind === "skill_update")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <Icon name="book" size={16} />
+      </span>
+    );
   if (n.kind === "computer_disk_full")
     return (
       <span className="nt-sys" aria-hidden="true">

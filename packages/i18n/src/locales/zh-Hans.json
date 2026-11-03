@@ -1832,6 +1832,20 @@
       "done": "已发送邀请",
       "adminOnly": "由有邀请权限的人发送"
     },
+    "install_skill": {
+      "title": "安装技能",
+      "open": "安装",
+      "done": "已安装",
+      "adminOnly": "由管理智能体的人安装"
+    },
+    "update_skills": {
+      "title_other": "更新 {{count}} 个技能",
+      "update": "更新",
+      "review": "审核",
+      "done": "已是最新",
+      "waiting": "等待审核",
+      "adminOnly": "由管理智能体的人更新"
+    },
     "agentProposal": {
       "title": "{{agent}} 提议创建一个新智能体",
       "review": "查看",
@@ -2878,6 +2892,14 @@
     "nameLabel": "名称",
     "roleLabel": "角色",
     "roleHelp": "它为团队做什么，例如：邮件和日历助理。",
+    "editName": "编辑名称：{{name}}",
+    "editHandle": "编辑提及：@{{handle}}",
+    "editRole": "编辑角色：{{role}}",
+    "noRole": "无角色",
+    "rolePlaceholder": "例如：客服",
+    "roleList": "角色列表",
+    "roleUse": "使用“{{role}}”",
+    "roleCurrent": "当前",
     "edit": "编辑",
     "chat": "聊天",
     "moreActions": "更多操作",
@@ -2926,15 +2948,7 @@
     "budgetDefaultHelp": "留空：使用工作区默认值。",
     "budgetDefaultHelpAmount": "留空：使用工作区默认值（{{amount}}）。",
     "budgetInvalid": "请输入大于零的值。",
-    "notFound": "该智能体不存在或已归档。",
-    "editName": "编辑名称：{{name}}",
-    "editHandle": "编辑提及：@{{handle}}",
-    "editRole": "编辑角色：{{role}}",
-    "noRole": "无角色",
-    "rolePlaceholder": "例如：客服",
-    "roleList": "角色列表",
-    "roleUse": "使用“{{role}}”",
-    "roleCurrent": "当前"
+    "notFound": "该智能体不存在或已归档。"
   },
   "agentPage": {
     "work": {
@@ -4018,20 +4032,6 @@
     },
     "dialog": {
       "title": "邀请加入 {{org}}",
-      "emails": "邮箱",
-      "moreEmails": "更多邮箱…",
-      "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
-      "withNote": "附带留言",
-      "alsoJoin": "同时加入",
-      "generalAlways": "所有人都会加入 #{{channel}}",
-      "note": "邮件中的留言",
-      "optional": "（可选）",
-      "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
-      "or": "或发送链接",
-      "send_other": "邀请 {{count}} 人",
-      "sent": "已向 {{email}} 发送邀请。",
-      "sentMany": "已发送 {{count}} 份邀请。",
-      "alsoIn": "他们也会加入 {{channels}}。",
       "stepOf": "第 {{n}} 步，共 {{total}} 步 · {{step}}",
       "steps": {
         "who": "邀请谁",
@@ -4039,9 +4039,23 @@
         "where": "加入频道",
         "note": "留言"
       },
+      "emails": "邮箱",
+      "moreEmails": "更多邮箱…",
+      "checkMarked": "请检查标出的邮箱：它们不会收到邀请。",
       "pasteHelp": "也可以粘贴一个列表：用逗号、空格分隔，或每行一个。",
       "leftOut": "已经在这里或已被邀请的人不会再收到邀请。",
+      "withNote": "附带留言",
+      "alsoJoin": "同时加入",
+      "generalAlways": "所有人都会加入 #{{channel}}",
+      "note": "邮件中的留言",
+      "optional": "（可选）",
+      "notePlaceholder": "你好，来加入 {{org}} 吧：团队和智能体都在这里。",
+      "or": "或发送链接",
       "continueWith": "继续（{{count}} 人）",
+      "send_other": "邀请 {{count}} 人",
+      "sent": "已向 {{email}} 发送邀请。",
+      "sentMany": "已发送 {{count}} 份邀请。",
+      "alsoIn": "他们也会加入 {{channels}}。",
       "who": {
         "title": "你想邀请谁？",
         "lead": "把邮箱告诉我。每个人都会收到邀请，并直接加入。"
@@ -4425,6 +4439,54 @@
     "flowHint": "任务会自动移到每个阶段的第一列：智能体开始时移到“进行中”，可以检查时移到“审核中”，你批准后移到“已完成”。",
     "moreOptions": "更多选项",
     "showCanceled": "显示已取消",
+    "filterButton": "筛选",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "我",
+    "display": {
+      "title": "显示",
+      "label": "显示：{{layout}} · {{group}}",
+      "layout": "布局",
+      "group": "分组依据",
+      "sort": "排序依据",
+      "fields": "卡片上显示",
+      "saved": "已在此工作区为你保存",
+      "reset": "恢复默认",
+      "by": {
+        "stage": "阶段",
+        "assignee": "负责人",
+        "priority": "优先级"
+      },
+      "order": {
+        "manual": "手动",
+        "priority": "优先级",
+        "due": "截止日期"
+      },
+      "field": {
+        "assignee": "负责人",
+        "priority": "优先级",
+        "due": "截止日期",
+        "criteria": "标准",
+        "pullRequest": "拉取请求",
+        "label": "标签"
+      }
+    },
+    "drop": {
+      "stage": "放到{{name}}",
+      "assignee": "放下以交给{{name}}",
+      "unassign": "放下以移除负责人",
+      "priority": "放下以设为{{priority}}优先级"
+    },
+    "drag": {
+      "role": "可拖动的任务",
+      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
+      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
+      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
+      "dropped": "你把 #{{number}} 放到了{{group}}。",
+      "canceled": "#{{number}} 回到了原位。",
+      "assigned": "#{{number}} 现在由{{name}}负责。",
+      "unassigned": "#{{number}} 现在没有负责人。",
+      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
+    },
     "canceledColumn": "已取消",
     "columns": {
       "add": "添加列",
@@ -4667,54 +4729,6 @@
       "agent_asked": "请 {{name}} 来完成",
       "forum_opened": "将它提交到论坛：{{title}}",
       "forum_evaluated": "带回了论坛的结果：{{title}}"
-    },
-    "filterButton": "筛选",
-    "filterValue": "{{filter}}：{{value}}",
-    "me": "我",
-    "display": {
-      "title": "显示",
-      "label": "显示：{{layout}} · {{group}}",
-      "layout": "布局",
-      "group": "分组依据",
-      "sort": "排序依据",
-      "fields": "卡片上显示",
-      "saved": "已在此工作区为你保存",
-      "reset": "恢复默认",
-      "by": {
-        "stage": "阶段",
-        "assignee": "负责人",
-        "priority": "优先级"
-      },
-      "order": {
-        "manual": "手动",
-        "priority": "优先级",
-        "due": "截止日期"
-      },
-      "field": {
-        "assignee": "负责人",
-        "priority": "优先级",
-        "due": "截止日期",
-        "criteria": "标准",
-        "pullRequest": "拉取请求",
-        "label": "标签"
-      }
-    },
-    "drop": {
-      "stage": "放到{{name}}",
-      "assignee": "放下以交给{{name}}",
-      "unassign": "放下以移除负责人",
-      "priority": "放下以设为{{priority}}优先级"
-    },
-    "drag": {
-      "role": "可拖动的任务",
-      "help": "按空格拿起任务，用方向键移动，再按空格放下，按 Esc 取消。",
-      "picked": "你拿起了 #{{number}}。方向键移动，空格放下，Esc 取消。",
-      "moved": "#{{number}}：{{group}}，第 {{position}} 个，共 {{total}} 个。",
-      "dropped": "你把 #{{number}} 放到了{{group}}。",
-      "canceled": "#{{number}} 回到了原位。",
-      "assigned": "#{{number}} 现在由{{name}}负责。",
-      "unassigned": "#{{number}} 现在没有负责人。",
-      "prioritized": "#{{number}} 现在是{{priority}}优先级。"
     }
   },
   "routines": {
@@ -4898,7 +4912,6 @@
         "artifact": "生成 Drive 中的文档"
       },
       "ahead": "为之后准备好的",
-      "ownActions": "自动执行",
       "createdBy": "由 {{name}} 创建 · {{date}}",
       "nameLabel": "例行工作名称",
       "editName": "编辑名称",
@@ -4915,7 +4928,8 @@
       "reportHint": {
         "always": "即使没有新内容",
         "when_new": "没有新内容时保持安静"
-      }
+      },
+      "ownActions": "自动执行"
     },
     "ownActions": {
       "hint": "每次运行都会在你已连接的应用中直接执行这些操作，无需询问。其中的其他操作会先请人审批，合并、部署和回滚始终需要审批。",
@@ -6319,6 +6333,37 @@
     "saved": "已保存 {{name}}。",
     "refresh": "从链接更新",
     "refreshed": "已从链接更新 {{name}}。",
+    "upToDate": "{{name}} 已经和链接中的内容一致。",
+    "waitingToast": "{{name}} 的更新会修改会运行的文件，所以要等审核。",
+    "autoUpdate": "自动更新",
+    "autoUpdateHelp": "每天读取它的链接。新文本会生效，可撤销。脚本的改动要等管理技能的人处理。",
+    "autoChip": "自动更新",
+    "waitingChip": "更新待处理",
+    "lastUpdate": "{{when}}从链接更新",
+    "undoUpdate": "撤销更新",
+    "undone": "{{name}} 已回到版本 {{version}}。",
+    "pending": {
+      "title": "来自链接的更新会修改会运行的文件：{{files}}",
+      "lead": "只有在你信任这些文件时才应用。智能体会在它们的电脑上运行这些文件。",
+      "apply": "应用更新",
+      "dismiss": "不应用",
+      "applied": "已从链接更新 {{name}}。",
+      "changedAgain": "链接又变了。请审核新的文件。",
+      "dismissed": "未应用更新。链接再有新改动时会再次询问。"
+    },
+    "updateFailed": {
+      "no_skill_md": "无法更新：链接里已经没有 SKILL.md。",
+      "connection_gone": "无法更新：读取它的 GitHub 连接已失效。",
+      "link_holds_several": "无法更新：链接里现在有多个技能。",
+      "link_renamed": "无法更新：链接里现在是另一个技能。",
+      "owner_gone": "无法更新：开启自动更新的人已不能管理技能。请重新开启。",
+      "other": "无法从链接更新。"
+    },
+    "notice": {
+      "updated": "{{name}} 已从链接更新",
+      "waiting": "{{name}} 的一个更新会修改它的脚本",
+      "failed": "{{name}} 无法从链接更新"
+    },
     "remove": "移除",
     "removeTitle": "移除 {{name}}？",
     "removeAgents_other": "{{names}} 正在使用这个技能，移除后将无法再使用。",
@@ -9953,7 +9998,11 @@
       "invalidDescription": "描述需为 1 到 {{max}} 个字符。",
       "tooLarge": "技能太大（最大 {{max}} MB）。",
       "tooManyFiles": "技能的文件太多（最多 {{max}} 个）。",
-      "connectionGone": "读取 {{repo}} 的 GitHub 连接已失效。请重新连接 GitHub 以更新这个技能。"
+      "connectionGone": "读取 {{repo}} 的 GitHub 连接已失效。请重新连接 GitHub 以更新这个技能。",
+      "linkHoldsSeveral": "链接里现在有多个技能。请从这个技能自己的文件夹重新安装。",
+      "linkRenamed": "链接里现在是技能 {{name}}。",
+      "noLink": "只有从链接安装的技能才会从链接更新。",
+      "noPendingUpdate": "这个技能没有待处理的更新。"
     },
     "agentGroup": {
       "notFound": "这个分组已不存在。",
@@ -11206,6 +11255,8 @@
         "creatingChannel": "创建了频道",
         "offeringConnectAi": "提议连接 AI",
         "offeringConnectApp": "提议连接一个应用",
+        "offeringSkill": "提议安装一个技能",
+        "updatingSkills": "更新了技能",
         "offeringInvites": "提议邀请成员",
         "proposingAgent": "提议了智能体",
         "askingAgent": "询问了另一个智能体",
@@ -11290,6 +11341,8 @@
       "creatingChannel": "创建频道",
       "offeringConnectAi": "准备连接 AI",
       "offeringConnectApp": "准备连接应用",
+      "offeringSkill": "准备安装技能",
+      "updatingSkills": "正在更新技能",
       "offeringInvites": "准备邀请",
       "proposingAgent": "提议智能体",
       "askingAgent": "询问另一个智能体",
@@ -11400,6 +11453,8 @@
       "action_connect_app": "连接 {{name}}",
       "action_add_mcp": "添加 MCP 服务器",
       "action_invite_people": "邀请成员",
+      "action_install_skill": "安装技能",
+      "action_update_skills": "更新技能",
       "agent_proposal": "提议了一个新智能体：{{name}}",
       "approval_request": "审批请求：{{title}}",
       "secret_request": "{{agent}} 请求了一个密钥：{{name}}",
@@ -11604,6 +11659,14 @@
     "offer_invites": {
       "label": "提议邀请成员",
       "description": "发布一张卡片，点击按钮即可打开已填好地址的邀请对话框。"
+    },
+    "offer_install_skill": {
+      "label": "提议安装技能",
+      "description": "发布一张卡片，按钮会打开已填好技能链接的安装窗口。"
+    },
+    "update_skill_from_source": {
+      "label": "从链接更新技能",
+      "description": "从安装来源更新技能。脚本的改动要等人处理。"
     },
     "propose_agent": {
       "label": "提议创建智能体",

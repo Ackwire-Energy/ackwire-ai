@@ -234,6 +234,11 @@ describe("Skills", () => {
     const s = { source: "url" as const, sourceUrl: "https://github.com/acme/s", version: 3, defaultForNewAgents: true };
     expect(skillLine(t, s, 2)).toBe("GitHub · Em agentes novos · v3 · 2 agentes usam");
     expect(skillLine(t, { ...s, source: "manual", defaultForNewAgents: false }, null)).toBe("Criada aqui · v3");
+    expect(skillLine(t, { ...s, autoUpdate: true }, null)).toBe("GitHub · Em agentes novos · Atualiza sozinha · v3");
+    const waiting = { scripts: ["run.sh"], at: "2026-11-03T10:00:00Z", dismissed: false };
+    expect(skillLine(t, { ...s, autoUpdate: true, pendingUpdate: waiting }, null)).toBe(
+      "GitHub · Em agentes novos · Atualização esperando · v3",
+    );
   });
 
   test("a long install's line moves on and stays on the last step", () => {

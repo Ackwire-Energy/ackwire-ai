@@ -3405,8 +3405,28 @@ export interface Skill {
   locked?: boolean;
   useCount?: number;
   lastUsedAt?: string | null;
+  /** "Atualizar sozinha": read from its link every day (older servers leave these out). */
+  autoUpdate?: boolean;
+  /** When its link was last read to update it. */
+  checkedAt?: string | null;
+  /** An update from its link that adds or changes files that run, waiting for who manages skills. */
+  pendingUpdate?: { scripts: string[]; at: string; dismissed: boolean } | null;
+  /** Why its last update from its link failed: a code (`skill.no_skill_md`, `skill.connection_gone`…). */
+  updateError?: string | null;
+  /** Its last update from its link, while Desfazer can take it back. */
+  lastUpdate?: { fromVersion: number; at: string } | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * An update from a skill's link: `waiting` when it adds or changes files that run (`scripts`), which a person who
+ * manages skills applies or refuses.
+ */
+export interface SkillSourceUpdate {
+  status: "unchanged" | "updated" | "waiting";
+  skill: SkillDetail;
+  scripts?: string[];
 }
 
 export interface SkillFile {
@@ -3471,6 +3491,8 @@ export interface SkillPatch {
   defaultForNewAgents?: boolean;
   /** Freeze it: agents can't change it. */
   locked?: boolean;
+  /** Update it from its link every day, with the rights of whoever turns it on. */
+  autoUpdate?: boolean;
 }
 
 /** A skill an agent made from its own how-tos (ADR 0120), archived ones too. */
@@ -5471,7 +5493,13 @@ export type NotificationKind =
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
-  | "app_created";
+  | "app_created"
+  /**
+   * An update of a skill from its link: `latest.statusTo` `updated`, `waiting` (it changes files that run: who manages
+   * skills, waiting, the files in `latest.title`) or `failed` (`latest.reason` its code). `source.skillId`, its name in
+   * `source.label`. Opens the skill.
+   */
+  | "skill_update";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5492,6 +5520,8 @@ export interface NotificationSource {
   questionId?: string;
   missionId?: string;
   routineId?: string;
+  /** `skill_update`: the skill. */
+  skillId?: string;
   /** `machine_connected`: the computer. */
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */

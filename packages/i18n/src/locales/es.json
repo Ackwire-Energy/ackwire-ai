@@ -1960,6 +1960,22 @@
       "done": "Invitación enviada",
       "adminOnly": "Lo envía quien puede invitar"
     },
+    "install_skill": {
+      "title": "Instalar una habilidad",
+      "open": "Instalar",
+      "done": "Instalada",
+      "adminOnly": "La instala quien gestiona agentes"
+    },
+    "update_skills": {
+      "title_one": "Actualizar una habilidad",
+      "title_many": "Actualizar {{count}} habilidades",
+      "title_other": "Actualizar {{count}} habilidades",
+      "update": "Actualizar",
+      "review": "Revisar",
+      "done": "Al día",
+      "waiting": "Espera revisión",
+      "adminOnly": "La actualiza quien gestiona agentes"
+    },
     "agentProposal": {
       "title": "{{agent}} propone un nuevo agente",
       "review": "Revisar",
@@ -3068,6 +3084,14 @@
     "nameLabel": "Nombre",
     "roleLabel": "Rol",
     "roleHelp": "Lo que hace por el equipo, por ejemplo: Asistente de correo y calendario.",
+    "editName": "Editar nombre: {{name}}",
+    "editHandle": "Editar menciones: @{{handle}}",
+    "editRole": "Editar rol: {{role}}",
+    "noRole": "Sin rol",
+    "rolePlaceholder": "Ej.: Soporte",
+    "roleList": "Lista de roles",
+    "roleUse": "Usar “{{role}}”",
+    "roleCurrent": "actual",
     "edit": "Editar",
     "chat": "Chatear",
     "moreActions": "Más acciones",
@@ -3114,15 +3138,7 @@
     "budgetDefaultHelp": "Vacío: el predeterminado del espacio de trabajo.",
     "budgetDefaultHelpAmount": "Vacío: el predeterminado del espacio de trabajo ({{amount}}).",
     "budgetInvalid": "Usa un valor mayor que cero.",
-    "notFound": "Este agente no existe o fue archivado.",
-    "editName": "Editar nombre: {{name}}",
-    "editHandle": "Editar menciones: @{{handle}}",
-    "editRole": "Editar rol: {{role}}",
-    "noRole": "Sin rol",
-    "rolePlaceholder": "Ej.: Soporte",
-    "roleList": "Lista de roles",
-    "roleUse": "Usar “{{role}}”",
-    "roleCurrent": "actual"
+    "notFound": "Este agente no existe o fue archivado."
   },
   "agentPage": {
     "work": {
@@ -4257,22 +4273,6 @@
     },
     "dialog": {
       "title": "Invitar a {{org}}",
-      "emails": "Correos",
-      "moreEmails": "Más correos…",
-      "checkMarked": "Revisa los correos marcados: no recibirán invitación.",
-      "withNote": "con una nota",
-      "alsoJoin": "También entran en",
-      "generalAlways": "Todos entran en #{{channel}}",
-      "note": "Nota en el correo",
-      "optional": "(opcional)",
-      "notePlaceholder": "Hola. Únete a {{org}}: el equipo y los agentes están todos aquí.",
-      "or": "o envía el enlace",
-      "send_one": "Invitar a {{count}} persona",
-      "send_many": "Invitar a {{count}} personas",
-      "send_other": "Invitar a {{count}} personas",
-      "sent": "Invitación enviada a {{email}}.",
-      "sentMany": "{{count}} invitaciones enviadas.",
-      "alsoIn": "También entran en {{channels}}.",
       "stepOf": "Paso {{n}} de {{total}} · {{step}}",
       "steps": {
         "who": "Quién",
@@ -4280,9 +4280,25 @@
         "where": "Dónde empiezan",
         "note": "Nota"
       },
+      "emails": "Correos",
+      "moreEmails": "Más correos…",
+      "checkMarked": "Revisa los correos marcados: no recibirán invitación.",
       "pasteHelp": "Pega una lista, si quieres: comas, espacios o una por línea.",
       "leftOut": "Quien ya está o ya tiene invitación queda fuera.",
+      "withNote": "con una nota",
+      "alsoJoin": "También entran en",
+      "generalAlways": "Todos entran en #{{channel}}",
+      "note": "Nota en el correo",
+      "optional": "(opcional)",
+      "notePlaceholder": "Hola. Únete a {{org}}: el equipo y los agentes están todos aquí.",
+      "or": "o envía el enlace",
       "continueWith": "Continuar con {{count}}",
+      "send_one": "Invitar a {{count}} persona",
+      "send_many": "Invitar a {{count}} personas",
+      "send_other": "Invitar a {{count}} personas",
+      "sent": "Invitación enviada a {{email}}.",
+      "sentMany": "{{count}} invitaciones enviadas.",
+      "alsoIn": "También entran en {{channels}}.",
       "who": {
         "title": "¿A quién quieres traer?",
         "lead": "Pásame los correos. Cada persona recibe una invitación y entra directamente."
@@ -4678,6 +4694,54 @@
     "flowHint": "La tarea avanza sola, a la primera columna de cada etapa: En curso cuando un agente empieza, En revisión cuando está lista para revisar, Hecha cuando la apruebas.",
     "moreOptions": "Más opciones",
     "showCanceled": "Mostrar canceladas",
+    "filterButton": "Filtro",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Yo",
+    "display": {
+      "title": "Visualización",
+      "label": "Visualización: {{layout}} · {{group}}",
+      "layout": "Diseño",
+      "group": "Agrupar por",
+      "sort": "Ordenar por",
+      "fields": "En las tarjetas",
+      "saved": "Guardado para ti en este espacio de trabajo",
+      "reset": "Volver a lo predeterminado",
+      "by": {
+        "stage": "Etapa",
+        "assignee": "Responsable",
+        "priority": "Prioridad"
+      },
+      "order": {
+        "manual": "Manual",
+        "priority": "Prioridad",
+        "due": "Fecha límite"
+      },
+      "field": {
+        "assignee": "Responsable",
+        "priority": "Prioridad",
+        "due": "Fecha límite",
+        "criteria": "Criterios",
+        "pullRequest": "Pull request",
+        "label": "Etiqueta"
+      }
+    },
+    "drop": {
+      "stage": "Suelta en {{name}}",
+      "assignee": "Suelta para dársela a {{name}}",
+      "unassign": "Suelta para quitar el responsable",
+      "priority": "Suelta para prioridad {{priority}}"
+    },
+    "drag": {
+      "role": "tarea que se puede arrastrar",
+      "help": "Espacio toma la tarea, las flechas la mueven, Espacio la suelta y Esc cancela.",
+      "picked": "Tomaste la #{{number}}. Las flechas la mueven, Espacio la suelta, Esc cancela.",
+      "moved": "#{{number}}: {{group}}, posición {{position}} de {{total}}.",
+      "dropped": "Soltaste la #{{number}} en {{group}}.",
+      "canceled": "La #{{number}} volvió a su lugar.",
+      "assigned": "La #{{number}} ahora está con {{name}}.",
+      "unassigned": "La #{{number}} quedó sin responsable.",
+      "prioritized": "La #{{number}} ahora tiene prioridad {{priority}}."
+    },
     "canceledColumn": "Canceladas",
     "columns": {
       "add": "Agregar columna",
@@ -4930,54 +4994,6 @@
       "agent_asked": "le pidió a {{name}} que lo hiciera",
       "forum_opened": "lo llevó al foro: {{title}}",
       "forum_evaluated": "trajo el resultado del foro: {{title}}"
-    },
-    "filterButton": "Filtro",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Yo",
-    "display": {
-      "title": "Visualización",
-      "label": "Visualización: {{layout}} · {{group}}",
-      "layout": "Diseño",
-      "group": "Agrupar por",
-      "sort": "Ordenar por",
-      "fields": "En las tarjetas",
-      "saved": "Guardado para ti en este espacio de trabajo",
-      "reset": "Volver a lo predeterminado",
-      "by": {
-        "stage": "Etapa",
-        "assignee": "Responsable",
-        "priority": "Prioridad"
-      },
-      "order": {
-        "manual": "Manual",
-        "priority": "Prioridad",
-        "due": "Fecha límite"
-      },
-      "field": {
-        "assignee": "Responsable",
-        "priority": "Prioridad",
-        "due": "Fecha límite",
-        "criteria": "Criterios",
-        "pullRequest": "Pull request",
-        "label": "Etiqueta"
-      }
-    },
-    "drop": {
-      "stage": "Suelta en {{name}}",
-      "assignee": "Suelta para dársela a {{name}}",
-      "unassign": "Suelta para quitar el responsable",
-      "priority": "Suelta para prioridad {{priority}}"
-    },
-    "drag": {
-      "role": "tarea que se puede arrastrar",
-      "help": "Espacio toma la tarea, las flechas la mueven, Espacio la suelta y Esc cancela.",
-      "picked": "Tomaste la #{{number}}. Las flechas la mueven, Espacio la suelta, Esc cancela.",
-      "moved": "#{{number}}: {{group}}, posición {{position}} de {{total}}.",
-      "dropped": "Soltaste la #{{number}} en {{group}}.",
-      "canceled": "La #{{number}} volvió a su lugar.",
-      "assigned": "La #{{number}} ahora está con {{name}}.",
-      "unassigned": "La #{{number}} quedó sin responsable.",
-      "prioritized": "La #{{number}} ahora tiene prioridad {{priority}}."
     }
   },
   "routines": {
@@ -5168,7 +5184,6 @@
         "artifact": "Se vuelve un documento en el Drive"
       },
       "ahead": "Preparado para después",
-      "ownActions": "Hace por su cuenta",
       "createdBy": "Creada por {{name}} · {{date}}",
       "nameLabel": "Nombre de la rutina",
       "editName": "Editar el nombre",
@@ -5185,7 +5200,8 @@
       "reportHint": {
         "always": "Aunque no haya nada nuevo",
         "when_new": "En silencio si no hay nada nuevo"
-      }
+      },
+      "ownActions": "Hace por su cuenta"
     },
     "ownActions": {
       "hint": "Cada ejecución hace esto en tus apps conectadas sin preguntar. Cualquier otra acción en ellas pide aprobación antes, y merge, deploy y rollback siempre la piden.",
@@ -6775,6 +6791,37 @@
     "saved": "{{name}} guardada.",
     "refresh": "Actualizar desde el enlace",
     "refreshed": "{{name}} actualizada desde su enlace.",
+    "upToDate": "{{name}} ya tiene lo que tiene su enlace.",
+    "waitingToast": "La actualización de {{name}} cambia archivos que se ejecutan, así que espera una revisión.",
+    "autoUpdate": "Actualizar sola",
+    "autoUpdateHelp": "Lee su enlace todos los días. El texto nuevo entra con Deshacer. Los cambios en scripts esperan a alguien que gestione habilidades.",
+    "autoChip": "Se actualiza sola",
+    "waitingChip": "Actualización en espera",
+    "lastUpdate": "Actualizada desde su enlace {{when}}",
+    "undoUpdate": "Deshacer actualización",
+    "undone": "{{name}} volvió a la versión {{version}}.",
+    "pending": {
+      "title": "La actualización de su enlace cambia archivos que se ejecutan: {{files}}",
+      "lead": "Aplícala solo si confías en estos archivos. Los agentes los ejecutan en sus computadoras.",
+      "apply": "Aplicar actualización",
+      "dismiss": "No aplicar",
+      "applied": "{{name}} actualizada desde su enlace.",
+      "changedAgain": "Su enlace cambió otra vez. Revisa los archivos nuevos.",
+      "dismissed": "Actualización no aplicada. Un cambio nuevo en su enlace vuelve a preguntar."
+    },
+    "updateFailed": {
+      "no_skill_md": "No se pudo actualizar: su enlace ya no tiene un SKILL.md.",
+      "connection_gone": "No se pudo actualizar: la conexión de GitHub que la leyó ya no existe.",
+      "link_holds_several": "No se pudo actualizar: su enlace ahora tiene varias habilidades.",
+      "link_renamed": "No se pudo actualizar: su enlace ahora tiene otra habilidad.",
+      "owner_gone": "No se pudo actualizar: quien activó la actualización automática ya no puede gestionar habilidades. Actívala de nuevo.",
+      "other": "No se pudo actualizar desde su enlace."
+    },
+    "notice": {
+      "updated": "{{name}} se actualizó desde su enlace",
+      "waiting": "Una actualización de {{name}} cambia sus scripts",
+      "failed": "{{name}} no se pudo actualizar desde su enlace"
+    },
     "remove": "Quitar",
     "removeTitle": "¿Quitar {{name}}?",
     "removeAgents_one": "{{names}} usa esta habilidad y pierde el acceso a ella.",
@@ -10605,7 +10652,11 @@
       "invalidDescription": "La descripción debe tener de 1 a {{max}} caracteres.",
       "tooLarge": "La habilidad es demasiado grande (máx. {{max}} MB).",
       "tooManyFiles": "La habilidad tiene demasiados archivos (máx. {{max}}).",
-      "connectionGone": "La conexión de GitHub que leyó {{repo}} ya no existe. Conecta GitHub de nuevo para actualizar esta habilidad."
+      "connectionGone": "La conexión de GitHub que leyó {{repo}} ya no existe. Conecta GitHub de nuevo para actualizar esta habilidad.",
+      "linkHoldsSeveral": "Su enlace ahora tiene varias habilidades. Instala esta de nuevo desde su propia carpeta.",
+      "linkRenamed": "Su enlace ahora tiene la habilidad {{name}}.",
+      "noLink": "Solo una habilidad instalada desde un enlace se actualiza desde él.",
+      "noPendingUpdate": "No hay ninguna actualización de esta habilidad en espera."
     },
     "agentGroup": {
       "notFound": "Este grupo ya no existe.",
@@ -11919,6 +11970,8 @@
         "creatingChannel": "Creó un canal",
         "offeringConnectAi": "Ofreció conectar una IA",
         "offeringConnectApp": "Ofreció conectar una app",
+        "offeringSkill": "Ofreció instalar una habilidad",
+        "updatingSkills": "Actualizó habilidades",
         "offeringInvites": "Ofreció invitar a personas",
         "proposingAgent": "Propuso un agente",
         "askingAgent": "Le preguntó a otro agente",
@@ -12003,6 +12056,8 @@
       "creatingChannel": "creando un canal",
       "offeringConnectAi": "preparando una IA para conectar",
       "offeringConnectApp": "preparando una app para conectar",
+      "offeringSkill": "preparando una habilidad para instalar",
+      "updatingSkills": "actualizando habilidades",
       "offeringInvites": "preparando las invitaciones",
       "proposingAgent": "proponiendo un agente",
       "askingAgent": "preguntándole a otro agente",
@@ -12114,6 +12169,8 @@
       "action_connect_app": "Conectar {{name}}",
       "action_add_mcp": "Agregar un servidor MCP",
       "action_invite_people": "Invitar a personas",
+      "action_install_skill": "Instalar una habilidad",
+      "action_update_skills": "Actualizar habilidades",
       "agent_proposal": "Propuso un nuevo agente: {{name}}",
       "approval_request": "Solicitud de aprobación: {{title}}",
       "secret_request": "{{agent}} pidió una clave: {{name}}",
@@ -12324,6 +12381,14 @@
     "offer_invites": {
       "label": "Ofrecer invitar personas",
       "description": "Publica una tarjeta cuyo botón abre el diálogo de invitación con las direcciones ya completadas."
+    },
+    "offer_install_skill": {
+      "label": "Ofrecer instalar una habilidad",
+      "description": "Publica una tarjeta cuyo botón abre la instalación con el enlace de la habilidad ya puesto."
+    },
+    "update_skill_from_source": {
+      "label": "Actualizar habilidades desde sus enlaces",
+      "description": "Actualiza habilidades desde donde se instalaron. Los cambios en scripts esperan a una persona."
     },
     "propose_agent": {
       "label": "Proponer un agente",

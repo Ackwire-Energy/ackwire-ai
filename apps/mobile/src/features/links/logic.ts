@@ -23,12 +23,14 @@ export type AppHref =
   | `/issues/${number}`
   | `/routines/${string}`
   | `/settings/computers/${string}`
+  | `/settings/skills/${string}`
   | `/consultation/${string}?channel=${string}`
   | "/routines"
   | "/issues"
   | "/connectors"
   | "/me/members"
   | "/settings/computers"
+  | "/settings/skills"
   | "/activity"
   | "/threads"
   | "/join-requests"
@@ -214,6 +216,8 @@ export function notificationHref(
   if (n.kind === "invitation_accepted") return "/me/members";
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed") return "/connectors";
+  // An update of a skill from its link: the skill's page, where what waits is applied.
+  if (n.kind === "skill_update") return isSafeId(s.skillId) ? `/settings/skills/${s.skillId}` : "/settings/skills";
   if (n.kind === "machine_connected")
     return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : "/settings/computers";
   // An agent held on agentes.chat Cloud: its page, where the hold shows. The workspace's own hold: the web's.

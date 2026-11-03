@@ -106,3 +106,12 @@ export function searchRepos(listing: GitHubRepositories | undefined, query: stri
     .map((a) => ({ ...a, repositories: a.repositories.filter((r) => !q || r.fullName.toLowerCase().includes(q)) }))
     .filter((a) => a.repositories.length > 0);
 }
+
+/** Why a skill's last update from its link failed (`updateError`), in the reader's words. */
+export function skillUpdateErrorText(t: TFunction, code: string) {
+  const key = code.replace(/^skill\./, "");
+  if (key === "no_skill_md" || key === "connection_gone" || key === "link_holds_several" || key === "link_renamed")
+    return t(`skills.updateFailed.${key}`);
+  if (key === "auto_update_owner_gone" || code === "forbidden") return t("skills.updateFailed.owner_gone");
+  return t("skills.updateFailed.other");
+}

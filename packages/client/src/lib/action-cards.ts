@@ -7,6 +7,7 @@ import type {
   CostKind,
   CostlyDecision,
   ProposedRoutine,
+  Skill,
   SuggestedAi,
 } from "../api/types";
 import type { Level } from "./access-levels";
@@ -120,10 +121,34 @@ export interface InviteCard {
   why: string;
 }
 
+/**
+ * "Instalar skill" (`offer_install_skill`): the install dialog with the skill's GitHub link filled in, where a person
+ * who manages skills picks it and installs it.
+ */
+export interface InstallSkillCard {
+  kind: "install_skill";
+  forUserId: string | null;
+  url: string;
+  why: string;
+}
+
+/**
+ * "Atualizar skills" (`update_skill_from_source`): the skills to update from their links, or whose update waits on
+ * its files that run; each opens in Skills, where who manages skills updates it or applies what waits.
+ */
+export interface UpdateSkillsCard {
+  kind: "update_skills";
+  forUserId: string | null;
+  skillIds: string[];
+  why: string;
+}
+
 export type ActionCard =
   | ConnectAiCard
   | ConnectAppCard
   | InviteCard
+  | InstallSkillCard
+  | UpdateSkillsCard
   | AgentProposalCard
   | StretchCard
   | UsagePauseCard
@@ -304,6 +329,15 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
       why,
     };
   }
+  if (card.kind === "install_skill") {
+    return typeof p.url === "string" && isHttpsUrl(p.url)
+      ? { kind: "install_skill", forUserId, url: p.url, why }
+      : null;
+  }
+  if (card.kind === "update_skills") {
+    const skillIds = Array.isArray(p.skillIds) ? p.skillIds.filter((id): id is string => typeof id === "string") : [];
+    return skillIds.length > 0 ? { kind: "update_skills", forUserId, skillIds, why } : null;
+  }
   if (card.kind === "invite_people") {
     const emails = Array.isArray(p.emails) ? p.emails.filter((e): e is string => typeof e === "string") : [];
     return emails.length > 0 ? { kind: "invite_people", forUserId, emails, why } : null;
@@ -346,3 +380,17 @@ export const inviteDone = (card: InviteCard, invited: readonly string[]) => {
   const have = new Set(invited.map((e) => e.toLowerCase()));
   return card.emails.every((e) => have.has(e.toLowerCase()));
 };
+
+/** Done once the library has a skill installed from the card's link. */
+export const installSkillDone = (card: InstallSkillCard, skills: readonly Pick<Skill, "sourceUrl">[]) =>
+  skills.some((s) => s.sourceUrl === card.url);
+
+/**
+ * Where a skill of an update card stands: `waiting` (its update changes files that run), `done` (its link was read
+ * after the card was posted and nothing waits) or `open` (to update from its link). A skill that's gone counts as done.
+ */
+export function skillUpdateState(skill: Pick<Skill, "checkedAt" | "pendingUpdate"> | undefined, postedAt: string) {
+  if (!skill) return "done" as const;
+  if (skill.pendingUpdate && !skill.pendingUpdate.dismissed) return "waiting" as const;
+  return skill.checkedAt && skill.checkedAt >= postedAt ? ("done" as const) : ("open" as const);
+}

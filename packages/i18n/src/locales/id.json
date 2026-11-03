@@ -1838,6 +1838,20 @@
       "done": "Undangan terkirim",
       "adminOnly": "Orang yang boleh mengundang yang mengirimnya"
     },
+    "install_skill": {
+      "title": "Pasang skill",
+      "open": "Pasang",
+      "done": "Terpasang",
+      "adminOnly": "Orang yang mengelola agen yang memasangnya"
+    },
+    "update_skills": {
+      "title_other": "Perbarui {{count}} skill",
+      "update": "Perbarui",
+      "review": "Tinjau",
+      "done": "Sudah terbaru",
+      "waiting": "Menunggu tinjauan",
+      "adminOnly": "Orang yang mengelola agen yang memperbaruinya"
+    },
     "agentProposal": {
       "title": "{{agent}} mengusulkan agen baru",
       "review": "Tinjau",
@@ -2885,6 +2899,14 @@
     "nameLabel": "Nama",
     "roleLabel": "Peran",
     "roleHelp": "Apa yang dikerjakannya untuk tim, misalnya Asisten email dan kalender.",
+    "editName": "Ubah nama: {{name}}",
+    "editHandle": "Ubah sebutan: @{{handle}}",
+    "editRole": "Ubah peran: {{role}}",
+    "noRole": "Tanpa peran",
+    "rolePlaceholder": "Contoh: Dukungan",
+    "roleList": "Daftar peran",
+    "roleUse": "Gunakan “{{role}}”",
+    "roleCurrent": "saat ini",
     "edit": "Ubah",
     "chat": "Obrolan",
     "moreActions": "Tindakan lain",
@@ -2929,15 +2951,7 @@
     "budgetDefaultHelp": "Kosong: default ruang kerja.",
     "budgetDefaultHelpAmount": "Kosong: default ruang kerja ({{amount}}).",
     "budgetInvalid": "Gunakan nilai lebih dari nol.",
-    "notFound": "Agen ini tidak ada atau sudah diarsipkan.",
-    "editName": "Ubah nama: {{name}}",
-    "editHandle": "Ubah sebutan: @{{handle}}",
-    "editRole": "Ubah peran: {{role}}",
-    "noRole": "Tanpa peran",
-    "rolePlaceholder": "Contoh: Dukungan",
-    "roleList": "Daftar peran",
-    "roleUse": "Gunakan “{{role}}”",
-    "roleCurrent": "saat ini"
+    "notFound": "Agen ini tidak ada atau sudah diarsipkan."
   },
   "agentPage": {
     "work": {
@@ -4003,20 +4017,6 @@
     },
     "dialog": {
       "title": "Undang ke {{org}}",
-      "emails": "Email",
-      "moreEmails": "Email lainnya…",
-      "checkMarked": "Periksa email yang ditandai: mereka tidak akan menerima undangan.",
-      "withNote": "dengan catatan",
-      "alsoJoin": "Mereka juga bergabung ke",
-      "generalAlways": "Semua orang bergabung ke #{{channel}}",
-      "note": "Catatan di email",
-      "optional": "(opsional)",
-      "notePlaceholder": "Hai. Ayo bergabung ke {{org}}: tim dan agen semuanya ada di sini.",
-      "or": "atau kirim tautannya",
-      "send_other": "Undang {{count}} orang",
-      "sent": "Undangan terkirim ke {{email}}.",
-      "sentMany": "{{count}} undangan terkirim.",
-      "alsoIn": "Mereka juga bergabung ke {{channels}}.",
       "stepOf": "Langkah {{n}} dari {{total}} · {{step}}",
       "steps": {
         "who": "Siapa",
@@ -4024,9 +4024,23 @@
         "where": "Mulai di mana",
         "note": "Catatan"
       },
+      "emails": "Email",
+      "moreEmails": "Email lainnya…",
+      "checkMarked": "Periksa email yang ditandai: mereka tidak akan menerima undangan.",
       "pasteHelp": "Tempel daftar kalau mau: koma, spasi, atau satu per baris.",
       "leftOut": "Yang sudah ada atau sudah diundang tidak ikut.",
+      "withNote": "dengan catatan",
+      "alsoJoin": "Mereka juga bergabung ke",
+      "generalAlways": "Semua orang bergabung ke #{{channel}}",
+      "note": "Catatan di email",
+      "optional": "(opsional)",
+      "notePlaceholder": "Hai. Ayo bergabung ke {{org}}: tim dan agen semuanya ada di sini.",
+      "or": "atau kirim tautannya",
       "continueWith": "Lanjutkan dengan {{count}}",
+      "send_other": "Undang {{count}} orang",
+      "sent": "Undangan terkirim ke {{email}}.",
+      "sentMany": "{{count}} undangan terkirim.",
+      "alsoIn": "Mereka juga bergabung ke {{channels}}.",
       "who": {
         "title": "Siapa yang ingin kamu ajak?",
         "lead": "Kasih tahu email mereka. Tiap orang menerima undangan dan langsung bergabung."
@@ -4410,6 +4424,54 @@
     "flowHint": "Tugas berpindah sendiri, ke kolom pertama tiap tahap: Sedang dikerjakan saat agen mulai, Ditinjau saat siap diperiksa, Selesai saat kamu menyetujuinya.",
     "moreOptions": "Opsi lainnya",
     "showCanceled": "Tampilkan yang dibatalkan",
+    "filterButton": "Saring",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Saya",
+    "display": {
+      "title": "Tampilan",
+      "label": "Tampilan: {{layout}} · {{group}}",
+      "layout": "Tata letak",
+      "group": "Kelompokkan menurut",
+      "sort": "Urutkan menurut",
+      "fields": "Di kartu",
+      "saved": "Disimpan untukmu di ruang kerja ini",
+      "reset": "Kembali ke bawaan",
+      "by": {
+        "stage": "Tahap",
+        "assignee": "Penanggung jawab",
+        "priority": "Prioritas"
+      },
+      "order": {
+        "manual": "Manual",
+        "priority": "Prioritas",
+        "due": "Tenggat"
+      },
+      "field": {
+        "assignee": "Penanggung jawab",
+        "priority": "Prioritas",
+        "due": "Tenggat",
+        "criteria": "Kriteria",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Jatuhkan di {{name}}",
+      "assignee": "Jatuhkan untuk memberikannya ke {{name}}",
+      "unassign": "Jatuhkan untuk melepas penanggung jawab",
+      "priority": "Jatuhkan untuk prioritas {{priority}}"
+    },
+    "drag": {
+      "role": "tugas yang bisa diseret",
+      "help": "Spasi mengambil tugas, tombol panah memindahkannya, Spasi menjatuhkannya, dan Esc membatalkan.",
+      "picked": "Kamu mengambil #{{number}}. Tombol panah memindahkannya, Spasi menjatuhkannya, Esc membatalkan.",
+      "moved": "#{{number}}: {{group}}, posisi {{position}} dari {{total}}.",
+      "dropped": "Kamu menjatuhkan #{{number}} di {{group}}.",
+      "canceled": "#{{number}} kembali ke tempatnya.",
+      "assigned": "#{{number}} sekarang dipegang {{name}}.",
+      "unassigned": "#{{number}} sekarang tanpa penanggung jawab.",
+      "prioritized": "#{{number}} sekarang berprioritas {{priority}}."
+    },
     "canceledColumn": "Dibatalkan",
     "columns": {
       "add": "Tambah kolom",
@@ -4652,54 +4714,6 @@
       "agent_asked": "meminta {{name}} mengerjakannya",
       "forum_opened": "membawanya ke forum: {{title}}",
       "forum_evaluated": "membawa kembali hasil forum: {{title}}"
-    },
-    "filterButton": "Saring",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Saya",
-    "display": {
-      "title": "Tampilan",
-      "label": "Tampilan: {{layout}} · {{group}}",
-      "layout": "Tata letak",
-      "group": "Kelompokkan menurut",
-      "sort": "Urutkan menurut",
-      "fields": "Di kartu",
-      "saved": "Disimpan untukmu di ruang kerja ini",
-      "reset": "Kembali ke bawaan",
-      "by": {
-        "stage": "Tahap",
-        "assignee": "Penanggung jawab",
-        "priority": "Prioritas"
-      },
-      "order": {
-        "manual": "Manual",
-        "priority": "Prioritas",
-        "due": "Tenggat"
-      },
-      "field": {
-        "assignee": "Penanggung jawab",
-        "priority": "Prioritas",
-        "due": "Tenggat",
-        "criteria": "Kriteria",
-        "pullRequest": "Pull request",
-        "label": "Label"
-      }
-    },
-    "drop": {
-      "stage": "Jatuhkan di {{name}}",
-      "assignee": "Jatuhkan untuk memberikannya ke {{name}}",
-      "unassign": "Jatuhkan untuk melepas penanggung jawab",
-      "priority": "Jatuhkan untuk prioritas {{priority}}"
-    },
-    "drag": {
-      "role": "tugas yang bisa diseret",
-      "help": "Spasi mengambil tugas, tombol panah memindahkannya, Spasi menjatuhkannya, dan Esc membatalkan.",
-      "picked": "Kamu mengambil #{{number}}. Tombol panah memindahkannya, Spasi menjatuhkannya, Esc membatalkan.",
-      "moved": "#{{number}}: {{group}}, posisi {{position}} dari {{total}}.",
-      "dropped": "Kamu menjatuhkan #{{number}} di {{group}}.",
-      "canceled": "#{{number}} kembali ke tempatnya.",
-      "assigned": "#{{number}} sekarang dipegang {{name}}.",
-      "unassigned": "#{{number}} sekarang tanpa penanggung jawab.",
-      "prioritized": "#{{number}} sekarang berprioritas {{priority}}."
     }
   },
   "routines": {
@@ -4886,7 +4900,6 @@
         "artifact": "Menjadi dokumen di Drive"
       },
       "ahead": "Disiapkan untuk nanti",
-      "ownActions": "Dilakukan sendiri",
       "createdBy": "Dibuat oleh {{name}} · {{date}}",
       "nameLabel": "Nama rutinitas",
       "editName": "Edit nama",
@@ -4903,7 +4916,8 @@
       "reportHint": {
         "always": "Meski tidak ada yang baru",
         "when_new": "Diam kalau tidak ada yang baru"
-      }
+      },
+      "ownActions": "Dilakukan sendiri"
     },
     "ownActions": {
       "hint": "Setiap jalannya melakukan ini di aplikasi terhubung kamu tanpa bertanya. Tindakan lain di sana meminta persetujuan seseorang dulu, dan merge, deploy, serta rollback selalu meminta.",
@@ -6319,6 +6333,37 @@
     "saved": "{{name}} disimpan.",
     "refresh": "Perbarui dari tautan",
     "refreshed": "{{name}} diperbarui dari tautannya.",
+    "upToDate": "{{name}} sudah sama dengan isi tautannya.",
+    "waitingToast": "Pembaruan {{name}} mengubah file yang dijalankan, jadi menunggu tinjauan.",
+    "autoUpdate": "Perbarui sendiri",
+    "autoUpdateHelp": "Membaca tautannya setiap hari. Teks baru masuk dengan Urungkan. Perubahan skrip menunggu orang yang mengelola skill.",
+    "autoChip": "Diperbarui sendiri",
+    "waitingChip": "Pembaruan menunggu",
+    "lastUpdate": "Diperbarui dari tautannya {{when}}",
+    "undoUpdate": "Urungkan pembaruan",
+    "undone": "{{name}} kembali ke versi {{version}}.",
+    "pending": {
+      "title": "Pembaruan dari tautannya mengubah file yang dijalankan: {{files}}",
+      "lead": "Terapkan hanya jika kamu memercayai file ini. Agen menjalankannya di komputer mereka.",
+      "apply": "Terapkan pembaruan",
+      "dismiss": "Jangan terapkan",
+      "applied": "{{name}} diperbarui dari tautannya.",
+      "changedAgain": "Tautannya berubah lagi. Tinjau file yang baru.",
+      "dismissed": "Pembaruan tidak diterapkan. Perubahan baru di tautannya akan bertanya lagi."
+    },
+    "updateFailed": {
+      "no_skill_md": "Tidak bisa memperbarui: tautannya tidak punya SKILL.md lagi.",
+      "connection_gone": "Tidak bisa memperbarui: koneksi GitHub yang membacanya sudah tidak ada.",
+      "link_holds_several": "Tidak bisa memperbarui: tautannya sekarang berisi beberapa skill.",
+      "link_renamed": "Tidak bisa memperbarui: tautannya sekarang berisi skill lain.",
+      "owner_gone": "Tidak bisa memperbarui: orang yang menyalakan pembaruan otomatis tidak bisa mengelola skill lagi. Nyalakan lagi.",
+      "other": "Tidak bisa memperbarui dari tautannya."
+    },
+    "notice": {
+      "updated": "{{name}} diperbarui dari tautannya",
+      "waiting": "Pembaruan {{name}} mengubah skripnya",
+      "failed": "{{name}} tidak bisa diperbarui dari tautannya"
+    },
     "remove": "Hapus",
     "removeTitle": "Hapus {{name}}?",
     "removeAgents_other": "{{names}} memakai skill ini dan akan kehilangan aksesnya.",
@@ -9944,7 +9989,11 @@
       "invalidDescription": "Deskripsi harus terdiri dari 1 sampai {{max}} karakter.",
       "tooLarge": "Skill terlalu besar (maks {{max}} MB).",
       "tooManyFiles": "Skill punya terlalu banyak file (maks {{max}}).",
-      "connectionGone": "Koneksi GitHub yang membaca {{repo}} sudah tidak ada. Hubungkan GitHub lagi untuk memperbarui skill ini."
+      "connectionGone": "Koneksi GitHub yang membaca {{repo}} sudah tidak ada. Hubungkan GitHub lagi untuk memperbarui skill ini.",
+      "linkHoldsSeveral": "Tautannya sekarang berisi beberapa skill. Pasang skill ini lagi dari foldernya sendiri.",
+      "linkRenamed": "Tautannya sekarang berisi skill {{name}}.",
+      "noLink": "Hanya skill yang dipasang dari tautan yang diperbarui dari tautan itu.",
+      "noPendingUpdate": "Tidak ada pembaruan skill ini yang menunggu."
     },
     "agentGroup": {
       "notFound": "Grup ini sudah tidak ada.",
@@ -11192,6 +11241,8 @@
         "creatingChannel": "Membuat kanal",
         "offeringConnectAi": "Menawarkan menghubungkan AI",
         "offeringConnectApp": "Menawarkan menghubungkan aplikasi",
+        "offeringSkill": "Menawarkan memasang skill",
+        "updatingSkills": "Memperbarui skill",
         "offeringInvites": "Menawarkan mengundang orang",
         "proposingAgent": "Mengusulkan agen",
         "askingAgent": "Bertanya ke agen lain",
@@ -11276,6 +11327,8 @@
       "creatingChannel": "membuat kanal",
       "offeringConnectAi": "menyiapkan AI untuk dihubungkan",
       "offeringConnectApp": "menyiapkan aplikasi untuk dihubungkan",
+      "offeringSkill": "menyiapkan skill untuk dipasang",
+      "updatingSkills": "memperbarui skill",
       "offeringInvites": "menyiapkan undangan",
       "proposingAgent": "mengusulkan agen",
       "askingAgent": "bertanya ke agen lain",
@@ -11385,6 +11438,8 @@
       "action_connect_app": "Hubungkan {{name}}",
       "action_add_mcp": "Tambah server MCP",
       "action_invite_people": "Undang orang",
+      "action_install_skill": "Pasang skill",
+      "action_update_skills": "Perbarui skill",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
       "secret_request": "{{agent}} meminta kunci: {{name}}",
@@ -11589,6 +11644,14 @@
     "offer_invites": {
       "label": "Tawarkan mengundang orang",
       "description": "Memposting kartu yang tombolnya membuka dialog undangan dengan alamat yang sudah terisi."
+    },
+    "offer_install_skill": {
+      "label": "Tawarkan memasang skill",
+      "description": "Memposting kartu yang tombolnya membuka pemasangan dengan tautan skill sudah terisi."
+    },
+    "update_skill_from_source": {
+      "label": "Perbarui skill dari tautannya",
+      "description": "Memperbarui skill dari tempat skill dipasang. Perubahan skrip menunggu seseorang."
     },
     "propose_agent": {
       "label": "Usulkan agen",
