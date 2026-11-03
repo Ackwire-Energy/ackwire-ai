@@ -1430,6 +1430,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           isMember: true,
           createdAt: NOW.toISOString(),
         });
+        // Its right hand comes with it (ADR 0134).
+        if (!state.agents.some((a) => a.builtin === "right_hand")) withRightHand(state, { ownerUserId: me.user.id });
         return {
           organization: { id: orgId, name: input.name, role: "owner", context: input.context },
           generalChannelId: general,
