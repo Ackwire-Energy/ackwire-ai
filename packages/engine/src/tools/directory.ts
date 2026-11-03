@@ -726,13 +726,36 @@ function coverage(tool: ToolDefinition, prefix: string, query: string) {
 /** Whether a run reaches other agents (`ask_agent`, `tell_agent`): only then does `turnMeans` name its teammates. */
 export const reachesTeammates = (names: ReadonlySet<string>) => names.has("ask_agent") || names.has("tell_agent");
 
+/** The requests that hand a person a step only they can do (ADR 0097 addendum): a step that needs them is no blocker. */
+export const HAND_OVER_TOOLS = [
+  "browser_ask_person",
+  "desktop_ask_person",
+  "request_secret",
+  "request_approval",
+  "request_permission",
+] as const;
+
+/**
+ * What a run reads when a step needs a person: it is handed over with the request made for it, never a reason to stop
+ * (ADR 0097 addendum). The controller's nudges and the mission prompts say it the same way.
+ */
+export const HAND_OVER_STEP =
+  "A step only a person can do (sign in, scan a QR code, type a code sent to them, a captcha, approve, grant a permission, a key, a file or a fact only they have) is never a blocker or a reason to say you can't: do everything up to it, hand it over with its request (on a page or app: `browser_ask_person` or `desktop_ask_person` once at that step; a key: `request_secret`; an approval: `request_approval`; a permission: `request_permission`; else `ask_user`), then go on.";
+
 export function turnMeans(names: ReadonlySet<string>, teammates: string[] = []): string[] {
   const out: string[] = [];
   if (names.has("web_search")) out.push("the web: `web_search` to search it, `web_fetch` to read any public page");
   if (names.has("browser_open") || names.has("browser_do"))
-    out.push("your browser (`browser_*`): open any website and read it, search engines included");
+    out.push(
+      "your browser (`browser_*`): any website or web app, search engines included, used as a person would, signed in to their account with their help (a service with no connector but a web version)",
+    );
   if (names.has("run_code")) out.push("your computer's terminal (`run_code`): commands, scripts, files");
   if (names.has("find_tools")) out.push("the tool directory (`find_tools`): tools for apps and services");
+  const handOver = HAND_OVER_TOOLS.filter((t) => names.has(t));
+  if (handOver.length > 0)
+    out.push(
+      `hand a person a step only they can do (sign in, scan a QR code, a code, a captcha, approve, a key) with ${handOver.map((t) => `\`${t}\``).join(", ")}, then go on`,
+    );
   if (reachesTeammates(names))
     out.push(
       `teammates (\`ask_agent\`, \`tell_agent\`)${teammates.length > 0 ? `: ${teammates.join("; ")}` : ": the ones whose role covers it"}`,

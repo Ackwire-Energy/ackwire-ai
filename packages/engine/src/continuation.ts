@@ -13,6 +13,7 @@ import { notifyRunFailed } from "./notification-producers";
 import { ANSWER_NUDGE } from "./reply-policy";
 import { deliverNoticeToRun } from "./run-resume";
 import type { AgentRun } from "./runs";
+import { HAND_OVER_STEP } from "./tools/directory";
 import { neutralizeUntrusted, untrustedBlock } from "./untrusted";
 
 /**
@@ -49,7 +50,7 @@ export type ContinuationVerdict = "done" | "continue" | "ask" | "untried" | "sec
  */
 export function untriedNudge(means: string[], tried: string[]) {
   const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
-  return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried:\n${triedBlock(tried)}\nUse the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. ${SAFETY_FINAL} If none works, say what you tried and the one thing a person must give.`;
+  return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried:\n${triedBlock(tried)}\nUse the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. ${SAFETY_FINAL} ${HAND_OVER_STEP} If no way is left at all, say what you tried and the one step a person must do.`;
 }
 
 /**
@@ -106,7 +107,7 @@ export function findableNudge(means: string[], tried: string[]) {
 
 /** What a run reads, once, when it described what only a person can give instead of asking for it. */
 export const ASK_NUDGE =
-  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few (a key or a password through request_secret). Do not end with a list of what's missing. If you need nothing from them to finish, just give your answer, with no question.";
+  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few; but a sign-in, a QR code, a code or a captcha with browser_ask_person or desktop_ask_person once the page or app is at that step, a key or a password through request_secret, an approval through request_approval, a permission through request_permission. Do not end with a list of what's missing. If you need nothing from them to finish, just give your answer, with no question.";
 
 /**
  * What a run reads, once, when its reply asks a person for a secret in the chat (ADR 0109 addendum): its reply is not
@@ -172,12 +173,12 @@ export async function continuationVerdict(
           instructions:
             "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message. `tried`: each tool call it made in this run, with its argument and outcome. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, does it still have untried ways, or does it need something only a person can give?",
           criteria: {
-            done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
+            done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision) and it already asked them for it with its request (`tried` shows browser_ask_person, desktop_ask_person, request_secret, request_approval, request_permission or ask_user) or `means` has no way to hand it to them. A reply that says it can't, stops, or only offers, because a step needs the person (a sign-in, a QR code, a code, a captcha, an approval, a permission) is not done while `means` can hand that step to them: that is untried. An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
             untried:
-              "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
+              "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt. Also when it said it couldn't, stopped, or only offered ('only if you want'), because a step needs the person (a sign-in, a QR code scanned with their phone, a code sent to them, a captcha, an approval, a permission, their consent to their own account) instead of doing everything up to it and handing that step over, while `means` can hand it over: a step that needs the person is never a blocker. A call refused for safety ([refused for safety]) is final for that data: counting it as a way left to try is wrong.",
             continue:
               "It said it will do more itself (next, later, after a build), or stopped midway, and nothing it set up brings it back. A reply that asks the person whether to do something ('want me to…?', 'quer que eu faça?') is not this: it waits for their answer. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
-            ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question. Not when it says it needs nothing from them, or what's missing only blocks optional extra work the request doesn't need: that is done.",
+            ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question. Not when it says it needs nothing from them, or what's missing only blocks optional extra work the request doesn't need: that is done. A way to do the request itself, even worded 'only if you want', is never optional extra work.",
             secret:
               "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
           },

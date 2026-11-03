@@ -115,7 +115,7 @@ export const FOLLOW_THROUGH_NUDGE_DM =
  * shows the mission waits on them, the answer resumes the session, and the mission doesn't go on by itself meanwhile.
  */
 export const MISSION_ASK_NUDGE =
-  "You ended waiting on a person, but you didn't ask them in a card. Ask now, directly: ask_user with one clear question (request_secret for a credential or a key, a blocking ask_decision for a choice between options), mark the plan item waiting_you with update_plan, then end your turn. Don't repeat the question in your text.";
+  "You ended waiting on a person, but you didn't ask them in a card. Ask now, directly: ask_user with one clear question (request_secret for a credential or a key, a blocking ask_decision for a choice between options, browser_ask_person or desktop_ask_person for a sign-in, a QR code or a code once the page or app is at that step), mark the plan item waiting_you with update_plan, then end your turn. Don't repeat the question in your text.";
 
 // ── Coming back by itself (`follow_up`) ──────────────────────────────────────
 
