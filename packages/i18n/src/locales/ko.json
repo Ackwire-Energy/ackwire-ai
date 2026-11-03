@@ -1386,7 +1386,6 @@
       "hideMembers": "멤버 숨기기"
     },
     "membersButton_other": "채널 멤버({{count}})",
-    "membersPeople": "사람",
     "membersAgents": "에이전트",
     "you": "나",
     "agentState": {
@@ -1396,7 +1395,6 @@
     },
     "autoReplyChip": "멘션 없이 답해요",
     "coordinatorChip": "팀을 조율해요",
-    "seeDetails": "채널 세부 정보 보기",
     "more": "메시지 작업 더 보기",
     "copyLink": "링크 복사",
     "linkCopied": "링크를 복사했어요.",
@@ -1418,7 +1416,6 @@
     "messages": "메시지",
     "members": "멤버: {{names}}",
     "details": "채널 세부 정보",
-    "agentsAnswer_other": "{{names}}이(가) 여기서 답해요",
     "composerLabel": "#{{channel}}에 메시지 보내기",
     "composerDm": "{{name}}에게 메시지 보내기",
     "composerPlaceholder": "#{{channel}}에 메시지 보내기 · @로 에이전트 부르기",
@@ -9210,7 +9207,7 @@
       "filters": "필터",
       "filtersCount_other": "필터 ({{count}})",
       "jump": "이동",
-      "jumpLabel": "메시지로 이동",
+      "jumpLabel": "{{name}}님의 메시지로 이동",
       "threadIn": "#{{channel}}의 스레드"
     },
     "dm": "{{name}}과(와)의 DM"

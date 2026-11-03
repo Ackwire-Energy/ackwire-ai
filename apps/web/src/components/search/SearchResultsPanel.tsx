@@ -9,13 +9,25 @@ import {
   searchChipLabel,
   searchTerms,
 } from "@agenteschat/client/lib/search-filters";
-import { Button, CountChip, EmptyState, Icon, Message, MessageText, Select } from "@agenteschat/ui";
+import {
+  Button,
+  CountChip,
+  EmptyState,
+  Icon,
+  Menu,
+  MenuRadioGroup,
+  Message,
+  MessageText,
+  Select,
+} from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { useChannelActions } from "@/components/channel-actions";
 import { ErrorState, LoadingList } from "@/components/Loading";
+import { COMPACT_QUERY } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { useMatchMedia } from "@/hooks/useMatchMedia";
 import { groupHits, hitLink, SEARCH_PAGE, useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 import "./search.css";
 
@@ -32,8 +44,10 @@ export function SearchResultsPanel({ channelId, onClose }: { channelId: string; 
   const navigate = useNavigate();
   const channels = useChannels(org.id);
   const categories = useChannelCategories(org.id);
+  const phone = useMatchMedia(COMPACT_QUERY);
   if (!ws) return null;
   const { hits, search, chips } = ws;
+  const sorts = SEARCH_SORTS.map((s) => ({ value: s, label: t(`searchPage.sort.${s}`) }));
   const terms = searchTerms(ws.q);
   const categoryOf = (id: string) => {
     const category = channels.data?.find((c) => c.id === id)?.categoryId;
@@ -89,7 +103,7 @@ export function SearchResultsPanel({ channelId, onClose }: { channelId: string; 
           <Button
             size="sm"
             className="search-result__jump"
-            aria-label={t("searchPage.panel.jumpLabel")}
+            aria-label={t("searchPage.panel.jumpLabel", { name })}
             onClick={() => {
               ws.remember();
               jump(hit);
@@ -134,6 +148,7 @@ export function SearchResultsPanel({ channelId, onClose }: { channelId: string; 
             <Button
               size="sm"
               icon="filter"
+              iconOnly={phone}
               className="search-panel__filters"
               aria-label={t("searchPage.panel.filtersCount", { count: chips.length })}
               onClick={() => {
@@ -141,16 +156,31 @@ export function SearchResultsPanel({ channelId, onClose }: { channelId: string; 
                 ws.field.current?.focus();
               }}
             >
-              <span className="search-panel__words">{t("searchPage.panel.filters")}</span>
-              {chips.length > 0 && <CountChip size="sm">{chips.length}</CountChip>}
+              {!phone && <span className="search-panel__words">{t("searchPage.panel.filters")}</span>}
+              {!phone && chips.length > 0 && <CountChip size="sm">{chips.length}</CountChip>}
             </Button>
-            <Select
-              size="sm"
-              aria-label={t("searchPage.sort.label")}
-              value={ws.sort}
-              onValueChange={ws.setSort}
-              options={SEARCH_SORTS.map((s) => ({ value: s, label: t(`searchPage.sort.${s}`) }))}
-            />
+            {phone ? (
+              <Menu
+                align="end"
+                label={t("searchPage.sort.label")}
+                trigger={<Button size="sm" icon="swap" iconOnly aria-label={t("searchPage.sort.label")} />}
+              >
+                <MenuRadioGroup
+                  label={t("searchPage.sort.label")}
+                  value={ws.sort}
+                  onValueChange={(v) => ws.setSort(v as typeof ws.sort)}
+                  options={sorts}
+                />
+              </Menu>
+            ) : (
+              <Select
+                size="sm"
+                aria-label={t("searchPage.sort.label")}
+                value={ws.sort}
+                onValueChange={ws.setSort}
+                options={sorts}
+              />
+            )}
             <Button
               size="sm"
               variant="ghost"

@@ -35,6 +35,12 @@ afterEach(() => {
 const COLUMN_KEY = `${STORAGE_KEYS.membersColumn}.u-walter.${ORG_ID}`;
 const toggle = () => screen().getByRole("button", { name: "Membros do canal (4)" });
 const column = () => screen().queryByRole("complementary", { name: "Membros de #eng" });
+const sheet = () => screen().queryByRole("dialog", { name: "Membros de #eng" });
+/** A member's row, found by the name it shows. */
+const row = (within: HTMLElement, name: string) =>
+  [...within.querySelectorAll<HTMLElement>(".members-side__row")].find(
+    (r) => r.querySelector(".members-side__label")?.textContent === name,
+  ) ?? null;
 
 const open = async (state: FakeState = seedState()) => {
   const ada = state.agents.find((a) => a.id === ADA_ID);
@@ -104,7 +110,10 @@ describe("the members column", () => {
       }),
     );
     await settle(2);
-    const ada = within(column() as HTMLElement).getByRole("button", { name: "Perfil de Ada" });
+    const ada = row(column() as HTMLElement, "Ada") as HTMLElement;
+    // Named "Perfil de Ada", described by all it shows (presence, line, chips).
+    expect(ada.getAttribute("aria-label")).toBe("Perfil de Ada");
+    expect(document.getElementById(ada.getAttribute("aria-describedby") ?? "")?.textContent).toContain("pensando");
     expect(ada.textContent).toContain("pensando");
     expect(ada.querySelector("[data-busy] .sidebar__trail")).toBeTruthy();
     // ↑/↓ between the rows.
@@ -126,9 +135,7 @@ describe("the members column", () => {
   test("a row opens the member's card", async () => {
     widthIs(DESKTOP_QUERY);
     await open();
-    await act(async () =>
-      fireEvent.click(within(column() as HTMLElement).getByRole("button", { name: "Perfil de João" })),
-    );
+    await act(async () => fireEvent.click(row(column() as HTMLElement, "João") as HTMLElement));
     await settle(3);
     expect(screen().getByRole("dialog", { name: "Perfil" }).textContent).toContain("João");
   });
@@ -146,23 +153,97 @@ describe("the members column", () => {
     expect(column()).toBeNull();
     await act(async () => fireEvent.click(toggle()));
     await settle(2);
-    const sheet = screen().getByRole("complementary", { name: "Membros de #eng" });
-    expect(sheet.classList.contains("members-sheet")).toBe(true);
-    expect(within(sheet).getByRole("button", { name: "Configurações do canal" })).toBeTruthy();
-    expect(within(sheet).getByRole("button", { name: "Mensagens fixadas" })).toBeTruthy();
-    expect(within(sheet).getByRole("button", { name: /^Threads/ })).toBeTruthy();
+    const panel = sheet() as HTMLElement;
+    expect(panel.classList.contains("members-sheet")).toBe(true);
+    expect(panel.getAttribute("aria-modal")).toBe("true");
+    expect(within(panel).getByRole("button", { name: "Configurações do canal" })).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: "Mensagens fixadas" })).toBeTruthy();
+    expect(within(panel).getByRole("button", { name: /^Threads/ })).toBeTruthy();
     await act(async () =>
-      fireEvent.change(within(sheet).getByRole("searchbox", { name: "Buscar pessoas e agentes" }), {
+      fireEvent.change(within(panel).getByRole("searchbox", { name: "Buscar pessoas e agentes" }), {
         target: { value: "atl" },
       }),
     );
-    expect(within(sheet).queryByRole("button", { name: "Perfil de Ada" })).toBeNull();
-    expect(within(sheet).getByRole("button", { name: "Perfil de Atlas" })).toBeTruthy();
+    expect(row(panel, "Ada")).toBeNull();
+    expect(row(panel, "Atlas")).toBeTruthy();
     // The cog closes the sheet for the channel's details.
-    await act(async () => fireEvent.click(within(sheet).getByRole("button", { name: "Configurações do canal" })));
+    await act(async () => fireEvent.click(within(panel).getByRole("button", { name: "Configurações do canal" })));
     await settle(3);
-    expect(screen().queryByRole("complementary", { name: "Membros de #eng" })).toBeNull();
+    expect(sheet()).toBeNull();
     expect(screen().getByRole("dialog", { name: /eng/ })).toBeTruthy();
+  });
+});
+
+describe("the phone's members sheet: a dialog over the channel", () => {
+  const openSheet = async () => {
+    widthIs(COMPACT_QUERY);
+    await open();
+    toggle().focus();
+    await act(async () => fireEvent.click(toggle()));
+    await settle(2);
+    return sheet() as HTMLElement;
+  };
+
+  test("focus goes in, the channel behind is inert; Esc closes it and focus is back on the toggle", async () => {
+    const panel = await openSheet();
+    expect(panel.contains(document.activeElement)).toBe(true);
+    expect((screen().getByRole("main") as HTMLElement).inert).toBe(true);
+    await act(async () => fireEvent.keyDown(window, { key: "Escape" }));
+    await settle(1);
+    expect(sheet()).toBeNull();
+    expect((screen().getByRole("main") as HTMLElement).inert).toBe(false);
+    expect(document.activeElement).toBe(toggle());
+  });
+
+  test("a swipe to the right closes it; a short one doesn't", async () => {
+    const panel = await openSheet();
+    const swipe = async (dx: number) =>
+      act(async () => {
+        fireEvent.touchStart(panel, { touches: [{ clientX: 100 }] });
+        fireEvent.touchEnd(panel, { changedTouches: [{ clientX: 100 + dx }] });
+      });
+    await swipe(20);
+    expect(sheet()).toBeTruthy();
+    await swipe(120);
+    expect(sheet()).toBeNull();
+  });
+
+  test("the backdrop closes it", async () => {
+    await openSheet();
+    const scrim = document.querySelector(".members-sheet__scrim") as HTMLElement;
+    expect(scrim.inert).toBe(false);
+    await act(async () => fireEvent.click(scrim));
+    expect(sheet()).toBeNull();
+  });
+});
+
+describe("the members column's edges", () => {
+  test("someone who hasn't joined a public channel still sees its members", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = seedState();
+    const eng = state.channels.find((c) => c.id === ENG_ID);
+    if (eng) eng.isMember = false;
+    await open(state);
+    expect(column()).toBeTruthy();
+  });
+
+  test("offline past the cap waits behind Mostrar mais", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = seedState();
+    const base = state.members[1] as (typeof state.members)[number];
+    const extra = Array.from({ length: 105 }, (_, i) => ({
+      ...base,
+      userId: `u-off-${i}`,
+      name: `Offline ${String(i).padStart(3, "0")}`,
+      handle: `off${i}`,
+    }));
+    state.members.push(...extra);
+    state.channelMembers[ENG_ID]?.push(...extra.map((m) => ({ type: "person" as const, id: m.userId })));
+    await open(state);
+    const offline = within(column() as HTMLElement).getByRole("region", { name: "Offline" });
+    expect(offline.querySelectorAll(".members-side__row").length).toBe(100);
+    await act(async () => fireEvent.click(within(offline).getByRole("button", { name: /^Mostrar mais/ })));
+    expect(offline.querySelectorAll(".members-side__row").length).toBeGreaterThan(100);
   });
 });
 

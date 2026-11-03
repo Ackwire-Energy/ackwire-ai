@@ -3532,9 +3532,6 @@
       "other": "Channel members ({{count}})"
     }
   },
-  "channel.membersPeople": {
-    "value": "People"
-  },
   "channel.membersAgents": {
     "value": "Agents"
   },
@@ -3555,9 +3552,6 @@
   },
   "channel.coordinatorChip": {
     "value": "coordinates the team"
-  },
-  "channel.seeDetails": {
-    "value": "See channel details"
   },
   "channel.more": {
     "value": "More message actions"
@@ -3621,12 +3615,6 @@
   },
   "channel.details": {
     "value": "Channel details"
-  },
-  "channel.agentsAnswer": {
-    "value": {
-      "one": "{{names}} answers here",
-      "other": "{{names}} answer here"
-    }
   },
   "channel.composerLabel": {
     "value": "Message #{{channel}}"
@@ -23277,7 +23265,7 @@
     "value": "Jump"
   },
   "searchPage.panel.jumpLabel": {
-    "value": "Jump to the message"
+    "value": "Jump to {{name}}'s message"
   },
   "searchPage.panel.threadIn": {
     "value": "thread in #{{channel}}"

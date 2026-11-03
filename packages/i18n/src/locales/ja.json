@@ -1386,7 +1386,6 @@
       "hideMembers": "メンバーを隠す"
     },
     "membersButton_other": "チャンネルのメンバー（{{count}}）",
-    "membersPeople": "人",
     "membersAgents": "エージェント",
     "you": "あなた",
     "agentState": {
@@ -1396,7 +1395,6 @@
     },
     "autoReplyChip": "メンションなしで返信",
     "coordinatorChip": "チームのまとめ役",
-    "seeDetails": "チャンネルの詳細を見る",
     "more": "メッセージのその他の操作",
     "copyLink": "リンクをコピー",
     "linkCopied": "リンクをコピーしました。",
@@ -1418,7 +1416,6 @@
     "messages": "メッセージ",
     "members": "メンバー: {{names}}",
     "details": "チャンネルの詳細",
-    "agentsAnswer_other": "{{names}}がここで返信します",
     "composerLabel": "#{{channel}}へのメッセージ",
     "composerDm": "{{name}}へのメッセージ",
     "composerPlaceholder": "#{{channel}}へのメッセージ · @でエージェントを呼べます",
@@ -9217,7 +9214,7 @@
       "filters": "フィルター",
       "filtersCount_other": "フィルター（{{count}}）",
       "jump": "移動",
-      "jumpLabel": "メッセージに移動",
+      "jumpLabel": "{{name}} のメッセージに移動",
       "threadIn": "#{{channel}}のスレッド"
     },
     "dm": "{{name}}とのDM"

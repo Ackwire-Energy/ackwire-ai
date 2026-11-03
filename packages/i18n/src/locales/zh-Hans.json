@@ -1386,7 +1386,6 @@
       "hideMembers": "隐藏成员"
     },
     "membersButton_other": "频道成员（{{count}}）",
-    "membersPeople": "成员",
     "membersAgents": "智能体",
     "you": "你",
     "agentState": {
@@ -1396,7 +1395,6 @@
     },
     "autoReplyChip": "无需提及即回复",
     "coordinatorChip": "协调团队",
-    "seeDetails": "查看频道详情",
     "more": "更多消息操作",
     "copyLink": "复制链接",
     "linkCopied": "链接已复制。",
@@ -1418,7 +1416,6 @@
     "messages": "消息",
     "members": "成员：{{names}}",
     "details": "频道详情",
-    "agentsAnswer_other": "{{names}} 在这里回复",
     "composerLabel": "在 #{{channel}} 中发消息",
     "composerDm": "给 {{name}} 发消息",
     "composerPlaceholder": "在 #{{channel}} 中发消息 · 用 @ 呼叫智能体",
@@ -9295,7 +9292,7 @@
       "filters": "筛选",
       "filtersCount_other": "筛选（{{count}}）",
       "jump": "前往",
-      "jumpLabel": "前往该消息",
+      "jumpLabel": "前往 {{name}} 的消息",
       "threadIn": "#{{channel}} 中的话题"
     },
     "dm": "与 {{name}} 的私信"

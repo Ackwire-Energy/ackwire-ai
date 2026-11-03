@@ -1539,7 +1539,6 @@
     "membersButton_few": "Участники канала ({{count}})",
     "membersButton_many": "Участники канала ({{count}})",
     "membersButton_other": "Участники канала ({{count}})",
-    "membersPeople": "Люди",
     "membersAgents": "Агенты",
     "you": "вы",
     "agentState": {
@@ -1549,7 +1548,6 @@
     },
     "autoReplyChip": "отвечает без упоминания",
     "coordinatorChip": "координирует команду",
-    "seeDetails": "Подробнее о канале",
     "more": "Другие действия с сообщением",
     "copyLink": "Копировать ссылку",
     "linkCopied": "Ссылка скопирована.",
@@ -1571,10 +1569,6 @@
     "messages": "Сообщения",
     "members": "Участники: {{names}}",
     "details": "О канале",
-    "agentsAnswer_one": "{{names}} отвечает здесь",
-    "agentsAnswer_few": "{{names}} отвечают здесь",
-    "agentsAnswer_many": "{{names}} отвечают здесь",
-    "agentsAnswer_other": "{{names}} отвечают здесь",
     "composerLabel": "Сообщение в #{{channel}}",
     "composerDm": "Сообщение для {{name}}",
     "composerPlaceholder": "Сообщение в #{{channel}} · @, чтобы позвать агента",
@@ -10230,7 +10224,7 @@
       "filtersCount_many": "Фильтры ({{count}})",
       "filtersCount_other": "Фильтры ({{count}})",
       "jump": "Перейти",
-      "jumpLabel": "Перейти к сообщению",
+      "jumpLabel": "Перейти к сообщению от {{name}}",
       "threadIn": "ветка в #{{channel}}"
     },
     "dm": "Личные сообщения с {{name}}"

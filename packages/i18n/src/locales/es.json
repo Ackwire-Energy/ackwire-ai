@@ -1488,7 +1488,6 @@
     "membersButton_one": "Miembros del canal ({{count}})",
     "membersButton_many": "Miembros del canal ({{count}})",
     "membersButton_other": "Miembros del canal ({{count}})",
-    "membersPeople": "Personas",
     "membersAgents": "Agentes",
     "you": "tú",
     "agentState": {
@@ -1498,7 +1497,6 @@
     },
     "autoReplyChip": "responde sin mención",
     "coordinatorChip": "coordina el equipo",
-    "seeDetails": "Ver detalles del canal",
     "more": "Más acciones del mensaje",
     "copyLink": "Copiar enlace",
     "linkCopied": "Enlace copiado.",
@@ -1520,9 +1518,6 @@
     "messages": "Mensajes",
     "members": "Miembros: {{names}}",
     "details": "Detalles del canal",
-    "agentsAnswer_one": "{{names}} responde aquí",
-    "agentsAnswer_many": "{{names}} responden aquí",
-    "agentsAnswer_other": "{{names}} responden aquí",
     "composerLabel": "Mensaje en #{{channel}}",
     "composerDm": "Mensaje para {{name}}",
     "composerPlaceholder": "Mensaje en #{{channel}} · usa @ para llamar a un agente",
@@ -9920,7 +9915,7 @@
       "filtersCount_many": "Filtros ({{count}})",
       "filtersCount_other": "Filtros ({{count}})",
       "jump": "Ir",
-      "jumpLabel": "Ir al mensaje",
+      "jumpLabel": "Ir al mensaje de {{name}}",
       "threadIn": "hilo en #{{channel}}"
     },
     "dm": "MD con {{name}}"

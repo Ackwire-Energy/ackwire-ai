@@ -5,7 +5,7 @@ import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
 import { picksForMe } from "@agenteschat/client/lib/routing";
 import { Avatar, Button, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
-import { type KeyboardEvent, type TouchEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { ChannelPinsButton } from "@/components/ChannelPins";
@@ -15,6 +15,7 @@ import { ProfileTrigger } from "@/components/ProfileCard";
 import { unshownRow } from "@/components/Sidebar";
 import { AgentTrail, colorOf } from "@/components/Sky";
 import { ChannelThreadsButton } from "@/components/threads/ThreadLines";
+import { useModalSheet } from "@/hooks/useModalSheet";
 import { agentLine, personLine, useAgentPresence, usePersonPresence, usePresences } from "@/hooks/usePresence";
 import { useStreams } from "@/realtime/context";
 import "./members.css";
@@ -54,11 +55,14 @@ export function MembersSheet({
   const { t } = useTranslation();
   const [find, setFind] = useState("");
   const touch = useRef<number | null>(null);
+  const sheet = useRef<HTMLElement>(null);
+  useModalSheet(sheet, ".members-sheet__scrim");
   const settings = t("shell.sidebarMenu.channelSettings");
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      const over = document.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"]');
+      if (Array.from(over).some((el) => el !== sheet.current)) return;
       e.preventDefault();
       onClose();
     };
@@ -77,7 +81,11 @@ export function MembersSheet({
         onClick={onClose}
       />
       <aside
+        ref={sheet}
         className="members-sheet"
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         aria-label={t("members.column.label", { channel: channel.name })}
         onTouchStart={(e: TouchEvent) => {
           touch.current = e.touches[0]?.clientX ?? null;
@@ -226,14 +234,17 @@ function PersonRow({ member: m, you }: { member: Member; you: boolean }) {
   const word = t(`presence.${presence}`);
   const seen = looks === "offline" ? shown?.person.lastSeenAt : null;
   const owner = t("members.column.ownerTitle");
+  const shows = useId();
   return (
     <ProfileTrigger
       actor={{ type: "person", id: m.userId }}
       label={t("profile.of", { name: m.name })}
+      describedBy={shows}
       className="members-side__row"
       side="left"
     >
       <span
+        id={shows}
         className="members-side__inner"
         data-presence={looks}
         title={seen ? `${word} · ${t("presence.seen", { when: relativeTime(t, i18n.language, seen) })}` : undefined}
@@ -279,14 +290,17 @@ function AgentRow({
   const line = agentLine(t, shown?.line ?? null);
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
   const text = line?.text ?? doing ?? agent.role ?? word;
+  const shows = useId();
   return (
     <ProfileTrigger
       actor={{ type: "agent", id: agent.id }}
       label={t("profile.of", { name: agent.name })}
+      describedBy={shows}
       className="members-side__row"
       side="left"
     >
       <span
+        id={shows}
         className="members-side__inner"
         data-presence={shown?.presence}
         data-busy={busy || undefined}

@@ -1488,7 +1488,6 @@
     "membersButton_one": "Membres du canal ({{count}})",
     "membersButton_many": "Membres du canal ({{count}})",
     "membersButton_other": "Membres du canal ({{count}})",
-    "membersPeople": "Personnes",
     "membersAgents": "Agents",
     "you": "vous",
     "agentState": {
@@ -1498,7 +1497,6 @@
     },
     "autoReplyChip": "répond sans mention",
     "coordinatorChip": "coordonne l'équipe",
-    "seeDetails": "Voir les détails du canal",
     "more": "Plus d'actions sur le message",
     "copyLink": "Copier le lien",
     "linkCopied": "Lien copié.",
@@ -1520,9 +1518,6 @@
     "messages": "Messages",
     "members": "Membres : {{names}}",
     "details": "Détails du canal",
-    "agentsAnswer_one": "{{names}} répond ici",
-    "agentsAnswer_many": "{{names}} répondent ici",
-    "agentsAnswer_other": "{{names}} répondent ici",
     "composerLabel": "Écrire dans #{{channel}}",
     "composerDm": "Écrire à {{name}}",
     "composerPlaceholder": "Écrire dans #{{channel}} · utilisez @ pour appeler un agent",
@@ -9992,7 +9987,7 @@
       "filtersCount_many": "Filtres ({{count}})",
       "filtersCount_other": "Filtres ({{count}})",
       "jump": "Aller",
-      "jumpLabel": "Aller au message",
+      "jumpLabel": "Aller au message de {{name}}",
       "threadIn": "fil dans #{{channel}}"
     },
     "dm": "Message direct avec {{name}}"

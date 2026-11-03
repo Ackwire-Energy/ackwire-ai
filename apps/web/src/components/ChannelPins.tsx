@@ -1,11 +1,8 @@
 import { type MessagePin, usePinMessage, usePins } from "@agenteschat/client";
-import { previewOf } from "@agenteschat/client/lib/consultations";
 import { clockAt } from "@agenteschat/client/lib/format";
-import { textOrMedia } from "@agenteschat/client/lib/media";
 import { can } from "@agenteschat/client/lib/permissions";
-import { pinsIn } from "@agenteschat/client/lib/pins";
+import { pinPreview, pinsIn } from "@agenteschat/client/lib/pins";
 import { Button, CountChip, Icon, Popover } from "@agenteschat/ui";
-import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
@@ -54,8 +51,6 @@ export function ChannelPinsButton({ channelId, channelName }: { channelId: strin
     </PinsPopover>
   );
 }
-
-const pinPreview = (t: TFunction, p: MessagePin) => previewOf(textOrMedia(t, p.message.body, p.message.meta));
 
 /**
  * Every pin here, the latest first, from its trigger (`children`): a row goes to the message (paged in and

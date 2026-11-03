@@ -1437,7 +1437,6 @@
     },
     "membersButton_one": "Kanal üyeleri ({{count}})",
     "membersButton_other": "Kanal üyeleri ({{count}})",
-    "membersPeople": "Kişiler",
     "membersAgents": "Ajanlar",
     "you": "siz",
     "agentState": {
@@ -1447,7 +1446,6 @@
     },
     "autoReplyChip": "bahsetme olmadan yanıt verir",
     "coordinatorChip": "ekibi koordine eder",
-    "seeDetails": "Kanal ayrıntılarını gör",
     "more": "Diğer mesaj işlemleri",
     "copyLink": "Bağlantıyı kopyala",
     "linkCopied": "Bağlantı kopyalandı.",
@@ -1469,8 +1467,6 @@
     "messages": "Mesajlar",
     "members": "Üyeler: {{names}}",
     "details": "Kanal ayrıntıları",
-    "agentsAnswer_one": "{{names}} burada yanıt verir",
-    "agentsAnswer_other": "{{names}} burada yanıt verir",
     "composerLabel": "#{{channel}} kanalına mesaj",
     "composerDm": "{{name}} kişisine mesaj",
     "composerPlaceholder": "#{{channel}} kanalına mesaj · bir ajana seslenmek için @ kullanın",
@@ -9525,7 +9521,7 @@
       "filtersCount_one": "Filtreler ({{count}})",
       "filtersCount_other": "Filtreler ({{count}})",
       "jump": "Git",
-      "jumpLabel": "Mesaja git",
+      "jumpLabel": "{{name}} adlı kişinin mesajına git",
       "threadIn": "#{{channel}} kanalındaki ileti dizisi"
     },
     "dm": "{{name}} ile DM"

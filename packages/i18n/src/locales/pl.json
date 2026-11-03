@@ -1539,7 +1539,6 @@
     "membersButton_few": "Członkowie kanału ({{count}})",
     "membersButton_many": "Członkowie kanału ({{count}})",
     "membersButton_other": "Członkowie kanału ({{count}})",
-    "membersPeople": "Osoby",
     "membersAgents": "Agenci",
     "you": "ty",
     "agentState": {
@@ -1549,7 +1548,6 @@
     },
     "autoReplyChip": "odpowiada bez wzmianki",
     "coordinatorChip": "koordynuje zespół",
-    "seeDetails": "Zobacz szczegóły kanału",
     "more": "Więcej akcji wiadomości",
     "copyLink": "Kopiuj link",
     "linkCopied": "Skopiowano link.",
@@ -1571,10 +1569,6 @@
     "messages": "Wiadomości",
     "members": "Członkowie: {{names}}",
     "details": "Szczegóły kanału",
-    "agentsAnswer_one": "{{names}} odpowiada tutaj",
-    "agentsAnswer_few": "{{names}} odpowiadają tutaj",
-    "agentsAnswer_many": "{{names}} odpowiadają tutaj",
-    "agentsAnswer_other": "{{names}} odpowiadają tutaj",
     "composerLabel": "Wiadomość do #{{channel}}",
     "composerDm": "Wiadomość do {{name}}",
     "composerPlaceholder": "Wiadomość do #{{channel}} · użyj @, żeby zawołać agenta",
@@ -10265,7 +10259,7 @@
       "filtersCount_many": "Filtry ({{count}})",
       "filtersCount_other": "Filtry ({{count}})",
       "jump": "Przejdź",
-      "jumpLabel": "Przejdź do wiadomości",
+      "jumpLabel": "Przejdź do wiadomości od {{name}}",
       "threadIn": "wątek na #{{channel}}"
     },
     "dm": "Wiadomość bezpośrednia z: {{name}}"

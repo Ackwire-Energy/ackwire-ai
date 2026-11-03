@@ -1,10 +1,11 @@
 import { Button } from "@agenteschat/ui";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { COMPACT_QUERY } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { SearchBox } from "@/components/search/SearchBox";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
+import { useModalSheet } from "@/hooks/useModalSheet";
 import { useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 
 /**
@@ -65,20 +66,34 @@ export function HeaderSearch({ onOpen }: { onOpen: () => void }) {
         onClick={() => setSheet(true)}
       />
       {!phone && box(false)}
-      {phone && sheet && (
-        <section className="search-sheet" aria-label={label}>
-          <header className="search-sheet__head">
-            <Button
-              variant="ghost"
-              iconOnly
-              icon="chevronLeft"
-              aria-label={t("common.back")}
-              onClick={() => setSheet(false)}
-            />
-            {box(true)}
-          </header>
-        </section>
-      )}
+      {phone && sheet && <SearchSheet label={label} onClose={() => setSheet(false)} box={box(true)} />}
     </>
+  );
+}
+
+/** The phone's search over the whole screen: a dialog, Esc or Back closes it (a menu open in it closes first). */
+function SearchSheet({ label, onClose, box }: { label: string; onClose: () => void; box: ReactNode }) {
+  const { t } = useTranslation();
+  const sheet = useRef<HTMLElement>(null);
+  useModalSheet(sheet);
+  return (
+    <section
+      ref={sheet}
+      className="search-sheet"
+      role="dialog"
+      aria-modal="true"
+      tabIndex={-1}
+      aria-label={label}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || e.defaultPrevented) return;
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <header className="search-sheet__head">
+        <Button variant="ghost" iconOnly icon="chevronLeft" aria-label={t("common.back")} onClick={onClose} />
+        {box}
+      </header>
+    </section>
   );
 }

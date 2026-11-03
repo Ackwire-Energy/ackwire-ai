@@ -1437,7 +1437,6 @@
     },
     "membersButton_one": "Kanaalleden ({{count}})",
     "membersButton_other": "Kanaalleden ({{count}})",
-    "membersPeople": "Mensen",
     "membersAgents": "Agents",
     "you": "jij",
     "agentState": {
@@ -1447,7 +1446,6 @@
     },
     "autoReplyChip": "antwoordt zonder vermelding",
     "coordinatorChip": "coördineert het team",
-    "seeDetails": "Kanaaldetails bekijken",
     "more": "Meer berichtacties",
     "copyLink": "Link kopiëren",
     "linkCopied": "Link gekopieerd.",
@@ -1469,8 +1467,6 @@
     "messages": "Berichten",
     "members": "Leden: {{names}}",
     "details": "Kanaaldetails",
-    "agentsAnswer_one": "{{names}} antwoordt hier",
-    "agentsAnswer_other": "{{names}} antwoorden hier",
     "composerLabel": "Bericht aan #{{channel}}",
     "composerDm": "Bericht aan {{name}}",
     "composerPlaceholder": "Bericht aan #{{channel}} · gebruik @ om een agent te roepen",
@@ -9665,7 +9661,7 @@
       "filtersCount_one": "Filters ({{count}})",
       "filtersCount_other": "Filters ({{count}})",
       "jump": "Ga naar",
-      "jumpLabel": "Ga naar het bericht",
+      "jumpLabel": "Ga naar het bericht van {{name}}",
       "threadIn": "thread in #{{channel}}"
     },
     "dm": "DM met {{name}}"

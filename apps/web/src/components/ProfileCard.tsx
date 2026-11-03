@@ -26,6 +26,7 @@ import { brainLine, engineOfBrain } from "@agenteschat/client/lib/brain";
 import { errorText } from "@agenteschat/client/lib/errors";
 import {
   clockHour,
+  firstName,
   formatMonthYear,
   formatPercent,
   formatTime,
@@ -91,11 +92,14 @@ export function ProfileTrigger({
   children,
   className,
   decorative,
+  describedBy,
   side = "bottom",
 }: {
   actor: Actor;
   /** Accessible name of the button ("Perfil de Ada"). */
   label: string;
+  /** The id of what the button shows, read after its name (a members row: presence, line, chips). */
+  describedBy?: string;
   children: ReactNode;
   className?: string;
   /** A second trigger next to a focusable one (the avatar beside the name): mouse only. */
@@ -132,6 +136,7 @@ export function ProfileTrigger({
           {...menu}
           className={className ? `profile-trigger ${className}` : "profile-trigger"}
           aria-label={label}
+          aria-describedby={describedBy}
           aria-haspopup="dialog"
           tabIndex={decorative ? -1 : undefined}
           aria-hidden={decorative || undefined}
@@ -460,7 +465,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   const thinks =
     agent.brain && agent.brain.kind !== "model"
-      ? brainLine(t, agent.brain, model, { owner: owner?.split(" ")[0], agents: dir.agents })
+      ? brainLine(t, agent.brain, model, { owner: owner ? firstName(owner) : undefined, agents: dir.agents })
       : null;
   // Its presence from its work and its line (ADR 0084): its own words or what it is doing now, and where.
   const shown = useAgentPresence(agent.id);
@@ -601,7 +606,8 @@ function AudienceEdit({ agent }: { agent: Agent }) {
   const [draft, setDraft] = useState<AgentAudience>(() => audienceOf(agent));
   const [blocked, setBlocked] = useState(false);
   const valid = audienceValid(draft, agent.ownerUserId);
-  const ownerFirst = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name.split(" ")[0] : undefined;
+  const ownerName = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : undefined;
+  const ownerFirst = ownerName ? firstName(ownerName) : undefined;
   return (
     <Popover
       open={open}

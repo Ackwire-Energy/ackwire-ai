@@ -1,0 +1,30 @@
+import { type RefObject, useEffect, useState } from "react";
+
+/**
+ * A full-screen sheet over the page (phone): while it is mounted, focus is inside it and everything behind it is
+ * inert, except the elements matching `keep` (its scrim, which closes it). When it goes, focus returns to what had it
+ * before, unless something else already took it (a panel the sheet opened).
+ */
+export function useModalSheet(sheet: RefObject<HTMLElement | null>, keep?: string) {
+  // Read on the first render, before a field inside takes the focus (`autoFocus`).
+  const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+  useEffect(() => {
+    const el = sheet.current;
+    if (!el) return;
+    const behind: HTMLElement[] = [];
+    for (let node: HTMLElement | null = el; node && node !== document.body; node = node.parentElement) {
+      const parent: HTMLElement | null = node.parentElement;
+      if (!parent) break;
+      for (const sib of Array.from(parent.children))
+        if (sib !== node && sib instanceof HTMLElement && !sib.inert && !(keep && sib.matches(keep))) behind.push(sib);
+    }
+    for (const b of behind) b.inert = true;
+    if (!el.contains(document.activeElement)) el.focus({ preventScroll: true });
+    return () => {
+      for (const b of behind) b.inert = false;
+      const now = document.activeElement;
+      const lost = !now || now === document.body || el.contains(now);
+      if (lost && opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [sheet, keep, opener]);
+}

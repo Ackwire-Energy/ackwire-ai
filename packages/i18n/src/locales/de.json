@@ -1437,7 +1437,6 @@
     },
     "membersButton_one": "Mitglieder des Kanals ({{count}})",
     "membersButton_other": "Mitglieder des Kanals ({{count}})",
-    "membersPeople": "Personen",
     "membersAgents": "Agenten",
     "you": "du",
     "agentState": {
@@ -1447,7 +1446,6 @@
     },
     "autoReplyChip": "antwortet ohne Erwähnung",
     "coordinatorChip": "koordiniert das Team",
-    "seeDetails": "Kanaldetails ansehen",
     "more": "Weitere Nachrichtenaktionen",
     "copyLink": "Link kopieren",
     "linkCopied": "Link kopiert.",
@@ -1469,8 +1467,6 @@
     "messages": "Nachrichten",
     "members": "Mitglieder: {{names}}",
     "details": "Kanaldetails",
-    "agentsAnswer_one": "{{names}} antwortet hier",
-    "agentsAnswer_other": "{{names}} antworten hier",
     "composerLabel": "Nachricht an #{{channel}}",
     "composerDm": "Nachricht an {{name}}",
     "composerPlaceholder": "Nachricht an #{{channel}} · mit @ rufst du einen Agenten",
@@ -9586,7 +9582,7 @@
       "filtersCount_one": "Filter ({{count}})",
       "filtersCount_other": "Filter ({{count}})",
       "jump": "Springen",
-      "jumpLabel": "Zur Nachricht springen",
+      "jumpLabel": "Zur Nachricht von {{name}} springen",
       "threadIn": "Thread in #{{channel}}"
     },
     "dm": "Direktnachricht mit {{name}}"

@@ -1386,7 +1386,6 @@
       "hideMembers": "Sembunyikan anggota"
     },
     "membersButton_other": "Anggota kanal ({{count}})",
-    "membersPeople": "Orang",
     "membersAgents": "Agen",
     "you": "kamu",
     "agentState": {
@@ -1396,7 +1395,6 @@
     },
     "autoReplyChip": "menjawab tanpa disebut",
     "coordinatorChip": "mengoordinasikan tim",
-    "seeDetails": "Lihat detail kanal",
     "more": "Tindakan pesan lainnya",
     "copyLink": "Salin tautan",
     "linkCopied": "Tautan disalin.",
@@ -1418,7 +1416,6 @@
     "messages": "Pesan",
     "members": "Anggota: {{names}}",
     "details": "Detail kanal",
-    "agentsAnswer_other": "{{names}} menjawab di sini",
     "composerLabel": "Kirim pesan ke #{{channel}}",
     "composerDm": "Kirim pesan ke {{name}}",
     "composerPlaceholder": "Kirim pesan ke #{{channel}} · pakai @ untuk memanggil agen",
@@ -9284,7 +9281,7 @@
       "filters": "Filter",
       "filtersCount_other": "Filter ({{count}})",
       "jump": "Buka",
-      "jumpLabel": "Buka pesannya",
+      "jumpLabel": "Buka pesan dari {{name}}",
       "threadIn": "utas di #{{channel}}"
     },
     "dm": "DM dengan {{name}}"
