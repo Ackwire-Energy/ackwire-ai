@@ -103,6 +103,7 @@ export function chatRoutes(deps: AppDeps) {
             unreadCount: r.unreadCount,
             mentionCount: r.mentionCount,
             muted: r.muted,
+            can: r.can,
             lastMessage: r.lastMessage ? { ...r.lastMessage, createdAt: r.lastMessage.createdAt.toISOString() } : null,
           })),
         },

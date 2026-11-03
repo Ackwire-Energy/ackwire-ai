@@ -23,6 +23,7 @@ import type {
   Channel,
   ChannelCategory,
   ChannelMember,
+  ChannelOverride,
   ComposioUsage,
   Connection,
   ConnectorCatalog,
@@ -244,6 +245,8 @@ export interface FakeState {
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
   autoReply: Record<string, boolean>;
+  /** A channel's exceptions (ADR 0134), by channel id. */
+  channelPermissions: Record<string, ChannelOverride[]>;
   /** `unread`: its count (0 when unset); the last message is the channel's latest in `messages`. */
   dms: {
     channelId: string;
@@ -858,6 +861,7 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
     reactions: {},
     dms: [],
     autoReply: {},
+    channelPermissions: {},
     calls: [],
     ...overrides,
   };
@@ -2545,6 +2549,19 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       setAutoReply: async (orgId, channelId, agentId, autoReply) => {
         log("chat.setAutoReply", orgId, channelId, agentId, autoReply);
         state.autoReply[`${agentId}:${channelId}`] = autoReply;
+      },
+      permissions: async (orgId, channelId) => {
+        log("chat.permissions", orgId, channelId);
+        return structuredClone(state.channelPermissions[channelId] ?? []);
+      },
+      setPermission: async (orgId, channelId, override) => {
+        log("chat.setPermission", orgId, channelId, override);
+        const same = (o: ChannelOverride) =>
+          o.target.type === override.target.type && o.target.id === override.target.id;
+        const rest = (state.channelPermissions[channelId] ?? []).filter((o) => !same(o));
+        const empty = override.allow.length === 0 && override.deny.length === 0;
+        state.channelPermissions[channelId] = empty ? rest : [...rest, override];
+        return empty ? null : override;
       },
       addMember: async (orgId, channelId, member) => {
         log("chat.addMember", orgId, channelId, member);

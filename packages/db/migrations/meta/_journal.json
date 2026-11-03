@@ -1345,6 +1345,13 @@
       "when": 1793725976871,
       "tag": "0193_question_dismissed",
       "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "7",
+      "when": 1793727546494,
+      "tag": "0195_channel_permissions",
+      "breakpoints": true
     }
   ]
 }

@@ -27,7 +27,7 @@ A workspace had three fixed roles. "Admin" meant everything but ownership, "memb
 
 - No role names in checks: a new action picks a key, and the role screen shows it.
 - Every request reads the person's keys with their membership (two indexed subqueries).
-- Next: exceptions per channel (who sees, who writes, allow / inherit / deny per role or person), who approves an agent by role (the audience by role is the addendum below), guests (a base that replaces `everyone` and sees only where they are put, which every read path has to honor), `@role` mentions and `hoist`.
+- Next: exceptions per channel (who sees, who writes, allow / inherit / deny per role or person; who writes, calls agents and manages is ADR 0134), who approves an agent by role (the audience by role is the addendum below), guests (a base that replaces `everyone` and sees only where they are put, which every read path has to honor), `@role` mentions and `hoist`.
 
 ## Addendum (2026-11-01): an agent's audience by role
 

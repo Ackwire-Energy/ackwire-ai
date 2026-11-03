@@ -65,6 +65,7 @@ import type {
   ChannelCategory,
   ChannelInput,
   ChannelMember,
+  ChannelOverride,
   Choices,
   CodeSent,
   CommandApproval,
@@ -661,6 +662,10 @@ export interface ApiClient {
     removeMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
     /** "Quando responde" for an agent in this channel (its creator, an admin or the agent's owner). */
     setAutoReply(orgId: string, channelId: string, agentId: string, autoReply: boolean): Promise<void>;
+    /** The channel's exceptions (ADR 0134), for who manages it. */
+    permissions(orgId: string, channelId: string): Promise<ChannelOverride[]>;
+    /** Sets one exception; empty `allow` and `deny` remove it (null). */
+    setPermission(orgId: string, channelId: string, override: ChannelOverride): Promise<ChannelOverride | null>;
     messages(
       orgId: string,
       channelId: string,

@@ -363,6 +363,7 @@ describe("the invite dialog", () => {
     await click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" }));
     await settle(3);
     const details = screen().getByRole("dialog", { name: "#eng" });
+    await click(within(details).getByRole("button", { name: "Membros" }));
     await click(within(details).getByRole("button", { name: "Adicionar pessoa ou agente" }));
     const add = screen().getByRole("dialog", { name: "Adicionar a #eng" });
     const search = within(add).getByRole("searchbox", { name: "Buscar pessoa ou agente" });

@@ -53,6 +53,7 @@ import type {
   ChannelCard,
   ChannelCategory,
   ChannelMember,
+  ChannelOverride,
   Choices,
   CodeSent,
   CommandApproval,
@@ -813,6 +814,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           method: "PATCH",
           json: { autoReply },
         }),
+      permissions: async (orgId, channelId) =>
+        (await request<{ overrides: ChannelOverride[] }>(`${org(orgId)}/channels/${enc(channelId)}/permissions`))
+          .overrides,
+      setPermission: async (orgId, channelId, override) =>
+        (await request<ChannelOverride | undefined>(`${org(orgId)}/channels/${enc(channelId)}/permissions`, {
+          method: "PUT",
+          json: override,
+        })) ?? null,
       messages: async (orgId, channelId, options = {}) => {
         const path = `${org(orgId)}/channels/${enc(channelId)}/messages`;
         const query = { threadId: options.threadId, before: options.before, limit: options.limit };

@@ -16,7 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { agents } from "./agents";
 import { users } from "./auth";
-import { organizations } from "./tenancy";
+import { organizationMembers, organizations, orgRoles } from "./tenancy";
 
 export const channelVisibilityEnum = pgEnum("channel_visibility", ["public", "private"]);
 /** `channel`: a named channel. `dm`: a direct conversation (person↔person or person↔agent), participants only. */
@@ -144,6 +144,40 @@ export const channelMembers = pgTable(
     index().on(t.userId),
     index().on(t.agentId),
     check("channel_members_one_member", sql`(${t.userId} is null) <> (${t.agentId} is null)`),
+  ],
+);
+
+/**
+ * A channel's exceptions to the workspace's keys (ADR 0134): for one role (`everyone` too) or one person, keys
+ * allowed or denied in this channel only. Only `post`, `talk_to_agents` and `manage_channels` (`CHANNEL_KEYS`).
+ */
+export const channelPermissionOverrides = pgTable(
+  "channel_permission_overrides",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    channelId: uuid().notNull(),
+    roleId: uuid(),
+    userId: text(),
+    allow: text().array().notNull().default(sql`'{}'::text[]`),
+    deny: text().array().notNull().default(sql`'{}'::text[]`),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.channelId], foreignColumns: [channels.orgId, channels.id] }).onDelete("cascade"),
+    foreignKey({ columns: [t.orgId, t.roleId], foreignColumns: [orgRoles.orgId, orgRoles.id] }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.orgId, t.userId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    unique().on(t.channelId, t.roleId),
+    unique().on(t.channelId, t.userId),
+    check("channel_permission_overrides_one_target", sql`(${t.roleId} is null) <> (${t.userId} is null)`),
+    check(
+      "channel_permission_overrides_keys",
+      sql`not (${t.allow} && ${t.deny}) and ${t.allow} <@ array['post', 'talk_to_agents', 'manage_channels']::text[]
+        and ${t.deny} <@ array['post', 'talk_to_agents', 'manage_channels']::text[]`,
+    ),
   ],
 );
 

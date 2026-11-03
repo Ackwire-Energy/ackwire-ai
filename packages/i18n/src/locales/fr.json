@@ -1488,6 +1488,52 @@
     "working_other": "{{count}} agents au travail"
   },
   "channel": {
+    "settingsNav": {
+      "label": "Paramètres du canal",
+      "overview": "Vue d’ensemble",
+      "permissions": "Autorisations",
+      "members": "Membres"
+    },
+    "perms": {
+      "advanced": "Autorisations avancées",
+      "intro": "Les exceptions ne valent que dans ce canal. Par défaut suit les rôles de l’espace de travail.",
+      "targets": "Rôles et personnes avec une exception",
+      "add": "Ajouter un rôle ou une personne",
+      "addSearch": "Rechercher des rôles ou des personnes",
+      "addNone": "Aucun rôle ni aucune personne trouvé",
+      "groupRoles": "Rôles",
+      "groupPeople": "Personnes",
+      "clear": "Retirer l’exception",
+      "stateLabel": "{{key}} pour {{target}}",
+      "state": {
+        "deny": "Refuser",
+        "inherit": "Par défaut",
+        "allow": "Autoriser"
+      },
+      "keys": {
+        "post": {
+          "title": "Envoyer des messages",
+          "line": "Écrire, répondre dans les fils et épingler des messages ici"
+        },
+        "callAgents": {
+          "title": "Appeler les agents",
+          "line": "Recevoir les réponses des agents de ce canal"
+        },
+        "manage": {
+          "title": "Gérer le canal",
+          "line": "Changer son nom, qui le voit, les membres et ces autorisations"
+        }
+      },
+      "default": {
+        "allowedBy": "Par défaut : autorisé par le rôle {{role}}",
+        "notHeld": "Par défaut : non autorisé par le rôle {{role}}",
+        "followsEveryone": "Par défaut : suit {{role}} dans ce canal",
+        "person": "Par défaut : suit les rôles de cette personne"
+      },
+      "readOnlyComposer": "Vous ne pouvez pas envoyer de messages dans ce canal",
+      "agentsDenied": "Dans ce canal, vous n’appelez pas les agents",
+      "forbidden": "Vous ne pouvez changer que les autorisations que vous avez, pour les rôles et les personnes en dessous de vous"
+    },
     "pins": {
       "title": "Épinglés",
       "button_one": "Messages épinglés ({{count}})",
@@ -2220,6 +2266,7 @@
     "editChannel": "Modifier le canal"
   },
   "channelMembers": {
+    "caption": "Qui peut voir ce canal",
     "addRow": "Ajouter personnes ou agents",
     "invite": "Inviter {{email}} dans {{org}} et #{{channel}}",
     "inviteOrg": "Inviter {{email}} dans {{org}}",
@@ -3081,6 +3128,14 @@
     "nameLabel": "Nom",
     "roleLabel": "Rôle",
     "roleHelp": "Ce qu'il fait pour l'équipe, par ex. Assistant e-mail et agenda.",
+    "editName": "Modifier le nom : {{name}}",
+    "editHandle": "Modifier les mentions : @{{handle}}",
+    "editRole": "Modifier le rôle : {{role}}",
+    "noRole": "Aucun rôle",
+    "rolePlaceholder": "Ex. : Support",
+    "roleList": "Rôles",
+    "roleUse": "Utiliser « {{role}} »",
+    "roleCurrent": "actuel",
     "edit": "Modifier",
     "chat": "Discuter",
     "moreActions": "Plus d'actions",
@@ -3131,15 +3186,7 @@
     "budgetDefaultHelp": "Vide : la valeur par défaut de l'espace de travail.",
     "budgetDefaultHelpAmount": "Vide : la valeur par défaut de l'espace de travail ({{amount}}).",
     "budgetInvalid": "Indiquez une valeur supérieure à zéro.",
-    "notFound": "Cet agent n'existe pas ou a été archivé.",
-    "editName": "Modifier le nom : {{name}}",
-    "editHandle": "Modifier les mentions : @{{handle}}",
-    "editRole": "Modifier le rôle : {{role}}",
-    "noRole": "Aucun rôle",
-    "rolePlaceholder": "Ex. : Support",
-    "roleList": "Rôles",
-    "roleUse": "Utiliser « {{role}} »",
-    "roleCurrent": "actuel"
+    "notFound": "Cet agent n'existe pas ou a été archivé."
   },
   "agentPage": {
     "work": {
@@ -4315,22 +4362,6 @@
     },
     "dialog": {
       "title": "Inviter dans {{org}}",
-      "emails": "E-mails",
-      "moreEmails": "Plus d'e-mails…",
-      "checkMarked": "Vérifiez les e-mails signalés : ils ne recevront pas d'invitation.",
-      "withNote": "avec un mot",
-      "alsoJoin": "Ils rejoignent aussi",
-      "generalAlways": "Tout le monde rejoint #{{channel}}",
-      "note": "Mot dans l'e-mail",
-      "optional": "(facultatif)",
-      "notePlaceholder": "Bonjour. Venez rejoindre {{org}} : l'équipe et les agents sont tous ici.",
-      "or": "ou envoyez le lien",
-      "send_one": "Inviter {{count}} personne",
-      "send_many": "Inviter {{count}} personnes",
-      "send_other": "Inviter {{count}} personnes",
-      "sent": "Invitation envoyée à {{email}}.",
-      "sentMany": "{{count}} invitations envoyées.",
-      "alsoIn": "Ils rejoignent aussi {{channels}}.",
       "stepOf": "Étape {{n}} sur {{total}} · {{step}}",
       "steps": {
         "who": "Qui",
@@ -4338,9 +4369,25 @@
         "where": "Point de départ",
         "note": "Mot"
       },
+      "emails": "E-mails",
+      "moreEmails": "Plus d'e-mails…",
+      "checkMarked": "Vérifiez les e-mails signalés : ils ne recevront pas d'invitation.",
       "pasteHelp": "Collez une liste si vous voulez : virgules, espaces ou une par ligne.",
       "leftOut": "Les personnes déjà présentes ou déjà invitées restent à l'écart.",
+      "withNote": "avec un mot",
+      "alsoJoin": "Ils rejoignent aussi",
+      "generalAlways": "Tout le monde rejoint #{{channel}}",
+      "note": "Mot dans l'e-mail",
+      "optional": "(facultatif)",
+      "notePlaceholder": "Bonjour. Venez rejoindre {{org}} : l'équipe et les agents sont tous ici.",
+      "or": "ou envoyez le lien",
       "continueWith": "Continuer avec {{count}}",
+      "send_one": "Inviter {{count}} personne",
+      "send_many": "Inviter {{count}} personnes",
+      "send_other": "Inviter {{count}} personnes",
+      "sent": "Invitation envoyée à {{email}}.",
+      "sentMany": "{{count}} invitations envoyées.",
+      "alsoIn": "Ils rejoignent aussi {{channels}}.",
       "who": {
         "title": "Qui voulez-vous faire venir ?",
         "lead": "Donnez-moi les e-mails. Chaque personne reçoit une invitation et rejoint directement."
@@ -4736,6 +4783,54 @@
     "flowHint": "La tâche avance d'elle-même, vers la première colonne de chaque étape : En cours quand un agent commence, En revue quand elle est prête à être vérifiée, Terminée quand vous approuvez.",
     "moreOptions": "Plus d'options",
     "showCanceled": "Afficher les annulées",
+    "filterButton": "Filtre",
+    "filterValue": "{{filter}} : {{value}}",
+    "me": "Moi",
+    "display": {
+      "title": "Affichage",
+      "label": "Affichage : {{layout}} · {{group}}",
+      "layout": "Disposition",
+      "group": "Grouper par",
+      "sort": "Trier par",
+      "fields": "Sur les cartes",
+      "saved": "Enregistré pour vous dans cet espace de travail",
+      "reset": "Revenir au réglage par défaut",
+      "by": {
+        "stage": "Étape",
+        "assignee": "Responsable",
+        "priority": "Priorité"
+      },
+      "order": {
+        "manual": "Manuel",
+        "priority": "Priorité",
+        "due": "Échéance"
+      },
+      "field": {
+        "assignee": "Responsable",
+        "priority": "Priorité",
+        "due": "Échéance",
+        "criteria": "Critères",
+        "pullRequest": "Pull request",
+        "label": "Étiquette"
+      }
+    },
+    "drop": {
+      "stage": "Déposez dans {{name}}",
+      "assignee": "Déposez pour la confier à {{name}}",
+      "unassign": "Déposez pour retirer le responsable",
+      "priority": "Déposez pour une priorité {{priority}}"
+    },
+    "drag": {
+      "role": "tâche déplaçable",
+      "help": "Espace prend la tâche, les flèches la déplacent, Espace la dépose et Échap annule.",
+      "picked": "Vous avez pris la #{{number}}. Les flèches la déplacent, Espace la dépose, Échap annule.",
+      "moved": "#{{number}} : {{group}}, position {{position}} sur {{total}}.",
+      "dropped": "Vous avez déposé la #{{number}} dans {{group}}.",
+      "canceled": "La #{{number}} est revenue à sa place.",
+      "assigned": "La #{{number}} est maintenant confiée à {{name}}.",
+      "unassigned": "La #{{number}} n'a plus de responsable.",
+      "prioritized": "La #{{number}} a maintenant une priorité {{priority}}."
+    },
     "canceledColumn": "Annulées",
     "columns": {
       "add": "Ajouter une colonne",
@@ -4988,54 +5083,6 @@
       "agent_asked": "a demandé à {{name}} de la faire",
       "forum_opened": "l'a portée au forum : {{title}}",
       "forum_evaluated": "a rapporté le résultat du forum : {{title}}"
-    },
-    "filterButton": "Filtre",
-    "filterValue": "{{filter}} : {{value}}",
-    "me": "Moi",
-    "display": {
-      "title": "Affichage",
-      "label": "Affichage : {{layout}} · {{group}}",
-      "layout": "Disposition",
-      "group": "Grouper par",
-      "sort": "Trier par",
-      "fields": "Sur les cartes",
-      "saved": "Enregistré pour vous dans cet espace de travail",
-      "reset": "Revenir au réglage par défaut",
-      "by": {
-        "stage": "Étape",
-        "assignee": "Responsable",
-        "priority": "Priorité"
-      },
-      "order": {
-        "manual": "Manuel",
-        "priority": "Priorité",
-        "due": "Échéance"
-      },
-      "field": {
-        "assignee": "Responsable",
-        "priority": "Priorité",
-        "due": "Échéance",
-        "criteria": "Critères",
-        "pullRequest": "Pull request",
-        "label": "Étiquette"
-      }
-    },
-    "drop": {
-      "stage": "Déposez dans {{name}}",
-      "assignee": "Déposez pour la confier à {{name}}",
-      "unassign": "Déposez pour retirer le responsable",
-      "priority": "Déposez pour une priorité {{priority}}"
-    },
-    "drag": {
-      "role": "tâche déplaçable",
-      "help": "Espace prend la tâche, les flèches la déplacent, Espace la dépose et Échap annule.",
-      "picked": "Vous avez pris la #{{number}}. Les flèches la déplacent, Espace la dépose, Échap annule.",
-      "moved": "#{{number}} : {{group}}, position {{position}} sur {{total}}.",
-      "dropped": "Vous avez déposé la #{{number}} dans {{group}}.",
-      "canceled": "La #{{number}} est revenue à sa place.",
-      "assigned": "La #{{number}} est maintenant confiée à {{name}}.",
-      "unassigned": "La #{{number}} n'a plus de responsable.",
-      "prioritized": "La #{{number}} a maintenant une priorité {{priority}}."
     }
   },
   "routines": {
@@ -5226,7 +5273,6 @@
         "artifact": "Devient un document dans le Drive"
       },
       "ahead": "Préparé pour plus tard",
-      "ownActions": "Fait seule",
       "createdBy": "Créée par {{name}} · {{date}}",
       "nameLabel": "Nom de la routine",
       "editName": "Modifier le nom",
@@ -5243,7 +5289,8 @@
       "reportHint": {
         "always": "Même sans rien de nouveau",
         "when_new": "Silencieuse quand il n'y a rien de nouveau"
-      }
+      },
+      "ownActions": "Fait seule"
     },
     "ownActions": {
       "hint": "Chaque exécution fait cela dans tes apps connectées sans demander. Toute autre action dans ces apps demande d’abord l’accord d’une personne, et merge, deploy et rollback le demandent toujours.",

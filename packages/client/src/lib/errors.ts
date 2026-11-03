@@ -16,6 +16,8 @@ export const REAUTH_PASSWORD = "reauth.password";
  * own message is English). Anything else falls back to that message.
  */
 const KNOWN = {
+  "channel.post_denied": "channel.perms.readOnlyComposer",
+  "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
   "agent_proposal.decided": "errors.agentProposal.decided",
   "approval.always_unavailable": "errors.approval.alwaysUnavailable",

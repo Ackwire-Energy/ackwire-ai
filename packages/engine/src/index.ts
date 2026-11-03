@@ -48,6 +48,7 @@ export * from "./cancel";
 export * from "./capabilities";
 export * from "./channel-categories";
 export * from "./channel-deletion";
+export * from "./channel-permissions";
 export * from "./channels";
 export * from "./chat-tools";
 export * from "./computer-queue";

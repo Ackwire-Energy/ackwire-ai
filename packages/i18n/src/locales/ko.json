@@ -1390,6 +1390,52 @@
     "working_other": "에이전트 {{count}}명 작업 중"
   },
   "channel": {
+    "settingsNav": {
+      "label": "채널 설정",
+      "overview": "개요",
+      "permissions": "권한",
+      "members": "멤버"
+    },
+    "perms": {
+      "advanced": "고급 권한",
+      "intro": "예외는 이 채널에만 적용돼요. 기본값은 워크스페이스의 역할을 따라요.",
+      "targets": "예외가 있는 역할과 사람",
+      "add": "역할 또는 사람 추가",
+      "addSearch": "역할이나 사람 검색",
+      "addNone": "찾은 역할이나 사람이 없어요",
+      "groupRoles": "역할",
+      "groupPeople": "사람",
+      "clear": "예외 없애기",
+      "stateLabel": "{{target}}의 {{key}}",
+      "state": {
+        "deny": "거부",
+        "inherit": "기본값",
+        "allow": "허용"
+      },
+      "keys": {
+        "post": {
+          "title": "메시지 보내기",
+          "line": "여기서 글쓰기, 스레드에 답하기, 메시지 고정하기"
+        },
+        "callAgents": {
+          "title": "에이전트 부르기",
+          "line": "이 채널의 에이전트에게 답장 받기"
+        },
+        "manage": {
+          "title": "채널 관리",
+          "line": "이름, 볼 수 있는 사람, 멤버, 이 권한 바꾸기"
+        }
+      },
+      "default": {
+        "allowedBy": "기본값: {{role}} 역할로 허용",
+        "notHeld": "기본값: {{role}} 역할로 허용 안 됨",
+        "followsEveryone": "기본값: 이 채널의 {{role}}을(를) 따라요",
+        "person": "기본값: 이 사람의 역할을 따라요"
+      },
+      "readOnlyComposer": "이 채널에서는 메시지를 보낼 수 없어요",
+      "agentsDenied": "이 채널에서는 에이전트를 부를 수 없어요",
+      "forbidden": "내가 가진 권한만, 나보다 아래인 역할과 사람에게만 바꿀 수 있어요"
+    },
     "pins": {
       "title": "고정됨",
       "button_other": "고정된 메시지({{count}})",
@@ -2071,6 +2117,7 @@
     "editChannel": "채널 편집"
   },
   "channelMembers": {
+    "caption": "이 채널을 볼 수 있는 사람",
     "addRow": "사람 또는 에이전트 추가",
     "invite": "{{email}}을(를) {{org}}와 #{{channel}}에 초대",
     "inviteOrg": "{{email}}을(를) {{org}}에 초대",
@@ -2873,6 +2920,14 @@
     "nameLabel": "이름",
     "roleLabel": "역할",
     "roleHelp": "팀을 위해 하는 일이에요. 예: 이메일 및 캘린더 어시스턴트.",
+    "editName": "이름 편집: {{name}}",
+    "editHandle": "멘션 편집: @{{handle}}",
+    "editRole": "역할 편집: {{role}}",
+    "noRole": "역할 없음",
+    "rolePlaceholder": "예: 고객 지원",
+    "roleList": "역할 목록",
+    "roleUse": "“{{role}}” 사용",
+    "roleCurrent": "현재",
     "edit": "편집",
     "chat": "채팅",
     "moreActions": "더 보기",
@@ -2917,15 +2972,7 @@
     "budgetDefaultHelp": "비워 두면 워크스페이스 기본값이 적용돼요.",
     "budgetDefaultHelpAmount": "비워 두면 워크스페이스 기본값({{amount}})이 적용돼요.",
     "budgetInvalid": "0보다 큰 값을 입력하세요.",
-    "notFound": "이 에이전트는 존재하지 않거나 보관되었어요.",
-    "editName": "이름 편집: {{name}}",
-    "editHandle": "멘션 편집: @{{handle}}",
-    "editRole": "역할 편집: {{role}}",
-    "noRole": "역할 없음",
-    "rolePlaceholder": "예: 고객 지원",
-    "roleList": "역할 목록",
-    "roleUse": "“{{role}}” 사용",
-    "roleCurrent": "현재"
+    "notFound": "이 에이전트는 존재하지 않거나 보관되었어요."
   },
   "agentPage": {
     "work": {
@@ -3976,20 +4023,6 @@
     },
     "dialog": {
       "title": "{{org}}에 초대",
-      "emails": "이메일",
-      "moreEmails": "이메일 더 보기…",
-      "checkMarked": "표시된 이메일을 확인하세요. 해당 주소로는 초대가 가지 않아요.",
-      "withNote": "메모 포함",
-      "alsoJoin": "함께 참여할 채널",
-      "generalAlways": "모두 #{{channel}}에 참여해요",
-      "note": "이메일에 넣을 메모",
-      "optional": "(선택 사항)",
-      "notePlaceholder": "안녕하세요. {{org}}에 함께해요. 팀과 에이전트가 모두 여기 있어요.",
-      "or": "또는 링크 보내기",
-      "send_other": "{{count}}명 초대",
-      "sent": "{{email}}에게 초대를 보냈어요.",
-      "sentMany": "초대 {{count}}개를 보냈어요.",
-      "alsoIn": "{{channels}}에도 참여해요.",
       "stepOf": "{{total}}단계 중 {{n}}단계 · {{step}}",
       "steps": {
         "who": "누구",
@@ -3997,9 +4030,23 @@
         "where": "시작 채널",
         "note": "메모"
       },
+      "emails": "이메일",
+      "moreEmails": "이메일 더 보기…",
+      "checkMarked": "표시된 이메일을 확인하세요. 해당 주소로는 초대가 가지 않아요.",
       "pasteHelp": "원하면 목록을 붙여 넣어도 돼요. 쉼표, 공백, 또는 한 줄에 하나씩 넣으세요.",
       "leftOut": "이미 있거나 이미 초대받은 사람은 빠져요.",
+      "withNote": "메모 포함",
+      "alsoJoin": "함께 참여할 채널",
+      "generalAlways": "모두 #{{channel}}에 참여해요",
+      "note": "이메일에 넣을 메모",
+      "optional": "(선택 사항)",
+      "notePlaceholder": "안녕하세요. {{org}}에 함께해요. 팀과 에이전트가 모두 여기 있어요.",
+      "or": "또는 링크 보내기",
       "continueWith": "{{count}}명으로 계속",
+      "send_other": "{{count}}명 초대",
+      "sent": "{{email}}에게 초대를 보냈어요.",
+      "sentMany": "초대 {{count}}개를 보냈어요.",
+      "alsoIn": "{{channels}}에도 참여해요.",
       "who": {
         "title": "누구를 데려올까요?",
         "lead": "이메일을 알려 주세요. 각자 초대를 받고 바로 참여해요."
@@ -4383,6 +4430,54 @@
     "flowHint": "작업은 각 단계의 첫 열로 알아서 이동해요. 에이전트가 시작하면 진행 중, 확인할 준비가 되면 검토 중, 승인하면 완료로 가요.",
     "moreOptions": "옵션 더 보기",
     "showCanceled": "취소된 작업 보기",
+    "filterButton": "필터",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "나",
+    "display": {
+      "title": "표시",
+      "label": "표시: {{layout}} · {{group}}",
+      "layout": "레이아웃",
+      "group": "그룹 기준",
+      "sort": "정렬 기준",
+      "fields": "카드에 표시",
+      "saved": "이 워크스페이스에 내 설정으로 저장돼요",
+      "reset": "기본값으로 되돌리기",
+      "by": {
+        "stage": "단계",
+        "assignee": "담당자",
+        "priority": "우선순위"
+      },
+      "order": {
+        "manual": "수동",
+        "priority": "우선순위",
+        "due": "마감일"
+      },
+      "field": {
+        "assignee": "담당자",
+        "priority": "우선순위",
+        "due": "마감일",
+        "criteria": "조건",
+        "pullRequest": "풀 리퀘스트",
+        "label": "라벨"
+      }
+    },
+    "drop": {
+      "stage": "{{name}}에 놓기",
+      "assignee": "놓아서 {{name}}에게 맡기기",
+      "unassign": "놓아서 담당자 빼기",
+      "priority": "놓아서 우선순위를 {{priority}}(으)로"
+    },
+    "drag": {
+      "role": "끌 수 있는 작업",
+      "help": "스페이스로 작업을 집고, 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
+      "picked": "#{{number}}을(를) 집었어요. 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
+      "moved": "#{{number}}: {{group}}, {{total}}개 중 {{position}}번째예요.",
+      "dropped": "#{{number}}을(를) {{group}}에 놓았어요.",
+      "canceled": "#{{number}}이(가) 제자리로 돌아갔어요.",
+      "assigned": "#{{number}}은(는) 이제 {{name}} 담당이에요.",
+      "unassigned": "#{{number}}에 이제 담당자가 없어요.",
+      "prioritized": "#{{number}}의 우선순위가 이제 {{priority}}이에요."
+    },
     "canceledColumn": "취소됨",
     "columns": {
       "add": "열 추가",
@@ -4616,54 +4711,6 @@
       "agent_asked": "{{name}}에게 맡겼어요",
       "forum_opened": "포럼으로 가져갔어요: {{title}}",
       "forum_evaluated": "포럼의 결과를 가져왔어요: {{title}}"
-    },
-    "filterButton": "필터",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "나",
-    "display": {
-      "title": "표시",
-      "label": "표시: {{layout}} · {{group}}",
-      "layout": "레이아웃",
-      "group": "그룹 기준",
-      "sort": "정렬 기준",
-      "fields": "카드에 표시",
-      "saved": "이 워크스페이스에 내 설정으로 저장돼요",
-      "reset": "기본값으로 되돌리기",
-      "by": {
-        "stage": "단계",
-        "assignee": "담당자",
-        "priority": "우선순위"
-      },
-      "order": {
-        "manual": "수동",
-        "priority": "우선순위",
-        "due": "마감일"
-      },
-      "field": {
-        "assignee": "담당자",
-        "priority": "우선순위",
-        "due": "마감일",
-        "criteria": "조건",
-        "pullRequest": "풀 리퀘스트",
-        "label": "라벨"
-      }
-    },
-    "drop": {
-      "stage": "{{name}}에 놓기",
-      "assignee": "놓아서 {{name}}에게 맡기기",
-      "unassign": "놓아서 담당자 빼기",
-      "priority": "놓아서 우선순위를 {{priority}}(으)로"
-    },
-    "drag": {
-      "role": "끌 수 있는 작업",
-      "help": "스페이스로 작업을 집고, 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
-      "picked": "#{{number}}을(를) 집었어요. 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
-      "moved": "#{{number}}: {{group}}, {{total}}개 중 {{position}}번째예요.",
-      "dropped": "#{{number}}을(를) {{group}}에 놓았어요.",
-      "canceled": "#{{number}}이(가) 제자리로 돌아갔어요.",
-      "assigned": "#{{number}}은(는) 이제 {{name}} 담당이에요.",
-      "unassigned": "#{{number}}에 이제 담당자가 없어요.",
-      "prioritized": "#{{number}}의 우선순위가 이제 {{priority}}이에요."
     }
   },
   "routines": {
@@ -4850,7 +4897,6 @@
         "artifact": "Drive의 문서로 저장돼요"
       },
       "ahead": "나중을 위해 준비됨",
-      "ownActions": "직접 수행하는 작업",
       "createdBy": "{{name}}이(가) 만듦 · {{date}}",
       "nameLabel": "루틴 이름",
       "editName": "이름 편집",
@@ -4867,7 +4913,8 @@
       "reportHint": {
         "always": "새로운 내용이 없어도",
         "when_new": "새로운 내용이 없으면 조용히 있어요"
-      }
+      },
+      "ownActions": "직접 수행하는 작업"
     },
     "ownActions": {
       "hint": "실행할 때마다 연결된 앱에서 이 작업을 묻지 않고 수행해요. 그 밖의 작업은 먼저 사람의 승인을 받고, 병합, 배포, 롤백은 항상 승인을 받아요.",

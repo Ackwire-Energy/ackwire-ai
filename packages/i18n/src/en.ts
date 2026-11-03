@@ -1419,6 +1419,58 @@ export const en = {
     working_other: "{{count}} agents working",
   },
   channel: {
+    /** Channel settings' sections, for who manages it (ADR 0134). */
+    settingsNav: {
+      label: "Channel settings",
+      overview: "Overview",
+      permissions: "Permissions",
+      members: "Members",
+    },
+    /** A channel's exceptions to the workspace's roles (ADR 0134), said for people who never used Discord. */
+    perms: {
+      advanced: "Advanced permissions",
+      intro: "Exceptions apply to this channel only. Default follows the workspace's roles.",
+      targets: "Roles and people with an exception",
+      add: "Add a role or person",
+      addSearch: "Search roles or people",
+      addNone: "No role or person found",
+      groupRoles: "Roles",
+      groupPeople: "People",
+      clear: "Remove exception",
+      /** The three-state control's name for screen readers: "Enviar mensagens para Vendas". */
+      stateLabel: "{{key}} for {{target}}",
+      state: {
+        deny: "Deny",
+        inherit: "Default",
+        allow: "Allow",
+      },
+      keys: {
+        post: {
+          title: "Send messages",
+          line: "Write, reply in threads and pin messages here",
+        },
+        callAgents: {
+          title: "Call agents",
+          line: "Get replies from this channel's agents",
+        },
+        manage: {
+          title: "Manage the channel",
+          line: "Change its name, who sees it, members and these permissions",
+        },
+      },
+      /** What "Padrão" means right now for the role or person picked. */
+      default: {
+        allowedBy: "Default: allowed by the {{role}} role",
+        notHeld: "Default: not allowed by the {{role}} role",
+        followsEveryone: "Default: follows {{role}} in this channel",
+        person: "Default: follows this person's roles",
+      },
+      /** In place of the composer when the channel's exceptions keep me from sending. */
+      readOnlyComposer: "You can't send messages in this channel",
+      /** Only for me, after my message mentioned an agent here. */
+      agentsDenied: "You can't call agents in this channel",
+      forbidden: "You can only change permissions you have, for roles and people below you",
+    },
     pins: {
       title: "Pinned",
       button_one: "Pinned messages ({{count}})",
@@ -2097,6 +2149,8 @@ export const en = {
     editChannel: "Edit channel",
   },
   channelMembers: {
+    /** A small line on top of the members column and sheet: what the list is. */
+    caption: "Who can see this channel",
     addRow: "Add people or agents",
     /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Invite {{email}} to {{org}} and #{{channel}}",

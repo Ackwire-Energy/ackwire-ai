@@ -1390,6 +1390,52 @@
     "working_other": "{{count}}体のエージェントが作業中"
   },
   "channel": {
+    "settingsNav": {
+      "label": "チャンネル設定",
+      "overview": "概要",
+      "permissions": "権限",
+      "members": "メンバー"
+    },
+    "perms": {
+      "advanced": "詳細な権限",
+      "intro": "例外はこのチャンネルだけに適用されます。既定はワークスペースのロールに従います。",
+      "targets": "例外のあるロールと人",
+      "add": "ロールまたは人を追加",
+      "addSearch": "ロールや人を検索",
+      "addNone": "ロールや人が見つかりません",
+      "groupRoles": "ロール",
+      "groupPeople": "人",
+      "clear": "例外を外す",
+      "stateLabel": "{{target}}の{{key}}",
+      "state": {
+        "deny": "拒否",
+        "inherit": "既定",
+        "allow": "許可"
+      },
+      "keys": {
+        "post": {
+          "title": "メッセージを送る",
+          "line": "ここで書く、スレッドで返信する、メッセージをピン留めする"
+        },
+        "callAgents": {
+          "title": "エージェントを呼ぶ",
+          "line": "このチャンネルのエージェントから返信をもらう"
+        },
+        "manage": {
+          "title": "チャンネルを管理",
+          "line": "名前、見られる人、メンバー、これらの権限を変更する"
+        }
+      },
+      "default": {
+        "allowedBy": "既定：ロール{{role}}で許可",
+        "notHeld": "既定：ロール{{role}}では不許可",
+        "followsEveryone": "既定：このチャンネルの{{role}}に従います",
+        "person": "既定：この人のロールに従います"
+      },
+      "readOnlyComposer": "このチャンネルではメッセージを送れません",
+      "agentsDenied": "このチャンネルではエージェントを呼べません",
+      "forbidden": "変更できるのは自分が持つ権限だけで、自分より下のロールと人に対してです"
+    },
     "pins": {
       "title": "ピン留め",
       "button_other": "ピン留めしたメッセージ（{{count}}）",
@@ -2073,6 +2119,7 @@
     "editChannel": "チャンネルを編集"
   },
   "channelMembers": {
+    "caption": "このチャンネルを見られる人",
     "addRow": "人またはエージェントを追加",
     "invite": "{{email}}を{{org}}と#{{channel}}に招待",
     "inviteOrg": "{{email}}を{{org}}に招待",
@@ -2875,6 +2922,14 @@
     "nameLabel": "名前",
     "roleLabel": "役割",
     "roleHelp": "チームのために何をするか。例: メールとカレンダーのアシスタント",
+    "editName": "名前を編集: {{name}}",
+    "editHandle": "メンションを編集: @{{handle}}",
+    "editRole": "役割を編集: {{role}}",
+    "noRole": "役割なし",
+    "rolePlaceholder": "例: サポート",
+    "roleList": "役割の一覧",
+    "roleUse": "「{{role}}」を使う",
+    "roleCurrent": "現在",
     "edit": "編集",
     "chat": "チャット",
     "moreActions": "その他の操作",
@@ -2919,15 +2974,7 @@
     "budgetDefaultHelp": "空欄: ワークスペースのデフォルト。",
     "budgetDefaultHelpAmount": "空欄: ワークスペースのデフォルト（{{amount}}）。",
     "budgetInvalid": "0より大きい値を入力してください。",
-    "notFound": "このエージェントは存在しないか、アーカイブされています。",
-    "editName": "名前を編集: {{name}}",
-    "editHandle": "メンションを編集: @{{handle}}",
-    "editRole": "役割を編集: {{role}}",
-    "noRole": "役割なし",
-    "rolePlaceholder": "例: サポート",
-    "roleList": "役割の一覧",
-    "roleUse": "「{{role}}」を使う",
-    "roleCurrent": "現在"
+    "notFound": "このエージェントは存在しないか、アーカイブされています。"
   },
   "agentPage": {
     "work": {
@@ -3980,20 +4027,6 @@
     },
     "dialog": {
       "title": "{{org}}に招待",
-      "emails": "メールアドレス",
-      "moreEmails": "メールアドレスを追加…",
-      "checkMarked": "マークされたメールアドレスを確認してください。招待は届きません。",
-      "withNote": "メッセージ付き",
-      "alsoJoin": "あわせて参加するチャンネル",
-      "generalAlways": "全員が#{{channel}}に参加します",
-      "note": "メールに添えるメッセージ",
-      "optional": "（任意）",
-      "notePlaceholder": "こんにちは。{{org}}に参加しませんか。チームもエージェントもみんなここにいます。",
-      "or": "またはリンクを送信",
-      "send_other": "{{count}}人を招待",
-      "sent": "{{email}}に招待を送信しました。",
-      "sentMany": "{{count}}件の招待を送信しました。",
-      "alsoIn": "{{channels}}にもあわせて参加します。",
       "stepOf": "ステップ {{n}}/{{total}} · {{step}}",
       "steps": {
         "who": "招待する人",
@@ -4001,9 +4034,23 @@
         "where": "参加チャンネル",
         "note": "メッセージ"
       },
+      "emails": "メールアドレス",
+      "moreEmails": "メールアドレスを追加…",
+      "checkMarked": "マークされたメールアドレスを確認してください。招待は届きません。",
       "pasteHelp": "リストを貼り付けることもできます。カンマ、スペース、または1行に1件で区切ってください。",
       "leftOut": "すでに参加している人や招待済みの人は除かれます。",
+      "withNote": "メッセージ付き",
+      "alsoJoin": "あわせて参加するチャンネル",
+      "generalAlways": "全員が#{{channel}}に参加します",
+      "note": "メールに添えるメッセージ",
+      "optional": "（任意）",
+      "notePlaceholder": "こんにちは。{{org}}に参加しませんか。チームもエージェントもみんなここにいます。",
+      "or": "またはリンクを送信",
       "continueWith": "{{count}}人で続ける",
+      "send_other": "{{count}}人を招待",
+      "sent": "{{email}}に招待を送信しました。",
+      "sentMany": "{{count}}件の招待を送信しました。",
+      "alsoIn": "{{channels}}にもあわせて参加します。",
       "who": {
         "title": "だれを招待しますか？",
         "lead": "メールアドレスを教えてください。それぞれに招待が届き、そのまま参加できます。"
@@ -4387,6 +4434,54 @@
     "flowHint": "タスクは各段階の最初の列へ自動で移動します。エージェントが始めると「進行中」、確認の準備ができると「レビュー中」、あなたが承認すると「完了」へ。",
     "moreOptions": "その他のオプション",
     "showCanceled": "キャンセル済みを表示",
+    "filterButton": "フィルター",
+    "filterValue": "{{filter}}：{{value}}",
+    "me": "自分",
+    "display": {
+      "title": "表示設定",
+      "label": "表示設定：{{layout}} · {{group}}",
+      "layout": "レイアウト",
+      "group": "グループ化",
+      "sort": "並べ替え",
+      "fields": "カードに表示",
+      "saved": "このワークスペースであなた用に保存されます",
+      "reset": "デフォルトに戻す",
+      "by": {
+        "stage": "段階",
+        "assignee": "担当者",
+        "priority": "優先度"
+      },
+      "order": {
+        "manual": "手動",
+        "priority": "優先度",
+        "due": "期日"
+      },
+      "field": {
+        "assignee": "担当者",
+        "priority": "優先度",
+        "due": "期日",
+        "criteria": "条件",
+        "pullRequest": "プルリクエスト",
+        "label": "ラベル"
+      }
+    },
+    "drop": {
+      "stage": "{{name}}にドロップ",
+      "assignee": "ドロップして{{name}}に渡す",
+      "unassign": "ドロップして担当者を外す",
+      "priority": "ドロップして優先度を{{priority}}にする"
+    },
+    "drag": {
+      "role": "ドラッグできるタスク",
+      "help": "スペースでタスクを持ち上げ、矢印キーで移動し、スペースで置き、Escでキャンセルします。",
+      "picked": "#{{number}}を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
+      "moved": "#{{number}}：{{group}}、{{total}}件中{{position}}番目。",
+      "dropped": "#{{number}}を{{group}}に置きました。",
+      "canceled": "#{{number}}は元の場所に戻りました。",
+      "assigned": "#{{number}}の担当は{{name}}になりました。",
+      "unassigned": "#{{number}}の担当者がいなくなりました。",
+      "prioritized": "#{{number}}の優先度は{{priority}}になりました。"
+    },
     "canceledColumn": "キャンセル済み",
     "columns": {
       "add": "列を追加",
@@ -4620,54 +4715,6 @@
       "agent_asked": "{{name}}に作業を頼みました",
       "forum_opened": "フォーラムに持ち込みました: {{title}}",
       "forum_evaluated": "フォーラムの結果を戻しました: {{title}}"
-    },
-    "filterButton": "フィルター",
-    "filterValue": "{{filter}}：{{value}}",
-    "me": "自分",
-    "display": {
-      "title": "表示設定",
-      "label": "表示設定：{{layout}} · {{group}}",
-      "layout": "レイアウト",
-      "group": "グループ化",
-      "sort": "並べ替え",
-      "fields": "カードに表示",
-      "saved": "このワークスペースであなた用に保存されます",
-      "reset": "デフォルトに戻す",
-      "by": {
-        "stage": "段階",
-        "assignee": "担当者",
-        "priority": "優先度"
-      },
-      "order": {
-        "manual": "手動",
-        "priority": "優先度",
-        "due": "期日"
-      },
-      "field": {
-        "assignee": "担当者",
-        "priority": "優先度",
-        "due": "期日",
-        "criteria": "条件",
-        "pullRequest": "プルリクエスト",
-        "label": "ラベル"
-      }
-    },
-    "drop": {
-      "stage": "{{name}}にドロップ",
-      "assignee": "ドロップして{{name}}に渡す",
-      "unassign": "ドロップして担当者を外す",
-      "priority": "ドロップして優先度を{{priority}}にする"
-    },
-    "drag": {
-      "role": "ドラッグできるタスク",
-      "help": "スペースでタスクを持ち上げ、矢印キーで移動し、スペースで置き、Escでキャンセルします。",
-      "picked": "#{{number}}を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
-      "moved": "#{{number}}：{{group}}、{{total}}件中{{position}}番目。",
-      "dropped": "#{{number}}を{{group}}に置きました。",
-      "canceled": "#{{number}}は元の場所に戻りました。",
-      "assigned": "#{{number}}の担当は{{name}}になりました。",
-      "unassigned": "#{{number}}の担当者がいなくなりました。",
-      "prioritized": "#{{number}}の優先度は{{priority}}になりました。"
     }
   },
   "routines": {
@@ -4854,7 +4901,6 @@
         "artifact": "Driveのドキュメントになります"
       },
       "ahead": "あとで実行する準備済み",
-      "ownActions": "自動で行うこと",
       "createdBy": "作成者: {{name}} · {{date}}",
       "nameLabel": "ルーティンの名前",
       "editName": "名前を編集",
@@ -4871,7 +4917,8 @@
       "reportHint": {
         "always": "新しい情報がなくても",
         "when_new": "新しい情報がなければ投稿しません"
-      }
+      },
+      "ownActions": "自動で行うこと"
     },
     "ownActions": {
       "hint": "毎回の実行で、接続済みアプリでこれらを確認なしで行います。それ以外の操作は先に人の承認を求め、マージ、デプロイ、ロールバックは常に承認を求めます。",
