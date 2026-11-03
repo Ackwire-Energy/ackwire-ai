@@ -387,6 +387,34 @@ export function ApproveAlways({
   );
 }
 
+/** "Aprovar sempre" in a request card's row of buttons, the same size as the others (its hint: `ApproveAlwaysHint`). */
+export function ApproveAlwaysButton({
+  approval: a,
+  disabled,
+  onPress,
+}: {
+  approval: Approval;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  if (!approveAlwaysOffered(a)) return null;
+  return (
+    <Button variant="secondary" size="card" label={approveAlwaysLabel(t, a)} disabled={disabled} onPress={onPress} />
+  );
+}
+
+/** What "Aprovar sempre" covers and where to undo it, on a line of its own under the row of buttons. */
+export function ApproveAlwaysHint({ approval: a, name }: { approval: Approval; name: string }) {
+  const { t } = useTranslation();
+  if (!approveAlwaysOffered(a)) return null;
+  return (
+    <Text variant="caption" tone="faint">
+      {approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}
+    </Text>
+  );
+}
+
 /** The amber fuse burning to the expiry and "expira em N min" (amber: it waits on a person). */
 export function ApprovalFuse({ approval: a }: { approval: Pick<Approval, "createdAt" | "expiresAt"> }) {
   const { t } = useTranslation();
