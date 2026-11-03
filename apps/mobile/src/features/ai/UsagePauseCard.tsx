@@ -14,7 +14,7 @@ import { useDirectory, useMeId } from "../shared/hooks";
  * "Don't run it" on what waits for a plan's or budget's limit (the web's): cancels the run, so nothing runs when the
  * limit is back. Greyed for anyone but the person behind it, the agent's owner and admins.
  */
-function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
+function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
   const { t } = useTranslation();
   const api = useApi();
   const { orgId } = useOrg();
@@ -37,7 +37,7 @@ function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
         variant="secondary"
         size="sm"
         icon="stop"
-        label={t("usageCard.dontRun")}
+        label={count > 1 ? t("usageCard.dontRunThese", { count }) : t("usageCard.dontRun")}
         disabled={pending || !may}
         onPress={() => void go()}
       />
@@ -60,7 +60,11 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
   const owner = dir.agentById.get(m.author.id ?? "")?.ownerUserId;
   return (
     <View style={styles.acts}>
-      <DontRunButton runId={wait.runId} may={mayContinueUsage(wait, meId, owner, can(org, "manage_agents"))} />
+      <DontRunButton
+        runId={wait.runId}
+        may={mayContinueUsage(wait, meId, owner, can(org, "manage_agents"))}
+        count={wait.count}
+      />
     </View>
   );
 }

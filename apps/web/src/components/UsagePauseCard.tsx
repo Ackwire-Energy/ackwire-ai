@@ -41,7 +41,7 @@ function useDontRun(runId: string | null) {
   return { run, pending };
 }
 
-function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
+function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
   const { t } = useTranslation();
   const dontRun = useDontRun(runId);
   if (!runId) return null;
@@ -55,12 +55,15 @@ function DontRunButton({ runId, may }: { runId: string | null; may: boolean }) {
       title={t(may ? "usageCard.dontRunHint" : "usageCard.dontRunForbidden")}
       onClick={dontRun.run}
     >
-      {t("usageCard.dontRun")}
+      {count > 1 ? t("usageCard.dontRunThese", { count }) : t("usageCard.dontRun")}
     </Button>
   );
 }
 
-/** Under an agent's "I'll answer when the plan resets": "Don't run it", while the run still waits. */
+/**
+ * Under an agent's "I'll answer when the plan resets": "Don't run it" ("Não rodar estas 3" for the later turns it
+ * speaks for), while the run still waits.
+ */
 export function UsageWaitCancel({ message, wait }: { message: Message; wait: UsageWait }) {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -68,7 +71,7 @@ export function UsageWaitCancel({ message, wait }: { message: Message; wait: Usa
   const may = mayContinueUsage(wait, me.user.id, owner, can(org, "manage_agents"));
   return (
     <span className="waitcard__acts">
-      <DontRunButton runId={wait.runId} may={may} />
+      <DontRunButton runId={wait.runId} may={may} count={wait.count} />
     </span>
   );
 }

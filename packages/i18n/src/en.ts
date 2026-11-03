@@ -1612,6 +1612,14 @@ export const en = {
     queued_other: "{{names}} are in line for the computer",
     away_one: "{{names}} is waiting for the computer",
     away_other: "{{names}} are waiting for the computer",
+    /** Its plan's limit or its budget holds its answer (`receipts.ts` `plan` / `budget`). */
+    plan_one: "{{names}} answers when the plan resets",
+    plan_other: "{{names}} answer when the plan resets",
+    budget_one: "{{names}} answers when the budget renews",
+    budget_other: "{{names}} answer when the budget renews",
+    /** A person stopped its run (Não rodar, Parar). */
+    canceled_one: "{{names}} won't answer",
+    canceled_other: "{{names}} won't answer",
     /** One agent first in the computer's line. */
     queuedNext: "{{names}} is in line for the computer · next",
     nobody: "No agent will answer",
@@ -1624,6 +1632,9 @@ export const en = {
       outage: "The AI provider is down · retries by itself",
       queued: "In line for the computer",
       away: "Waiting for the computer",
+      plan: "Answers when the plan resets",
+      budget: "Answers when the budget renews",
+      canceled: "Canceled",
       handled: "Answered",
       failed: "Failed",
       referenced: "Only mentioned",
@@ -1639,10 +1650,6 @@ export const en = {
     mentionNeededHint: "No AI here could pick an agent for this message. Mention an agent to call it.",
     picking: "Picking who answers",
     by: {
-      jev: "Picked by Jev",
-      model: "Picked by {{model}}",
-      planYours: "Picked by your {{brand}} plan",
-      planOf: "Picked by {{person}}'s {{brand}} plan",
       reply: "A reply to {{name}}",
       only_agent: "Only {{name}} answers here without a mention",
       follow_up: "Follows the talk with {{name}}",
@@ -1874,6 +1881,8 @@ export const en = {
     ended: "This work ended before it picked up",
     canceled: "Canceled. It won't run when the limit is back.",
     dontRun: "Don't run it",
+    /** The note speaks for later turns in its conversation too: it stops them all. */
+    dontRunThese: "Don't run these {{count}}",
     dontRunHint: "Cancel it: nothing runs when the limit is back",
     dontRunForbidden: "Only who asked, the agent's owner or an admin can cancel it",
     extraTitle: "Long work may use paid extra usage",

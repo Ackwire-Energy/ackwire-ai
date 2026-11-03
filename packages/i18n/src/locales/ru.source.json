@@ -4033,6 +4033,24 @@
       "other": "{{names}} are waiting for the computer"
     }
   },
+  "receipts.plan": {
+    "value": {
+      "one": "{{names}} answers when the plan resets",
+      "other": "{{names}} answer when the plan resets"
+    }
+  },
+  "receipts.budget": {
+    "value": {
+      "one": "{{names}} answers when the budget renews",
+      "other": "{{names}} answer when the budget renews"
+    }
+  },
+  "receipts.canceled": {
+    "value": {
+      "one": "{{names}} won't answer",
+      "other": "{{names}} won't answer"
+    }
+  },
   "receipts.queuedNext": {
     "value": "{{names}} is in line for the computer · next"
   },
@@ -4062,6 +4080,15 @@
   },
   "receipts.status.away": {
     "value": "Waiting for the computer"
+  },
+  "receipts.status.plan": {
+    "value": "Answers when the plan resets"
+  },
+  "receipts.status.budget": {
+    "value": "Answers when the budget renews"
+  },
+  "receipts.status.canceled": {
+    "value": "Canceled"
   },
   "receipts.status.handled": {
     "value": "Answered"
@@ -4101,18 +4128,6 @@
   },
   "receipts.picking": {
     "value": "Picking who answers"
-  },
-  "receipts.by.jev": {
-    "value": "Picked by Jev"
-  },
-  "receipts.by.model": {
-    "value": "Picked by {{model}}"
-  },
-  "receipts.by.planYours": {
-    "value": "Picked by your {{brand}} plan"
-  },
-  "receipts.by.planOf": {
-    "value": "Picked by {{person}}'s {{brand}} plan"
   },
   "receipts.by.reply": {
     "value": "A reply to {{name}}"
@@ -4650,6 +4665,9 @@
   },
   "usageCard.dontRun": {
     "value": "Don't run it"
+  },
+  "usageCard.dontRunThese": {
+    "value": "Don't run these {{count}}"
   },
   "usageCard.dontRunHint": {
     "value": "Cancel it: nothing runs when the limit is back"

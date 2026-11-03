@@ -29,6 +29,15 @@ export const computerWaitSql = sql<"queued" | "away" | null>`(case when ${agentR
   then 'queued' else 'away' end) end)`;
 
 /**
+ * For a select over `agent_runs`: waiting on its plan's limit (`plan`) or its budget (`budget`), long work paused near
+ * one too (`usage_pause`, by its `source`): it answers when that renews, nobody is asked.
+ */
+export const usageWaitSql = sql<"plan" | "budget" | null>`(case when ${agentRuns.status} = 'waiting_input'
+  and ${agentRuns.waitingMachineId} is null then (case ${agentRuns.transcript}->'waitingForBrain'->>'code'
+  when 'plan_limit' then 'plan' when 'budget' then 'budget'
+  when 'usage_pause' then coalesce(${agentRuns.transcript}->'waitingForBrain'->>'source', 'plan') end) end)`;
+
+/**
  * Where a run's replies go: asked in the main timeline (a channel, a DM
  * or a forum post), it answers in the main timeline; asked in a thread, in
  * that thread. The run keeps `threadRootId` (its trigger, when top-level) as

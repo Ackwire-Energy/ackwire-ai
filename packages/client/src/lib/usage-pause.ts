@@ -88,6 +88,8 @@ export const mayContinueUsage = (
 
 export interface UsageWait {
   runId: string;
+  /** The turns waiting behind it: its own and every later one in the conversation it speaks for (`usageWait.runIds`). */
+  count: number;
   forUserId: string | null;
   canceled: boolean;
   /** Its run is back at work, or over: nothing waits to cancel. */
@@ -96,11 +98,18 @@ export interface UsageWait {
 
 /**
  * An agent's note that it waits on its plan or budget (`meta.usageWait`: "I'll answer at 9:00"), with the run it holds:
- * "Don't run it" cancels that run. Null: no such note, or one written before notes named their run.
+ * "Don't run it" cancels that run, and the later turns in its conversation it speaks for. Null: no such note, or one written before notes named their run.
  */
 export function usageWaitOf(meta: Record<string, unknown> | null | undefined): UsageWait | null {
   const raw = meta?.usageWait as Record<string, unknown> | undefined;
   const runId = str(raw?.runId);
   if (!runId || usagePauseCardOf(meta)) return null;
-  return { runId, forUserId: str(raw?.forUserId), canceled: raw?.canceled === true, ended: raw?.ended === true };
+  const joined = raw?.runIds;
+  return {
+    runId,
+    count: 1 + (Array.isArray(joined) ? joined.length : 0),
+    forUserId: str(raw?.forUserId),
+    canceled: raw?.canceled === true,
+    ended: raw?.ended === true,
+  };
 }

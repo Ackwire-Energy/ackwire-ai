@@ -89,6 +89,9 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
         ...(active.status === "waiting_input" && active.waitingMachineId
           ? { computer: brainWait?.code === "busy" ? ("queued" as const) : ("away" as const) }
           : {}),
+        ...(brainWait?.code === "plan_limit" || brainWait?.code === "budget"
+          ? { usage: brainWait.code === "budget" ? ("budget" as const) : ("plan" as const) }
+          : {}),
       });
     }
     let live = false;

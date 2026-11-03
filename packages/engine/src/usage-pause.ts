@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, ne, schema, sql } from "@agenteschat/db";
 import { extraUsageLeft, planBinding } from "@agenteschat/ui/plan-state";
 import { recordAudit } from "./audit";
 import { storedPlanUsage } from "./brains/select";
@@ -421,14 +421,74 @@ export async function usageWaitNoteEnded(
   if (deps.pubsub) for (const row of rows) await publishMessageCreated(deps.pubsub, messageView(row));
 }
 
+/** A note cancelled this recently still speaks for its conversation: a new ask there shows only its receipt. */
+export const CANCELED_NOTE_QUIET_MS = 15 * 60_000;
+
+/**
+ * One "I'll answer when it resets" note per agent, conversation and wait. When the agent's last word in this
+ * conversation (`threadId`: a thread, or null for the main timeline) already says it waits on the same limit (`code`,
+ * a reset within a minute of `resetsAt`, or both unknown) and its run isn't back at work, a newly parked turn posts
+ * none: a note still waiting takes the turn in (`usageWait.runIds`, its "Don't run it" stops them all) and comes back
+ * to be published; one cancelled less than `CANCELED_NOTE_QUIET_MS` ago stays as it is (`note: null`), the turn's
+ * receipt says it waits. Null: the turn posts its own note.
+ */
+export async function joinUsageNote(
+  tx: Executor,
+  run: { id: string; orgId: string; agentId: string; channelId: string },
+  threadId: string | null,
+  code: string,
+  resetsAt: string | undefined,
+  now = Date.now(),
+): Promise<{ note: Message | null } | null> {
+  const { messages } = schema;
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext(${`usage-note:${run.agentId}:${run.channelId}:${threadId ?? ""}`}))`,
+  );
+  const [last] = await tx
+    .select()
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        eq(messages.authorAgentId, run.agentId),
+        sql`${messages.threadId} is not distinct from ${threadId}::uuid and ${messages.deletedAt} is null`,
+        // "Told it to stop" and the other notices the agent reads aren't its word in the conversation.
+        sql`${messages.meta}->'notice' is null`,
+      ),
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  const w = last?.meta.usageWait as
+    | { code?: string; resetsAt?: string; ended?: boolean; canceled?: boolean; canceledAt?: string }
+    | undefined;
+  if (!last || !w || w.code !== code || w.ended) return null;
+  const sameReset =
+    w.resetsAt && resetsAt
+      ? Math.abs(Date.parse(w.resetsAt) - Date.parse(resetsAt)) < 60_000
+      : !w.resetsAt && !resetsAt;
+  if (!sameReset) return null;
+  if (w.canceled) return now - Date.parse(w.canceledAt ?? "") < CANCELED_NOTE_QUIET_MS ? { note: null } : null;
+  const [note] = await tx
+    .update(messages)
+    .set({
+      meta: sql`jsonb_set(${messages.meta}, '{usageWait,runIds}',
+        coalesce(${messages.meta}->'usageWait'->'runIds', '[]'::jsonb) || to_jsonb(${run.id}::text))`,
+    })
+    .where(and(eq(messages.id, last.id), eq(messages.createdAt, last.createdAt)))
+    .returning();
+  return { note: note ?? null };
+}
+
 /**
  * A run waiting on its plan or budget was stopped ("Don't run it", or any stop while it waited): what said it would run
- * later says it won't, quietly: its note (`meta.usageWait.canceled`) and its long-work card (`canceled`).
+ * later says it won't, quietly: its note (`meta.usageWait.canceled`, with when) and its long-work card (`canceled`).
+ * Returns the turns its note took in (`joinUsageNote`): "Don't run it" stops them too.
  */
 export async function usageWaitCanceled(
   deps: { db: Database; pubsub?: PubSub },
   run: { id: string; orgId: string; channelId: string; createdAt: Date },
-) {
+): Promise<string[]> {
   const { messages } = schema;
   const card = sql`coalesce(${messages.meta}->'actionCard'->>'kind', '') = 'usage_paused'`;
   const rows = await deps.db
@@ -436,7 +496,8 @@ export async function usageWaitCanceled(
     .set({
       meta: sql`case when ${card}
         then jsonb_set(${messages.meta}, '{actionCard,state}', '"canceled"'::jsonb)
-        else jsonb_set(${messages.meta}, '{usageWait,canceled}', 'true'::jsonb) end`,
+        else jsonb_set(${messages.meta}, '{usageWait}', (${messages.meta}->'usageWait')
+          || jsonb_build_object('canceled', true, 'canceledAt', ${new Date().toISOString()}::text)) end`,
     })
     .where(
       and(
@@ -449,6 +510,10 @@ export async function usageWaitCanceled(
     )
     .returning();
   if (deps.pubsub) for (const row of rows) await publishMessageCreated(deps.pubsub, messageView(row));
+  return rows.flatMap((r) => {
+    const ids = (r.meta.usageWait as { runIds?: unknown } | undefined)?.runIds;
+    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+  });
 }
 
 /**

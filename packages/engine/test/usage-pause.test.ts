@@ -5,6 +5,7 @@ import {
   type Brain,
   type BrainEvent,
   type BrainTurn,
+  CANCELED_NOTE_QUIET_MS,
   cancelRun,
   clearPlanLimits,
   createJobHandlers,
@@ -693,6 +694,84 @@ test("Don't run it: who asked cancels a reply waiting on the plan; its note says
   expect(status?.status).toBeNull();
   await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + RESUME_GAP_MS) });
   expect(seen).toHaveLength(1);
+});
+
+test("one note per conversation and limit: a later ask joins it, its Não rodar stops both, and a new ask right after a cancel stays quiet", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  const resetsAt = later(3600_000).toISOString();
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const first = await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  // The channel's main timeline: a second ask is a run of its own, and no second note.
+  const second = await post(f, "@dev e aí?");
+  await drainOutbox(f.db, handlers);
+  const [a, b] = await runs(f);
+  expect([a?.status, b?.status]).toEqual(["waiting_input", "waiting_input"]);
+  const [note, ...more] = await notes(f, "plan_limit_wait");
+  expect(more).toHaveLength(0);
+  expect(note?.meta.usageWait).toMatchObject({ runId: a?.id, runIds: [b?.id] });
+  // Each ask's receipt says it waits on the plan, not that the agent waits for an answer.
+  const receiptOf = async (id: string) =>
+    (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).find((m) => m.id === id)?.receipts?.handled[0];
+  expect(await receiptOf(second.id)).toMatchObject({ status: "waiting_input", usage: "plan" });
+
+  await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, a?.id ?? "");
+  expect((await runs(f)).map((r) => r.status)).toEqual(["canceled", "canceled"]);
+  expect(await receiptOf(first.id)).toMatchObject({ status: "canceled" });
+  expect((await notes(f, "plan_limit_wait"))[0]?.meta.usageWait).toMatchObject({ canceled: true });
+
+  // Asked again right after: the receipt says it waits, the note isn't repeated.
+  await post(f, "@dev e agora?");
+  await drainOutbox(f.db, handlers);
+  expect((await runs(f))[2]?.status).toBe("waiting_input");
+  expect(await notes(f, "plan_limit_wait")).toHaveLength(1);
+
+  // A while after the cancel, a new ask is told again.
+  await f.db
+    .update(schema.messages)
+    .set({
+      meta: {
+        ...note?.meta,
+        usageWait: {
+          ...(note?.meta.usageWait as object),
+          canceled: true,
+          canceledAt: later(-CANCELED_NOTE_QUIET_MS - 1000).toISOString(),
+        },
+      },
+    })
+    .where(eq(schema.messages.id, note?.id ?? ""));
+  await post(f, "@dev oi de novo");
+  await drainOutbox(f.db, handlers);
+  expect(await notes(f, "plan_limit_wait")).toHaveLength(2);
+});
+
+test("another reset is another note, and so is another conversation", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f, { brainFallback: false });
+  let resetsAt = later(3600_000).toISOString();
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const other = await post(f, "outra conversa");
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  await post(f, "@dev e no fio?", other.id);
+  await drainOutbox(f.db, handlers);
+  expect(await notes(f, "plan_limit_wait")).toHaveLength(1);
+  expect(await notes(f, "plan_limit_wait", other.id)).toHaveLength(1);
+
+  clearPlanLimits();
+  resetsAt = later(5 * 3600_000).toISOString();
+  await post(f, "@dev e agora?");
+  await drainOutbox(f.db, handlers);
+  expect(await notes(f, "plan_limit_wait")).toHaveLength(2);
 });
 
 test("Don't run it goes away once the run is back at work, and comes back if it parks on the limit again", async () => {

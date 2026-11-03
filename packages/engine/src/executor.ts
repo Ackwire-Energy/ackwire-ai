@@ -248,6 +248,7 @@ import {
   budgetUsedPercent,
   continuesPastPlan,
   isLongWork,
+  joinUsageNote,
   ladderDelay,
   nextMonthStart,
   overrideHolds,
@@ -1005,6 +1006,8 @@ async function executeRunInner(
     outage?: true,
     computer?: "queued" | "away",
     passed?: true,
+    /** `waiting_input` on its plan's limit or its budget: the apps say it answers when that renews. */
+    usage?: "plan" | "budget",
   ) => {
     for (const id of withReceipts.splice(0)) {
       await publishMessageActions({ db, pubsub: deps.pubsub }, run.orgId, id).catch(() => {});
@@ -1026,6 +1029,7 @@ async function executeRunInner(
       ...(outage ? { outage } : {}),
       ...(computer ? { computer } : {}),
       ...(passed ? { passed } : {}),
+      ...(usage ? { usage } : {}),
     });
     // Long work (ADR 0121): a wait pauses its promise (the card that stopped it is the update); an end goes home.
     if (run.workId) {
@@ -1054,6 +1058,7 @@ async function executeRunInner(
       ...(outage ? { outage } : {}),
       ...(computer ? { computer } : {}),
       ...(passed ? { passed } : {}),
+      ...(usage ? { usage } : {}),
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
     // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
@@ -1095,7 +1100,13 @@ async function executeRunInner(
     );
   };
 
-  const event = (status: RunStatus, error?: string, outage?: true, computer?: "queued" | "away"): ChannelEvent => ({
+  const event = (
+    status: RunStatus,
+    error?: string,
+    outage?: true,
+    computer?: "queued" | "away",
+    usage?: "plan" | "budget",
+  ): ChannelEvent => ({
     type: "agent.run",
     channelId: run.channelId,
     threadId: replyThreadId,
@@ -1105,6 +1116,7 @@ async function executeRunInner(
     ...bg,
     ...(outage ? { outage } : {}),
     ...(computer ? { computer } : {}),
+    ...(usage ? { usage } : {}),
     ...(error ? { error, ...runErrorDetail(error) } : {}),
   });
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */
@@ -2781,6 +2793,7 @@ async function executeRunInner(
     const firstPark = t.brainNotice !== u.code;
     const say = !(run.background || viaRoutine !== null || u.soon) && firstPark;
     const waitId = Bun.randomUUIDv7();
+    let joined = null as Message | null;
     const note = say
       ? await db.transaction(async (tx) => {
           if (u.pause) {
@@ -2788,6 +2801,12 @@ async function executeRunInner(
             t.usagePause = { ...t.usagePause, cardId: card.id };
             t.postedCount++;
             return card;
+          }
+          // Its conversation already heard it waits on this limit: one note speaks for every turn waiting there.
+          const join = cut ? null : await joinUsageNote(tx, run, replyThreadId, u.code, resetsAt, now);
+          if (join) {
+            joined = join.note;
+            return null;
           }
           const [code, text] = budget
             ? [
@@ -2880,6 +2899,7 @@ async function executeRunInner(
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
     }
+    if (joined) await publishMessageCreated(deps.pubsub, messageView(joined));
     // A routine's run says nothing in the conversation: its people hear it once per outage instead.
     if (firstPark && !budget) await routineRunWaitingForPlan({ db, pubsub: deps.pubsub }, run).catch(() => {});
     if (tellOwner) {
@@ -2896,8 +2916,9 @@ async function executeRunInner(
         },
       ).catch(() => {});
     }
-    await publishChannelEvent(deps.pubsub, event("waiting_input"));
-    await finished("waiting_input");
+    const usage = budget ? "budget" : "plan";
+    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, undefined, undefined, usage));
+    await finished("waiting_input", undefined, undefined, undefined, undefined, usage);
   };
 
   if (plan.unavailable) {

@@ -17,8 +17,8 @@ import type { TFunction } from "i18next";
  * with a check and a popover). Faces of the agents it is about, a small mark, and words: who saw it, a wait, a
  * failure, nobody or no AI, and while the author's own plan picks who answers. A receipt never takes a line of its
  * own: it is a mark beside the message (`markOf`): the clock, one tick or two (`receiptTicks`), its words its label,
- * except what asks something of you (send it again, connect an AI) and the AI provider being down, which keep their
- * line under the message, as on the web. "Nobody will answer" and "No one replied" (every agent it was for passed) are
+ * except what asks something of you (send it again, connect an AI) and what nobody can act on (the AI provider being
+ * down, the plan or budget to renew), which keep their line under the message, as on the web. "Nobody will answer" and "No one replied" (every agent it was for passed) are
  * two ticks whose sheet says it, with "Chamar um agente". Pure, so it is tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved
  * by the channel's events).
  */
@@ -50,8 +50,11 @@ export type ReceiptWords =
   | "receipts.outage"
   | "receipts.queued"
   | "receipts.away"
+  | "receipts.plan"
+  | "receipts.budget"
   | "receipts.handled"
   | "receipts.passed"
+  | "receipts.canceled"
   | "receipts.failed"
   | "receipts.nobody"
   | "receipts.platformCap"
@@ -81,7 +84,8 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
     case "picked":
     case "claimed":
     case "handled":
-    case "passed": {
+    case "passed":
+    case "canceled": {
       const label = { key: `receipts.${status.kind}` as const, agents: status.agents };
       return { ...faces(status.agents), mark, words: null, label, action: null, alert: false };
     }
@@ -92,7 +96,9 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
     }
     case "outage":
     case "queued":
-    case "away": {
+    case "away":
+    case "plan":
+    case "budget": {
       const words = { key: `receipts.${status.kind}` as const, agents: status.agents };
       return { ...faces(status.agents), mark: "none", words, label: words, action: null, alert: false };
     }

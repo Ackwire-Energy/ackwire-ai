@@ -990,6 +990,8 @@ export interface MessageReceipts {
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
     computer?: "queued" | "away";
+    /** `waiting_input` on its plan's limit or its budget: it answers when that renews. */
+    usage?: "plan" | "budget";
     /** It ended without answering: passed and posted nothing, or canceled before it started. */
     passed?: true;
   }[];
@@ -1211,6 +1213,8 @@ export type ChannelEvent =
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -1298,6 +1302,8 @@ export type ChannelEvent =
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
       passed?: true;
       error?: string;
@@ -1390,6 +1396,8 @@ export type ChannelEvent =
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
       computer?: "queued" | "away";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: passed and posted nothing, or canceled before it started. */
       passed?: true;
     }

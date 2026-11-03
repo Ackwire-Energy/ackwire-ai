@@ -291,6 +291,17 @@ describe("what waits on a plan's limit: Não rodar", () => {
     expect(within(done).queryByRole("button", { name: "Não rodar" })).toBeNull();
   });
 
+  test("a note that speaks for later turns in its conversation says how many it stops", async () => {
+    const state = seedState();
+    state.messages.push(note("w-three", { runIds: ["r-2", "r-3"] }));
+    await open(state);
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Respondo assim que ele renovar")) as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Não rodar estas 3" }));
+    expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-w-three")).toBe(true);
+  });
+
   test("back at work, the note offers nothing to cancel", async () => {
     const state = seedState();
     state.messages.push(note("w-back", { ended: true }));

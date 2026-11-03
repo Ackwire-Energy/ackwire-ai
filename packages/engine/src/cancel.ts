@@ -231,6 +231,8 @@ export async function cancelRun(
   if (!options.stopMessageId && options.tell !== false) {
     await tellAgentStopped(deps, row.run, stopped.previousStatus, userId, options.reason).catch(() => null);
   }
+  // Its usage note's "Don't run it" speaks for every turn that note took in, each for who may stop it.
+  for (const id of stopped.joined ?? []) await cancelRun(deps, userId, orgId, id, { tell: false }).catch(() => null);
   return stopped;
 }
 
@@ -250,7 +252,7 @@ export async function stopRun(
   channelKind: string | null,
   actor: { type: "person"; id: string } | { type: "system"; reason: string },
   options: { stopMessageId?: string } = {},
-): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
+): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus; joined?: string[] }> {
   const { db } = deps;
   const error = actor.type === "person" ? `canceled_by:${actor.id}` : actor.reason;
   let run = start;
@@ -324,10 +326,11 @@ export async function stopRun(
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
   // Waiting on its plan or budget: its note or card says it won't run when the limit is back.
   const wait = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain;
+  let joined: string[] = [];
   if (previous === "waiting_input" && wait?.code) {
     // Loaded here: the usage pause checks who may stop a run through this module.
     const { USAGE_WAIT_CODES, usageWaitCanceled } = await import("./usage-pause");
-    if (USAGE_WAIT_CODES.has(wait.code)) await usageWaitCanceled(deps, run).catch(() => null);
+    if (USAGE_WAIT_CODES.has(wait.code)) joined = (await usageWaitCanceled(deps, run).catch(() => null)) ?? [];
   }
   // Long work (ADR 0121): its end goes home now ("Parado por …"), whoever runs it; the card goes back to A fazer.
   if (run.workId) await endWork(deps, run, "canceled").catch(() => null);
@@ -390,7 +393,7 @@ export async function stopRun(
       }).catch(() => null);
     }
   }
-  return { id: run.id, status: run.status, previousStatus: previous };
+  return { id: run.id, status: run.status, previousStatus: previous, ...(joined.length ? { joined } : {}) };
 }
 
 /**
