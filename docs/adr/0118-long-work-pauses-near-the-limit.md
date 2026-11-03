@@ -77,4 +77,4 @@ With 300 messages over a weekly limit, every channel ask parked a turn of its ow
 7. **One owner notice per plan line** when the reset is still unknown after a day (`groupKey: plan_reset_unknown:${waitKey}`); each conversation reaching a day merges in.
 8. **Long work in the agent's line of work** (`work_queue`, ADR 0121) reads "Ada começa quando terminar outro trabalho" in its receipts (phase `line`), not "Esperando sua resposta".
 
-Routines, missions and long work at 95% keep their own rules (one open routine run, slots more than 12 h late are missed; a mission's own keep-going check; long work keeps its card and Continuar agora). The Jev check before each catch-up (closing one when every asker's ask is clearly closed) is the next step of the same design.
+Routines, missions and long work at 95% keep their own rules (one open routine run, slots more than 12 h late are missed; a mission's own keep-going check; long work keeps its card and Continuar agora). The Jev check before each catch-up (closing one when every asker's ask is clearly closed) is [ADR 0136](0136-a-check-before-each-catch-up.md).
