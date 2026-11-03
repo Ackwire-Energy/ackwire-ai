@@ -6335,10 +6335,12 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
 }
 
 /* Emoji picker: glass popover, search, category tabs, grids */
+/* It never scrolls sideways, an emoji growing under the pointer included. */
 .ac-emoji-popover {
   width: 332px;
   max-width: calc(100vw - 32px);
   padding: 8px;
+  overflow-x: hidden;
 }
 /* Its popover stops at a menu's 280px (`.ac-menu`): only the grid gives up height, so it is the one scroll and its last
    row stays inside. */
@@ -6407,6 +6409,7 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
 }
 .ac-emoji__scroll {
   height: 248px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -6423,8 +6426,10 @@ html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
   border-collapse: collapse;
   table-layout: fixed;
 }
-.ac-emoji__grid td {
+.ac-emoji__grid col {
   width: 12.5%;
+}
+.ac-emoji__grid td {
   padding: 0;
 }
 .ac-emoji__cell {

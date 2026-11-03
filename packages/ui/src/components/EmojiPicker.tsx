@@ -28,6 +28,7 @@ export interface EmojiPickerLabels {
 
 /** Emoji per row in the grid (arrow keys move by this much up and down). */
 export const EMOJI_COLUMNS = 8;
+const COLUMN_KEYS = Array.from({ length: EMOJI_COLUMNS }, (_, i) => `c${i}`);
 const RECENT_KEY = "agentes:emoji-recent";
 const RECENT_MAX = 16;
 
@@ -222,6 +223,13 @@ export function EmojiPicker({
               </div>
               {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: the ARIA grid pattern (arrow keys move between cells) */}
               <table role="grid" aria-labelledby={`${id}-${s.id}`} className="ac-emoji__grid">
+                {/* The columns are set here, not by the first row: a section of fewer emoji than a row keeps the
+                    cells' width and starts on the left, instead of spreading them across the row. */}
+                <colgroup>
+                  {COLUMN_KEYS.map((k) => (
+                    <col key={k} />
+                  ))}
+                </colgroup>
                 <tbody>
                   {layout.rows
                     .filter((row) => row.section === s.id)
