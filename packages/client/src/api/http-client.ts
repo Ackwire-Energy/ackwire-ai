@@ -1036,6 +1036,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<SkillSourceUpdate>(`${org(orgId)}/skills/${enc(id)}/update/approve`, { json: {} }),
       dismissUpdate: (orgId, id) =>
         request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/dismiss`, { json: {} }),
+      reopenUpdate: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/reopen`, { json: {} }),
       undoUpdate: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/undo`, { json: {} }),
       settings: (orgId) => request<SkillSettings>(`${org(orgId)}/skill-settings`),
       saveSettings: (orgId, input) =>

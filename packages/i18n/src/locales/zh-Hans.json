@@ -6427,6 +6427,7 @@
     "autoUpdateHelp": "每天读取它的链接。新文本会生效，可撤销。脚本的改动要等管理技能的人处理。",
     "autoChip": "自动更新",
     "waitingChip": "更新待处理",
+    "waitingChipEdited": "链接和智能体都改了",
     "lastUpdate": "{{when}}从链接更新",
     "undoUpdate": "撤销更新",
     "undone": "{{name}} 已回到版本 {{version}}。",
@@ -6435,16 +6436,46 @@
     "agentsImproveThis": "智能体自行改进此技能",
     "agentChange": "{{agent}} {{when}}修改了它",
     "undoAgentChange": "撤销修改",
+    "undo": "撤销",
+    "chosenLink": "{{when}}改用了链接的版本",
+    "history": {
+      "title": "智能体的修改",
+      "empty": "还没有智能体修改过这个技能。",
+      "show": "查看修改",
+      "hide": "收起修改",
+      "undone": "已撤销"
+    },
+    "diff": {
+      "label": "查看修改的方式",
+      "agents": "智能体改了什么",
+      "link": "链接里改了什么",
+      "compare": "当前 × 链接",
+      "same": "两边的文字相同。",
+      "files": "会运行的文件",
+      "newFile": "新增",
+      "changedFile": "有修改",
+      "large": "太大了，这里显示不了。请在链接里查看。",
+      "unavailable": "用“从链接更新”看看会改什么。"
+    },
     "pending": {
       "title": "来自链接的更新会修改会运行的文件：{{files}}",
       "lead": "只有在你信任这些文件时才应用。智能体会在它们的电脑上运行这些文件。",
-      "edited": "来自链接的更新会替换智能体对它做的修改",
-      "editedLead": "应用后使用链接中的版本。之后可以撤销。",
+      "edited": "链接有新版本，智能体也改过这个技能",
+      "editedLead": "选择保留哪个版本。之后可以撤销。",
       "apply": "应用更新",
       "dismiss": "不应用",
       "applied": "已从链接更新 {{name}}。",
       "changedAgain": "链接又变了。请审核新的文件。",
-      "dismissed": "未应用更新。链接再有新改动时会再次询问。"
+      "dismissed": "未应用更新。链接再有新改动时会再次询问。",
+      "useLink": "用链接的版本",
+      "keepAgents": "保留智能体的版本",
+      "usedLink": "{{name}} 现在用的是链接的版本。",
+      "keptAgents": "{{name}} 保留智能体的版本。",
+      "reopened": "{{name}} 的更新又在等待处理了。",
+      "linkSince": "{{when}}链接里有了新版本",
+      "keptLine": "{{when}}保留了智能体的版本",
+      "notAppliedLine": "{{when}}没有应用链接的更新",
+      "byAgents_other": "{{names}} 修改过这个技能，最近一次在{{when}}"
     },
     "updateFailed": {
       "no_skill_md": "无法更新：链接里已经没有 SKILL.md。",
@@ -6457,7 +6488,7 @@
     "notice": {
       "updated": "{{name}} 已从链接更新",
       "waiting": "{{name}} 的一个更新会修改它的脚本",
-      "waitingEdited": "{{name}} 的更新会替换智能体做的修改",
+      "waitingEdited": "{{name}} 在链接和智能体那边都改了：选择保留哪个版本",
       "failed": "{{name}} 无法从链接更新",
       "edited": "智能体改进了 {{name}}"
     },

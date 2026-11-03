@@ -9,6 +9,31 @@ import { organizations } from "./tenancy";
  * (`load_skill`). No code runs: scripts are kept as "ignored" until the
  * sandbox exists (ADR 0020).
  */
+/** A changed file that runs, as its link has it now (`before` null: new); texts null past what the page shows. */
+export interface SkillPendingFile {
+  path: string;
+  before: string | null;
+  after: string | null;
+  large?: boolean;
+}
+
+/**
+ * An update from its link waiting for a person (`skills.pendingUpdate`): what its link held (`hash`), its files that
+ * run (`scripts`, with their text in `files`) and its text (`body`, `description`), to show what it would change.
+ */
+export interface SkillPendingUpdate {
+  hash: string;
+  scripts: string[];
+  at: string;
+  dismissed?: boolean;
+  /** When a person kept the skill as it is (`dismissed`). */
+  dismissedAt?: string;
+  edited?: boolean;
+  body?: string;
+  description?: string;
+  files?: SkillPendingFile[];
+}
+
 export const skills = pgTable(
   "skills",
   {
@@ -60,18 +85,17 @@ export const skills = pgTable(
      * manages skills: what it held (`hash`) and those files. `dismissed`: said no to; the same content isn't raised again.
      * `edited`: it waits (also) because it would replace what agents changed (`editedSinceSource`).
      */
-    pendingUpdate: jsonb().$type<{
-      hash: string;
-      scripts: string[];
-      at: string;
-      dismissed?: boolean;
-      edited?: boolean;
-    }>(),
+    pendingUpdate: jsonb().$type<SkillPendingUpdate>(),
     /**
      * Changed by an agent (or an accepted proposal) since its link last wrote it: the next update from its link waits
      * for a person (`pendingUpdate.edited`), since it would replace that change. A save of the whole skill clears it.
      */
     editedSinceSource: boolean().notNull().default(false),
+    /**
+     * The text its link last wrote, kept when an agent (or an accepted proposal) first changes it after that: what the
+     * agents changed is measured from it, and so is what its link changed next. Null once its link writes it again.
+     */
+    linkBase: jsonb().$type<{ body: string; description: string; at: string }>(),
     /** The last refusal of an update from its link (its code), so a failure is reported once, not every day. */
     updateError: text(),
     /**
@@ -83,6 +107,15 @@ export const skills = pgTable(
       version: number;
       at: string;
       agentId?: string;
+      /**
+       * It was a waiting update a person applied: undoing it brings the choice back (this update waiting, its link's
+       * hash, `editedSinceSource` and `linkBase` as they were).
+       */
+      waited?: {
+        pending: SkillPendingUpdate;
+        sourceHash: string | null;
+        linkBase: { body: string; description: string; at: string } | null;
+      };
     }>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

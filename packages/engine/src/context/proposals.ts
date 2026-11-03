@@ -38,7 +38,7 @@ import { enqueue } from "../outbox";
 import { maySql } from "../permissions";
 import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
-import { pinBlobs, runsCode, skillFolderFiles, writeSkillBody, writeSkillChange } from "../skills";
+import { editedByAgents, pinBlobs, runsCode, skillFolderFiles, writeSkillBody, writeSkillChange } from "../skills";
 import { ALL_TOOLS } from "../tools/scopes";
 import {
   type ContextItem,
@@ -448,7 +448,8 @@ async function appliedToSkill(deps: { db: Database; blobs?: BlobStoreResolver },
   const { db } = deps;
   const id = proposalSkillId(p);
   if (!id) return false;
-  const edited = () => db.update(schema.skills).set({ editedSinceSource: true }).where(eq(schema.skills.id, id));
+  const edited = (was: typeof schema.skills.$inferSelect) =>
+    db.update(schema.skills).set(editedByAgents(was)).where(eq(schema.skills.id, id));
   const [skill] = await db
     .select()
     .from(schema.skills)
@@ -458,7 +459,7 @@ async function appliedToSkill(deps: { db: Database; blobs?: BlobStoreResolver },
   if (!p.skillPath) {
     if (sha256(skill.body) !== p.baseHash) return false;
     await writeSkillBody(db, skill, p.proposedText);
-    await edited();
+    await edited(skill);
     return true;
   }
   if (!deps.blobs) throw new ValidationError("Skill files can't be changed on this server (no storage)");
@@ -470,7 +471,7 @@ async function appliedToSkill(deps: { db: Database; blobs?: BlobStoreResolver },
     body: skill.body,
     files: [{ path, data: new TextEncoder().encode(p.proposedText) }],
   });
-  await edited();
+  await edited(skill);
   return true;
 }
 

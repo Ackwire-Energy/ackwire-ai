@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ComputerSetup, Machine, StorageConfig } from "@agenteschat/client";
 import { type SetupView, setupView } from "@agenteschat/client/lib/computer";
+import { changedByText, changesSinceLink, skillPendingViews, skillUpdateWords } from "@agenteschat/client/lib/skills";
 import { storageUsageLine } from "@agenteschat/client/lib/storage";
 import {
   agentComputerPick,
@@ -239,6 +240,59 @@ describe("Skills", () => {
     expect(skillLine(t, { ...s, autoUpdate: true, pendingUpdate: waiting }, null)).toBe(
       "GitHub · Em agentes novos · Atualização esperando · v3",
     );
+    expect(skillLine(t, { ...s, pendingUpdate: { ...waiting, edited: true } }, null)).toBe(
+      "GitHub · Em agentes novos · Link e agentes mudaram · v3",
+    );
+  });
+
+  test("its page while an update waits on both sides: the choice, who changed it, and Desfazer after either", async () => {
+    const t = await translator("pt-BR");
+    const at = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    const base = { body: "# v1", description: "Antes do deploy.", at: new Date(Date.now() - 86_400_000).toISOString() };
+    const change = { id: "c1", agentId: "ada", at, before: "# v1", after: "# v1\nCache.", undone: false };
+    const skill = {
+      id: "s1",
+      name: "deploy",
+      description: "Antes do deploy.",
+      version: 3,
+      source: "url" as const,
+      sourceUrl: "https://github.com/acme/s",
+      defaultForNewAgents: false,
+      metadata: {},
+      createdAt: at,
+      updatedAt: at,
+      body: "# v1\nCache.",
+      files: [],
+      pendingUpdate: { scripts: [], at, dismissed: false, edited: true },
+      pending: { body: "# v2", description: "Antes do deploy.", base, files: [] },
+      changes: [change],
+    };
+    const words = skillUpdateWords(t, "pt-BR", skill);
+    expect(words.waiting).toMatchObject({
+      title: "O link tem uma versão nova, e os agentes também mudaram esta skill",
+      since: "Versão nova no link há 2 h",
+      apply: "Usar a versão do link",
+      keep: "Manter a dos agentes",
+    });
+    expect(changedByText(t, "pt-BR", changesSinceLink(skill), () => "Ada")).toBe(
+      "Ada mudou esta skill, a última vez há 2 h",
+    );
+    expect(skillPendingViews(skill).map((v) => t(`skills.diff.${v.id}`))).toEqual([
+      "O que os agentes mudaram",
+      "O que mudou no link",
+      "Atual × link",
+    ]);
+    const kept = skillUpdateWords(t, "pt-BR", {
+      ...skill,
+      pendingUpdate: { ...skill.pendingUpdate, dismissed: true, dismissedAt: at },
+    });
+    expect([kept.waiting, kept.kept]).toEqual([null, "Ficou a versão dos agentes há 2 h"]);
+    const chosen = skillUpdateWords(t, "pt-BR", {
+      ...skill,
+      pendingUpdate: null,
+      lastUpdate: { fromVersion: 3, at, agentId: null, waited: true },
+    });
+    expect(chosen.last).toEqual({ line: "Ficou a versão do link há 2 h", undo: "Desfazer" });
   });
 
   test("a long install's line moves on and stays on the last step", () => {

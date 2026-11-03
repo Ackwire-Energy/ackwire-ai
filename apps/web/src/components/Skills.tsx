@@ -1,5 +1,6 @@
 import type {
   Skill,
+  SkillAgentChange,
   SkillChoice,
   SkillDetail,
   SkillFile,
@@ -24,17 +25,24 @@ import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
+  changedByText,
+  changesSinceLink,
   githubRepoLink,
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
   SKILL_UPDATE_TOAST,
+  type SkillPendingView,
+  type SkillText,
   searchRepos,
+  skillPendingViews,
   skillPickOf,
   skillRefusalText,
   skillSourceViaText,
   skillUpdateErrorText,
+  skillUpdateWords,
   skillViaText,
+  skillWaitingChip,
   skippedSkillText,
 } from "@agenteschat/client/lib/skills";
 import {
@@ -49,6 +57,8 @@ import {
   DialogBody,
   DialogFooter,
   DialogSearchList,
+  Diff,
+  diffLines,
   Field,
   Icon,
   type IconName,
@@ -126,7 +136,7 @@ function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null
         <SourceChip skill={skill} />
         {skill.defaultForNewAgents && <Chip icon="check">{t("skills.defaultChip")}</Chip>}
         {skill.pendingUpdate && !skill.pendingUpdate.dismissed ? (
-          <Chip icon="alert">{t("skills.waitingChip")}</Chip>
+          <Chip icon="alert">{t(skillWaitingChip(skill.pendingUpdate))}</Chip>
         ) : (
           skill.autoUpdate && <Chip icon="refresh">{t("skills.autoChip")}</Chip>
         )}
@@ -694,97 +704,195 @@ function ConnectedRepos({ onPick, onBack }: { onPick: (fullName: string) => void
   );
 }
 
+/** A line diff of two texts: what it is for (when it changed) over its SKILL.md; one line when nothing differs. */
+function TextDiff({ before, after }: { before: SkillText; after: SkillText }) {
+  const { t } = useTranslation();
+  const labels = { addedLabel: t("proposals.added"), removedLabel: t("proposals.removed") };
+  const description = before.description !== after.description;
+  if (!description && before.body === after.body) return <p className="small muted">{t("skills.diff.same")}</p>;
+  return (
+    <>
+      {description && (
+        <Diff
+          {...labels}
+          aria-label={t("skills.description")}
+          lines={diffLines([before.description], [after.description])}
+        />
+      )}
+      {before.body !== after.body && (
+        <Diff {...labels} code lines={diffLines(before.body.split("\n"), after.body.split("\n"))} />
+      )}
+    </>
+  );
+}
+
 /**
- * A skill from a link, as it updates from it: "Atualizar sozinha", an update waiting because it changes files that run
- * (applied or refused here, the files named), why its last update failed, and Desfazer for the last one.
+ * What the waiting update changes: the ways to read it (`skillPendingViews`) as tabs, then each file that runs, new
+ * or changed, with its diff (or why it isn't shown).
+ */
+function PendingDiff({ skill: s }: { skill: SkillDetail }) {
+  const { t } = useTranslation();
+  const views = skillPendingViews(s);
+  const [tab, setTab] = useState<SkillPendingView["id"]>(views[0]?.id ?? "link");
+  if (!s.pending) return <p className="small muted">{t("skills.diff.unavailable")}</p>;
+  const labels = { addedLabel: t("proposals.added"), removedLabel: t("proposals.removed") };
+  return (
+    <div className="skill-diff">
+      {views.length > 1 ? (
+        <Tabs
+          variant="segmented"
+          value={tab}
+          onValueChange={setTab}
+          label={t("skills.diff.label")}
+          items={views.map((v) => ({ value: v.id, label: t(`skills.diff.${v.id}`) }))}
+        >
+          {views.map((v) => (
+            <TabPanel key={v.id} value={v.id}>
+              <TextDiff before={v.before} after={v.after} />
+            </TabPanel>
+          ))}
+        </Tabs>
+      ) : (
+        views[0] && <TextDiff before={views[0].before} after={views[0].after} />
+      )}
+      {s.pending.files.length > 0 && (
+        <>
+          <h4 className="ac-eyebrow">{t("skills.diff.files")}</h4>
+          {s.pending.files.map((f) => (
+            <div key={f.path} className="skill-diff__file">
+              <span className="skill-file">
+                <code>{f.path}</code>
+                <Chip icon="code">
+                  {t(f.before === null && !f.large ? "skills.diff.newFile" : "skills.diff.changedFile")}
+                </Chip>
+              </span>
+              {f.large || f.after === null ? (
+                <p className="small muted">{t("skills.diff.large")}</p>
+              ) : (
+                <Diff {...labels} code lines={diffLines(f.before?.split("\n") ?? [], f.after.split("\n"))} />
+              )}
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A skill from a link, as it updates from it: "Atualizar sozinha"; an update waiting because it changes files that
+ * run or would replace what agents changed, with what changed on each side, who changed it and when, and the choice
+ * (Usar a versão do link, Manter a dos agentes), each with Desfazer; why its last update failed; Desfazer for the last.
  */
 function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const action = useSkillAction(org.id);
+  const agents = useAgents(org.id);
   if (s.source !== "url" || !s.sourceUrl) return null;
-  const pending = s.pendingUpdate && !s.pendingUpdate.dismissed ? s.pendingUpdate : null;
+  const words = skillUpdateWords(t, i18n.language, s);
+  const waiting = words.waiting;
+  const nameOf = (id: string) => agents.data?.find((a) => a.id === id)?.name ?? t("channel.unknownAgent");
+  const by = changedByText(t, i18n.language, changesSinceLink(s), nameOf);
+  const reopened = () => toast.show(t("skills.pending.reopened", { name: s.name }));
+  const reopen = () => action.mutate({ type: "reopenUpdate", id: s.id }, { onSuccess: reopened });
+  // A choice undone: its update waits again.
+  const undoChoice = () => action.mutate({ type: "undoUpdate", id: s.id }, { onSuccess: reopened });
+  const undo = () =>
+    s.lastUpdate?.waited
+      ? undoChoice()
+      : action.mutate(
+          { type: "undoUpdate", id: s.id },
+          {
+            onSuccess: (r) =>
+              toast.show(
+                t("skills.undone", { name: s.name, version: s.lastUpdate?.fromVersion ?? (r as SkillDetail).version }),
+              ),
+          },
+        );
+  const apply = () =>
+    action.mutate(
+      { type: "approveUpdate", id: s.id },
+      {
+        onSuccess: (r) =>
+          (r as SkillSourceUpdate).status === "waiting"
+            ? toast.show(t("skills.pending.changedAgain", { name: s.name }), "info")
+            : toast.show(t(waiting?.applied ?? "skills.pending.applied", { name: s.name }), "success", {
+                label: t("skills.undo"),
+                run: undoChoice,
+              }),
+      },
+    );
+  const keep = () =>
+    action.mutate(
+      { type: "dismissUpdate", id: s.id },
+      {
+        onSuccess: () =>
+          toast.show(t(waiting?.kept ?? "skills.pending.dismissed", { name: s.name }), "success", {
+            label: t("skills.undo"),
+            run: reopen,
+          }),
+      },
+    );
   return (
     <>
-      {pending && (
-        <div className="waitcard">
+      {waiting && (
+        <section className="waitcard skill-wait" aria-label={t("skills.waitingChip")}>
           <span className="waitcard__top ac-iconline">
             <Icon name="alert" size={16} />
-            <span>
-              {pending.scripts.length > 0
-                ? t("skills.pending.title", { files: pending.scripts.join(", ") })
-                : t("skills.pending.edited")}
-            </span>
+            <span>{waiting.title}</span>
           </span>
-          {pending.scripts.length > 0 && <p>{t("skills.pending.lead")}</p>}
-          {pending.edited && <p>{t("skills.pending.editedLead")}</p>}
+          <ul className="waitcard__lines">
+            <li className="ac-iconline">
+              <Icon name="link" size={14} />
+              <span>{waiting.since}</span>
+            </li>
+            {by && (
+              <li className="ac-iconline">
+                <Icon name="agent" size={14} />
+                <span>{by}</span>
+              </li>
+            )}
+          </ul>
+          <p>{waiting.lead}</p>
+          <PendingDiff skill={s} />
           <span className="waitcard__acts">
             <Button
               size="sm"
               variant="primary"
               disabled={action.isPending}
-              onClick={() =>
-                action.mutate(
-                  { type: "approveUpdate", id: s.id },
-                  {
-                    onSuccess: (r) =>
-                      toast.show(
-                        t(
-                          (r as SkillSourceUpdate).status === "waiting"
-                            ? "skills.pending.changedAgain"
-                            : "skills.pending.applied",
-                          {
-                            name: s.name,
-                          },
-                        ),
-                      ),
-                  },
-                )
-              }
+              loading={action.isPending && action.variables?.type === "approveUpdate"}
+              onClick={apply}
             >
-              {t("skills.pending.apply")}
+              {waiting.apply}
             </Button>
             <Button
               size="sm"
               variant="ghost"
               disabled={action.isPending}
-              onClick={() =>
-                action.mutate(
-                  { type: "dismissUpdate", id: s.id },
-                  { onSuccess: () => toast.show(t("skills.pending.dismissed")) },
-                )
-              }
+              loading={action.isPending && action.variables?.type === "dismissUpdate"}
+              onClick={keep}
             >
-              {t("skills.pending.dismiss")}
+              {waiting.keep}
             </Button>
           </span>
-        </div>
+        </section>
+      )}
+      {words.kept && (
+        <p className="small muted skill-line">
+          <span>{words.kept}</span>
+          <Button size="sm" variant="ghost" icon="undo" disabled={action.isPending} onClick={reopen}>
+            {t("skills.undo")}
+          </Button>
+        </p>
       )}
       {s.updateError && <Alert>{skillUpdateErrorText(t, s.updateError)}</Alert>}
-      {s.lastUpdate && !s.lastUpdate.agentId && (
-        <p className="small muted row" style={{ gap: 8, alignItems: "center" }}>
-          <span>{t("skills.lastUpdate", { when: relativeTime(t, i18n.language, s.lastUpdate.at) })}</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={action.isPending}
-            onClick={() =>
-              action.mutate(
-                { type: "undoUpdate", id: s.id },
-                {
-                  onSuccess: (r) =>
-                    toast.show(
-                      t("skills.undone", {
-                        name: s.name,
-                        version: s.lastUpdate?.fromVersion ?? (r as SkillDetail).version,
-                      }),
-                    ),
-                },
-              )
-            }
-          >
-            {t("skills.undoUpdate")}
+      {words.last && (
+        <p className="small muted skill-line">
+          <span>{words.last.line}</span>
+          <Button size="sm" variant="ghost" icon="undo" disabled={action.isPending} onClick={undo}>
+            {words.last.undo}
           </Button>
         </p>
       )}
@@ -802,45 +910,82 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
   );
 }
 
-/**
- * A person's skill as agents improve it: its own "Agentes melhoram esta skill sozinhos" (the workspace's until set),
- * and the last change an agent made, with Desfazer while it is still the skill's version.
- */
-function AgentImprove({ skill: s }: { skill: SkillDetail }) {
+/** One change an agent made: who and when, its diff opened in place, Desfazer on the newest while it is the skill's. */
+function ChangeRow({
+  skill,
+  change: c,
+  agent,
+  undoable,
+}: {
+  skill: SkillDetail;
+  change: SkillAgentChange;
+  agent: string;
+  undoable: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const action = useSkillAction(org.id);
-  const settings = useSkillSettings(org.id);
-  const agents = useAgents(org.id);
-  const change = s.lastUpdate?.agentId ? s.lastUpdate : null;
-  const agent = change ? agents.data?.find((a) => a.id === change.agentId) : undefined;
-  if (s.origin === "agent") return null;
+  const [open, setOpen] = useState(false);
   return (
-    <>
-      {change && (
-        <p className="small muted row" style={{ gap: 8, alignItems: "center" }}>
-          <span>
-            {t("skills.agentChange", {
-              agent: agent?.name ?? t("channel.unknownAgent"),
-              when: relativeTime(t, i18n.language, change.at),
-            })}
-          </span>
+    <li className="skill-history__row">
+      <span className="skill-line">
+        <span className="small">
+          {t("skills.agentChange", { agent, when: relativeTime(t, i18n.language, c.at) })}
+          {c.undone && <> · {t("skills.history.undone")}</>}
+        </span>
+        <Button size="sm" variant="ghost" icon="eye" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {t(open ? "skills.history.hide" : "skills.history.show")}
+        </Button>
+        {undoable && (
           <Button
             size="sm"
             variant="ghost"
+            icon="undo"
             disabled={action.isPending}
             onClick={() =>
               action.mutate(
-                { type: "undoUpdate", id: s.id },
-                { onSuccess: () => toast.show(t("skills.undone", { name: s.name, version: change.fromVersion })) },
+                { type: "undoUpdate", id: skill.id },
+                {
+                  onSuccess: () =>
+                    toast.show(
+                      t("skills.undone", { name: skill.name, version: skill.lastUpdate?.fromVersion ?? skill.version }),
+                    ),
+                },
               )
             }
           >
             {t("skills.undoAgentChange")}
           </Button>
-        </p>
+        )}
+      </span>
+      {open && (
+        <Diff
+          addedLabel={t("proposals.added")}
+          removedLabel={t("proposals.removed")}
+          code
+          lines={diffLines(c.before.split("\n"), c.after.split("\n"))}
+        />
       )}
+    </li>
+  );
+}
+
+/**
+ * A person's skill as agents improve it: its own "Agentes melhoram esta skill sozinhos" (the workspace's until set),
+ * and what the agents changed, newest first, each with its diff, Desfazer on the newest while it is still the skill's.
+ */
+function AgentImprove({ skill: s }: { skill: SkillDetail }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useSkillAction(org.id);
+  const settings = useSkillSettings(org.id);
+  const agents = useAgents(org.id);
+  if (s.origin === "agent") return null;
+  const changes = s.changes ?? [];
+  const nameOf = (id: string) => agents.data?.find((a) => a.id === id)?.name ?? t("channel.unknownAgent");
+  return (
+    <>
       <span className="row" style={{ gap: 10, alignItems: "center" }}>
         <Switch
           id={`skill-improve-${s.id}`}
@@ -850,6 +995,24 @@ function AgentImprove({ skill: s }: { skill: SkillDetail }) {
         />
         <label htmlFor={`skill-improve-${s.id}`}>{t("skills.agentsImproveThis")}</label>
       </span>
+      <section className="skill-history" aria-label={t("skills.history.title")}>
+        <h3 className="ac-eyebrow">{t("skills.history.title")}</h3>
+        {changes.length === 0 ? (
+          <p className="small muted">{t("skills.history.empty")}</p>
+        ) : (
+          <ul className="skill-history__list">
+            {changes.map((c, i) => (
+              <ChangeRow
+                key={c.id}
+                skill={s}
+                change={c}
+                agent={nameOf(c.agentId)}
+                undoable={i === 0 && !c.undone && !!s.lastUpdate?.agentId}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
     </>
   );
 }
@@ -882,7 +1045,7 @@ export function SkillSheet({
       size="lg"
       onOpenChange={(o) => !o && onClose()}
       closeLabel={t("common.close")}
-      title={s?.name ?? t("common.loading")}
+      title={s?.name ?? (skill.isError ? t("skills.title") : t("common.loading"))}
       icon={<Icon name="document" />}
       subtitle={
         s
@@ -930,6 +1093,14 @@ export function SkillSheet({
         )
       }
     >
+      {skill.isError && !s && (
+        <div className="skill-line">
+          <Alert>{t("common.loadFailed")}</Alert>
+          <Button size="sm" onClick={() => skill.refetch()}>
+            {t("common.retry")}
+          </Button>
+        </div>
+      )}
       {s && (
         <div className="skill-sheet">
           <div className="skill-sheet__main">

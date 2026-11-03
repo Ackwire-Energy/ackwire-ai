@@ -18,6 +18,7 @@ import { clockAt, formatPercent, relativeTime } from "@agenteschat/client/lib/fo
 import { folderName, hostDescKey, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import { zoneDisplayName } from "@agenteschat/client/lib/routines";
+import { skillWaitingChip } from "@agenteschat/client/lib/skills";
 import type { TFunction } from "i18next";
 import type { IconName } from "@/ui";
 
@@ -229,7 +230,7 @@ export function skillLine(
     t(`skills.source.${skillSourceKey(s)}`),
     s.defaultForNewAgents ? t("skills.defaultChip") : null,
     s.pendingUpdate && !s.pendingUpdate.dismissed
-      ? t("skills.waitingChip")
+      ? t(skillWaitingChip(s.pendingUpdate))
       : s.autoUpdate
         ? t("skills.autoChip")
         : null,

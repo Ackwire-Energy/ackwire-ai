@@ -3452,11 +3452,24 @@ export interface Skill {
    * An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or would
    * replace what agents changed since (`edited`, left out by older servers).
    */
-  pendingUpdate?: { scripts: string[]; at: string; dismissed: boolean; edited?: boolean } | null;
+  pendingUpdate?: {
+    scripts: string[];
+    at: string;
+    dismissed: boolean;
+    /** When a person kept the skill as it is (`dismissed`); Desfazer makes it wait again (`reopenUpdate`). */
+    dismissedAt?: string | null;
+    edited?: boolean;
+  } | null;
   /** Why its last update from its link failed: a code (`skill.no_skill_md`, `skill.connection_gone`…). */
   updateError?: string | null;
   /** Its last update from its link, or an agent's last change to it (`agentId`), while Desfazer can take it back. */
-  lastUpdate?: { fromVersion: number; at: string; agentId?: string | null } | null;
+  lastUpdate?: {
+    fromVersion: number;
+    at: string;
+    agentId?: string | null;
+    /** A person chose this update while it waited: Desfazer makes it wait again. */
+    waited?: boolean;
+  } | null;
   /** "Agentes melhoram as skills sozinhos" set for this skill; null: the workspace's setting. */
   agentsImprove?: boolean | null;
   createdAt: string;
@@ -3481,10 +3494,41 @@ export interface SkillFile {
   status: "stored" | "ignored" | "script";
 }
 
+/** A changed file that runs in a waiting update: `before` null for a new file; texts null when `large`. */
+export interface SkillPendingFile {
+  path: string;
+  before: string | null;
+  after: string | null;
+  large: boolean;
+}
+
+/** The waiting update's content (`SkillDetail.pending`). */
+export interface SkillPending {
+  body: string;
+  description: string;
+  /** What its link last wrote before agents changed it; null: not known (changed before servers kept it). */
+  base: { body: string; description: string; at: string } | null;
+  files: SkillPendingFile[];
+}
+
+/** An agent's change to a skill's text, newest first. */
+export interface SkillAgentChange {
+  id: string;
+  agentId: string;
+  at: string;
+  before: string;
+  after: string;
+  undone: boolean;
+}
+
 export interface SkillDetail extends Skill {
   /** SKILL.md without the front matter (Markdown). */
   body: string;
   files: SkillFile[];
+  /** The waiting update's content (older servers leave it out). */
+  pending?: SkillPending | null;
+  /** The agents' changes to its text, the last 20 (older servers leave it out). */
+  changes?: SkillAgentChange[];
 }
 
 /** A skill a GitHub link holds, offered to pick when it holds several. */

@@ -6371,6 +6371,7 @@
     "autoUpdateHelp": "매일 링크를 읽어요. 새 텍스트는 실행 취소할 수 있게 반영돼요. 스크립트 변경은 스킬을 관리하는 사람을 기다려요.",
     "autoChip": "자동으로 업데이트돼요",
     "waitingChip": "업데이트 대기 중",
+    "waitingChipEdited": "링크와 에이전트가 변경함",
     "lastUpdate": "{{when}} 링크에서 업데이트됨",
     "undoUpdate": "업데이트 실행 취소",
     "undone": "{{name}}을(를) 버전 {{version}}(으)로 되돌렸어요.",
@@ -6379,16 +6380,46 @@
     "agentsImproveThis": "에이전트가 이 스킬을 스스로 개선해요",
     "agentChange": "{{agent}}이(가) {{when}} 변경함",
     "undoAgentChange": "변경 실행 취소",
+    "undo": "실행 취소",
+    "chosenLink": "{{when}} 링크 버전으로 바꿈",
+    "history": {
+      "title": "에이전트의 변경",
+      "empty": "아직 이 스킬을 바꾼 에이전트가 없어요.",
+      "show": "변경 보기",
+      "hide": "변경 숨기기",
+      "undone": "취소됨"
+    },
+    "diff": {
+      "label": "변경 보는 방법",
+      "agents": "에이전트가 바꾼 것",
+      "link": "링크에서 바뀐 것",
+      "compare": "현재 × 링크",
+      "same": "두 쪽 모두 텍스트가 같아요.",
+      "files": "실행되는 파일",
+      "newFile": "새 파일",
+      "changedFile": "변경됨",
+      "large": "너무 커서 여기서 보여줄 수 없어요. 링크에서 확인하세요.",
+      "unavailable": "링크에서 업데이트를 누르면 무엇이 바뀌는지 볼 수 있어요."
+    },
     "pending": {
       "title": "링크에서 받은 업데이트가 실행되는 파일을 바꿔요: {{files}}",
       "lead": "이 파일들을 믿을 수 있을 때만 적용하세요. 에이전트가 자기 컴퓨터에서 이 파일들을 실행해요.",
-      "edited": "링크에서 받은 업데이트가 에이전트가 바꾼 내용을 덮어써요",
-      "editedLead": "링크의 버전으로 바꾸려면 적용하세요. 나중에 되돌릴 수 있어요.",
+      "edited": "링크에 새 버전이 있고, 에이전트도 이 스킬을 바꿨어요",
+      "editedLead": "어느 버전을 남길지 고르세요. 나중에 되돌릴 수 있어요.",
       "apply": "업데이트 적용",
       "dismiss": "적용하지 않기",
       "applied": "{{name}}을(를) 링크에서 업데이트했어요.",
       "changedAgain": "링크가 또 바뀌었어요. 새 파일을 검토하세요.",
-      "dismissed": "업데이트를 적용하지 않았어요. 링크가 새로 바뀌면 다시 물어봐요."
+      "dismissed": "업데이트를 적용하지 않았어요. 링크가 새로 바뀌면 다시 물어봐요.",
+      "useLink": "링크 버전 사용",
+      "keepAgents": "에이전트 버전 유지",
+      "usedLink": "{{name}}이(가) 이제 링크 버전을 써요.",
+      "keptAgents": "{{name}}은(는) 에이전트 버전을 유지해요.",
+      "reopened": "{{name}} 업데이트가 다시 대기 중이에요.",
+      "linkSince": "{{when}} 링크에 새 버전",
+      "keptLine": "{{when}} 에이전트 버전을 유지함",
+      "notAppliedLine": "{{when}} 링크 업데이트를 적용하지 않음",
+      "byAgents_other": "{{names}}이(가) 이 스킬을 바꿈, 마지막 {{when}}"
     },
     "updateFailed": {
       "no_skill_md": "업데이트할 수 없어요: 링크에 SKILL.md가 더 이상 없어요.",
@@ -6401,7 +6432,7 @@
     "notice": {
       "updated": "{{name}}이(가) 링크에서 업데이트됐어요",
       "waiting": "{{name}} 업데이트가 스크립트를 바꿔요",
-      "waitingEdited": "{{name}} 업데이트가 에이전트가 바꾼 내용을 덮어써요",
+      "waitingEdited": "{{name}}이(가) 링크와 에이전트 양쪽에서 바뀌었어요. 남길 버전을 고르세요",
       "failed": "{{name}}을(를) 링크에서 업데이트하지 못했어요",
       "edited": "에이전트가 {{name}}을(를) 개선했어요"
     },

@@ -6427,6 +6427,7 @@
     "autoUpdateHelp": "Membaca tautannya setiap hari. Teks baru masuk dengan Urungkan. Perubahan skrip menunggu orang yang mengelola skill.",
     "autoChip": "Diperbarui sendiri",
     "waitingChip": "Pembaruan menunggu",
+    "waitingChipEdited": "Tautan dan agen mengubahnya",
     "lastUpdate": "Diperbarui dari tautannya {{when}}",
     "undoUpdate": "Urungkan pembaruan",
     "undone": "{{name}} kembali ke versi {{version}}.",
@@ -6435,16 +6436,46 @@
     "agentsImproveThis": "Agen memperbaiki skill ini sendiri",
     "agentChange": "{{agent}} mengubahnya {{when}}",
     "undoAgentChange": "Urungkan perubahan",
+    "undo": "Urungkan",
+    "chosenLink": "Versi tautan dipakai {{when}}",
+    "history": {
+      "title": "Perubahan oleh agen",
+      "empty": "Belum ada agen yang mengubah skill ini.",
+      "show": "Lihat perubahan",
+      "hide": "Sembunyikan perubahan",
+      "undone": "diurungkan"
+    },
+    "diff": {
+      "label": "Cara melihat perubahan",
+      "agents": "Yang diubah agen",
+      "link": "Yang berubah di tautan",
+      "compare": "Sekarang × tautan",
+      "same": "Teksnya sama di keduanya.",
+      "files": "File yang dijalankan",
+      "newFile": "baru",
+      "changedFile": "berubah",
+      "large": "Terlalu besar untuk ditampilkan di sini. Lihat di tautan.",
+      "unavailable": "Pakai Perbarui dari tautan untuk melihat apa yang berubah."
+    },
     "pending": {
       "title": "Pembaruan dari tautannya mengubah file yang dijalankan: {{files}}",
       "lead": "Terapkan hanya jika kamu memercayai file ini. Agen menjalankannya di komputer mereka.",
-      "edited": "Pembaruan dari tautannya akan mengganti apa yang diubah agen di dalamnya",
-      "editedLead": "Terapkan untuk memakai versi dari tautannya. Kamu bisa membatalkannya nanti.",
+      "edited": "Tautan punya versi baru, dan agen juga mengubah skill ini",
+      "editedLead": "Pilih versi mana yang dipakai. Bisa diurungkan nanti.",
       "apply": "Terapkan pembaruan",
       "dismiss": "Jangan terapkan",
       "applied": "{{name}} diperbarui dari tautannya.",
       "changedAgain": "Tautannya berubah lagi. Tinjau file yang baru.",
-      "dismissed": "Pembaruan tidak diterapkan. Perubahan baru di tautannya akan bertanya lagi."
+      "dismissed": "Pembaruan tidak diterapkan. Perubahan baru di tautannya akan bertanya lagi.",
+      "useLink": "Pakai versi tautan",
+      "keepAgents": "Pertahankan versi agen",
+      "usedLink": "{{name}} sekarang memakai versi tautan.",
+      "keptAgents": "{{name}} tetap memakai versi agen.",
+      "reopened": "Pembaruan {{name}} menunggu lagi.",
+      "linkSince": "Versi baru di tautan {{when}}",
+      "keptLine": "Versi agen dipertahankan {{when}}",
+      "notAppliedLine": "Pembaruan dari tautan tidak diterapkan {{when}}",
+      "byAgents_other": "{{names}} mengubah skill ini, terakhir {{when}}"
     },
     "updateFailed": {
       "no_skill_md": "Tidak bisa memperbarui: tautannya tidak punya SKILL.md lagi.",
@@ -6457,7 +6488,7 @@
     "notice": {
       "updated": "{{name}} diperbarui dari tautannya",
       "waiting": "Pembaruan {{name}} mengubah skripnya",
-      "waitingEdited": "Pembaruan {{name}} akan mengganti apa yang diubah agen",
+      "waitingEdited": "{{name}} berubah di tautannya dan oleh agen: pilih versi yang dipakai",
       "failed": "{{name}} tidak bisa diperbarui dari tautannya",
       "edited": "Agen memperbaiki {{name}}"
     },

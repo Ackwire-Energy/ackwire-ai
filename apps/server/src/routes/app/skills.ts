@@ -13,6 +13,7 @@ import {
   importSkillZip,
   listSkills,
   parseSkillMarkdown,
+  reopenSkillUpdate,
   restoreSkill,
   revertSkillChange,
   SKILL_LIMITS,
@@ -68,11 +69,17 @@ const Skill = z
     autoUpdate: z.boolean().openapi({ description: "Read from its link every day and updated from it." }),
     checkedAt: z.string().nullable().openapi({ description: "When its link was last read to update it." }),
     pendingUpdate: z
-      .object({ scripts: z.array(z.string()), at: z.string(), dismissed: z.boolean(), edited: z.boolean() })
+      .object({
+        scripts: z.array(z.string()),
+        at: z.string(),
+        dismissed: z.boolean(),
+        dismissedAt: z.string().nullable().openapi({ description: "When a person kept the skill as it is." }),
+        edited: z.boolean(),
+      })
       .nullable()
       .openapi({
         description:
-          "An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or it would replace what agents changed since (`edited`); `dismissed`: refused.",
+          "An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or it would replace what agents changed since (`edited`); `dismissed`: kept out (`…/update/reopen` makes it wait again).",
       }),
     updateError: z
       .string()
@@ -83,6 +90,9 @@ const Skill = z
         fromVersion: z.number(),
         at: z.string(),
         agentId: z.uuid().nullable().openapi({ description: "The agent that changed it; null: its link." }),
+        waited: z.boolean().openapi({
+          description: "A person chose this update while it waited: undoing it makes it wait again.",
+        }),
       })
       .nullable()
       .openapi({
@@ -109,6 +119,37 @@ const SkillDetail = Skill.extend({
       }),
     }),
   ),
+  pending: z
+    .object({
+      body: z.string(),
+      description: z.string(),
+      base: z
+        .object({ body: z.string(), description: z.string(), at: z.string() })
+        .nullable()
+        .openapi({ description: "What its link last wrote before agents changed it; null: not known." }),
+      files: z.array(
+        z.object({
+          path: z.string(),
+          before: z.string().nullable().openapi({ description: "Null: a new file, or `large`." }),
+          after: z.string().nullable(),
+          large: z.boolean().openapi({ description: "Past what the page shows: only its name." }),
+        }),
+      ),
+    })
+    .nullable()
+    .openapi({ description: "The waiting update's content: its text and its files that run, as its link has them." }),
+  changes: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        agentId: z.uuid(),
+        at: z.string(),
+        before: z.string(),
+        after: z.string(),
+        undone: z.boolean(),
+      }),
+    )
+    .openapi({ description: "The agents' changes to its text, newest first (the last 20)." }),
 }).openapi("SkillDetail");
 const SkillChoice = z
   .object({
@@ -552,6 +593,22 @@ export function skillRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, skillId } = c.req.valid("param");
       return c.json(await dismissSkillUpdate(skills(), c.get("user").id, orgId, skillId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/skills/{skillId}/update/reopen",
+      tags,
+      security,
+      summary: "Undo keeping the skill as it is: the update it kept out waits again",
+      request: { params: SkillParams },
+      responses: { 200: json(SkillDetail), ...errors },
+    }),
+    async (c) => {
+      const { orgId, skillId } = c.req.valid("param");
+      return c.json(await reopenSkillUpdate(skills(), c.get("user").id, orgId, skillId), 200);
     },
   );
 

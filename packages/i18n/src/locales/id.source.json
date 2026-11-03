@@ -16177,6 +16177,9 @@
   "skills.waitingChip": {
     "value": "Update waiting"
   },
+  "skills.waitingChipEdited": {
+    "value": "Link and agents changed it"
+  },
   "skills.lastUpdate": {
     "value": "Updated from its link {{when}}"
   },
@@ -16201,6 +16204,57 @@
   "skills.undoAgentChange": {
     "value": "Undo change"
   },
+  "skills.undo": {
+    "value": "Undo"
+  },
+  "skills.chosenLink": {
+    "value": "Switched to the link's version {{when}}"
+  },
+  "skills.history.title": {
+    "value": "Agents' changes"
+  },
+  "skills.history.empty": {
+    "value": "No agent has changed this skill yet."
+  },
+  "skills.history.show": {
+    "value": "Show change"
+  },
+  "skills.history.hide": {
+    "value": "Hide change"
+  },
+  "skills.history.undone": {
+    "value": "undone"
+  },
+  "skills.diff.label": {
+    "value": "How to see the changes"
+  },
+  "skills.diff.agents": {
+    "value": "What the agents changed"
+  },
+  "skills.diff.link": {
+    "value": "What changed in the link"
+  },
+  "skills.diff.compare": {
+    "value": "Current × link"
+  },
+  "skills.diff.same": {
+    "value": "The text is the same in both."
+  },
+  "skills.diff.files": {
+    "value": "Files that run"
+  },
+  "skills.diff.newFile": {
+    "value": "new"
+  },
+  "skills.diff.changedFile": {
+    "value": "changed"
+  },
+  "skills.diff.large": {
+    "value": "Too large to show here. Check it in the link."
+  },
+  "skills.diff.unavailable": {
+    "value": "Use Update from link to see what changes."
+  },
   "skills.pending.title": {
     "value": "The update from its link changes files that run: {{files}}"
   },
@@ -16208,10 +16262,10 @@
     "value": "Apply it only if you trust these files. Agents run them on their computers."
   },
   "skills.pending.edited": {
-    "value": "The update from its link would replace what agents changed in it"
+    "value": "The link has a new version, and agents changed this skill too"
   },
   "skills.pending.editedLead": {
-    "value": "Apply it to take its link's version. You can undo it after."
+    "value": "Choose which version stays. You can undo it after."
   },
   "skills.pending.apply": {
     "value": "Apply update"
@@ -16227,6 +16281,36 @@
   },
   "skills.pending.dismissed": {
     "value": "Update not applied. A new change to its link asks again."
+  },
+  "skills.pending.useLink": {
+    "value": "Use the link's version"
+  },
+  "skills.pending.keepAgents": {
+    "value": "Keep the agents' version"
+  },
+  "skills.pending.usedLink": {
+    "value": "{{name}} now uses the link's version."
+  },
+  "skills.pending.keptAgents": {
+    "value": "{{name}} keeps the agents' version."
+  },
+  "skills.pending.reopened": {
+    "value": "The update of {{name}} is waiting again."
+  },
+  "skills.pending.linkSince": {
+    "value": "New version in the link {{when}}"
+  },
+  "skills.pending.keptLine": {
+    "value": "Kept the agents' version {{when}}"
+  },
+  "skills.pending.notAppliedLine": {
+    "value": "Update from the link not applied {{when}}"
+  },
+  "skills.pending.byAgents": {
+    "value": {
+      "one": "{{names}} changed this skill, last {{when}}",
+      "other": "{{names}} changed this skill, last {{when}}"
+    }
   },
   "skills.updateFailed.no_skill_md": {
     "value": "Couldn't update it: its link no longer has a SKILL.md."
@@ -16253,7 +16337,7 @@
     "value": "An update of {{name}} changes its scripts"
   },
   "skills.notice.waitingEdited": {
-    "value": "An update of {{name}} would replace what agents changed"
+    "value": "{{name}} changed in its link and by agents: choose which version stays"
   },
   "skills.notice.failed": {
     "value": "{{name}} couldn't update from its link"

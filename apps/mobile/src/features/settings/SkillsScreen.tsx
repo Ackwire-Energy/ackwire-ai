@@ -1,5 +1,6 @@
 import type {
   Connection,
+  SkillAgentChange,
   SkillChoice,
   SkillDetail,
   SkillFile,
@@ -23,19 +24,25 @@ import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
+  changedByText,
+  changesSinceLink,
   githubRepoLink,
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
   SKILL_UPDATE_TOAST,
+  type SkillText,
   searchRepos,
+  skillPendingViews,
   skillPickOf,
   skillRefusalText,
   skillSourceViaText,
   skillUpdateErrorText,
+  skillUpdateWords,
   skillViaText,
   skippedSkillText,
 } from "@agenteschat/client/lib/skills";
+import { diffLines } from "@agenteschat/ui/diff";
 import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
@@ -46,6 +53,8 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import {
   Button,
+  DiffView,
+  Filters,
   GroupedFooter,
   GroupedHeader,
   GroupedList,
@@ -255,9 +264,15 @@ export function SkillScreen({ id }: { id: string }) {
     <SettingsPage title={s?.name ?? t("skills.title")} subtitle={subtitle}>
       {skill.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
       {skill.isError && !s ? (
-        <View style={styles.note}>
-          <Note icon="x">{t("common.loadFailed")}</Note>
-        </View>
+        <>
+          <View style={styles.note}>
+            <Note icon="x">{t("common.loadFailed")}</Note>
+          </View>
+          <Gap />
+          <GroupedList>
+            <GroupedRow icon="down" label={t("common.retry")} onPress={() => skill.refetch()} />
+          </GroupedList>
+        </>
       ) : null}
       {s ? (
         <>
@@ -319,36 +334,114 @@ export function SkillScreen({ id }: { id: string }) {
   );
 }
 
+/** A line diff of two texts, as the web's: what it is for (when it changed) over its SKILL.md. */
+function TextDiff({ before, after }: { before: SkillText; after: SkillText }) {
+  const { t } = useTranslation();
+  if (before.description === after.description && before.body === after.body)
+    return <GroupedFooter>{t("skills.diff.same")}</GroupedFooter>;
+  return (
+    <View style={styles.diff}>
+      {before.description !== after.description ? (
+        <DiffView prose lines={diffLines([before.description], [after.description])} />
+      ) : null}
+      {before.body !== after.body ? (
+        <DiffView lines={diffLines(before.body.split("\n"), after.body.split("\n"))} />
+      ) : null}
+    </View>
+  );
+}
+
+/** What the waiting update changes, as the web's: the ways to read it as pills, then each file that runs. */
+function PendingDiff({ skill: s }: { skill: SkillDetail }) {
+  const { t } = useTranslation();
+  const views = skillPendingViews(s);
+  const [tab, setTab] = useState<string>(views[0]?.id ?? "link");
+  if (!s.pending) return <GroupedFooter>{t("skills.diff.unavailable")}</GroupedFooter>;
+  const view = views.find((v) => v.id === tab) ?? views[0];
+  return (
+    <>
+      {views.length > 1 ? (
+        <View style={styles.tabs}>
+          <Filters
+            items={views.map((v) => ({ key: v.id, label: t(`skills.diff.${v.id}`) }))}
+            value={view?.id ?? "link"}
+            onChange={setTab}
+          />
+        </View>
+      ) : null}
+      {view ? <TextDiff before={view.before} after={view.after} /> : null}
+      {s.pending.files.length > 0 ? (
+        <>
+          <GroupedHeader>{t("skills.diff.files")}</GroupedHeader>
+          {s.pending.files.map((f) => (
+            <View key={f.path} style={styles.diff}>
+              <Text variant="caption" tone="muted">
+                {`${f.path} · ${t(f.before === null && !f.large ? "skills.diff.newFile" : "skills.diff.changedFile")}`}
+              </Text>
+              {f.large || f.after === null ? (
+                <Text variant="caption" tone="faint">
+                  {t("skills.diff.large")}
+                </Text>
+              ) : (
+                <DiffView lines={diffLines(f.before?.split("\n") ?? [], f.after.split("\n"))} />
+              )}
+            </View>
+          ))}
+        </>
+      ) : null}
+    </>
+  );
+}
+
 /**
- * A skill from a link, as the web's sheet: an update waiting because it changes files that run (applied or refused
- * here, the files named), why its last update failed, Desfazer for the last one, and "Atualizar sozinha".
+ * A skill from a link, as the web's sheet: an update waiting because it changes files that run or would replace what
+ * agents changed, with what changed on each side, who changed it and when, and the choice (Usar a versão do link,
+ * Manter a dos agentes); after either, a row with Desfazer; why its last update failed; "Atualizar sozinha".
  */
 function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { orgId } = useOrg();
   const action = useSkillAction(orgId);
+  const agents = useAgents(orgId);
   if (s.source !== "url" || !s.sourceUrl) return null;
-  const pending = s.pendingUpdate && !s.pendingUpdate.dismissed ? s.pendingUpdate : null;
+  const words = skillUpdateWords(t, i18n.language, s);
+  const waiting = words.waiting;
+  const nameOf = (id: string) => agents.data?.find((a) => a.id === id)?.name ?? t("channel.unknownAgent");
+  const by = changedByText(t, i18n.language, changesSinceLink(s), nameOf);
   const said = (title: string) => {
     successHaptic();
     toast({ title, icon: "check" });
   };
+  const reopened = () => said(t("skills.pending.reopened", { name: s.name }));
+  const undo = () =>
+    action.mutate(
+      { type: "undoUpdate", id: s.id },
+      {
+        onSuccess: () =>
+          s.lastUpdate?.waited
+            ? reopened()
+            : said(t("skills.undone", { name: s.name, version: s.lastUpdate?.fromVersion ?? 0 })),
+      },
+    );
   return (
     <>
-      {pending ? (
+      {waiting ? (
         <>
           <View style={styles.note}>
-            <Note icon="shield">
-              {pending.scripts.length > 0
-                ? t("skills.pending.title", { files: pending.scripts.join(", ") })
-                : t("skills.pending.edited")}
-            </Note>
+            <Note icon="shield">{waiting.title}</Note>
           </View>
+          <Gap />
+          <GroupedList>
+            <GroupedRow icon="down" label={waiting.since} labelLines={2} />
+            {by ? <GroupedRow icon="agent" label={by} labelLines={3} /> : null}
+          </GroupedList>
+          <PendingDiff skill={s} />
+          <Gap />
           <GroupedList>
             <GroupedRow
               icon="check"
-              label={t("skills.pending.apply")}
+              label={waiting.apply}
               disabled={action.isPending}
               onPress={() =>
                 action.mutate(
@@ -356,12 +449,9 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
                   {
                     onSuccess: (r) =>
                       said(
-                        t(
-                          (r as SkillSourceUpdate).status === "waiting"
-                            ? "skills.pending.changedAgain"
-                            : "skills.pending.applied",
-                          { name: s.name },
-                        ),
+                        (r as SkillSourceUpdate).status === "waiting"
+                          ? t("skills.pending.changedAgain", { name: s.name })
+                          : t(waiting.applied, { name: s.name }),
                       ),
                   },
                 )
@@ -369,22 +459,31 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
             />
             <GroupedRow
               icon="x"
-              label={t("skills.pending.dismiss")}
+              label={waiting.keep}
               disabled={action.isPending}
               onPress={() =>
                 action.mutate(
                   { type: "dismissUpdate", id: s.id },
-                  { onSuccess: () => said(t("skills.pending.dismissed")) },
+                  { onSuccess: () => said(t(waiting.kept, { name: s.name })) },
                 )
               }
             />
           </GroupedList>
-          <GroupedFooter>
-            {[
-              ...(pending.scripts.length > 0 ? [t("skills.pending.lead")] : []),
-              ...(pending.edited ? [t("skills.pending.editedLead")] : []),
-            ].join(" ")}
-          </GroupedFooter>
+          <GroupedFooter>{waiting.lead}</GroupedFooter>
+        </>
+      ) : null}
+      {words.kept ? (
+        <>
+          <Gap />
+          <GroupedList>
+            <GroupedRow
+              icon="undo"
+              label={t("skills.undo")}
+              sub={words.kept}
+              disabled={action.isPending}
+              onPress={() => action.mutate({ type: "reopenUpdate", id: s.id }, { onSuccess: reopened })}
+            />
+          </GroupedList>
         </>
       ) : null}
       {s.updateError ? (
@@ -400,20 +499,13 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
           disabled={action.isPending}
           onPress={() => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: !s.autoUpdate } })}
         />
-        {s.lastUpdate && !s.lastUpdate.agentId ? (
+        {words.last ? (
           <GroupedRow
             icon="undo"
-            label={t("skills.undoUpdate")}
-            sub={t("skills.lastUpdate", { when: relativeTime(t, i18n.language, s.lastUpdate.at) })}
+            label={words.last.undo}
+            sub={words.last.line}
             disabled={action.isPending}
-            onPress={() =>
-              action.mutate(
-                { type: "undoUpdate", id: s.id },
-                {
-                  onSuccess: () => said(t("skills.undone", { name: s.name, version: s.lastUpdate?.fromVersion ?? 0 })),
-                },
-              )
-            }
+            onPress={undo}
           />
         ) : null}
       </GroupedList>
@@ -422,9 +514,34 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
   );
 }
 
+/** One change an agent made, as the web's: who and when; a tap opens its diff in place. */
+function ChangeRow({ change: c, agent }: { change: SkillAgentChange; agent: string }) {
+  const { t, i18n } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const line = t("skills.agentChange", { agent, when: relativeTime(t, i18n.language, c.at) });
+  return (
+    <>
+      <GroupedRow
+        icon="eye"
+        label={line}
+        labelLines={2}
+        sub={c.undone ? t("skills.history.undone") : undefined}
+        value={t(open ? "skills.history.hide" : "skills.history.show")}
+        onPress={() => setOpen(!open)}
+      />
+      {open ? (
+        <View style={styles.page}>
+          <DiffView lines={diffLines(c.before.split("\n"), c.after.split("\n"))} />
+        </View>
+      ) : null}
+    </>
+  );
+}
+
 /**
  * A person's skill as agents improve it, as the web's sheet: its own "Agentes melhoram esta skill sozinhos" (the
- * workspace's until set), and the last change an agent made, with Desfazer while it is still the skill's version.
+ * workspace's until set), and what the agents changed, newest first, each opening its diff, Desfazer for the newest
+ * while it is still the skill's version.
  */
 function AgentImprove({ skill: s }: { skill: SkillDetail }) {
   const { t, i18n } = useTranslation();
@@ -435,7 +552,7 @@ function AgentImprove({ skill: s }: { skill: SkillDetail }) {
   const agents = useAgents(orgId);
   if (s.origin === "agent") return null;
   const change = s.lastUpdate?.agentId ? s.lastUpdate : null;
-  const agent = change ? agents.data?.find((a) => a.id === change.agentId) : undefined;
+  const nameOf = (id: string) => agents.data?.find((a) => a.id === id)?.name ?? t("channel.unknownAgent");
   const on = s.agentsImprove ?? settings.data?.agentsImprove ?? true;
   return (
     <>
@@ -453,7 +570,7 @@ function AgentImprove({ skill: s }: { skill: SkillDetail }) {
             icon="undo"
             label={t("skills.undoAgentChange")}
             sub={t("skills.agentChange", {
-              agent: agent?.name ?? t("channel.unknownAgent"),
+              agent: change.agentId ? nameOf(change.agentId) : t("channel.unknownAgent"),
               when: relativeTime(t, i18n.language, change.at),
             })}
             disabled={action.isPending}
@@ -471,6 +588,20 @@ function AgentImprove({ skill: s }: { skill: SkillDetail }) {
           />
         ) : null}
       </GroupedList>
+      {s.changes ? (
+        <>
+          <GroupedHeader>{t("skills.history.title")}</GroupedHeader>
+          {s.changes.length === 0 ? (
+            <GroupedFooter>{t("skills.history.empty")}</GroupedFooter>
+          ) : (
+            <GroupedList>
+              {s.changes.map((c) => (
+                <ChangeRow key={c.id} change={c} agent={nameOf(c.agentId)} />
+              ))}
+            </GroupedList>
+          )}
+        </>
+      ) : null}
     </>
   );
 }
@@ -914,6 +1045,7 @@ const styles = StyleSheet.create({
   search: { paddingTop: 14, paddingBottom: 8 },
   loading: { marginVertical: 16 },
   page: { paddingHorizontal: 16, paddingVertical: 14 },
+  diff: { gap: 8, paddingTop: 10, paddingHorizontal: 4 },
   tabs: { paddingTop: 10, paddingHorizontal: 4 },
   error: { paddingTop: 8, paddingHorizontal: 16 },
   hidden: { gap: 12, paddingHorizontal: 4, paddingTop: 10, alignItems: "flex-start" },
