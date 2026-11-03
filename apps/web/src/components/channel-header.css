@@ -96,6 +96,9 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
   background: var(--sunken);
   box-shadow: 0 0 0 2px var(--pane);
 }
+.members-sheet .channel__icon-count.ac-count {
+  box-shadow: 0 0 0 2px var(--side);
+}
 .channel__search-icon.ac-btn {
   display: none;
 }
@@ -146,9 +149,10 @@ html:not([data-pointer]) .channel__icon.ac-btn:focus-visible {
     width: 18px;
     height: 18px;
   }
-  /* Threads, pins and the settings move to the members sheet's head; the search takes the whole screen. */
+  /* Threads, pins and the settings move to the members sheet's head (the cog stays when there's no sheet to open); the
+     search takes the whole screen. */
   .channel__acts > .channel__threads,
-  .channel__acts > .channel__cog,
+  .channel__acts:has(.channel__members-toggle) > .channel__cog,
   .channel__acts > .channel__pin,
   .channel__acts > .channel__search {
     display: none;

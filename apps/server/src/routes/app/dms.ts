@@ -121,9 +121,10 @@ export function dmRoutes(deps: AppDeps) {
         tags,
         security,
         summary: muted
-          ? "Mute a channel or DM for you: it never looks unread (a mention of you still counts)"
-          : "Unmute a channel or DM for you",
-        description: "Members only. Your other devices hear `channel.muted` on your own topic.",
+          ? "Mute a channel for you: it never looks unread (a mention of you still counts)"
+          : "Unmute a channel for you",
+        description:
+          "Members only, channels only (a DM gets 400). Your other devices hear `channel.muted` on your own topic.",
         request: { params: OrgParams.extend({ channelId: z.uuid() }) },
         responses: { 204: noContent[204], ...errors },
       }),

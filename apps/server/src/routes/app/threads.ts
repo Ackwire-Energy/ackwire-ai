@@ -84,7 +84,7 @@ const Thread = z
     }),
     unread: z.number().int().openapi({
       description:
-        "Replies you haven't read in a thread you follow (0 otherwise), at most 100: not yours, after both your read of the thread (`POST …/read`) and of its channel. Left out of `thread.updated` events.",
+        "Replies you haven't read in a thread you follow (0 otherwise), at most 100: not yours, not moved in from the channel, after your read of the thread (`POST …/read`, or your joining its channel). Left out of `thread.updated` events.",
     }),
     mission: z
       .object({

@@ -9,6 +9,7 @@
   box-sizing: border-box;
   background: var(--side);
   box-shadow: inset 1px 0 0 var(--line);
+  --presence-ring: var(--side);
 }
 [data-theme="dark"] .members-side {
   box-shadow: inset 1px 0 0 var(--line2);
@@ -134,7 +135,7 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   flex: none;
   padding: 0 6px;
   border-radius: var(--radius-full);
-  background: var(--sunken);
+  background: var(--side-chosen);
   font-size: 10.5px;
   font-weight: 500;
   line-height: 16px;
@@ -171,6 +172,7 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   display: flex;
   flex-direction: column;
   background: var(--side);
+  --presence-ring: var(--side);
   box-shadow: var(--e3);
   border-radius: var(--radius-section) 0 0 var(--radius-section);
   overflow: hidden;

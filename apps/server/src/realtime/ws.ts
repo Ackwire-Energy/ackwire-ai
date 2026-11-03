@@ -237,14 +237,18 @@ export function createRealtime(deps: RealtimeDeps) {
   const browsers = new Set<BrowserSocket>();
   deps.pubsub.subscribe(chatActivityTopic, (raw) => {
     if (browsers.size === 0) return;
-    const { channelId, threadId, authorUserId } = raw as {
+    const { channelId, threadId, authorUserId, mentionedUserIds } = raw as {
       channelId?: unknown;
       threadId?: unknown;
       authorUserId?: unknown;
+      mentionedUserIds?: unknown;
     };
     if (typeof channelId !== "string" || !UUID.test(channelId)) return;
     const thread = typeof threadId === "string" && UUID.test(threadId) ? threadId : null;
-    void activityAudience(deps.db, channelId, thread)
+    const mentioned = Array.isArray(mentionedUserIds)
+      ? mentionedUserIds.filter((id): id is string => typeof id === "string")
+      : [];
+    void activityAudience(deps.db, channelId, thread, mentioned)
       .then(({ orgId, dm, userIds }) => {
         const event = { type: "channel.activity", channelId, threadId: thread, dm };
         for (const ws of browsers)

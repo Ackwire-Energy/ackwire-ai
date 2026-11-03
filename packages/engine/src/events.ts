@@ -603,6 +603,7 @@ export async function publishMessageCreated(pubsub: PubSub, message: MessageView
       channelId: message.channelId,
       threadId: message.threadId,
       authorUserId: message.author.type === "person" ? message.author.id : null,
+      mentionedUserIds: message.mentionedUserIds,
     });
   } catch {
     // Best effort: the lists catch up when they're read again.

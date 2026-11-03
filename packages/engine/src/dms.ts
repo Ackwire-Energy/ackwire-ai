@@ -400,8 +400,8 @@ export async function markChannelRead(
 }
 
 /**
- * Mutes (or unmutes) a channel or DM for me: it never looks unread to me, though a mention of me still counts. My
- * other devices hear `channel.muted`.
+ * Mutes (or unmutes) a channel for me: it never looks unread to me, though a mention of me still counts. My other
+ * devices hear `channel.muted`. Not a DM: its lists count every unread message, muted or not.
  */
 export async function setChannelMuted(
   db: Database,
@@ -412,12 +412,14 @@ export async function setChannelMuted(
   pubsub?: PubSub,
 ) {
   const [member] = await db
-    .select({ id: channelMembers.id, joinedAt: channelMembers.createdAt })
+    .select({ id: channelMembers.id, joinedAt: channelMembers.createdAt, kind: channels.kind })
     .from(channelMembers)
+    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
     .where(
       and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, actorId)),
     );
   if (!member) throw new NotFoundError("Channel not found");
+  if (member.kind === "dm") throw new ValidationError("Only a channel can be muted", "channel.mute_dm");
   // Never read yet: the new row reads from my joining (listChannels' fallback), so muting marks nothing read.
   await db
     .insert(channelReads)

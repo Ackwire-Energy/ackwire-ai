@@ -8,7 +8,7 @@
   --presence-ring: var(--side);
 }
 .sidebar__item[data-status="active"] {
-  --presence-ring: var(--side-active);
+  --presence-ring: var(--side-chosen);
 }
 .ac-msg {
   --presence-ring: var(--pane);

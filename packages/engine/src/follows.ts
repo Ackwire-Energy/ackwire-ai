@@ -42,14 +42,29 @@ export function threadReadAtSql(userId: string, root: SQL): SQL {
 
 /**
  * Who hears a new message's `channel.activity` (their unread marks): the people in its channel, and for a thread's
- * reply only those following the thread (a reply elsewhere never counts for them). `dm`: the lists to read again.
+ * reply only those following the thread or mentioned in it (a reply elsewhere never counts for them). `dm`: the
+ * lists to read again.
  */
-export async function activityAudience(db: Executor, channelId: string, threadId: string | null) {
+export async function activityAudience(
+  db: Executor,
+  channelId: string,
+  threadId: string | null,
+  mentioned: readonly string[] = [],
+) {
+  const named =
+    mentioned.length > 0
+      ? sql`cm.user_id in (${sql.join(
+          mentioned.map((id) => sql`${id}`),
+          sql`, `,
+        )}) or `
+      : sql``;
+  const inThread = threadId
+    ? sql`and (${named}${followsThreadSql(sql`cm.org_id`, sql`cm.user_id`, sql`${threadId}::uuid`)})`
+    : sql``;
   const rows = rowsOf<{ org_id: string; user_id: string; dm: boolean }>(
     await db.execute(sql`select cm.org_id, cm.user_id, (c.kind = 'dm') as dm from ${schema.channelMembers} cm
       join ${schema.channels} c on c.org_id = cm.org_id and c.id = cm.channel_id
-      where cm.channel_id = ${channelId}::uuid and cm.user_id is not null
-        ${threadId ? sql`and ${followsThreadSql(sql`cm.org_id`, sql`cm.user_id`, sql`${threadId}::uuid`)}` : sql``}`),
+      where cm.channel_id = ${channelId}::uuid and cm.user_id is not null ${inThread}`),
   );
   return { orgId: rows[0]?.org_id ?? null, dm: rows[0]?.dm === true, userIds: new Set(rows.map((r) => r.user_id)) };
 }

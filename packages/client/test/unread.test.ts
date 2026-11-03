@@ -37,10 +37,13 @@ describe("what looks unread", () => {
   });
 
   test("the tab title carries the total in front, replaced, gone at zero, 99+ past 99", () => {
-    expect(titledWithUnread("agentes.chat", 3)).toBe("(3) agentes.chat");
-    expect(titledWithUnread("(3) agentes.chat", 5)).toBe("(5) agentes.chat");
-    expect(titledWithUnread("(99+) #geral", 0)).toBe("#geral");
-    expect(titledWithUnread("#geral", 120)).toBe("(99+) #geral");
+    expect(titledWithUnread("agentes.chat", 3)).toEqual({ title: "(3) agentes.chat", prefix: "(3) " });
+    expect(titledWithUnread("(3) agentes.chat", 5, "(3) ").title).toBe("(5) agentes.chat");
+    expect(titledWithUnread("(99+) #geral", 0, "(99+) ").title).toBe("#geral");
+    expect(titledWithUnread("#geral", 120).title).toBe("(99+) #geral");
+    // A page's own count (the Notifications page) stays, whatever the total.
+    expect(titledWithUnread("(3) Notificações", 0, "(5) ")).toEqual({ title: "(3) Notificações", prefix: "" });
+    expect(titledWithUnread("(3) Notificações", 7).title).toBe("(3) Notificações");
   });
 });
 

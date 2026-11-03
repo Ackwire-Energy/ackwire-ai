@@ -2222,10 +2222,10 @@ function ChannelView({
               />
             )}
           </Tag>
-          {!chrome && isMember && membersColumn.column && (
+          {!chrome && membersColumn.column && (
             <MembersColumn channel={channel} people={channelPeople} agents={channelAgents} />
           )}
-          {!chrome && isMember && membersColumn.sheet && (
+          {!chrome && membersColumn.sheet && (
             <MembersSheet
               channel={channel}
               isMember={isMember}

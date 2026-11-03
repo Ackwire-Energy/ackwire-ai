@@ -23,8 +23,13 @@ export function unreadTotal(
 
 const COUNTED = /^\(\d+\+?\) /;
 
-/** A title with the total in front, "(3) agentes.chat" (99+ past 99), whatever count it carried before. */
-export function titledWithUnread(title: string, total: number): string {
-  const bare = title.replace(COUNTED, "");
-  return total > 0 ? `(${total > 99 ? "99+" : total}) ${bare}` : bare;
+/**
+ * A title with the total in front, "(3) agentes.chat" (99+ past 99). `mine` is the prefix this put on last time:
+ * only that comes off, so a title that arrives with its own count (the Notifications page's) keeps it, untouched.
+ */
+export function titledWithUnread(title: string, total: number, mine = ""): { title: string; prefix: string } {
+  const bare = mine && title.startsWith(mine) ? title.slice(mine.length) : title;
+  if (COUNTED.test(bare)) return { title: bare, prefix: "" };
+  const prefix = total > 0 ? `(${total > 99 ? "99+" : total}) ` : "";
+  return { title: prefix + bare, prefix };
 }
