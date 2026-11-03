@@ -480,7 +480,7 @@ export async function personMentionAddressees(
 /**
  * For tests: answers from `answer(kind, questionId, state, question)` (default: every
  * Noul 0, no Choice picked, level 0, a box at the top left). A whole `JudgeAnswer` is passed
- * through (spread probabilities, a box). Never calls a model. An agent's @mention needs
+ * through (spread probabilities, a box) when it fits the question. Never calls a model. An agent's @mention needs
  * nothing from the agent it names unless `answer` says otherwise (`mention_needs_nothing`
  * 1), so a canned reply that names an agent wakes nobody by accident.
  */
@@ -504,7 +504,8 @@ export function createFakeJudge(
         const a =
           answer?.(request.kind, id, request.state, q, request) ??
           (request.kind === "mention_needs_nothing" ? 1 : undefined);
-        if (a !== null && typeof a === "object") out[id] = a;
+        // A whole answer of another type (a Choice's, a Box's) says nothing to a Noul: it gets the default.
+        if (a !== null && typeof a === "object" && (q.type !== "noul" || "noul" in a)) out[id] = a;
         else if (q.type === "noul") out[id] = { noul: clamp(typeof a === "number" ? a : 0) };
         else if (q.type === "box") out[id] = { box: { top: 0, bottom: 0, left: 0, right: 0 }, confidence: 0 };
         else if (q.type === "score") {

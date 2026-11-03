@@ -123,7 +123,10 @@ describe("canceling a run", () => {
     expect(f.provider.calls).toHaveLength(0);
     expect((await runOf())?.status).toBe("canceled");
     expect(events.find((e) => e.type === "run.finished")).toMatchObject({ status: "canceled" });
-    expect(events.find((e) => e.type === "message.handled")).toMatchObject({ status: "canceled" });
+    // It never answered: "didn't reply", live and after a reload.
+    expect(events.find((e) => e.type === "message.handled")).toMatchObject({ status: "canceled", passed: true });
+    const [listed] = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(listed?.receipts?.handled[0]).toMatchObject({ status: "canceled", passed: true });
   });
 
   test("permissions: the person who asked, the agent's owner or admins; finished runs can't be canceled", async () => {

@@ -25,3 +25,11 @@ test("an image alone on a message keeps its loading size too (the lone tile's he
   expect(last(topLevel(css), lone, "height")).toBe("180px");
   expect(last(topLevel(css), lone, "width")).toBe("240px");
 });
+
+test("the newest rows are never skipped: a message I send is its own height when the glide down reads the end", () => {
+  // A row that just came in would start skipped, at the 56px placeholder: the glide would stop short of its real
+  // height, and the list jump up the rest once it ends.
+  const newest = ".channel__messages > .ac-msg:nth-last-of-type(-n + 3)";
+  expect(last(topLevel(css), newest, "content-visibility")).toBe("visible");
+  expect(last(topLevel(css), ".channel__messages .ac-msg", "content-visibility")).toBe("auto");
+});

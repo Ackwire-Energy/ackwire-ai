@@ -15,6 +15,7 @@ import {
   promptChars,
   type StopReason,
   stableToolsFirst,
+  withoutImages,
 } from "./types";
 
 /**
@@ -360,7 +361,8 @@ function toMessages(request: ModelRequest, claude: boolean): Message[] {
         : {}),
     }));
   const out: Message[] = system.length > 0 ? [{ role: "system", content: system }] : [];
-  for (const m of request.messages) {
+  // ponytail: images left out for every model; send them once the catalog knows which OpenRouter models read images.
+  for (const m of withoutImages(request.messages)) {
     const parts: ContentBlock[] = typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content;
     const text = parts.flatMap((b) => (b.type === "text" && b.text ? [b.text] : [])).join("\n\n");
     if (m.role === "assistant") {

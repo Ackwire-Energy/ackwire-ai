@@ -749,6 +749,7 @@
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
+      "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",
       "app_created_other": "一个 AI 应用为你创建了内容"
     },
     "markRead": "标为已读",
@@ -838,7 +839,7 @@
     "issues": "任务",
     "issuesWithMe_other": "{{count}} 个与你有关",
     "drive": "Drive",
-    "connectors": "连接器",
+    "connectors": "连接器和 MCP",
     "usage": "用量",
     "preferences": "偏好设置",
     "editProfile": "编辑资料",
@@ -1418,11 +1419,12 @@
     }
   },
   "connectors": {
-    "title": "连接器",
+    "title": "连接器和 MCP",
     "search": "搜索服务",
+    "mcps": "MCP",
+    "mcpsNone": "通过地址连接的 MCP 服务器会显示在这里。",
+    "addMcp": "添加 MCP",
     "connected": "已连接",
-    "address": "地址",
-    "byAddress": "通过地址",
     "suggested": "为 {{org}} 推荐",
     "all": "全部",
     "empty": "你的智能体还没有使用任何服务",

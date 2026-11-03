@@ -117,7 +117,7 @@ describe("Membros e convites (ADR 0090)", () => {
     expect(sentWords(false).copied).toBe("copiedNoEmail");
   });
 
-  test("a person's line: their role, or Membro, then when they were here", async () => {
+  test("a person's line: their @handle, their role, or Membro, then when they were here", async () => {
     const pt = await translator("pt-BR");
     const joinedAt = later(-30);
     const person = { role: "member" as const, roleIds: [], online: true, lastSeenAt: null, joinedAt };
@@ -126,6 +126,7 @@ describe("Membros e convites (ADR 0090)", () => {
     expect(memberLine(pt, "pt-BR", admin, ROLES, NOW)).toStartWith("Admin · ativo ");
     const fresh = { ...person, online: false };
     expect(memberLine(pt, "pt-BR", fresh, ROLES, NOW)).toStartWith("Membro · entrou ");
+    expect(memberLine(pt, "pt-BR", { ...person, handle: "bia" }, ROLES, NOW)).toBe("@bia · Membro · ativo agora");
   });
 
   test("who invites: owners and whoever holds a role that gives it, administrators included", () => {

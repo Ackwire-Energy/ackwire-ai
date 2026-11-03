@@ -124,6 +124,8 @@
     "color": "Kleur",
     "colorDesc": "Kleurt het teken van de rol.",
     "colorOf": "Kleur {{color}}",
+    "hoist": "Apart tonen in de ledenlijst",
+    "hoistDesc": "Wie deze rol heeft, krijgt een eigen groep in de ledenkolom.",
     "icon": "Icoon",
     "iconDesc": "Naast de naam getoond.",
     "more": "Meer opties",
@@ -1090,9 +1092,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Systeem",
     "markRead": "Markeren als gelezen",
+    "muteChannel": "Kanaal dempen",
+    "unmuteChannel": "Kanaal niet meer dempen",
     "mention": "Vermelden",
     "copyHandle": "@{{handle}} kopiëren",
     "handleCopied": "@ gekopieerd.",
+    "copyId": "ID kopiëren",
+    "idCopied": "ID gekopieerd.",
     "editAgent": "Agent bewerken",
     "openPage": "Volledige pagina openen",
     "moveUp": "Omhoog",
@@ -1201,9 +1207,8 @@
     "sidebarMenu": {
       "title": "Zijbalk",
       "newChannel": "Nieuw kanaal",
-      "newAgentGroup": "Nieuwe agentgroep",
       "addToChannels": "Nieuw kanaal of nieuwe categorie",
-      "addToAgents": "Agent of groep maken",
+      "addToDms": "Nieuw bericht of agent",
       "newMessage": "Nieuw bericht",
       "addMembers": "Mensen of agents toevoegen",
       "channelSettings": "Kanaalinstellingen",
@@ -1301,6 +1306,11 @@
     "pendingApprovals_other": "{{count}} goedkeuringen open",
     "home": "Start",
     "notifications": "Meldingen",
+    "unreadMark": "Ongelezen",
+    "unreadMentions_one": "{{count}} vermelding van jou",
+    "unreadMentions_other": "{{count}} vermeldingen van jou",
+    "unreadThreads_one": "Threads: {{count}} met ongelezen antwoorden",
+    "unreadThreads_other": "Threads: {{count}} met ongelezen antwoorden",
     "unreadNotifications_one": "{{count}} ongelezen melding",
     "unreadNotifications_other": "{{count}} ongelezen meldingen"
   },
@@ -1334,6 +1344,9 @@
   },
   "team": {
     "title": "Team",
+    "groups": {
+      "title": "Agentgroepen"
+    },
     "subtitle_one": "{{count}} agent, gegroepeerd naar wie ervoor zorgt.",
     "subtitle_other": "{{count}} agents, gegroepeerd naar wie voor elk zorgt.",
     "working_one": "{{count}} nu aan het werk.",
@@ -1416,11 +1429,16 @@
       "button_other": "Vastgezette berichten ({{count}})",
       "label": "Vastgezette berichten in #{{channel}}",
       "in": "Vastgezet in #{{channel}}",
-      "unpin": "Bericht van {{name}} losmaken"
+      "unpin": "Bericht van {{name}} losmaken",
+      "empty": "Hier is nog niets vastgezet"
+    },
+    "header": {
+      "pins": "Vastgezette berichten",
+      "showMembers": "Leden tonen",
+      "hideMembers": "Leden verbergen"
     },
     "membersButton_one": "Kanaalleden ({{count}})",
     "membersButton_other": "Kanaalleden ({{count}})",
-    "membersPeople": "Mensen",
     "membersAgents": "Agents",
     "you": "jij",
     "agentState": {
@@ -1430,7 +1448,6 @@
     },
     "autoReplyChip": "antwoordt zonder vermelding",
     "coordinatorChip": "coördineert het team",
-    "seeDetails": "Kanaaldetails bekijken",
     "more": "Meer berichtacties",
     "copyLink": "Link kopiëren",
     "linkCopied": "Link gekopieerd.",
@@ -1452,8 +1469,6 @@
     "messages": "Berichten",
     "members": "Leden: {{names}}",
     "details": "Kanaaldetails",
-    "agentsAnswer_one": "{{names}} antwoordt hier",
-    "agentsAnswer_other": "{{names}} antwoorden hier",
     "composerLabel": "Bericht aan #{{channel}}",
     "composerDm": "Bericht aan {{name}}",
     "composerPlaceholder": "Bericht aan #{{channel}} · gebruik @ om een agent te roepen",
@@ -1486,6 +1501,13 @@
     "generalName": "#general houdt zijn naam.",
     "archive": "Kanaal archiveren",
     "archived": "#{{channel}} gearchiveerd. Het gesprek blijft bewaard.",
+    "delete": "Kanaal verwijderen",
+    "deleteTitle": "#{{channel}} definitief verwijderen?",
+    "deleteGoes": "Verdwijnt nu: berichten, threads, bestanden en vastgezette berichten, wat de agents uit het kanaal onthielden en de routines die erin posten.",
+    "deleteIssues": "De taken gaan ook weg, want alleen de leden van het kanaal konden ze zien.",
+    "deleteOrArchive": "Wil je het gesprek bewaren, archiveer het kanaal dan.",
+    "deleteTypeName": "Typ {{channel}} om te bevestigen",
+    "deleteDone": "#{{channel}} is verwijderd.",
     "detailsSub": "{{category}} · {{visibility}}",
     "visibilityPublic": "Openbaar",
     "visibilityPrivate": "Privé",
@@ -1534,6 +1556,8 @@
     "waiting_other": "{{names}} wachten op goedkeuring",
     "handled_one": "{{names}} heeft geantwoord",
     "handled_other": "{{names}} hebben geantwoord",
+    "passed_one": "Niemand heeft geantwoord",
+    "passed_other": "Niemand heeft geantwoord",
     "failed_one": "{{names}} kon niet antwoorden",
     "failed_other": "{{names}} konden niet antwoorden",
     "asking_one": "{{names}} wacht op jouw antwoord",
@@ -1558,6 +1582,7 @@
       "handled": "Beantwoord",
       "failed": "Mislukt",
       "referenced": "Alleen genoemd",
+      "passed": "Niet geantwoord",
       "reacted": "Reageerde"
     },
     "failedShort": "Kon niet antwoorden",
@@ -1749,7 +1774,8 @@
     },
     "useAnyway": "{{email}} gebruiken",
     "assignFailed": "Het account {{label}} is gekoppeld, maar {{agent}} kon er niet naar overstappen.",
-    "noAgents": "Een abonnement denkt alleen voor de agents van de eigenaar, en jij hebt er nog geen.",
+    "forNewAgents": "{{label}} is gekoppeld. De agents die je maakt denken ermee.",
+    "forNewAgentsHint": "De agents die je maakt denken ermee.",
     "done": "Klaar",
     "agent": "Voor welke agent",
     "keyLocked": "Alleen een beheerder voegt een API-sleutel toe.",
@@ -1846,6 +1872,18 @@
     },
     "connect": "Koppelen",
     "connected": "Gekoppeld",
+    "connect_app": {
+      "title": "{{name}} koppelen",
+      "mcp": "Een MCP-server toevoegen",
+      "adminOnly": "Een admin koppelt het"
+    },
+    "invite": {
+      "title_one": "{{count}} persoon uitnodigen",
+      "title_other": "{{count}} personen uitnodigen",
+      "open": "Uitnodigen",
+      "done": "Uitnodiging verstuurd",
+      "adminOnly": "Wie mag uitnodigen, verstuurt het"
+    },
     "agentProposal": {
       "title": "{{agent}} stelt een nieuwe agent voor",
       "review": "Bekijken",
@@ -1933,6 +1971,7 @@
     "routine": {
       "created": "Routine <b>{{name}}</b> aangemaakt · {{schedule}}",
       "created_bare": "Routine <b>{{name}}</b> aangemaakt",
+      "ownActions": "Doet zelf, zonder te vragen: {{actions}}",
       "updated": "{{fields}} van routine <b>{{name}}</b> gewijzigd",
       "updated_paused": "Routine <b>{{name}}</b> gepauzeerd",
       "updated_resumed": "Routine <b>{{name}}</b> hervat",
@@ -2131,6 +2170,12 @@
   "profile": {
     "audience": "Wie kan praten",
     "cardLabel": "Profiel",
+    "roles": "Rollen",
+    "memberSince": "Lid sinds",
+    "messageTo": "Bericht aan {{name}}",
+    "audienceEdit": "Bewerken",
+    "nowIn": "nu, in #{{channel}}",
+    "more": "Meer",
     "of": "Profiel van {{name}}",
     "presence": "Aanwezigheid",
     "offline": "Nog niet lid geworden",
@@ -3510,6 +3555,8 @@
         "org_deleting": "De werkruimte wordt verwijderd.",
         "agent_paused": "De agent is gepauzeerd.",
         "computer_busy": "De computer bleef bezig met andere taken.",
+        "computer_failed": "De computer liep tegen een probleem aan en stopte.",
+        "computer_timeout": "De computer deed er te lang over om te antwoorden.",
         "unknown": "Mislukt."
       }
     },
@@ -3892,6 +3939,7 @@
       "handleTaken": "@{{handle}} is al van een andere agent of persoon. Wat dacht je van @{{suggestion}}?",
       "modelUnavailable": "Kies een model dat de werkruimte kan gebruiken."
     },
+    "noAi": "De werkruimte heeft nog geen AI. Koppel er nu een, of maak de agent en koppel er daarna een.",
     "instructions": "Instructies",
     "instructionsPlaceholder": "Bijv. Beantwoordt vragen van klanten in #support op basis van de documentatie. Als hij iets niet weet, roept hij iemand van het team erbij.",
     "startedFrom": "Gestart vanuit de tekst van {{role}}",
@@ -4032,6 +4080,13 @@
     "routineNotMade": "De routine is niet gemaakt: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Leden van #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Eigenaar van de workspace",
+      "more": "Nog {{count}} tonen",
+      "find": "Mensen en agents zoeken"
+    },
     "agentsOnlyYou": "Je agents antwoorden alleen jou.",
     "agentsOnlyYouHint": "Met een abonnement kun je op de pagina van elke agent instellen dat hij ook anderen antwoordt.",
     "filters": "Mensen filteren",
@@ -4056,7 +4111,6 @@
       "on": "op {{date}}"
     },
     "waitingTitle": "Wacht op jou",
-    "more": "Meer acties voor {{name}}",
     "remove": {
       "item": "Uit de werkruimte verwijderen",
       "leave": "Werkruimte verlaten",
@@ -4394,7 +4448,7 @@
     },
     "setup_write": {
       "label": "De werkruimte inrichten",
-      "description": "Aanbieden om een AI te koppelen met een kaart waarop iemand klikt, en kanalen maken voor wie erom vroeg, met Ongedaan maken."
+      "description": "Aanbieden om een AI, een app of een MCP-server te koppelen of mensen uit te nodigen met een kaart waarop iemand klikt, en kanalen maken voor wie erom vroeg, met Ongedaan maken."
     },
     "github_git_read": {
       "label": "Repositories klonen (git)",
@@ -4879,7 +4933,12 @@
         "forum": "De agents overleggen in een forumonderwerp",
         "artifact": "Wordt een document in de Drive"
       },
-      "ahead": "Klaargezet voor later"
+      "ahead": "Klaargezet voor later",
+      "ownActions": "Doet zelf"
+    },
+    "ownActions": {
+      "hint": "Elke run doet dit in je gekoppelde apps zonder te vragen. Elke andere actie daar vraagt eerst een persoon om goedkeuring, en merge, deploy en rollback vragen dat altijd.",
+      "none": "In gekoppelde apps vraagt ze voor elke actie eerst een persoon om goedkeuring. Wil je dat ze haar werk zelf doet, vertel de agent in de chat welke acties ze mag doen."
     },
     "ahead": {
       "approved": "Goedgekeurd · draait {{when}}",
@@ -6375,9 +6434,10 @@
     "bodyHelp": "De body van SKILL.md.",
     "writeMissing": "Vul de naam, wanneer te gebruiken en de instructies in.",
     "files": "Bestanden",
-    "needsSandbox": "heeft een sandbox nodig",
+    "needsSandbox": "niet bewaard",
+    "assetLimit": "Een skill bewaart tot {{max}} MB aan afbeeldingen en andere bestanden.",
     "runsOnPc": "draait op de pc van de agent",
-    "reinstall": "Installeer opnieuw om de scripts te gebruiken.",
+    "reinstall": "Installeer de skill opnieuw zodat agents dit bestand kunnen gebruiken.",
     "edit": "Bewerken",
     "save": "Opslaan",
     "saved": "{{name}} opgeslagen.",
@@ -8584,6 +8644,12 @@
   "connectors": {
     "title": "Connectors",
     "add": "Connector toevoegen",
+    "mcp": {
+      "title": "MCP's",
+      "add": "MCP toevoegen",
+      "list": "Gekoppelde MCP-servers",
+      "none": "MCP-servers die je via hun adres koppelt, verschijnen hier."
+    },
     "addTitle": "Connector toevoegen",
     "catalogText": "Koppel één keer voor {{org}}. Kies daarna wat elke agent mag gebruiken.",
     "catalog": "Beschikbare connectors",
@@ -9894,6 +9960,29 @@
       "relevance": "Meest relevant"
     },
     "searchHere": "Zoeken in dit gesprek",
+    "optionHint": {
+      "from": "naam",
+      "in": "kanaal",
+      "has": "link, bestand, afbeelding of kaart",
+      "mentions": "naam"
+    },
+    "moreFiltersHint": "datums, alleen agents, vastgezet",
+    "clearRecentAll": "Recente zoekopdrachten wissen",
+    "header": {
+      "placeholder": "Zoeken in {{org}}",
+      "clear": "Zoekopdracht wissen"
+    },
+    "panel": {
+      "label": "Zoekresultaten",
+      "count_one": "{{count}} resultaat",
+      "count_other": "{{count}} resultaten",
+      "filters": "Filters",
+      "filtersCount_one": "Filters ({{count}})",
+      "filtersCount_other": "Filters ({{count}})",
+      "jump": "Ga naar",
+      "jumpLabel": "Ga naar het bericht van {{name}}",
+      "threadIn": "thread in #{{channel}}"
+    },
     "dm": "DM met {{name}}"
   },
   "files": {
@@ -10227,6 +10316,7 @@
       "measuring": "Grootte nog niet gemeten",
       "diskFullNotice": "De schijf van {{name}} is bijna vol"
     },
+    "chromeMissingNotice": "{{name}} heeft Google Chrome nodig voor de browser van de agents. Download het op google.com/chrome",
     "access": {
       "folders": "Toegestane mappen",
       "ownFolder": "De map van elke agent",
@@ -10721,6 +10811,7 @@
         "wiki": "een wikipagina",
         "mission": "een missie",
         "thread": "een thread",
+        "channel": "een kanaal",
         "forum": "een forumonderwerp",
         "artifact": "een bestand in Drive",
         "agent": "een agent",
@@ -10804,7 +10895,7 @@
       "members": "Leden en uitnodigingen",
       "roles": "Rollen en rechten",
       "access": "Agents en toegang",
-      "connectors": "Connectors",
+      "connectors": "Connectors en MCP's",
       "skills": "Skills",
       "keys": "AI-accounts",
       "storage": "Opslag",
@@ -10824,7 +10915,7 @@
       "members": "Wie er in de werkruimte zit, en uitnodigingen.",
       "roles": "Wat iedereen kan doen. Rollen tellen op.",
       "access": "Wat elke agent kan gebruiken: één niveau per connector.",
-      "connectors": "Diensten die één keer voor de hele werkruimte zijn gekoppeld.",
+      "connectors": "Diensten en MCP-servers die één keer voor de hele werkruimte zijn gekoppeld.",
       "skills": "Markdown-instructies die agents openen als ze ze nodig hebben.",
       "keys": "Je abonnementen en de API-sleutels van de werkruimte.",
       "storage": "Waar de bestanden van de werkruimte staan.",
@@ -11378,6 +11469,8 @@
         "readingForum": "Het forum gelezen",
         "creatingChannel": "Een kanaal gemaakt",
         "offeringConnectAi": "Aangeboden een AI te koppelen",
+        "offeringConnectApp": "Aangeboden een app te koppelen",
+        "offeringInvites": "Aangeboden mensen uit te nodigen",
         "proposingAgent": "Een agent voorgesteld",
         "askingAgent": "Een andere agent iets gevraagd",
         "tellingAgent": "Een andere agent iets laten weten",
@@ -11460,6 +11553,8 @@
       "readingForum": "het forum aan het lezen",
       "creatingChannel": "een kanaal aan het maken",
       "offeringConnectAi": "een AI klaar aan het zetten om te koppelen",
+      "offeringConnectApp": "een app klaar aan het zetten om te koppelen",
+      "offeringInvites": "uitnodigingen klaar aan het zetten",
       "proposingAgent": "een agent aan het voorstellen",
       "askingAgent": "een andere agent iets aan het vragen",
       "tellingAgent": "een andere agent iets aan het laten weten",
@@ -11567,6 +11662,9 @@
       "no_ai_signed_out": "Ik kan nog niet antwoorden: mijn AI is uitgelogd.",
       "no_ai_not_signed_in": "Ik kan nog niet antwoorden: {{brain}} is niet ingelogd op mijn computer.",
       "action_connect_ai": "AI koppelen",
+      "action_connect_app": "{{name}} koppelen",
+      "action_add_mcp": "Een MCP-server toevoegen",
+      "action_invite_people": "Mensen uitnodigen",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
       "secret_request": "{{agent}} vroeg om een sleutel: {{name}}",
@@ -11766,6 +11864,14 @@
     "offer_connect_ai": {
       "label": "Aanbieden een AI te koppelen",
       "description": "Plaatst een kaart met een knop die het venster opent om een abonnement of API-sleutel te koppelen."
+    },
+    "offer_connect_app": {
+      "label": "Aanbieden een app of MCP te koppelen",
+      "description": "Plaatst een kaart met een knop die het venster opent om een app of een MCP-server via zijn adres te koppelen."
+    },
+    "offer_invites": {
+      "label": "Aanbieden mensen uit te nodigen",
+      "description": "Plaatst een kaart met een knop die het uitnodigingsvenster opent met de adressen al ingevuld."
     },
     "propose_agent": {
       "label": "Agent voorstellen",

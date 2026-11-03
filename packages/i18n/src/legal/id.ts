@@ -7,8 +7,8 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Perjanjian untuk menggunakan agentes.chat: ruang kerja Anda, agen Anda, dan apa yang menjadi tanggung jawab masing-masing pihak.",
     courtesy:
-      "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan; apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
-    updated: "2026-11-02",
+      "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan. Apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "agreement",
@@ -22,7 +22,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "service",
         heading: "2. Layanan",
         blocks: [
-          "Layanan adalah ruang kerja tempat manusia dan agen AI bekerja bersama: kanal, utas, dan pesan langsung; agen dengan peran, instruksi, memori, dan anggarannya masing-masing; tugas, wiki, Drive, forum, kalender, dan rutinitas; persetujuan; konektor ke layanan lain; serta pilihan untuk menghubungkan komputer tempat agen dapat bekerja.",
+          "Layanan adalah ruang kerja tempat manusia dan agen AI bekerja bersama. Layanan mencakup kanal, utas, dan pesan langsung, serta agen dengan peran, instruksi, memori, dan anggarannya masing-masing. Layanan juga mencakup tugas, wiki, Drive, forum, kalender, dan rutinitas, persetujuan, konektor ke layanan lain, serta pilihan untuk menghubungkan komputer tempat agen dapat bekerja.",
           "Layanan ini masih baru dan terus berkembang: fitur dapat berubah, dibatasi, atau dihapus. Untuk sementara waktu, kami dapat membuka akun baru hanya melalui undangan, atau bagi siapa pun yang mendaftar. Kami akan memberi tahu Anda terlebih dahulu sebelum menghapus sesuatu yang Anda andalkan, sepanjang hal itu dapat dilaksanakan.",
         ],
       },
@@ -38,7 +38,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "4. Agen dan apa yang mereka lakukan",
         blocks: [
           "Agen bertindak berdasarkan instruksi, izin, konektor, anggaran, dan komputer yang diberikan oleh Anda dan ruang kerja Anda. Apa yang dilakukan agen dalam batas izin tersebut, termasuk pesan yang dikirimnya, kode yang diubahnya, data yang dibaca, ditulis, atau dihapusnya, serta perintah yang dijalankannya di komputer, dilakukan atas nama ruang kerja Anda, dan ruang kerja Anda bertanggung jawab atasnya berdasarkan Ketentuan ini. Setiap agen memiliki seorang penanggung jawab.",
-          "Tindakan yang sulit dibatalkan menjadi permintaan persetujuan kepada seseorang sebelum tindakan itu terjadi. Menyetujuinya merupakan keputusan Anda; Layanan menunjukkan apa yang akan dilakukan, tetapi Anda bertanggung jawab untuk meninjaunya.",
+          "Tindakan yang sulit dibatalkan menjadi permintaan persetujuan kepada seseorang sebelum tindakan itu terjadi. Menyetujuinya merupakan keputusan Anda. Layanan menunjukkan apa yang akan dilakukan, tetapi Anda bertanggung jawab untuk meninjaunya.",
           "Keluaran AI dapat keliru, tidak lengkap, atau usang, bahkan ketika terdengar meyakinkan. Tinjau apa yang dihasilkan agen sebelum mengandalkannya, dan jangan menggunakannya sebagai pengganti nasihat profesional (hukum, medis, keuangan, atau lainnya) atau sebagai satu-satunya dasar bagi keputusan yang memiliki akibat hukum atau akibat signifikan serupa terhadap orang.",
         ],
       },
@@ -49,12 +49,12 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
           "Anda setuju untuk tidak menggunakan Layanan, atau membiarkan agen digunakan, untuk:",
           {
             list: [
-              "melanggar hukum, melanggar hak orang lain, atau memproses data pribadi tanpa dasar hukum yang sah;",
-              "mengirim spam atau pesan yang tidak diminta, atau melecehkan, mengancam, menipu, atau menyamar sebagai siapa pun;",
-              "membuat atau mendistribusikan malware, phishing, atau konten yang menyeksualisasi anak di bawah umur, mempromosikan kekerasan, atau dengan cara lain melanggar hukum;",
-              "mengakali batasan dan pengamanan Layanan, seperti anggaran, batas laju (rate limit), persetujuan, izin, atau pemeriksaan pada komputer dan basis data yang terhubung;",
-              "menyerang Layanan atau pihak lain melalui Layanan, termasuk mencari celah kerentanan, membebaninya secara berlebihan, atau menanamkan instruksi yang dimaksudkan untuk mengambil alih agen milik orang lain;",
-              "mengakses layanan, komputer, atau data yang tidak berhak Anda gunakan, atau menggunakan layanan yang terhubung secara bertentangan dengan ketentuannya sendiri;",
+              "melanggar hukum, melanggar hak orang lain, atau memproses data pribadi tanpa dasar hukum yang sah",
+              "mengirim spam atau pesan yang tidak diminta, atau melecehkan, mengancam, menipu, atau menyamar sebagai siapa pun",
+              "membuat atau mendistribusikan malware, phishing, atau konten yang menyeksualisasi anak di bawah umur, mempromosikan kekerasan, atau dengan cara lain melanggar hukum",
+              "mengakali batasan dan pengamanan Layanan, seperti anggaran, batas laju (rate limit), persetujuan, izin, atau pemeriksaan pada komputer dan basis data yang terhubung",
+              "menyerang Layanan atau pihak lain melalui Layanan, termasuk mencari celah kerentanan, membebaninya secara berlebihan, atau menanamkan instruksi yang dimaksudkan untuk mengambil alih agen milik orang lain",
+              "mengakses layanan, komputer, atau data yang tidak berhak Anda gunakan, atau menggunakan layanan yang terhubung secara bertentangan dengan ketentuannya sendiri",
               "melanggar kebijakan penggunaan penyedia model AI yang menjalankan agen Anda.",
             ],
           },
@@ -75,7 +75,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         heading: "7. Penyedia model, konektor, dan akun Anda sendiri",
         blocks: [
           "Agen berjalan di atas model AI dari pihak ketiga (seperti Anthropic, yang membuat Claude, dan OpenAI), melalui kunci API yang ditambahkan oleh ruang kerja Anda atau paket AI, seperti Claude atau ChatGPT, yang dihubungkan oleh seseorang di ruang kerja Anda. Penggunaan kunci atau paket tersebut juga diatur oleh perjanjian Anda dengan penyedianya, dan Anda bertanggung jawab untuk mematuhi ketentuannya dan atas biayanya.",
-          "Konektor memberi agen akses ke layanan lain (seperti GitHub, Google, Linear, Sentry, atau kotak masuk email). Layanan tersebut disediakan oleh pihak ketiga berdasarkan ketentuan mereka sendiri; ketersediaannya dan apa yang mereka lakukan terhadap data berada di luar kendali kami.",
+          "Konektor memberi agen akses ke layanan lain (seperti GitHub, Google, Linear, Sentry, atau kotak masuk email). Layanan tersebut disediakan oleh pihak ketiga berdasarkan ketentuan mereka sendiri. Ketersediaannya dan apa yang mereka lakukan terhadap data berada di luar kendali kami.",
         ],
       },
       {
@@ -106,7 +106,6 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
               "**Pembayaran gagal.** Apabila suatu pembayaran gagal, kami mencobanya kembali selama beberapa hari berikutnya. Apabila tetap gagal, ruang kerja ditahan sementara (on hold): agennya berhenti, dan orang tetap dapat membaca dan menulis di dalamnya. Komputernya disimpan selama 7 hari, kemudian dilepaskan dan dihapus. Melakukan pembayaran akan memulihkan ruang kerja, pada komputer baru apabila komputer lama telah dilepaskan.",
               "**Perubahan harga.** Kami dapat mengubah harga bagi pelanggan baru kapan saja. Harga paket yang sudah Anda miliki hanya berubah karena pajak baru, mulai perpanjangan berikutnya, dengan pemberitahuan sekurang-kurangnya 30 hari sebelumnya.",
               "**Penggunaan wajar.** Beberapa fitur berjalan di atas layanan AI yang kami sediakan tanpa biaya tambahan, seperti memilih agen mana yang menjawab, menilai memori dan tindakan, serta menemukan apa yang perlu diklik di layar. Kami dapat membatasinya bagi ruang kerja yang penggunaannya jauh di atas normal.",
-              "**Akses awal.** Kami akan memberikan pemberitahuan sekurang-kurangnya 30 hari sebelum mengenakan biaya atas sesuatu yang gratis selama masa akses awal.",
               "**Anggaran.** Anggaran yang ditetapkan per ruang kerja dan per agen menghentikan penggunaan model oleh agen ketika batasnya tercapai. Anggaran merupakan bagian dari Layanan, bukan cacat Layanan. Biaya yang dikenakan penyedia atas kunci atau paket AI Anda sendiri merupakan urusan antara Anda dan penyedia tersebut.",
             ],
           },
@@ -137,7 +136,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "liability",
         heading: "14. Batasan tanggung jawab",
         blocks: [
-          "Sejauh diizinkan secara maksimal oleh hukum: tidak ada pihak yang bertanggung jawab atas kerugian tidak langsung, insidental, khusus, konsekuensial, atau yang bersifat hukuman (punitive), atau atas hilangnya keuntungan, pendapatan, atau data; dan tanggung jawab agregat kami yang timbul dari Layanan terbatas pada jumlah yang Anda bayarkan kepada kami dalam dua belas bulan sebelum peristiwa yang menimbulkan klaim (atau USD 100 apabila Anda tidak membayar apa pun). Batasan ini tidak berlaku terhadap kewajiban pembayaran Anda, pelanggaran Anda terhadap Bagian 5, atau tanggung jawab yang tidak dapat dibatasi menurut hukum.",
+          "Sejauh diizinkan secara maksimal oleh hukum: tidak ada pihak yang bertanggung jawab atas kerugian tidak langsung, insidental, khusus, konsekuensial, atau yang bersifat hukuman (punitive), atau atas hilangnya keuntungan, pendapatan, atau data. Sejauh yang sama, tanggung jawab agregat kami yang timbul dari Layanan terbatas pada jumlah yang Anda bayarkan kepada kami dalam dua belas bulan sebelum peristiwa yang menimbulkan klaim (atau USD 100 apabila Anda tidak membayar apa pun). Batasan ini tidak berlaku terhadap kewajiban pembayaran Anda, pelanggaran Anda terhadap Bagian 5, atau tanggung jawab yang tidak dapat dibatasi menurut hukum.",
         ],
       },
       {
@@ -158,7 +157,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "17. Perubahan atas Ketentuan ini",
         blocks: [
-          "Kami dapat memperbarui Ketentuan ini. Perubahan material akan diumumkan melalui email atau di aplikasi sekurang-kurangnya 14 hari sebelum berlaku; penggunaan yang berlanjut setelah tanggal berlakunya merupakan penerimaan. Versi terkini selalu tersedia di halaman ini. Apabila suatu terjemahan berbeda dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku, kecuali apabila hukum menentukan lain.",
+          "Kami dapat memperbarui Ketentuan ini. Perubahan material akan diumumkan melalui email atau di aplikasi sekurang-kurangnya 14 hari sebelum berlaku. Penggunaan yang berlanjut setelah tanggal berlakunya merupakan penerimaan. Versi terkini selalu tersedia di halaman ini. Apabila suatu terjemahan berbeda dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku, kecuali apabila hukum menentukan lain.",
         ],
       },
       {
@@ -175,8 +174,8 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Apa yang kami kumpulkan, apa yang dikirim agen dan ke mana, siapa yang dapat melihat ruang kerja Anda, dan hak-hak yang Anda miliki.",
     courtesy:
-      "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan; apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
-    updated: "2026-11-02",
+      "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan. Apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
+    updated: "2026-11-03",
     sections: [
       {
         id: "overview",
@@ -201,7 +200,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
               "**Data ruang kerja:** nama ruang kerja, anggota, peran, dan undangannya.",
               "**Data penagihan:** untuk ruang kerja dengan paket agentes.chat, nama, alamat email, alamat penagihan, dan nomor identitas pajak orang yang membayar, paketnya, serta faktur dan pembayarannya. Pembayaran diproses oleh Stripe, yang menangani detail kartu: detail tersebut tidak pernah sampai kepada kami.",
               "**Data penggunaan dan log:** alamat IP, peramban dan perangkat, sesi masuk, peristiwa keamanan, permintaan API, dan catatan setiap pemanggilan model (model, token, dan biaya, beserta ruang kerja dan agen terkait), yang kami simpan untuk menegakkan anggaran dan menampilkan penggunaan. Ketika terjadi kerusakan, kami mencatat galatnya, tanpa isi pesan, untuk memperbaikinya.",
-              "**Perangkat:** untuk aplikasi ponsel, token notifikasi push dari setiap perangkat tempat Anda masuk; untuk komputer yang terhubung dan aplikasi Mac, nama komputer, sistem operasi, dan versi aplikasinya.",
+              "**Perangkat:** untuk aplikasi ponsel, token notifikasi push dari setiap perangkat tempat Anda masuk. Untuk komputer yang terhubung dan aplikasi Mac, nama komputer, sistem operasi, dan versi aplikasinya.",
               "**Daftar tunggu:** alamat email dan bahasa yang Anda berikan kepada kami di agentes.chat, dan apakah Anda telah mengonfirmasinya.",
               "**Analitik situs:** di agentes.chat (situs publik, bukan ruang kerja), halaman yang dilihat, situs perujuk, jenis perangkat, dan perkiraan lokasi yang diturunkan dari alamat IP, yang dikumpulkan dengan Himetrica.",
             ],
@@ -220,7 +219,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "workspace-content",
         heading: "4. Konten Ruang Kerja, diproses atas nama ruang kerja",
         blocks: [
-          "Konten Ruang Kerja mencakup pesan di kanal, utas, dan pesan langsung; berkas di Drive; halaman wiki; tugas, topik forum, rutinitas, dan acara kalender; persetujuan; instruksi, pengaturan, dan memori agen; apa yang ditulis dan dilakukan agen; serta data yang dibaca agen melalui konektor, basis data, dan komputer yang dihubungkan oleh ruang kerja. Kami memprosesnya hanya untuk menjalankan ruang kerja dan agennya sebagaimana dikonfigurasi oleh ruang kerja, untuk menampilkannya kepada anggota ruang kerja, untuk mengirim notifikasi yang mereka minta, dan untuk memberikan dukungan.",
+          "Konten Ruang Kerja mencakup pesan di kanal, utas, dan pesan langsung, berkas di Drive, dan halaman wiki. Konten ini juga mencakup tugas, topik forum, rutinitas, acara kalender, dan persetujuan, instruksi, pengaturan, dan memori agen, apa yang ditulis dan dilakukan agen, serta data yang dibaca agen melalui konektor, basis data, dan komputer yang dihubungkan oleh ruang kerja. Kami memprosesnya hanya untuk menjalankan ruang kerja dan agennya sebagaimana dikonfigurasi oleh ruang kerja, untuk menampilkannya kepada anggota ruang kerja, untuk mengirim notifikasi yang mereka minta, dan untuk memberikan dukungan.",
           "Konten Ruang Kerja adalah milik ruang kerja: anggota melihat apa yang diizinkan oleh kanal dan izinnya, dan pemilik serta adminnya mengelolanya. Pesan yang Anda kirim tetap berada di ruang kerja setelah Anda meninggalkannya atau menghapus akun Anda, kecuali ruang kerja menghapusnya.",
         ],
       },
@@ -237,8 +236,8 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
               "**Memori.** Agen menyimpan memori dari percakapan (ringkasan, fakta, dan pelajaran) agar semakin baik dari waktu ke waktu. Sebagian penilaian tentang memori (apakah sesuatu layak disimpan, atau bertentangan dengan apa yang sudah diketahui agen) dilakukan oleh TypeSafe. Memori dapat dilihat dan dihapus di halaman agen, dan dihapus bersama ruang kerja.",
               "**Pencarian.** Untuk menemukan pesan dan dokumen terkait, teks dapat diubah menjadi vektor (embedding) oleh Voyage AI.",
               "**Konektor.** Ketika ruang kerja menghubungkan suatu layanan (seperti GitHub, Google, Linear, Sentry, kotak masuk email, atau server MCP apa pun), kami menyimpan token aksesnya dalam keadaan terenkripsi dan membaca atau menulis ke layanan tersebut hanya dalam cakupan yang diberikan ruang kerja kepada setiap agen. Layanan yang terhubung memproses data tersebut berdasarkan ketentuannya sendiri. Sambungan ke kotak masuk Gmail dan Outlook, serta ke Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, dan Square, melewati Composio, yang memproses apa yang dibaca dan ditulis agen di sana.",
-              "**Basis data.** Sambungan basis data bersifat hanya-baca; kredensial disimpan dalam keadaan terenkripsi dan setiap kueri diperiksa sebelum dijalankan.",
-              "**Komputer yang terhubung.** Ketika seseorang menghubungkan komputer, agen dapat menjalankan perintah dan menggunakan peramban di sana, dalam batas folder dan izin yang ditetapkan di komputer tersebut. Tampilan langsung peramban agen melewati Cloudflare dan memori server kami, dan tidak direkam; ringkasan langkah-langkah yang diambil agen (seperti alamat yang dikunjungi dan tindakan) disimpan bersama pekerjaannya agar tim dapat melihat apa yang dilakukannya.",
+              "**Basis data.** Sambungan basis data bersifat hanya-baca. Kredensial disimpan dalam keadaan terenkripsi dan setiap kueri diperiksa sebelum dijalankan.",
+              "**Komputer yang terhubung.** Ketika seseorang menghubungkan komputer, agen dapat menjalankan perintah dan menggunakan peramban di sana, dalam batas folder dan izin yang ditetapkan di komputer tersebut. Tampilan langsung peramban agen melewati Cloudflare dan memori server kami, dan tidak direkam. Ringkasan langkah-langkah yang diambil agen (seperti alamat yang dikunjungi dan tindakan) disimpan bersama pekerjaannya agar tim dapat melihat apa yang dilakukannya.",
               "**Komputer ruang kerja.** Di agentes.chat Cloud, agen suatu ruang kerja bekerja pada komputer yang kami jalankan untuk ruang kerja tersebut, yang di-hosting oleh Contabo di Uni Eropa. Kami menghitung berapa banyak data yang dikirim dan diterima per hari oleh peramban, alat AI, dan program lain setiap agen di sana. Komputer tersebut dihapus setelah paket agentes.chat ruang kerja berakhir, sebagaimana diuraikan dalam Ketentuan Penggunaan.",
             ],
           },
@@ -257,7 +256,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
               "**Apabila diwajibkan oleh hukum.**",
             ],
           },
-          "Orang-orang yang mengoperasikan infrastruktur kami dapat menjangkau server dan basis data yang menyimpan Konten Ruang Kerja; mereka menggunakan akses tersebut hanya untuk menjaga Layanan tetap berjalan, seperti mendiagnosis gangguan dan memulihkan cadangan, atau untuk memenuhi kewajiban hukum. Tidak satu pun dari jalur ini digunakan untuk membuat profil, iklan, atau data pelatihan.",
+          "Orang-orang yang mengoperasikan infrastruktur kami dapat menjangkau server dan basis data yang menyimpan Konten Ruang Kerja. Mereka menggunakan akses tersebut hanya untuk menjaga Layanan tetap berjalan, seperti mendiagnosis gangguan dan memulihkan cadangan, atau untuk memenuhi kewajiban hukum. Tidak satu pun dari jalur ini digunakan untuk membuat profil, iklan, atau data pelatihan.",
         ],
       },
       {
@@ -294,14 +293,14 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "apps",
         heading: "10. Aplikasi ponsel dan Mac",
         blocks: [
-          "Aplikasi ponsel mengirim notifikasi melalui Expo, Apple, dan Google; notifikasi dapat menampilkan nama penulis dan awal pesan, dan Anda memilih notifikasi mana yang Anda terima. Aplikasi Mac dan komputer yang terhubung menyimpan sesi masuknya di perangkat; menghapus akun Anda (juga tersedia di aplikasi) mengeluarkan semua perangkat dari sesi masuk.",
+          "Aplikasi ponsel mengirim notifikasi melalui Expo, Apple, dan Google. Notifikasi dapat menampilkan nama penulis dan awal pesan, dan Anda memilih notifikasi mana yang Anda terima. Aplikasi Mac dan komputer yang terhubung menyimpan sesi masuknya di perangkat. Menghapus akun Anda (juga tersedia di aplikasi) mengeluarkan semua perangkat dari sesi masuk.",
         ],
       },
       {
         id: "gdpr",
         heading: "11. Hak Anda berdasarkan GDPR",
         blocks: [
-          "Apabila Anda berada di EEA atau Inggris, Anda dapat meminta akses, perbaikan, penghapusan, pembatasan, dan portabilitas, serta mengajukan keberatan atas pemrosesan, dan Anda dapat mengajukan pengaduan kepada otoritas pengawas Anda. Untuk data akun, hubungi kami secara langsung; Anda juga dapat memperbaiki profil dan menghapus akun Anda sendiri di aplikasi. Untuk data pribadi dalam Konten Ruang Kerja, hubungi pemilik atau admin ruang kerja, yang mengendalikannya. Kami akan meneruskan permintaan yang kami terima kepada ruang kerja tersebut dan membantunya sebagai prosesor.",
+          "Apabila Anda berada di EEA atau Inggris, Anda dapat meminta akses, perbaikan, penghapusan, pembatasan, dan portabilitas, serta mengajukan keberatan atas pemrosesan, dan Anda dapat mengajukan pengaduan kepada otoritas pengawas Anda. Untuk data akun, hubungi kami secara langsung. Anda juga dapat memperbaiki profil dan menghapus akun Anda sendiri di aplikasi. Untuk data pribadi dalam Konten Ruang Kerja, hubungi pemilik atau admin ruang kerja, yang mengendalikannya. Kami akan meneruskan permintaan yang kami terima kepada ruang kerja tersebut dan membantunya sebagai prosesor.",
         ],
       },
       {
@@ -336,7 +335,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "changes",
         heading: "16. Perubahan atas kebijakan ini",
         blocks: [
-          "Kami dapat memperbarui kebijakan ini; perubahan material akan diumumkan melalui email atau di aplikasi sebelum berlaku. Versi terkini selalu tersedia di halaman ini. Apabila suatu terjemahan berbeda dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku, kecuali apabila hukum menentukan lain.",
+          "Kami dapat memperbarui kebijakan ini. Perubahan material akan diumumkan melalui email atau di aplikasi sebelum berlaku. Versi terkini selalu tersedia di halaman ini. Apabila suatu terjemahan berbeda dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku, kecuali apabila hukum menentukan lain.",
         ],
       },
       {

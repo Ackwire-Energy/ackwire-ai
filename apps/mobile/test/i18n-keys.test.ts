@@ -128,7 +128,13 @@ test("extra keys merge deeply into the app's strings", () => {
 test("the plan's notifications have their own Activity line in both languages, not the agent's name alone", () => {
   for (const keys of [featureKeysEn, featureKeysPtBR]) {
     const kind = keys.activity.kind as Record<string, string>;
-    for (const k of ["plan_reset_unknown", "routine_waiting_plan", "browser_profile_request", "computer_disk_full"]) {
+    for (const k of [
+      "plan_reset_unknown",
+      "routine_waiting_plan",
+      "browser_profile_request",
+      "computer_disk_full",
+      "computer_no_chrome",
+    ]) {
       expect(kind[`${k}_one`]).toBeString();
       expect(kind[`${k}_other`]).toBeString();
     }

@@ -4,8 +4,10 @@ import type { AgentProposalCard } from "../src/api/types";
 import {
   actionCardOf,
   agentProposalOf,
+  connectAppDone,
   draftLevels,
   draftMailLevels,
+  inviteDone,
   mayContinueStretch,
   proposalLines,
   proposalStatus,
@@ -188,4 +190,34 @@ test("a stretch's pause card (ADR 0089): read safely, said with the agents' name
   expect(mayContinueStretch(card, "u-caio", owner, false)).toBe(false);
   expect(mayContinueStretch(card, "u-caio", owner, true)).toBe(true);
   expect(mayContinueStretch(card, null, owner, false)).toBe(false);
+});
+
+test("connect-an-app and invite cards: read from the message, a plain http address dropped, done from live data", () => {
+  const app = actionCardOf({
+    actionCard: {
+      kind: "connect_app",
+      forUserId: "u1",
+      params: { url: "https://mcp.acme.dev/mcp", why: "MCP da Acme" },
+    },
+  });
+  expect(app).toEqual({ kind: "connect_app", forUserId: "u1", url: "https://mcp.acme.dev/mcp", why: "MCP da Acme" });
+  expect(
+    actionCardOf({ actionCard: { kind: "connect_app", forUserId: null, params: { url: "http://x", why: "" } } }),
+  ).toEqual({ kind: "connect_app", forUserId: null, why: "" });
+  if (app?.kind !== "connect_app") throw new Error("not a connect card");
+  const server = (serverUrl: string) => ({ def: null, server: { serverUrl } as never });
+  expect(connectAppDone(app, [server("https://other.dev/mcp")])).toBe(false);
+  expect(connectAppDone(app, [server("https://MCP.acme.dev/mcp/")])).toBe(true);
+  const linear = { kind: "connect_app" as const, forUserId: null, connector: "linear", why: "" };
+  expect(connectAppDone(linear, [{ def: { id: "linear" } as never, server: null }])).toBe(true);
+  expect(connectAppDone({ kind: "connect_app", forUserId: null, why: "" }, [server("https://x.dev")])).toBe(false);
+
+  const invite = actionCardOf({
+    actionCard: { kind: "invite_people", forUserId: "u1", params: { emails: ["ana@x.com", 3], why: "Design" } },
+  });
+  expect(invite).toEqual({ kind: "invite_people", forUserId: "u1", emails: ["ana@x.com"], why: "Design" });
+  expect(actionCardOf({ actionCard: { kind: "invite_people", params: { emails: [] } } })).toBeNull();
+  if (invite?.kind !== "invite_people") throw new Error("not an invite card");
+  expect(inviteDone(invite, [])).toBe(false);
+  expect(inviteDone(invite, ["ANA@x.com"])).toBe(true);
 });

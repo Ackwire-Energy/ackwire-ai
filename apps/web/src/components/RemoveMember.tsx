@@ -3,6 +3,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { removalLines } from "@agenteschat/client/lib/removal";
 import { Alert, Button, Dialog, DialogBody, DialogFooter } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
+import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -70,5 +71,23 @@ export function RemoveMemberDialog({
         </Button>
       </DialogFooter>
     </Dialog>
+  );
+}
+
+type Removing = Pick<Person, "userId" | "name">;
+const RemoveContext = createContext<((person: Removing) => void) | null>(null);
+
+/** Opens "Remover do workspace" (or "Sair") for a person; null outside the workspace shell. */
+export const useRemoveMemberDialog = () => useContext(RemoveContext);
+
+/** One removal dialog for the workspace: Members, a person's card and their right click open it. */
+export function RemoveMemberProvider({ children }: { children: ReactNode }) {
+  const [person, setPerson] = useState<Removing | null>(null);
+  const open = useMemo(() => (p: Removing) => setPerson({ userId: p.userId, name: p.name }), []);
+  return (
+    <RemoveContext.Provider value={open}>
+      {children}
+      <RemoveMemberDialog person={person} onClose={() => setPerson(null)} />
+    </RemoveContext.Provider>
   );
 }

@@ -749,6 +749,7 @@
       "browser_profile_request_other": "{{names}}이(가) 브라우저 프로필을 하나 더 요청해요",
       "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
+      "computer_no_chrome_other": "컴퓨터에 Google Chrome이 필요해요. google.com/chrome에서 받으세요",
       "app_created_other": "AI 앱이 나를 위해 항목을 만들었어요"
     },
     "markRead": "읽음으로 표시",
@@ -838,7 +839,7 @@
     "issues": "작업",
     "issuesWithMe_other": "나와 관련된 작업 {{count}}개",
     "drive": "Drive",
-    "connectors": "커넥터",
+    "connectors": "커넥터와 MCP",
     "usage": "사용량",
     "preferences": "환경설정",
     "editProfile": "프로필 편집",
@@ -1418,11 +1419,12 @@
     }
   },
   "connectors": {
-    "title": "커넥터",
+    "title": "커넥터와 MCP",
     "search": "서비스 검색",
+    "mcps": "MCP",
+    "mcpsNone": "주소로 연결한 MCP 서버가 여기에 표시돼요.",
+    "addMcp": "MCP 추가",
     "connected": "연결됨",
-    "address": "주소",
-    "byAddress": "주소로 연결",
     "suggested": "{{org}}에 추천",
     "all": "전체",
     "empty": "아직 에이전트가 사용하는 서비스가 없어요",

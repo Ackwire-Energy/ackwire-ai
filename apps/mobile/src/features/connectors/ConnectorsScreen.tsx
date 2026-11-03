@@ -7,7 +7,7 @@ import {
   useMailAccounts,
 } from "@agenteschat/client";
 import { composioOffText, composioUsageText, nearComposioLimit } from "@agenteschat/client/lib/composio";
-import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { type ConnectedItem, connectedItems, isMcpItem, itemName } from "@agenteschat/client/lib/connected";
 import { choiceOf, MAIL_BRANDS } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
@@ -80,6 +80,8 @@ function Gallery() {
     () => connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? []),
     [connections.data, servers.data, catalog.data],
   );
+  const apps = items.filter((i) => !isMcpItem(i));
+  const mcps = items.filter(isMcpItem);
   const name = (d: ConnectorDef) => connectorName(t, d);
   const suggestions = useMemo(() => suggestionsOf(list, items), [list, items]);
   const searching = q.trim().length > 0;
@@ -98,9 +100,19 @@ function Gallery() {
   };
   // A connection opens its own screen (a server connected by an address we don't know included).
   const openItem = (item: ConnectedItem) => openConnection(item.id);
+  // From an agent's card in the chat (`?connect=<catalog id>` or `?mcp=<address>`, `?mcp=` alone: any address): the
+  // same sheet the gallery opens, once the catalog is in.
+  const { connected, connect, mcp } = useLocalSearchParams<{ connected?: string; connect?: string; mcp?: string }>();
+  const offered = useRef(false);
+  useEffect(() => {
+    if (offered.current || (connect === undefined && mcp === undefined) || !catalog.data || !admin) return;
+    offered.current = true;
+    const def = connect ? catalog.data.connectors.find((d) => d.id === connect) : undefined;
+    if (def) open(def);
+    else sheet.open(<AddressSheet url={mcp || undefined} />);
+  });
   // Back from a sign-in that finished on the link route (`?connected=<id>`): its tools, as the web opens
   // "O que faz" for the connection that just came in (admins; anyone else had the toast).
-  const { connected } = useLocalSearchParams<{ connected?: string }>();
   const returned = useRef<string | null>(null);
   useEffect(() => {
     if (!connected || returned.current === connected || !connections.data || !servers.data || !catalog.data) return;
@@ -153,7 +165,7 @@ function Gallery() {
         </View>
       ) : (
         <>
-          {searching ? null : items.length + mailboxes.length > 0 ? (
+          {searching ? null : apps.length + mailboxes.length > 0 ? (
             <>
               <SectionHeader title={t("mobile.connectors.connected")} />
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
@@ -172,8 +184,8 @@ function Gallery() {
                     </Text>
                   </Pressable>
                 ))}
-                {/* Every connection, servers connected by their address included (oldest first, as on the web). */}
-                {items.map((item) => (
+                {/* Every connection but the MCPs below (oldest first, as on the web). */}
+                {apps.map((item) => (
                   <Pressable
                     key={item.id}
                     onPress={() => openItem(item)}
@@ -187,11 +199,39 @@ function Gallery() {
                     </Text>
                   </Pressable>
                 ))}
-                {admin ? <AddressTile onPress={() => sheet.open(<AddressSheet />)} /> : null}
               </ScrollView>
             </>
-          ) : (
-            <EmptyHint admin={admin} onAddress={() => sheet.open(<AddressSheet />)} />
+          ) : items.length === 0 ? (
+            <EmptyHint />
+          ) : null}
+          {searching ? null : (
+            <>
+              <SectionHeader title={t("mobile.connectors.mcps")} />
+              {mcps.length === 0 ? (
+                <Text variant="small" tone="muted" style={styles.mcpNone}>
+                  {t("mobile.connectors.mcpsNone")}
+                </Text>
+              ) : null}
+              {mcps.length > 0 || admin ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+                  {mcps.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => openItem(item)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t("mobile.connectors.connectedCheck", { name: itemName(t, item) })}
+                      style={styles.mini}
+                    >
+                      <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size={48} check />
+                      <Text variant="caption" tone="muted" numberOfLines={1}>
+                        {itemName(t, item)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                  {admin ? <AddressTile onPress={() => sheet.open(<AddressSheet />)} /> : null}
+                </ScrollView>
+              ) : null}
+            </>
           )}
           {!searching && suggestions.length > 0 ? (
             <>
@@ -250,8 +290,8 @@ function Gallery() {
   );
 }
 
-/** Nothing connected yet: who would use it, in a line (agents only on a subject about them). */
-function EmptyHint({ admin, onAddress }: { admin: boolean; onAddress: () => void }) {
+/** Nothing connected yet: who would use it, in a line (the MCPs section under it adds one by its address). */
+function EmptyHint() {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -272,22 +312,6 @@ function EmptyHint({ admin, onAddress }: { admin: boolean; onAddress: () => void
         <Text variant="small" tone="muted">
           {t("mobile.connectors.emptySub")}
         </Text>
-        {admin ? (
-          // Under the text, spelled out: beside it, it squeezed the text into a narrow column; a globe alone
-          // didn't say it connects a service by its MCP address.
-          <Pressable
-            onPress={onAddress}
-            accessibilityRole="button"
-            accessibilityLabel={t("mobile.connectors.addressTitle")}
-            hitSlop={6}
-            style={styles.byAddress}
-          >
-            <Icon name="globe" size={15} color={c.muted} />
-            <Text variant="small" style={styles.bold}>
-              {t("mobile.connectors.byAddress")}
-            </Text>
-          </Pressable>
-        ) : null}
       </View>
     </View>
   );
@@ -300,14 +324,14 @@ function AddressTile({ onPress }: { onPress: () => void }) {
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={t("mobile.connectors.addressTitle")}
+      accessibilityLabel={t("mobile.connectors.addMcp")}
       style={styles.mini}
     >
       <View style={[styles.addTile, { borderColor: c.line2 }]}>
         <Icon name="plus" size={20} color={c.muted} />
       </View>
       <Text variant="caption" tone="muted" numberOfLines={1}>
-        {t("mobile.connectors.address")}
+        {t("mobile.connectors.addMcp")}
       </Text>
     </Pressable>
   );
@@ -397,6 +421,7 @@ const styles = StyleSheet.create({
   search: { paddingHorizontal: 16, paddingBottom: 6 },
   note: { paddingHorizontal: 16, paddingTop: 16 },
   usage: { paddingHorizontal: 16, paddingBottom: 8 },
+  mcpNone: { paddingHorizontal: 16, paddingBottom: 8 },
   center: { alignItems: "center", gap: 12, paddingVertical: 48, paddingHorizontal: 24 },
   centerText: { textAlign: "center" },
   row: { gap: 14, paddingHorizontal: 16, paddingBottom: 6 },
@@ -425,7 +450,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   hintText: { gap: 2 },
-  byAddress: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 8 },
   suggestions: { gap: 10, paddingHorizontal: 16 },
   filters: { paddingTop: 20 },
   card: {

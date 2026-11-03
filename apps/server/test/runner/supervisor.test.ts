@@ -1893,7 +1893,7 @@ test.if(posix)(
           self: { command: [process.execPath, "/nonexistent/agentes-runner.mjs"], compiled: false },
           browser: {
             command: [process.execPath, path.join(import.meta.dir, "fake-agent-browser.mjs")],
-            chrome: () => "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome",
+            chrome: () => "/opt/google/chrome/chrome",
             isOurChrome: async () => false,
             async startChrome(_exe, args, _profile, env) {
               const c = { args, env, killed: false };

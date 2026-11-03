@@ -5,7 +5,7 @@ setupDom();
 
 import { afterEach } from "bun:test";
 import { cleanup } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -125,14 +125,17 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { name: "Página não encontrada" })).toBeTruthy();
   });
 
-  test("the sidebar lists channels, agents, DMs and the pending approvals count", async () => {
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi() });
+  test("the sidebar lists channels, DMs (people and agents) and the pending approvals count", async () => {
+    const state = seedState();
+    for (const id of [ADA_ID, ATLAS_ID]) seedDm(state, { type: "agent", id });
+    seedDm(state, { type: "person", id: "u-joao" });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle();
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     expect(nav.textContent).toContain("Acme");
     expect(nav.textContent).toContain("2 membros · 2 agentes");
     expect(screen().getByLabelText("2 aprovações pendentes").textContent).toBe("2");
-    for (const name of ["Canais", "eng", "general", "Agentes", "Ada", "Atlas", "João"]) {
+    for (const name of ["Canais", "eng", "general", "Mensagens diretas", "Ada", "Atlas", "João"]) {
       expect(nav.textContent).toContain(name);
     }
     // Money never shows in the sidebar (US$ 15,40 of US$ 60); the budget's use is the account menu's.

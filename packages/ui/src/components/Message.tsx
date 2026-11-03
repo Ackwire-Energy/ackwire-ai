@@ -116,6 +116,7 @@ export function Message({
   const tap = useRef({ x: 0, y: 0 });
   const [menuAt, setMenuAt] = useState<ReturnType<typeof menuPlace>>(null);
   const menuOpen = Boolean(menu) && menuAt !== null;
+  const footed = own && (run === "end" || run === "solo");
   useEffect(() => {
     if (!menuOpen) return;
     // The menu follows its row and closes when the row leaves the screen: a phone's keyboard going down resizes the
@@ -198,7 +199,9 @@ export function Message({
               </span>
             </span>
           )}
-          {status && !own && (
+          {/* A run's earlier row of mine has no line under it once sent, so none while it sends: its hidden head
+              reads the state out. */}
+          {status && !footed && (
             <span className="ac-msg__status">
               {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
               {status.label}
@@ -208,23 +211,27 @@ export function Message({
         </div>
         {aside && grouped && !own && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
         {children}
-        {own &&
-          (status ? (
-            <span className="ac-msg__own-time ac-msg__status">
-              {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
-              {status.label}
-            </span>
-          ) : run === "end" || run === "solo" ? (
-            // The head (hidden) reads the time; here it is for the eye, its details on hover. One per run: its rows
-            // are minutes apart at most (they group). The receipt's mark ends this line, so it never adds one.
-            <div className="ac-msg__own-foot">
-              <span className="ac-msg__own-time" aria-hidden="true">
-                {time}
-                {meta && <span className="ac-msg__tip">{meta}</span>}
+        {footed && (
+          // The head (hidden) reads the time; here it is for the eye, its details on hover. One per run: its rows
+          // are minutes apart at most (they group). The receipt's mark ends this line, so it never adds one. A
+          // sending state stands in the same line's box, so the row keeps its size when the time takes its place.
+          <div className="ac-msg__own-foot">
+            {status ? (
+              <span className="ac-msg__own-time ac-msg__status">
+                {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
+                {status.label}
               </span>
-              {aside && <span className="ac-msg__aside">{aside}</span>}
-            </div>
-          ) : null)}
+            ) : (
+              <>
+                <span className="ac-msg__own-time" aria-hidden="true">
+                  {time}
+                  {meta && <span className="ac-msg__tip">{meta}</span>}
+                </span>
+                {aside && <span className="ac-msg__aside">{aside}</span>}
+              </>
+            )}
+          </div>
+        )}
         {foot && <div className="ac-msg__foot">{foot}</div>}
       </div>
       {menu &&

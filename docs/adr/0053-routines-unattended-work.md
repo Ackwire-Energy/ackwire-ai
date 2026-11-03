@@ -197,3 +197,12 @@ A routine set up as "every day at 08:30 give me a good morning" showed two messa
 
 This changes §4's "hand_off delivers its routine_handoff notice" (now with `wake_me` only), §5's "the only things a routine puts in a conversation are its hand_off notice and its approval cards" (its message or its notice, and its approval cards) and §7's run woken by every report (now only by a hand-off).
 
+
+## Addendum 2026-11-03: a routine does its job without asking every run
+
+The owner decided on 2026-10-31 that a routine a person asked for posts and messages where they asked, with no approval. Posting in agentes.chat already worked that way (§2 amendment), but a routine's write to a connected app still became an approval card on every run, whatever the person had asked for: a routine set up to post the weekly summary in Slack asked for that post every Monday.
+
+1. **Its job is named when it is set up.** `routines.own_actions` lists the connected-app actions the routine's job needs: tool names as the agent calls them, or a Composio action's slug (`SLACK_SEND_MESSAGE`). The agent sets them with `create_routine`/`update_routine` (`own_actions`), from what the person asked for; the API takes `ownActions` on create and edit. Only someone who decides the agent's approvals (its owner, `approve_actions`) may set them, and only the routine's creator may change them (others take it over first). Merge, deploy, rollback and the rest of the never-for-good list (`alwaysAsks`) are refused when set.
+2. **Setting it up is the approval.** On a routine's own run, the Tool Gateway lets a call through without a card (`ownJobCovers`) when every action it runs is in the list, the call could be approved ahead at all (`aheadRefusal`: a connected app's own action, never one that runs whatever its input says, never merge, deploy, rollback and the like), and the routine's creator still decides the agent's approvals. All of it is read fresh on every call, so a removed action or a creator who lost the right asks again at once.
+3. **What stays a card.** Any other write to a connected app, an action beside an allowed one in the same call, merge, deploy and rollback, a mailbox's send (its owner's own rule, ADR 0038), and every write from a run a routine's report woke (§4: only the routine's own run does its job).
+4. **People see it.** The agent's confirmation and the chat receipt of a created routine say what it does on its own; the routine's form and details list it ("Faz sozinha"), or say that every action in a connected app asks first.

@@ -17,7 +17,7 @@ import { type DragEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "./org-context";
 
-/** What the sidebar's group dialog is for: a new group (with these agents in it), or renaming one. */
+/** What Equipe's group dialog is for: a new group (with these agents in it), or renaming one. */
 export type GroupDialogFor = { mode: "create"; agentIds?: string[] } | { mode: "rename"; group: AgentGroup };
 
 /** "Novo grupo" and "Renomear grupo": a name, nothing else. Mounted while open. */
@@ -136,9 +136,7 @@ export function GroupMenu({
     <Menu
       align="end"
       label={label}
-      trigger={
-        <Button variant="ghost" size="sm" iconOnly icon="more" className="sidebar__section-add" aria-label={label} />
-      }
+      trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={label} />}
     >
       <MenuItem icon="edit" onSelect={onRename}>
         {t("agentGroups.rename")}
@@ -183,9 +181,7 @@ export function AgentGroupMenu({
     <Menu
       align="end"
       label={label}
-      trigger={
-        <Button variant="ghost" size="sm" iconOnly icon="more" className="sidebar__row-menu" aria-label={label} />
-      }
+      trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={label} />}
     >
       <MenuRadioGroup
         label={t("agentGroups.group")}
@@ -224,7 +220,7 @@ export function AgentGroupMenu({
 const AGENT_DRAG = "application/x-agentes-agent";
 
 /**
- * Dragging agents between the sidebar's sections (owners and admins): rows are draggable, sections take the drop.
+ * Dragging agents between Equipe's groups (owners and admins): rows are draggable, groups take the drop.
  * Inside a group the row lands where the pointer is (`over.index`, before the first row whose middle is below it);
  * the agents in no group keep the workspace's order.
  */

@@ -48,12 +48,13 @@ test("reading a conversation again (after a reconnect) keeps my messages still s
   await qc.fetchQuery({ ...messagesQuery(api, "o1", "c1"), staleTime: 0 });
   outbox.remove("k1");
 
+  // The one still on its way goes last: the server stamps it when it writes it, after everything it has.
   expect(qc.getQueryData<Message[]>(keys.messages("o1", "c1"))?.map((m) => m.id)).toEqual([
     "before",
     "local-k1",
     "other",
-    "local-k2",
     "real-k3",
+    "local-k2",
   ]);
 });
 

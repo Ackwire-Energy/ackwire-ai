@@ -151,7 +151,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   "setup:write": {
     label: "Set up the workspace",
     description:
-      "Offer to connect an AI with a card a person clicks, and create channels for the person who asked, with Undo.",
+      "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for the person who asked, with Undo.",
   },
 };
 

@@ -4,6 +4,7 @@ import {
   BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   brainTopic,
+  CONVERSATION_PROTOCOL,
   createMemoryPubSub,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
@@ -209,6 +210,31 @@ test("before a chat turn: the agent's checkouts set where it starts and add # Yo
     }).run(turn(), io()),
   );
   expect(calls[2]?.request).toMatchObject({ cwd: "", system: "You are dev." });
+});
+
+test("protocol 40: what holds for the conversation, and # Your code, go apart from the system text; an older runner gets one text", async () => {
+  const conversation = "# This conversation\n\n## Your team\nOther agents: @ops.";
+  const code = { cwd: "repos/acme/app", prompt: "# Your code\nacme/app", start: "" };
+  const sent = async (protocol: number) => {
+    const pubsub = createMemoryPubSub();
+    const { hub, calls } = fakeHub(pubsub, { status: status({ protocol }) });
+    await collect(
+      createClaudeCodeBrain({
+        hub,
+        pubsub,
+        agentScope: async (t) => ({ id: t.agentId, handle: "dev" }),
+        finalGraceMs: 20,
+      }).run({ ...turn(), conversation, code: Promise.resolve(code) }, io()),
+    );
+    return calls[0]?.request as { system?: string; conversation?: string } | undefined;
+  };
+  expect(await sent(CONVERSATION_PROTOCOL)).toMatchObject({
+    system: "You are dev.",
+    conversation: `${conversation}\n\n# Your code\nacme/app`,
+  });
+  const older = await sent(CONVERSATION_PROTOCOL - 1);
+  expect(older?.system).toBe(`You are dev.\n\n${conversation}\n\n# Your code\nacme/app`);
+  expect(older?.conversation).toBeUndefined();
 });
 
 test("a new session reads the conversation so far, not only the message that called it", async () => {

@@ -805,6 +805,8 @@
       "connector_tool_changed_other": "Gekoppelde servers hebben tools gewijzigd die je hebt goedgekeurd",
       "computer_disk_full_one": "De schijf van een computer is bijna vol",
       "computer_disk_full_other": "Schijven van computers zijn bijna vol",
+      "computer_no_chrome_one": "Een computer heeft Google Chrome nodig. Download het op google.com/chrome",
+      "computer_no_chrome_other": "Computers hebben Google Chrome nodig. Download het op google.com/chrome",
       "app_created_one": "Een AI-app heeft dingen voor je aangemaakt",
       "app_created_other": "AI-apps hebben dingen voor je aangemaakt"
     },
@@ -897,7 +899,7 @@
     "issuesWithMe_one": "{{count}} bij jou",
     "issuesWithMe_other": "{{count}} bij jou",
     "drive": "Drive",
-    "connectors": "Connectors",
+    "connectors": "Connectors en MCP's",
     "usage": "Gebruik",
     "preferences": "Voorkeuren",
     "editProfile": "Profiel bewerken",
@@ -1495,11 +1497,12 @@
     }
   },
   "connectors": {
-    "title": "Connectors",
+    "title": "Connectors en MCP's",
     "search": "Zoek een dienst",
+    "mcps": "MCP's",
+    "mcpsNone": "MCP-servers die je via hun adres koppelt, verschijnen hier.",
+    "addMcp": "MCP toevoegen",
     "connected": "Verbonden",
-    "address": "Adres",
-    "byAddress": "Via adres",
     "suggested": "Voorgesteld voor {{org}}",
     "all": "Alle",
     "empty": "Je agents gebruiken nog niets",

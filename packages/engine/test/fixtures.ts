@@ -347,7 +347,15 @@ export async function setup(
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
     ...(options.skillTools
-      ? [createSkillToolSource({ db, blobs: artifactDeps.blobs, pubsub, judge: context.judge })]
+      ? [
+          createSkillToolSource({
+            db,
+            blobs: artifactDeps.blobs,
+            pubsub,
+            judge: context.judge,
+            ...(sandboxDeps ? { computer: sandboxDeps } : {}),
+          }),
+        ]
       : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
     ...(options.scheduleTools ? [createScheduleToolSource({ pubsub, context })] : []),

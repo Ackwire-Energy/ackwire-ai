@@ -3,6 +3,7 @@ import {
   applyComputerEvent,
   applyMachineEvent,
   applyNotificationEvent,
+  applyUnreadEvent,
   applyWorkspaceEvent,
   cacheApproval,
   isNotificationEvent,
@@ -45,6 +46,8 @@ export function useUserEvents() {
           if (sound) playSound(sound);
         }
       }
+      // Unread marks: a message where you are, and your reads and mutes from any device.
+      applyUnreadEvent(qc, orgId, event);
       // "Seguir" changed on one of your devices.
       if (event.type === "thread.follow" && "threadId" in event) {
         const follow = event as ThreadFollowEvent;

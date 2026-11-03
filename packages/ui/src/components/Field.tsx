@@ -115,6 +115,19 @@ function fitText(el: HTMLTextAreaElement) {
 }
 
 /**
+ * A section's heading inside a picker's list ("Papéis"), with the line under it that says what picking one means: a
+ * real gap between the two, as a field's label and its help have.
+ */
+export function PickerHeading({ label, description }: { label: ReactNode; description?: ReactNode }) {
+  return (
+    <div className="ac-picker-head">
+      <span className="ac-field__label">{label}</span>
+      {description && <span className="ac-picker-head__desc">{description}</span>}
+    </div>
+  );
+}
+
+/**
  * A textarea as tall as its text (up to its CSS max-height), measured again when the text changes and when a new
  * width rewraps it (a window resize, a sidebar opening). `on` false leaves its height alone.
  */

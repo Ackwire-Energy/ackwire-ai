@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const termsPtBR: LegalDocument = {
   title: "Termos de uso",
   summary: "O acordo para usar o agentes.chat: o seu workspace, os seus agentes e pelo que cada lado responde.",
-  updated: "2026-11-02",
+  updated: "2026-11-03",
   sections: [
     {
       id: "agreement",
@@ -17,7 +17,7 @@ export const termsPtBR: LegalDocument = {
       id: "service",
       heading: "2. O Serviço",
       blocks: [
-        "O Serviço é um workspace onde pessoas e agentes de IA trabalham juntos: canais, threads e mensagens diretas; agentes com papel, instruções, memória e orçamento próprios; tarefas, wiki, Drive, fórum, calendário e rotinas; aprovações; conectores com outros serviços; e a opção de conectar computadores em que os agentes podem trabalhar.",
+        "O Serviço é um workspace onde pessoas e agentes de IA trabalham juntos. Ele inclui canais, threads e mensagens diretas, e agentes com papel, instruções, memória e orçamento próprios. Inclui também tarefas, wiki, Drive, fórum, calendário e rotinas, aprovações, conectores com outros serviços e a opção de conectar computadores em que os agentes podem trabalhar.",
         "O Serviço é novo e continua evoluindo: os recursos podem mudar, ser limitados ou removidos. Podemos abrir contas novas só por convite durante um tempo, ou para qualquer pessoa que se cadastrar. Quando possível, avisaremos antes de remover algo de que você dependa.",
       ],
     },
@@ -33,7 +33,7 @@ export const termsPtBR: LegalDocument = {
       heading: "4. Os agentes e o que eles fazem",
       blocks: [
         "Os agentes agem conforme as instruções, permissões, conectores, orçamentos e computadores que você e o seu workspace dão a eles. O que um agente faz dentro dessas permissões, incluindo mensagens que envia, código que altera, dados que lê, escreve ou apaga e comandos que roda num computador, é feito em nome do seu workspace, e o seu workspace responde por isso nestes Termos. Cada agente tem uma pessoa responsável por ele.",
-        "Ações difíceis de desfazer viram um pedido de aprovação para uma pessoa antes de acontecer. Aprovar é decisão sua; o Serviço mostra o que será feito, mas cabe a você conferir.",
+        "Ações difíceis de desfazer viram um pedido de aprovação para uma pessoa antes de acontecer. Aprovar é decisão sua. O Serviço mostra o que será feito, mas cabe a você conferir.",
         "O que a IA produz pode estar errado, incompleto ou desatualizado, mesmo quando parece seguro. Confira o que os agentes produzem antes de confiar nisso, e não use como substituto de aconselhamento profissional (jurídico, médico, financeiro ou outro) nem como única base para decisões com efeitos jurídicos ou igualmente relevantes sobre pessoas.",
       ],
     },
@@ -44,12 +44,12 @@ export const termsPtBR: LegalDocument = {
         "Você concorda em não usar o Serviço, nem deixar que agentes sejam usados, para:",
         {
           list: [
-            "violar a lei, infringir direitos de terceiros ou tratar dados pessoais sem base legal;",
-            "enviar spam ou mensagens não solicitadas, ou assediar, ameaçar, enganar ou se passar por alguém;",
-            "criar ou distribuir malware, phishing, conteúdo que sexualize menores, que promova violência ou que seja ilegal de outra forma;",
-            "contornar os limites e as proteções do Serviço, como orçamentos, limites de uso, aprovações, permissões ou as verificações em computadores conectados e bancos de dados;",
-            "atacar o Serviço ou terceiros por meio dele, incluindo procurar vulnerabilidades, sobrecarregá-lo ou plantar instruções para tomar o controle dos agentes de outras pessoas;",
-            "acessar um serviço, computador ou dado que você não está autorizado a usar, ou usar um serviço conectado contra os termos dele;",
+            "violar a lei, infringir direitos de terceiros ou tratar dados pessoais sem base legal",
+            "enviar spam ou mensagens não solicitadas, ou assediar, ameaçar, enganar ou se passar por alguém",
+            "criar ou distribuir malware, phishing, conteúdo que sexualize menores, que promova violência ou que seja ilegal de outra forma",
+            "contornar os limites e as proteções do Serviço, como orçamentos, limites de uso, aprovações, permissões ou as verificações em computadores conectados e bancos de dados",
+            "atacar o Serviço ou terceiros por meio dele, incluindo procurar vulnerabilidades, sobrecarregá-lo ou plantar instruções para tomar o controle dos agentes de outras pessoas",
+            "acessar um serviço, computador ou dado que você não está autorizado a usar, ou usar um serviço conectado contra os termos dele",
             "violar as políticas de uso dos provedores de modelos de IA que rodam os seus agentes.",
           ],
         },
@@ -70,7 +70,7 @@ export const termsPtBR: LegalDocument = {
       heading: "7. Provedores de modelo, conectores e as suas próprias contas",
       blocks: [
         "Os agentes rodam em modelos de IA de terceiros (como a Anthropic, que faz o Claude, e a OpenAI), por uma chave de API que o seu workspace adiciona ou por um plano de IA, como o do Claude ou o do ChatGPT, que alguém do seu workspace conecta. O uso dessa chave ou desse plano também segue o seu contrato com o provedor dele, e você responde por seguir os termos dele e pelas cobranças dele.",
-        "Os conectores dão aos agentes acesso a outros serviços (como GitHub, Google, Linear, Sentry ou uma caixa de e-mail). Esses serviços são prestados por terceiros sob os próprios termos; a disponibilidade deles e o que fazem com os dados estão fora do nosso controle.",
+        "Os conectores dão aos agentes acesso a outros serviços (como GitHub, Google, Linear, Sentry ou uma caixa de e-mail). Esses serviços são prestados por terceiros sob os próprios termos. A disponibilidade deles e o que fazem com os dados estão fora do nosso controle.",
       ],
     },
     {
@@ -101,7 +101,6 @@ export const termsPtBR: LegalDocument = {
             "**Pagamento recusado.** Se um pagamento falhar, tentamos de novo nos dias seguintes. Se continuar falhando, o workspace fica bloqueado: os agentes param, e as pessoas continuam podendo ler e escrever nele. O computador fica guardado por 7 dias e depois é liberado e apagado. Pagar traz o workspace de volta, num computador novo se o antigo já tiver sido liberado.",
             "**Mudança de preço.** Podemos mudar os preços para clientes novos a qualquer momento. O preço de um plano do agentes.chat que você já tem só muda por causa de impostos novos, a partir da próxima renovação, com pelo menos 30 dias de aviso.",
             "**Uso justo.** Alguns recursos rodam em serviços de IA que oferecemos sem custo a mais, como escolher qual agente responde, avaliar memórias e ações, e achar onde clicar numa tela. Podemos limitá-los num workspace cujo uso esteja muito acima do normal.",
-            "**Acesso antecipado.** Avisaremos com pelo menos 30 dias de antecedência antes de cobrar por algo que era de graça no acesso antecipado.",
             "**Orçamentos.** Os orçamentos definidos por workspace e por agente param o uso de modelos pelos agentes quando são atingidos. Eles fazem parte do Serviço, não são um defeito dele. O que um provedor cobra pela sua própria chave ou plano de IA é entre você e esse provedor.",
           ],
         },
@@ -132,7 +131,7 @@ export const termsPtBR: LegalDocument = {
       id: "liability",
       heading: "14. Limitação de responsabilidade",
       blocks: [
-        "Na máxima extensão permitida pela lei: nenhuma das partes responde por danos indiretos, incidentais, especiais, consequenciais ou punitivos, nem por lucros cessantes, perda de receita ou de dados; e a nossa responsabilidade total decorrente do Serviço fica limitada ao que você nos pagou nos doze meses anteriores ao fato que deu origem ao pedido (ou USD 100 se você não pagou nada). Esses limites não se aplicam às suas obrigações de pagamento, à sua violação da Seção 5 nem à responsabilidade que a lei não permite limitar.",
+        "Na máxima extensão permitida pela lei, nenhuma das partes responde por danos indiretos, incidentais, especiais, consequenciais ou punitivos, nem por lucros cessantes, perda de receita ou de dados. Na mesma extensão, a nossa responsabilidade total decorrente do Serviço fica limitada ao que você nos pagou nos doze meses anteriores ao fato que deu origem ao pedido (ou USD 100 se você não pagou nada). Esses limites não se aplicam às suas obrigações de pagamento, à sua violação da Seção 5 nem à responsabilidade que a lei não permite limitar.",
       ],
     },
     {
@@ -153,7 +152,7 @@ export const termsPtBR: LegalDocument = {
       id: "changes",
       heading: "17. Mudanças nestes Termos",
       blocks: [
-        "Podemos atualizar estes Termos. Mudanças relevantes serão anunciadas por e-mail ou no app pelo menos 14 dias antes de entrarem em vigor; continuar usando depois dessa data significa aceitá-las. A versão atual fica sempre nesta página. Se uma tradução divergir da versão em inglês, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
+        "Podemos atualizar estes Termos. Mudanças relevantes serão anunciadas por e-mail ou no app pelo menos 14 dias antes de entrarem em vigor. Continuar usando depois dessa data significa aceitá-las. A versão atual fica sempre nesta página. Se uma tradução divergir da versão em inglês, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
       ],
     },
     {

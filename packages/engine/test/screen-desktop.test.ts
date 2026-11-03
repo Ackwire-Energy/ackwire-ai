@@ -205,36 +205,27 @@ describe("a desktop's plan and report", () => {
   });
 });
 
-describe("costly words on a desktop", () => {
+describe("costly buttons on a desktop, in any language", () => {
+  // "Don't Save" and "Move to Trash" in Portuguese, English, Japanese and German: the judge says it can't be undone.
   const names = [
-    "Don't Save",
-    "Don’t Save",
-    "Close without Saving",
-    "Move to Trash",
-    "Empty Trash",
-    "Discard",
-    "Overwrite",
-    "Replace",
-    "Uninstall",
-    "Format…",
     "Não salvar",
-    "Fechar sem salvar",
-    "Sair sem salvar",
+    "Don't Save",
+    "保存しない",
+    "Nicht speichern",
     "Mover para a lixeira",
-    "Esvaziar lixeira",
-    "Descartar",
-    "Sobrescrever",
-    "Substituir",
-    "Desinstalar",
-    "Formatar",
+    "Move to Trash",
+    "ゴミ箱に入れる",
+    "In den Papierkorb legen",
   ];
-  const pick = (p: number) =>
+  const pick = (p: number, costly = 0) =>
     createFakeJudge((kind, id) =>
       kind !== "screen_target"
         ? undefined
         : id === "present"
           ? 0.95
-          : { choice: "e1", probabilities: { e1: p, e2: 1 - p } },
+          : id === "costly"
+            ? costly
+            : { choice: "e1", probabilities: { e1: p, e2: 1 - p } },
     );
   for (const name of names) {
     test(`"${name}" needs the surer pick`, async () => {
@@ -242,8 +233,11 @@ describe("costly words on a desktop", () => {
         text: `- group\n  - button "${name}" [ref=e1]\n  - button "Keep" [ref=e2]`,
       });
       const base = { ...ids, observation, scope: "a", target: "the one that gets rid of it", use: "click" as const };
-      expect(await resolveTarget({ ...base, judge: pick(0.8) })).toMatchObject({ found: false, reason: "unsure" });
-      expect(await resolveTarget({ ...base, judge: pick(0.9) })).toMatchObject({ found: true, ref: "e1" });
+      expect(await resolveTarget({ ...base, judge: pick(0.8, 0.95) })).toMatchObject({
+        found: false,
+        reason: "unsure",
+      });
+      expect(await resolveTarget({ ...base, judge: pick(0.9, 0.95) })).toMatchObject({ found: true, ref: "e1" });
     });
   }
 

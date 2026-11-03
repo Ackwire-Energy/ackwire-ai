@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 39;
+export const MACHINE_PROTOCOL_VERSION = 40;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -379,7 +379,7 @@ export const CONTEXT_LIMIT_PROTOCOL = 28;
 /**
  * Protocol 27: what an agent's browser request waited on before it ran, in
  * milliseconds, each only when it happened: its worker starting (system mode),
- * `agent-browser` and Chrome for Testing being found or installed, the
+ * `agent-browser` being found or downloaded, the
  * requests ahead of it in the agent's queue, the agent's desktop starting, and
  * Chrome starting.
  */
@@ -457,6 +457,13 @@ export const SHARED_CODEX_PROTOCOL = 38;
  * to an older runner.
  */
 export const OPENCODE_PROTOCOL = 39;
+/**
+ * From this protocol on: a Claude Code `brain.turn` takes `conversation`, what holds for its conversation only. The
+ * runner leaves it, and the checkout's CLAUDE.md and AGENTS.md, out of the appended system text and puts them at the
+ * head of the session's first message (again on the first turn after the CLI compacts its history), so the system
+ * text is the same in every session of the agent. An older runner gets both in `system`, as before.
+ */
+export const CONVERSATION_PROTOCOL = 40;
 /** `account` `begin`'s `provider` for an OpenCode account: an OpenCode (Zen / Go) API key, its only sign-in. */
 export const OPENCODE_KEY_PROVIDER = "zen";
 
@@ -631,16 +638,55 @@ export const BROWSER_LIMITS = {
   message: 500,
 } as const;
 
+/** Where people get Google Chrome, which agents' browsers run on (ADR 0133). */
+export const CHROME_DOWNLOAD_URL = "https://www.google.com/chrome/";
+
+/** What a runner's update or install says on a computer without Google Chrome (no root to install it). */
+export const CHROME_NEEDED = `The agents' browser needs Google Chrome, which this computer doesn't have: install it from ${CHROME_DOWNLOAD_URL}`;
+
+/**
+ * What the agent is told, in plain words, when the computer's Google Chrome fails it (a `browser_unavailable` error,
+ * whose message starts with one of these): missing (`missingServer` where root installs it), not starting (more may
+ * follow: the libraries it lacks), the agent's profile not opening, or Chrome older than the one that last opened the
+ * agent's profile (by a major version: an older Chrome can't open what a newer one wrote, and the agent would seem
+ * signed out). The server reports each (`chromeFailureKind`).
+ */
+export const CHROME_FAILURES = {
+  missing: "Google Chrome isn't installed on this computer. Install it from google.com/chrome, then try again.",
+  missingServer:
+    "Google Chrome isn't installed on this computer. Its admin should run the agentes.chat installer on it again.",
+  start: "Google Chrome didn't start on this computer.",
+  profile: "The agent's browser profile on this computer didn't open. Try again in a minute.",
+  outdated:
+    "Google Chrome on this computer is older than the one the agent's browser last ran on. Update Google Chrome on it, then try again.",
+} as const;
+
+export type ChromeFailure = "missing" | "start" | "profile" | "outdated";
+
+/** Which of `CHROME_FAILURES` a runner's message is, or null for another one (an older runner's, a busy computer). */
+export function chromeFailureKind(message: string): ChromeFailure | null {
+  if (message.startsWith("Google Chrome isn't installed")) return "missing";
+  if (message.startsWith(CHROME_FAILURES.start)) return "start";
+  if (message.startsWith(CHROME_FAILURES.profile)) return "profile";
+  if (message.startsWith(CHROME_FAILURES.outdated)) return "outdated";
+  return null;
+}
+
 /** `hello.browser` (protocol 12): whether this machine can run the agent browser. */
 export interface RunnerBrowserInfo {
-  /** The binary is there (checked) and a Chrome was found. */
+  /** The binary is there (checked). */
   available: boolean;
   /** `agent-browser`'s version. */
   version?: string;
-  /** The Chrome it uses ("Google Chrome 141.0…", "Chrome for Testing …"). */
+  /** The Chrome it uses, with its version when known ("Google Chrome 156.0.8078.79"). */
   chrome?: string;
   /** Why it isn't available, for people ("Chrome's libraries are missing: run …"). */
   reason?: string;
+  /**
+   * The computer has no Google Chrome at its standard path: the server tells the person once (or reports it, on a
+   * computer of the Cloud's). Absent from runners before ADR 0133, which fetched Chrome for Testing themselves.
+   */
+  chromeMissing?: true;
 }
 
 /** `hello.desktop` (protocol 18): whether this machine can run the agents' desktops. */
@@ -1123,6 +1169,9 @@ export type WireBrainEvent =
       model?: string;
       cacheRead?: number;
       cacheWrite?: number;
+      /** Claude Code: the API calls the turn made (`num_turns`), and the most uncached input one of them read. */
+      calls?: number;
+      maxUncached?: number;
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
@@ -1181,6 +1230,8 @@ export interface BrainTurnRequest {
   model?: string;
   /** The engine-built context, appended to Claude Code's system prompt when a session starts. */
   system: string;
+  /** Protocol 40 (`CONVERSATION_PROTOCOL`), Claude Code: what holds for this conversation, read once per session. */
+  conversation?: string;
   /** What this turn says (the new user message). */
   prompt: string;
   /**
@@ -2170,6 +2221,8 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         ...(isString(v.model) ? { model: v.model.slice(0, 100) } : {}),
         ...(num(v.cacheRead) > 0 ? { cacheRead: num(v.cacheRead) } : {}),
         ...(num(v.cacheWrite) > 0 ? { cacheWrite: num(v.cacheWrite) } : {}),
+        ...(num(v.calls) > 0 ? { calls: num(v.calls) } : {}),
+        ...(num(v.maxUncached) > 0 ? { maxUncached: num(v.maxUncached) } : {}),
       };
     case "limit":
       return { type: "limit", ...(isString(v.resetsAt) ? { resetsAt: v.resetsAt.slice(0, 40) } : {}) };
@@ -2916,6 +2969,7 @@ export function parseBrowserInfo(v: Record<string, unknown>): RunnerBrowserInfo 
     ...(version !== undefined ? { version } : {}),
     ...(chrome !== undefined ? { chrome } : {}),
     ...(reason !== undefined ? { reason } : {}),
+    ...(v.chromeMissing === true ? { chromeMissing: true as const } : {}),
   };
 }
 

@@ -96,11 +96,11 @@ export async function setMySidebarItems(
   await requirePermission(db, userId, orgId, "read");
   const clean = sidebarItemsOf(items);
   const column = organizationMembers.sidebarItems;
-  // The section order shares the row (`setMySidebarOrder`) and stays as it was.
+  // The section order and the tools' order share the row (`setMySidebarOrder`, `setMySidebarToolOrder`) and stay.
   await db
     .update(organizationMembers)
     .set({
-      sidebarItems: sql`${JSON.stringify(clean)}::jsonb || jsonb_strip_nulls(jsonb_build_object('order', ${column} -> 'order'))`,
+      sidebarItems: sql`${JSON.stringify(clean)}::jsonb || jsonb_strip_nulls(jsonb_build_object('order', ${column} -> 'order', 'tools', ${column} -> 'tools'))`,
     })
     .where(mine(orgId, userId));
   return clean;
@@ -155,4 +155,49 @@ export async function setMySidebarOrder(
     .where(mine(orgId, userId))
     .returning({ items });
   return sidebarOrderOf((row?.items as Record<string, unknown> | undefined)?.[ORDER_KEY]);
+}
+
+const TOOLS_KEY = "tools";
+
+/**
+ * The tools in the person's order (`tools` in the same `sidebar_items` row): the known ones as stored, each once, then
+ * any tool the app gained since in its default order. Where each shows (list or More) is its place, not this.
+ */
+export function sidebarToolOrderOf(raw: unknown): SidebarItem[] {
+  const stored = Array.isArray(raw) ? raw.filter((x): x is SidebarItem => typeof x === "string" && isItem(x)) : [];
+  return [...new Set([...stored, ...SIDEBAR_ITEMS])];
+}
+
+/** The person's order of the tools in this workspace. */
+export async function mySidebarToolOrder(db: Database, orgId: string, userId: string): Promise<SidebarItem[]> {
+  await requirePermission(db, userId, orgId, "read");
+  const [row] = await db
+    .select({ items: organizationMembers.sidebarItems })
+    .from(organizationMembers)
+    .where(mine(orgId, userId));
+  return sidebarToolOrderOf((row?.items as Record<string, unknown> | undefined)?.[TOOLS_KEY]);
+}
+
+/** Saves the person's order of the tools in this workspace (`null`: back to the default); places and sections stay. */
+export async function setMySidebarToolOrder(
+  db: Database,
+  orgId: string,
+  userId: string,
+  order: readonly string[] | null,
+): Promise<SidebarItem[]> {
+  await requirePermission(db, userId, orgId, "read");
+  if (order !== null && (order.length !== SIDEBAR_ITEMS.length || sidebarToolOrderOf(order).join() !== order.join()))
+    throw new ValidationError("the order must list every tool once");
+  const items = organizationMembers.sidebarItems;
+  const [row] = await db
+    .update(organizationMembers)
+    .set({
+      sidebarItems:
+        order === null
+          ? sql`${items} - ${TOOLS_KEY}::text`
+          : sql`${items} || jsonb_build_object(${TOOLS_KEY}::text, ${JSON.stringify(order)}::jsonb)`,
+    })
+    .where(mine(orgId, userId))
+    .returning({ items });
+  return sidebarToolOrderOf((row?.items as Record<string, unknown> | undefined)?.[TOOLS_KEY]);
 }

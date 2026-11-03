@@ -272,18 +272,18 @@ describe("a category in the sidebar (ADR 0080)", () => {
       await settle(8);
     };
     const sidebar = nav();
-    await click(category("Agentes").toggle);
-    expect(saved(ORG_ID)).toEqual(["agents"]);
+    await click(category("Mensagens diretas").toggle);
+    expect(saved(ORG_ID)).toEqual(["people"]);
 
     await switchTo(BETA_ID);
     expect(nav()).toBe(sidebar);
-    expect(open("Agentes")).toBe("true");
+    expect(open("Mensagens diretas")).toBe("true");
     await click(category("Canais").toggle);
     expect(saved(BETA_ID)).toEqual(["channels"]);
-    expect(saved(ORG_ID)).toEqual(["agents"]);
+    expect(saved(ORG_ID)).toEqual(["people"]);
 
     await switchTo(ORG_ID);
-    expect(open("Agentes")).toBe("false");
+    expect(open("Mensagens diretas")).toBe("false");
     expect(open("Canais")).toBe("true");
   });
 });

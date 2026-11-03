@@ -32,6 +32,7 @@ import { ErrorState, LoadingCards } from "@/components/Loading";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { TeamGroups } from "@/components/TeamGroups";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useTheme } from "@/lib/theme";
 import { AskAccessButton } from "./agent/PublicCard";
@@ -235,6 +236,7 @@ export function TeamPage() {
               </div>
             )}
           </Card>
+          <TeamGroups />
         </>
       )}
       {admin && archived.length > 0 && (

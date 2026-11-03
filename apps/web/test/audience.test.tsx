@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client/lib/audience";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
-import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, ORG_ID, seedRoles, seedState } from "./fake-api";
+import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedRoles, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -72,6 +72,11 @@ describe("Quem pode falar com a Ada", () => {
     expect(results.textContent).not.toContain("everyone");
     const text = results.textContent ?? "";
     expect(text.indexOf("Papéis")).toBeLessThan(text.indexOf("Pessoas"));
+    // Each section's heading is the kit's picker heading: the roles' description under its label, apart.
+    expect([...results.querySelectorAll(".ac-picker-head")].map((h) => h.textContent)).toEqual([
+      "PapéisQuem tem o papel pode falar, inclusive quem entrar nele depois.",
+      "Pessoas",
+    ]);
     expect(
       within(results)
         .getByLabelText(/Suporte/)
@@ -124,7 +129,9 @@ describe("Quem pode falar com a Ada", () => {
   });
 
   test("an agent that doesn't answer me: chip, no @ suggestion, DM composer off with the notice", async () => {
-    await go(`c/${ENG_ID}`, onlyOwner());
+    const withDm = onlyOwner();
+    seedDm(withDm, { type: "agent", id: ADA_ID });
+    await go(`c/${ENG_ID}`, withDm);
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     const sidebarAda = within(nav).getByRole("link", { name: /^Ada/ });
     // In the sidebar: her role, then a lock that says who she answers. The chip is in the DM's header.

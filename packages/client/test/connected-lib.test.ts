@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { Connection, ConnectorDef, CustomServer } from "../src/api/types";
 import { composioOffText, composioUsageText, hiddenWithoutComposio, nearComposioLimit } from "../src/lib/composio";
-import { accountUnchecked, appConnector, connectedItems, itemName, outcomeText } from "../src/lib/connected";
+import { accountUnchecked, appConnector, connectedItems, isMcpItem, itemName, outcomeText } from "../src/lib/connected";
 
 /** The app's words for the keys these tests need; any other key comes back with its values. */
 const WORDS: Record<string, string> = { "connectors.names.atlassian": "Atlassian (Jira e Confluence)" };
@@ -183,4 +183,16 @@ test("a server whose provider named none of its accounts can't be checked; one n
   expect(accountUnchecked([])).toBe(true);
   expect(accountUnchecked([{ accountLabel: null }, undefined])).toBe(true);
   expect(accountUnchecked([{ accountLabel: null }, { accountLabel: "Acme" }])).toBe(false);
+});
+
+test("an MCP is a server by address the catalog doesn't list; a one-click server, Composio's and ours are connectors", () => {
+  const item = (custom: boolean, def: boolean, viaComposio = false) => ({
+    custom,
+    def: def ? ({ id: "x" } as ConnectorDef) : null,
+    viaComposio,
+  });
+  expect(isMcpItem(item(true, false))).toBe(true);
+  expect(isMcpItem(item(true, true))).toBe(false);
+  expect(isMcpItem(item(true, false, true))).toBe(false);
+  expect(isMcpItem(item(false, true))).toBe(false);
 });

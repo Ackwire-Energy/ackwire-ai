@@ -357,7 +357,8 @@ export async function stopRun(
   } else if (previous !== "running") {
     // Nobody is executing it: finish it for the app here.
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where });
-    await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status: "canceled" });
+    const passed = run.startedAt ? {} : { passed: true as const };
+    await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, status: "canceled", ...passed });
     await publishChannelEvent(deps.pubsub, {
       type: "message.handled",
       channelId: run.channelId,
@@ -365,6 +366,7 @@ export async function stopRun(
       agentId: run.agentId,
       runId: run.id,
       status: "canceled",
+      ...passed,
     });
     // A forum turn that never ran: the topic moves on.
     if (channelKind === "forum") {

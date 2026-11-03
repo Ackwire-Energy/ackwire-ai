@@ -90,13 +90,12 @@ test("the head's controls ship on the name's capitals, full screen's bar's in it
   expect(await ships(COMPUTER, `src/${COMPUTER}`, '[data-theme="dark"] .cmp-acts > .cmp-back')).toContain(
     "margin-inline:1px",
   );
-  // On the full-screen sheet they stand as far under its edge as its sides are in (20 px, a phone's 16): the head's top
-  // holds the half of them that rises past the name's 24 px line and the capitals' lift.
+  // On the full-screen sheet they stand as far under its edge as its sides are in (the dialog's inset, a phone's 16):
+  // the head's top holds the half of them that rises past the name's 24 px line and the capitals' lift.
   const sheet = ".cmp-dialog:not(.is-screen-only) .ac-dialog__head";
   const lift = "(var(--cmp-button)-24px)/2+var(--title-cap-mid,var(--cap-mid))";
-  expect(await ships(COMPUTER, `src/${COMPUTER}`, sheet, PHONE)).toContain(`padding-top:calc(20px+${lift})`);
-  expect(await ships(COMPUTER, `src/${COMPUTER}`, sheet, "@media (max-width: 640px)")).toContain(
-    `padding-top:calc(16px+${lift})`,
+  expect(await ships(COMPUTER, `src/${COMPUTER}`, sheet, PHONE)).toContain(
+    `padding-top:calc(var(--dialog-pad)+${lift})`,
   );
 });
 

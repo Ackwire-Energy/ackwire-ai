@@ -59,6 +59,7 @@ import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { CostlyProposalCard } from "../ai/CostlyProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
+import { OfferCard } from "../ai/OfferCard";
 import { StretchCard } from "../ai/StretchCard";
 import { UsagePauseCard, UsageWaitCancel } from "../ai/UsagePauseCard";
 import { HandoffCard } from "../browser/HandoffCard";
@@ -444,7 +445,7 @@ export const MessageRow = memo(function MessageRow({
           pressed && press && { backgroundColor: c.sunken },
         ]}
       >
-        <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
+        <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={34} live={false} />}</View>
         <View style={styles.body}>
           {grouped ? null : (
             <View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>
@@ -635,6 +636,7 @@ export const MessageRow = memo(function MessageRow({
           {isAgent ? <UsagePauseCard message={m} /> : null}
           {isAgent ? <UsageWaitCancel message={m} /> : null}
           {isAgent ? <ProposalCard message={m} /> : null}
+          {isAgent ? <OfferCard message={m} /> : null}
           {isAgent ? <InstructionProposals message={m} /> : null}
           {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
           {handoff ? <HandoffCard handoff={handoff} /> : null}

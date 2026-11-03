@@ -16,8 +16,14 @@ test("code keeps its marks, words don't", () => {
     d: { blocks: [{ code: "cd x; ls" }] },
     e: "A — B",
     x: { code: "Code from the email; check your spam" },
+    members: { column: { group: "{{name}} — {{count}}", label: "A — B" } },
   };
-  expect(unplainLeaves(tree)).toEqual(["a: Two; one", "e: A — B", "x.code: Code from the email; check your spam"]);
+  expect(unplainLeaves(tree)).toEqual([
+    "a: Two; one",
+    "e: A — B",
+    "x.code: Code from the email; check your spam",
+    "members.column.label: A — B",
+  ]);
 });
 
 test("the server's words: each call that answers people, never a log line", () => {

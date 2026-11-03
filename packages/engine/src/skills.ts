@@ -4,21 +4,34 @@ import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { activeConnections, type ConnectorDeps } from "./connectors/connections";
 import { type ErrorParams, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
+import { formatBytes } from "./format";
 import { connectionToken } from "./git/branches";
 import { appTokenForRepo, boundInstallations, type GitHubAppConfig, type GitHubHttp } from "./git/github-app";
 import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { can, requirePermission } from "./organizations";
-import { inflateZipEntry, listZip, readZip, type ZipListing } from "./zip";
+import { inflateZipEntry, listZip, type ZipListing } from "./zip";
 
 const { skills, skillFiles, agentSkills } = schema;
 
 export type SkillRow = typeof skills.$inferSelect;
 
-export const SKILL_LIMITS = { maxFiles: 200, maxBytes: 2 * 1024 * 1024, bodyChars: 200_000, fileReadChars: 40_000 };
+/**
+ * `maxBytes`: the text and scripts a skill keeps (past it the skill is refused). `assetBytes`: the images, PDFs and
+ * other binary files it keeps, in folder order (past it the rest are only listed). `imageBytes`: the largest image
+ * shown to a model (5 MB of base64, what the Claude API takes).
+ */
+export const SKILL_LIMITS = {
+  maxFiles: 200,
+  maxBytes: 2 * 1024 * 1024,
+  assetBytes: 20 * 1024 * 1024,
+  imageBytes: 3_750_000,
+  bodyChars: 200_000,
+  fileReadChars: 40_000,
+};
 export const SKILL_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-/** Files we store and can show the model; everything else (scripts, binaries) is listed as ignored. */
+/** Files the model reads as text. */
 const SHOWABLE: Record<string, string> = {
   md: "text/markdown",
   markdown: "text/markdown",
@@ -144,16 +157,35 @@ export const SKILL_SCRIPTS: Record<string, string> = {
   cjs: "text/javascript",
 };
 
+/**
+ * `stored`: kept, and the model may read it (text as text, an image as an image, other files described); `script`:
+ * kept for the agent's computer, never shown; `ignored`: listed only (a binary past `SKILL_LIMITS.assetBytes`).
+ */
 export type SkillFileStatus = "stored" | "script" | "ignored";
 
-/** `stored`: text the model may read; `script`: kept for the agent's computer, never shown; `ignored`: listed only. */
-export function classifyFile(path: string): { mime: string; status: SkillFileStatus } {
+/** Images the models read (what the Claude, OpenAI and Gemini APIs take). */
+export const MODEL_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+/** A file by its name: text the model reads, a script, or a binary (an image, a PDF, anything else). */
+export function classifyFile(path: string): { mime: string; kind: "text" | "script" | "binary" } {
   const ext = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
   const mime = SHOWABLE[ext];
-  if (mime) return { mime, status: "stored" };
+  if (mime) return { mime, kind: "text" };
   const script = SKILL_SCRIPTS[ext];
-  if (script) return { mime: script, status: "script" };
-  return { mime: "application/octet-stream", status: "ignored" };
+  if (script) return { mime: script, kind: "script" };
+  return { mime: Bun.file(path).type.split(";")[0] || "application/octet-stream", kind: "binary" };
+}
+
+/** The binary files a skill keeps: in the order given, while they fit `SKILL_LIMITS.assetBytes`. */
+function keptBinaries(files: { path: string; size: number }[]) {
+  const kept = new Set<string>();
+  let total = 0;
+  for (const f of files) {
+    if (classifyFile(f.path).kind !== "binary" || total + f.size > SKILL_LIMITS.assetBytes) continue;
+    total += f.size;
+    kept.add(f.path);
+  }
+  return kept;
 }
 
 function safePath(path: string) {
@@ -167,11 +199,13 @@ function safePath(path: string) {
 export interface SkillFileInput {
   path: string;
   data: Uint8Array;
+  /** A binary left unread (past `SKILL_LIMITS.assetBytes`): its size, and `data` is empty. */
+  skippedSize?: number;
 }
 
 /** A skill folder's files → the SKILL.md (found at the root, or under one top folder) and the rest. */
 export function splitSkillFolder(files: SkillFileInput[]) {
-  const normalized = files.map((f) => ({ path: safePath(f.path), data: f.data }));
+  const normalized = files.map((f) => ({ ...f, path: safePath(f.path) }));
   const firstSegments = new Set(normalized.map((f) => f.path.split("/")[0]));
   let root = "";
   if (!normalized.some((f) => f.path.toLowerCase() === "skill.md") && firstSegments.size === 1) {
@@ -179,7 +213,7 @@ export function splitSkillFolder(files: SkillFileInput[]) {
   }
   const inRoot = normalized
     .filter((f) => f.path.startsWith(root) && !f.path.split("/").some((p) => p.startsWith(".") && p !== "."))
-    .map((f) => ({ path: f.path.slice(root.length), data: f.data }));
+    .map((f) => ({ ...f, path: f.path.slice(root.length) }));
   const main = inRoot.find((f) => f.path.toLowerCase() === "skill.md");
   if (!main) throw new ValidationError("No SKILL.md at the top of the skill folder");
   return { skillMd: new TextDecoder().decode(main.data), files: inRoot.filter((f) => f !== main) };
@@ -262,8 +296,8 @@ async function loadSkill(db: Database, orgId: string, id: string) {
 }
 
 /**
- * A skill whose files have these paths and sizes within the limits, refused as an upload is. Ignored files (binaries
- * such as images and videos) are only listed, never stored: they count as files, not toward the size.
+ * A skill whose files have these paths and sizes within the limits, refused as an upload is. Binaries (images, PDFs,
+ * videos) count as files, not toward the size: past `SKILL_LIMITS.assetBytes` they are only listed.
  */
 function assertSkillSize(files: { path: string; size: number }[]) {
   if (files.length > SKILL_LIMITS.maxFiles) {
@@ -271,7 +305,7 @@ function assertSkillSize(files: { path: string; size: number }[]) {
       max: SKILL_LIMITS.maxFiles,
     });
   }
-  if (files.reduce((n, f) => n + (classifyFile(f.path).status === "ignored" ? 0 : f.size), 0) > SKILL_LIMITS.maxBytes) {
+  if (files.reduce((n, f) => n + (classifyFile(f.path).kind === "binary" ? 0 : f.size), 0) > SKILL_LIMITS.maxBytes) {
     throw new ValidationError("The skill is too large (max 2 MB)", "skill.too_large", {
       max: SKILL_LIMITS.maxBytes / 1024 / 1024,
     });
@@ -280,17 +314,31 @@ function assertSkillSize(files: { path: string; size: number }[]) {
 
 /** Where a version's files go and how each is kept, refused before the skill or any file is written. */
 async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]) {
-  assertSkillSize(files.map((f) => ({ path: f.path, size: f.data.byteLength })));
+  assertSkillSize(files.map((f) => ({ path: f.path, size: f.skippedSize ?? f.data.byteLength })));
   // Two entries that normalize to the same path would share one blob key: the second's bytes overwrite
   // the first on disk while its row insert is dropped on the unique key, so the stored size stops matching disk.
-  const normalized = files.map((f) => ({ path: safePath(f.path), data: f.data }));
+  const normalized = files.map((f) => ({ ...f, path: safePath(f.path) }));
   const seen = new Set<string>();
   for (const { path } of normalized) {
     if (seen.has(path)) throw new ValidationError(`Two files share the path ${path}`, "skill.duplicate_path");
     seen.add(path);
   }
   const location = await deps.blobs.forOrg(orgId);
-  const planned = normalized.map((n) => ({ ...n, ...classifyFile(n.path) }));
+  const kept = keptBinaries(
+    normalized.filter((n) => n.skippedSize === undefined).map((n) => ({ path: n.path, size: n.data.byteLength })),
+  );
+  const planned = normalized.map((n) => {
+    const { mime, kind } = classifyFile(n.path);
+    const status: SkillFileStatus =
+      kind === "text" ? "stored" : kind === "script" ? "script" : kept.has(n.path) ? "stored" : "ignored";
+    return {
+      path: n.path,
+      data: status === "ignored" ? new Uint8Array() : n.data,
+      size: n.skippedSize ?? n.data.byteLength,
+      mime,
+      status,
+    };
+  });
   // The workspace's own bucket counts against no limit of ours. Storing no file (the skill's text is in the database)
   // takes no room, even past a limit lowered below what the workspace already keeps.
   const stored = planned.filter((p) => p.status !== "ignored").reduce((n, p) => n + p.data.byteLength, 0);
@@ -298,14 +346,14 @@ async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]
   return { location, files: planned };
 }
 
-/** Stores a version's files: showable ones in the blob store, the rest only listed as ignored. */
+/** Stores a version's files: kept ones in the blob store, the rest only listed as ignored. */
 async function storeFiles(
   deps: SkillDeps,
   s: { id: string; orgId: string },
   version: number,
   { location, files }: Awaited<ReturnType<typeof planFiles>>,
 ) {
-  for (const { path, data, mime, status } of files) {
+  for (const { path, data, size, mime, status } of files) {
     let blobKey: string | null = null;
     if (status !== "ignored") {
       blobKey = `${location.prefix}skills/${s.id}/v${version}/${path}`;
@@ -316,7 +364,7 @@ async function storeFiles(
       skillId: s.id,
       version,
       path,
-      size: data.byteLength,
+      size,
       mime,
       status,
       storageConfigId: status !== "ignored" ? location.storageConfigId : null,
@@ -410,13 +458,15 @@ export async function saveSkill(
 
 /** Import from a zip of the skill folder (`SKILL.md` + files). */
 export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: string, zip: Uint8Array) {
-  const entries = readZip(
-    zip,
-    { maxFiles: SKILL_LIMITS.maxFiles, maxBytes: SKILL_LIMITS.maxBytes },
-    (path) => classifyFile(path).status === "ignored",
-  );
-  const { skillMd, files } = splitSkillFolder(entries);
-  return saveSkill(deps, actorId, orgId, { ...parseSkillMarkdown(skillMd), source: "upload", files });
+  const entries = listZip(zip).filter((e) => !e.symlink);
+  return saveSkill(deps, actorId, orgId, {
+    ...repositorySkill(
+      zip,
+      "",
+      entries.map((e) => [e.path, e]),
+    ),
+    source: "upload",
+  });
 }
 
 const GITHUB_HOSTS = new Set(["github.com", "raw.githubusercontent.com", "api.github.com", "codeload.github.com"]);
@@ -761,15 +811,21 @@ function skillFolders(files: GithubRepository["files"], folder: string) {
   return new Map([...skills].sort(([a], [b]) => (a < b ? -1 : 1)));
 }
 
-/** A skill folder of the repository (`inside`: its files) as an upload's: binaries are listed, never inflated. */
+/**
+ * A skill folder of a zip (`inside`: its files), within the limits by their declared sizes before anything is
+ * inflated: binaries past `SKILL_LIMITS.assetBytes` are listed, never inflated.
+ */
 function repositorySkill(zip: Uint8Array, dir: string, inside: [string, ZipListing][]) {
   const prefix = dir ? `${dir}/` : "";
+  const listed = inside.map(([path, entry]) => ({ path: path.slice(prefix.length), size: entry.size, entry }));
+  assertSkillSize(listed);
+  const kept = keptBinaries(listed);
   const { skillMd, files } = splitSkillFolder(
-    inside.map(([path, entry]) => {
-      const relative = path.slice(prefix.length);
-      const ignored = classifyFile(relative).status === "ignored";
-      return { path: relative, data: ignored ? new Uint8Array() : inflateZipEntry(zip, entry) };
-    }),
+    listed.map(({ path, size, entry }) =>
+      classifyFile(path).kind === "binary" && !kept.has(path)
+        ? { path, data: new Uint8Array(), skippedSize: size }
+        : { path, data: inflateZipEntry(zip, entry) },
+    ),
   );
   return { ...parseSkillMarkdown(skillMd), files };
 }
@@ -1212,7 +1268,25 @@ export async function agentSkillByName(db: Database, orgId: string, agentId: str
   return row?.skill ?? null;
 }
 
-export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string, version = s.version) {
+/**
+ * Why a listed file wasn't kept, from the version's files: past the binaries a skill keeps (with those kept, it
+ * doesn't fit), or installed before binaries were kept (it would fit now).
+ */
+export function notKeptReason(
+  f: { path: string; size: number },
+  files: { path: string; size: number; status: string }[],
+) {
+  const kept = files.reduce(
+    (n, x) => n + (x.status === "stored" && classifyFile(x.path).kind === "binary" ? x.size : 0),
+    0,
+  );
+  return kept + f.size > SKILL_LIMITS.assetBytes
+    ? `${f.path} (${formatBytes(f.size)}) was not kept: a skill keeps up to ${SKILL_LIMITS.assetBytes / 1024 / 1024} MB of images and other files that aren't text, and this one is past it. Ask a person to make the skill's files smaller.`
+    : `${f.path} was installed before skills kept images and other files that aren't text: ask a person to reinstall the skill (or update it from its link) to read it.`;
+}
+
+/** A kept file of the skill's version with its bytes: `text` when the model reads it as text. */
+export async function skillFile(deps: SkillDeps, s: SkillRow, path: string, version = s.version) {
   const [f] = await deps.db
     .select()
     .from(skillFiles)
@@ -1222,12 +1296,18 @@ export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string, 
     throw new NotFoundError(`${path} is a script: it is never shown, only run on your computer with run_skill_script`);
   }
   if (f.status !== "stored" || !f.blobKey) {
-    throw new NotFoundError(`${path} is not available: binaries are listed only, never stored`);
+    throw new NotFoundError(notKeptReason(f, await skillFilesOf(deps.db, { ...s, version })));
   }
   const store = await deps.blobs.forConfig(s.orgId, f.storageConfigId);
   const object = await store.get(f.blobKey);
   if (!object) throw new NotFoundError(`The stored file ${path} is missing`);
-  return new TextDecoder().decode(object.body);
+  return { path, mime: f.mime, size: f.size, data: object.body, text: classifyFile(path).kind === "text" };
+}
+
+export async function skillFileText(deps: SkillDeps, s: SkillRow, path: string, version = s.version) {
+  const f = await skillFile(deps, s, path, version);
+  if (!f.text) throw new ValidationError(`${path} is not a text file (${f.mime}, ${formatBytes(f.size)})`);
+  return new TextDecoder().decode(f.data);
 }
 
 /** `GET …/skills/{id}/files/{path}`: a stored text file of a version (default: current). */
@@ -1247,8 +1327,8 @@ export async function getSkillFile(
 }
 
 /**
- * Every kept file of the skill's version (text and scripts), with bytes: what `run_skill_script` copies onto
- * the computer.
+ * Every kept file of the skill's version (text, binaries and scripts), with bytes: what `run_skill_script` copies
+ * onto the computer.
  */
 export async function skillFolderFiles(deps: SkillDeps, s: SkillRow) {
   const rows = await deps.db

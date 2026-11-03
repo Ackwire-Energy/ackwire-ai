@@ -274,6 +274,7 @@ export function buildEngine(o: EngineOptions) {
     pubsub: adapters.pubsub,
     replicaId: o.replicaId,
     readyEmail: adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, gateway } : null,
+    errors: o.errors,
   });
   const sandbox: SandboxDeps = {
     db,
@@ -307,6 +308,7 @@ export function buildEngine(o: EngineOptions) {
     judge: context.judge,
     vision,
     publicUrl: config.PUBLIC_URL,
+    errors: o.errors,
   });
   // The workspace's cap of live background works (ADR 0121 §7).
   setWorkOrgCap(config.AGENT_WORK_MAX_PER_ORG);
@@ -347,9 +349,20 @@ export function buildEngine(o: EngineOptions) {
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
       // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo, new agents proposed.
-      createSetupToolSource({ pubsub: adapters.pubsub, ai: { gateway }, context }),
+      createSetupToolSource({
+        pubsub: adapters.pubsub,
+        ai: { gateway },
+        context,
+        catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
+      }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
-      createSkillToolSource({ db, blobs: artifacts.blobs, pubsub: adapters.pubsub, judge: context.judge }),
+      createSkillToolSource({
+        db,
+        blobs: artifacts.blobs,
+        pubsub: adapters.pubsub,
+        judge: context.judge,
+        computer: sandbox,
+      }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
       createScheduleToolSource({
         pubsub: adapters.pubsub,

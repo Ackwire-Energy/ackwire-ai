@@ -5,9 +5,24 @@ import { type AppLocale, localeInfo } from "@agenteschat/i18n/locale";
  */
 export const cutText = (text: string, max: number) => text.slice(0, max).replace(/[\uD800-\uDBFF]$/, "");
 
+/** Whether `text` asks something by its punctuation, in any script: `?`, the full-width `？`, the Arabic `؟`. */
+export const hasQuestionMark = (text: string) => /[?？؟]/.test(text);
+
+const WORDS = new Intl.Segmenter(undefined, { granularity: "word" });
+/** How many words `text` has, in any script: Chinese, Japanese or Thai, written without spaces, count theirs too. */
+export function wordCount(text: string) {
+  let n = 0;
+  for (const s of WORDS.segment(text)) if (s.isWordLike) n++;
+  return n;
+}
+
 /** `cutText` from the end: the last `max` units, never half of a pair at the start. */
 export const cutTextEnd = (text: string, max: number) =>
   text.slice(Math.max(0, text.length - max)).replace(/^[\uDC00-\uDFFF]/, "");
+
+/** The strings of an untrusted value: its string items when it is an array, else none. */
+export const stringsOf = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
 
 /** Postgres text and jsonb refuse NUL and lone UTF-16 surrogates: `text` without either. */
 export const pgSafeText = (text: string) =>

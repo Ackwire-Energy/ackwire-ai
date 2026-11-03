@@ -370,6 +370,10 @@ describe("the shared folder (ADR 0115)", () => {
       to: "/org/$orgId/settings/computers/$machineId",
       params: { machineId: "m1" },
     });
+    // A computer without Google Chrome (ADR 0133): its own headline, and it opens that computer too.
+    const noChrome = { ...notice, kind: "computer_no_chrome", latest: {} } as AppNotification;
+    expect(workspaceHeadline(noChrome)).toBe("machines.chromeMissingNotice");
+    expect(openTarget(noChrome)).toEqual(openTarget(notice));
   });
 
   test("the folders people allowed leave it out (web and phone show it on its own row); its facts", () => {

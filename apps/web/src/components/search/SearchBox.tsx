@@ -13,8 +13,8 @@ import {
   suggestPlaces,
   typingOperator,
 } from "@agenteschat/client/lib/search-filters";
-import { Icon, Token } from "@agenteschat/ui";
-import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
+import { cx, Icon, type IconName, Token } from "@agenteschat/ui";
+import { type KeyboardEvent, type ReactNode, type RefObject, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import "./search.css";
@@ -25,12 +25,43 @@ interface Option {
   description?: ReactNode;
   leading?: ReactNode;
   group?: string;
+  className?: string;
   pick: () => void;
 }
 
 /** The ones the empty box offers first; the rest under "Mais filtros". */
 const MAIN_OPS: SearchOp[] = ["from", "in", "has", "mentions"];
 const DATE_OPS = new Set<SearchOp>(["before", "after", "during"]);
+/** The compact menu's mark for each main filter. */
+const OP_ICONS: Partial<Record<SearchOp, IconName>> = { from: "person", in: "channel", has: "attach" };
+
+/** A recent search as its chips (the operator in bold, a face or a #) and its words. */
+function RecentSearch({ text, directory, words }: { text: string; directory: SearchDirectory; words: SearchWords }) {
+  const { t, i18n } = useTranslation();
+  const parsed = parseSearch(text, directory, words);
+  return (
+    <span className="search-menu__chips">
+      {parsed.chips.map((c) => {
+        const label = searchChipLabel(t, i18n.language, c);
+        const at = label.indexOf(": ");
+        const value = at < 0 ? label : label.slice(at + 2).replace(/^#/, "");
+        return (
+          <span key={searchChipKey(c)} className="ac-token search-menu__chip">
+            <span className="ac-token__label">
+              {at >= 0 && <b>{label.slice(0, at + 1)}</b>}
+              {(c.op === "from" || c.op === "mentions") && (
+                <ActorAvatar actor={c.actor} name={c.actor.name} size="xs" />
+              )}
+              {c.op === "in" && !c.place.dm && <Icon name="channel" size={14} />}
+              {value}
+            </span>
+          </span>
+        );
+      })}
+      {parsed.text && <span className="search-menu__text">{parsed.text}</span>}
+    </span>
+  );
+}
 
 /**
  * The search box with filters (ADR 0123): chips inside the field, the options and recent searches while it is
@@ -49,6 +80,12 @@ export function SearchBox({
   recent,
   onPickRecent,
   onClearRecent,
+  compact,
+  placeholder,
+  autoFocus = true,
+  inputRef,
+  onClear,
+  className,
 }: {
   chips: SearchChip[];
   onChipsChange: (chips: SearchChip[]) => void;
@@ -61,9 +98,22 @@ export function SearchBox({
   recent: string[];
   onPickRecent: (search: string) => void;
   onClearRecent: () => void;
+  /**
+   * The channel header's mini menu: each main filter with its mark and an example, the rest folded under "Mais
+   * filtros", recent searches as their chips.
+   */
+  compact?: boolean;
+  placeholder?: string;
+  autoFocus?: boolean;
+  inputRef?: RefObject<HTMLInputElement | null>;
+  /** A ✕ in the field while it holds something. */
+  onClear?: () => void;
+  className?: string;
 }) {
   const { t, i18n } = useTranslation();
-  const input = useRef<HTMLInputElement>(null);
+  const own = useRef<HTMLInputElement>(null);
+  const input = inputRef ?? own;
+  const [more, setMore] = useState(false);
   const listId = useId();
   const [open, setOpen] = useState(false);
   // -1: nothing highlighted yet (an operator being typed still highlights its first option).
@@ -89,12 +139,22 @@ export function SearchBox({
   if (typing) {
     const op = typing.op;
     if (op === "from" || op === "mentions") {
-      for (const a of suggestActors(typing.value, directory.actors)) {
+      // Agents, then people, each under its name.
+      const found = suggestActors(typing.value, directory.actors).sort(
+        (a, b) => Number(b.type === "agent") - Number(a.type === "agent"),
+      );
+      for (const a of found) {
         options.push({
           key: `${a.type}:${a.id}`,
-          label: a.name,
-          description: a.handle ? `@${a.handle}` : undefined,
-          leading: <ActorAvatar actor={a} name={a.name} size="xs" />,
+          label: (
+            <span className="search-from__who">
+              <span className="search-from__name">{a.name}</span>
+              {a.handle && <span className="search-from__handle">{a.handle}</span>}
+            </span>
+          ),
+          leading: <ActorAvatar actor={a} name={a.name} size="sm" />,
+          group: t(`searchPage.authorLabel.${a.type}`),
+          className: "search-from__item",
           pick: () => addChip({ op, actor: a }, withSpace(before)),
         });
       }
@@ -131,6 +191,57 @@ export function SearchBox({
         label: t("searchPage.pinnedChip"),
         leading: <Icon name="pin" size={16} />,
         pick: () => addChip({ op }, withSpace(before)),
+      });
+    }
+  } else if (!text.trim() && compact) {
+    for (const op of SEARCH_OPS) {
+      const main = MAIN_OPS.includes(op);
+      if (!main && !more) continue;
+      const icon = OP_ICONS[op];
+      options.push({
+        key: op,
+        label: t(`searchPage.option.${op}`),
+        description: (
+          <>
+            <b>{words.ops[op]}:</b> {main ? t(`searchPage.optionHint.${op as "from"}`) : null}
+          </>
+        ),
+        leading: (
+          <span className="search-menu__icon">
+            {icon ? <Icon name={icon} /> : <span className="search-menu__at">@</span>}
+          </span>
+        ),
+        group: main ? t("searchPage.panel.filters") : t("searchPage.moreFilters"),
+        className: "search-menu__filter",
+        pick: () => insertOp(op),
+      });
+    }
+    if (!more) {
+      options.push({
+        key: "more",
+        label: t("searchPage.moreFilters"),
+        description: t("searchPage.moreFiltersHint"),
+        leading: (
+          <span className="search-menu__icon">
+            <Icon name="filter" />
+          </span>
+        ),
+        group: t("searchPage.panel.filters"),
+        className: "search-menu__filter",
+        pick: () => {
+          setMore(true);
+          input.current?.focus();
+        },
+      });
+    }
+    for (const r of recent) {
+      options.push({
+        key: `recent:${r}`,
+        label: <RecentSearch text={r} directory={directory} words={words} />,
+        leading: <Icon name="search" size={16} />,
+        group: t("searchPage.recent"),
+        className: "search-menu__recent",
+        pick: () => onPickRecent(r),
       });
     }
   } else if (!text.trim()) {
@@ -194,7 +305,7 @@ export function SearchBox({
   let lastGroup: string | undefined;
   return (
     <search
-      className="search-box"
+      className={cx("search-box", compact && "search-box--compact", className)}
       // Closes when the focus leaves the box and its menu (the date field inside the menu keeps it open).
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
@@ -227,9 +338,9 @@ export function SearchBox({
           aria-activedescendant={shown && current >= 0 ? `${listId}-${current}` : undefined}
           aria-autocomplete="list"
           autoComplete="off"
-          // biome-ignore lint/a11y/noAutofocus: the search page is for typing.
-          autoFocus
-          placeholder={chips.length ? "" : t("searchPage.placeholder")}
+          // biome-ignore lint/a11y/noAutofocus: the search page and the phone's search sheet are for typing.
+          autoFocus={autoFocus}
+          placeholder={chips.length ? "" : (placeholder ?? t("searchPage.placeholder"))}
           value={text}
           onChange={(e) => {
             commit(e.target.value);
@@ -239,9 +350,29 @@ export function SearchBox({
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
         />
+        {onClear && (chips.length > 0 || text) && (
+          <button
+            type="button"
+            className="search-box__x"
+            aria-label={t("searchPage.header.clear")}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+              setMore(false);
+              input.current?.focus();
+            }}
+          >
+            <Icon name="close" size={14} />
+          </button>
+        )}
       </div>
       {shown && (
-        <div className="ac-menu search-box__menu" role="listbox" id={listId} aria-label={t("searchPage.options")}>
+        <div
+          className={cx("ac-menu search-box__menu", compact && "search-menu")}
+          role="listbox"
+          id={listId}
+          aria-label={t("searchPage.options")}
+        >
           {typing && DATE_OPS.has(typing.op) && (
             <label className="search-box__date">
               <span className="small muted">{t("searchPage.pickDate")}</span>
@@ -266,16 +397,28 @@ export function SearchBox({
                 {heading && (
                   <div className="ac-menu__heading search-box__heading" role="presentation">
                     <span>{o.group}</span>
-                    {o.group === t("searchPage.recent") && (
-                      <button
-                        type="button"
-                        className="search-box__clear"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={onClearRecent}
-                      >
-                        {t("searchPage.clearRecent")}
-                      </button>
-                    )}
+                    {o.group === t("searchPage.recent") &&
+                      (compact ? (
+                        <button
+                          type="button"
+                          className="search-box__clear search-menu__trash"
+                          aria-label={t("searchPage.clearRecentAll")}
+                          title={t("searchPage.clearRecentAll")}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={onClearRecent}
+                        >
+                          <Icon name="trash" size={16} />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="search-box__clear"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={onClearRecent}
+                        >
+                          {t("searchPage.clearRecent")}
+                        </button>
+                      ))}
                   </div>
                 )}
                 <div
@@ -284,7 +427,7 @@ export function SearchBox({
                   tabIndex={-1}
                   aria-selected={i === current}
                   data-active={i === current || undefined}
-                  className="ac-menu__item ac-suggest__item"
+                  className={cx("ac-menu__item ac-suggest__item", o.className)}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={o.pick}
                   onKeyDown={() => {}}

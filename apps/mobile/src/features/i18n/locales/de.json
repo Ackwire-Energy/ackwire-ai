@@ -805,6 +805,8 @@
       "connector_tool_changed_other": "Verbundene Server haben Tools geändert, die du freigegeben hast",
       "computer_disk_full_one": "Die Festplatte eines Computers ist fast voll",
       "computer_disk_full_other": "Festplatten von Computern sind fast voll",
+      "computer_no_chrome_one": "Ein Computer braucht Google Chrome. Lade es unter google.com/chrome herunter",
+      "computer_no_chrome_other": "Computer brauchen Google Chrome. Lade es unter google.com/chrome herunter",
       "app_created_one": "Eine KI-App hat etwas für dich erstellt",
       "app_created_other": "KI-Apps haben etwas für dich erstellt"
     },
@@ -897,7 +899,7 @@
     "issuesWithMe_one": "{{count}} bei dir",
     "issuesWithMe_other": "{{count}} bei dir",
     "drive": "Drive",
-    "connectors": "Konnektoren",
+    "connectors": "Konnektoren und MCP",
     "usage": "Nutzung",
     "preferences": "Einstellungen",
     "editProfile": "Profil bearbeiten",
@@ -1495,11 +1497,12 @@
     }
   },
   "connectors": {
-    "title": "Konnektoren",
+    "title": "Konnektoren und MCP",
     "search": "Dienst suchen",
+    "mcps": "MCP",
+    "mcpsNone": "Hier erscheinen die MCP-Server, die du über ihre Adresse verbindest.",
+    "addMcp": "MCP hinzufügen",
     "connected": "Verbunden",
-    "address": "Adresse",
-    "byAddress": "Per Adresse",
     "suggested": "Vorgeschlagen für {{org}}",
     "all": "Alle",
     "empty": "Deine Agenten nutzen noch nichts",

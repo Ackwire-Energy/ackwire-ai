@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { runAuthority } from "./authority";
 import { cancelRun } from "./cancel";
+import { listsEveryTool } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
   cleanPlan,
@@ -58,6 +59,12 @@ async function runOf(ctx: ToolContext) {
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
+/** Whether the run may move to the background now (`work_in_background` would take it). */
+export async function workMayStart(ctx: ToolContext) {
+  const run = await runOf(ctx);
+  return run !== null && !run.workId && (await workEligible(ctx.db, run));
+}
+
 /**
  * Long work's tools (ADR 0121), the same on every brain (the bridge lists them to Claude Code, Codex and Cursor):
  * `work_in_background` and `post_update` for a person's run in a conversation people read, `steer_work` and
@@ -86,7 +93,10 @@ export function createWorkToolSource(deps: { pubsub?: PubSub }): ToolSource {
     describe: (input) => ({ title: "Work in the background", detail: str(input.title) }),
     async execute(input, ctx) {
       const run = await runOf(ctx);
-      if (!run) return refused("Only a conversation's run can go to the background.");
+      if (!run)
+        return refused(
+          "Only a conversation's run can go to the background: keep working here and answer when it's done.",
+        );
       if (run.workId) return refused("This is already background work: keep going, and post_update when it's time.");
       if (!(await workEligible(ctx.db, run)))
         return refused("This conversation can't hold background work (no person asked here): just answer.");
@@ -194,10 +204,13 @@ export function createWorkToolSource(deps: { pubsub?: PubSub }): ToolSource {
   return {
     name: "work",
     async tools(ctx) {
+      // A run that lists every tool has both whatever the run is: each says why when it doesn't apply.
+      const every = listsEveryTool(ctx);
       const run = await runOf(ctx);
-      if (!run) return [];
+      if (!run) return every ? [move, update] : [];
       const out: ToolDefinition[] = [];
-      if (run.workId) out.push(update);
+      if (every) out.push(move, update);
+      else if (run.workId) out.push(update);
       else if (await workEligible(ctx.db, run)) out.push(move, update);
       if (!run.workId && (await liveWorksHere(ctx.db, run)).length > 0) out.push(steer, stop);
       return out;

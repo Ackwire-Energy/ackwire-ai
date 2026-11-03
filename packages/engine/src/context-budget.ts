@@ -2,6 +2,7 @@ import {
   type ContentBlock,
   contextWindowOf,
   contextWindowWithin,
+  IMAGE_CHARS,
   type ModelMessage,
   type SystemBlock,
   type ToolSpec,
@@ -51,13 +52,16 @@ const REMOVED_PREFIX = "[Result removed to save space:";
 export const removedPlaceholder = (chars: number) =>
   `${REMOVED_PREFIX} ${chars} chars. Call the tool again if you need it.]`;
 
+const resultChars = (b: Extract<ContentBlock, { type: "tool_result" }>) =>
+  b.content.length + (b.images?.length ?? 0) * IMAGE_CHARS;
+
 const blockChars = (b: ContentBlock) =>
   b.type === "text"
     ? b.text.length
     : b.type === "tool_use"
       ? b.name.length + JSON.stringify(b.input).length
       : b.type === "tool_result"
-        ? b.content.length
+        ? resultChars(b)
         : JSON.stringify(b.data).length;
 
 /** Input tokens of a request, estimated: characters of the system blocks, messages and tool schemas over `CHARS_PER_TOKEN`. */
@@ -123,7 +127,7 @@ export function removableToolResults(messages: ModelMessage[]): ToolResultCandid
       else if (
         b.type === "tool_result" &&
         i < latest &&
-        b.content.length >= MIN_REMOVABLE_CHARS &&
+        resultChars(b) >= MIN_REMOVABLE_CHARS &&
         !b.content.startsWith(REMOVED_PREFIX)
       ) {
         const call = calls.get(b.toolUseId);
@@ -131,7 +135,7 @@ export function removableToolResults(messages: ModelMessage[]): ToolResultCandid
           toolUseId: b.toolUseId,
           name: call?.name ?? "unknown",
           input: call?.input ?? {},
-          chars: b.content.length,
+          chars: resultChars(b),
           excerpt: cutText(b.content, EXCERPT_CHARS),
           position: out.length,
         });
@@ -175,13 +179,44 @@ export function compactToolResults(messages: ModelMessage[], toolUseIds: Set<str
       return m;
     return {
       ...m,
-      content: m.content.map((b) =>
-        b.type === "tool_result" && toolUseIds.has(b.toolUseId)
-          ? { ...b, content: removedPlaceholder(b.content.length) }
-          : b,
-      ),
+      content: m.content.map((b) => {
+        if (b.type !== "tool_result" || !toolUseIds.has(b.toolUseId)) return b;
+        const { images: _images, ...rest } = b;
+        return { ...rest, content: removedPlaceholder(resultChars(b)) };
+      }),
     };
   });
+}
+
+/**
+ * Base64 of the images one request carries, newest kept first: under the smallest request the APIs take (Gemini's
+ * 20 MB), so a run that read several large pictures still goes out.
+ */
+export const IMAGES_PER_REQUEST_CHARS = 15_000_000;
+
+/** The messages with older tool results' images dropped (a note says so) past `maxChars` of base64, else the same array. */
+export function dropOldImages(messages: ModelMessage[], maxChars = IMAGES_PER_REQUEST_CHARS): ModelMessage[] {
+  let total = 0;
+  let changed = false;
+  const out = [...messages];
+  for (let i = out.length - 1; i >= 0; i--) {
+    const m = out[i] as ModelMessage;
+    if (typeof m.content === "string") continue;
+    let dropped = false;
+    const content = m.content.map((b) => {
+      if (b.type !== "tool_result" || !b.images?.length) return b;
+      total += b.images.reduce((n, img) => n + img.data.length, 0);
+      if (total <= maxChars) return b;
+      dropped = true;
+      const { images: _images, ...rest } = b;
+      return { ...rest, content: `${b.content}\n[Image removed to save space. Read the file again if you need it.]` };
+    });
+    if (dropped) {
+      out[i] = { ...m, content };
+      changed = true;
+    }
+  }
+  return changed ? out : messages;
 }
 
 /** What the person asked: `task`, else the latest message of a person (not a tool result). */

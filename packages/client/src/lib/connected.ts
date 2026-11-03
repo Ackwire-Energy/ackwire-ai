@@ -115,6 +115,13 @@ export function connectedItems(connections: Connection[], servers: CustomServer[
   ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
+/**
+ * An MCP server the catalog doesn't list, connected by its address ("Can't find it", "Add MCP"): the MCPs section,
+ * apart from the catalog's connectors (a one-click server and a service through Composio are the catalog's).
+ */
+export const isMcpItem = (item: Pick<ConnectedItem, "custom" | "def" | "viaComposio">) =>
+  item.custom && !item.def && !item.viaComposio;
+
 /** Catalog ids that are connected (a preset counts when a server has its address). */
 export function connectedIds(items: ConnectedItem[]) {
   return new Set(items.flatMap((i) => (i.def ? [i.def.id] : [])));

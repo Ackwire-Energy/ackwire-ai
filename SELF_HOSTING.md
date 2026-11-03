@@ -902,9 +902,10 @@ every server. They open in a new tab with no referrer and carry only the page, t
 your server's address. An old link to `/help/<page>` on your server answers 301 to that page on the docs site
 (`?lang=`, else the browser's language, else English), and the browser keeps the `#section`.
 
-An agents' computer, this server's own included, downloads Bun from GitHub when it is set up, Chrome
-for Testing from Google the first time an agent opens the browser there, and, on Linux, the packages
-agents' screens and browsers need from the system's own package sources.
+An agents' computer, this server's own included, downloads Bun from GitHub when it is set up, and, on
+Linux, the packages agents' screens need from the system's own package sources; a Linux server set up
+with `--system` also gets Google Chrome and its updates from Google's apt repository
+(`dl.google.com`).
 
 Besides that report and the model providers each organization chooses, the instance talks to a third
 party only when you turn that service on:
@@ -984,12 +985,13 @@ your organization. Then it installs a background service
 `--dir <folder>` (where agents work, default `~/agentes`), `--name <name>`, `--no-exec` (files only,
 no commands) and `--no-service`.
 
-That computer runs the commands agents execute, the browser they drive (Chrome for Testing, which the
-runner installs as it starts once the browser is turned on there), and Claude Code, Codex, Cursor's
-or OpenCode's CLI when an agent thinks with a subscription signed in there (OpenCode's free models need
-no sign-in at all). Install the ones you want on that computer, as the user that runs the runner:
-Cursor's with `curl https://cursor.com/install -fsS | bash` (it lands in `~/.local/bin`, which the
-runner's PATH must include), OpenCode's with `npm install -g opencode-ai@1.19.5`. A runner in system mode (each agent
+That computer runs the commands agents execute, the browser they drive (the computer's own Google
+Chrome, which must be installed there: get it from google.com/chrome; it keeps itself up to date, and
+each agent uses a profile of its own, never yours), and Claude Code, Codex, Cursor's or OpenCode's CLI
+when an agent thinks with a subscription signed in there (OpenCode's free models need no sign-in at all).
+Install the ones you want on that computer, as the user that runs the runner: Cursor's with
+`curl https://cursor.com/install -fsS | bash` (it lands in `~/.local/bin`, which the runner's PATH must
+include), OpenCode's with `npm install -g opencode-ai@1.19.5`. A runner in system mode (each agent
 its own system user) needs the CLI where every agent's user can run it, not in one user's home: install it
 under a shared folder and link it into `/usr/local/bin`, for example
 `sudo env HOME=/opt/cursor sh -c 'curl https://cursor.com/install -fsS | bash'`, then
@@ -1000,15 +1002,15 @@ Commands run as the user that runs the runner, so give it a dedicated user or a 
 `agentes-runner tools disable commands` (or `claude`, `codex`, `cursor` or `opencode`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
 
-On Linux, Chrome for Testing loads system libraries that a minimal server doesn't have. The
-installer's `--system` option (below) installs them; with the command above, install them once
-(Debian and Ubuntu names; on Debian 13 and Ubuntu 24.04, `libasound2t64` in place of `libasound2`):
-
-```sh
-sudo apt install --no-install-recommends libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
-  libcairo2 libcups2 libdbus-1-3 libexpat1 libgbm1 libglib2.0-0 libnspr4 libnss3 libpango-1.0-0 \
-  libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2
-```
+On a Linux server, the installer's `--system` option (below) installs Google Chrome from Google's apt
+repository (its signing key checked against its fingerprint) when the computer has none, with a
+systemd timer (`agentes-chrome-update.timer`) that upgrades it, and nothing else, every 6 hours. With the command
+above, install Google Chrome yourself (on Debian and Ubuntu, the `.deb` from google.com/chrome adds
+Google's repository). Computers that ran Chrome for Testing for their agents move to Google Chrome when
+the installer runs again (or the runner updates, outside `--system`), and the agents stay signed in.
+Without root nothing installs Chrome for you: `agentes-runner update` and the installer say so, with
+where to get it, and when a computer's runner connects without a Chrome, whoever connected it gets a
+notification once (with the browser switched on there).
 
 **Desktops and terminal (Linux).** On a Linux computer each agent can have a desktop of its own, with
 its browser on it, that people watch live from the agent's page and take control of when it needs a
@@ -1078,11 +1080,12 @@ terminal are for the person who connected the computer, since they act as its us
 agent runs as that one user, its desktop and terminal included, so whoever uses either can read the
 other agents' folders, the sign-ins on that computer and the runner's token, as the agents' commands
 can. Give the runner a user of its own, or a VM. On a Linux server, the installer's `--system` option
-(as root) makes each agent its own user instead. On x64 it also installs `agent-browser` and Chrome for
-Testing once for all of them, in `/opt/agentes-runner/browser` (root's, each checked against the
-SHA-256 in the installer; running the installer again updates them), so an agent's first use of its
-browser downloads nothing. If the installer can't download them, it goes on, and each agent downloads
-what's missing at its browser's first use, which takes about a minute. Since its agents run as the
+(as root) makes each agent its own user instead. On x64 it also installs `agent-browser` once for all
+of them, in `/opt/agentes-runner/browser` (root's, checked against the SHA-256 in the installer;
+running the installer again updates it), and Google Chrome from Google's apt repository when the
+computer has none, kept current by the computer's package updates. If the installer can't download
+them, it goes on: each agent downloads `agent-browser` at its browser's first use, and says so when
+Chrome is missing. Since its agents run as the
 person who connected it, a computer leaves the organization with them when they leave, are removed or
 delete their account; one installed with `--system` is the team's and stays.
 
@@ -1506,10 +1509,11 @@ for the agents' desktops and terminals), HTTP/1.1 to the app, and a read timeout
 that computer: its `Desktops` and `Terminal` lines say what is missing (the runner on Bun 1.3.5 or
 newer, the packages, or the switch), as in Agent computers above.
 
-**An agent's browser "is missing system libraries".** Chrome for Testing can't load them on that
-computer. The message names the first few and the runner's log all of them; install the packages
-under Agent computers above. On a computer installed with `--system`, running that same install
-command again installs them.
+**An agent says "Google Chrome isn't installed on this computer".** Install Google Chrome there
+(google.com/chrome); on a computer installed with `--system`, run that same install command again.
+The next request works, no restart needed. "Google Chrome didn't start" names the system libraries it
+lacks when that is why, and the runner's log keeps what Chrome printed. Each of these is also sent to
+your error reports when `SENTRY_DSN` is set.
 
 **`extension "vector" is not available` at the first start.** The database is a Postgres without
 pgvector. Use the compose file's `pgvector/pgvector` image; on a database of your own, install

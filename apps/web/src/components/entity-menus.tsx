@@ -1,8 +1,17 @@
 import type { Agent, Channel } from "@agenteschat/client";
-import { keys, useArchiveChannel, useDms, useMarkChannelRead } from "@agenteschat/client";
+import {
+  keys,
+  useArchiveChannel,
+  useDms,
+  useMarkChannelRead,
+  useMuteChannel,
+  usePeople,
+  useRoles,
+} from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
+import { leaves, removes } from "@agenteschat/client/lib/roles";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -14,6 +23,7 @@ import { useLiveStore } from "@/realtime/context";
 import { useOpenAgentPanel } from "./agent-panel-context";
 import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
+import { useRemoveMemberDialog } from "./RemoveMember";
 import { isStoppable, useStopRun } from "./StopRun";
 
 /*
@@ -90,6 +100,22 @@ function useCopyHandle() {
       : [];
 }
 
+/** "Copiar ID", last in its menu, as in Discord. */
+function useCopyId() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  return (id: string): MenuEntry[] => [
+    { kind: "separator" },
+    {
+      kind: "item",
+      id: "copy-id",
+      label: t("contextMenu.copyId"),
+      icon: "copy",
+      run: () => void copyText(id, () => toast.show(t("contextMenu.idCopied"))),
+    },
+  ];
+}
+
 /** "Mencionar": `@handle` in the composer, inside a conversation only. */
 function useMention() {
   const { t } = useTranslation();
@@ -118,12 +144,29 @@ export function useChannelMenu() {
   const toast = useToast();
   const navigate = useNavigate();
   const markRead = useMarkRead();
+  const mute = useMuteChannel(org.id);
   const archive = useArchiveChannelWithUndo();
   return (c: Channel, extra: MenuEntry[] = []): MenuEntry[] => {
     const manages = managesChannel(c, me.user.id, org);
     return [
       { kind: "header", label: `#${c.name}` },
       ...markRead(c.id, c.unreadCount ?? 0),
+      // Muted, it never looks unread to me (a mention of me still counts).
+      ...(c.isMember
+        ? [
+            {
+              kind: "item" as const,
+              id: "mute",
+              label: c.muted ? t("contextMenu.unmuteChannel") : t("contextMenu.muteChannel"),
+              icon: c.muted ? ("eye" as const) : ("eyeOff" as const),
+              run: () =>
+                mute.mutate(
+                  { channelId: c.id, muted: !c.muted },
+                  { onError: (e) => toast.show(errorText(t, e), "error") },
+                ),
+            },
+          ]
+        : []),
       {
         kind: "item",
         id: "edit",
@@ -161,8 +204,8 @@ export function useChannelMenu() {
 }
 
 /**
- * An agent (sidebar row, its face or name in a message): talk, its profile, mention, copy @, mark its DM read, edit
- * (its owner and admins), its link, and stop while it works.
+ * An agent (sidebar row, its face or name in a message, its card's ⋯): talk, its profile, mention, copy @, mark its DM
+ * read, edit (its owner and admins), its link, stop while it works, its id.
  */
 export function useAgentMenu() {
   const { t } = useTranslation();
@@ -175,6 +218,7 @@ export function useAgentMenu() {
   const dms = useDms(org.id).data;
   const markRead = useMarkRead();
   const copyHandle = useCopyHandle();
+  const copyId = useCopyId();
   const mention = useMention();
   return (a: Pick<Agent, "id" | "name" | "handle" | "ownerUserId">): MenuEntry[] => {
     const dm = dms?.find((d) => d.with.id === a.id);
@@ -236,22 +280,34 @@ export function useAgentMenu() {
             },
           ] satisfies MenuEntry[])
         : []),
+      ...copyId(a.id),
     ];
   };
 }
 
-/** A person (sidebar row, their face or name in a message): DM, their card (`openCard`), mention, copy @, mark read. */
+/**
+ * A person (sidebar row, Members, their face or name in a message, their card's ⋯): DM, their card (`openCard`),
+ * mention, copy @, mark read, Remover do workspace for who may (Sair do workspace on one's own), their id.
+ */
 export function usePersonMenu() {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const navigate = useNavigate();
   const dms = useDms(org.id).data;
+  const people = usePeople(org.id).data ?? [];
+  const roles = useRoles(org.id).data?.roles ?? [];
+  const remove = useRemoveMemberDialog();
   const markRead = useMarkRead();
   const copyHandle = useCopyHandle();
+  const copyId = useCopyId();
   const mention = useMention();
+  const viewer = { role: org.role, rank: org.rank, userId: me.user.id, permissions: org.permissions };
   return (p: { userId: string; name: string; handle?: string | null }, openCard?: () => void): MenuEntry[] => {
     const dm = dms?.find((d) => d.with.id === p.userId);
     const handle = p.handle ?? undefined;
+    const mine = p.userId === me.user.id;
+    const person = people.find((x) => x.userId === p.userId);
+    const out = remove && person && (mine ? leaves(org, people) : removes(viewer, person, roles));
     return [
       { kind: "header", label: p.name },
       ...(p.userId !== me.user.id
@@ -274,6 +330,20 @@ export function usePersonMenu() {
       ...mention(handle),
       ...copyHandle(handle),
       ...markRead(dm?.channelId, dm?.unread ?? 0),
+      ...(out
+        ? ([
+            { kind: "separator" },
+            {
+              kind: "item",
+              id: "remove",
+              label: mine ? t("members.remove.leave") : t("members.remove.item"),
+              icon: mine ? "arrowRight" : "trash",
+              danger: true,
+              run: () => remove(p),
+            },
+          ] satisfies MenuEntry[])
+        : []),
+      ...copyId(p.userId),
     ];
   };
 }

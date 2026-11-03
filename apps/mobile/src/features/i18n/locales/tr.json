@@ -805,6 +805,8 @@
       "connector_tool_changed_other": "Bağlı bir sunucu, onayladığınız araçları değiştirdi",
       "computer_disk_full_one": "Bir bilgisayarın diski neredeyse dolu",
       "computer_disk_full_other": "Bir bilgisayarın diski neredeyse dolu",
+      "computer_no_chrome_one": "Bir bilgisayarın Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
+      "computer_no_chrome_other": "Bilgisayarların Google Chrome'a ihtiyacı var. google.com/chrome adresinden indirin",
       "app_created_one": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu",
       "app_created_other": "Bir yapay zeka uygulaması sizin için bir şeyler oluşturdu"
     },
@@ -897,7 +899,7 @@
     "issuesWithMe_one": "{{count}} tanesi sizde",
     "issuesWithMe_other": "{{count}} tanesi sizde",
     "drive": "Drive",
-    "connectors": "Bağlayıcılar",
+    "connectors": "Bağlayıcılar ve MCP'ler",
     "usage": "Kullanım",
     "preferences": "Tercihler",
     "editProfile": "Profili düzenle",
@@ -1495,11 +1497,12 @@
     }
   },
   "connectors": {
-    "title": "Bağlayıcılar",
+    "title": "Bağlayıcılar ve MCP'ler",
     "search": "Bir hizmet arayın",
+    "mcps": "MCP'ler",
+    "mcpsNone": "Adresiyle bağladığınız MCP sunucuları burada görünür.",
+    "addMcp": "MCP ekle",
     "connected": "Bağlı",
-    "address": "Adres",
-    "byAddress": "Adresle",
     "suggested": "{{org}} için önerilenler",
     "all": "Tümü",
     "empty": "Ajanlarınız henüz hiçbir şey kullanmıyor",

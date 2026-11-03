@@ -349,6 +349,12 @@ export const Channel = z
       description:
         "Channel list only: messages since you last read it (since you joined, if never), not yours; a thread reply counts only in a thread you follow; an agent's sticker or GIF after its own reply never (ADR 0091). At most 100; 0 when you're not a member.",
     }),
+    mentionCount: z.number().int().optional().openapi({
+      description: "Channel list only: of `unreadCount`, the messages that mention you (counted even while muted).",
+    }),
+    muted: z.boolean().optional().openapi({
+      description: "Channel list only: you muted it, so it never looks unread (`PUT`/`DELETE …/mute`).",
+    }),
     lastMessage: z
       .object({
         id: z.uuid(),
@@ -483,6 +489,9 @@ const MessageBase = z.object({
           computer: z.enum(["queued", "away"]).optional().openapi({
             description:
               "`waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`).",
+          }),
+          passed: z.literal(true).optional().openapi({
+            description: "It ended without answering: passed and posted nothing, or canceled before it started.",
           }),
         }),
       ),

@@ -121,6 +121,8 @@
     "color": "Warna",
     "colorDesc": "Mewarnai tanda peran.",
     "colorOf": "Warna {{color}}",
+    "hoist": "Tampilkan terpisah di daftar anggota",
+    "hoistDesc": "Orang dengan peran ini mendapat grup sendiri di kolom anggota.",
     "icon": "Ikon",
     "iconDesc": "Ditampilkan di samping nama.",
     "more": "Opsi lainnya",
@@ -1054,9 +1056,13 @@
     "lookOurs": "agentes.chat",
     "lookSystem": "Sistem",
     "markRead": "Tandai sudah dibaca",
+    "muteChannel": "Bisukan saluran",
+    "unmuteChannel": "Bunyikan saluran",
     "mention": "Sebut",
     "copyHandle": "Salin @{{handle}}",
     "handleCopied": "@ disalin.",
+    "copyId": "Salin ID",
+    "idCopied": "ID disalin.",
     "editAgent": "Ubah agen",
     "openPage": "Buka halaman penuh",
     "moveUp": "Pindah ke atas",
@@ -1165,9 +1171,8 @@
     "sidebarMenu": {
       "title": "Bilah samping",
       "newChannel": "Kanal baru",
-      "newAgentGroup": "Grup agen baru",
       "addToChannels": "Kanal atau kategori baru",
-      "addToAgents": "Buat agen atau grup",
+      "addToDms": "Pesan baru atau agen",
       "newMessage": "Pesan baru",
       "addMembers": "Tambah orang atau agen",
       "channelSettings": "Pengaturan kanal",
@@ -1261,6 +1266,9 @@
     "pendingApprovals_other": "{{count}} persetujuan tertunda",
     "home": "Beranda",
     "notifications": "Notifikasi",
+    "unreadMark": "Belum dibaca",
+    "unreadMentions_other": "{{count}} sebutan untuk Anda",
+    "unreadThreads_other": "Thread: {{count}} dengan balasan belum dibaca",
     "unreadNotifications_other": "{{count}} notifikasi belum dibaca"
   },
   "agentGroups": {
@@ -1293,6 +1301,9 @@
   },
   "team": {
     "title": "Tim",
+    "groups": {
+      "title": "Grup agen"
+    },
     "subtitle_other": "{{count}} agen, dikelompokkan berdasarkan siapa yang mengurusnya.",
     "working_other": "{{count}} sedang bekerja.",
     "skyLabel": "Agen dikelompokkan berdasarkan penanggung jawabnya. Ketuk agen untuk melihat apa yang dikerjakannya.",
@@ -1368,10 +1379,15 @@
       "button_other": "Pesan yang disematkan ({{count}})",
       "label": "Pesan yang disematkan di #{{channel}}",
       "in": "Disematkan di #{{channel}}",
-      "unpin": "Lepas sematan pesan {{name}}"
+      "unpin": "Lepas sematan pesan {{name}}",
+      "empty": "Belum ada yang disematkan di sini"
+    },
+    "header": {
+      "pins": "Pesan yang disematkan",
+      "showMembers": "Tampilkan anggota",
+      "hideMembers": "Sembunyikan anggota"
     },
     "membersButton_other": "Anggota kanal ({{count}})",
-    "membersPeople": "Orang",
     "membersAgents": "Agen",
     "you": "kamu",
     "agentState": {
@@ -1381,7 +1397,6 @@
     },
     "autoReplyChip": "menjawab tanpa disebut",
     "coordinatorChip": "mengoordinasikan tim",
-    "seeDetails": "Lihat detail kanal",
     "more": "Tindakan pesan lainnya",
     "copyLink": "Salin tautan",
     "linkCopied": "Tautan disalin.",
@@ -1403,7 +1418,6 @@
     "messages": "Pesan",
     "members": "Anggota: {{names}}",
     "details": "Detail kanal",
-    "agentsAnswer_other": "{{names}} menjawab di sini",
     "composerLabel": "Kirim pesan ke #{{channel}}",
     "composerDm": "Kirim pesan ke {{name}}",
     "composerPlaceholder": "Kirim pesan ke #{{channel}} · pakai @ untuk memanggil agen",
@@ -1436,6 +1450,13 @@
     "generalName": "#general tetap dengan namanya.",
     "archive": "Arsipkan kanal",
     "archived": "#{{channel}} diarsipkan. Percakapannya tetap disimpan.",
+    "delete": "Hapus kanal",
+    "deleteTitle": "Hapus #{{channel}} untuk selamanya?",
+    "deleteGoes": "Hilang sekarang: pesan, utas, file dan sematan, apa yang diingat agen dari kanal ini, serta rutinitas yang memposting di sini.",
+    "deleteIssues": "Tugasnya juga ikut terhapus, karena hanya anggota channel yang bisa melihatnya.",
+    "deleteOrArchive": "Untuk menyimpan percakapannya, arsipkan kanal alih-alih menghapusnya.",
+    "deleteTypeName": "Ketik {{channel}} untuk mengonfirmasi",
+    "deleteDone": "#{{channel}} telah dihapus.",
     "detailsSub": "{{category}} · {{visibility}}",
     "visibilityPublic": "Publik",
     "visibilityPrivate": "Privat",
@@ -1475,6 +1496,7 @@
     "claimed_other": "{{names}} sedang menjawab",
     "waiting_other": "{{names}} menunggu persetujuan",
     "handled_other": "{{names}} sudah menjawab",
+    "passed_other": "Tidak ada yang menjawab",
     "failed_other": "{{names}} tidak bisa menjawab",
     "asking_other": "{{names}} menunggu jawabanmu",
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
@@ -1494,6 +1516,7 @@
       "handled": "Sudah menjawab",
       "failed": "Gagal",
       "referenced": "Hanya disebut",
+      "passed": "Tidak menjawab",
       "reacted": "Bereaksi"
     },
     "failedShort": "Tidak bisa menjawab",
@@ -1690,7 +1713,8 @@
     },
     "useAnyway": "Pakai {{email}}",
     "assignFailed": "Akun {{label}} sudah terhubung, tapi {{agent}} tidak bisa beralih ke akun itu.",
-    "noAgents": "Paket hanya berpikir untuk agen milik pemiliknya, dan kamu belum punya agen.",
+    "forNewAgents": "{{label}} sudah terhubung. Agen yang kamu buat berpikir dengannya.",
+    "forNewAgentsHint": "Agen yang kamu buat berpikir dengannya.",
     "done": "Selesai",
     "agent": "Untuk agen mana",
     "keyLocked": "Hanya Admin yang bisa menambahkan kunci API.",
@@ -1787,6 +1811,17 @@
     },
     "connect": "Hubungkan",
     "connected": "Terhubung",
+    "connect_app": {
+      "title": "Hubungkan {{name}}",
+      "mcp": "Tambah server MCP",
+      "adminOnly": "Admin yang menghubungkannya"
+    },
+    "invite": {
+      "title_other": "Undang {{count}} orang",
+      "open": "Undang",
+      "done": "Undangan terkirim",
+      "adminOnly": "Orang yang boleh mengundang yang mengirimnya"
+    },
     "agentProposal": {
       "title": "{{agent}} mengusulkan agen baru",
       "review": "Tinjau",
@@ -1876,6 +1911,7 @@
     "routine": {
       "created": "Membuat rutinitas <b>{{name}}</b> · {{schedule}}",
       "created_bare": "Membuat rutinitas <b>{{name}}</b>",
+      "ownActions": "Dilakukan sendiri, tanpa bertanya: {{actions}}",
       "updated": "Mengubah {{fields}} di rutinitas <b>{{name}}</b>",
       "updated_paused": "Menjeda rutinitas <b>{{name}}</b>",
       "updated_resumed": "Melanjutkan rutinitas <b>{{name}}</b>",
@@ -2067,6 +2103,12 @@
   "profile": {
     "audience": "Siapa yang bisa bicara",
     "cardLabel": "Profil",
+    "roles": "Peran",
+    "memberSince": "Di ruang kerja sejak",
+    "messageTo": "Pesan untuk {{name}}",
+    "audienceEdit": "Ubah",
+    "nowIn": "sekarang, di #{{channel}}",
+    "more": "Lainnya",
     "of": "Profil {{name}}",
     "presence": "Kehadiran",
     "offline": "Belum bergabung",
@@ -3365,6 +3407,8 @@
         "org_deleting": "Ruang kerja sedang dihapus.",
         "agent_paused": "Agen sedang dijeda.",
         "computer_busy": "Komputer terus sibuk dengan tugas lain.",
+        "computer_failed": "Komputer mengalami masalah dan berhenti.",
+        "computer_timeout": "Komputer terlalu lama menjawab.",
         "unknown": "Gagal."
       }
     },
@@ -3734,6 +3778,7 @@
       "handleTaken": "@{{handle}} sudah dipakai agen atau orang lain. Bagaimana kalau @{{suggestion}}?",
       "modelUnavailable": "Pilih model yang bisa dipakai ruang kerja."
     },
+    "noAi": "Ruang kerja ini belum punya AI. Hubungkan satu sekarang, atau buat agennya lalu hubungkan nanti.",
     "instructions": "Instruksi",
     "instructionsPlaceholder": "Misalnya, menjawab pertanyaan pelanggan di #support berdasarkan dokumentasi. Saat tidak tahu, memanggil seseorang di tim.",
     "startedFrom": "Dimulai dari teks {{role}}",
@@ -3870,6 +3915,13 @@
     "routineNotMade": "Rutinitas tidak dibuat: {{reason}}"
   },
   "members": {
+    "column": {
+      "label": "Anggota #{{channel}}",
+      "group": "{{name}} — {{count}}",
+      "ownerTitle": "Pemilik workspace",
+      "more": "Tampilkan {{count}} lagi",
+      "find": "Cari orang dan agen"
+    },
     "agentsOnlyYou": "Agenmu hanya menjawabmu.",
     "agentsOnlyYouHint": "Dengan paket, kamu bisa membiarkan tiap agen menjawab orang lain dari halamannya.",
     "filters": "Filter orang",
@@ -3892,7 +3944,6 @@
       "on": "pada {{date}}"
     },
     "waitingTitle": "Menunggumu",
-    "more": "Tindakan lain untuk {{name}}",
     "remove": {
       "item": "Keluarkan dari ruang kerja",
       "leave": "Keluar dari ruang kerja",
@@ -4217,7 +4268,7 @@
     },
     "setup_write": {
       "label": "Siapkan ruang kerja",
-      "description": "Tawarkan untuk menghubungkan AI lewat kartu yang diklik seseorang, dan buat kanal untuk yang meminta, dengan Urungkan."
+      "description": "Tawarkan untuk menghubungkan AI, aplikasi, atau server MCP, atau mengundang orang, lewat kartu yang diklik seseorang, dan buat kanal untuk yang meminta, dengan Urungkan."
     },
     "github_git_read": {
       "label": "Kloning repositori (git)",
@@ -4697,7 +4748,12 @@
         "forum": "Agen berdiskusi di topik forum",
         "artifact": "Menjadi dokumen di Drive"
       },
-      "ahead": "Disiapkan untuk nanti"
+      "ahead": "Disiapkan untuk nanti",
+      "ownActions": "Dilakukan sendiri"
+    },
+    "ownActions": {
+      "hint": "Setiap jalannya melakukan ini di aplikasi terhubung kamu tanpa bertanya. Tindakan lain di sana meminta persetujuan seseorang dulu, dan merge, deploy, serta rollback selalu meminta.",
+      "none": "Di aplikasi terhubung, rutinitas ini meminta persetujuan seseorang sebelum setiap tindakan. Agar bisa bekerja sendiri, beri tahu agen di chat tindakan apa saja yang boleh dilakukan."
     },
     "ahead": {
       "approved": "Disetujui · jalan {{when}}",
@@ -6100,9 +6156,10 @@
     "bodyHelp": "Isi SKILL.md.",
     "writeMissing": "Isi nama, kapan dipakai, dan instruksinya.",
     "files": "File",
-    "needsSandbox": "butuh sandbox",
+    "needsSandbox": "tidak disimpan",
+    "assetLimit": "Satu skill menyimpan hingga {{max}} MB gambar dan file lain.",
     "runsOnPc": "berjalan di PC agen",
-    "reinstall": "Pasang ulang untuk memakai skripnya.",
+    "reinstall": "Pasang ulang skill agar agen bisa memakai file ini.",
     "edit": "Ubah",
     "save": "Simpan",
     "saved": "{{name}} disimpan.",
@@ -8227,6 +8284,12 @@
   "connectors": {
     "title": "Konektor",
     "add": "Tambah konektor",
+    "mcp": {
+      "title": "MCP",
+      "add": "Tambah MCP",
+      "list": "Server MCP yang terhubung",
+      "none": "Server MCP yang kamu hubungkan lewat alamatnya muncul di sini."
+    },
     "addTitle": "Tambah konektor",
     "catalogText": "Hubungkan sekali untuk {{org}}. Lalu pilih apa yang bisa dipakai tiap agen.",
     "catalog": "Konektor yang tersedia",
@@ -9506,6 +9569,27 @@
       "relevance": "Paling relevan"
     },
     "searchHere": "Cari di percakapan ini",
+    "optionHint": {
+      "from": "nama",
+      "in": "kanal",
+      "has": "tautan, file, gambar, atau kartu",
+      "mentions": "nama"
+    },
+    "moreFiltersHint": "tanggal, hanya agen, disematkan",
+    "clearRecentAll": "Hapus pencarian terbaru",
+    "header": {
+      "placeholder": "Cari di {{org}}",
+      "clear": "Hapus pencarian"
+    },
+    "panel": {
+      "label": "Hasil pencarian",
+      "count_other": "{{count}} hasil",
+      "filters": "Filter",
+      "filtersCount_other": "Filter ({{count}})",
+      "jump": "Buka",
+      "jumpLabel": "Buka pesan dari {{name}}",
+      "threadIn": "utas di #{{channel}}"
+    },
     "dm": "DM dengan {{name}}"
   },
   "files": {
@@ -9838,6 +9922,7 @@
       "measuring": "Ukuran belum diukur",
       "diskFullNotice": "Disk {{name}} hampir penuh"
     },
+    "chromeMissingNotice": "{{name}} memerlukan Google Chrome untuk browser agen. Unduh di google.com/chrome",
     "access": {
       "folders": "Folder yang diizinkan",
       "ownFolder": "Folder tiap agen",
@@ -10318,6 +10403,7 @@
         "wiki": "halaman wiki",
         "mission": "misi",
         "thread": "utas",
+        "channel": "kanal",
         "forum": "topik forum",
         "artifact": "file Drive",
         "agent": "agen",
@@ -10401,7 +10487,7 @@
       "members": "Anggota dan undangan",
       "roles": "Peran dan izin",
       "access": "Agen dan akses",
-      "connectors": "Konektor",
+      "connectors": "Konektor dan MCP",
       "skills": "Skill",
       "keys": "Akun AI",
       "storage": "Penyimpanan",
@@ -10421,7 +10507,7 @@
       "members": "Siapa saja yang ada di ruang kerja, dan undangan.",
       "roles": "Yang bisa dilakukan tiap orang. Peran saling menambah.",
       "access": "Yang bisa dipakai tiap agen: satu tingkat per konektor.",
-      "connectors": "Layanan yang dihubungkan sekali untuk seluruh ruang kerja.",
+      "connectors": "Layanan dan server MCP yang dihubungkan sekali untuk seluruh ruang kerja.",
       "skills": "Instruksi Markdown yang dibuka agen saat dibutuhkan.",
       "keys": "Paketmu dan kunci API ruang kerja.",
       "storage": "Tempat file ruang kerja disimpan.",
@@ -10951,6 +11037,8 @@
         "readingForum": "Membaca forum",
         "creatingChannel": "Membuat kanal",
         "offeringConnectAi": "Menawarkan menghubungkan AI",
+        "offeringConnectApp": "Menawarkan menghubungkan aplikasi",
+        "offeringInvites": "Menawarkan mengundang orang",
         "proposingAgent": "Mengusulkan agen",
         "askingAgent": "Bertanya ke agen lain",
         "tellingAgent": "Memberi tahu agen lain",
@@ -11033,6 +11121,8 @@
       "readingForum": "membaca forum",
       "creatingChannel": "membuat kanal",
       "offeringConnectAi": "menyiapkan AI untuk dihubungkan",
+      "offeringConnectApp": "menyiapkan aplikasi untuk dihubungkan",
+      "offeringInvites": "menyiapkan undangan",
       "proposingAgent": "mengusulkan agen",
       "askingAgent": "bertanya ke agen lain",
       "tellingAgent": "memberi tahu agen lain",
@@ -11138,6 +11228,9 @@
       "no_ai_signed_out": "Aku belum bisa menjawab: AI-ku sudah keluar.",
       "no_ai_not_signed_in": "Aku belum bisa menjawab: {{brain}} belum masuk di komputerku.",
       "action_connect_ai": "Hubungkan AI",
+      "action_connect_app": "Hubungkan {{name}}",
+      "action_add_mcp": "Tambah server MCP",
+      "action_invite_people": "Undang orang",
       "agent_proposal": "Mengusulkan agen baru: {{name}}",
       "approval_request": "Permintaan persetujuan: {{title}}",
       "secret_request": "{{agent}} meminta kunci: {{name}}",
@@ -11334,6 +11427,14 @@
     "offer_connect_ai": {
       "label": "Tawarkan menghubungkan AI",
       "description": "Memposting kartu yang tombolnya membuka dialog untuk menghubungkan paket atau kunci API."
+    },
+    "offer_connect_app": {
+      "label": "Tawarkan menghubungkan aplikasi atau MCP",
+      "description": "Memposting kartu yang tombolnya membuka dialog untuk menghubungkan aplikasi atau server MCP lewat alamatnya."
+    },
+    "offer_invites": {
+      "label": "Tawarkan mengundang orang",
+      "description": "Memposting kartu yang tombolnya membuka dialog undangan dengan alamat yang sudah terisi."
     },
     "propose_agent": {
       "label": "Usulkan agen",

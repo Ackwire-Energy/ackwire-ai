@@ -5,7 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { NEW_CHANNEL_EVENT } from "@/components/Sidebar";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -24,7 +24,8 @@ const as = (role: "owner" | "member", state = seedState()) => {
 };
 /**
  * Acme where Ada answers only João, her owner, and is Integrations' only agent; #eng sits in Engenharia, and
- * Diretoria holds only private channels I'm not in (the server leaves them out of my list). I am Walter.
+ * Diretoria holds only private channels I'm not in (the server leaves them out of my list). I am Walter, with a DM
+ * with each agent (Atlas's the latest).
  */
 function acme(role: "owner" | "member") {
   const state = as(role);
@@ -36,6 +37,8 @@ function acme(role: "owner" | "member") {
     { id: BOARD, name: "Diretoria", position: 1 },
   ];
   for (const c of state.channels) if (c.id === ENG_ID) c.categoryId = ENGINEERING;
+  seedDm(state, { type: "agent", id: ADA_ID }, { ago: 2 });
+  seedDm(state, { type: "agent", id: ATLAS_ID }, { ago: 1 });
   return state;
 }
 const go = async (state: State, path = `c/${ENG_ID}`) => {
@@ -52,7 +55,7 @@ const typeIn = (el: HTMLTextAreaElement, value: string) =>
   });
 
 describe("what a member's sidebar lists", () => {
-  test("only the agents that answer them, and no group left with none of those", async () => {
+  test("only the DMs of agents that answer them, and no agent group", async () => {
     await go(acme("member"));
     expect(agentRows()).toEqual(["Atlas"]);
     expect(sections()).not.toContain("Integrations");
@@ -63,7 +66,7 @@ describe("what a member's sidebar lists", () => {
 
   test("no category whose channels are all private ones they're not in", async () => {
     await go(acme("member"));
-    expect(sections()).toEqual(["Canais", "Engenharia", "Agentes", "Mensagens diretas"]);
+    expect(sections()).toEqual(["Canais", "Engenharia", "Mensagens diretas"]);
   });
 
   test("@ offers only the agents that answer them", async () => {
@@ -104,20 +107,22 @@ describe("what a member's sidebar lists", () => {
     expect(picker.textContent).not.toContain("Ada");
   });
 
-  test("owners and admins see every agent, locked ones with the lock, and every group and category", async () => {
+  test("owners and admins see every agent's DM, locked ones with the lock, and every category", async () => {
     await go(acme("owner"));
-    expect(sections()).toEqual(["Canais", "Engenharia", "Diretoria", "Agentes", "Integrations", "Mensagens diretas"]);
+    expect(sections()).toEqual(["Canais", "Engenharia", "Diretoria", "Mensagens diretas"]);
     expect(agentRows()).toEqual(["Atlas", "Ada"]);
     const ada = within(nav()).getByRole("link", { name: /^Ada/ });
     expect(within(ada).getByRole("img", { name: "Pessoal" })).toBeTruthy();
   });
 });
 
-describe("Equipe on the Agentes header", () => {
+describe("Equipe on the Mensagens diretas header", () => {
   const agentsHead = () => {
-    const toggle = [...nav().querySelectorAll(".sidebar__section-toggle")].find((b) => b.textContent === "Agentes");
+    const toggle = [...nav().querySelectorAll(".sidebar__section-toggle")].find(
+      (b) => b.textContent === "Mensagens diretas",
+    );
     const head = toggle?.closest(".sidebar__section-head");
-    if (!(head instanceof HTMLElement)) throw new Error("no Agentes header");
+    if (!(head instanceof HTMLElement)) throw new Error("no Mensagens diretas header");
     return head;
   };
 
@@ -126,7 +131,7 @@ describe("Equipe on the Agentes header", () => {
     const team = within(agentsHead()).getByRole("link", { name: "Equipe" });
     expect(team.getAttribute("href")).toBe(`/org/${ORG_ID}/team`);
     expect(team.getAttribute("title")).toBe("Equipe");
-    expect(within(agentsHead()).getByRole("button", { name: "Criar agente ou grupo" })).toBeTruthy();
+    expect(within(agentsHead()).getByRole("button", { name: "Nova mensagem ou agente" })).toBeTruthy();
     expect(within(nav()).getAllByRole("link", { name: "Equipe" })).toHaveLength(1);
     expect(team.getAttribute("data-status")).toBeNull();
     cleanup();

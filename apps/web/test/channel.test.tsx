@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -49,8 +49,10 @@ const until = (at: number) => act(() => new Promise((r) => setTimeout(r, Math.ma
 describe("Canal", () => {
   test("header, messages with agent replies inline, neutral mentions and code", async () => {
     await open();
-    expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
-    expect(screen().getByText("Código, erros e deploys · Ada e Atlas respondem aqui")).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "eng" })).toBeTruthy();
+    // The topic beside the name; who answers here is the members list's to say.
+    expect(screen().getByText("Código, erros e deploys")).toBeTruthy();
+    expect(screen().queryByText(/respondem aqui/)).toBeNull();
     const log = screen().getByRole("region", { name: "Mensagens" });
     const articles = within(log).getAllByRole("article");
     const ask = articles.find((a) => a.textContent?.includes("o login está devolvendo 401"));
@@ -94,7 +96,9 @@ describe("Canal", () => {
   });
 
   test("streams an agent reply with the running ring and cursor, then shows the final message", async () => {
-    const { socket } = await open();
+    const withDm = seedState();
+    seedDm(withDm, { type: "agent", id: ATLAS_ID });
+    const { socket } = await open(withDm);
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
     // Asked in the channel: it answers there, its events carry no thread.
@@ -107,7 +111,7 @@ describe("Canal", () => {
     expect(streaming?.textContent).toContain("escrevendo…");
     expect(streaming?.textContent).toContain("Os 401 no Sentry caíram de 312 para");
     expect(streaming?.querySelector(".ac-avatar--running")).not.toBeNull();
-    // The sidebar shows the ring too.
+    // Its DM in the sidebar shows the ring too.
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     expect(nav.querySelector(".ac-avatar--running")).not.toBeNull();
 
@@ -526,7 +530,9 @@ describe("Canal", () => {
 
   test("channel details: agents and people in groups, no search on a short list", async () => {
     await open();
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
+    await act(async () =>
+      fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
+    );
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
     expect(dialog.textContent).toContain("Agentes");
@@ -587,7 +593,9 @@ describe("Canal", () => {
 
   test("admins edit the channel topic from the details", async () => {
     const { state } = await open();
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Detalhes do canal" })));
+    await act(async () =>
+      fireEvent.click(within(screen().getByRole("main")).getByRole("button", { name: "Configurações do canal" })),
+    );
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "#eng" });
     await act(async () =>

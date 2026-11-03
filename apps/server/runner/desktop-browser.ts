@@ -20,8 +20,8 @@ import { toMachineError } from "./errors";
  *   itself). It takes one word, `open`: no address, no flag, nothing that widens what the browser reaches. The
  *   agent's own code can connect too: it answers one click at a time and holds a few connections at most.
  * - The runner answers once Chrome's window is on the desktop. When that takes more than a moment, a small window
- *   on the desktop says the browser is opening (or, before the agent's first browser, that Chrome for Testing
- *   installs) until then; when the browser can't open, one says why.
+ *   on the desktop says the browser is opening (or, before the agent's first browser, that `agent-browser`
+ *   downloads) until then; when the browser can't open, one says why.
  */
 
 /** The socket's name, in the folder of the desktop's password file. */
@@ -32,7 +32,7 @@ const OPEN = "open";
 const ASK_MS = 5000;
 /** Connections held at once: each is one of the runner's open files (root's, in system mode). */
 const CONNECTIONS_MAX = 4;
-/** Chrome for Testing's download and install, then Chrome's start: a click is given up after this. */
+/** `agent-browser`'s download, then Chrome's start: a click is given up after this. */
 export const SHOW_MS = 16 * 60_000;
 /**
  * A click answered sooner (Chrome already open, brought to the front: from the apps menu, say, since docklike handles
@@ -42,8 +42,8 @@ export const SHOW_MS = 16 * 60_000;
 const QUIET_MS = 300;
 
 /**
- * Answers the Browser of one agent's desktop on `socket`: `open` in; `installing` while Chrome for Testing
- * installs first, then `ok` (its window is on the desktop) or `error <code>`. One click at a time, until its
+ * Answers the Browser of one agent's desktop on `socket`: `open` in; `installing` while `agent-browser`
+ * downloads first, then `ok` (its window is on the desktop) or `error <code>`. One click at a time, until its
  * answer: one that comes meanwhile is told `busy` and starts nothing, and the first one's launcher shows what
  * happens. The socket takes its folder's group (the agent's, in system mode), and only that group may write to it.
  */
@@ -200,8 +200,8 @@ function ask(socket: string, installing: () => void, timeoutMs: number): Promise
 
 /**
  * `agentes-runner desktop-browser <socket>`, from the desktop (its session's environment): asks for the agent's
- * browser on it. A note says it is opening once that takes more than a moment, and that Chrome for Testing
- * installs first as soon as the runner says so; another one says why when it doesn't open.
+ * browser on it. A note says it is opening once that takes more than a moment, and that `agent-browser`
+ * downloads first as soon as the runner says so; another one says why when it doesn't open.
  */
 export async function runDesktopBrowser(
   socket: string,

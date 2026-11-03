@@ -130,6 +130,8 @@ export const en = {
     color: "Color",
     colorDesc: "Paints the role's mark.",
     colorOf: "{{color}} color",
+    hoist: "Show apart in the members list",
+    hoistDesc: "People with this role get a group of their own in the members column.",
     icon: "Icon",
     iconDesc: "Shown next to the name.",
     more: "More options",
@@ -1099,9 +1101,13 @@ export const en = {
     lookOurs: "agentes.chat",
     lookSystem: "System",
     markRead: "Mark as read",
+    muteChannel: "Mute channel",
+    unmuteChannel: "Unmute channel",
     mention: "Mention",
     copyHandle: "Copy @{{handle}}",
     handleCopied: "@ copied.",
+    copyId: "Copy ID",
+    idCopied: "ID copied.",
     editAgent: "Edit agent",
     openPage: "Open full page",
     moveUp: "Move up",
@@ -1180,9 +1186,8 @@ export const en = {
     sidebarMenu: {
       title: "Sidebar",
       newChannel: "New channel",
-      newAgentGroup: "New agent group",
       addToChannels: "New channel or category",
-      addToAgents: "Create agent or group",
+      addToDms: "New message or agent",
       newMessage: "New message",
       addMembers: "Add people or agents",
       channelSettings: "Channel settings",
@@ -1282,6 +1287,12 @@ export const en = {
     pendingApprovals_other: "{{count}} pending approvals",
     home: "Home",
     notifications: "Notifications",
+    /** Read by screen readers on an unread channel with no number (the pill at its edge). */
+    unreadMark: "Unread",
+    unreadMentions_one: "{{count}} mention of you",
+    unreadMentions_other: "{{count}} mentions of you",
+    unreadThreads_one: "Threads: {{count}} with unread replies",
+    unreadThreads_other: "Threads: {{count}} with unread replies",
     unreadNotifications_one: "{{count}} unread notification",
     unreadNotifications_other: "{{count}} unread notifications",
   },
@@ -1315,6 +1326,9 @@ export const en = {
   },
   team: {
     title: "Team",
+    groups: {
+      title: "Agent groups",
+    },
     subtitle_one: "{{count}} agent, grouped by who looks after it.",
     subtitle_other: "{{count}} agents, grouped by who looks after each one.",
     working_one: "{{count}} working now.",
@@ -1395,16 +1409,16 @@ export const en = {
       label: "Pinned messages in #{{channel}}",
       in: "Pinned in #{{channel}}",
       unpin: "Unpin {{name}}'s message",
+      empty: "Nothing pinned here yet",
     },
+    header: { pins: "Pinned messages", showMembers: "Show members", hideMembers: "Hide members" },
     membersButton_one: "Channel members ({{count}})",
     membersButton_other: "Channel members ({{count}})",
-    membersPeople: "People",
     membersAgents: "Agents",
     you: "you",
     agentState: { idle: "available", thinking: "thinking", writing: "writing" },
     autoReplyChip: "answers without a mention",
     coordinatorChip: "coordinates the team",
-    seeDetails: "See channel details",
     more: "More message actions",
     copyLink: "Copy link",
     linkCopied: "Link copied.",
@@ -1426,8 +1440,6 @@ export const en = {
     messages: "Messages",
     members: "Members: {{names}}",
     details: "Channel details",
-    agentsAnswer_one: "{{names}} answers here",
-    agentsAnswer_other: "{{names}} answer here",
     composerLabel: "Message #{{channel}}",
     composerDm: "Message {{name}}",
     composerPlaceholder: "Message #{{channel}} · use @ to call an agent",
@@ -1460,6 +1472,16 @@ export const en = {
     generalName: "#general keeps its name.",
     archive: "Archive channel",
     archived: "#{{channel}} archived. The conversation is kept.",
+    /** Delete channel: owners and admins, never #general; its name typed to confirm. */
+    delete: "Delete channel",
+    deleteTitle: "Delete #{{channel}} for good?",
+    deleteGoes:
+      "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it.",
+    /** A private channel's tasks (issues): nobody could open them once its members are gone. */
+    deleteIssues: "Its tasks go too, as only the channel's members could see them.",
+    deleteOrArchive: "To keep the conversation, archive the channel instead.",
+    deleteTypeName: "Type {{channel}} to confirm",
+    deleteDone: "#{{channel}} was deleted.",
     detailsSub: "{{category}} · {{visibility}}",
     visibilityPublic: "Public",
     visibilityPrivate: "Private",
@@ -1505,6 +1527,9 @@ export const en = {
     waiting_other: "{{names}} are waiting for approval",
     handled_one: "{{names}} answered",
     handled_other: "{{names}} answered",
+    /** Every agent it was for ended without answering. */
+    passed_one: "No one replied",
+    passed_other: "No one replied",
     failed_one: "{{names}} couldn't answer",
     failed_other: "{{names}} couldn't answer",
     asking_one: "{{names}} is waiting for your answer",
@@ -1530,6 +1555,7 @@ export const en = {
       handled: "Answered",
       failed: "Failed",
       referenced: "Only mentioned",
+      passed: "Didn't reply",
       reacted: "Reacted",
     },
     failedShort: "Couldn't answer",
@@ -1692,7 +1718,9 @@ export const en = {
     },
     useAnyway: "Use {{email}}",
     assignFailed: "The {{label}} account is connected, but {{agent}} couldn't switch to it.",
-    noAgents: "A plan thinks only for its owner's agents, and you have none yet.",
+    /** A plan connected by someone who owns no agent yet: it thinks for the agents they create. */
+    forNewAgents: "{{label}} is connected. The agents you create think with it.",
+    forNewAgentsHint: "The agents you create think with it.",
     done: "Done",
     agent: "For which agent",
     keyLocked: "Only an admin adds an API key.",
@@ -1789,6 +1817,18 @@ export const en = {
     },
     connect: "Connect",
     connected: "Connected",
+    connect_app: {
+      title: "Connect {{name}}",
+      mcp: "Add an MCP server",
+      adminOnly: "An admin connects it",
+    },
+    invite: {
+      title_one: "Invite {{count}} person",
+      title_other: "Invite {{count}} people",
+      open: "Invite",
+      done: "Invited",
+      adminOnly: "Someone who may invite sends it",
+    },
     agentProposal: {
       title: "{{agent}} proposes a new agent",
       review: "Review",
@@ -1875,6 +1915,8 @@ export const en = {
     routine: {
       created: "Created the routine <b>{{name}}</b> · {{schedule}}",
       created_bare: "Created the routine <b>{{name}}</b>",
+      /** Under a created routine's receipt: the connected-app actions its runs do without asking (tool names). */
+      ownActions: "Does on its own, without asking: {{actions}}",
       updated: "Changed {{fields}} of the routine <b>{{name}}</b>",
       updated_paused: "Paused the routine <b>{{name}}</b>",
       updated_resumed: "Resumed the routine <b>{{name}}</b>",
@@ -2075,6 +2117,12 @@ export const en = {
   profile: {
     audience: "Who can talk",
     cardLabel: "Profile",
+    roles: "Roles",
+    memberSince: "Member since",
+    messageTo: "Message {{name}}",
+    audienceEdit: "Edit",
+    nowIn: "now, in #{{channel}}",
+    more: "More",
     of: "Profile of {{name}}",
     presence: "Presence",
     offline: "Hasn't joined yet",
@@ -3380,6 +3428,9 @@ export const en = {
         org_deleting: "The workspace is being deleted.",
         agent_paused: "The agent is paused.",
         computer_busy: "The computer stayed busy with other tasks.",
+        /** A computer brain (Claude Code, Codex) stopped with an error code; the code shows only on hover. */
+        computer_failed: "The computer ran into a problem and stopped.",
+        computer_timeout: "The computer took too long to answer.",
         unknown: "Failed.",
       },
     },
@@ -3735,6 +3786,8 @@ export const en = {
       handleTaken: "@{{handle}} already belongs to another agent or person. How about @{{suggestion}}?",
       modelUnavailable: "Pick a model the workspace can use.",
     },
+    /** The model step with nothing to think with yet: the agent is created all the same. */
+    noAi: "This workspace has no AI yet. Connect one now, or create the agent and connect one after.",
     instructions: "Instructions",
     instructionsPlaceholder:
       "E.g. Answers customer questions in #support based on the docs. When it doesn't know, calls someone on the team.",
@@ -3863,6 +3916,14 @@ export const en = {
     routineNotMade: "The routine wasn't created: {{reason}}",
   },
   members: {
+    /** The channel's members column (and its sheet on a phone). */
+    column: {
+      label: "Members of #{{channel}}",
+      group: "{{name}} — {{count}}",
+      ownerTitle: "Workspace owner",
+      more: "Show {{count}} more",
+      find: "Find people and agents",
+    },
     agentsOnlyYou: "Your agents answer only you.",
     agentsOnlyYouHint: "On a plan, you can let each one answer other people on its page.",
     filters: "Filter people",
@@ -3886,7 +3947,6 @@ export const en = {
     /** When something happened, after a verb: "Asked through the link on Oct 22". */
     when: { on: "on {{date}}" },
     waitingTitle: "Waiting for you",
-    more: "More actions for {{name}}",
     // Remove from workspace, or leaving it: the confirmation says what goes with the person, from the server's preview.
     remove: {
       item: "Remove from workspace",
@@ -4189,7 +4249,7 @@ export const en = {
     setup_write: {
       label: "Set up the workspace",
       description:
-        "Offer to connect an AI with a card a person clicks, and create channels for whoever asked, with Undo.",
+        "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for whoever asked, with Undo.",
     },
     github_git_read: {
       label: "Clone repositories (git)",
@@ -4642,6 +4702,12 @@ export const en = {
         artifact: "Becomes a document in the Drive",
       },
       ahead: "Prepared for later",
+      ownActions: "Does on its own",
+    },
+    /** The connected-app actions a routine's runs do without asking: the job its creator set it up for. */
+    ownActions: {
+      hint: "Every run does these in your connected apps without asking. Any other action there asks a person first, and merge, deploy and rollback always ask.",
+      none: "In connected apps it asks a person before each action. To let it do its job on its own, tell the agent in the chat which actions it may do.",
     },
     ahead: {
       approved: "Approved · runs {{when}}",
@@ -6021,9 +6087,10 @@ export const en = {
     bodyHelp: "The body of SKILL.md.",
     writeMissing: "Fill in the name, when to use and the instructions.",
     files: "Files",
-    needsSandbox: "needs a sandbox",
+    needsSandbox: "not kept",
+    assetLimit: "A skill keeps up to {{max}} MB of images and other files.",
     runsOnPc: "runs on the agent's PC",
-    reinstall: "Reinstall to use the scripts.",
+    reinstall: "Reinstall the skill so agents can use this file.",
     edit: "Edit",
     save: "Save",
     saved: "{{name}} saved.",
@@ -8150,6 +8217,13 @@ export const en = {
   connectors: {
     title: "Connectors",
     add: "Add connector",
+    /** Settings › Connectors and MCPs: the second card, every MCP server connected by its address. */
+    mcp: {
+      title: "MCPs",
+      add: "Add MCP",
+      list: "Connected MCP servers",
+      none: "MCP servers you connect by their address show up here.",
+    },
     addTitle: "Add connector",
     catalogText: "Connect once for {{org}}. Then choose what each agent can use.",
     catalog: "Available connectors",
@@ -9201,6 +9275,22 @@ export const en = {
     noPlace: "No channel or DM by that name.",
     sort: { label: "Sort", newest: "Newest", oldest: "Oldest", relevance: "Most relevant" },
     searchHere: "Search in this conversation",
+    optionHint: { from: "name", in: "channel", has: "link, file, image or card", mentions: "name" },
+    moreFiltersHint: "dates, agents only, pinned",
+    clearRecentAll: "Clear recent searches",
+    /** The search at the top of a channel (Discord style): the field, and the results in the panel beside it. */
+    header: { placeholder: "Search {{org}}", clear: "Clear search" },
+    panel: {
+      label: "Search results",
+      count_one: "{{count}} result",
+      count_other: "{{count}} results",
+      filters: "Filters",
+      filtersCount_one: "Filters ({{count}})",
+      filtersCount_other: "Filters ({{count}})",
+      jump: "Jump",
+      jumpLabel: "Jump to {{name}}'s message",
+      threadIn: "thread in #{{channel}}",
+    },
     dm: "DM with {{name}}",
   },
   files: {
@@ -9534,6 +9624,8 @@ export const en = {
       measuring: "Size not measured yet",
       diskFullNotice: "The disk of {{name}} is almost full",
     },
+    /** A notice row's headline: the computer's runner found no Google Chrome, which agents' browsers now run on. */
+    chromeMissingNotice: "{{name}} needs Google Chrome for the agents' browser. Get it at google.com/chrome",
     access: {
       folders: "Allowed folders",
       ownFolder: "Each agent's folder",
@@ -10029,6 +10121,7 @@ export const en = {
         wiki: "a wiki page",
         mission: "a mission",
         thread: "a thread",
+        channel: "a channel",
         forum: "a forum topic",
         artifact: "a Drive file",
         agent: "an agent",
@@ -10112,7 +10205,7 @@ export const en = {
       members: "Members and invitations",
       roles: "Roles and permissions",
       access: "Agents and access",
-      connectors: "Connectors",
+      connectors: "Connectors and MCPs",
       skills: "Skills",
       keys: "AI accounts",
       storage: "Storage",
@@ -10133,7 +10226,7 @@ export const en = {
       members: "Who is in the workspace, and invitations.",
       roles: "What each person can do. Roles add up.",
       access: "What each agent can use: one level per connector.",
-      connectors: "Services connected once for the whole workspace.",
+      connectors: "Services and MCP servers connected once for the whole workspace.",
       skills: "Markdown instructions agents open when they need them.",
       keys: "Your plans and the workspace's API keys.",
       storage: "Where the workspace's files live.",
@@ -10692,6 +10785,8 @@ export const en = {
         readingForum: "Read the forum",
         creatingChannel: "Created a channel",
         offeringConnectAi: "Offered to connect an AI",
+        offeringConnectApp: "Offered to connect an app",
+        offeringInvites: "Offered to invite people",
         proposingAgent: "Proposed an agent",
         askingAgent: "Asked another agent",
         tellingAgent: "Told another agent",
@@ -10774,6 +10869,8 @@ export const en = {
       readingForum: "reading the forum",
       creatingChannel: "creating a channel",
       offeringConnectAi: "getting an AI ready to connect",
+      offeringConnectApp: "getting an app ready to connect",
+      offeringInvites: "getting invitations ready",
       proposingAgent: "proposing an agent",
       askingAgent: "asking another agent",
       tellingAgent: "telling another agent",
@@ -10889,6 +10986,9 @@ export const en = {
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
       action_connect_ai: "Connect an AI",
+      action_connect_app: "Connect {{name}}",
+      action_add_mcp: "Add an MCP server",
+      action_invite_people: "Invite people",
       agent_proposal: "Proposed a new agent: {{name}}",
       approval_request: "Approval request: {{title}}",
       secret_request: "{{agent}} asked for a key: {{name}}",
@@ -11093,6 +11193,14 @@ export const en = {
     offer_connect_ai: {
       label: "Offer to connect an AI",
       description: "Posts a card whose button opens the dialog to connect a plan or an API key.",
+    },
+    offer_connect_app: {
+      label: "Offer to connect an app or MCP",
+      description: "Posts a card whose button opens the dialog to connect an app or an MCP server by its address.",
+    },
+    offer_invites: {
+      label: "Offer to invite people",
+      description: "Posts a card whose button opens the invite dialog with the addresses filled in.",
     },
     propose_agent: {
       label: "Propose an agent",

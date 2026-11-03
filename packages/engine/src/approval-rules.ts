@@ -2,7 +2,7 @@ import { and, asc, type Database, type Executor, eq, inArray, schema } from "@ag
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError } from "./errors";
-import { can, requirePermission } from "./organizations";
+import { can, getMembership, requirePermission } from "./organizations";
 
 const { approvalRules, connectorConnections, customTools, users } = schema;
 
@@ -52,6 +52,16 @@ export function rememberedKindOf(value: unknown): RememberedKind | null {
   if (!v || typeof v.tool !== "string" || !v.tool || !Array.isArray(v.actions)) return null;
   if (!v.actions.every((a) => typeof a === "string" && a)) return null;
   return { tool: v.tool, actions: v.actions };
+}
+
+/** Whether `userId` decides an agent's approvals: its owner, or who holds `approve_actions`. */
+export async function decidesAgentApprovals(
+  db: Executor,
+  orgId: string,
+  userId: string,
+  agentOwnerUserId: string | null,
+): Promise<boolean> {
+  return agentOwnerUserId === userId || can(await getMembership(db, userId, orgId), "approve_actions");
 }
 
 /** The ids of the rules that cover this call, or null when one is missing. Read fresh: a removed rule asks at once. */

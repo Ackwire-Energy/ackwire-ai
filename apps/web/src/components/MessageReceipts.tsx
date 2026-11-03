@@ -5,20 +5,24 @@ import {
   type ReceiptView,
   receiptTicks,
   receiptView,
+  useApi,
   useModelLabel,
   useReactions,
   useSteerState,
 } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import { Icon, type IconName, PixelSpinner, Popover, ProviderLogo } from "@agenteschat/ui";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { FanOutStrip, QueuedWords } from "@/components/ComputerQueue";
 import { useConnectAi } from "@/components/ConnectAi";
 import { HelpLink } from "@/components/HelpLink";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useToast } from "@/lib/toast";
 import { useLive } from "@/realtime/context";
 import { CallAgentMenu, useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
@@ -71,7 +75,8 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
  * the time's line under my own turn (`part="check"`), never a line of its own, so it never changes the message's
  * height or the room before the next one. Clicking or focusing it opens a popover with each agent and its status, and
  * who picked them. The mark is the clock, one tick or two (`receiptTicks`). While the author's own plan picks, and
- * when no agent will answer (an agent's reaction counts as acting), "Chamar um agente" is in its popover: never a line
+ * when no agent will answer or every one it was for passed (an agent's reaction counts as acting), "Chamar um agente"
+ * is in its popover: never a line
  * in the timeline, which read as wrong beside an agent's reaction. A message sent into a task at work wears what
  * became of it there instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change.
  * Words only for what you can act on (a failure, no AI connected) or what nobody can (the AI provider is down, it
@@ -83,9 +88,12 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
+  const api = useApi();
+  const toast = useToast();
   const connect = useConnectAi();
   const modelLabel = useModelLabel();
   const steerId = useId();
+  const [retrying, setRetrying] = useState(false);
   const receipt = useLive((s) => s.receipts[message.id]);
   // The pills' list (live through `message.reactions`), else the message's: an agent's reaction is its answer.
   const reactions = useReactions(org.id, message.id, false).data ?? message.reactions;
@@ -101,8 +109,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <CallAgentMenu />
       </ReceiptAction>
     ) : null;
-  const nobody = status?.kind === "nobody";
-  // "Tentar de novo" sends the words again as mine: never an agent's.
+  // Nobody will answer, or every agent it was for ended without answering: a person can call one.
+  const nobody = status?.kind === "nobody" || status?.kind === "passed";
+  // "Tentar de novo" answers my message again: never an agent's.
   const worded =
     status?.kind === "outage" ||
     status?.kind === "queued" ||
@@ -142,7 +151,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   const phaseText = (id: string) => {
     const phase = phases.get(id) ?? "seen";
     if (phase === "no_ai") return t("noAi.chip");
-    if (phase === "seen" && reacted.has(id)) return t("receipts.status.reacted");
+    // A reaction was its answer, whatever its run's state says.
+    if (reacted.has(id)) return t("receipts.status.reacted");
     return view.referenced.includes(id) && phase === "seen"
       ? t("receipts.status.referenced")
       : t(`receipts.status.${phase}`);
@@ -259,11 +269,24 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       {status?.kind === "failed" && actions && (
         <span className="ac-receipt__words">
           <span>{t("receipts.failedShort")}</span>
-          <ReceiptAction>
-            <button type="button" className="ac-receipt__action" onClick={() => actions.resend(message.body)}>
-              {t("receipts.retry")}
-            </button>
-          </ReceiptAction>
+          {/* Only who asked: anyone else's click would be refused (`run.answer_forbidden`). */}
+          {message.author.id === me.user.id && (
+            <ReceiptAction>
+              <button
+                type="button"
+                className="ac-receipt__action"
+                disabled={retrying}
+                onClick={() => {
+                  setRetrying(true);
+                  void retryAnswer(api, org.id, message, () => actions.resend(message.body))
+                    .catch((error) => toast.show(errorText(t, error), "error"))
+                    .finally(() => setRetrying(false));
+                }}
+              >
+                {t("receipts.retry")}
+              </button>
+            </ReceiptAction>
+          )}
         </span>
       )}
       {status?.kind === "platform_cap" && (

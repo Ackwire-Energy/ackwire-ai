@@ -749,6 +749,7 @@
       "browser_profile_request_other": "{{names}} meminta satu profil browser lagi",
       "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",
+      "computer_no_chrome_other": "Komputer memerlukan Google Chrome. Unduh di google.com/chrome",
       "app_created_other": "Aplikasi AI membuat sesuatu untukmu"
     },
     "markRead": "Tandai sudah dibaca",
@@ -838,7 +839,7 @@
     "issues": "Tugas",
     "issuesWithMe_other": "{{count}} bersamamu",
     "drive": "Drive",
-    "connectors": "Konektor",
+    "connectors": "Konektor dan MCP",
     "usage": "Pemakaian",
     "preferences": "Preferensi",
     "editProfile": "Ubah profil",
@@ -1418,11 +1419,12 @@
     }
   },
   "connectors": {
-    "title": "Konektor",
+    "title": "Konektor dan MCP",
     "search": "Cari layanan",
+    "mcps": "MCP",
+    "mcpsNone": "Server MCP yang kamu hubungkan lewat alamatnya muncul di sini.",
+    "addMcp": "Tambah MCP",
     "connected": "Terhubung",
-    "address": "Alamat",
-    "byAddress": "Lewat alamat",
     "suggested": "Disarankan untuk {{org}}",
     "all": "Semua",
     "empty": "Agenmu belum memakai apa pun",

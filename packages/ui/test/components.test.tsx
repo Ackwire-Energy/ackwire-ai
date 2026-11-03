@@ -530,7 +530,7 @@ describe("Message", () => {
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`${selector} {`)[1]?.split("}")[0] ?? "";
     expect(rule(".ac-msg")).toContain("align-items: flex-start");
-    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 32px");
+    expect(rule(".ac-msg__avatar,\n.ac-msg__gutter")).toContain("flex: 0 0 36px");
     expect(rule(".ac-msg__avatar")).toContain("align-self: flex-start");
   });
 });

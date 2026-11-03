@@ -71,3 +71,7 @@ function withoutTrigger(
     trigger: content.slice(from).replace(/^\(current message\) /, ""),
   };
 }
+
+/** The system text with the conversation's part after it (and `extra`), for a brain or runner that takes no `conversation`. */
+export const systemWithConversation = (turn: Pick<BrainTurn, "system" | "conversation">, extra?: string) =>
+  [turn.system, turn.conversation, extra].filter(Boolean).join("\n\n");

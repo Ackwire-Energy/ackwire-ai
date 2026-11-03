@@ -62,14 +62,17 @@ allowed-tools:
  * A minimal zip writer (stored entries) for tests. `zip64`: the end record as git archive writes it past 65,535 files,
  * its count at the maximum and the real values in a zip64 record before it.
  */
-function zip(files: Record<string, string>, options: { zip64?: boolean } = {}) {
+/** The first bytes of a PNG: enough for the type read from its bytes. */
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function zip(files: Record<string, string | Uint8Array>, options: { zip64?: boolean } = {}) {
   const enc = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
   let offset = 0;
   for (const [path, text] of Object.entries(files)) {
     const name = enc.encode(path);
-    const data = enc.encode(text);
+    const data = typeof text === "string" ? enc.encode(text) : text;
     const local = new Uint8Array(30 + name.length + data.length);
     const lv = new DataView(local.buffer);
     lv.setUint32(0, 0x04034b50, true);
@@ -222,7 +225,7 @@ Body.`);
 });
 
 describe("import", () => {
-  test("a zip of the folder: SKILL.md + text files stored, scripts kept as scripts, binaries ignored", async () => {
+  test("a zip of the folder: SKILL.md, text files and images stored, scripts kept as scripts", async () => {
     f = await setup();
     const skill = await importSkillZip(
       skillDeps(),
@@ -238,7 +241,7 @@ describe("import", () => {
     );
     expect(skill).toMatchObject({ name: "relatorio-semanal", version: 1, source: "upload" });
     expect(skill.files.map((x) => [x.path, x.status])).toEqual([
-      ["logo.png", "ignored"],
+      ["logo.png", "stored"],
       ["run.sh", "script"],
       ["scripts/build.py", "script"],
       ["templates/relatorio.md", "stored"],
@@ -277,7 +280,7 @@ describe("import", () => {
     expect("files" in skill && skill.files.map((x) => [x.path, x.status])).toEqual([
       ["build.py", "script"],
       ["examples/inner/SKILL.md", "stored"],
-      ["logo.png", "ignored"],
+      ["logo.png", "stored"],
       ["templates/relatorio.md", "stored"],
     ]);
     expect(github.fetched).toEqual([
@@ -433,7 +436,7 @@ describe("import", () => {
     expect(await refusal("https://github.com/acme/skills", spent)).toMatchObject({ params: { count: 5 } });
   });
 
-  test("images and videos are only listed, so they don't count toward 2 MB; text past 2 MB is still refused", async () => {
+  test("images and videos are kept apart from the 2 MB of text, up to 20 MB; past it they are only listed", async () => {
     f = await setup();
     // A repository shaped like a real one: a video and screenshots past 2 MB next to a little Markdown.
     const url = "https://github.com/acme/skills";
@@ -450,24 +453,35 @@ describe("import", () => {
       url,
     );
     expect("files" in skill && skill.files.map((x) => [x.path, x.status])).toEqual([
-      ["assets/demo.mp4", "ignored"],
-      ["assets/shot.jpg", "ignored"],
+      ["assets/demo.mp4", "stored"],
+      ["assets/shot.jpg", "stored"],
       ["references/pricing.md", "stored"],
     ]);
+    expect("files" in skill && skill.files.find((x) => x.path === "assets/shot.jpg")).toMatchObject({
+      mime: "image/jpeg",
+      size: 670_000,
+    });
 
     const book = zip({ "skills-main/SKILL.md": SKILL_MD, "skills-main/book.md": "x".repeat(2_200_000) });
     await expect(
       importSkillFromUrl({ ...skillDeps(), fetch: fakeGithub({ archive: book }).fetch }, f.owner.id, f.org.id, url),
     ).rejects.toThrow("too large");
 
-    // The same in a zip: a big image is listed and never inflated, a big text file is refused.
+    // The same in a zip: images past 20 MB in all are listed and never inflated, a big text file is refused.
     const zipped = await importSkillZip(
       skillDeps(),
       f.owner.id,
       f.org.id,
-      zip({ "SKILL.md": SKILL_MD, "assets/shot.png": "x".repeat(2_200_000) }),
+      zip({
+        "SKILL.md": SKILL_MD,
+        "assets/shot.png": "x".repeat(2_200_000),
+        "assets/huge.png": "x".repeat(SKILL_LIMITS.assetBytes),
+      }),
     );
-    expect(zipped.files.map((x) => [x.path, x.status])).toEqual([["assets/shot.png", "ignored"]]);
+    expect(zipped.files.map((x) => [x.path, x.status, x.size])).toEqual([
+      ["assets/huge.png", "ignored", SKILL_LIMITS.assetBytes],
+      ["assets/shot.png", "stored", 2_200_000],
+    ]);
     await expect(
       importSkillZip(
         skillDeps(),
@@ -587,10 +601,10 @@ describe("private repositories", () => {
     ]);
     expect(github.requests.filter((r) => r.auth && !r.url.startsWith("https://api.github.com/"))).toEqual([]);
 
-    // The same limits as a public link: the video is only listed.
+    // The same limits as a public link: the video is kept.
     const [deploy] = await importPickedSkills(deps, f.owner.id, f.org.id, url, ["team/deploy"]);
     expect(deploy).toMatchObject({ name: "deploy", sourceVia: "github" });
-    expect(deploy?.files.map((x) => [x.path, x.status])).toEqual([["demo.mp4", "ignored"]]);
+    expect(deploy?.files.map((x) => [x.path, x.status])).toEqual([["demo.mp4", "stored"]]);
 
     // Updating reads through the connection again, not without credentials first.
     const before = github.requests.length;
@@ -819,6 +833,81 @@ describe("runtime", () => {
     expect(results[2]).toMatchObject({ name: "read_skill_file", isError: true });
   });
 
+  test("read_skill_file shows an image to a model brain; a PDF is described; files too large say so", async () => {
+    const reads = [
+      "references/diagram.png",
+      "references/photo.png",
+      "references/manual.pdf",
+      "references/big.jpg",
+      "references/huge.webp",
+    ];
+    let step = 0;
+    f = await setup({
+      skillTools: true,
+      reply: () => {
+        const path = reads[step++];
+        return path
+          ? { chunks: [], toolUses: [{ name: "read_skill_file", input: { name: "relatorio-semanal", path } }] }
+          : { chunks: ["ok"] };
+      },
+    });
+    const skill = await importSkillZip(
+      skillDeps(),
+      f.owner.id,
+      f.org.id,
+      zip({
+        "SKILL.md": SKILL_MD,
+        "references/diagram.png": PNG,
+        "references/photo.png": "GIF89a",
+        "references/manual.pdf": "%PDF-1.4",
+        "references/big.jpg": Uint8Array.from(
+          { length: SKILL_LIMITS.imageBytes + 1 },
+          (_, i) => [0xff, 0xd8, 0xff][i] ?? 0,
+        ),
+        "references/huge.webp": "x".repeat(SKILL_LIMITS.assetBytes),
+      }),
+    );
+    expect(skill.files.map((x) => [x.path, x.status])).toEqual([
+      ["references/big.jpg", "stored"],
+      ["references/diagram.png", "stored"],
+      ["references/huge.webp", "ignored"],
+      ["references/manual.pdf", "stored"],
+      ["references/photo.png", "stored"],
+    ]);
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev olha o diagrama",
+    });
+    await drainOutbox(f.db, f.handlers);
+
+    // The image goes to the model with the tool's result, as base64 of its bytes.
+    const results = f.provider.calls.flatMap((c) =>
+      c.request.messages.flatMap((m) => (typeof m.content === "string" ? [] : m.content)),
+    );
+    const diagram = results.find((b) => b.type === "tool_result" && b.content.includes("diagram.png"));
+    expect(diagram).toMatchObject({
+      images: [{ mediaType: "image/png", data: Buffer.from(PNG).toString("base64") }],
+    });
+    // Its type from its bytes, never its name: an API refuses an image sent under another type.
+    const photo = results.find((b) => b.type === "tool_result" && b.content.includes("photo.png"));
+    expect(photo).toMatchObject({ images: [{ mediaType: "image/gif" }] });
+    const steps = (await f.db.select().from(schema.agentRunSteps))
+      .filter((s) => s.kind === "tool_result")
+      .map((s) => s.data as { content: string; isError: boolean });
+    expect(steps[0]?.content).toBe(
+      "relatorio-semanal/references/diagram.png (image/png, 8 bytes): the image is attached.",
+    );
+    // Never the bytes in the run's steps.
+    expect(JSON.stringify(steps)).not.toContain(Buffer.from(PNG).toString("base64"));
+    expect(steps[2]).toMatchObject({ isError: false });
+    expect(steps[2]?.content).toContain(
+      "manual.pdf (application/pdf, 8 bytes): not text, so its content isn't shown here.",
+    );
+    expect(steps[3]?.content).toContain("It is too large to show you here (max 3.6 MB).");
+    expect(steps[4]).toMatchObject({ isError: true });
+    expect(steps[4]?.content).toContain("huge.webp (20.0 MB) was not kept: a skill keeps up to 20 MB of images");
+  });
+
   test("denying the tools hides them; other orgs never see the skill", async () => {
     f = await setup({ skillTools: true, reply: () => ({ chunks: ["ok"] }) });
     const skill = await importSkillZip(skillDeps(), f.owner.id, f.org.id, zip({ "SKILL.md": SKILL_MD }));
@@ -876,6 +965,24 @@ describe("files, counts and delete", () => {
     );
     await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, v1.id, "nope.md")).rejects.toBeInstanceOf(
       NotFoundError,
+    );
+
+    // A picture an older import only listed: reinstalling keeps it now. A kept one isn't text for this route.
+    const pictured = await importSkillZip(
+      skillDeps(),
+      f.owner.id,
+      f.org.id,
+      zip({ ...folder, "relatorio-semanal/a.png": "PNG" }),
+    );
+    await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, pictured.id, "a.png")).rejects.toThrow(
+      "not a text file (image/png, 3 bytes)",
+    );
+    await f.db
+      .update(schema.skillFiles)
+      .set({ status: "ignored", blobKey: null, size: 0 })
+      .where(eq(schema.skillFiles.path, "a.png"));
+    await expect(getSkillFile(skillDeps(), f.owner.id, f.org.id, pictured.id, "a.png")).rejects.toThrow(
+      "a.png was installed before skills kept images and other files that aren't text: ask a person to reinstall the skill",
     );
   });
 

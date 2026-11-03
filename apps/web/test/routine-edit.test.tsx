@@ -65,6 +65,20 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     expect(card("Resumo da semana").textContent).toContain("De segunda a sexta, às 08:30");
   });
 
+  test("the form says what it does on its own in connected apps, editing and new", async () => {
+    await open();
+    await menu("Resumo da semana", "Editar");
+    const dialog = screen().getByRole("dialog", { name: "Editar rotina" });
+    expect(within(dialog).getByRole("list", { name: "Faz sozinha" }).textContent).toBe("Enviar mensagem (Slack)");
+    expect(dialog.textContent).toContain("Qualquer outra ação neles pede aprovação antes");
+    await click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await settle(3);
+    await click(screen().getByRole("button", { name: "Nova rotina" }));
+    await settle(3);
+    const fresh = screen().getByRole("dialog", { name: "Nova rotina" });
+    expect(fresh.textContent).toContain("Nos apps conectados, ela pede aprovação antes de cada ação");
+  });
+
   test("nothing changed: Salvar just closes", async () => {
     const { state } = await open();
     await menu("Resumo da semana", "Editar");

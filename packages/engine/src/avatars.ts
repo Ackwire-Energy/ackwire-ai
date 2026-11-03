@@ -20,6 +20,10 @@ export function sniffImage(bytes: Uint8Array): "image/jpeg" | "image/png" | "ima
   return null;
 }
 
+/** An image a model reads (PNG, JPEG, WebP or GIF) by its first bytes: the APIs refuse one sent under another type. */
+export const sniffModelImage = (bytes: Uint8Array) =>
+  sniffImage(bytes) ?? (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 ? "image/gif" : null);
+
 /** JPEG without EXIF/XMP (APP1), Photoshop/IPTC (APP13) or comments; the image data is untouched. */
 function stripJpeg(b: Uint8Array): Uint8Array {
   const out: Uint8Array[] = [b.subarray(0, 2)];

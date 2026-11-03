@@ -132,6 +132,12 @@ export const NOTIFICATION_KINDS = [
    */
   "computer_disk_full",
   /**
+   * A computer's runner drives its Google Chrome (ADR 0133) and it has none: the person who connected it (else who
+   * configures the workspace) hears it once each time it goes missing, `source.machineId` and its name in
+   * `source.label`. Never for the Cloud's computers, whose operators get an error report instead.
+   */
+  "computer_no_chrome",
+  /**
    * An AI app connected as the person created agents, routines, skills, memories or channels for them (ADR 0119):
    * one row per connection merging while unread, `latest.title` the app's name and `latest.created` how many of each
    * kind; `source.agentId` or `source.routineId` the newest one it opens. Inbox only.

@@ -1,5 +1,5 @@
 import type { SeriesScope } from "@agenteschat/client";
-import { Button, Dialog, DialogFooter } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 
 /** "Só este / Este e os próximos / Todos" for an edit (or delete) of a recurring event. */
@@ -24,13 +24,13 @@ export function SeriesPrompt({
       closeLabel={t("common.close")}
       width={420}
     >
-      <div className="cal-series">
+      <DialogBody className="cal-series">
         {(["this", "following", "all"] as const).map((scope) => (
           <Button key={scope} variant={scope === "this" ? "primary" : "default"} onClick={() => onPick(scope)}>
             {t(`calendar.series.${scope}`)}
           </Button>
         ))}
-      </div>
+      </DialogBody>
       <DialogFooter>
         <Button variant="ghost" onClick={onCancel}>
           {t("common.cancel")}

@@ -5,7 +5,7 @@ setupDom();
 
 import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
@@ -60,6 +60,7 @@ describe("a channel", () => {
     expect(event.defaultPrevented).toBe(true);
     expect(items()).toEqual([
       "Marcar como lida",
+      "Silenciar canal",
       "Editar canal",
       "Nova categoria com este canal",
       "Copiar link",
@@ -79,25 +80,41 @@ describe("a channel", () => {
 
   test("the channel's header has the same menu", async () => {
     await go();
-    await rightClick(screen().getByRole("heading", { level: 1, name: "# eng" }));
-    expect(items()).toEqual(["Editar canal", "Copiar link", "Arquivar canal"]);
+    await rightClick(screen().getByRole("heading", { level: 1, name: "eng" }));
+    expect(items()).toEqual(["Silenciar canal", "Editar canal", "Copiar link", "Arquivar canal"]);
   });
 });
 
+/** DMs with Ada, Atlas and João, so each has a row under "Mensagens diretas". */
+const withDms = () => {
+  const state = seedState();
+  seedDm(state, { type: "agent", id: ADA_ID });
+  seedDm(state, { type: "agent", id: ATLAS_ID });
+  seedDm(state, { type: "person", id: "u-joao" });
+  return state;
+};
+
 describe("an agent", () => {
-  test("Shift+F10 on its row: talk, profile, copy @, edit (owner or admin), link", async () => {
-    await go();
+  test("Shift+F10 on its row: talk, profile, copy @, edit (owner or admin), link, id", async () => {
+    await go(undefined, withDms());
     const row = within(nav()).getByRole("link", { name: /^Ada/ });
     row.focus();
     await act(async () => fireEvent.keyDown(row, { key: "F10", shiftKey: true }));
     await settle(2);
-    expect(items()).toEqual(["Mensagem direta", "Ver perfil", "Copiar @ada", "Editar agente", "Copiar link"]);
+    expect(items()).toEqual([
+      "Mensagem direta",
+      "Ver perfil",
+      "Copiar @ada",
+      "Editar agente",
+      "Copiar link",
+      "Copiar ID",
+    ]);
     await pick("Copiar @ada");
     expect(copied.at(-1)).toBe("@ada");
   });
 
   test("the menu key opens it too; Editar agente goes to its settings", async () => {
-    const { router } = await go();
+    const { router } = await go(undefined, withDms());
     const row = within(nav()).getByRole("link", { name: /^Atlas/ });
     await act(async () => fireEvent.keyDown(row, { key: "ContextMenu" }));
     await settle(2);
@@ -108,12 +125,14 @@ describe("an agent", () => {
 });
 
 describe("a person", () => {
-  test("their sidebar row: DM and copy @", async () => {
-    await go();
+  test("their sidebar row: DM, copy @, remove (I may) and copy id", async () => {
+    await go(undefined, withDms());
     const row = nav().querySelector('a[href$="/dm/person/u-joao"]');
     if (!row) throw new Error("no row for João");
     await rightClick(row);
-    expect(items()).toEqual(["Mensagem direta", "Copiar @joao"]);
+    expect(items()).toEqual(["Mensagem direta", "Copiar @joao", "Remover do workspace", "Copiar ID"]);
+    await pick("Copiar ID");
+    expect(copied.at(-1)).toBe("u-joao");
   });
 
   test("their name in a message: also their card and Mencionar, which types the @ in the composer", async () => {
@@ -177,26 +196,27 @@ describe("the sidebar's sections, in my order", () => {
 
   test("the default order; Mover para baixo on Canais saves the new one; Restaurar ordem padrão goes back", async () => {
     const { state } = await go();
-    expect(blocks()).toEqual(["tools", "channels", "agents", "people"]);
+    // The agents' part is gone: three sections show, the saved order still has all four.
+    expect(blocks()).toEqual(["tools", "channels", "people"]);
     await act(async () => fireEvent.click(within(nav()).getByRole("button", { name: "Arrastar Canais" })));
     await settle(2);
     expect(within(menu()).getByRole("menuitem", { name: "Mover para cima" }).getAttribute("aria-disabled")).toBe(null);
     await pick("Mover para baixo");
-    expect(blocks()).toEqual(["tools", "agents", "channels", "people"]);
+    expect(blocks()).toEqual(["tools", "people", "channels"]);
     expect(state.calls.filter((c) => c.method === "orgs.setSidebarOrder").map((c) => c.args[1])).toEqual([
-      ["tools", "agents", "channels", "people"],
+      ["tools", "people", "agents", "channels"],
     ]);
 
-    await rightClick(within(nav()).getByRole("button", { name: "Agentes" }));
+    await rightClick(within(nav()).getByRole("button", { name: "Mensagens diretas" }));
     await pick("Restaurar ordem padrão");
-    expect(blocks()).toEqual(["tools", "channels", "agents", "people"]);
+    expect(blocks()).toEqual(["tools", "channels", "people"]);
     expect(state.calls.filter((c) => c.method === "orgs.setSidebarOrder").at(-1)?.args[1]).toBeNull();
   });
 
-  test("a saved order comes back: agents first; the top one can't go up", async () => {
+  test("a saved order comes back: DMs first; the top one can't go up", async () => {
     await go(`c/${ENG_ID}`, seedState({ sidebarOrder: ["agents", "people", "tools", "channels"] }));
-    expect(blocks()).toEqual(["agents", "people", "tools", "channels"]);
-    await rightClick(within(nav()).getByRole("button", { name: "Agentes" }));
+    expect(blocks()).toEqual(["people", "tools", "channels"]);
+    await rightClick(within(nav()).getByRole("button", { name: "Mensagens diretas" }));
     expect(within(menu()).getByRole("menuitem", { name: "Mover para cima" }).hasAttribute("data-disabled")).toBe(true);
   });
 });
@@ -241,29 +261,12 @@ describe("dragging in the sidebar", () => {
 });
 
 describe("the open row's highlight", () => {
-  test("the active row's plate has a soft glow from the right: the accent's, an agent's in its own color", async () => {
+  test("the open channel and the open agent are the active row (one plate, sidebar-css.test.ts has its look)", async () => {
     const { router } = await go();
     const active = () => nav().querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
     expect(active()?.textContent).toContain("eng");
-    const css = readFileSync(new URL("../src/layout.css", import.meta.url), "utf8");
-    const start = css.indexOf('.sidebar__item[data-status="active"]::before {\n  background:\n    linear-gradient(');
-    const rule = css.slice(start, css.indexOf("}", start));
-    expect(start).toBeGreaterThan(-1);
-    expect(rule).toContain("to left");
-    expect(rule).toContain("var(--sel-glow-color, var(--agent))");
-    expect(rule).toContain("transparent var(--sel-glow-reach, 45%)");
-    // Strong enough to see at a glance, in both themes (the app always sets data-theme, the system's included).
-    expect(Number(rule.match(/var\(--sel-glow, (\d+)%\)/)?.[1])).toBeGreaterThanOrEqual(20);
-    expect(
-      Number(
-        css.match(/\[data-theme="dark"\] \.sidebar__item\[data-status="active"\] \{\n {2}--sel-glow: (\d+)%/)?.[1],
-      ),
-    ).toBeGreaterThanOrEqual(26);
-    // No agent row is left out of it.
-    expect(css).not.toContain('.sidebar__row[data-agent-row] > .sidebar__item[data-status="active"]::before');
     await act(() => router.navigate({ to: `/org/${ORG_ID}/dm/agent/${seedState().agents[0]?.id}` }));
     await settle(4);
     expect(active()?.closest("[data-agent-row]")).not.toBeNull();
-    expect(active()?.style.getPropertyValue("--sel-glow-color")).toMatch(/^#[0-9a-f]{6}$/i);
   });
 });
