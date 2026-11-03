@@ -3089,7 +3089,7 @@ export const ptBR = {
         efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
         effortsLower: { auto: "automático", low: "baixo", medium: "médio", high: "alto", max: "máximo" },
         effortText: {
-          auto: "Escolhe o esforço para cada tarefa.",
+          auto: "O modelo Automático escolhe o esforço de cada tarefa. Escolha um modelo para fixar o esforço.",
           low: "Responde rápido. Bom para perguntas simples.",
           medium: "O padrão. Pensa o suficiente na maioria das vezes.",
           high: "Pensa mais em tarefas difíceis. Demora e gasta mais.",

@@ -3030,7 +3030,7 @@ export const en = {
         efforts: { auto: "Automatic", low: "Low", medium: "Medium", high: "High", max: "Maximum" },
         effortsLower: { auto: "automatic", low: "low", medium: "medium", high: "high", max: "maximum" },
         effortText: {
-          auto: "Picks the effort for each task.",
+          auto: "The Automatic model picks each task's effort. Pick a model to set the effort yourself.",
           low: "Answers fast. Good for simple questions.",
           medium: "The default. Thinks enough most of the time.",
           high: "Thinks more on hard tasks. Slower and costs more.",

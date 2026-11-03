@@ -3133,7 +3133,7 @@
           "max": "maximaal"
         },
         "effortText": {
-          "auto": "Kiest de inspanning per taak.",
+          "auto": "Het automatische model kiest de inspanning per taak. Kies een model om de inspanning vast te zetten.",
           "low": "Antwoordt snel. Goed voor simpele vragen.",
           "medium": "De standaard. Denkt meestal genoeg na.",
           "high": "Denkt meer na bij moeilijke taken. Trager en duurder.",

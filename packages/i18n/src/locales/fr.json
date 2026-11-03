@@ -3229,7 +3229,7 @@
           "max": "maximal"
         },
         "effortText": {
-          "auto": "Choisit l'effort pour chaque tâche.",
+          "auto": "Le modèle Automatique choisit l'effort de chaque tâche. Choisissez un modèle pour fixer l'effort.",
           "low": "Répond vite. Idéal pour les questions simples.",
           "medium": "Par défaut. Réfléchit assez la plupart du temps.",
           "high": "Réfléchit davantage sur les tâches difficiles. Plus lent et plus cher.",

@@ -7604,7 +7604,7 @@
     "value": "maximum"
   },
   "agentPage.work.brain.effortText.auto": {
-    "value": "Picks the effort for each task."
+    "value": "The Automatic model picks each task's effort. Pick a model to set the effort yourself."
   },
   "agentPage.work.brain.effortText.low": {
     "value": "Answers fast. Good for simple questions."

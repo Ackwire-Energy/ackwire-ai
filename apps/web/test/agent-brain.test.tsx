@@ -1830,9 +1830,12 @@ describe("Quem pensa: Automático", () => {
     await done(a);
     await model(d, /^Automático/);
     expect(d.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
-    // The model picks the effort too: no ramp to set.
+    // The model picks the effort too: no ramp to set, and the place says so and how to set it.
     a = await advanced(d);
     expect(within(a).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    expect(a.textContent).toContain(
+      "EsforçoO modelo Automático escolhe o esforço de cada tarefa. Escolha um modelo para fixar o esforço.",
+    );
     await done(a);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);

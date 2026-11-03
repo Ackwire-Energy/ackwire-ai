@@ -3108,7 +3108,7 @@
           "max": "maximal"
         },
         "effortText": {
-          "auto": "Wählt den Aufwand für jede Aufgabe.",
+          "auto": "Das automatische Modell wählt den Aufwand jeder Aufgabe. Wähle ein Modell, um den Aufwand festzulegen.",
           "low": "Antwortet schnell. Gut für einfache Fragen.",
           "medium": "Der Standard. Denkt meistens genug nach.",
           "high": "Denkt bei schweren Aufgaben mehr nach. Langsamer und teurer.",

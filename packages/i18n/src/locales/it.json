@@ -3228,7 +3228,7 @@
           "max": "massimo"
         },
         "effortText": {
-          "auto": "Sceglie l'impegno per ogni attività.",
+          "auto": "Il modello Automatico sceglie l'impegno di ogni attività. Scegli un modello per fissare l'impegno.",
           "low": "Risponde in fretta. Adatto alle domande semplici.",
           "medium": "Il predefinito. Ragiona abbastanza quasi sempre.",
           "high": "Ragiona di più sulle attività difficili. Più lento e costa di più.",

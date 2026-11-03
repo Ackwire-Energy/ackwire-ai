@@ -3204,7 +3204,7 @@
           "max": "máximo"
         },
         "effortText": {
-          "auto": "Elige el esfuerzo para cada tarea.",
+          "auto": "El modelo Automático elige el esfuerzo de cada tarea. Elige un modelo para fijar el esfuerzo.",
           "low": "Responde rápido. Bueno para preguntas simples.",
           "medium": "El predeterminado. Piensa lo suficiente casi siempre.",
           "high": "Piensa más en las tareas difíciles. Más lento y más caro.",

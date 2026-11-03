@@ -3312,7 +3312,7 @@
           "max": "maksymalny"
         },
         "effortText": {
-          "auto": "Dobiera wysiłek do każdego zadania.",
+          "auto": "Model Automatyczny wybiera wysiłek dla każdego zadania. Wybierz model, aby ustawić wysiłek.",
           "low": "Odpowiada szybko. Dobre do prostych pytań.",
           "medium": "Domyślny. Zwykle myśli wystarczająco.",
           "high": "Myśli więcej przy trudnych zadaniach. Wolniej i drożej.",

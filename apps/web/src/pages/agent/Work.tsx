@@ -1488,16 +1488,23 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           <DialogBody>
             <section className="agp-advgroup">
               <h3 className="agp-advgroup__title">{t("agentPage.work.brain.advanced.think")}</h3>
-              {kind !== "model" && !isAuto(planModel) && (
-                <EffortPixels
-                  label={t("agentPage.work.brain.effort")}
-                  value={adv.effort}
-                  onValueChange={(e) => setAdv({ ...adv, effort: e })}
-                  color={draft.look.color}
-                  steps={EFFORTS.map((e) => ({ value: e, label: t(`agentPage.work.brain.efforts.${e}`) }))}
-                  hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
-                />
-              )}
+              {kind !== "model" &&
+                (isAuto(planModel) ? (
+                  // "Automático" picks the effort too: said where the ramp would be, as the phone's row says it.
+                  <div className="agp-brainfield">
+                    <span className="ac-effort__head">{t("agentPage.work.brain.effort")}</span>
+                    <span className="small muted">{t("agentPage.work.brain.effortText.auto")}</span>
+                  </div>
+                ) : (
+                  <EffortPixels
+                    label={t("agentPage.work.brain.effort")}
+                    value={adv.effort}
+                    onValueChange={(e) => setAdv({ ...adv, effort: e })}
+                    color={draft.look.color}
+                    steps={EFFORTS.map((e) => ({ value: e, label: t(`agentPage.work.brain.efforts.${e}`) }))}
+                    hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
+                  />
+                ))}
               <ContextField
                 value={adv.contextTokens}
                 options={contextOptions}

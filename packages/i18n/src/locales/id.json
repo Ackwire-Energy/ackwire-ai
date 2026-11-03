@@ -3019,7 +3019,7 @@
           "max": "maksimum"
         },
         "effortText": {
-          "auto": "Memilih upaya untuk setiap tugas.",
+          "auto": "Model Otomatis memilih upaya tiap tugas. Pilih model untuk menetapkan upayanya.",
           "low": "Menjawab cepat. Cocok untuk pertanyaan sederhana.",
           "medium": "Default. Berpikir cukup hampir setiap saat.",
           "high": "Berpikir lebih banyak untuk tugas sulit. Lebih lambat dan lebih mahal.",
