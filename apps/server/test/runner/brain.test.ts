@@ -421,7 +421,7 @@ function setup(over: Partial<BrainManagerOptions> = {}) {
         .trim()
         .split("\n")
         .filter(Boolean)
-        .map((l) => JSON.parse(l) as { pid: number; args: string[] });
+        .map((l) => JSON.parse(l) as { pid: number; args: string[]; system: string | null });
     } catch {
       return [];
     }
@@ -585,6 +585,47 @@ test.if(posix)("idle processes close after the idle time", async () => {
   expect(m.size).toBe(1);
   await waitFor(() => m.size === 0 && proc?.exited === true, 4000);
 });
+
+/** A spawn's argv with its per-process folder masked and the session flag as a resume's. */
+const resumedArgs = (home: string, args: string[]) =>
+  args.map((a) =>
+    a === "--session-id" ? "--resume" : a.replace(new RegExp(`${path.join(home, "brains")}/[0-9a-f-]{36}`), "<dir>"),
+  );
+
+test.if(posix)(
+  "a resumed session starts with the system text it began with (the cached prefix holds after an idle close)",
+  async () => {
+    const { m, home, ws, spawns, turn } = setup({ idleMs: 50 });
+    await turn(1, "hi", { system: "S1" });
+    const proc = m.process(AGENT.id, SESSION(1));
+    await waitFor(() => m.size === 0 && proc?.exited === true, 4000);
+    // The checkout's instructions change meanwhile too.
+    writeFileSync(path.join(await agentWorkspace(ws, AGENT), "CLAUDE.md"), "new rules");
+    expect((await turn(2, "again", { system: "S2" })).final).toMatchObject({ type: "done" });
+    const [a, b] = spawns();
+    expect(a?.system).toBe("S1");
+    expect(b?.system).toBe(a?.system ?? "");
+    expect(b?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+    expect(resumedArgs(home, b?.args ?? [])).toEqual(resumedArgs(home, a?.args ?? []));
+  },
+);
+
+test.if(posix)(
+  "two sessions taking turns under a cap of one: each resumes with its own first system text",
+  async () => {
+    const { home, spawns, turn } = setup({ maxProcesses: 1 });
+    const s = (n: number) => ({ session: { id: SESSION(n), resume: false } });
+    await turn(1, "a1", { system: "A1", ...s(1) });
+    await turn(2, "b1", { system: "B1", ...s(2) });
+    await turn(3, "a2", { system: "A2", ...s(1) });
+    await turn(4, "b2", { system: "B2", ...s(2) });
+    const all = spawns();
+    expect(all.map((x) => x.system)).toEqual(["A1", "B1", "A1", "B1"]);
+    expect(all.map((x) => x.args.at(-2))).toEqual(["--session-id", "--session-id", "--resume", "--resume"]);
+    expect(resumedArgs(home, all[2]?.args ?? [])).toEqual(resumedArgs(home, all[0]?.args ?? []));
+    expect(resumedArgs(home, all[3]?.args ?? [])).toEqual(resumedArgs(home, all[1]?.args ?? []));
+  },
+);
 
 test.if(posix)("at most N processes: the least recently used idle one is closed for a new thread", async () => {
   const { m, ws } = setup({ maxProcesses: 2 });
