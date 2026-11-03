@@ -50,7 +50,7 @@ import {
   orgAutoModels,
   withAuto,
 } from "./auto-model";
-import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL } from "./blocks";
+import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, someoneAnswers } from "./blocks";
 import { brainOf } from "./brain-settings";
 import { missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
@@ -100,8 +100,10 @@ import { announceConsultationChange, answersOpen, onConsultedRunFinished } from 
 import {
   buildRunContext,
   type ContextBlock,
+  conversationText,
   getChannelCached,
   isComputerTurnBlock,
+  isConversationBlock,
   restatesReaction,
   stableFirst,
   teammatesNowAgain,
@@ -228,8 +230,10 @@ import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials, maskCredentialsExcept } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import {
+  EVERY_TOOL,
   isCore,
   isStableTool,
+  listsEveryTool,
   ON_DEMAND_FIND,
   ON_DEMAND_USE,
   presentTools,
@@ -265,7 +269,7 @@ import {
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { RESTRICTED_HERE, sendHeldToDm } from "./wiki-dm";
 import { withWikiLinks } from "./wiki-links";
-import { movedNote, queuedNote, workStartsNote } from "./work-tools";
+import { movedNote, queuedNote, workMayStart, workStartsNote } from "./work-tools";
 import {
   dropWorkNotices,
   endWork,
@@ -1232,9 +1236,15 @@ async function executeRunInner(
   const needsContext = !run.transcript;
   /** What the run's policy refused of the tools the agent's scopes grant: who is behind it held them back. */
   const heldBack: string[] = [];
-  // Independent reads together: the agent (cached), the trigger, and the tools it may use.
-  const [agent, triggerRows, granted] = await Promise.all([
-    getAgentCached(db, run.orgId, run.agentId),
+  const agent = await getAgentCached(db, run.orgId, run.agentId);
+  // Claude Code defers our tools itself (its ToolSearch): a new run lists every tool the agent has, the same in every
+  // run, instead of the groups a judge picks, so its cached prefix holds across runs and sessions (ADR 0043).
+  if (needsContext && deps.toolsOnDemand && agent && brainOf(agent.brain) === "claude_code") {
+    ctx.loadedGroups = [EVERY_TOOL];
+  }
+  const every = listsEveryTool(ctx);
+  // Independent reads together: the trigger, and the tools it may use.
+  const [triggerRows, granted] = await Promise.all([
     !needsContext
       ? Promise.resolve([])
       : topTrigger
@@ -1246,6 +1256,16 @@ async function executeRunInner(
     deps.tools ? deps.tools.granted(ctx, heldBack) : Promise.resolve([]),
   ]);
   let tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+  /**
+   * Only Claude Code defers our tools itself: a run that lists every tool and thinks with another brain (the model
+   * brain standing in, a mission's Codex) lists the core tools instead, the rest behind `find_tools`.
+   */
+  const onDemandForOtherBrain = (t: Transcript) => {
+    if (!listsEveryTool(ctx)) return;
+    ctx.loadedGroups = [];
+    t.toolGroups = [];
+    tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+  };
   const trigger = triggerRows[0];
   if (fresh && trigger)
     deps.onTiming?.("trigger_to_claim_ms", claimedAt - trigger.createdAt.getTime(), { runId: run.id });
@@ -1291,7 +1311,7 @@ async function executeRunInner(
   const autoAsked = needsContext && autoWanted(agent) ? askAuto() : null;
   // The judge's answer is awaited where the tools are needed: the context is read meanwhile (`CONTEXT_TOOLS`).
   const judging: Promise<void> | null =
-    needsContext && deps.toolsOnDemand && judge && granted.length > 0
+    needsContext && deps.toolsOnDemand && judge && granted.length > 0 && !every
       ? (async () => {
           const [recent, keep] = await Promise.all([
             recentMessages(),
@@ -1519,6 +1539,10 @@ async function executeRunInner(
     const browsers = granted.some((t) => t.name === "browser_profile")
       ? browsersPrompt(await agentBrowserProfiles(db, run.orgId, agent.id), agent.browserProfileId)
       : "";
+    // Listed in every run of the agent (`EVERY_TOOL`): the prompt speaks of them only where they apply.
+    const [workApplies, choicesApply] = every
+      ? await Promise.all([workMayStart(ctx), someoneAnswers(ctx)])
+      : [true, true];
     const [context, memory, wikiPages] = await Promise.all([
       buildRunContext(db, run, agent, {
         maxMessages: deps.contextMessages,
@@ -1526,9 +1550,9 @@ async function executeRunInner(
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
         react: tools.some((t) => t.name === REACT_TOOL),
         followUp: tools.some((t) => t.name === FOLLOW_UP_TOOL),
-        work: tools.some((t) => t.name === WORK_IN_BACKGROUND_TOOL),
+        work: workApplies && tools.some((t) => t.name === WORK_IN_BACKGROUND_TOOL),
         blocks: tools.some((t) => t.name === SHOW_BLOCK_TOOL),
-        choices: tools.some((t) => t.name === ASK_CHOICES_TOOL),
+        choices: choicesApply && tools.some((t) => t.name === ASK_CHOICES_TOOL),
         // "What you can do" names the loaded groups: it waits for the judge.
         capabilities: Promise.resolve(judging).then(() =>
           [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
@@ -1593,7 +1617,10 @@ async function executeRunInner(
         : null;
       const summary = found && (!dm || (await dm.item(found))) ? found : null;
       if (summary)
-        system.push({ text: `# Earlier in this thread (summary)\n${itemLabel(summary)} ${summary.content}` });
+        system.push({
+          conversation: true,
+          text: `# Earlier in this thread (summary)\n${itemLabel(summary)} ${summary.content}`,
+        });
     }
     if (memory.text) {
       // Found for this trigger: per turn (a computer brain reads it in "# This turn").
@@ -1668,7 +1695,7 @@ async function executeRunInner(
       system: stableFirst(system),
       messages: context.messages,
       notesAt: context.messages.length - 1,
-      ...(toolChoice ? { toolGroups: toolChoice.groups } : {}),
+      ...(toolChoice ? { toolGroups: toolChoice.groups } : every ? { toolGroups: [EVERY_TOOL] } : {}),
       ...(tools.some((t) => t.name === PASS_TOOL) ? { passListed: true } : {}),
       promptKey: sha256(
         JSON.stringify([
@@ -2034,6 +2061,7 @@ async function executeRunInner(
   if (brainPlan.kind !== "model" && run.brain === "model" && transcript.fallback) {
     brainPlan = { kind: "model", ...(brainPlan.missionId ? { missionId: brainPlan.missionId } : {}) };
   }
+  if (brainPlan.kind !== "claude_code") onDemandForOtherBrain(transcript);
   // The run's effective brain (ADR 0053 §10): shared code reads it, never the agent's stored brain.
   if (run.brain !== brainPlan.kind) {
     await recordRunBrain(db, run.id, brainPlan.kind);
@@ -2333,6 +2361,7 @@ async function executeRunInner(
         ...(autoEffort ? { effort: autoEffort } : {}),
       };
       brain = createBrain(deps, thinker, run, "model", turnToken, () => transcript as Transcript);
+      onDemandForOtherBrain(t);
       await saveTranscript(db, t);
       await recordRunBrain(db, run.id, "model");
       run = { ...run, brain: "model" };
@@ -3554,6 +3583,9 @@ async function executeRunInner(
       const ours = new Set(turnTools.map((t) => t.name));
       const own = executedNow.filter((c) => !ours.has(c.name));
       const ranItself = own.length;
+      // Claude Code's lookups of our deferred tools have no step of their own: ADR 0043's uncached-input query
+      // splits turns by them.
+      const toolSearches = own.filter((c) => c.name === "ToolSearch").length;
       if (own.length > 0)
         transcript.harnessTried = [
           ...(transcript.harnessTried ?? []),
@@ -3569,6 +3601,7 @@ async function executeRunInner(
         addRunStep(db, run, "model_call", {
           model: result.model,
           ...(ranItself > 0 ? { executed: ranItself } : {}),
+          ...(toolSearches > 0 ? { toolSearches } : {}),
           stopReason: result.stopReason,
           usageRecordId: result.usageRecordId,
           costNanoUsd: result.costNanoUsd,
@@ -4228,8 +4261,9 @@ function brainTurnOf(
     threadRootId: run.threadRootId,
     get system() {
       if (plan.kind === "model") return t.system.map((b) => b.text).join("\n\n");
+      // The same in every conversation of the agent: what holds for this one comes once in its session (`conversation`).
       const text = t.system
-        .filter((b) => !isComputerTurnBlock(b))
+        .filter((b) => !isComputerTurnBlock(b) && !isConversationBlock(b))
         .map((b) => b.text)
         .join("\n\n");
       // A computer brain has its own tools (read, search, shell, git) besides ours.
@@ -4243,6 +4277,9 @@ function brainTurnOf(
       ]
         .filter(Boolean)
         .join("\n\n");
+    },
+    get conversation() {
+      return plan.kind === "model" ? undefined : conversationText(t.system) || undefined;
     },
     get thisTurn() {
       const parts = turnParts();
@@ -4297,7 +4334,9 @@ interface BrainStep {
   model?: string;
   usageRecordId?: string;
   costNanoUsd?: number;
-  usage?: Partial<Record<"inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens", number>>;
+  usage?: Partial<
+    Record<"inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens" | "calls" | "maxUncached", number>
+  >;
   thinking?: ModelResult["thinking"];
 }
 
@@ -4344,7 +4383,7 @@ async function thinkOnce(
   const toolCalls: BrainStep["toolCalls"] = [];
   let executedCount = 0;
   let taken = false;
-  let usage: { input: number; output: number; source: "api" | "plan"; model?: string } | null = null;
+  let usage: Extract<BrainEvent, { type: "usage" }> | null = null;
   /** The plan said `limit`: the turn is read on until `deadline`, for the answer the brain may still finish. */
   let limit: { resetsAt?: string; deadline: number } | null = null;
   const limitFailure = (message: string, worked?: boolean) =>
@@ -4439,7 +4478,15 @@ async function thinkOnce(
     toolCalls,
     executedCount,
     model: usage?.model,
-    usage: usage ? { inputTokens: usage.input, outputTokens: usage.output } : undefined,
+    usage: usage
+      ? {
+          inputTokens: usage.input,
+          outputTokens: usage.output,
+          // Kept on the step (`model_call`): a turn's uncached input split into its calls.
+          ...(usage.calls ? { calls: usage.calls } : {}),
+          ...(usage.maxUncached ? { maxUncached: usage.maxUncached } : {}),
+        }
+      : undefined,
   };
 }
 

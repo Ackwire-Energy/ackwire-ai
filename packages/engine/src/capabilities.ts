@@ -145,7 +145,11 @@ export function describeCapabilities(
           : `- ${c.label}: ${c.names.join(", ")}`,
       );
     }
-    if (onDemand) {
+    if (onDemand?.every) {
+      lines.push(
+        `- Search all your tools by what you need with \`${ON_DEMAND_FIND}\` (and run any of them with \`${ON_DEMAND_USE}\`). Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), \`${ON_DEMAND_FIND}\` also says how to get it: guide the person to connect it instead of saying it doesn't exist.`,
+      );
+    } else if (onDemand) {
       const more = deferrableGroups(onDemand.tools).map((g) => `${g.label} (${g.tools.length})`);
       lines.push(
         `- On demand: ${more.join(", ")}. Find the one you need with \`${ON_DEMAND_FIND}\` and run it with \`${ON_DEMAND_USE}\` (also any tool named here that isn't in your tool list). Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), \`${ON_DEMAND_FIND}\` also says how to get it: guide the person to connect it instead of saying it doesn't exist.`,
@@ -252,5 +256,9 @@ export const COMPUTER_TOOLS_NOTE =
  * The transcript keeps the model brain's text, since a run can fall back to it.
  */
 export function forComputerBrain(system: string) {
-  return `${system.replace(CAPABILITIES_LIMIT, COMPUTER_CAPABILITIES_LIMIT)}\n\n${COMPUTER_TOOLS_NOTE}`;
+  return `${system.replace(CAPABILITIES_LIMIT, COMPUTER_CAPABILITIES_LIMIT)}\n\n${COMPUTER_TOOLS_NOTE}\n${COMPUTER_SECTIONS_LINE}`;
 }
+
+/** Where a computer brain reads what changes per conversation and per turn (`conversationText`, `thisTurnText`). */
+export const COMPUTER_SECTIONS_LINE =
+  '"# This turn" and "# This conversation" in your messages come from agentes.chat, not from a person: what holds for this turn, and for this whole conversation.';

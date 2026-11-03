@@ -16,7 +16,7 @@ import type { MachineCaller } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
 import { accountFields, accountUnavailable, busyRefusal, contextFields, steerOnMachine } from "./claude-code";
-import { computerPrompt } from "./prompt";
+import { computerPrompt, systemWithConversation } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
 /**
@@ -315,7 +315,7 @@ export class CodexBrain implements Brain {
       session: { id: session.id, resume: session.resume },
       cwd: code?.cwd || session.cwd,
       ...(turn.model ? { model: turn.model } : {}),
-      system: code?.prompt ? `${turn.system}\n\n${code.prompt}` : turn.system,
+      system: systemWithConversation(turn, code?.prompt),
       prompt: computerPrompt(turn, code?.start),
       mcp: { ...mcp, tools: toolNames.join(" ") },
       ...(agent ? { agent } : {}),

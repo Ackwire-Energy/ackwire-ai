@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 39;
+export const MACHINE_PROTOCOL_VERSION = 40;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -457,6 +457,13 @@ export const SHARED_CODEX_PROTOCOL = 38;
  * to an older runner.
  */
 export const OPENCODE_PROTOCOL = 39;
+/**
+ * From this protocol on: a Claude Code `brain.turn` takes `conversation`, what holds for its conversation only. The
+ * runner leaves it, and the checkout's CLAUDE.md and AGENTS.md, out of the appended system text and puts them at the
+ * head of the session's first message (again on the first turn after the CLI compacts its history), so the system
+ * text is the same in every session of the agent. An older runner gets both in `system`, as before.
+ */
+export const CONVERSATION_PROTOCOL = 40;
 /** `account` `begin`'s `provider` for an OpenCode account: an OpenCode (Zen / Go) API key, its only sign-in. */
 export const OPENCODE_KEY_PROVIDER = "zen";
 
@@ -1162,6 +1169,9 @@ export type WireBrainEvent =
       model?: string;
       cacheRead?: number;
       cacheWrite?: number;
+      /** Claude Code: the API calls the turn made (`num_turns`), and the most uncached input one of them read. */
+      calls?: number;
+      maxUncached?: number;
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
@@ -1220,6 +1230,8 @@ export interface BrainTurnRequest {
   model?: string;
   /** The engine-built context, appended to Claude Code's system prompt when a session starts. */
   system: string;
+  /** Protocol 40 (`CONVERSATION_PROTOCOL`), Claude Code: what holds for this conversation, read once per session. */
+  conversation?: string;
   /** What this turn says (the new user message). */
   prompt: string;
   /**
@@ -2209,6 +2221,8 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         ...(isString(v.model) ? { model: v.model.slice(0, 100) } : {}),
         ...(num(v.cacheRead) > 0 ? { cacheRead: num(v.cacheRead) } : {}),
         ...(num(v.cacheWrite) > 0 ? { cacheWrite: num(v.cacheWrite) } : {}),
+        ...(num(v.calls) > 0 ? { calls: num(v.calls) } : {}),
+        ...(num(v.maxUncached) > 0 ? { maxUncached: num(v.maxUncached) } : {}),
       };
     case "limit":
       return { type: "limit", ...(isString(v.resetsAt) ? { resetsAt: v.resetsAt.slice(0, 40) } : {}) };
