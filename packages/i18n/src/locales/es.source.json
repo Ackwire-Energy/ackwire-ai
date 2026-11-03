@@ -4042,6 +4042,60 @@
   "rightHand.composerHint": {
     "value": "nothing changes without you"
   },
+  "rightHand.intro.greeting": {
+    "value": "Hi, I'm {{name}}. I'll build the team with you."
+  },
+  "rightHand.intro.lead": {
+    "value": "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do."
+  },
+  "rightHand.intro.connect.title": {
+    "value": "Connect an AI for the team"
+  },
+  "rightHand.intro.connect.text": {
+    "value": "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed."
+  },
+  "rightHand.intro.connect.action": {
+    "value": "Connect"
+  },
+  "rightHand.intro.start.question": {
+    "value": "How do you want to start?"
+  },
+  "rightHand.intro.start.createOne": {
+    "value": "Create {{name}}"
+  },
+  "rightHand.intro.start.team": {
+    "value": "Build a starter team"
+  },
+  "rightHand.intro.start.describe": {
+    "value": "Describe what I need"
+  },
+  "rightHand.intro.start.import": {
+    "value": "Import my agents"
+  },
+  "rightHand.intro.start.form": {
+    "value": "Fill in the form"
+  },
+  "rightHand.intro.next.question": {
+    "value": "The team is here. What next?"
+  },
+  "rightHand.intro.next.invite": {
+    "value": "Invite people"
+  },
+  "rightHand.intro.next.firstTask": {
+    "value": "Give {{name}} a first task"
+  },
+  "rightHand.intro.firstTask.theo": {
+    "value": "Plan our first week: what does each of us do first?"
+  },
+  "rightHand.intro.firstTask.ada": {
+    "value": "What could you build or automate for us first?"
+  },
+  "rightHand.intro.firstTask.lia": {
+    "value": "Who are our 5 closest competitors, and what do they do better than us?"
+  },
+  "rightHand.intro.firstTask.atlas": {
+    "value": "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?"
+  },
   "rightHand.profile.how": {
     "value": "How it works"
   },

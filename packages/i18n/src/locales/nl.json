@@ -1626,6 +1626,34 @@
     "role": "Workspace-assistent",
     "actsAsYou": "handelt met jouw rechten",
     "composerHint": "niets verandert zonder jou",
+    "intro": {
+      "greeting": "Hoi, ik ben {{name}}. Ik bouw het team samen met jou.",
+      "lead": "Ik maak de agents, koppel de apps en nodig de mensen uit. Niets verandert zonder jouw klik, en ik doe alleen wat jij mag doen.",
+      "connect": {
+        "title": "Een AI voor het team koppelen",
+        "text": "De agents denken met de AI van de workspace. Log in met je Claude- of ChatGPT-abonnement, zonder API-sleutel.",
+        "action": "Koppelen"
+      },
+      "start": {
+        "question": "Hoe wil je beginnen?",
+        "createOne": "{{name}} maken",
+        "team": "Een startteam samenstellen",
+        "describe": "Beschrijven wat ik nodig heb",
+        "import": "Mijn agents importeren",
+        "form": "Het formulier invullen"
+      },
+      "next": {
+        "question": "Het team is er. En nu?",
+        "invite": "Mensen uitnodigen",
+        "firstTask": "{{name}} een eerste taak geven"
+      },
+      "firstTask": {
+        "theo": "Maak het plan voor onze eerste week: wat doet ieder van ons eerst?",
+        "ada": "Wat zou je als eerste voor ons kunnen bouwen of automatiseren?",
+        "lia": "Wie zijn onze 5 naaste concurrenten, en wat doen ze beter dan wij?",
+        "atlas": "Wat ga je als eerste volgen in onze fouten, wachtrijen en deploys, en hoe laat je het me weten als er iets stukgaat?"
+      }
+    },
     "profile": {
       "how": "Zo werkt het",
       "permissions": "Handelt met jouw rechten",

@@ -1688,6 +1688,34 @@
     "role": "Asistente del workspace",
     "actsAsYou": "actúa con tus permisos",
     "composerHint": "nada cambia sin ti",
+    "intro": {
+      "greeting": "Hola, soy {{name}}. Armo el equipo contigo.",
+      "lead": "Creo los agentes, conecto las apps e invito a las personas. Nada cambia sin tu clic, y solo hago lo que tú puedes hacer.",
+      "connect": {
+        "title": "Conectar una IA para el equipo",
+        "text": "Los agentes piensan con la IA del workspace. Inicia sesión con tu plan de Claude o de ChatGPT, sin clave de API.",
+        "action": "Conectar"
+      },
+      "start": {
+        "question": "¿Cómo quieres empezar?",
+        "createOne": "Crear a {{name}}",
+        "team": "Armar un equipo para empezar",
+        "describe": "Describir lo que necesito",
+        "import": "Importar mis agentes",
+        "form": "Llenar el formulario"
+      },
+      "next": {
+        "question": "El equipo ya llegó. ¿Y ahora?",
+        "invite": "Invitar personas",
+        "firstTask": "Darle una primera tarea a {{name}}"
+      },
+      "firstTask": {
+        "theo": "Arma el plan de nuestra primera semana: ¿qué hace primero cada uno de nosotros?",
+        "ada": "¿Qué podrías construir o automatizar para nosotros primero?",
+        "lia": "¿Quiénes son nuestros 5 competidores más cercanos, y qué hacen mejor que nosotros?",
+        "atlas": "¿Qué vas a vigilar primero en nuestros errores, colas y deploys, y cómo me avisas cuando algo falle?"
+      }
+    },
     "profile": {
       "how": "Cómo funciona",
       "permissions": "Actúa con tus permisos",

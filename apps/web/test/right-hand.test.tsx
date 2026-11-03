@@ -107,7 +107,9 @@ describe("the right hand elsewhere", () => {
   test("its DM says what it is and that nothing changes without you", async () => {
     await go(withRightHand(seedState()), `dm/agent/${LODI_ID}`);
     const header = document.querySelector(".channel__header") as HTMLElement;
-    expect(header.textContent).toContain("Seu braço direito · age com as suas permissões");
+    // As the language writes it; the line's first letter goes up in CSS (no case change on translated text).
+    const topic = header.querySelector(".channel__topic[data-right-hand]");
+    expect(topic?.textContent).toContain("seu braço direito · age com as suas permissões");
     expect(header.textContent).not.toContain("Computador");
     expect(screen().getByRole("combobox", { name: "Mensagem para Lodi · nada muda sem você" })).toBeTruthy();
   });

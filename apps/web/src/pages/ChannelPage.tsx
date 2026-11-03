@@ -410,6 +410,11 @@ export interface ChannelChrome {
   suggestions?: string[];
   /** Above the messages (a thread's origin and context block). */
   top?: ReactNode;
+  /**
+   * Always at the conversation's top, in place of its empty state and of the no-AI banner (the right hand's greeting
+   * and first cards, ADR 0134, which say it themselves).
+   */
+  intro?: ReactNode;
   /** The composer's label and placeholder ("Responder na thread"). */
   composerLabel?: string;
   /** In place of the composer (an archived thread's read-only note). */
@@ -2028,41 +2033,47 @@ function ChannelView({
                     {/* Pushes short channels down, next to the composer. */}
                     <div className="channel__spacer" aria-hidden="true" />
                     {chrome?.top}
+                    {chrome?.intro}
                     {messages.isLoading && <LoadingConversation />}
                     {messages.isError && !messages.data && (
                       <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
                     )}
-                    {messages.isSuccess && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
-                      <div className="channel__empty">
-                        <EmptyState
-                          icon="message"
-                          // A DM with an agent: the light sky, like the other empty screens about agents.
-                          sky={Boolean(chrome?.dmAgentId)}
-                          title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
-                          actions={
-                            emptySuggestions.length > 0 ? (
-                              <fieldset className="channel__suggestions">
-                                <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
-                                {emptySuggestions.map((s) => (
-                                  <Button
-                                    key={s.text}
-                                    size="sm"
-                                    onClick={() => {
-                                      setDraft(s.text);
-                                      composer.current?.focus();
-                                    }}
-                                  >
-                                    {s.label}
-                                  </Button>
-                                ))}
-                              </fieldset>
-                            ) : undefined
-                          }
-                        >
-                          {chrome?.emptyText}
-                        </EmptyState>
-                      </div>
-                    )}
+                    {messages.isSuccess &&
+                      timeline.length === 0 &&
+                      slots.length === 0 &&
+                      !thread &&
+                      !adjusting &&
+                      !chrome?.intro && (
+                        <div className="channel__empty">
+                          <EmptyState
+                            icon="message"
+                            // A DM with an agent: the light sky, like the other empty screens about agents.
+                            sky={Boolean(chrome?.dmAgentId)}
+                            title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
+                            actions={
+                              emptySuggestions.length > 0 ? (
+                                <fieldset className="channel__suggestions">
+                                  <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
+                                  {emptySuggestions.map((s) => (
+                                    <Button
+                                      key={s.text}
+                                      size="sm"
+                                      onClick={() => {
+                                        setDraft(s.text);
+                                        composer.current?.focus();
+                                      }}
+                                    >
+                                      {s.label}
+                                    </Button>
+                                  ))}
+                                </fieldset>
+                              ) : undefined
+                            }
+                          >
+                            {chrome?.emptyText}
+                          </EmptyState>
+                        </div>
+                      )}
                     {adjustThreadId ? (
                       <RangeRows
                         adjust={adjust}
@@ -2149,7 +2160,9 @@ function ChannelView({
                 </div>
                 <div className="channel__composer">
                   <ConnectionBanner status={status} />
-                  <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
+                  {!chrome?.intro && (
+                    <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
+                  )}
                   <ActivityBar
                     channelId={channel.id}
                     threadId={thread?.id ?? null}

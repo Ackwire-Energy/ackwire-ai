@@ -1610,6 +1610,38 @@ export const en = {
     actsAsYou: "acts with your permissions",
     /** After "Message to {{name}} ·" in its DM's composer. */
     composerHint: "nothing changes without you",
+    /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
+    intro: {
+      greeting: "Hi, I'm {{name}}. I'll build the team with you.",
+      lead: "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do.",
+      connect: {
+        title: "Connect an AI for the team",
+        text: "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed.",
+        action: "Connect",
+      },
+      start: {
+        question: "How do you want to start?",
+        /** A ready-made agent's tile: creates it alone. */
+        createOne: "Create {{name}}",
+        team: "Build a starter team",
+        describe: "Describe what I need",
+        import: "Import my agents",
+        form: "Fill in the form",
+      },
+      next: {
+        question: "The team is here. What next?",
+        invite: "Invite people",
+        firstTask: "Give {{name}} a first task",
+      },
+      /** Written in the ready-made agent's DM composer by "Give … a first task", for the person to send or change. */
+      firstTask: {
+        theo: "Plan our first week: what does each of us do first?",
+        ada: "What could you build or automate for us first?",
+        lia: "Who are our 5 closest competitors, and what do they do better than us?",
+        atlas:
+          "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?",
+      },
+    },
     profile: {
       how: "How it works",
       permissions: "Acts with your permissions",

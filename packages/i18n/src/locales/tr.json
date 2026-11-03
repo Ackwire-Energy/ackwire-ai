@@ -1623,6 +1623,34 @@
     "role": "Çalışma alanı asistanı",
     "actsAsYou": "senin izinlerinle çalışır",
     "composerHint": "sen olmadan hiçbir şey değişmez",
+    "intro": {
+      "greeting": "Merhaba, ben {{name}}. Ekibi seninle birlikte kuruyorum.",
+      "lead": "Ajanları oluşturur, uygulamaları bağlar ve kişileri davet ederim. Sen tıklamadan hiçbir şey değişmez ve yalnızca senin yapabildiklerini yaparım.",
+      "connect": {
+        "title": "Ekip için bir yapay zeka bağla",
+        "text": "Ajanlar çalışma alanının yapay zekasıyla düşünür. Claude veya ChatGPT planınla giriş yap, API anahtarı gerekmez.",
+        "action": "Bağla"
+      },
+      "start": {
+        "question": "Nasıl başlamak istersin?",
+        "createOne": "{{name}} oluştur",
+        "team": "Başlangıç ekibi kur",
+        "describe": "Neye ihtiyacım olduğunu anlat",
+        "import": "Ajanlarımı içe aktar",
+        "form": "Formu doldur"
+      },
+      "next": {
+        "question": "Ekip geldi. Şimdi ne yapalım?",
+        "invite": "Kişileri davet et",
+        "firstTask": "{{name}} için ilk görevi ver"
+      },
+      "firstTask": {
+        "theo": "İlk haftamızın planını çıkar: her birimiz önce ne yapıyor?",
+        "ada": "Bizim için önce neyi geliştirebilir ya da otomatikleştirebilirsin?",
+        "lia": "En yakın 5 rakibimiz kim ve bizden daha iyi ne yapıyorlar?",
+        "atlas": "Hatalarımızda, kuyruklarımızda ve deploy'larımızda önce neyi izleyeceksin, bir şey bozulduğunda bana nasıl haber vereceksin?"
+      }
+    },
     "profile": {
       "how": "Nasıl çalışır",
       "permissions": "Senin izinlerinle çalışır",

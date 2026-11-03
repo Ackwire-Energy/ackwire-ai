@@ -1607,6 +1607,40 @@ export const ptBR = {
     role: "Assistente do workspace",
     actsAsYou: "age com as suas permissões",
     composerHint: "nada muda sem você",
+    /** The top of its DM, drawn by the app (no model): its greeting and the first card the workspace needs. */
+    intro: {
+      greeting: "Oi, eu sou o {{name}}. Monto o time com você.",
+      greeting_female: "Oi, eu sou a {{name}}. Monto o time com você.",
+      lead: "Crio os agentes, conecto os apps e convido as pessoas. Nada muda sem o seu clique, e eu faço só o que você pode fazer.",
+      connect: {
+        title: "Conectar uma IA para o time",
+        text: "Os agentes pensam com a IA do workspace. Entre com o seu plano do Claude ou do ChatGPT, sem chave de API.",
+        action: "Conectar",
+      },
+      start: {
+        question: "Como você quer começar?",
+        /** A ready-made agent's tile: creates it alone. */
+        createOne: "Criar {{name}}",
+        team: "Montar um time pra começar",
+        describe: "Descrever o que preciso",
+        import: "Importar meus agentes",
+        form: "Preencher o formulário",
+      },
+      next: {
+        question: "O time chegou. E agora?",
+        invite: "Convidar pessoas",
+        firstTask: "Dar a primeira tarefa para o {{name}}",
+        firstTask_female: "Dar a primeira tarefa para a {{name}}",
+      },
+      /** Written in the ready-made agent's DM composer by "Dar a primeira tarefa", for the person to send or change. */
+      firstTask: {
+        theo: "Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?",
+        ada: "O que você poderia construir ou automatizar para a gente primeiro?",
+        lia: "Quem são os nossos 5 concorrentes mais próximos, e o que eles fazem melhor que a gente?",
+        atlas:
+          "O que você vai acompanhar primeiro nos nossos erros, filas e deploys, e como me avisa quando algo quebrar?",
+      },
+    },
     profile: {
       how: "Como funciona",
       permissions: "Age com as suas permissões",

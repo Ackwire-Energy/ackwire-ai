@@ -991,6 +991,10 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* The right hand's label starts the line (ADR 0134): its first letter up, as each language writes a sentence. */
+.channel__topic[data-right-hand]::first-letter {
+  text-transform: uppercase;
+}
 /* A face beside a name that rises to it (`.ac-captop`, a DM's name with a line under it): both start at one top,
    whatever else the header holds. A name that doesn't rise stays centred on the face. */
 .channel__header > .ac-avatar:has(+ div > .ac-captop),

@@ -3,7 +3,6 @@ import { keys, useModels } from "@agenteschat/client";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
-import { capitalize } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { apiProviderOf, isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
@@ -18,6 +17,7 @@ import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { RightHandIntro } from "@/components/RightHandIntro";
 import { SearchHereButton } from "@/components/search/SearchHereButton";
 import { AgentTasksPill } from "@/components/tasks/AgentTasksPanel";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -25,7 +25,7 @@ import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
 export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMessageId?: string }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -83,9 +83,9 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
           {agent && <AudienceChip agent={agent} />}
         </h1>
         {agent && (
-          <span className="channel__topic">
+          <span className="channel__topic" data-right-hand={rightHand || undefined}>
             {rightHand
-              ? `${capitalize(t("rightHand.label"), i18n.language)} · ${t("rightHand.actsAsYou")}`
+              ? `${t("rightHand.label")} · ${t("rightHand.actsAsYou")}`
               : owner
                 ? t("dm.subtitle", { role, owner: owner.name })
                 : t("dm.subtitleNoOwner", { role })}
@@ -125,8 +125,11 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
       chrome={{
         header,
         composerTarget: name,
-        ...(rightHand
-          ? { composerLabel: `${t("channel.composerDm", { name })} · ${t("rightHand.composerHint")}` }
+        ...(rightHand && agent
+          ? {
+              composerLabel: `${t("channel.composerDm", { name })} · ${t("rightHand.composerHint")}`,
+              intro: <RightHandIntro agent={agent} />,
+            }
           : {}),
         dmAgentId: agent?.id,
         dmPersonId: person?.userId,
