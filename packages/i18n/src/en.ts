@@ -9663,8 +9663,11 @@ export const en = {
       actual: "Actual size",
       /** Switches the magnifier that follows the mouse over the picture. */
       lens: "Magnifier",
-      hint: "Click or scroll to zoom in",
+      hint: "Click, pinch or use the wheel to zoom in",
       hintZoomed: "Drag to move around. Esc fits it back",
+      /** The same hints on a touch screen. */
+      hintTouch: "Tap or pinch to zoom in",
+      hintZoomedTouch: "Drag to move around. Tap to fit it back",
     },
   },
   errors: {

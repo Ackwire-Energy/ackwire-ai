@@ -9920,8 +9920,10 @@
       "fit": "Sesuaikan",
       "actual": "Ukuran asli",
       "lens": "Kaca pembesar",
-      "hint": "Klik atau gulir untuk memperbesar",
-      "hintZoomed": "Seret untuk menggeser. Esc menyesuaikan lagi"
+      "hint": "Klik, cubit, atau putar roda mouse untuk memperbesar",
+      "hintZoomed": "Seret untuk menggeser. Esc menyesuaikan lagi",
+      "hintTouch": "Ketuk atau cubit untuk memperbesar",
+      "hintZoomedTouch": "Seret untuk menggeser. Ketuk untuk menyesuaikan lagi"
     }
   },
   "errors": {

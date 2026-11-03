@@ -11,6 +11,7 @@ import {
   panBy,
   type Size,
   stepZoom,
+  wheelIntent,
   ZOOM_MAX,
   type ZoomView,
   zoomAt,
@@ -28,6 +29,8 @@ const CLICK_SLOP = 4;
 const DOUBLE_CLICK_MS = 400;
 /** Arrow keys move the zoomed picture this share of the stage. */
 const ARROW_STEP = 0.1;
+/** The floating zoom bar's height and its gap above the stage's bottom edge: the lens pane stays clear of it. */
+const BAR_ROOM = 52;
 
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const middle = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
@@ -35,8 +38,9 @@ const middle = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2
 /**
  * A picture filling its box, fitted (never past its real size), with zoom: the hover lens and its magnified pane
  * (mouse only, switchable), a click to zoom in at the pointer and back, the wheel or a pinch around the cursor, a
- * drag to move, − / % / + / Ajustar / 100%, and the keys + − 0 1, the arrows and Esc (back to fitted, then the
- * dialog closes).
+ * drag or two fingers on a trackpad to move, − / % / + / Ajustar / 100% on a bar floating over the picture (shown on
+ * hover, on focus and while zoomed), and the keys + − 0 1, the arrows and Esc (back to fitted, then the dialog
+ * closes).
  */
 export function ImageZoom({ src, alt }: { src: string; alt: string }) {
   const { t, i18n } = useTranslation();
@@ -99,10 +103,17 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
     const onWheel = (e: WheelEvent) => {
       const v = viewRef.current;
       if (!v) return;
+      const intent = wheelIntent(e);
+      if (intent === "scroll") {
+        // Two fingers on a trackpad move a zoomed picture; on a fitted one there is nothing to move.
+        if (!isZoomed(v, img, stage)) return;
+        e.preventDefault();
+        go(panBy(v, -e.deltaX, -e.deltaY, img, stage), false);
+        return;
+      }
       e.preventDefault();
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? stage.h : 1;
-      // A trackpad pinch arrives as a wheel with ctrlKey and small steps.
-      const k = Math.exp(-e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.002));
+      const k = Math.exp(-e.deltaY * unit * (intent === "pinch" ? 0.01 : 0.002));
       const r = el.getBoundingClientRect();
       go(zoomAt(v, v.scale * k, { x: e.clientX - r.left, y: e.clientY - r.top }, img, stage), false);
     };
@@ -237,12 +248,12 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
   const mag = lensMag(fit);
   const lens =
     hover && lensOn && !zoomed && !dragging && stage && box && pointer && inBox
-      ? lensLayout(stage, box, pointer, mag)
+      ? lensLayout({ w: stage.w, h: stage.h - BAR_ROOM }, box, pointer, mag)
       : null;
   const percent = formatPercent(i18n.language, Math.round((view?.scale ?? 1) * 100));
 
   return (
-    <div className="izoom">
+    <div className="izoom" data-zoomed={zoomed || undefined}>
       {/* biome-ignore lint/a11y/useSemanticElements: a picture's stage, not a set of form fields */}
       <div
         ref={stageRef}
@@ -252,7 +263,6 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
         aria-describedby={hintId}
         // biome-ignore lint/a11y/noNoninteractiveTabindex: the keys zoom and move the picture once it has focus
         tabIndex={0}
-        data-zoomed={zoomed || undefined}
         data-dragging={dragging || undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -319,7 +329,9 @@ export function ImageZoom({ src, alt }: { src: string; alt: string }) {
       </div>
       <div className="izoom__bar">
         <p id={hintId} className="izoom__hint small muted">
-          {zoomed ? t("files.zoom.hintZoomed") : t("files.zoom.hint")}
+          {hover
+            ? t(zoomed ? "files.zoom.hintZoomed" : "files.zoom.hint")
+            : t(zoomed ? "files.zoom.hintZoomedTouch" : "files.zoom.hintTouch")}
         </p>
         <div className="izoom__tools ac-acts" role="toolbar" aria-label={t("files.zoom.toolbar")}>
           {hover && (

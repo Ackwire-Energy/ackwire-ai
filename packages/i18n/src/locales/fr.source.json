@@ -24833,10 +24833,16 @@
     "value": "Magnifier"
   },
   "files.zoom.hint": {
-    "value": "Click or scroll to zoom in"
+    "value": "Click, pinch or use the wheel to zoom in"
   },
   "files.zoom.hintZoomed": {
     "value": "Drag to move around. Esc fits it back"
+  },
+  "files.zoom.hintTouch": {
+    "value": "Tap or pinch to zoom in"
+  },
+  "files.zoom.hintZoomedTouch": {
+    "value": "Drag to move around. Tap to fit it back"
   },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."

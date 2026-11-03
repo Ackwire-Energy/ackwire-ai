@@ -10652,8 +10652,10 @@
       "fit": "Ajuster",
       "actual": "Taille réelle",
       "lens": "Loupe",
-      "hint": "Cliquez ou faites défiler pour agrandir",
-      "hintZoomed": "Faites glisser pour vous déplacer. Échap réajuste"
+      "hint": "Cliquez, pincez ou utilisez la molette pour agrandir",
+      "hintZoomed": "Faites glisser pour vous déplacer. Échap réajuste",
+      "hintTouch": "Touchez ou pincez pour agrandir",
+      "hintZoomedTouch": "Faites glisser pour vous déplacer. Touchez pour réajuster"
     }
   },
   "errors": {

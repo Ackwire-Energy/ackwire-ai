@@ -10659,8 +10659,10 @@
       "fit": "Adatta",
       "actual": "Dimensioni reali",
       "lens": "Lente",
-      "hint": "Fai clic o scorri per ingrandire",
-      "hintZoomed": "Trascina per spostarti. Esc la riadatta"
+      "hint": "Fai clic, pizzica o usa la rotella per ingrandire",
+      "hintZoomed": "Trascina per spostarti. Esc la riadatta",
+      "hintTouch": "Tocca o pizzica per ingrandire",
+      "hintZoomedTouch": "Trascina per spostarti. Tocca per riadattarla"
     }
   },
   "errors": {

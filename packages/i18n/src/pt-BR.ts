@@ -9849,8 +9849,10 @@ export const ptBR = {
       fit: "Ajustar",
       actual: "Tamanho real",
       lens: "Lupa",
-      hint: "Clique ou role para ampliar",
+      hint: "Clique, faça pinça ou gire a roda do mouse para ampliar",
       hintZoomed: "Arraste para mover. Esc volta a ajustar",
+      hintTouch: "Toque ou faça pinça para ampliar",
+      hintZoomedTouch: "Arraste para mover. Toque para voltar a ajustar",
     },
   },
   errors: {

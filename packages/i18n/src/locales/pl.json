@@ -10948,8 +10948,10 @@
       "fit": "Dopasuj",
       "actual": "Rzeczywisty rozmiar",
       "lens": "Lupa",
-      "hint": "Kliknij lub przewiń, aby powiększyć",
-      "hintZoomed": "Przeciągnij, aby przesunąć. Esc dopasowuje z powrotem"
+      "hint": "Kliknij, zsuń palce lub użyj kółka, aby powiększyć",
+      "hintZoomed": "Przeciągnij, aby przesunąć. Esc dopasowuje z powrotem",
+      "hintTouch": "Stuknij lub zsuń palce, aby powiększyć",
+      "hintZoomedTouch": "Przeciągnij, aby przesunąć. Stuknij, aby dopasować z powrotem"
     }
   },
   "errors": {

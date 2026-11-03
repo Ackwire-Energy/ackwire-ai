@@ -10582,8 +10582,10 @@
       "fit": "Ajustar",
       "actual": "Tamaño real",
       "lens": "Lupa",
-      "hint": "Haz clic o desplázate para ampliar",
-      "hintZoomed": "Arrastra para moverte. Esc vuelve a ajustar"
+      "hint": "Haz clic, pellizca o usa la rueda para ampliar",
+      "hintZoomed": "Arrastra para moverte. Esc vuelve a ajustar",
+      "hintTouch": "Toca o pellizca para ampliar",
+      "hintZoomedTouch": "Arrastra para moverte. Toca para volver a ajustar"
     }
   },
   "errors": {

@@ -20,23 +20,25 @@ beforeAll(() => {
   };
   Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => STAGE.w });
   Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => STAGE.h });
-  realMatch = globalThis.matchMedia;
-  // A mouse: the hover lens is offered.
-  globalThis.matchMedia = ((query: string) => ({
-    matches: query.includes("hover: hover"),
+  realMatch = window.matchMedia;
+  // A mouse (the hover lens is offered), or a finger when `touch` is set.
+  window.matchMedia = ((query: string) => ({
+    matches: !touch && query.includes("hover: hover"),
     media: query,
     addEventListener() {},
     removeEventListener() {},
   })) as unknown as typeof matchMedia;
 });
+let touch = false;
 afterAll(() => {
   HTMLElement.prototype.getBoundingClientRect = realRect;
   Reflect.deleteProperty(HTMLElement.prototype, "clientWidth");
   Reflect.deleteProperty(HTMLElement.prototype, "clientHeight");
-  globalThis.matchMedia = realMatch;
+  if (typeof window !== "undefined") window.matchMedia = realMatch;
 });
 afterEach(() => {
   cleanup();
+  touch = false;
   try {
     localStorage.clear();
   } catch {}
@@ -126,16 +128,45 @@ describe("the picture viewer's zoom", () => {
     expect(key(stage, "Escape").defaultPrevented).toBe(false);
   });
 
-  test("the wheel zooms around the cursor", async () => {
+  test("a mouse wheel and a trackpad pinch zoom around the cursor; two fingers move only a zoomed picture", async () => {
     const { img, stage } = await show();
-    await act(async () => {
-      const wheel = new WheelEvent("wheel", { deltaY: -400, cancelable: true });
-      // happy-dom's WheelEvent leaves out the mouse position.
-      Object.defineProperties(wheel, { clientX: { value: 0 }, clientY: { value: 350 } });
-      stage.dispatchEvent(wheel);
-    });
+    const wheel = (init: WheelEventInit) => {
+      const e = new WheelEvent("wheel", { cancelable: true, ...init });
+      // happy-dom's WheelEvent leaves out the mouse position and the modifier keys.
+      Object.defineProperties(e, {
+        clientX: { value: 0 },
+        clientY: { value: 350 },
+        ctrlKey: { value: Boolean(init.ctrlKey) },
+      });
+      act(() => {
+        stage.dispatchEvent(e);
+      });
+      return e;
+    };
+    // A two-finger scroll on the fitted picture does nothing and leaves the event to the page.
+    expect(wheel({ deltaY: 12.5, deltaX: 3 }).defaultPrevented).toBe(false);
+    expect(scaleOf(img)).toBeCloseTo(1 / 3);
+    wheel({ deltaY: -400 });
     expect(scaleOf(img)).toBeGreaterThan(0.6);
     expect(img.style.transform).toContain("translate(0px,");
+    const zoomed = scaleOf(img);
+    wheel({ deltaY: -20, ctrlKey: true });
+    expect(scaleOf(img)).toBeGreaterThan(zoomed);
+    const before = img.style.transform;
+    expect(wheel({ deltaY: 0, deltaX: 40.5 }).defaultPrevented).toBe(true);
+    expect(img.style.transform).not.toBe(before);
+    expect(img.style.transform).toContain("translate(-40.5px,");
+  });
+
+  test("on a touch screen the hints say tap and pinch", async () => {
+    touch = true;
+    const { stage, getByText } = await show();
+    expect(getByText("Toque ou faça pinça para ampliar")).toBeTruthy();
+    await act(async () => {
+      fireEvent.pointerDown(stage, { pointerId: 1, button: 0, clientX: 600, clientY: 350 });
+      fireEvent.pointerUp(stage, { pointerId: 1, button: 0, clientX: 600, clientY: 350 });
+    });
+    expect(getByText("Arraste para mover. Toque para voltar a ajustar")).toBeTruthy();
   });
 
   test("the hover lens shows a magnified pane, and can be switched off", async () => {

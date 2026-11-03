@@ -9,6 +9,7 @@ import {
   lensMag,
   panBy,
   stepZoom,
+  wheelIntent,
   ZOOM_MAX,
   zoomAt,
 } from "../src/lib/zoom";
@@ -100,5 +101,21 @@ describe("the hover lens", () => {
     const box = { x: 0, y: 0, w: 1200, h: 700 };
     expect(lensLayout(stage, box, { x: 100, y: 100 }, 2).pane.x).toBeGreaterThanOrEqual(600);
     expect(lensLayout(stage, box, { x: 1100, y: 100 }, 2).pane.x + 1).toBeLessThan(600);
+  });
+});
+
+describe("what a wheel event is", () => {
+  const w = (deltaY: number, deltaX = 0, deltaMode = 0, ctrlKey = false) =>
+    wheelIntent({ ctrlKey, deltaMode, deltaX, deltaY });
+  test("ctrl is a trackpad pinch", () => expect(w(-3.5, 0, 0, true)).toBe("pinch"));
+  test("lines, pages or a large whole step on Y alone are a mouse wheel", () => {
+    expect(w(3, 0, 1)).toBe("wheel");
+    expect(w(-100)).toBe("wheel");
+    expect(w(120)).toBe("wheel");
+  });
+  test("small, fractional or sideways steps are a two-finger scroll", () => {
+    expect(w(4)).toBe("scroll");
+    expect(w(-62.5)).toBe("scroll");
+    expect(w(100, 2)).toBe("scroll");
   });
 });

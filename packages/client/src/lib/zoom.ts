@@ -116,3 +116,20 @@ export function lensLayout(stage: Size, box: Rect, pointer: Point, mag: number) 
 
 /** How much the lens magnifies the fitted picture: up to its real pixels, between 2× and 4×. */
 export const lensMag = (fit: number) => clamp(1 / fit, 2, 4);
+
+/** A wheel event over the picture: a trackpad pinch, a mouse wheel's notch, or a trackpad's two-finger scroll. */
+export type WheelIntent = "pinch" | "wheel" | "scroll";
+
+/**
+ * Browsers don't say which device sent a wheel event, so it is read from its shape: a pinch comes as a wheel with
+ * ctrlKey (Chrome, Edge, Firefox and Safari); a mouse wheel counts in lines or pages (Firefox) or in large whole
+ * steps on Y alone (a notch is 100 or 120 px in Chrome, Edge and Safari); anything else, small or fractional steps or
+ * any X, is a trackpad's two-finger scroll.
+ * ponytail: a shape heuristic, so a fast trackpad flick of whole 50+ px steps with no X zooms like a wheel; read
+ * `wheelDeltaY` multiples of 120 too if that shows up.
+ */
+export function wheelIntent(e: { ctrlKey: boolean; deltaMode: number; deltaX: number; deltaY: number }): WheelIntent {
+  if (e.ctrlKey) return "pinch";
+  if (e.deltaMode !== 0) return "wheel";
+  return e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50 ? "wheel" : "scroll";
+}

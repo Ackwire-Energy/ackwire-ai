@@ -9845,8 +9845,10 @@
       "fit": "맞춤",
       "actual": "실제 크기",
       "lens": "돋보기",
-      "hint": "클릭하거나 스크롤해 확대",
-      "hintZoomed": "드래그해 이동. Esc로 다시 맞춤"
+      "hint": "클릭, 핀치 또는 휠로 확대",
+      "hintZoomed": "드래그해 이동. Esc로 다시 맞춤",
+      "hintTouch": "탭하거나 핀치해 확대",
+      "hintZoomedTouch": "드래그해 이동. 탭하면 다시 맞춤"
     }
   },
   "errors": {
