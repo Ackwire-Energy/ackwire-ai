@@ -51,6 +51,18 @@ test("a new top-level message starts its thread's list with itself; a list alrea
   expect(qc.getQueryData(keys.thread("o1", "c1", "r2"))).toBeUndefined();
 });
 
+test("a live reply to an older thread: its root from the older pages; with no root here, the list stays to be read", () => {
+  const qc = new QueryClient();
+  qc.setQueryData(keys.messages("o1", "c1"), [msg({ id: "new" })]);
+  qc.setQueryData(keys.olderPages("o1", "c1"), { pages: [msg({ id: "old" })], done: false });
+  cacheMessage(qc, "o1", msg({ id: "r1", threadId: "old" }));
+  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "old"))?.map((m) => m.id)).toEqual(["old", "r1"]);
+  expect(qc.getQueryState(keys.thread("o1", "c1", "old"))?.isInvalidated).toBe(false);
+  cacheMessage(qc, "o1", msg({ id: "r2", threadId: "gone" }));
+  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "gone"))?.map((m) => m.id)).toEqual(["r2"]);
+  expect(qc.getQueryState(keys.thread("o1", "c1", "gone"))?.isInvalidated).toBe(true);
+});
+
 test("reading a conversation again (after a reconnect) keeps my messages still sending or waiting to go out, not one the server refused", async () => {
   const qc = new QueryClient();
   const before = msg({ id: "before", createdAt: "2026-10-16T04:10:00.000Z" });

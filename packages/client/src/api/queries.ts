@@ -953,7 +953,7 @@ export function useAddChannelMember(orgId: string) {
 
 /**
  * Puts a message in the right cache: the channel list, or its thread (a thread's list starts with its root
- * when the channel list has it). Replaces the optimistic copy (same `clientId`), which always waits in the
+ * when a channel list here has it). Replaces the optimistic copy (same `clientId`), which always waits in the
  * channel list (a thread may not be loaded yet): a reply's copy is removed
  * from there too, or it would stay "sending…" next to the real one.
  */
@@ -964,10 +964,11 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
     message.clientId ? list?.filter((m) => !(m.local && m.clientId === message.clientId)) : list;
   if (message.threadId && message.clientId) qc.setQueryData<Message[]>(channelKey, withoutLocal);
   // A thread's first list holds its root, as the server lists it: a panel opened on it shows the root.
-  const root = message.threadId
-    ? qc.getQueryData<Message[]>(channelKey)?.find((m) => m.id === message.threadId)
-    : undefined;
+  const started = !message.threadId || qc.getQueryData(key) !== undefined;
+  const root = message.threadId ? cachedTopLevel(qc, orgId, message.threadId, message.channelId) : undefined;
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list) ?? (root && [root]), message));
+  // Its root in no list here (an older thread): the reply alone must not pass for the whole thread.
+  if (!started && !root) void qc.invalidateQueries({ queryKey: key, exact: true, refetchType: "none" });
 }
 
 /**
