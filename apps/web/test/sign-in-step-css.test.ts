@@ -11,9 +11,6 @@ const PLACEMENT = [
   ".agp-addacct__step.ac-iconline > .agp-addacct__text",
   ".agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text)",
   ".agp-addacct__step:not(.ac-iconline) > .agp-addacct__text",
-  ".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__text",
-  ".ai-panel--plan .agp-addacct__step.ac-iconline > :not(i, .agp-addacct__text)",
-  ".ai-panel--plan .agp-addacct > .agp-addacct__step:not(.ac-iconline)",
   ".agp-addacct > .ai-panel__row > .ac-setnote",
   ".agp-addacct > .ai-panel__row > :not(.ac-setnote)",
   ".ai-panel--plan .ai-panel__row > .ac-setnote",
@@ -37,8 +34,8 @@ test("the built stylesheet keeps a step's button under its words at every width,
   expect(declarations(shipped, ".agp-addacct__step")).toContainEqual(["flex-wrap", "wrap"]);
   // Nothing in what ships pulls a step's words down to a button beside them, at any width.
   expect(css).not.toMatch(/agp-addacct__step:has\(/);
-  // A failed sign-in's buttons go under the note's words anywhere, and on the text's column in a plan's panel: the
-  // panel's rule, as specific, comes later.
+  // A failed sign-in's buttons go under the note's words anywhere, and in a plan's panel after its 20px lead column:
+  // the panel's rule, as specific, comes later.
   const at = (selector: string) => shipped.search(new RegExp(`(^|[}])[^{}]*${escaped(selector)}[^{}]*\\{`));
   const anywhere = at(".agp-addacct>.ai-panel__row>:not(.ac-setnote)");
   expect(anywhere).toBeGreaterThan(-1);

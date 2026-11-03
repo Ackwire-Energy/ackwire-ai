@@ -306,15 +306,6 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
   }
 }
 
-/* ── Selection bar: Drive's floating glass bar ─────────────────────────── */
-.threads-selbar {
-  position: fixed;
-  left: 50%;
-  bottom: 22px;
-  transform: translateX(-50%);
-  max-width: calc(100vw - 24px);
-}
-
 /* ── Details (in the shared details dialog) ─────────────────────────────── */
 .thread-details__actions {
   display: flex;
@@ -429,13 +420,4 @@ html:not([data-pointer]) .thread-where:focus-visible {
 .thread-facts dd {
   margin: 0;
   color: var(--ink2);
-}
-
-@media (max-width: 760px) {
-  .threads-selbar {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-    transform: none;
-  }
 }
