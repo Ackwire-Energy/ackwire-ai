@@ -385,9 +385,7 @@ export async function sweepExpiredVoice(
       .limit(pageSize);
     for (const clip of page) {
       try {
-        const store = await deps.blobs.forConfig(clip.orgId, clip.storageConfigId);
-        await store.delete(clip.blobKey);
-        await deps.db.update(voiceClips).set({ audioDeletedAt: new Date() }).where(eq(voiceClips.id, clip.id));
+        await dropAudio(deps, clip);
         result.swept++;
       } catch {
         result.failed++;
@@ -396,4 +394,27 @@ export async function sweepExpiredVoice(
     if (page.length < pageSize) return result;
     cursor = page[page.length - 1]?.id ?? null;
   }
+}
+
+type ClipAudio = { id: string; orgId: string; storageConfigId: string | null; blobKey: string };
+
+/** A recording leaves storage; its row stays for fair use. */
+async function dropAudio(deps: Pick<VoiceDeps, "db" | "blobs">, clip: ClipAudio) {
+  const store = await deps.blobs.forConfig(clip.orgId, clip.storageConfigId);
+  await store.delete(clip.blobKey);
+  await deps.db.update(voiceClips).set({ audioDeletedAt: new Date() }).where(eq(voiceClips.id, clip.id));
+}
+
+/** A deleted channel's recordings leave storage now, whatever the retention (a failure throws, so its job retries). */
+export async function dropChannelVoice(deps: Pick<VoiceDeps, "db" | "blobs">, orgId: string, channelId: string) {
+  const clips = await deps.db
+    .select({
+      id: voiceClips.id,
+      orgId: voiceClips.orgId,
+      storageConfigId: voiceClips.storageConfigId,
+      blobKey: voiceClips.blobKey,
+    })
+    .from(voiceClips)
+    .where(and(eq(voiceClips.orgId, orgId), eq(voiceClips.channelId, channelId), isNull(voiceClips.audioDeletedAt)));
+  for (const clip of clips) await dropAudio(deps, clip);
 }

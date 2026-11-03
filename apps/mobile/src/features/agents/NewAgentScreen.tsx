@@ -21,7 +21,12 @@ import {
 import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, draftMailLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
-import { type BrainPickOption, brainPickOptions, planAccountOption } from "@agenteschat/client/lib/brain-picker";
+import {
+  type BrainPickOption,
+  brainPickOptions,
+  newPlanAccountOption,
+  planAccountOption,
+} from "@agenteschat/client/lib/brain-picker";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { defaultPolicy, toMailLevel } from "@agenteschat/client/lib/mail";
@@ -192,12 +197,13 @@ function NewAgentForm({
   });
   const [picked, setPicked] = useState<BrainPickOption | null>(null);
   const [picking, setPicking] = useState(false);
-  // "Conectar uma IA" from this step (the same sheet as Settings, for the agents I create): the plan it connects is
-  // what the agent thinks with once it shows up, over a pick made before.
-  const [connectedHere, setConnectedHere] = useState(false);
+  // "Conectar uma IA" from this step (the same sheet as Settings, for the agents I create): a plan account that wasn't
+  // among the choices when it opened is what the agent thinks with, over a pick made before; nothing new keeps the pick.
+  const [optionsBefore, setOptionsBefore] = useState<ReadonlySet<string> | null>(null);
   const ownPlan = planAccountOption(brainOptions);
+  const connectedHere = optionsBefore ? newPlanAccountOption(brainOptions, optionsBefore) : undefined;
   // No last setup to start from: a plan account of mine that can think for it (one connected before I had an agent).
-  const chosen = (connectedHere ? ownPlan : undefined) ?? picked ?? (proposed || start ? null : (ownPlan ?? null));
+  const chosen = connectedHere ?? picked ?? (proposed || start ? null : (ownPlan ?? null));
   const thinks = chosen
     ? pickedAi(chosen.pick, aiAccounts.data?.computers)
     : newAgentAi(start && useLast ? start : null);
@@ -683,7 +689,7 @@ function NewAgentForm({
           onPick={(o) => {
             setPicked(o);
             setUseLast(false);
-            setConnectedHere(false);
+            setOptionsBefore(null);
           }}
         />
         {proposed ? null : (
@@ -693,7 +699,7 @@ function NewAgentForm({
             icon="plus"
             label={t("aiAccounts.page.connect")}
             onPress={() => {
-              setConnectedHere(true);
+              setOptionsBefore(new Set(brainOptions.map((o) => o.value)));
               openConnectAi({ forNew: "1" });
             }}
           />

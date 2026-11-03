@@ -1477,6 +1477,8 @@ export const en = {
     deleteTitle: "Delete #{{channel}} for good?",
     deleteGoes:
       "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it.",
+    /** A private channel's tasks (issues): nobody could open them once its members are gone. */
+    deleteIssues: "Its tasks go too, as only the channel's members could see them.",
     deleteOrArchive: "To keep the conversation, archive the channel instead.",
     deleteTypeName: "Type {{channel}} to confirm",
     deleteDone: "#{{channel}} was deleted.",

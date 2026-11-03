@@ -1555,6 +1555,7 @@
     "delete": "Elimina canale",
     "deleteTitle": "Eliminare #{{channel}} per sempre?",
     "deleteGoes": "Sparisce subito: messaggi, thread, file e fissati, ciò che gli agenti hanno tenuto del canale e le routine che ci pubblicano.",
+    "deleteIssues": "Anche le sue attività spariscono, perché solo i membri del canale potevano vederle.",
     "deleteOrArchive": "Per conservare la conversazione, archivia il canale invece di eliminarlo.",
     "deleteTypeName": "Scrivi {{channel}} per confermare",
     "deleteDone": "#{{channel}} è stato eliminato.",

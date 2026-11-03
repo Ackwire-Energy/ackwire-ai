@@ -1504,6 +1504,7 @@
     "delete": "Kanaal verwijderen",
     "deleteTitle": "#{{channel}} definitief verwijderen?",
     "deleteGoes": "Verdwijnt nu: berichten, threads, bestanden en vastgezette berichten, wat de agents uit het kanaal onthielden en de routines die erin posten.",
+    "deleteIssues": "De taken gaan ook weg, want alleen de leden van het kanaal konden ze zien.",
     "deleteOrArchive": "Wil je het gesprek bewaren, archiveer het kanaal dan.",
     "deleteTypeName": "Typ {{channel}} om te bevestigen",
     "deleteDone": "#{{channel}} is verwijderd.",

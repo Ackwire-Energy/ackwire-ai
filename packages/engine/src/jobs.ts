@@ -869,7 +869,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     // A deleted channel's contents (`purgeChannel`): a no-op for one that isn't deleted.
     [CHANNEL_DELETE_JOB]: async (job) => {
-      await purgeChannel({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.channelId));
+      await purgeChannel(
+        { db: deps.db, pubsub: deps.pubsub, ...(deps.voice ? { blobs: deps.voice.blobs } : {}) },
+        orgOf(job),
+        String(job.payload.channelId),
+      );
     },
     // A workspace whose deletion's date came (`purgeWorkspace`): a no-op once restored, kept or gone.
     [ORG_DELETE_JOB]: async (job, ctx) => {

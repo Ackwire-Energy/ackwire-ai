@@ -1504,6 +1504,7 @@
     "delete": "Kanalı sil",
     "deleteTitle": "#{{channel}} kalıcı olarak silinsin mi?",
     "deleteGoes": "Hemen gider: mesajlar, ileti dizileri, dosyalar ve sabitlenenler, ajanların bu kanaldan hatırladıkları ve buraya gönderi yapan rutinler.",
+    "deleteIssues": "Görevleri de silinir, çünkü onları yalnızca kanalın üyeleri görebiliyordu.",
     "deleteOrArchive": "Konuşmayı saklamak için kanalı silmek yerine arşivle.",
     "deleteTypeName": "Onaylamak için {{channel}} yaz",
     "deleteDone": "#{{channel}} silindi.",

@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import type { AgentDeletionDeps } from "./agent-deletion";
 import { ARTIFACT_TRASH_DAYS } from "./artifacts";
@@ -13,6 +13,8 @@ import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { deleteChannelRoutines } from "./routines";
 import { ACTIVE_RUN_STATUSES } from "./run-inbox";
+import { enqueueIndex } from "./search";
+import { dropChannelVoice } from "./voice";
 
 const {
   agentRuns,
@@ -22,6 +24,7 @@ const {
   channelReads,
   channels,
   contextItems,
+  issues,
   messagePins,
   messageReactions,
   messages,
@@ -41,8 +44,9 @@ const {
  * runs and missions stop, and the audit log says who did it. Then the `channel.delete` job takes what it held:
  * messages and their reactions, threads, pins, reads, members (people and agents), the agents' memory from it, what
  * search finds of it and the notifications that point at it; its files become tombstones whose contents the files'
- * purge takes. The row stays, so runs, usage and audit that name it still resolve. Voice recordings follow their own
- * retention.
+ * purge takes, and its voice recordings leave storage. Issues of a private channel go too (nobody could see them
+ * again); a public channel's stay for the whole workspace, as it could already read them. The row stays, so runs,
+ * usage and audit that name it still resolve.
  */
 
 /** The job that purges a deleted channel's contents (`purgeChannel`). */
@@ -130,10 +134,14 @@ export async function deleteChannel(
 }
 
 /** Job: a deleted channel's contents go, in one transaction; a no-op for a channel that isn't deleted. */
-export async function purgeChannel(deps: { db: Database; pubsub?: PubSub }, orgId: string, channelId: string) {
+export async function purgeChannel(
+  deps: { db: Database; pubsub?: PubSub; blobs?: BlobStoreResolver },
+  orgId: string,
+  channelId: string,
+) {
   const { db } = deps;
   const [channel] = await db
-    .select({ deletedAt: channels.deletedAt })
+    .select({ deletedAt: channels.deletedAt, visibility: channels.visibility })
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel?.deletedAt) return;
@@ -177,6 +185,13 @@ export async function purgeChannel(deps: { db: Database; pubsub?: PubSub }, orgI
     await tx
       .delete(notifications)
       .where(and(eq(notifications.orgId, orgId), sql`${notifications.source}->>'channelId' = ${channelId}`));
+    const itsIssues = and(eq(issues.orgId, orgId), eq(issues.channelId, channelId));
+    if (channel.visibility === "public") {
+      const kept = await tx.update(issues).set({ channelId: null }).where(itsIssues).returning({ id: issues.id });
+      for (const issue of kept) await enqueueIndex(tx, { orgId, kind: "issue", sourceId: issue.id });
+    } else {
+      await tx.delete(issues).where(itsIssues);
+    }
     for (const table of [
       messages,
       threads,
@@ -190,4 +205,5 @@ export async function purgeChannel(deps: { db: Database; pubsub?: PubSub }, orgI
       await tx.delete(table).where(and(eq(table.orgId, orgId), eq(table.channelId, channelId)));
     }
   });
+  if (deps.blobs) await dropChannelVoice({ db, blobs: deps.blobs }, orgId, channelId);
 }

@@ -18,7 +18,7 @@ export function DeleteChannelDialog({
   onClose,
   onDeleted,
 }: {
-  channel: Pick<Channel, "id" | "name"> | null;
+  channel: Pick<Channel, "id" | "name" | "visibility"> | null;
   onClose: () => void;
   onDeleted?: () => void;
 }) {
@@ -71,6 +71,12 @@ export function DeleteChannelDialog({
               <Icon name="trash" size={16} />
               <span>{t("channel.deleteGoes")}</span>
             </li>
+            {channel?.visibility === "private" && (
+              <li className="ac-iconline">
+                <Icon name="issues" size={16} />
+                <span>{t("channel.deleteIssues")}</span>
+              </li>
+            )}
             <li className="ac-iconline">
               <Icon name="archive" size={16} />
               <span>{t("channel.deleteOrArchive")}</span>

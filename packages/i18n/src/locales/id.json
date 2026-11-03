@@ -1453,6 +1453,7 @@
     "delete": "Hapus kanal",
     "deleteTitle": "Hapus #{{channel}} untuk selamanya?",
     "deleteGoes": "Hilang sekarang: pesan, utas, file dan sematan, apa yang diingat agen dari kanal ini, serta rutinitas yang memposting di sini.",
+    "deleteIssues": "Tugasnya juga ikut terhapus, karena hanya anggota channel yang bisa melihatnya.",
     "deleteOrArchive": "Untuk menyimpan percakapannya, arsipkan kanal alih-alih menghapusnya.",
     "deleteTypeName": "Ketik {{channel}} untuk mengonfirmasi",
     "deleteDone": "#{{channel}} telah dihapus.",

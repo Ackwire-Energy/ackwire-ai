@@ -1473,6 +1473,7 @@ export const ptBR = {
     deleteTitle: "Apagar o #{{channel}} de vez?",
     deleteGoes:
       "Sai agora: mensagens, threads, arquivos e fixados, o que os agentes guardaram do canal e as rotinas que postam nele.",
+    deleteIssues: "As tarefas dele saem também, porque só os membros do canal podiam vê-las.",
     deleteOrArchive: "Para guardar a conversa, arquive o canal em vez de apagar.",
     deleteTypeName: "Digite {{channel}} para confirmar",
     deleteDone: "#{{channel}} foi apagado.",

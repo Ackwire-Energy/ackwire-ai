@@ -1779,7 +1779,7 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
 .ac-menu--select .ac-menu__leading > .ac-avatar {
   width: 32px;
   height: 32px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .ac-menu__desc {
   font-size: 13px;

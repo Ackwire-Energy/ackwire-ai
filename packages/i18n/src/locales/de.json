@@ -1504,6 +1504,7 @@
     "delete": "Kanal löschen",
     "deleteTitle": "#{{channel}} endgültig löschen?",
     "deleteGoes": "Weg ist sofort: Nachrichten, Threads, Dateien und Angeheftetes, was die Agenten sich aus dem Kanal gemerkt haben, und die Routinen, die dort posten.",
+    "deleteIssues": "Seine Aufgaben sind auch weg, da nur die Mitglieder des Kanals sie sehen konnten.",
     "deleteOrArchive": "Um das Gespräch zu behalten, archiviere den Kanal stattdessen.",
     "deleteTypeName": "Gib {{channel}} zur Bestätigung ein",
     "deleteDone": "#{{channel}} wurde gelöscht.",

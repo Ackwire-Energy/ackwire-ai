@@ -8,6 +8,7 @@ import {
   brainPickText,
   brainPickValue,
   needsOwnSignIn,
+  newPlanAccountOption,
   pickGroups,
 } from "../src/lib/brain-picker";
 import { brainModelChoices, CODING_PLANS } from "../src/lib/plans";
@@ -249,4 +250,19 @@ describe("OpenCode (ADR 0132) in Quem pensa", () => {
     expect(rows[1]?.keywords).toContain("free");
     expect(rows[0]?.description).toBe("brain.opencodeText");
   });
+});
+
+test("the plan account just connected: one not among the options when Conectar uma IA opened, else none", () => {
+  const row = (value: string, accountId?: string) =>
+    ({
+      value,
+      disabled: false,
+      pick: { kind: "claude_code", machineId: "m1", model: AUTO, ...(accountId ? { accountId } : {}) },
+    }) as never;
+  const before = [row("auto"), row("claude@m1#old/auto", "old")];
+  expect(newPlanAccountOption(before, new Set(before.map((o: { value: string }) => o.value)))).toBeUndefined();
+  const after = [...before, row("claude@m1#new/auto", "new")];
+  expect(newPlanAccountOption(after, new Set(before.map((o: { value: string }) => o.value)))?.value).toBe(
+    "claude@m1#new/auto",
+  );
 });

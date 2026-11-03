@@ -10,6 +10,7 @@ import {
   NotFoundError,
   pinMessage,
   postPersonMessage,
+  purgeChannel,
   unarchiveChannel,
   ValidationError,
 } from "../src";
@@ -121,4 +122,42 @@ test("gone at once: unlisted, its name free, never unarchived, audited, its rout
   // Other channels keep theirs; the tombstone stays.
   expect((await f.db.select().from(schema.messages).where(eq(schema.messages.id, kept.id))).length).toBe(1);
   expect((await f.db.select().from(schema.channels).where(eq(schema.channels.id, room.id))).length).toBe(1);
+});
+
+test("a private channel's tasks go with it, a public one's stay for everyone; its recordings leave storage", async () => {
+  f = await setup();
+  const open = await createChannel(f.db, f.owner.id, f.org.id, { name: "aberto" });
+  const closed = await createChannel(f.db, f.owner.id, f.org.id, { name: "fechado", visibility: "private" });
+  const task = (n: number, channelId: string) => ({
+    orgId: f.org.id,
+    number: n,
+    title: `Tarefa ${n}`,
+    channelId,
+    createdByType: "person",
+    createdById: f.owner.id,
+  });
+  await f.db.insert(schema.issues).values([task(1, open.id), task(2, closed.id)]);
+  const blobs = f.artifactDeps.blobs;
+  await (await blobs.forConfig(f.org.id, null)).put("voice/clip-1", new Uint8Array([1]), { contentType: "audio/webm" });
+  await f.db.insert(schema.voiceClips).values({
+    orgId: f.org.id,
+    channelId: closed.id,
+    userId: f.owner.id,
+    clientId: "clip-1",
+    blobKey: "voice/clip-1",
+    contentType: "audio/webm",
+    size: 1,
+    durationMs: 1000,
+    peaks: [],
+    status: "sent",
+  });
+  await remove(open.id, "aberto");
+  await remove(closed.id, "fechado");
+  await purgeChannel({ db: f.db, blobs }, f.org.id, open.id);
+  await purgeChannel({ db: f.db, blobs }, f.org.id, closed.id);
+  const left = await f.db.select().from(schema.issues).where(eq(schema.issues.orgId, f.org.id));
+  expect(left.map((i) => [i.number, i.channelId])).toEqual([[1, null]]);
+  const [clip] = await f.db.select().from(schema.voiceClips).where(eq(schema.voiceClips.clientId, "clip-1"));
+  expect(clip?.audioDeletedAt).not.toBeNull();
+  expect(await (await blobs.forConfig(f.org.id, null)).get("voice/clip-1")).toBeNull();
 });

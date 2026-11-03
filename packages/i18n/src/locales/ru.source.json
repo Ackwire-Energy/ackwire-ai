@@ -3721,6 +3721,9 @@
   "channel.deleteGoes": {
     "value": "Goes now: messages, threads, files and pins, what agents kept from the channel and the routines that post in it."
   },
+  "channel.deleteIssues": {
+    "value": "Its tasks go too, as only the channel's members could see them."
+  },
   "channel.deleteOrArchive": {
     "value": "To keep the conversation, archive the channel instead."
   },

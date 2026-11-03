@@ -49,6 +49,8 @@ test("the name typed to confirm, then the channel is gone and its page left", as
   await settle(3);
   const ask = screen().getByRole("dialog", { name: "Apagar o #eng de vez?" });
   expect(ask.textContent).toContain("arquive o canal");
+  // A public channel's tasks stay for the whole workspace: only a private one's go.
+  expect(ask.textContent).not.toContain("As tarefas dele saem");
   const confirm = within(ask).getByRole("button", { name: "Apagar canal" }) as HTMLButtonElement;
   const field = within(ask).getByLabelText("Digite eng para confirmar");
   await act(async () => fireEvent.change(field, { target: { value: "en" } }));

@@ -1453,6 +1453,7 @@
     "delete": "채널 삭제",
     "deleteTitle": "#{{channel}} 채널을 영구 삭제할까요?",
     "deleteGoes": "지금 사라지는 것: 메시지, 스레드, 파일, 고정 항목, 에이전트가 이 채널에서 기억한 내용, 여기에 게시하는 루틴.",
+    "deleteIssues": "채널 멤버만 볼 수 있었기 때문에 작업도 함께 삭제됩니다.",
     "deleteOrArchive": "대화를 남기려면 삭제 대신 채널을 보관하세요.",
     "deleteTypeName": "확인하려면 {{channel}} 입력",
     "deleteDone": "#{{channel}} 채널을 삭제했어요.",

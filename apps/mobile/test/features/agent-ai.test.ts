@@ -155,8 +155,9 @@ describe("the agent's AI", () => {
     const [screen, sheet] = await Promise.all([read("agents/NewAgentScreen.tsx"), read("ai/ConnectAi.tsx")]);
     expect(screen).toContain('label={t("aiAccounts.page.connect")}');
     expect(screen).toContain('openConnectAi({ forNew: "1" });');
-    // The plan it connects is what the agent thinks with once it shows up, over a pick made before.
-    expect(screen).toContain("(connectedHere ? ownPlan : undefined) ?? picked");
+    // The plan it connects is what the agent thinks with once it shows up, over a pick made before; nothing new keeps it.
+    expect(screen).toContain("newPlanAccountOption(brainOptions, optionsBefore)");
+    expect(screen).toContain("connectedHere ?? picked");
     // For the agents I create: none of mine is offered, so a plan signs in for the new one.
     expect(sheet).toContain('params.forNew === "1" ? []');
     expect(sheet).toContain("queryKey: keys.brainMachines(orgId)");

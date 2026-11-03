@@ -108,6 +108,10 @@ export function apiPickOptions(t: TFunction, locale: string, choices: [string, M
 export const planAccountOption = (options: readonly BrainPickOption[]) =>
   options.find((o) => !o.disabled && "accountId" in o.pick && Boolean(o.pick.accountId) && o.pick.model === AUTO);
 
+/** A plan account option that wasn't among `before` (the options' values when "Conectar uma IA" opened): the one just connected. */
+export const newPlanAccountOption = (options: readonly BrainPickOption[], before: ReadonlySet<string>) =>
+  planAccountOption(options.filter((o) => !before.has(o.value)));
+
 /** The API provider whose models a plan also thinks with (Claude's plan: Anthropic's models). */
 const PLAN_PROVIDER: Partial<Record<PlanChoice, string>> = { claude: "anthropic", chatgpt: "openai" };
 
