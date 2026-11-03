@@ -5,7 +5,7 @@ setupDom();
 
 import { readFileSync } from "node:fs";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
@@ -85,9 +85,18 @@ describe("a channel", () => {
   });
 });
 
+/** DMs with Ada, Atlas and João, so each has a row under "Mensagens diretas". */
+const withDms = () => {
+  const state = seedState();
+  seedDm(state, { type: "agent", id: ADA_ID });
+  seedDm(state, { type: "agent", id: ATLAS_ID });
+  seedDm(state, { type: "person", id: "u-joao" });
+  return state;
+};
+
 describe("an agent", () => {
   test("Shift+F10 on its row: talk, profile, copy @, edit (owner or admin), link, id", async () => {
-    await go();
+    await go(undefined, withDms());
     const row = within(nav()).getByRole("link", { name: /^Ada/ });
     row.focus();
     await act(async () => fireEvent.keyDown(row, { key: "F10", shiftKey: true }));
@@ -105,7 +114,7 @@ describe("an agent", () => {
   });
 
   test("the menu key opens it too; Editar agente goes to its settings", async () => {
-    const { router } = await go();
+    const { router } = await go(undefined, withDms());
     const row = within(nav()).getByRole("link", { name: /^Atlas/ });
     await act(async () => fireEvent.keyDown(row, { key: "ContextMenu" }));
     await settle(2);
@@ -117,7 +126,7 @@ describe("an agent", () => {
 
 describe("a person", () => {
   test("their sidebar row: DM, copy @ and copy id", async () => {
-    await go();
+    await go(undefined, withDms());
     const row = nav().querySelector('a[href$="/dm/person/u-joao"]');
     if (!row) throw new Error("no row for João");
     await rightClick(row);
@@ -187,26 +196,27 @@ describe("the sidebar's sections, in my order", () => {
 
   test("the default order; Mover para baixo on Canais saves the new one; Restaurar ordem padrão goes back", async () => {
     const { state } = await go();
-    expect(blocks()).toEqual(["tools", "channels", "agents", "people"]);
+    // The agents' part is gone: three sections show, the saved order still has all four.
+    expect(blocks()).toEqual(["tools", "channels", "people"]);
     await act(async () => fireEvent.click(within(nav()).getByRole("button", { name: "Arrastar Canais" })));
     await settle(2);
     expect(within(menu()).getByRole("menuitem", { name: "Mover para cima" }).getAttribute("aria-disabled")).toBe(null);
     await pick("Mover para baixo");
-    expect(blocks()).toEqual(["tools", "agents", "channels", "people"]);
+    expect(blocks()).toEqual(["tools", "people", "channels"]);
     expect(state.calls.filter((c) => c.method === "orgs.setSidebarOrder").map((c) => c.args[1])).toEqual([
-      ["tools", "agents", "channels", "people"],
+      ["tools", "people", "agents", "channels"],
     ]);
 
-    await rightClick(within(nav()).getByRole("button", { name: "Agentes" }));
+    await rightClick(within(nav()).getByRole("button", { name: "Mensagens diretas" }));
     await pick("Restaurar ordem padrão");
-    expect(blocks()).toEqual(["tools", "channels", "agents", "people"]);
+    expect(blocks()).toEqual(["tools", "channels", "people"]);
     expect(state.calls.filter((c) => c.method === "orgs.setSidebarOrder").at(-1)?.args[1]).toBeNull();
   });
 
-  test("a saved order comes back: agents first; the top one can't go up", async () => {
+  test("a saved order comes back: DMs first; the top one can't go up", async () => {
     await go(`c/${ENG_ID}`, seedState({ sidebarOrder: ["agents", "people", "tools", "channels"] }));
-    expect(blocks()).toEqual(["agents", "people", "tools", "channels"]);
-    await rightClick(within(nav()).getByRole("button", { name: "Agentes" }));
+    expect(blocks()).toEqual(["people", "tools", "channels"]);
+    await rightClick(within(nav()).getByRole("button", { name: "Mensagens diretas" }));
     expect(within(menu()).getByRole("menuitem", { name: "Mover para cima" }).hasAttribute("data-disabled")).toBe(true);
   });
 });

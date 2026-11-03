@@ -1207,9 +1207,8 @@
     "sidebarMenu": {
       "title": "Kenar çubuğu",
       "newChannel": "Yeni kanal",
-      "newAgentGroup": "Yeni ajan grubu",
       "addToChannels": "Yeni kanal veya kategori",
-      "addToAgents": "Ajan veya grup oluştur",
+      "addToDms": "Yeni mesaj veya ajan",
       "newMessage": "Yeni mesaj",
       "addMembers": "Kişi veya ajan ekle",
       "channelSettings": "Kanal ayarları",
@@ -1345,6 +1344,9 @@
   },
   "team": {
     "title": "Ekip",
+    "groups": {
+      "title": "Ajan grupları"
+    },
     "subtitle_one": "{{count}} ajan, onunla kimin ilgilendiğine göre gruplandı.",
     "subtitle_other": "{{count}} ajan, her biriyle kimin ilgilendiğine göre gruplandı.",
     "working_one": "Şu anda {{count}} tanesi çalışıyor.",

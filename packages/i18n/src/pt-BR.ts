@@ -1184,9 +1184,8 @@ export const ptBR = {
     sidebarMenu: {
       title: "Barra lateral",
       newChannel: "Novo canal",
-      newAgentGroup: "Novo grupo de agentes",
       addToChannels: "Novo canal ou categoria",
-      addToAgents: "Criar agente ou grupo",
+      addToDms: "Nova mensagem ou agente",
       newMessage: "Nova mensagem",
       addMembers: "Adicionar pessoas ou agentes",
       channelSettings: "Configurações do canal",
@@ -1324,6 +1323,9 @@ export const ptBR = {
   },
   team: {
     title: "Equipe",
+    groups: {
+      title: "Grupos de agentes",
+    },
     subtitle_one: "{{count}} agente, agrupado por quem cuida dele.",
     subtitle_other: "{{count}} agentes, agrupados por quem cuida de cada um.",
     working_one: "{{count}} trabalhando agora.",

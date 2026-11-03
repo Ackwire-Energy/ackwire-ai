@@ -1186,9 +1186,8 @@ export const en = {
     sidebarMenu: {
       title: "Sidebar",
       newChannel: "New channel",
-      newAgentGroup: "New agent group",
       addToChannels: "New channel or category",
-      addToAgents: "Create agent or group",
+      addToDms: "New message or agent",
       newMessage: "New message",
       addMembers: "Add people or agents",
       channelSettings: "Channel settings",
@@ -1327,6 +1326,9 @@ export const en = {
   },
   team: {
     title: "Team",
+    groups: {
+      title: "Agent groups",
+    },
     subtitle_one: "{{count}} agent, grouped by who looks after it.",
     subtitle_other: "{{count}} agents, grouped by who looks after each one.",
     working_one: "{{count}} working now.",

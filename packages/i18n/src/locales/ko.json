@@ -1171,9 +1171,8 @@
     "sidebarMenu": {
       "title": "사이드바",
       "newChannel": "새 채널",
-      "newAgentGroup": "새 에이전트 그룹",
       "addToChannels": "새 채널 또는 카테고리",
-      "addToAgents": "에이전트 또는 그룹 만들기",
+      "addToDms": "새 메시지 또는 에이전트",
       "newMessage": "새 메시지",
       "addMembers": "사람 또는 에이전트 추가",
       "channelSettings": "채널 설정",
@@ -1302,6 +1301,9 @@
   },
   "team": {
     "title": "팀",
+    "groups": {
+      "title": "에이전트 그룹"
+    },
     "subtitle_other": "에이전트 {{count}}명, 담당자별로 묶었어요.",
     "working_other": "지금 {{count}}명 작업 중.",
     "skyLabel": "담당자별로 묶은 에이전트예요. 에이전트를 탭하면 하는 일을 볼 수 있어요.",

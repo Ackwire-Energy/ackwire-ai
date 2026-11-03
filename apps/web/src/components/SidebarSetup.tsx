@@ -4,7 +4,6 @@ import {
   moveSection,
   SIDEBAR_COUNTED,
   SIDEBAR_ITEMS,
-  SIDEBAR_SECTIONS,
   sameOrder,
   sidebarPlace,
 } from "@agenteschat/client/lib/sidebar-items";
@@ -21,7 +20,7 @@ import {
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "./org-context";
-import { sectionName, useSectionOrder } from "./SidebarOrder";
+import { SHOWN_SECTIONS, sectionName, useSectionOrder } from "./SidebarOrder";
 
 /** The tools at the top of the sidebar: the page each opens and its icon. */
 export const SIDEBAR_TOOLS = {
@@ -119,8 +118,8 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
         <Button
           variant="ghost"
           icon="undo"
-          disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
-          onClick={() => sections.put([...SIDEBAR_SECTIONS])}
+          disabled={sameOrder(sections.order, SHOWN_SECTIONS)}
+          onClick={() => sections.put(SHOWN_SECTIONS)}
         >
           {t("contextMenu.restoreOrder")}
         </Button>

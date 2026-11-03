@@ -1171,9 +1171,8 @@
     "sidebarMenu": {
       "title": "サイドバー",
       "newChannel": "新しいチャンネル",
-      "newAgentGroup": "新しいエージェントグループ",
       "addToChannels": "新しいチャンネルまたはカテゴリ",
-      "addToAgents": "エージェントまたはグループを作成",
+      "addToDms": "新しいメッセージまたはエージェント",
       "newMessage": "新しいメッセージ",
       "addMembers": "人またはエージェントを追加",
       "channelSettings": "チャンネルの設定",
@@ -1302,6 +1301,9 @@
   },
   "team": {
     "title": "チーム",
+    "groups": {
+      "title": "エージェントグループ"
+    },
     "subtitle_other": "{{count}}体のエージェントを、担当者ごとにまとめています。",
     "working_other": "{{count}}体が作業中です。",
     "skyLabel": "担当者ごとにまとめたエージェント。エージェントをタップすると、何をしているかが見られます。",

@@ -1243,9 +1243,8 @@
     "sidebarMenu": {
       "title": "Barra lateral",
       "newChannel": "Nuevo canal",
-      "newAgentGroup": "Nuevo grupo de agentes",
       "addToChannels": "Nuevo canal o categoría",
-      "addToAgents": "Crear agente o grupo",
+      "addToDms": "Nuevo mensaje o agente",
       "newMessage": "Nuevo mensaje",
       "addMembers": "Agregar personas o agentes",
       "channelSettings": "Configuración del canal",
@@ -1388,6 +1387,9 @@
   },
   "team": {
     "title": "Equipo",
+    "groups": {
+      "title": "Grupos de agentes"
+    },
     "subtitle_one": "{{count}} agente, agrupado según quién se encarga de él.",
     "subtitle_many": "{{count}} agentes, agrupados según quién se encarga de cada uno.",
     "subtitle_other": "{{count}} agentes, agrupados según quién se encarga de cada uno.",

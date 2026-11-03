@@ -1171,9 +1171,8 @@
     "sidebarMenu": {
       "title": "Bilah samping",
       "newChannel": "Kanal baru",
-      "newAgentGroup": "Grup agen baru",
       "addToChannels": "Kanal atau kategori baru",
-      "addToAgents": "Buat agen atau grup",
+      "addToDms": "Pesan baru atau agen",
       "newMessage": "Pesan baru",
       "addMembers": "Tambah orang atau agen",
       "channelSettings": "Pengaturan kanal",
@@ -1302,6 +1301,9 @@
   },
   "team": {
     "title": "Tim",
+    "groups": {
+      "title": "Grup agen"
+    },
     "subtitle_other": "{{count}} agen, dikelompokkan berdasarkan siapa yang mengurusnya.",
     "working_other": "{{count}} sedang bekerja.",
     "skyLabel": "Agen dikelompokkan berdasarkan penanggung jawabnya. Ketuk agen untuk melihat apa yang dikerjakannya.",

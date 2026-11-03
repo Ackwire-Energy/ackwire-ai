@@ -1207,9 +1207,8 @@
     "sidebarMenu": {
       "title": "Zijbalk",
       "newChannel": "Nieuw kanaal",
-      "newAgentGroup": "Nieuwe agentgroep",
       "addToChannels": "Nieuw kanaal of nieuwe categorie",
-      "addToAgents": "Agent of groep maken",
+      "addToDms": "Nieuw bericht of agent",
       "newMessage": "Nieuw bericht",
       "addMembers": "Mensen of agents toevoegen",
       "channelSettings": "Kanaalinstellingen",
@@ -1345,6 +1344,9 @@
   },
   "team": {
     "title": "Team",
+    "groups": {
+      "title": "Agentgroepen"
+    },
     "subtitle_one": "{{count}} agent, gegroepeerd naar wie ervoor zorgt.",
     "subtitle_other": "{{count}} agents, gegroepeerd naar wie voor elk zorgt.",
     "working_one": "{{count}} nu aan het werk.",

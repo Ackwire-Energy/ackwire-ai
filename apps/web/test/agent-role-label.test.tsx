@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { click, typeIn } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -45,9 +45,10 @@ test("where a role is cut to the line, it shows whole on hover", async () => {
   const state = seedState();
   const ada = state.agents.find((a) => a.id === ADA_ID);
   if (ada) ada.role = "Assistente de e-mails";
+  seedDm(state, { type: "agent", id: ADA_ID });
   await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
   await settle(6);
-  // The sidebar's row.
+  // The sidebar's DM row.
   const row = document.querySelector(`[data-agent-row="${ADA_ID}"] .sidebar__item`);
   expect(row?.getAttribute("title")).toContain("Assistente de e-mails");
   // The channel's members column: the role wraps whole under the name, and the row's title has it too.

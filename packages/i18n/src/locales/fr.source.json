@@ -2921,14 +2921,11 @@
   "shell.sidebarMenu.newChannel": {
     "value": "New channel"
   },
-  "shell.sidebarMenu.newAgentGroup": {
-    "value": "New agent group"
-  },
   "shell.sidebarMenu.addToChannels": {
     "value": "New channel or category"
   },
-  "shell.sidebarMenu.addToAgents": {
-    "value": "Create agent or group"
+  "shell.sidebarMenu.addToDms": {
+    "value": "New message or agent"
   },
   "shell.sidebarMenu.newMessage": {
     "value": "New message"
@@ -3307,6 +3304,9 @@
   },
   "team.title": {
     "value": "Team"
+  },
+  "team.groups.title": {
+    "value": "Agent groups"
   },
   "team.subtitle": {
     "value": {

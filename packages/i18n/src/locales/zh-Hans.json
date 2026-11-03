@@ -1171,9 +1171,8 @@
     "sidebarMenu": {
       "title": "侧边栏",
       "newChannel": "新建频道",
-      "newAgentGroup": "新建智能体分组",
       "addToChannels": "新建频道或分类",
-      "addToAgents": "创建智能体或分组",
+      "addToDms": "新消息或智能体",
       "newMessage": "新消息",
       "addMembers": "添加成员或智能体",
       "channelSettings": "频道设置",
@@ -1302,6 +1301,9 @@
   },
   "team": {
     "title": "团队",
+    "groups": {
+      "title": "智能体分组"
+    },
     "subtitle_other": "{{count}} 个智能体，按负责人分组。",
     "working_other": "{{count}} 个正在工作。",
     "skyLabel": "按负责人分组的智能体。点击智能体查看它做什么。",

@@ -132,19 +132,23 @@ From `concept.css` "Sidebar: channel states like Discord":
 - A closed category or part keeps its summary. It shows the red mention total, or the pill when only plain unread
   is inside.
 
-### The Agentes and Pessoas parts of the left sidebar (decision D1, confirm before deleting)
+### The Agentes and Pessoas parts of the left sidebar (decision D1, approved by the owner)
 
 The concept's sidebar has only tools and channel categories. People and agents move to the right column. But
 today the left parts also hold the DM list, DM unread counts, agent groups (ADR 0083: create, rename, drag) and "+
 new agent". The right column shows only the open channel's members, and only on channel pages.
 
-Default for this slice, so nothing is lost: replace the "Agentes" and "Pessoas" parts with one "Mensagens diretas"
+The owner chose to replace them, as on Discord: the "Agentes" and "Pessoas" parts become one "Mensagens diretas"
 part (`shell.directMessages`, the key exists). It lists the conversations that have messages, people and agents
 together, latest first, with the red unread count, the presence badge and the agent's working trail. Its `+` keeps
 today's entries (new DM, new agent). The agent group arrangement (new, rename, delete, drag) moves to the Team page
 (`/org/$orgId/team`), reusing the dialogs and `GroupMenu` from `AgentGroups.tsx`. The agent's Settings tab still
-picks its group. The rail (tablet or collapsed) shows the same DMs as faces. Ask the owner to confirm D1 in the
-review. If they want the parts kept, this is a revert of one commit.
+picks its group. The rail (tablet or collapsed) shows the same DMs as faces. The part always shows (empty until
+a first message), with Equipe beside its +. Its + is a menu (Nova mensagem, Criar agente) for who creates agents,
+else the plain Nova mensagem button. The saved section order keeps "agents" (the server checks all four); the web
+hides it and puts it back on save (`SidebarOrder.tsx`). Built as one commit, so keeping the parts is a revert.
+The phone needs no matching change: its home already lists conversations (agent DMs, channels, people's DMs,
+latest first, with agents to start one while there is none) and its agent groups already live in the Agentes tab.
 
 ### i18n (slice 1)
 
@@ -469,8 +473,8 @@ Against `profile-person-*` (card plus open picker) and `profile-agent-*` (card p
 
 ## Risks
 
-- D1 (left sidebar parts) is the largest behavior change. It needs the owner's yes before the deletion commit.
-  Build it as its own commit so it reverts cleanly.
+- D1 (left sidebar parts) is the largest behavior change. The owner approved it. It is its own commit so it
+  reverts cleanly.
 - The dark `--pane` / `--side` change repaints every dark screen, and the phone app too through
   `packages/tokens`. Check a few other dark pages (settings, issues, wiki) in the screenshot pass. If the phone
   shouldn't change, keep `packages/tokens` on the old values and add web-only tokens instead. That needs a

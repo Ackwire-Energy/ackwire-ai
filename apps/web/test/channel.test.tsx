@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -96,7 +96,9 @@ describe("Canal", () => {
   });
 
   test("streams an agent reply with the running ring and cursor, then shows the final message", async () => {
-    const { socket } = await open();
+    const withDm = seedState();
+    seedDm(withDm, { type: "agent", id: ATLAS_ID });
+    const { socket } = await open(withDm);
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
     // Asked in the channel: it answers there, its events carry no thread.
@@ -109,7 +111,7 @@ describe("Canal", () => {
     expect(streaming?.textContent).toContain("escrevendo…");
     expect(streaming?.textContent).toContain("Os 401 no Sentry caíram de 312 para");
     expect(streaming?.querySelector(".ac-avatar--running")).not.toBeNull();
-    // The sidebar shows the ring too.
+    // Its DM in the sidebar shows the ring too.
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     expect(nav.querySelector(".ac-avatar--running")).not.toBeNull();
 

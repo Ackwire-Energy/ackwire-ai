@@ -1001,14 +1001,14 @@ describe("direct messages with an agent", () => {
     expect(document.querySelector(".ac-empty__text")?.textContent).toBe(
       "Peça para lembrar, esquecer ou trabalhar de outro jeito.",
     );
-    // The sidebar lists the DM under "Mensagens diretas".
+    // Empty, the DM isn't in "Mensagens diretas" yet: it lists conversations that have a message.
     await settle(4);
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
-    expect(
+    const dmLinks = () =>
       within(nav)
-        .getAllByRole("link", { name: /Ada/ })
-        .map((l) => l.getAttribute("href")),
-    ).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
+        .queryAllByRole("link", { name: /Ada/ })
+        .map((l) => l.getAttribute("href"));
+    expect(dmLinks()).not.toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     await sendText("lembra que deploy é só de segunda a quinta");
     expect(bar().textContent).toBe("Ada");
   });
