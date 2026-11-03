@@ -16,11 +16,16 @@ import {
   controlScale,
   cursorGain,
   DEFAULT_DESKTOP,
+  type Drag,
+  DRAG_REST,
+  type DragEvent,
+  dragStep,
   dragView,
   fitScale,
   followCursor,
   lookAt,
   MAX_SCALE,
+  TAP_DRAG_MS,
   toDesktop,
   zoomCamera,
 } from "../../src/features/computer/screen-view";
@@ -246,5 +251,71 @@ describe("the person's cursor", () => {
     const tones = new Set(cursorCells().map((c) => c.tone));
     expect(tones).toEqual(new Set(["rim", "body", "light"]));
     expect(cursorCells()).toEqual(cursorCells());
+  });
+});
+
+describe("pressing and dragging with one finger", () => {
+  /** The acts a run of finger events sends, from rest. */
+  const acts = (events: [DragEvent, number][], from: Drag = DRAG_REST) => {
+    let d = from;
+    const out: string[] = [];
+    for (const [event, at] of events) {
+      const next = dragStep(d, event, at);
+      d = next.drag;
+      if (next.act) out.push(next.act);
+    }
+    return out;
+  };
+  /** A tap at 0..100, its finger off at 100. */
+  const tapped: [DragEvent, number][] = [
+    ["touch", 0],
+    ["tap", 100],
+    ["lift", 100],
+  ];
+
+  test("a tap clicks; a swipe only moves", () => {
+    expect(acts(tapped)).toEqual(["click"]);
+    expect(acts([["touch", 0], ["move", 50], ["lift", 400]])).toEqual([]);
+  });
+
+  test("a hold presses, and the lift lets go however far the finger went after", () => {
+    // The hold's own gesture ends a few points into the move: only the lift lets go.
+    expect(acts([["touch", 0], ["hold", 320], ["move", 400], ["lift", 900]])).toEqual(["press", "release"]);
+  });
+
+  test("tap, then touch again soon and move: pressed from the move to the lift", () => {
+    const again = 100 + TAP_DRAG_MS - 50;
+    const run: [DragEvent, number][] = [...tapped, ["touch", again], ["move", again + 60], ["lift", 900]];
+    expect(acts(run)).toEqual(["click", "press", "release"]);
+  });
+
+  test("tap, then a second tap soon is a double click, never a press left down", () => {
+    expect(acts([...tapped, ["touch", 200], ["tap", 280], ["lift", 280]])).toEqual(["click", "click"]);
+  });
+
+  test("a touch long after a tap that moves only moves the cursor", () => {
+    const late = 101 + TAP_DRAG_MS;
+    expect(acts([...tapped, ["touch", late], ["move", late + 60], ["lift", 900]])).toEqual(["click"]);
+  });
+
+  test("a touch that pressed and lifted quickly lets go once and never also clicks, whichever comes first", () => {
+    const armed = dragStep(dragStep(DRAG_REST, "tap", 0).drag, "touch", 100).drag;
+    const pressed = dragStep(armed, "move", 120).drag;
+    expect(acts([["tap", 180], ["lift", 180]], pressed)).toEqual(["release"]);
+    expect(acts([["lift", 180], ["tap", 180]], pressed)).toEqual(["release"]);
+    // That tap doesn't arm the next touch: a third quick touch that moves only moves.
+    const third: [DragEvent, number][] = [
+      ["tap", 180],
+      ["lift", 180],
+      ["touch", 200],
+      ["move", 220],
+      ["lift", 300],
+    ];
+    expect(acts(third, pressed)).toEqual(["release"]);
+  });
+
+  test("a press whose lift never came is let go by the next touch", () => {
+    const held = dragStep(dragStep(DRAG_REST, "touch", 0).drag, "hold", 320).drag;
+    expect(dragStep(held, "touch", 2000).act).toBe("release");
   });
 });

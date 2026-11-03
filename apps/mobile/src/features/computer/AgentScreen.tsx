@@ -75,6 +75,9 @@ import {
   controlScale,
   cursorGain,
   DEFAULT_DESKTOP,
+  DRAG_REST,
+  type DragEvent,
+  dragStep,
   dragView,
   fitScale,
   followCursor,
@@ -466,6 +469,22 @@ export function AgentScreen({
     cursorY.value = to.y;
     scheduleOnRN(moved, to.x, to.y);
   };
+  // A hold, or a touch soon after a tap that moves, presses where the finger is; the lift lets go (`dragStep`).
+  const touchDrag = useSharedValue(DRAG_REST);
+  const touchStep = (event: DragEvent) => {
+    "worklet";
+    const { drag, act } = dragStep(touchDrag.value, event, Date.now());
+    touchDrag.value = drag;
+    dragging.value = drag.touch === "down";
+    if (act === "press") {
+      spotHeld.value = withTiming(1, { duration: 120 });
+      scheduleOnRN(held, true);
+    } else if (act === "release") {
+      spotHeld.value = withTiming(0, { duration: 120 });
+      scheduleOnRN(held, false);
+    }
+    return act;
+  };
   const touchTap = useTapGesture({
     enabled: wide,
     maxDuration: 260,
@@ -473,6 +492,8 @@ export function AgentScreen({
     onDeactivate: (e) => {
       "worklet";
       if (e.canceled) return;
+      // A touch that pressed already clicked by letting go.
+      if (touchStep("tap") !== "click") return;
       const to = toDesktop({ x: e.x, y: e.y }, { x: x.value, y: y.value }, s.value, desk.value);
       cursorX.value = to.x;
       cursorY.value = to.y;
@@ -490,15 +511,7 @@ export function AgentScreen({
     onActivate: (e) => {
       "worklet";
       pointAt(e.x, e.y);
-      dragging.value = true;
-      spotHeld.value = withTiming(1, { duration: 120 });
-      scheduleOnRN(held, true);
-    },
-    onDeactivate: () => {
-      "worklet";
-      dragging.value = false;
-      spotHeld.value = withTiming(0, { duration: 120 });
-      scheduleOnRN(held, false);
+      touchStep("hold");
     },
   });
   // One finger rolls what it touches: the view first, then the page, wherever the finger came down.
@@ -512,11 +525,13 @@ export function AgentScreen({
       spotX.value = e.x;
       spotY.value = e.y;
       spotOn.value = withTiming(1, { duration: 80 });
+      touchStep("touch");
     },
     onActivate: (e) => {
       "worklet";
       notches.value = 0;
       pointAt(e.x, e.y);
+      touchStep("move");
     },
     onUpdate: (e) => {
       "worklet";
@@ -535,6 +550,7 @@ export function AgentScreen({
     onFinalize: () => {
       "worklet";
       spotOn.value = withTiming(0, { duration: 160 });
+      touchStep("lift");
     },
   });
   const touchMove = usePanGesture({
@@ -719,8 +735,8 @@ export function AgentScreen({
 }
 
 /**
- * The person's fingers as a laptop's trackpad: swipe moves, tap clicks, hold drags, two fingers scroll. No words: the
- * dots answer the fingers, and until the first touch a pixel finger shows the gestures.
+ * The person's fingers as a laptop's trackpad: swipe moves, tap clicks, hold or tap and touch again drags, two fingers
+ * scroll. No words: the dots answer the fingers, and until the first touch a pixel finger shows the gestures.
  */
 function Trackpad({
   camera,
@@ -821,6 +837,23 @@ function Trackpad({
     "worklet";
     on.value = withTiming(0, { duration: 280 });
   };
+  // A hold, or a touch soon after a tap that moves, presses; the lift lets go, wherever the finger went (`dragStep`).
+  const drag = useSharedValue(DRAG_REST);
+  const step = (event: DragEvent) => {
+    "worklet";
+    const next = dragStep(drag.value, event, Date.now());
+    drag.value = next.drag;
+    if (next.act === "press") {
+      nudge.value = withTiming(1.14, { duration: 120 });
+      scheduleOnRN(setHolding, true);
+      scheduleOnRN(onHold, true);
+    } else if (next.act === "release") {
+      nudge.value = withTiming(1, { duration: 120 });
+      scheduleOnRN(setHolding, false);
+      scheduleOnRN(onHold, false);
+    }
+    return next.act;
+  };
 
   const swipe = usePanGesture({
     maxPointers: 1,
@@ -828,6 +861,11 @@ function Trackpad({
     onBegin: (e) => {
       "worklet";
       touch(e.x, e.y);
+      step("touch");
+    },
+    onActivate: () => {
+      "worklet";
+      step("move");
     },
     onUpdate: (e) => {
       "worklet";
@@ -853,6 +891,7 @@ function Trackpad({
     onFinalize: () => {
       "worklet";
       lift();
+      step("lift");
     },
   });
   const hold = useLongPressGesture({
@@ -860,15 +899,7 @@ function Trackpad({
     maxDistance: 8,
     onActivate: () => {
       "worklet";
-      nudge.value = withTiming(1.14, { duration: 120 });
-      scheduleOnRN(setHolding, true);
-      scheduleOnRN(onHold, true);
-    },
-    onDeactivate: () => {
-      "worklet";
-      nudge.value = withTiming(1, { duration: 120 });
-      scheduleOnRN(setHolding, false);
-      scheduleOnRN(onHold, false);
+      step("hold");
     },
   });
   const tap = useTapGesture({
@@ -877,6 +908,8 @@ function Trackpad({
     onDeactivate: (e) => {
       "worklet";
       if (e.canceled) return;
+      // A touch that pressed already clicked by letting go.
+      if (step("tap") !== "click") return;
       nudge.value = withSequence(withTiming(0.84, { duration: 60 }), withTiming(1, { duration: 120 }));
       ringX.value = e.x;
       ringY.value = e.y;
@@ -941,33 +974,37 @@ function Trackpad({
   });
 
   return (
-    <GestureDetector gesture={gestures}>
-      <View
-        collapsable={false}
-        onLayout={(e) => {
-          const { width, height } = e.nativeEvent.layout;
-          padSize.value = { width, height };
-          setSize({ width, height });
-        }}
-        style={[styles.pad, { backgroundColor: c.sunken, borderColor: holding ? tones[3] : c.line }]}
-        accessibilityLabel={t("agentComputer.phone.trackpad")}
-        accessibilityHint={t("agentComputer.phone.trackpadHint")}
-      >
-        {source && size.width > 0 ? (
-          <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-            <Fill>
-              <Shader source={source} uniforms={uniforms} />
-            </Fill>
-          </Canvas>
-        ) : null}
-        <View style={styles.padTurn}>
-          <IconButton icon="expand" plate label={t("agentComputer.phone.turn")} onPress={onTurn} />
+    <View style={[styles.pad, { backgroundColor: c.sunken, borderColor: holding ? tones[3] : c.line }]}>
+      <GestureDetector gesture={gestures}>
+        <View
+          collapsable={false}
+          onLayout={(e) => {
+            const { width, height } = e.nativeEvent.layout;
+            padSize.value = { width, height };
+            setSize({ width, height });
+          }}
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel={t("agentComputer.phone.trackpad")}
+          accessibilityHint={t("agentComputer.phone.trackpadHint")}
+        >
+          {source && size.width > 0 ? (
+            <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Fill>
+                <Shader source={source} uniforms={uniforms} />
+              </Fill>
+            </Canvas>
+          ) : null}
         </View>
-        <View style={styles.padKeyboard}>
-          <IconButton icon="keyboard" plate label={t("desktop.keyboard.label")} onPress={onKeyboard} />
-        </View>
+      </GestureDetector>
+      {/* Beside the pad's gestures, not inside them: a press here never also taps the pad, which would click on the
+          screen where the cursor is and drop a selection there just as the keyboard opens to delete it. */}
+      <View style={styles.padTurn}>
+        <IconButton icon="expand" plate label={t("agentComputer.phone.turn")} onPress={onTurn} />
       </View>
-    </GestureDetector>
+      <View style={styles.padKeyboard}>
+        <IconButton icon="keyboard" plate label={t("desktop.keyboard.label")} onPress={onKeyboard} />
+      </View>
+    </View>
   );
 }
 
