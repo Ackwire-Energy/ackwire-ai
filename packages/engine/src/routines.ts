@@ -39,7 +39,7 @@ import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { nextCronTime, zonedTimeForward } from "./cron";
 import { openDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { publishMessageCreated, publishUserEvent } from "./events";
+import { publishMessageCreated, publishRoutineRuns, publishUserEvent } from "./events";
 import { createForumTopic } from "./forum";
 import { releaseRoutineEmails } from "./mail/inbound";
 import {
@@ -67,7 +67,9 @@ import {
 import { enqueueRoutineJob, queueEventRun, startGatheredRun } from "./routine-events";
 import { claimRoutineRun, haltRoutineRuns, makeWayForRun, skipRoutineRun, unclaimRoutineRun } from "./routine-firing";
 import {
+  DEFAULT_HOOK_METHODS,
   ensureRoutineHook,
+  type HookMethod,
   liveHookUrl,
   type RoutineHookConfig,
   routineHookKeys,
@@ -202,7 +204,7 @@ export type RoutineTrigger =
    * A call to its own address (ADR 0106), stored as the event `webhook.received` plus a `routine_hooks` row. `url`
    * only for who may manage it (null for everyone else and for agents); `signed`: calls must carry a signature.
    */
-  | { type: "webhook"; url: string | null; signed: boolean }
+  | { type: "webhook"; url: string | null; signed: boolean; methods: HookMethod[] }
   /**
    * A connector's event (ADR 0130): stored as a webhook routine whose address the provider was given through the
    * connection (`routine_hooks.source`). `status` `error`: the provider refused it (`lastError`).
@@ -359,8 +361,11 @@ export type RoutineTriggerInput =
   | { type: "once"; at: string; timezone?: string }
   /** New mail in a mailbox the routine's agent can read; `folder` default the inbox. */
   | { type: "email"; accountId: string; folder?: string; filter?: MailFilter }
-  /** A call to an address of its own (made with it, kept while its trigger changes). */
-  | { type: "webhook" }
+  /**
+   * A call to an address of its own (made with it, kept while its trigger changes). `methods`: the HTTP methods it
+   * answers (default POST; left out on a change, what it had).
+   */
+  | { type: "webhook"; methods?: string[] }
   /** A connector's event (ADR 0130), from a connection the routine's agent may read. */
   | {
       type: "connector";
@@ -411,7 +416,7 @@ export function routineSlots(r: Pick<RoutineRow, "rule" | "cron" | "timezone">, 
 function triggerOf(
   r: RoutineRow,
   watch?: MailWatchRow,
-  hook?: { url: string | null; signed: boolean; source?: ConnectorTriggerSource | null },
+  hook?: { url: string | null; signed: boolean; methods: HookMethod[]; source?: ConnectorTriggerSource | null },
 ): RoutineTrigger {
   if (r.triggerType === "event" && r.event === WEBHOOK_EVENT && hook?.source) {
     const s = hook.source;
@@ -426,7 +431,12 @@ function triggerOf(
     };
   }
   if (r.triggerType === "event" && r.event === WEBHOOK_EVENT) {
-    return { type: "webhook", url: hook?.url ?? null, signed: hook?.signed ?? false };
+    return {
+      type: "webhook",
+      url: hook?.url ?? null,
+      signed: hook?.signed ?? false,
+      methods: hook?.methods ?? [...DEFAULT_HOOK_METHODS],
+    };
   }
   if (r.triggerType === "event" && r.event === "email.received" && watch) {
     return {
@@ -955,7 +965,12 @@ async function views(
       trigger: triggerOf(
         r,
         watches.get(r.id),
-        hookKey && { url: hookUrls.get(r.id) ?? null, signed: hookKey.signed, source: hookKey.source },
+        hookKey && {
+          url: hookUrls.get(r.id) ?? null,
+          signed: hookKey.signed,
+          methods: hookKey.methods,
+          source: hookKey.source,
+        },
       ),
       active: r.active,
       nextRunAt: r.active && r.nextRunAt ? r.nextRunAt.toISOString() : null,
@@ -1286,7 +1301,14 @@ export async function createRoutine(
     .returning();
   if (!row) throw new Error("routine insert returned nothing");
   if (input.trigger.type === "email") await syncMailWatch(deps, row, emailWatch(input.trigger));
-  if (hooks) await ensureRoutineHook(db, hooks, row);
+  // A connector's provider posts its events: its address answers POST whatever a webhook trigger had chosen.
+  if (hooks)
+    await ensureRoutineHook(
+      db,
+      hooks,
+      row,
+      input.trigger.type === "webhook" ? input.trigger.methods : DEFAULT_HOOK_METHODS,
+    );
   if (input.trigger.type === "connector") await syncConnector(deps, row, connectorSource(input.trigger));
   await recordAudit(db, {
     orgId,
@@ -1571,7 +1593,13 @@ export async function updateRoutine(
     if (mailTrigger && patch.active === true && !current.active) await resetMailWatchState(db, row.id);
     await syncMailWatch(deps, row, mailTrigger);
   }
-  if (hooks) await ensureRoutineHook(db, hooks, row);
+  if (hooks)
+    await ensureRoutineHook(
+      db,
+      hooks,
+      row,
+      patch.trigger?.type === "webhook" ? patch.trigger.methods : DEFAULT_HOOK_METHODS,
+    );
   if (connectorTrigger || hadConnector) await syncConnector(deps, row, connectorTrigger);
   // Pausing also stops its work in progress (§6.7); resuming clears why it paused itself.
   if (patch.active === false && current.active) {
@@ -1747,6 +1775,7 @@ export async function runRoutineNow(deps: RoutineDeps, actorId: string, orgId: s
   const routine = await loadRoutine(deps.db, orgId, id);
   await requireRoutineManager(deps.db, actorId, orgId, routine.agentId);
   await queueRoutineRun(deps, routine, new Date(), "manual");
+  await publishRoutineRuns(deps.pubsub, orgId, routine.id);
   const [view] = await views(deps.db, [routine], actorId, deps.hooks);
   return view as RoutineView;
 }
@@ -2069,6 +2098,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   });
   // Stopped while it was being started: nothing ran.
   if (!started) return;
+  await publishRoutineRuns(deps.pubsub, routine.orgId, routine.id);
   await ran();
 }
 

@@ -64,9 +64,17 @@ const urlOf = async (routineId: string) => {
 const tokenOf = async (routineId: string) => (await urlOf(routineId))?.split("/api/hooks/")[1] ?? "";
 
 /** A POST to an address: `body` as it arrives, `null` from the reader when it is past the limit. */
-const post = (d: RoutineHookDeps, token: string, body: string, headers: Record<string, string> = {}) =>
+const post = (
+  d: RoutineHookDeps,
+  token: string,
+  body: string,
+  headers: Record<string, string> = {},
+  call: { method?: string; query?: Record<string, string> } = {},
+) =>
   receiveRoutineHook(d, {
     token,
+    ...call,
+    ...(call.query ? { rawQuery: new URLSearchParams(call.query).toString() } : {}),
     headers: new Headers({ "content-type": "application/json", ...headers }),
     read: async (max) => {
       const bytes = new TextEncoder().encode(body);
@@ -97,6 +105,43 @@ const wellFormed = (text: string) => {
 };
 
 describe("routine webhooks", () => {
+  test("an address answers POST by default; its managers choose the methods, and GET's query string is the data", async () => {
+    f = await setup();
+    const routine = await webhookRoutine();
+    expect(routine.trigger).toMatchObject({ type: "webhook", methods: ["POST"] });
+    const token = await tokenOf(routine.id);
+    expect(await post(hookDeps(), token, "", {}, { method: "GET", query: { status: "ok" } })).toEqual({
+      status: 405,
+      code: "method_not_allowed",
+      allow: ["POST"],
+    });
+    expect(await runsOf(routine.id)).toHaveLength(0);
+    const changed = await updateRoutine(deps(), f.owner.id, f.org.id, routine.id, {
+      trigger: { type: "webhook", methods: ["post", "GET", "nope"] },
+    });
+    expect(changed.trigger).toMatchObject({ type: "webhook", methods: ["GET", "POST"] });
+    // The same address: only what it answers changed.
+    expect(await tokenOf(routine.id)).toBe(token);
+    expect((await routineHookView({ db: f.db, hooks: HOOKS }, { ...routine, orgId: f.org.id })).methods).toEqual([
+      "GET",
+      "POST",
+    ]);
+    const answer = await post(hookDeps(), token, "", {}, { method: "get", query: { status: "ok", order: "42" } });
+    expect(answer).toMatchObject({ status: 202, duplicate: false });
+    const runId = answer.status === 202 ? (answer.runId ?? "") : "";
+    const [stored] = ((await routineRunRow(f, runId)).event?.calls ?? []) as { body: string; method?: string }[];
+    expect(stored).toMatchObject({ body: '{"status":"ok","order":"42"}', method: "GET" });
+    const text = await runText(runId);
+    expect(text).toContain("What was sent to this routine's webhook address");
+    expect(text).toContain("GET call at");
+    expect(await post(hookDeps(), token, "", {}, { method: "DELETE" })).toMatchObject({ status: 405 });
+    // A change that leaves the methods out keeps them.
+    await updateRoutine(deps(), f.owner.id, f.org.id, routine.id, { trigger: { type: "webhook" } });
+    expect((await getRoutineView(f.db, f.owner.id, f.org.id, routine.id, HOOKS)).trigger).toMatchObject({
+      methods: ["GET", "POST"],
+    });
+  });
+
   test("a webhook routine gets its own address, stored only as a hash and shown only to who manages it", async () => {
     f = await setup();
     const routine = await webhookRoutine();
@@ -113,6 +158,7 @@ describe("routine webhooks", () => {
       type: "webhook",
       url: null,
       signed: false,
+      methods: ["POST"],
     });
     expect((await listOrgRoutines(f.db, f.org.id))[0]?.trigger).toMatchObject({ type: "webhook", url: null });
     await expect(managedWebhookRoutine(f.db, bia.id, f.org.id, routine.id)).rejects.toThrow();
@@ -200,6 +246,21 @@ describe("routine webhooks", () => {
     ]);
     await removeRoutineHookSecret(hookDeps(), f.owner.id, ref);
     expect(await post(d, token, body)).toMatchObject({ status: 202 });
+  });
+
+  test("a signed GET's signature covers its query string: one seen signature can't carry other data", async () => {
+    f = await setup();
+    const routine = await webhookRoutine();
+    await updateRoutine(deps(), f.owner.id, f.org.id, routine.id, { trigger: { type: "webhook", methods: ["GET"] } });
+    const ref = await managedWebhookRoutine(f.db, f.owner.id, f.org.id, routine.id);
+    const { secret } = await newRoutineHookSecret(hookDeps(), f.owner.id, ref);
+    const token = await tokenOf(routine.id);
+    const d = hookDeps();
+    const get = (query: Record<string, string>, signature: string) =>
+      post(d, token, "", { "x-agentes-signature": signature }, { method: "GET", query });
+    expect(await get({ order: "42" }, sign(secret, ""))).toMatchObject({ status: 401 });
+    expect(await get({ order: "42" }, sign(secret, "order=42"))).toMatchObject({ status: 202 });
+    expect(await get({ order: "999" }, sign(secret, "order=42"))).toMatchObject({ status: 401 });
   });
 
   test("the same Idempotency-Key or X-GitHub-Delivery within 24 hours answers with the first run, nothing new", async () => {

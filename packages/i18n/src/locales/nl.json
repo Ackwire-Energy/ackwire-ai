@@ -1949,6 +1949,7 @@
       "updated": "Skill <b>{{name}}</b> verbeterd"
     },
     "other": "Iets gewijzigd",
+    "copyWebhook": "Webhookadres kopiëren",
     "issueFields": {
       "title": "de titel",
       "description": "de beschrijving",
@@ -4637,6 +4638,9 @@
       "every": "Draait bij elke aanroep. Aanroepen die tegelijk binnenkomen, worden één run.",
       "newNote": "De routine krijgt een eigen adres. Elke POST ernaartoe start de agent met wat er werd gestuurd. Het adres verschijnt op de pagina van de routine zodra die is opgeslagen.",
       "hidden": "Alleen wie de routine kan wijzigen, ziet het adres.",
+      "methods": "Toegestane methoden",
+      "methodsHelp": "Het adres reageert alleen op de aangevinkte methoden. Bij GET zijn de queryparameters van de URL de gegevens van de aanroep.",
+      "methodsLine": "Accepteert {{methods}}.",
       "address": "Adres",
       "addressHelp": "Iedereen met het adres kan de agent starten. Bewaar het als een wachtwoord en maak een nieuw als het uitlekt.",
       "copied": "Adres gekopieerd.",
@@ -4647,7 +4651,7 @@
       "signature": "Handtekening",
       "signedOff": "Uit: de agent krijgt elke aanroep naar het adres.",
       "signedOn": "Aan: alleen aanroepen die met het geheim zijn ondertekend, komen door.",
-      "signedHelp": "Stuur de HMAC-SHA256 van de body in X-Agentes-Signature (sha256=…). X-Hub-Signature-256 van GitHub werkt ook.",
+      "signedHelp": "Stuur de HMAC-SHA256 van de body (bij een GET-aanroep: van de querystring, zonder het ?) in X-Agentes-Signature (sha256=…). X-Hub-Signature-256 van GitHub werkt ook.",
       "addSecret": "Handtekening vereisen",
       "newSecret": "Nieuw geheim",
       "newSecretTitle": "Een nieuw geheim maken?",

@@ -1927,6 +1927,8 @@ export const ptBR = {
     },
     /** A kind this app doesn't know yet (a newer server's). */
     other: "Fiz uma mudança",
+    /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */
+    copyWebhook: "Copiar endereço do webhook",
     issueFields: {
       title: "o título",
       description: "a descrição",
@@ -4539,6 +4541,11 @@ export const ptBR = {
       newNote:
         "A rotina ganha um endereço só dela. Cada POST que chegar nele aciona o agente com o que foi enviado. O endereço aparece na página da rotina assim que ela for salva.",
       hidden: "Só quem pode mudar a rotina vê o endereço.",
+      methods: "Métodos aceitos",
+      methodsHelp:
+        "O endereço só responde aos métodos marcados. Num GET, os parâmetros da URL viram os dados da chamada.",
+      /** After "Roda a cada chamada…" on the routine's page: `methods` are HTTP methods ("GET, POST"). */
+      methodsLine: "Aceita {{methods}}.",
       address: "Endereço",
       addressHelp: "Quem tiver o endereço aciona o agente. Guarde como uma senha e gere outro se vazar.",
       copied: "Endereço copiado.",
@@ -4550,7 +4557,7 @@ export const ptBR = {
       signedOff: "Desligada: o agente recebe qualquer chamada ao endereço.",
       signedOn: "Ligada: só passam as chamadas assinadas com o segredo.",
       signedHelp:
-        "Mande o HMAC-SHA256 do corpo em X-Agentes-Signature (sha256=…). O X-Hub-Signature-256 do GitHub também vale.",
+        "Mande o HMAC-SHA256 do corpo (numa chamada GET, da query string, sem o ?) em X-Agentes-Signature (sha256=…). O X-Hub-Signature-256 do GitHub também vale.",
       addSecret: "Exigir assinatura",
       newSecret: "Gerar novo segredo",
       newSecretTitle: "Gerar um novo segredo?",

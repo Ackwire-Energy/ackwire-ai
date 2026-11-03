@@ -2061,6 +2061,7 @@
       "updated": "Poprawiono umiejętność <b>{{name}}</b>"
     },
     "other": "Wprowadzono zmianę",
+    "copyWebhook": "Kopiuj adres webhooka",
     "issueFields": {
       "title": "tytuł",
       "description": "opis",
@@ -4879,6 +4880,9 @@
       "every": "Uruchamia się przy każdym wywołaniu. Wywołania, które przyjdą razem, dają jedno uruchomienie.",
       "newNote": "Rutyna dostaje własny adres. Każdy POST na niego uruchamia agenta z tym, co wysłano. Adres pojawi się na stronie rutyny po jej zapisaniu.",
       "hidden": "Adres widzą tylko osoby, które mogą zmieniać rutynę.",
+      "methods": "Akceptowane metody",
+      "methodsHelp": "Adres odpowiada tylko na zaznaczone metody. Przy GET parametry zapytania w URL są danymi wywołania.",
+      "methodsLine": "Akceptuje {{methods}}.",
       "address": "Adres",
       "addressHelp": "Każdy, kto zna adres, może uruchomić agenta. Chroń go jak hasło i utwórz nowy, jeśli wycieknie.",
       "copied": "Adres skopiowany.",
@@ -4889,7 +4893,7 @@
       "signature": "Podpis",
       "signedOff": "Wyłączony: agent dostaje każde wywołanie adresu.",
       "signedOn": "Włączony: przechodzą tylko wywołania podpisane sekretem.",
-      "signedHelp": "Wyślij HMAC-SHA256 treści w nagłówku X-Agentes-Signature (sha256=…). X-Hub-Signature-256 z GitHuba też działa.",
+      "signedHelp": "Wyślij HMAC-SHA256 treści (przy wywołaniu GET: jego query stringa, bez ?) w nagłówku X-Agentes-Signature (sha256=…). X-Hub-Signature-256 z GitHuba też działa.",
       "addSecret": "Wymagaj podpisu",
       "newSecret": "Nowy sekret",
       "newSecretTitle": "Utworzyć nowy sekret?",

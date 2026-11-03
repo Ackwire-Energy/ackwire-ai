@@ -1936,6 +1936,7 @@
       "updated": "<b>{{name}}</b> becerisini düzelttim"
     },
     "other": "Bir değişiklik yaptım",
+    "copyWebhook": "Webhook adresini kopyala",
     "issueFields": {
       "title": "başlığı",
       "description": "açıklamayı",
@@ -4546,6 +4547,9 @@
       "every": "Her çağrıda çalışır. Birlikte gelen çağrılar tek bir çalıştırma olur.",
       "newNote": "Rutinin kendine ait bir adresi olur. Bu adrese yapılan her POST, ajanı gönderilen içerikle başlatır. Adres, rutin kaydedildikten sonra rutinin sayfasında görünür.",
       "hidden": "Adresini yalnızca rutini değiştirebilenler görür.",
+      "methods": "Kabul edilen yöntemler",
+      "methodsHelp": "Adres yalnızca işaretli yöntemlere yanıt verir. GET ile URL'nin sorgu parametreleri çağrının verisi olur.",
+      "methodsLine": "{{methods}} kabul eder.",
       "address": "Adres",
       "addressHelp": "Adrese sahip olan herkes ajanı başlatabilir. Onu bir şifre gibi saklayın ve sızarsa yenisini oluşturun.",
       "copied": "Adres kopyalandı.",
@@ -4556,7 +4560,7 @@
       "signature": "İmza",
       "signedOff": "Kapalı: ajan, adrese yapılan her çağrıyı alır.",
       "signedOn": "Açık: yalnızca gizli anahtarla imzalanan çağrılar geçer.",
-      "signedHelp": "Gövdenin HMAC-SHA256 değerini X-Agentes-Signature başlığında (sha256=…) gönderin. GitHub'ın X-Hub-Signature-256 başlığı da çalışır.",
+      "signedHelp": "Gövdenin (GET çağrısında: ? olmadan sorgu dizesinin) HMAC-SHA256 değerini X-Agentes-Signature başlığında (sha256=…) gönderin. GitHub'ın X-Hub-Signature-256 başlığı da çalışır.",
       "addSecret": "İmza iste",
       "newSecret": "Yeni gizli anahtar",
       "newSecretTitle": "Yeni bir gizli anahtar oluşturulsun mu?",

@@ -62,7 +62,7 @@ const UNREADABLE = "Não entendi. Tente “toda segunda às 9h” ou “dias út
 /** A webhook routine's address, as the server makes them (a 43-character token). */
 const hookUrl = () => `https://app.agentes.test/api/hooks/${mockId("hook").padEnd(43, "x").slice(0, 43)}`;
 const hookOf = (s: { hooks: Map<string, RoutineHook> }, routineId: string) => {
-  const hook = s.hooks.get(routineId) ?? { url: hookUrl(), signed: false, calls: [] };
+  const hook = s.hooks.get(routineId) ?? { url: hookUrl(), signed: false, methods: ["POST"], calls: [] };
   s.hooks.set(routineId, hook);
   return hook;
 };
@@ -649,12 +649,16 @@ export function createMockPlanning(
             timezone: input.trigger.timezone ?? "America/Sao_Paulo",
             description: input.trigger.at,
           };
-        else if (input.trigger.type === "webhook") trigger = { type: "webhook", url: null, signed: false };
+        else if (input.trigger.type === "webhook")
+          trigger = { type: "webhook", url: null, signed: false, methods: input.trigger.methods ?? ["POST"] };
         else if (input.trigger.type === "connector") trigger = { ...input.trigger, status: "active", lastError: null };
         else trigger = input.trigger;
         const agents = await ctx.lookup.agents(orgId);
         const id = mockId("rt");
-        if (trigger.type === "webhook") trigger.url = hookOf(s, id).url;
+        if (trigger.type === "webhook") {
+          trigger.url = hookOf(s, id).url;
+          hookOf(s, id).methods = trigger.methods;
+        }
         const r: Routine = {
           ...routineDefaults(),
           id,
@@ -689,9 +693,11 @@ export function createMockPlanning(
             timezone: patch.trigger.timezone ?? "America/Sao_Paulo",
             description: r.trigger.type === "once" ? r.trigger.description : patch.trigger.at,
           };
-        else if (patch.trigger?.type === "webhook")
-          r.trigger = { type: "webhook", url: hookOf(await store(orgId), id).url, signed: false };
-        else if (patch.trigger?.type === "connector")
+        else if (patch.trigger?.type === "webhook") {
+          const hook = hookOf(await store(orgId), id);
+          if (patch.trigger.methods) hook.methods = patch.trigger.methods;
+          r.trigger = { type: "webhook", url: hook.url, signed: false, methods: hook.methods };
+        } else if (patch.trigger?.type === "connector")
           r.trigger = { ...patch.trigger, status: "active", lastError: null };
         else if (patch.trigger) r.trigger = patch.trigger;
         r.nextRunAt =

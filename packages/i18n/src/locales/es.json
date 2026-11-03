@@ -2008,6 +2008,7 @@
       "updated": "Corregí la habilidad <b>{{name}}</b>"
     },
     "other": "Hice un cambio",
+    "copyWebhook": "Copiar dirección del webhook",
     "issueFields": {
       "title": "el título",
       "description": "la descripción",
@@ -4718,6 +4719,9 @@
       "every": "Se ejecuta en cada llamada. Las llamadas que llegan juntas se vuelven una sola ejecución.",
       "newNote": "La rutina recibe una dirección propia. Cada POST a ella inicia al agente con lo que se envió. La dirección aparece en la página de la rutina cuando se guarda.",
       "hidden": "Solo quien puede cambiar la rutina ve su dirección.",
+      "methods": "Métodos aceptados",
+      "methodsHelp": "La dirección solo responde a los métodos marcados. Con GET, los parámetros de la URL son los datos de la llamada.",
+      "methodsLine": "Acepta {{methods}}.",
       "address": "Dirección",
       "addressHelp": "Cualquiera con la dirección puede iniciar al agente. Guárdala como una contraseña y crea una nueva si se filtra.",
       "copied": "Dirección copiada.",
@@ -4728,7 +4732,7 @@
       "signature": "Firma",
       "signedOff": "Desactivada: el agente recibe cualquier llamada a la dirección.",
       "signedOn": "Activada: solo pasan las llamadas firmadas con el secreto.",
-      "signedHelp": "Envía el HMAC-SHA256 del cuerpo en X-Agentes-Signature (sha256=…). El X-Hub-Signature-256 de GitHub también funciona.",
+      "signedHelp": "Envía el HMAC-SHA256 del cuerpo (en una llamada GET: de su query string, sin el ?) en X-Agentes-Signature (sha256=…). El X-Hub-Signature-256 de GitHub también funciona.",
       "addSecret": "Exigir una firma",
       "newSecret": "Nuevo secreto",
       "newSecretTitle": "¿Crear un nuevo secreto?",

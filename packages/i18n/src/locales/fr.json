@@ -2011,6 +2011,7 @@
       "updated": "J'ai corrigé la compétence <b>{{name}}</b>"
     },
     "other": "A fait une modification",
+    "copyWebhook": "Copier l’adresse du webhook",
     "issueFields": {
       "title": "le titre",
       "description": "la description",
@@ -4772,6 +4773,9 @@
       "every": "S'exécute à chaque appel. Les appels qui arrivent ensemble ne font qu'une exécution.",
       "newNote": "La routine reçoit sa propre adresse. Chaque POST vers elle lance l'agent avec ce qui a été envoyé. L'adresse apparaît sur la page de la routine une fois enregistrée.",
       "hidden": "Seules les personnes qui peuvent modifier la routine voient son adresse.",
+      "methods": "Méthodes acceptées",
+      "methodsHelp": "L’adresse ne répond qu’aux méthodes cochées. Avec GET, les paramètres de l’URL sont les données de l’appel.",
+      "methodsLine": "Accepte {{methods}}.",
       "address": "Adresse",
       "addressHelp": "Toute personne qui a l'adresse peut lancer l'agent. Gardez-la comme un mot de passe et créez-en une nouvelle si elle fuite.",
       "copied": "Adresse copiée.",
@@ -4782,7 +4786,7 @@
       "signature": "Signature",
       "signedOff": "Désactivée : l'agent reçoit tout appel à l'adresse.",
       "signedOn": "Activée : seuls les appels signés avec le secret passent.",
-      "signedHelp": "Envoyez le HMAC-SHA256 du corps dans X-Agentes-Signature (sha256=…). Le X-Hub-Signature-256 de GitHub fonctionne aussi.",
+      "signedHelp": "Envoyez le HMAC-SHA256 du corps (pour un appel GET : de sa query string, sans le ?) dans X-Agentes-Signature (sha256=…). Le X-Hub-Signature-256 de GitHub fonctionne aussi.",
       "addSecret": "Exiger une signature",
       "newSecret": "Nouveau secret",
       "newSecretTitle": "Créer un nouveau secret ?",

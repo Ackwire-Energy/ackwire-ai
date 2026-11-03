@@ -185,3 +185,8 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
     transition: none;
   }
 }
+/* A webhook routine's address to copy: under the sentence, the button's own inset lined up with the text. */
+.ag-rc__extra {
+  display: flex;
+  margin: 4px 0 -2px -10px;
+}

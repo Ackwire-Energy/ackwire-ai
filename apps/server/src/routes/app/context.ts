@@ -45,6 +45,7 @@ export const routineHookDeps = (deps: AppDeps): RoutineHookDeps => ({
   hooks: hookConfig(deps.config),
   keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
   rateLimiter: deps.adapters.rateLimiter,
+  pubsub: deps.adapters.pubsub,
 });
 
 /** How routines reach a connection's service to register their connector events (ADR 0130), as connectors do. */

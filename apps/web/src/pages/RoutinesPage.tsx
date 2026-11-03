@@ -2,6 +2,7 @@ import type {
   Routine,
   RoutineEvent,
   RoutineHookCall,
+  RoutineHookMethod,
   RoutineInput,
   RoutinePatch,
   RoutineReport,
@@ -10,6 +11,7 @@ import type {
   RoutineTargetInput,
 } from "@agenteschat/client";
 import {
+  ROUTINE_HOOK_METHODS,
   useCalendar,
   useChannels,
   useDms,
@@ -73,6 +75,7 @@ import {
 import {
   Button,
   Checkbox,
+  CheckboxPill,
   Chip,
   cx,
   DetailsDialog,
@@ -1269,7 +1272,12 @@ function RoutineDetails({
         {r.trigger.type === "email" || r.trigger.type === "connector" ? (
           <p className="small muted">{t("mail.routine.every")}</p>
         ) : r.trigger.type === "webhook" ? (
-          <p className="small muted">{t("routines.webhook.every")}</p>
+          <p className="small muted">
+            {t("common.joinSentences", {
+              a: t("routines.webhook.every"),
+              b: t("routines.webhook.methodsLine", { methods: (r.trigger.methods ?? ["POST"]).join(", ") }),
+            })}
+          </p>
         ) : r.trigger.type === "event" ? (
           <p className="small muted">{t("routines.panel.eventEvery")}</p>
         ) : (
@@ -1520,10 +1528,15 @@ function WebhookPanel({ routine: r, runs }: { routine: Routine; runs: RoutineRun
           </div>
         )}
       </div>
+      <HookMethods routine={r} methods={data.methods} />
       <div className="routine-hook__part">
         <span className="ac-field__label">{t("routines.webhook.example")}</span>
         <CommandBlock
-          command={hookCurl(data.url, data.signed ? (secret ?? t("routines.webhook.secretPlaceholder")) : null)}
+          command={hookCurl(
+            data.url,
+            data.signed ? (secret ?? t("routines.webhook.secretPlaceholder")) : null,
+            data.methods,
+          )}
           copied={t("routines.webhook.exampleCopied")}
         />
         <div className="routine-hook__actions">
@@ -1549,6 +1562,45 @@ function WebhookPanel({ routine: r, runs }: { routine: Routine; runs: RoutineRun
             ))}
           </ol>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The HTTP methods the address answers (POST by default), one pill each; at least one stays on. GET passes its query
+ * string as the run's data.
+ */
+function HookMethods({ routine: r, methods }: { routine: Routine; methods: RoutineHookMethod[] }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const save = useRoutineAction(org.id);
+  const toggle = (m: RoutineHookMethod, on: boolean) => {
+    const next = ROUTINE_HOOK_METHODS.filter((x) => (x === m ? on : methods.includes(x)));
+    if (next.length === 0) return;
+    // Its address's view (under the routines' key) is read again once it's saved.
+    save.mutate({ type: "update", id: r.id, patch: { trigger: { type: "webhook", methods: next } } });
+  };
+  return (
+    <div className="routine-hook__part">
+      <span className="ac-hintline">
+        <span className="ac-field__label">{t("routines.webhook.methods")}</span>
+        <InfoHint name={t("common.about", { label: t("routines.webhook.methods") })}>
+          {t("routines.webhook.methodsHelp")}
+        </InfoHint>
+      </span>
+      <div className="routine-hook__methods">
+        {ROUTINE_HOOK_METHODS.map((m) => (
+          <CheckboxPill
+            key={m}
+            id={`hook-method-${r.id}-${m}`}
+            checked={methods.includes(m)}
+            disabled={save.isPending || (methods.length === 1 && methods.includes(m))}
+            onCheckedChange={(on) => toggle(m, on)}
+          >
+            {m}
+          </CheckboxPill>
+        ))}
       </div>
     </div>
   );

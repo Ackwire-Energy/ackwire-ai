@@ -1882,6 +1882,7 @@
       "updated": "スキル<b>{{name}}</b>を修正しました"
     },
     "other": "変更を加えました",
+    "copyWebhook": "Webhook のアドレスをコピー",
     "issueFields": {
       "title": "タイトル",
       "description": "説明",
@@ -4421,6 +4422,9 @@
       "every": "呼び出しのたびに実行します。同時に届いた呼び出しは1回の実行にまとめられます。",
       "newNote": "ルーティンに専用のアドレスが割り当てられます。そこへのPOSTごとに、送信内容を受け取ってエージェントが動き始めます。アドレスは保存後にルーティンのページに表示されます。",
       "hidden": "アドレスはルーティンを変更できる人だけに表示されます。",
+      "methods": "受け付けるメソッド",
+      "methodsHelp": "このアドレスはチェックしたメソッドにだけ応答します。GET の場合は URL のクエリパラメータが呼び出しのデータになります。",
+      "methodsLine": "{{methods}} を受け付けます。",
       "address": "アドレス",
       "addressHelp": "アドレスを知っている人は誰でもエージェントを起動できます。パスワードのように扱い、漏れた場合は新しいアドレスを作成してください。",
       "copied": "アドレスをコピーしました。",
@@ -4431,7 +4435,7 @@
       "signature": "署名",
       "signedOff": "オフ: アドレスへのすべての呼び出しがエージェントに届きます。",
       "signedOn": "オン: シークレットで署名された呼び出しだけが届きます。",
-      "signedHelp": "本文のHMAC-SHA256をX-Agentes-Signature（sha256=…）で送ってください。GitHubのX-Hub-Signature-256も使えます。",
+      "signedHelp": "本文（GETの呼び出しではクエリ文字列、?を除く）のHMAC-SHA256をX-Agentes-Signature（sha256=…）で送ってください。GitHubのX-Hub-Signature-256も使えます。",
       "addSecret": "署名を必須にする",
       "newSecret": "新しいシークレット",
       "newSecretTitle": "新しいシークレットを作成しますか？",

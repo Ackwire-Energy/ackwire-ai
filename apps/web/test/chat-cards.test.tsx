@@ -494,3 +494,43 @@ describe("what a reply names opens over the conversation", () => {
     ).toBe("true");
   });
 });
+
+describe("a webhook routine the agent made", () => {
+  test("its line copies the address, kept out of the message; a routine on a schedule has no such button", async () => {
+    let clip = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          clip = text;
+        },
+      },
+    });
+    const state = seedState();
+    const api = createFakeApi(state);
+    const hooked = await api.routines.create(ORG_ID, {
+      name: "Avisar no general",
+      agentId: ADA_ID,
+      prompt: "Poste works no #general.",
+      target: { type: "channel", channelId: ENG_ID },
+      trigger: { type: "webhook" },
+    });
+    const made = (id: string, params: AgentAction["params"], n: string): Message => ({
+      ...answer(id, [{ id: `act-${n}`, messageId: `m-${n}`, params }]),
+      id: `m-${n}`,
+    });
+    state.messages = [
+      made(hooked.id, { name: "Avisar no general", trigger: "webhook" }, "hook"),
+      made("rt-schedule", { name: "Relatório", trigger: "schedule" }, "schedule"),
+    ];
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const buttons = screen().getAllByRole("button", { name: "Copiar endereço do webhook" });
+    expect(buttons).toHaveLength(1);
+    expect(document.querySelector('[data-message-id="m-schedule"]')?.textContent).not.toContain("Copiar endereço");
+    await click(buttons[0] as HTMLElement);
+    await settle(4);
+    expect(clip).toBe((await api.routines.hook(ORG_ID, hooked.id)).url);
+    expect(screen().getByText("URL do webhook copiada.")).toBeTruthy();
+  });
+});

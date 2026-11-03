@@ -2955,7 +2955,12 @@ export interface RoutineWebhookTrigger {
   type: "webhook";
   url: string | null;
   signed: boolean;
+  /** The HTTP methods its address answers (POST by default; GET passes its query string as the run's data). */
+  methods: RoutineHookMethod[];
 }
+
+export const ROUTINE_HOOK_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
+export type RoutineHookMethod = (typeof ROUTINE_HOOK_METHODS)[number];
 
 /** How a call to a routine's address ended: `duplicate` repeated an idempotency key within 24 hours. */
 export type RoutineHookOutcome = "accepted" | "duplicate" | "bad_signature" | "too_large" | "rate_limited";
@@ -2977,6 +2982,7 @@ export interface RoutineHookCall {
 export interface RoutineHook {
   url: string;
   signed: boolean;
+  methods: RoutineHookMethod[];
   calls: RoutineHookCall[];
 }
 
@@ -3166,7 +3172,7 @@ export interface RoutineInput {
     | { type: "event"; event: RoutineEvent }
     | { type: "once"; at: string; timezone?: string }
     | Omit<RoutineEmailTrigger, "status">
-    | { type: "webhook" }
+    | { type: "webhook"; methods?: RoutineHookMethod[] }
     | Omit<RoutineConnectorTrigger, "status" | "lastError">;
   /** Ignored: every routine acts (ADR 0109). */
   access?: RoutineAccess;

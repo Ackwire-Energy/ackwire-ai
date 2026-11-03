@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
 import { routineBriefOfRun, routineOfRun } from "./background";
 import { publishDelivery } from "./delivery";
+import { publishRoutineRuns } from "./events";
 import { deliverRoutineReport, routineDeliveryBlock } from "./hand-off";
 import { releaseRoutineEmails } from "./mail/inbound";
 import { notifyRoutineFailed, notifyRoutineFinished, resolveRoutineTrouble } from "./notification-producers";
@@ -247,6 +248,7 @@ export async function afterRoutineRunEnded(
     }
   } finally {
     await startGatheredRun(deps, ended.routineId).catch(() => false);
+    await publishRoutineRuns(deps.pubsub, ended.orgId, ended.routineId);
   }
 }
 

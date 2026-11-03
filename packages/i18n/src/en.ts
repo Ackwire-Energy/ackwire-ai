@@ -1894,6 +1894,8 @@ export const en = {
       updated: "Fixed the skill <b>{{name}}</b>",
     },
     other: "Made a change",
+    /** On the line of a webhook routine the agent created: copies its secret address (only for who manages it). */
+    copyWebhook: "Copy webhook address",
     issueFields: {
       title: "the title",
       description: "the description",
@@ -4403,6 +4405,11 @@ export const en = {
       newNote:
         "The routine gets an address of its own. Every POST to it starts the agent with what was sent. The address shows on the routine's page once it is saved.",
       hidden: "Only who can change the routine sees its address.",
+      methods: "Accepted methods",
+      methodsHelp:
+        "The address answers only the methods checked. With GET, the URL's query parameters are the call's data.",
+      /** After "Runs on every call…" on the routine's page: `methods` are HTTP methods ("GET, POST"). */
+      methodsLine: "Accepts {{methods}}.",
       address: "Address",
       addressHelp:
         "Anyone with the address can start the agent. Keep it like a password and make a new one if it leaks.",
@@ -4415,7 +4422,7 @@ export const en = {
       signedOff: "Off: the agent gets any call to the address.",
       signedOn: "On: only calls signed with the secret get through.",
       signedHelp:
-        "Send the HMAC-SHA256 of the body in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too.",
+        "Send the HMAC-SHA256 of the body (of a GET call: its query string, without the ?) in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too.",
       addSecret: "Require a signature",
       newSecret: "New secret",
       newSecretTitle: "Make a new secret?",

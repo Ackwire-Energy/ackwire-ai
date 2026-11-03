@@ -248,6 +248,8 @@ export const routineHooks = pgTable("routine_hooks", {
    * provider keeps for it (`ConnectorTriggerSource`). Null: a plain webhook routine.
    */
   source: jsonb(),
+  /** The HTTP methods the address answers (GET passes its query string as the call's data). */
+  methods: text().array().notNull().default(sql`'{POST}'::text[]`),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

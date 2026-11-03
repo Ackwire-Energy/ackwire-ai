@@ -4697,6 +4697,9 @@
   "agentActions.other": {
     "value": "Made a change"
   },
+  "agentActions.copyWebhook": {
+    "value": "Copy webhook address"
+  },
   "agentActions.issueFields.title": {
     "value": "the title"
   },
@@ -11118,6 +11121,15 @@
   "routines.webhook.hidden": {
     "value": "Only who can change the routine sees its address."
   },
+  "routines.webhook.methods": {
+    "value": "Accepted methods"
+  },
+  "routines.webhook.methodsHelp": {
+    "value": "The address answers only the methods checked. With GET, the URL's query parameters are the call's data."
+  },
+  "routines.webhook.methodsLine": {
+    "value": "Accepts {{methods}}."
+  },
   "routines.webhook.address": {
     "value": "Address"
   },
@@ -11149,7 +11161,7 @@
     "value": "On: only calls signed with the secret get through."
   },
   "routines.webhook.signedHelp": {
-    "value": "Send the HMAC-SHA256 of the body in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too."
+    "value": "Send the HMAC-SHA256 of the body (of a GET call: its query string, without the ?) in X-Agentes-Signature (sha256=…). GitHub's X-Hub-Signature-256 works too."
   },
   "routines.webhook.addSecret": {
     "value": "Require a signature"

@@ -1892,6 +1892,7 @@
       "updated": "Memperbaiki skill <b>{{name}}</b>"
     },
     "other": "Membuat perubahan",
+    "copyWebhook": "Salin alamat webhook",
     "issueFields": {
       "title": "judul",
       "description": "deskripsi",
@@ -4457,6 +4458,9 @@
       "every": "Berjalan di setiap panggilan. Panggilan yang datang bersamaan menjadi satu proses.",
       "newNote": "Rutinitas ini mendapat alamatnya sendiri. Setiap POST ke alamat itu memulai agen dengan data yang dikirim. Alamatnya muncul di halaman rutinitas setelah disimpan.",
       "hidden": "Hanya yang bisa mengubah rutinitas ini yang melihat alamatnya.",
+      "methods": "Metode yang diterima",
+      "methodsHelp": "Alamat ini hanya menjawab metode yang dicentang. Dengan GET, parameter kueri URL menjadi data panggilan.",
+      "methodsLine": "Menerima {{methods}}.",
       "address": "Alamat",
       "addressHelp": "Siapa pun yang punya alamat ini bisa memulai agen. Jaga seperti kata sandi dan buat yang baru kalau bocor.",
       "copied": "Alamat disalin.",
@@ -4467,7 +4471,7 @@
       "signature": "Tanda tangan",
       "signedOff": "Mati: agen menerima semua panggilan ke alamat ini.",
       "signedOn": "Aktif: hanya panggilan yang ditandatangani dengan rahasia yang diterima.",
-      "signedHelp": "Kirim HMAC-SHA256 dari body di X-Agentes-Signature (sha256=…). X-Hub-Signature-256 dari GitHub juga bisa.",
+      "signedHelp": "Kirim HMAC-SHA256 dari body (untuk panggilan GET: dari query string-nya, tanpa ?) di X-Agentes-Signature (sha256=…). X-Hub-Signature-256 dari GitHub juga bisa.",
       "addSecret": "Wajibkan tanda tangan",
       "newSecret": "Rahasia baru",
       "newSecretTitle": "Buat rahasia baru?",

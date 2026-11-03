@@ -1289,6 +1289,13 @@
       "when": 1793665112110,
       "tag": "0185_routine_hook_source",
       "breakpoints": true
+    },
+    {
+      "idx": 185,
+      "version": "7",
+      "when": 1793665289811,
+      "tag": "0186_routine_hook_methods",
+      "breakpoints": true
     }
   ]
 }

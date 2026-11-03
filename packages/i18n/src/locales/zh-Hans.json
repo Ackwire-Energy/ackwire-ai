@@ -1884,6 +1884,7 @@
       "updated": "修正了技能 <b>{{name}}</b>"
     },
     "other": "做了一项更改",
+    "copyWebhook": "复制 Webhook 地址",
     "issueFields": {
       "title": "标题",
       "description": "描述",
@@ -4474,6 +4475,9 @@
       "every": "每次调用都会运行。同时到达的调用会合并为一次运行。",
       "newNote": "例行工作会获得一个专属地址。每次向它发送 POST，都会带着发送的内容启动智能体。保存后，地址会显示在例行工作页面上。",
       "hidden": "只有能修改此例行工作的人才能看到它的地址。",
+      "methods": "接受的方法",
+      "methodsHelp": "该地址只响应勾选的方法。使用 GET 时，URL 的查询参数就是这次调用的数据。",
+      "methodsLine": "接受 {{methods}}。",
       "address": "地址",
       "addressHelp": "任何拥有此地址的人都能启动智能体。请像密码一样保管它，泄露后请生成新地址。",
       "copied": "地址已复制。",
@@ -4484,7 +4488,7 @@
       "signature": "签名",
       "signedOff": "关闭：智能体会接收发到此地址的所有调用。",
       "signedOn": "开启：只有用密钥签名的调用才能通过。",
-      "signedHelp": "在 X-Agentes-Signature 中发送请求体的 HMAC-SHA256（sha256=…）。GitHub 的 X-Hub-Signature-256 也可以。",
+      "signedHelp": "在 X-Agentes-Signature 中发送请求体（GET 调用则为其查询字符串，不含 ?）的 HMAC-SHA256（sha256=…）。GitHub 的 X-Hub-Signature-256 也可以。",
       "addSecret": "要求签名",
       "newSecret": "新密钥",
       "newSecretTitle": "生成新密钥？",
