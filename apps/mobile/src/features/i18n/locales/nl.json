@@ -348,20 +348,6 @@
       "back": "Weer verbonden"
     },
     "longPressHint": "Ingedrukt houden om te reageren en meer acties te zien",
-    "consult": {
-      "answered": "{{name}} heeft geantwoord",
-      "expiredF": "{{name}} heeft niet op tijd geantwoord",
-      "expiredM": "{{name}} heeft niet op tijd geantwoord",
-      "failedF": "{{name}} kon niet antwoorden",
-      "failedM": "{{name}} kon niet antwoorden",
-      "answerOfF": "Antwoord van {{name}}",
-      "answerOfM": "Antwoord van {{name}}",
-      "noAnswer": "Geen antwoord.",
-      "privateFF": "Een privégesprek tussen {{from}} en {{to}}",
-      "privateFM": "Een privégesprek tussen {{from}} en {{to}}",
-      "privateMF": "Een privégesprek tussen {{from}} en {{to}}",
-      "privateMM": "Een privégesprek tussen {{from}} en {{to}}"
-    },
     "file": "Bestand",
     "fileOpen": "Tik om te openen",
     "fileDeleted": "Bestand verwijderd",

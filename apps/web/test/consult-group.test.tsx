@@ -133,7 +133,9 @@ const asked = () =>
   screen()
     .getAllByRole("article")
     .find((a) => a.textContent?.includes("Pedi a parte de juros")) as HTMLElement;
-const group = () => asked().querySelector(".ac-consult-group") as HTMLElement | null;
+/** The pair row ("Ada ⇄ Atlas · 2 min"), right before the reply that asked. */
+const row = () => document.querySelector(".consult-pair") as HTMLElement | null;
+const rowButton = () => row()?.querySelector("button") as HTMLElement;
 const typingBar = () => document.querySelector(".ac-typing") as HTMLElement;
 const bar = () => typingBar().querySelector(".ac-typing__text")?.textContent ?? "";
 const push = (socket: { push: (f: unknown) => void }, event: Record<string, unknown>) =>
@@ -143,79 +145,103 @@ const push = (socket: { push: (f: unknown) => void }, event: Record<string, unkn
 /** Ada's question going out, live: "Ada está perguntando para Atlas…" on the working line. */
 const asking = { type: "agent.consulting", runId: RUN, agentId: ADA_ID, consultedAgentId: ATLAS_ID };
 
-const pills = () => [...(group()?.querySelectorAll(".ac-talk") ?? [])] as HTMLElement[];
-/** The pill of Ada and Atlas talking, by what it says after their names. */
-const pill = (state: RegExp) => within(group() as HTMLElement).getByRole("button", { name: state });
-
-describe("the questions inside the reply that asked: one pill per agent (ConsultGroup)", () => {
-  test("still out: Ada's face, the arrows, Atlas's face, 'Ada ⇄ Atlas · conversando há 40 s'", async () => {
+describe("the pair row before the reply that asked (ConsultPairRow)", () => {
+  test("still out: the two faces, ⇄ and 'perguntando' with its clock, right before the reply, never the question", async () => {
     await open(withAsk([consultation({})]));
-    const [one] = pills();
-    expect(pills()).toHaveLength(1);
-    expect(one?.textContent).toMatch(/^Ada ⇄ Atlas · conversando há 4\d s$/);
-    expect(one?.getAttribute("aria-label")).toMatch(/^Conversa entre Ada e Atlas · conversando há 4\d s$/);
-    expect(one?.classList.contains("ac-talk--waiting")).toBe(true);
-    // A face on each side of the arrows.
-    const faces = one?.querySelector(".ac-talk__faces");
-    expect(faces?.children).toHaveLength(3);
-    expect(faces?.children[1]?.tagName.toLowerCase()).toBe("svg");
-    // No tool block with "Perguntou a 1 colega", nor its lines.
-    expect(group()?.querySelector(".ac-tools__head, .ac-tools__line")).toBeNull();
-    expect(group()?.textContent).not.toContain("Perguntou a");
-    cleanup();
-    // Two questions: two pills, nothing to open first.
-    await open(withAsk([consultation({}), consultation({ id: "q2", question: "E a de 5 anos?" })]));
-    expect(pills()).toHaveLength(2);
-    expect(group()?.textContent).not.toContain("Perguntou a 2 colegas");
+    const r = row() as HTMLElement;
+    expect(r).not.toBeNull();
+    expect(asked().previousElementSibling).toBe(r);
+    expect([...r.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(r.querySelectorAll(".ac-avatar")).toHaveLength(2);
+    expect(r.querySelector(".consult-pair__word")?.textContent).toBe("perguntando");
+    expect(r.querySelector(".consult-pair__time")?.textContent).toMatch(/^\d+ s$/);
+    expect(r.querySelector(".consult-pair__row--live")).not.toBeNull();
+    expect(r.textContent).not.toContain(QUESTION);
+    // The reply under it shows its face and name again (not grouped under the message above).
+    expect(asked().classList.contains("ac-msg--grouped")).toBe(false);
   });
 
-  test("work handed off: the same pill, opening the request in the panel", async () => {
+  test("several agents fold into one row: stacked faces, 'Atlas e mais 1', the count while out", async () => {
+    const state = withAsk([consultation({}), consultation({ id: "q2", consultedAgentId: "agent-iris" })]);
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) state.agents.push({ ...atlas, id: "agent-iris", name: "Iris", handle: "iris" });
+    await open(state);
+    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
+    const r = row() as HTMLElement;
+    expect(r.querySelectorAll(".consult-pair__faces .ac-avatar")).toHaveLength(2);
+    expect(r.textContent).toContain("Atlas e mais 1");
+    expect(r.querySelector(".consult-pair__word")?.textContent).toBe("0 de 2");
+    expect(rowButton().getAttribute("title")).toBe("Conversas de Ada com Atlas e Iris");
+  });
+
+  test("waiting on a person, for its computer, on what it handed on: a short word in the same slot", async () => {
+    await open(withAsk([consultation({ waiting: "approval" })]));
+    expect(row()?.querySelector(".consult-pair__word")?.textContent).toBe("esperando aprovação");
+    cleanup();
+    await open(withAsk([consultation({ waiting: "computer" })]));
+    expect(row()?.querySelector(".consult-pair__word")?.textContent).toBe("esperando o computador");
+    expect(row()?.querySelector(".consult-pair__row--live")).not.toBeNull();
+  });
+
+  test("work handed off, its part done: 'esperando outros agentes', and the panel opens it as a request", async () => {
     const c = consultation({ kind: "note", waiting: "agents" });
     await open(withTalk(withAsk([c]), c));
-    expect(group()?.textContent).not.toContain("Passou para 1 colega");
-    await act(async () => fireEvent.click(pill(/Conversa entre Ada e Atlas/)));
+    expect(row()?.querySelector(".consult-pair__word")?.textContent).toBe("esperando outros agentes");
+    await act(async () => fireEvent.click(rowButton()));
     await settle(3);
     const side = panel() as HTMLElement;
     expect(side.textContent).toContain("Ada fez um pedido para Atlas em #eng");
     expect(side.textContent).toContain("O Atlas passou uma parte adiante e espera o retorno");
   });
 
-  test("one that couldn't finish: 'sem resposta'", async () => {
-    await open(
-      withAsk([consultation({ kind: "note", status: "failed", answer: "stopped by a person", answeredAt: ago(2) })]),
-    );
-    const [one] = pills();
-    expect(one?.textContent).toBe("Ada ⇄ Atlas · sem resposta");
-    expect(one?.classList.contains("ac-talk--failed")).toBe(true);
+  test("some never answered: '1 de 2 responderam' in the warning tone, the one that didn't dimmed", async () => {
+    const state = withAsk([
+      consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) }),
+      consultation({
+        id: "q2",
+        kind: "note",
+        consultedAgentId: "agent-iris",
+        status: "failed",
+        answer: "stopped by a person",
+        answeredAt: ago(2),
+      }),
+    ]);
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) state.agents.push({ ...atlas, id: "agent-iris", name: "Iris", handle: "iris" });
+    await open(state);
+    const r = row() as HTMLElement;
+    expect(r.querySelector(".consult-pair__row--bad .consult-pair__word")?.textContent).toBe("1 de 2 responderam");
+    expect(r.querySelectorAll(".consult-pair__off")).toHaveLength(1);
+    expect(r.querySelector(".consult-pair__time")).toBeNull();
   });
 
-  test("answered: 'respondeu em 35 s'; a click opens the two agents' conversation over the channel, read only", async () => {
+  test("answered: how long it took, no answer in the channel; a click opens the conversation in the panel", async () => {
     const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
     await open(withTalk(withAsk([c], true), c));
-    const one = pill(/respondeu em/);
-    expect(one.textContent).toBe("Ada ⇄ Atlas · respondeu em 35 s");
-    await act(async () => fireEvent.click(one));
+    const r = row() as HTMLElement;
+    expect(r.querySelector(".consult-pair__word")).toBeNull();
+    expect(r.querySelector(".consult-pair__time")?.textContent).toBe("35 s");
+    // The answer shows nowhere in the channel: the `consult_reply` notice folds away (no second row, no line).
+    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
+    expect(document.querySelector("main")?.textContent).not.toContain("subiu 6 pb");
+    expect(document.body.textContent).not.toContain("respondeu à pergunta");
+    await act(async () => fireEvent.click(rowButton()));
     await settle(3);
-    // Not in place: in the panel over the channel, the question as it went and the answer.
-    expect(group()?.textContent).not.toContain(QUESTION);
+    expect(r.querySelector(".consult-pair__detail")).toBeNull();
     const side = panel() as HTMLElement;
     expect(side.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
     expect(side.textContent).toContain(QUESTION);
     expect(side.textContent).toContain("subiu 6 pb");
-    expect(one.getAttribute("aria-pressed")).toBe("true");
+    expect(rowButton().getAttribute("aria-pressed")).toBe("true");
     // Read only: no composer there, a note instead.
     expect(within(side).queryByRole("combobox")).toBeNull();
     expect(side.textContent).toContain("Só leitura.");
-    // The answer is shown once in the channel: the notice draws no second pill (it's close), nor a line.
-    expect(document.querySelectorAll(".ac-talk")).toHaveLength(1);
-    expect(document.body.textContent).not.toContain("respondeu à pergunta");
   });
 
   test("still out: the panel says Atlas works on it; 'Falar com a Ada' closes it and mentions her", async () => {
     const c = consultation({});
     await open(withTalk(withAsk([c]), c));
-    const line = pill(/conversando/);
-    await act(async () => fireEvent.click(line));
+    await act(async () => fireEvent.click(rowButton()));
     await settle(3);
     const side = panel() as HTMLElement;
     expect(side.textContent).toContain(QUESTION);
@@ -255,8 +281,8 @@ describe("the questions inside the reply that asked: one pill per agent (Consult
       createdAt: ago(20),
     };
     const { state } = await open(withTalk(withAsk([c]), c, [asks]));
-    const line = pill(/conversando/);
-    await act(async () => fireEvent.click(line));
+    expect(row()?.querySelector(".consult-pair__word")?.textContent).toBe("esperando uma resposta");
+    await act(async () => fireEvent.click(rowButton()));
     await settle(3);
     const side = panel() as HTMLElement;
     expect(side.textContent).toContain("Uso a fonte paga para a curva?");
@@ -299,75 +325,70 @@ describe("the questions inside the reply that asked: one pill per agent (Consult
     expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
   });
 
-  test("the answer far below its question: the two agents' pill where it arrived, opening the conversation", async () => {
+  test("the answer far below its question: the same pair row where it arrived, opening the conversation", async () => {
     const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
     await open(talkAfter(withTalk(withAsk([c], true), c), 3));
-    const all = [...document.querySelectorAll(".ac-talk")] as HTMLElement[];
-    // One in the reply that asked, one where the answer arrived: no "Atlas respondeu à pergunta da Ada · Ver".
-    expect(all).toHaveLength(2);
+    const rows = [...document.querySelectorAll(".consult-pair")] as HTMLElement[];
+    expect(rows).toHaveLength(2);
+    const far = rows.find((r) => r.parentElement?.getAttribute("data-message-id") === "msg-notice") as HTMLElement;
+    expect([...far.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(far.textContent).not.toContain("subiu 6 pb");
     expect(document.body.textContent).not.toContain("respondeu à pergunta");
-    const arrived = all[1] as HTMLElement;
-    expect(arrived.textContent).toBe("Ada ⇄ Atlas · respondeu em 35 s");
-    await act(async () => fireEvent.click(arrived));
+    await act(async () => fireEvent.click(far.querySelector("button") as HTMLElement));
     await settle(3);
     // The two agents' conversation over the channel: the question and the whole answer.
     expect(panel()?.textContent).toContain(QUESTION);
     expect(panel()?.textContent).toContain("subiu 6 pb");
   });
 
-  test("without questions the reply has no block, and the notice stays", async () => {
-    const state = withAsk([], true);
+  test("an agent @named outside the conversation got it by direct message: the pair row on the reach line, no 'Entregue ao', not twice", async () => {
+    const relayed = `[@ada mentioned you in #engenharia, where you aren't a member, so it reaches you here]\n\n${QUESTION}`;
+    const c = consultation({ kind: "note", question: relayed });
+    const state = withTalk(withAsk([c]), c);
+    const ask = state.messages.find((m) => m.id === "msg-asked");
+    if (ask)
+      ask.meta = { reach: [{ agentId: ATLAS_ID, handle: "atlas", reason: "not_in_channel", consultationId: "q1" }] };
     await open(state);
-    expect(group()).toBeNull();
-    expect(document.querySelectorAll(".ac-talk")).toHaveLength(1);
+    expect(document.body.textContent).not.toContain("Entregue ao");
+    // The reply's own row leaves it to the reach line: one row for the hand-off.
+    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
+    const reach = screen().getByRole("group", { name: "Quem a mensagem não chamou direto" });
+    const r = reach.querySelector(".consult-pair") as HTMLElement;
+    expect([...r.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(r.querySelector(".consult-pair__word")?.textContent).toBe("trabalhando");
+    await act(async () => fireEvent.click(r.querySelector("button") as HTMLElement));
+    await settle(3);
+    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
+    expect(panel()?.textContent).not.toContain("mentioned you");
   });
 
-  test("the reply that asked isn't loaded here: the notice keeps its card", async () => {
-    const state = withAsk([consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) })], true);
+  test("without questions the reply has no row before it; the notice draws its own, with no answer in it", async () => {
+    await open(withAsk([], true));
+    expect(asked().previousElementSibling?.classList.contains("consult-pair")).toBe(false);
+    const r = row() as HTMLElement;
+    expect(r.parentElement?.getAttribute("data-message-id")).toBe("msg-notice");
+    expect(r.textContent).not.toContain("subiu 6 pb");
+  });
+
+  test("the reply that asked isn't loaded here: the notice is a pair row that opens the panel, never in place", async () => {
+    const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
+    const state = withTalk(withAsk([c], true), c);
     // The asking reply is further up, not paged in: only the notice is here.
     state.messages = state.messages.filter((m) => m.id !== "msg-asked");
     await open(state);
-    expect(document.querySelectorAll(".ac-talk")).toHaveLength(1);
-    expect(document.querySelector(".ac-consult-group")).toBeNull();
-  });
-
-  test("the notice's pill opens the two agents' conversation in the panel, never in place", async () => {
-    const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
-    const state = withTalk(withAsk([c], true), c);
-    state.messages = state.messages.filter((m) => m.id !== "msg-asked");
-    await open(state);
-    const head = document.querySelector(".ac-talk") as HTMLElement;
-    expect(head.textContent).toBe("Ada ⇄ Atlas · respondeu em 35 s");
-    expect(head.getAttribute("aria-expanded")).toBeNull();
-    await act(async () => fireEvent.click(head));
+    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
+    expect(document.querySelector("main")?.textContent).not.toContain("subiu 6 pb");
+    await act(async () => fireEvent.click(rowButton()));
     await settle(3);
-    // A long answer reads beside the chat: the pill opens nothing in place.
-    expect(document.querySelector(".ac-talk-detail")).toBeNull();
+    expect(row()?.querySelector(".consult-pair__detail")).toBeNull();
     expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
     expect(panel()?.textContent).toContain("subiu 6 pb");
-    expect(head.getAttribute("aria-pressed")).toBe("true");
+    expect(rowButton().getAttribute("aria-pressed")).toBe("true");
   });
 
-  test("an agent @named outside the conversation got it by direct message: their pill, no 'Entregue ao' row", async () => {
-    const c = consultation({ kind: "note" });
-    const state = withTalk(withAsk([c]), c);
-    const asked = state.messages.find((m) => m.id === "msg-asked");
-    if (asked)
-      asked.meta = { reach: [{ agentId: ATLAS_ID, handle: "atlas", reason: "not_in_channel", consultationId: "q1" }] };
-    await open(state);
-    expect(document.body.textContent).not.toContain("Entregue ao");
-    const reach = screen().getByRole("group", { name: "Quem a mensagem não chamou direto" });
-    const talks = [...reach.querySelectorAll(".ac-talk")] as HTMLElement[];
-    expect(talks).toHaveLength(1);
-    expect(talks[0]?.textContent).toMatch(/^Ada ⇄ Atlas · conversando há/);
-    await act(async () => fireEvent.click(talks[0] as HTMLElement));
-    await settle(3);
-    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre Ada e Atlas");
-  });
-
-  test("an event reloads the list: an answer that came shows in place", async () => {
+  test("an event reloads the list: the answer coming in turns the same row to its time", async () => {
     const { socket, state } = await open(withAsk([consultation({})]));
-    expect(group()?.textContent).toContain("conversando");
+    expect(row()?.querySelector(".consult-pair__word")?.textContent).toBe("perguntando");
     state.consultations = {
       [ENG_ID]: [consultation({ status: "answered", answer: ANSWER, answeredAt: ago(1) })],
     };
@@ -387,18 +408,20 @@ describe("the questions inside the reply that asked: one pill per agent (Consult
       }),
     );
     await settle(5);
-    // The answer is in: the same pill says so, in place.
-    expect(pills()[0]?.textContent).toBe("Ada ⇄ Atlas · respondeu em 39 s");
-    expect(pills()[0]?.classList.contains("ac-talk--answered")).toBe(true);
+    const r = row() as HTMLElement;
+    expect(r.querySelector(".consult-pair__word")).toBeNull();
+    expect(r.querySelector(".consult-pair__row--live")).toBeNull();
+    expect(r.querySelector(".consult-pair__time")?.textContent).toMatch(/^\d+ s$/);
+    expect(r.textContent).not.toContain("subiu 6 pb");
   });
 });
 
-describe("the working line while the block shows the questions", () => {
-  test("the reply that asked is close: its block says it, the line doesn't; the asker's own work stays", async () => {
+describe("the working line while the row shows the questions", () => {
+  test("the reply that asked is close: its row says it, the line doesn't; the asker's own work stays", async () => {
     const { socket } = await open(withAsk([consultation({})]));
     await push(socket, asking);
     await settle(2);
-    expect(group()?.textContent).toContain("conversando");
+    expect(row()?.querySelector(".consult-pair__word")?.textContent).toBe("perguntando");
     expect(bar()).toBe("");
     expect(typingBar().getAttribute("data-active")).toBe("false");
     // Ada at work again (another turn): her own line, not the question.

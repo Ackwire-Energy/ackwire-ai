@@ -1,7 +1,6 @@
 import {
   type AgentQuestion,
   type Approval,
-  type MessageConsultation,
   type ThreadInfo,
   useApi,
   useApproval,
@@ -30,8 +29,6 @@ import {
   decisionOutcome,
   requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
-import { consultAskedKey, openableConsultation } from "@agenteschat/client/lib/consult-group";
-import { withoutRelayLine } from "@agenteschat/client/lib/consultations";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
@@ -53,110 +50,20 @@ import {
   useOriginShort,
 } from "../approvals/parts";
 import { chatHref } from "../links/logic";
-import { AgentFace, Face, withAgentFaces } from "../shared/Face";
+import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { genderOf, previewOf } from "../shared/logic";
+import { genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { askEndedAt } from "./ask-store";
 import { AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "./asks";
-import { AgentTalkPill, TalkPills } from "./ConsultGroup";
 import { markName, threadFaces } from "./logic";
 
 /**
- * The cards inside a message: the agent it consulted, the approval it asks for, an agent's question and a change
+ * The cards inside a message: the approval it asks for, an agent's question and a change
  * it proposes (each the request card, `asks.tsx`), and the link to its thread. Its tools are `ToolCalls.tsx`.
  */
-
-// ── Consultation ─────────────────────────────────────────────────────────────
-
-/**
- * What the agent asked another agent before answering, in a private conversation: with the conversation it was
- * asked from (`channelId`), the two agents' pill ("Ada ⇄ Infra · respondeu") opening their talk on its own screen.
- * Without it (already on that screen), or with no talk to open, "Infra respondeu" opening in place.
- */
-export function ConsultationCard({
-  askerId,
-  consultation: cs,
-  channelId,
-}: {
-  askerId: string;
-  consultation: MessageConsultation;
-  channelId?: string;
-}) {
-  const id = openableConsultation(cs.consultationId);
-  if (id && channelId)
-    return (
-      <TalkPills>
-        <AgentTalkPill consultationId={id} channelId={channelId} fromId={askerId} toId={cs.agentId} stored={cs} />
-      </TalkPills>
-    );
-  return <ConsultationDetails askerId={askerId} consultation={cs} />;
-}
-
-function ConsultationDetails({ askerId, consultation: cs }: { askerId: string; consultation: MessageConsultation }) {
-  const { t } = useTranslation();
-  const dir = useDirectory();
-  const c = useColors();
-  const surface = useSurface();
-  const [open, setOpen] = useState(false);
-  const asker = dir.agentById.get(askerId)?.name ?? "";
-  const name = dir.agentById.get(cs.agentId)?.name ?? "";
-  const ga = genderOf(asker);
-  const gn = genderOf(name);
-  const head =
-    cs.status === "answered"
-      ? t("mobile.chat.consult.answered", { name })
-      : cs.status === "expired"
-        ? t(`mobile.chat.consult.expired${gn}`, { name })
-        : cs.kind === "note"
-          ? t("chat.consultation.failedNote", { name, context: agentGrammar(name).context })
-          : t(`mobile.chat.consult.failed${gn}`, { name });
-  return (
-    <View style={[styles.box, styles.cs, surface]}>
-      <Pressable
-        onPress={() => setOpen((v) => !v)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        style={styles.head}
-      >
-        <AgentFace agentId={cs.agentId} size={18} live={false} />
-        <Text variant="small" tone="ink" style={styles.bold}>
-          {head}
-        </Text>
-        <Text variant="small" tone="faint" numberOfLines={1} style={[styles.grow, open && styles.hidden]}>
-          {cs.answer ? previewOf(cs.answer) : ""}
-        </Text>
-        <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={16} color={c.faint} />
-        </View>
-      </Pressable>
-      {open ? (
-        <View style={styles.csBody}>
-          <Text variant="caption" tone="faint" style={styles.bold}>
-            {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}
-          </Text>
-          <Text variant="small" tone="muted">
-            {withoutRelayLine(cs.question)}
-          </Text>
-          <Text variant="caption" tone="faint" style={[styles.bold, styles.gap]}>
-            {t(`mobile.chat.consult.answerOf${gn}`, { name })}
-          </Text>
-          <Text variant="small" tone="ink2">
-            {cs.answer ?? t("mobile.chat.consult.noAnswer")}
-          </Text>
-          <View style={styles.foot}>
-            <Icon name="eyeoff" size={13} color={c.faint} />
-            <Text variant="caption" tone="faint" style={styles.grow}>
-              {t(`mobile.chat.consult.private${ga}${gn}`, { from: asker, to: name })}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-    </View>
-  );
-}
 
 // ── Approval ─────────────────────────────────────────────────────────────────
 
@@ -887,23 +794,9 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
 }
 
 const styles = StyleSheet.create({
-  box: { marginTop: 8, borderRadius: 14, overflow: "hidden" },
-  cs: { marginTop: 6, marginBottom: 8 },
-  head: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minHeight: 42,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  csBody: { paddingLeft: 40, paddingRight: 14, paddingBottom: 14, gap: 2 },
-  gap: { marginTop: 8 },
-  foot: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
   grow: { flex: 1 },
   shrink: { flexShrink: 1 },
   bold: { fontWeight: "600" },
-  hidden: { opacity: 0 },
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },

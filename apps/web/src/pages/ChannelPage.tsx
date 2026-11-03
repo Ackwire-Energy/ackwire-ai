@@ -131,6 +131,7 @@ import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
+import { reachHandoffs } from "@agenteschat/client/lib/reach";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
@@ -239,15 +240,15 @@ import { ChannelPinnedBar } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { AppViaTag, NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
 import { QueueButton, QueueWaitTurns, useAgentsMachineId } from "@/components/ComputerQueue";
-import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
   ConsultAnswerLine,
-  ConsultGroup,
   type ConsultGroups,
   ConsultGroupsProvider,
   ConsultHelpingTag,
+  ConsultPairRow,
   useConsultGroups,
+  useReplyConsults,
 } from "@/components/ConsultGroup";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
@@ -3495,8 +3496,20 @@ export const TimelineMessage = memo(function TimelineMessage({
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.openThread !== undefined;
   // An agent suggests a topic ("Vale um fórum?"): only a person opens it.
   const forumSuggestion = m.author.type === "agent" ? forumSuggestionOf(meta) : null;
-  // It asked other agents before answering (`meta.consulted`): one card per agent, on top of the reply.
+  // It asked other agents before answering: one row right before the reply, its run's questions (on the run's last
+  // message here, or on its live row while it works) and the ones its `meta.consulted` names.
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
+  const reached = useMemo(() => reachHandoffs(m.meta), [m.meta]);
+  const consults = useReplyConsults(
+    m.author.type !== "agent" || m.local ? null : live ? m.agentRunId : lastOfRun ? replyRun : null,
+    consulted,
+    !live,
+    reached,
+  );
+  const pair =
+    m.author.type === "agent" && m.author.id && consults.length > 0 ? (
+      <ConsultPairRow askerId={m.author.id} items={consults} />
+    ) : null;
   // Nobody called it: it joined the conversation on its own (`meta.joined`).
   const joined = m.author.type === "agent" && meta.joined === true;
   const joinedTip = joined ? t("chat.joined.tip", agentGrammar(name)) : null;
@@ -3553,438 +3566,441 @@ export const TimelineMessage = memo(function TimelineMessage({
     .filter(Boolean)
     .join(" · ");
   return (
-    <Message
-      agent={m.author.type === "agent"}
-      data-message-id={live ? undefined : m.id}
-      data-run-id={live?.runId}
-      data-live={live?.status}
-      // What someone else wrote (an agent's answer, a teammate's message): lands at its start when long, read
-      // from the top (an answer shares its live block's id, so only once). Never your own message.
-      data-read-id={
-        m.local
-          ? undefined
-          : m.author.type === "agent"
-            ? (replyRun ?? m.id)
-            : m.author.type === "person" && m.author.id !== me.user.id
-              ? m.id
-              : undefined
-      }
-      grouped={grouped && !waiting}
-      own={own}
-      run={run}
-      waiting={waiting}
-      entering={entering && !replacesLive}
-      streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
-      className={cx(
-        local && `ac-msg--local ac-msg--${local}`,
-        contextMark && "msg--context",
-        mentionsMe && "ac-msg--mentions-me",
-        wide && "ac-msg--wide",
-      )}
-      onMouseEnter={feedback ? () => setActive(true) : undefined}
-      onFocus={feedback ? () => setActive(true) : undefined}
-      onContextMenu={live || readOnly ? undefined : menu.onContextMenu}
-      avatar={
-        m.author.id ? (
-          <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
-            {m.author.type === "agent" ? (
-              // At work: thinking, then writing; a saved message: the agent at rest (one no longer in the team too).
-              // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
-              // Both wear their presence badge (ADR 0084).
-              <AgentAvatar
-                agentId={m.author.id}
-                name={name}
-                state={live ? agentStateOfRun(live) : "idle"}
-                reactionKey={live ? undefined : m.id}
-                presence
-              />
-            ) : person ? (
-              <PersonAvatar id={person.userId} name={name} presence />
-            ) : (
-              <Avatar kind="person" name={name} />
-            )}
-          </ProfileTrigger>
-        ) : m.author.type === "agent" ? (
-          <AgentAvatar name={name} />
-        ) : (
-          <Avatar kind="person" name={name} imageUrl={person?.image} />
-        )
-      }
-      author={
-        m.author.id ? (
-          <>
+    <>
+      {pair}
+      <Message
+        agent={m.author.type === "agent"}
+        data-message-id={live ? undefined : m.id}
+        data-run-id={live?.runId}
+        data-live={live?.status}
+        // What someone else wrote (an agent's answer, a teammate's message): lands at its start when long, read
+        // from the top (an answer shares its live block's id, so only once). Never your own message.
+        data-read-id={
+          m.local
+            ? undefined
+            : m.author.type === "agent"
+              ? (replyRun ?? m.id)
+              : m.author.type === "person" && m.author.id !== me.user.id
+                ? m.id
+                : undefined
+        }
+        grouped={grouped && !waiting && !pair}
+        own={own}
+        run={run}
+        waiting={waiting}
+        entering={entering && !replacesLive}
+        streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
+        className={cx(
+          local && `ac-msg--local ac-msg--${local}`,
+          contextMark && "msg--context",
+          mentionsMe && "ac-msg--mentions-me",
+          wide && "ac-msg--wide",
+        )}
+        onMouseEnter={feedback ? () => setActive(true) : undefined}
+        onFocus={feedback ? () => setActive(true) : undefined}
+        onContextMenu={live || readOnly ? undefined : menu.onContextMenu}
+        avatar={
+          m.author.id ? (
             <ProfileTrigger
               actor={{ type: m.author.type, id: m.author.id }}
               label={t("profile.of", { name })}
-              className="profile-trigger--name"
+              decorative
             >
-              {name}
+              {m.author.type === "agent" ? (
+                // At work: thinking, then writing; a saved message: the agent at rest (one no longer in the team too).
+                // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
+                // Both wear their presence badge (ADR 0084).
+                <AgentAvatar
+                  agentId={m.author.id}
+                  name={name}
+                  state={live ? agentStateOfRun(live) : "idle"}
+                  reactionKey={live ? undefined : m.id}
+                  presence
+                />
+              ) : person ? (
+                <PersonAvatar id={person.userId} name={name} presence />
+              ) : (
+                <Avatar kind="person" name={name} />
+              )}
             </ProfileTrigger>
-            {/* The author's written status: its emoji, its words on hover (ADR 0084). */}
-            <AuthorStatus actor={{ type: m.author.type, id: m.author.id }} />
-            {reminder && (
-              <span className="msg-reminder">
-                <Icon name="bell" size={14} />
-                {t("channel.reminder")}
-              </span>
-            )}
-            {routine && (
-              <RoutineTag
-                routine={routine}
-                report={report}
-                open={reportOpen}
-                onToggle={() => setReportOpen((o) => !o)}
-              />
-            )}
-            {via && <AppViaTag via={via} person={name} />}
-            {talker && (
-              <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
-                {t("chat.notice.talker")}
-              </span>
-            )}
-            {helping && <ConsultHelpingTag consultation={helping} />}
-          </>
-        ) : (
-          name
-        )
-      }
-      time={
-        live ? <RunClock run={live} /> : <time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>
-      }
-      meta={m.local || live ? undefined : details}
-      note={joinedTip ? { label: t("chat.joined.label"), tip: joinedTip } : undefined}
-      status={
-        liveWaiting
-          ? { icon: "waiting", label: t("channel.waitingApproval") }
-          : local === "pending"
-            ? {
-                // "enviando" only past half a second (most sends never show it); offline it says when it goes.
-                mark: slowSend ? <PixelSpinner size={14} /> : undefined,
-                label: (
-                  <span className={slowSend ? undefined : "ac-visually-hidden"}>
-                    {queued ? t("channel.sendingOffline") : t("channel.sending")}
-                  </span>
-                ),
-              }
-            : waitNotice
-              ? { label: <AwayPill notice={waitNotice} agentId={m.author.id ?? null} /> }
-              : undefined
-      }
-      aside={
-        receipted || seenSlot ? (
-          <>
-            {receipted && <MessageReceipts message={m} part="check" />}
-            {seenSlot && <SeenMark personId={seen ? dmPersonId : undefined} />}
-          </>
-        ) : undefined
-      }
-      foot={receipted ? <MessageReceipts message={m} part="line" /> : undefined}
-      menu={
-        barred && menu.touch.length > 0
-          ? { label: t("channel.actions", { name }), items: <MenuEntries entries={menu.touch} /> }
-          : undefined
-      }
-      stacked={Boolean(card)}
-    >
-      {live && waiting ? (
-        <Parts resetKey={m}>
-          <WaitLine work={live.work} color={colorOf(agent)} />
-          <LiveRunStatus run={live} quietOnly />
-          {m.author.id && m.agentRunId && <ConsultGroup runId={m.agentRunId} askerId={m.author.id} />}
-          <RunBrowserCard run={live} name={name} />
-          <span className="ac-visually-hidden">{t("channel.writing")}</span>
-        </Parts>
-      ) : live ? (
-        <Parts resetKey={m}>
-          {/* The first thing it said opens the block, above its tools; with nothing said, its words stream on top. */}
-          {/* Keyed like the saved message's parts: its text stays the same element when the message takes its place. */}
-          {wordsOnTop && !liveFailed && revealed ? (
-            <MessageText key="body">
-              <MessageBody
-                body={revealed}
-                resolveMention={dir.mentionName}
-                live={!liveStopped}
-                accent={colorOf(agent)}
-              />
-            </MessageText>
+          ) : m.author.type === "agent" ? (
+            <AgentAvatar name={name} />
           ) : (
-            opening.said && (
-              <MessageText key="said">
-                <MessageBody body={opening.said} resolveMention={dir.mentionName} />
-              </MessageText>
-            )
-          )}
-          {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
-          {!liveFailed && revealed && !wordsOnTop && (
-            <MessageText key="body">
-              <MessageBody
-                body={revealed}
-                resolveMention={dir.mentionName}
-                live={!liveStopped}
-                accent={colorOf(agent)}
-              />
-            </MessageText>
-          )}
-          {liveFailed && (
-            <p className="ac-msg__error" role="alert">
-              <Icon name="alert" size={18} />
-              <span style={{ flex: 1 }}>
-                {refusal
-                  ? t("channel.runRefused", { agent: name, reason: refusal })
-                  : live.errorCode === "run.computer_busy"
-                    ? t("channel.runBusy", { agent: name })
-                    : live.errorCode === "run.budget_exceeded"
-                      ? t("channel.runFailed", { agent: name, reason: t("agentPage.activity.errors.budget_exceeded") })
-                      : live.error
-                        ? t("channel.runFailed", { agent: name, reason: live.error })
-                        : t("channel.runFailedNoReason", { agent: name })}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly
-                icon="close"
-                aria-label={t("common.close")}
-                onClick={() => dismissRun(live.runId)}
-              />
-            </p>
-          )}
-          {liveStopped ? (
-            <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
+            <Avatar kind="person" name={name} imageUrl={person?.image} />
+          )
+        }
+        author={
+          m.author.id ? (
+            <>
+              <ProfileTrigger
+                actor={{ type: m.author.type, id: m.author.id }}
+                label={t("profile.of", { name })}
+                className="profile-trigger--name"
+              >
+                {name}
+              </ProfileTrigger>
+              {/* The author's written status: its emoji, its words on hover (ADR 0084). */}
+              <AuthorStatus actor={{ type: m.author.type, id: m.author.id }} />
+              {reminder && (
+                <span className="msg-reminder">
+                  <Icon name="bell" size={14} />
+                  {t("channel.reminder")}
+                </span>
+              )}
+              {routine && (
+                <RoutineTag
+                  routine={routine}
+                  report={report}
+                  open={reportOpen}
+                  onToggle={() => setReportOpen((o) => !o)}
+                />
+              )}
+              {via && <AppViaTag via={via} person={name} />}
+              {talker && (
+                <span className="msg-reminder msg-talker" title={t("chat.notice.talkerTip")}>
+                  {t("chat.notice.talker")}
+                </span>
+              )}
+              {helping && <ConsultHelpingTag consultation={helping} />}
+            </>
           ) : (
-            !liveFailed && <LiveRunStatus run={live} />
-          )}
-          {m.author.id && m.agentRunId && <ConsultGroup runId={m.agentRunId} askerId={m.author.id} />}
-          {/* Its tools, as on its saved message: one line (what it does now) opening into each call. */}
-          <LiveTools
-            work={opening.work}
-            agentName={name}
-            color={colorOf(agent)}
-            steerNote={steerNote}
-            stopped={liveStopped}
-          />
-          {/* Last, after its tools; also on a failed or stopped run, for the person still in control (they hand back from it). */}
-          <RunBrowserCard run={live} name={name} />
-          {!liveFailed && !liveWaiting && !liveStopped && (
+            name
+          )
+        }
+        time={
+          live ? <RunClock run={live} /> : <time dateTime={m.createdAt}>{formatTime(i18n.language, m.createdAt)}</time>
+        }
+        meta={m.local || live ? undefined : details}
+        note={joinedTip ? { label: t("chat.joined.label"), tip: joinedTip } : undefined}
+        status={
+          liveWaiting
+            ? { icon: "waiting", label: t("channel.waitingApproval") }
+            : local === "pending"
+              ? {
+                  // "enviando" only past half a second (most sends never show it); offline it says when it goes.
+                  mark: slowSend ? <PixelSpinner size={14} /> : undefined,
+                  label: (
+                    <span className={slowSend ? undefined : "ac-visually-hidden"}>
+                      {queued ? t("channel.sendingOffline") : t("channel.sending")}
+                    </span>
+                  ),
+                }
+              : waitNotice
+                ? { label: <AwayPill notice={waitNotice} agentId={m.author.id ?? null} /> }
+                : undefined
+        }
+        aside={
+          receipted || seenSlot ? (
+            <>
+              {receipted && <MessageReceipts message={m} part="check" />}
+              {seenSlot && <SeenMark personId={seen ? dmPersonId : undefined} />}
+            </>
+          ) : undefined
+        }
+        foot={receipted ? <MessageReceipts message={m} part="line" /> : undefined}
+        menu={
+          barred && menu.touch.length > 0
+            ? { label: t("channel.actions", { name }), items: <MenuEntries entries={menu.touch} /> }
+            : undefined
+        }
+        stacked={Boolean(card)}
+      >
+        {live && waiting ? (
+          <Parts resetKey={m}>
+            <WaitLine work={live.work} color={colorOf(agent)} />
+            <LiveRunStatus run={live} quietOnly />
+            <RunBrowserCard run={live} name={name} />
             <span className="ac-visually-hidden">{t("channel.writing")}</span>
-          )}
-        </Parts>
-      ) : (
-        <Parts resetKey={m}>
-          {keptSaid?.kind === "say" && (
-            <MessageText key="said">
-              <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
-            </MessageText>
-          )}
-          {routine && report && reportOpen && <RoutineReport text={report} />}
-          {quoted && <QuotedMessage reply={quoted} />}
-          {m.author.id && consulted.length > 0 && (
-            <div className="ac-talks">
-              {consulted.map((c) => (
-                <ConsultationCard key={c.consultationId} consultation={c} askerId={m.author.id ?? ""} />
-              ))}
-            </div>
-          )}
-          {!missionCard &&
-            // A request says its action itself ("Pedido de aprovação: …" would repeat it).
-            !approvalId &&
-            // A secret request's card names the key itself: its fallback text ("Theo asked for a key") is for pushes.
-            !secretRequest &&
-            !forumSuggestion &&
-            !issueWork &&
-            !waitNotice &&
-            !noAi &&
-            !actionCard &&
-            // A question's card already says it: its own text isn't repeated above.
-            !(question && body.trim() === question.text.trim()) &&
-            !voice &&
-            !choiceReply &&
-            (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
-              <MessageText key="body" style={workOver ? { opacity: 0.6 } : undefined}>
+          </Parts>
+        ) : live ? (
+          <Parts resetKey={m}>
+            {/* The first thing it said opens the block, above its tools; with nothing said, its words stream on top. */}
+            {/* Keyed like the saved message's parts: its text stays the same element when the message takes its place. */}
+            {wordsOnTop && !liveFailed && revealed ? (
+              <MessageText key="body">
                 <MessageBody
-                  body={talk ? talk.lead : body}
+                  body={revealed}
                   resolveMention={dir.mentionName}
-                  renderMention={renderMention}
-                  wikiLink={wikiLink}
-                  channelRefs={channelRefsOf(m.meta)}
+                  live={!liveStopped}
                   accent={colorOf(agent)}
                 />
-                {talk && openThread && (
-                  <button
-                    type="button"
-                    className="msg-talk__more"
-                    aria-pressed={threadsView?.open === talkThread}
-                    onClick={() => openThread(talkThread)}
-                  >
-                    {t("chat.talk.readAll")}
-                    <span className="msg-talk__count">{t("chat.talk.more", { count: talk.more })}</span>
-                    <Icon name="chevronRight" size={14} />
-                  </button>
-                )}
+              </MessageText>
+            ) : (
+              opening.said && (
+                <MessageText key="said">
+                  <MessageBody body={opening.said} resolveMention={dir.mentionName} />
+                </MessageText>
+              )
+            )}
+            {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
+            {!liveFailed && revealed && !wordsOnTop && (
+              <MessageText key="body">
+                <MessageBody
+                  body={revealed}
+                  resolveMention={dir.mentionName}
+                  live={!liveStopped}
+                  accent={colorOf(agent)}
+                />
               </MessageText>
             )}
-          {choiceReply && (
-            <p className="choice-reply">
-              <Icon name="check" size={14} />
-              <b>{choiceReplyLine(body)}</b>
-            </p>
-          )}
-          {media && <ChatMedia media={media} />}
-          {voice && <ChatVoice message={m} voice={voice} />}
-          {(stopped.canceled || atLimit || providerCut) && (
-            <StoppedLine
-              runId={m.agentRunId}
-              byUserId={stopped.byUserId}
-              note={stopped.note}
-              limit={providerCut ? "failed" : atLimit}
-              owner={
-                m.author.type === "agent" && m.author.id
-                  ? { agentId: m.author.id, channelId: m.channelId, threadId: m.threadId ?? m.id }
-                  : null
-              }
-              message={m}
-            />
-          )}
-          {local === "failed" && (
-            <p className="ac-msg__error" role="alert">
-              <Icon name="alert" size={18} />
-              <span>{t("channel.notSent")}</span>
-              <span aria-hidden="true">·</span>
-              <button type="button" className="ac-link" onClick={() => actions?.retry(m)} style={inlineButton}>
-                {t("channel.retrySend")}
-              </button>
-            </p>
-          )}
-          {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
-          {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
-          {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
-          {agent &&
-            memoryUpdates
-              .filter((u) => u.action !== "proposed")
-              .map((u) => (
-                <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} sentAt={m.createdAt} />
-              ))}
-          {browserTrail.length > 0 && m.author.id && !m.local && (
-            <BrowserTrailCard
-              agentId={m.author.id}
-              runId={m.agentRunId ?? null}
-              name={name}
-              steps={browserTrail}
-              stopped={stopped.canceled ? { byUserId: stopped.byUserId } : null}
-              recent={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
-            />
-          )}
-          {desktopTrail.length > 0 && m.author.id && !m.local && (
-            <BrowserTrailCard
-              agentId={m.author.id}
-              runId={m.agentRunId ?? null}
-              name={name}
-              steps={desktopTrail}
-              stopped={stopped.canceled ? { byUserId: stopped.byUserId } : null}
-              screen="desktop"
-            />
-          )}
-          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && (
-            <HeldBrowserCard
-              agentId={m.author.id}
-              runId={replyRun}
-              name={name}
-              enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
-            />
-          )}
-          {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
-          {missionPlan && <MissionPlanCard plan={missionPlan} />}
-          {missionReview && <MissionReviewCard message={missionReview} />}
-          {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
-          {missionReport && <MissionReportExtras report={missionReport} message={m} />}
-          {missionStart && <MissionStartLink message={m} />}
-          {missionLink && <MissionLinkCard link={missionLink} />}
-          {issueWork && (
-            <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
-          )}
-          {artifacts.length > 0 && (
-            <div className="artifact-cards">
-              {artifacts.map((r) => (
-                <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
-              ))}
-            </div>
-          )}
-          {/* Its tools after its words and what it changed: the same place live, kept and saved. */}
-          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && consulted.length === 0 && (
-            <ConsultGroup runId={replyRun} askerId={m.author.id} saved />
-          )}
-          {keptSteps?.length && seenLive ? (
+            {liveFailed && (
+              <p className="ac-msg__error" role="alert">
+                <Icon name="alert" size={18} />
+                <span style={{ flex: 1 }}>
+                  {refusal
+                    ? t("channel.runRefused", { agent: name, reason: refusal })
+                    : live.errorCode === "run.computer_busy"
+                      ? t("channel.runBusy", { agent: name })
+                      : live.errorCode === "run.budget_exceeded"
+                        ? t("channel.runFailed", {
+                            agent: name,
+                            reason: t("agentPage.activity.errors.budget_exceeded"),
+                          })
+                        : live.error
+                          ? t("channel.runFailed", { agent: name, reason: live.error })
+                          : t("channel.runFailedNoReason", { agent: name })}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  icon="close"
+                  aria-label={t("common.close")}
+                  onClick={() => dismissRun(live.runId)}
+                />
+              </p>
+            )}
+            {liveStopped ? (
+              <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
+            ) : (
+              !liveFailed && <LiveRunStatus run={live} />
+            )}
+            {/* Its tools, as on its saved message: one line (what it does now) opening into each call. */}
             <LiveTools
-              work={keptSteps}
+              work={opening.work}
               agentName={name}
               color={colorOf(agent)}
               steerNote={steerNote}
-              done
-              stopped={stopped.canceled}
+              stopped={liveStopped}
             />
-          ) : null}
-          {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
-          {m.author.type === "agent" && replyRun && !card && !m.local && !keptAll && !m.meta?.consultation && (
-            <SavedTools
-              runId={replyRun}
-              meta={m.meta}
-              agentName={agent?.name ?? name}
-              color={colorOf(agent)}
-              skipScreens={onCards}
-            />
-          )}
-          {/* What waits for a person's click comes last, after the words and the tools. */}
-          {approvalId && (
-            <MessageApproval messageId={m.id} approvalId={approvalId} agent={agent} members={dir.memberById} />
-          )}
-          {proposalId && <InlineProposal proposalId={proposalId} />}
-          {agent &&
-            memoryUpdates
-              .filter((u) => u.action === "proposed")
-              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
-          {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
-          {noAi && <NoAiCard message={m} />}
-          {actionCard && <ActionCard message={m} />}
-          {usageWait && !usageWait.canceled && !usageWait.ended && <UsageWaitCancel message={m} wait={usageWait} />}
-          {question && <QuestionCard question={question} />}
-          {secretRequest && <SecretCard request={secretRequest} />}
-          {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
-          {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
-          {missionDecision && <MissionDecisionCard message={missionDecision} />}
-          {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
-          {missionCommand && <MissionCommandCard command={missionCommand} />}
-          {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
-          {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
-          {!m.local && !readOnly && (
-            <MessageReactions
-              messageId={m.id}
-              initial={m.reactions}
-              feedback={feedback}
-              extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
-            />
-          )}
-          {/* Long work (ADR 0121): how it stands, under the agent's "Vou cuidar disso". */}
-          {m.longWork && !m.local && <MessageWorkLine message={m} threaded={Boolean(threadLine)} />}
-          {/* A "Responder" thread went on from here: its line (opens the panel). */}
-          {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
-          {feedback && (
-            <MessageFeedback
-              messageId={m.id}
-              agentName={agent?.name ?? t("channel.unknownAgent")}
-              active={active}
-              initial={m.reactions}
-              quick={<ReplyButton message={m} />}
-              more={<MessageMoreMenu entries={menu.more} />}
-            />
-          )}
-          {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
-          {personBar && !(mediaAfter && readOnly) && (
-            <PersonMessageActions message={m} authorName={name} more={menu.more} />
-          )}
-          {menu.dialog}
-        </Parts>
-      )}
-    </Message>
+            {/* Last, after its tools; also on a failed or stopped run, for the person still in control (they hand back from it). */}
+            <RunBrowserCard run={live} name={name} />
+            {!liveFailed && !liveWaiting && !liveStopped && (
+              <span className="ac-visually-hidden">{t("channel.writing")}</span>
+            )}
+          </Parts>
+        ) : (
+          <Parts resetKey={m}>
+            {keptSaid?.kind === "say" && (
+              <MessageText key="said">
+                <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
+              </MessageText>
+            )}
+            {routine && report && reportOpen && <RoutineReport text={report} />}
+            {quoted && <QuotedMessage reply={quoted} />}
+            {!missionCard &&
+              // A request says its action itself ("Pedido de aprovação: …" would repeat it).
+              !approvalId &&
+              // A secret request's card names the key itself: its fallback text ("Theo asked for a key") is for pushes.
+              !secretRequest &&
+              !forumSuggestion &&
+              !issueWork &&
+              !waitNotice &&
+              !noAi &&
+              !actionCard &&
+              // A question's card already says it: its own text isn't repeated above.
+              !(question && body.trim() === question.text.trim()) &&
+              !voice &&
+              !choiceReply &&
+              (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
+                <MessageText key="body" style={workOver ? { opacity: 0.6 } : undefined}>
+                  <MessageBody
+                    body={talk ? talk.lead : body}
+                    resolveMention={dir.mentionName}
+                    renderMention={renderMention}
+                    wikiLink={wikiLink}
+                    channelRefs={channelRefsOf(m.meta)}
+                    accent={colorOf(agent)}
+                  />
+                  {talk && openThread && (
+                    <button
+                      type="button"
+                      className="msg-talk__more"
+                      aria-pressed={threadsView?.open === talkThread}
+                      onClick={() => openThread(talkThread)}
+                    >
+                      {t("chat.talk.readAll")}
+                      <span className="msg-talk__count">{t("chat.talk.more", { count: talk.more })}</span>
+                      <Icon name="chevronRight" size={14} />
+                    </button>
+                  )}
+                </MessageText>
+              )}
+            {choiceReply && (
+              <p className="choice-reply">
+                <Icon name="check" size={14} />
+                <b>{choiceReplyLine(body)}</b>
+              </p>
+            )}
+            {media && <ChatMedia media={media} />}
+            {voice && <ChatVoice message={m} voice={voice} />}
+            {(stopped.canceled || atLimit || providerCut) && (
+              <StoppedLine
+                runId={m.agentRunId}
+                byUserId={stopped.byUserId}
+                note={stopped.note}
+                limit={providerCut ? "failed" : atLimit}
+                owner={
+                  m.author.type === "agent" && m.author.id
+                    ? { agentId: m.author.id, channelId: m.channelId, threadId: m.threadId ?? m.id }
+                    : null
+                }
+                message={m}
+              />
+            )}
+            {local === "failed" && (
+              <p className="ac-msg__error" role="alert">
+                <Icon name="alert" size={18} />
+                <span>{t("channel.notSent")}</span>
+                <span aria-hidden="true">·</span>
+                <button type="button" className="ac-link" onClick={() => actions?.retry(m)} style={inlineButton}>
+                  {t("channel.retrySend")}
+                </button>
+              </p>
+            )}
+            {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
+            {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
+            {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
+            {agent &&
+              memoryUpdates
+                .filter((u) => u.action !== "proposed")
+                .map((u) => (
+                  <MemoryChangeCard
+                    key={`${u.action}-${u.itemId}`}
+                    update={u}
+                    agentId={agent.id}
+                    sentAt={m.createdAt}
+                  />
+                ))}
+            {browserTrail.length > 0 && m.author.id && !m.local && (
+              <BrowserTrailCard
+                agentId={m.author.id}
+                runId={m.agentRunId ?? null}
+                name={name}
+                steps={browserTrail}
+                stopped={stopped.canceled ? { byUserId: stopped.byUserId } : null}
+                recent={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
+              />
+            )}
+            {desktopTrail.length > 0 && m.author.id && !m.local && (
+              <BrowserTrailCard
+                agentId={m.author.id}
+                runId={m.agentRunId ?? null}
+                name={name}
+                steps={desktopTrail}
+                stopped={stopped.canceled ? { byUserId: stopped.byUserId } : null}
+                screen="desktop"
+              />
+            )}
+            {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && (
+              <HeldBrowserCard
+                agentId={m.author.id}
+                runId={replyRun}
+                name={name}
+                enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
+              />
+            )}
+            {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
+            {missionPlan && <MissionPlanCard plan={missionPlan} />}
+            {missionReview && <MissionReviewCard message={missionReview} />}
+            {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
+            {missionReport && <MissionReportExtras report={missionReport} message={m} />}
+            {missionStart && <MissionStartLink message={m} />}
+            {missionLink && <MissionLinkCard link={missionLink} />}
+            {issueWork && (
+              <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
+            )}
+            {artifacts.length > 0 && (
+              <div className="artifact-cards">
+                {artifacts.map((r) => (
+                  <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
+                ))}
+              </div>
+            )}
+            {/* Its tools after its words and what it changed: the same place live, kept and saved. */}
+            {keptSteps?.length && seenLive ? (
+              <LiveTools
+                work={keptSteps}
+                agentName={name}
+                color={colorOf(agent)}
+                steerNote={steerNote}
+                done
+                stopped={stopped.canceled}
+              />
+            ) : null}
+            {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
+            {m.author.type === "agent" && replyRun && !card && !m.local && !keptAll && !m.meta?.consultation && (
+              <SavedTools
+                runId={replyRun}
+                meta={m.meta}
+                agentName={agent?.name ?? name}
+                color={colorOf(agent)}
+                skipScreens={onCards}
+              />
+            )}
+            {/* What waits for a person's click comes last, after the words and the tools. */}
+            {approvalId && (
+              <MessageApproval messageId={m.id} approvalId={approvalId} agent={agent} members={dir.memberById} />
+            )}
+            {proposalId && <InlineProposal proposalId={proposalId} />}
+            {agent &&
+              memoryUpdates
+                .filter((u) => u.action === "proposed")
+                .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
+            {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
+            {noAi && <NoAiCard message={m} />}
+            {actionCard && <ActionCard message={m} />}
+            {usageWait && !usageWait.canceled && !usageWait.ended && <UsageWaitCancel message={m} wait={usageWait} />}
+            {question && <QuestionCard question={question} />}
+            {secretRequest && <SecretCard request={secretRequest} />}
+            {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+            {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
+            {missionDecision && <MissionDecisionCard message={missionDecision} />}
+            {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
+            {missionCommand && <MissionCommandCard command={missionCommand} />}
+            {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
+            {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
+            {!m.local && !readOnly && (
+              <MessageReactions
+                messageId={m.id}
+                initial={m.reactions}
+                feedback={feedback}
+                extra={m.memories?.length ? <MemoryMarks message={m} /> : undefined}
+              />
+            )}
+            {/* Long work (ADR 0121): how it stands, under the agent's "Vou cuidar disso". */}
+            {m.longWork && !m.local && <MessageWorkLine message={m} threaded={Boolean(threadLine)} />}
+            {/* A "Responder" thread went on from here: its line (opens the panel). */}
+            {threadLine && <ThreadReplyLine thread={threadLine.thread} count={threadLine.count} />}
+            {feedback && (
+              <MessageFeedback
+                messageId={m.id}
+                agentName={agent?.name ?? t("channel.unknownAgent")}
+                active={active}
+                initial={m.reactions}
+                quick={<ReplyButton message={m} />}
+                more={<MessageMoreMenu entries={menu.more} />}
+              />
+            )}
+            {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
+            {personBar && !(mediaAfter && readOnly) && (
+              <PersonMessageActions message={m} authorName={name} more={menu.more} />
+            )}
+            {menu.dialog}
+          </Parts>
+        )}
+      </Message>
+    </>
   );
 });
 

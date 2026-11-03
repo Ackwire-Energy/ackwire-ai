@@ -68,6 +68,7 @@ import {
 } from "./brains/select";
 import {
   BRAIN_NAMES,
+  BRAIN_PLAN_NAMES,
   type Brain,
   type BrainEvent,
   type BrainIO,
@@ -976,6 +977,8 @@ async function executeRunInner(
   let brainPlan: BrainPlan | null = null;
   /** How its last turn ended (`decideTurnEnd`); every other way to `done` is recorded as `ended` (I2). */
   let turnEnd: TurnEndDecision | null = null;
+  /** A failure's own code when the run error's prefix is too broad (`brain_unavailable: …`), and the plan it names. */
+  let failCause: { code?: string; plan?: string } | undefined;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
   /** Messages that got receipts (`message.actions` goes out once they are published). */
   const withReceipts: string[] = [];
@@ -1070,7 +1073,7 @@ async function executeRunInner(
       await resolveRunFailed({ db, pubsub: deps.pubsub }, run).catch(() => {});
     }
     if (status === "failed" && error && !standingErrorDetail(error))
-      await reportRunFailure({ db, pubsub: deps.pubsub }, run, error);
+      await reportRunFailure({ db, pubsub: deps.pubsub }, run, error, failCause);
   };
 
   /**
@@ -1133,6 +1136,8 @@ async function executeRunInner(
   /** `ledger`: the routine run's coded reason when the run error's own code isn't the right one. */
   const fail = async (reason: string, ledger?: { code: string; detail?: string }) => {
     await deferred;
+    const plan = brainPlan && isComputerBrain(brainPlan.kind) ? BRAIN_PLAN_NAMES[brainPlan.kind] : undefined;
+    failCause = { ...(ledger ? { code: ledger.code } : {}), ...(plan ? { plan } : {}) };
     await addRunStep(db, run, "error", { reason });
     const failed = await transitionRun(db, run.id, "running", "failed", { error: reason });
     if (failed) await closeRoutine({ status: "failed", ...(ledger ?? routineFailureEnd(reason)) });

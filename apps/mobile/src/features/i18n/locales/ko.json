@@ -333,20 +333,6 @@
       "back": "다시 연결됐어요"
     },
     "longPressHint": "길게 눌러 반응하고 더 많은 작업 보기",
-    "consult": {
-      "answered": "{{name}}이(가) 답했어요",
-      "expiredF": "{{name}}이(가) 제때 답하지 못했어요",
-      "expiredM": "{{name}}이(가) 제때 답하지 못했어요",
-      "failedF": "{{name}}이(가) 답할 수 없었어요",
-      "failedM": "{{name}}이(가) 답할 수 없었어요",
-      "answerOfF": "{{name}}의 답변",
-      "answerOfM": "{{name}}의 답변",
-      "noAnswer": "답변이 없어요.",
-      "privateFF": "{{from}}와(과) {{to}}의 비공개 채팅",
-      "privateFM": "{{from}}와(과) {{to}}의 비공개 채팅",
-      "privateMF": "{{from}}와(과) {{to}}의 비공개 채팅",
-      "privateMM": "{{from}}와(과) {{to}}의 비공개 채팅"
-    },
     "file": "파일",
     "fileOpen": "탭해서 열기",
     "fileDeleted": "파일이 삭제됨",

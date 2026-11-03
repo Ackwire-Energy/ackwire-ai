@@ -1,5 +1,5 @@
 import type { Message } from "@agenteschat/client";
-import type { ConsultNoticeFold } from "@agenteschat/client/lib/consult-group";
+import { type ConsultNoticeFold, pairItemOf } from "@agenteschat/client/lib/consult-group";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { consultationOfNotice, stoppedNoticeOf } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
@@ -7,8 +7,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { LineIcon, Text } from "@/ui";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
-import { AgentTalkPill, TalkPills } from "./ConsultGroup";
-import { ConsultationCard } from "./cards";
+import { ConsultPairRow } from "./ConsultGroup";
 import { eventLineOf } from "./logic";
 import { MessageText } from "./MessageText";
 import { StoppedLine } from "./StoppedLine";
@@ -18,8 +17,8 @@ import { StoppedLine } from "./StoppedLine";
  * conversation ("Rotina «Sentry» entregou um relatório" while the agent hasn't told it yet, "Infra
  * respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava"). Quiet like `IssueTakenLine`; the
  * text opens under it on "Ver". The agent's own reply, if it has one, follows as a normal message.
- * An answer the reply that asked shows (`ConsultGroup`, `fold`): nothing when that reply is close, one line
- * when it is farther up: the two agents' pill, opening their conversation.
+ * An answer the reply that asked shows (`ConsultGroup`, `fold`): nothing when that reply is close, the two agents'
+ * pair row when it is farther up (a tap opens their conversation).
  * A task a person stopped has its own line (`StoppedLine`).
  */
 export function EventLine({ message, fold }: { message: Message; fold?: ConsultNoticeFold }) {
@@ -32,23 +31,13 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
   const stopped = stoppedNoticeOf(message.meta);
   if (stopped) return <StoppedLine message={message} notice={stopped} />;
   if (fold?.fold === "hide") return null;
-  const far = fold?.fold === "line" ? fold : null;
-  // Farther up than the reply that asked: the two agents' pill where the answer arrived, opening their talk.
-  if (far)
+  // Farther up than the reply that asked: the same pair row where the answer arrived, opening their conversation.
+  if (fold?.fold === "line")
     return (
-      <View style={styles.line}>
-        <TalkPills>
-          <AgentTalkPill
-            consultationId={far.consultation.id}
-            channelId={message.channelId}
-            fromId={far.consultation.agentId}
-            toId={far.consultation.consultedAgentId}
-          />
-        </TalkPills>
-      </View>
+      <ConsultPairRow askerId={fold.consultation.agentId} channelId={message.channelId} items={[fold.consultation]} />
     );
-  // An answer from another agent that carries the consultation (who asked whom, the question and the
-  // answer apart): the same card as a reply that waited for it, not the text written for the agent.
+  // An answer from another agent that carries the consultation, its reply not here: the same pair row a reply
+  // has (who asked whom), never the text written for the agent; a tap opens what they said.
   const consulted = consultationOfNotice(message.meta);
   const line = eventLineOf(
     message,
@@ -60,13 +49,11 @@ export function EventLine({ message, fold }: { message: Message; fold?: ConsultN
   );
   if (consulted)
     return (
-      <View style={styles.line}>
-        <ConsultationCard
-          askerId={consulted.askerId}
-          consultation={consulted.consultation}
-          channelId={message.channelId}
-        />
-      </View>
+      <ConsultPairRow
+        askerId={consulted.askerId}
+        channelId={message.channelId}
+        items={[pairItemOf(consulted.consultation)]}
+      />
     );
   if (!line) return null;
   return (

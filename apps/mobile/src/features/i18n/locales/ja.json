@@ -333,20 +333,6 @@
       "back": "再接続しました"
     },
     "longPressHint": "長押しでリアクションやその他の操作",
-    "consult": {
-      "answered": "{{name}}が回答しました",
-      "expiredF": "{{name}}は時間内に回答しませんでした",
-      "expiredM": "{{name}}は時間内に回答しませんでした",
-      "failedF": "{{name}}は回答できませんでした",
-      "failedM": "{{name}}は回答できませんでした",
-      "answerOfF": "{{name}}の回答",
-      "answerOfM": "{{name}}の回答",
-      "noAnswer": "回答はありません。",
-      "privateFF": "{{from}}と{{to}}の非公開チャット",
-      "privateFM": "{{from}}と{{to}}の非公開チャット",
-      "privateMF": "{{from}}と{{to}}の非公開チャット",
-      "privateMM": "{{from}}と{{to}}の非公開チャット"
-    },
     "file": "ファイル",
     "fileOpen": "タップして開く",
     "fileDeleted": "ファイルは削除されました",

@@ -142,6 +142,11 @@
   .channel__header > .ac-acts {
     flex: none;
   }
+  /* Its buttons all show their plates: the header's own 8px between them, as in a DM, leaves the title its room
+     (the touch row's 24px gap left "# lancamento" 6px wide at 360). */
+  .channel__header > .channel__acts {
+    column-gap: 8px;
+  }
   .channel__title {
     display: block;
     min-width: 0;
@@ -163,6 +168,10 @@
   .channel__messages .ac-msg {
     --msg-inline: 12px;
     gap: 10px;
+  }
+  /* The message padding above is 4px less, so the pair row's first face moves with it to stay over the reply's face. */
+  .channel__messages .consult-pair {
+    padding-left: 9px;
   }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);

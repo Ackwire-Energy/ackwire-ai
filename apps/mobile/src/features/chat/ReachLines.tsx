@@ -9,11 +9,11 @@ import { Icon, PillButton, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
 import { boldRuns } from "./actions";
-import { AgentTalkPill, TalkPills } from "./ConsultGroup";
+import { ConsultPairRow, useConsultById } from "./ConsultGroup";
 
 /**
  * On the phone, under an agent's message, every agent it @named that its mention didn't wake (`meta.reach`): one
- * outside the conversation got it by direct message (the two agents' pill, opening their conversation), one it couldn't call
+ * outside the conversation got it by direct message (the two agents' pair row, opening their conversation), one it couldn't call
  * says why, and the agent's owner can let that person talk to it. The team actions' sunken row (TeamChecks.tsx).
  */
 export function ReachLines({ message: m }: { message: Message }) {
@@ -39,6 +39,7 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   const agent = dir.agentById.get(e.agentId);
   const g = agentGrammar(agent?.name ?? `@${e.handle}`);
   const handed = Boolean(e.consultationId);
+  const talk = useConsultById(channelId, reachOpens(e) ? e.consultationId : undefined);
   const runs = boldRuns(t(reachKey(e) as "reach.handed", { ...g, place }) as string);
   const detail = [
     !handed && e.outside ? t("reach.outside", { place }) : null,
@@ -46,13 +47,8 @@ function Row({ entry: e, channelId, authorId }: { entry: ReachEntry; channelId: 
   ]
     .filter(Boolean)
     .join(" · ");
-  // Handed to it by direct message: the two agents talking, as one pill that opens their conversation.
-  if (reachOpens(e) && e.consultationId)
-    return (
-      <TalkPills>
-        <AgentTalkPill consultationId={e.consultationId} channelId={channelId} fromId={authorId} toId={e.agentId} />
-      </TalkPills>
-    );
+  // Handed to it by direct message: the two agents talking, as the pair row that opens their conversation.
+  if (talk) return <ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />;
   return (
     <View style={[styles.one, { backgroundColor: colors.sunken }]}>
       <View style={[styles.tile, { backgroundColor: colors.raised }]}>

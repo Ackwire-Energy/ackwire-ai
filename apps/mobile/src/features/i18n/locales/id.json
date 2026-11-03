@@ -333,20 +333,6 @@
       "back": "Terhubung lagi"
     },
     "longPressHint": "Tahan untuk memberi reaksi dan melihat tindakan lain",
-    "consult": {
-      "answered": "{{name}} menjawab",
-      "expiredF": "{{name}} tidak menjawab tepat waktu",
-      "expiredM": "{{name}} tidak menjawab tepat waktu",
-      "failedF": "{{name}} tidak bisa menjawab",
-      "failedM": "{{name}} tidak bisa menjawab",
-      "answerOfF": "Jawaban {{name}}",
-      "answerOfM": "Jawaban {{name}}",
-      "noAnswer": "Tidak ada jawaban.",
-      "privateFF": "Obrolan pribadi antara {{from}} dan {{to}}",
-      "privateFM": "Obrolan pribadi antara {{from}} dan {{to}}",
-      "privateMF": "Obrolan pribadi antara {{from}} dan {{to}}",
-      "privateMM": "Obrolan pribadi antara {{from}} dan {{to}}"
-    },
     "file": "File",
     "fileOpen": "Ketuk untuk membuka",
     "fileDeleted": "File dihapus",

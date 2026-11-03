@@ -190,3 +190,17 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   display: flex;
   margin: 4px 0 -2px -10px;
 }
+/* A hand-off by direct message: the two agents' pair row with the reach rows, no reply face to line up with. */
+.ag-rc--talk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ag-rcs .ag-rc--talk > .consult-pair {
+  margin: 0;
+  padding: 0;
+}
+.ag-rc--talk .consult-pair__detail {
+  padding-left: 0;
+}

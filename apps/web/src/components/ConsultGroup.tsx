@@ -8,20 +8,20 @@ import {
 import {
   type ConsultLineState,
   type ConsultNoticeFold,
+  type ConsultPairItem,
   type ConsultRow,
   consultAskedKey,
   consultBlocksNearEnd,
   consultLineKey,
   consultLineState,
   consultNoticeFolds,
-  consultSeconds,
+  consultPair,
   groupsByRun,
   openableConsultation,
-  talkState,
-  talkStateOf,
-  talkStatus,
+  pairItemOf,
 } from "@agenteschat/client/lib/consult-group";
 import { withoutRelayLine } from "@agenteschat/client/lib/consultations";
+import { joinNames, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatLineTime } from "@agenteschat/client/lib/work";
 import { cx, Icon } from "@agenteschat/ui";
@@ -92,7 +92,8 @@ export function useConsultGroups(
   }, [list.data]);
   return useMemo(() => {
     const all = list.data ?? [];
-    if (all.length === 0) return EMPTY;
+    // A reply's `meta.consulted` row still shows pressed while its question is open beside the conversation.
+    if (all.length === 0) return open === null && live.size === 0 ? EMPTY : { ...EMPTY, live, open };
     return {
       byRun: groupsByRun(all),
       folds: consultNoticeFolds(rows, all, live),
@@ -104,129 +105,166 @@ export function useConsultGroups(
   }, [list.data, rows, live, open, helping]);
 }
 
-/** A question's state in words, the same in the panel ("A Iris espera uma aprovação"). */
+/** A question's state in words, in the panel and in place ("A Iris espera uma aprovação"). */
 export const consultLineLabel = (
   t: TFunction,
   state: ConsultLineState,
-  c: RunConsultation,
+  c: Pick<RunConsultation, "waiting" | "kind">,
   to: ReturnType<typeof agentGrammar>,
 ) => t(consultLineKey(state, c), { name: to.name, context: to.context });
 
-/** The conversation's question by its id, as the list loaded it (null when it isn't there). */
-const consultationById = (groups: ConsultGroups, id: string | null) =>
-  id ? ([...groups.byRun.values()].flat().find((c) => c.id === id) ?? null) : null;
+const NO_ITEMS: ConsultPairItem[] = [];
 
 /**
- * Two agents talking, as one pill: the asker's face, the arrows, the other's face, then "Caio ⇄ Theo · respondeu em
- * 8 s" (still out it counts the time; no answer says so). A click opens their conversation in the panel beside the
- * channel, as a thread opens; where there is no panel (a thread view) it opens what was asked and answered under it.
- * The live state comes from the conversation's questions (`useConsultGroups`); a stored card gives the rest.
+ * The questions a reply's pair row stands for: its run's (`runId`, null: none) and those its `meta.consulted` names
+ * that the list doesn't have. `saved`: a message the run posted while it still works, whose live row shows them.
+ * `reached`: hand-offs the message's reach lines show (`reachHandoffs`), left out here.
  */
-export function AgentTalkPill({
-  consultationId,
-  fromId,
-  toId,
-  stored,
-}: {
-  consultationId?: string | null;
-  fromId: string;
-  toId: string;
-  /** What a stored card knows of it (`meta.consulted`, a `consult_reply` notice), when the list lacks it. */
-  stored?: Pick<MessageConsultation, "status" | "question" | "answer" | "kind">;
-}) {
-  const { t, i18n } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
+export function useReplyConsults(
+  runId: string | null | undefined,
+  consulted: readonly MessageConsultation[],
+  saved: boolean,
+  reached: ReadonlySet<string>,
+): ConsultPairItem[] {
   const groups = useContext(ConsultGroupsContext);
-  const openPanel = useChannelActions()?.openConsultation;
-  const id = openableConsultation(consultationId);
-  const run = consultationById(groups, id);
-  const now = useNow(run?.status === "open");
-  const [open, setOpen] = useState(false);
-  const from = dir.agentById.get(fromId)?.name ?? t("channel.unknownAgent");
-  const to = dir.agentById.get(toId)?.name ?? t("channel.unknownAgent");
-  const state = run ? talkState(consultLineState(run, now)) : stored ? talkStateOf(stored.status, stored.answer) : null;
-  const status = state
-    ? talkStatus(state, run ? formatLineTime(i18n.language, consultSeconds(run, now) * 1000) : null)
-    : null;
-  const names = t("chat.consultPanel.title", { from, to });
-  const said = status ? t(status.key, status.values) : null;
-  const talk = run ?? stored;
-  const inPanel = Boolean(id && openPanel);
-  return (
-    <>
-      <button
-        type="button"
-        className={cx("ac-talk", state && `ac-talk--${state}`)}
-        aria-label={[t("chat.consultPanel.label", { from, to }), said].filter(Boolean).join(" · ")}
-        aria-pressed={inPanel && groups.open === id ? true : undefined}
-        aria-expanded={inPanel || !talk ? undefined : open}
-        disabled={!inPanel && !talk}
-        onClick={() => (inPanel && id ? openPanel?.(id) : setOpen((o) => !o))}
-      >
-        <span className="ac-talk__faces" aria-hidden="true">
-          <AgentAvatar agentId={fromId} size="xs" name={from} state="idle" />
-          <Icon name="swap" size={14} />
-          <AgentAvatar agentId={toId} size="xs" name={to} state={state === "waiting" ? "thinking" : "idle"} />
-        </span>
-        <span className="ac-talk__text" aria-hidden="true">
-          <span className="ac-talk__names">{names}</span>
-          {said && <span className="ac-talk__state"> · {said}</span>}
-        </span>
-      </button>
-      {open && !inPanel && talk && (
-        <div className="ac-talk-detail ac-consult__body ac-consult__body--inline">
-          <small>{withAgentFace(t(consultAskedKey(talk), { name: from }), from, fromId)}</small>
-          <div className="ac-consult__text ac-consult__text--q">
-            <MessageBody body={withoutRelayLine(talk.question)} resolveMention={dir.mentionName} />
-          </div>
-          {state === "answered" && talk.answer && (
-            <>
-              <small>{t("chat.consultation.answerOf", agentGrammar(to))}</small>
-              <div className="ac-consult__text">
-                <MessageBody body={talk.answer} resolveMention={dir.mentionName} />
-              </div>
-            </>
-          )}
-          <p className="ac-consult__foot ac-iconline">
-            <Icon name="eyeOff" size={14} />
-            {t("chat.consultation.private", { from, to })}
-          </p>
-        </div>
-      )}
-    </>
-  );
+  return useMemo(() => {
+    if (saved && runId && groups.live.has(runId)) return NO_ITEMS;
+    const all = (runId && groups.byRun.get(runId)) || NO_ITEMS;
+    const run = reached.size === 0 ? all : all.filter((c) => !reached.has(c.id));
+    const extra = consulted.filter((c) => !all.some((r) => r.id === c.consultationId)).map(pairItemOf);
+    return extra.length === 0 ? run : [...run, ...extra];
+  }, [groups.byRun, groups.live, runId, consulted, saved, reached]);
+}
+
+/** The conversation's question with this id, as its list loaded it (a hand-off a reach line shows). */
+export function useConsultById(id: string | undefined): RunConsultation | null {
+  const { byRun } = useContext(ConsultGroupsContext);
+  return useMemo(() => {
+    for (const group of byRun.values()) for (const c of group) if (c.id === id) return c;
+    return null;
+  }, [byRun, id]);
 }
 
 /**
- * The questions the agent asked other agents in this turn (`ask_agent`) and the work it handed them (`tell_agent`),
- * inside its reply: one pill per agent (`AgentTalkPill`), each opening the two agents' conversation.
+ * The slim row right before a reply whose agent asked other agents first (`ask_agent`) or handed them work
+ * (`tell_agent`): the asker's face and name, ⇄, the consulted agent's (several fold into stacked faces, "Atlas e
+ * mais 2"), then how long it took, or while it runs "perguntando 42 s", or "não respondeu". Never what they said: in a
+ * channel or a DM a click opens the two agents' conversation in the panel; in a thread view and inside that panel
+ * (no panel to open) the question and the answer open under the row. The same row stands for an answer whose reply
+ * is farther up or not here, and for a hand-off by direct message on a reach line.
  */
-export function ConsultGroup({
-  runId,
-  askerId,
-  saved = false,
-}: {
-  runId: string;
-  askerId: string;
-  /** On a message the run posted: while the run still works, its live block below draws the questions. */
-  saved?: boolean;
-}) {
-  const groups = useContext(ConsultGroupsContext);
-  const group = saved && groups.live.has(runId) ? undefined : groups.byRun.get(runId);
-  if (!group || group.length === 0) return null;
+export function ConsultPairRow({ askerId, items }: { askerId: string; items: readonly ConsultPairItem[] }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const panel = useChannelActions()?.openConsultation;
+  const openId = useOpenConsultation();
+  const [open, setOpen] = useState(false);
+  const live = items.some((c) => c.status === "open");
+  const now = useNow(live);
+  const pair = consultPair(items, now);
+  if (!pair) return null;
+  // An old reply's question with no id of its own has no conversation to open: it opens in place.
+  const openConsultation = openableConsultation(pair.opens) ? panel : undefined;
+  const nameOf = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
+  const from = nameOf(askerId);
+  const names = pair.faces.map((f) => nameOf(f.agentId));
+  const title =
+    names.length === 1
+      ? t("chat.consultPanel.label", { from, to: names[0] })
+      : t("chat.consultPair.labelMany", { from, to: joinNames(names, t) });
   return (
-    <div className="ac-talks ac-consult-group">
-      {group.map((c) => (
-        <AgentTalkPill key={c.id} consultationId={c.id} fromId={askerId} toId={c.consultedAgentId} />
-      ))}
+    <div className="consult-pair">
+      <button
+        type="button"
+        className={cx("consult-pair__row", pair.tone && `consult-pair__row--${pair.tone}`)}
+        title={title}
+        {...(openConsultation
+          ? {
+              "aria-pressed": items.some((c) => c.id === openId),
+              onClick: () => openConsultation(pair.opens),
+            }
+          : { "aria-expanded": open, onClick: () => setOpen((o) => !o) })}
+      >
+        <AgentAvatar agentId={askerId} size="xs" name={from} state="idle" />
+        <span className="consult-pair__name">{from}</span>
+        <Icon name="swap" size={16} className="consult-pair__swap" label={t("newAgent.and")} />
+        <span className="ac-avatar-stack consult-pair__faces">
+          {pair.faces.slice(0, 3).map((f) => (
+            <AgentAvatar
+              key={f.agentId}
+              agentId={f.agentId}
+              size="xs"
+              name={nameOf(f.agentId)}
+              state={live && !f.off ? "thinking" : "idle"}
+              className={f.off ? "consult-pair__off" : undefined}
+            />
+          ))}
+        </span>
+        <span className="consult-pair__name">{names.length === 1 ? names[0] : namesText(t, names, 1)}</span>
+        {(pair.word || pair.seconds !== null) && (
+          <span className="consult-pair__sep" aria-hidden="true">
+            ·
+          </span>
+        )}
+        {pair.word && <span className="consult-pair__word">{t(pair.word.key, pair.word.values)}</span>}
+        {pair.seconds !== null && (
+          <span className="consult-pair__time">{formatLineTime(i18n.language, pair.seconds * 1000)}</span>
+        )}
+        <Icon name={openConsultation ? "chevronRight" : "chevronDown"} size={14} className="consult-pair__chev" />
+      </button>
+      {open && !openConsultation && (
+        <div className="consult-pair__detail">
+          {items.map((c) => (
+            <ConsultInPlace key={c.id} consultation={c} askerId={askerId} now={now} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One question opened under its row where no panel opens: what was asked or handed, and the answer or its state. */
+function ConsultInPlace({
+  consultation: c,
+  askerId,
+  now,
+}: {
+  consultation: ConsultPairItem;
+  askerId: string;
+  now: number;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const from = agentGrammar(dir.agentById.get(askerId)?.name ?? t("channel.unknownAgent"));
+  const to = agentGrammar(dir.agentById.get(c.consultedAgentId)?.name ?? t("channel.unknownAgent"));
+  const state = consultLineState(c, now);
+  return (
+    <div className="ac-consult__body ac-consult__body--inline">
+      <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askerId)}</small>
+      <div className="ac-consult__text ac-consult__text--q">
+        <MessageBody body={withoutRelayLine(c.question)} resolveMention={dir.mentionName} />
+      </div>
+      <small>{t("chat.consultation.answerOf", { name: to.name, context: to.context })}</small>
+      {state === "answered" ? (
+        <div className="ac-consult__text">
+          <MessageBody body={c.answer ?? ""} resolveMention={dir.mentionName} />
+        </div>
+      ) : (
+        <p className="ac-consult__text ac-consult__text--q">{consultLineLabel(t, state, c, to)}</p>
+      )}
+      <p className="ac-consult__foot ac-iconline">
+        <Icon name="eyeOff" size={14} />
+        {t("chat.consultation.private", { from: from.name, to: to.name })}
+      </p>
     </div>
   );
 }
 
 /**
- * An answer to a question asked in a reply farther up (`consultNoticeFolds`): the two agents' pill where the answer
- * arrived, opening their conversation. The words of the answer stay there, not here.
+ * An answer to a question asked in a reply farther up (`consultNoticeFolds`): the same pair row where the answer
+ * arrived, opening the two agents' conversation. The words of the answer stay there, not here.
  */
 export function ConsultAnswerLine({
   message,
@@ -237,8 +275,8 @@ export function ConsultAnswerLine({
 }) {
   const c = fold.consultation;
   return (
-    <div className="ac-talks" data-message-id={message.id}>
-      <AgentTalkPill consultationId={c.id} fromId={c.agentId} toId={c.consultedAgentId} />
+    <div data-message-id={message.id}>
+      <ConsultPairRow askerId={c.agentId} items={[c]} />
     </div>
   );
 }

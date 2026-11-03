@@ -162,8 +162,6 @@ export interface BlockLine {
   label: string;
   /** The tool's own name or the built-in's label: read aloud, not drawn (no room on a phone). */
   hint: string | null;
-  /** The start of what came back, under the phrase in two lines at most (another agent's answer). */
-  preview?: string | null;
   /** "1,2 s". */
   time?: string;
   /** "×5": several calls of the same kind in a row. */
@@ -174,8 +172,6 @@ export interface BlockLine {
   detail?: ReactNode;
   /** Opens by itself (a call running code shows it as it runs). */
   defaultOpen?: boolean;
-  /** Opens somewhere else instead of in place (another agent's conversation, on a screen of its own). */
-  onOpen?: () => void;
 }
 
 export type BlockItem = { kind: "line"; line: BlockLine } | { kind: "note"; key: string; node: ReactNode };
@@ -371,8 +367,8 @@ function Line({
     if (running.current && line.state !== "run") setOpen(false);
     running.current = line.state === "run";
   }, [line.state]);
-  const opens = Boolean(line.detail) && !line.onOpen;
-  const said = [line.label, line.hint, line.preview, line.count, line.time].filter(Boolean).join(", ");
+  const opens = Boolean(line.detail);
+  const said = [line.label, line.hint, line.count, line.time].filter(Boolean).join(", ");
   const row = (
     <>
       <View style={styles.logo}>{line.logo}</View>
@@ -382,12 +378,6 @@ function Line({
             {line.label}
           </Text>
         </Breathing>
-        {/* Opened, the whole answer shows below: the preview would repeat its start. */}
-        {line.preview && (!open || line.onOpen) ? (
-          <Text variant="footnote" tone="muted" numberOfLines={2}>
-            {line.preview}
-          </Text>
-        ) : null}
       </View>
       {line.count ? (
         <Text
@@ -412,29 +402,12 @@ function Line({
       <View style={styles.level}>
         <Mark state={line.state} color={color} />
       </View>
-      {line.onOpen ? (
-        <View style={styles.chevLevel}>
-          <Icon name="right" size={14} color={c.faint} />
-        </View>
-      ) : null}
     </>
   );
   return (
     // A failed call says so by its mark and its reason, on the block's own surface (no tinted plate).
     <View style={styles.line}>
-      {line.onOpen ? (
-        <Pressable
-          onPress={() => {
-            tapHaptic();
-            line.onOpen?.();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={said}
-          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plateSoft }]}
-        >
-          {row}
-        </Pressable>
-      ) : opens ? (
+      {opens ? (
         <Pressable
           onPress={() => {
             tapHaptic();
@@ -914,7 +887,6 @@ const styles = StyleSheet.create({
   },
   firstLine: { marginTop: 1 },
   level: { marginTop: 2 },
-  chevLevel: { marginTop: 3 },
   one: { padding: 2 },
   logo: { width: 20, alignItems: "center" },
   why: { marginTop: -4, paddingLeft: 37, paddingRight: 8, paddingBottom: 8 },

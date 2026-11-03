@@ -14,20 +14,19 @@ const at = (text: string, pieces: string[]) =>
 const ascending = (xs: number[]) => xs.every((x, i) => i === 0 || (xs[i - 1] ?? 0) < x);
 
 describe("a reply's tools sit last, live and saved", () => {
-  test("saved: its words, what it changed and its cards, then its questions to others and its tools", () => {
+  test("saved: its words, what it changed and its cards, then its tools", () => {
     const row = source("MessageRow.tsx");
     expect(
       ascending(
         at(row, [
           // A long message to another agent shows its first paragraph (`talk.lead`), the rest behind "Ler tudo".
-          ") : body ? (\n          <MessageText\n            body={talk ? talk.lead : body}",
+          ") : body ? (\n            <MessageText\n              body={talk ? talk.lead : body}",
           "<Receipts message={m} />",
-          "{cards}\n        {/* Its tools after",
-          "<ConsultGroup message={m} />",
+          "{cards}\n          {/* Its tools after",
           "<TurnTools",
           "<SavedTools",
           "<NoAiCard message={m} />",
-          "{foot}\n      </View>\n    </Pressable>\n  );\n});",
+          "{foot}\n        </View>\n      </Pressable>\n    </>\n  );\n});",
         ]),
       ),
     ).toBe(true);
@@ -43,7 +42,10 @@ describe("a reply's tools sit last, live and saved", () => {
 
   test("what waits for a person's click comes after the tools, the thread and reactions under it", () => {
     const row = source("MessageRow.tsx");
-    const [toolsAt, footAt] = at(row, ["<SavedTools\n", "{foot}\n      </View>\n    </Pressable>\n  );\n});"]);
+    const [toolsAt, footAt] = at(row, [
+      "<SavedTools\n",
+      "{foot}\n        </View>\n      </Pressable>\n    </>\n  );\n});",
+    ]);
     const last = row.slice(toolsAt, footAt);
     for (const card of [
       "<NoAiCard",
@@ -69,6 +71,50 @@ describe("a reply's tools sit last, live and saved", () => {
   });
 });
 
+describe("agents it asked first: one pair row right before the reply, never inside it", () => {
+  test("saved: the row sits before the reply's own row (which then shows its face and name), none in its body", () => {
+    const row = source("MessageRow.tsx");
+    expect(ascending(at(row, ["const grouped = groupedIn && !pair;", "{pair}\n      <Pressable"]))).toBe(true);
+    const [bodyAt, endAt] = at(row, ["<View style={styles.body}>", "{foot}\n        </View>\n      </Pressable>"]);
+    expect(row.slice(bodyAt, endAt)).not.toContain("Consult");
+  });
+
+  test("live: a turn that posted nothing yet carries the row above its working row", () => {
+    const live = source("LiveRows.tsx");
+    expect(live).toContain("const consults = useRunConsults(run.runId, run, null);");
+    expect(ascending(at(live, ["{pair}\n        <View style={styles.msg}>", "<WaitLine work={run.work}"]))).toBe(true);
+  });
+
+  test("the row says no answer: only faces, names, a short word and the time", () => {
+    const pair = source("ConsultGroup.tsx");
+    expect(pair).not.toContain("previewOf");
+    expect(pair).not.toContain(".answer");
+    expect(pair).toContain('<Icon name="swap"');
+  });
+
+  test("a notice whose reply isn't here is the same row, not a card with the answer", () => {
+    const line = source("EventLine.tsx");
+    expect(line).toContain("items={[pairItemOf(consulted.consultation)]}");
+    expect(source("cards.tsx")).not.toContain("Consultation");
+  });
+
+  test("an answer far below its question is the same row, never a line of words or a pill", () => {
+    const line = source("EventLine.tsx");
+    expect(line).toContain("items={[fold.consultation]}");
+    expect(line).not.toContain("consultFarKey");
+    expect(source("ConsultGroup.tsx")).not.toContain("TalkPill");
+  });
+
+  test("a hand-off by direct message is the same row on its reach line, left out of the reply's own row", () => {
+    const reach = source("ReachLines.tsx");
+    expect(reach).toContain("<ConsultPairRow askerId={authorId} channelId={channelId} items={[talk]} inline />");
+    expect(reach).not.toContain("reach.see");
+    const row = source("MessageRow.tsx");
+    expect(row).toContain("const reached = useMemo(() => reachHandoffs(m.meta), [m.meta]);");
+    expect(row).toContain("    consulted,\n    reached,\n  );");
+  });
+});
+
 describe("one call is its own line", () => {
   test("live, kept and saved replies and a single question to a teammate draw the line, not the block", () => {
     const tools = source("ToolCalls.tsx");
@@ -76,8 +122,6 @@ describe("one call is its own line", () => {
     expect(tools).toContain("one={one}");
     expect(tools).toContain("const lone = savedOneLine(meta, onCard);");
     expect(tools).toContain("<Line line={{ ...only.line, detail }} color={color} onToggle={onToggle} />");
-    // A question to a teammate is one agents-talking pill per consultation, not a tool line.
-    expect(source("ConsultGroup.tsx")).toContain("<AgentTalkPill\n          key={c.id}");
   });
 });
 

@@ -19,7 +19,7 @@ const open = async (state = seedState(), api = createFakeApi(state)) => {
 };
 /**
  * The reply moved under João's post and that thread opened beside the channel: a thread view has no panel of its
- * own, so the pill there opens in place (in the channel it opens the two agents' conversation in the panel).
+ * own, so the card there opens in place (in the channel it opens the two agents' conversation in the panel).
  */
 const openInThread = async (state: ReturnType<typeof seedState>) => {
   const reply = state.messages.at(-1) as (typeof state.messages)[number];
@@ -60,10 +60,15 @@ function withReply(meta: Record<string, unknown>, body = "Já subi o fix em stag
   return state;
 }
 
-const pillsIn = (el: ParentNode) => [...el.querySelectorAll(".ac-talk")] as HTMLElement[];
+/** The pair row right before the reply carrying `text`. */
+const pairOf = (text: string) => {
+  const before = rowWith(text).previousElementSibling as HTMLElement | null;
+  return before?.classList.contains("consult-pair") ? before : null;
+};
+const pairButton = (pair: HTMLElement | null) => pair?.querySelector("button") as HTMLElement;
 
-describe("what another agent said before the reply (meta.consulted): the two agents' pill", () => {
-  test("answered: 'Ada ⇄ Atlas · respondeu' on top of the reply; a click opens their conversation beside", async () => {
+describe("a reply's `meta.consulted`: the pair row before it", () => {
+  test("in a channel: the two faces and names, no preview; a click opens the panel (a toggle), never in place", async () => {
     await open(
       withReply({
         consulted: [
@@ -71,45 +76,103 @@ describe("what another agent said before the reply (meta.consulted): the two age
         ],
       }),
     );
-    const row = rowWith("Já subi o fix");
-    const [pill] = pillsIn(row);
-    expect(pill?.textContent).toBe("Ada ⇄ Atlas · respondeu");
-    expect(pill?.querySelectorAll(".ac-avatar--agent")).toHaveLength(2);
-    // On top of the reply's text.
-    expect(
-      (pill as HTMLElement).compareDocumentPosition(row.querySelector(".ac-msg__text") as Node) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    await act(async () => fireEvent.click(pill as HTMLElement));
+    const pair = pairOf("Já subi o fix") as HTMLElement;
+    expect(pair).not.toBeNull();
+    expect([...pair.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
+    expect(pair.textContent).not.toContain("Staging");
+    // No times on `meta.consulted`: the row says nothing after the names.
+    expect(pair.querySelector(".consult-pair__sep")).toBeNull();
+    const button = pairButton(pair);
+    expect(button.getAttribute("aria-expanded")).toBeNull();
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    await act(async () => fireEvent.click(button));
     await settle(3);
-    // The panel beside the channel opens on that conversation (the fake backend has none stored for it).
-    expect(document.querySelector("aside.thread-panel")?.getAttribute("aria-label")).toMatch(/^Conversa entre /);
+    expect(pair.querySelector(".consult-pair__detail")).toBeNull();
+    expect(button.getAttribute("aria-pressed")).toBe("true");
   });
 
-  test("in a thread (no panel): the pill opens in place to the question, the answer and who saw it", async () => {
-    const { thread } = await openInThread(
+  test("in a thread (no panel): the row opens in place to the question, the answer and who saw it", async () => {
+    await openInThread(
       withReply({
         consulted: [
           { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
         ],
       }),
     );
-    const [pill] = pillsIn(thread);
-    expect(pill?.getAttribute("aria-expanded")).toBe("false");
-    await act(async () => fireEvent.click(pill as HTMLElement));
-    const body = thread.querySelector(".ac-talk-detail") as HTMLElement;
+    const pair = pairOf("Já subi o fix") as HTMLElement;
+    expect(pair).not.toBeNull();
+    expect(pair.textContent).not.toContain("Staging");
+    const button = pairButton(pair);
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => fireEvent.click(button));
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    const body = pair.querySelector(".consult-pair__detail") as HTMLElement;
     expect(body.textContent).toContain("Ada perguntou");
     expect(body.textContent).toContain(QUESTION);
     expect(body.textContent).toContain("Resposta do Atlas");
     expect(body.querySelector("strong")?.textContent).toBe("Staging");
-    expect(body.textContent).toContain("Conversa só entre Ada e Atlas");
+    expect(body.querySelector(".ac-consult__foot")?.textContent).toBe("Conversa só entre Ada e Atlas");
+    await act(async () => fireEvent.click(button));
+    expect(pair.querySelector(".consult-pair__detail")).toBeNull();
   });
 
-  test("expired or failed: 'sem resposta'; one pill per agent asked", async () => {
+  test("expired: 'não respondeu' in the warning tone, the face dimmed; opened, the question and why", async () => {
+    await openInThread(
+      withReply(
+        {
+          consulted: [{ agentId: ATLAS_ID, consultationId: "k2", status: "expired", question: QUESTION, answer: null }],
+        },
+        "O Atlas não respondeu. Quer que eu suba do jeito de sempre?",
+      ),
+    );
+    const pair = pairOf("do jeito de sempre") as HTMLElement;
+    expect(pair.querySelector(".consult-pair__row--bad .consult-pair__word")?.textContent).toBe("não respondeu");
+    expect(pair.querySelectorAll(".consult-pair__off")).toHaveLength(1);
+    await act(async () => fireEvent.click(pairButton(pair)));
+    const body = pair.querySelector(".consult-pair__detail") as HTMLElement;
+    expect(body.textContent).toContain(QUESTION);
+    expect(body.textContent).toContain("O Atlas não respondeu a tempo");
+  });
+
+  test("an old reply's question with no id of its own: no conversation to open, it opens in place", async () => {
+    await open(
+      withReply({ consulted: [{ agentId: ATLAS_ID, status: "answered", question: QUESTION, answer: ANSWER }] }),
+    );
+    const pair = pairOf("Já subi o fix") as HTMLElement;
+    const button = pairButton(pair);
+    expect(button.getAttribute("aria-pressed")).toBeNull();
+    await act(async () => fireEvent.click(button));
+    expect(document.querySelector("aside.thread-panel")).toBeNull();
+    expect(pair.querySelector(".consult-pair__detail")?.textContent).toContain(QUESTION);
+  });
+
+  test("people never read the relay line the server opens a mention to an agent with", async () => {
+    const relayed = `[@ada mentioned you in #engenharia, where you aren't a member, so it reaches you here]\n\n${QUESTION}`;
+    await openInThread(
+      withReply({
+        consulted: [
+          {
+            agentId: ATLAS_ID,
+            consultationId: "k1",
+            kind: "note",
+            status: "answered",
+            question: relayed,
+            answer: ANSWER,
+          },
+        ],
+      }),
+    );
+    const pair = pairOf("Já subi o fix") as HTMLElement;
+    await act(async () => fireEvent.click(pairButton(pair)));
+    const body = pair.querySelector(".consult-pair__detail") as HTMLElement;
+    expect(body.textContent).toContain(QUESTION);
+    expect(body.textContent).not.toContain("mentioned you");
+  });
+
+  test("two questions to one agent, one failed: one row, '1 de 2 responderam'", async () => {
     await open(
       withReply({
         consulted: [
-          { agentId: ATLAS_ID, consultationId: "k2", status: "expired", question: QUESTION, answer: null },
           { agentId: ATLAS_ID, consultationId: "k3", status: "failed", question: QUESTION, answer: null },
           {
             agentId: ATLAS_ID,
@@ -121,19 +184,16 @@ describe("what another agent said before the reply (meta.consulted): the two age
         ],
       }),
     );
-    const pills = pillsIn(rowWith("Já subi o fix"));
-    expect(pills.map((p) => p.textContent)).toEqual([
-      "Ada ⇄ Atlas · sem resposta",
-      "Ada ⇄ Atlas · sem resposta",
-      "Ada ⇄ Atlas · respondeu",
-    ]);
-    expect(pills[0]?.classList.contains("ac-talk--failed")).toBe(true);
+    expect(document.querySelectorAll(".consult-pair")).toHaveLength(1);
+    const pair = pairOf("Já subi o fix") as HTMLElement;
+    expect(pair.querySelector(".consult-pair__word")?.textContent).toBe("1 de 2 responderam");
+    expect(pair.textContent).not.toContain("Em manutenção");
   });
 });
 
 describe("what came of work handed off (a `consult_reply` notice with `kind` `note`)", () => {
-  /** Ada's conversation got what Atlas did with the work she handed it (`consultationId` none: nothing to open). */
-  const withResult = (status: string, answer: string | null, consultationId?: string) => {
+  /** Ada's conversation got what Atlas did with the work she handed it. */
+  const withResult = (status: string, answer: string | null) => {
     const state = seedState();
     state.messages.push({
       id: "msg-result",
@@ -150,13 +210,12 @@ describe("what came of work handed off (a `consult_reply` notice with `kind` `no
           from: "@atlas",
           refs: {
             kind: "note",
-            ...(consultationId ? { consultationId } : {}),
+            consultationId: "k9",
             runId: "r-handed",
             askerAgentId: ADA_ID,
             agentId: ATLAS_ID,
             status,
-            question:
-              "[@ada mentioned you in a conversation, where you aren't a member, so it reaches you here]\n\nPassa a pasta ao Diogo e confirma que ele abre.",
+            question: "Passa a pasta ao Diogo e confirma que ele abre.",
             ...(answer ? { answer } : {}),
           },
         },
@@ -166,24 +225,20 @@ describe("what came of work handed off (a `consult_reply` notice with `kind` `no
     return state;
   };
 
-  test("its pill opens what Ada wrote in place when there is no conversation to open, never the relay line", async () => {
-    await open(withResult("answered", "Passei a pasta; o Diogo abriu."));
-    const [pill] = pillsIn(document);
-    expect(pill?.textContent).toBe("Ada ⇄ Atlas · respondeu");
-    expect(pill?.getAttribute("aria-expanded")).toBe("false");
-    await act(async () => fireEvent.click(pill as HTMLElement));
-    const body = document.querySelector(".ac-talk-detail") as HTMLElement;
+  test("its row opened in place says what Ada wrote, not what she asked", async () => {
+    const { thread } = await openInThread(withResult("answered", "Passei a pasta; o Diogo abriu."));
+    const pair = thread.querySelector(".consult-pair") as HTMLElement;
+    expect(pair.textContent).not.toContain("Passei a pasta");
+    await act(async () => fireEvent.click(pairButton(pair)));
+    const body = pair.querySelector(".consult-pair__detail") as HTMLElement;
     expect(body.textContent).toContain("Ada escreveu");
     expect(body.textContent).not.toContain("Ada perguntou");
     expect(body.textContent).toContain("Passa a pasta ao Diogo");
-    expect(body.textContent).not.toContain("mentioned you");
   });
 
-  test("one that couldn't be finished: 'sem resposta'; with its id, the pill opens the conversation", async () => {
-    await open(withResult("failed", null, "k9"));
-    const [pill] = pillsIn(document);
-    expect(pill?.textContent).toBe("Ada ⇄ Atlas · sem resposta");
-    expect(pill?.hasAttribute("aria-expanded")).toBe(false);
+  test("one that couldn't be finished says so", async () => {
+    await open(withResult("failed", null));
+    expect(document.querySelector(".consult-pair__word")?.textContent).toBe("não terminou");
   });
 });
 

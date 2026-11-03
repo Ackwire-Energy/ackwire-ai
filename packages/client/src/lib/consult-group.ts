@@ -1,46 +1,31 @@
-import { useEffect, useState } from "react";
-import type { RunConsultation } from "../api/types";
-import { previewOf } from "./consultations";
+import type { MessageConsultation, RunConsultation } from "../api/types";
 import { noticeOf } from "./notices";
 
 /**
- * The questions an agent asked other agents in one turn, and the work it handed them, drawn inside the reply of
- * that turn ("Perguntou a 3 colegas", "Passou para 1 colega"): one line per agent with where it is, and the answer
- * under it (ADR 0034, ADR 0095). The answers also arrive as `consult_reply` notices; the ones a reply close by
- * already shows fold away (`consultNoticeFolds`), and the working line leaves out what such a block already says
- * (`consultsForLine`).
+ * The questions an agent asked other agents in one turn, and the work it handed them, drawn as one slim row right
+ * before the reply of that turn: the two faces with ⇄ between them and how long it took, several consulted agents
+ * folded into the same row (ADR 0034, ADR 0095). What they said opens only on a click. The answers also arrive as
+ * `consult_reply` notices; the ones a reply close by already stands for fold away (`consultNoticeFolds`), and the
+ * working line leaves out what such a row already says (`consultsForLine`).
  */
 
 /**
- * Where one question is, for its line. `waiting`: the consulted agent waits on a person; `offline`: for its
- * computer or its AI provider to come back (still out, paused, on no one); `handedOn`: its part done, it waits on
- * agents it handed some to.
+ * Where one question is. `waiting`: the consulted agent waits on a person; `offline`: for its computer or its AI
+ * provider to come back (still out, paused, on no one); `handedOn`: its part done, it waits on agents it handed
+ * some to.
  */
 export type ConsultLineState = "working" | "waiting" | "offline" | "handedOn" | "answered" | "failed" | "expired";
 
-/**
- * Reloads the list this often while a question is out (a consulted agent that stops waiting sends no event), so the
- * work handed off shows moving (`progress`).
- */
+/** Reloads the list this often while a question is out (a consulted agent that stops waiting sends no event). */
 export const CONSULT_GROUP_POLL_MS = 10_000;
-
-/**
- * What an open line shows of the work so far (ADR 0097): how many messages the consulted agent posted in the agents'
- * DM and the start of the latest ("12 mensagens · Gerei a imagem 40"), or null. Answered lines show the answer.
- */
-export function consultProgress(c: Pick<RunConsultation, "status" | "progress">) {
-  return c.status === "open" && c.progress && c.progress.posts > 0
-    ? {
-        key: "chat.consultGroup.posted" as const,
-        values: { count: c.progress.posts, latest: previewOf(c.progress.latest) },
-      }
-    : null;
-}
 
 /** An opened question reloads this often while it's out: its agents' DM sends the page no events. */
 export const CONSULT_CONVERSATION_POLL_MS = 4_000;
 
-export function consultLineState(c: RunConsultation, now: number): ConsultLineState {
+export function consultLineState(
+  c: Pick<RunConsultation, "status" | "answer" | "expiresAt" | "waiting">,
+  now: number,
+): ConsultLineState {
   if (c.status === "answered") return c.answer?.trim() ? "answered" : "failed";
   if (c.status === "failed") return "failed";
   if (c.status === "expired") return "expired";
@@ -53,7 +38,7 @@ export function consultLineState(c: RunConsultation, now: number): ConsultLineSt
 
 const isNote = (c: Pick<RunConsultation, "kind">) => c.kind === "note";
 
-/** A line's words by its state, the same in the reply's block, the panel and the phone's screen. */
+/** A question's words by its state, in the panel and on the phone's screen ("A Iris espera uma aprovação"). */
 export function consultLineKey(state: ConsultLineState, c: Pick<RunConsultation, "waiting" | "kind">) {
   switch (state) {
     case "working":
@@ -77,19 +62,6 @@ export function consultLineKey(state: ConsultLineState, c: Pick<RunConsultation,
   }
 }
 
-/**
- * A block's head and label by what its run did: only questions "Perguntou a 3 colegas", only work handed off
- * "Passou para 2 colegas", both "Chamou 3 colegas"; with any work in it, the label says requests.
- */
-export function consultGroupKeys(group: readonly Pick<RunConsultation, "kind">[]) {
-  const notes = group.filter(isNote).length;
-  if (notes === 0) return { head: "chat.consultGroup.asked", label: "chat.consultGroup.label" } as const;
-  return {
-    head: notes === group.length ? "chat.consultGroup.handed" : "chat.consultGroup.brought",
-    label: "chat.consultGroup.labelRequests",
-  } as const;
-}
-
 /** Over the asking agent's words: what it asked, or what it handed off ("Theo escreveu"). */
 export const consultAskedKey = (c: Pick<RunConsultation, "kind">) =>
   isNote(c) ? ("chat.consultation.wrote" as const) : ("chat.consultation.asked" as const);
@@ -103,10 +75,6 @@ export const consultOriginKey = (c: Pick<RunConsultation, "kind">, inChannel: bo
     : inChannel
       ? ("chat.consultPanel.origin" as const)
       : ("chat.consultPanel.originDm" as const);
-
-/** The quiet line of an answer whose reply is farther up. */
-export const consultFarKey = (c: Pick<RunConsultation, "kind">) =>
-  isNote(c) ? ("chat.consultGroup.answeredRequestFar" as const) : ("chat.consultGroup.answeredFar" as const);
 
 /** The conversation's questions by the run that asked them, each run's oldest first. */
 export function groupsByRun(list: readonly RunConsultation[]): Map<string, RunConsultation[]> {
@@ -125,13 +93,16 @@ export interface ConsultGroupSummary {
   /** Answered, failed or expired. */
   closed: number;
   answered: number;
-  /** Some question is still out: the block opens and the count shows. */
+  /** Some question is still out: the row counts what came back. */
   open: boolean;
   /** Some consulted agent waits on a person (one waiting for its computer doesn't count). */
   waiting: boolean;
 }
 
-export function consultGroupSummary(group: readonly RunConsultation[], now: number): ConsultGroupSummary {
+export function consultGroupSummary(
+  group: readonly Pick<RunConsultation, "status" | "answer" | "expiresAt" | "waiting">[],
+  now: number,
+): ConsultGroupSummary {
   let closed = 0;
   let answered = 0;
   let waiting = false;
@@ -145,8 +116,114 @@ export function consultGroupSummary(group: readonly RunConsultation[], now: numb
 }
 
 /**
- * The questions a reply in view shows: those of runs with a message (or a live block) loaded here. A notice
- * whose asking reply isn't loaded (further up, not paged in yet) keeps its card, so no answer goes unseen.
+ * One question as the pair row reads it: the run's list has it whole; a reply's `meta.consulted` entry or an
+ * answer's notice is closed and carries no times (`pairItemOf`).
+ */
+export type ConsultPairItem = Pick<
+  RunConsultation,
+  "id" | "kind" | "consultedAgentId" | "status" | "waiting" | "question" | "answer" | "expiresAt"
+> & { createdAt: string | null; answeredAt: string | null };
+
+export const pairItemOf = (c: MessageConsultation): ConsultPairItem => ({
+  id: c.consultationId,
+  kind: c.kind,
+  consultedAgentId: c.agentId,
+  status: c.status,
+  waiting: null,
+  question: c.question,
+  answer: c.answer,
+  expiresAt: "",
+  createdAt: null,
+  answeredAt: null,
+});
+
+/** The short word after the names while one question is out ("perguntando 42 s"). */
+function pairOpenKey(state: ConsultLineState, c: ConsultPairItem) {
+  switch (state) {
+    case "waiting":
+      return c.waiting === "approval"
+        ? ("chat.consultPair.waitingApproval" as const)
+        : ("chat.consultPair.waitingInput" as const);
+    case "offline":
+      return c.waiting === "outage"
+        ? ("chat.consultPair.waitingProvider" as const)
+        : ("chat.consultPair.waitingComputer" as const);
+    case "handedOn":
+      return "chat.consultPair.handedOn" as const;
+    default:
+      return isNote(c) ? ("chat.consultPair.working" as const) : ("chat.consultPair.asking" as const);
+  }
+}
+
+export interface ConsultPair {
+  /** The consulted agents, each once, in the order asked; `off`: it didn't answer (its face dims). */
+  faces: { agentId: string; off: boolean }[];
+  /** The question a click opens: the first still out, else the first. */
+  opens: string;
+  /** What the slot after the names says, if anything: "perguntando", "1 de 3", "não respondeu". */
+  word: {
+    key:
+      | ReturnType<typeof pairOpenKey>
+      | "chat.consultGroup.progress"
+      | "chat.consultPair.noAnswer"
+      | "chat.consultPair.notFinished"
+      | "chat.consultPair.someAnswered";
+    values?: { done: number; total: number };
+  } | null;
+  /** `live`: some question is still out (accent, the clock ticks); `bad`: some went unanswered. */
+  tone: "live" | "bad" | null;
+  /** How long it took, or has been out while live; null without times (a reply's `meta.consulted`). */
+  seconds: number | null;
+}
+
+/** The pair row of a run's questions: "Theo ⇄ Atlas · 2 min", "Theo ⇄ Atlas e mais 2 · 1 de 3 42 s". */
+export function consultPair(group: readonly ConsultPairItem[], now: number): ConsultPair | null {
+  const first = group[0];
+  if (!first) return null;
+  const states = group.map((c) => consultLineState(c, now));
+  const closed = (s: ConsultLineState) => s === "answered" || s === "failed" || s === "expired";
+  const off = new Map<string, boolean>();
+  group.forEach((c, i) => {
+    off.set(c.consultedAgentId, states[i] === "failed" || states[i] === "expired");
+  });
+  const faces = [...off].map(([agentId, o]) => ({ agentId, off: o }));
+  const summary = consultGroupSummary(group, now);
+  const starts = group.map((c) => (c.createdAt ? Date.parse(c.createdAt) : Number.NaN));
+  const start = Math.min(...starts);
+  const out = group.findIndex((_, i) => !closed(states[i] ?? "answered"));
+  const opens = group[out]?.id ?? first.id;
+  if (summary.open) {
+    const state = states[0] ?? "working";
+    return {
+      faces,
+      opens,
+      word:
+        group.length === 1
+          ? { key: pairOpenKey(state, first) }
+          : { key: "chat.consultGroup.progress", values: { done: summary.closed, total: summary.total } },
+      tone: "live",
+      seconds: Number.isNaN(start) ? null : Math.max(1, Math.round((now - start) / 1000)),
+    };
+  }
+  const ends = group.map((c) => (c.answeredAt ? Date.parse(c.answeredAt) : Number.NaN));
+  const end = Math.max(...ends);
+  const seconds = Number.isNaN(start) || Number.isNaN(end) ? null : Math.max(1, Math.round((end - start) / 1000));
+  if (summary.answered === summary.total) return { faces, opens, word: null, tone: null, seconds };
+  return {
+    faces,
+    opens,
+    word:
+      group.length === 1
+        ? { key: isNote(first) ? "chat.consultPair.notFinished" : "chat.consultPair.noAnswer" }
+        : { key: "chat.consultPair.someAnswered", values: { done: summary.answered, total: summary.total } },
+    tone: "bad",
+    seconds: null,
+  };
+}
+
+/**
+ * The questions a reply in view shows: those of runs with a message (or a live row) loaded here. A notice
+ * whose asking reply isn't loaded (further up, not paged in yet) keeps its own row, so no answer goes unseen.
  */
 export function shownConsultations(
   list: readonly RunConsultation[],
@@ -166,7 +243,7 @@ export function foldsNotice(meta: Record<string, unknown> | undefined, shown: Re
 /**
  * How many rows away the reply that asked may sit and still stand in for the rest: an answer's notice that close
  * to it folds away, and with it among the last rows the working line doesn't repeat its questions. About what a
- * phone shows above the box: farther up, a person reading the newest messages doesn't see the block.
+ * phone shows above the box: farther up, a person reading the newest messages doesn't see the row.
  */
 export const CONSULT_NEAR_ROWS = 3;
 
@@ -180,7 +257,7 @@ export interface ConsultRow {
 /**
  * How an answer's `consult_reply` notice draws: not at all (the reply that asked is close and shows the answer),
  * one line leading to that reply when it is farther up ("Atlas respondeu à pergunta da Ada · Ver": the answer
- * arriving still leaves a sign where the person reads), or its own card when that reply isn't here.
+ * arriving still leaves a sign where the person reads), or its own row when that reply isn't here.
  */
 export type ConsultNoticeFold =
   | { fold: "hide" }
@@ -188,7 +265,7 @@ export type ConsultNoticeFold =
   | {
       fold: "line";
       consultation: RunConsultation;
-      /** The asking run's message nearest the notice: "Ver" goes there and opens the block. */
+      /** The asking run's message nearest the notice: "Ver" goes there and opens the row. */
       messageId: string;
     };
 
@@ -199,7 +276,7 @@ const NO_RUNS: ReadonlySet<string> = new Set();
  * (hidden, or one line): answers to several questions in a row don't push their reply away.
  */
 /**
- * Which of a run's messages draws its block: the web draws it on the run's last message, the phone on its first
+ * Which of a run's messages draws its row: the web draws it on the run's last message, the phone on its first
  * (its rows don't know their neighbours, `firstOfRun`). Distances and "Ver" go to that one message.
  */
 export type ConsultAnchor = "first" | "last";
@@ -214,7 +291,7 @@ function consultLayout(
   const shown = shownConsultations(list, new Set([...live, ...rows.flatMap((r) => r.agentRunId ?? [])]));
   /** Each run's rows: its place among the rows people see, and the message. */
   const places = new Map<string, { at: number; id: string }[]>();
-  /** Answers' notices, each between the rows `at - 1` and `at`; `consultation` null: it draws its card. */
+  /** Answers' notices, each between the rows `at - 1` and `at`; `consultation` null: it draws its own row. */
   const notices: { id: string; at: number; consultation: RunConsultation | null }[] = [];
   let count = 0;
   for (const row of rows) {
@@ -232,7 +309,7 @@ function consultLayout(
     }
     count++;
   }
-  // Only the message that draws the block counts: a run that posted several shows its questions on one of them.
+  // Only the message that draws the row counts: a run that posted several shows its questions on one of them.
   for (const [runId, own] of places) {
     const one = anchor === "first" ? own[0] : own.at(-1);
     if (one) places.set(runId, [one]);
@@ -242,8 +319,8 @@ function consultLayout(
 
 /**
  * How each answer's notice draws here (every `consult_reply` row, by message id). `rows`: the conversation's
- * messages in order; `live`: the runs drawn as live blocks under them (at the end, where the newest answers land:
- * their notices fold); `anchor`: the run's message that draws its block. Close is `CONSULT_NEAR_ROWS` rows at most,
+ * messages in order; `live`: the runs drawn as live rows under them (at the end, where the newest answers land:
+ * their notices fold); `anchor`: the run's message that draws its row. Close is `CONSULT_NEAR_ROWS` rows at most,
  * on either side.
  */
 export function consultNoticeFolds(
@@ -277,8 +354,8 @@ export function consultNoticeFolds(
 }
 
 /**
- * The asking runs whose block shows their questions near the end of the conversation, right above the working
- * line: a reply among the last `CONSULT_NEAR_ROWS` rows, or a live block.
+ * The asking runs whose row shows their questions near the end of the conversation, right above the working
+ * line: a reply among the last `CONSULT_NEAR_ROWS` rows, or a live row.
  */
 export function consultBlocksNearEnd(
   rows: readonly ConsultRow[],
@@ -298,89 +375,11 @@ export function consultBlocksNearEnd(
 
 /**
  * The live questions the working line still says ("Dev está perguntando ao Infra… 0:41"): not those of a run whose
- * block, near the end, shows every question with where it is and its clock. The asker's own work stays on the
+ * row, near the end, shows every question with where it is and its clock. The asker's own work stays on the
  * line. With the reply farther up or not loaded, the line is the only sign that a question is out.
  */
 export function consultsForLine<T extends { runId: string }>(live: T[], blocks: ReadonlySet<string>): T[] {
   return blocks.size === 0 ? live : live.filter((c) => !blocks.has(c.runId));
-}
-
-/**
- * "Ver" on an answer's line: the reply that asked opens its block at that answer. A request waits for the block
- * it names (the reply may not be drawn yet: the phone draws rows as they scroll in) and is used once.
- */
-export interface ConsultBlockRequest {
-  runId: string;
-  consultationId: string;
-  at: number;
-}
-
-/** A request older than this is stale (the reply never came into view): it opens nothing later. */
-export const CONSULT_REQUEST_FRESH_MS = 10_000;
-
-let pendingRequest: ConsultBlockRequest | null = null;
-const requestListeners = new Set<() => void>();
-
-export function requestConsultBlock(runId: string, consultationId: string, now = Date.now()) {
-  pendingRequest = { runId, consultationId, at: now };
-  for (const listener of requestListeners) listener();
-}
-
-/** The request waiting for this run's block, once (it is then used up); a stale one goes. */
-export function takeConsultBlockRequest(runId: string, now = Date.now()): ConsultBlockRequest | null {
-  const r = pendingRequest;
-  if (!r) return null;
-  if (now - r.at > CONSULT_REQUEST_FRESH_MS) {
-    pendingRequest = null;
-    return null;
-  }
-  if (r.runId !== runId) return null;
-  pendingRequest = null;
-  return r;
-}
-
-/** The last request for this run's block (it opens at that answer), else null. `runId` null: not listening. */
-export function useConsultBlockRequest(runId: string | null): ConsultBlockRequest | null {
-  const [hit, setHit] = useState<ConsultBlockRequest | null>(null);
-  useEffect(() => {
-    if (!runId) return;
-    const check = () => {
-      const r = takeConsultBlockRequest(runId);
-      if (r) setHit(r);
-    };
-    check();
-    requestListeners.add(check);
-    return () => {
-      requestListeners.delete(check);
-    };
-  }, [runId]);
-  // A row drawn again for another run keeps no request of the one before.
-  return hit?.runId === runId ? hit : null;
-}
-
-/**
- * Two agents talking (a question, work handed off, its answer) as one pill: "Caio ⇄ Theo · respondeu em 8 s". Its
- * state: still out, answered, or no answer (failed or expired).
- */
-export type TalkState = "waiting" | "answered" | "failed";
-
-export const talkState = (state: ConsultLineState): TalkState =>
-  state === "answered" ? "answered" : state === "failed" || state === "expired" ? "failed" : "waiting";
-
-/** What a stored card knows (`meta.consulted`, a `consult_reply` notice): how it ended. */
-export const talkStateOf = (status: string, answer: string | null | undefined): TalkState =>
-  status === "answered" && answer?.trim() ? "answered" : status === "open" ? "waiting" : "failed";
-
-/** The pill's words after the names, with the time (`formatLineTime`) when it is known. */
-export function talkStatus(state: TalkState, time: string | null) {
-  if (state === "failed") return { key: "chat.agentTalk.failed" as const, values: {} };
-  if (state === "answered")
-    return time
-      ? { key: "chat.agentTalk.answeredIn" as const, values: { time } }
-      : { key: "chat.agentTalk.answered" as const, values: {} };
-  return time
-    ? { key: "chat.agentTalk.waitingFor" as const, values: { time } }
-    : { key: "chat.agentTalk.waiting" as const, values: {} };
 }
 
 /** A stored card's id that opens the two agents' conversation: not the stand-in `consultationsOf` makes for none. */
@@ -407,7 +406,7 @@ export function firstOfRun(
 }
 
 /**
- * Where "Ver" on an answer's line goes on the phone: the message that draws the asking run's block (its first,
+ * Where "Ver" on an answer's line goes on the phone: the message that draws the asking run's row (its first,
  * `firstOfRun`), not the run's message nearest the notice when the run posted several; that one if none of the
  * run's messages is among `messages`.
  */

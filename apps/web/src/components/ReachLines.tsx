@@ -5,7 +5,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
 import { Icon } from "@agenteschat/ui";
 import { Trans, useTranslation } from "react-i18next";
-import { AgentTalkPill } from "@/components/ConsultGroup";
+import { ConsultPairRow, useConsultById } from "@/components/ConsultGroup";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -13,8 +13,8 @@ import "./agent-actions.css";
 
 /**
  * Under an agent's message, every agent it @named that its mention didn't wake (`meta.reach`), so nothing is silent:
- * one outside the conversation got it by direct message (Ver opens the two agents' conversation; who manages
- * channels may add it), or wasn't forwarded from a private one, one it couldn't call says why, and the agent's owner
+ * one outside the conversation got it by direct message (the two agents' pair row, opening their conversation; who
+ * manages channels may add it), or wasn't forwarded from a private one, one it couldn't call says why, and the agent's owner
  * can let that person talk to it. The team actions' rows (agent-actions.css).
  */
 export function ReachLines({ message }: { message: Message }) {
@@ -65,6 +65,7 @@ function ReachRow({
   const g = agentGrammar(agent?.name ?? `@${e.handle}`);
   const values = { ...g, place };
   const handed = Boolean(e.consultationId);
+  const talk = useConsultById(reachOpens(e) ? e.consultationId : undefined);
   const detail = [
     !handed && e.outside ? t("reach.outside", { place }) : null,
     e.routine ? t("reach.routine", { name: e.routine.name }) : null,
@@ -88,11 +89,11 @@ function ReachRow({
         {t("reach.add")}
       </button>
     );
-  // Handed to it by direct message: the two agents talking, as one pill that opens their conversation.
-  if (handed && reachOpens(e))
+  // Handed to it by direct message: the two agents talking, as the pair row that opens their conversation.
+  if (talk)
     return (
-      <div className="ac-talks ag-rc--talk">
-        <AgentTalkPill consultationId={e.consultationId} fromId={authorId} toId={e.agentId} />
+      <div className="ag-rc--talk">
+        <ConsultPairRow askerId={authorId} items={[talk]} />
         {addButton}
       </div>
     );

@@ -24,6 +24,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { type EntrySignal, QueueButton, useAgentMachineId } from "@/components/ComputerQueue";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useKeyboardLock } from "@/hooks/useKeyboardLock";
 import { useNow } from "@/hooks/useNow";
@@ -608,17 +609,32 @@ function Banner({
 }
 
 /**
- * "Computador" in the agent's DM header, for whoever may watch its computer: the same dialog, in place, with a
- * dot while the agent needs someone (amber) or works on it (its color).
+ * "Computador" in the agent's DM header: while turns wait for its computer, "Computador · 4 aguardando" opening the
+ * line (with a way on to the computer for whoever may watch it), else, for whoever may watch it, the same dialog in
+ * place, with a dot while the agent needs someone (amber) or works on it (its color).
  */
 export function ComputerButton({ agent }: { agent: Agent }) {
+  const view = useAgentComputer(agent);
+  const openComputer = useOpenComputer();
+  const signal = useEntrySignal(agent, view);
+  const watch = view.ready && !view.forbidden && view.facts;
+  return (
+    <QueueButton
+      machineId={useAgentMachineId(agent.id)}
+      signal={watch ? signal : undefined}
+      idle={watch ? <WatchButton agent={agent} signal={signal} /> : null}
+      onOpenComputer={watch ? () => openComputer(agent.id) : undefined}
+    />
+  );
+}
+
+/** What the DM header's computer button signals: its dot's state and the line a screen reader hears with it. */
+function useEntrySignal(agent: Agent, view: AgentComputerView): EntrySignal {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const view = useAgentComputer(agent);
-  const openComputer = useOpenComputer();
-  if (!view.ready || view.forbidden || !view.facts) return null;
   const f = view.facts;
+  if (!f) return {};
   const entry = entryState(f);
   const state =
     entry.kind === "needsYou" || entry.kind === "needsOther"
@@ -626,30 +642,36 @@ export function ComputerButton({ agent }: { agent: Agent }) {
       : entry.kind === "working" || entry.kind === "you" || entry.kind === "other"
         ? "live"
         : undefined;
-  const dot = { "--dot": gradientOf(colorOf(agent))[0] } as CSSProperties;
+  if (!state) return {};
+  return {
+    state,
+    style: state === "live" ? ({ "--dot": gradientOf(colorOf(agent))[0] } as CSSProperties) : undefined,
+    line: entryLine(t, entry, {
+      edition: f.edition,
+      locale: i18n.language,
+      computer: view.machine?.name ?? "",
+      lastSeenAt: null,
+      person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
+      step: null,
+      emailPromised: false,
+    }),
+  };
+}
+
+function WatchButton({ agent, signal }: { agent: Agent; signal: EntrySignal }) {
+  const { t } = useTranslation();
+  const openComputer = useOpenComputer();
   return (
     <Button
       size="sm"
       icon="computer"
       className="brw-dm"
-      data-state={state}
-      style={state === "live" ? dot : undefined}
+      data-state={signal.state}
+      style={signal.style}
       onClick={() => openComputer(agent.id)}
     >
       <span className="brw-dm__label">{t("agentComputer.button")}</span>
-      {state && (
-        <span className="ac-visually-hidden">
-          {entryLine(t, entry, {
-            edition: f.edition,
-            locale: i18n.language,
-            computer: view.machine?.name ?? "",
-            lastSeenAt: null,
-            person: (id) => dir.memberById.get(id)?.name ?? t("channel.unknownPerson"),
-            step: null,
-            emailPromised: false,
-          })}
-        </span>
-      )}
+      {signal.line && <span className="ac-visually-hidden">{signal.line}</span>}
     </Button>
   );
 }

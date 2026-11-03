@@ -1,26 +1,22 @@
 import { describe, expect, test } from "bun:test";
 import type { RunConsultation } from "../src/api/types";
 import {
-  CONSULT_REQUEST_FRESH_MS,
   consultAskedKey,
   consultBlocksNearEnd,
-  consultFarKey,
-  consultGroupKeys,
   consultGroupSummary,
   consultLineKey,
   consultLineState,
   consultLineTarget,
   consultNoticeFolds,
   consultOriginKey,
-  consultProgress,
+  consultPair,
   consultSeconds,
   consultsForLine,
   firstOfRun,
   foldsNotice,
   groupsByRun,
-  requestConsultBlock,
+  pairItemOf,
   shownConsultations,
-  takeConsultBlockRequest,
 } from "../src/lib/consult-group";
 
 const T0 = Date.parse("2026-10-29T10:00:00Z");
@@ -74,20 +70,6 @@ describe("consultLineState", () => {
 
 describe("the words of a block, by what its run asked or handed off (ADR 0095)", () => {
   const note = (over: Partial<RunConsultation> = {}) => q({ kind: "note", ...over });
-  test("its head and label: questions, work handed off, or both", () => {
-    expect(consultGroupKeys([q(), q({ kind: "question" })])).toEqual({
-      head: "chat.consultGroup.asked",
-      label: "chat.consultGroup.label",
-    });
-    expect(consultGroupKeys([note(), note()])).toEqual({
-      head: "chat.consultGroup.handed",
-      label: "chat.consultGroup.labelRequests",
-    });
-    expect(consultGroupKeys([q(), note()])).toEqual({
-      head: "chat.consultGroup.brought",
-      label: "chat.consultGroup.labelRequests",
-    });
-  });
   test("each line by its state; only a note that couldn't finish says so its own way", () => {
     expect(consultLineKey("working", note())).toBe("chat.consultGroup.working");
     expect(consultLineKey("waiting", note({ waiting: "approval" }))).toBe("chat.consultGroup.waitingApproval");
@@ -99,15 +81,13 @@ describe("the words of a block, by what its run asked or handed off (ADR 0095)",
     expect(consultLineKey("failed", note())).toBe("chat.consultation.failedNote");
     expect(consultLineKey("failed", q())).toBe("chat.consultation.failed");
   });
-  test("what was asked or handed, where it came from, and the line of an answer farther up", () => {
+  test("what was asked or handed, and where it came from", () => {
     expect(consultAskedKey(note())).toBe("chat.consultation.wrote");
     expect(consultAskedKey(q())).toBe("chat.consultation.asked");
     expect(consultOriginKey(note(), true)).toBe("chat.consultPanel.originNote");
     expect(consultOriginKey(note(), false)).toBe("chat.consultPanel.originNoteDm");
     expect(consultOriginKey(q(), true)).toBe("chat.consultPanel.origin");
     expect(consultOriginKey(q(), false)).toBe("chat.consultPanel.originDm");
-    expect(consultFarKey(note())).toBe("chat.consultGroup.answeredRequestFar");
-    expect(consultFarKey(q())).toBe("chat.consultGroup.answeredFar");
   });
 });
 
@@ -305,25 +285,84 @@ describe("consultsForLine", () => {
   });
 });
 
-describe("requestConsultBlock ('Ver' on an answer's line)", () => {
-  test("waits for its run's block and is used once; a stale one opens nothing", () => {
-    requestConsultBlock("r1", "q1", T0);
-    expect(takeConsultBlockRequest("r2", T0 + 100)).toBeNull();
-    expect(takeConsultBlockRequest("r1", T0 + 100)).toEqual({ runId: "r1", consultationId: "q1", at: T0 });
-    expect(takeConsultBlockRequest("r1", T0 + 200)).toBeNull();
-    requestConsultBlock("r1", "q1", T0);
-    expect(takeConsultBlockRequest("r1", T0 + CONSULT_REQUEST_FRESH_MS + 1)).toBeNull();
-    expect(takeConsultBlockRequest("r1", T0)).toBeNull();
+describe("consultPair (the row before the reply)", () => {
+  const now = T0 + 42_000;
+  test("one question answered: the two agents and how long it took, no word", () => {
+    const pair = consultPair([q({ status: "answered", answer: "Up 6 bp", answeredAt: iso(120) })], now);
+    expect(pair).toEqual({
+      faces: [{ agentId: "theo", off: false }],
+      opens: "q1",
+      word: null,
+      tone: null,
+      seconds: 120,
+    });
   });
-});
-
-test("an open line shows the work handed off so far; none before it posts, none once answered", () => {
-  const progress = { posts: 12, latest: "Gerei a imagem 40.\nSegue o lote.", at: iso(60) };
-  expect(consultProgress(q({ kind: "note", progress }))).toEqual({
-    key: "chat.consultGroup.posted",
-    values: { count: 12, latest: "Gerei a imagem 40. Segue o lote." },
+  test("still out: a short word by where it is and the clock since it went out", () => {
+    expect(consultPair([q()], now)).toMatchObject({
+      word: { key: "chat.consultPair.asking" },
+      tone: "live",
+      seconds: 42,
+    });
+    expect(consultPair([q({ kind: "note" })], now)?.word?.key).toBe("chat.consultPair.working");
+    expect(consultPair([q({ waiting: "approval" })], now)?.word?.key).toBe("chat.consultPair.waitingApproval");
+    expect(consultPair([q({ waiting: "input" })], now)?.word?.key).toBe("chat.consultPair.waitingInput");
+    expect(consultPair([q({ waiting: "computer" })], now)?.word?.key).toBe("chat.consultPair.waitingComputer");
+    expect(consultPair([q({ waiting: "outage" })], now)?.word?.key).toBe("chat.consultPair.waitingProvider");
+    expect(consultPair([q({ waiting: "agents" })], now)?.word?.key).toBe("chat.consultPair.handedOn");
   });
-  expect(consultProgress(q({ progress: null }))).toBeNull();
-  expect(consultProgress(q({ progress: { ...progress, posts: 0 } }))).toBeNull();
-  expect(consultProgress(q({ status: "answered", answer: "ok", progress }))).toBeNull();
+  test("unanswered: 'não respondeu' (a note: 'não terminou'), its face dimmed, no time", () => {
+    expect(consultPair([q({ status: "expired" })], now)).toEqual({
+      faces: [{ agentId: "theo", off: true }],
+      opens: "q1",
+      word: { key: "chat.consultPair.noAnswer" },
+      tone: "bad",
+      seconds: null,
+    });
+    expect(consultPair([q({ kind: "note", status: "failed" })], now)?.word?.key).toBe("chat.consultPair.notFinished");
+  });
+  test("several fold into one row: each agent once, the count while out, the whole span once in", () => {
+    const three = [
+      q({ id: "a", consultedAgentId: "atlas", status: "answered", answer: "A", answeredAt: iso(30) }),
+      q({ id: "b", consultedAgentId: "iris", createdAt: iso(5) }),
+      q({ id: "c", consultedAgentId: "rio", createdAt: iso(10) }),
+    ];
+    expect(consultPair(three, now)).toMatchObject({
+      faces: [
+        { agentId: "atlas", off: false },
+        { agentId: "iris", off: false },
+        { agentId: "rio", off: false },
+      ],
+      // The first still out opens.
+      opens: "b",
+      word: { key: "chat.consultGroup.progress", values: { done: 1, total: 3 } },
+      tone: "live",
+      seconds: 42,
+    });
+    const done = [
+      q({ id: "a", consultedAgentId: "atlas", status: "answered", answer: "A", answeredAt: iso(30) }),
+      q({ id: "b", consultedAgentId: "iris", status: "answered", answer: "B", answeredAt: iso(240) }),
+    ];
+    expect(consultPair(done, now)).toMatchObject({ opens: "a", word: null, tone: null, seconds: 240 });
+    const some = [done[0], q({ id: "b", consultedAgentId: "iris", status: "failed" })] as RunConsultation[];
+    expect(consultPair(some, now)).toMatchObject({
+      faces: [
+        { agentId: "atlas", off: false },
+        { agentId: "iris", off: true },
+      ],
+      word: { key: "chat.consultPair.someAnswered", values: { done: 1, total: 2 } },
+      tone: "bad",
+      seconds: null,
+    });
+  });
+  test("a reply's `meta.consulted` entry: closed, no times", () => {
+    const item = pairItemOf({ agentId: "theo", consultationId: "k1", status: "answered", question: "?", answer: "!" });
+    expect(consultPair([item], now)).toEqual({
+      faces: [{ agentId: "theo", off: false }],
+      opens: "k1",
+      word: null,
+      tone: null,
+      seconds: null,
+    });
+    expect(consultPair([], now)).toBeNull();
+  });
 });

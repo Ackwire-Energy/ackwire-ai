@@ -1,25 +1,6 @@
 import { expect, test } from "bun:test";
-import { openableConsultation, talkState, talkStateOf, talkStatus } from "../src/lib/consult-group";
+import { openableConsultation } from "../src/lib/consult-group";
 import { forPeople, previewOf, withoutRelayLine } from "../src/lib/consultations";
-
-test("the pill's state: out (working, waiting, offline, handed on), answered, or no answer", () => {
-  for (const s of ["working", "waiting", "offline", "handedOn"] as const) expect(talkState(s)).toBe("waiting");
-  expect(talkState("answered")).toBe("answered");
-  expect(talkState("failed")).toBe("failed");
-  expect(talkState("expired")).toBe("failed");
-  expect(talkStateOf("answered", "ok")).toBe("answered");
-  expect(talkStateOf("answered", "  ")).toBe("failed");
-  expect(talkStateOf("open", null)).toBe("waiting");
-  expect(talkStateOf("expired", null)).toBe("failed");
-});
-
-test("the pill's words after the names, with the time when known", () => {
-  expect(talkStatus("answered", "8 s")).toEqual({ key: "chat.agentTalk.answeredIn", values: { time: "8 s" } });
-  expect(talkStatus("answered", null)).toEqual({ key: "chat.agentTalk.answered", values: {} });
-  expect(talkStatus("waiting", "12 s")).toEqual({ key: "chat.agentTalk.waitingFor", values: { time: "12 s" } });
-  expect(talkStatus("waiting", null)).toEqual({ key: "chat.agentTalk.waiting", values: {} });
-  expect(talkStatus("failed", "3 s")).toEqual({ key: "chat.agentTalk.failed", values: {} });
-});
 
 test("only a real consultation id opens the conversation, not the stand-in for none", () => {
   expect(openableConsultation("8f0c1c0e-0000-4000-8000-000000000001")).toBe("8f0c1c0e-0000-4000-8000-000000000001");

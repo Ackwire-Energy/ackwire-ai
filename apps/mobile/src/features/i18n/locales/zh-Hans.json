@@ -333,20 +333,6 @@
       "back": "已重新连接"
     },
     "longPressHint": "长按以回应并查看更多操作",
-    "consult": {
-      "answered": "{{name}} 已回答",
-      "expiredF": "{{name}} 没有及时回答",
-      "expiredM": "{{name}} 没有及时回答",
-      "failedF": "{{name}} 无法回答",
-      "failedM": "{{name}} 无法回答",
-      "answerOfF": "{{name}} 的回答",
-      "answerOfM": "{{name}} 的回答",
-      "noAnswer": "没有回答。",
-      "privateFF": "{{from}} 和 {{to}} 的私下对话",
-      "privateFM": "{{from}} 和 {{to}} 的私下对话",
-      "privateMF": "{{from}} 和 {{to}} 的私下对话",
-      "privateMM": "{{from}} 和 {{to}} 的私下对话"
-    },
     "file": "文件",
     "fileOpen": "点按打开",
     "fileDeleted": "文件已移除",

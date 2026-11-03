@@ -39,6 +39,7 @@ import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReduce
 import { AgentFace, AgentWho, Face } from "../shared/Face";
 import { useDirectory, useNow, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
+import { ConsultPairRow, useRunConsults } from "./ConsultGroup";
 import {
   type LineDrawn,
   type LineWords,
@@ -100,6 +101,10 @@ export const TurnRow = memo(function TurnRow({
   const waiting = waitsForWords(run);
   const wordsOnTop = !said && lines.length === 0;
   const now = useNow(1000);
+  // Asking other agents before it posted anything: the pair row stands right before this row (its reply takes it).
+  const consults = useRunConsults(run.runId, run, null);
+  const pair =
+    consults.length > 0 ? <ConsultPairRow askerId={run.agentId} channelId={run.channelId} items={consults} /> : null;
   const since = run.startedAt ?? run.since ?? null;
   const secs = since ? Math.max(0, now - since) : 0;
   const word = t(`mobile.chat.turn.${phase}`);
@@ -128,52 +133,58 @@ export const TurnRow = memo(function TurnRow({
 
   if (waiting)
     return (
-      <View style={styles.msg}>
-        <View style={styles.avslot}>
-          <AgentFace agentId={run.agentId} size={32} mode="think" />
+      <>
+        {pair}
+        <View style={styles.msg}>
+          <View style={styles.avslot}>
+            <AgentFace agentId={run.agentId} size={32} mode="think" />
+          </View>
+          <WaitLine work={run.work} color={color} />
         </View>
-        <WaitLine work={run.work} color={color} />
-      </View>
+      </>
     );
   return (
-    <View style={styles.msg}>
-      <View style={styles.avslot}>
-        <AgentFace agentId={run.agentId} size={32} mode={live ? (phase === "writing" ? "run" : "think") : "idle"} />
-      </View>
-      <View style={styles.body}>
-        <View style={styles.who}>
-          <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
-            {agent?.name ?? ""}
-          </Text>
-          {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
-              `RunClock`); "parado" once stopped. */}
-          <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
-            {live ? (
-              <Text variant="footnote" tone="faint">
-                {when.time(new Date(since ?? mountedAt).toISOString())}
-              </Text>
-            ) : (
-              <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-                {word}
-                {took}
-              </Text>
-            )}
-          </View>
+    <>
+      {pair}
+      <View style={styles.msg}>
+        <View style={styles.avslot}>
+          <AgentFace agentId={run.agentId} size={32} mode={live ? (phase === "writing" ? "run" : "think") : "idle"} />
         </View>
-        {/* Nothing said and no steps yet: the words stream where the opener stands, so the line it opens
-            with stays put when a tool call turns it into narration. */}
-        {wordsOnTop && run.text ? (
-          <RevealText text={run.text} live={phase === "writing"} accent={color} />
-        ) : said ? (
-          <View style={styles.say}>
-            <MessageText body={said} selectable={false} />
+        <View style={styles.body}>
+          <View style={styles.who}>
+            <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
+              {agent?.name ?? ""}
+            </Text>
+            {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
+              `RunClock`); "parado" once stopped. */}
+            <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
+              {live ? (
+                <Text variant="footnote" tone="faint">
+                  {when.time(new Date(since ?? mountedAt).toISOString())}
+                </Text>
+              ) : (
+                <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+                  {word}
+                  {took}
+                </Text>
+              )}
+            </View>
           </View>
-        ) : null}
-        {run.text && !wordsOnTop ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
-        {/* Its tools last, where its saved reply keeps them. */}
-        <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
+          {/* Nothing said and no steps yet: the words stream where the opener stands, so the line it opens
+            with stays put when a tool call turns it into narration. */}
+          {wordsOnTop && run.text ? (
+            <RevealText text={run.text} live={phase === "writing"} accent={color} />
+          ) : said ? (
+            <View style={styles.say}>
+              <MessageText body={said} selectable={false} />
+            </View>
+          ) : null}
+          {run.text && !wordsOnTop ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
+          {/* Its tools last, where its saved reply keeps them. */}
+          <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
+        </View>
       </View>
-    </View>
+    </>
   );
 });
 

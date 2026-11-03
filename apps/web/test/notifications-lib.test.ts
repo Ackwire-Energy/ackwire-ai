@@ -134,7 +134,13 @@ describe("grouping and order", () => {
     );
     expect(isExpandable(notification({ id: "i", kind: "issue_comment", count: 2, source: { issueId: "i1" } }))).toBe(
       true,
-    );
+    ); // A shared failure row expands on the agents it lists, whatever its count says.
+    const failure = (agentId: string) => ({ key: agentId, agentId, channelId: "c", messageId: "m" });
+    expect(
+      isExpandable(
+        notification({ id: "rf", kind: "run_failed", count: 1, latest: { failures: [failure("a1"), failure("a2")] } }),
+      ),
+    ).toBe(true);
   });
 });
 

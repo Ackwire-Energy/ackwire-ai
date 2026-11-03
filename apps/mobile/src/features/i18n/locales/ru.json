@@ -378,20 +378,6 @@
       "back": "Снова на связи"
     },
     "longPressHint": "Удерживайте, чтобы отреагировать и увидеть другие действия",
-    "consult": {
-      "answered": "{{name}}: есть ответ",
-      "expiredF": "{{name}} не ответила вовремя",
-      "expiredM": "{{name}} не ответил вовремя",
-      "failedF": "{{name}} не смогла ответить",
-      "failedM": "{{name}} не смог ответить",
-      "answerOfF": "Ответ: {{name}}",
-      "answerOfM": "Ответ: {{name}}",
-      "noAnswer": "Ответа нет.",
-      "privateFF": "Личный чат: {{from}} и {{to}}",
-      "privateFM": "Личный чат: {{from}} и {{to}}",
-      "privateMF": "Личный чат: {{from}} и {{to}}",
-      "privateMM": "Личный чат: {{from}} и {{to}}"
-    },
     "file": "Файл",
     "fileOpen": "Нажмите, чтобы открыть",
     "fileDeleted": "Файл удалён",
