@@ -1,4 +1,4 @@
-/* The task manager (ADR 0127): the agents' cards, the tasks now and what ended today, on one page. */
+/* The task manager (ADR 0128): the agents' cards, the tasks now and what ended today, on one page. */
 .tm {
   gap: 18px;
   /* "Tempo" warms as a task goes on (full at 40 min), like an operating system's task manager. */
@@ -421,7 +421,7 @@ html:not([data-pointer]) .tm-more:focus-visible {
   }
 }
 
-/* "Computadores" (ADR 0127): the computers with work, whether each has room, and "Ver fila". No memory figure. */
+/* "Computadores" (ADR 0128): the computers with work, whether each has room, and "Ver fila". No memory figure. */
 .tm-computers {
   display: flex;
   flex-direction: column;

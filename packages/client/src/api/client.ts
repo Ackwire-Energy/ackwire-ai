@@ -580,7 +580,7 @@ export interface ApiClient {
     run(orgId: string, runId: string): Promise<{ run: Run; steps: RunStep[] }>;
     /**
      * "Parar": stops a run (the person who started it, the agent's owner, admins). The agent is told, with `reason`
-     * when given (ADR 0127).
+     * when given (ADR 0128).
      */
     cancelRun(orgId: string, runId: string, reason?: string): Promise<void>;
     /** "Dizer por quê" after stopping a task (only who stopped it, once): the agent reads it. */
@@ -789,6 +789,8 @@ export interface ApiClient {
     desktopLatest(target: string, arch: string): Promise<DesktopRelease | null>;
     /** Offline computers that agents wait for, and where they could move. */
     outages(orgId: string): Promise<MachineOutages>;
+    /** A computer's line: the turns working on it and the runs waiting for room, in order. */
+    queue(orgId: string, machineId: string): Promise<ComputerQueue>;
     /** Moves waiting agents off an offline computer (their waiting runs follow where they can). */
     moveAgents(orgId: string, machineId: string, input: MoveAgentsInput): Promise<MoveAgentsResult>;
     /**
@@ -1404,12 +1406,10 @@ export interface ApiClient {
   /** "Trabalhando agora": agent runs in progress in the conversations you are in (any member). */
   working?: {
     list(orgId: string): Promise<WorkingRun[]>;
-    /** The task manager (ADR 0127): tasks now, what each uses, each agent's last hour, what ended since `since`. */
+    /** The task manager (ADR 0128): tasks now, what each uses, each agent's last hour, what ended since `since`. */
     taskManager?(orgId: string, since?: string): Promise<TaskManagerView>;
     /** A task's steps for "Ver passos", to whoever sees it in the task manager (no inputs, no outputs). */
     taskSteps?(orgId: string, runId: string): Promise<TaskSteps>;
-    /** A computer's line ("Ver fila"): what runs on it and who waits for room, in order (ADR 0127). */
-    computerQueue?(orgId: string, machineId: string): Promise<ComputerQueue>;
   };
   /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio, the rest by IMAP/SMTP. */
   mail: {

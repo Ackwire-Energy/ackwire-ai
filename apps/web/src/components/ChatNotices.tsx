@@ -148,7 +148,7 @@ export function NoticeLine({ message }: { message: Message }) {
   const dir = useDirectory(org.id);
   const notice = noticeOf(message.meta);
   if (!notice) return null;
-  // A person stopped one of the agent's tasks (ADR 0127): its own calm line, with "Dizer por quê" for who stopped it.
+  // A person stopped one of the agent's tasks (ADR 0128): its own calm line, with "Dizer por quê" for who stopped it.
   const stopped = stoppedNoticeOf(message.meta);
   if (stopped) return <StoppedLine message={message} notice={stopped} />;
   // Another agent's answer with its consultation: the same card as a reply that waited for it (who asked

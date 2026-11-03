@@ -3,7 +3,7 @@ import { isSafeId } from "@/features/shared/logic";
 import { AgentTasksScreen } from "@/features/task-manager/AgentTasksScreen";
 
 /**
- * An agent's tasks (`/agent-tasks/<agentId>?channel=…&thread=…`), pushed from its DM's header (ADR 0127): the
+ * An agent's tasks (`/agent-tasks/<agentId>?channel=…&thread=…`), pushed from its DM's header (ADR 0128): the
  * conversation it came from tags its tasks there.
  */
 export default function AgentTasksRoute() {

@@ -7,19 +7,17 @@ import {
   agentTasksHref,
   agentTasksOf,
   computerLine,
-  computerQueueHref,
   doneTodayOf,
   endedLatestFirst,
   endedText,
   groupLine,
   isHere,
+  lineStartText,
   rowState,
   stateText,
-  tasksBadge,
   taskStateText,
   taskSubline,
-  turnSub,
-  turnTitle,
+  tasksBadge,
   usingNow,
 } from "../../src/features/task-manager/logic";
 import { translator } from "./fixtures";
@@ -67,7 +65,7 @@ const ended = (over: Partial<EndedTask> & { runId: string }): EndedTask => ({
 
 const NONE: ReadonlySet<string> = new Set();
 
-describe("a task's row (ADR 0127)", () => {
+describe("a task's row (ADR 0128)", () => {
   test("its state: working, waiting on an ok or an answer, queued, and stopping once asked here", async () => {
     const t = await translator("pt-BR");
     const said = (over: Partial<ManagedTask>, stopping = NONE) =>
@@ -248,8 +246,9 @@ describe("an agent's tasks, from its DM's header", () => {
   });
 });
 
-describe("a computer's line (ADR 0127)", () => {
-  const full = { machineId: "m1", position: 2, of: 3, people: false, since: null };
+describe("a computer's line (ADR 0128)", () => {
+  const now = Date.parse("2026-11-02T14:00:00.000Z");
+  const full = { machineId: "m1", position: 2, of: 3, people: false, estimatedStartAt: null };
 
   test("a task waiting for room on its computer says its place, not just that the computer is full", async () => {
     const t = await translator("pt-BR");
@@ -268,34 +267,25 @@ describe("a computer's line (ADR 0127)", () => {
     expect(computerLine(t, { working: 0, inLine: 0 })).toBe("Tem espaço");
   });
 
-  test("a turn says what it is for only to who sees it; otherwise whose it is", async () => {
+  test("under its place, when it should start, in the computer line's words; nothing without an estimate", async () => {
     const t = await translator("pt-BR");
-    const seen = { kind: "person" as const, who: "Ana", label: "Mensagem em #vendas" };
-    expect(turnTitle(t, seen, "Vendas")).toBe("Vendas · Mensagem em #vendas");
-    expect(turnSub(t, seen, "line", "2 min")).toBe("Pedido de Ana · esperando há 2 min");
-    const hidden = { kind: "person" as const, who: null, label: null };
-    expect(turnTitle(t, hidden, "Dev")).toBe("Dev · Pedido de uma pessoa");
-    expect(turnSub(t, hidden, "working", "6 min")).toBe("há 6 min");
-    expect(turnTitle(t, { kind: "routine", who: "Fechar o caixa", label: null }, "Finanças")).toBe(
-      "Finanças · Rotina «Fechar o caixa»",
-    );
-    expect(turnTitle(t, { kind: "agent", who: "Dev", label: null }, "Pesquisa")).toBe("Pesquisa · Pedido de Dev");
-    expect(turnSub(t, hidden, "line", null)).toBe("");
-  });
-
-  test("a turn's place, and where the line opens", async () => {
-    const t = await translator("pt-BR");
-    expect(t("taskManager.queue.place", { position: 2 })).toBe("2º");
-    expect(computerQueueHref("m1")).toBe("/computer-queue/m1");
+    const soon = task({
+      runId: "r1",
+      status: "waiting_input",
+      held: "computer_busy",
+      line: { ...full, estimatedStartAt: "2026-11-02T14:03:00.000Z" },
+    });
+    expect(lineStartText(t, soon, now)).toBe("começa em ~3 min");
+    expect(lineStartText(t, { ...soon, line: full }, now)).toBeNull();
+    expect(lineStartText(t, task({ runId: "r2" }), now)).toBeNull();
   });
 });
 
 describe("navigation", () => {
-  test("the task manager, a task, an agent's tasks and a computer's line are pushed screens, in the stack", () => {
+  test("the task manager, a task and an agent's tasks are pushed screens, in the stack", () => {
     const layout = readFileSync(join(APP, "_layout.tsx"), "utf8");
     expect(layout).toContain(`name="task-manager/index" options={{ ...pushed, ...scrollUnder }}`);
     expect(layout).toContain(`name="task-manager/[runId]" options={{ ...pushed, ...scrollUnder }}`);
     expect(layout).toContain(`name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }}`);
-    expect(layout).toContain(`name="computer-queue/[machineId]" options={{ ...pushed, ...scrollUnder }}`);
   });
 });

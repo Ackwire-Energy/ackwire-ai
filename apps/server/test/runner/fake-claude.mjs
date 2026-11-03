@@ -265,6 +265,13 @@ async function answer(line) {
       parent_tool_use_id: null,
     });
   }
+  // "SERVE": the model starts a dev server in the background; it runs until a later "UNSERVE" stops it.
+  if (prompt.includes("SERVE") && !prompt.includes("UNSERVE")) {
+    out({ type: "system", subtype: "task_started", task_id: "srv", tool_use_id: "v1", is_backgrounded: true });
+  }
+  if (prompt.includes("UNSERVE")) {
+    out({ type: "system", subtype: "task_updated", task_id: "srv", patch: { status: "killed" } });
+  }
   const marker = log ? path.join(path.dirname(log), "crashed") : "";
   if (prompt.includes("CRASH") && marker && !existsSync(marker)) {
     writeFileSync(marker, "");

@@ -43,6 +43,12 @@ export interface ToolSpec {
   description: string;
   /** JSON Schema (object) of the tool input. */
   inputSchema: Record<string, unknown>;
+  /**
+   * The same in every run of the agent, whatever else loads: the stable tools are sent first and the others after
+   * (each part sorted by name), with a prompt-cache breakpoint after the last stable one where the provider takes it,
+   * so loading a tool group doesn't throw away the cached tools before it.
+   */
+  stable?: boolean;
 }
 
 export interface ModelRequest {
@@ -59,6 +65,12 @@ export interface ModelRequest {
    * `none`: the least the model allows (its catalog `leastThinking`), else `low`.
    */
   effort?: "none" | "low" | "medium" | "high";
+  /**
+   * `1h`: the breakpoints of the stable prefix (stable tools, system blocks marked `cache`) last an hour where the
+   * provider offers it (Anthropic's extended TTL, written at 2× the input price); the conversation's tail keeps the
+   * 5-minute default. Absent: 5 minutes everywhere.
+   */
+  cacheTtl?: "1h";
   signal?: AbortSignal;
 }
 
@@ -67,6 +79,8 @@ export interface ModelUsage {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  /** Of `cacheWriteTokens`, those written to the 1-hour cache (`cacheTtl`), priced higher; absent: none. */
+  cacheWriteLongTokens?: number;
 }
 
 export type StopReason = "end_turn" | "max_tokens" | "refusal" | "tool_use" | "other";
@@ -116,6 +130,8 @@ export interface PartialUsage {
   inputTokens: number | null;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  /** Of `cacheWriteTokens`, those written to the 1-hour cache. */
+  cacheWriteLongTokens?: number;
   /** Output tokens reported by the provider so far, or null when it reported none. */
   outputTokens: number | null;
   /** Characters of output received (text and tool input), for a local estimate. */
@@ -149,6 +165,12 @@ export function promptChars(request: Pick<ModelRequest, "system" | "messages" | 
   const tools = request.tools ? JSON.stringify(request.tools).length : 0;
   return system + messages + tools;
 }
+
+/** Tools in the order providers send them: the stable ones, then the others, each part sorted by name. */
+export const stableToolsFirst = <T extends Pick<ToolSpec, "name" | "stable">>(tools: readonly T[]): T[] => {
+  const byName = [...tools].sort((a, b) => a.name.localeCompare(b.name));
+  return [...byName.filter((t) => t.stable), ...byName.filter((t) => !t.stable)];
+};
 
 /** Concatenated text of a message content. */
 export const textOf = (content: string | ContentBlock[]) =>

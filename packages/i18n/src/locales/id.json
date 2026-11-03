@@ -1480,6 +1480,7 @@
     "outage_other": "{{names}}: penyedia AI sedang gangguan · mencoba lagi sendiri",
     "queued_other": "{{names}} sedang antre untuk komputer",
     "away_other": "{{names}} menunggu komputer",
+    "queuedNext": "{{names}} mengantre untuk komputer · berikutnya",
     "nobody": "Tidak ada agen yang akan menjawab",
     "status": {
       "seen": "Sudah melihat",
@@ -2782,6 +2783,7 @@
     "runsEmpty": "Tidak ada proses yang cocok dengan “{{q}}”.",
     "runsNone": "Belum ada proses.",
     "runNoText": "Tanpa teks",
+    "runPrivate": "Dalam percakapan yang tidak kamu ikuti",
     "runTokens": "{{input}} masuk · {{cached}} dari cache · {{output}} keluar",
     "runTokensTip": "{{input}} token input baru, {{cached}} dibaca dari cache (lebih murah), {{output}} output",
     "budgetHelp": "Saat mencapai batas, {{name}} berhenti dan memberi tahu di kanal. {{ownerNote}}",
@@ -7213,9 +7215,73 @@
     "uses": {
       "title": "Agen yang memakai halaman ini",
       "count_other": "kali dipakai dalam 7 hari terakhir",
+      "week_other": "{{count}} kali dirujuk minggu ini",
       "last": "{{name}} memakainya {{when}}",
       "lastIn": "{{name}} memakainya {{when}}, saat menjawab di #{{channel}}",
       "none": "Belum ada agen yang memakainya. Halaman ini masuk ke jawaban saat seseorang bertanya tentang topiknya."
+    },
+    "editedWhen": "mengedit {{when}}",
+    "access": {
+      "label": "Siapa yang melihat: {{who}}",
+      "everyone": "Seluruh ruang kerja",
+      "everyoneHint": "Setiap anggota dan setiap agen dengan akses ke wiki membaca halaman ini.",
+      "peopleAnd": "Semua orang dan {{agents}}",
+      "peopleOnly": "Semua orang, tanpa agen",
+      "ownersOnly": "Hanya pemilik",
+      "withAllAgents": "{{names}} dan semua agen",
+      "more_other": "{{count}} lagi"
+    },
+    "backlinkDm": "Percakapan dengan {{name}}",
+    "backlinkDmSomeone": "seseorang",
+    "draftKept": "Draf disimpan",
+    "draftRecovered": "Draf dipulihkan",
+    "markdown": "Markdown",
+    "markdownHint": "Lihat dan edit teks sebagai Markdown",
+    "props": {
+      "folderHint": "Folder halaman",
+      "noFolder": "Tanpa folder",
+      "searchFolder": "Cari folder",
+      "createFolder": "Buat folder “{{name}}”",
+      "addTag": "Tag",
+      "removeTag": "Hapus #{{tag}}"
+    },
+    "rich": {
+      "placeholder": "Tulis di sini. [[ menautkan halaman lain dan / menampilkan blok.",
+      "hint": "[[ menautkan halaman · / menampilkan blok · {{key}} S menyimpan versi",
+      "blockLabel": "Jenis blok",
+      "strike": "Coret",
+      "linkPage": "Tautkan halaman",
+      "column": "Kolom",
+      "addRow": "Baris",
+      "addColumn": "Kolom",
+      "calloutText": "Tulis sorotan di sini.",
+      "codeText": "kode",
+      "blocks": {
+        "paragraph": "Paragraf",
+        "heading": "Judul",
+        "subheading": "Subjudul",
+        "list": "Daftar",
+        "numbered": "Daftar bernomor",
+        "task": "Tugas",
+        "table": "Tabel",
+        "callout": "Sorotan",
+        "code": "Kode",
+        "quote": "Kutipan",
+        "rule": "Pemisah",
+        "link": "Halaman wiki"
+      }
+    },
+    "ask": {
+      "button": "Minta agen",
+      "title": "Minta agen",
+      "text": "Permintaan masuk ke percakapanmu dengan agen, beserta tautan halaman. Agen mengedit dengan alat wiki, dan versinya tercatat di riwayat sebagai atas permintaanmu.",
+      "agent": "Agen",
+      "what": "Apa yang perlu diubah?",
+      "placeholder": "Mis.: perbarui dengan kenaikan harga 2027",
+      "send": "Kirim ke {{name}}",
+      "sendNone": "Kirim",
+      "sent": "Permintaan terkirim di percakapanmu dengan {{name}}.",
+      "message": "Tentang halaman [[{{title}}]]:"
     },
     "import": {
       "cta": "Impor dari Obsidian",
@@ -7476,6 +7542,67 @@
       "label": "Komputer",
       "none": "Tanpa komputer",
       "noneText": "Tidak menjalankan program atau menyimpan file"
+    }
+  },
+  "queue": {
+    "button_other": "Komputer · {{count}} menunggu",
+    "buttonIdle": "Komputer",
+    "see": "Lihat antrean",
+    "label": "Antrean {{name}}",
+    "full": "Penuh",
+    "fullNext": "Penuh · berikutnya mulai sekitar {{n}} mnt lagi",
+    "free": "Tidak ada yang mengantre",
+    "workingNow": "Sedang bekerja · {{n}}",
+    "inLine": "Dalam antrean · {{n}}",
+    "allStarted": "semua mulai dalam ~{{n}} mnt",
+    "nothingWorking": "Tidak ada yang berjalan sekarang",
+    "rule": "Orang didahulukan. Agen yang disebut bersamaan mulai satu per satu.",
+    "youFirst": "Kamu duluan",
+    "startsIn": "mulai ~{{n}} mnt lagi",
+    "startsAfter": "mulai setelah {{after}} selesai",
+    "left": "sisa ~{{n}} mnt",
+    "who": "{{name}}",
+    "away": "Pergi {{time}}",
+    "purpose": {
+      "you": "menjawab kamu",
+      "person": "menjawab {{name}}",
+      "someone": "menjawab seseorang",
+      "agent": "diminta {{name}}",
+      "someAgent": "diminta agen",
+      "routine": "rutinitas",
+      "work": "kerja panjang"
+    },
+    "where": {
+      "yourDm": "DM kamu",
+      "dm": "DM dengan {{name}}",
+      "thread": "thread di #{{name}}",
+      "private": "percakapan pribadi"
+    },
+    "live": {
+      "nextEta": "Menunggu komputer. Giliran berikutnya, sekitar {{n}} mnt lagi",
+      "nextAfter": "Menunggu komputer. Giliran berikutnya setelah {{after}} selesai",
+      "next": "Menunggu komputer. Giliran berikutnya",
+      "behind": "Dalam antrean, ke-{{nth}}. Setelah {{names}}",
+      "position": "Dalam antrean, ke-{{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}",
+      "two": "{{n}}",
+      "few": "{{n}}",
+      "other": "{{n}}"
+    },
+    "fan": {
+      "called_other": "{{count}} agen dipanggil",
+      "answered_other": "{{count}} menjawab",
+      "working_other": "{{count}} bekerja",
+      "inLine_other": "{{count}} mengantre",
+      "failed_other": "{{count}} tidak menjawab",
+      "chip": {
+        "answered": "menjawab",
+        "working": "bekerja",
+        "inLine": "mengantre",
+        "failed": "tidak menjawab"
+      }
     }
   },
   "access": {
@@ -8656,6 +8783,7 @@
     "clearSearch": "Hapus pencarian",
     "noMatch": "Tidak ada hasil untuk “{{q}}”.",
     "noTools": "Server ini tidak menyediakan alat apa pun.",
+    "unreadable": "Tidak dapat membaca alat konektor: {{reason}}",
     "refresh": "Cari alat baru",
     "decideTitle": "Butuh keputusanmu · {{count}}",
     "decideHelp": "Namanya tidak menjelaskan fungsinya. Konfirmasi saran atau pilih yang lain.",
@@ -10339,13 +10467,14 @@
   "usageViews": {
     "signedOut": "Sudah keluar",
     "whose": "Milik {{name}}",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "Batasnya muncul setelah akun ini dipakai lagi.",
     "unused": "Tidak ada agen yang memakai akun ini.",
     "usesNow": "sedang memakainya",
     "monthTokens": "{{tokens}} token bulan ini",
     "tokens": "{{tokens}} token",
     "equivalent": "≈ {{amount}} lewat API",
+    "thisMonth": "Bulan ini",
+    "moreAgents_other": "+{{count}} agen",
     "paid": "{{amount}} dibayar",
     "budgetShare": "{{percent}} dari anggaran",
     "estimate": "Paket hanya memberi tahu pemakaian seluruh akun. Bagian tiap agen adalah perkiraan, dari pemakaian masing-masing.",
@@ -10866,9 +10995,9 @@
       "issue_work_start": "Tolong kerjakan tugas #{{number}}.",
       "issue_taken": "Mengambil tugas #{{number}}.",
       "done": "Selesai.",
-      "stretch_paused_runs_other": "{{agents}} berhenti untuk memastikan denganmu · {{steps}} langkah tanpamu sejak permintaanmu",
-      "stretch_paused_spend_other": "{{agents}} berhenti untuk memastikan denganmu · memakai {{percent}}% anggaran bulan ini untuk ini tanpamu",
-      "stretch_paused_spend_cost_other": "{{agents}} berhenti untuk memastikan denganmu · memakai {{amount}} ({{percent}}% anggaran bulan ini) untuk ini tanpamu",
+      "stretch_paused_runs_other": "{{agents}} berhenti sebentar untuk memastikan denganmu sebelum lanjut",
+      "stretch_paused_spend_other": "{{agents}} berhenti untuk memastikan denganmu · memakai {{percent}}% anggaran bulan ini",
+      "stretch_paused_spend_cost_other": "{{agents}} berhenti untuk memastikan denganmu · memakai {{amount}} ({{percent}}% anggaran bulan ini)",
       "memory": {
         "proposed": "Usulan dibuat: {{text}}",
         "forgot": "Memori diperbarui: melupakan \"{{text}}\".",
@@ -12072,25 +12201,10 @@
     "activity": "30 menit terakhir",
     "failed": "Tidak bisa menghentikannya. Coba lagi.",
     "queue": {
-      "title": "Antrean komputer",
-      "sub": "{{name}} · semua orang di ruang kerja melihat urutan yang sama",
       "see": "Lihat antrean",
       "full_other": "Penuh · {{count}} antre",
       "room": "Ada tempat",
-      "working": "Sedang bekerja",
-      "line": "Dalam antrean",
-      "first": "Kamu duluan",
-      "place": "ke-{{position}}",
-      "waiting": "menunggu {{time}}",
-      "running": "selama {{time}}",
-      "person": "Diminta oleh {{name}}",
-      "personHidden": "Diminta oleh seseorang",
-      "agent": "Diminta oleh {{name}}",
-      "routine": "Rutinitas «{{name}}»",
-      "empty": "Tidak ada yang antre.",
-      "note": "Orang didahulukan. Agen yang dipanggil bersamaan mulai satu per satu, sesuai urutan dipanggil.",
-      "computers": "Komputer",
-      "back": "Kembali ke tugas"
+      "computers": "Komputer"
     },
     "navWhat": "Apa yang sedang dikerjakan tiap agen, dan hentikan yang perlu",
     "cards": {

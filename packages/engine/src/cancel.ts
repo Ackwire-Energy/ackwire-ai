@@ -3,6 +3,8 @@ import { and, type Database, type Executor, eq, gte, inArray, schema, sql } from
 import { announceAgentStatus } from "./agent-status";
 import { recordAudit } from "./audit";
 import { personOfMessage } from "./authority";
+import { lineMachineOf, publishQueueChanged } from "./computer-queue";
+import { INBOX_JOB } from "./dispatch";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
@@ -11,8 +13,8 @@ import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
 import { can, type Membership, requireActiveMembership } from "./organizations";
 import { type AgentQuestionRow, publishQuestion, syncQuestionMessage } from "./questions";
 import { closeRoutineRun } from "./routine-ledger";
-import { tellAgentStopped } from "./run-stopped";
 import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
+import { tellAgentStopped } from "./run-stopped";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
 import { standingErrorDetail } from "./standing";
@@ -224,7 +226,7 @@ export async function cancelRun(
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
   const stopped = await stopRun(deps, orgId, row.run, row.channelKind, { type: "person", id: userId }, options);
-  // The agent is told (ADR 0127), unless the stop came with a message to it ("Parar e mandar": that message says it)
+  // The agent is told (ADR 0128), unless the stop came with a message to it ("Parar e mandar": that message says it)
   // or the agent stopped it itself on a person's word (`tell: false`).
   if (!options.stopMessageId && options.tell !== false) {
     await tellAgentStopped(deps, row.run, stopped.previousStatus, userId, options.reason).catch(() => null);
@@ -253,9 +255,11 @@ export async function stopRun(
   const error = actor.type === "person" ? `canceled_by:${actor.id}` : actor.reason;
   let run = start;
   let previous: RunStatus = run.status;
+  let line: string | null = null;
   for (let attempt = 0; ; attempt++) {
     if (isTerminal(run.status)) throw new ConflictError("This task already ended", "run_finished");
     previous = run.status;
+    line = lineMachineOf(run);
     const status = run.status;
     let closedSecrets: SecretRequestRow[] = [];
     let closedQuestions: AgentQuestionRow[] = [];
@@ -346,6 +350,7 @@ export async function stopRun(
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
   // Its line ends with the run (ADR 0084 §11).
   await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
+  if (line) await publishQueueChanged(deps.pubsub, run.orgId, line);
   if (previous !== "running" && run.background) {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, ...bg, status: "canceled" });
@@ -408,6 +413,17 @@ export async function stopOrgWork(
         eq(agentRuns.orgId, orgId),
         inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
         agentId ? eq(agentRuns.agentId, agentId) : undefined,
+      ),
+    );
+  // Wakes still waiting outside any run (ADR 0032 "Calm wakes") never start.
+  await deps.db
+    .delete(outbox)
+    .where(
+      and(
+        eq(outbox.orgId, orgId),
+        eq(outbox.kind, INBOX_JOB),
+        eq(outbox.status, "pending"),
+        agentId ? sql`${outbox.payload}->>'agentId' = ${agentId}` : undefined,
       ),
     );
   for (const { run, channelKind } of live) {

@@ -81,6 +81,8 @@ import type {
   GifCategory,
   GifKey,
   InviteBatch,
+  IssueActivity,
+  IssueActivityEvent,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -2957,6 +2959,54 @@ export const useIssueActivity = (orgId: string, id: string | undefined) => {
   });
 };
 
+/**
+ * A live event while a task is open: a comment or an event on it (`issue.comment`) goes into its activity once, and
+ * an event also refreshes the task itself (status, assignee, a linked PR). `false`: not about this task.
+ */
+export function applyIssueActivityEvent(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  issueId: string,
+  event: { type: string },
+): boolean {
+  if (event.type !== "issue.comment" || !("issueId" in event) || !("activity" in event)) return false;
+  const { issueId: id, activity } = event as IssueActivityEvent;
+  if (id !== issueId) return false;
+  qc.setQueryData<IssueActivity[]>(keys.issueActivity(orgId, issueId), (list) =>
+    !list || list.some((a) => a.id === activity.id) ? list : [...list, activity],
+  );
+  if (activity.kind === "event") void qc.invalidateQueries({ queryKey: [...keys.issues(orgId), "one"] });
+  return true;
+}
+
+/**
+ * A task's activity live while it is open: comments and events come on the task's channel, or as org broadcasts
+ * for a task with none. What was missed while the connection was down comes back on reconnect.
+ */
+export function useIssueLive(
+  orgId: string,
+  connection: RealtimeConnection | null,
+  issue: { id: string; channelId: string | null } | undefined,
+) {
+  const qc = useQueryClient();
+  const issueId = issue?.id;
+  const channelId = issue?.channelId ?? null;
+  useEffect(() => {
+    if (!connection || !issueId) return;
+    const take = (event: { type: string }) => void applyIssueActivityEvent(qc, orgId, issueId, event);
+    const offOrg = connection.onUserEvent(take);
+    const offChannel = channelId ? connection.subscribe(channelId, take) : undefined;
+    const offReconnect = connection.onReconnect(() => {
+      void qc.invalidateQueries({ queryKey: keys.issueActivity(orgId, issueId) });
+    });
+    return () => {
+      offOrg();
+      offChannel?.();
+      offReconnect();
+    };
+  }, [connection, orgId, qc, issueId, channelId]);
+}
+
 export function useIssueAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -3479,6 +3529,22 @@ export const useMachineOutages = (orgId: string, enabled = true) => {
     retry: false,
     refetchInterval: (q) => ((q.state.data?.outages.length ?? 0) > 0 ? 30_000 : false),
     refetchOnWindowFocus: true,
+    meta: { quiet: true },
+  });
+};
+
+/**
+ * A computer's line (who works on it, who waits, estimates). `computer.queue` events refetch it; while anything
+ * waits it also refetches every 30 s, so the estimates keep counting down.
+ */
+export const useMachineQueue = (orgId: string, machineId: string | null | undefined, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.machineQueue(orgId, machineId ?? ""),
+    queryFn: () => api.machines.queue(orgId, machineId ?? ""),
+    enabled: enabled && Boolean(machineId),
+    retry: false,
+    refetchInterval: (q) => ((q.state.data?.waiting.length ?? 0) > 0 ? 30_000 : false),
     meta: { quiet: true },
   });
 };
@@ -4419,11 +4485,11 @@ export function useWorkingRuns(orgId: string, enabled = true, pollMs: number | f
   });
 }
 
-/** How often the task manager asks again while it's open (ADR 0127): it follows every conversation at once. */
+/** How often the task manager asks again while it's open (ADR 0128): it follows every conversation at once. */
 export const TASK_MANAGER_POLL_MS = 3_000;
 
 /**
- * The task manager (ADR 0127): what the agents are doing now, what each one uses, each agent's last hour and what
+ * The task manager (ADR 0128): what the agents are doing now, what each one uses, each agent's last hour and what
  * ended since `since` (default: the last 24 h). Asked again every `pollMs` while shown.
  */
 export function useTaskManager(
@@ -4445,7 +4511,7 @@ export function useTaskManager(
 }
 
 /**
- * A task's steps for "Ver passos" (ADR 0127), to whoever sees it in the task manager: `workFromSteps(data.steps,
+ * A task's steps for "Ver passos" (ADR 0128), to whoever sees it in the task manager: `workFromSteps(data.steps,
  * data.run)` draws them like the chat's work block. `pollMs` while it still works.
  */
 export function useTaskSteps(orgId: string, runId: string | null, pollMs: number | false = false) {
@@ -4462,23 +4528,8 @@ export function useTaskSteps(orgId: string, runId: string | null, pollMs: number
   });
 }
 
-/** A computer's line ("Ver fila", ADR 0127): asked again every 3 s while shown. */
-export function useComputerQueue(orgId: string, machineId: string | null) {
-  const api = useApi();
-  return useQuery({
-    queryKey: keys.computerQueue(orgId, machineId ?? ""),
-    queryFn: () => {
-      const working = part(api, "working");
-      if (!working.computerQueue) throw new Error("This server can't show a computer's line yet");
-      return working.computerQueue(orgId, machineId ?? "");
-    },
-    enabled: machineId !== null && Boolean(api.working?.computerQueue),
-    refetchInterval: TASK_MANAGER_POLL_MS,
-  });
-}
-
 /**
- * "Parar" from the task manager or the chat's strip (ADR 0127): stops each task (with the reason the agent reads)
+ * "Parar" from the task manager or the chat's strip (ADR 0128): stops each task (with the reason the agent reads)
  * and refreshes the lists. Stopping several (an agent's "Parar todas") stops them one by one; one refused doesn't
  * keep the others running.
  */

@@ -279,7 +279,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       taskManager: (orgId, since) =>
         request<TaskManagerView>(`${org(orgId)}/task-manager`, { query: since ? { since } : {} }),
       taskSteps: (orgId, runId) => request<TaskSteps>(`${org(orgId)}/task-manager/${enc(runId)}/steps`),
-      computerQueue: (orgId, machineId) => request<ComputerQueue>(`${org(orgId)}/machines/${enc(machineId)}/queue`),
     },
     mail: {
       providers: (orgId) => request<MailProviders>(`${org(orgId)}/mail/providers`),
@@ -922,6 +921,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await nullOn(404, () => request<DesktopRelease>("/api/desktop/latest", { query: { target, arch } }))) ??
         (await nullOn(404, () => cloud<DesktopRelease>("/api/desktop/latest", { query: { target, arch } }))),
       outages: (orgId) => request<MachineOutages>(`${org(orgId)}/machines/outages`),
+      queue: (orgId, machineId) => request<ComputerQueue>(`${org(orgId)}/machines/${enc(machineId)}/queue`),
       moveAgents: (orgId, machineId, input) =>
         request<MoveAgentsResult>(`${org(orgId)}/machines/${enc(machineId)}/move-agents`, { json: input }),
       beginAccountLogin: (orgId, machineId, kind, options = {}) =>

@@ -1,11 +1,12 @@
 import { type Database, rowsOf, schema, sql } from "@agenteschat/db";
-import { replyExcerpt } from "./messages";
+import { computerQueue as lineOfComputer } from "./computer-queue";
 import { NotFoundError } from "./errors";
+import { replyExcerpt } from "./messages";
 import { can, requireActiveMembership } from "./organizations";
 import { pendingIds } from "./recovery";
 
 /**
- * The task manager (ADR 0127): every task the caller may see, what each one uses right now, each agent's activity
+ * The task manager (ADR 0128): every task the caller may see, what each one uses right now, each agent's activity
  * over the last hour and what ended since `since`. Who sees what is the "Trabalhando agora" rule (the conversations
  * the caller is in, `listWorkingRuns`), plus the routines' background runs for admins (`manage_agents`) and for the
  * agent's owner. No cost: people stop work here, they don't audit spend.
@@ -87,10 +88,17 @@ export interface ManagedTask {
    */
   held: "computer_busy" | "computer_offline" | "plan" | "budget" | null;
   /**
-   * Its place in its computer's line for room (`computer_busy`, ADR 0032 "Calm waits"): people's turns first, then
-   * the longest wait, as `roomHead` orders it. `people`: a person waits on it (it goes before agents' work).
+   * Its place in its computer's line for room (`computer_busy`, ADR 0032 "Calm waits"), as the line's own view gives
+   * it (`computerQueue`). `people`: a person waits on it (it goes before agents' work).
    */
-  line: { machineId: string; position: number; of: number; people: boolean; since: string | null } | null;
+  line: {
+    machineId: string;
+    position: number;
+    of: number;
+    people: boolean;
+    /** When it should start, from the line's estimates; null with no basis. */
+    estimatedStartAt: string | null;
+  } | null;
 }
 
 /** A computer with work on it or a line for its room: the task manager's computers row and "Ver fila". */
@@ -162,6 +170,7 @@ type Row = {
   stopper_name: string | null;
   wait_code: string | null;
   wait_source: string | null;
+  waiting_machine_id: string | null;
 };
 
 const iso = (v: string | Date | null) => (v === null ? null : new Date(v).toISOString());
@@ -190,7 +199,8 @@ async function visibleRuns(
         last.data as last_data, last.created_at as last_at,
         (select count(*) from ${agentRunSteps} s where s.run_id = r.id and s.kind = 'tool_call') as steps,
         su.name as stopper_name,
-        r.transcript->'waitingForBrain'->>'code' as wait_code, r.transcript->'waitingForBrain'->>'source' as wait_source
+        r.transcript->'waitingForBrain'->>'code' as wait_code,
+        r.transcript->'waitingForBrain'->>'source' as wait_source, r.waiting_machine_id
       from ${agentRuns} r
       join ${channels} c on c.id = r.channel_id and c.org_id = ${orgId}::uuid
         and c.archived_at is null and c.kind in ('channel', 'dm')
@@ -243,8 +253,7 @@ const planOf = (raw: { state: string }[] | string | null) => {
   return plan.length ? { done: plan.filter((p) => p.state === "done").length, total: plan.length } : null;
 };
 
-const labelOf = (r: Row) =>
-  replyExcerpt(r.work_title?.trim() || r.title?.trim() || r.root_body || "", 80) || null;
+const labelOf = (r: Row) => replyExcerpt(r.work_title?.trim() || r.title?.trim() || r.root_body || "", 80) || null;
 
 function nowOf(r: Row): TaskNow | null {
   const data = typeof r.last_data === "string" ? (JSON.parse(r.last_data) as Record<string, unknown>) : r.last_data;
@@ -303,7 +312,15 @@ export async function taskManager(
     held: heldOf(r),
     line: null,
   }));
-  const [lines, computers] = await Promise.all([computerLines(db, orgId), computerSummaries(db, orgId)]);
+  const waitingOn = [
+    ...new Set(
+      active.flatMap((r) => (heldOf(r) === "computer_busy" && r.waiting_machine_id ? [r.waiting_machine_id] : [])),
+    ),
+  ];
+  const [lines, computers] = await Promise.all([
+    computerLines(db, userId, orgId, waitingOn),
+    computerSummaries(db, orgId),
+  ]);
   for (const task of tasks) {
     const place = task.held === "computer_busy" ? lines.get(task.runId) : undefined;
     if (place) task.line = place;
@@ -326,47 +343,31 @@ export async function taskManager(
   return { tasks, ended: endedTasks, computers, activity: await agentActivity(db, orgId, now) };
 }
 
-/** The computer brains: their turns run on the agent's computer (the turns the line is for). */
-const COMPUTER_BRAINS = sql`('claude_code', 'codex', 'cursor')`;
-/** People's turns first, then the longest wait, then the id: `roomHead`'s order (computer-queue.ts). */
-const LINE_ORDER = sql`coalesce((r.transcript->>'roomPeople')::boolean, false) desc,
-  coalesce((r.transcript->>'roomWaitSince')::bigint, 0), r.id`;
 const IN_LINE = sql`r.status = 'waiting_input' and r.waiting_machine_id is not null
   and r.transcript->'waitingForBrain'->>'code' = 'busy'`;
-/** The computer a running turn is on: the one it asked for room (`roomAsk`), else its agent's for a computer brain. */
-const RUNS_ON = sql`coalesce(r.transcript->'roomAsk'->>'machineId',
-  case when r.brain in ${COMPUTER_BRAINS} then a.machine_id::text end)`;
+/** The computer a running turn is on: the one it asked for room (`roomAsk`), as the line's view counts it. */
+const RUNS_ON = sql`r.transcript->'roomAsk'->>'machineId'`;
 
-/** Every run in a computer's line, by its place (ADR 0032 "Calm waits"), keyed by run id. */
-async function computerLines(db: Database, orgId: string) {
-  const rows = rowsOf<{
-    id: string;
-    machine_id: string;
-    position: number | string;
-    of: number | string;
-    people: boolean | string | null;
-    since: string | null;
-  }>(
-    await db.execute(sql`select r.id, r.waiting_machine_id as machine_id,
-        row_number() over (partition by r.waiting_machine_id order by ${LINE_ORDER}) as position,
-        count(*) over (partition by r.waiting_machine_id) as of,
-        coalesce((r.transcript->>'roomPeople')::boolean, false) as people,
-        r.transcript->>'roomWaitSince' as since
-      from ${agentRuns} r
-      where r.org_id = ${orgId}::uuid and ${IN_LINE}`),
-  );
-  return new Map(
-    rows.map((r) => [
-      r.id,
-      {
-        machineId: r.machine_id,
-        position: Number(r.position),
-        of: Number(r.of),
-        people: truthy(r.people ?? false),
-        since: r.since ? new Date(Number(r.since)).toISOString() : null,
-      },
-    ]),
-  );
+/**
+ * Each task's place in its computer's line, from the line's own view (`computerQueue` in computer-queue.ts, ADR 0032
+ * "Calm waits"): the same order and estimates the line shows, keyed by run id. Only the computers a task waits on.
+ */
+async function computerLines(db: Database, userId: string, orgId: string, machineIds: string[]) {
+  const places = new Map<string, NonNullable<ManagedTask["line"]>>();
+  const queues = await Promise.all(machineIds.map((id) => lineOfComputer(db, userId, orgId, id).catch(() => null)));
+  for (const queue of queues) {
+    if (!queue) continue;
+    for (const w of queue.waiting) {
+      places.set(w.runId, {
+        machineId: queue.machineId,
+        position: w.position,
+        of: queue.waiting.length,
+        people: w.people,
+        estimatedStartAt: w.estimatedStartAt,
+      });
+    }
+  }
+  return places;
 }
 
 /** The workspace's computers with a turn running or waiting for room. */
@@ -383,123 +384,6 @@ async function computerSummaries(db: Database, orgId: string): Promise<ComputerS
   return rows
     .map((r) => ({ id: r.id, name: r.name, working: Number(r.working), inLine: Number(r.in_line) }))
     .filter((c) => c.working > 0 || c.inLine > 0);
-}
-
-/** One turn on a computer's line view: what it is for, never its content (ADR 0127). */
-export interface QueueTurn {
-  runId: string;
-  agentId: string;
-  /** Who it is for: a person's request, another agent's, or a routine's. */
-  kind: "person" | "agent" | "routine";
-  /** Who asked: the person (when you see the conversation), the agent, or the routine's name. Null: not shown. */
-  who: string | null;
-  /** What it is about, only when you see its conversation (the task manager's label). */
-  label: string | null;
-  /** You see its conversation: it opens in the task manager. */
-  visible: boolean;
-  /** You asked for it. */
-  mine: boolean;
-  canStop: boolean;
-  /** Since when it runs, or waits in line. */
-  since: string | null;
-}
-
-export interface ComputerQueue {
-  computer: { id: string; name: string };
-  working: QueueTurn[];
-  /** In order: people's turns first, then the longest wait. */
-  line: (QueueTurn & { people: boolean })[];
-}
-
-/**
- * A computer's line (ADR 0127 over ADR 0032's "Calm waits"): what runs on it now and who waits for room, in the
- * order the engine admits them. Everyone in the workspace may see it; a turn says what it is about only to who sees
- * its conversation (the task manager's rule), otherwise only whose it is.
- */
-export async function computerQueue(
-  db: Database,
-  userId: string,
-  orgId: string,
-  machineId: string,
-): Promise<ComputerQueue> {
-  const membership = await requireActiveMembership(db, userId, orgId);
-  const manages = can(membership, "manage_agents");
-  const [computer] = rowsOf<{ id: string; name: string }>(
-    await db.execute(
-      sql`select m.id, m.name from ${machines} m where m.org_id = ${orgId}::uuid and m.id = ${machineId}::uuid`,
-    ),
-  );
-  if (!computer) throw new NotFoundError("Computer not found");
-  type TurnRow = {
-    id: string;
-    agent_id: string;
-    status: string;
-    background: boolean | string;
-    owner_user_id: string | null;
-    requester_id: string | null;
-    requester_name: string | null;
-    asker_agent: string | null;
-    routine_name: string | null;
-    visible: boolean | string;
-    people: boolean | string | null;
-    since: string | null;
-    started_at: string | Date | null;
-    title: string | null;
-    root_body: string | null;
-    work_title: string | null;
-  };
-  const rows = rowsOf<TurnRow>(
-    await db.execute(sql`select r.id, r.agent_id, r.status, r.background, a.owner_user_id,
-        trig.author_user_id as requester_id, ru.name as requester_name, ag.name as asker_agent, rt.name as routine_name,
-        (exists (select 1 from ${channelMembers} cm
-            where cm.org_id = ${orgId}::uuid and cm.channel_id = r.channel_id and cm.user_id = ${userId})
-          or (r.background and (${manages} or a.owner_user_id = ${userId}))) as visible,
-        coalesce((r.transcript->>'roomPeople')::boolean, false) as people,
-        r.transcript->>'roomWaitSince' as since, r.started_at,
-        t.title, root.body as root_body, w.title as work_title
-      from ${agentRuns} r
-      join ${agents} a on a.id = r.agent_id and a.org_id = ${orgId}::uuid
-      left join ${schema.agentWorks} w on w.id = r.work_id
-      left join ${threads} t on t.org_id = ${orgId}::uuid and t.root_message_id = r.thread_root_id
-      left join lateral (
-        select m.body from ${messages} m
-        where m.org_id = ${orgId}::uuid and m.id = r.thread_root_id and m.deleted_at is null limit 1
-      ) root on true
-      left join lateral (
-        select m.author_user_id, m.author_agent_id from ${messages} m
-        where m.org_id = ${orgId}::uuid and m.id = r.trigger_message_id limit 1
-      ) trig on true
-      left join ${users} ru on ru.id = trig.author_user_id
-      left join ${agents} ag on ag.id = trig.author_agent_id
-      left join ${routineRuns} rr on rr.org_id = ${orgId}::uuid and rr.agent_run_id = r.id
-      left join ${routines} rt on rt.id = rr.routine_id
-      where r.org_id = ${orgId}::uuid
-        and ((${IN_LINE} and r.waiting_machine_id = ${machineId}::uuid)
-          or (r.status = 'running' and ${RUNS_ON} = ${machineId}))
-      order by (r.status = 'running') desc, ${LINE_ORDER}`),
-  );
-  const turn = (r: TurnRow): QueueTurn => {
-    const visible = truthy(r.visible);
-    const kind: QueueTurn["kind"] =
-      r.routine_name || truthy(r.background) ? "routine" : r.asker_agent ? "agent" : "person";
-    const label = replyExcerpt(r.work_title?.trim() || r.title?.trim() || r.root_body || "", 80) || null;
-    return {
-      runId: r.id,
-      agentId: r.agent_id,
-      kind,
-      who: kind === "routine" ? r.routine_name : kind === "agent" ? r.asker_agent : visible ? r.requester_name : null,
-      label: visible ? label : null,
-      visible,
-      mine: r.requester_id === userId,
-      canStop: visible && (manages || r.requester_id === userId || r.owner_user_id === userId),
-      since: r.status === "running" ? iso(r.started_at) : r.since ? new Date(Number(r.since)).toISOString() : null,
-    };
-  };
-  return {
-    computer,
-    working: rows.filter((r) => r.status === "running").map(turn),
-    line: rows.filter((r) => r.status !== "running").map((r) => ({ ...turn(r), people: truthy(r.people ?? false) })),
-  };
 }
 
 /**
@@ -523,7 +407,8 @@ export async function agentActivity(db: Database, orgId: string, now = new Date(
   for (const r of rows) {
     const ago = Number(r.ago);
     if (ago < 0 || ago >= ACTIVITY_MINUTES) continue;
-    const line = (out[r.agent_id] ??= Array.from({ length: ACTIVITY_MINUTES }, () => 0));
+    const line = out[r.agent_id] ?? Array.from({ length: ACTIVITY_MINUTES }, () => 0);
+    out[r.agent_id] = line;
     line[ACTIVITY_MINUTES - 1 - ago] = Number(r.n);
   }
   return out;
@@ -543,7 +428,7 @@ export interface TaskStep {
 const PERMISSION_TOOL = "permission_prompt";
 
 /**
- * A task's steps for the task manager's "Ver passos" (ADR 0127), to whoever sees the task there: what each call was
+ * A task's steps for the task manager's "Ver passos" (ADR 0128), to whoever sees the task there: what each call was
  * (the chat chip's fields) and how it ended, never a connector's input or a tool's output (only a permission check's
  * answer, which says whether it ran). The full trail (`getRun`) stays with usage access.
  */

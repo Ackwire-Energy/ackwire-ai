@@ -16,7 +16,7 @@ import { SayWhy, StopTaskButton, TaskStateChip, taskAge, UsingNow, useOpenTask }
 import "@/components/threads/threads.css";
 
 /**
- * A task opened from the task manager ("Ver passos", ADR 0127), over the page like a thread beside its channel: the
+ * A task opened from the task manager ("Ver passos", ADR 0128), over the page like a thread beside its channel: the
  * agent and what the task is, what it does now, its state, time, what it uses and where it runs (no cost), its steps
  * as a reply's block lists them (asked again every 3 s while it works), "Abrir na conversa" and "Parar tarefa". Once
  * stopped it says so, and who stopped it can still say why.
@@ -93,10 +93,11 @@ export function TaskPanel({
   ) : (
     "—"
   );
+  const using = task ? <UsingNow task={task} /> : "—";
   const facts: [string, ReactNode][] = [
     [t("taskManager.columns.state"), state],
     [t("taskManager.columns.time"), task ? taskClock(taskAge(task, now)) : took !== null ? taskClock(took) : "—"],
-    [t("taskManager.columns.using"), task ? <UsingNow task={task} /> : "—"],
+    [t("taskManager.columns.using"), using],
     [t("taskManager.columns.computer"), last ? (last.machine?.name ?? t("taskManager.servers")) : "—"],
   ];
   const hasSteps = steps.data?.steps.some((s) => s.kind === "tool_call") ?? false;

@@ -10,6 +10,7 @@ import {
   type Message,
   type MessageMedia,
   type MessagePin,
+  type ReceiptsState,
   type RunConsultation,
   sendHelpers,
   typingIn,
@@ -105,6 +106,8 @@ import { threadTitle } from "../chats/logic";
 import { chatHref, consultationHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
+import { FanStrip } from "../queue/parts";
+import { QueueButton, useAgentsQueue, useOpenQueue } from "../queue/QueueSheet";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -318,6 +321,14 @@ function Chat({
   const dmAgent = dmAgentId ? dir.agentById.get(dmAgentId) : undefined;
   const member = dm ? true : (channel?.isMember ?? true);
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
+  // The computer this conversation's agents share, while turns wait for it: the bar's way into its line.
+  const queueAgents = useMemo(
+    () => (dmAgentId ? [dmAgentId] : (roster.data ?? []).filter((r) => r.type === "agent").map((r) => r.id)),
+    [dmAgentId, roster.data],
+  );
+  const { machineId: queueMachineId, queue: barQueue } = useAgentsQueue(queueAgents);
+  const openQueue = useOpenQueue();
+  const queueShown = Boolean(queueMachineId && barQueue?.waiting.length && !isThread);
   const join = useJoinChannel(orgId, channelId);
   // The "@" picker's sections: a channel's members (also in its threads); a DM has none.
   const mentionMembers = useMentionMembers(channelId, !dm && Boolean(channel?.isMember));
@@ -416,7 +427,7 @@ function Chat({
       },
     };
   }, [busyRuns, stoppable, stopRun, dir.agentById, t]);
-  // An agent's DM header counts its tasks, here and elsewhere (ADR 0127); a tap opens them, pushed like a thread.
+  // An agent's DM header counts its tasks, here and elsewhere (ADR 0128); a tap opens them, pushed like a thread.
   const agentTasks = useDmAgentTasks(member && !isThread ? dmAgentId : null);
 
   // ── Agents' blocks ──
@@ -1303,7 +1314,7 @@ function Chat({
         subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
-        extraActions={(dmAgentId ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
+        extraActions={(dmAgentId ? 1 : 0) + (queueShown ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
         label={
@@ -1341,11 +1352,12 @@ function Chat({
           ) : undefined
         }
         onPress={openMembers}
+        extraActions={queueShown ? 1 : 0}
         {...hold}
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
-  // An agent's DM also opens its tasks while it has some (ADR 0127), pushed like a thread, and its computer (as the
+  // An agent's DM also opens its tasks while it has some (ADR 0128), pushed like a thread, and its computer (as the
   // web's DM header), for whoever may watch it.
   const right =
     (isThread && info) || dm || channel ? (
@@ -1359,6 +1371,9 @@ function Chat({
               router.push(agentTasksHref(dmAgentId, { channelId, threadId }));
             }}
           />
+        ) : null}
+        {queueShown && barQueue && queueMachineId ? (
+          <QueueButton queue={barQueue} onPress={() => openQueue(queueMachineId)} />
         ) : null}
         {dmAgentId && !isThread ? <DmComputerButton agentId={dmAgentId} onOpen={leavePlace} /> : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
@@ -1418,6 +1433,13 @@ function Chat({
     : "";
   // biome-ignore lint/correctness/useExhaustiveDependencies: `receiptKey` stands for the receipt
   const receipt = useMemo(() => receiptNow, [receiptKey]);
+  // Agents' messages that called several agents: their strip (`FanStrip`). Only their receipts redraw the list.
+  const fanNow = shownMessages
+    .filter((m) => m.author.type === "agent" && m.mentionedAgentIds.length > 1)
+    .map((m) => [m.id, live.receipts[m.id]] as const);
+  const fanKey = JSON.stringify(fanNow);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `fanKey` stands for the receipts
+  const receipts: ReceiptsState = useMemo(() => Object.fromEntries(fanNow.filter(([, r]) => r)), [fanKey]);
   // Above the box: an agent here without an AI, or the whole workspace without one (as on the web).
   const aiStatus = useAiStatus(orgId);
   const banner = member
@@ -1506,6 +1528,9 @@ function Chat({
                 receipt={item.message.id === markAt ? receipt : undefined}
                 seenBy={item.message.id === seenId ? seenBy : undefined}
               />
+              {item.message.author.type === "agent" && item.message.mentionedAgentIds.length > 1 ? (
+                <FanStrip message={item.message} receipt={receipts[item.message.id]} />
+              ) : null}
               {item.message.id === receiptId ? (
                 <AgentReceiptLine
                   message={item.message}
@@ -1541,6 +1566,7 @@ function Chat({
       seeConsult,
       flashId,
       c.sunken,
+      receipts,
     ],
   );
 

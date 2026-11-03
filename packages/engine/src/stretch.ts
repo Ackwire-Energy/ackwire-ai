@@ -4,7 +4,7 @@ import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { messageRoot } from "./authority";
 import { routineBriefOfRun } from "./background";
-import { eligibleChannelAgents, type RunTrigger, startOrJoinRun } from "./dispatch";
+import { eligibleChannelAgents, type RunTrigger, startOrJoinRun, takeConsultation } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { ForbiddenError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
@@ -28,9 +28,31 @@ const { agentConsultations, agentRuns, agents, channels, messages, usageRecords 
  * No limit reads words. Agents start at most `runs` runs on their own in one stretch (`unattendedRuns` when nobody
  * asked for the work), and each agent spends at most `budgetShare` of its monthly budget there. Past either, the
  * wake-up is held and one card in the conversation says why, with Continuar. Waiting costs nothing: only runs and
- * API spend count.
+ * API spend count. A crowded computer never lowers these: its line orders and parks turns (ADR 0032 "Calm wakes").
  */
 export const STRETCH = { runs: 50, unattendedRuns: 10, budgetShare: 0.2 } as const;
+
+/**
+ * How long work a person asked for (a stretch they opened) goes before agents' own in a computer's line
+ * (`transcript.roomAsked`, ADR 0032 "Calm wakes").
+ */
+export const PERSON_ASKED_MS = 4 * 3600_000;
+
+/** Nobody asked for the stretch's work: an agent wrote its first message, or it is a routine's brief. */
+const unattendedSql = (orgId: string, stretchId: string) => sql`exists (select 1 from ${messages} m
+  where m.org_id = ${orgId}::uuid and m.id = ${stretchId}::uuid and (m.author_type = 'agent' or m.meta ? 'routineBrief'))`;
+
+/**
+ * Whether a stretch is work a person asked for (their message, decision or Continuar opened it) within
+ * `PERSON_ASKED_MS`. Stretch ids are UUIDv7: their first 48 bits are when it opened.
+ */
+export async function personAskedLately(db: Executor, orgId: string, stretchId: string): Promise<boolean> {
+  const [row] = rowsOf<{ asked: boolean | string }>(
+    await db.execute(sql`select (not ${unattendedSql(orgId, stretchId)}
+      and ('x' || left(replace(${stretchId}::text, '-', ''), 12))::bit(48)::bigint > ${Date.now() - PERSON_ASKED_MS}) as asked`),
+  );
+  return row?.asked === true || row?.asked === "t";
+}
 
 /**
  * How many links up a chain of questions and hand-offs between agents the walks to where people read go
@@ -69,7 +91,12 @@ export async function stretchStop(
   agentId: string,
   triggerId: string | null = null,
 ): Promise<StretchStop | null> {
-  const [row] = rowsOf<{ started: boolean; runs: number; unattended: boolean; spent: string | number | null }>(
+  const [row] = rowsOf<{
+    started: boolean;
+    runs: number;
+    unattended: boolean;
+    spent: string | number | null;
+  }>(
     await db.execute(sql`with runs as (
         select r.id, r.agent_id, r.created_at from ${agentRuns} r
         where r.org_id = ${orgId}::uuid and r.stretch_id = ${stretchId}::uuid and r.hop >= 2
@@ -77,14 +104,14 @@ export async function stretchStop(
       select exists (select 1 from ${agentRuns} s where ${triggerId}::uuid is not null
           and s.trigger_message_id = ${triggerId}::uuid and s.agent_id = ${agentId}::uuid) as started,
         (select count(*) from runs)::int as runs,
-        exists (select 1 from ${messages} m where m.org_id = ${orgId}::uuid and m.id = ${stretchId}::uuid
-          and (m.author_type = 'agent' or m.meta ? 'routineBrief')) as unattended,
+        ${unattendedSql(orgId, stretchId)} as unattended,
         (select sum(u.cost_nano_usd) from ${usageRecords} u
           where u.org_id = ${orgId}::uuid and u.agent_id = ${agentId}::uuid and u.billed_to = 'org'
             and u.created_at >= (select min(created_at) from mine) and u.run_id in (select id from mine)) as spent`),
   );
   if (!row || row.started === true || (row.started as unknown) === "t") return null;
-  const limit = row.unattended === true || (row.unattended as unknown) === "t" ? STRETCH.unattendedRuns : STRETCH.runs;
+  const yes = (v: unknown) => v === true || v === "t";
+  const limit = yes(row.unattended) ? STRETCH.unattendedRuns : STRETCH.runs;
   if (Number(row.runs) >= limit) return { reason: "runs", limit };
   const spent = Number(row.spent ?? 0);
   if (spent <= 0) return null;
@@ -257,7 +284,8 @@ export interface StretchCard {
   /** The agents that stopped, in order. */
   agentIds: string[];
   /** What Continuar starts: each agent on the message that would have woken it (null: on this card). */
-  held: { agentId: string; messageId: string | null; trigger: RunTrigger }[];
+  /** `threadId` (when `messageId` is null): the thread of the card's channel it was held in (null: the timeline). */
+  held: { agentId: string; messageId: string | null; threadId?: string | null; trigger: RunTrigger }[];
   continuedByUserId: string | null;
   continuedAt: string | null;
 }
@@ -269,19 +297,17 @@ export const stretchCardOf = (meta: Record<string, unknown> | null | undefined):
     : null;
 };
 
-/** One card per stretch and conversation: its writers take turns. */
-const lockCard = (tx: Executor, stretchId: string, channelId: string, threadId: string | null) =>
-  tx.execute(
-    sql`select pg_advisory_xact_lock(hashtext(${`stretch-card:${stretchId}:${channelId}:${threadId ?? ""}`}))`,
-  );
+/** One card per stretch: its writers take turns. */
+const lockCard = (tx: Executor, stretchId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`stretch-card:${stretchId}`}))`);
 
 /** The card's English text (what agents read, and the fallback) and its code for the apps. */
 function cardText(card: StretchCard, names: string[]) {
   const who = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "The agents");
   const body =
     card.reason === "runs"
-      ? `${who} stopped to check with you: ${card.limit} steps on ${names.length > 1 ? "their" : "its"} own since your request.`
-      : `${who} stopped to check with you: used ${card.limit}% of the month's budget on this without you.`;
+      ? `${who} paused to check with you before going on.`
+      : `${who} paused to check with you. ${names.length > 1 ? "Each" : "It"} used ${card.limit}% of the month's budget.`;
   return {
     body,
     meta: {
@@ -290,7 +316,7 @@ function cardText(card: StretchCard, names: string[]) {
       bodyParams: {
         agents: names.join(", "),
         count: names.length,
-        ...(card.reason === "runs" ? { steps: card.limit } : { percent: card.limit }),
+        ...(card.reason === "spend" ? { percent: card.limit } : {}),
       },
     },
   };
@@ -315,26 +341,38 @@ async function accountableFor(db: Database, orgId: string, messageId: string, st
 }
 
 /**
- * Job `stretch.paused`: the conversation's card for the held wake-up, written as the agent the work stopped at (so
- * the person behind it hears of it, `notifyMessage`), or the card already waiting there for this stretch with this
- * wake-up added.
+ * Job `stretch.paused`: the stretch's card for the held wake-up, written as the agent the work stopped at (so the
+ * person behind it hears of it, `notifyMessage`), or the card already waiting for this stretch with this wake-up
+ * added. One card per stretch, wherever it waits: the ways a wake-up is held place it differently (the held
+ * message's conversation, the refused run's reply thread, a long work's own thread, a routine's report), so one
+ * stretch held in two of them would otherwise show the same agents' pause twice.
  */
 export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, orgId: string, hold: StretchHold) {
   const { db } = deps;
   const behind = hold.messageId ?? (await runTriggerOf(db, orgId, hold.runId));
   const forUserId = behind ? await accountableFor(db, orgId, behind, hold.stretchId) : null;
-  const entry = { agentId: hold.agentId, messageId: hold.messageId, trigger: hold.trigger };
+  const entry = {
+    agentId: hold.agentId,
+    messageId: hold.messageId,
+    ...(hold.messageId ? {} : { threadId: hold.threadId }),
+    trigger: hold.trigger,
+  };
   const stopped = hold.stoppedAgentId ?? hold.agentId;
   const card = await db.transaction(async (tx) => {
-    await lockCard(tx, hold.stretchId, hold.channelId, hold.threadId);
+    await lockCard(tx, hold.stretchId);
+    // Where it can wait: this hold's channel, or one the stretch's runs work in (by their index, not the meta). A
+    // wake-up with no message starts on the card, so only a card in its own channel can hold it.
     const [open] = await tx
       .select()
       .from(messages)
       .where(
         and(
           eq(messages.orgId, orgId),
-          eq(messages.channelId, hold.channelId),
-          hold.threadId ? eq(messages.threadId, hold.threadId) : isNull(messages.threadId),
+          hold.messageId
+            ? sql`(${messages.channelId} = ${hold.channelId}::uuid or ${messages.channelId} in (
+            select distinct ${agentRuns.channelId} from ${agentRuns}
+            where ${agentRuns.orgId} = ${orgId}::uuid and ${agentRuns.stretchId} = ${hold.stretchId}::uuid))`
+            : eq(messages.channelId, hold.channelId),
           gt(messages.createdAt, new Date(Date.now() - 7 * 86_400_000)),
           isNull(messages.deletedAt),
           sql`${messages.meta}->'actionCard'->>'kind' = 'stretch_paused'`,
@@ -350,7 +388,12 @@ export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, o
           ...was,
           ...(was.reason === "spend" && hold.stop.reason === "runs" ? { reason: "runs", limit: hold.stop.limit } : {}),
           agentIds: was.agentIds.includes(stopped) ? was.agentIds : [...was.agentIds, stopped],
-          held: was.held.some((h) => h.agentId === entry.agentId && h.messageId === entry.messageId)
+          held: was.held.some(
+            (h) =>
+              h.agentId === entry.agentId &&
+              h.messageId === entry.messageId &&
+              (h.threadId ?? null) === (entry.threadId ?? null),
+          )
             ? was.held
             : [...was.held, entry],
         }
@@ -446,7 +489,7 @@ export async function continueStretch(
     throw new ForbiddenError("Only who asked, the agents' owners or an admin can do this", "run.answer_forbidden");
   const stretchId = Bun.randomUUIDv7();
   const done = await db.transaction(async (tx) => {
-    await lockCard(tx, card.stretchId, message.channelId, message.threadId);
+    await lockCard(tx, card.stretchId);
     // What it holds now: a wake-up held after the caller read the card may have joined it since.
     const now = stretchCardOf((await getMessage(tx, message.orgId, message.id))?.meta);
     if (now?.state !== "paused") return null;
@@ -471,24 +514,23 @@ export async function continueStretch(
     const runs: AgentRun[] = [];
     const started: { agentId: string; runId: string }[] = [];
     for (const h of next.held) {
-      const trigger = h.messageId ? await getMessage(tx, message.orgId, h.messageId) : row;
+      // No message: on the card, in the thread it was held in (the card may wait in another one).
+      const trigger = h.messageId
+        ? await getMessage(tx, message.orgId, h.messageId)
+        : h.threadId === undefined
+          ? row
+          : { ...row, threadId: h.threadId };
       if (!trigger || trigger.deletedAt) continue;
       const [active] = await eligibleChannelAgents(tx, message.orgId, trigger.channelId, [h.agentId]);
       if (!active) continue;
       const out = await startOrJoinRun(tx, trigger, h.agentId, h.trigger, { granted: stretchId });
       if (!out) continue;
       // A question or a note the stretch held is answered by the run that takes it now (ADR 0095).
-      await tx
-        .update(agentConsultations)
-        .set({ targetRunId: "created" in out ? out.created.id : out.joined })
-        .where(
-          and(
-            eq(agentConsultations.orgId, message.orgId),
-            eq(agentConsultations.messageId, trigger.id),
-            eq(agentConsultations.status, "open"),
-            isNull(agentConsultations.targetRunId),
-          ),
-        );
+      await takeConsultation(
+        tx,
+        { orgId: message.orgId, messageId: trigger.id },
+        "created" in out ? out.created.id : out.joined,
+      );
       if ("joined" in out) {
         await rerootRun(tx, { id: out.joined }, stretchId);
         // Should that run end before reading it, the run it is handed on to counts in the new stretch, not in the

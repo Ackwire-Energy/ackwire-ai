@@ -1355,6 +1355,17 @@ export type ChannelEvent =
       file?: string;
     };
 
+/**
+ * Something landed on a task's activity (packages/engine/src/issues.ts): a comment or an event. It comes on the
+ * task's channel, or as an org broadcast (no `channelId`) for a task with none.
+ */
+export type IssueActivityEvent = {
+  type: "issue.comment";
+  channelId?: string;
+  issueId: string;
+  activity: IssueActivity;
+};
+
 /** You followed or unfollowed a thread (on any of your devices). */
 export type ThreadFollowEvent = { type: "thread.follow" } & ThreadFollow;
 
@@ -1921,8 +1932,12 @@ export interface Run {
   /** The error as a code (`run.budget_exceeded`…) and its values, to say it in the person's language. */
   errorCode?: string;
   errorParams?: Record<string, string>;
-  /** Start of the message that started the run. */
+  /** Start of the message that started the run; empty when `private`. */
   what: string;
+  /** The viewer isn't in the run's conversation: no `what` and no steps, only its numbers (older servers: absent). */
+  private?: boolean;
+  /** Started by one of the agent's routines, also when `private` (older servers: absent). */
+  routine?: boolean;
   turns: number;
   /** Every input token, cache included. */
   inputTokens: number;
@@ -2053,6 +2068,8 @@ export interface CustomServer {
   via?: "composio";
   /** `needs_reconnect`: its Composio account stopped working; no tools until Reconectar. Older servers leave it out. */
   status?: "active" | "needs_reconnect";
+  /** Why its tools couldn't be read the last time they were listed (short); null or absent when they were. */
+  toolsError?: string | null;
   tools: CustomTool[];
   /** Last time an admin saved the classification; null = never (nothing exposed). */
   reviewedAt: string | null;
@@ -3615,6 +3632,50 @@ export type OutageTarget = {
   reasonOff: "offline" | "paused" | null;
 };
 
+/** What a turn on a computer is for, never its content. Ids are null when the author is gone. */
+export type QueuePurpose =
+  | { kind: "person"; userId: string | null }
+  | { kind: "agent"; agentId: string | null }
+  | { kind: "routine" }
+  | { kind: "work" };
+
+export interface QueueWhere {
+  channelId: string;
+  threadId: string | null;
+}
+
+export interface QueueWorking {
+  runId: string;
+  agentId: string;
+  purpose: QueuePurpose;
+  where: QueueWhere;
+  startedAt: string;
+  /** An estimate (the agent's typical turn), never exact; null with no basis. */
+  estimatedEndAt: string | null;
+}
+
+export interface QueueWaiting {
+  runId: string;
+  agentId: string;
+  purpose: QueuePurpose;
+  where: QueueWhere;
+  /** A person waits on it: it goes first. */
+  people: boolean;
+  /** 1 = next. */
+  position: number;
+  estimatedStartAt: string | null;
+  /** Who it waits for: for the head, the running turn expected to end first; behind it, the agents ahead in line. */
+  after: string[];
+}
+
+/** `GET …/machines/{machineId}/queue`: a computer's line; `computer.queue` org events say it changed. */
+export interface ComputerQueue {
+  machineId: string;
+  name: string;
+  working: QueueWorking[];
+  waiting: QueueWaiting[];
+}
+
 /** `GET …/machines/outages`. */
 export interface MachineOutages {
   outages: MachineOutage[];
@@ -4241,7 +4302,16 @@ export interface ImportedSource {
 /** Where a page is mentioned: other pages, messages, forum topics, issues. */
 export type WikiBacklink =
   | { kind: "page"; slug: string; title: string; excerpt?: string }
-  | { kind: "message"; channelId: string; messageId: string; channelName: string; excerpt: string; at: string }
+  | {
+      kind: "message";
+      channelId: string;
+      messageId: string;
+      channelName: string;
+      /** In a direct conversation: who it is with (a DM's name is an internal key). */
+      dm?: { type: "agent" | "person"; id: string } | null;
+      excerpt: string;
+      at: string;
+    }
   | { kind: "forum"; topicId: string; title: string }
   | { kind: "issue"; number: number; title: string };
 
@@ -5547,7 +5617,7 @@ export interface WorkingRun {
   work?: { id: string; title: string; plan: { done: number; total: number } | null; since: string } | null;
 }
 
-/** What a task uses right now: its latest tool call, as the chat's live chip says it (ADR 0127). */
+/** What a task uses right now: its latest tool call, as the chat's live chip says it (ADR 0128). */
 export interface TaskNow {
   tool: string;
   detail: string | null;
@@ -5557,7 +5627,7 @@ export interface TaskNow {
   at: string;
 }
 
-/** One task in the task manager (`GET …/task-manager`, ADR 0127): a run still on. No cost. */
+/** One task in the task manager (`GET …/task-manager`, ADR 0128): a run still on. No cost. */
 export interface ManagedTask {
   runId: string;
   agentId: string;
@@ -5592,7 +5662,14 @@ export interface ManagedTask {
   /** What it waits on when it isn't a person: its computer (full or away), its plan's limit, the budget. */
   held?: "computer_busy" | "computer_offline" | "plan" | "budget" | null;
   /** Its place in its computer's line for room (people's turns first, then the longest wait). */
-  line?: { machineId: string; position: number; of: number; people: boolean; since: string | null } | null;
+  line?: {
+    machineId: string;
+    position: number;
+    of: number;
+    people: boolean;
+    /** When it should start (the line's estimate); null with no basis. */
+    estimatedStartAt: string | null;
+  } | null;
 }
 
 /** A computer with turns running or waiting for room (counts only). */
@@ -5601,28 +5678,6 @@ export interface ComputerSummary {
   name: string;
   working: number;
   inLine: number;
-}
-
-/** One turn on a computer's line view: what it is for, never its content (ADR 0127). */
-export interface QueueTurn {
-  runId: string;
-  agentId: string;
-  kind: "person" | "agent" | "routine";
-  /** Who asked (the person only when you see the conversation, another agent, a routine's name); null: not shown. */
-  who: string | null;
-  /** What it is about, only when you see its conversation. */
-  label: string | null;
-  visible: boolean;
-  mine: boolean;
-  canStop: boolean;
-  since: string | null;
-}
-
-/** A computer's line (`GET …/machines/{id}/queue`): what runs now, then who waits, in the order they start. */
-export interface ComputerQueue {
-  computer: { id: string; name: string };
-  working: QueueTurn[];
-  line: (QueueTurn & { people: boolean })[];
 }
 
 /** A task that ended (`ended` of the task manager). */

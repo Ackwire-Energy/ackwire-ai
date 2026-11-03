@@ -11,10 +11,12 @@ export interface ChipProps {
   label: string;
   /** Anything before the label instead of an icon (a small avatar). */
   leading?: ReactNode;
+  /** Words after the label that never shrink (a state): a long label ends in "…" first. */
+  trailing?: string;
 }
 
 /** A small neutral tag: a light gray pill, muted text. */
-export function Chip({ icon, label, leading }: ChipProps) {
+export function Chip({ icon, label, leading, trailing }: ChipProps) {
   const { colors } = useTheme();
   return (
     <View
@@ -39,6 +41,15 @@ export function Chip({ icon, label, leading }: ChipProps) {
       >
         {label}
       </RNText>
+      {trailing ? (
+        <RNText
+          numberOfLines={1}
+          maxFontSizeMultiplier={CHROME_MAX_SCALE}
+          style={[systemText("caption", weights.regular), { color: colors.muted, flexShrink: 0 }]}
+        >
+          {trailing}
+        </RNText>
+      ) : null}
     </View>
   );
 }

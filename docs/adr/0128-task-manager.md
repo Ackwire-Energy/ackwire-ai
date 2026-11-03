@@ -1,4 +1,4 @@
-# 0127. The task manager: see every agent's tasks, stop them, and the agent is told
+# 0128. The task manager: see every agent's tasks, stop them, and the agent is told
 
 - Status: Accepted (built)
 - Date: 2026-11-02
@@ -46,11 +46,11 @@ The reason can come with the stop (the "stop all" confirmation) or after it: `se
 
 ### 4. The computer's line
 
-The engine keeps a line for a shared computer's room (ADR 0032, "Calm waits", `computer-queue.ts`): people's turns first, then the longest wait. The task manager shows it:
+The engine keeps a line for a shared computer's room and shows it (ADR 0032, "Calm waits", `computer-queue.ts`: `computerQueue`, `GET …/machines/{machineId}/queue`, the "Fila do computador" dialog on the web and sheet on the phone). The task manager reads that line rather than keeping its own:
 
-- A task waiting for room carries `line` (its computer, its place, how many are in line, whether a person waits on it), ranked in SQL the way `roomHead` orders the line.
+- A task waiting for room carries `line`: its computer, its place, how many are in line, whether a person waits on it and when it should start (`estimatedStartAt`), all taken from `computerQueue`, so the order and the estimate are the queue's own.
 - `computers` (in the same read) counts, per computer with work, the turns running and waiting: everyone may see how full a computer is.
-- `computerQueue` (`GET …/machines/{machineId}/queue`, "Ver fila"): what runs on a computer now and who waits, in order. Everyone in the workspace sees the line; a turn says what it is about only to who sees its conversation, otherwise only whose it is (a person, another agent, a routine). "Você vai primeiro" marks the caller's own turn a person waits on.
+- "Ver fila" (a computer's row, a task waiting for room) opens the queue's own dialog or sheet.
 
 Computers report no live memory, only the last day's average; the line says "full" by having people in it, not by a gauge.
 

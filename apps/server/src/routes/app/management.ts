@@ -8,7 +8,6 @@ import {
   cancelRun,
   canTalkTo,
   canViewCost,
-  computerQueue,
   continueRun,
   GIF_RATINGS,
   getMembership,
@@ -272,7 +271,12 @@ const Run = z
     error: z.string().nullable(),
     errorCode: z.string().optional().openapi({ description: "Stable code of `error` (translate with `errorParams`)." }),
     errorParams: z.record(z.string(), z.string()).optional(),
-    what: z.string().openapi({ description: "Start of the message that started the run." }),
+    what: z.string().openapi({ description: "Start of the message that started the run; empty when `private`." }),
+    private: z.boolean().openapi({
+      description:
+        "The viewer doesn't read the run's conversation (not in its channel or DM): no `what` and no steps, only its numbers.",
+    }),
+    routine: z.boolean().openapi({ description: "Started by one of the agent's routines (also when `private`)." }),
     turns: z.number(),
     inputTokens: z.number().openapi({ description: "Every input token, cache included." }),
     cachedTokens: z.number().openapi({ description: "How much of `inputTokens` was read from the prompt cache." }),
@@ -339,19 +343,16 @@ const ManagedTask = z
     steps: z.number().int(),
     pendingMessageIds: z.array(z.uuid()),
     canStop: z.boolean(),
-    held: z
-      .enum(["computer_busy", "computer_offline", "plan", "budget"])
-      .nullable()
-      .openapi({
-        description: "What it waits on when it isn't a person: its computer (full or away), its plan, the budget.",
-      }),
+    held: z.enum(["computer_busy", "computer_offline", "plan", "budget"]).nullable().openapi({
+      description: "What it waits on when it isn't a person: its computer (full or away), its plan, the budget.",
+    }),
     line: z
       .object({
         machineId: z.uuid(),
         position: z.number().int(),
         of: z.number().int(),
         people: z.boolean(),
-        since: z.string().nullable(),
+        estimatedStartAt: z.string().nullable(),
       })
       .nullable()
       .openapi({
@@ -359,21 +360,6 @@ const ManagedTask = z
       }),
   })
   .openapi("ManagedTask");
-
-const QueueTurn = z
-  .object({
-    runId: z.uuid(),
-    agentId: z.uuid(),
-    kind: z.enum(["person", "agent", "routine"]),
-    who: z.string().nullable(),
-    label: z.string().nullable().openapi({ description: "Only when you see its conversation." }),
-    visible: z.boolean(),
-    mine: z.boolean(),
-    canStop: z.boolean(),
-    since: z.string().nullable(),
-  })
-  .openapi("QueueTurn");
-
 const EndedTask = z
   .object({
     runId: z.uuid(),
@@ -1275,7 +1261,7 @@ export function managementRoutes(deps: AppDeps) {
       summary:
         "Stop an agent's run (the person who asked, the agent's owner or an admin). Its text so far is kept; a queued run never starts",
       description:
-        "The agent is told in that conversation (a routine's room for a routine), with `reason` when given (ADR 0127): a notice it reads before its next turn there, which wakes nothing.",
+        "The agent is told in that conversation (a routine's room for a routine), with `reason` when given (ADR 0128): a notice it reads before its next turn there, which wakes nothing.",
       request: {
         params: OrgParams.extend({ runId: z.uuid() }),
         body: {
@@ -1325,7 +1311,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/runs/{runId}/stop-reason",
       tags: ["Usage"],
       security,
-      summary: "Say why you stopped an agent's task (ADR 0127): the agent reads it",
+      summary: "Say why you stopped an agent's task (ADR 0128): the agent reads it",
       description:
         "Only who stopped it, once. The notice in that conversation (`meta.notice.kind = run_stopped`) gets the reason; 404 when the task wasn't stopped by a person.",
       request: {
@@ -1348,7 +1334,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/task-manager/{runId}/steps",
       tags: ["Usage"],
       security,
-      summary: "A task's steps for the task manager (ADR 0127): what each call was and how it ended",
+      summary: "A task's steps for the task manager (ADR 0128): what each call was and how it ended",
       description:
         "To whoever sees the task in the task manager. Never a connector's input or a tool's output (only a permission check's answer); the full trail (`GET …/runs/{runId}`) needs usage access. 404 when you don't see it.",
       request: { params: OrgParams.extend({ runId: z.uuid() }) },
@@ -1378,37 +1364,10 @@ export function managementRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "get",
-      path: "/organizations/{orgId}/machines/{machineId}/queue",
-      tags: ["Usage"],
-      security,
-      summary: "A computer's line (ADR 0127): what runs on it now and who waits for room, in the order they start",
-      description:
-        "Everyone in the workspace sees it. A turn says what it is about only to who sees its conversation; otherwise only whose it is (a person, another agent, a routine).",
-      request: { params: OrgParams.extend({ machineId: z.uuid() }) },
-      responses: {
-        200: json(
-          z.object({
-            computer: z.object({ id: z.uuid(), name: z.string() }),
-            working: z.array(QueueTurn),
-            line: z.array(QueueTurn.extend({ people: z.boolean() })),
-          }),
-        ),
-        ...errors,
-      },
-    }),
-    async (c) => {
-      const { orgId, machineId } = c.req.valid("param");
-      return c.json(await computerQueue(db, c.get("user").id, orgId, machineId), 200);
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "get",
       path: "/organizations/{orgId}/task-manager",
       tags: ["Usage"],
       security,
-      summary: "The task manager (ADR 0127): what the agents are doing now, what each uses, and what ended",
+      summary: "The task manager (ADR 0128): what the agents are doing now, what each uses, and what ended",
       description:
         "Tasks in the conversations you are in (the `active-runs` rule), plus routines' background runs for admins and the agent's owner. No cost. `since` (default: the last 24 h) bounds `ended`.",
       request: { params: OrgParams, query: z.object({ since: z.iso.datetime().optional() }) },

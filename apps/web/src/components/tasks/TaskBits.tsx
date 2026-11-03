@@ -1,6 +1,7 @@
 import type { ManagedTask } from "@agenteschat/client";
 import { useCatalog, useStopReason, useStopTasks } from "@agenteschat/client";
 import { activityVerb, appLabel } from "@agenteschat/client/lib/activity";
+import { etaMinutes } from "@agenteschat/client/lib/computer-queue";
 import { capitalize, joinNames } from "@agenteschat/client/lib/format";
 import { brainName } from "@agenteschat/client/lib/outages";
 import { playSound } from "@agenteschat/client/lib/sounds";
@@ -15,7 +16,7 @@ import {
   waitsFor,
   waitsOnPerson,
 } from "@agenteschat/client/lib/task-manager";
-import { callLogo, formatDuration } from "@agenteschat/client/lib/work";
+import { callLogo } from "@agenteschat/client/lib/work";
 import { Button, Chip, cx, Icon, Input, PixelStop, Popover, ProviderLogo, Spinner } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -32,7 +33,7 @@ import { useLiveStore } from "@/realtime/context";
 import "./tasks.css";
 
 /*
- * The task manager's pieces (ADR 0127), the same on its page and in an agent's panel beside its DM: a task's state,
+ * The task manager's pieces (ADR 0128), the same on its page and in an agent's panel beside its DM: a task's state,
  * what it uses now, its stop and the confirmation that stops several at once.
  */
 
@@ -135,7 +136,7 @@ export function SayWhy({
 }
 
 /**
- * What a task waits for, in words: "Espera seu ok", "Na fila · 2º" with its place in its computer's line (ADR 0127),
+ * What a task waits for, in words: "Espera seu ok", "Na fila · 2º" with its place in its computer's line (ADR 0128),
  * "Computador cheio" when the line isn't known, "Esperando o plano"…; null when it waits for nothing.
  */
 export function waitWords(t: TFunction, task: Pick<ManagedTask, "status" | "held" | "line">): string | null {
@@ -242,18 +243,18 @@ export function ProgramLogo({ program }: { program: TaskProgram }) {
   return <span className="tm-logo">{logo(program.activity)}</span>;
 }
 
-/** "Usando agora": the logo, the program and what it does in it; a dash in the queue, its wait in a computer's line. */
+/** "Usando agora": the logo, the program and what it does in it; a dash queued, when it starts in a computer's line. */
 export function UsingNow({ task }: { task: ManagedTask }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const text = useProgramText()(task);
   const place = linePlace(task);
-  const now = useNow(place?.since ? 30_000 : false);
+  const now = useNow(place?.estimatedStartAt ? 30_000 : false);
   if (place) {
-    // In its computer's line it uses nothing yet: how long it has waited for its turn.
-    const waited = place.since ? formatDuration(t, Math.max(0, now - Date.parse(place.since))) : null;
-    return (
-      <span className="tm-use tm-use--none">{waited ? t("taskManager.queue.waiting", { time: waited }) : "—"}</span>
-    );
+    // In its computer's line it uses nothing yet: when it should start, worded as the line's own dialog words it.
+    const starts = place.estimatedStartAt
+      ? capitalize(t("queue.startsIn", { n: etaMinutes(place.estimatedStartAt, now) }), i18n.language)
+      : "—";
+    return <span className="tm-use tm-use--none">{starts}</span>;
   }
   if (!text) return <span className="tm-use tm-use--none">—</span>;
   return (

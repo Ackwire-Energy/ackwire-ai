@@ -6,20 +6,31 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, Chip, Count, Icon, PixelStop, Text, weights } from "@/ui";
+import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
+import { SheetHostProvider } from "../shared/SheetHost";
 import { useAgentTasks, useStopper } from "./hooks";
-import { computerQueueHref, type Place, rowState, taskStateText } from "./logic";
-import { StopButton, StopConfirm, TaskMark, useAgentColor, UsingLine } from "./parts";
+import { lineStartText, type Place, rowState, taskStateText } from "./logic";
+import { StopButton, StopConfirm, TaskMark, UsingLine, useAgentColor } from "./parts";
 
 /**
- * An agent's tasks (ADR 0127), pushed from its DM's header the way a thread opens: how many it has now and how many
+ * An agent's tasks (ADR 0128), pushed from its DM's header the way a thread opens: how many it has now and how many
  * wait on you, three wells (Agora, Esperam você, Feitas hoje), then its tasks (people's first, then its routines'),
  * the ones asked in that conversation tagged "aqui", each with its state, what it uses now and "Parar"; a task opens
- * its own screen. At the end, "Abrir no gerenciador" and "Parar todas", which asks first, in place.
+ * its own screen. At the end, "Abrir no gerenciador" and "Parar todas", which asks first, in place. A task waiting for
+ * room on its computer opens that computer's line in a sheet ("Ver fila"), as the conversation's bar opens it.
  */
 export function AgentTasksScreen({ agentId, from }: { agentId: string; from: Place | null }) {
+  return (
+    <SheetHostProvider>
+      <AgentTasks agentId={agentId} from={from} />
+    </SheetHostProvider>
+  );
+}
+
+function AgentTasks({ agentId, from }: { agentId: string; from: Place | null }) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -137,8 +148,8 @@ function Well({ label, value }: { label: string; value: number }) {
 
 /**
  * One of the agent's tasks: its mark, title ("aqui" for one asked in that conversation), a small line (what it waits
- * for, in amber, or where and for how long; its place when it waits for room on its computer, with "Ver fila"), what
- * it uses now, and "Parar". It opens the task's screen.
+ * for, in amber, or where and for how long; its place when it waits for room on its computer, with when it should
+ * start and "Ver fila"), what it uses now, and "Parar". It opens the task's screen.
  */
 function TaskRow({
   task,
@@ -158,6 +169,7 @@ function TaskRow({
   const { t } = useTranslation();
   const c = useColors();
   const color = useAgentColor(task.agentId);
+  const openQueue = useOpenQueue();
   const state = rowState(task, stopping);
   const title = taskTitle(t, task);
   const where = taskWhere(t, task);
@@ -169,8 +181,10 @@ function TaskRow({
       : [taskStateText(t, task, state), state === "stopping" ? null : place];
   const line = sub.filter(Boolean).join(" · ");
   const label = [title, here ? t("taskManager.strip.here") : null, line].filter(Boolean).join(", ");
-  // Waiting for room on its computer: its place is in the line above, and "Ver fila" opens the line.
+  // Waiting for room on its computer: its place shows in the line above, when it should start under it, and "Ver
+  // fila" opens the computer's line.
   const inLine = state === "stopping" ? null : linePlace(task);
+  const starts = inLine ? lineStartText(t, task, now) : null;
   return (
     <Pressable
       onPress={() => router.push(`/task-manager/${task.runId}`)}
@@ -196,10 +210,15 @@ function TaskRow({
         >
           {line}
         </Text>
+        {starts ? (
+          <Text variant="caption" tone="faint" numberOfLines={1}>
+            {starts}
+          </Text>
+        ) : null}
         {state === "stopping" ? null : <UsingLine task={task} />}
         {inLine ? (
           <Pressable
-            onPress={() => router.push(computerQueueHref(inLine.machineId))}
+            onPress={() => openQueue(inLine.machineId)}
             accessibilityRole="button"
             hitSlop={6}
             style={({ pressed }) => [styles.see, pressed && styles.pressed]}

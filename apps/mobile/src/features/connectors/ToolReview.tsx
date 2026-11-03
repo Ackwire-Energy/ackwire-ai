@@ -141,20 +141,32 @@ function ServerReview({
   };
   return (
     <>
-      <Text variant="body" tone="muted">
-        {t("toolReview.lead", { count: tools.length, name })}
-      </Text>
+      {server.toolsError ? (
+        <Problem text={t("toolReview.unreadable", { reason: server.toolsError })} />
+      ) : (
+        <Text variant="body" tone="muted">
+          {t("toolReview.lead", { count: tools.length, name })}
+        </Text>
+      )}
       <Button
         variant="secondary"
         size="sm"
-        label={refresh.isPending ? t("mobile.connectors.review.refreshing") : t("toolReview.refresh")}
+        label={
+          refresh.isPending
+            ? t("mobile.connectors.review.refreshing")
+            : server.toolsError
+              ? t("common.retry")
+              : t("toolReview.refresh")
+        }
         disabled={busy}
         onPress={lookAgain}
       />
       {tools.length === 0 ? (
-        <Text variant="small" tone="muted">
-          {t("toolReview.noTools")}
-        </Text>
+        server.toolsError ? null : (
+          <Text variant="small" tone="muted">
+            {t("toolReview.noTools")}
+          </Text>
+        )
       ) : (
         <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
       )}

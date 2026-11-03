@@ -14,6 +14,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
+import { QueueDialog } from "@/components/ComputerQueue";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { WaitMark } from "@/components/RequestCard";
@@ -22,12 +23,11 @@ import { TaskStepsBlock } from "@/components/ToolCalls";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
 import { useAgentTasks } from "./agent-tasks-context";
-import { ComputerLine } from "./ComputerLine";
 import { StopAllInline, StopTaskButton, TaskMark, taskAge, useTaskStop, waitWords } from "./TaskBits";
 import "@/components/threads/threads.css";
 
 /**
- * In a DM's header (ADR 0127), while the agent has tasks the person can see: the orbit (or the waiting mark),
+ * In a DM's header (ADR 0128), while the agent has tasks the person can see: the orbit (or the waiting mark),
  * "3 tarefas · 1 espera você" and a chevron. It opens and closes the agent's tasks in the side panel.
  */
 export function AgentTasksPill() {
@@ -50,7 +50,7 @@ export function AgentTasksPill() {
 }
 
 /**
- * An agent's tasks beside its DM (ADR 0127), in the side panel a thread opens in: how many now, waiting for you and
+ * An agent's tasks beside its DM (ADR 0128), in the side panel a thread opens in: how many now, waiting for you and
  * done today, then a card per task (people's first, then its routines') with its state, where and how long, "Passos"
  * (its steps, as a reply's block lists them) and Parar. At the foot, "Abrir no gerenciador" and "Parar todas", which
  * turns the foot into its confirmation. Esc and a click beside it close it.
@@ -78,8 +78,6 @@ export function AgentTasksPanel({
   const now = useNow(30_000);
   const { stop, stopping } = useTaskStop();
   const [confirming, setConfirming] = useState(false);
-  // A computer's line shown in place of the tasks ("Ver fila" on a task waiting for room, ADR 0127).
-  const [lineOf, setLineOf] = useState<string | null>(null);
   // Esc closes it, before the conversation's own Esc (which would stop the agent's work there). In a field (the
   // reason of "Parar todas") Esc is the field's: it leaves the confirmation.
   useEffect(() => {
@@ -112,28 +110,15 @@ export function AgentTasksPanel({
     [t("taskManager.agentPanel.wells.done"), done],
   ];
 
-  const scrim = (
-    <button
-      type="button"
-      className="thread-panel__scrim"
-      tabIndex={-1}
-      aria-label={t("common.close")}
-      onClick={onClose}
-    />
-  );
-  if (lineOf)
-    return (
-      <>
-        {scrim}
-        <aside className="thread-panel tm-agentpanel tm-line" aria-label={t("taskManager.queue.title")}>
-          <ComputerLine machineId={lineOf} onClose={onClose} onBack={() => setLineOf(null)} />
-        </aside>
-      </>
-    );
-
   return (
     <>
-      {scrim}
+      <button
+        type="button"
+        className="thread-panel__scrim"
+        tabIndex={-1}
+        aria-label={t("common.close")}
+        onClick={onClose}
+      />
       <aside className="thread-panel tm-agentpanel" aria-label={title}>
         <header className="channel__header thread-head thread-head--panel">
           <span className="thread-head__who" aria-hidden="true">
@@ -169,7 +154,6 @@ export function AgentTasksPanel({
                   now={now}
                   stopping={stopping.has(task.runId)}
                   onStop={() => stop([task.runId])}
-                  onLine={setLineOf}
                 />
               ))}
             </ul>
@@ -209,7 +193,7 @@ export function AgentTasksPanel({
 /**
  * One of the agent's tasks: its mark, what it is ("aqui" for this conversation's), what it waits for or where and how
  * long, "Passos" while it works (its steps open in the card, asked again every 3 s while open), "Ver fila" while it
- * waits in its computer's line, and Parar.
+ * waits in its computer's line (the line's own dialog), and Parar.
  */
 function TaskCard({
   task,
@@ -217,20 +201,19 @@ function TaskCard({
   now,
   stopping,
   onStop,
-  onLine,
 }: {
   task: ManagedTask;
   here: boolean;
   now: number;
   stopping: boolean;
   onStop: () => void;
-  /** Its computer's line, in place of the tasks. */
-  onLine: (machineId: string) => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const [open, setOpen] = useState(false);
+  // The computer whose line is open ("Ver fila"): kept once the task leaves the line, so the dialog stays put.
+  const [queueOf, setQueueOf] = useState<string | null>(null);
   const working = taskState(task) === "working" && !stopping;
   const steps = useTaskSteps(org.id, open ? task.runId : null, open && working ? TASK_MANAGER_POLL_MS : false);
   const title = taskTitle(t, task);
@@ -257,9 +240,8 @@ function TaskCard({
           <small data-wait={waitsOnPerson(task) || undefined}>{sub}</small>
         </span>
         {place && (
-          <Button size="sm" variant="ghost" onClick={() => onLine(place.machineId)}>
-            {t("taskManager.queue.see")}
-            <Icon name="chevronRight" size={14} />
+          <Button size="sm" variant="ghost" onClick={() => setQueueOf(place.machineId)}>
+            {t("queue.see")}
           </Button>
         )}
         {working && (
@@ -290,6 +272,15 @@ function TaskCard({
             <p className="tm-panel__none">{t("taskManager.panel.noSteps")}</p>
           )}
         </div>
+      )}
+      {queueOf && (
+        <QueueDialog
+          machineId={queueOf}
+          open
+          onOpenChange={(shown) => {
+            if (!shown) setQueueOf(null);
+          }}
+        />
       )}
     </li>
   );

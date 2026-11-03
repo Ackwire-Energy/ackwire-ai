@@ -1533,6 +1533,583 @@
           }
         },
         "required": ["connector", "label", "from", "to", "days", "tools", "actions", "orgs", "orgsMore"]
+      },
+      "OperatorWorkAnalytics": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "to": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": ["hour", "day"],
+            "description": "By hour for 2 days or fewer, else by day."
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "turns": {
+                "$ref": "#/components/schemas/OperatorWorkTurns"
+              },
+              "waits": {
+                "$ref": "#/components/schemas/OperatorWorkWaits"
+              },
+              "tokens": {
+                "$ref": "#/components/schemas/OperatorWorkTokens"
+              },
+              "agentShare": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Agent-to-agent turns over all turns."
+              },
+              "byPayer": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "payer": {
+                      "type": "string",
+                      "description": "Who pays: `plan` (a computer brain's plan), `workspace_key` (the workspace's API key), `platform_key` (this server's model key, or a key since removed), `platform` (this server's own services)."
+                    },
+                    "input": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Uncached input tokens."
+                    },
+                    "output": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "cacheRead": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "cacheWrite": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "costUsd": {
+                      "type": "number",
+                      "description": "What was billed through an API (a plan's tokens are 0)."
+                    },
+                    "apiEquivalentUsd": {
+                      "type": "number",
+                      "description": "Everything at API prices: a plan's tokens priced like the app's plan card (≈ … pela API)."
+                    }
+                  },
+                  "required": ["payer", "input", "output", "cacheRead", "cacheWrite", "costUsd", "apiEquivalentUsd"]
+                },
+                "description": "Most tokens first."
+              },
+              "turnsWithUsage": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Distinct turns that spent tokens in the dates."
+              },
+              "perTurn": {
+                "type": "object",
+                "properties": {
+                  "input": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "output": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "cacheRead": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "cacheWrite": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": ["input", "output", "cacheRead", "cacheWrite"],
+                "description": "Tokens over `turnsWithUsage`."
+              }
+            },
+            "required": ["turns", "waits", "tokens", "agentShare", "byPayer", "turnsWithUsage", "perTurn"]
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string"
+                },
+                "turns": {
+                  "$ref": "#/components/schemas/OperatorWorkTurns"
+                },
+                "waits": {
+                  "$ref": "#/components/schemas/OperatorWorkWaits"
+                },
+                "tokens": {
+                  "$ref": "#/components/schemas/OperatorWorkTokens"
+                },
+                "agentShare": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Agent-to-agent turns over all turns."
+                },
+                "byPayer": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "payer": {
+                        "type": "string",
+                        "description": "Who pays: `plan` (a computer brain's plan), `workspace_key` (the workspace's API key), `platform_key` (this server's model key, or a key since removed), `platform` (this server's own services)."
+                      },
+                      "input": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Uncached input tokens."
+                      },
+                      "output": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "cacheRead": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "cacheWrite": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "costUsd": {
+                        "type": "number",
+                        "description": "What was billed through an API (a plan's tokens are 0)."
+                      },
+                      "apiEquivalentUsd": {
+                        "type": "number",
+                        "description": "Everything at API prices: a plan's tokens priced like the app's plan card (≈ … pela API)."
+                      }
+                    },
+                    "required": ["payer", "input", "output", "cacheRead", "cacheWrite", "costUsd", "apiEquivalentUsd"]
+                  }
+                }
+              },
+              "required": ["at", "turns", "waits", "tokens", "agentShare", "byPayer"]
+            },
+            "description": "Oldest first, by `bucket`: `at` is YYYY-MM-DD, or YYYY-MM-DDTHH (UTC) by hour. A bucket with nothing is left out."
+          },
+          "more": {
+            "type": "boolean",
+            "description": "More rows than the 500 listed."
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orgId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "turns": {
+                  "$ref": "#/components/schemas/OperatorWorkTurns"
+                },
+                "waits": {
+                  "$ref": "#/components/schemas/OperatorWorkWaits"
+                },
+                "tokens": {
+                  "$ref": "#/components/schemas/OperatorWorkTokens"
+                },
+                "agentShare": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Agent-to-agent turns over all turns."
+                }
+              },
+              "required": ["orgId", "turns", "waits", "tokens", "agentShare"]
+            },
+            "description": "Most tokens first (then turns), at most 500."
+          }
+        },
+        "required": ["from", "to", "bucket", "totals", "series", "more", "workspaces"]
+      },
+      "OperatorWorkTurns": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Agent turns (runs) created in the bucket."
+          },
+          "person": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Started by a person's message."
+          },
+          "agent": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Agent to agent: started by another agent's message or answer, or 2+ agent replies deep."
+          },
+          "routine": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Started by a routine (its run, its reminder, its report)."
+          },
+          "longWork": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Long work and other background runs."
+          },
+          "followUp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "The agent coming back to its own work: a follow-up due, a wait or proposal ended, a check-in."
+          },
+          "other": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Its trigger message is gone."
+          },
+          "done": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "canceled": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Not ended yet (queued, running, waiting)."
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "computerBusy": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Failed: no room on its computer for the whole wait."
+          },
+          "noAi": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Failed: no AI to think with (no sign-in, no key, a revoked or wrong key)."
+          },
+          "paused": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Failed: the workspace or agent on hold or paused, or its budget spent."
+          },
+          "failedOther": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "total",
+          "person",
+          "agent",
+          "routine",
+          "longWork",
+          "followUp",
+          "other",
+          "done",
+          "canceled",
+          "active",
+          "failed",
+          "computerBusy",
+          "noAi",
+          "paused",
+          "failedOther"
+        ]
+      },
+      "OperatorWorkWaits": {
+        "type": "object",
+        "properties": {
+          "waited": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Turns that waited for room on a computer."
+          },
+          "peakWaiting": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Most turns waiting for room at once (for a row, its own)."
+          },
+          "personReplies": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Person-started turns that replied."
+          },
+          "personFailed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Person-started turns that failed: they have no reply, so the reply times leave them out."
+          },
+          "replyMedianSec": {
+            "type": ["integer", "null"],
+            "description": "Median seconds from a person-started turn's creation to its reply; null without one. Work it handed to another agent is not waited for."
+          },
+          "replyP90Sec": {
+            "type": ["integer", "null"]
+          }
+        },
+        "required": ["waited", "peakWaiting", "personReplies", "personFailed", "replyMedianSec", "replyP90Sec"]
+      },
+      "OperatorWorkTokens": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Uncached input tokens."
+          },
+          "output": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cacheRead": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cacheWrite": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "costUsd": {
+            "type": "number",
+            "description": "What was billed through an API (a plan's tokens are 0)."
+          },
+          "apiEquivalentUsd": {
+            "type": "number",
+            "description": "Everything at API prices: a plan's tokens priced like the app's plan card (≈ … pela API)."
+          }
+        },
+        "required": ["input", "output", "cacheRead", "cacheWrite", "costUsd", "apiEquivalentUsd"]
+      },
+      "OperatorOrgWorkAnalytics": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "to": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": ["hour", "day"],
+            "description": "By hour for 2 days or fewer, else by day."
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "turns": {
+                "$ref": "#/components/schemas/OperatorWorkTurns"
+              },
+              "waits": {
+                "$ref": "#/components/schemas/OperatorWorkWaits"
+              },
+              "tokens": {
+                "$ref": "#/components/schemas/OperatorWorkTokens"
+              },
+              "agentShare": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Agent-to-agent turns over all turns."
+              },
+              "byPayer": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "payer": {
+                      "type": "string",
+                      "description": "Who pays: `plan` (a computer brain's plan), `workspace_key` (the workspace's API key), `platform_key` (this server's model key, or a key since removed), `platform` (this server's own services)."
+                    },
+                    "input": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Uncached input tokens."
+                    },
+                    "output": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "cacheRead": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "cacheWrite": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "costUsd": {
+                      "type": "number",
+                      "description": "What was billed through an API (a plan's tokens are 0)."
+                    },
+                    "apiEquivalentUsd": {
+                      "type": "number",
+                      "description": "Everything at API prices: a plan's tokens priced like the app's plan card (≈ … pela API)."
+                    }
+                  },
+                  "required": ["payer", "input", "output", "cacheRead", "cacheWrite", "costUsd", "apiEquivalentUsd"]
+                },
+                "description": "Most tokens first."
+              },
+              "turnsWithUsage": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Distinct turns that spent tokens in the dates."
+              },
+              "perTurn": {
+                "type": "object",
+                "properties": {
+                  "input": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "output": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "cacheRead": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "cacheWrite": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": ["input", "output", "cacheRead", "cacheWrite"],
+                "description": "Tokens over `turnsWithUsage`."
+              }
+            },
+            "required": ["turns", "waits", "tokens", "agentShare", "byPayer", "turnsWithUsage", "perTurn"]
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string"
+                },
+                "turns": {
+                  "$ref": "#/components/schemas/OperatorWorkTurns"
+                },
+                "waits": {
+                  "$ref": "#/components/schemas/OperatorWorkWaits"
+                },
+                "tokens": {
+                  "$ref": "#/components/schemas/OperatorWorkTokens"
+                },
+                "agentShare": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Agent-to-agent turns over all turns."
+                },
+                "byPayer": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "payer": {
+                        "type": "string",
+                        "description": "Who pays: `plan` (a computer brain's plan), `workspace_key` (the workspace's API key), `platform_key` (this server's model key, or a key since removed), `platform` (this server's own services)."
+                      },
+                      "input": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Uncached input tokens."
+                      },
+                      "output": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "cacheRead": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "cacheWrite": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "costUsd": {
+                        "type": "number",
+                        "description": "What was billed through an API (a plan's tokens are 0)."
+                      },
+                      "apiEquivalentUsd": {
+                        "type": "number",
+                        "description": "Everything at API prices: a plan's tokens priced like the app's plan card (≈ … pela API)."
+                      }
+                    },
+                    "required": ["payer", "input", "output", "cacheRead", "cacheWrite", "costUsd", "apiEquivalentUsd"]
+                  }
+                }
+              },
+              "required": ["at", "turns", "waits", "tokens", "agentShare", "byPayer"]
+            },
+            "description": "Oldest first, by `bucket`: `at` is YYYY-MM-DD, or YYYY-MM-DDTHH (UTC) by hour. A bucket with nothing is left out."
+          },
+          "more": {
+            "type": "boolean",
+            "description": "More rows than the 500 listed."
+          },
+          "orgId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "agentId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "turns": {
+                  "$ref": "#/components/schemas/OperatorWorkTurns"
+                },
+                "waits": {
+                  "$ref": "#/components/schemas/OperatorWorkWaits"
+                },
+                "tokens": {
+                  "$ref": "#/components/schemas/OperatorWorkTokens"
+                },
+                "agentShare": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Agent-to-agent turns over all turns."
+                }
+              },
+              "required": ["agentId", "turns", "waits", "tokens", "agentShare"]
+            },
+            "description": "Most tokens first (then turns), at most 500. The workspace's own usage (the router, embeddings) is only in the totals."
+          }
+        },
+        "required": ["from", "to", "bucket", "totals", "series", "more", "orgId", "agents"]
       }
     },
     "parameters": {}
@@ -3476,6 +4053,141 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OperatorConnectorAnalytics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (`analytics.range`: the dates)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/work": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "Agent work and tokens across workspaces: per day (or hour) and per workspace",
+        "description": "Turns and waits count runs created in the dates, tokens the usage recorded in them. Counts and ids only: no message, no name.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The first UTC day, YYYY-MM-DD.",
+              "example": "2026-10-01"
+            },
+            "required": true,
+            "description": "The first UTC day, YYYY-MM-DD.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The last UTC day, YYYY-MM-DD: at most 90 days, both counted. Else 400 `analytics.range`.",
+              "example": "2026-10-31"
+            },
+            "required": true,
+            "description": "The last UTC day, YYYY-MM-DD: at most 90 days, both counted. Else 400 `analytics.range`.",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorWorkAnalytics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (`analytics.range`: the dates)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/work/orgs/{orgId}": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "One workspace's agent work and tokens: per day (or hour) and per agent",
+        "description": "Turns and waits count runs created in the dates, tokens the usage recorded in them. Counts and ids only: no message, no name. An unknown workspace answers with zeros.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The first UTC day, YYYY-MM-DD.",
+              "example": "2026-10-01"
+            },
+            "required": true,
+            "description": "The first UTC day, YYYY-MM-DD.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The last UTC day, YYYY-MM-DD: at most 90 days, both counted. Else 400 `analytics.range`.",
+              "example": "2026-10-31"
+            },
+            "required": true,
+            "description": "The last UTC day, YYYY-MM-DD: at most 90 days, both counted. Else 400 `analytics.range`.",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorOrgWorkAnalytics"
                 }
               }
             }

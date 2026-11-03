@@ -8,7 +8,7 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { ReasonField } from "../task-manager/parts";
 
 /**
- * A person stopped one of the agent's tasks (ADR 0127): one calm line where the task was, "Você parou esta tarefa ·
+ * A person stopped one of the agent's tasks (ADR 0128): one calm line where the task was, "Você parou esta tarefa ·
  * 14:09 · Dev recebeu o aviso e só retoma se alguém pedir.", with the reason when there is one. Who stopped it, while
  * it has none, gets "Dizer por quê": a short field the agent reads.
  */

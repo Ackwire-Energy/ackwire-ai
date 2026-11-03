@@ -1,15 +1,15 @@
-import type { ComputerSummary, EndedTask, ManagedTask, QueueTurn } from "@agenteschat/client";
+import type { ComputerSummary, EndedTask, ManagedTask } from "@agenteschat/client";
 import { type Activity, activityVerb } from "@agenteschat/client/lib/activity";
+import { etaMinutes } from "@agenteschat/client/lib/computer-queue";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { brainName } from "@agenteschat/client/lib/outages";
 import {
   type AgentTasks,
   endedState,
   linePlace,
-  queueWho,
   type TaskProgram,
-  tasksOf,
   taskState,
+  tasksOf,
   taskWhere,
   waitsFor,
   waitsOnPerson,
@@ -17,7 +17,7 @@ import {
 import type { TFunction } from "i18next";
 
 /**
- * What the phone's task manager says (ADR 0127): its list, a task's screen, an agent's tasks screen and the count in
+ * What the phone's task manager says (ADR 0128): its list, a task's screen, an agent's tasks screen and the count in
  * its DM's header, from the shared model (`@agenteschat/client/lib/task-manager`).
  */
 
@@ -88,37 +88,20 @@ export function taskStateText(t: TFunction, task: Pick<ManagedTask, "held" | "li
   return line ? t("taskManager.state.inLine", { position: line.position }) : stateText(t, state);
 }
 
-/** A computer's line (ADR 0127), pushed from the task manager, a task or an agent's tasks. */
-export const computerQueueHref = (machineId: string) => `/computer-queue/${machineId}` as const;
+/**
+ * When a task waiting for room on its computer should start, in the computer line's own words ("começa em ~3 min");
+ * null with no estimate, or when it isn't in a line.
+ */
+export function lineStartText(t: TFunction, task: Pick<ManagedTask, "held" | "line">, now: number): string | null {
+  const at = linePlace(task)?.estimatedStartAt;
+  return at ? t("queue.startsIn", { n: etaMinutes(at, now) }) : null;
+}
 
 /** A computer on the task manager: "Cheio · 2 na fila · 3 trabalhando", "Tem espaço · 1 trabalhando". */
 export function computerLine(t: TFunction, computer: Pick<ComputerSummary, "working" | "inLine">): string {
   const room =
     computer.inLine > 0 ? t("taskManager.queue.full", { count: computer.inLine }) : t("taskManager.queue.room");
   return computer.working > 0 ? `${room} · ${t("taskManager.working", { count: computer.working })}` : room;
-}
-
-/** A turn on a computer's line: the agent and what it is for (its label when you see it, else whose turn it is). */
-export const turnTitle = (t: TFunction, turn: Pick<QueueTurn, "kind" | "who" | "label">, agentName: string) =>
-  `${agentName} · ${turn.label ?? queueWho(t, turn)}`;
-
-/**
- * Under a turn's title: whose it is (when the title has its label) and for how long it has run or waited ("Pedido de
- * Ana · esperando há 2 min"); `time` is that duration in words.
- */
-export function turnSub(
-  t: TFunction,
-  turn: Pick<QueueTurn, "kind" | "who" | "label">,
-  where: "working" | "line",
-  time: string | null,
-): string {
-  const who = turn.label ? queueWho(t, turn) : null;
-  const when = time
-    ? where === "line"
-      ? t("taskManager.queue.waiting", { time })
-      : t("taskManager.queue.running", { time })
-    : null;
-  return [who, when].filter(Boolean).join(" · ");
 }
 
 /** An agent's row: "1 trabalhando · 1 espera você", or "Na fila" while its tasks only wait their turn. */
@@ -231,7 +214,7 @@ export function usingNow(
   }
 }
 
-/** One agent's tasks now: its DM header's count and its tasks screen (ADR 0127). */
+/** One agent's tasks now: its DM header's count and its tasks screen (ADR 0128). */
 export interface AgentTaskView {
   /** People's first, then its routines', oldest first; `here`: asked in the conversation it was opened from. */
   rows: { task: ManagedTask; here: boolean }[];

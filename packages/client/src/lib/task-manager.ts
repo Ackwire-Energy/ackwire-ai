@@ -1,9 +1,9 @@
 import type { TFunction } from "i18next";
-import type { EndedTask, ManagedTask, QueueTurn, TaskNow } from "../api/types";
+import type { EndedTask, ManagedTask, TaskNow } from "../api/types";
 import { type Activity, toolActivity } from "./activity";
 
 /**
- * The task manager, the same on every app (ADR 0127): the web's page, the phone's list and the chat's strip read
+ * The task manager, the same on every app (ADR 0128): the web's page, the phone's list and the chat's strip read
  * these. Tasks are grouped by agent; a routine's background run goes to its own section; what a task uses now comes
  * from its latest tool call, the way the chat's live chip says it.
  */
@@ -35,13 +35,6 @@ export const waitsOnPerson = (t: Pick<ManagedTask, "status" | "held">) => {
  */
 export const linePlace = (t: Pick<ManagedTask, "held" | "line">) =>
   t.held === "computer_busy" && t.line ? t.line : null;
-
-/** Whose a turn on a computer's line is, in the person's words (`taskManager.queue.*`). */
-export function queueWho(t: TFunction, turn: Pick<QueueTurn, "kind" | "who">): string {
-  if (turn.kind === "routine") return t("taskManager.queue.routine", { name: turn.who ?? "" });
-  if (turn.kind === "agent") return t("taskManager.queue.agent", { name: turn.who ?? "" });
-  return turn.who ? t("taskManager.queue.person", { name: turn.who }) : t("taskManager.queue.personHidden");
-}
 
 /** The words of a wait (`taskManager.state.*`). */
 export const waitKey = (w: WaitReason) =>

@@ -1483,6 +1483,7 @@
     "outage_other": "{{names}}：AI 服务商出现故障 · 会自动重试",
     "queued_other": "{{names}} 正在排队等待电脑",
     "away_other": "{{names}} 正在等待电脑",
+    "queuedNext": "{{names}} 正在电脑的队列中 · 下一个",
     "nobody": "没有智能体会回答",
     "status": {
       "seen": "已看到",
@@ -2781,6 +2782,7 @@
     "runsEmpty": "没有与“{{q}}”匹配的运行记录。",
     "runsNone": "还没有运行记录。",
     "runNoText": "无文本",
+    "runPrivate": "在你未参与的对话中",
     "runTokens": "输入 {{input}} · 缓存 {{cached}} · 输出 {{output}}",
     "runTokensTip": "{{input}} 个新输入 token，{{cached}} 个从缓存读取（更便宜），{{output}} 个输出",
     "budgetHelp": "达到上限时，{{name}} 会停止并在频道中说明。{{ownerNote}}",
@@ -7230,9 +7232,73 @@
     "uses": {
       "title": "使用此页面的智能体",
       "count_other": "次使用（近 7 天）",
+      "week_other": "本周被参考 {{count}} 次",
       "last": "{{name}} 在{{when}}使用过",
       "lastIn": "{{name}} 在{{when}}使用过，在 #{{channel}} 中回答时",
       "none": "还没有智能体使用过它。当有人问到相关主题时，它会被用于回答。"
+    },
+    "editedWhen": "{{when}}编辑",
+    "access": {
+      "label": "谁能看到：{{who}}",
+      "everyone": "整个工作区",
+      "everyoneHint": "任何成员和任何能访问Wiki的智能体都能读这页。",
+      "peopleAnd": "所有人和{{agents}}",
+      "peopleOnly": "所有人，不含智能体",
+      "ownersOnly": "仅所有者",
+      "withAllAgents": "{{names}}和所有智能体",
+      "more_other": "另外 {{count}} 个"
+    },
+    "backlinkDm": "与{{name}}的对话",
+    "backlinkDmSomeone": "某人",
+    "draftKept": "草稿已保存",
+    "draftRecovered": "草稿已恢复",
+    "markdown": "Markdown",
+    "markdownHint": "以 Markdown 查看和编辑文本",
+    "props": {
+      "folderHint": "页面所在文件夹",
+      "noFolder": "无文件夹",
+      "searchFolder": "搜索文件夹",
+      "createFolder": "创建文件夹“{{name}}”",
+      "addTag": "标签",
+      "removeTag": "移除 #{{tag}}"
+    },
+    "rich": {
+      "placeholder": "在这里写。[[ 链接其他页面，/ 显示所有块。",
+      "hint": "[[ 链接页面 · / 显示块 · {{key}} S 保存一个版本",
+      "blockLabel": "块类型",
+      "strike": "删除线",
+      "linkPage": "链接页面",
+      "column": "列",
+      "addRow": "行",
+      "addColumn": "列",
+      "calloutText": "在这里写提示内容。",
+      "codeText": "代码",
+      "blocks": {
+        "paragraph": "段落",
+        "heading": "标题",
+        "subheading": "副标题",
+        "list": "列表",
+        "numbered": "编号列表",
+        "task": "待办",
+        "table": "表格",
+        "callout": "提示块",
+        "code": "代码",
+        "quote": "引用",
+        "rule": "分隔线",
+        "link": "Wiki页面"
+      }
+    },
+    "ask": {
+      "button": "请智能体修改",
+      "title": "请智能体修改",
+      "text": "请求会连同页面链接一起发到你和智能体的对话里。智能体用Wiki工具编辑，这个版本会在历史中记为应你的请求所改。",
+      "agent": "智能体",
+      "what": "要改什么？",
+      "placeholder": "例如：按 2027 年的涨价更新",
+      "send": "发送给{{name}}",
+      "sendNone": "发送",
+      "sent": "已在与{{name}}的对话中发送请求。",
+      "message": "关于页面 [[{{title}}]]："
     },
     "import": {
       "cta": "从 Obsidian 导入",
@@ -7491,6 +7557,67 @@
       "label": "电脑",
       "none": "不用电脑",
       "noneText": "不运行程序，也不保存文件"
+    }
+  },
+  "queue": {
+    "button_other": "电脑 · {{count}} 个等待中",
+    "buttonIdle": "电脑",
+    "see": "查看队列",
+    "label": "{{name}} 的队列",
+    "full": "已满",
+    "fullNext": "已满 · 下一个约 {{n}} 分钟后开始",
+    "free": "没有排队",
+    "workingNow": "正在工作 · {{n}}",
+    "inLine": "排队中 · {{n}}",
+    "allStarted": "全部约 {{n}} 分钟内开始",
+    "nothingWorking": "现在没有在运行的任务",
+    "rule": "人优先。一起被提及的智能体逐个开始。",
+    "youFirst": "你优先",
+    "startsIn": "约 {{n}} 分钟后开始",
+    "startsAfter": "{{after}} 完成后开始",
+    "left": "还剩约 {{n}} 分钟",
+    "who": "{{name}}",
+    "away": "离开 {{time}}",
+    "purpose": {
+      "you": "正在回复你",
+      "person": "正在回复 {{name}}",
+      "someone": "正在回复某人",
+      "agent": "应 {{name}} 的请求",
+      "someAgent": "应某个智能体的请求",
+      "routine": "例行任务",
+      "work": "长时间工作"
+    },
+    "where": {
+      "yourDm": "你的私信",
+      "dm": "与 {{name}} 的私信",
+      "thread": "#{{name}} 中的一个话题",
+      "private": "私密对话"
+    },
+    "live": {
+      "nextEta": "正在等待电脑。下一个就是它，约 {{n}} 分钟后",
+      "nextAfter": "正在等待电脑。{{after}} 完成后就轮到它",
+      "next": "正在等待电脑。下一个就是它",
+      "behind": "排队中，第 {{nth}}。在 {{names}} 之后",
+      "position": "排队中，第 {{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}",
+      "two": "{{n}}",
+      "few": "{{n}}",
+      "other": "{{n}}"
+    },
+    "fan": {
+      "called_other": "已呼叫 {{count}} 个智能体",
+      "answered_other": "{{count}} 个已回复",
+      "working_other": "{{count}} 个工作中",
+      "inLine_other": "{{count}} 个排队中",
+      "failed_other": "{{count}} 个未回复",
+      "chip": {
+        "answered": "已回复",
+        "working": "工作中",
+        "inLine": "排队中",
+        "failed": "未回复"
+      }
     }
   },
   "access": {
@@ -8667,6 +8794,7 @@
     "clearSearch": "清除搜索",
     "noMatch": "没有找到“{{q}}”相关内容。",
     "noTools": "服务器没有提供任何工具。",
+    "unreadable": "无法读取连接器的工具：{{reason}}",
     "refresh": "查找新工具",
     "decideTitle": "需要你决定 · {{count}}",
     "decideHelp": "从名称看不出它们做什么。请确认建议或选择其他级别。",
@@ -10350,13 +10478,14 @@
   "usageViews": {
     "signedOut": "已退出登录",
     "whose": "{{name}} 的",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "再次使用此账号后会显示限额。",
     "unused": "没有智能体使用此账号。",
     "usesNow": "正在使用",
     "monthTokens": "本月 {{tokens}} 个 token",
     "tokens": "{{tokens}} 个 token",
     "equivalent": "按 API 计约 {{amount}}",
+    "thisMonth": "本月",
+    "moreAgents_other": "+{{count}} 个智能体",
     "paid": "已支付 {{amount}}",
     "budgetShare": "预算的 {{percent}}",
     "estimate": "套餐只显示整个账号的用量。每个智能体的部分是根据各自的花费估算的。",
@@ -10887,9 +11016,9 @@
       "issue_work_start": "请完成任务 #{{number}}。",
       "issue_taken": "接手了任务 #{{number}}。",
       "done": "完成。",
-      "stretch_paused_runs_other": "{{agents}} 停下来向你确认 · 自你提出请求以来已自主执行 {{steps}} 步",
-      "stretch_paused_spend_other": "{{agents}} 停下来向你确认 · 在没有你参与的情况下，每个都已在这上面用掉本月预算的 {{percent}}%",
-      "stretch_paused_spend_cost_other": "{{agents}} 停下来向你确认 · 在没有你参与的情况下，每个都已在这上面用掉 {{amount}}（本月预算的 {{percent}}%）",
+      "stretch_paused_runs_other": "{{agents}} 暂停下来，先向你确认再继续",
+      "stretch_paused_spend_other": "{{agents}} 暂停下来向你确认 · 每个已用掉本月预算的 {{percent}}%",
+      "stretch_paused_spend_cost_other": "{{agents}} 暂停下来向你确认 · 每个已用掉 {{amount}}（本月预算的 {{percent}}%）",
       "memory": {
         "proposed": "已创建提议：{{text}}",
         "forgot": "记忆已更新：忘记了“{{text}}”。",
@@ -12154,25 +12283,10 @@
     "activity": "最近 30 分钟",
     "failed": "无法停止，请重试。",
     "queue": {
-      "title": "电脑的队列",
-      "sub": "{{name}} · 工作区中的所有人看到的顺序都一样",
       "see": "查看队列",
       "full_other": "已满 · {{count}} 个在排队",
       "room": "有空位",
-      "working": "正在工作",
-      "line": "排队中",
-      "first": "你优先",
-      "place": "第{{position}}",
-      "waiting": "已等待 {{time}}",
-      "running": "已进行 {{time}}",
-      "person": "{{name}} 的请求",
-      "personHidden": "一位成员的请求",
-      "agent": "{{name}} 的请求",
-      "routine": "例行工作“{{name}}”",
-      "empty": "没有人在排队。",
-      "note": "成员的请求优先。同时被叫到的智能体会按被叫的顺序逐个开始。",
-      "computers": "电脑",
-      "back": "返回任务"
+      "computers": "电脑"
     },
     "navWhat": "查看每个智能体正在做什么，并停止需要停止的任务",
     "cards": {

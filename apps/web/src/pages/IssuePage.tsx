@@ -64,6 +64,7 @@ import {
 } from "@/lib/issues";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
+import { useIssueRealtime } from "@/realtime/context";
 import "./issues.css";
 
 /** One issue as a page (`/issues/131`); the board opens the same details in its panel. */
@@ -479,6 +480,7 @@ function Activity({ issue }: { issue: Issue }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const activity = useIssueActivity(org.id, issue.id);
+  useIssueRealtime(org.id, issue);
   const action = useIssueAction(org.id);
   const actors = useActors();
   const [text, setText] = useState("");

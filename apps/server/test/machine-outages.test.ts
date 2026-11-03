@@ -130,9 +130,59 @@ test("outages and move-agents over HTTP: the contract the apps read", async () =
   expect((await stranger(`/api/app/organizations/${orgId}/machines/outages`)).status).toBe(403);
 });
 
+test("a computer's queue over HTTP: every member reads it, only the org's own computers", async () => {
+  const { api, pair, agentId, orgId, channelId } = await start();
+  const pro = await pair("MacBook Pro", true, "203.0.113.22");
+  const trigger = crypto.randomUUID();
+  const [run] = await t.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId,
+      agentId,
+      channelId,
+      threadRootId: trigger,
+      triggerMessageId: trigger,
+      trigger: "mention",
+      hop: 1,
+      status: "waiting_input",
+      waitingMachineId: pro,
+      transcript: {
+        messages: [],
+        waitingForBrain: { kind: "claude_code", machineId: pro, code: "busy", waitId: "w1" },
+        roomWaitSince: Date.now(),
+      },
+    })
+    .returning();
+
+  const res = await api(`/machines/${pro}/queue`);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({
+    machineId: pro,
+    name: "MacBook Pro",
+    working: [],
+    waiting: [
+      {
+        runId: run?.id,
+        agentId,
+        purpose: { kind: "person", userId: null },
+        where: { channelId, threadId: null },
+        people: false,
+        position: 1,
+        estimatedStartAt: null,
+        after: [],
+      },
+    ],
+  });
+  expect((await api(`/machines/${crypto.randomUUID()}/queue`)).status).toBe(404);
+  const stranger = browser(t);
+  await signUp(stranger, "x@example.com");
+  expect((await stranger(`/api/app/organizations/${orgId}/machines/${pro}/queue`)).status).toBe(403);
+});
+
 test("the OpenAPI document lists both routes", async () => {
   await start();
   const doc = (await (await t.app.request("/api/openapi.json")).json()) as { paths: Record<string, unknown> };
   expect(Object.keys(doc.paths)).toContain("/app/organizations/{orgId}/machines/outages");
   expect(Object.keys(doc.paths)).toContain("/app/organizations/{orgId}/machines/{machineId}/move-agents");
+  expect(Object.keys(doc.paths)).toContain("/app/organizations/{orgId}/machines/{machineId}/queue");
 });

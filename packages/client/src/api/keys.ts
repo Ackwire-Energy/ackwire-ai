@@ -120,6 +120,8 @@ export const keys = {
   hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
   machineOutages: (orgId: string) => ["org", orgId, "machines", "outages"] as const,
+  /** A computer's line (under `machines`); `computer.queue` org events refetch it. */
+  machineQueue: (orgId: string, machineId: string) => ["org", orgId, "machines", "queue", machineId] as const,
   /** The workspace's own computer on its way (ADR 0056 §10); `machine.provisioning` events set it. */
   computerSetup: (orgId: string) => ["org", orgId, "computer-setup"] as const,
   /** A computer's device code (`/conectar`): not under an organization, it is picked on that page. */
@@ -197,7 +199,6 @@ export const keys = {
   working: (orgId: string) => ["org", orgId, "working"] as const,
   taskManager: (orgId: string) => ["org", orgId, "task-manager"] as const,
   taskSteps: (orgId: string, runId: string) => ["org", orgId, "task-manager", "steps", runId] as const,
-  computerQueue: (orgId: string, machineId: string) => ["org", orgId, "task-manager", "queue", machineId] as const,
   reminders: (orgId: string) => ["org", orgId, "reminders"] as const,
   /** Every mailbox read (prefix). */
   mail: (orgId: string) => ["org", orgId, "mail"] as const,

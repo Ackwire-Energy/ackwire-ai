@@ -1,7 +1,7 @@
 import type { ComputerSummary, EndedTask, ManagedTask } from "@agenteschat/client";
 import {
-  agentSummary,
   type AgentTasks,
+  agentSummary,
   endedState,
   groupTasks,
   taskState,
@@ -29,15 +29,16 @@ import {
   Text,
   weights,
 } from "@/ui";
+import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { Tile } from "../shared/parts";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
+import { Tile } from "../shared/parts";
+import { SheetHostProvider } from "../shared/SheetHost";
 import { useStopper, useTasksToday } from "./hooks";
 import {
   computerLine,
-  computerQueueHref,
   endedLatestFirst,
   endedText,
   groupLine,
@@ -55,12 +56,20 @@ const LIVE_ROWS = 8;
 const taskHref = (runId: string) => `/task-manager/${runId}` as const;
 
 /**
- * The task manager (ADR 0127), pushed from Agentes: what the agents are doing now. The tasks people asked for, by
+ * The task manager (ADR 0128), pushed from Agentes: what the agents are doing now. The tasks people asked for, by
  * agent (its row folds, says how its tasks stand and stops them all, asking first), each with its state, what it uses
  * now and "Parar"; then the routines' work in the background and what ended today. A task opens its own screen. Above
- * them, the computers with work, each opening its line.
+ * them, the computers with work, each opening its line in a sheet, as the conversation's bar opens it.
  */
 export function TaskManagerScreen() {
+  return (
+    <SheetHostProvider>
+      <TaskManager />
+    </SheetHostProvider>
+  );
+}
+
+function TaskManager() {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -131,7 +140,9 @@ export function TaskManagerScreen() {
           {computers.length > 0 ? (
             <>
               <SectionHeader title={t("taskManager.queue.computers")} count={computers.length} />
-              {computers.map((m, i) => <ComputerRow key={m.id} computer={m} divider={i > 0} />)}
+              {computers.map((m, i) => (
+                <ComputerRow key={m.id} computer={m} divider={i > 0} />
+              ))}
             </>
           ) : null}
           {groups.length > 0 ? (
@@ -352,9 +363,7 @@ function TaskRow({
       ]}
     >
       {divider ? (
-        <View
-          style={[styles.divider, flat ? styles.flatDivider : styles.taskDivider, { backgroundColor: c.line2 }]}
-        />
+        <View style={[styles.divider, flat ? styles.flatDivider : styles.taskDivider, { backgroundColor: c.line2 }]} />
       ) : null}
       {flat ? <AgentFace agentId={task.agentId} size={30} live={false} /> : null}
       <View style={styles.taskText}>
@@ -377,17 +386,18 @@ function TaskRow({
 }
 
 /**
- * A computer with work (ADR 0127): its name, whether it has room or how many wait for it, how many run there now. It
- * opens its line.
+ * A computer with work (ADR 0128): its name, whether it has room or how many wait for it, how many run there now. It
+ * opens its line (`QueueSheet`).
  */
 function ComputerRow({ computer, divider }: { computer: ComputerSummary; divider: boolean }) {
   const { t } = useTranslation();
   const c = useColors();
   const kind = useComputerKind(useOrgId(), computer.id);
+  const openQueue = useOpenQueue();
   const line = computerLine(t, computer);
   return (
     <Pressable
-      onPress={() => router.push(computerQueueHref(computer.id))}
+      onPress={() => openQueue(computer.id)}
       accessibilityRole="button"
       accessibilityLabel={`${computer.name}, ${line}`}
       style={({ pressed }) => [styles.computer, pressed && { backgroundColor: c.sunken }]}

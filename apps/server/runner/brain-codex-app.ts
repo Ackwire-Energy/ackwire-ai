@@ -42,8 +42,9 @@ import type { Spawn } from "./scope-gate";
  * progress, as Claude Code's do (`brain.ts`).
  *
  * - One app-server per (agent, session) stays alive between turns (closed
- *   after `idleMs` idle, at most `maxProcesses`; the least recently used idle
- *   one goes for a new one; all busy: that turn runs with `codex exec`).
+ *   after `idleMs` idle, at most `maxProcesses` kept per agent; the least
+ *   recently used idle one goes for a new one; all busy: the turn still gets
+ *   its own, and the extra ones close as turns end).
  *   Started with the same `-c` overrides as exec (the agent's writable roots,
  *   our MCP bridge; no network) and the same env (the agent's secrets,
  *   `CODEX_HOME` = the turn's account). A change of folder, roots, account,
@@ -806,10 +807,11 @@ export class CodexAppServers implements CodexAppRunner {
       live = undefined;
     }
     if (!live) {
-      const max = this.opts.maxProcesses ?? CODEX_APP_MAX_PROCESSES;
-      if (this.size >= max) this.evictIdle();
-      // All busy: this turn runs with exec.
-      if (this.size >= max) return false;
+      const agent = input.agentId ?? "";
+      const lru = this.alive(agent) >= this.max ? this.lruIdle(agent) : undefined;
+      if (lru) this.drop(lru);
+      // Over the cap when every app-server is busy: the turn still gets its own (steering reaches it, never exec's
+      // `unsupported`); `trim` closes the extra as turns end.
       const started = await this.start(key, threadKey, sig, input, opts);
       if (!started) return false;
       live = started;
@@ -965,6 +967,7 @@ export class CodexAppServers implements CodexAppRunner {
       live.lastUsed = Date.now();
       if (live.bridge && this.opts.runs.has(live.id)) this.opts.runs.set(live.id, live.bridge);
       if (this.live.get(live.key) === live) this.armIdle(live);
+      this.trim(live.agentId);
     }
   }
 
@@ -1288,14 +1291,31 @@ export class CodexAppServers implements CodexAppRunner {
     live.idleTimer.unref?.();
   }
 
-  /** Closes the least recently used idle process, if any. */
-  private evictIdle() {
+  private get max() {
+    return this.opts.maxProcesses ?? CODEX_APP_MAX_PROCESSES;
+  }
+
+  /** The cap is per agent: one agent's turns never close another's warm app-server. */
+  private alive(agentId: string) {
+    return [...this.live.values()].filter((l) => l.agentId === agentId && !l.client.exited).length;
+  }
+
+  private lruIdle(agentId: string): AppLive | undefined {
     let lru: AppLive | undefined;
     for (const l of this.live.values()) {
-      if (l.busy) continue;
+      if (l.busy || l.agentId !== agentId) continue;
       if (!lru || l.lastUsed < lru.lastUsed) lru = l;
     }
-    if (lru) this.drop(lru);
+    return lru;
+  }
+
+  /** Back within the agent's cap once its turns end, least recently used idle first. */
+  private trim(agentId: string) {
+    while (this.alive(agentId) > this.max) {
+      const l = this.lruIdle(agentId);
+      if (!l) return;
+      this.drop(l);
+    }
   }
 
   private drop(live: AppLive) {

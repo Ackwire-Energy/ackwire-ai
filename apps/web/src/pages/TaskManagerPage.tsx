@@ -1,4 +1,4 @@
-import type { EndedTask, ManagedTask } from "@agenteschat/client";
+import type { ComputerSummary, EndedTask, ManagedTask } from "@agenteschat/client";
 import { useTaskManager } from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
 import {
@@ -33,11 +33,11 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { Sparkline } from "@/components/ChartBlock";
+import { QueueDialog } from "@/components/ComputerQueue";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { WaitMark } from "@/components/RequestCard";
 import { colorOf } from "@/components/Sky";
-import { ComputerLinePanel, computerLine } from "@/components/tasks/ComputerLine";
 import {
   heatOf,
   ProgramStack,
@@ -57,7 +57,7 @@ import { useNow } from "@/hooks/useNow";
 import "./task-manager.css";
 
 /*
- * The task manager (ADR 0127), one page: the agents as cards with their last half hour (one chosen shows only its
+ * The task manager (ADR 0128), one page: the agents as cards with their last half hour (one chosen shows only its
  * tasks), the tasks now (asked by people, grouped by agent, then the routines' background runs) with their state,
  * what each uses, its time, where it runs and Parar, and what ended today at the end. No cost anywhere: here people
  * stop work. A row or an agent chosen gives the toolbar "Ver passos" and "Parar tarefa" / "Parar tudo de Dev".
@@ -88,32 +88,28 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
   const [confirm, setConfirm] = useState<string | null>(null);
   // The task whose steps are open in the panel ("Ver passos"); it stays open after the task ends.
   const [panel, setPanel] = useState<string | null>(null);
-  // The computer whose line is open in the panel ("Ver fila", ADR 0127); one panel at a time.
-  const [lineOf, setLineOf] = useState<{ id: string; name: string } | null>(null);
-  const openTask = (runId: string) => {
-    setLineOf(null);
-    setPanel(runId);
-  };
-  const openLine = (machine: { id: string; name: string }) => {
-    setPanel(null);
-    setLineOf(machine);
-  };
+  // The computer whose line is open ("Ver fila"): the line's own dialog, as a conversation's header opens it.
+  const [queueOf, setQueueOf] = useState<string | null>(null);
   // Esc closes the panel, like a thread's; an Escape a dialog over it took is the dialog's alone.
   useEffect(() => {
-    if (!panel && !lineOf) return;
+    if (!panel) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
       setPanel(null);
-      setLineOf(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panel, lineOf]);
+  }, [panel]);
 
   const all = view.data?.tasks ?? [];
   const activity = view.data?.activity;
-  // The computers with turns running or waiting for room (ADR 0127).
+  // The computers with turns running or waiting for room (ADR 0128).
   const computers = view.data?.computers ?? [];
+  // "Cheio · 3 na fila" or "Tem espaço", and "1 trabalhando": a computer as the page lists it.
+  const computerText = (c: ComputerSummary) => {
+    const room = c.inLine > 0 ? t("taskManager.queue.full", { count: c.inLine }) : t("taskManager.queue.room");
+    return c.working > 0 ? `${room} · ${t("taskManager.working", { count: c.working })}` : room;
+  };
   const nameOf = (id: string) => dir.anyAgent(id)?.name ?? t("channel.unknownAgent");
   const query = q.trim().toLocaleLowerCase();
   const matches = (task: ManagedTask) => {
@@ -172,8 +168,8 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
       selected={selected === task.runId}
       stopping={stopping.has(task.runId)}
       onSelect={() => pick(task.runId)}
-      onSteps={() => openTask(task.runId)}
-      onLine={openLine}
+      onSteps={() => setPanel(task.runId)}
+      onQueue={setQueueOf}
       onStop={() => stopOne(task)}
     />
   );
@@ -304,16 +300,16 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
                 </span>
                 <span className="tm-computer__text">
                   <b>{c.name}</b>
-                  <small>{computerLine(t, c)}</small>
+                  <small>{computerText(c)}</small>
                 </span>
                 {(c.inLine > 0 || c.working > 0) && (
                   <Button
                     size="sm"
                     variant="ghost"
-                    aria-label={`${t("taskManager.queue.see")}: ${c.name}`}
-                    onClick={() => openLine({ id: c.id, name: c.name })}
+                    aria-label={`${t("queue.see")}: ${c.name}`}
+                    onClick={() => setQueueOf(c.id)}
                   >
-                    {t("taskManager.queue.see")}
+                    {t("queue.see")}
                   </Button>
                 )}
               </li>
@@ -337,7 +333,7 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
               variant="ghost"
               icon="list"
               disabled={!selTask}
-              onClick={() => selTask && openTask(selTask.runId)}
+              onClick={() => selTask && setPanel(selTask.runId)}
             >
               {t("taskManager.actions.steps")}
             </Button>
@@ -445,17 +441,15 @@ export function TaskManagerPage({ agent }: { agent?: string }) {
           />,
           document.querySelector(".shell") ?? document.body,
         )}
-      {lineOf &&
-        createPortal(
-          <ComputerLinePanel
-            key={lineOf.id}
-            machineId={lineOf.id}
-            name={lineOf.name}
-            onClose={() => setLineOf(null)}
-            onOpenTask={openTask}
-          />,
-          document.querySelector(".shell") ?? document.body,
-        )}
+      {queueOf && (
+        <QueueDialog
+          machineId={queueOf}
+          open
+          onOpenChange={(shown) => {
+            if (!shown) setQueueOf(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -506,7 +500,7 @@ function TaskRow({
   stopping,
   onSelect,
   onSteps,
-  onLine,
+  onQueue,
   onStop,
 }: {
   task: ManagedTask;
@@ -519,8 +513,8 @@ function TaskRow({
   onSelect: () => void;
   /** "Ver passos": its panel. */
   onSteps: () => void;
-  /** Its computer's line ("Onde roda", ADR 0127). */
-  onLine: (machine: { id: string; name: string }) => void;
+  /** Its computer's line ("Onde roda"), in the line's dialog. */
+  onQueue: (machineId: string) => void;
   onStop: () => void;
 }) {
   const { t } = useTranslation();
@@ -565,9 +559,9 @@ function TaskRow({
           <button
             type="button"
             className="tm-where"
-            aria-label={`${t("taskManager.queue.see")}: ${machine.name}`}
-            title={t("taskManager.queue.see")}
-            onClick={() => onLine(machine)}
+            aria-label={`${t("queue.see")}: ${machine.name}`}
+            title={t("queue.see")}
+            onClick={() => onQueue(machine.id)}
           >
             <Icon name="computer" size={14} />
             <span className="tm-ellipsis">{machine.name}</span>

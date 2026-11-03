@@ -69,7 +69,7 @@ html:not([data-pointer]) .cn-line__toggle:focus-visible {
   font-weight: 400;
 }
 
-/* "Você parou esta tarefa" (ADR 0127): the same quiet line; "Dizer por quê" opens its field and Mandar
+/* "Você parou esta tarefa" (ADR 0128): the same quiet line; "Dizer por quê" opens its field and Mandar
    (`.tm-saywhy`) under it, in the words' column. */
 .cn-stopped__why {
   flex: 1 1 100%;

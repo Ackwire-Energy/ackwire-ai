@@ -10,14 +10,14 @@ import { useCallLogo } from "../chat/ToolCalls";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { isHeld, type RowState, taskStateText, usingNow } from "./logic";
+import { isHeld, lineStartText, type RowState, taskStateText, usingNow } from "./logic";
 
 /**
- * The pieces the task manager's list, a task's screen and an agent's tasks share (ADR 0127): a task's mark and state,
+ * The pieces the task manager's list, a task's screen and an agent's tasks share (ADR 0128): a task's mark and state,
  * what it uses now, its "Parar", and the confirmation that stopping several asks for.
  */
 
-/** A reason's length at most: the server's (ADR 0127). */
+/** A reason's length at most: the server's (ADR 0128). */
 const REASON_MAX = 500;
 
 /** A task's mark: the agent's orbit while it works, the waiting clock (amber: it waits on you), queued, stopping. */
@@ -43,13 +43,17 @@ export function useAgentColor(agentId: string): AgentColorName {
   return agentLook(useDirectory().anyAgent(agentId)).color;
 }
 
-/** "Trabalhando · 6:12", "Espera seu ok · 18:03" (amber: it waits on a person), "Na fila · 2º", "Parando…". */
+/**
+ * "Trabalhando · 6:12", "Espera seu ok · 18:03" (amber: it waits on a person), "Na fila · 2º" (with when it should
+ * start under it, in the computer line's words), "Parando…".
+ */
 export function StateLine({ task, state, now }: { task: ManagedTask; state: RowState; now: number }) {
   const { t } = useTranslation();
   const c = useColors();
   const color = useAgentColor(task.agentId);
   const waits = state === "ok" || state === "answer";
-  return (
+  const starts = state === "computerBusy" ? lineStartText(t, task, now) : null;
+  const line = (
     <View style={styles.row}>
       <TaskMark state={state} color={color} />
       <Text
@@ -64,6 +68,15 @@ export function StateLine({ task, state, now }: { task: ManagedTask; state: RowS
           · {taskClock(now - taskSince(task))}
         </Text>
       )}
+    </View>
+  );
+  if (!starts) return line;
+  return (
+    <View style={styles.stack}>
+      {line}
+      <Text variant="caption" tone="faint" numberOfLines={1} style={styles.starts}>
+        {starts}
+      </Text>
     </View>
   );
 }
@@ -210,6 +223,9 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   grow: { flex: 1, minWidth: 0 },
   num: { fontVariant: ["tabular-nums"], flexShrink: 0 },
+  stack: { gap: 1, minWidth: 0 },
+  // Under the state's words, past its mark (16 + 6).
+  starts: { marginLeft: 22 },
   // As tall as the button it stands in for, so the row doesn't move.
   stopping: { minWidth: 36, height: 36, alignItems: "center", justifyContent: "center" },
   field: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 10, minHeight: 36 },

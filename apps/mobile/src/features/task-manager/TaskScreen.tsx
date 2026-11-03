@@ -15,21 +15,31 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Card, PixelDone, PixelFail, PixelStop, PixelStopped, Section, Text, weights } from "@/ui";
 import { RunSteps } from "../chat/ToolCalls";
 import { chatHref } from "../links/logic";
+import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
+import { SheetHostProvider } from "../shared/SheetHost";
 import { useStopper, useTasksToday } from "./hooks";
-import { computerQueueHref, endedText, rowState, taskSubline } from "./logic";
+import { endedText, rowState, taskSubline } from "./logic";
 import { StateLine, UsingLine } from "./parts";
 
 /**
- * A task's screen (ADR 0127), pushed from the task manager or an agent's tasks: whose it is, where and who asked, how
+ * A task's screen (ADR 0128), pushed from the task manager or an agent's tasks: whose it is, where and who asked, how
  * it stands (its place when it waits for room on its computer, with "Ver fila"), for how long, what it uses now and
  * where it runs, its steps so far, "Abrir na conversa" and "Parar tarefa". Once it ends, how it ended (the list it
  * came from keeps what ended today).
  */
 export function TaskScreen({ runId }: { runId: string }) {
+  return (
+    <SheetHostProvider>
+      <Task runId={runId} />
+    </SheetHostProvider>
+  );
+}
+
+function Task({ runId }: { runId: string }) {
   const { t } = useTranslation();
   const c = useColors();
   const tasks = useTasksToday();
@@ -48,7 +58,9 @@ export function TaskScreen({ runId }: { runId: string }) {
         </View>
       </View>
     );
-  return task ? <Live task={task} /> : ended ? <Ended task={ended} /> : null;
+  if (task) return <Live task={task} />;
+  if (ended) return <Ended task={ended} />;
+  return null;
 }
 
 /** A task still on: its state moves, and who may stop it can. */
@@ -163,7 +175,7 @@ function Page({
   sub: string;
   rows: { key: string; label: string; value: ReactNode }[];
   steps: { calls: number; live: boolean };
-  /** It waits for room on this computer: "Ver fila" opens its line. */
+  /** It waits for room on this computer: "Ver fila" opens its line (`QueueSheet`). */
   line?: string | null;
   stop: ReactNode;
 }) {
@@ -171,6 +183,7 @@ function Page({
   const c = useColors();
   const dir = useDirectory();
   const insets = useSafeAreaInsets();
+  const openQueue = useOpenQueue();
   const agent = dir.anyAgent(task.agentId);
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
@@ -215,7 +228,9 @@ function Page({
               wide
               icon="laptop"
               label={t("taskManager.queue.see")}
-              onPress={() => router.push(computerQueueHref(line))}
+              onPress={() => {
+                if (line) openQueue(line);
+              }}
             />
           ) : null}
           {task.background ? null : (

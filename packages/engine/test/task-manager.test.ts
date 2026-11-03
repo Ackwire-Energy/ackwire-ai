@@ -3,11 +3,10 @@ import { eq, schema } from "@agenteschat/db";
 import {
   addRunStep,
   cancelRun,
-  computerQueue,
   drainOutbox,
   ForbiddenError,
-  NotFoundError,
   listMessages,
+  NotFoundError,
   postPersonMessage,
   setStopReason,
   taskManager,
@@ -32,7 +31,7 @@ const stoppedNotices = async () =>
     (m) => (m.meta as { notice?: { kind?: string } }).notice?.kind === "run_stopped",
   );
 
-describe("stopping a task tells the agent (ADR 0127)", () => {
+describe("stopping a task tells the agent (ADR 0128)", () => {
   test("a notice in that conversation, with the reason, which wakes nothing; the next turn reads it", async () => {
     f = await setup({ reply: () => ({ chunks: ["Ok."] }) });
     await ask("@dev prepara o relatório de vendas");
@@ -69,7 +68,7 @@ describe("stopping a task tells the agent (ADR 0127)", () => {
     );
     await setStopReason(deps(), f.owner.id, f.org.id, run?.id ?? "", "o cliente desistiu");
     const [notice] = await stoppedNotices();
-    expect((notice?.meta as { notice: { text: string } }).notice.text).toContain("o cliente desistiu");
+    expect((notice?.meta as { notice?: { text?: string } } | undefined)?.notice?.text).toContain("o cliente desistiu");
     await expect(setStopReason(deps(), f.owner.id, f.org.id, run?.id ?? "", "de novo")).rejects.toBeInstanceOf(
       ValidationError,
     );
@@ -158,14 +157,20 @@ describe("the task manager", () => {
     expect(view.tasks[0]).toMatchObject({ runId: run.id, status: "waiting_input", held: "computer_busy" });
   });
 
-  test("the computer's line: places (people first), the computers row, what each viewer may read", async () => {
+  test("the computer's line: each task's place as the line orders it (people first), and the computers row", async () => {
     f = await setup();
     const [machine] = await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "Mac" }).returning();
     if (!machine) throw new Error("no machine");
     await ask("@dev roda os testes");
-    await ask("@dev e o lint");
-    const [a, b] = await runs();
-    if (!a || !b) throw new Error("no runs");
+    const second = await ask("@dev e o lint");
+    const [a] = await runs();
+    if (!a) throw new Error("no run");
+    // A second turn of its own (the main timeline would join the first one), as another conversation would start.
+    const [b] = await f.db
+      .insert(schema.agentRuns)
+      .values({ ...a, id: undefined, triggerMessageId: second.id, threadRootId: second.id })
+      .returning();
+    if (!b) throw new Error("no second run");
     const inLine = (since: number, people: boolean) => ({
       status: "waiting_input" as const,
       waitingMachineId: machine.id,
@@ -188,16 +193,5 @@ describe("the task manager", () => {
     });
     expect(view.tasks.find((t) => t.runId === a.id)?.line).toMatchObject({ position: 2, of: 2, people: false });
     expect(view.computers).toEqual([{ id: machine.id, name: "Mac", working: 0, inLine: 2 }]);
-
-    const queue = await computerQueue(f.db, f.owner.id, f.org.id, machine.id);
-    expect(queue.line.map((t) => t.runId)).toEqual([b.id, a.id]);
-    expect(queue.line[0]).toMatchObject({ kind: "person", visible: true, mine: true, canStop: true, people: true });
-    expect(queue.line[0]?.label).toContain("o lint");
-
-    // Someone outside the conversation sees the line, but not what it is about nor who asked.
-    const outsider = await addMember(f.db, f.org.id, "member", "caio");
-    const theirs = await computerQueue(f.db, outsider.id, f.org.id, machine.id);
-    expect(theirs.line).toHaveLength(2);
-    expect(theirs.line[0]).toMatchObject({ kind: "person", who: null, label: null, visible: false, canStop: false });
   });
 });

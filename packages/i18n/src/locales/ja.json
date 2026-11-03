@@ -1480,6 +1480,7 @@
     "outage_other": "{{names}}: AIプロバイダーが停止中 · 自動で再試行します",
     "queued_other": "{{names}}がコンピューターの順番待ちです",
     "away_other": "{{names}}がコンピューターを待っています",
+    "queuedNext": "{{names}}はコンピューターの待ち行列にいます · 次の番",
     "nobody": "回答するエージェントはいません",
     "status": {
       "seen": "確認済み",
@@ -2768,6 +2769,7 @@
     "runsEmpty": "「{{q}}」に一致する実行はありません。",
     "runsNone": "実行はまだありません。",
     "runNoText": "テキストなし",
+    "runPrivate": "参加していない会話",
     "runTokens": "入力 {{input}} · キャッシュ {{cached}} · 出力 {{output}}",
     "runTokensTip": "新しい入力トークン{{input}}、キャッシュからの読み込み{{cached}}（割安）、出力{{output}}",
     "budgetHelp": "上限に達すると、{{name}}は停止してチャンネルでお知らせします。{{ownerNote}}",
@@ -7147,9 +7149,73 @@
     "uses": {
       "title": "このページを使っているエージェント",
       "count_other": "過去7日間の使用回数",
+      "week_other": "今週{{count}}回参照",
       "last": "{{name}}が{{when}}に使用",
       "lastIn": "{{name}}が{{when}}に#{{channel}}での回答に使用",
       "none": "まだどのエージェントも使っていません。誰かがこのテーマについて質問すると、回答に使われます。"
+    },
+    "editedWhen": "{{when}}に編集",
+    "access": {
+      "label": "閲覧できる人：{{who}}",
+      "everyone": "ワークスペース全体",
+      "everyoneHint": "Wikiにアクセスできるメンバーとエージェントは全員このページを読めます。",
+      "peopleAnd": "全員と{{agents}}",
+      "peopleOnly": "全員（エージェントなし）",
+      "ownersOnly": "オーナーのみ",
+      "withAllAgents": "{{names}}とすべてのエージェント",
+      "more_other": "ほか{{count}}"
+    },
+    "backlinkDm": "{{name}}との会話",
+    "backlinkDmSomeone": "だれか",
+    "draftKept": "下書きを保存しました",
+    "draftRecovered": "下書きを復元しました",
+    "markdown": "Markdown",
+    "markdownHint": "テキストをMarkdownで表示・編集",
+    "props": {
+      "folderHint": "ページのフォルダー",
+      "noFolder": "フォルダーなし",
+      "searchFolder": "フォルダーを検索",
+      "createFolder": "フォルダー「{{name}}」を作成",
+      "addTag": "タグ",
+      "removeTag": "#{{tag}}を外す"
+    },
+    "rich": {
+      "placeholder": "ここに書きます。[[ でほかのページにリンク、/ でブロックを表示します。",
+      "hint": "[[ でページにリンク · / でブロック · {{key}} S でバージョンを保存",
+      "blockLabel": "ブロックの種類",
+      "strike": "取り消し線",
+      "linkPage": "ページにリンク",
+      "column": "列",
+      "addRow": "行",
+      "addColumn": "列",
+      "calloutText": "ここに強調する内容を書きます。",
+      "codeText": "コード",
+      "blocks": {
+        "paragraph": "段落",
+        "heading": "見出し",
+        "subheading": "小見出し",
+        "list": "リスト",
+        "numbered": "番号付きリスト",
+        "task": "タスク",
+        "table": "表",
+        "callout": "強調ブロック",
+        "code": "コード",
+        "quote": "引用",
+        "rule": "区切り線",
+        "link": "Wikiのページ"
+      }
+    },
+    "ask": {
+      "button": "エージェントに頼む",
+      "title": "エージェントに頼む",
+      "text": "依頼はページへのリンク付きで、あなたとエージェントの会話に送られます。エージェントはWikiのツールで編集し、そのバージョンは履歴にあなたの依頼として残ります。",
+      "agent": "エージェント",
+      "what": "何を変えますか？",
+      "placeholder": "例：2027年の値上げを反映して",
+      "send": "{{name}}に送信",
+      "sendNone": "送信",
+      "sent": "{{name}}との会話で依頼を送りました。",
+      "message": "ページ [[{{title}}]] について："
     },
     "import": {
       "cta": "Obsidianからインポート",
@@ -7409,6 +7475,67 @@
       "label": "コンピューター",
       "none": "コンピューターなし",
       "noneText": "プログラムの実行やファイルの保存はしません"
+    }
+  },
+  "queue": {
+    "button_other": "コンピューター · {{count}}件待機中",
+    "buttonIdle": "コンピューター",
+    "see": "待ち行列を見る",
+    "label": "{{name}}の待ち行列",
+    "full": "満杯",
+    "fullNext": "満杯 · 次は約{{n}}分後に開始",
+    "free": "待っている人はいません",
+    "workingNow": "作業中 · {{n}}",
+    "inLine": "待機中 · {{n}}",
+    "allStarted": "全員が約{{n}}分以内に開始",
+    "nothingWorking": "今は何も実行されていません",
+    "rule": "人が優先です。一緒にメンションされたエージェントは1つずつ開始します。",
+    "youFirst": "あなたが先です",
+    "startsIn": "約{{n}}分後に開始",
+    "startsAfter": "{{after}}が終わると開始",
+    "left": "残り約{{n}}分",
+    "who": "{{name}}",
+    "away": "{{time}}離脱中",
+    "purpose": {
+      "you": "あなたに回答中",
+      "person": "{{name}}に回答中",
+      "someone": "ある人に回答中",
+      "agent": "{{name}}からの依頼",
+      "someAgent": "エージェントからの依頼",
+      "routine": "ルーティン",
+      "work": "長い作業"
+    },
+    "where": {
+      "yourDm": "あなたのDM",
+      "dm": "{{name}}とのDM",
+      "thread": "#{{name}}のスレッド",
+      "private": "非公開の会話"
+    },
+    "live": {
+      "nextEta": "コンピューター待ち。次の番です。約{{n}}分後",
+      "nextAfter": "コンピューター待ち。{{after}}が終わると次の番です",
+      "next": "コンピューター待ち。次の番です",
+      "behind": "待ち行列の{{nth}}。{{names}}の後",
+      "position": "待ち行列の{{nth}}"
+    },
+    "nth": {
+      "one": "{{n}}番目",
+      "two": "{{n}}番目",
+      "few": "{{n}}番目",
+      "other": "{{n}}番目"
+    },
+    "fan": {
+      "called_other": "{{count}}体のエージェントを呼び出し",
+      "answered_other": "{{count}}体が回答",
+      "working_other": "{{count}}体が作業中",
+      "inLine_other": "{{count}}体が待機中",
+      "failed_other": "{{count}}体が未回答",
+      "chip": {
+        "answered": "回答済み",
+        "working": "作業中",
+        "inLine": "待機中",
+        "failed": "未回答"
+      }
     }
   },
   "access": {
@@ -8589,6 +8716,7 @@
     "clearSearch": "検索をクリア",
     "noMatch": "「{{q}}」に一致するものは見つかりませんでした。",
     "noTools": "サーバーからツールが提供されませんでした。",
+    "unreadable": "コネクタのツールを読み込めませんでした: {{reason}}",
     "refresh": "新しいツールを探す",
     "decideTitle": "あなたの判断が必要 · {{count}}",
     "decideHelp": "名前だけでは何をするかわかりません。提案を確認するか、別のものを選んでください。",
@@ -10272,13 +10400,14 @@
   "usageViews": {
     "signedOut": "ログアウト済み",
     "whose": "{{name}}の",
-    "part": "{{name}} ≈ {{percent}}",
     "noWindows": "このアカウントが再び使われると、上限が表示されます。",
     "unused": "このアカウントを使っているエージェントはいません。",
     "usesNow": "使用中",
     "monthTokens": "今月{{tokens}}トークン",
     "tokens": "{{tokens}}トークン",
     "equivalent": "API換算で≈ {{amount}}",
+    "thisMonth": "今月",
+    "moreAgents_other": "+{{count}}人のエージェント",
     "paid": "{{amount}}支払い済み",
     "budgetShare": "予算の{{percent}}",
     "estimate": "プランからわかるのはアカウント全体の使用量だけです。各エージェントの分は、それぞれの使用量からの推定値です。",
@@ -10799,9 +10928,9 @@
       "issue_work_start": "タスク#{{number}}をお願いします。",
       "issue_taken": "タスク#{{number}}を引き受けました。",
       "done": "完了しました。",
-      "stretch_paused_runs_other": "{{agents}}があなたに確認するため停止しました · 依頼以降、自分で{{steps}}ステップ実行",
-      "stretch_paused_spend_other": "{{agents}}があなたに確認するため停止しました · それぞれ、あなたの不在中にこの作業で今月の予算の{{percent}}%を使用",
-      "stretch_paused_spend_cost_other": "{{agents}}があなたに確認するため停止しました · それぞれ、あなたの不在中にこの作業で{{amount}}（今月の予算の{{percent}}%）を使用",
+      "stretch_paused_runs_other": "{{agents}}は続ける前にあなたに確認するため一時停止しました",
+      "stretch_paused_spend_other": "{{agents}}はあなたに確認するため一時停止しました · それぞれ今月の予算の{{percent}}%を使用",
+      "stretch_paused_spend_cost_other": "{{agents}}はあなたに確認するため一時停止しました · それぞれ{{amount}}（今月の予算の{{percent}}%）を使用",
       "memory": {
         "proposed": "提案を作成しました: {{text}}",
         "forgot": "メモリを更新しました: 「{{text}}」を忘れました。",
@@ -11957,25 +12086,10 @@
     "activity": "過去30分",
     "failed": "停止できませんでした。もう一度お試しください。",
     "queue": {
-      "title": "コンピューターの順番待ち",
-      "sub": "{{name}} · ワークスペースの全員に同じ順番が表示されます",
       "see": "順番待ちを見る",
       "full_other": "空きなし · {{count}}件が順番待ち",
       "room": "空きあり",
-      "working": "作業中",
-      "line": "順番待ち",
-      "first": "あなたが優先",
-      "place": "{{position}}番目",
-      "waiting": "{{time}}待機中",
-      "running": "{{time}}経過",
-      "person": "{{name}}の依頼",
-      "personHidden": "人からの依頼",
-      "agent": "{{name}}の依頼",
-      "routine": "ルーティン「{{name}}」",
-      "empty": "順番待ちはありません。",
-      "note": "人からの依頼が優先されます。一緒に呼ばれたエージェントは、呼ばれた順に一つずつ始めます。",
-      "computers": "コンピューター",
-      "back": "タスクに戻る"
+      "computers": "コンピューター"
     },
     "navWhat": "各エージェントが今していることを見て、必要なものを停止できます",
     "cards": {

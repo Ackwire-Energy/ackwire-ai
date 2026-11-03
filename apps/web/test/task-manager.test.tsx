@@ -8,7 +8,6 @@ import type {
   EndedTask,
   ManagedTask,
   Message,
-  QueueTurn,
   RunStep,
   TaskManagerView,
   TaskSteps,
@@ -16,7 +15,7 @@ import type {
 } from "@agenteschat/client";
 import { keys, TASK_MANAGER_POLL_MS } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -26,6 +25,7 @@ afterEach(() => {
 
 const DM_ADA = "dm-ada";
 const ago = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+const in_ = (m: number) => new Date(Date.now() + m * 60_000).toISOString();
 const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
   await settle(3);
@@ -160,20 +160,10 @@ function linkSteps(): TaskSteps {
   };
 }
 
-const turn = (over: Partial<QueueTurn> & Pick<QueueTurn, "runId" | "agentId" | "kind">): QueueTurn => ({
-  who: null,
-  label: null,
-  visible: false,
-  mine: false,
-  canStop: false,
-  since: ago(5),
-  ...over,
-});
-
 /**
- * Busy, plus Ada's checkout waiting for room on the MacBook (1º of 3, mine) and Atlas's report waiting on a full
- * computer whose line isn't known; the MacBook's line as the server says it: someone's request I don't see, and a
- * turn Ada asked Atlas for.
+ * Busy, plus Ada's checkout waiting for room on the MacBook (1º of 3, mine, due in about 3 min) and Atlas's report
+ * waiting on a full computer whose line isn't known; the MacBook's line as the server says it: Ada's link working,
+ * then my checkout, João's request and a turn Ada asked Atlas for.
  */
 function withLine() {
   const view = busy();
@@ -183,7 +173,7 @@ function withLine() {
       agentId: ADA_ID,
       status: "waiting_input",
       held: "computer_busy",
-      line: { machineId: "machine_1", position: 1, of: 3, people: true, since: ago(4) },
+      line: { machineId: "machine_1", position: 1, of: 3, people: true, estimatedStartAt: in_(3) },
       label: "Ajustar o texto do checkout",
       machine: { id: "machine_1", name: "MacBook" },
       startedAt: ago(4),
@@ -204,17 +194,52 @@ function withLine() {
     { id: "machine_1", name: "MacBook", working: 1, inLine: 3 },
     { id: "machine_2", name: "Servidor", working: 0, inLine: 0 },
   ];
-  const mine = { kind: "person" as const, who: "Walter", visible: true, mine: true };
+  const where = { channelId: ENG_ID, threadId: null };
+  const me = { kind: "person" as const, userId: "u-walter" };
   const queue: ComputerQueue = {
-    computer: { id: "machine_1", name: "MacBook" },
-    working: [turn({ ...mine, runId: "r-link", agentId: ADA_ID, label: "Corrigir o link de cancelar", since: ago(6) })],
-    line: [
+    machineId: "machine_1",
+    name: "MacBook",
+    working: [
       {
-        ...turn({ ...mine, runId: "r-checkout", agentId: ADA_ID, label: "Ajustar o texto do checkout", canStop: true }),
-        people: true,
+        runId: "r-link",
+        agentId: ADA_ID,
+        purpose: me,
+        where: { channelId: DM_ADA, threadId: null },
+        startedAt: ago(6),
+        estimatedEndAt: in_(3),
       },
-      { ...turn({ runId: "r-other", agentId: ATLAS_ID, kind: "person" }), people: true },
-      { ...turn({ runId: "r-asked", agentId: ATLAS_ID, kind: "agent", who: "Ada" }), people: false },
+    ],
+    waiting: [
+      {
+        runId: "r-checkout",
+        agentId: ADA_ID,
+        purpose: me,
+        where,
+        people: true,
+        position: 1,
+        estimatedStartAt: in_(3),
+        after: [ADA_ID],
+      },
+      {
+        runId: "r-other",
+        agentId: ATLAS_ID,
+        purpose: { kind: "person", userId: "u-joao" },
+        where,
+        people: true,
+        position: 2,
+        estimatedStartAt: null,
+        after: [ADA_ID],
+      },
+      {
+        runId: "r-asked",
+        agentId: ATLAS_ID,
+        purpose: { kind: "agent", agentId: ADA_ID },
+        where,
+        people: false,
+        position: 3,
+        estimatedStartAt: null,
+        after: [ADA_ID, ATLAS_ID],
+      },
     ],
   };
   return { view, queue };
@@ -231,8 +256,11 @@ function withDm(over: Partial<FakeState> = {}) {
   return state;
 }
 
-const open = async (state: FakeState, path: string) => {
-  const r = await renderApp(`/org/${ORG_ID}/${path}`, { api: createFakeApi(state) });
+/** The page at `path`; `queue`: a computer's line, as its dialog reads it. */
+const open = async (state: FakeState, path: string, queue?: ComputerQueue) => {
+  const api = createFakeApi(state);
+  if (queue) fakeMachinesOf.get(api)?.setQueue(queue);
+  const r = await renderApp(`/org/${ORG_ID}/${path}`, { api });
   await settle(6);
   return r;
 };
@@ -602,22 +630,33 @@ describe("an agent's tasks beside its DM", () => {
 });
 
 describe("a computer's line", () => {
-  test("a task waiting for room says its place in the line; with no line known, Computador cheio", async () => {
+  test("a task waiting for room says its place in the line and when it should start; unknown, Computador cheio", async () => {
     const { view } = withLine();
     await open(seedState({ taskManager: view }), "task-manager");
     const checkout = rowOf("Ajustar o texto do checkout");
     expect(checkout.querySelector(".tm-cell--state")?.textContent).toBe("Na fila · 1º");
     // Grey with the clock: it waits on its computer, not on me.
     expect(checkout.querySelector(".tm-cell--state .ac-chip--waiting")).toBeNull();
-    expect(checkout.querySelector(".tm-cell--use")?.textContent).toMatch(/^esperando há /);
-    expect(rowOf("Gerar o relatório").querySelector(".tm-cell--state")?.textContent).toBe("Computador cheio");
+    expect(checkout.querySelector(".tm-cell--use")?.textContent).toBe("Começa em ~3 min");
+    const report = rowOf("Gerar o relatório");
+    expect(report.querySelector(".tm-cell--state")?.textContent).toBe("Computador cheio");
+    expect(report.querySelector(".tm-cell--use")?.textContent).toBe("—");
     expect(document.querySelector(".tm-sum")?.textContent).toBe("3 trabalhando1 espera você");
   });
 
-  test("Computadores: room or a line for each; Ver fila opens the line in the side panel", async () => {
+  test("with no estimate, a task in line says no time rather than a made-up one", async () => {
+    const { view } = withLine();
+    const checkout = view.tasks.find((x) => x.runId === "r-checkout");
+    if (checkout?.line) checkout.line.estimatedStartAt = null;
+    await open(seedState({ taskManager: view }), "task-manager");
+    const row = rowOf("Ajustar o texto do checkout");
+    expect(row.querySelector(".tm-cell--state")?.textContent).toBe("Na fila · 1º");
+    expect(row.querySelector(".tm-cell--use")?.textContent).toBe("—");
+  });
+
+  test("Computadores: room or a line for each; Ver fila opens the computer's line in its dialog", async () => {
     const { view, queue } = withLine();
-    const state = seedState({ taskManager: view, computerQueues: { machine_1: queue } });
-    await open(state, "task-manager");
+    await open(seedState({ taskManager: view }), "task-manager", queue);
     const list = screen().getByRole("region", { name: "Computadores" });
     const rows = [...list.querySelectorAll(".tm-computer__text")].map((r) => r.textContent);
     expect(rows).toEqual(["MacBookCheio · 3 na fila · 1 trabalhando", "ServidorTem espaço"]);
@@ -625,49 +664,35 @@ describe("a computer's line", () => {
     expect(within(list).queryByRole("button", { name: "Ver fila: Servidor" })).toBeNull();
     await click(within(list).getByRole("button", { name: "Ver fila: MacBook" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "working.computerQueue")?.args).toEqual([ORG_ID, "machine_1"]);
-    const panel = screen().getByRole("complementary", { name: "Fila do computador" });
-    expect(panel.querySelector(".thread-head__meta")?.textContent).toBe(
-      "MacBook · todo mundo no workspace vê a mesma ordem",
-    );
-    expect(panel.querySelector(".tm-line__well")?.textContent).toBe("Cheio · 3 na fila1 trabalhando");
-    const working = within(panel).getByRole("region", { name: "Trabalhando agora" });
-    expect(working.textContent).toContain("Ada · Corrigir o link de cancelar");
-    const line = [...within(panel).getByRole("region", { name: "Na fila" }).querySelectorAll(".tm-turn")];
-    expect(line.map((r) => r.querySelector(".tm-turn__place")?.textContent)).toEqual(["1º", "2º", "3º"]);
-    // Mine says what it is for; someone else's, only whose it is.
-    expect(line.map((r) => r.querySelector(".tm-turn__title")?.textContent)).toEqual([
-      "Ada · Ajustar o texto do checkoutVocê vai primeiro",
-      "Atlas · Pedido de uma pessoa",
-      "Atlas · Pedido de Ada",
-    ]);
-    expect(within(panel).getAllByRole("button", { name: /^Parar: / })).toHaveLength(1);
-    expect(panel.textContent).toContain("Pessoas vão primeiro.");
-    expect(panel.textContent).not.toMatch(/GB|memória/i);
+    const dialog = screen().getByRole("dialog", { name: "Fila de MacBook" });
+    const text = dialog.textContent ?? "";
+    expect(text).toContain("Cheio · o próximo começa em cerca de 3 min");
+    expect(text).toContain("Trabalhando agora · 1");
+    expect(text).toContain("faltam ~3 min");
+    expect(text).toContain("Na fila · 3");
+    expect(text).toContain("respondendo você · #eng");
+    expect(text).toContain("Você vai primeiro");
+    expect(text).not.toMatch(/US\$|GB|memória/i);
   });
 
-  test("Onde roda opens its computer's line; a turn I can see opens its task", async () => {
+  test("Onde roda opens its computer's line in the same dialog, over the page", async () => {
     const { view, queue } = withLine();
-    await open(seedState({ taskManager: view, computerQueues: { machine_1: queue } }), "task-manager");
-    const where = within(rowOf("Corrigir o link de cancelar")).getByRole("button", { name: "Ver fila: MacBook" });
-    await click(where);
+    await open(seedState({ taskManager: view }), "task-manager", queue);
+    // On our servers there is no line to open.
+    expect(within(rowOf("Investigar a lentidão da API")).queryByRole("button", { name: /^Ver fila/ })).toBeNull();
+    await click(within(rowOf("Corrigir o link de cancelar")).getByRole("button", { name: "Ver fila: MacBook" }));
     await settle(4);
-    const line = screen().getByRole("complementary", { name: "Fila do computador" });
-    // Someone else's turn opens nothing.
-    expect(within(line).queryByRole("button", { name: "Atlas · Pedido de uma pessoa" })).toBeNull();
-    await click(within(line).getByRole("button", { name: "Ada · Ajustar o texto do checkout" }));
-    await settle(4);
-    expect(screen().queryByRole("complementary", { name: "Fila do computador" })).toBeNull();
-    expect(screen().getByRole("complementary", { name: "Ajustar o texto do checkout" })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "Fila de MacBook" }).textContent).toContain("Trabalhando agora · 1");
+    // No task's panel opens for it.
+    expect(document.querySelector(".tm-panel")).toBeNull();
   });
 
-  test("in her DM's panel a task in line says its place; Ver fila shows the line in place, and back", async () => {
+  test("in her DM's panel a task in line says its place; Ver fila opens the line over the tasks", async () => {
     const { view, queue } = withLine();
-    await open(withDm({ taskManager: view, computerQueues: { machine_1: queue } }), `dm/agent/${ADA_ID}`);
+    await open(withDm({ taskManager: view }), `dm/agent/${ADA_ID}`, queue);
     await click(screen().getByRole("button", { name: "4 tarefas · 1 espera você" }));
-    const tasks = () => screen().getByRole("complementary", { name: "Tarefas de Ada" });
     const checkout = () => {
-      const cards = [...tasks().querySelectorAll<HTMLElement>(".tm-taskcard")];
+      const cards = [...document.querySelectorAll<HTMLElement>(".tm-agentpanel .tm-taskcard")];
       return cards.find((c) => c.textContent?.includes("Ajustar o texto do checkout")) as HTMLElement;
     };
     const sub = checkout().querySelector(".tm-taskcard__label small");
@@ -675,11 +700,10 @@ describe("a computer's line", () => {
     expect(sub?.hasAttribute("data-wait")).toBe(false);
     await click(within(checkout()).getByRole("button", { name: "Ver fila" }));
     await settle(4);
-    const line = screen().getByRole("complementary", { name: "Fila do computador" });
-    expect(screen().queryByRole("complementary", { name: "Tarefas de Ada" })).toBeNull();
-    expect(line.textContent).toContain("Atlas · Pedido de uma pessoa");
-    await click(within(line).getByRole("button", { name: "Voltar para as tarefas" }));
-    expect(tasks().querySelectorAll(".tm-taskcard")).toHaveLength(4);
+    const dialog = screen().getByRole("dialog", { name: "Fila de MacBook" });
+    expect(dialog.textContent).toContain("respondendo você · sua DM");
+    // The tasks stay beside the conversation, under the dialog.
+    expect(document.querySelectorAll(".tm-agentpanel .tm-taskcard")).toHaveLength(4);
   });
 });
 
