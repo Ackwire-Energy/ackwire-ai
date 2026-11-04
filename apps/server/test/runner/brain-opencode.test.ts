@@ -37,6 +37,7 @@ afterEach(async () => {
     "FAKE_OPENCODE_ALLOW",
     "FAKE_OPENCODE_EXTRA_TOOL",
     "FAKE_OPENCODE_PROBE_FAIL",
+    "FAKE_OPENCODE_RUN_BASH",
   ])
     delete process.env[name];
   process.env.HOME = realHome;
@@ -523,13 +524,30 @@ test("a chat turn: every tool denied by `*` but our bridge's, its own agent, no 
   expect(OPENCODE_CHAT_PERMISSION["*"]).toBe("deny");
 });
 
-test("the guard reads `opencode debug agent`: any tool on but ours, or no list, stops the turn", () => {
-  const answer = (tools: unknown) => JSON.stringify({ name: "build", tools }, null, 2);
+test("the guard reads `opencode debug agent`: any tool on but ours, a rule after ours, or no list, stops the turn", () => {
+  const rule = (permission: string, action: string, pattern = "*") => ({ permission, pattern, action });
+  // OpenCode 1.19.5's build agent: its defaults, ours, then the truncation folder it always appends.
+  const ours = [
+    rule("*", "allow"),
+    rule("read", "ask", "*.env"),
+    rule("*", "deny"),
+    rule(`${CODEX_MCP_SERVER}_*`, "allow"),
+    rule("external_directory", "allow", "/tmp/opencode/tool-output/*"),
+  ];
+  const answer = (tools: unknown, permission: unknown = ours) =>
+    JSON.stringify({ name: "build", permission, tools }, null, 2);
   expect(opencodeToolsBreach(answer({ bash: false, read: false, [`${CODEX_MCP_SERVER}_post`]: true }))).toBeNull();
   expect(opencodeToolsBreach(answer({ bash: false, websearch: true }))).toContain("websearch");
   expect(opencodeToolsBreach(answer(undefined))).toContain("didn't list");
+  expect(opencodeToolsBreach(answer({ bash: false }, null))).toContain("didn't list");
   expect(opencodeToolsBreach("")).toContain("didn't list");
   expect(opencodeToolsBreach(answer({ read: "maybe" }))).toContain("read");
+  // An MCP server's tools never show in `tools`: a config read after ours that allows them stops the turn.
+  expect(opencodeToolsBreach(answer({ bash: false }, [...ours, rule("corp_*", "allow")]))).toContain("corp_*");
+  // A pattern denied after ours shows the tool again (`Permission.disabled` hides only a `*` deny).
+  expect(opencodeToolsBreach(answer({ bash: false }, [...ours, rule("gh_*", "deny", "rm *")]))).toContain("gh_*");
+  expect(opencodeToolsBreach(answer({ bash: false }, [...ours, rule("bash", "deny")]))).toBeNull();
+  expect(opencodeToolsBreach(answer({ bash: false }, ours.slice(0, 2)))).toContain("*");
 });
 
 test.skipIf(!posix)(
@@ -559,17 +577,35 @@ test.skipIf(!posix)(
     expect(path.basename(run?.cwd ?? "")).toBe(`dev-${AGENT.id.slice(0, 8)}`);
     expect(run?.args).toEqual(["run", "--format", "json", "--agent", "build", "--pure"]);
     expect(JSON.parse(run?.config ?? "{}").permission).toEqual(OPENCODE_CHAT_PERMISSION);
+    // Not the computer's `~/.claude/CLAUDE.md`.
+    expect((run as unknown as { claudeCode: string | null }).claudeCode).toBe("1");
 
     // Another config allows a tool after ours: the turn stops before OpenCode runs it.
     process.env.FAKE_OPENCODE_ALLOW = "bash";
     const breached = await chat(2);
     expect(breached.final).toMatchObject({ type: "error", code: "tools_not_locked" });
     expect((breached.final as { message: string }).message).toContain("bash");
+    // An MCP server another config adds and allows (its tools never in `debug agent`'s list): stopped too.
+    process.env.FAKE_OPENCODE_ALLOW = "corp_*";
+    expect((await chat(4)).final).toMatchObject({ type: "error", code: "tools_not_locked" });
     delete process.env.FAKE_OPENCODE_ALLOW;
+    // A tool of OpenCode's own that runs anyway: the turn ends there, and what it read goes nowhere.
+    process.env.FAKE_OPENCODE_RUN_BASH = "1";
+    const events: CodexBrainEvent[] = [];
+    const ran = (await handleRequest(
+      { ...ctx, grants: ["/somewhere/else"] },
+      turn({ runId: RUN.replace(/1$/, "5"), permissions: { mode: "chat" } }),
+      { ...scope, emit: (f: { event?: CodexBrainEvent }) => f.event && events.push(f.event) } as never,
+    )) as { final: CodexBrainEvent };
+    expect(ran.final).toMatchObject({ type: "error", code: "tools_not_locked" });
+    expect(events.filter((e) => e.type === "tool_call" || e.type === "text_delta")).toEqual([
+      expect.objectContaining({ type: "text_delta", text: "Let me check." }),
+    ]);
+    delete process.env.FAKE_OPENCODE_RUN_BASH;
     // A probe that fails says nothing: the turn stops too.
     process.env.FAKE_OPENCODE_PROBE_FAIL = "1";
     expect((await chat(3)).final).toMatchObject({ type: "error", code: "tools_not_locked" });
-    expect(logOf(log).filter((l) => !(l as { probe?: boolean }).probe)).toHaveLength(1);
+    expect(logOf(log).filter((l) => !(l as { probe?: boolean }).probe)).toHaveLength(2);
   },
   20_000,
 );
