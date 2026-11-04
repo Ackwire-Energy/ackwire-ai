@@ -1474,7 +1474,9 @@ function Chat({
     ) : null;
 
   const placeholder = isThread
-    ? t("mobile.chat.reply")
+    ? rootTask
+      ? t("issues.commentPlaceholder")
+      : t("mobile.chat.reply")
     : dm
       ? rightHand
         ? `${t("mobile.chat.messageTo", { name: dm.with.name })} · ${t("rightHand.composerHint")}`

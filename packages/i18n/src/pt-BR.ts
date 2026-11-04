@@ -5370,7 +5370,7 @@ export const ptBR = {
     },
     noComments: "Nenhum comentário ainda.",
     comment: "Comentar na tarefa",
-    commentPlaceholder: "Comentar · use @ para chamar um agente",
+    commentPlaceholder: "Comentar na tarefa · use @ para chamar um agente",
     send: "Comentar",
     details: "Detalhes da tarefa",
     statusLabel: "Status",

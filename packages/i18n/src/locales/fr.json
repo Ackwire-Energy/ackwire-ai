@@ -5546,7 +5546,7 @@
     },
     "noComments": "Aucun commentaire pour l'instant.",
     "comment": "Commenter la tâche",
-    "commentPlaceholder": "Commentaire · utilisez @ pour appeler un agent",
+    "commentPlaceholder": "Commenter la tâche · utilisez @ pour appeler un agent",
     "send": "Commenter",
     "details": "Détails de la tâche",
     "statusLabel": "Statut",

@@ -1,11 +1,10 @@
 import type { Issue } from "@agenteschat/client";
 import { runsInChannel, useTaskConversation } from "@agenteschat/client";
-import { relativeTime } from "@agenteschat/client/lib/format";
 import { conversationLine } from "@agenteschat/client/lib/issues";
-import { AvatarStack, Button, CountChip, Icon } from "@agenteschat/ui";
+import { Button, CountChip, Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-import { useActors } from "@/components/actors";
 import { useOrg } from "@/components/org-context";
+import { ThreadLineBody } from "@/components/threads/ThreadLines";
 import { ChannelSkeleton } from "@/pages/ChannelPage";
 import { ThreadPage } from "@/pages/ThreadPage";
 import { useStreams } from "@/realtime/context";
@@ -53,11 +52,10 @@ export function TaskConversationButton({
 
 /**
  * Where "Discussão" was: one line that opens the conversation. Who took part, "6 mensagens", "Trabalhando" while
- * an agent is at it, else when it last moved; nobody yet: "Conversar sobre a tarefa".
+ * an agent is at it, when it last moved; nobody yet: "Conversar sobre a tarefa".
  */
 export function TaskConversationSummary({ issue, onOpen }: { issue: Issue; onOpen: () => void }) {
-  const { t, i18n } = useTranslation();
-  const actors = useActors();
+  const { t } = useTranslation();
   const line = conversationLine(issue);
   const working = useWorking(issue);
   return (
@@ -65,25 +63,7 @@ export function TaskConversationSummary({ issue, onOpen }: { issue: Issue; onOpe
       <Icon name="message" size={16} />
       {line ? (
         <>
-          <span className="thread-line__who" aria-hidden="true">
-            <AvatarStack>{line.people.map((p) => actors.avatar(p, "xs"))}</AvatarStack>
-          </span>
-          <b>{t("issues.conversation.messages", { count: line.count })}</b>
-          {working ? (
-            <span className="thread-line__state thread-line__state--working">
-              <Icon name="bolt" size={14} />
-              {t("threads.status.working")}
-            </span>
-          ) : (
-            line.lastAt && (
-              <>
-                <span className="thread-line__dot" aria-hidden="true">
-                  ·
-                </span>
-                <time dateTime={line.lastAt}>{relativeTime(t, i18n.language, line.lastAt)}</time>
-              </>
-            )
-          )}
+          <ConversationLineBody line={line} working={working} />
           <span className="task-talk__open">{t("issues.conversation.open")}</span>
         </>
       ) : (
@@ -94,35 +74,33 @@ export function TaskConversationSummary({ issue, onOpen }: { issue: Issue; onOpe
   );
 }
 
-/** A board card's last line: the chat's thread line (who, "6 mensagens", "Trabalhando" or when). None: nothing. */
+/** A board card's last line: the chat's thread line (who, "6 mensagens", "Trabalhando", when). None: nothing. */
 export function TaskCardConversation({ issue }: { issue: Issue }) {
-  const { t, i18n } = useTranslation();
-  const actors = useActors();
   const line = conversationLine(issue);
   const working = useWorking(issue);
   if (!line) return null;
   return (
     <span className="thread-line issue-card__talk">
-      <span className="thread-line__who" aria-hidden="true">
-        <AvatarStack>{line.people.map((p) => actors.avatar(p, "xs"))}</AvatarStack>
-      </span>
-      <b>{t("issues.conversation.messages", { count: line.count })}</b>
-      {working ? (
-        <span className="thread-line__state thread-line__state--working">
-          <Icon name="bolt" size={14} />
-          {t("threads.status.working")}
-        </span>
-      ) : (
-        line.lastAt && (
-          <>
-            <span className="thread-line__dot" aria-hidden="true">
-              ·
-            </span>
-            <time dateTime={line.lastAt}>{relativeTime(t, i18n.language, line.lastAt)}</time>
-          </>
-        )
-      )}
+      <ConversationLineBody line={line} working={working} />
     </span>
+  );
+}
+
+function ConversationLineBody({
+  line,
+  working,
+}: {
+  line: NonNullable<ReturnType<typeof conversationLine>>;
+  working: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ThreadLineBody
+      people={line.people}
+      label={t("issues.conversation.messages", { count: line.count })}
+      status={working ? "working" : undefined}
+      at={line.lastAt}
+    />
   );
 }
 

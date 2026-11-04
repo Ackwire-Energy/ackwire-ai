@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -420,7 +420,7 @@ describe("Issue detail", () => {
     expect(dialog.className).toContain("ac-details--side");
     expect(within(dialog).getByRole("heading", { name: "Conversa da tarefa" })).toBeTruthy();
     // The chat's composer, never locked while sending; the message shows in the panel, oldest first.
-    const box = within(dialog).getByRole("combobox", { name: "Comentar · use @ para chamar um agente" });
+    const box = within(dialog).getByRole("combobox", { name: "Comentar na tarefa · use @ para chamar um agente" });
     await type(box, "Começo amanhã.");
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     await settle(5);
@@ -445,15 +445,34 @@ describe("Issue detail", () => {
       rootId: "root_r",
       count: 6,
       lastAt: new Date().toISOString(),
-      participants: [{ type: "agent" as const, id: ADA_ID }],
+      participants: [
+        { type: "person" as const, id: "u-joao" },
+        { type: "agent" as const, id: ADA_ID },
+      ],
       working: true,
     };
     api.issues.list = async (orgId, filters) =>
       (await list(orgId, filters)).map((i) => (i.number === 131 ? { ...i, conversation } : i));
-    await go("issues", api);
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await go("issues", api);
+      // Each face of the stack has its key: React warns of none.
+      expect(logged.mock.calls.some((c) => String(c[0]).includes('unique "key"'))).toBe(false);
+    } finally {
+      logged.mockRestore();
+    }
     const talking = document.querySelector('[data-card="131"] .issue-card__talk');
+    expect(talking?.classList.contains("thread-line")).toBe(true);
     expect(talking?.textContent).toContain("6 mensagens");
     expect(talking?.textContent).toContain("Trabalhando");
+    // The chat's faces: one size, framed, agents and people alike (an unframed agent stands taller than the letters).
+    const faces = [...(talking?.querySelectorAll(".thread-line__who .ac-avatar") ?? [])];
+    expect(
+      faces.map((a) => [a.getAttribute("data-kind"), a.className.includes("ac-avatar--xs ac-avatar--framed")]),
+    ).toEqual([
+      ["person", true],
+      ["agent", true],
+    ]);
     expect(document.querySelector('[data-card="132"] .issue-card__talk')).toBeNull();
   });
 

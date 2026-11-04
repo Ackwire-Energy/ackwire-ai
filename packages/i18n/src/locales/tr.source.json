@@ -12119,7 +12119,7 @@
     "value": "Comment on the task"
   },
   "issues.commentPlaceholder": {
-    "value": "Comment · use @ to call an agent"
+    "value": "Comment on the task · use @ to call an agent"
   },
   "issues.send": {
     "value": "Comment"

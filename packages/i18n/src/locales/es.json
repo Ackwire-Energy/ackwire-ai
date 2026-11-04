@@ -5493,7 +5493,7 @@
     },
     "noComments": "Todavía no hay comentarios.",
     "comment": "Comentar la tarea",
-    "commentPlaceholder": "Comenta · usa @ para llamar a un agente",
+    "commentPlaceholder": "Comentar la tarea · usa @ para llamar a un agente",
     "send": "Comentar",
     "details": "Detalles de la tarea",
     "statusLabel": "Estado",

@@ -5253,7 +5253,7 @@ export const en = {
     },
     noComments: "No comments yet.",
     comment: "Comment on the task",
-    commentPlaceholder: "Comment · use @ to call an agent",
+    commentPlaceholder: "Comment on the task · use @ to call an agent",
     send: "Comment",
     details: "Task details",
     statusLabel: "Status",

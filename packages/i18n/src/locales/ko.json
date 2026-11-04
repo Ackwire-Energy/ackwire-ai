@@ -5132,7 +5132,7 @@
     },
     "noComments": "아직 댓글이 없어요.",
     "comment": "작업에 댓글 달기",
-    "commentPlaceholder": "댓글 · @로 에이전트 호출",
+    "commentPlaceholder": "작업에 댓글 달기 · @로 에이전트 호출",
     "send": "댓글",
     "details": "작업 세부 정보",
     "statusLabel": "상태",

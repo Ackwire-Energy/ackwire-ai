@@ -1804,6 +1804,12 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
   margin: 2px 0 0 -6px;
   pointer-events: none;
 }
+.issue-card {
+  --stack-ring: var(--raised);
+}
+.issue-card.is-on {
+  --stack-ring: var(--chosen-bg);
+}
 /* Where "Discussão" was: one line that opens the conversation. */
 .task-talk__summary {
   display: flex;

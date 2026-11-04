@@ -12090,18 +12090,22 @@ html:not([data-pointer]) .channel__latest-btn.ac-btn:focus-visible {
 .ac-typing__text + .ac-typing__elapsed::before {
   content: "· ";
 }
-/* One agent out of view: its row's step after its name, at most one width (cut with "…"), its time, "Ver" and the
-   stop right after it; a narrow bar still fits it. */
+/* One agent out of view: its row's step after its name, as wide as its words while the bar has room (cut with "…"
+   only when it runs out), its time, "Ver" and the stop right after it. */
 .ac-typing__step {
   display: flex;
   flex: 0 1 auto;
-  max-width: 260px;
   min-width: 0;
   margin-left: 0.3em;
 }
 /* Its step and someone typing beside it ("· Marina digitando…", after its time): the pill widens for both. */
 .ac-typing[data-active="true"][data-wide] {
   max-width: 640px;
+}
+/* A task's conversation column is a little wider than the bar's one width: there the bar spans its composer, as it
+   does in a thread beside a channel. */
+:is(.ac-details__side, .issue-page__talk) .channel__composer > .ac-typing[data-active="true"] {
+  max-width: none;
 }
 .ac-typing__also {
   display: flex;

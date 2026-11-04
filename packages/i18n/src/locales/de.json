@@ -5332,7 +5332,7 @@
     },
     "noComments": "Noch keine Kommentare.",
     "comment": "Aufgabe kommentieren",
-    "commentPlaceholder": "Kommentar · mit @ rufst du einen Agent",
+    "commentPlaceholder": "Aufgabe kommentieren · mit @ rufst du einen Agent",
     "send": "Kommentieren",
     "details": "Details der Aufgabe",
     "statusLabel": "Status",

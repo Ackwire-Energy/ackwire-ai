@@ -5136,7 +5136,7 @@
     },
     "noComments": "まだコメントはありません。",
     "comment": "タスクにコメント",
-    "commentPlaceholder": "コメント · @でエージェントを呼べます",
+    "commentPlaceholder": "タスクにコメント · @でエージェントを呼べます",
     "send": "コメント",
     "details": "タスクの詳細",
     "statusLabel": "ステータス",

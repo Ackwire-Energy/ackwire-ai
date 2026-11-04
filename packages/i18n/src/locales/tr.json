@@ -5293,7 +5293,7 @@
     },
     "noComments": "Henüz yorum yok.",
     "comment": "Göreve yorum yap",
-    "commentPlaceholder": "Yorum · bir ajanı çağırmak için @ kullanın",
+    "commentPlaceholder": "Göreve yorum yap · bir ajanı çağırmak için @ kullanın",
     "send": "Yorum yap",
     "details": "Görev ayrıntıları",
     "statusLabel": "Durum",

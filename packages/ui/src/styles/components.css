@@ -910,8 +910,9 @@ textarea.ac-input {
   display: flex;
   align-items: center;
 }
+/* Each ringed in the surface under it (`--stack-ring` where that isn't the page's). */
 .ac-avatar-stack > .ac-avatar {
-  box-shadow: 0 0 0 2px var(--surface);
+  box-shadow: 0 0 0 2px var(--stack-ring, var(--surface));
 }
 .ac-avatar-stack > .ac-avatar + .ac-avatar {
   margin-left: -6px;

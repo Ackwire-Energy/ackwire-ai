@@ -5687,7 +5687,7 @@
     },
     "noComments": "Jeszcze nie ma komentarzy.",
     "comment": "Skomentuj zadanie",
-    "commentPlaceholder": "Komentarz · użyj @, żeby zawołać agenta",
+    "commentPlaceholder": "Skomentuj zadanie · użyj @, żeby zawołać agenta",
     "send": "Skomentuj",
     "details": "Szczegóły zadania",
     "statusLabel": "Status",

@@ -71,6 +71,38 @@ describe("a task's conversation (ADR 0144)", () => {
     ]);
   });
 
+  test("an agent's mention there brings in the agent it names, as a person's does, at the next hop", async () => {
+    f = await setup({
+      // The judge reads the handover as one that needs QA.
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined),
+      reply: (_request, call) => ({ chunks: [call === 1 ? "@qa pode revisar o texto?" : "Revisei: tudo certo."] }),
+    });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const qa = await createAgent(f.db, f.owner.id, f.org.id, { name: "QA", handle: "qa" }, NEW_AGENT_DEFAULTS);
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Texto do convite" });
+    const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, issue.id);
+    await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, { body: "@dev escreve", threadId: at.rootId });
+    await drainOutbox(f.db, f.handlers);
+
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.map((r) => [r.agentId, r.channelId, r.hop]).sort()).toEqual(
+      [
+        [f.agent.id, at.channelId, 1],
+        [qa.id, at.channelId, 2],
+      ].sort(),
+    );
+    expect((await repliesIn(at.channelId)).map((m) => [m.authorType, m.body])).toEqual([
+      ["person", "@dev escreve"],
+      ["agent", "@qa pode revisar o texto?"],
+      ["agent", "Revisei: tudo certo."],
+    ]);
+    const members = await f.db
+      .select()
+      .from(schema.channelMembers)
+      .where(eq(schema.channelMembers.channelId, at.channelId));
+    expect(members.map((m) => m.agentId)).toContain(qa.id);
+  });
+
   test("a comment (the old box, the agent's tool) is a reply in it; never an activity row", async () => {
     f = await setup();
     const deps = { db: f.db, pubsub: f.pubsub };

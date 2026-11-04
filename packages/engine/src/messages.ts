@@ -375,7 +375,8 @@ function channelRefsSql(orgId: string, channelId: string, names: string[]) {
 /**
  * The org's agents an agent's text @mentions that aren't members of `channelId`: a mention reaches only members
  * (`insertMessageWithRuns`), so for them it is plain text that wakes nobody. Handles, lower case; never the author,
- * an archived agent or a handle a person holds (the @ is theirs).
+ * an archived agent or a handle a person holds (the @ is theirs). In a task's conversation (ADR 0144) the ones that see
+ * the task join it first, as `insertMessageWithRuns` does, so they are reached.
  */
 export async function unreachedAgents(
   db: Executor,
@@ -383,6 +384,9 @@ export async function unreachedAgents(
 ): Promise<string[]> {
   const handles = parseMentionHandles(input.body);
   if (handles.length === 0) return [];
+  await admitTaskAgents(db, input.orgId, input.channelId, {
+    handles: await currentHandles(db, input.orgId, handles),
+  });
   const rows = await db
     .select({ handle: agents.handle })
     .from(agents)
@@ -570,10 +574,14 @@ export async function insertMessageWithRuns(
   const silent = isMediaAfterReply(input.meta);
   if (body.length > MAX_MESSAGE_LENGTH)
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
-  // Handles match [a-z0-9_-]: safe as an array literal.
-  const handles = `{${(await currentHandles(tx, input.orgId, parseMentionHandles(body))).join(",")}}`;
-  const id = Bun.randomUUIDv7();
+  const mentions = await currentHandles(tx, input.orgId, parseMentionHandles(body));
   const person = input.author.type === "person";
+  // A task's conversation (ADR 0144): an agent another agent mentions there joins it when it sees the task, as with a
+  // person's mention (`postPersonMessage`), so the mention wakes it (hop limits as anywhere). Elsewhere it adds no one.
+  if (!person && mentions.length > 0) await admitTaskAgents(tx, input.orgId, input.channelId, { handles: mentions });
+  // Handles match [a-z0-9_-]: safe as an array literal.
+  const handles = `{${mentions.join(",")}}`;
+  const id = Bun.randomUUIDv7();
   const userId = input.author.type === "person" ? input.author.userId : null;
   const agentId = input.author.type === "agent" ? input.author.agentId : null;
   const runId = input.author.type === "agent" ? input.author.runId : null;

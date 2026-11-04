@@ -5384,7 +5384,7 @@
     },
     "noComments": "Nog geen reacties.",
     "comment": "Reageren op de taak",
-    "commentPlaceholder": "Reageer · gebruik @ om een agent te roepen",
+    "commentPlaceholder": "Reageren op de taak · gebruik @ om een agent te roepen",
     "send": "Reageren",
     "details": "Details van de taak",
     "statusLabel": "Status",

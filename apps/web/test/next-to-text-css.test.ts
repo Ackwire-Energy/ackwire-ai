@@ -22,7 +22,7 @@ test("a row's minor action, its time and its stop sit right after its words, nev
   expect(shipped).not.toContain(".ac-wait");
   // The bar's step the same way.
   expect(last(shipped, ".ac-typing__step", "flex")).not.toContain("260px");
-  expect(last(shipped, ".ac-typing__step", "max-width")).toBe("260px");
+  expect(last(shipped, ".ac-typing__step", "max-width")).toBeUndefined();
 });
 
 test("a thread opens in the members column's place, wider, with no scrim; a phone keeps the whole-screen sheet", async () => {
