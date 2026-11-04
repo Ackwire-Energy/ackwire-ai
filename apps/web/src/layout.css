@@ -7014,7 +7014,7 @@ html:not([data-pointer]) .file-row__open:focus-visible {
 .izoom__stage[data-dragging] {
   cursor: grabbing;
 }
-.izoom__stage:focus-visible {
+html:not([data-pointer]) .izoom__stage:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
