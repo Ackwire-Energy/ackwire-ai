@@ -3254,6 +3254,8 @@ test.if(posix)(
           .of("pong")
           .some((p) => (p.networkTransition as { state?: string } | undefined)?.state === "restart_required"),
       ).toBe(true);
+      // The in-flight request's failure goes out after the worker's input ends, not in the same tick.
+      await waitFor(() => socket.of("result").some((r) => r.id === "active"), 5000);
       expect(socket.of("result").find((r) => r.id === "active")?.ok).toBe(false);
       await waitFor(() => desktopStops === 2, 5000);
       old.crash(0);

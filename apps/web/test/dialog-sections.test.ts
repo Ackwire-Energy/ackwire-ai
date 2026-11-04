@@ -1,9 +1,19 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 // @ts-expect-error: @babel/core ships no types (the build's React compiler brings it), and the parse is walked untyped
 import { parseSync } from "@babel/core";
 import { sourceFiles } from "../../../packages/i18n/test/maker-words";
+
+// Babel's first parse replaces `Error.prepareStackTrace` for good, with a rewriter that hands every stack to the one
+// before it. Bun's own refuses anything but a real Error, so once this file ran, `Error.captureStackTrace` on a plain
+// object threw in every later file of the run: Vite's bundled follow-redirects does that while it loads, which broke
+// each stylesheet test (`built-css.ts`). The runtime's own come back when this file is done.
+const runtimeStack = { prepare: Error.prepareStackTrace, limit: Error.stackTraceLimit };
+afterAll(() => {
+  Error.prepareStackTrace = runtimeStack.prepare;
+  Error.stackTraceLimit = runtimeStack.limit;
+});
 
 const REPO = join(import.meta.dir, "..", "..", "..");
 const ROOTS = [join(import.meta.dir, "..", "src"), join(REPO, "packages", "ui", "src")];
