@@ -532,22 +532,6 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
 .waitcard__acts > .ac-chip {
   font-size: var(--control-fs-sm);
 }
-/* "Não rodar": a muted house link led by its icon, no plate and no padding, so under a message its icon starts where
-   the words above do; the controls' type size, on a button's line beside one. */
-.waitcard__textbtn {
-  gap: 6px;
-  font-size: var(--control-fs-sm);
-  line-height: 20px;
-}
-/* Beside a button, the gap a plate would have given. */
-.waitcard__textbtn:not(:first-child) {
-  margin-inline-start: 6px;
-}
-.waitcard__textbtn:disabled {
-  cursor: not-allowed;
-  color: var(--faint);
-  text-decoration-color: transparent;
-}
 /* What a proposed agent gets, a line each, as quiet as the card's other lines. */
 .waitcard__lines {
   display: flex;

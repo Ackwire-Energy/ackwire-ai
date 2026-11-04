@@ -39,12 +39,11 @@ test("every count pill centres its figures' own box, and the production build ke
   expect(undo.filter((d) => !d.startsWith(".ac-count,.ac-countchip "))).toEqual([]);
 });
 
-test("Não rodar is a text button: no plate, no padding, its icon where the message's words start", () => {
+test("a text button has no plate and no padding: house links, and Não rodar's words where the message's start", () => {
   expect(last(":where(button).ac-link", "padding")).toBe("0");
   // The minifier writes `background: none` as `0 0`.
   expect(last(":where(button).ac-link", "background")).toBe("0 0");
-  expect(last(".waitcard__textbtn", "padding")).toBeUndefined();
-  expect(last(".waitcard__textbtn", "background")).toBeUndefined();
-  expect(last(".waitcard__textbtn:not(:first-child)", "margin-inline-start")).toBe("6px");
+  expect(last(".cq-link", "padding")).toBe("0");
+  expect(last(".cq-link", "background")).toBe("0 0");
   expect(last(".ac-link--muted:hover", "color")).toBe("var(--ink)");
 });
