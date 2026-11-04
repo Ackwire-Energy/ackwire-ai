@@ -116,6 +116,7 @@ import type {
   OrgRoles,
   Person,
   PersonalTokenInput,
+  PersonLimits,
   Proposal,
   ReactionCount,
   ReminderInput,
@@ -2286,6 +2287,59 @@ export function useAuditRow(orgId: string, id: string): AuditRow | null {
 export const usePlanUsage = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.planUsage(orgId), queryFn: () => api.orgs.planUsage(orgId) });
+};
+
+/** Uso › Pessoas (ADR 0141): each person's use; "Agora" stays live while the page is open. */
+export const usePeopleUsage = (orgId: string, period: { since?: string; until?: string } = {}, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.peopleUsage(orgId, period),
+    queryFn: () => api.orgs.peopleUsage(orgId, period),
+    enabled,
+    // ponytail: "Agora" polls; the runs' realtime events could refresh it instead.
+    refetchInterval: 15_000,
+  });
+};
+
+/** A person's month (the drawer), or one's own ("Seu uso", in percentages). */
+export const usePersonUsage = (orgId: string, userId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.personUsage(orgId, userId ?? ""),
+    queryFn: () => api.orgs.personUsage(orgId, userId as string),
+    enabled: !!userId,
+  });
+};
+
+export const usePersonLimits = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.personLimits(orgId), queryFn: () => api.orgs.personLimits(orgId), enabled });
+};
+
+/** Saving limits, raising or refusing moves every meter of Uso › Pessoas. */
+const usePeopleUsageMutation = <A extends unknown[], R>(orgId: string, run: (...args: A) => Promise<R>) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: A) => run(...args),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["org", orgId, "people-usage"] }),
+  });
+};
+
+export const useSetPersonLimits = (orgId: string) => {
+  const api = useApi();
+  return usePeopleUsageMutation(orgId, (limits: PersonLimits) => api.orgs.setPersonLimits(orgId, limits));
+};
+
+export const useRaisePersonLimit = (orgId: string) => {
+  const api = useApi();
+  return usePeopleUsageMutation(orgId, (userId: string, limitUsd: number) =>
+    api.orgs.raisePersonLimit(orgId, userId, limitUsd),
+  );
+};
+
+export const useRefuseMoreUsage = (orgId: string) => {
+  const api = useApi();
+  return usePeopleUsageMutation(orgId, (userId: string) => api.orgs.refuseMoreUsage(orgId, userId));
 };
 
 /** The agent's "Uso" tab: its month by account and day, and the account it thinks with now. */

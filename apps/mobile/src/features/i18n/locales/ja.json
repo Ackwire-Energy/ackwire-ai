@@ -750,6 +750,12 @@
       "invitation_accepted_other": "{{names}}が招待を承諾しました",
       "composio_limit_other": "このワークスペースは今月のComposio呼び出し回数を使い切りました",
       "change_request_other": "{{names}}がチームの変更を求めています",
+      "usage_limit_warning": "今月の上限の{{percent}}%を使いました",
+      "usage_limit_reached_notify": "今月の利用上限に達しました",
+      "usage_limit_reached": "{{names}}さんが上限{{amount}}に達しました",
+      "usage_limit_request": "{{names}}さんが上限{{amount}}に達し、追加を求めています",
+      "usage_limit_raised": "{{names}}さんが今月のあなたの上限を引き上げました",
+      "usage_limit_refused": "{{names}}さんが追加利用のリクエストを断りました",
       "browser_profile_request_other": "{{names}}がブラウザプロフィールの追加を求めています",
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
@@ -1138,7 +1144,8 @@
       "browser": "ブラウザ",
       "secret": "シークレット",
       "join": "メンバー",
-      "tools": "ツール"
+      "tools": "ツール",
+      "limit": "上限"
     },
     "review": "レビュー",
     "answer": "返信",

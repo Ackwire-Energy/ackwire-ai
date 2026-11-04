@@ -22,7 +22,7 @@ import { agents, providerCredentials } from "./agents";
 import { connectorConnections } from "./connectors";
 import { machines } from "./machines";
 import { missions } from "./missions";
-import { organizations } from "./tenancy";
+import { organizationMembers, organizations } from "./tenancy";
 import { issues } from "./work";
 
 export const outboxStatusEnum = pgEnum("outbox_status", ["pending", "processing", "done", "failed"]);
@@ -357,12 +357,19 @@ export const usageRecords = pgTable(
      */
     machineId: uuid(),
     brainAccountId: uuid(),
+    /**
+     * The person behind the run at call time (ADR 0141): who asked, or a routine's creator. Null for calls nobody is
+     * behind (an agent's own work, the router, embeddings) and rows from before it was recorded. No foreign key: the
+     * history outlives a member who left.
+     */
+    personId: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
     index().on(t.orgId, t.agentId, t.createdAt),
     index().on(t.orgId, t.createdAt),
+    index().on(t.orgId, t.personId, t.createdAt),
     // The operator's work analytics read every workspace's usage in a range of dates.
     index().on(t.createdAt),
   ],
@@ -387,6 +394,35 @@ export const agentBudgetPeriods = pgTable(
   (t) => [
     primaryKey({ columns: [t.agentId, t.periodStart] }),
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * A person's AI use for one calendar month (UTC), across every agent (ADR 0141): what the Model Gateway and the plan
+ * brains add after each call (API cost, or the API-equivalent of a plan's tokens), read before the next one against
+ * the person's monthly limit. `raised_limit_nano_usd`: an admin raised it for this month only; `requested_at`: the
+ * person asked for more ("Pedir mais") and nobody answered yet.
+ */
+export const personUsageMonths = pgTable(
+  "person_usage_months",
+  {
+    orgId: uuid().notNull(),
+    personId: text().notNull(),
+    periodStart: date({ mode: "string" }).notNull(),
+    spentNanoUsd: bigint({ mode: "number" }).notNull().default(0),
+    raisedLimitNanoUsd: bigint({ mode: "number" }),
+    raisedByUserId: text(),
+    requestedAt: timestamp({ withTimezone: true }),
+    /** When this month's use first reached the limit in force then (cleared by a raise). */
+    reachedAt: timestamp({ withTimezone: true }),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.personId, t.periodStart] }),
+    foreignKey({
+      columns: [t.orgId, t.personId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
   ],
 );
 

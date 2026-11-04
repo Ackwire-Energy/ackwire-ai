@@ -750,6 +750,12 @@
       "invitation_accepted_other": "{{names}} 接受了你的邀请",
       "composio_limit_other": "此工作区已用完本月的 Composio 调用次数",
       "change_request_other": "{{names}} 请求调整团队",
+      "usage_limit_warning": "本月你已用掉额度的 {{percent}}%",
+      "usage_limit_reached_notify": "你已达到本月的使用额度",
+      "usage_limit_reached": "{{names}} 已达到 {{amount}} 的额度",
+      "usage_limit_request": "{{names}} 已达到 {{amount}} 的额度并申请增加",
+      "usage_limit_raised": "{{names}} 提高了你本月的额度",
+      "usage_limit_refused": "{{names}} 拒绝了你增加使用的申请",
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
@@ -1138,7 +1144,8 @@
       "browser": "浏览器",
       "secret": "密钥",
       "join": "成员",
-      "tools": "工具"
+      "tools": "工具",
+      "limit": "额度"
     },
     "review": "审阅",
     "answer": "回复",

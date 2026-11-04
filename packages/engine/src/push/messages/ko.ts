@@ -47,4 +47,13 @@ export const strings: Partial<PushStrings> = {
   sentGif: "GIF를 보냈어요",
   sentSticker: "스티커를 보냈어요",
   sentVoice: "음성 메시지를 보냈어요",
+  usageWarningTitle: (p) => `이번 달 한도의 ${p}%를 사용했어요`,
+  usageReachedMineTitle: "이번 달 사용 한도에 도달했어요",
+  usageMineBody: "탭해서 사용량을 확인하세요.",
+  usageReachedTitle: (a) => `${a} 님이 이번 달 사용 한도에 도달했어요`,
+  usageRequestTitle: (a) => `${a} 님이 이번 달 사용량을 더 요청했어요`,
+  usageRequestBody: "탭해서 한도를 올리거나 거절하세요.",
+  usageRaisedTitle: (a) => `${a} 님이 이번 달 한도를 올렸어요`,
+  usageRaisedBody: "계속할 수 있어요.",
+  usageRefusedTitle: (a) => `${a} 님이 사용량 추가 요청을 거절했어요`,
 };

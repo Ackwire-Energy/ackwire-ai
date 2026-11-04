@@ -393,6 +393,8 @@ export async function deliverPush(
     routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
     screen: source.screen ?? null,
     reminder: latest.reminder === true,
+    status: latest.statusTo ?? null,
+    percent: latest.percent ?? null,
   };
 
   let sent = 0;

@@ -191,8 +191,11 @@ import type {
   OrgPlanUsage,
   OrgRoles,
   OrgSettings,
+  PeopleUsage,
   Person,
   PersonalTokenInput,
+  PersonLimits,
+  PersonUsage,
   PhoneSignIn,
   Poll,
   PostMedia,
@@ -487,6 +490,18 @@ export interface ApiClient {
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
     /** Every plan account by computer and the API per agent, this month (ADR 0063). */
     planUsage(orgId: string): Promise<OrgPlanUsage>;
+    /** Uso › Pessoas (ADR 0141): each person's use, their limit and what they do now (`view_usage`). */
+    peopleUsage(orgId: string, period?: { since?: string; until?: string }): Promise<PeopleUsage>;
+    /** Where the CSV of `peopleUsage` downloads from, one row per person per day. */
+    peopleUsageCsvUrl(orgId: string, period?: { since?: string; until?: string }): string;
+    /** A person's month; one's own in percentages. */
+    personUsage(orgId: string, userId: string, period?: { since?: string; until?: string }): Promise<PersonUsage>;
+    personLimits(orgId: string): Promise<PersonLimits>;
+    setPersonLimits(orgId: string, limits: PersonLimits): Promise<PersonLimits>;
+    /** "Pedir mais": the caller asks who decides for more this month. */
+    requestMoreUsage(orgId: string): Promise<{ requestedAt: string }>;
+    raisePersonLimit(orgId: string, userId: string, limitUsd: number): Promise<void>;
+    refuseMoreUsage(orgId: string, userId: string): Promise<void>;
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };

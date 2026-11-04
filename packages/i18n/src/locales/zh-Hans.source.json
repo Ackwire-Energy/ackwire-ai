@@ -27441,7 +27441,7 @@
     "value": "Where the workspace's files live."
   },
   "settings.sectionText.usage": {
-    "value": "Budgets and what each agent spent this month."
+    "value": "How much AI each person and each agent uses, and the month's limits."
   },
   "settings.sectionText.audit": {
     "value": "What the agents did outside the conversation and what people changed. Only admins see it."
@@ -32594,5 +32594,389 @@
   },
   "sidebarPins.full.people": {
     "value": "You already pinned 5 people. Unpin one to pin this one."
+  },
+  "notifications.what.usageLimitWarning": {
+    "value": "You've used {{percent}}% of your limit this month"
+  },
+  "notifications.what.usageLimitReachedSelf": {
+    "value": "You've reached your usage limit for this month"
+  },
+  "notifications.what.usageLimitReached": {
+    "value": "<b>{{name}}</b> reached their {{amount}} limit"
+  },
+  "notifications.what.usageLimitRequest": {
+    "value": "<b>{{name}}</b> reached their {{amount}} limit and asks for more"
+  },
+  "notifications.what.usageLimitRaised": {
+    "value": "<b>{{name}}</b> raised your limit for this month"
+  },
+  "notifications.what.usageLimitRefused": {
+    "value": "<b>{{name}}</b> turned down your request for more"
+  },
+  "notifications.usageLimit.runs": {
+    "value": {
+      "one": "{{count}} request this month",
+      "other": "{{count}} requests this month"
+    }
+  },
+  "notifications.usageLimit.top": {
+    "value": "{{share}}% with {{agent}}"
+  },
+  "notifications.usageLimit.fromRole": {
+    "value": "The {{role}} role's limit."
+  },
+  "notifications.usageLimit.fromRaised": {
+    "value": "Limit raised this month."
+  },
+  "notifications.usageLimit.fromPerson": {
+    "value": "A limit set for this person."
+  },
+  "notifications.usageLimit.fromDefault": {
+    "value": "The workspace's default limit."
+  },
+  "notifications.usageLimit.line": {
+    "value": "{{runs}}. {{from}}"
+  },
+  "agentPage.activity.errors.person_limit": {
+    "value": "The person who asked reached their usage limit for this month."
+  },
+  "routines.code.person_limit": {
+    "value": "Didn't run: its creator reached their usage limit for this month"
+  },
+  "peopleUsage.tabs.summary": {
+    "value": "Summary"
+  },
+  "peopleUsage.tabs.people": {
+    "value": "People"
+  },
+  "peopleUsage.tabs.mine": {
+    "value": "Your usage"
+  },
+  "peopleUsage.view.usage": {
+    "value": "Usage"
+  },
+  "peopleUsage.view.limits": {
+    "value": "Limits"
+  },
+  "peopleUsage.title": {
+    "value": "Usage by person"
+  },
+  "peopleUsage.about": {
+    "value": "You see how much each person uses and with which agents. What private conversations say never shows here."
+  },
+  "peopleUsage.plansAbout": {
+    "value": "The plan is already paid for. This amount only compares use between people."
+  },
+  "peopleUsage.sub": {
+    "value": {
+      "one": "{{month}} · {{count}} person · {{amount}} of AI",
+      "other": "{{month}} · {{count}} people · {{amount}} of AI"
+    }
+  },
+  "peopleUsage.periodLabel": {
+    "value": "Period"
+  },
+  "peopleUsage.period.month": {
+    "value": "This month"
+  },
+  "peopleUsage.period.last7": {
+    "value": "Last 7 days"
+  },
+  "peopleUsage.period.last30": {
+    "value": "Last 30 days"
+  },
+  "peopleUsage.period.lastMonth": {
+    "value": "Last month"
+  },
+  "peopleUsage.role": {
+    "value": "Role"
+  },
+  "peopleUsage.roleAll": {
+    "value": "Role: all"
+  },
+  "peopleUsage.agent": {
+    "value": "Agent"
+  },
+  "peopleUsage.agentAll": {
+    "value": "Agent: all"
+  },
+  "peopleUsage.chips.near": {
+    "value": "Near the limit"
+  },
+  "peopleUsage.chips.at": {
+    "value": "At the limit"
+  },
+  "peopleUsage.chips.idle": {
+    "value": "No use"
+  },
+  "peopleUsage.summary.near": {
+    "value": "{{n}} near the limit"
+  },
+  "peopleUsage.summary.at": {
+    "value": "{{n}} at the limit"
+  },
+  "peopleUsage.summary.idle": {
+    "value": "{{n}} with no use in the period"
+  },
+  "peopleUsage.export": {
+    "value": "Export CSV"
+  },
+  "peopleUsage.limitsHint": {
+    "value": "Set a limit per person in Limits"
+  },
+  "peopleUsage.empty": {
+    "value": "Nobody has used agents this month yet."
+  },
+  "peopleUsage.owner": {
+    "value": "Owner"
+  },
+  "peopleUsage.member": {
+    "value": "Member"
+  },
+  "peopleUsage.columns.person": {
+    "value": "Person"
+  },
+  "peopleUsage.columns.now": {
+    "value": "Now"
+  },
+  "peopleUsage.columns.runs": {
+    "value": "Requests"
+  },
+  "peopleUsage.columns.agents": {
+    "value": "Used most"
+  },
+  "peopleUsage.columns.usage": {
+    "value": "This month"
+  },
+  "peopleUsage.columns.caresFor": {
+    "value": "Looks after"
+  },
+  "peopleUsage.columns.created": {
+    "value": "Created"
+  },
+  "peopleUsage.now.channel": {
+    "value": "With {{agent}} in #{{channel}}"
+  },
+  "peopleUsage.now.private": {
+    "value": "In a private conversation with {{agent}}"
+  },
+  "peopleUsage.now.hidden": {
+    "value": "With {{agent}} in a private channel"
+  },
+  "peopleUsage.now.routine": {
+    "value": "Routine {{name}}"
+  },
+  "peopleUsage.now.last": {
+    "value": "Last used {{when}}"
+  },
+  "peopleUsage.now.never": {
+    "value": "No use"
+  },
+  "peopleUsage.meter.of": {
+    "value": "of {{limit}}"
+  },
+  "peopleUsage.meter.noLimit": {
+    "value": "· no limit"
+  },
+  "peopleUsage.meter.estimate": {
+    "value": "≈ {{amount}} through the API"
+  },
+  "peopleUsage.live.title": {
+    "value": "Now"
+  },
+  "peopleUsage.live.routineOf": {
+    "value": "{{name}}'s routine"
+  },
+  "peopleUsage.from.raised": {
+    "value": "raised this month"
+  },
+  "peopleUsage.from.person": {
+    "value": "set for this person"
+  },
+  "peopleUsage.from.role": {
+    "value": "from the {{role}} role"
+  },
+  "peopleUsage.from.default": {
+    "value": "the workspace's default"
+  },
+  "peopleUsage.drawer.limit": {
+    "value": "This month's limit: {{amount}}"
+  },
+  "peopleUsage.drawer.noLimit": {
+    "value": "No usage limit this month."
+  },
+  "peopleUsage.drawer.reached": {
+    "value": "Reached the limit on {{date}} · {{used}} used"
+  },
+  "peopleUsage.drawer.used": {
+    "value": "{{used}} used · {{percent}}%"
+  },
+  "peopleUsage.drawer.raise": {
+    "value": "Raise limit"
+  },
+  "peopleUsage.drawer.raiseTo": {
+    "value": "New limit for this month in US$"
+  },
+  "peopleUsage.drawer.raiseSave": {
+    "value": "Raise"
+  },
+  "peopleUsage.drawer.raised": {
+    "value": "Limit raised for this month"
+  },
+  "peopleUsage.drawer.asked": {
+    "value": "Asked for more"
+  },
+  "peopleUsage.drawer.days": {
+    "value": "Use per day"
+  },
+  "peopleUsage.drawer.agents": {
+    "value": "With which agents"
+  },
+  "peopleUsage.drawer.runs": {
+    "value": {
+      "one": "{{count}} request",
+      "other": "{{count}} requests"
+    }
+  },
+  "peopleUsage.drawer.recent": {
+    "value": "What they did lately"
+  },
+  "peopleUsage.drawer.untitled": {
+    "value": "Untitled"
+  },
+  "peopleUsage.drawer.with": {
+    "value": "with {{agent}}"
+  },
+  "peopleUsage.drawer.minutes": {
+    "value": "{{n}} min"
+  },
+  "peopleUsage.drawer.private": {
+    "value": "Private conversation with {{agent}}"
+  },
+  "peopleUsage.drawer.hidden": {
+    "value": "In a private channel with {{agent}}"
+  },
+  "peopleUsage.drawer.routine": {
+    "value": "Routine {{name}}"
+  },
+  "peopleUsage.drawer.created": {
+    "value": "Agents they created"
+  },
+  "peopleUsage.drawer.createdAt": {
+    "value": "created on {{date}}"
+  },
+  "peopleUsage.drawer.audit": {
+    "value": "See the agents' actions in Audit"
+  },
+  "peopleUsage.drawer.noUse": {
+    "value": "No use in this period."
+  },
+  "peopleUsage.limits.title": {
+    "value": "Usage limit per person"
+  },
+  "peopleUsage.limits.lead": {
+    "value": "How much AI each person may use a month, across every agent. It counts what they ask for and the routines they created."
+  },
+  "peopleUsage.limits.default": {
+    "value": "Workspace default"
+  },
+  "peopleUsage.limits.defaultHint": {
+    "value": "For anyone without a limit from a role or an exception."
+  },
+  "peopleUsage.limits.byRole": {
+    "value": "By role"
+  },
+  "peopleUsage.limits.people": {
+    "value": "Exceptions"
+  },
+  "peopleUsage.limits.addPerson": {
+    "value": "Add a person"
+  },
+  "peopleUsage.limits.useDefault": {
+    "value": "Use the default"
+  },
+  "peopleUsage.limits.none": {
+    "value": "No limit"
+  },
+  "peopleUsage.limits.amount": {
+    "value": "Monthly limit"
+  },
+  "peopleUsage.limits.rule": {
+    "value": "The person's own limit applies. Without one, the highest of their roles'. Without any, the default. Owners have no limit."
+  },
+  "peopleUsage.limits.whenTitle": {
+    "value": "When someone reaches the limit"
+  },
+  "peopleUsage.limits.block": {
+    "value": "Agents stop starting new work for that person"
+  },
+  "peopleUsage.limits.notify": {
+    "value": "Only tell the admins"
+  },
+  "peopleUsage.limits.warn": {
+    "value": "Warn at 80%"
+  },
+  "peopleUsage.limits.warnHint": {
+    "value": "The person gets a notice, and the admins get another at 100%."
+  },
+  "peopleUsage.limits.saved": {
+    "value": "Limits saved"
+  },
+  "peopleUsage.mine.title": {
+    "value": "You've used {{percent}}% of your limit this month"
+  },
+  "peopleUsage.mine.noLimit": {
+    "value": "You have no usage limit this month"
+  },
+  "peopleUsage.mine.renews": {
+    "value": "It renews on {{date}}."
+  },
+  "peopleUsage.mine.near": {
+    "value": "Close to the limit, ask an admin for more."
+  },
+  "peopleUsage.mine.recent": {
+    "value": "What you did lately"
+  },
+  "peopleUsage.mine.ofLimit": {
+    "value": "{{percent}}% of the limit"
+  },
+  "peopleUsage.card.title": {
+    "value": "You've reached your usage limit for this month"
+  },
+  "peopleUsage.card.text": {
+    "value": "It renews on {{date}}. To keep going now, ask an admin."
+  },
+  "peopleUsage.card.ask": {
+    "value": "Ask for more"
+  },
+  "peopleUsage.card.asked": {
+    "value": "Request sent"
+  },
+  "peopleUsage.card.see": {
+    "value": "See my usage"
+  },
+  "peopleUsage.card.other": {
+    "value": "{{name}} reached their usage limit for this month"
+  },
+  "peopleUsage.card.raised": {
+    "value": "{{name}} raised your limit for this month. You can go on."
+  },
+  "peopleUsage.card.raisedOther": {
+    "value": "{{name}} raised the limit for this month"
+  },
+  "peopleUsage.card.refused": {
+    "value": "{{name}} turned down the request. The limit renews on {{date}}."
+  },
+  "peopleUsage.actions.raise": {
+    "value": "Raise to {{amount}} this month"
+  },
+  "peopleUsage.actions.refuse": {
+    "value": "Decline"
+  },
+  "peopleUsage.actions.see": {
+    "value": "See their usage"
+  },
+  "chat.body.person_limit": {
+    "value": "The person who asked reached their usage limit for this month. To keep going now, ask an admin."
   }
 }

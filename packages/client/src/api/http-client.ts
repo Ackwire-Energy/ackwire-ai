@@ -149,7 +149,10 @@ import type {
   OrgPlanUsage,
   OrgRoles,
   OrgSettings,
+  PeopleUsage,
   Person,
+  PersonLimits,
+  PersonUsage,
   PhoneSignIn,
   Poll,
   Proposal,
@@ -571,6 +574,21 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ roleIds: string[] }>(`${org(orgId)}/invitations/${enc(id)}`, { method: "PATCH", json: { roleIds } }),
       usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
       planUsage: (orgId) => request<OrgPlanUsage>(`${org(orgId)}/usage/plans`),
+      peopleUsage: (orgId, period = {}) => request<PeopleUsage>(`${org(orgId)}/usage/people`, { query: period }),
+      peopleUsageCsvUrl: (orgId, period = {}) => {
+        const qs = new URLSearchParams(Object.entries(period).filter((e): e is [string, string] => !!e[1]));
+        return `${base}${org(orgId)}/usage/people.csv${qs.size ? `?${qs}` : ""}`;
+      },
+      personUsage: (orgId, userId, period = {}) =>
+        request<PersonUsage>(`${org(orgId)}/usage/people/${enc(userId)}`, { query: period }),
+      personLimits: (orgId) => request<PersonLimits>(`${org(orgId)}/usage/limits`),
+      setPersonLimits: (orgId, limits) =>
+        request<PersonLimits>(`${org(orgId)}/usage/limits`, { method: "PUT", json: limits }),
+      requestMoreUsage: (orgId) => request<{ requestedAt: string }>(`${org(orgId)}/usage/limits/request`, { json: {} }),
+      raisePersonLimit: (orgId, userId, limitUsd) =>
+        request<void>(`${org(orgId)}/usage/people/${enc(userId)}/raise`, { json: { limitUsd } }),
+      refuseMoreUsage: (orgId, userId) =>
+        request<void>(`${org(orgId)}/usage/people/${enc(userId)}/refuse`, { json: {} }),
       audit: (orgId, query = {}) =>
         request<AuditPage>(`${org(orgId)}/audit`, {
           query: {

@@ -807,6 +807,12 @@
       "composio_limit_other": "Deze werkruimte heeft haar Composio-aanroepen voor de maand opgebruikt",
       "change_request_one": "{{names}} vraagt om een wijziging in het team",
       "change_request_other": "{{names}} vragen om een wijziging in het team",
+      "usage_limit_warning": "Je hebt {{percent}}% van je limiet deze maand gebruikt",
+      "usage_limit_reached_notify": "Je hebt je gebruikslimiet voor deze maand bereikt",
+      "usage_limit_reached": "{{names}} heeft de limiet van {{amount}} bereikt",
+      "usage_limit_request": "{{names}} heeft de limiet van {{amount}} bereikt en vraagt om meer",
+      "usage_limit_raised": "{{names}} heeft je limiet voor deze maand verhoogd",
+      "usage_limit_refused": "{{names}} heeft je verzoek om meer gebruik afgewezen",
       "browser_profile_request_one": "{{names}} vraagt om nog een browserprofiel",
       "browser_profile_request_other": "{{names}} vragen om nog een browserprofiel",
       "connector_tool_changed_one": "Een gekoppelde server heeft tools gewijzigd die je hebt goedgekeurd",
@@ -1209,7 +1215,8 @@
       "browser": "Browser",
       "secret": "Geheim",
       "join": "Leden",
-      "tools": "Tools"
+      "tools": "Tools",
+      "limit": "Limiet"
     },
     "review": "Nakijken",
     "answer": "Antwoorden",

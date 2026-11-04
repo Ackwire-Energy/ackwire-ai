@@ -46,6 +46,7 @@ import { managementRoutes } from "./routes/app/management";
 import { memoryRoutes } from "./routes/app/memory";
 import { missionRoutes } from "./routes/app/missions";
 import { notificationRoutes } from "./routes/app/notifications";
+import { personUsageRoutes } from "./routes/app/person-usage";
 import { planUsageRoutes } from "./routes/app/plan-usage";
 import { pushRoutes } from "./routes/app/push";
 import { questionRoutes } from "./routes/app/questions";
@@ -201,6 +202,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", machineAppRoutes(deps));
     api.route("/app", machineAccountRoutes(deps));
     api.route("/app", planUsageRoutes(deps));
+    api.route("/app", personUsageRoutes(deps));
     api.route("/app", telemetryRoutes(deps));
     api.route("/app", jevRoutes(deps));
     api.route("/app", gifKeyRoutes(deps));

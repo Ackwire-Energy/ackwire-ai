@@ -807,6 +807,12 @@
       "composio_limit_other": "Dieser Workspace hat seine Composio-Aufrufe für den Monat aufgebraucht",
       "change_request_one": "{{names}} bittet um eine Änderung im Team",
       "change_request_other": "{{names}} bitten um eine Änderung im Team",
+      "usage_limit_warning": "Du hast {{percent}} % deines Limits in diesem Monat verbraucht",
+      "usage_limit_reached_notify": "Du hast dein Nutzungslimit für diesen Monat erreicht",
+      "usage_limit_reached": "{{names}} hat das Limit von {{amount}} erreicht",
+      "usage_limit_request": "{{names}} hat das Limit von {{amount}} erreicht und bittet um mehr",
+      "usage_limit_raised": "{{names}} hat dein Limit für diesen Monat erhöht",
+      "usage_limit_refused": "{{names}} hat deine Bitte um mehr Nutzung abgelehnt",
       "browser_profile_request_one": "{{names}} bittet um ein weiteres Browserprofil",
       "browser_profile_request_other": "{{names}} bitten um ein weiteres Browserprofil",
       "connector_tool_changed_one": "Ein verbundener Server hat Tools geändert, die du freigegeben hast",
@@ -1209,7 +1215,8 @@
       "browser": "Browser",
       "secret": "Secret",
       "join": "Mitglieder",
-      "tools": "Tools"
+      "tools": "Tools",
+      "limit": "Limit"
     },
     "review": "Prüfen",
     "answer": "Antworten",

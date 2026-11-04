@@ -47,4 +47,13 @@ export const strings: Partial<PushStrings> = {
   sentGif: "发送了一个 GIF",
   sentSticker: "发送了一个贴纸",
   sentVoice: "发送了一条语音消息",
+  usageWarningTitle: (p) => `你本月已用掉额度的 ${p}%`,
+  usageReachedMineTitle: "你已达到本月的使用额度",
+  usageMineBody: "点按查看你的用量。",
+  usageReachedTitle: (a) => `${a} 已达到本月的使用额度`,
+  usageRequestTitle: (a) => `${a} 申请本月增加用量`,
+  usageRequestBody: "点按提高额度或拒绝。",
+  usageRaisedTitle: (a) => `${a} 提高了你本月的额度`,
+  usageRaisedBody: "可以继续了。",
+  usageRefusedTitle: (a) => `${a} 拒绝了你增加用量的申请`,
 };

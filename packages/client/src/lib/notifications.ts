@@ -386,6 +386,15 @@ export function openTarget(n: AppNotification): OpenTarget | null {
         : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return { to: "/org/$orgId/settings/$section", params: { section: "usage" } };
+  // A person's limit (ADR 0141): who decides opens that person's month in Uso › Pessoas; the person, Seu uso.
+  if (n.kind === "usage_limit") {
+    const theirs = n.latest.statusTo === "reached" || n.latest.statusTo === "request";
+    return {
+      to: "/org/$orgId/settings/$section",
+      params: { section: "usage" },
+      ...(theirs && s.userId ? { search: { person: s.userId } } : {}),
+    };
+  }
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed")
     return { to: "/org/$orgId/settings/$section", params: { section: "connectors" } };
@@ -488,7 +497,7 @@ export function snoozeTimes(now = new Date()) {
  * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, give
  * a secret, let someone in, or review tools a connected server changed.
  */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join" | "tools";
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join" | "tools" | "limit";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
@@ -521,6 +530,8 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
   // A connected server changed approved tools (ADR 0117): reviewed in Connectors, never answered like a question.
   if (n.kind === "connector_tool_changed")
     return { kind: "tools", title: l.title ?? "", expiresAt: null, action: "review" };
+  // A person at their limit asks for more (ADR 0141): raised or refused on the card itself.
+  if (n.kind === "usage_limit") return { kind: "limit", title: "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
 }
 

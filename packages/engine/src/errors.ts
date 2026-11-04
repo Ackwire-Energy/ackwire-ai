@@ -87,6 +87,18 @@ export class BudgetExceededError extends Error {
   }
 }
 
+/** The person behind a run reached their monthly AI limit (ADR 0141). Checked before every call made for them. */
+export class PersonLimitError extends Error {
+  constructor(
+    public readonly personId: string,
+    public readonly spentNanoUsd: number,
+    public readonly limitNanoUsd: number,
+  ) {
+    super("This person has used their monthly AI limit");
+    this.name = "PersonLimitError";
+  }
+}
+
 /** No usable provider credential (none configured, revoked, or no platform key in this edition). */
 export class MissingCredentialError extends Error {
   /** A job that hits it fails at once: retrying can't add a key (the outbox reads this flag). */

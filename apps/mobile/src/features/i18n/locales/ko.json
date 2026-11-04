@@ -750,6 +750,12 @@
       "invitation_accepted_other": "{{names}}이(가) 초대를 수락했어요",
       "composio_limit_other": "이 워크스페이스는 이번 달 Composio 호출을 모두 썼어요",
       "change_request_other": "{{names}}이(가) 팀 변경을 요청해요",
+      "usage_limit_warning": "이번 달 한도의 {{percent}}%를 사용했어요",
+      "usage_limit_reached_notify": "이번 달 사용 한도에 도달했어요",
+      "usage_limit_reached": "{{names}} 님이 {{amount}} 한도에 도달했어요",
+      "usage_limit_request": "{{names}} 님이 {{amount}} 한도에 도달해 추가를 요청했어요",
+      "usage_limit_raised": "{{names}} 님이 이번 달 내 한도를 올렸어요",
+      "usage_limit_refused": "{{names}} 님이 추가 사용 요청을 거절했어요",
       "browser_profile_request_other": "{{names}}이(가) 브라우저 프로필을 하나 더 요청해요",
       "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
@@ -1138,7 +1144,8 @@
       "browser": "브라우저",
       "secret": "비밀 정보",
       "join": "멤버",
-      "tools": "도구"
+      "tools": "도구",
+      "limit": "한도"
     },
     "review": "검토",
     "answer": "답장",

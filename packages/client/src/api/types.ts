@@ -5769,7 +5769,13 @@ export type NotificationKind =
    * `source.proposalId` (or `source.messageId` for a new agent's card), `source.agentId` and `label` the agent,
    * `latest.text` why. Done once someone decides.
    */
-  | "change_request";
+  | "change_request"
+  /**
+   * ADR 0141: a person's monthly AI limit, `source.userId` the person, `latest.statusTo`: `warning` (80%, the
+   * person), `reached` (who decides; `reached_notify` to the person when the limit only notifies), `request` (who
+   * decides, waiting, with `raiseToUsd`), `raised` or `refused` (the person). The person's own carry a percent only.
+   */
+  | "usage_limit";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5856,6 +5862,15 @@ export interface NotificationLatest {
   failures?: RunFailure[];
   /** `run_failed` on a computer brain: the plan's name its cause names ("Claude"). */
   plan?: string;
+  /** `usage_limit`: the share of the person's limit used. */
+  percent?: number;
+  /** `usage_limit` to who decides: the limit, the raise offered, where the limit comes from, this month's requests. */
+  limitUsd?: number;
+  raiseToUsd?: number;
+  limitFrom?: string;
+  runs?: number;
+  /** `usage_limit`: the share of the requests made with the agent named in `title`. */
+  share?: number;
 }
 
 /** A run a `run_failed` row lists: its agent and where it failed (`key` names both). */
@@ -6717,4 +6732,112 @@ export interface BrowserProfileWait {
   profileId: string;
   name: string;
   holder: BrowserProfileHolder;
+}
+
+/** Where a person's work happened, as the viewer may see it (ADR 0141): never a DM's content. */
+export interface UsagePlace {
+  kind: "channel" | "private" | "hidden" | "routine";
+  channelId?: string;
+  channelName?: string;
+  routineName?: string;
+}
+
+export interface PersonLimitView {
+  percent: number | null;
+  state: "none" | "ok" | "near" | "at";
+  requested: boolean;
+  reachedAt: string | null;
+  /** With money (`view_usage`) only. */
+  monthUsd?: number;
+  limitUsd?: number | null;
+  limitFrom?: "raised" | "person" | "role" | "default" | "owner" | "none";
+  limitRoleId?: string | null;
+  raiseToUsd?: number | null;
+}
+
+export interface PersonLiveWork {
+  personId: string | null;
+  agentId: string;
+  routine: boolean;
+  place: UsagePlace;
+  title: string | null;
+  startedAt: string;
+}
+
+/** `GET …/usage/people`: Uso › Pessoas (ADR 0141), for who sees money. */
+export interface PeopleUsage {
+  month: string;
+  since: string;
+  until: string;
+  totalUsd: number;
+  plansOnly: boolean;
+  limitsOn: boolean;
+  people: (Required<Omit<PersonLimitView, "limitRoleId">> & {
+    limitRoleId: string | null;
+    userId: string;
+    name: string;
+    image: string | null;
+    owner: boolean;
+    roleIds: string[];
+    runs: number;
+    costUsd: number;
+    estimated: boolean;
+    agents: { agentId: string; share: number }[];
+    caresFor: string[];
+    created: number;
+    lastActiveAt: string | null;
+    now: { agentId: string; place: UsagePlace; title: string | null; startedAt: string } | null;
+  })[];
+  live: PersonLiveWork[];
+}
+
+export type PersonUsageRecent =
+  | {
+      kind: "work";
+      agentId: string;
+      place: UsagePlace;
+      title: string | null;
+      startedAt: string;
+      minutes: number;
+      amount: number;
+    }
+  | { kind: "private" | "hidden"; agentId: string; runs: number; amount: number; lastAt: string };
+
+/** `GET …/usage/people/{userId}`: a person's month; `money` false: amounts are percentages of their limit. */
+export interface PersonUsage {
+  userId: string;
+  name: string;
+  image: string | null;
+  roleIds: string[];
+  owner: boolean;
+  money: boolean;
+  renewsAt: string;
+  since: string;
+  until: string;
+  limit: PersonLimitView;
+  total: number;
+  days: { date: string; agents: Record<string, number> }[];
+  agents: { agentId: string; runs: number; amount: number }[];
+  recent: PersonUsageRecent[];
+  created: { agentId: string; createdAt: string }[];
+}
+
+/** The monthly AI limits per person, in US$ (null: no limit); a role not in `roles` uses the default. */
+export interface PersonLimits {
+  defaultUsd: number | null;
+  roles: Record<string, number | null>;
+  people: Record<string, number | null>;
+  onLimit: "block" | "notify";
+  warn: boolean;
+}
+
+/** `meta.actionCard` of the card an agent posts when the person behind its run is at their limit (ADR 0141). */
+export interface PersonLimitCard {
+  kind: "person_limit";
+  state: "limited" | "raised" | "refused";
+  userId: string | null;
+  agentId: string;
+  runId: string;
+  renewsAt: string;
+  byUserId?: string;
 }

@@ -2940,7 +2940,22 @@
       "changeRequestAgent": "<b>{{name}}</b> meminta agen baru: <b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b> menerima undanganmu dan bergabung ke {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> menerima undanganmu",
-      "reaction_other": "<b>{{names}}</b> bereaksi pada pesanmu"
+      "reaction_other": "<b>{{names}}</b> bereaksi pada pesanmu",
+      "usageLimitWarning": "Kamu sudah memakai {{percent}}% dari batasmu bulan ini",
+      "usageLimitReachedSelf": "Kamu sudah mencapai batas pemakaianmu bulan ini",
+      "usageLimitReached": "<b>{{name}}</b> mencapai batas {{amount}}",
+      "usageLimitRequest": "<b>{{name}}</b> mencapai batas {{amount}} dan meminta tambahan",
+      "usageLimitRaised": "<b>{{name}}</b> menaikkan batasmu bulan ini",
+      "usageLimitRefused": "<b>{{name}}</b> menolak permintaan tambahan pemakaianmu"
+    },
+    "usageLimit": {
+      "runs_other": "{{count}} permintaan bulan ini",
+      "top": "{{share}}% dengan {{agent}}",
+      "fromRole": "Batas peran {{role}}.",
+      "fromRaised": "Batas dinaikkan bulan ini.",
+      "fromPerson": "Batas khusus untuk orang ini.",
+      "fromDefault": "Batas bawaan workspace.",
+      "line": "{{runs}}. {{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3719,6 +3734,7 @@
         "credential_wrong_provider": "Modelnya dari {{modelProvider}}, tapi kuncinya dari {{keyProvider}}.",
         "model_unlisted": "OpenRouter tidak lagi menyediakan {{model}}. Pilih model lain di pengaturan agen.",
         "no_ai": "Agen belum punya AI yang terhubung.",
+        "person_limit": "Orang yang meminta sudah mencapai batas pemakaiannya bulan ini.",
         "org_paused": "Agen di ruang kerja ini sedang dijeda.",
         "org_suspended": "Ruang kerja tidak tersedia.",
         "org_deleting": "Ruang kerja sedang dihapus.",
@@ -5420,6 +5436,7 @@
       "agent_archived": "Agennya diarsipkan",
       "interrupted": "Terputus karena server dimulai ulang",
       "no_ai": "Agen ini belum terhubung ke AI",
+      "person_limit": "Tidak dijalankan: pembuatnya sudah mencapai batas pemakaian bulan ini",
       "org_paused": "Tidak jalan: agen ruang kerja sedang dijeda",
       "org_suspended": "Tidak jalan: ruang kerja tidak tersedia",
       "org_deleting": "Tidak jalan: ruang kerja sedang dihapus",
@@ -11142,7 +11159,7 @@
       "skills": "Instruksi Markdown yang dibuka agen saat dibutuhkan.",
       "keys": "Paketmu dan kunci API ruang kerja.",
       "storage": "Tempat file ruang kerja disimpan.",
-      "usage": "Anggaran dan pengeluaran tiap agen bulan ini.",
+      "usage": "Berapa banyak AI yang dipakai tiap orang dan tiap agen, dan batas bulan ini.",
       "audit": "Yang dilakukan agen di luar percakapan dan yang diubah orang. Hanya admin yang melihatnya.",
       "import": "Bawa agen dari aplikasi atau ruang kerja lain, dan bawa ruang kerja ini ke mana pun kamu mau.",
       "billing": "Paket agentes.chat, kartu, dan faktur ruang kerja ini ada di halaman kami, di luar aplikasi.",
@@ -11323,6 +11340,147 @@
         "jev": "Agen mengirim stiker sendiri hanya dengan Jev.",
         "jevLink": "Siapkan Jev"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "Ringkasan",
+      "people": "Orang",
+      "mine": "Pemakaianmu"
+    },
+    "view": {
+      "usage": "Pemakaian",
+      "limits": "Batas"
+    },
+    "title": "Pemakaian per orang",
+    "about": "Kamu melihat berapa banyak tiap orang memakai dan dengan agen mana. Isi percakapan pribadi tidak pernah muncul di sini.",
+    "plansAbout": "Paket sudah dibayar. Nilai ini hanya membandingkan pemakaian antarorang.",
+    "sub_other": "{{month}} · {{count}} orang · {{amount}} untuk AI",
+    "periodLabel": "Periode",
+    "period": {
+      "month": "Bulan ini",
+      "last7": "7 hari terakhir",
+      "last30": "30 hari terakhir",
+      "lastMonth": "Bulan lalu"
+    },
+    "role": "Peran",
+    "roleAll": "Peran: semua",
+    "agent": "Agen",
+    "agentAll": "Agen: semua",
+    "chips": {
+      "near": "Hampir batas",
+      "at": "Di batas",
+      "idle": "Tanpa pemakaian"
+    },
+    "summary": {
+      "near": "{{n}} hampir batas",
+      "at": "{{n}} di batas",
+      "idle": "{{n}} tanpa pemakaian di periode ini"
+    },
+    "export": "Ekspor CSV",
+    "limitsHint": "Atur batas per orang di Batas",
+    "empty": "Belum ada yang memakai agen bulan ini.",
+    "owner": "Pemilik",
+    "member": "Anggota",
+    "columns": {
+      "person": "Orang",
+      "now": "Sekarang",
+      "runs": "Permintaan",
+      "agents": "Paling sering",
+      "usage": "Bulan ini",
+      "caresFor": "Mengurus",
+      "created": "Dibuat"
+    },
+    "now": {
+      "channel": "Dengan {{agent}} di #{{channel}}",
+      "private": "Dalam percakapan pribadi dengan {{agent}}",
+      "hidden": "Dengan {{agent}} di kanal pribadi",
+      "routine": "Rutinitas {{name}}",
+      "last": "Terakhir dipakai {{when}}",
+      "never": "Tanpa pemakaian"
+    },
+    "meter": {
+      "of": "dari {{limit}}",
+      "noLimit": "· tanpa batas",
+      "estimate": "≈ {{amount}} lewat API"
+    },
+    "live": {
+      "title": "Sekarang",
+      "routineOf": "Rutinitas milik {{name}}"
+    },
+    "from": {
+      "raised": "dinaikkan bulan ini",
+      "person": "khusus untuk orang ini",
+      "role": "dari peran {{role}}",
+      "default": "bawaan workspace"
+    },
+    "drawer": {
+      "limit": "Batas bulan ini: {{amount}}",
+      "noLimit": "Tidak ada batas pemakaian bulan ini.",
+      "reached": "Mencapai batas pada {{date}} · {{used}} terpakai",
+      "used": "{{used}} terpakai · {{percent}}%",
+      "raise": "Naikkan batas",
+      "raiseTo": "Batas baru bulan ini dalam US$",
+      "raiseSave": "Naikkan",
+      "raised": "Batas dinaikkan untuk bulan ini",
+      "asked": "Meminta tambahan",
+      "days": "Pemakaian per hari",
+      "agents": "Dengan agen mana",
+      "runs_other": "{{count}} permintaan",
+      "recent": "Yang dikerjakan belakangan ini",
+      "untitled": "Tanpa judul",
+      "with": "dengan {{agent}}",
+      "minutes": "{{n}} mnt",
+      "private": "Percakapan pribadi dengan {{agent}}",
+      "hidden": "Di kanal pribadi dengan {{agent}}",
+      "routine": "Rutinitas {{name}}",
+      "created": "Agen yang dibuat",
+      "createdAt": "dibuat pada {{date}}",
+      "audit": "Lihat tindakan agen di Audit",
+      "noUse": "Tidak ada pemakaian di periode ini."
+    },
+    "limits": {
+      "title": "Batas pemakaian per orang",
+      "lead": "Berapa banyak AI yang boleh dipakai tiap orang per bulan, dari semua agen. Yang dihitung adalah permintaannya dan rutinitas yang ia buat.",
+      "default": "Bawaan workspace",
+      "defaultHint": "Berlaku untuk yang tidak punya batas dari peran atau pengecualian.",
+      "byRole": "Per peran",
+      "people": "Pengecualian",
+      "addPerson": "Tambah orang",
+      "useDefault": "Pakai bawaan",
+      "none": "Tanpa batas",
+      "amount": "Batas per bulan",
+      "rule": "Batas milik orang itu yang berlaku. Tanpanya, yang tertinggi dari perannya. Tanpa keduanya, bawaan. Pemilik tidak punya batas.",
+      "whenTitle": "Saat seseorang mencapai batas",
+      "block": "Agen berhenti memulai pekerjaan baru untuk orang itu",
+      "notify": "Hanya beri tahu admin",
+      "warn": "Peringatkan di 80%",
+      "warnHint": "Orang itu mendapat pemberitahuan, dan admin mendapat satu lagi di 100%.",
+      "saved": "Batas tersimpan"
+    },
+    "mine": {
+      "title": "Kamu sudah memakai {{percent}}% dari batasmu bulan ini",
+      "noLimit": "Kamu tidak punya batas pemakaian bulan ini",
+      "renews": "Diperbarui pada {{date}}.",
+      "near": "Hampir batas, minta tambahan ke admin.",
+      "recent": "Yang kamu kerjakan belakangan ini",
+      "ofLimit": "{{percent}}% dari batas"
+    },
+    "card": {
+      "title": "Kamu sudah mencapai batas pemakaianmu bulan ini",
+      "text": "Diperbarui pada {{date}}. Untuk lanjut sekarang, minta ke admin.",
+      "ask": "Minta tambahan",
+      "asked": "Permintaan terkirim",
+      "see": "Lihat pemakaianku",
+      "other": "{{name}} mencapai batas pemakaian bulan ini",
+      "raised": "{{name}} menaikkan batasmu bulan ini. Kamu bisa lanjut.",
+      "raisedOther": "{{name}} menaikkan batas bulan ini",
+      "refused": "{{name}} menolak permintaan itu. Batas diperbarui pada {{date}}."
+    },
+    "actions": {
+      "raise": "Naikkan ke {{amount}} bulan ini",
+      "refuse": "Tolak",
+      "see": "Lihat pemakaian"
     }
   },
   "usageViews": {
@@ -11866,6 +12024,7 @@
       "work_end_canceled": "Dihentikan setelah {{minutes}} menit.",
       "work_end_canceledBy": "Dihentikan oleh {{name}} setelah {{minutes}} menit.",
       "no_ai": "Aku belum bisa menjawab: aku belum punya AI yang terhubung.",
+      "person_limit": "Orang yang meminta sudah mencapai batas pemakaiannya bulan ini. Untuk lanjut sekarang, minta ke admin.",
       "no_ai_signed_out": "Aku belum bisa menjawab: AI-ku sudah keluar.",
       "no_ai_not_signed_in": "Aku belum bisa menjawab: {{brain}} belum masuk di komputerku.",
       "action_connect_ai": "Hubungkan AI",

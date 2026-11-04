@@ -60,6 +60,7 @@ import { CostlyProposalCardView } from "@/components/CostlyProposalCard";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
+import { PersonLimitCardView } from "@/components/PeopleUsage";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
 import { SettingsProposalCardView } from "@/components/RightHandCards";
 import { InstallSkillDialog, SkillSheet } from "@/components/Skills";
@@ -105,6 +106,7 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "settings_proposal") return <SettingsProposalCardView message={message} card={card} />;
   if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
   if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
+  if (card.kind === "person_limit") return <PersonLimitCardView message={message} card={card} />;
   if (card.kind === "connect_app") return <ConnectAppCardView card={card} />;
   if (card.kind === "invite_people") return <InviteCardView card={card} />;
   if (card.kind === "install_skill") return <InstallSkillCardView card={card} />;

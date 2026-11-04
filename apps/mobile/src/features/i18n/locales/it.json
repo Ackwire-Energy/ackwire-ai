@@ -864,6 +864,12 @@
       "change_request_one": "{{names}} chiede una modifica al team",
       "change_request_many": "{{names}} chiedono una modifica al team",
       "change_request_other": "{{names}} chiedono una modifica al team",
+      "usage_limit_warning": "Hai usato il {{percent}}% del tuo limite di questo mese",
+      "usage_limit_reached_notify": "Hai raggiunto il tuo limite di utilizzo di questo mese",
+      "usage_limit_reached": "{{names}} ha raggiunto il limite di {{amount}}",
+      "usage_limit_request": "{{names}} ha raggiunto il limite di {{amount}} e chiede di più",
+      "usage_limit_raised": "{{names}} ha alzato il tuo limite di questo mese",
+      "usage_limit_refused": "{{names}} ha rifiutato la tua richiesta di più utilizzo",
       "browser_profile_request_one": "{{names}} chiede un altro profilo del browser",
       "browser_profile_request_many": "{{names}} chiedono un altro profilo del browser",
       "browser_profile_request_other": "{{names}} chiedono un altro profilo del browser",
@@ -1280,7 +1286,8 @@
       "browser": "Browser",
       "secret": "Segreto",
       "join": "Membri",
-      "tools": "Strumenti"
+      "tools": "Strumenti",
+      "limit": "Limite"
     },
     "review": "Rivedi",
     "answer": "Rispondi",

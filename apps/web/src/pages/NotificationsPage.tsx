@@ -39,6 +39,7 @@ import {
   stepCells,
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
+import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { routineNotificationWords } from "@agenteschat/client/lib/routine-view";
 import { secretNoticeLine } from "@agenteschat/client/lib/secret-requests";
 import {
@@ -80,6 +81,7 @@ import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationHref, useNotificationOpener } from "@/components/NotificationOpen";
 import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
+import { UsageLimitActions } from "@/components/PeopleUsage";
 import { AllowTalkButton } from "@/components/ReachLines";
 import { ChangeRequestCard } from "@/components/RightHandCards";
 import { colorOf, prepareBurst } from "@/components/Sky";
@@ -627,11 +629,13 @@ function Row({
   const media = mediaKindOf(l.media);
   const text = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
-    : why
-      ? sayWords(t, why, l.text ?? "")
-      : media === "voice"
-        ? mediaWord(t, media)
-        : l.text || (media ? mediaWord(t, media) : l.text);
+    : n.kind === "usage_limit"
+      ? usageLimitLine(t, n)
+      : why
+        ? sayWords(t, why, l.text ?? "")
+        : media === "voice"
+          ? mediaWord(t, media)
+          : l.text || (media ? mediaWord(t, media) : l.text);
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -729,6 +733,7 @@ function Row({
                 <ChangeRequestCard n={n} />
               </div>
             )}
+            {n.kind === "usage_limit" && <UsageLimitActions n={n} />}
             {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
               <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
@@ -1094,6 +1099,7 @@ function WaitCard({
             <ChangeRequestCard n={n} />
           </div>
         )}
+        {n.kind === "usage_limit" && <UsageLimitActions n={n} />}
       </WaitRow>
     );
   let meta: ReactNode;
@@ -1331,7 +1337,9 @@ function WaitRow({
       ? null
       : n.kind === "secret_request"
         ? secretNoticeLine(n)
-        : (n.latest.title ?? n.latest.text);
+        : n.kind === "usage_limit"
+          ? usageLimitLine(t, n)
+          : (n.latest.title ?? n.latest.text);
   const l1 = useRef<HTMLDivElement>(null);
   const wraps = useWraps(l1);
   return (

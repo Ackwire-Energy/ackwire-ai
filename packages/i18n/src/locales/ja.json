@@ -2928,7 +2928,22 @@
       "changeRequestAgent": "<b>{{name}}</b>が新しいエージェントを依頼しています：<b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b>があなたの招待を受けて{{org}}に参加しました",
       "invitationAcceptedAny": "<b>{{name}}</b>があなたの招待を受けました",
-      "reaction_other": "<b>{{names}}</b>があなたのメッセージにリアクションしました"
+      "reaction_other": "<b>{{names}}</b>があなたのメッセージにリアクションしました",
+      "usageLimitWarning": "今月の上限の{{percent}}%を使いました",
+      "usageLimitReachedSelf": "今月の利用上限に達しました",
+      "usageLimitReached": "<b>{{name}}</b>さんが上限{{amount}}に達しました",
+      "usageLimitRequest": "<b>{{name}}</b>さんが上限{{amount}}に達し、追加を求めています",
+      "usageLimitRaised": "<b>{{name}}</b>さんが今月のあなたの上限を引き上げました",
+      "usageLimitRefused": "<b>{{name}}</b>さんが追加利用のリクエストを断りました"
+    },
+    "usageLimit": {
+      "runs_other": "今月{{count}}件のリクエスト",
+      "top": "{{agent}}で{{share}}%",
+      "fromRole": "ロール{{role}}の上限です。",
+      "fromRaised": "今月、上限が引き上げられました。",
+      "fromPerson": "この人に個別に設定された上限です。",
+      "fromDefault": "ワークスペースの既定の上限です。",
+      "line": "{{runs}}。{{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3706,6 +3721,7 @@
         "credential_wrong_provider": "モデルは{{modelProvider}}のものですが、キーは{{keyProvider}}のものです。",
         "model_unlisted": "OpenRouterでは{{model}}が提供されなくなりました。エージェントの設定で別のモデルを選んでください。",
         "no_ai": "エージェントにAIが接続されていません。",
+        "person_limit": "依頼した人が今月の利用上限に達しました。",
         "org_paused": "ワークスペースのエージェントは一時停止中です。",
         "org_suspended": "ワークスペースは利用できません。",
         "org_deleting": "ワークスペースは削除中です。",
@@ -5385,6 +5401,7 @@
       "agent_archived": "エージェントがアーカイブされました",
       "interrupted": "サーバーの再起動で中断されました",
       "no_ai": "エージェントにAIが接続されていません",
+      "person_limit": "実行されませんでした: 作成者が今月の利用上限に達しました",
       "org_paused": "実行されませんでした: ワークスペースのエージェントが一時停止されていました",
       "org_suspended": "実行されませんでした: ワークスペースが利用できませんでした",
       "org_deleting": "実行されませんでした: ワークスペースが削除中でした",
@@ -11076,7 +11093,7 @@
       "skills": "エージェントが必要なときに開くMarkdownの指示。",
       "keys": "あなたのプランと、ワークスペースのAPIキー。",
       "storage": "ワークスペースのファイルの保存先。",
-      "usage": "予算と、今月各エージェントが使った金額。",
+      "usage": "各メンバーと各エージェントのAI利用量と、今月の上限。",
       "audit": "エージェントが会話の外で行ったことと、人が変更したこと。管理者だけが閲覧できます。",
       "import": "ほかのアプリやワークスペースからエージェントを取り込んだり、このワークスペースを好きな場所へ持ち出したりできます。",
       "billing": "このワークスペースのagentes.chatのプラン、カード、請求書は、アプリ外の専用ページにあります。",
@@ -11257,6 +11274,147 @@
         "jev": "エージェントが自分からステッカーを送るのは、Jevを使っている場合だけです。",
         "jevLink": "Jevを設定"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "概要",
+      "people": "メンバー",
+      "mine": "あなたの利用"
+    },
+    "view": {
+      "usage": "利用",
+      "limits": "上限"
+    },
+    "title": "メンバー別の利用",
+    "about": "各メンバーがどれだけ、どのエージェントで使っているかを確認できます。プライベートな会話の内容はここに表示されません。",
+    "plansAbout": "プランは支払い済みです。この金額はメンバー間の利用を比べるためだけのものです。",
+    "sub_other": "{{month}} · {{count}}人 · AIに{{amount}}",
+    "periodLabel": "期間",
+    "period": {
+      "month": "今月",
+      "last7": "過去7日間",
+      "last30": "過去30日間",
+      "lastMonth": "先月"
+    },
+    "role": "ロール",
+    "roleAll": "ロール: すべて",
+    "agent": "エージェント",
+    "agentAll": "エージェント: すべて",
+    "chips": {
+      "near": "上限に近い",
+      "at": "上限に到達",
+      "idle": "利用なし"
+    },
+    "summary": {
+      "near": "上限に近い: {{n}}",
+      "at": "上限に到達: {{n}}",
+      "idle": "期間中の利用なし: {{n}}"
+    },
+    "export": "CSVを書き出す",
+    "limitsHint": "上限でメンバーごとの上限を設定",
+    "empty": "今月はまだ誰もエージェントを使っていません。",
+    "owner": "オーナー",
+    "member": "メンバー",
+    "columns": {
+      "person": "メンバー",
+      "now": "いま",
+      "runs": "リクエスト",
+      "agents": "よく使う",
+      "usage": "今月",
+      "caresFor": "担当",
+      "created": "作成"
+    },
+    "now": {
+      "channel": "#{{channel}}で{{agent}}と",
+      "private": "{{agent}}とプライベートな会話中",
+      "hidden": "プライベートチャンネルで{{agent}}と",
+      "routine": "ルーティン {{name}}",
+      "last": "最終利用 {{when}}",
+      "never": "利用なし"
+    },
+    "meter": {
+      "of": "/ {{limit}}",
+      "noLimit": "· 上限なし",
+      "estimate": "API換算で≈ {{amount}}"
+    },
+    "live": {
+      "title": "いま",
+      "routineOf": "{{name}}さんのルーティン"
+    },
+    "from": {
+      "raised": "今月引き上げ",
+      "person": "この人に個別設定",
+      "role": "ロール{{role}}から",
+      "default": "ワークスペースの既定"
+    },
+    "drawer": {
+      "limit": "今月の上限: {{amount}}",
+      "noLimit": "今月は利用上限がありません。",
+      "reached": "{{date}}に上限に到達 · {{used}}使用",
+      "used": "{{used}}使用 · {{percent}}%",
+      "raise": "上限を引き上げる",
+      "raiseTo": "今月の新しい上限 (US$)",
+      "raiseSave": "引き上げる",
+      "raised": "今月の上限を引き上げました",
+      "asked": "追加を依頼済み",
+      "days": "日ごとの利用",
+      "agents": "使ったエージェント",
+      "runs_other": "{{count}}件のリクエスト",
+      "recent": "最近の作業",
+      "untitled": "無題",
+      "with": "{{agent}}と",
+      "minutes": "{{n}}分",
+      "private": "{{agent}}とのプライベートな会話",
+      "hidden": "プライベートチャンネルで{{agent}}と",
+      "routine": "ルーティン {{name}}",
+      "created": "作成したエージェント",
+      "createdAt": "{{date}}に作成",
+      "audit": "監査でエージェントの操作を見る",
+      "noUse": "この期間の利用はありません。"
+    },
+    "limits": {
+      "title": "メンバーごとの利用上限",
+      "lead": "各メンバーが1か月に使えるAIの量で、すべてのエージェントの合計です。本人の依頼と、本人が作成したルーティンが含まれます。",
+      "default": "ワークスペースの既定",
+      "defaultHint": "ロールや例外による上限がない人に適用されます。",
+      "byRole": "ロール別",
+      "people": "例外",
+      "addPerson": "メンバーを追加",
+      "useDefault": "既定を使う",
+      "none": "上限なし",
+      "amount": "月の上限",
+      "rule": "本人の上限が優先されます。ない場合はロールのうち最も高いもの。どちらもない場合は既定です。オーナーには上限がありません。",
+      "whenTitle": "上限に達したとき",
+      "block": "その人のための新しい作業をエージェントが始めなくなる",
+      "notify": "管理者に知らせるだけ",
+      "warn": "80%で知らせる",
+      "warnHint": "本人に通知が届き、100%で管理者にも通知が届きます。",
+      "saved": "上限を保存しました"
+    },
+    "mine": {
+      "title": "今月の上限の{{percent}}%を使いました",
+      "noLimit": "今月は利用上限がありません",
+      "renews": "{{date}}に更新されます。",
+      "near": "上限が近いので、管理者に追加を依頼してください。",
+      "recent": "最近の作業",
+      "ofLimit": "上限の{{percent}}%"
+    },
+    "card": {
+      "title": "今月の利用上限に達しました",
+      "text": "{{date}}に更新されます。今すぐ続けるには管理者に依頼してください。",
+      "ask": "追加を依頼",
+      "asked": "依頼しました",
+      "see": "自分の利用を見る",
+      "other": "{{name}}さんが今月の利用上限に達しました",
+      "raised": "{{name}}さんが今月の上限を引き上げました。続けられます。",
+      "raisedOther": "{{name}}さんが今月の上限を引き上げました",
+      "refused": "{{name}}さんが依頼を断りました。上限は{{date}}に更新されます。"
+    },
+    "actions": {
+      "raise": "今月{{amount}}に引き上げる",
+      "refuse": "断る",
+      "see": "利用を見る"
     }
   },
   "usageViews": {
@@ -11800,6 +11958,7 @@
       "work_end_canceled": "{{minutes}}分後に停止しました。",
       "work_end_canceledBy": "{{minutes}}分後に{{name}}が停止しました。",
       "no_ai": "まだ返信できません。AIが接続されていません。",
+      "person_limit": "依頼した人が今月の利用上限に達しました。今すぐ続けるには管理者に依頼してください。",
       "no_ai_signed_out": "まだ返信できません。AIがログアウトされています。",
       "no_ai_not_signed_in": "まだ返信できません。私のコンピューターで{{brain}}にログインしていません。",
       "action_connect_ai": "AIを接続",

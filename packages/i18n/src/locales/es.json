@@ -3138,7 +3138,24 @@
       "invitationAcceptedAny": "<b>{{name}}</b> aceptó tu invitación",
       "reaction_one": "<b>{{names}}</b> reaccionó a tu mensaje",
       "reaction_many": "<b>{{names}}</b> reaccionaron a tu mensaje",
-      "reaction_other": "<b>{{names}}</b> reaccionaron a tu mensaje"
+      "reaction_other": "<b>{{names}}</b> reaccionaron a tu mensaje",
+      "usageLimitWarning": "Usaste el {{percent}} % de tu límite de este mes",
+      "usageLimitReachedSelf": "Llegaste a tu límite de uso de este mes",
+      "usageLimitReached": "<b>{{name}}</b> llegó al límite de {{amount}}",
+      "usageLimitRequest": "<b>{{name}}</b> llegó al límite de {{amount}} y pide más",
+      "usageLimitRaised": "<b>{{name}}</b> subió tu límite de este mes",
+      "usageLimitRefused": "<b>{{name}}</b> rechazó tu pedido de más uso"
+    },
+    "usageLimit": {
+      "runs_one": "{{count}} pedido este mes",
+      "runs_many": "{{count}} pedidos este mes",
+      "runs_other": "{{count}} pedidos este mes",
+      "top": "{{share}} % con {{agent}}",
+      "fromRole": "Límite del rol {{role}}.",
+      "fromRaised": "Límite subido este mes.",
+      "fromPerson": "Un límite definido para esta persona.",
+      "fromDefault": "El límite predeterminado del workspace.",
+      "line": "{{runs}}. {{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3978,6 +3995,7 @@
         "credential_wrong_provider": "El modelo es de {{modelProvider}}, pero la clave es de {{keyProvider}}.",
         "model_unlisted": "OpenRouter ya no ofrece {{model}}. Elige otro modelo en la configuración del agente.",
         "no_ai": "El agente no tiene una IA conectada.",
+        "person_limit": "Quien pidió llegó a su límite de uso de este mes.",
         "org_paused": "Los agentes del espacio de trabajo están en pausa.",
         "org_suspended": "El espacio de trabajo no está disponible.",
         "org_deleting": "El espacio de trabajo se está eliminando.",
@@ -5744,6 +5762,7 @@
       "agent_archived": "El agente se archivó",
       "interrupted": "Interrumpida por un reinicio del servidor",
       "no_ai": "El agente no tiene IA conectada",
+      "person_limit": "No se ejecutó: quien la creó llegó a su límite de uso de este mes",
       "org_paused": "No se ejecutó: los agentes del espacio de trabajo estaban en pausa",
       "org_suspended": "No se ejecutó: el espacio de trabajo no estaba disponible",
       "org_deleting": "No se ejecutó: el espacio de trabajo se estaba eliminando",
@@ -11873,7 +11892,7 @@
       "skills": "Instrucciones en Markdown que los agentes abren cuando las necesitan.",
       "keys": "Tus planes y las claves de API del espacio de trabajo.",
       "storage": "Dónde viven los archivos del espacio de trabajo.",
-      "usage": "Presupuestos y lo que gastó cada agente este mes.",
+      "usage": "Cuánta IA usa cada persona y cada agente, y los límites del mes.",
       "audit": "Lo que hicieron los agentes fuera de la conversación y lo que cambiaron las personas. Solo lo ven los admins.",
       "import": "Trae agentes de otra app o espacio de trabajo, y lleva este adonde quieras.",
       "billing": "El plan de agentes.chat, la tarjeta y las facturas de este espacio de trabajo están en una página nuestra, fuera de la app.",
@@ -12072,6 +12091,151 @@
         "jev": "Los agentes envían stickers por su cuenta solo con Jev.",
         "jevLink": "Configurar Jev"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "Resumen",
+      "people": "Personas",
+      "mine": "Tu uso"
+    },
+    "view": {
+      "usage": "Uso",
+      "limits": "Límites"
+    },
+    "title": "Uso por persona",
+    "about": "Ves cuánto usa cada persona y con qué agentes. Lo que dicen las conversaciones privadas nunca aparece aquí.",
+    "plansAbout": "El plan ya está pagado. Este valor solo compara el uso entre personas.",
+    "sub_one": "{{month}} · {{count}} persona · {{amount}} de IA",
+    "sub_many": "{{month}} · {{count}} personas · {{amount}} de IA",
+    "sub_other": "{{month}} · {{count}} personas · {{amount}} de IA",
+    "periodLabel": "Período",
+    "period": {
+      "month": "Este mes",
+      "last7": "Últimos 7 días",
+      "last30": "Últimos 30 días",
+      "lastMonth": "Mes pasado"
+    },
+    "role": "Rol",
+    "roleAll": "Rol: todos",
+    "agent": "Agente",
+    "agentAll": "Agente: todos",
+    "chips": {
+      "near": "Cerca del límite",
+      "at": "En el límite",
+      "idle": "Sin uso"
+    },
+    "summary": {
+      "near": "{{n}} cerca del límite",
+      "at": "{{n}} en el límite",
+      "idle": "{{n}} sin uso en el período"
+    },
+    "export": "Exportar CSV",
+    "limitsHint": "Define un límite por persona en Límites",
+    "empty": "Nadie usó agentes este mes todavía.",
+    "owner": "Dueño",
+    "member": "Miembro",
+    "columns": {
+      "person": "Persona",
+      "now": "Ahora",
+      "runs": "Pedidos",
+      "agents": "Más usó",
+      "usage": "Este mes",
+      "caresFor": "Cuida de",
+      "created": "Creó"
+    },
+    "now": {
+      "channel": "Con {{agent}} en #{{channel}}",
+      "private": "En una conversación privada con {{agent}}",
+      "hidden": "Con {{agent}} en un canal privado",
+      "routine": "Rutina {{name}}",
+      "last": "Último uso {{when}}",
+      "never": "Sin uso"
+    },
+    "meter": {
+      "of": "de {{limit}}",
+      "noLimit": "· sin límite",
+      "estimate": "≈ {{amount}} por la API"
+    },
+    "live": {
+      "title": "Ahora",
+      "routineOf": "Rutina de {{name}}"
+    },
+    "from": {
+      "raised": "subido este mes",
+      "person": "definido para la persona",
+      "role": "del rol {{role}}",
+      "default": "predeterminado del workspace"
+    },
+    "drawer": {
+      "limit": "Límite de este mes: {{amount}}",
+      "noLimit": "Sin límite de uso este mes.",
+      "reached": "Llegó al límite el {{date}} · {{used}} usados",
+      "used": "{{used}} usados · {{percent}} %",
+      "raise": "Subir límite",
+      "raiseTo": "Nuevo límite de este mes en US$",
+      "raiseSave": "Subir",
+      "raised": "Límite subido para este mes",
+      "asked": "Pidió más",
+      "days": "Uso por día",
+      "agents": "Con qué agentes",
+      "runs_one": "{{count}} pedido",
+      "runs_many": "{{count}} pedidos",
+      "runs_other": "{{count}} pedidos",
+      "recent": "Lo que hizo últimamente",
+      "untitled": "Sin título",
+      "with": "con {{agent}}",
+      "minutes": "{{n}} min",
+      "private": "Conversación privada con {{agent}}",
+      "hidden": "En un canal privado con {{agent}}",
+      "routine": "Rutina {{name}}",
+      "created": "Agentes que creó",
+      "createdAt": "creado el {{date}}",
+      "audit": "Ver las acciones de los agentes en Auditoría",
+      "noUse": "Ningún uso en este período."
+    },
+    "limits": {
+      "title": "Límite de uso por persona",
+      "lead": "Cuánta IA puede usar cada persona por mes, sumando todos los agentes. Cuenta lo que pide y las rutinas que creó.",
+      "default": "Predeterminado del workspace",
+      "defaultHint": "Vale para quien no tiene límite por rol ni excepción.",
+      "byRole": "Por rol",
+      "people": "Excepciones",
+      "addPerson": "Agregar persona",
+      "useDefault": "Usar el predeterminado",
+      "none": "Sin límite",
+      "amount": "Límite por mes",
+      "rule": "Vale el límite de la persona. Sin él, el mayor entre sus roles. Sin ninguno, el predeterminado. Los dueños no tienen límite.",
+      "whenTitle": "Cuando alguien llega al límite",
+      "block": "Los agentes dejan de empezar trabajo nuevo para esa persona",
+      "notify": "Solo avisar a los admins",
+      "warn": "Avisar al 80 %",
+      "warnHint": "La persona recibe un aviso, y los admins reciben otro al 100 %.",
+      "saved": "Límites guardados"
+    },
+    "mine": {
+      "title": "Usaste el {{percent}} % de tu límite de este mes",
+      "noLimit": "No tienes límite de uso este mes",
+      "renews": "Se renueva el {{date}}.",
+      "near": "Cerca del límite, pide más a un admin.",
+      "recent": "Lo que hiciste últimamente",
+      "ofLimit": "{{percent}} % del límite"
+    },
+    "card": {
+      "title": "Llegaste a tu límite de uso de este mes",
+      "text": "Se renueva el {{date}}. Para seguir ahora, pide a un admin.",
+      "ask": "Pedir más",
+      "asked": "Pedido enviado",
+      "see": "Ver mi uso",
+      "other": "{{name}} llegó al límite de uso de este mes",
+      "raised": "{{name}} subió tu límite de este mes. Puedes seguir.",
+      "raisedOther": "{{name}} subió el límite de este mes",
+      "refused": "{{name}} rechazó el pedido. El límite se renueva el {{date}}."
+    },
+    "actions": {
+      "raise": "Subir a {{amount}} este mes",
+      "refuse": "Rechazar",
+      "see": "Ver el uso"
     }
   },
   "usageViews": {
@@ -12637,6 +12801,7 @@
       "work_end_canceled": "Detenido después de {{minutes}} min.",
       "work_end_canceledBy": "Detenido por {{name}} después de {{minutes}} min.",
       "no_ai": "Todavía no puedo responder: no tengo una IA conectada.",
+      "person_limit": "Quien pidió llegó a su límite de uso de este mes. Para seguir ahora, pide a un admin.",
       "no_ai_signed_out": "Todavía no puedo responder: mi IA tiene la sesión cerrada.",
       "no_ai_not_signed_in": "Todavía no puedo responder: {{brain}} no tiene la sesión iniciada en mi computadora.",
       "action_connect_ai": "Conectar una IA",

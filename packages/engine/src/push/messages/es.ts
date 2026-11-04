@@ -47,4 +47,13 @@ export const strings: Partial<PushStrings> = {
   sentGif: "Envió un GIF",
   sentSticker: "Envió un sticker",
   sentVoice: "Envió un mensaje de voz",
+  usageWarningTitle: (p) => `Usaste el ${p}% de tu límite de este mes`,
+  usageReachedMineTitle: "Llegaste a tu límite de uso de este mes",
+  usageMineBody: "Toca para ver tu uso.",
+  usageReachedTitle: (a) => `${a} llegó a su límite de uso de este mes`,
+  usageRequestTitle: (a) => `${a} pidió más uso este mes`,
+  usageRequestBody: "Toca para subir el límite o rechazar.",
+  usageRaisedTitle: (a) => `${a} subió tu límite de este mes`,
+  usageRaisedBody: "Puedes seguir.",
+  usageRefusedTitle: (a) => `${a} rechazó tu pedido de más uso`,
 };

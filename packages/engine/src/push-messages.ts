@@ -49,6 +49,9 @@ export interface PushTextInput {
   screen?: string | null;
   /** `browser_handoff` still unanswered an hour later: the title says the agent still needs them. */
   reminder?: boolean;
+  /** `usage_limit`: what happened (`latest.statusTo`) and the share of the limit used. */
+  status?: string | null;
+  percent?: number | null;
 }
 
 const clip = (s: string, max: number) => {
@@ -139,6 +142,22 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       if (by) return out(s.joinSuggestionTitle(by, who, input.label?.trim() || ""), s.joinRequestBody);
       return out(s.joinRequestTitle(who, input.label?.trim() || ""), s.joinRequestBody);
     }
+    case "usage_limit":
+      // Percentages only for the person; who decides reads the person's name (ADR 0141).
+      switch (input.status) {
+        case "warning":
+          return out(s.usageWarningTitle(Math.round(input.percent ?? 80)), s.usageMineBody);
+        case "reached_notify":
+          return out(s.usageReachedMineTitle, s.usageMineBody);
+        case "reached":
+          return out(s.usageReachedTitle(actor), s.openBody);
+        case "request":
+          return out(s.usageRequestTitle(actor), s.usageRequestBody);
+        case "raised":
+          return out(s.usageRaisedTitle(actor), s.usageRaisedBody);
+        default:
+          return out(s.usageRefusedTitle(actor), s.openBody);
+      }
     default:
       return out(input.waiting ? s.waitingTitle : actor, text || what || s.openBody);
   }

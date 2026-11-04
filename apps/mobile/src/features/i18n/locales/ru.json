@@ -921,6 +921,12 @@
       "change_request_few": "{{names}} просят изменить команду",
       "change_request_many": "{{names}} просят изменить команду",
       "change_request_other": "{{names}} просят изменить команду",
+      "usage_limit_warning": "Вы использовали {{percent}}% своего лимита в этом месяце",
+      "usage_limit_reached_notify": "Вы достигли лимита использования в этом месяце",
+      "usage_limit_reached": "{{names}}: лимит {{amount}} исчерпан",
+      "usage_limit_request": "{{names}}: лимит {{amount}} исчерпан, просит больше",
+      "usage_limit_raised": "{{names}} повышает ваш лимит на этот месяц",
+      "usage_limit_refused": "{{names}} отклоняет вашу просьбу о большем использовании",
       "browser_profile_request_one": "{{names}} просит ещё один профиль браузера",
       "browser_profile_request_few": "{{names}} просят ещё один профиль браузера",
       "browser_profile_request_many": "{{names}} просят ещё один профиль браузера",
@@ -1351,7 +1357,8 @@
       "browser": "Браузер",
       "secret": "Секрет",
       "join": "Участники",
-      "tools": "Инструменты"
+      "tools": "Инструменты",
+      "limit": "Лимит"
     },
     "review": "Проверить",
     "answer": "Ответить",
