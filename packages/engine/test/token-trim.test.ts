@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, typingTopic } from "@agenteschat/adapters";
 import { asc, eq, schema } from "@agenteschat/db";
-import { createAnthropicProvider, type ModelRequest, systemText } from "@agenteschat/providers";
+import { createAnthropicProvider, type ModelMessage, type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
   type BrainTurn,
@@ -9,13 +9,16 @@ import {
   computerPrompt,
   createAgent,
   createBlockToolSource,
+  createContextToolSource,
   createJobHandlers,
   createWorkToolSource,
   drainOutbox,
   EVERY_TOOL,
+  flattenContent,
   getMessage,
   grantScopes,
   historyStart,
+  insertMessage,
   type MachineStatus,
   type Message,
   openDm,
@@ -25,6 +28,7 @@ import {
   toTurns,
 } from "../src";
 import { TYPING_GRACE_MS, typingLogFor, waitForBurst } from "../src/burst";
+import { cutOldToolSteps, KEEP_TOOL_STEPS } from "../src/context-budget";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -247,6 +251,177 @@ test("B9: long messages before the last eight read cut, with the id expand reope
     .flatMap((m) => (typeof m.content === "string" ? [] : m.content))
     .flatMap((b) => (b.type === "tool_result" ? [b.content] : []));
   expect(results).toEqual([long.trim()]);
+});
+
+/** A run's transcript of `steps` tool steps, each a large log read (an error and a question's answer among them). */
+const toolRun = (steps: number): ModelMessage[] => [
+  { role: "user", content: "[Ana]: @dev por que o deploy falhou?" },
+  ...Array.from({ length: steps }, (_, i): ModelMessage[] => {
+    const name = i === 1 ? "ask_user" : i === 3 ? "load_skill" : "read_log";
+    return [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: `Lendo a parte ${i}.` },
+          { type: "tool_use", id: `toolu_${i}`, name, input: { page: i, note: "x".repeat(i === 0 ? 2000 : 10) } },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            toolUseId: `toolu_${i}`,
+            content: `${i === 1 ? "Ana answered: " : ""}linha ${i} `.repeat(400),
+            ...(i === 2 ? { isError: true } : {}),
+          },
+        ],
+      },
+    ];
+  }).flat(),
+];
+const withExpand = [{ name: "expand" }, { name: "read_log" }];
+
+test("B12: old tool calls and results read cut, reopened by expand; the last steps, errors and answers whole", () => {
+  const steps = 14;
+  const run = toolRun(steps);
+  const cut = cutOldToolSteps(run, withExpand);
+  const text = JSON.stringify(cut);
+  // The first eight steps cut (an anchor), the last six whole.
+  for (let i = 0; i < steps; i++) {
+    const old = i < 8 && i !== 1 && i !== 2 && i !== 3;
+    expect(text.includes(`expand toolu_${i} reopens it whole`), `step ${i}`).toBe(old);
+  }
+  expect(text).toContain("expand toolu_0 reopens the call");
+  // An error and a person's answer stay whole however old; so does every text people and the agent wrote.
+  expect(text).toContain(JSON.stringify(`Ana answered: linha 1 `.repeat(400)));
+  expect(text).toContain(JSON.stringify(`linha 2 `.repeat(400)));
+  expect(text).toContain(JSON.stringify(`linha 3 `.repeat(400)));
+  expect(text).toContain("[Ana]: @dev por que o deploy falhou?");
+  for (let i = 0; i < steps; i++) expect(text).toContain(`Lendo a parte ${i}.`);
+  // Byte-stable: two builds of the same history give the same bytes, and the input is left as it was.
+  expect(JSON.stringify(cutOldToolSteps(structuredClone(run), withExpand))).toBe(text);
+  expect(JSON.stringify(run)).not.toContain("reopens it whole");
+  // The last KEEP_TOOL_STEPS are never cut, and the cut moves at anchors: few changes as the run grows.
+  let moved = 0;
+  for (let k = 1; k <= 30; k++) {
+    const seen = cutOldToolSteps(toolRun(k), withExpand);
+    const shown = JSON.stringify(seen);
+    for (let i = k - KEEP_TOOL_STEPS; i < k; i++) if (i >= 0) expect(shown).not.toContain(`toolu_${i} reopens`);
+    const before = JSON.stringify(cutOldToolSteps(toolRun(k - 1), withExpand));
+    if (k > 1 && !shown.startsWith(before.slice(0, -1))) moved++;
+  }
+  expect(moved).toBeLessThanOrEqual(7);
+  // Without expand, nothing is cut.
+  expect(cutOldToolSteps(run, [{ name: "read_log" }])).toBe(run);
+  const size = (m: ModelMessage[]) => JSON.stringify(m).length;
+  const flat = (m: ModelMessage[]) =>
+    computerPrompt({
+      messages: m.map((x) => ({ role: x.role, content: flattenContent(x.content) })),
+      trigger: "",
+    } as unknown as BrainTurn).length;
+  console.log(
+    `B12, ${steps} steps of 3.6k-character results: API messages ${size(run)} -> ${size(cut)} chars; computer prompt ${flat(run)} -> ${flat(cut)}`,
+  );
+  expect(size(cut)).toBeLessThan(size(run) * 0.8);
+});
+
+test("B12: an agent that needs a cut tool result calls expand and reads it whole", async () => {
+  const log = (i: number) => `log ${i}: ${"erro de conexão ".repeat(300)}`;
+  const reads = 9;
+  f = await setup({
+    contextTools: true,
+    toolSources: [
+      {
+        name: "logs",
+        tools: async () => [
+          {
+            name: "read_log",
+            description: "Read a deploy log page.",
+            inputSchema: { type: "object", properties: { page: { type: "number" } }, additionalProperties: false },
+            scope: "context:read",
+            execute: async (input) => ({ content: log(Number(input.page)) }),
+          },
+        ],
+      },
+    ],
+    reply: (_r, n) =>
+      n <= reads
+        ? { chunks: [], toolUses: [{ id: `toolu_read_${n}`, name: "read_log", input: { page: n } }] }
+        : n === reads + 1
+          ? { chunks: [], toolUses: [{ id: "toolu_expand", name: "expand", input: { item_id: "toolu_read_1" } }] }
+          : { chunks: ["ok"] },
+  });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev lê os logs",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const calls = agentCalls(f);
+  const results = (r: ModelRequest) =>
+    r.messages
+      .flatMap((m) => (typeof m.content === "string" ? [] : m.content))
+      .flatMap((b) => (b.type === "tool_result" ? [b] : []));
+  // What the expand call saw: the first read cut, with its id.
+  const before = calls.at(-2) as ModelRequest;
+  expect(results(before)[0]?.content).toContain("expand toolu_read_1 reopens it whole");
+  const last = calls.at(-1) as ModelRequest;
+  const reopened = results(last).find((b) => b.toolUseId === "toolu_expand");
+  expect(reopened?.content).toBe(`Tool call read_log {"page":1}\n\nResult:\n${log(1)}`);
+  // The run's transcript keeps every result whole; the request reads the old ones cut.
+  const [row] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id));
+  const kept = (row?.transcript as { messages: ModelMessage[] } | undefined)?.messages.slice(0, last.messages.length);
+  expect(JSON.stringify(kept)).not.toContain("reopens it whole");
+  console.log(
+    `B12, ${reads} log reads and an expand: messages ${JSON.stringify(kept).length} -> ${JSON.stringify(last.messages).length} chars`,
+  );
+});
+
+test("B12: expand reopens a cut call from an earlier run of the same computer session, never another session's", async () => {
+  f = await setup({ contextTools: true });
+  const runOf = async (session: string, messages: ModelMessage[]): Promise<ToolContext> => {
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "@dev lê os logs",
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: said.id,
+        triggerMessageId: said.id,
+        trigger: "mention",
+        hop: 1,
+        status: "running",
+        brainSessionId: session,
+        transcript: { messages },
+      })
+      .returning();
+    if (!run) throw new Error("no run");
+    return {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: said.id,
+      triggerMessageId: said.id,
+    };
+  };
+  await runOf("session-a", toolRun(9));
+  const later = await runOf("session-a", toolRun(0));
+  const other = await runOf("session-b", toolRun(0));
+  const expand = async (ctx: ToolContext) => {
+    const tool = (await createContextToolSource(f.context).tools(ctx)).find((t) => t.name === "expand");
+    return tool?.execute({ item_id: "toolu_4" }, ctx);
+  };
+  expect((await expand(later))?.content).toBe(
+    `Tool call read_log {"note":"xxxxxxxxxx","page":4}\n\nResult:\n${"linha 4 ".repeat(400)}`,
+  );
+  expect(await expand(other)).toMatchObject({ isError: true, content: "Not found." });
 });
 
 test("B10: during the quiet window the first call's prompt is pre-warmed: the same request with no output", async () => {

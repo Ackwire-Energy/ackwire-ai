@@ -96,7 +96,7 @@ Beyond this, you can't. Never say you did or can do something that isn't on this
   ],
   "tools": [
     {
-      "description": "Open a context item by id: its full content and the sources it came from (also archived items). Also a message of the conversation shown cut short, by the id its cut names.",
+      "description": "Open a context item by id: its full content and the sources it came from (also archived items). Also a message of the conversation, or a tool call or result of this run, shown cut short, by the id its cut names.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {

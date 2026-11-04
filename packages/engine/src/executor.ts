@@ -130,8 +130,8 @@ import {
 import { recordContextUse } from "./context/feedback";
 import { afterTurnDone, learnTags, reportLearnFailure } from "./context/learn";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
-import { itemLabel, retrieveForRun } from "./context/tools";
-import { dropOldImages, fitContextWindow } from "./context-budget";
+import { EXPAND_TOOL, itemLabel, retrieveForRun } from "./context/tools";
+import { compactToolResults, cutOldToolSteps, dropOldImages, fitContextWindow } from "./context-budget";
 import {
   advance as advanceContinuation,
   type ContinuationState,
@@ -1793,7 +1793,7 @@ async function executeRunInner(
         skills: skillList,
         // Granted: `find_agent` is on demand (token-trim B3), and "# Your team" stays.
         team: granted.some((t) => t.name === FIND_AGENT_TOOL),
-        expand: tools.some((t) => t.name === "expand"),
+        expand: tools.some((t) => t.name === EXPAND_TOOL),
         // Granted is enough: on demand (ADR 0043) it is one `use_tool` away.
         issueTools: granted.some((t) => t.name === UPDATE_ISSUE_TOOL),
         trigger,
@@ -3589,12 +3589,13 @@ async function executeRunInner(
           limitTokens: agent.contextTokens,
           maxOutputTokens: deps.maxOutputTokens,
           system: transcript.system,
-          messages: transcript.messages,
+          // Measured as the model reads it: results the view already cuts stay reachable by `expand`.
+          messages: cutOldToolSteps(transcript.messages, turnTools),
           tools: turnTools,
           task: triggerText,
         }).catch(() => null);
         if (fitted) {
-          transcript.messages = fitted.messages;
+          transcript.messages = compactToolResults(transcript.messages, fitted.removed);
           await saveTranscript(db, transcript);
           const report = fitted.report;
           later(() => addRunStep(db, run, "context", { contextBudget: report }));
@@ -4562,7 +4563,7 @@ function brainTurnOf(
       return turnParts()?.found || undefined;
     },
     get messages() {
-      return t.messages.map((m) => ({ role: m.role, content: flattenContent(m.content) }));
+      return cutOldToolSteps(t.messages, tools).map((m) => ({ role: m.role, content: flattenContent(m.content) }));
     },
     tools: tools.map((d) => (isStableTool(d) ? { ...brainToolOf(d), stable: true } : brainToolOf(d))),
     ...(model ? { model } : {}),
@@ -4580,7 +4581,7 @@ const startAgain = (code: Promise<CodeSetup | null>, turn: Parameters<typeof cod
   code.then((c) => (c?.pick ? { ...c, ...codeStart(c.pick, turn) } : c));
 
 /** A message as plain text for brains that take text: tool calls and results inline, provider blocks dropped. */
-const flattenContent = (content: string | ContentBlock[]): string =>
+export const flattenContent = (content: string | ContentBlock[]): string =>
   typeof content === "string"
     ? content
     : content
