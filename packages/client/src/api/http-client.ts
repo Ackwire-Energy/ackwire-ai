@@ -104,6 +104,7 @@ import type {
   Issue,
   IssueActivity,
   IssueColumn,
+  IssueConversationRef,
   IssuesView,
   JevKey,
   JoinApproval,
@@ -1251,6 +1252,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       askAgent: (orgId, id, agentId) =>
         request<Issue>(`${org(orgId)}/issues/${enc(id)}/ask-agent`, { json: { agentId } }),
+      conversation: (orgId, id) =>
+        request<IssueConversationRef>(`${org(orgId)}/issues/${enc(id)}/conversation`, { method: "POST" }),
       columns: async (orgId) => (await request<{ columns: IssueColumn[] }>(`${org(orgId)}/issue-columns`)).columns,
       addColumn: async (orgId, input) =>
         (await request<{ columns: IssueColumn[] }>(`${org(orgId)}/issue-columns`, { json: input })).columns,

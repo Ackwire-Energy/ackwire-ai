@@ -469,9 +469,13 @@ test("issues: assigned (resolved when unassigned), status by others, comments me
   });
 
   // Comments: followers merge per issue; a mention is its own `mention`.
+  // A comment is a reply in the task's conversation (ADR 0144): its notifications come from the message's job.
   await commentIssue(deps(), { type: "person", userId: caio.id }, f.org.id, issue.id, "Looks good");
+  await drainOutbox(f.db, f.handlers);
   await commentIssue(deps(), agentActor, f.org.id, issue.id, "PR opened");
+  await drainOutbox(f.db, f.handlers);
   await commentIssue(deps(), owner, f.org.id, issue.id, "@caio can you review?");
+  await drainOutbox(f.db, f.handlers);
   const ownerComments = (await inbox(f.owner.id)).items.find((n) => n.kind === "issue_comment");
   expect(ownerComments).toMatchObject({ count: 2, latest: { text: "PR opened" } });
   const caioInbox = await inbox(caio.id);

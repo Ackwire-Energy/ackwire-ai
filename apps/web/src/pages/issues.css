@@ -1758,3 +1758,94 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
     display: none;
   }
 }
+
+/*
+ * A task's conversation (ADR 0144). The card's last line is the chat's thread line, quiet inside the card (the card
+ * opens; the line isn't a button of its own).
+ */
+.issue-card__talk {
+  margin: 2px 0 0 -6px;
+  pointer-events: none;
+}
+/* Where "Discussão" was: one line that opens the conversation. */
+.task-talk__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--plate-soft);
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.task-talk__summary:hover {
+  background: var(--plate);
+}
+html:not([data-pointer]) .task-talk__summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.task-talk__summary b {
+  color: var(--ink);
+  font-weight: 650;
+}
+.task-talk__open {
+  margin-left: auto;
+  color: var(--ink);
+  font-weight: 600;
+}
+.task-talk__chev {
+  flex: none;
+}
+.task-talk__summary > span:only-of-type {
+  flex: 1;
+}
+.task-talk__toggle .ac-countchip {
+  margin-left: 2px;
+}
+/* The task's own page with its conversation: the details and the thread panel side by side. */
+.issue-page__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.issue-page--talk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 38%, 520px);
+  gap: 24px;
+  align-items: start;
+}
+.issue-page__talk {
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 96px);
+  /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+  height: calc(100dvh - 96px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-section);
+  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--surface-raised);
+}
+.issue-page__talk > .thread-panel__chat,
+.ac-details__side > .thread-panel__chat {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+}
+@media (max-width: 960px) {
+  .issue-page--talk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .issue-page--talk > .issue-page__main {
+    display: none;
+  }
+}

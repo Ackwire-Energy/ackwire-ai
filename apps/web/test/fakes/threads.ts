@@ -33,7 +33,8 @@ export function createFakeThreads(
       id: root.id,
       channelId: root.channelId,
       channelName: channel?.name ?? "",
-      channelKind: "channel",
+      // A task's conversation (ADR 0144): its own channel, never listed.
+      channelKind: root.meta?.taskConversation ? "task" : "channel",
       title: null,
       rootText: root.body,
       rootAuthor: root.author,

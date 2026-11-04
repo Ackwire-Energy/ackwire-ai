@@ -12071,7 +12071,7 @@
     "value": "Ask an agent"
   },
   "issues.asked": {
-    "value": "Request sent. {{name}} posts progress here. Your conversation stays in your DM."
+    "value": "Request sent. {{name}} works in the task's conversation, where everyone who sees the task follows along."
   },
   "issues.activity": {
     "value": "Activity"
@@ -12081,6 +12081,33 @@
   },
   "issues.discussion": {
     "value": "Discussion"
+  },
+  "issues.conversation.button": {
+    "value": "Conversation"
+  },
+  "issues.conversation.toggle": {
+    "value": {
+      "one": "Conversation, {{count}} message",
+      "other": "Conversation, {{count}} messages"
+    }
+  },
+  "issues.conversation.title": {
+    "value": "Task conversation"
+  },
+  "issues.conversation.messages": {
+    "value": {
+      "one": "{{count}} message",
+      "other": "{{count}} messages"
+    }
+  },
+  "issues.conversation.open": {
+    "value": "Open"
+  },
+  "issues.conversation.start": {
+    "value": "Talk about the task"
+  },
+  "issues.conversation.close": {
+    "value": "Close the conversation"
   },
   "issues.noComments": {
     "value": "No comments yet."

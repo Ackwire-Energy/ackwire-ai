@@ -46,7 +46,7 @@ import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { capitalize } from "@agenteschat/client/lib/format";
-import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import {
@@ -559,31 +559,33 @@ function Chat({
       const root = list.find((m) => m.id === threadId);
       const replies = list.filter((m) => m.id !== threadId);
       const info = thread.data;
-      const head: Row[] = root
-        ? [
-            {
-              kind: "marker",
-              key: "started",
-              // In a DM, with whom (its channel name is internal, "dm-…"); in a channel, where.
-              text:
-                info?.channelKind === "dm" || dm
-                  ? t("mobile.chat.startedWith", { name: dm?.with.name ?? "" })
-                  : t("mobile.chat.startedIn", { channel: info?.channelName ?? channel?.name ?? "" }),
-            },
-            // The root as it started the thread (its mission card is pinned above already).
-            {
-              kind: "message",
-              key: root.id,
-              message: { ...root, meta: { ...root.meta, missionStart: undefined, missionLink: undefined } },
-              grouped: false,
-            },
-            {
-              kind: "marker",
-              key: "replies",
-              text: t("mobile.chat.replies", { count: info?.replyCount ?? replies.length }),
-            },
-          ]
-        : [];
+      // A task's conversation (ADR 0144): its root stands for the task, one screen back; only the replies show.
+      const head: Row[] =
+        root && !taskConversationOf(root.meta)
+          ? [
+              {
+                kind: "marker",
+                key: "started",
+                // In a DM, with whom (its channel name is internal, "dm-…"); in a channel, where.
+                text:
+                  info?.channelKind === "dm" || dm
+                    ? t("mobile.chat.startedWith", { name: dm?.with.name ?? "" })
+                    : t("mobile.chat.startedIn", { channel: info?.channelName ?? channel?.name ?? "" }),
+              },
+              // The root as it started the thread (its mission card is pinned above already).
+              {
+                kind: "message",
+                key: root.id,
+                message: { ...root, meta: { ...root.meta, missionStart: undefined, missionLink: undefined } },
+                grouped: false,
+              },
+              {
+                kind: "marker",
+                key: "replies",
+                text: t("mobile.chat.replies", { count: info?.replyCount ?? replies.length }),
+              },
+            ]
+          : [];
       return [
         ...head,
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
@@ -1127,13 +1129,17 @@ function Chat({
   // number and title, in the reader's.
   const root = isThread ? list.find((m) => m.id === threadId) : undefined;
   const rootWork = issueWorkOf(root?.meta);
+  // A task's conversation (ADR 0144): "Conversa da tarefa", the task under it.
+  const rootTask = taskConversationOf(root?.meta);
   const title = isThread
-    ? rootWork
-      ? t("issues.open", { number: rootWork.number, title: rootWork.title })
-      : info
-        ? // A thread on a GIF or a sticker has no words of its own to title it (ADR 0091).
-          threadTitle(info) || previewOf(root ? textOrMedia(t, root.body, root.meta) : "") || t("mobile.chat.thread")
-        : ""
+    ? rootTask
+      ? t("issues.conversation.title")
+      : rootWork
+        ? t("issues.open", { number: rootWork.number, title: rootWork.title })
+        : info
+          ? // A thread on a GIF or a sticker has no words of its own to title it (ADR 0091).
+            threadTitle(info) || previewOf(root ? textOrMedia(t, root.body, root.meta) : "") || t("mobile.chat.thread")
+          : ""
     : dm
       ? dm.with.name
       : channel
@@ -1141,28 +1147,30 @@ function Chat({
         : "";
   const agentsHere = (roster.data ?? []).filter((r) => r.type === "agent").length;
   const subtitle = isThread
-    ? info
-      ? info.channelKind === "dm"
-        ? // A DM's channel name is internal ("dm-…"): the thread says who it is with.
-          t(
-            mission
-              ? "mobile.chat.missionWith"
-              : info.state === "closed"
-                ? "mobile.chat.closedThreadWith"
-                : "mobile.chat.threadWith",
-            { name: dm?.with.name ?? "" },
-          )
-        : t(
-            mission
-              ? "mobile.chat.missionIn"
-              : info.state === "closed"
-                ? "mobile.chat.closedThreadIn"
-                : "mobile.chat.threadIn",
-            {
-              channel: info.channelName,
-            },
-          )
-      : undefined
+    ? rootTask
+      ? `#${rootTask.number} · ${rootTask.title}`
+      : info
+        ? info.channelKind === "dm"
+          ? // A DM's channel name is internal ("dm-…"): the thread says who it is with.
+            t(
+              mission
+                ? "mobile.chat.missionWith"
+                : info.state === "closed"
+                  ? "mobile.chat.closedThreadWith"
+                  : "mobile.chat.threadWith",
+              { name: dm?.with.name ?? "" },
+            )
+          : t(
+              mission
+                ? "mobile.chat.missionIn"
+                : info.state === "closed"
+                  ? "mobile.chat.closedThreadIn"
+                  : "mobile.chat.threadIn",
+              {
+                channel: info.channelName,
+              },
+            )
+        : undefined
     : dmAgentId
       ? rightHand
         ? `${t("rightHand.label")} · ${t("rightHand.actsAsYou")}`

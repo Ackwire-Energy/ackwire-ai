@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { Artifact, Issue, IssueColumn } from "@agenteschat/client";
+import { conversationLine } from "@agenteschat/client/lib/issues";
 import { cardPreview, cardShape, driveSections, gridRows, kindKey, matchesType } from "../../src/features/drive/logic";
 import {
   columnChoices,
   columnOfIssue,
-  conversationOf,
   criteriaProgress,
   currentStep,
   dueDateOf,
@@ -17,6 +17,7 @@ import {
   listState,
   minutesSince,
   passesFilter,
+  taskConversationHref,
   waitsOnYou,
   workLines,
 } from "../../src/features/issues/logic";
@@ -302,13 +303,24 @@ describe("issue row details", () => {
     expect(dueDateOf("nextWeek", NOW)).toBe("2026-10-24");
   });
 
-  test("Conversar: the channel, the source message's channel, else the agent", () => {
-    expect(conversationOf(issue({ number: 1, channelId: "c1" }))).toEqual({ channelId: "c1" });
-    expect(conversationOf(issue({ number: 2, source: { type: "message", channelId: "c2", messageId: "m1" } }))).toEqual(
-      { channelId: "c2" },
-    );
-    expect(conversationOf(issue({ number: 3, assignee: { type: "agent", id: "a1" } }))).toEqual({ agentId: "a1" });
-    expect(conversationOf(issue({ number: 4 }))).toBeNull();
+  test("Conversar: the task's own conversation, at a message when one is named", () => {
+    const at = { channelId: "c1", rootId: "r1" };
+    expect(taskConversationHref(at)).toBe("/chat/c1?thread=r1");
+    expect(taskConversationHref(at, "m1")).toBe("/chat/c1?thread=r1&m=m1");
+  });
+
+  test("the conversation line: nothing until someone writes, then who, how many, working or when", () => {
+    expect(conversationLine(issue({ number: 1 }))).toBeNull();
+    const quiet = { channelId: "c1", rootId: "r1", count: 0, lastAt: null, participants: [], working: false };
+    expect(conversationLine(issue({ number: 2, conversation: quiet }))).toBeNull();
+    const people = ["u1", "u2", "u3", "u4"].map((id) => ({ type: "person" as const, id }));
+    const busy = { ...quiet, count: 6, lastAt: "2026-11-04T10:00:00.000Z", participants: people, working: true };
+    expect(conversationLine(issue({ number: 3, conversation: busy }))).toEqual({
+      count: 6,
+      people: people.slice(0, 3),
+      working: true,
+      lastAt: "2026-11-04T10:00:00.000Z",
+    });
   });
 
   test("route numbers", () => {

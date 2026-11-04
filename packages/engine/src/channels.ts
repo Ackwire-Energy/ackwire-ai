@@ -43,6 +43,7 @@ import {
 } from "./permissions";
 import { refuseRightHand } from "./right-hand";
 import { closedRefusal, STANDING_COLUMNS } from "./standing";
+import { taskReaderSql } from "./task-access";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
 
@@ -505,7 +506,11 @@ export async function readableChannelIds(
         eq(channels.orgId, orgId),
         inArray(channels.id, ids),
         isNull(channels.archivedAt),
-        or(isNotNull(channelMembers.id), eq(channels.kind, "forum")),
+        or(
+          isNotNull(channelMembers.id),
+          eq(channels.kind, "forum"),
+          and(eq(channels.kind, "task"), taskReaderSql(sql`${channels.id}`, sql`${userId}::text`)),
+        ),
       ),
     );
   return new Set(rows.map((r) => r.id));
@@ -530,6 +535,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
       channel: channels,
       memberId: channelMembers.id,
       overrides: channelOverridesSql(organizationMembers.orgId, sql`${channelId}::uuid`, organizationMembers.userId),
+      taskReader: sql<boolean>`${channels.kind} = 'task' and ${taskReaderSql(sql`${channelId}::uuid`, sql`${userId}::text`)}`,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
@@ -545,8 +551,14 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   if (closed) throw closed;
   const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
-  // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum.
-  if (!row.memberId && channel.kind !== "forum") throw new ForbiddenError("Join this channel first");
+  // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum. A task's
+  // conversation by whoever sees the task (ADR 0144), always checked again: people are never its members.
+  if (
+    channel.kind === "task"
+      ? !(row.taskReader === true || String(row.taskReader) === "t")
+      : !row.memberId && channel.kind !== "forum"
+  )
+    throw new ForbiddenError("Join this channel first");
   const workspace: Membership = {
     orgId,
     orgName: row.orgName,

@@ -46,6 +46,11 @@ export interface DetailsDialogProps {
   titleHidden?: boolean;
   /** A fixed bar at the bottom (primary actions). */
   footer?: ReactNode;
+  /**
+   * A column on the right, the dialog's full height, beside the details (a task's conversation): the dialog widens
+   * for it. On a narrow window it takes the whole dialog.
+   */
+  side?: ReactNode;
   children: ReactNode;
   className?: string;
   /**
@@ -77,6 +82,7 @@ export function DetailsDialog({
   fill = false,
   titleHidden = false,
   footer,
+  side,
   children,
   className,
   onEscapeKeyDown,
@@ -102,12 +108,59 @@ export function DetailsDialog({
   );
   const pageIcon = <Icon name="external" size={16} />;
   const pageClass = "ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon";
+  const main = (
+    <>
+      <div className="ac-details__head">
+        {/* With no eyebrow, the heading takes the bar's empty start, beside the buttons, instead of a row of its own. */}
+        <div className={cx("ac-details__bar", inline && "ac-details__bar--titled")}>
+          {inline ? heading : <span className="ac-details__eyebrow">{eyebrow}</span>}
+          <div className="ac-details__actions ac-acts">
+            {actions}
+            {page &&
+              (page.render ? (
+                page.render({
+                  className: pageClass,
+                  "aria-label": page.label,
+                  title: page.label,
+                  children: pageIcon,
+                })
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  icon="external"
+                  aria-label={page.label}
+                  title={page.label}
+                  onClick={page.onOpen}
+                />
+              ))}
+            {/* With a side column, its own close is the one at the top right (Esc and the scrim still close). */}
+            {!side && (
+              <RDialog.Close asChild>
+                <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} title={closeLabel} />
+              </RDialog.Close>
+            )}
+          </div>
+        </div>
+        {!inline && heading}
+      </div>
+      <div className="ac-details__body">{children}</div>
+      {footer && <div className="ac-details__foot">{footer}</div>}
+    </>
+  );
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
       <RDialog.Portal>
         <RDialog.Overlay className="ac-dialog__scrim" />
         <RDialog.Content
-          className={cx("ac-details", size !== "md" && `ac-details--${size}`, fill && "ac-details--fill", className)}
+          className={cx(
+            "ac-details",
+            size !== "md" && `ac-details--${size}`,
+            fill && "ac-details--fill",
+            side ? "ac-details--side" : undefined,
+            className,
+          )}
           aria-describedby={undefined}
           onEscapeKeyDown={onEscapeKeyDown}
           onCloseAutoFocus={(e) => {
@@ -118,40 +171,14 @@ export function DetailsDialog({
             }
           }}
         >
-          <div className="ac-details__head">
-            {/* With no eyebrow, the heading takes the bar's empty start, beside the buttons, instead of a row of its own. */}
-            <div className={cx("ac-details__bar", inline && "ac-details__bar--titled")}>
-              {inline ? heading : <span className="ac-details__eyebrow">{eyebrow}</span>}
-              <div className="ac-details__actions ac-acts">
-                {actions}
-                {page &&
-                  (page.render ? (
-                    page.render({
-                      className: pageClass,
-                      "aria-label": page.label,
-                      title: page.label,
-                      children: pageIcon,
-                    })
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      icon="external"
-                      aria-label={page.label}
-                      title={page.label}
-                      onClick={page.onOpen}
-                    />
-                  ))}
-                <RDialog.Close asChild>
-                  <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={closeLabel} title={closeLabel} />
-                </RDialog.Close>
-              </div>
-            </div>
-            {!inline && heading}
-          </div>
-          <div className="ac-details__body">{children}</div>
-          {footer && <div className="ac-details__foot">{footer}</div>}
+          {side ? (
+            <>
+              <div className="ac-details__main">{main}</div>
+              <div className="ac-details__side">{side}</div>
+            </>
+          ) : (
+            main
+          )}
         </RDialog.Content>
       </RDialog.Portal>
     </RDialog.Root>

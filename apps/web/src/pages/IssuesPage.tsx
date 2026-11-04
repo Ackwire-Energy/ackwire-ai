@@ -25,6 +25,7 @@ import { IssueCardWork } from "@/components/BackgroundWork";
 import { useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { TaskCardConversation } from "@/components/TaskConversation";
 import { copyText } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import {
@@ -75,6 +76,8 @@ export function IssuesPage() {
   const [q, setQ] = useState("");
   // The open issue lives in the URL (`?open=131`): a reload or a shared link reopens it.
   const [openParam, setOpenParam] = useOpenParam();
+  // A message of the open task's conversation to open at (a notice, a link: ADR 0144).
+  const [focusParam] = useOpenParam("m");
   const openNumber = openParam && /^\d+$/.test(openParam) ? Number(openParam) : null;
   const copy = useFilterCopy();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -216,7 +219,9 @@ export function IssuesPage() {
           />
         )}
       </div>
-      {opened && <IssueDialog issue={opened} onClose={() => setOpenParam(null)} />}
+      {opened && (
+        <IssueDialog issue={opened} focusMessageId={focusParam ?? undefined} onClose={() => setOpenParam(null)} />
+      )}
       <NewIssueDialog
         open={creating !== false}
         columnId={creating ? creating.columnId : null}
@@ -684,6 +689,7 @@ function IssueCard({
           )}
         </span>
       )}
+      <TaskCardConversation issue={i} />
       {isWorking(i) && <WorkSweep color={color(i) ?? "sky"} waiting={i.work?.state !== "running"} />}
     </Link>
   );

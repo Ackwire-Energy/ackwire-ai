@@ -112,7 +112,7 @@ import { errorCode, errorText, restrictionLine, runErrorText } from "@agentescha
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { capitalize, dayLabel, formatFullDate, formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
@@ -433,6 +433,11 @@ export interface ChannelChrome {
   panel?: boolean;
   /** A thread view where a person's reply makes it a "Responder" thread (`openThread` on the post). */
   openThread?: boolean;
+  /**
+   * A task's conversation (ADR 0144): "@" offers the whole workspace as one list (an agent that sees the task joins
+   * it when mentioned), and the root, which stands for the task, isn't drawn.
+   */
+  task?: boolean;
 }
 
 const sameRuns = (a: LiveRun[], b: LiveRun[]) => a.length === b.length && a.every((r, i) => r === b[i]);
@@ -846,7 +851,7 @@ function ChannelView({
   }, [channel.id, chrome?.header]);
   // An agent mentioned from outside the channel: offer to add it.
   const [offer, setOffer] = useState<string | null>(null);
-  const mentionSearch = useMentionSearch(members.data);
+  const mentionSearch = useMentionSearch(chrome?.task ? undefined : members.data);
   const channelSearch = useChannelSearch();
   const composer = useRef<HTMLTextAreaElement>(null);
   const emojiPicker = useEmojiLabels();
@@ -1059,8 +1064,11 @@ function ChannelView({
       // The thread's conversation. One made from a range: not its root (the channel's marker) nor the
       // moved messages (written before the root; the context block lists them).
       const mine = (channelMessages.data ?? []).filter((m) => m.local && m.threadId === thread.id);
+      // A task's conversation: not its root, which stands for the task beside it (ADR 0144).
       const list = mergeTimeline(threadMessages.data ?? [], [mine]).filter(
-        (m) => !thread.context || m.local || (m.id !== thread.id && m.createdAt > thread.createdAt),
+        (m) =>
+          !taskConversationOf(m.meta) &&
+          (!thread.context || m.local || (m.id !== thread.id && m.createdAt > thread.createdAt)),
       );
       const passed = supersededBrainNotices(list);
       return buildTimeline(

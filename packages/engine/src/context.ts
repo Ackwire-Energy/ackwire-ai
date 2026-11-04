@@ -48,6 +48,7 @@ import { WEBHOOK_EVENT, webhookEventText } from "./routine-hooks";
 import { heldHere } from "./run-inbox";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { stretchCardOf } from "./stretch";
+import { taskConversationOf } from "./task-conversation";
 import { loadTeam, rosterScopeNames, TEAM_IN_PROMPT, teammatesFor, teammatesNowPrompt, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
 import { HAND_OVER_STEP } from "./tools/directory";
@@ -808,10 +809,17 @@ export async function buildRunContext(
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
     .join(", ");
 
-  // An issue's work thread (asked to implement it): the task, read from the issue now, never shown in the chat.
+  // A task's conversation (ADR 0144), or an older work thread in a DM (asked to implement it): the task, read from
+  // the issue now, never shown in the chat. In the conversation the assignee works on it; another agent was called in.
   const issueWork = root ? issueWorkOf(root.meta) : null;
+  const taskHere = root ? taskConversationOf(root.meta) : null;
   const workIssueId = issueWork && issueWork.agentId === agent.id ? issueWork.issueId : null;
-  const issueBrief = workIssueId ? await issueWorkBrief(db, run.orgId, workIssueId).catch(() => null) : null;
+  const taskAsked = taskHere ? await assignedTo(db, run.orgId, taskHere.issueId, agent.id) : false;
+  const issueBrief = workIssueId
+    ? await issueWorkBrief(db, run.orgId, workIssueId, { inConversation: false }).catch(() => null)
+    : taskHere
+      ? await issueWorkBrief(db, run.orgId, taskHere.issueId, { asked: taskAsked }).catch(() => null)
+      : null;
 
   // A routine's background run: its routine block, time line and where it reports (ADR 0053 §4).
   const routine = background ? await routineContext(db, run, agent, trigger, zone) : null;
@@ -1074,7 +1082,10 @@ export async function buildRunContext(
       blocks: await blockStateNotes(db, run.orgId, history, zone),
     }),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
-    issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
+    issueId:
+      workIssueId ??
+      (taskAsked && taskHere ? taskHere.issueId : null) ??
+      (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
     sessionPrompt: [
       // The rules, the organization's context and the agent's block (name, role, instructions).
       ...system.slice(0, 3).map((b) => b.text),
@@ -2120,4 +2131,20 @@ export function toTurns(
     for (const part of final.parts) if (part.id === currentId) part.text = `(current message) ${part.text}`;
   }
   return turns.map((t) => ({ role: t.role, content: t.parts.map((p) => p.text).join("\n\n") }));
+}
+
+/** Whether the task is this agent's (its assignee works on it in the task's conversation, ADR 0144). */
+async function assignedTo(db: Database, orgId: string, issueId: string, agentId: string) {
+  const [row] = await db
+    .select({ id: schema.issues.id })
+    .from(schema.issues)
+    .where(
+      and(
+        eq(schema.issues.id, issueId),
+        eq(schema.issues.orgId, orgId),
+        eq(schema.issues.assigneeType, "agent"),
+        eq(schema.issues.assigneeId, agentId),
+      ),
+    );
+  return Boolean(row);
 }
