@@ -2,6 +2,7 @@ import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { ComputerSky, Glass, Icon, type IconName, PixelOrbit, Text, useTheme } from "@/ui";
+import { withAlpha } from "@/ui/palette";
 import { DEFAULT_DESKTOP } from "./screen-view";
 
 /**
@@ -18,6 +19,7 @@ export function Cover({
   help,
   action,
   fill = false,
+  clear = false,
 }: {
   icon?: IconName;
   art?: ReactNode;
@@ -30,6 +32,8 @@ export function Cover({
   action?: ReactNode;
   /** Over the live screen's box, filling it. */
   fill?: boolean;
+  /** Dimmed, not covered: the picture under it stays in sight (a switch between watching and control, a question). */
+  clear?: boolean;
 }) {
   const { colors: c, shadows } = useTheme();
   return (
@@ -38,7 +42,7 @@ export function Cover({
         styles.cover,
         sky && !fill && styles.stage,
         fill && StyleSheet.absoluteFill,
-        { backgroundColor: c.sunken },
+        { backgroundColor: clear ? withAlpha(c.bg, 0.3) : c.sunken },
       ]}
     >
       {sky ? <ComputerSky color={color} style={StyleSheet.absoluteFill} /> : null}

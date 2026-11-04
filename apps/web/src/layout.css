@@ -3661,6 +3661,11 @@ html:not([data-pointer]) .settings__link:focus-visible {
 .ac-card__head + .settings-rows > .settings-row:first-child {
   border-top: 1px solid var(--line);
 }
+/* Over a card's foot the last row ends on the foot's hairline, as deep below as above (the card's gap is
+   `--space-3`). */
+.settings-rows:has(+ .ac-card__foot) {
+  margin-bottom: calc(-1 * var(--space-3));
+}
 .settings-row__text {
   flex: 1;
   min-width: 0;
