@@ -43,12 +43,14 @@ export {
 } from "./agent/live";
 export { addLiveSticker, liveStickerCount } from "./agent/sticker-live";
 export {
+  type DrawnMood,
   drawSticker,
   STICKER_MOODS,
   STICKER_STILL_T,
   type StickerLook,
   type StickerMood,
   stickerSeed,
+  WAVE_SECONDS,
 } from "./agent/stickers";
 export {
   BRAIN_GRID,
@@ -99,6 +101,8 @@ export {
   type BrainPortraitState,
 } from "./components/Brain";
 export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
+export { CardHorizon, horizonCrest, horizonHeight, horizonTones } from "./components/CardHorizon";
+export { type CardCut, CardMore, useCardCut } from "./components/CardMore";
 export { Carousel, type CarouselProps } from "./components/Carousel";
 export { CHAT_GIF_MAX, ChatGif, type ChatGifProps } from "./components/ChatGif";
 export {
@@ -469,5 +473,11 @@ export { DitherLine, fillEnds, paintCells, paintLineArea, useElementWidth } from
 export { formatWidgetNumber, formatWithUnit, useCountUp, widgetDigits } from "./widgets/format";
 export { ditherTile, WIDGET_CELL, widgetTileVars, widgetTones } from "./widgets/tiles";
 export { BuildingDither, WidgetBody, type WidgetBodyProps } from "./widgets/WidgetBody";
-export { WidgetBleed, WidgetCard, type WidgetCardProps, type WidgetOrganize } from "./widgets/WidgetCard";
+export {
+  type CardBoardLabels,
+  WidgetBleed,
+  WidgetCard,
+  type WidgetCardProps,
+  type WidgetOrganize,
+} from "./widgets/WidgetCard";
 export { WidgetGlyph } from "./widgets/WidgetGlyph";

@@ -1,7 +1,6 @@
 import { type Actor, type Issue, type IssuePriority, useAiStatus, useIssueAction } from "@agenteschat/client";
 import { PRIORITIES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -9,13 +8,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Filters, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { PushedHeader, successHaptic } from "../shared/parts";
+import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { DUE_CHOICES, type DueChoice, dueDateOf } from "./logic";
 
 type Open = "who" | "priority" | "due" | null;
 
-const close = () => (router.canGoBack() ? router.back() : router.replace("/issues"));
+const close = () => goBack("/issues");
 
 /**
  * "Nova tarefa", a screen pushed over Tarefas (the native bar: back, the title, "Criar"): the title, a

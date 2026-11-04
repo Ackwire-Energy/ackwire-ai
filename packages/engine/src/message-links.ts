@@ -14,6 +14,36 @@ export function setMessageLinkBase(publicUrl: string) {
   base = publicUrl.replace(/\/+$/, "");
 }
 
+/** A page of this workspace in the web app (`/team`, `/settings/members`), as an agent links a person to it. */
+export const appPageLink = (orgId: string, path: string) => `${base}/org/${orgId}${path}`;
+
+/** The Cloud's domain: an address under it is our own app wherever this server runs. */
+const PRODUCT_HOST = "agentes.chat";
+
+/** A loopback `PUBLIC_URL` (a self-host's default): there, on the agent's computer, it is some other app. */
+const LOOPBACK = /^(localhost|127(\.\d+){3}|\[::1\])$/;
+
+/**
+ * Whether an address or a sentence names our own app: this server's address (`PUBLIC_URL`, unless loopback), or
+ * agentes.chat and its subdomains. An email address on those domains (an agent's own mailbox) doesn't count; a URL's
+ * `user@` does not hide its host, nor do width forms or an ideographic full stop (browsers read them as dots).
+ */
+export function namesOwnApp(text: string): boolean {
+  const own = new URL(base).hostname;
+  const loopback = LOOPBACK.test(own);
+  if (!loopback && text.includes(base)) return true;
+  const hosts = !loopback && own.includes(".") ? [PRODUCT_HOST, own] : [PRODUCT_HOST];
+  return text
+    .normalize("NFKC")
+    .replace(/[\u3002\uff61]/g, ".")
+    .toLowerCase()
+    .replace(/:\/\/[^\s/?#@]*@/g, "://")
+    .split(/[^\w.@-]+/)
+    .filter((word) => !word.includes("@"))
+    .map((word) => word.replace(/\.+$/, ""))
+    .some((word) => hosts.some((h) => word === h || word.endsWith(`.${h}`)));
+}
+
 /** A message's permalink on this server, as agents write it and the apps show it as a pill. */
 export const messageLink = (orgId: string, m: MessagePlace) => `${base}${messagePath(orgId, m)}`;
 

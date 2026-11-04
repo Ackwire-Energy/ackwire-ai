@@ -54,8 +54,8 @@ const STILL = "dsk-still";
 /** The canvas drawn in `el`, under any picture held over it. */
 export const liveCanvas = (el: ParentNode) => el.querySelector<HTMLCanvasElement>(`canvas:not(.${STILL})`);
 
-/** The picture held over `el`'s canvas, if any. */
-export const heldPicture = (el: ParentNode) => el.querySelector<HTMLCanvasElement>(`.${STILL}`);
+/** The picture held over `el`'s canvas, if any: its own last one, or another view's (`holdImage`). */
+export const heldPicture = (el: ParentNode) => el.querySelector<HTMLCanvasElement | HTMLImageElement>(`.${STILL}`);
 
 /**
  * Keeps what `el`'s canvas shows now over it, as a still copy, so the canvas can go and a new one draw under it.
@@ -72,4 +72,27 @@ export function holdPicture(el: HTMLElement) {
   still.getContext("2d")?.drawImage(canvas, 0, 0);
   el.append(still);
   return true;
+}
+
+/** Holds another view's last picture (a data URL) over `el`'s canvas, as `holdPicture` holds its own. */
+export function holdImage(el: HTMLElement, src: string) {
+  heldPicture(el)?.remove();
+  const still = document.createElement("img");
+  still.className = STILL;
+  still.alt = "";
+  still.src = src;
+  el.append(still);
+}
+
+/** What `el` shows now, as a data URL for `holdImage`: the picture held over it, else its canvas's; null for none. */
+export function pictureOf(el: ParentNode): string | null {
+  const held = heldPicture(el);
+  if (held instanceof HTMLImageElement) return held.src;
+  const canvas = held ?? liveCanvas(el);
+  if (!canvas || (!held && !showsPicture(canvas))) return null;
+  try {
+    return canvas.toDataURL("image/jpeg", 0.85) || null;
+  } catch {
+    return null;
+  }
 }

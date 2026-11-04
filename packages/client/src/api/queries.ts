@@ -31,9 +31,11 @@ import {
 } from "../lib/notifications";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
+import { firstVisitOf } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
+import { SIDEBAR_VIEW_DEFAULT } from "../lib/sidebar-view";
 import { playSound } from "../lib/sounds";
 import { threadStartOf } from "../lib/threads";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
@@ -42,7 +44,7 @@ import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
 import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
-import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
+import { type AgentReactionEffect, useAgentReaction, useApi, useCardVia } from "./context";
 import { ApiError } from "./http";
 import { keys } from "./keys";
 import { keepSending, outbox } from "./outbox";
@@ -63,6 +65,7 @@ import type {
   AppConsentDecision,
   AppNotification,
   Approval,
+  ApprovalCoverInput,
   ArtifactContent,
   ArtifactDetail,
   ArtifactFilters,
@@ -72,6 +75,7 @@ import type {
   BlockState,
   CalendarEventInput,
   CalendarEventPatch,
+  CardDelegate,
   Channel,
   ChannelInput,
   ChannelOverride,
@@ -117,9 +121,12 @@ import type {
   OrgRoles,
   Person,
   PersonalTokenInput,
+  PersonLimits,
   Proposal,
   ReactionCount,
   ReminderInput,
+  RightHandApprovals,
+  RightHandApprovalsInput,
   Role,
   RoleInput,
   Routine,
@@ -135,6 +142,7 @@ import type {
   SidebarItems,
   SidebarPlace,
   SidebarSection,
+  SidebarView,
   SkillInput,
   SkillPatch,
   SkillSettings,
@@ -397,8 +405,9 @@ export const useMembers = (orgId: string) => {
 export function useChangeRole(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: Role }) => api.orgs.changeRole(orgId, userId, role),
+    mutationFn: ({ userId, role }: { userId: string; role: Role }) => api.orgs.changeRole(orgId, userId, role, via),
     onSettled: () => refreshRoles(qc, orgId),
   });
 }
@@ -492,9 +501,10 @@ export function useReorderRoles(orgId: string) {
 export function useSetMemberRoles(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: ({ userId, roleIds }: { userId: string; roleIds: string[] }) =>
-      api.roles.setFor(orgId, userId, roleIds),
+      api.roles.setFor(orgId, userId, roleIds, via),
     onMutate: async ({ userId, roleIds }) => {
       await qc.cancelQueries({ queryKey: keys.people(orgId) });
       const before = qc.getQueryData<Person[]>(keys.people(orgId));
@@ -527,8 +537,9 @@ export const useRemovalPreview = (orgId: string, userId: string | null) => {
 export function useRemoveMember(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
-    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId),
+    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId, via),
     onMutate: async (userId) => {
       await qc.cancelQueries({ queryKey: keys.people(orgId) });
       const before = qc.getQueryData<Person[]>(keys.people(orgId));
@@ -1594,6 +1605,7 @@ function keepOwnRights(previous: Approval | undefined, approval: Approval): Appr
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: ({
       id,
@@ -1607,8 +1619,8 @@ export function useDecideApproval(orgId: string) {
       always?: boolean;
     }) =>
       decision === "approve"
-        ? api.approvals.approve(orgId, id, reason, always)
-        : api.approvals.refuse(orgId, id, reason),
+        ? api.approvals.approve(orgId, id, reason, always, via)
+        : api.approvals.refuse(orgId, id, reason, via),
     onSuccess: (approval, { decision, always }) => {
       playSound(decision === "approve" ? "approved" : "error");
       cacheApproval(qc, orgId, approval);
@@ -1635,9 +1647,10 @@ export function useCancelApproval(orgId: string) {
 export function useDecideApprovals(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
+  const via = useCardVia();
   return useMutation({
     mutationFn: (input: { ids: string[]; decision: "approve" | "refuse"; reason?: string }) =>
-      api.approvals.decideMany(orgId, input),
+      api.approvals.decideMany(orgId, via ? { ...input, via } : input),
     onSuccess: (result, { decision }) => {
       playSound(decision === "approve" ? "approved" : "error");
       for (const approval of result.approvals) cacheApproval(qc, orgId, approval);
@@ -1663,6 +1676,88 @@ export function useRemoveApprovalRule(orgId: string, agentId: string) {
     mutationFn: (ruleId: string) => api.approvals.removeRule(orgId, agentId, ruleId),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, agentId) }),
   });
+}
+
+/** "Quem aprova por mim" (ADR 0139): who covers me, and whom I cover. */
+export const useApprovalCovers = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.approvalCovers(orgId), queryFn: () => api.approvals.covers(orgId) });
+};
+
+/** Chooses who covers me (`input`), or with null ends it. */
+export function useSetApprovalCover(orgId: string, meId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ApprovalCoverInput | null) => {
+      if (input) return api.approvals.setCover(orgId, input);
+      await api.approvals.endCover(orgId, meId);
+      return null;
+    },
+    onSuccess: (covers) =>
+      covers
+        ? qc.setQueryData(keys.approvalCovers(orgId), covers)
+        : qc.invalidateQueries({ queryKey: keys.approvalCovers(orgId) }),
+  });
+}
+
+/** "Não quero cobrir": I stop covering `userId`. */
+export function useDeclineApprovalCover(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api.approvals.endCover(orgId, userId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalCovers(orgId) }),
+  });
+}
+
+/** "O Gerente aprova por você" (ADR 0139 §2). */
+export const useRightHandApprovals = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.rightHandApprovals(orgId), queryFn: () => api.approvals.rightHand(orgId) });
+};
+
+/** Saves a change at once, shown before the answer (a switch, a box, the budget, the guidance). */
+export function useSetRightHandApprovals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.rightHandApprovals(orgId);
+  return useMutation({
+    mutationFn: (input: RightHandApprovalsInput) => api.approvals.setRightHand(orgId, input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<RightHandApprovals>(key);
+      if (before) qc.setQueryData<RightHandApprovals>(key, { ...before, ...input });
+      return { before };
+    },
+    onError: (_e, _input, ctx) => ctx?.before && qc.setQueryData(key, ctx.before),
+    onSuccess: (next) => qc.setQueryData(key, next),
+  });
+}
+
+/** Desfazer on a card the right hand approved: the card says "Desfeito por …" when its event arrives. */
+export function useUndoRightHand(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decisionId: string) => api.approvals.undoRightHand(orgId, decisionId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.rightHandApprovals(orgId) });
+    },
+  });
+}
+
+/** `card.delegate`: what the right hand did with a card, on the message in the cache. */
+export function cacheCardDelegate(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  delegate: CardDelegate | null,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
+    actionCard: { ...(meta.actionCard as Record<string, unknown> | undefined), delegate },
+  }));
 }
 
 // ── Connectors and agent scopes ─────────────────────────────────────────────
@@ -2286,6 +2381,59 @@ export function useAuditRow(orgId: string, id: string): AuditRow | null {
 export const usePlanUsage = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.planUsage(orgId), queryFn: () => api.orgs.planUsage(orgId) });
+};
+
+/** Uso › Pessoas (ADR 0141): each person's use; "Agora" stays live while the page is open. */
+export const usePeopleUsage = (orgId: string, period: { since?: string; until?: string } = {}, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.peopleUsage(orgId, period),
+    queryFn: () => api.orgs.peopleUsage(orgId, period),
+    enabled,
+    // ponytail: "Agora" polls; the runs' realtime events could refresh it instead.
+    refetchInterval: 15_000,
+  });
+};
+
+/** A person's month (the drawer), or one's own ("Seu uso", in percentages). */
+export const usePersonUsage = (orgId: string, userId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.personUsage(orgId, userId ?? ""),
+    queryFn: () => api.orgs.personUsage(orgId, userId as string),
+    enabled: !!userId,
+  });
+};
+
+export const usePersonLimits = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.personLimits(orgId), queryFn: () => api.orgs.personLimits(orgId), enabled });
+};
+
+/** Saving limits, raising or refusing moves every meter of Uso › Pessoas. */
+const usePeopleUsageMutation = <A extends unknown[], R>(orgId: string, run: (...args: A) => Promise<R>) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: A) => run(...args),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["org", orgId, "people-usage"] }),
+  });
+};
+
+export const useSetPersonLimits = (orgId: string) => {
+  const api = useApi();
+  return usePeopleUsageMutation(orgId, (limits: PersonLimits) => api.orgs.setPersonLimits(orgId, limits));
+};
+
+export const useRaisePersonLimit = (orgId: string) => {
+  const api = useApi();
+  return usePeopleUsageMutation(orgId, (userId: string, limitUsd: number) =>
+    api.orgs.raisePersonLimit(orgId, userId, limitUsd),
+  );
+};
+
+export const useRefuseMoreUsage = (orgId: string) => {
+  const api = useApi();
+  return usePeopleUsageMutation(orgId, (userId: string) => api.orgs.refuseMoreUsage(orgId, userId));
 };
 
 /** The agent's "Uso" tab: its month by account and day, and the account it thinks with now. */
@@ -4587,6 +4735,48 @@ export function useSetSidebarOrder(orgId: string) {
   });
 }
 
+/** How my sidebar shows the agents, and what I pinned, in this workspace (the default until it loads). */
+export const useSidebarView = (orgId: string): SidebarView => {
+  const api = useApi();
+  return (
+    useQuery({
+      queryKey: keys.sidebarView(orgId),
+      queryFn: () => api.orgs.sidebarView(orgId),
+      staleTime: 60_000,
+    }).data ?? SIDEBAR_VIEW_DEFAULT
+  );
+};
+
+/**
+ * Changes my sidebar view: the sidebar changes at once and the whole view goes to the server, one request at a time,
+ * so the last change is what stays. Each change starts from the latest view on screen, so two quick ones never undo
+ * each other; a refusal brings back what the server keeps.
+ */
+export function useSetSidebarView(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.sidebarView(orgId);
+  const mutationKey = ["sidebar-view", orgId];
+  const save = useMutation({
+    mutationKey,
+    scope: { id: `sidebar-view:${orgId}` },
+    mutationFn: (view: SidebarView) => api.orgs.setSidebarView(orgId, view),
+    onError: () => {
+      if (qc.isMutating({ mutationKey }) > 1) return;
+      void qc.invalidateQueries({ queryKey: key });
+    },
+    onSuccess: (view) => {
+      if (qc.isMutating({ mutationKey }) <= 1) qc.setQueryData(key, view);
+    },
+  });
+  return (change: (now: SidebarView) => SidebarView) => {
+    void qc.cancelQueries({ queryKey: key });
+    const next = change(qc.getQueryData<SidebarView>(key) ?? SIDEBAR_VIEW_DEFAULT);
+    qc.setQueryData(key, next);
+    save.mutate(next);
+  };
+}
+
 /** How I look at Tarefas in this workspace (the default until it loads, or when it can't). */
 export const useIssuesView = (orgId: string) => {
   const api = useApi();
@@ -4629,16 +4819,18 @@ export function useSetIssuesView(orgId: string) {
   };
 }
 
-/** The sidebar's tools in my order in this workspace (the default until it loads). */
+/**
+ * The sidebar's tools in my order in this workspace (the default until it loads); a tool the app gained since the
+ * order was saved goes at its end, as the server's `sidebarToolOrderOf` does.
+ */
 export const useSidebarToolOrder = (orgId: string): SidebarItem[] => {
   const api = useApi();
-  return (
-    useQuery({
-      queryKey: keys.sidebarToolOrder(orgId),
-      queryFn: () => api.orgs.sidebarToolOrder(orgId),
-      staleTime: 60_000,
-    }).data ?? [...SIDEBAR_ITEMS]
-  );
+  const saved = useQuery({
+    queryKey: keys.sidebarToolOrder(orgId),
+    queryFn: () => api.orgs.sidebarToolOrder(orgId),
+    staleTime: 60_000,
+  }).data;
+  return saved ? [...new Set([...saved, ...SIDEBAR_ITEMS])] : [...SIDEBAR_ITEMS];
 };
 
 /** Saves my order of the tools (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
@@ -4877,6 +5069,25 @@ export function useMarkChannelRead(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.unreadThreads(orgId) });
     },
   });
+}
+
+/**
+ * The right hand waves under its greeting on the person's first visit to its DM (ADR 0137 §6): decided once, as the
+ * DM opens, and kept for the visit. That visit marks the DM read, even with nothing in it yet, so the next one, on
+ * any device, has no wave.
+ */
+export function useRightHandWave(orgId: string, agentId: string): boolean {
+  const dms = useDms(orgId);
+  const markRead = useMarkChannelRead(orgId).mutate;
+  const first = firstVisitOf(dms.data, agentId);
+  const [wave, setWave] = useState(first);
+  const channelId = dms.data?.find((d) => d.with.type === "agent" && d.with.id === agentId)?.channelId;
+  useEffect(() => {
+    if (first === undefined) return;
+    setWave((w) => w ?? first);
+    if (first && channelId) markRead(channelId);
+  }, [first, channelId, markRead]);
+  return wave === true;
 }
 
 /** A conversation shows nothing unread in the cached lists (read here or on another device). */

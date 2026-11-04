@@ -1,5 +1,4 @@
 import { useArtifact } from "@agenteschat/client";
-import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -16,6 +15,7 @@ import Animated, { type SharedValue, useAnimatedStyle, useSharedValue, withTimin
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon, type IconName, PressScale, Text, ToastHost } from "@/ui";
 import { useDirectory, useOrgId } from "../shared/hooks";
+import { goBack } from "../shared/parts";
 import { savedAt, useFileActions, useSavedWhen } from "./actions";
 import { decodeFileList, fileInfo } from "./logic";
 import { useRemoteFile } from "./source";
@@ -73,7 +73,7 @@ function Viewer({
   const current = files[index];
   const detail = useArtifact(orgId, current?.id ?? null, current?.version).data;
   const actions = useFileActions(detail);
-  const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
+  const close = () => goBack();
   useEffect(() => {
     if (from) tellViewerPlace(from, index);
   }, [from, index]);

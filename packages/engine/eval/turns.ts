@@ -135,6 +135,15 @@ export const TURNS: ScriptedTurn[] = [
     reachable: [{ tool: "deploy_service", query: "deploy service to production" }],
     wants: ["deploy_service", "find_tools", "use_tool"],
   },
+  {
+    id: "start-over",
+    title: "Starting the team over, with no sign-in to our own app",
+    where: "dm",
+    body: "Quero apagar todos os outros agentes e vamos reconstruir tudo novamente.",
+    listed: ["find_tools", "use_tool"],
+    reachable: [{ tool: "propose_remove_agents", query: "archive or delete agents" }],
+    wants: ["propose_remove_agents", "find_tools", "use_tool"],
+  },
 ];
 
 /** A made-up deploy connector: one read, one action that asks a person's approval. */

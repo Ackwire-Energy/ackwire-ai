@@ -160,7 +160,8 @@ describe("handoff routes", () => {
     })) as unknown as typeof hub.status;
     hub.call = (async (_machineId: string, request: MachineRequest) => {
       asked.push(request);
-      if (request.op !== "browser.act" || request.command !== "open") return { success: false, data: null };
+      if (request.op !== "browser.act") return { success: false, data: null };
+      if (request.command !== "open") return { success: true, data: null };
       if (request.args[0]?.includes("evil")) {
         throw new MachineRequestError("not_allowed", "evil.example is outside the sites this agent may use");
       }
@@ -187,6 +188,12 @@ describe("handoff routes", () => {
       const bad = await api(`/agents/${org.agentId}/browser/open`, { json: { url: "file:///etc/passwd" } });
       expect(bad.status).toBe(400);
       expect(((await bad.json()) as { error: { code: string } }).error.code).toBe("browser.bad_address");
+      // The address bar's arrows and reload: the browser's own commands, nothing else.
+      for (const go of ["back", "forward", "reload"]) {
+        expect((await api(`/agents/${org.agentId}/browser/open`, { json: { go } })).status).toBe(204);
+        expect(asked.at(-1)).toMatchObject({ op: "browser.act", command: go, args: [] });
+      }
+      expect((await api(`/agents/${org.agentId}/browser/open`, { json: { go: "close" } })).status).toBe(400);
     } finally {
       hub.call = call;
       hub.status = status;

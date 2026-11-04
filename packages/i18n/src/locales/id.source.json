@@ -236,6 +236,36 @@
   "rolesPage.nothing": {
     "value": "Nothing"
   },
+  "rolesPage.computer.title": {
+    "value": "Agents' computers"
+  },
+  "rolesPage.computer.levels.none": {
+    "value": "None"
+  },
+  "rolesPage.computer.levels.browser": {
+    "value": "Browser only"
+  },
+  "rolesPage.computer.levels.full": {
+    "value": "Whole computer"
+  },
+  "rolesPage.computer.every.none": {
+    "value": "Only what Everyone can already do"
+  },
+  "rolesPage.computer.every.browser": {
+    "value": "Any agent's browser and sign-in requests, never the full screen or the terminal"
+  },
+  "rolesPage.computer.every.full": {
+    "value": "Any agent's full screen, control and terminal"
+  },
+  "rolesPage.computer.own.none": {
+    "value": "Nobody sees or uses the agents' computers or browsers, sign-in requests included"
+  },
+  "rolesPage.computer.own.browser": {
+    "value": "Their own agents' browser and sign-in requests made to them, never the full screen"
+  },
+  "rolesPage.computer.own.full": {
+    "value": "The full screen and terminal of their own agents and of the computers they connected"
+  },
   "rolesPage.everyoneNote": {
     "value": "Applies to every person in the workspace. Other roles only add to it."
   },
@@ -616,6 +646,42 @@
   },
   "permissions.control_computers.say": {
     "value": "takes over the agents' screens"
+  },
+  "permissions.control_browsers.title": {
+    "value": "Use the agents' browsers"
+  },
+  "permissions.control_browsers.desc": {
+    "value": "See and control any agent's browser and answer sign-in requests."
+  },
+  "permissions.control_browsers.short": {
+    "value": "use the agents' browsers"
+  },
+  "permissions.control_browsers.say": {
+    "value": "uses the agents' browsers"
+  },
+  "permissions.own_computers.title": {
+    "value": "Use their own agents' computers"
+  },
+  "permissions.own_computers.desc": {
+    "value": "The full screen and terminal of the agents they're responsible for and of the computers they connected."
+  },
+  "permissions.own_computers.short": {
+    "value": "use their own agents' computers"
+  },
+  "permissions.own_computers.say": {
+    "value": "uses their own agents' computers"
+  },
+  "permissions.own_browsers.title": {
+    "value": "Use their own agents' browsers"
+  },
+  "permissions.own_browsers.desc": {
+    "value": "The browser of the agents they're responsible for and sign-in requests made to them."
+  },
+  "permissions.own_browsers.short": {
+    "value": "use their own agents' browsers"
+  },
+  "permissions.own_browsers.say": {
+    "value": "uses their own agents' browsers"
   },
   "permissions.manage_connectors.title": {
     "value": "Connect apps"
@@ -2684,6 +2750,9 @@
   "contextMenu.copyLink": {
     "value": "Copy link"
   },
+  "contextMenu.openComputer": {
+    "value": "Open the computer"
+  },
   "contextMenu.linkCopied": {
     "value": "Link copied."
   },
@@ -2971,9 +3040,6 @@
   },
   "shell.sidebarMenu.addToChannels": {
     "value": "New channel or category"
-  },
-  "shell.sidebarMenu.addToDms": {
-    "value": "New message or agent"
   },
   "shell.sidebarMenu.newMessage": {
     "value": "New message"
@@ -3691,9 +3757,6 @@
   "channel.agentState.writing": {
     "value": "writing"
   },
-  "channel.autoReplyChip": {
-    "value": "answers without a mention"
-  },
   "channel.more": {
     "value": "More message actions"
   },
@@ -3937,11 +4000,11 @@
   "channel.callAgentMenu": {
     "value": "Agents in this channel"
   },
-  "channel.newMessages": {
-    "value": "New messages"
+  "channel.toLatest": {
+    "value": "Go to the latest messages"
   },
   "channel.newPill.label": {
-    "value": "New messages: {{text}}"
+    "value": "Go to the latest messages: {{text}}"
   },
   "channel.newPill.count": {
     "value": {
@@ -3954,6 +4017,9 @@
   },
   "channel.newPill.writing": {
     "value": "{{name}} writing"
+  },
+  "channel.newPill.mentionsYou": {
+    "value": "you were mentioned"
   },
   "channel.unreadDivider": {
     "value": "New"
@@ -4150,279 +4216,6 @@
   "receipts.by.default": {
     "value": "Nobody was called, so {{name}} answered"
   },
-  "rightHand.label": {
-    "value": "your right hand"
-  },
-  "rightHand.newDot": {
-    "value": "New"
-  },
-  "rightHand.callWith": {
-    "value": "call with @{{handle}}"
-  },
-  "rightHand.role": {
-    "value": "Workspace assistant"
-  },
-  "rightHand.actsAsYou": {
-    "value": "acts with your permissions"
-  },
-  "rightHand.composerHint": {
-    "value": "nothing changes without you"
-  },
-  "rightHand.intro.greeting": {
-    "value": "Hi, I'm {{name}}. I'll build the team with you."
-  },
-  "rightHand.intro.lead": {
-    "value": "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do."
-  },
-  "rightHand.intro.connect.title": {
-    "value": "Connect an AI for the team"
-  },
-  "rightHand.intro.connect.text": {
-    "value": "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed."
-  },
-  "rightHand.intro.connect.action": {
-    "value": "Connect"
-  },
-  "rightHand.intro.start.question": {
-    "value": "How do you want to start?"
-  },
-  "rightHand.intro.start.createOne": {
-    "value": "Create {{name}}"
-  },
-  "rightHand.intro.start.team": {
-    "value": "Build a starter team"
-  },
-  "rightHand.intro.start.describe": {
-    "value": "Describe what I need"
-  },
-  "rightHand.intro.start.import": {
-    "value": "Import my agents"
-  },
-  "rightHand.intro.start.form": {
-    "value": "Fill in the form"
-  },
-  "rightHand.intro.next.question": {
-    "value": "The team is here. What next?"
-  },
-  "rightHand.intro.next.invite": {
-    "value": "Invite people"
-  },
-  "rightHand.intro.next.firstTask": {
-    "value": "Give {{name}} a first task"
-  },
-  "rightHand.intro.firstTask.theo": {
-    "value": "Plan our first week: what does each of us do first?"
-  },
-  "rightHand.intro.firstTask.ada": {
-    "value": "What could you build or automate for us first?"
-  },
-  "rightHand.intro.firstTask.lia": {
-    "value": "Who are our 5 closest competitors, and what do they do better than us?"
-  },
-  "rightHand.intro.firstTask.atlas": {
-    "value": "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?"
-  },
-  "rightHand.profile.how": {
-    "value": "How it works"
-  },
-  "rightHand.profile.permissions": {
-    "value": "Acts with your permissions"
-  },
-  "rightHand.profile.private": {
-    "value": "Talks only with you in your DM"
-  },
-  "rightHand.profile.channels": {
-    "value": "Replies in channels when called"
-  },
-  "rightHand.profile.model": {
-    "value": "Model"
-  },
-  "rightHand.profile.message": {
-    "value": "Message"
-  },
-  "rightHand.profile.configure": {
-    "value": "Configure"
-  },
-  "rightHand.settings.name": {
-    "value": "Name and look"
-  },
-  "rightHand.settings.nameHelp": {
-    "value": "In the sidebar it always shows as “{{label}}”."
-  },
-  "rightHand.settings.changeLook": {
-    "value": "Change look"
-  },
-  "rightHand.settings.ai": {
-    "value": "AI and model"
-  },
-  "rightHand.settings.aiHelp": {
-    "value": "Automatic picks the cheapest model that does the job."
-  },
-  "rightHand.settings.budget": {
-    "value": "Monthly budget"
-  },
-  "rightHand.settings.perMonth": {
-    "value": "/month"
-  },
-  "rightHand.settings.budgetHelp": {
-    "value": "When it reaches the limit, it stops and tells you, like any agent."
-  },
-  "rightHand.settings.audience": {
-    "value": "Who can use it"
-  },
-  "rightHand.settings.audienceHelp": {
-    "value": "Outside it, a person doesn't see {{name}} in the sidebar."
-  },
-  "rightHand.settings.lock": {
-    "value": "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it."
-  },
-  "rightHand.settings.audit": {
-    "value": "See what {{name}} did"
-  },
-  "rightHand.card.settings": {
-    "value": "{{name}} · Settings"
-  },
-  "rightHand.card.apply": {
-    "value": "Apply"
-  },
-  "rightHand.card.dismiss": {
-    "value": "Dismiss"
-  },
-  "rightHand.card.decline": {
-    "value": "Decline"
-  },
-  "rightHand.card.askAdmin": {
-    "value": "Ask an admin"
-  },
-  "rightHand.card.sentTo": {
-    "value": "Sent to {{names}} · {{when}}"
-  },
-  "rightHand.card.sentToAny": {
-    "value": "Sent to whoever decides · {{when}}"
-  },
-  "rightHand.card.appliedBy": {
-    "value": "Applied by {{name}}"
-  },
-  "rightHand.card.appliedByYou": {
-    "value": "Applied by you"
-  },
-  "rightHand.card.declinedBy": {
-    "value": "Declined by {{name}}"
-  },
-  "rightHand.card.declinedByYou": {
-    "value": "Declined by you"
-  },
-  "rightHand.card.undo": {
-    "value": "Undo"
-  },
-  "rightHand.card.undone": {
-    "value": "Undone"
-  },
-  "rightHand.card.stale": {
-    "value": "Out of date"
-  },
-  "rightHand.card.staleHelp": {
-    "value": "{{name}} changed since this card. Nothing was applied."
-  },
-  "rightHand.card.redo": {
-    "value": "Redo"
-  },
-  "rightHand.card.redoMessage": {
-    "value": "Redo the card for {{name}} with today's values"
-  },
-  "rightHand.card.createTest": {
-    "value": "Create and try it"
-  },
-  "rightHand.card.to": {
-    "value": "to"
-  },
-  "rightHand.card.editFirst": {
-    "value": "Edit first"
-  },
-  "rightHand.card.superseded": {
-    "value": "Replaced by the newer proposal"
-  },
-  "rightHand.card.onlyCreators": {
-    "value": "Only admins create agents"
-  },
-  "rightHand.card.only.model": {
-    "value": "Only admins change an agent's model"
-  },
-  "rightHand.card.only.budget": {
-    "value": "Only admins change an agent's budget"
-  },
-  "rightHand.card.only.owner": {
-    "value": "Only admins change who owns an agent"
-  },
-  "rightHand.card.only.archive": {
-    "value": "Only admins archive an agent"
-  },
-  "rightHand.card.only.audience": {
-    "value": "Only admins and its owner change who talks to it"
-  },
-  "rightHand.card.only.channels": {
-    "value": "Only admins and its owner change its channels"
-  },
-  "rightHand.card.only.ai_account": {
-    "value": "Only the account's owner gives it"
-  },
-  "rightHand.card.only.many": {
-    "value": "Only admins make these changes"
-  },
-  "rightHand.field.model": {
-    "value": "Model"
-  },
-  "rightHand.field.ai_account": {
-    "value": "AI account"
-  },
-  "rightHand.field.budget": {
-    "value": "Monthly budget"
-  },
-  "rightHand.field.owner": {
-    "value": "Owner"
-  },
-  "rightHand.field.audience": {
-    "value": "Who can talk"
-  },
-  "rightHand.field.archive": {
-    "value": "Status"
-  },
-  "rightHand.field.channel": {
-    "value": "Channel"
-  },
-  "rightHand.value.none": {
-    "value": "None"
-  },
-  "rightHand.value.budgetDefault": {
-    "value": "Workspace default"
-  },
-  "rightHand.value.anAccount": {
-    "value": "An AI account"
-  },
-  "rightHand.value.everyone": {
-    "value": "Everyone"
-  },
-  "rightHand.value.ownerOnly": {
-    "value": "Only its owner"
-  },
-  "rightHand.value.somePeople": {
-    "value": "Some people"
-  },
-  "rightHand.value.active": {
-    "value": "Active"
-  },
-  "rightHand.value.archived": {
-    "value": "Archived"
-  },
-  "rightHand.value.notIn": {
-    "value": "Not in it"
-  },
-  "rightHand.value.withoutMention": {
-    "value": "On its own"
-  },
-  "rightHand.value.mentionOnly": {
-    "value": "Only when mentioned"
-  },
   "routing.title": {
     "value": "Who picks the agents"
   },
@@ -4496,6 +4289,24 @@
   },
   "noAi.lockedAdmins": {
     "value": "Only an admin can connect an AI."
+  },
+  "noAi.rightHand.computer_away": {
+    "value": "{{name}} can't answer now: the computer the plan is signed in on is away."
+  },
+  "noAi.rightHand.plan_limit": {
+    "value": "{{name}} can't answer now: the plan reached its limit."
+  },
+  "noAi.rightHand.plan_not_shared": {
+    "value": "{{name}} thinks with a plan that answers only its owner."
+  },
+  "noAi.rightHand.runner_outdated": {
+    "value": "{{name}} can't answer now: the program on the plan's computer needs an update."
+  },
+  "noAi.rightHand.plan_tools": {
+    "value": "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own."
+  },
+  "noAi.rightHand.useKey": {
+    "value": "Use an API key"
   },
   "noAi.receipt": {
     "value": "Nobody will answer: no AI connected"
@@ -4944,23 +4755,11 @@
   "usageCard.extraHint": {
     "value": "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets."
   },
-  "usageQueue.title": {
-    "value": {
-      "one": "{{agent}} has {{count}} conversation to pick up",
-      "other": "{{agent}} has {{count}} conversations to pick up"
-    }
-  },
-  "usageQueue.line": {
-    "value": "Picks up {{when}}, when the {{plan}} plan resets. One at a time, in this order."
-  },
-  "usageQueue.lineUnknown": {
-    "value": "Picks up as soon as the {{plan}} plan resets. One at a time, in this order."
-  },
-  "usageQueue.lineBudget": {
-    "value": "Picks up {{when}}, when the budget renews, or sooner if an admin raises it. One at a time, in this order."
-  },
   "usageQueue.shared": {
-    "value": "The line belongs to the plan: {{agents}} share the same account."
+    "value": {
+      "one": "{{agents}} uses the same {{plan}} plan. Both agents' conversations go in the same line.",
+      "other": "{{agents}} use the same {{plan}} plan. All their conversations go in the same line."
+    }
   },
   "usageQueue.dm": {
     "value": "DM with {{name}}"
@@ -4983,31 +4782,13 @@
   "usageQueue.paused": {
     "value": "Paused {{ago}}"
   },
-  "usageQueue.after": {
-    "value": {
-      "one": "{{count}} message since",
-      "other": "{{count}} messages since"
-    }
-  },
-  "usageQueue.nothingAfter": {
-    "value": "Nothing since"
-  },
-  "usageQueue.wrote": {
-    "value": {
-      "one": "{{names}} wrote since",
-      "other": "{{names}} wrote since"
-    }
-  },
-  "usageQueue.queued": {
-    "value": "In line"
-  },
   "usageQueue.answering": {
-    "value": "Answering now"
+    "value": "Answering"
   },
   "usageQueue.hidden": {
     "value": {
-      "one": "+{{count}} in conversations you can't see",
-      "other": "+{{count}} in conversations you can't see"
+      "one": "+{{count}} you can't see",
+      "other": "+{{count}} you can't see"
     }
   },
   "usageQueue.dontRunAll": {
@@ -5015,8 +4796,8 @@
   },
   "usageQueue.confirmAll": {
     "value": {
-      "one": "Don't run {{count}} conversation?",
-      "other": "Don't run these {{count}} conversations?"
+      "one": "Don't run this one?",
+      "other": "Don't run all {{count}}?"
     }
   },
   "usageQueue.yesDontRun": {
@@ -5027,12 +4808,12 @@
   },
   "usageQueue.canceledAll": {
     "value": {
-      "one": "{{count}} conversation canceled. {{agent}} won't answer it when the limit is back.",
-      "other": "{{count}} conversations canceled. {{agent}} won't answer them when the limit is back."
+      "one": "{{count}} conversation canceled. {{agent}} won't answer it.",
+      "other": "{{count}} conversations canceled. {{agent}} won't answer them."
     }
   },
   "usageQueue.empty": {
-    "value": "Nothing waiting to pick up."
+    "value": "Nothing waiting on the plan."
   },
   "usageQueue.waiting": {
     "value": {
@@ -5040,29 +4821,47 @@
       "other": "{{count}} conversations waiting"
     }
   },
-  "usageQueue.closedTitle": {
-    "value": {
-      "one": "{{count}} didn't need an answer",
-      "other": "{{count}} didn't need an answer"
-    }
-  },
-  "usageQueue.closedWhy": {
-    "value": "They looked handled, so {{agent}} didn't answer."
-  },
-  "usageQueue.closedLine": {
-    "value": "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway."
-  },
-  "usageQueue.seeConversation": {
-    "value": "See conversation"
-  },
   "usageQueue.answeredAnyway": {
-    "value": "Someone asked for an answer anyway"
-  },
-  "usageQueue.toResume": {
-    "value": "To pick up"
+    "value": "Answering anyway"
   },
   "usageQueue.switchAi": {
     "value": "Change {{name}}'s AI"
+  },
+  "usageQueue.back": {
+    "value": "{{agent}} is back {{when}}"
+  },
+  "usageQueue.backPlan": {
+    "value": "{{agent}} is back when the plan resets"
+  },
+  "usageQueue.backBudget": {
+    "value": "{{agent}} is back when the budget renews"
+  },
+  "usageQueue.resuming": {
+    "value": "{{agent}} is picking up"
+  },
+  "usageQueue.about": {
+    "value": "About the line"
+  },
+  "usageQueue.lists": {
+    "value": "Conversations"
+  },
+  "usageQueue.queuedTab": {
+    "value": "In line"
+  },
+  "usageQueue.skippedTab": {
+    "value": "Skipped"
+  },
+  "usageQueue.skip_solved": {
+    "value": "{{name}} already took care of it"
+  },
+  "usageQueue.skip_withdrawn": {
+    "value": "{{name}} said it's no longer needed"
+  },
+  "usageQueue.skip_task_canceled": {
+    "value": "{{name}} canceled the task"
+  },
+  "usageQueue.skip_mixed": {
+    "value": "Already handled"
   },
   "actionCard.connect_ai.title": {
     "value": "Connect an AI for {{agents}}"
@@ -5396,9 +5195,6 @@
   },
   "agentActions.skill.updated": {
     "value": "Fixed the skill <b>{{name}}</b>"
-  },
-  "agentActions.agent.settings_changed": {
-    "value": "Changed the settings of <b>{{agentName}}</b>"
   },
   "agentActions.other": {
     "value": "Made a change"
@@ -5891,6 +5687,9 @@
   "profile.nowIn": {
     "value": "now, in #{{channel}}"
   },
+  "profile.answersHere": {
+    "value": "Answers here without an @"
+  },
   "profile.more": {
     "value": "More"
   },
@@ -6151,6 +5950,12 @@
   },
   "presence.agent.out_of_budget": {
     "value": "Monthly budget spent"
+  },
+  "presence.agent.out_of_planShort": {
+    "value": "Out of limit"
+  },
+  "presence.agent.out_of_budgetShort": {
+    "value": "Out of budget"
   },
   "presence.agent.backAt": {
     "value": "back {{when}}"
@@ -8108,6 +7913,9 @@
   "notifications.what.browserProfileRequest": {
     "value": "<b>{{name}}</b> asks for one more browser profile for <b>{{agent}}</b>"
   },
+  "notifications.what.desktopTaken": {
+    "value": "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer"
+  },
   "notifications.what.routineWaitingPlan": {
     "value": "<b>{{name}}</b> is waiting for its plan to reset to run a routine"
   },
@@ -8155,12 +7963,6 @@
   },
   "notifications.what.joinSuggestion": {
     "value": "<b>{{by}}</b> suggested <b>{{name}}</b>"
-  },
-  "notifications.what.changeRequest": {
-    "value": "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>"
-  },
-  "notifications.what.changeRequestAgent": {
-    "value": "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>"
   },
   "notifications.what.invitationAccepted": {
     "value": "<b>{{name}}</b> accepted your invitation and joined {{org}}"
@@ -10632,9 +10434,6 @@
   "proposals.targetRole": {
     "value": "{{name}}'s role"
   },
-  "proposals.targetSettings": {
-    "value": "{{name}}'s settings"
-  },
   "proposals.targetAccess": {
     "value": "{{name}}'s access"
   },
@@ -10769,9 +10568,6 @@
   },
   "proposals.titleAccess": {
     "value": "Change {{name}}'s access"
-  },
-  "proposals.titleSettings": {
-    "value": "Change {{name}}'s settings"
   },
   "proposals.titleSkill": {
     "value": "Fix the skill {{skill}}"
@@ -21671,6 +21467,9 @@
   "brain.free": {
     "value": "Free"
   },
+  "brain.opencodeFreeHint": {
+    "value": "Other free models run through OpenCode on the agent's computer."
+  },
   "brain.modelHelp": {
     "value": "Bigger models think more and use up the plan faster."
   },
@@ -25185,27 +24984,6 @@
   "database.urlInvalid": {
     "value": "Paste an address that starts with postgres://, or fill in the fields under Advanced."
   },
-  "database.scope": {
-    "value": "Which databases"
-  },
-  "database.scopeOne": {
-    "value": "Just this database"
-  },
-  "database.scopeAll": {
-    "value": "Every database on this server"
-  },
-  "database.scopeAllHelp": {
-    "value": "For one database per customer. Agents see the list and pick the database in each query."
-  },
-  "database.prefix": {
-    "value": "Only names starting with"
-  },
-  "database.prefixPlaceholder": {
-    "value": "E.g. customer_"
-  },
-  "database.prefixHelp": {
-    "value": "Leave empty for all. New databases starting this way show up on their own."
-  },
   "database.howTitle": {
     "value": "How do I create a read-only user?"
   },
@@ -25266,9 +25044,6 @@
   "database.how.other.3": {
     "value": "Build the address postgres://agentes_leitura:password@server:5432/database and paste it here."
   },
-  "database.howAll": {
-    "value": "To read every database (Postgres 14 or newer)."
-  },
   "database.openPage": {
     "value": "Open {{name}}"
   },
@@ -25283,9 +25058,6 @@
   },
   "database.database": {
     "value": "Database"
-  },
-  "database.databaseOptional": {
-    "value": "Optional for every database."
   },
   "database.password": {
     "value": "Password"
@@ -25320,68 +25092,14 @@
   "database.error.unknown": {
     "value": "Couldn't connect right now. Try again in a moment."
   },
-  "database.error.no_databases": {
-    "value": "This user can't open any database on this server. Check its permissions or the start of the name."
-  },
   "database.connect": {
     "value": "Connect"
   },
   "database.connectedToast": {
     "value": "{{name}} connected."
   },
-  "database.connectedToastAll": {
-    "value": {
-      "one": "{{name}} connected with {{count}} database.",
-      "other": "{{name}} connected with {{count}} databases."
-    }
-  },
-  "database.count": {
-    "value": {
-      "one": "{{count}} database",
-      "other": "{{count}} databases"
-    }
-  },
-  "database.prefixRow": {
-    "value": "databases starting with {{prefix}}"
-  },
-  "database.refresh": {
-    "value": "Refresh list"
-  },
-  "database.refreshName": {
-    "value": "Refresh the list of databases of {{name}}"
-  },
-  "database.scopeEdit": {
-    "value": "Databases"
-  },
-  "database.scopeEditName": {
-    "value": "Databases of {{name}}"
-  },
-  "database.scopeSaved": {
-    "value": "{{name}} saved."
-  },
-  "database.widenTitle": {
-    "value": "Open the whole server?"
-  },
-  "database.widenTitlePrefix": {
-    "value": "Open more databases?"
-  },
-  "database.widenText": {
-    "value": {
-      "one": "The agent with access will read every database on this server. You can limit it per agent in Rules.",
-      "other": "The {{count}} agents with access will read every database on this server. You can limit it per agent in Rules."
-    }
-  },
-  "database.widenTextPrefix": {
-    "value": {
-      "one": "The agent with access will read every database starting with {{prefix}}. You can limit it per agent in Rules.",
-      "other": "The {{count}} agents with access will read every database starting with {{prefix}}. You can limit it per agent in Rules."
-    }
-  },
   "database.testing.reach": {
     "value": "Reaching the database…"
-  },
-  "database.testing.databases": {
-    "value": "Looking at the databases…"
   },
   "database.testing.tables": {
     "value": "Looking at the tables…"
@@ -25464,24 +25182,6 @@
   "database.rule.tablesHelp": {
     "value": "None checked = every table."
   },
-  "database.rule.tablesIn": {
-    "value": "Tables (seen in {{database}})"
-  },
-  "database.rule.databases": {
-    "value": "Databases"
-  },
-  "database.rule.databasesAll": {
-    "value": "All"
-  },
-  "database.rule.databasesSome": {
-    "value": "Only these"
-  },
-  "database.rule.databasePlaceholder": {
-    "value": "Database name"
-  },
-  "database.rule.databasesHelp": {
-    "value": "The rules below apply to every database this agent reads."
-  },
   "database.rule.hidden": {
     "value": "Columns it never sees"
   },
@@ -25499,9 +25199,6 @@
   },
   "database.rule.capHelp": {
     "value": "Empty = no limit."
-  },
-  "database.rule.capHelpAll": {
-    "value": "Empty = no limit. Counted across every database."
   },
   "database.rule.timeout": {
     "value": "Time limit per query"
@@ -25529,15 +25226,6 @@
   },
   "database.agent.saved": {
     "value": "{{name}}'s database access saved."
-  },
-  "database.agent.allDatabases": {
-    "value": "Every database of {{name}}"
-  },
-  "database.agent.someDatabases": {
-    "value": {
-      "one": "{{count}} database of {{name}}",
-      "other": "{{count}} databases of {{name}}"
-    }
   },
   "mail.choice.gmail.name": {
     "value": "Gmail"
@@ -27459,7 +27147,7 @@
     "value": "How computers work"
   },
   "computers.hostMissing": {
-    "value": "This server can be your agents' computer too: the steps are under “This server as the agents' computer” in <code>SELF_HOSTING.md</code>."
+    "value": "This server can be your agents' computer too: <guide>here's how</guide>."
   },
   "computers.other.title": {
     "value": "Other computers"
@@ -28838,9 +28526,6 @@
   "settings.section.general": {
     "value": "General"
   },
-  "settings.section.right_hand": {
-    "value": "Right hand"
-  },
   "settings.section.members": {
     "value": "Members and invitations"
   },
@@ -28898,9 +28583,6 @@
   "settings.sectionText.general": {
     "value": "Name, time zone and what every agent knows about the workspace."
   },
-  "settings.sectionText.right_hand": {
-    "value": "The assistant that builds the team with each person, in their DM and with their permissions."
-  },
   "settings.sectionText.members": {
     "value": "Who is in the workspace, and invitations."
   },
@@ -28926,7 +28608,7 @@
     "value": "Where the workspace's files live."
   },
   "settings.sectionText.usage": {
-    "value": "Budgets and what each agent spent this month."
+    "value": "How much AI each person and each agent uses, and the month's limits."
   },
   "settings.sectionText.audit": {
     "value": "What the agents did outside the conversation and what people changed. Only admins see it."
@@ -30859,6 +30541,24 @@
   "chat.body.no_ai_not_signed_in": {
     "value": "I can't answer yet: {{brain}} isn't signed in on my computer."
   },
+  "chat.body.no_ai_computer_away": {
+    "value": "I can't answer now: the computer my plan is signed in on is away."
+  },
+  "chat.body.no_ai_plan_limit": {
+    "value": "I can't answer now: the plan I think with reached its limit."
+  },
+  "chat.body.no_ai_plan_not_shared": {
+    "value": "I can't answer you on this plan: it answers only its owner."
+  },
+  "chat.body.no_ai_runner_outdated": {
+    "value": "I can't answer now: the program on my plan's computer needs an update."
+  },
+  "chat.body.no_ai_plan_tools": {
+    "value": "I stopped before answering: my plan's AI on that computer offers tools of its own."
+  },
+  "chat.body.redacted": {
+    "value": "[removed: it looked like a sign-in or a key]"
+  },
   "chat.body.action_connect_ai": {
     "value": "Connect an AI"
   },
@@ -30879,9 +30579,6 @@
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"
-  },
-  "chat.body.settings_proposal": {
-    "value": "Proposed a change to {{names}}"
   },
   "chat.body.approval_request": {
     "value": "Approval request: {{title}}"
@@ -32117,6 +31814,9 @@
   "browser.inCard.forbidden": {
     "value": "You can't see this browser."
   },
+  "browser.inCard.noRole": {
+    "value": "Your role doesn't give you the agents' browsers."
+  },
   "browser.inCard.tooMany": {
     "value": "Too many browsers open at once. This one shows when another one closes."
   },
@@ -32153,8 +31853,23 @@
   "browser.inCard.fullExit": {
     "value": "Exit full screen"
   },
-  "browser.inCard.goToggle": {
-    "value": "Open a site"
+  "browser.inCard.navBack": {
+    "value": "Go back"
+  },
+  "browser.inCard.navForward": {
+    "value": "Go forward"
+  },
+  "browser.inCard.navReload": {
+    "value": "Reload the page"
+  },
+  "browser.inCard.paste": {
+    "value": "Paste"
+  },
+  "browser.inCard.pasteHint": {
+    "value": "Paste what you copied into the page"
+  },
+  "browser.inCard.pasteBlocked": {
+    "value": "Your browser didn't let the page read what you copied. Use {{keys}} on the page."
   },
   "browser.inCard.goLabel": {
     "value": "Site address"
@@ -32188,6 +31903,9 @@
   },
   "browser.inCard.backPlaceholder": {
     "value": "Optional: anything {{name}} should know?"
+  },
+  "browser.inCard.addNote": {
+    "value": "Leave a note"
   },
   "browser.now.ready": {
     "value": "Ready on {{computer}}"
@@ -32918,6 +32636,9 @@
   "desktop.ask.working": {
     "value": "{{name}} pauses while you’re in control."
   },
+  "desktop.ask.titleBrowser": {
+    "value": "Take over the browser?"
+  },
   "desktop.sub.control": {
     "value": "You're in control · {{name}} waits"
   },
@@ -32942,8 +32663,14 @@
   "desktop.takeover": {
     "value": "Take control"
   },
+  "desktop.takeBrowser": {
+    "value": "Take over the browser"
+  },
   "desktop.taking": {
     "value": "Taking control…"
+  },
+  "desktop.returning": {
+    "value": "Handing back to {{name}}…"
   },
   "desktop.clipboard.got": {
     "value": "Copied on {{name}}'s computer:"
@@ -33084,11 +32811,26 @@
     "value": "{{name}} can't use apps on his screen on {{computer}} yet.",
     "female": "{{name}} can't use apps on her screen on {{computer}} yet."
   },
+  "desktop.browserOnly.title": {
+    "value": "You're in the browser, not the whole computer"
+  },
+  "desktop.browserOnly.plan": {
+    "value": "{{name}} thinks with the owner's plan, so only the owner and admins who manage agents control the whole computer"
+  },
+  "desktop.browserOnly.other": {
+    "value": "You can control {{name}}'s browser, not the whole computer"
+  },
+  "desktop.browserOnly.role": {
+    "value": "Your role gives you {{name}}'s browser, not the whole computer"
+  },
   "agentComputer.title": {
     "value": "{{name}}'s computer"
   },
   "agentComputer.open": {
     "value": "Open"
+  },
+  "agentComputer.openOf": {
+    "value": "Open {{name}}'s computer"
   },
   "agentComputer.help": {
     "value": "Help"
@@ -33236,6 +32978,9 @@
   },
   "agentComputer.state.forbidden": {
     "value": "You can't see this computer."
+  },
+  "agentComputer.state.noRole": {
+    "value": "Your role doesn't give you the agents' computers."
   },
   "agentComputer.closeAsk": {
     "value": "{{name}} waits 2 min for you to come back."
@@ -34020,6 +33765,15 @@
   "widgets.home": {
     "value": "My Home"
   },
+  "widgets.seeMore": {
+    "value": "See more"
+  },
+  "widgets.seeMoreHidden": {
+    "value": {
+      "one": "{{count}} more",
+      "other": "{{count}} more"
+    }
+  },
   "widgets.untitled": {
     "value": "New widget"
   },
@@ -34631,5 +34385,1190 @@
   },
   "dashboards.errors.notTested": {
     "value": "Test it first: the widget is created once its test works."
+  },
+  "database.scope": {
+    "value": "Which databases"
+  },
+  "database.scopeOne": {
+    "value": "Just this database"
+  },
+  "database.scopeAll": {
+    "value": "Every database on this server"
+  },
+  "database.scopeAllHelp": {
+    "value": "For one database per customer. Agents see the list and pick the database in each query."
+  },
+  "database.prefix": {
+    "value": "Only names starting with"
+  },
+  "database.prefixPlaceholder": {
+    "value": "E.g. customer_"
+  },
+  "database.prefixHelp": {
+    "value": "Leave empty for all. New databases starting this way show up on their own."
+  },
+  "database.databaseOptional": {
+    "value": "Optional for every database."
+  },
+  "database.testing.databases": {
+    "value": "Looking at the databases…"
+  },
+  "database.error.no_databases": {
+    "value": "This user can't open any database on this server. Check its permissions or the start of the name."
+  },
+  "database.connectedToastAll": {
+    "value": {
+      "one": "{{name}} connected with {{count}} database.",
+      "other": "{{name}} connected with {{count}} databases."
+    }
+  },
+  "database.howAll": {
+    "value": "To read every database (Postgres 14 or newer)."
+  },
+  "database.count": {
+    "value": {
+      "one": "{{count}} database",
+      "other": "{{count}} databases"
+    }
+  },
+  "database.prefixRow": {
+    "value": "databases starting with {{prefix}}"
+  },
+  "database.refresh": {
+    "value": "Refresh list"
+  },
+  "database.refreshName": {
+    "value": "Refresh the list of databases of {{name}}"
+  },
+  "database.rule.databases": {
+    "value": "Databases"
+  },
+  "database.rule.databasesAll": {
+    "value": "All"
+  },
+  "database.rule.databasesSome": {
+    "value": "Only these"
+  },
+  "database.rule.databasePlaceholder": {
+    "value": "Database name"
+  },
+  "database.rule.databasesHelp": {
+    "value": "The rules below apply to every database this agent reads."
+  },
+  "database.rule.tablesIn": {
+    "value": "Tables (seen in {{database}})"
+  },
+  "database.rule.capHelpAll": {
+    "value": "Empty = no limit. Counted across every database."
+  },
+  "database.agent.allDatabases": {
+    "value": "Every database of {{name}}"
+  },
+  "database.agent.someDatabases": {
+    "value": {
+      "one": "{{count}} database of {{name}}",
+      "other": "{{count}} databases of {{name}}"
+    }
+  },
+  "database.scopeEdit": {
+    "value": "Databases"
+  },
+  "database.scopeEditName": {
+    "value": "Databases of {{name}}"
+  },
+  "database.scopeSaved": {
+    "value": "{{name}} saved."
+  },
+  "database.widenTitle": {
+    "value": "Open the whole server?"
+  },
+  "database.widenTitlePrefix": {
+    "value": "Open more databases?"
+  },
+  "database.widenText": {
+    "value": {
+      "one": "The agent with access will read every database on this server. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database on this server. You can limit it per agent in Rules."
+    }
+  },
+  "database.widenTextPrefix": {
+    "value": {
+      "one": "The agent with access will read every database starting with {{prefix}}. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database starting with {{prefix}}. You can limit it per agent in Rules."
+    }
+  },
+  "rightHand.label": {
+    "value": "your right hand"
+  },
+  "rightHand.newDot": {
+    "value": "New"
+  },
+  "rightHand.callWith": {
+    "value": "call with @{{handle}}"
+  },
+  "rightHand.role": {
+    "value": "Workspace assistant"
+  },
+  "rightHand.actsAsYou": {
+    "value": "acts with your permissions"
+  },
+  "rightHand.composerHint": {
+    "value": "nothing changes without you"
+  },
+  "rightHand.intro.greeting": {
+    "value": "Hi, I'm {{name}}. I'll build the team with you."
+  },
+  "rightHand.intro.lead": {
+    "value": "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do."
+  },
+  "rightHand.intro.connect.title": {
+    "value": "Connect an AI for the team"
+  },
+  "rightHand.intro.connect.text": {
+    "value": "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed."
+  },
+  "rightHand.intro.connect.action": {
+    "value": "Connect"
+  },
+  "rightHand.intro.start.question": {
+    "value": "How do you want to start?"
+  },
+  "rightHand.intro.start.createOne": {
+    "value": "Create {{name}}"
+  },
+  "rightHand.intro.start.team": {
+    "value": "Build a starter team"
+  },
+  "rightHand.intro.start.describe": {
+    "value": "Describe what I need"
+  },
+  "rightHand.intro.start.import": {
+    "value": "Import my agents"
+  },
+  "rightHand.intro.start.form": {
+    "value": "Fill in the form"
+  },
+  "rightHand.intro.next.question": {
+    "value": "The team is here. What next?"
+  },
+  "rightHand.intro.next.invite": {
+    "value": "Invite people"
+  },
+  "rightHand.intro.next.firstTask": {
+    "value": "Give {{name}} a first task"
+  },
+  "rightHand.intro.firstTask.theo": {
+    "value": "Plan our first week: what does each of us do first?"
+  },
+  "rightHand.intro.firstTask.ada": {
+    "value": "What could you build or automate for us first?"
+  },
+  "rightHand.intro.firstTask.lia": {
+    "value": "Who are our 5 closest competitors, and what do they do better than us?"
+  },
+  "rightHand.intro.firstTask.atlas": {
+    "value": "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?"
+  },
+  "rightHand.profile.how": {
+    "value": "How it works"
+  },
+  "rightHand.profile.permissions": {
+    "value": "Acts with your permissions"
+  },
+  "rightHand.profile.private": {
+    "value": "Talks only with you in your DM"
+  },
+  "rightHand.profile.channels": {
+    "value": "Replies in channels when called"
+  },
+  "rightHand.profile.model": {
+    "value": "Model"
+  },
+  "rightHand.profile.message": {
+    "value": "Message"
+  },
+  "rightHand.profile.configure": {
+    "value": "Configure"
+  },
+  "rightHand.settings.name": {
+    "value": "Name and look"
+  },
+  "rightHand.settings.nameHelp": {
+    "value": "In the sidebar it always shows as “{{label}}”."
+  },
+  "rightHand.settings.changeLook": {
+    "value": "Change look"
+  },
+  "rightHand.settings.ai": {
+    "value": "AI and model"
+  },
+  "rightHand.settings.aiHelp": {
+    "value": "Automatic picks the cheapest model that does the job."
+  },
+  "rightHand.settings.budget": {
+    "value": "Monthly budget"
+  },
+  "rightHand.settings.perMonth": {
+    "value": "/month"
+  },
+  "rightHand.settings.budgetHelp": {
+    "value": "When it reaches the limit, it stops and tells you, like any agent."
+  },
+  "rightHand.settings.audience": {
+    "value": "Who can use it"
+  },
+  "rightHand.settings.audienceHelp": {
+    "value": "Outside it, a person doesn't see {{name}} in the sidebar."
+  },
+  "rightHand.settings.lock": {
+    "value": "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it."
+  },
+  "rightHand.settings.audit": {
+    "value": "See what {{name}} did"
+  },
+  "rightHand.settings.onPlan": {
+    "value": "Claude plan · {{account}}"
+  },
+  "rightHand.settings.change": {
+    "value": "Change"
+  },
+  "rightHand.settings.planHelp": {
+    "value": "The plan's owner pays. When its computer is away, the conversation says so and offers an API key."
+  },
+  "rightHand.settings.plan": {
+    "value": "A plan"
+  },
+  "rightHand.settings.planOffer": {
+    "value": "{{name}} can think with your plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace."
+  },
+  "rightHand.settings.usePlan": {
+    "value": "Use a plan"
+  },
+  "rightHand.card.settings": {
+    "value": "{{name}} · Settings"
+  },
+  "rightHand.card.apply": {
+    "value": "Apply"
+  },
+  "rightHand.card.dismiss": {
+    "value": "Dismiss"
+  },
+  "rightHand.card.decline": {
+    "value": "Decline"
+  },
+  "rightHand.card.askAdmin": {
+    "value": "Ask an admin"
+  },
+  "rightHand.card.sentTo": {
+    "value": "Sent to {{names}} · {{when}}"
+  },
+  "rightHand.card.sentToAny": {
+    "value": "Sent to whoever decides · {{when}}"
+  },
+  "rightHand.card.appliedBy": {
+    "value": "Applied by {{name}}"
+  },
+  "rightHand.card.appliedByYou": {
+    "value": "Applied by you"
+  },
+  "rightHand.card.declinedBy": {
+    "value": "Declined by {{name}}"
+  },
+  "rightHand.card.declinedByYou": {
+    "value": "Declined by you"
+  },
+  "rightHand.card.undo": {
+    "value": "Undo"
+  },
+  "rightHand.card.undone": {
+    "value": "Undone"
+  },
+  "rightHand.card.stale": {
+    "value": "Out of date"
+  },
+  "rightHand.card.staleHelp": {
+    "value": "{{name}} changed since this card. Nothing was applied."
+  },
+  "rightHand.card.redo": {
+    "value": "Redo"
+  },
+  "rightHand.card.redoMessage": {
+    "value": "Redo the card for {{name}} with today's values"
+  },
+  "rightHand.card.createTest": {
+    "value": "Create and try it"
+  },
+  "rightHand.card.to": {
+    "value": "to"
+  },
+  "rightHand.card.editFirst": {
+    "value": "Edit first"
+  },
+  "rightHand.card.superseded": {
+    "value": "Replaced by the newer proposal"
+  },
+  "rightHand.card.onlyCreators": {
+    "value": "Only admins create agents"
+  },
+  "rightHand.card.only.model": {
+    "value": "Only admins change an agent's model"
+  },
+  "rightHand.card.only.budget": {
+    "value": "Only admins change an agent's budget"
+  },
+  "rightHand.card.only.owner": {
+    "value": "Only admins change who owns an agent"
+  },
+  "rightHand.card.only.archive": {
+    "value": "Only admins archive an agent"
+  },
+  "rightHand.card.only.delete": {
+    "value": "Only admins delete an agent"
+  },
+  "rightHand.card.only.audience": {
+    "value": "Only admins and its owner change who talks to it"
+  },
+  "rightHand.card.only.channels": {
+    "value": "Only admins and its owner change its channels"
+  },
+  "rightHand.card.only.ai_account": {
+    "value": "Only the account's owner gives it"
+  },
+  "rightHand.card.only.many": {
+    "value": "Only admins make these changes"
+  },
+  "rightHand.field.model": {
+    "value": "Model"
+  },
+  "rightHand.field.ai_account": {
+    "value": "AI account"
+  },
+  "rightHand.field.budget": {
+    "value": "Monthly budget"
+  },
+  "rightHand.field.owner": {
+    "value": "Owner"
+  },
+  "rightHand.field.audience": {
+    "value": "Who can talk"
+  },
+  "rightHand.field.archive": {
+    "value": "Status"
+  },
+  "rightHand.field.channel": {
+    "value": "Channel"
+  },
+  "rightHand.value.none": {
+    "value": "None"
+  },
+  "rightHand.value.budgetDefault": {
+    "value": "Workspace default"
+  },
+  "rightHand.value.anAccount": {
+    "value": "An AI account"
+  },
+  "rightHand.value.everyone": {
+    "value": "Everyone"
+  },
+  "rightHand.value.ownerOnly": {
+    "value": "Only its owner"
+  },
+  "rightHand.value.somePeople": {
+    "value": "Some people"
+  },
+  "rightHand.value.active": {
+    "value": "Active"
+  },
+  "rightHand.value.archived": {
+    "value": "Archived"
+  },
+  "rightHand.value.deleted": {
+    "value": "Deleted"
+  },
+  "rightHand.value.notIn": {
+    "value": "Not in it"
+  },
+  "rightHand.value.withoutMention": {
+    "value": "On its own"
+  },
+  "rightHand.value.mentionOnly": {
+    "value": "Only when mentioned"
+  },
+  "rightHand.remove.archiveTitle": {
+    "value": {
+      "one": "Archive {{count}} agent?",
+      "other": "Archive {{count}} agents?"
+    }
+  },
+  "rightHand.remove.deleteTitle": {
+    "value": {
+      "one": "Delete {{count}} agent for good?",
+      "other": "Delete {{count}} agents for good?"
+    }
+  },
+  "rightHand.remove.archiveAll": {
+    "value": "Archive all"
+  },
+  "rightHand.remove.deleteAll": {
+    "value": "Delete all"
+  },
+  "rightHand.remove.archiveSome": {
+    "value": {
+      "one": "Archive {{count}}",
+      "other": "Archive {{count}}"
+    }
+  },
+  "rightHand.remove.deleteSome": {
+    "value": {
+      "one": "Delete {{count}}",
+      "other": "Delete {{count}}"
+    }
+  },
+  "rightHand.remove.deleteHelp": {
+    "value": "Their instructions, memory and routines go for good. Their messages stay."
+  },
+  "agentActions.agent.settings_changed": {
+    "value": "Changed the settings of <b>{{agentName}}</b>"
+  },
+  "notifications.what.changeRequest": {
+    "value": "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>"
+  },
+  "notifications.what.changeRequestAgent": {
+    "value": "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>"
+  },
+  "proposals.targetSettings": {
+    "value": "{{name}}'s settings"
+  },
+  "proposals.titleSettings": {
+    "value": "Change {{name}}'s settings"
+  },
+  "settings.section.right_hand": {
+    "value": "Right hand"
+  },
+  "settings.sectionText.right_hand": {
+    "value": "The assistant that builds the team with each person, in their DM and with their permissions."
+  },
+  "chat.body.settings_proposal": {
+    "value": "Proposed a change to {{names}}"
+  },
+  "shell.moreWhat.team": {
+    "value": "Who's who: people, agents and their groups"
+  },
+  "agentGroups.moved": {
+    "value": "{{name}} moved to the group {{group}}"
+  },
+  "agentGroups.movedOut": {
+    "value": "{{name}} left the group {{group}}"
+  },
+  "agentGroups.undo": {
+    "value": "Undo"
+  },
+  "sidebarAgents.options": {
+    "value": "Agents options"
+  },
+  "sidebarAgents.add": {
+    "value": "New agent or group"
+  },
+  "sidebarAgents.order": {
+    "value": "Order"
+  },
+  "sidebarAgents.sort.workspace": {
+    "value": "Workspace's order"
+  },
+  "sidebarAgents.sort.mine": {
+    "value": "Mine first"
+  },
+  "sidebarAgents.sort.working": {
+    "value": "Working first"
+  },
+  "sidebarAgents.showAll": {
+    "value": "Show agents that don't talk to me"
+  },
+  "sidebarAgents.collapseAll": {
+    "value": "Collapse all"
+  },
+  "sidebarAgents.expandAll": {
+    "value": "Expand all"
+  },
+  "sidebarAgents.organize": {
+    "value": "Organize groups in Team"
+  },
+  "sidebarAgents.seeAll": {
+    "value": {
+      "one": "See the {{count}} agent",
+      "other": "See all {{count}} agents"
+    }
+  },
+  "sidebarAgents.createFirst": {
+    "value": "Create the first agent"
+  },
+  "sidebarAgents.working": {
+    "value": {
+      "one": "{{count}} working",
+      "other": "{{count}} working"
+    }
+  },
+  "sidebarAgents.count": {
+    "value": {
+      "one": "{{count}} agent",
+      "other": "{{count}} agents"
+    }
+  },
+  "sidebarAgents.workingIn": {
+    "value": "working in #{{channel}}"
+  },
+  "sidebarAgents.talksOnly": {
+    "value": "only talks to {{name}}"
+  },
+  "sidebarAgents.talksOnlyMore": {
+    "value": {
+      "one": "only talks to {{name}} and {{count}} more",
+      "other": "only talks to {{name}} and {{count}} more"
+    }
+  },
+  "sidebarAgents.changeGroup": {
+    "value": "Move to group"
+  },
+  "sidebarAgents.newGroupWith": {
+    "value": "New group with {{name}}"
+  },
+  "sidebarAgents.dmsEmpty": {
+    "value": "Your conversations with people show up here."
+  },
+  "sidebarPins.pin": {
+    "value": "Pin to top"
+  },
+  "sidebarPins.unpin": {
+    "value": "Unpin"
+  },
+  "sidebarPins.pinned": {
+    "value": "Pinned"
+  },
+  "sidebarPins.hint": {
+    "value": "Your agents stay on top. Right-click any conversation to pin it."
+  },
+  "sidebarPins.full.agents": {
+    "value": "You already pinned 5 agents. Unpin one to pin this one."
+  },
+  "sidebarPins.full.channels": {
+    "value": "You already pinned 5 channels. Unpin one to pin this one."
+  },
+  "sidebarPins.full.people": {
+    "value": "You already pinned 5 people. Unpin one to pin this one."
+  },
+  "notifications.what.usageLimitWarning": {
+    "value": "You've used {{percent}}% of your limit this month"
+  },
+  "notifications.what.usageLimitReachedSelf": {
+    "value": "You've reached your usage limit for this month"
+  },
+  "notifications.what.usageLimitReached": {
+    "value": "<b>{{name}}</b> reached their {{amount}} limit"
+  },
+  "notifications.what.usageLimitRequest": {
+    "value": "<b>{{name}}</b> reached their {{amount}} limit and asks for more"
+  },
+  "notifications.what.usageLimitRaised": {
+    "value": "<b>{{name}}</b> raised your limit for this month"
+  },
+  "notifications.what.usageLimitRefused": {
+    "value": "<b>{{name}}</b> turned down your request for more"
+  },
+  "notifications.usageLimit.runs": {
+    "value": {
+      "one": "{{count}} request this month",
+      "other": "{{count}} requests this month"
+    }
+  },
+  "notifications.usageLimit.top": {
+    "value": "{{share}}% with {{agent}}"
+  },
+  "notifications.usageLimit.fromRole": {
+    "value": "The {{role}} role's limit."
+  },
+  "notifications.usageLimit.fromRaised": {
+    "value": "Limit raised this month."
+  },
+  "notifications.usageLimit.fromPerson": {
+    "value": "A limit set for this person."
+  },
+  "notifications.usageLimit.fromDefault": {
+    "value": "The workspace's default limit."
+  },
+  "notifications.usageLimit.line": {
+    "value": "{{runs}}. {{from}}"
+  },
+  "agentPage.activity.errors.person_limit": {
+    "value": "The person who asked reached their usage limit for this month."
+  },
+  "routines.code.person_limit": {
+    "value": "Didn't run: its creator reached their usage limit for this month"
+  },
+  "peopleUsage.tabs.summary": {
+    "value": "Summary"
+  },
+  "peopleUsage.tabs.people": {
+    "value": "People"
+  },
+  "peopleUsage.tabs.mine": {
+    "value": "Your usage"
+  },
+  "peopleUsage.view.usage": {
+    "value": "Usage"
+  },
+  "peopleUsage.view.limits": {
+    "value": "Limits"
+  },
+  "peopleUsage.title": {
+    "value": "Usage by person"
+  },
+  "peopleUsage.about": {
+    "value": "You see how much each person uses and with which agents. What private conversations say never shows here."
+  },
+  "peopleUsage.plansAbout": {
+    "value": "The plan is already paid for. This amount only compares use between people."
+  },
+  "peopleUsage.sub": {
+    "value": {
+      "one": "{{month}} · {{count}} person · {{amount}} of AI",
+      "other": "{{month}} · {{count}} people · {{amount}} of AI"
+    }
+  },
+  "peopleUsage.periodLabel": {
+    "value": "Period"
+  },
+  "peopleUsage.period.month": {
+    "value": "This month"
+  },
+  "peopleUsage.period.last7": {
+    "value": "Last 7 days"
+  },
+  "peopleUsage.period.last30": {
+    "value": "Last 30 days"
+  },
+  "peopleUsage.period.lastMonth": {
+    "value": "Last month"
+  },
+  "peopleUsage.role": {
+    "value": "Role"
+  },
+  "peopleUsage.roleAll": {
+    "value": "Role: all"
+  },
+  "peopleUsage.agent": {
+    "value": "Agent"
+  },
+  "peopleUsage.agentAll": {
+    "value": "Agent: all"
+  },
+  "peopleUsage.chips.near": {
+    "value": "Near the limit"
+  },
+  "peopleUsage.chips.at": {
+    "value": "At the limit"
+  },
+  "peopleUsage.chips.idle": {
+    "value": "No use"
+  },
+  "peopleUsage.summary.near": {
+    "value": "{{n}} near the limit"
+  },
+  "peopleUsage.summary.at": {
+    "value": "{{n}} at the limit"
+  },
+  "peopleUsage.summary.idle": {
+    "value": "{{n}} with no use in the period"
+  },
+  "peopleUsage.export": {
+    "value": "Export CSV"
+  },
+  "peopleUsage.limitsHint": {
+    "value": "Set a limit per person in Limits"
+  },
+  "peopleUsage.empty": {
+    "value": "Nobody has used agents this month yet."
+  },
+  "peopleUsage.owner": {
+    "value": "Owner"
+  },
+  "peopleUsage.member": {
+    "value": "Member"
+  },
+  "peopleUsage.columns.person": {
+    "value": "Person"
+  },
+  "peopleUsage.columns.now": {
+    "value": "Now"
+  },
+  "peopleUsage.columns.runs": {
+    "value": "Requests"
+  },
+  "peopleUsage.columns.agents": {
+    "value": "Used most"
+  },
+  "peopleUsage.columns.usage": {
+    "value": "This month"
+  },
+  "peopleUsage.columns.caresFor": {
+    "value": "Looks after"
+  },
+  "peopleUsage.columns.created": {
+    "value": "Created"
+  },
+  "peopleUsage.now.channel": {
+    "value": "With {{agent}} in #{{channel}}"
+  },
+  "peopleUsage.now.private": {
+    "value": "In a private conversation with {{agent}}"
+  },
+  "peopleUsage.now.hidden": {
+    "value": "With {{agent}} in a private channel"
+  },
+  "peopleUsage.now.routine": {
+    "value": "Routine {{name}}"
+  },
+  "peopleUsage.now.last": {
+    "value": "Last used {{when}}"
+  },
+  "peopleUsage.now.never": {
+    "value": "No use"
+  },
+  "peopleUsage.meter.of": {
+    "value": "of {{limit}}"
+  },
+  "peopleUsage.meter.noLimit": {
+    "value": "· no limit"
+  },
+  "peopleUsage.meter.estimate": {
+    "value": "≈ {{amount}} through the API"
+  },
+  "peopleUsage.live.title": {
+    "value": "Now"
+  },
+  "peopleUsage.live.routineOf": {
+    "value": "{{name}}'s routine"
+  },
+  "peopleUsage.from.raised": {
+    "value": "raised this month"
+  },
+  "peopleUsage.from.person": {
+    "value": "set for this person"
+  },
+  "peopleUsage.from.role": {
+    "value": "from the {{role}} role"
+  },
+  "peopleUsage.from.default": {
+    "value": "the workspace's default"
+  },
+  "peopleUsage.drawer.limit": {
+    "value": "This month's limit: {{amount}}"
+  },
+  "peopleUsage.drawer.noLimit": {
+    "value": "No usage limit this month."
+  },
+  "peopleUsage.drawer.reached": {
+    "value": "Reached the limit on {{date}} · {{used}} used"
+  },
+  "peopleUsage.drawer.used": {
+    "value": "{{used}} used · {{percent}}%"
+  },
+  "peopleUsage.drawer.raise": {
+    "value": "Raise limit"
+  },
+  "peopleUsage.drawer.raiseTo": {
+    "value": "New limit for this month in US$"
+  },
+  "peopleUsage.drawer.raiseSave": {
+    "value": "Raise"
+  },
+  "peopleUsage.drawer.raised": {
+    "value": "Limit raised for this month"
+  },
+  "peopleUsage.drawer.asked": {
+    "value": "Asked for more"
+  },
+  "peopleUsage.drawer.days": {
+    "value": "Use per day"
+  },
+  "peopleUsage.drawer.agents": {
+    "value": "With which agents"
+  },
+  "peopleUsage.drawer.runs": {
+    "value": {
+      "one": "{{count}} request",
+      "other": "{{count}} requests"
+    }
+  },
+  "peopleUsage.drawer.recent": {
+    "value": "What they did lately"
+  },
+  "peopleUsage.drawer.untitled": {
+    "value": "Untitled"
+  },
+  "peopleUsage.drawer.with": {
+    "value": "with {{agent}}"
+  },
+  "peopleUsage.drawer.minutes": {
+    "value": "{{n}} min"
+  },
+  "peopleUsage.drawer.private": {
+    "value": "Private conversation with {{agent}}"
+  },
+  "peopleUsage.drawer.hidden": {
+    "value": "In a private channel with {{agent}}"
+  },
+  "peopleUsage.drawer.routine": {
+    "value": "Routine {{name}}"
+  },
+  "peopleUsage.drawer.created": {
+    "value": "Agents they created"
+  },
+  "peopleUsage.drawer.createdAt": {
+    "value": "created on {{date}}"
+  },
+  "peopleUsage.drawer.audit": {
+    "value": "See the agents' actions in Audit"
+  },
+  "peopleUsage.drawer.noUse": {
+    "value": "No use in this period."
+  },
+  "peopleUsage.limits.title": {
+    "value": "Usage limit per person"
+  },
+  "peopleUsage.limits.lead": {
+    "value": "How much AI each person may use a month, across every agent. It counts what they ask for and the routines they created."
+  },
+  "peopleUsage.limits.default": {
+    "value": "Workspace default"
+  },
+  "peopleUsage.limits.defaultHint": {
+    "value": "For anyone without a limit from a role or an exception."
+  },
+  "peopleUsage.limits.byRole": {
+    "value": "By role"
+  },
+  "peopleUsage.limits.people": {
+    "value": "Exceptions"
+  },
+  "peopleUsage.limits.addPerson": {
+    "value": "Add a person"
+  },
+  "peopleUsage.limits.useDefault": {
+    "value": "Use the default"
+  },
+  "peopleUsage.limits.none": {
+    "value": "No limit"
+  },
+  "peopleUsage.limits.amount": {
+    "value": "Monthly limit"
+  },
+  "peopleUsage.limits.rule": {
+    "value": "The person's own limit applies. Without one, the highest of their roles'. Without any, the default. Owners have no limit."
+  },
+  "peopleUsage.limits.whenTitle": {
+    "value": "When someone reaches the limit"
+  },
+  "peopleUsage.limits.block": {
+    "value": "Agents stop starting new work for that person"
+  },
+  "peopleUsage.limits.notify": {
+    "value": "Only tell the admins"
+  },
+  "peopleUsage.limits.warn": {
+    "value": "Warn at 80%"
+  },
+  "peopleUsage.limits.warnHint": {
+    "value": "The person gets a notice, and the admins get another at 100%."
+  },
+  "peopleUsage.limits.saved": {
+    "value": "Limits saved"
+  },
+  "peopleUsage.mine.title": {
+    "value": "You've used {{percent}}% of your limit this month"
+  },
+  "peopleUsage.mine.noLimit": {
+    "value": "You have no usage limit this month"
+  },
+  "peopleUsage.mine.renews": {
+    "value": "It renews on {{date}}."
+  },
+  "peopleUsage.mine.near": {
+    "value": "Close to the limit, ask an admin for more."
+  },
+  "peopleUsage.mine.recent": {
+    "value": "What you did lately"
+  },
+  "peopleUsage.mine.ofLimit": {
+    "value": "{{percent}}% of the limit"
+  },
+  "peopleUsage.card.title": {
+    "value": "You've reached your usage limit for this month"
+  },
+  "peopleUsage.card.text": {
+    "value": "It renews on {{date}}. To keep going now, ask an admin."
+  },
+  "peopleUsage.card.ask": {
+    "value": "Ask for more"
+  },
+  "peopleUsage.card.asked": {
+    "value": "Request sent"
+  },
+  "peopleUsage.card.see": {
+    "value": "See my usage"
+  },
+  "peopleUsage.card.other": {
+    "value": "{{name}} reached their usage limit for this month"
+  },
+  "peopleUsage.card.raised": {
+    "value": "{{name}} raised your limit for this month. You can go on."
+  },
+  "peopleUsage.card.raisedOther": {
+    "value": "{{name}} raised the limit for this month"
+  },
+  "peopleUsage.card.refused": {
+    "value": "{{name}} turned down the request. The limit renews on {{date}}."
+  },
+  "peopleUsage.actions.raise": {
+    "value": "Raise to {{amount}} this month"
+  },
+  "peopleUsage.actions.refuse": {
+    "value": "Decline"
+  },
+  "peopleUsage.actions.see": {
+    "value": "See their usage"
+  },
+  "chat.body.person_limit": {
+    "value": "The person who asked reached their usage limit for this month. To keep going now, ask an admin."
+  },
+  "settings.section.approvals": {
+    "value": "Approvals"
+  },
+  "settings.sectionText.approvals": {
+    "value": "Who decides for you when an agent asks for something that waits for your approval."
+  },
+  "approval.outcomeApprovedCovering": {
+    "value": "Approved by {{name}}, covering {{for}}"
+  },
+  "approval.outcomeRefusedCovering": {
+    "value": "Refused by {{name}}, covering {{for}}"
+  },
+  "approval.outcomeApprovedByYouCovering": {
+    "value": "Approved by you, covering {{for}}"
+  },
+  "approval.outcomeRefusedByYouCovering": {
+    "value": "Refused by you, covering {{for}}"
+  },
+  "approval.outcomeApprovedCoveringYou": {
+    "value": "Approved by {{name}}, covering for you"
+  },
+  "approval.outcomeRefusedCoveringYou": {
+    "value": "Refused by {{name}}, covering for you"
+  },
+  "notifications.what.approvalCover": {
+    "value": "<b>{{name}}</b> picked you in Who approves for me"
+  },
+  "notifications.what.approvalCoverDeclined": {
+    "value": "<b>{{name}}</b> won't approve for you any more"
+  },
+  "notifications.what.approvalCoverEnded": {
+    "value": "<b>{{name}}</b> ended who approves for you"
+  },
+  "approvalCover.title": {
+    "value": "Who approves for me"
+  },
+  "approvalCover.subtitle": {
+    "value": "Decides in your name what is asked of you, and never what that person asked for."
+  },
+  "approvalCover.person": {
+    "value": "Person"
+  },
+  "approvalCover.nobody": {
+    "value": "No one"
+  },
+  "approvalCover.when": {
+    "value": "When"
+  },
+  "approvalCover.whenHelp": {
+    "value": "Out: when your status says you're out of office."
+  },
+  "approvalCover.whileOut": {
+    "value": "Only when I'm out"
+  },
+  "approvalCover.always": {
+    "value": "Always"
+  },
+  "approvalCover.until": {
+    "value": "Until"
+  },
+  "approvalCover.noDate": {
+    "value": "No end date"
+  },
+  "approvalCover.clearDate": {
+    "value": "Remove the date"
+  },
+  "approvalCover.risky": {
+    "value": "Merge, deploy and other risky actions"
+  },
+  "approvalCover.riskyOff": {
+    "value": "Off, these stay with you only."
+  },
+  "approvalCover.riskyOn": {
+    "value": "On, this person decides these too."
+  },
+  "approvalCover.lock": {
+    "value": "Always yours: money, people and roles, AI keys, your mailbox and deleting."
+  },
+  "approvalCover.coveringTitle": {
+    "value": "You approve for"
+  },
+  "approvalCover.coveringSubtitle": {
+    "value": "What is asked of these people reaches you too, and you decide in their name. Never what you asked for."
+  },
+  "approvalCover.coveringWhileOut": {
+    "value": "When they're out"
+  },
+  "approvalCover.coveringUntil": {
+    "value": "until {{date}}"
+  },
+  "approvalCover.coveringNow": {
+    "value": "Covering now"
+  },
+  "approvalCover.decline": {
+    "value": "Stop covering"
+  },
+  "approvalCover.failed": {
+    "value": "Couldn't save. Try again."
+  },
+  "rightHandApprovals.title": {
+    "value": "{{name}} approves for you"
+  },
+  "rightHandApprovals.subtitle": {
+    "value": "Only what came from a request of yours. What it wouldn't approve, it passes to you."
+  },
+  "rightHandApprovals.newAgents": {
+    "value": "Create agents other agents propose"
+  },
+  "rightHandApprovals.newAgentsHelp": {
+    "value": "No apps, open channels only. You can undo it for 24 h."
+  },
+  "rightHandApprovals.agentChanges": {
+    "value": "Change an agent's model, budget and channels"
+  },
+  "rightHandApprovals.agentChangesHelp": {
+    "value": "The model only on the same AI account."
+  },
+  "rightHandApprovals.cantDecide": {
+    "value": "You don't decide this today"
+  },
+  "rightHandApprovals.budget": {
+    "value": "Extra budget, per agent"
+  },
+  "rightHandApprovals.budgetHelp": {
+    "value": "Above that, the request goes to you."
+  },
+  "rightHandApprovals.perMonth": {
+    "value": "/month"
+  },
+  "rightHandApprovals.guidanceLabel": {
+    "value": "How {{name}} decides for you"
+  },
+  "rightHandApprovals.guidanceHelp": {
+    "value": "{{name}} reads this before deciding. Optional."
+  },
+  "rightHandApprovals.guidancePlaceholder": {
+    "value": "E.g.: no duplicate agents\nOnly cheap models for new agents\nNever in customer channels"
+  },
+  "rightHandApprovals.paused": {
+    "value": "Paused: you undid 3 of its decisions this week. Turn it back on when you want."
+  },
+  "rightHandApprovals.card.deciding": {
+    "value": "{{name}} is looking at it for {{for}}…"
+  },
+  "rightHandApprovals.card.approved": {
+    "value": "Approved by {{name}} for {{for}}"
+  },
+  "rightHandApprovals.card.passed": {
+    "value": "{{name}} passed it to you"
+  },
+  "rightHandApprovals.card.passedWhy": {
+    "value": "{{name}} passed it to you: {{reason}}"
+  },
+  "rightHandApprovals.card.outside": {
+    "value": "Outside what you let {{name}} approve"
+  },
+  "rightHandApprovals.card.own": {
+    "value": "{{name}} doesn't decide its own request"
+  },
+  "rightHandApprovals.card.limit": {
+    "value": "{{name}} reached today's limit: this one stays with you"
+  },
+  "rightHandApprovals.card.undoneByYou": {
+    "value": "Undone by you"
+  },
+  "rightHandApprovals.card.undoneBy": {
+    "value": "Undone by {{name}}"
+  },
+  "rightHandApprovals.card.why": {
+    "value": "Why?"
+  },
+  "rightHandApprovals.card.undo": {
+    "value": "Undo"
+  },
+  "rightHandApprovals.card.undoArchives": {
+    "value": "Undo archives {{name}}. It lasts until {{until}}."
+  },
+  "rightHandApprovals.card.undoSettings": {
+    "value": "Undo puts the settings back. It lasts until {{until}}."
+  },
+  "notifications.what.rightHandDecided": {
+    "value": "Requests <b>{{name}}</b> approved for you today: {{count}}"
+  },
+  "notifications.what.rightHandPaused": {
+    "value": "<b>{{name}}</b> stopped approving for you: you undid 3 of its decisions this week"
+  },
+  "rightHandApprovals.card.approvedForYou": {
+    "value": "Approved by {{name}} for you"
+  },
+  "rightHandApprovals.card.decidingForYou": {
+    "value": "{{name}} is looking at it for you…"
+  },
+  "rightHand.people.title": {
+    "value": "Change people"
+  },
+  "rightHand.people.gets": {
+    "value": "Gets {{roles}}"
+  },
+  "rightHand.people.loses": {
+    "value": "Loses {{roles}}"
+  },
+  "rightHand.people.done": {
+    "value": "Done"
+  },
+  "rightHand.people.onlyOwners": {
+    "value": "Only owners change who is an owner"
+  },
+  "rightHand.people.onlyAdmins": {
+    "value": "Only admins change people's roles and remove people"
+  },
+  "rightHand.approvals.title": {
+    "value": "Approvals waiting for you"
+  },
+  "rightHand.approvals.done": {
+    "value": "Decided"
+  },
+  "rightHand.open.open": {
+    "value": "Open"
+  },
+  "rightHand.open.web": {
+    "value": "Open on the website"
+  },
+  "rightHand.open.notAllowed": {
+    "value": "You don't have access to this screen"
+  },
+  "chat.body.action_approvals": {
+    "value": "Approvals waiting for you"
+  },
+  "chat.body.action_open_page": {
+    "value": "Open a screen"
   }
 }

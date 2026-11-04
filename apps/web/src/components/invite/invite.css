@@ -87,7 +87,7 @@
  * body keeps one height across the steps, so the dialog doesn't jump under the pointer between them.
  */
 .invite-steps {
-  margin: 2px 20px 10px;
+  margin: 2px var(--dialog-pad) 10px;
 }
 .ac-dialog__body.invite-dialog {
   min-height: min(340px, 52dvh);
@@ -117,11 +117,6 @@
 /* The answers start where the bubble does: the host's 36px and the 14px beside it. */
 .invite-answer {
   padding-left: 50px;
-}
-@media (max-width: 640px) {
-  .invite-steps {
-    margin: 2px 16px 10px;
-  }
 }
 @media (max-width: 560px) {
   .invite-answer {

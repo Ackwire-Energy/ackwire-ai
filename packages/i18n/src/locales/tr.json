@@ -87,6 +87,24 @@
     "fromAdmin": "Yönetici'den gelir",
     "viaAdmin": "Her şey, Yönetici olduğu için",
     "nothing": "Hiçbir şey",
+    "computer": {
+      "title": "Ajanların bilgisayarları",
+      "levels": {
+        "none": "Hiçbiri",
+        "browser": "Yalnızca tarayıcı",
+        "full": "Bilgisayarın tamamı"
+      },
+      "every": {
+        "none": "Yalnızca Herkes'in zaten yapabildikleri",
+        "browser": "Herhangi bir ajanın tarayıcısı ve oturum açma istekleri, asla tam ekran veya terminal değil",
+        "full": "Herhangi bir ajanın tam ekranı, kontrolü ve terminali"
+      },
+      "own": {
+        "none": "Kimse ajanların bilgisayarlarını, tarayıcılarını veya oturum açma isteklerini göremez ve kullanamaz",
+        "browser": "Kendi ajanlarının tarayıcısı ve kişiye gelen oturum açma istekleri, asla tam ekran değil",
+        "full": "Kendi ajanlarının ve kişinin bağladığı bilgisayarların tam ekranı ve terminali"
+      }
+    },
     "everyoneNote": "Çalışma alanındaki herkese uygulanır. Diğer roller yalnızca buna ekleme yapar.",
     "summary": {
       "owner": "Her zaman her şeyi yapabilir. Her çalışma alanının en az bir sahibi vardır.",
@@ -249,6 +267,24 @@
       "desc": "Masaüstlerini ve tarayıcılarını kontrol etme.",
       "short": "ekranları devralma",
       "say": "ajanların ekranlarını devralır"
+    },
+    "control_browsers": {
+      "title": "Ajanların tarayıcılarını kullanma",
+      "desc": "Herhangi bir ajanın tarayıcısını görme, kontrol etme ve oturum açma isteklerini yanıtlama.",
+      "short": "ajanların tarayıcılarını kullanma",
+      "say": "ajanların tarayıcılarını kullanır"
+    },
+    "own_computers": {
+      "title": "Kendi ajanlarının bilgisayarını kullanma",
+      "desc": "Sorumlu olduğu ajanların ve bağladığı bilgisayarların tam ekranı ve terminali.",
+      "short": "kendi ajanlarının bilgisayarını kullanma",
+      "say": "kendi ajanlarının bilgisayarını kullanır"
+    },
+    "own_browsers": {
+      "title": "Kendi ajanlarının tarayıcısını kullanma",
+      "desc": "Sorumlu olduğu ajanların tarayıcısı ve kendisine gelen oturum açma istekleri.",
+      "short": "kendi ajanlarının tarayıcısını kullanma",
+      "say": "kendi ajanlarının tarayıcısını kullanır"
     },
     "manage_connectors": {
       "title": "Uygulama bağlama",
@@ -1091,6 +1127,7 @@
     "copyText": "Metni kopyala",
     "textCopied": "Metin kopyalandı.",
     "copyLink": "Bağlantıyı kopyala",
+    "openComputer": "Bilgisayarı aç",
     "linkCopied": "Bağlantı kopyalandı.",
     "saveToWiki": "Wiki'ye kaydet",
     "pin": "Mesajı sabitle",
@@ -1130,6 +1167,63 @@
     "none": {
       "terms": "Bu sunucunun kullanım koşulları sayfası yok",
       "privacy": "Bu sunucunun gizlilik sayfası yok"
+    }
+  },
+  "approvalCover": {
+    "title": "Benim yerime kim onaylar",
+    "subtitle": "Sizden istenenlere sizin adınıza karar verir, o kişinin kendi isteklerine asla.",
+    "person": "Kişi",
+    "nobody": "Kimse",
+    "when": "Ne zaman",
+    "whenHelp": "Dışarıda: durumunuz ofis dışında olduğunuzu söylediğinde.",
+    "whileOut": "Yalnızca dışarıdayken",
+    "always": "Her zaman",
+    "until": "Bitiş",
+    "noDate": "Tarih yok",
+    "clearDate": "Tarihi kaldırın",
+    "risky": "Merge, deploy ve diğer riskli işlemler",
+    "riskyOff": "Kapalı, bunlar yalnızca sizde kalır.",
+    "riskyOn": "Açık, bunlara da bu kişi karar verir.",
+    "lock": "Her zaman sizde: para, kişiler ve roller, yapay zeka anahtarları, posta kutunuz ve silme.",
+    "coveringTitle": "Yerine onayladığınız kişiler",
+    "coveringSubtitle": "Bu kişilerden istenenler size de gelir ve onların adına karar verirsiniz. Kendi isteklerinize asla.",
+    "coveringWhileOut": "Kişi dışarıdayken",
+    "coveringUntil": "{{date}} tarihine kadar",
+    "coveringNow": "Şu an yerine bakıyorsunuz",
+    "decline": "Yerine bakmayı bırakın",
+    "failed": "Kaydedilemedi. Tekrar deneyin."
+  },
+  "rightHandApprovals": {
+    "title": "{{name}} sizin yerinize onaylar",
+    "subtitle": "Yalnızca sizin bir isteğinizden gelenler. Onaylamayacaklarını size iletir.",
+    "newAgents": "Diğer ajanların önerdiği ajanları oluşturmak",
+    "newAgentsHelp": "Uygulama yok, yalnızca açık kanallar. 24 saat boyunca geri alabilirsiniz.",
+    "agentChanges": "Bir ajanın modelini, bütçesini ve kanallarını değiştirmek",
+    "agentChangesHelp": "Model yalnızca aynı yapay zeka hesabında.",
+    "cantDecide": "Bunu şu an siz karar vermiyorsunuz",
+    "budget": "Ajan başına ek bütçe",
+    "budgetHelp": "Bunun üstünde istek size gelir.",
+    "perMonth": "/ay",
+    "guidanceLabel": "{{name}} sizin yerinize nasıl karar verir",
+    "guidanceHelp": "{{name}} karar vermeden önce bunu okur. İsteğe bağlı.",
+    "guidancePlaceholder": "Ör.: aynı işi yapan ajan olmasın\nYeni ajanlara yalnızca ucuz modeller\nMüşteri kanallarına asla",
+    "paused": "Duraklatıldı: bu hafta 3 kararını geri aldınız. İstediğinizde yeniden açın.",
+    "card": {
+      "deciding": "{{name}}, {{for}} adına inceliyor…",
+      "approved": "{{name}}, {{for}} adına onayladı",
+      "passed": "{{name}} bunu size iletti",
+      "passedWhy": "{{name}} bunu size iletti: {{reason}}",
+      "outside": "{{name}} adlı yardımcıya izin verdiğiniz kapsamın dışında",
+      "own": "{{name}} kendi isteğine karar vermez",
+      "limit": "{{name}} bugünkü sınıra ulaştı: bu sizde kalıyor",
+      "undoneByYou": "Sizin tarafınızdan geri alındı",
+      "undoneBy": "{{name}} tarafından geri alındı",
+      "why": "Neden?",
+      "undo": "Geri al",
+      "undoArchives": "Geri almak {{name}} adlı ajanı arşivler. {{until}} saatine kadar geçerli.",
+      "undoSettings": "Geri almak ayarları eski haline getirir. {{until}} saatine kadar geçerli.",
+      "approvedForYou": "{{name}} sizin adınıza onayladı",
+      "decidingForYou": "{{name}} sizin adınıza inceliyor…"
     }
   },
   "noticePrefs": {
@@ -1219,14 +1313,14 @@
       "drive": "Dosyalar, raporlar ve tablolar",
       "routines": "Ajanların zamanında kendi başlarına yaptıkları",
       "calendar": "Toplantılar ve son tarihler",
-      "forum": "Bir kararın birkaç bakış açısına ihtiyacı olduğunda"
+      "forum": "Bir kararın birkaç bakış açısına ihtiyacı olduğunda",
+      "team": "Kim kimdir: kişiler, ajanlar ve grupları"
     },
     "customizeSidebar": "Kenar çubuğunu özelleştir",
     "sidebarMenu": {
       "title": "Kenar çubuğu",
       "newChannel": "Yeni kanal",
       "addToChannels": "Yeni kanal veya kategori",
-      "addToDms": "Yeni mesaj veya ajan",
       "newMessage": "Yeni mesaj",
       "addMembers": "Kişi veya ajan ekle",
       "channelSettings": "Kanal ayarları",
@@ -1349,7 +1443,49 @@
     "delete": "Grubu sil",
     "deleteTitle": "{{name}} grubu silinsin mi?",
     "deleteText": "Ajanları Ajanlar bölümüne geri döner.",
-    "dropHere": "Ajanları buraya sürükleyin"
+    "dropHere": "Ajanları buraya sürükleyin",
+    "moved": "{{name}} artık {{group}} grubunda",
+    "movedOut": "{{name}}, {{group}} grubundan ayrıldı",
+    "undo": "Geri al"
+  },
+  "sidebarAgents": {
+    "options": "Ajan seçenekleri",
+    "add": "Yeni ajan veya grup",
+    "order": "Sıra",
+    "sort": {
+      "workspace": "Çalışma alanı sırası",
+      "mine": "Önce benimkiler",
+      "working": "Önce çalışanlar"
+    },
+    "showAll": "Benimle konuşmayan ajanları göster",
+    "collapseAll": "Tümünü daralt",
+    "expandAll": "Tümünü genişlet",
+    "organize": "Grupları Ekip'te düzenle",
+    "seeAll_one": "{{count}} ajanı gör",
+    "seeAll_other": "{{count}} ajanın tümünü gör",
+    "createFirst": "İlk ajanı oluştur",
+    "working_one": "{{count}} çalışıyor",
+    "working_other": "{{count}} çalışıyor",
+    "count_one": "{{count}} ajan",
+    "count_other": "{{count}} ajan",
+    "workingIn": "#{{channel}} kanalında çalışıyor",
+    "talksOnly": "yalnızca {{name}} ile konuşur",
+    "talksOnlyMore_one": "yalnızca {{name}} ve {{count}} kişiyle daha konuşur",
+    "talksOnlyMore_other": "yalnızca {{name}} ve {{count}} kişiyle daha konuşur",
+    "changeGroup": "Grubu değiştir",
+    "newGroupWith": "{{name}} ile yeni grup",
+    "dmsEmpty": "Kişilerle konuşmalarınız burada görünür."
+  },
+  "sidebarPins": {
+    "pin": "En üste sabitle",
+    "unpin": "Sabitlemeyi kaldır",
+    "pinned": "En üste sabitlendi",
+    "hint": "Ajanlarınız en üstte kalır. Sabitlemek için herhangi bir konuşmaya sağ tıklayın.",
+    "full": {
+      "agents": "Zaten 5 ajan sabitlediniz. Bunu sabitlemek için birini kaldırın.",
+      "channels": "Zaten 5 kanal sabitlediniz. Bunu sabitlemek için birini kaldırın.",
+      "people": "Zaten 5 kişi sabitlediniz. Bunu sabitlemek için birini kaldırın."
+    }
   },
   "openOnPhone": {
     "qr": "agentes uygulamasına giriş yapmak için QR kodu",
@@ -1512,7 +1648,6 @@
       "thinking": "düşünüyor",
       "writing": "yazıyor"
     },
-    "autoReplyChip": "bahsetme olmadan yanıt verir",
     "more": "Diğer mesaj işlemleri",
     "copyLink": "Bağlantıyı kopyala",
     "linkCopied": "Bağlantı kopyalandı.",
@@ -1594,13 +1729,14 @@
     "typing_other": "{{names}} yazıyor…",
     "callAgent": "Bir ajana seslen",
     "callAgentMenu": "Bu kanaldaki ajanlar",
-    "newMessages": "Yeni mesajlar",
+    "toLatest": "En son mesajlara git",
     "newPill": {
-      "label": "Yeni mesajlar: {{text}}",
+      "label": "En son mesajlara git: {{text}}",
       "count_one": "{{count}} yeni",
       "count_other": "{{count}} yeni",
       "more": "{{names}} ve {{count}} kişi daha",
-      "writing": "{{name}} yazıyor"
+      "writing": "{{name}} yazıyor",
+      "mentionsYou": "sizden bahsedildi"
     },
     "unreadDivider": "Yeni",
     "offline": "Bağlantı yok. Gönderdikleriniz bağlantı gelince kendiliğinden gider.",
@@ -1730,7 +1866,13 @@
       "audience": "Kimler kullanabilir",
       "audienceHelp": "Bunun dışındaki kişi kenar çubuğunda {{name}} adını görmez.",
       "lock": "{{name}} arşivlenemez ve silinemez. Biri onunla konuşmadıkça hiçbir şey paylaşmaz.",
-      "audit": "{{name}} neler yaptı, gör"
+      "audit": "{{name}} neler yaptı, gör",
+      "onPlan": "Claude planı · {{account}}",
+      "change": "Değiştir",
+      "planHelp": "Ücreti planın sahibi öder. Planın bilgisayarına ulaşılamadığında konuşma bunu söyler ve bir API anahtarı önerir.",
+      "plan": "Bir plan",
+      "planOffer": "{{name}}, API anahtarı yerine planınızla düşünebilir. Planın oturum açtığı bilgisayarda çalışır ve bu çalışma alanının dışına ulaşmaz.",
+      "usePlan": "Plan kullan"
     },
     "card": {
       "settings": "{{name}} · Ayarlar",
@@ -1760,6 +1902,7 @@
         "budget": "Bir ajanın bütçesini yalnızca yöneticiler değiştirir",
         "owner": "Bir ajanın sorumlusunu yalnızca yöneticiler değiştirir",
         "archive": "Bir ajanı yalnızca yöneticiler arşivler",
+        "delete": "Bir ajanı yalnızca yöneticiler siler",
         "audience": "Onunla kimin konuşacağını yalnızca yöneticiler ve sorumlusu değiştirir",
         "channels": "Kanallarını yalnızca yöneticiler ve sorumlusu değiştirir",
         "ai_account": "Yalnızca hesabın sahibi verebilir",
@@ -1784,9 +1927,40 @@
       "somePeople": "Bazı kişiler",
       "active": "Etkin",
       "archived": "Arşivlendi",
+      "deleted": "Silindi",
       "notIn": "Kanalda değil",
       "withoutMention": "Kendiliğinden",
       "mentionOnly": "Yalnızca bahsedilince"
+    },
+    "remove": {
+      "archiveTitle_one": "{{count}} ajan arşivlensin mi?",
+      "archiveTitle_other": "{{count}} ajan arşivlensin mi?",
+      "deleteTitle_one": "{{count}} ajan kalıcı olarak silinsin mi?",
+      "deleteTitle_other": "{{count}} ajan kalıcı olarak silinsin mi?",
+      "archiveAll": "Hepsini arşivle",
+      "deleteAll": "Hepsini sil",
+      "archiveSome_one": "{{count}} ajanı arşivle",
+      "archiveSome_other": "{{count}} ajanı arşivle",
+      "deleteSome_one": "{{count}} ajanı sil",
+      "deleteSome_other": "{{count}} ajanı sil",
+      "deleteHelp": "Talimatları, hafızaları ve rutinleri kalıcı olarak silinir. Mesajları kalır."
+    },
+    "people": {
+      "title": "Kişileri değiştir",
+      "gets": "{{roles}} alır",
+      "loses": "{{roles}} kaybeder",
+      "done": "Tamam",
+      "onlyOwners": "Sahibi yalnızca sahipler değiştirir",
+      "onlyAdmins": "Rolleri yalnızca yöneticiler değiştirir ve kişileri çıkarır"
+    },
+    "approvals": {
+      "title": "Sizi bekleyen onaylar",
+      "done": "Karar verildi"
+    },
+    "open": {
+      "open": "Aç",
+      "web": "Sitede aç",
+      "notAllowed": "Bu ekrana erişiminiz yok"
     }
   },
   "routing": {
@@ -1826,6 +2000,14 @@
     "action": "Bağla",
     "locked": "{{name}} için yapay zekayı kim bağlar: API anahtarıyla bir yönetici ya da kendi planıyla {{owner}}.",
     "lockedAdmins": "Yapay zekayı yalnızca bir yönetici bağlayabilir.",
+    "rightHand": {
+      "computer_away": "{{name}} şu an yanıt veremiyor: planın bilgisayarına ulaşılamıyor.",
+      "plan_limit": "{{name}} şu an yanıt veremiyor: plan sınırına ulaştı.",
+      "plan_not_shared": "{{name}}, yalnızca sahibine yanıt veren bir planla düşünüyor.",
+      "runner_outdated": "{{name}} şu an yanıt veremiyor: planın bilgisayarındaki programın güncellenmesi gerekiyor.",
+      "plan_tools": "{{name}} yanıt vermeden durdu: o bilgisayardaki planın yapay zekâsı kendi araçlarını sunuyor.",
+      "useKey": "API anahtarı kullan"
+    },
     "receipt": "Kimse yanıt vermeyecek: bağlı yapay zeka yok",
     "chip": "Yapay zeka yok"
   },
@@ -2031,12 +2213,16 @@
     "extraHint": "Planda ek kullanım açıkken uzun işler %95'in ötesinde sürer. Kapalıyken %95'te duraklar ve plan sıfırlanınca devam eder."
   },
   "usageQueue": {
-    "title_one": "{{agent}} için kaldığı yerden sürecek {{count}} konuşma var",
-    "title_other": "{{agent}} için kaldığı yerden sürecek {{count}} konuşma var",
-    "line": "{{plan}} planı sıfırlanınca, {{when}}, kaldığı yerden sürer. Sırayla, tek tek.",
-    "lineUnknown": "{{plan}} planı sıfırlanır sıfırlanmaz kaldığı yerden sürer. Sırayla, tek tek.",
-    "lineBudget": "Bütçe yenilenince, {{when}}, ya da bir yönetici artırırsa daha önce kaldığı yerden sürer. Sırayla, tek tek.",
-    "shared": "Sıra plana ait: {{agents}} aynı hesabı paylaşıyor.",
+    "back": "{{agent}} {{when}} geri dönüyor",
+    "backPlan": "{{agent}} plan sıfırlanınca geri dönüyor",
+    "backBudget": "{{agent}} bütçe yenilenince geri dönüyor",
+    "resuming": "{{agent}} kaldığı yerden sürdürüyor",
+    "shared_one": "{{agents}} da aynı {{plan}} planını kullanıyor. İkisinin konuşmaları aynı sıraya giriyor.",
+    "shared_other": "{{agents}} da aynı {{plan}} planını kullanıyor. Hepsinin konuşmaları aynı sıraya giriyor.",
+    "about": "Sıra hakkında",
+    "lists": "Konuşmalar",
+    "queuedTab": "Sırada",
+    "skippedTab": "Atlananlar",
     "dm": "{{name}} ile DM",
     "yourDm": "DM'in",
     "thread": "#{{channel}} içindeki ileti dizisi",
@@ -2044,32 +2230,24 @@
     "work": "İş: {{name}}",
     "askedBy": "{{names}} istedi · {{ago}}",
     "paused": "Duraklatıldı · {{ago}}",
-    "after_one": "Sonrasında {{count}} mesaj",
-    "after_other": "Sonrasında {{count}} mesaj",
-    "nothingAfter": "Sonrasında bir şey yok",
-    "wrote_one": "{{names}} sonrasında yazdı",
-    "wrote_other": "{{names}} sonrasında yazdı",
-    "queued": "Sırada",
-    "answering": "Şimdi yanıtlıyor",
-    "hidden_one": "+{{count}} göremediğin konuşmalarda",
-    "hidden_other": "+{{count}} göremediğin konuşmalarda",
+    "answering": "Yanıtlıyor",
+    "hidden_one": "+{{count}} göremediğin konuşma",
+    "hidden_other": "+{{count}} göremediğin konuşma",
     "dontRunAll": "Hiçbirini çalıştırma",
-    "confirmAll_one": "{{count}} konuşma çalıştırılmasın mı?",
-    "confirmAll_other": "Bu {{count}} konuşma çalıştırılmasın mı?",
+    "confirmAll_one": "Bu çalıştırılmasın mı?",
+    "confirmAll_other": "{{count}} konuşmanın hiçbiri çalıştırılmasın mı?",
     "yesDontRun": "Evet, çalıştırma",
     "keep": "Kalsın",
-    "canceledAll_one": "{{count}} konuşma iptal edildi. Sınır geri gelince {{agent}} yanıtlamayacak.",
-    "canceledAll_other": "{{count}} konuşma iptal edildi. Sınır geri gelince {{agent}} yanıtlamayacak.",
-    "empty": "Kaldığı yerden sürecek bir şey yok.",
+    "canceledAll_one": "{{count}} konuşma iptal edildi. {{agent}} yanıtlamayacak.",
+    "canceledAll_other": "{{count}} konuşma iptal edildi. {{agent}} yanıtlamayacak.",
+    "empty": "Planı bekleyen bir şey yok.",
     "waiting_one": "{{count}} konuşma bekliyor",
     "waiting_other": "{{count}} konuşma bekliyor",
-    "closedTitle_one": "{{count}} konuşma yanıt gerektirmedi",
-    "closedTitle_other": "{{count}} konuşma yanıt gerektirmedi",
-    "closedWhy": "Çözülmüş göründükleri için {{agent}} yanıt vermedi.",
-    "closedLine": "Çözülmüş göründükleri için {{agent}} yanıt vermedi. Hâlâ yanıt bekleyen varsa Yine de yanıtla seçeneğini seçin.",
-    "seeConversation": "Konuşmayı gör",
-    "answeredAnyway": "Biri yine de yanıt istedi",
-    "toResume": "Kaldığı yerden sürecek",
+    "skip_solved": "{{name}} bununla zaten ilgilendi",
+    "skip_withdrawn": "{{name}} artık gerek olmadığını söyledi",
+    "skip_task_canceled": "{{name}} görevi iptal etti",
+    "skip_mixed": "Zaten çözüldü",
+    "answeredAnyway": "Yine de yanıtlıyor",
     "switchAi": "{{name}} için yapay zekayı değiştir"
   },
   "actionCard": {
@@ -2412,6 +2590,7 @@
     "messageTo": "{{name}} için mesaj",
     "audienceEdit": "Düzenle",
     "nowIn": "şu an #{{channel}} kanalında",
+    "answersHere": "Burada @ olmadan yanıtlar",
     "more": "Daha fazla",
     "of": "{{name}} profili",
     "presence": "Durum",
@@ -2510,6 +2689,8 @@
       "provider_down": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
       "out_of_plan": "Plan limiti doldu",
       "out_of_budget": "Aylık bütçe bitti",
+      "out_of_planShort": "Limit doldu",
+      "out_of_budgetShort": "Bütçe bitti",
       "backAt": "dönüş: {{when}}",
       "work": "Arka planda: {{subject}}"
     },
@@ -3101,6 +3282,12 @@
     "outcomeApprovedByYou": "Siz onayladınız",
     "outcomeRefusedBy": "{{name}} reddetti",
     "outcomeRefusedByYou": "Siz reddettiniz",
+    "outcomeApprovedCovering": "{{name}}, {{for}} yerine onayladı",
+    "outcomeRefusedCovering": "{{name}}, {{for}} yerine reddetti",
+    "outcomeApprovedByYouCovering": "{{for}} yerine siz onayladınız",
+    "outcomeRefusedByYouCovering": "{{for}} yerine siz reddettiniz",
+    "outcomeApprovedCoveringYou": "{{name}} sizin yerinize onayladı",
+    "outcomeRefusedCoveringYou": "{{name}} sizin yerinize reddetti",
     "refusedByYou": "Siz reddettiniz · {{when}}",
     "expiresIn": "{{time}} içinde sona erer",
     "expired": "Süresi doldu",
@@ -3322,6 +3509,7 @@
       "routineStalled": "<b>{{name}}</b> bir rutini çalıştırmak için bilgisayarı bekliyor",
       "agentUnreached": "Bir rutin <b>{{name}}</b> ajanını çağıramadı",
       "browserProfileRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir tarayıcı profili daha istiyor",
+      "desktopTaken": "<b>{{name}}</b>, <b>{{agent}}</b> ajanının bilgisayar ekranını devraldı",
       "routineWaitingPlan": "<b>{{name}}</b> bir rutini çalıştırmak için planının sıfırlanmasını bekliyor",
       "planResetUnknown": "{{plan}} sınırının ne zaman sıfırlanacağını söylemedi. <b>{{name}}</b> ajanının işi hâlâ bekliyor.",
       "catchUpClosed_one": "<b>{{name}}</b> döndü ve yanıt gerektirmeyen {{count}} konuşmayı atladı",
@@ -3340,10 +3528,31 @@
       "joinSuggestion": "<b>{{by}}</b>, <b>{{name}}</b> kişisini önerdi",
       "changeRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir değişiklik istiyor",
       "changeRequestAgent": "<b>{{name}}</b> yeni bir ajan istiyor: <b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> sizi Benim yerime kim onaylar bölümünde seçti",
+      "approvalCoverDeclined": "<b>{{name}}</b> artık sizin yerinize onaylamayacak",
+      "approvalCoverEnded": "<b>{{name}}</b> sizin yerinize onaylayan kişiyi kaldırdı",
+      "rightHandDecided": "<b>{{name}}</b> adlı yardımcının bugün sizin yerinize onayladığı istekler: {{count}}",
+      "rightHandPaused": "<b>{{name}}</b> artık sizin yerinize onaylamıyor: bu hafta 3 kararını geri aldınız",
       "invitationAccepted": "<b>{{name}}</b> davetinizi kabul etti ve {{org}} çalışma alanına katıldı",
       "invitationAcceptedAny": "<b>{{name}}</b> davetinizi kabul etti",
       "reaction_one": "<b>{{names}}</b> mesajınıza tepki verdi",
-      "reaction_other": "<b>{{names}}</b> mesajınıza tepki verdi"
+      "reaction_other": "<b>{{names}}</b> mesajınıza tepki verdi",
+      "usageLimitWarning": "Bu ayki limitinin %{{percent}} kadarını kullandın",
+      "usageLimitReachedSelf": "Bu ayki kullanım limitine ulaştın",
+      "usageLimitReached": "<b>{{name}}</b> {{amount}} limitine ulaştı",
+      "usageLimitRequest": "<b>{{name}}</b> {{amount}} limitine ulaştı ve daha fazlasını istiyor",
+      "usageLimitRaised": "<b>{{name}}</b> bu ayki limitini artırdı",
+      "usageLimitRefused": "<b>{{name}}</b> daha fazla kullanım isteğini reddetti"
+    },
+    "usageLimit": {
+      "runs_one": "Bu ay {{count}} istek",
+      "runs_other": "Bu ay {{count}} istek",
+      "top": "{{agent}} ile %{{share}}",
+      "fromRole": "{{role}} rolünün limiti.",
+      "fromRaised": "Limit bu ay artırıldı.",
+      "fromPerson": "Bu kişiye özel bir limit.",
+      "fromDefault": "Çalışma alanının varsayılan limiti.",
+      "line": "{{runs}}. {{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -4153,6 +4362,7 @@
         "credential_wrong_provider": "Model {{modelProvider}} sağlayıcısına ait, ama anahtar {{keyProvider}} sağlayıcısına ait.",
         "model_unlisted": "OpenRouter artık {{model}} sunmuyor. Ajanın ayarlarından başka bir model seçin.",
         "no_ai": "Ajana bağlı bir yapay zeka yok.",
+        "person_limit": "İsteyen kişi bu ayki kullanım limitine ulaştı.",
         "org_paused": "Çalışma alanının ajanları duraklatıldı.",
         "org_suspended": "Çalışma alanı kullanılamıyor.",
         "org_deleting": "Çalışma alanı siliniyor.",
@@ -5874,6 +6084,7 @@
       "agent_archived": "Ajan arşivlendi",
       "interrupted": "Sunucu yeniden başlatıldığı için kesildi",
       "no_ai": "Ajanın bağlı yapay zekası yok",
+      "person_limit": "Çalışmadı: oluşturan kişi bu ayki kullanım limitine ulaştı",
       "org_paused": "Çalışmadı: çalışma alanının ajanları duraklatılmıştı",
       "org_suspended": "Çalışmadı: çalışma alanı kullanılamıyordu",
       "org_deleting": "Çalışmadı: çalışma alanı siliniyordu",
@@ -8800,6 +9011,7 @@
     },
     "recommended": "Önerilen",
     "free": "Ücretsiz",
+    "opencodeFreeHint": "Diğer ücretsiz modeller ajanın bilgisayarındaki OpenCode ile çalışır.",
     "modelHelp": "Büyük modeller daha çok düşünür ve planı daha hızlı tüketir.",
     "hidden": "Düşünen yapay zekayı {{owner}} veya bir yönetici seçer.",
     "hiddenAdmins": "Düşünen yapay zekayı yalnızca yöneticiler seçer.",
@@ -11241,7 +11453,7 @@
     "leadCloud": "Ajanlarınızın çalıştığı yer: yalnızca bu çalışma alanına ait, her zaman açık bir bilgisayar.",
     "about": "Bu bilgisayar hakkında",
     "how": "Bilgisayarlar nasıl çalışır",
-    "hostMissing": "Bu sunucu da ajanlarınızın bilgisayarı olabilir: adımlar <code>SELF_HOSTING.md</code> içindeki “This server as the agents' computer” bölümünde.",
+    "hostMissing": "Bu sunucu da ajanlarınızın bilgisayarı olabilir: <guide>nasıl yapılır</guide>.",
     "other": {
       "title": "Diğer bilgisayarlar",
       "text": "Evdeki bir Mac mini ya da başka bir sunucu gibi, bir kodla bağlanır. Her birinin neye izin verdiği o bilgisayarda ayarlanır.",
@@ -11820,7 +12032,8 @@
       "billing": "Plan ve faturalandırma",
       "media": "GIF'ler ve çıkartmalar",
       "voice": "Ses",
-      "apps": "Yapay zeka uygulamaları"
+      "apps": "Yapay zeka uygulamaları",
+      "approvals": "Onaylar"
     },
     "sectionText": {
       "account": "Profiliniz ve uygulamanın size nasıl göründüğü.",
@@ -11835,13 +12048,14 @@
       "skills": "Ajanların ihtiyaç duyduklarında açtıkları Markdown talimatları.",
       "keys": "Planlarınız ve çalışma alanının API anahtarları.",
       "storage": "Çalışma alanının dosyalarının durduğu yer.",
-      "usage": "Bütçeler ve her ajanın bu ay harcadıkları.",
+      "usage": "Her kişinin ve her ajanın ne kadar yapay zekâ kullandığı ve ayın limitleri.",
       "audit": "Ajanların konuşma dışında yaptıkları ve kişilerin değiştirdikleri. Yalnızca yöneticiler görür.",
       "import": "Başka bir uygulamadan ya da çalışma alanından ajan getirin ve bu çalışma alanını istediğiniz yere götürün.",
       "billing": "Bu çalışma alanının agentes.chat planı, kartı ve faturaları uygulamanın dışında, bize ait bir sayfada.",
       "media": "Kişilerin bir konuşmada neler gönderebileceği ve ajanların ne zaman GIF ya da çıkartma göndereceği.",
       "voice": "Konuşmalardaki sesli mesajlar ve sesi metne kimin dönüştürdüğü.",
-      "apps": "Claude, Cursor ve diğer uygulamalardan bu çalışma alanının ajanlarına görev verin."
+      "apps": "Claude, Cursor ve diğer uygulamalardan bu çalışma alanının ajanlarına görev verin.",
+      "approvals": "Bir ajan onayınızı bekleyen bir şey istediğinde sizin yerinize kimin karar vereceği."
     },
     "title": "Ayarlar",
     "account": {
@@ -12025,6 +12239,149 @@
         "jev": "Ajanlar kendiliğinden çıkartmayı yalnızca Jev ile gönderir.",
         "jevLink": "Jev'i kur"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "Özet",
+      "people": "Kişiler",
+      "mine": "Kullanımın"
+    },
+    "view": {
+      "usage": "Kullanım",
+      "limits": "Limitler"
+    },
+    "title": "Kişi başına kullanım",
+    "about": "Her kişinin ne kadar ve hangi ajanlarla kullandığını görürsün. Özel konuşmaların içeriği burada asla görünmez.",
+    "plansAbout": "Plan zaten ödendi. Bu tutar yalnızca kişiler arasındaki kullanımı karşılaştırır.",
+    "sub_one": "{{month}} · {{count}} kişi · {{amount}} yapay zekâ",
+    "sub_other": "{{month}} · {{count}} kişi · {{amount}} yapay zekâ",
+    "periodLabel": "Dönem",
+    "period": {
+      "month": "Bu ay",
+      "last7": "Son 7 gün",
+      "last30": "Son 30 gün",
+      "lastMonth": "Geçen ay"
+    },
+    "role": "Rol",
+    "roleAll": "Rol: tümü",
+    "agent": "Ajan",
+    "agentAll": "Ajan: tümü",
+    "chips": {
+      "near": "Limite yakın",
+      "at": "Limitte",
+      "idle": "Kullanım yok"
+    },
+    "summary": {
+      "near": "Limite yakın: {{n}}",
+      "at": "Limitte: {{n}}",
+      "idle": "Dönemde kullanım yok: {{n}}"
+    },
+    "export": "CSV dışa aktar",
+    "limitsHint": "Limitler bölümünde kişi başına limit belirle",
+    "empty": "Bu ay henüz kimse ajan kullanmadı.",
+    "owner": "Sahip",
+    "member": "Üye",
+    "columns": {
+      "person": "Kişi",
+      "now": "Şimdi",
+      "runs": "İstekler",
+      "agents": "En çok kullanılan",
+      "usage": "Bu ay",
+      "caresFor": "İlgilendiği",
+      "created": "Oluşturdu"
+    },
+    "now": {
+      "channel": "#{{channel}} içinde {{agent}} ile",
+      "private": "{{agent}} ile özel bir konuşmada",
+      "hidden": "Özel bir kanalda {{agent}} ile",
+      "routine": "Rutin {{name}}",
+      "last": "Son kullanım {{when}}",
+      "never": "Kullanım yok"
+    },
+    "meter": {
+      "of": "/ {{limit}}",
+      "noLimit": "· limitsiz",
+      "estimate": "API üzerinden ≈ {{amount}}"
+    },
+    "live": {
+      "title": "Şimdi",
+      "routineOf": "{{name}} rutini"
+    },
+    "from": {
+      "raised": "bu ay artırıldı",
+      "person": "bu kişi için belirlendi",
+      "role": "{{role}} rolünden",
+      "default": "çalışma alanı varsayılanı"
+    },
+    "drawer": {
+      "limit": "Bu ayın limiti: {{amount}}",
+      "noLimit": "Bu ay kullanım limiti yok.",
+      "reached": "{{date}} tarihinde limite ulaştı · {{used}} kullanıldı",
+      "used": "{{used}} kullanıldı · %{{percent}}",
+      "raise": "Limiti artır",
+      "raiseTo": "Bu ay için yeni limit (US$)",
+      "raiseSave": "Artır",
+      "raised": "Limit bu ay için artırıldı",
+      "asked": "Daha fazla istedi",
+      "days": "Günlük kullanım",
+      "agents": "Hangi ajanlarla",
+      "runs_one": "{{count}} istek",
+      "runs_other": "{{count}} istek",
+      "recent": "Son yaptıkları",
+      "untitled": "Başlıksız",
+      "with": "{{agent}} ile",
+      "minutes": "{{n}} dk",
+      "private": "{{agent}} ile özel konuşma",
+      "hidden": "Özel bir kanalda {{agent}} ile",
+      "routine": "Rutin {{name}}",
+      "created": "Oluşturduğu ajanlar",
+      "createdAt": "{{date}} tarihinde oluşturuldu",
+      "audit": "Ajanların eylemlerini Denetim'de gör",
+      "noUse": "Bu dönemde kullanım yok."
+    },
+    "limits": {
+      "title": "Kişi başına kullanım limiti",
+      "lead": "Her kişinin ayda tüm ajanlarda toplam ne kadar yapay zekâ kullanabileceği. İstedikleri ve oluşturdukları rutinler sayılır.",
+      "default": "Çalışma alanı varsayılanı",
+      "defaultHint": "Rolden ya da istisnadan limiti olmayan herkes için geçerli.",
+      "byRole": "Role göre",
+      "people": "İstisnalar",
+      "addPerson": "Kişi ekle",
+      "useDefault": "Varsayılanı kullan",
+      "none": "Limitsiz",
+      "amount": "Aylık limit",
+      "rule": "Kişinin kendi limiti geçerlidir. Yoksa rollerinin en yükseği. Hiçbiri yoksa varsayılan. Sahiplerin limiti yoktur.",
+      "whenTitle": "Biri limite ulaştığında",
+      "block": "Ajanlar o kişi için yeni iş başlatmayı bırakır",
+      "notify": "Yalnızca yöneticilere haber ver",
+      "warn": "%80'de uyar",
+      "warnHint": "Kişi bir bildirim alır, yöneticiler de %100'de bir tane daha alır.",
+      "saved": "Limitler kaydedildi"
+    },
+    "mine": {
+      "title": "Bu ayki limitinin %{{percent}} kadarını kullandın",
+      "noLimit": "Bu ay kullanım limitin yok",
+      "renews": "{{date}} tarihinde yenilenir.",
+      "near": "Limite yakınsın, bir yöneticiden daha fazlasını iste.",
+      "recent": "Son yaptıkların",
+      "ofLimit": "Limitin %{{percent}} kadarı"
+    },
+    "card": {
+      "title": "Bu ayki kullanım limitine ulaştın",
+      "text": "{{date}} tarihinde yenilenir. Şimdi devam etmek için bir yöneticiye sor.",
+      "ask": "Daha fazla iste",
+      "asked": "İstek gönderildi",
+      "see": "Kullanımımı gör",
+      "other": "{{name}} bu ayki kullanım limitine ulaştı",
+      "raised": "{{name}} bu ayki limitini artırdı. Devam edebilirsin.",
+      "raisedOther": "{{name}} bu ayın limitini artırdı",
+      "refused": "{{name}} isteği reddetti. Limit {{date}} tarihinde yenilenir."
+    },
+    "actions": {
+      "raise": "Bu ay {{amount}} olarak artır",
+      "refuse": "Reddet",
+      "see": "Kullanımı gör"
     }
   },
   "usageViews": {
@@ -12573,8 +12930,15 @@
       "work_end_canceled": "{{minutes}} dk sonra durduruldu.",
       "work_end_canceledBy": "{{minutes}} dk sonra {{name}} durdurdu.",
       "no_ai": "Henüz yanıt veremiyorum: bağlı bir yapay zekam yok.",
+      "person_limit": "İsteyen kişi bu ayki kullanım limitine ulaştı. Şimdi devam etmek için bir yöneticiye sor.",
       "no_ai_signed_out": "Henüz yanıt veremiyorum: yapay zekamın oturumu kapalı.",
       "no_ai_not_signed_in": "Henüz yanıt veremiyorum: bilgisayarımda {{brain}} oturumu açık değil.",
+      "no_ai_computer_away": "Şu an yanıt veremiyorum: planımın bilgisayarına ulaşılamıyor.",
+      "no_ai_plan_limit": "Şu an yanıt veremiyorum: düşündüğüm plan sınırına ulaştı.",
+      "no_ai_plan_not_shared": "Bu planla size yanıt veremiyorum: yalnızca sahibine yanıt veriyor.",
+      "no_ai_runner_outdated": "Şu an yanıt veremiyorum: planımın bilgisayarındaki programın güncellenmesi gerekiyor.",
+      "no_ai_plan_tools": "Yanıt vermeden durdum: o bilgisayarda planımın yapay zekâsı kendi araçlarını sunuyor.",
+      "redacted": "[kaldırıldı: bir oturum açma bilgisi ya da anahtar gibi görünüyordu]",
       "action_connect_ai": "Yapay zeka bağla",
       "action_connect_app": "{{name}} bağla",
       "action_add_mcp": "Bir MCP sunucusu ekle",
@@ -12610,7 +12974,9 @@
       "stuck": "Takıldım ve bitirmeden durdum.",
       "forum_suggestion": "Forum açmaya değer mi? \"{{title}}\"",
       "forum_concluded": "\"{{title}}\" forumu sona erdi. Sentez aşağıdaki dosyada.",
-      "forum_concluded_issues": "\"{{title}}\" forumu sona erdi. Sentez, onaylanacak {{count}} önerilen görevle birlikte aşağıdaki dosyada."
+      "forum_concluded_issues": "\"{{title}}\" forumu sona erdi. Sentez, onaylanacak {{count}} önerilen görevle birlikte aşağıdaki dosyada.",
+      "action_approvals": "Sizi bekleyen onaylar",
+      "action_open_page": "Bir ekran aç"
     }
   },
   "builtinTools": {
@@ -13185,6 +13551,7 @@
       "noComputer": "{{name}} ajanının bağlı bir bilgisayarı yok.",
       "noComputerCloud": "{{name}} ajanının bilgisayarı hazırlanıyor.",
       "forbidden": "Bu tarayıcıyı göremezsiniz.",
+      "noRole": "Rolünüz ajanların tarayıcılarına erişim vermiyor.",
       "tooMany": "Aynı anda çok fazla tarayıcı açık. Bu, başka biri kapanınca görünür.",
       "unavailable": "Tarayıcı şu anda gösterilemiyor. Yeniden deneniyor…",
       "closed": "{{name}} ajanının tarayıcısı kapalı.",
@@ -13197,7 +13564,12 @@
       "subHidden": "Kontrol {{person}} kişisinde · ekran gizli",
       "full": "Tam ekran",
       "fullExit": "Tam ekrandan çık",
-      "goToggle": "Site aç",
+      "navBack": "Geri git",
+      "navForward": "İleri git",
+      "navReload": "Sayfayı yenile",
+      "paste": "Yapıştır",
+      "pasteHint": "Kopyaladığını sayfaya yapıştır",
+      "pasteBlocked": "Tarayıcın kopyaladığını okumaya izin vermedi. Sayfada {{keys}} kullan.",
       "goLabel": "Site adresi",
       "goPlaceholder": "ornek.com gibi bir adres yazın",
       "go": "Aç",
@@ -13208,7 +13580,8 @@
       "backTitle": "{{name}} ajanına geri ver",
       "doneTitle": "Bitti. {{name}} için bir not?",
       "backLabel": "{{name}} için not",
-      "backPlaceholder": "İsteğe bağlı: {{name}} ajanının bilmesi gereken bir şey var mı?"
+      "backPlaceholder": "İsteğe bağlı: {{name}} ajanının bilmesi gereken bir şey var mı?",
+      "addNote": "Not bırak"
     },
     "now": {
       "ready": "{{computer}} üzerinde hazır",
@@ -13543,7 +13916,8 @@
     "ask": {
       "watching": "Yalnızca izliyorsunuz.",
       "title": "Kontrolü almak ister misiniz?",
-      "working": "Kontrol sizdeyken {{name}} duraklar."
+      "working": "Kontrol sizdeyken {{name}} duraklar.",
+      "titleBrowser": "Tarayıcıyı devralmak ister misiniz?"
     },
     "sub": {
       "control": "Kontrol sizde · {{name}} bekliyor",
@@ -13557,7 +13931,9 @@
     },
     "retry": "Tekrar dene",
     "takeover": "Kontrolü al",
+    "takeBrowser": "Tarayıcıyı devral",
     "taking": "Kontrol alınıyor…",
+    "returning": "{{name}} ajanına geri veriliyor…",
     "clipboard": {
       "got": "{{name}} bilgisayarında kopyalandı:",
       "copy": "Kopyala",
@@ -13624,11 +14000,18 @@
       "linuxOnly": "Ajanlar kendi ekranlarında uygulamaları yalnızca Linux bilgisayarlarda kullanır.",
       "agent": "{{name}}, {{computer}} üzerinde kendi ekranındaki uygulamaları henüz kullanamıyor.",
       "agent_female": "{{name}}, {{computer}} üzerinde kendi ekranındaki uygulamaları henüz kullanamıyor."
+    },
+    "browserOnly": {
+      "title": "Tüm bilgisayarda değil, tarayıcıdasınız",
+      "plan": "{{name}} sahibinin planıyla düşünüyor, bu yüzden tüm bilgisayarı yalnızca sahibi ve ajanları yöneten yöneticiler kontrol eder",
+      "other": "{{name}} adlı ajanın tarayıcısını kontrol edebilirsiniz, tüm bilgisayarı değil",
+      "role": "Rolünüz size {{name}} adlı ajanın tarayıcısını verir, tüm bilgisayarı değil"
     }
   },
   "agentComputer": {
     "title": "{{name}} ajanının bilgisayarı",
     "open": "Aç",
+    "openOf": "{{name}} ajanının bilgisayarını aç",
     "help": "Yardım",
     "button": "Bilgisayar",
     "choose": "Bir bilgisayar seçin",
@@ -13684,7 +14067,8 @@
       "noScreenHelp": "Araçlar ve erişim bölümünden ekrana veya tarayıcıya izin verin.",
       "noComputer": "{{name}} için bir bilgisayar seçin.",
       "browserOff": "{{name}} ajanının tarayıcısı {{computer}} üzerinde kapalı",
-      "forbidden": "Bu bilgisayarı göremezsiniz."
+      "forbidden": "Bu bilgisayarı göremezsiniz.",
+      "noRole": "Rolünüz ajanların bilgisayarlarına erişim vermiyor."
     },
     "closeAsk": "{{name}}, geri dönmeniz için 2 dakika bekler.",
     "openAccess": "Araçlar ve erişimi aç",
@@ -14025,6 +14409,9 @@
       "open": "Aç"
     },
     "home": "Ana sayfam",
+    "seeMore": "Daha fazla gör",
+    "seeMoreHidden_one": "{{count}} tane daha",
+    "seeMoreHidden_other": "{{count}} tane daha",
     "untitled": "Yeni widget",
     "updatedAgo": "{{when}} güncellendi",
     "removed": {

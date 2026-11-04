@@ -15,6 +15,7 @@ import type {
   ApiClient,
   AppNotification,
   Approval,
+  ApprovalCovers,
   ApprovalRule,
   AuditRow,
   AuthConfig,
@@ -63,10 +64,14 @@ import type {
   NewAgentSetup,
   OrgRole,
   OrgSettings,
+  PeopleUsage,
   Person,
+  PersonLimits,
+  PersonUsage,
   PlanAccountUsage,
   Proposal,
   ReactionCount,
+  RightHandApprovals,
   Role,
   Run,
   RunConsultation,
@@ -77,6 +82,7 @@ import type {
   SidebarItem,
   SidebarItems,
   SidebarSection,
+  SidebarView,
   SignInOptions,
   SpeechKey,
   StoragePlatform,
@@ -213,6 +219,10 @@ export interface FakeState {
   /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
   keyRefusal?: string;
   approvals: Approval[];
+  /** Who approves for me, and whom I approve for (ADR 0139). */
+  approvalCovers?: ApprovalCovers;
+  /** What the right hand approves for me (ADR 0139 §2); unset: off, as a new member has it. */
+  rightHandApprovals?: RightHandApprovals;
   /** How many of the newest the unfiltered list returns (the server's window); all when unset. */
   approvalsWindow?: number;
   /** What each agent runs without asking ("Aprovar sempre"), by agent id; unset = none. */
@@ -248,17 +258,26 @@ export interface FakeState {
   agentStatuses?: AgentStatus[];
   /** Per agent: what it picks up when its plan or budget is back (`agents.usageQueue`). */
   usageQueues?: Record<string, UsageQueue>;
+  /** Uso › Pessoas (ADR 0141); unset: nobody used agents yet. */
+  peopleUsage?: PeopleUsage;
+  /** A person's month by id; unset: an empty month. */
+  personUsage?: Record<string, PersonUsage>;
+  personLimits?: PersonLimits;
   memories: Memory[];
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
   autoReply: Record<string, boolean>;
   /** A channel's exceptions (ADR 0134), by channel id. */
   channelPermissions: Record<string, ChannelOverride[]>;
-  /** `unread`: its count (0 when unset); the last message is the channel's latest in `messages`. */
+  /**
+   * `unread`: its count (0 when unset); the last message is the channel's latest in `messages`. `everRead: false`:
+   * never read by me yet (`dms.markRead` sets it).
+   */
   dms: {
     channelId: string;
     with: { type: "person" | "agent"; id: string; name: string; handle: string | null };
     unread?: number;
+    everRead?: boolean;
   }[];
   calls: { method: string; args: unknown[] }[];
   context?: string;
@@ -392,6 +411,8 @@ export interface FakeState {
   issuesView?: IssuesView;
   /** The sidebar's tools in my order (`orgs.sidebarToolOrder`); unset = the default. */
   sidebarToolOrder?: SidebarItem[];
+  /** How my sidebar shows the agents and what I pinned (`orgs.sidebarView`); unset = never changed. */
+  sidebarView?: SidebarView;
   /**
    * The task manager (ADR 0128, `working.taskManager`); unset = a server without it (no `working` part). Stopping a
    * task (`agents.cancelRun`) moves it to `ended`, stopped by me.
@@ -433,6 +454,7 @@ export function seedRoles(): OrgRole[] {
         "talk_to_agents",
         "assign_work",
         "pair_computers",
+        "own_computers",
         "edit_wiki",
         "upload_files",
       ],
@@ -469,8 +491,16 @@ const PERMISSION_AREAS = [
   },
   {
     id: "tools",
-    use: ["pair_computers", "control_computers"],
-    keys: ["pair_computers", "control_computers", "manage_connectors", "manage_credentials"],
+    use: ["pair_computers"],
+    keys: [
+      "pair_computers",
+      "own_browsers",
+      "own_computers",
+      "control_browsers",
+      "control_computers",
+      "manage_connectors",
+      "manage_credentials",
+    ],
   },
   {
     id: "knowledge",
@@ -1420,8 +1450,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("roles.reorder", orgId, ids);
         state.roles = roles().map((r) => (ids.includes(r.id) ? { ...r, position: ids.indexOf(r.id) } : r));
       },
-      setFor: async (orgId, userId, roleIds) => {
+      setFor: async (orgId, userId, roleIds, via) => {
         log("roles.setFor", orgId, userId, roleIds);
+        if (via) log("via", via);
         const m = state.members.find((x) => x.userId === userId);
         if (m) m.roleIds = [...roleIds];
         return { roleIds: [...roleIds] };
@@ -1582,6 +1613,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.sidebarToolOrder = order ? [...order] : undefined;
         return [...(order ?? SIDEBAR_ITEMS)];
       },
+      sidebarView: async () =>
+        structuredClone(state.sidebarView ?? { agentSort: "workspace", showAllAgents: false, pins: null }),
+      setSidebarView: async (orgId, view) => {
+        log("orgs.setSidebarView", orgId, view);
+        state.sidebarView = structuredClone(view);
+        return structuredClone(view);
+      },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
         const m = state.members.find((x) => x.userId === state.me?.user.id);
@@ -1619,8 +1657,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           uploads: { usedBytes24h: 0, limitBytesPerDay: null },
         },
       members: async () => state.members,
-      changeRole: async (orgId, userId, role: Role) => {
+      changeRole: async (orgId, userId, role: Role, via) => {
         log("orgs.changeRole", orgId, userId, role);
+        if (via) log("via", via);
         const m = state.members.find((x) => x.userId === userId);
         if (m) m.role = role;
       },
@@ -1634,8 +1673,9 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           routines: 0,
         };
       },
-      removeMember: async (orgId, userId) => {
+      removeMember: async (orgId, userId, via) => {
         log("orgs.removeMember", orgId, userId);
+        if (via) log("via", via);
         state.members = state.members.filter((m) => m.userId !== userId);
         for (const a of state.agents) if (a.ownerUserId === userId) a.ownerUserId = state.me?.user.id ?? null;
       },
@@ -1762,6 +1802,53 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const inv = state.invitations.find((i) => i.id === invitationId);
         if (inv) inv.roleIds = roleIds;
         return { roleIds };
+      },
+      peopleUsage: async () =>
+        state.peopleUsage ?? {
+          month: new Date().toISOString().slice(0, 7),
+          since: new Date().toISOString(),
+          until: new Date().toISOString(),
+          totalUsd: 0,
+          plansOnly: false,
+          limitsOn: false,
+          people: [],
+          live: [],
+        },
+      peopleUsageCsvUrl: (orgId) => `/api/app/organizations/${orgId}/usage/people.csv`,
+      personUsage: async (_orgId, userId) =>
+        state.personUsage?.[userId] ?? {
+          userId,
+          name: state.members.find((m) => m.userId === userId)?.name ?? "",
+          image: null,
+          roleIds: [],
+          owner: false,
+          money: seesCost(),
+          renewsAt: new Date().toISOString(),
+          since: new Date().toISOString(),
+          until: new Date().toISOString(),
+          limit: { percent: null, state: "none", requested: false, reachedAt: null },
+          total: 0,
+          days: [],
+          agents: [],
+          recent: [],
+          created: [],
+        },
+      personLimits: async () =>
+        state.personLimits ?? { defaultUsd: null, roles: {}, people: {}, onLimit: "block", warn: true },
+      setPersonLimits: async (orgId, limits) => {
+        log("orgs.setPersonLimits", orgId, limits);
+        state.personLimits = limits;
+        return limits;
+      },
+      requestMoreUsage: async (orgId) => {
+        log("orgs.requestMoreUsage", orgId);
+        return { requestedAt: new Date().toISOString() };
+      },
+      raisePersonLimit: async (orgId, userId, limitUsd) => {
+        log("orgs.raisePersonLimit", orgId, userId, limitUsd);
+      },
+      refuseMoreUsage: async (orgId, userId) => {
+        log("orgs.refuseMoreUsage", orgId, userId);
       },
       planUsage: async () => ({
         month: new Date().toISOString().slice(0, 7),
@@ -2774,7 +2861,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!a) throw new ApiError(404, "not_found", "Approval not found");
         return structuredClone(a);
       },
-      approve: async (orgId, approvalId, reason, always) => {
+      approve: async (orgId, approvalId, reason, always, via) => {
+        if (via) log("via", via);
         if (!always) return decide(orgId, approvalId, "approved", reason);
         const a = state.approvals.find((x) => x.id === approvalId);
         const kind = a?.approveAlways;
@@ -2797,7 +2885,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         }
         return decided;
       },
-      refuse: async (orgId, id, reason) => decide(orgId, id, "refused", reason),
+      refuse: async (orgId, id, reason, via) => {
+        if (via) log("via", via);
+        return decide(orgId, id, "refused", reason);
+      },
       cancel: async (orgId, approvalId) => {
         log("approvals.cancel", orgId, approvalId);
         const a = state.approvals.find((x) => x.id === approvalId);
@@ -2842,6 +2933,37 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const list = state.approvalRules?.[agentId] ?? [];
         if (!list.some((r) => r.id === ruleId)) throw new ApiError(404, "not_found", "Rule not found");
         if (state.approvalRules) state.approvalRules[agentId] = list.filter((r) => r.id !== ruleId);
+      },
+      covers: async (orgId) => {
+        log("approvals.covers", orgId);
+        return structuredClone(state.approvalCovers ?? { cover: null, covering: [] });
+      },
+      setCover: async (orgId, input) => {
+        log("approvals.setCover", orgId, input);
+        const covers = state.approvalCovers ?? { cover: null, covering: [] };
+        state.approvalCovers = { ...covers, cover: { ...input, active: input.mode === "always" } };
+        return structuredClone(state.approvalCovers);
+      },
+      endCover: async (orgId, userId) => {
+        log("approvals.endCover", orgId, userId);
+        const covers = state.approvalCovers ?? { cover: null, covering: [] };
+        state.approvalCovers = {
+          cover: userId === state.me?.user.id ? null : covers.cover,
+          covering: covers.covering.filter((c) => c.userId !== userId),
+        };
+      },
+      rightHand: async (orgId) => {
+        log("approvals.rightHand", orgId);
+        return structuredClone(state.rightHandApprovals ?? rightHandOff(state));
+      },
+      setRightHand: async (orgId, input) => {
+        log("approvals.setRightHand", orgId, input);
+        const before = state.rightHandApprovals ?? rightHandOff(state);
+        state.rightHandApprovals = { ...before, ...input, ...(input.enabled ? { pausedAt: null } : {}) };
+        return structuredClone(state.rightHandApprovals);
+      },
+      undoRightHand: async (orgId, decisionId) => {
+        log("approvals.undoRightHand", orgId, decisionId);
       },
     },
     connectors: {
@@ -2994,7 +3116,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return { channelId };
       },
-      markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
+      markRead: async (orgId, channelId) => {
+        log("dms.markRead", orgId, channelId);
+        const dm = state.dms.find((d) => d.channelId === channelId);
+        if (dm) dm.everRead = true;
+      },
       reads: async () => [],
     },
     reads: {
@@ -3607,4 +3733,21 @@ export function fakeAgentBrain(agentId: string, patch: Partial<AgentBrain> = {})
   if (patch.machines) return brain;
   const computer = brain.computer ?? { machineId: "machine_1", name: "MacBook", online: true };
   return { ...brain, machines: [{ ...computer, options: brain.options }] };
+}
+
+/** The right hand's approvals as a member who never turned them on reads them. */
+export function rightHandOff(state: FakeState): RightHandApprovals {
+  const lodi = state.agents.find((a) => a.builtin === "right_hand");
+  return {
+    enabled: false,
+    newAgents: true,
+    agentChanges: true,
+    budgetCapNanoUsd: 20_000_000_000,
+    guidance: "",
+    pausedAt: null,
+    rightHand: lodi ? { id: lodi.id, name: lodi.name } : null,
+    mayDecide: { newAgents: true, agentChanges: true },
+    caps: { decisionsPerDay: 10, newAgentsPerDay: 2, monthNanoUsd: 50_000_000_000 },
+    used: { decisionsToday: 0, newAgentsToday: 0, monthNanoUsd: 0 },
+  };
 }

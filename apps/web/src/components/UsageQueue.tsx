@@ -3,22 +3,23 @@ import { useCancelUsageQueue, useUsageQueue } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { closedNoteText } from "@agenteschat/client/lib/usage-pause";
 import {
-  usageQueueFacts,
-  usageQueueLine,
   usageQueueMeta,
+  usageQueueResuming,
   usageQueueShared,
-  usageQueueState,
+  usageQueueSkippedWhere,
+  usageQueueSkipReason,
+  usageQueueStoppable,
   usageQueueTitle,
   usageQueueWhere,
+  usageQueueWho,
   usageWaitingText,
 } from "@agenteschat/client/lib/usage-queue";
-import { Button, Chip, Dialog, DialogBody, DialogFooter, useNow } from "@agenteschat/ui";
+import { Button, Chip, Dialog, DialogBody, DialogFooter, InfoHint, Segmented, useNow } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { AnswerAnywayButton, DontRunButton, TextAction } from "@/components/UsagePauseCard";
@@ -27,23 +28,26 @@ import { useAgentPresence } from "@/hooks/usePresence";
 import { useToast } from "@/lib/toast";
 import "./computer-queue.css";
 
+/** The dialog's two lists: what it picks up when the limit is back, and what it skipped as already handled. */
+export type UsageQueueTab = "queued" | "skipped";
+
 /**
- * An agent's line of work waiting on its plan or budget (ADR 0118): what it picks up when the limit is back, one
- * conversation at a time in this order, what happened in each since, and "Don't run it" per row ("Don't run any" and
- * "Change its AI" for its owner and admins). A dialog over the page the person is on, opened from its waiting note,
- * its out-of-office line, its page and its owner's notice.
+ * An agent's line of work waiting on its plan or budget (ADR 0118): one short row per conversation in the order it
+ * picks them up, "Não rodar" where the viewer may use it ("Não rodar nenhuma" and "Change its AI" for its owner and
+ * admins), and, in a second list, what it skipped as already handled (ADR 0136). A dialog over the page the person is
+ * on, opened from its waiting note, its out-of-office line, its page and its owner's notice; `tab` "skipped" from a
+ * skip.
  */
-export function SeeUsageQueue({ agentId }: { agentId: string }) {
+export function SeeUsageQueue({ agentId, tab }: { agentId: string; tab?: UsageQueueTab }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <>
       <TextAction onClick={() => setOpen(true)}>{t("queue.see")}</TextAction>
-      {open && <UsageQueueDialog agentId={agentId} open={open} onOpenChange={setOpen} />}
+      {open && <UsageQueueDialog agentId={agentId} open={open} onOpenChange={setOpen} tab={tab} />}
     </>
   );
 }
-
 /** On the agent's page, out of office with conversations waiting: "Sem limite no plano · 7 conversas esperando". */
 export function UsageQueueChip({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
@@ -68,10 +72,13 @@ export function UsageQueueDialog({
   agentId,
   open,
   onOpenChange,
+  tab: initialTab = "queued",
 }: {
   agentId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** The list it opens on, when both have something. */
+  tab?: UsageQueueTab;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -81,31 +88,69 @@ export function UsageQueueDialog({
   const agent = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
   const queue = q.data;
   const waiting = queue ? queue.rows.length + queue.hidden : 0;
-  const queued = queue ? queue.rows.filter((r) => r.state === "queued").length + queue.hidden : 0;
-  const closed = queue?.closed ?? [];
+  const skipped = queue?.closed.length ?? 0;
+  const [chosen, setChosen] = useState<UsageQueueTab>(initialTab);
+  // The switch only when both lists have something: otherwise the one that does.
+  const tab: UsageQueueTab = waiting === 0 ? "skipped" : skipped === 0 ? "queued" : chosen;
   const leave = () => onOpenChange(false);
   // "Não rodar nenhuma?" asked in place takes the whole footer.
   const [asking, setAsking] = useState(false);
+  const title = queue ? usageQueueTitle(t, i18n.language, agent, queue, new Date(now)) : agent;
+  const shared = queue
+    ? usageQueueShared(
+        t,
+        queue.plan,
+        queue.sharedWith.flatMap((id) => dir.agentById.get(id)?.name ?? []),
+      )
+    : null;
   return (
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={queue && waiting > 0 ? usageQueueTitle(t, agent, queue) : agent}
+      title={
+        shared ? (
+          <span className="ac-hintline">
+            {title}
+            <InfoHint name={t("usageQueue.about")}>{shared}</InfoHint>
+          </span>
+        ) : (
+          title
+        )
+      }
+      // Asleep while it waits on the limit, awake (its live state) once it picks up.
+      leading={
+        <AgentAvatar
+          agentId={agentId}
+          name={agent}
+          size="sm"
+          state={queue?.reason && !usageQueueResuming(queue) ? "sleeping" : undefined}
+        />
+      }
       closeLabel={t("common.close")}
       width={440}
-      className="cq-dialog"
-      subtitle={queue && waiting > 0 ? usageQueueLine(t, i18n.language, queue, new Date(now)) : undefined}
+      className="cq-dialog uq-dialog"
     >
       <DialogBody>
         {queue ? (
-          <div className="cq">
-            {waiting > 0 ? (
-              <WaitingRows queue={queue} agent={agent} now={now} titled={closed.length > 0} onLeave={leave} />
-            ) : (
-              closed.length === 0 && <p className="cq__empty">{t("usageQueue.empty")}</p>
+          <div className="uq">
+            {waiting > 0 && skipped > 0 && (
+              <Segmented
+                size="sm"
+                label={t("usageQueue.lists")}
+                value={tab}
+                onValueChange={setChosen}
+                options={[
+                  { value: "queued", label: t("usageQueue.queuedTab"), count: waiting },
+                  { value: "skipped", label: t("usageQueue.skippedTab"), count: skipped },
+                ]}
+              />
             )}
-            {closed.length > 0 && (
-              <SkippedRows rows={closed} agentId={agentId} agent={agent} now={now} onLeave={leave} />
+            {waiting === 0 && skipped === 0 ? (
+              <p className="cq__empty">{t("usageQueue.empty")}</p>
+            ) : tab === "queued" ? (
+              <WaitingRows queue={queue} agentId={agentId} now={now} onLeave={leave} />
+            ) : (
+              <SkippedRows rows={queue.closed} agentId={agentId} now={now} onLeave={leave} />
             )}
           </div>
         ) : q.isError ? (
@@ -114,7 +159,7 @@ export function UsageQueueDialog({
           <LoadingList count={3} />
         )}
       </DialogBody>
-      {queue?.mayStopAll && waiting > 0 && (
+      {queue?.mayStopAll && tab === "queued" && waiting > 0 && (
         <DialogFooter
           bar
           note={
@@ -131,14 +176,22 @@ export function UsageQueueDialog({
             )
           }
         >
-          {queued > 0 && <StopAll agentId={agentId} agent={agent} count={queued} asking={asking} onAsk={setAsking} />}
+          {usageQueueStoppable(queue) > 0 && (
+            <StopAll
+              agentId={agentId}
+              agent={agent}
+              count={usageQueueStoppable(queue)}
+              asking={asking}
+              onAsk={setAsking}
+            />
+          )}
         </DialogFooter>
       )}
     </Dialog>
   );
 }
 
-/** "Ver conversa": the conversation at the message, with the dialog closed. */
+/** A row opens its conversation at the message, with the dialog closed. */
 function useOpenConversation(onLeave: () => void) {
   const { org } = useOrg();
   const navigate = useNavigate();
@@ -158,40 +211,19 @@ function useOpenConversation(onLeave: () => void) {
   };
 }
 
-/** A row's face: the first person who asked (who waits on it), or the agent itself for a routine or long work. */
-function RowFace({
-  agentId,
-  agent,
-  askers,
-  answering,
-}: {
-  agentId: string;
-  agent: string;
-  askers: string[];
-  answering?: boolean;
-}) {
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const asker = askers[0];
-  return asker ? (
-    <PersonAvatar id={asker} name={dir.memberById.get(asker)?.name ?? ""} size="xs" />
-  ) : (
-    <AgentAvatar agentId={agentId} name={agent} size="xs" state={answering ? "thinking" : "idle"} />
-  );
-}
-
+/**
+ * In the order it picks them up, one line each: "1 #suporte · Ana e Bruno · há 40 min", with "Não rodar" only where the
+ * viewer may use it and "Respondendo" on the one it answers now. The whole row opens the conversation.
+ */
 function WaitingRows({
   queue,
-  agent,
+  agentId,
   now,
-  titled,
   onLeave,
 }: {
   queue: UsageQueue;
-  agent: string;
+  agentId: string;
   now: number;
-  /** The skipped section follows, so this one is titled too. */
-  titled: boolean;
   onLeave: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -200,104 +232,80 @@ function WaitingRows({
   const openConversation = useOpenConversation(onLeave);
   const person = (id: string) =>
     id === me.user.id ? t("common.you") : (dir.memberById.get(id)?.name ?? t("channel.unknownPerson"));
-  const shared = usageQueueShared(
-    t,
-    agent,
-    queue.sharedWith.flatMap((id) => dir.agentById.get(id)?.name ?? []),
-  );
   return (
-    <section className="cq__group">
-      {titled && <h3 className="cq__title">{t("usageQueue.toResume")}</h3>}
-      {shared && <p className="cq__rule">{shared}</p>}
+    <>
       {queue.rows.length > 0 && (
-        <ol className="cq__rows">
-          {queue.rows.map((row) => (
-            <li key={row.runId} className="cq__row" data-mine={row.askers.includes(me.user.id) || undefined}>
-              <RowFace
-                agentId={queue.agentId}
-                agent={agent}
-                askers={row.askers}
-                answering={row.state === "answering"}
-              />
-              <span className="cq__text">
-                <span className="cq__l1">
+        <ol className="uq__rows">
+          {queue.rows.map((row, i) => (
+            <li
+              key={row.runId}
+              className="uq__row"
+              title={usageQueueMeta(t, i18n.language, row, person, new Date(now))}
+            >
+              <button type="button" className="uq__open" onClick={() => openConversation(row)}>
+                <span className="uq__n">{i + 1}</span>
+                <span className="uq__what">
                   <b>{usageQueueWhere(t, row, me.user.id, person)}</b>
-                  <span className="cq__time" data-now={row.state === "answering" || undefined}>
-                    {usageQueueState(t, row)}
+                  <span className="uq__meta">{` · ${usageQueueWho(t, i18n.language, row, person, new Date(now))}`}</span>
+                </span>
+              </button>
+              <span className="uq__act">
+                {row.state === "answering" ? (
+                  <span className="uq__now">
+                    <AgentSpinner agentId={agentId} />
+                    {t("usageQueue.answering")}
                   </span>
-                </span>
-                <span className="cq__l2">{usageQueueMeta(t, i18n.language, row, person, new Date(now))}</span>
-                <span className="cq__l2">{usageQueueFacts(t, row, me.user.name)}</span>
-                <span className="cq__acts">
-                  {row.state === "queued" && row.mayStop && <DontRunButton runId={row.runId} may />}
-                  <TextAction onClick={() => openConversation(row)}>{t("usageQueue.seeConversation")}</TextAction>
-                </span>
+                ) : row.mayStop ? (
+                  <DontRunButton runId={row.runId} may />
+                ) : null}
               </span>
             </li>
           ))}
         </ol>
       )}
-      {queue.hidden > 0 && <p className="cq__rule">{t("usageQueue.hidden", { count: queue.hidden })}</p>}
-    </section>
+      {queue.hidden > 0 && <p className="uq__hidden">{t("usageQueue.hidden", { count: queue.hidden })}</p>}
+    </>
   );
 }
 
 /**
- * The catch-ups it skipped in the last day as already handled (ADR 0136): why, "Responder mesmo assim" for who may,
- * and "Ver conversa". A wrong skip is one look and one click away.
+ * What it skipped in the last day as already handled (ADR 0136): where and when over why, and "Responder mesmo assim"
+ * for who may. A wrong skip is one look and one click away.
  */
 function SkippedRows({
   rows,
   agentId,
-  agent,
   now,
   onLeave,
 }: {
   rows: UsageQueueClosedRow[];
   agentId: string;
-  agent: string;
   now: number;
   onLeave: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const { me } = useOrg();
   const openConversation = useOpenConversation(onLeave);
   return (
-    <section className="cq__group">
-      <h3 className="cq__title">{t("usageQueue.closedTitle", { count: rows.length })}</h3>
-      <p className="cq__rule">
-        {t(rows.some((r) => r.mayAnswer && !r.continuedRunId) ? "usageQueue.closedLine" : "usageQueue.closedWhy", {
-          agent,
-        })}
-      </p>
-      <ol className="cq__rows">
-        {rows.map((row) => (
-          <li key={row.runId} className="cq__row" data-mine={row.closed.askers.includes(me.user.id) || undefined}>
-            <RowFace agentId={agentId} agent={agent} askers={row.closed.askers} />
-            <span className="cq__text">
-              <span className="cq__l1">
-                <b>
-                  {row.channelKind === "dm"
-                    ? t("usageQueue.yourDm")
-                    : row.threadId
-                      ? t("usageQueue.thread", { channel: row.channelName ?? "" })
-                      : `#${row.channelName ?? ""}`}
-                </b>
-                <span className="cq__time">{relativeTime(t, i18n.language, row.closed.at, new Date(now))}</span>
-              </span>
-              <span className="cq__l2">{closedNoteText(t, row.closed)}</span>
-              {row.continuedRunId && <span className="cq__l2">{t("usageQueue.answeredAnyway")}</span>}
-              <span className="cq__acts">
-                {row.mayAnswer && !row.continuedRunId && (
-                  <AnswerAnywayButton runId={row.runId} agentId={agentId} closed={row.closed} />
-                )}
-                <TextAction onClick={() => openConversation(row)}>{t("usageQueue.seeConversation")}</TextAction>
-              </span>
+    <ol className="uq__rows">
+      {rows.map((row) => (
+        <li key={row.runId} className="uq__row" data-two="">
+          <button type="button" className="uq__open" onClick={() => openConversation(row)}>
+            <span className="uq__what">
+              <b>{usageQueueSkippedWhere(t, row)}</b>
+              <span className="uq__meta">{` · ${relativeTime(t, i18n.language, row.closed.at, new Date(now))}`}</span>
+              <span className="uq__why">{usageQueueSkipReason(t, row.closed)}</span>
             </span>
-          </li>
-        ))}
-      </ol>
-    </section>
+          </button>
+          <span className="uq__act">
+            {row.continuedRunId ? (
+              <span className="uq__done">{t("usageQueue.answeredAnyway")}</span>
+            ) : row.mayAnswer ? (
+              <AnswerAnywayButton runId={row.runId} agentId={agentId} closed={row.closed} />
+            ) : null}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

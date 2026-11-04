@@ -13,6 +13,7 @@ import {
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { PageTarget, pageTarget } from "./browser";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
 const tags = ["Browser profiles"];
@@ -42,7 +43,7 @@ const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 /**
  * Browser profiles (ADR 0110): named, shared logins on one computer that the agents granted them use, one at a
  * time. Anyone in the workspace sees the list; creating, granting and deleting take `manage_connectors`; logging in
- * ("Fazer login", a person's control on the live view `profile:<id>`) also takes `control_computers`. An agent's
+ * ("Fazer login", a person's control on the live view `profile:<id>`) also takes `control_browsers`. An agent's
  * owner chooses its default among the profiles it has and can ask for another, never grant one.
  */
 export function browserProfileRoutes(deps: AppDeps) {
@@ -148,7 +149,7 @@ export function browserProfileRoutes(deps: AppDeps) {
       security,
       summary: "Fazer login: take control of the profile (agents wait) and open its live view",
       description:
-        '`manage_connectors` with `control_computers`. The live view is `browser.watch` with `agentId: "profile:<id>"` on `/api/ws`. 409 `browser_profile.busy` while another person has it.',
+        '`manage_connectors` with `control_browsers`. The live view is `browser.watch` with `agentId: "profile:<id>"` on `/api/ws`. 409 `browser_profile.busy` while another person has it.',
       request: { params: ProfileParams },
       responses: { 200: json(BrowserProfile), ...errors },
     }),
@@ -180,13 +181,13 @@ export function browserProfileRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/browser-profiles/{profileId}/open",
       tags,
       security,
-      summary: "Open a site in the profile (the person in control)",
-      request: { params: ProfileParams, body: body(z.object({ url: z.string().min(1).max(2048) })) },
+      summary: "Open a site in the profile (the person in control), or go back, forward or reload (`go`)",
+      request: { params: ProfileParams, body: body(PageTarget) },
       responses: { 204: { description: "Opened" }, ...errors },
     }),
     async (c) => {
       const { orgId, profileId } = c.req.valid("param");
-      await openProfilePage(control, c.get("user").id, orgId, profileId, c.req.valid("json").url);
+      await openProfilePage(control, c.get("user").id, orgId, profileId, pageTarget(c.req.valid("json")));
       return c.body(null, 204);
     },
   );

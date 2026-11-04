@@ -71,21 +71,31 @@ describe("the help request card", () => {
 });
 
 describe("whose help request it is", () => {
-  const asked = (requestedForUserId: string | null) => ({ requestedForUserId });
+  const asked = (requestedForUserId: string | null, screen?: "browser" | "desktop") => ({ requestedForUserId, screen });
+  const member = { permissions: ["own_browsers"] };
+  const browsers = { permissions: ["own_browsers", "control_browsers"] };
+  const computers = { permissions: ["own_browsers", "own_computers", "control_browsers", "control_computers"] };
 
   test("the person it was asked of and the agent's responsible person, not everyone else", () => {
-    expect(handoffIsMine(asked("me"), "me", "owner", false)).toBe(true);
-    expect(handoffIsMine(asked("someone"), "me", "me", false)).toBe(true);
-    expect(handoffIsMine(asked("someone"), "me", "owner", false)).toBe(false);
+    expect(handoffIsMine(asked("me"), "me", "owner", member)).toBe(true);
+    expect(handoffIsMine(asked("someone"), "me", "me", member)).toBe(true);
+    expect(handoffIsMine(asked("someone"), "me", "owner", member)).toBe(false);
   });
 
   test("an admin isn't called for one asked of someone else", () => {
-    expect(handoffIsMine(asked("someone"), "me", "owner", true)).toBe(false);
+    expect(handoffIsMine(asked("someone"), "me", "owner", browsers)).toBe(false);
   });
 
-  test("asked of no one in particular: only who may control computers", () => {
-    expect(handoffIsMine(asked(null), "me", null, true)).toBe(true);
-    expect(handoffIsMine(asked(null), "me", null, false)).toBe(false);
+  test("asked of no one in particular: only who may control every agent's screen", () => {
+    expect(handoffIsMine(asked(null), "me", null, browsers)).toBe(true);
+    expect(handoffIsMine(asked(null), "me", null, member)).toBe(false);
+    expect(handoffIsMine(asked(null, "desktop"), "me", null, browsers)).toBe(false);
+    expect(handoffIsMine(asked(null, "desktop"), "me", null, computers)).toBe(true);
+  });
+
+  test("whose roles don't give them that screen: none, not even their own agent's", () => {
+    expect(handoffIsMine(asked("me"), "me", "me", { permissions: [] })).toBe(false);
+    expect(handoffIsMine(asked("me", "desktop"), "me", "me", member)).toBe(false);
   });
 });
 

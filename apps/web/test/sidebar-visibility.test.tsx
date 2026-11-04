@@ -66,7 +66,7 @@ describe("what a member's sidebar lists", () => {
 
   test("no category whose channels are all private ones they're not in", async () => {
     await go(acme("member"));
-    expect(sections()).toEqual(["Canais", "Engenharia", "Mensagens diretas"]);
+    expect(sections()).toEqual(["Canais", "Engenharia", "Agentes", "Mensagens diretas"]);
   });
 
   test("@ offers only the agents that answer them", async () => {
@@ -107,50 +107,43 @@ describe("what a member's sidebar lists", () => {
     expect(picker.textContent).not.toContain("Ada");
   });
 
-  test("owners and admins see every agent's DM, locked ones with the lock, and every category", async () => {
+  test("owners and admins see every category, and the agents that talk to them until they show the rest", async () => {
     await go(acme("owner"));
-    expect(sections()).toEqual(["Canais", "Engenharia", "Diretoria", "Mensagens diretas"]);
+    expect(sections()).toEqual(["Canais", "Engenharia", "Diretoria", "Agentes", "Mensagens diretas"]);
+    expect(agentRows()).toEqual(["Atlas"]);
+    cleanup();
+    const state = acme("owner");
+    state.sidebarView = { agentSort: "workspace", showAllAgents: true, pins: null };
+    await go(state);
+    expect(sections()).toEqual(["Canais", "Engenharia", "Diretoria", "Agentes", "Integrations", "Mensagens diretas"]);
     expect(agentRows()).toEqual(["Atlas", "Ada"]);
+    // The lock explains itself: the line under the name says who it talks to.
     const ada = within(nav()).getByRole("link", { name: /^Ada/ });
     expect(within(ada).getByRole("img", { name: "Pessoal" })).toBeTruthy();
+    expect(ada.querySelector(".sidebar__item-role")?.textContent).toBe("só fala com João");
   });
 });
 
-describe("Equipe on the Mensagens diretas header", () => {
-  const agentsHead = () => {
-    const toggle = [...nav().querySelectorAll(".sidebar__section-toggle")].find(
-      (b) => b.textContent === "Mensagens diretas",
-    );
-    const head = toggle?.closest(".sidebar__section-head");
-    if (!(head instanceof HTMLElement)) throw new Error("no Mensagens diretas header");
-    return head;
-  };
+describe("Equipe, a tool row of its own", () => {
+  const team = () =>
+    within(nav().querySelector(".sidebar__tools") as HTMLElement).getByRole("link", { name: "Equipe" });
 
-  test("a button beside the +, not a row of its own, marked while the page is open", async () => {
+  test("among the tools, marked while the page is open", async () => {
     await go(acme("owner"));
-    const team = within(agentsHead()).getByRole("link", { name: "Equipe" });
-    expect(team.getAttribute("href")).toBe(`/org/${ORG_ID}/team`);
-    expect(team.getAttribute("title")).toBe("Equipe");
-    expect(within(agentsHead()).getByRole("button", { name: "Nova mensagem ou agente" })).toBeTruthy();
-    expect(within(nav()).getAllByRole("link", { name: "Equipe" })).toHaveLength(1);
-    expect(team.getAttribute("data-status")).toBeNull();
+    expect(team().getAttribute("href")).toBe(`/org/${ORG_ID}/team`);
+    expect(team().getAttribute("data-status")).toBeNull();
     cleanup();
     await go(acme("owner"), "team");
-    expect(within(agentsHead()).getByRole("link", { name: "Equipe" }).getAttribute("data-status")).toBe("active");
+    expect(team().getAttribute("data-status")).toBe("active");
   });
 
-  test("the icon rail, which hides the headers, keeps it as a tile", async () => {
+  test("the icon rail keeps it with the other tools", async () => {
     await go(acme("owner"));
-    const teamTiles = () =>
-      [...nav().querySelectorAll(".sidebar__section-body > a.sidebar__item")].filter(
-        (a) => a.getAttribute("href") === `/org/${ORG_ID}/team`,
-      );
-    expect(teamTiles()).toHaveLength(0);
     const toggle = () => within(nav()).getByRole("button", { name: /barra lateral$/ });
     await act(async () => fireEvent.click(toggle()));
     try {
       expect(nav().getAttribute("data-rail")).toBe("true");
-      expect(teamTiles()).toHaveLength(1);
+      expect(team()).toBeTruthy();
     } finally {
       // The rail is kept for the whole page, not per render: back to the full sidebar for the other tests.
       await act(async () => fireEvent.click(toggle()));
@@ -186,7 +179,14 @@ describe("an agent's row", () => {
   test("the role on its own line under the name, and the lock alone at the row's end", async () => {
     const state = acme("owner");
     const ada = state.agents.find((a) => a.id === ADA_ID);
-    if (ada) ada.role = "Assistente de e-mails e agenda da diretoria";
+    if (ada) Object.assign(ada, { role: "Assistente de e-mails e agenda da diretoria", ownerUserId: "u-walter" });
+    // Ada answers Walter and João; pinned or not, the role line is the same.
+    if (ada) ada.audience = { mode: "people", userIds: ["u-joao"] };
+    state.sidebarView = {
+      agentSort: "workspace",
+      showAllAgents: false,
+      pins: { agents: [], channels: [], people: [] },
+    };
     await go(state);
     const row = nav().querySelector(`[data-agent-row="${ADA_ID}"] .sidebar__item`);
     const text = row?.querySelector(":scope > .sidebar__item-text");

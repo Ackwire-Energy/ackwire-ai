@@ -436,7 +436,7 @@ export function advance(state: ContinuationState, d: TurnEndDecision, executed: 
 }
 
 /** Run errors the person already sees explained elsewhere, or that no one can act on. */
-const UNREPORTED = new Set(["agent_archived", "no_ai", "canceled"]);
+const UNREPORTED = new Set(["agent_archived", "no_ai", "person_limit", "canceled"]);
 
 /**
  * A conversation run failed for good (I5): the person accountable for it (the person behind it, else the routine's

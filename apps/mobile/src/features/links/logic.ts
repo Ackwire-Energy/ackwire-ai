@@ -29,6 +29,7 @@ export type AppHref =
   | "/issues"
   | "/connectors"
   | "/me/members"
+  | "/me/approvals"
   | "/settings/computers"
   | "/settings/skills"
   | "/activity"
@@ -226,7 +227,7 @@ export function notificationHref(
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
     return routineHref(s.routineId);
   // Asking for one more browser profile: the agent's page, where its browsers are.
-  if (n.kind === "agent_unreached" || n.kind === "browser_profile_request")
+  if (n.kind === "agent_unreached" || n.kind === "browser_profile_request" || n.kind === "desktop_taken")
     return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
   // What an AI app created as the person: the newest agent, else the newest routine.
@@ -235,6 +236,8 @@ export function notificationHref(
   if (n.kind === "join_request") return "/join-requests";
   // Someone who joined: Membros, where they now are (the app has no "say hi" of its own for them).
   if (n.kind === "invitation_accepted") return "/me/members";
+  // Who approves for whom (ADR 0139): Perfil › Aprovações, where it is set and declined.
+  if (n.kind === "approval_cover" || n.kind === "right_hand_paused") return "/me/approvals";
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed") return "/connectors";
   // An update of a skill from its link: the skill's page, where what waits is applied.
@@ -245,6 +248,8 @@ export function notificationHref(
   if (n.kind === "org_standing") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";
+  // A person's monthly limit (ADR 0141): Uso, where the people's months and one's own are.
+  if (n.kind === "usage_limit") return "/usage";
   // A widget's alert or failure opens the widget; an agent asking to publish a dashboard, the dashboard (ADR 0135).
   if (n.kind === "widget_alert" || n.kind === "widget_failed") return widgetHref(s.widgetId, s.dashboardId);
   if (n.kind === "dashboard_proposal") return boardHref(s.dashboardId);

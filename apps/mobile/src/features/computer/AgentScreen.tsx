@@ -14,7 +14,6 @@ import {
 import { asksMe, liveSubLine } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { can } from "@agenteschat/client/lib/permissions";
 import { bodyTones } from "@agenteschat/ui/agent/engine";
 import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -259,7 +258,7 @@ export function AgentScreen({
   const waiting = handoff && isWaitingHandoff(handoff, now) ? handoff : null;
   const asked = waiting !== null && asksMe(waiting, userId);
   // Whose it is goes by ids, the same rule as the request's card: its owner and who controls computers may help too.
-  const mine = waiting !== null && handoffIsMine(waiting, userId, agent?.ownerUserId, can(org, "control_computers"));
+  const mine = waiting !== null && handoffIsMine(waiting, userId, agent?.ownerUserId, org);
   const ask = inControl && handoff?.kind === "ask";
   const doneLabel = ask ? t("mobile.browser.live.done") : t("mobile.browser.live.handBack");
   const { handBack, couldnt } = useFinishHandoff(inControl ? handoff : null, name, doneLabel);
@@ -299,7 +298,7 @@ export function AgentScreen({
     <Button
       variant="secondary"
       size="sm"
-      label={t("browser.watch.takeover")}
+      label={status?.canControl ? t("desktop.takeover") : t("desktop.takeBrowser")}
       loading={taking}
       onPress={() => void take()}
     />

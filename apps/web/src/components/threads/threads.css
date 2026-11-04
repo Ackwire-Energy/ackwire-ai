@@ -109,7 +109,6 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   box-shadow: none;
 }
 .thread-closed__text {
-  flex: 1 1 220px;
   min-width: 0;
 }
 .thread-closed__actions {
@@ -923,6 +922,57 @@ html:not([data-pointer]) .thread-line:focus-visible {
     width: auto;
     border-radius: 0;
     box-shadow: none;
+  }
+}
+/* A thread beside its channel (`.thread-panel--docked`): in the members column's place under the channel's header,
+   wider than it, with no scrim, so the channel stays in use; closing it brings the members back. The chat keeps
+   400px where it can and never less than 360px; a body too narrow for both (a tablet with the sidebar open) gives
+   the thread the conversation's place under the header until it closes. A phone keeps the whole-screen sheet above. */
+.channel__body {
+  container: channel-body / inline-size;
+}
+.thread-panel--docked {
+  container: thread-dock / inline-size;
+}
+@media (min-width: 861px) {
+  .thread-panel--docked {
+    position: relative;
+    z-index: auto;
+    inset: auto;
+    flex: none;
+    width: clamp(360px, calc(100% - 400px), 640px);
+    border-radius: 0;
+    border-left: 1px solid var(--line);
+    box-shadow: none;
+    animation: ac-fade-in 160ms ease-out;
+  }
+  [data-theme="dark"] .thread-panel--docked {
+    border-left-color: var(--line2);
+  }
+  .channel__body:has(> .thread-panel--docked) {
+    position: relative;
+  }
+  @container channel-body (max-width: 719px) {
+    .thread-panel--docked {
+      position: absolute;
+      z-index: 30;
+      inset: 0;
+      width: auto;
+      border-left: 0;
+    }
+  }
+  /* Narrow beside its channel: the channel's name and who is in it go (the channel is right there, their faces
+     lead the header), so the replies and the time never follow a lone "·". */
+  @container thread-dock (max-width: 479px) {
+    .thread-head__meta > .thread-head__where,
+    .thread-head__meta > .thread-head__where + [aria-hidden="true"] {
+      display: none;
+    }
+  }
+}
+@media (min-width: 861px) and (prefers-reduced-motion: reduce) {
+  .thread-panel--docked {
+    animation: none;
   }
 }
 /* The agent's page in the same panel ("Ver perfil" in its DM): it scrolls inside, so its tabs and

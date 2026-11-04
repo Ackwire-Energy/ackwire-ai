@@ -16,6 +16,8 @@ export interface MuralTile {
   count: number;
   action?: ReactNode;
   body: ReactNode;
+  /** False when the body draws its own sky (the calm state): no horizon under it. */
+  horizon?: boolean;
 }
 
 /** Where Home's fixed tiles start, until the person's home board has come (ADR 0135 §9). */
@@ -39,15 +41,14 @@ export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting:
   const [widgetId, setWidgetId] = useOpenParam("widget");
   const own = withTiles(home.own ?? placeholder(orgId));
   const chosen = home.chosen;
-  // With a chosen board (even before it came), the own home keeps only its fixed tiles here; its widgets stay in
-  // "My Home".
+  // While a chosen board loads, only the own home's fixed tiles; its widgets stay in "My Home".
   const tilesBoard = home.chosenId ? { ...own, widgets: [] } : own;
   const ownEditable = Boolean(home.own?.canEdit);
   const editable = chosen ? chosen.canEdit || ownEditable : ownEditable;
   const title = home.chosenId ? (chosen?.title ?? home.chosenTitle ?? "") : t("widgets.home");
   const count = home.chosenId ? (chosen?.widgets.length ?? 0) : own.widgets.length;
   const tile = (it: MuralTile) => (organize: TileOrganize | null) => (
-    <BoardTile title={it.title} count={it.count} action={it.action} organize={organize}>
+    <BoardTile title={it.title} count={it.count} action={it.action} horizon={it.horizon} organize={organize}>
       {it.body}
     </BoardTile>
   );
@@ -74,18 +75,22 @@ export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting:
           )}
         </span>
       </div>
-      <WidgetBoard
-        orgId={orgId}
-        board={tilesBoard}
-        arranging={arranging && ownEditable}
-        {...fixed}
-        onOpen={(id) => setWidgetId(id)}
-      />
-      {chosen && chosen.widgets.length > 0 && (
+      {/* One grid: the fixed tiles among the widgets of what Início shows, so either moves anywhere in it. */}
+      {chosen ? (
         <WidgetBoard
           orgId={orgId}
           board={chosen}
-          arranging={arranging && chosen.canEdit}
+          arranging={arranging && (chosen.canEdit || ownEditable)}
+          {...fixed}
+          homeTiles={{ boardId: own.id, tiles: own.tiles }}
+          onOpen={(id) => setWidgetId(id)}
+        />
+      ) : (
+        <WidgetBoard
+          orgId={orgId}
+          board={tilesBoard}
+          arranging={arranging && ownEditable}
+          {...fixed}
           onOpen={(id) => setWidgetId(id)}
         />
       )}

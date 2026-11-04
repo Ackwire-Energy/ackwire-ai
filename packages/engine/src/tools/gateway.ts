@@ -85,6 +85,18 @@ export const alwaysAsks = (name: string) => {
   );
 };
 
+/** What a mailbox's scopes say is not high risk: a draft stays in the mailbox, reading and filing change nothing. */
+const MAIL_QUIET = new Set(["mail:draft", "mail:read", "mail:organize"]);
+/** Production, can't be undone, or leaves the company; mirrors the client's `approvalRisk` (`approval-kind.ts`). */
+const RISKY_WORDS =
+  /deploy|rollback|workflow|actions\.run|delete|remove|destroy|drop|purge|send|email|mail\b|sms|share|publish/i;
+/**
+ * Merge, deploy, rollback, sends, deletes and whatever "Aprovar sempre" never covers by its name (`alwaysAsks`): a
+ * person covering someone decides these only when that person turned it on (`approval_covers.risky`).
+ */
+export const highRisk = (tool: string, scope: string) =>
+  !MAIL_QUIET.has(scope) && (alwaysAsks(tool) || ALWAYS_SENSITIVE.test(scope) || RISKY_WORDS.test(`${tool} ${scope}`));
+
 /**
  * The kind "Aprovar sempre" would cover for this call (`approval_rules`), or null when it is never offered: only
  * on a run that isn't a routine's, whose policy didn't make the call ask, for a tool its source lets be
@@ -551,6 +563,8 @@ export function createToolGateway(deps: {
         detail: (described.detail ?? "").slice(0, APPROVAL_DETAIL_CHARS),
         why: request.why,
         ownerUserId: owner,
+        requestedByUserId: authority.personId,
+        highRisk: highRisk(tool.name, tool.scope),
         // Decided by its time at the latest (else its run asks then), and within a day like any request.
         expiresAt: new Date(Math.min(slot.runAt.getTime(), now().getTime() + APPROVAL_TTL_MS)),
         routineId: slot.routineId,
@@ -1094,6 +1108,8 @@ export function createToolGateway(deps: {
             expiresAt: new Date(now().getTime() + APPROVAL_TTL_MS),
             approveAlways: remember,
             approvers: asked?.approvers ?? null,
+            requestedByUserId: authority ? (authority.personId ?? routineCreatorOf(authority)) : null,
+            highRisk: highRisk(tool.name, tool.scope),
           })
           .onConflictDoNothing()
           .returning();

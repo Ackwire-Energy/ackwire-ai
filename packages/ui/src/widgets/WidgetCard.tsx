@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 import { Button } from "../components/Button";
+import { CardHorizon } from "../components/CardHorizon";
+import { CardMore, useCardCut } from "../components/CardMore";
 import { cx } from "../cx";
 import { useDarkTheme } from "../hooks/useDarkTheme";
 import { Icon } from "../icons/Icon";
@@ -52,8 +54,19 @@ export type WidgetCardProps = {
   onOpen?: () => void;
   /** On a board in Organize: its controls in place of `actions`. */
   organize?: WidgetOrganize | null;
+  /**
+   * On a board: the card's height is capped (S and M one row, L two) and content past it fades out under "See more",
+   * which opens the widget (`onOpen`); a card with room to spare gets the horizon at its foot.
+   */
+  board?: CardBoardLabels;
   className?: string;
 } & Omit<HTMLAttributes<HTMLElement>, "title" | "color">;
+
+/** A card on a board: "See more" and what it hides, for screen readers ("5 more"). */
+export interface CardBoardLabels {
+  seeMore: string;
+  hidden: (count: number) => string;
+}
 
 const FLASH_MS = 1200;
 
@@ -75,12 +88,18 @@ export function WidgetCard({
   actions,
   onOpen,
   organize,
+  board,
   className,
   style,
   ...rest
 }: WidgetCardProps) {
   const dark = useDarkTheme();
   const flash = useFlash(spec);
+  const body = useRef<HTMLDivElement>(null);
+  const capped = Boolean(board) && !organize;
+  const cut = useCardCut(body, capped && Boolean(onOpen));
+  // A number's trend already runs along the foot: no horizon under it.
+  const horizon = capped && status !== "building" && !sparkOf(spec);
   const grip = (e: KeyboardEvent<HTMLButtonElement>) => {
     const delta =
       e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : 0;
@@ -96,6 +115,8 @@ export function WidgetCard({
       data-w={size.w}
       data-h={size.h}
       data-organize={organize ? "" : undefined}
+      data-capped={capped || undefined}
+      data-cut={cut.cut || undefined}
       aria-label={title}
       aria-busy={status === "building" || status === "updating" || undefined}
       style={{ ...widgetTileVars(color, dark), ...style }}
@@ -152,7 +173,7 @@ export function WidgetCard({
           actions && <span className="wg__acts">{actions}</span>
         )}
       </div>
-      <div className={cx("wg__body", flash && "wg__flash")}>
+      <div ref={body} className={cx("wg__body", flash && "wg__flash")}>
         <WidgetBody
           spec={spec}
           status={status}
@@ -162,9 +183,18 @@ export function WidgetCard({
           buildingText={buildingText}
           sparkApart
         />
+        {board && cut.cut && onOpen && (
+          <CardMore
+            label={board.seeMore}
+            hiddenLabel={cut.hidden ? board.hidden(cut.hidden) : undefined}
+            hidden={cut.hidden}
+            onOpen={onOpen}
+          />
+        )}
       </div>
       <div className="wg__foot">{footer}</div>
       <WidgetBleed spec={status === "building" ? null : spec} color={color} size={size} />
+      {horizon && <CardHorizon content={body} />}
     </article>
   );
 }

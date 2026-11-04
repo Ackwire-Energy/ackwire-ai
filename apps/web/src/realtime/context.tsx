@@ -38,6 +38,7 @@ import {
   type ConsultsState,
   cacheAgentProposal,
   cacheApproval,
+  cacheCardDelegate,
   cacheDmRead,
   cacheForumSuggestion,
   cacheMessage,
@@ -774,6 +775,9 @@ export function applyTaskEvent(qc: ReturnType<typeof useQueryClient>, orgId: str
   }
 }
 
+/** A tab away at least this long reads its open conversation again when it comes back (a quick switch doesn't). */
+export const RESYNC_AFTER_HIDDEN_MS = 10_000;
+
 /** Subscribes to a channel while mounted: live runs + message cache updates. */
 export function useChannelRealtime(orgId: string, channelId: string, enabled: boolean) {
   const { connection, streams } = useRealtime();
@@ -788,17 +792,30 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
       if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
     });
-    return connection.onSubscribed((id) => {
-      if (id !== channelId) return;
+    const resync = () => {
       void reconcileChannelRuns(api, streams, orgId, channelId);
-      // A receipt nothing changed while the read was on its way takes it as it is. The lists' copies get the same
-      // receipts, so the page seeding them again (on every change) changes nothing.
-      const before = streams.get().receipts;
-      void catchUpChannel(api, qc, orgId, channelId).then((read) => {
-        streams.seed(read, before);
-        cacheReceipts(qc, orgId, channelId, read);
-      });
+      catchUpLists(api, qc, streams, orgId, channelId);
+    };
+    const offSubscribed = connection.onSubscribed((id) => {
+      if (id === channelId) resync();
     });
+    // Back to the tab after a while: read it again at once. The socket may have died in the meantime (its check takes
+    // seconds), or stayed up while events never reached it (a sleeping tab, the server's pub/sub reconnecting).
+    let hiddenAt: number | null = null;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt ??= Date.now();
+        return;
+      }
+      const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
+      hiddenAt = null;
+      if (away >= RESYNC_AFTER_HIDDEN_MS) resync();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      offSubscribed();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
     if (!connection || !enabled) return;
@@ -835,6 +852,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
       // An agent's proposal of a new agent was created or denied (by anyone): its card.
       if (event.type === "agent.proposal.updated") cacheAgentProposal(qc, orgId, event, event);
+      if (event.type === "card.delegate") cacheCardDelegate(qc, orgId, event, event.delegate);
       // An agent's "Vale um fórum?" card was accepted or dismissed (by anyone).
       if (event.type === "forum.suggestion.updated") {
         cacheForumSuggestion(qc, orgId, channelId, event.messageId, event.suggestion);
@@ -867,17 +885,41 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);
-        else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
+        else {
+          // Too big for its event: the open lists read it (its live block holds until it lands); a closed one, when
+          // it opens again.
+          void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId], refetchType: "none" });
+          catchUpLists(api, qc, streams, orgId, channelId);
+        }
         // A new top-level message may get agent replies in its thread: start watching it.
         if (event.message) startThreadCache(qc, orgId, event.message);
         // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines. An agent's
         // sticker after its reply (ADR 0091) changes none of them.
-        if (event.message?.threadId && !isMediaAfterReply(event.message.meta)) {
+        if ((event.message ? event.message.threadId : event.threadId) && !isMediaAfterReply(event.message?.meta)) {
           void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
         }
       }
     });
-  }, [connection, enabled, orgId, channelId, qc, streams]);
+  }, [connection, enabled, orgId, channelId, qc, streams, api]);
+}
+
+/**
+ * Reads a conversation's open lists and adds what they lack (`catchUpChannel`). A receipt nothing changed while the
+ * read was on its way takes it as it is. The lists' copies get the same receipts, so the page seeding them again (on
+ * every change) changes nothing.
+ */
+function catchUpLists(
+  api: ApiClient,
+  qc: ReturnType<typeof useQueryClient>,
+  streams: StreamsStore,
+  orgId: string,
+  channelId: string,
+) {
+  const before = streams.get().receipts;
+  void catchUpChannel(api, qc, orgId, channelId).then((read) => {
+    streams.seed(read, before);
+    cacheReceipts(qc, orgId, channelId, read);
+  });
 }
 
 /** An open task's activity, live: comments and events from others land in its feed (`useIssueLive`). */

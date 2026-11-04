@@ -391,7 +391,11 @@ export function BrowserCard({
                   }
                 />
               ) : null}
-              <TypeBar {...browserTyping(live.sendInput)} />
+              <TypeBar
+                {...browserTyping(live.sendInput, () =>
+                  toast({ title: t("desktop.clipboard.tooLong", agentGrammar(name)), icon: "x" }),
+                )}
+              />
               {/* A take over asked for nothing: it only hands back. */}
               {handoff?.kind === "ask" ? (
                 <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={6} style={styles.couldnt}>

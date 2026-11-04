@@ -41,6 +41,8 @@ test("GET /me: an owner may do everything; a member what the base role gives", a
     "assign_work",
     "create_channels",
     "edit_wiki",
+    "own_browsers",
+    "own_computers",
     "pair_computers",
     "post",
     "read",

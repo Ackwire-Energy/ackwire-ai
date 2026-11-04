@@ -536,6 +536,8 @@ describe("Configurações do workspace", () => {
     ).toEqual([
       "Sua conta",
       "Notificações",
+      // Whether the right hand approves for them is each person's own choice.
+      "Aprovações",
       // Each person connects their own AI apps (ADR 0119).
       "Apps de IA",
       // The people, where a member who may not invite suggests someone (ADR 0090).

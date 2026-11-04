@@ -1,8 +1,19 @@
+import { LOCKED_BRAIN_PROTOCOL } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNull, type SQL, schema, sql } from "@agenteschat/db";
+import { serverText } from "@agenteschat/i18n";
+import { appLocale } from "@agenteschat/i18n/locale";
 import { AUTO_MODEL } from "@agenteschat/providers";
+import type { Agent } from "./agents";
+import type { NoAiReason } from "./ai-status";
+import { recordAudit } from "./audit";
+import type { BrainUnavailability } from "./brains/select";
 import { ForbiddenError } from "./errors";
+import type { MachineStatus } from "./machine-hub";
+import { personBehindCall } from "./requester";
+import type { AgentRun } from "./runs";
+import { scrubSignIns } from "./tool-detail";
 
-const { agents, agentBudgetPeriods, organizationMembers, organizations, users } = schema;
+const { agents, agentBudgetPeriods, machineAccounts, organizationMembers, organizations, users } = schema;
 
 /**
  * The team's right hand (ADR 0137): one built-in agent per workspace that sets the team up and changes it, through
@@ -161,3 +172,102 @@ export async function refuseRightHand(db: Executor, orgId: string, agentId: stri
 export const rightHandReaches = (agent: SQL, channelId: SQL) =>
   sql`(${agent}.builtin = ${RIGHT_HAND} and exists (select 1 from ${schema.channels} rhc
     where rhc.id = ${channelId} and rhc.kind = 'channel' and rhc.archived_at is null and rhc.deleted_at is null))`;
+
+/**
+ * Its reply before it is posted (ADR 0137 §4): a sign-in or a key in it (`scrubSignIns`) becomes a note in the language
+ * of the person behind the run, and the audit log says how many were taken out, never what. On a Codex or Cursor
+ * plan a command could read the plan's own sign-in before the runner kills the turn: this is the last line.
+ */
+export async function scrubRightHandReply(
+  db: Executor,
+  run: Pick<AgentRun, "orgId" | "id" | "agentId" | "channelId" | "triggerMessageId">,
+  text: string,
+): Promise<string> {
+  if (scrubSignIns(text, "").found === 0) return text;
+  const personId = await personBehindCall({
+    db,
+    orgId: run.orgId,
+    runId: run.id,
+    triggerMessageId: run.triggerMessageId,
+  }).catch(() => null);
+  const [person] = personId ? await db.select({ locale: users.locale }).from(users).where(eq(users.id, personId)) : [];
+  const out = scrubSignIns(text, serverText(appLocale([person?.locale], true) ?? "en", "chat.body.redacted"));
+  await recordAudit(db, {
+    orgId: run.orgId,
+    actor: { type: "agent", id: run.agentId },
+    action: "right_hand.reply_redacted",
+    target: { type: "agent", id: run.agentId },
+    details: { found: out.found },
+    runId: run.id,
+    channelId: run.channelId,
+    onBehalfOfUserId: personId,
+  });
+  return out.text;
+}
+
+/** Its computer turns' permission profile: the runner's locked-down `chat` (`LOCKED_BRAIN_PROTOCOL`). */
+export const RIGHT_HAND_TURN = { mode: "chat" } as const;
+
+type ThinkingAgent = Pick<Agent, "orgId" | "brainAccountId" | "machineId"> &
+  Partial<Pick<Agent, "builtin" | "ownerUserId">>;
+
+/**
+ * An agent as its brain sees it. The right hand is on no computer and its owner is the workspace's (`followOwner`):
+ * on a plan it thinks on the computer where that plan's account is signed in, and the plan is its owner's (who pays,
+ * as for any agent, ADR 0059 §3). With no account it has no computer. Every other agent is itself.
+ */
+export async function thinkingAgent<T extends ThinkingAgent>(db: Executor, agent: T): Promise<T> {
+  if (!isRightHand(agent)) return agent;
+  const [plan] = agent.brainAccountId
+    ? await db
+        .select({ machineId: machineAccounts.machineId, ownerId: machineAccounts.createdBy })
+        .from(machineAccounts)
+        .where(and(eq(machineAccounts.orgId, agent.orgId), eq(machineAccounts.id, agent.brainAccountId)))
+    : [];
+  return { ...agent, machineId: plan?.machineId ?? null, ownerUserId: plan?.ownerId ?? null };
+}
+
+/**
+ * Why its turn can't think on the plan now, beyond what any computer brain checks (null: it can): a runner that
+ * can't lock the CLI down, or someone else's DM while "Atende outras pessoas" is off. `agent` is `thinkingAgent`'s.
+ */
+export async function rightHandPlanRefusal(
+  db: Executor,
+  agent: Pick<Agent, "name" | "ownerUserId" | "planForOthers">,
+  run: Pick<AgentRun, "orgId" | "id" | "triggerMessageId">,
+  status: Pick<MachineStatus, "name" | "protocol"> | null,
+): Promise<BrainUnavailability | null> {
+  if (!agent.planForOthers) {
+    const person = await personBehindCall({
+      db,
+      orgId: run.orgId,
+      runId: run.id,
+      triggerMessageId: run.triggerMessageId,
+    });
+    if (!person || person !== agent.ownerUserId) {
+      return { code: "plan_not_shared", message: `${agent.name} thinks with a plan that answers only its owner.` };
+    }
+  }
+  if (status && status.protocol < LOCKED_BRAIN_PROTOCOL) {
+    return {
+      code: "runner_outdated",
+      message: `The runner on ${status.name} is too old for ${agent.name} to think there. Update it.`,
+    };
+  }
+  return null;
+}
+
+/**
+ * The line its DM shows when its plan can't think (ADR 0137 §7): it never falls back to an API key, nor waits with a
+ * spinner. Its computer asleep or paused, the plan at its limit, someone else's DM, or what any agent says.
+ */
+export function rightHandNoAiReason(code: string): NoAiReason {
+  if (code === "machine_offline" || code === "machine_paused") return "computer_away";
+  if (code === "plan_limit") return "plan_limit";
+  if (code === "plan_not_shared") return "plan_not_shared";
+  if (code === "runner_outdated") return "runner_outdated";
+  if (code === "tools_not_locked") return "plan_tools";
+  if (code === "no_computer" || code === "no_session") return "no_computer";
+  if (code === "not_logged_in" || code === "plan_not_owner") return "not_signed_in";
+  return "cli_missing";
+}

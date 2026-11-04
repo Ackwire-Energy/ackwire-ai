@@ -22,6 +22,7 @@ import { dropAgentRules } from "./approval-rules";
 import { revokeMemberApps } from "./apps/revoke";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
+import { memberCardVia } from "./card-via";
 import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, safeEqual, sha256 } from "./crypto";
 import { restoreDms } from "./dms";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
@@ -922,10 +923,12 @@ export async function changeMemberRole(
   orgId: string,
   targetUserId: string,
   role: MemberRole,
-  options: { pubsub?: PubSub } = {},
+  /** `via`: the people card it was applied from (the audit's "via", `memberCardVia`). */
+  options: { pubsub?: PubSub; via?: string } = {},
 ) {
   await requirePermission(db, actorId, orgId, "manage_owners");
   const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
+  const via = await memberCardVia(db, orgId, options.via, targetUserId);
   if (!target) throw new ConflictError("That user is not a member");
   await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
@@ -937,7 +940,11 @@ export async function changeMemberRole(
       .set({ role })
       .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, targetUserId)));
     if (target.role !== role) {
-      await auditMember(tx, orgId, actorId, "member.role_changed", targetUserId, { from: target.role, to: role });
+      await auditMember(tx, orgId, actorId, "member.role_changed", targetUserId, {
+        from: target.role,
+        to: role,
+        ...(via ? { via } : {}),
+      });
       await followOwner(tx, orgId);
     }
   });
@@ -1086,10 +1093,12 @@ export async function removeMember(
   actorId: string,
   orgId: string,
   targetUserId: string,
-  options: { pubsub?: PubSub } = {},
+  /** `via`: the people card it was applied from (the audit's "via", `memberCardVia`). */
+  options: { pubsub?: PubSub; via?: string } = {},
 ) {
   const target = await removableMember(db, actorId, orgId, targetUserId);
   if (!target) return;
+  const via = await memberCardVia(db, orgId, options.via, targetUserId);
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
@@ -1193,6 +1202,7 @@ export async function removeMember(
     await auditMember(tx, orgId, actorId, action, targetUserId, {
       role: target.role,
       ...(handed.length ? { agentsTo: heir, agents: handed.map((a) => a.id) } : {}),
+      ...(via ? { via } : {}),
     });
     // No agent goes on reading or sending in their name: their mailboxes leave every agent, and what waits to run there doesn't.
     await dropMailOfOwner(tx, orgId, targetUserId, actorId);

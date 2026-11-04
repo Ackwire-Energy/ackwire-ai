@@ -201,6 +201,12 @@ export const agents = pgTable(
      */
     builtin: text().$type<"right_hand">(),
     /**
+     * The right hand on a person's plan (ADR 0137 §1, amended 2026-11-04): "Atende outras pessoas", whether other
+     * people's DMs with it think with that plan too. Off: only the plan's owner's. Read for the right hand only (every
+     * other agent's is its audience, ADR 0059 §5).
+     */
+    planForOthers: boolean().notNull().default(false),
+    /**
      * Retired with ADR 0093 (superseded by ADR 0137): nothing reads or writes it. Kept, with its index, while a
      * running version still selects it (`check:migrations`); dropped by a migration in a later release.
      */
@@ -277,6 +283,12 @@ export const organizationSettings = pgTable("organization_settings", {
    * null), in nano-USD. Set by admins; members only ever see percentages.
    */
   defaultAgentBudgetNanoUsd: bigint({ mode: "number" }).notNull().default(50_000_000_000),
+  /**
+   * Monthly AI limits per person (ADR 0141), in nano-USD: `{ default?, roles?: { [roleId]: n | null },
+   * people?: { [userId]: n | null }, onLimit?: "block" | "notify", warn?: boolean }`; null means no limit. Read
+   * through `personLimitsOf` (packages/engine/src/person-usage.ts). Empty: nobody has a limit.
+   */
+  personLimits: jsonb().$type<Record<string, unknown>>().notNull().default({}),
   /** Agents check what the team already did before an outside action (ADR 0064). On unless an admin turns it off. */
   actionCheck: boolean().notNull().default(true),
   /**

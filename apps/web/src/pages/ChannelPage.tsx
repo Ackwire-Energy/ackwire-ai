@@ -99,6 +99,7 @@ import {
   nearBottom,
   type RunPosition,
   runPosition,
+  screenAboveEnd,
   usageLine,
 } from "@agenteschat/client/lib/chat";
 import { choiceReplyLine } from "@agenteschat/client/lib/choices";
@@ -320,6 +321,7 @@ import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { SearchResultsPanel } from "@/components/search/SearchResultsPanel";
 import { TeamChecks } from "@/components/TeamChecks";
+import { ToLatest } from "@/components/ToLatest";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
 import { AgentTasksPanel } from "@/components/tasks/AgentTasksPanel";
 import { AgentTasksContext } from "@/components/tasks/agent-tasks-context";
@@ -1099,18 +1101,20 @@ function ChannelView({
   const [holdTick, setHoldTick] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `holdTick` re-checks blocks waiting for their message
   const slots = useMemo(() => {
-    const live = liveRunsKey
+    const onScreen = liveRunsKey
       ? liveRunsKey.split("\n").map((line) => {
           const [runId = "", agentId = "", provisional] = line.split("\t");
           return { runId, agentId, provisional: provisional === "1" };
         })
       : [];
-    // Its message is in a cache already (it lands in the timeline on the next render): hold the block.
+    // Its message is in a cache already (it lands in the timeline on the next render), or came without its body and
+    // is being read: hold the block.
     const expected = (runId: string) =>
+      Boolean(live.get().streams.landing?.[runId]) ||
       qc
         .getQueriesData<MessageType[]>({ queryKey: ["org", org.id, "channel", channel.id] })
         .some(([, list]) => Array.isArray(list) && list.some((m) => m?.agentRunId === runId));
-    const next = nextSlots(slotsRef.current, live, {
+    const next = nextSlots(slotsRef.current, onScreen, {
       landed: (runId) => landedRuns.has(runId),
       expected,
       now: Date.now(),
@@ -1119,7 +1123,7 @@ function ChannelView({
     const kept = sameSlots(slotsRef.current, next) ? slotsRef.current : next;
     slotsRef.current = kept;
     return kept;
-  }, [liveRunsKey, landedRuns, holdTick, qc, org.id, channel.id]);
+  }, [liveRunsKey, landedRuns, holdTick, qc, org.id, channel.id, live]);
   // A block waiting for its message: look again once the wait is over (it goes if nothing came).
   useEffect(() => {
     if (!slots.some((x) => x.goneAt !== null)) return;
@@ -1134,8 +1138,13 @@ function ChannelView({
   const consultGroups = useConsultGroups(channel.id, consultRows, liveRuns, consultId);
 
   // Newest at the bottom: follow new messages and streaming text while the person is at the
-  // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
+  // bottom; if they scrolled up, the round button at the top right leads back instead of jumping.
   const scroller = useRef<HTMLElement>(null);
+  // More than a screen above the end: the round button shows even with nothing new below. Never while pinned to
+  // the end, so it stays gone while its own click glides down.
+  const [far, setFar] = useState(false);
+  const measureFar = (el: HTMLElement) =>
+    setFar(!stick.current && screenAboveEnd(el.scrollHeight - el.scrollTop - el.clientHeight, el.clientHeight));
   const datePill = useRef<DatePillHandle>(null);
   // Every conversation opens at its last message (coming back to one included).
   // Opened at a message: not pinned to the bottom until the person scrolls down.
@@ -1347,9 +1356,10 @@ function ChannelView({
   }, [isMember]);
   const lastKey = timeline.at(-1)?.key;
   const previousLastKey = useRef(lastKey);
-  /** The person asked for the end ("Novas mensagens", "Fim da resposta", a correction sent). */
+  /** The person asked for the end (the round button, "Fim da resposta", a correction sent). */
   const toBottom = (smooth = false) => {
     markRead();
+    setFar(false);
     const el = scroller.current;
     if (el) {
       if (smooth && !reducedMotion && typeof el.scrollTo === "function") {
@@ -1374,6 +1384,7 @@ function ChannelView({
     const blocks = previousSlots.current.split(" ");
     const newBlock = slotsKey.split(" ").some((k) => k && !blocks.includes(k));
     previousSlots.current = slotsKey;
+    if (scroller.current) measureFar(scroller.current);
     if (stick.current) follow((newRow || newBlock) && settled);
     // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
     else if (!holdingRef.current) {
@@ -1817,8 +1828,12 @@ function ChannelView({
         ),
       }
     : undefined;
-  // The "↓ novas" pill: how many, who spoke, and who is writing now.
-  const unseenSummary = useMemo(() => unseenOf(timeline, unseenFrom, me.user.id), [timeline, unseenFrom, me.user.id]);
+  // The round button's count (red for a mention of me), and its label: how many, who spoke, who is writing now.
+  const myHandle = dir.memberById.get(me.user.id)?.handle?.toLowerCase();
+  const unseenSummary = useMemo(
+    () => unseenOf(timeline, unseenFrom, me.user.id, myHandle),
+    [timeline, unseenFrom, me.user.id, myHandle],
+  );
   const writingAgents = useStreams((s) =>
     scopedRuns(s)
       .filter((r) => r.status === "running" && r.text.length > 0)
@@ -1834,8 +1849,9 @@ function ChannelView({
     unseenSummary.count,
     pillAuthors.map((a) => dir.authorName(a)),
     pillWriting.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),
+    unseenSummary.mentionsMe,
   );
-  /** The pill: to the "Novas" divider when it is far up, else to the end. */
+  /** A catch-up while away: to the "Novas" divider when it is far up, else to the end. */
   const openUnseen = () => {
     const el = scroller.current;
     const line = el?.querySelector<HTMLElement>(".channel__unread");
@@ -2018,8 +2034,16 @@ function ChannelView({
                 queueMachine={queueMachine}
                 people={channelPeople}
                 agents={channelAgents}
-                membersOpen={membersColumn.open}
-                onMembers={membersColumn.toggle}
+                // A thread in the members' place: the toggle closes it and shows the members.
+                membersOpen={!panel && membersColumn.open}
+                onMembers={
+                  panel
+                    ? () => {
+                        setPanel(null);
+                        if (!membersColumn.open) membersColumn.toggle();
+                      }
+                    : membersColumn.toggle
+                }
                 onDetails={() => setDetailsOpen(true)}
                 onSearch={() => {
                   setPanel(null);
@@ -2076,6 +2100,17 @@ function ChannelView({
                       </div>
                     )}
                     {olderState !== "loading" && <DatePill scroller={scroller} ref={datePill} />}
+                    <ToLatest
+                      shown={!adjustThreadId && (far || pillOn)}
+                      count={unseenSummary.count}
+                      mentionsMe={unseenSummary.mentionsMe}
+                      label={
+                        pillText.length > 0
+                          ? t("channel.newPill.label", { text: pillText.join(" · ") })
+                          : t("channel.toLatest")
+                      }
+                      onClick={() => toBottom(true)}
+                    />
                     <RowsProvider asks={askRegistry} stop={stopTarget?.runId} drawn={rowDrawn}>
                       <section
                         ref={scroller}
@@ -2101,6 +2136,7 @@ function ChannelView({
                         onScroll={(e) => {
                           const previousTop = lastScrollTop.current;
                           lastScrollTop.current = e.currentTarget.scrollTop;
+                          measureFar(e.currentTarget);
                           // Only the person scrolling unpins (or loads older pages); layout changes never do.
                           const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
                           // A drag selecting text past the top edge scrolls up too: the person is reading.
@@ -2226,41 +2262,6 @@ function ChannelView({
                         </Button>
                       </div>
                     )}
-                    <div className="channel__pill">
-                      <button
-                        type="button"
-                        className="channel__newpill"
-                        data-on={(pillOn && !holding) || undefined}
-                        aria-hidden={!pillOn || holding || undefined}
-                        tabIndex={pillOn && !holding ? 0 : -1}
-                        aria-label={t("channel.newPill.label", {
-                          text: pillText.join(" · ") || t("channel.newMessages"),
-                        })}
-                        onClick={openUnseen}
-                      >
-                        <Icon name="chevronDown" size={16} />
-                        <span className="channel__newpill-stack" aria-hidden="true">
-                          {[
-                            ...pillWriting.map((id) => ({ type: "agent" as const, id })),
-                            ...pillAuthors.flatMap((a) => (a.id ? [{ type: a.type, id: a.id }] : [])),
-                          ]
-                            .filter((a, i, all) => all.findIndex((x) => x.type === a.type && x.id === a.id) === i)
-                            .slice(0, 3)
-                            .map((a) => (
-                              <ActorAvatar key={`${a.type}:${a.id}`} actor={a} size="xs" name={dir.authorName(a)} />
-                            ))}
-                        </span>
-                        <span>{pillText[0] ?? t("channel.newMessages")}</span>
-                        {pillText.length > 1 && (
-                          <span className="channel__newpill-more">
-                            {pillText
-                              .slice(1)
-                              .map((x) => `· ${x}`)
-                              .join(" ")}
-                          </span>
-                        )}
-                      </button>
-                    </div>
                     <div className="channel__composer">
                       <ConnectionBanner status={status} />
                       {!chrome?.intro && (
@@ -2427,13 +2428,34 @@ function ChannelView({
                   />
                 )}
               </div>
-              {!chrome && membersColumn.column && (
-                <MembersColumn
-                  channel={channel}
-                  people={channelPeople}
-                  agents={channelAgents}
-                  {...(addsMembers ? { onAdd: addMembers } : {})}
-                />
+              {/* A thread opens in the members' place, wider, and gives it back when it closes; the channel stays in use
+                  beside it (a phone: a sheet over it). */}
+              {panel ? (
+                <aside className="thread-panel thread-panel--docked" aria-label={t("threads.side.label")}>
+                  <ThreadPage
+                    key={`${panel.id}:${panel.focus ?? ""}`}
+                    threadId={panel.id}
+                    reply={panel.reply}
+                    focusMessageId={panel.focus}
+                    onClose={() => setPanel(null)}
+                    onSeeInChannel={(messageId, channelId) => {
+                      if (channelId !== channel.id) return false;
+                      setPanel(null);
+                      jumpTo(messageId);
+                      return true;
+                    }}
+                  />
+                </aside>
+              ) : (
+                !chrome &&
+                membersColumn.column && (
+                  <MembersColumn
+                    channel={channel}
+                    people={channelPeople}
+                    agents={channelAgents}
+                    {...(addsMembers ? { onAdd: addMembers } : {})}
+                  />
+                )
               )}
             </div>
           </Tag>
@@ -2457,32 +2479,6 @@ function ChannelView({
                 : {})}
               onClose={membersColumn.closeSheet}
             />
-          )}
-          {panel && (
-            <button
-              type="button"
-              className="thread-panel__scrim"
-              tabIndex={-1}
-              aria-label={t("common.close")}
-              onClick={() => setPanel(null)}
-            />
-          )}
-          {panel && (
-            <aside className="thread-panel" aria-label={t("threads.side.label")}>
-              <ThreadPage
-                key={`${panel.id}:${panel.focus ?? ""}`}
-                threadId={panel.id}
-                reply={panel.reply}
-                focusMessageId={panel.focus}
-                onClose={() => setPanel(null)}
-                onSeeInChannel={(messageId, channelId) => {
-                  if (channelId !== channel.id) return false;
-                  setPanel(null);
-                  jumpTo(messageId);
-                  return true;
-                }}
-              />
-            </aside>
           )}
           {searchOpen && <SearchResultsPanel channelId={channel.id} onClose={() => setSearchOpen(false)} />}
           {profile && (

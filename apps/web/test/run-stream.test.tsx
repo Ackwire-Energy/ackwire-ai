@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -79,14 +79,15 @@ describe("streaming a reply with tools in between", () => {
 describe("live row and Parar", () => {
   const open = async () => {
     const state = seedState();
-    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    const api = createFakeApi(state);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(5);
     const socket = r.sockets.last();
     await act(async () => socket.open());
     await settle(2);
     const ev = (event: Record<string, unknown>) =>
       act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
-    return { state, ev };
+    return { state, api, ev };
   };
   const ids = { threadId: null, runId: "r-live", agentId: ADA_ID };
 
@@ -153,6 +154,91 @@ describe("live row and Parar", () => {
     expect(stopped.textContent).toContain("Parado por você");
     expect(within(stopped).getByRole("button", { name: "Continuar" })).toBeTruthy();
     expect(stopped.querySelector('.ac-avatar[data-state="idle"]')).not.toBeNull();
+  });
+
+  test("a reply too big to ride its event keeps its text on screen until its copy read over HTTP takes the place", async () => {
+    const { state, api, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Resposta longa sobre o Azure" });
+    await settle(2);
+    const body = `Resposta longa sobre o Azure. ${"Mais detalhes. ".repeat(400)}`;
+    state.messages.push({
+      id: "m-big",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body,
+      mentionedAgentIds: [],
+      mentionedUserIds: [],
+      agentRunId: "r-live",
+      meta: {},
+      clientId: null,
+      createdAt: new Date().toISOString(),
+    } as Message);
+    // The conversation's read is slow to come back.
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const read = api.chat.messages;
+    api.chat.messages = async (...args) => {
+      await gate;
+      return read(...args);
+    };
+    // Past the pub/sub's size, the server sends the message's id without the message.
+    await ev({ type: "message.created", messageId: "m-big", agentRunId: "r-live", threadId: null });
+    await ev({ type: "agent.run", ...ids, status: "done" });
+    await ev({ type: "agent.idle", ...ids });
+    await ev({ type: "run.finished", ...ids, status: "done" });
+    await settle(3);
+    // Not a blank while the read is on its way: the streamed text stays.
+    expect(document.body.textContent).toContain("Resposta longa sobre o Azure");
+    await act(async () => release());
+    await settle(5);
+    const answers = screen()
+      .getAllByRole("article")
+      .filter((a) => a.textContent?.includes("Resposta longa sobre o Azure"));
+    expect(answers).toHaveLength(1);
+    expect(answers[0]?.textContent).toContain("Mais detalhes.");
+    expect(document.querySelector(".ac-msg--streaming")).toBeNull();
+  });
+
+  test("back to the tab after a while, the conversation is read again: an answer whose end never came lands", async () => {
+    const { state, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Começando a resposta" });
+    await settle(2);
+    // While the tab was away, the run ended and its events never reached this page (the socket still looks open).
+    state.activeRuns = { [ENG_ID]: [] };
+    state.messages.push({
+      id: "m-done",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "Começando a resposta, e aqui está o fim dela.",
+      mentionedAgentIds: [],
+      mentionedUserIds: [],
+      agentRunId: "r-live",
+      meta: {},
+      clientId: null,
+      createdAt: new Date().toISOString(),
+    } as Message);
+    const visibility = (value: "hidden" | "visible") =>
+      act(async () => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => value });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+    try {
+      await visibility("hidden");
+      setSystemTime(new Date(Date.now() + 60_000));
+      await visibility("visible");
+      await settle(5);
+      expect(document.querySelector(".ac-msg--streaming")).toBeNull();
+      expect(document.body.textContent).toContain("e aqui está o fim dela.");
+    } finally {
+      setSystemTime();
+      Reflect.deleteProperty(document, "visibilityState");
+    }
   });
 
   test("Esc with an empty composer stops the latest run I may stop, right away", async () => {

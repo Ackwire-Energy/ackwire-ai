@@ -145,6 +145,39 @@ describe("mintBillingLink", () => {
     expect(claims).toMatchObject({ role: "admin", locale: "en", usage: { members: 2 } });
   });
 
+  test("back to the page it was opened from when that is one of this workspace's; anything else, the default", async () => {
+    const org = `/org/${f.org.id}`;
+    const back = async (from: (typeof BILLING_FROM)[number], returnTo: string) =>
+      claimsOf(
+        (
+          await mintBillingLink(f.db, {
+            secret: SECRET,
+            baseUrl: "https://billing.example.com",
+            userId: f.owner.id,
+            orgId: f.org.id,
+            from,
+            returnTo,
+            now: NOW,
+          })
+        ).url,
+      ).return;
+    // The upload that hit the limit, in a channel: back to that channel. The billing service takes a bare path only
+    // (it adds `?paid=1`), so the page's search and hash stay behind.
+    const channel = `${org}/c/0b6f4c1e-8d2a-4f3b-9c7e-5a1d2e3f4a5b`;
+    expect(await back("upload_full", `${channel}?thread=m-1#x`)).toBe(channel);
+    expect(await back("hold", `${org}/settings/members`)).toBe(`${org}/settings/members`);
+    // Another workspace, another host, the onboarding outside any workspace, or a path that only starts like it.
+    expect(await back("upload_full", "/org/someone-else/c/abc")).toBe(org);
+    expect(await back("upload_full", "https://evil.example.com/org")).toBe(org);
+    expect(await back("upload_full", `//evil.example.com${org}/`)).toBe(org);
+    expect(await back("onboarding", "/onboarding")).toBe(`${org}/onboarding`);
+    expect(await back("settings", `${org}x/c/abc`)).toBe(`${org}/settings/billing`);
+    expect(await back("settings", `${org}/c/a\\b`)).toBe(`${org}/settings/billing`);
+    // A shape the billing service would refuse the whole link over: the default instead.
+    expect(await back("settings", `${org}/wiki/Café`)).toBe(`${org}/settings/billing`);
+    expect(await back("settings", `${org}/c/a b`)).toBe(`${org}/settings/billing`);
+  });
+
   test("usage counts the files on this server's storage; on the workspace's own bucket, none", async () => {
     const owner = { type: "person" as const, userId: f.owner.id };
     await createFileArtifact(f.artifactDeps, owner, f.org.id, { title: "a", name: "a.txt", bytes: new Uint8Array(42) });

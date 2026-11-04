@@ -199,6 +199,32 @@ export const maskCredentialsExcept = (text: string, pasted: string) => {
   return text.replace(SECRET, keep).replace(PRIVATE_KEY_BLOCK, keep);
 };
 
+/**
+ * What a CLI's sign-in holds beyond `SECRET`'s shapes (OpenAI and Anthropic keys and OAuth tokens, JWTs): Cursor keys
+ * (`key_…`, `crsr_…`), OpenAI refresh tokens (`rt.…`, `rt_…`), and every value of a sign-in file's fields (Codex's
+ * `auth.json`, Claude Code's `.credentials.json`, Cursor's and OpenCode's): `"refresh_token": "…"`, `accessToken: …`,
+ * `OPENAI_API_KEY=…`.
+ */
+// Codex 0.165's `auth.json` refresh token starts `rt.` (seen on a real sign-in, 2026-11-04), older ones `rt_`.
+const SIGN_IN_SHAPES = /\b(?:key|crsr)_[A-Za-z0-9]{32,}|\brt[._][A-Za-z0-9._-]{19,}[A-Za-z0-9_-]/g;
+const SIGN_IN_FIELD =
+  /(["']?\b(?:access_?token|refresh_?token|id_?token|oauth_?token|api_?key|\w*_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)["']?\s*[:=]\s*)("[^"\s]{8,}"|'[^'\s]{8,}'|[^\s"',}]{8,})/gi;
+
+/** The team's right hand's reply (ADR 0137 §4): every credential and sign-in in it replaced by `note`, and how many. */
+export function scrubSignIns(text: string, note: string): { text: string; found: number } {
+  let found = 0;
+  const hit = () => {
+    found++;
+    return note;
+  };
+  const out = text
+    .replace(SIGN_IN_FIELD, (_match, field: string) => `${field}${hit()}`)
+    .replace(PRIVATE_KEY_BLOCK, hit)
+    .replace(SECRET, hit)
+    .replace(SIGN_IN_SHAPES, hit);
+  return { text: out, found };
+}
+
 /** An address's user and password (`postgres://user:pass@host`). */
 const USERINFO = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#@'"]+@/gi;
 /** The value after an option named for a secret (`--password hunter2`, `--api-key k`). */

@@ -74,6 +74,17 @@ const RETURN_TO: Partial<Record<BillingFrom, string>> = {
 };
 
 /**
+ * The page the person opened the link from (`returnTo`), when it is one of this workspace's: they land back there,
+ * not on the entry point's default. Never another workspace or host. The billing service refuses the whole link
+ * unless `return` is `/org/<uuid>` plus lowercase path segments (no search, no hash; it adds `?paid=1` itself), so
+ * the page's search and hash are dropped and any other shape falls back to the default.
+ */
+const placeIn = (orgId: string, returnTo: string | undefined) => {
+  const path = returnTo?.split(/[?#]/)[0];
+  return path?.startsWith(`/org/${orgId}/`) && /^\/org\/[0-9a-f-]{36}(\/[a-z0-9/-]*)?$/.test(path) ? path : null;
+};
+
+/**
  * What a workspace holds, for the billing service's pages (ADR 0079 §3): workspace-wide counts, never a name, a word of
  * content, or a figure per channel or person. Messages are those of every conversation a person can read (an
  * agent-only room has no `u:` in its key, as `isAgentOnlyDm` reads it), counted per conversation on each month's
@@ -99,7 +110,16 @@ const totalsOf = (orgId: string) => ({
  */
 export async function mintBillingLink(
   db: Database,
-  input: { secret: string; baseUrl: string; userId: string; orgId: string; from: BillingFrom; now?: Date },
+  input: {
+    secret: string;
+    baseUrl: string;
+    userId: string;
+    orgId: string;
+    from: BillingFrom;
+    /** The page it was opened from, to come back to (`placeIn`). */
+    returnTo?: string;
+    now?: Date;
+  },
 ): Promise<{ url: string; expiresAt: Date }> {
   const { userId, orgId, from } = input;
   const membership = await requirePermission(db, userId, orgId, "manage_billing");
@@ -127,7 +147,7 @@ export async function mintBillingLink(
     role: membership.role === "owner" ? "owner" : "admin",
     locale: appLocale([user.locale], true) ?? "en",
     from,
-    return: `/org/${orgId}${RETURN_TO[from] ?? ""}`,
+    return: placeIn(orgId, input.returnTo) ?? `/org/${orgId}${RETURN_TO[from] ?? ""}`,
     usage: {
       members: org.counts.members,
       agents: org.counts.agents,

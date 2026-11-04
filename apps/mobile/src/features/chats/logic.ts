@@ -310,6 +310,8 @@ export interface HomeBlock {
   more: boolean;
   /** A category's unread rows: they stay in sight while it is closed, as on the web. */
   unread: ConversationRow[];
+  /** How many of its first rows are pinned ("Fixar no topo"). */
+  pinned?: number;
 }
 
 /** A category's "Ver todos" route segment (`conversations/category-<id>`). */
@@ -318,18 +320,31 @@ export const categoryListKind = (categoryId: string) => `category-${categoryId}`
 export const categoryOfListKind = (kind: string) =>
   kind.startsWith(CATEGORY_LIST_PREFIX) ? kind.slice(CATEGORY_LIST_PREFIX.length) || null : null;
 
+/** The row's agent, channel or person, as "Fixar no topo" names it. */
+const pinIdOf = (r: ConversationRow) => (r.kind === "dm" ? r.with.id : r.kind === "channel" ? r.channelId : null);
+
 /**
  * The home with channel categories: Agentes, Canais (the channels with no category), one section per category
- * in the sidebar's order, then Pessoas; each the first `max` by latest activity. A channel whose category is
- * unknown counts as having none. Sections with no rows are left out.
+ * in the sidebar's order, then Pessoas; each the first `max` by latest activity, its pinned rows first (`pins`, as
+ * the web sidebar: a pinned channel on top of Canais whatever its category). A channel whose category is unknown
+ * counts as having none. Sections with no rows are left out.
  */
 export function homeLayout(
   rows: ConversationRow[],
   categories: readonly { id: string; name: string }[],
   max = SECTION_MAX,
   starters: ConversationRow[] = [],
+  pins: { agents: readonly string[]; channels: readonly string[]; people: readonly string[] } = {
+    agents: [],
+    channels: [],
+    people: [],
+  },
 ): HomeBlock[] {
   const known = new Set(categories.map((c) => c.id));
+  const pinnedFirst = (all: ConversationRow[], ids: readonly string[]) => {
+    const top = ids.flatMap((id) => all.filter((r) => pinIdOf(r) === id));
+    return { list: [...top, ...all.filter((r) => !top.includes(r))], pinned: top.length };
+  };
   const categoryOf = (r: ConversationRow) =>
     r.kind === "channel" && r.categoryId && known.has(r.categoryId) ? r.categoryId : null;
   const block = (key: HomeKey, all: ConversationRow[], extra: Partial<HomeBlock> = {}): HomeBlock => ({
@@ -340,16 +355,20 @@ export function homeLayout(
     unread: all.filter((r) => r.unread > 0),
     ...extra,
   });
-  const channels = rowsOfKind(rows, "channels");
+  const pinned = (key: HomeKey, all: ConversationRow[], ids: readonly string[]) => {
+    const { list, pinned: count } = pinnedFirst(all, ids);
+    return block(key, list, count ? { pinned: Math.min(count, max) } : {});
+  };
+  const allChannels = rowsOfKind(rows, "channels");
+  const topChannels = pins.channels.flatMap((id) => allChannels.filter((r) => pinIdOf(r) === id));
+  const channels = allChannels.filter((r) => !topChannels.includes(r));
+  const agents = rowsOfKind(rows, "agents");
   return [
     // No conversation with an agent yet: the team's agents, to start one ("Ver todos" would list none).
-    rowsOfKind(rows, "agents").length > 0
-      ? block("agents", rowsOfKind(rows, "agents"))
-      : { ...block("agents", starters), more: false },
-    block(
-      "channels",
-      channels.filter((r) => categoryOf(r) === null),
-    ),
+    agents.length > 0
+      ? pinned("agents", agents, pins.agents)
+      : { ...pinned("agents", starters, pins.agents), more: false },
+    pinned("channels", [...topChannels, ...channels.filter((r) => categoryOf(r) === null)], pins.channels),
     ...categories.map((c) =>
       block(
         `category:${c.id}`,
@@ -357,7 +376,7 @@ export function homeLayout(
         { name: c.name, categoryId: c.id },
       ),
     ),
-    block("people", rowsOfKind(rows, "people")),
+    pinned("people", rowsOfKind(rows, "people"), pins.people),
   ].filter((b) => b.total > 0);
 }
 
@@ -384,8 +403,8 @@ export function agentStarters(
 }
 
 /**
- * The right hand's own row on top of Conversas (ADR 0137): its DM, or one to start (no channel yet), never under
- * Agentes; the other rows without it. No pin when there is none for this person (outside its audience).
+ * The right hand's own row (ADR 0137), first in Conversas' Agentes and never among its sorted rows: its DM, or one to
+ * start (no channel yet); the other rows without it. No pin when there is none for this person (outside its audience).
  */
 export function rightHandPin(
   rows: ConversationRow[],

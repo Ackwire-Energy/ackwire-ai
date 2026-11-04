@@ -3,7 +3,7 @@ import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 /**
  * The conversation list's scroll rules, kept pure so they can be tested: when the list follows new
  * content, which rows just arrived at the bottom (they animate in), what sits below the person while
- * they read older ones (the "↓ N novas" pill and the "Novas" line), how a finished reply's block waits
+ * they read older ones (the round button's count and the "Novas" line), how a finished reply's block waits
  * for its saved message so the swap never leaves an empty frame, the keys that keep an agent's
  * block the same row from "pensando" to its saved reply, and where the person was while something
  * covered the list.
@@ -12,7 +12,7 @@ import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 /**
  * The list follows new content only while the person is this close to the end, as a fraction of the
  * visible height (Legend List's `maintainScrollAtEndThreshold`, measured from the physical end since 3.7:
- * about Bluesky's 100 points). Farther up, they are reading: nothing moves and the pill counts what arrived.
+ * about Bluesky's 100 points). Farther up, they are reading: nothing moves and the round button counts what arrived.
  */
 export const STICK_TO_END_THRESHOLD = 0.15;
 
@@ -47,6 +47,8 @@ export interface ScrollRow {
   who?: string;
   /** The sticker or GIF an agent adds after its reply (ADR 0091): never news of its own (no count, no "Novas"). */
   silent?: boolean;
+  /** Someone else's message that @mentions the person reading: the round button's count turns red. */
+  mentionsMe?: boolean;
 }
 
 /** The last message row: where the person has read up to when they are at the end. */
@@ -67,11 +69,13 @@ export interface Unseen {
   authors: string[];
   /** Who is at work below ("Theo escrevendo"), once each. */
   working: string[];
+  /** One of the new messages @mentions the person reading. */
+  mentionsMe: boolean;
 }
 
 /** What arrived below the last row the person saw, theirs left out ("↓ 2 novas · Marina e Ada · Theo escrevendo"). */
 export function unseenBelow(rows: readonly ScrollRow[], seenKey: string | null): Unseen {
-  const none: Unseen = { messages: 0, firstKey: null, authors: [], working: [] };
+  const none: Unseen = { messages: 0, firstKey: null, authors: [], working: [], mentionsMe: false };
   if (!seenKey) return none;
   const at = rows.findIndex((r) => r.key === seenKey);
   if (at < 0) return none;
@@ -81,18 +85,12 @@ export function unseenBelow(rows: readonly ScrollRow[], seenKey: string | null):
     if ((r.kind !== "message" && r.kind !== "run") || r.mine || r.silent) continue;
     out.firstKey ??= r.key;
     if (r.kind === "message") out.messages++;
+    if (r.mentionsMe) out.mentionsMe = true;
     const list = r.kind === "message" ? out.authors : out.working;
     if (r.who && !list.includes(r.who)) list.push(r.who);
   }
   return out;
 }
-
-/**
- * The pill lands on the "Novas" line when it is far from the end (more than 1.2 screens of content below
- * it), else at the end.
- */
-export const landsOnDivider = (contentLength: number, dividerAt: number | undefined, viewport: number) =>
-  dividerAt !== undefined && contentLength - dividerAt > viewport * 1.2;
 
 /**
  * Where the person is in the conversation, kept while something covers it (a sheet, the agent's computer): at the

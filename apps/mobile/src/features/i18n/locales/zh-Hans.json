@@ -296,6 +296,7 @@
     "failed": "未发送 · 重试",
     "notSent": "消息未发送。",
     "toLatest": "前往最新消息",
+    "toLatestNew": "前往最新消息：{{text}}",
     "stopAgent": "停止 {{name}}",
     "offlineWait": "恢复连接后发送",
     "turn": {
@@ -326,6 +327,7 @@
     "unseen": {
       "count_other": "{{count}} 条新消息",
       "working": "{{names}} 正在输入",
+      "mentionsYou": "有人提及了你",
       "divider": "新消息"
     },
     "connection": {
@@ -750,7 +752,20 @@
       "invitation_accepted_other": "{{names}} 接受了你的邀请",
       "composio_limit_other": "此工作区已用完本月的 Composio 调用次数",
       "change_request_other": "{{names}} 请求调整团队",
+      "usage_limit_warning": "本月你已用掉额度的 {{percent}}%",
+      "usage_limit_reached_notify": "你已达到本月的使用额度",
+      "usage_limit_reached": "{{names}} 已达到 {{amount}} 的额度",
+      "usage_limit_request": "{{names}} 已达到 {{amount}} 的额度并申请增加",
+      "usage_limit_raised": "{{names}} 提高了你本月的额度",
+      "usage_limit_refused": "{{names}} 拒绝了你增加使用的申请",
+      "approval_cover_other": "{{names}} 在“谁替我审批”中选了你",
+      "approval_cover_declined_other": "{{names}} 不再替你审批",
+      "approval_cover_ended_other": "{{names}} 取消了替你审批的人",
+      "right_hand_decided_other": "{{names}} 今天替你批准了请求",
+      "right_hand_paused_other": "{{names}} 已停止替你审批",
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
+      "desktop_taken_other": "{{names}} 接管了 {{agent}} 的电脑屏幕",
+      "desktop_taken_female_other": "{{names}} 接管了 {{agent}} 的电脑屏幕",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
       "computer_no_chrome_other": "电脑需要 Google Chrome。请在 google.com/chrome 下载",
@@ -1138,7 +1153,8 @@
       "browser": "浏览器",
       "secret": "密钥",
       "join": "成员",
-      "tools": "工具"
+      "tools": "工具",
+      "limit": "额度"
     },
     "review": "审阅",
     "answer": "回复",
@@ -1363,6 +1379,8 @@
       "typeMarked": "在标记的输入框中输入",
       "typeMarkedSecret": "标记输入框的密码",
       "keys": "按键",
+      "paste": "粘贴",
+      "pasteHint": "把你复制的内容粘贴到页面",
       "secureOn": "显示文字",
       "secureOff": "隐藏文字（密码）",
       "send": "发送",

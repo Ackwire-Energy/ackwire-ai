@@ -37,6 +37,7 @@ import type {
   AppConsent,
   AppNotification,
   Approval,
+  ApprovalCovers,
   ApprovalRule,
   AppsList,
   Artifact,
@@ -152,13 +153,18 @@ import type {
   OrgPlanUsage,
   OrgRoles,
   OrgSettings,
+  PageTarget,
+  PeopleUsage,
   Person,
+  PersonLimits,
+  PersonUsage,
   PhoneSignIn,
   Poll,
   Proposal,
   ReactionCount,
   Reminder,
   RemovalPreview,
+  RightHandApprovals,
   RosterMember,
   Routine,
   RoutineHook,
@@ -177,6 +183,7 @@ import type {
   SidebarItem,
   SidebarItems,
   SidebarSection,
+  SidebarView,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -220,6 +227,7 @@ const filterQuery = (f: SearchFilterInput | undefined) =>
       )
     : {};
 
+const pageBody = (to: PageTarget) => (typeof to === "string" ? { url: to } : to);
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
 /** The most agents one `POST …/agent-setup` takes (the server's `SETUP_AGENTS_MAX`). */
 const SETUP_AGENTS_PER_CALL = 200;
@@ -393,8 +401,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/takeover`, {
           json: runId ? { runId } : {},
         }),
-      open: (orgId, agentId, url) =>
-        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
+      open: (orgId, agentId, to) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: pageBody(to) }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
       restart: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/restart`, { json: {} }),
     },
@@ -414,8 +422,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}/takeover`, { json: {} }),
       handback: (orgId, profileId) =>
         request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}/handback`, { json: {} }),
-      open: (orgId, profileId, url) =>
-        request<void>(`${org(orgId)}/browser-profiles/${enc(profileId)}/open`, { json: { url } }),
+      open: (orgId, profileId, to) =>
+        request<void>(`${org(orgId)}/browser-profiles/${enc(profileId)}/open`, { json: pageBody(to) }),
       setDefault: (orgId, agentId, profileId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser-profile`, { method: "PUT", json: { profileId } }),
       request: (orgId, agentId) =>
@@ -526,8 +534,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),
       setLogo: (orgId, input) => request<{ logo: string }>(`${org(orgId)}/logo`, { method: "PUT", json: input }),
       removeLogo: (orgId) => request<void>(`${org(orgId)}/logo`, { method: "DELETE" }),
-      billingLink: (orgId, from) =>
-        request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, { json: { from } }),
+      billingLink: (orgId, from, returnTo) =>
+        request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, { json: { from, returnTo } }),
       limits: (orgId) => request<WorkspaceLimits>(`${org(orgId)}/limits`),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
@@ -552,6 +560,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       issuesView: async (orgId) => (await request<{ view: IssuesView }>(`${org(orgId)}/me/issues-view`)).view,
       setIssuesView: async (orgId, view) =>
         (await request<{ view: IssuesView }>(`${org(orgId)}/me/issues-view`, { method: "PUT", json: { view } })).view,
+      sidebarView: async (orgId) => (await request<{ view: SidebarView }>(`${org(orgId)}/me/sidebar/view`)).view,
+      setSidebarView: async (orgId, view) =>
+        (await request<{ view: SidebarView }>(`${org(orgId)}/me/sidebar/view`, { method: "PUT", json: { view } })).view,
       sidebarToolOrder: async (orgId) =>
         (await request<{ order: SidebarItem[] }>(`${org(orgId)}/me/sidebar/tools`)).order,
       setSidebarToolOrder: async (orgId, order) =>
@@ -559,10 +570,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           .order,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
-      changeRole: (orgId, userId, role) =>
-        request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "PATCH", json: { role } }),
+      changeRole: (orgId, userId, role, via) =>
+        request<void>(`${org(orgId)}/members/${enc(userId)}`, {
+          method: "PATCH",
+          json: { role },
+          query: via ? { via } : {},
+        }),
       removal: (orgId, userId) => request<RemovalPreview>(`${org(orgId)}/members/${enc(userId)}/removal`),
-      removeMember: (orgId, userId) => request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "DELETE" }),
+      removeMember: (orgId, userId, via) =>
+        request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "DELETE", query: via ? { via } : {} }),
       invitations: async (orgId) =>
         (await request<{ invitations: Invitation[] }>(`${org(orgId)}/invitations`)).invitations,
       invite: (orgId, input) =>
@@ -591,6 +607,21 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ roleIds: string[] }>(`${org(orgId)}/invitations/${enc(id)}`, { method: "PATCH", json: { roleIds } }),
       usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
       planUsage: (orgId) => request<OrgPlanUsage>(`${org(orgId)}/usage/plans`),
+      peopleUsage: (orgId, period = {}) => request<PeopleUsage>(`${org(orgId)}/usage/people`, { query: period }),
+      peopleUsageCsvUrl: (orgId, period = {}) => {
+        const qs = new URLSearchParams(Object.entries(period).filter((e): e is [string, string] => !!e[1]));
+        return `${base}${org(orgId)}/usage/people.csv${qs.size ? `?${qs}` : ""}`;
+      },
+      personUsage: (orgId, userId, period = {}) =>
+        request<PersonUsage>(`${org(orgId)}/usage/people/${enc(userId)}`, { query: period }),
+      personLimits: (orgId) => request<PersonLimits>(`${org(orgId)}/usage/limits`),
+      setPersonLimits: (orgId, limits) =>
+        request<PersonLimits>(`${org(orgId)}/usage/limits`, { method: "PUT", json: limits }),
+      requestMoreUsage: (orgId) => request<{ requestedAt: string }>(`${org(orgId)}/usage/limits/request`, { json: {} }),
+      raisePersonLimit: (orgId, userId, limitUsd) =>
+        request<void>(`${org(orgId)}/usage/people/${enc(userId)}/raise`, { json: { limitUsd } }),
+      refuseMoreUsage: (orgId, userId) =>
+        request<void>(`${org(orgId)}/usage/people/${enc(userId)}/refuse`, { json: {} }),
       audit: (orgId, query = {}) =>
         request<AuditPage>(`${org(orgId)}/audit`, {
           query: {
@@ -612,10 +643,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/roles/${enc(roleId)}`, { method: "PATCH", json: patch }),
       remove: (orgId, roleId) => request<void>(`${org(orgId)}/roles/${enc(roleId)}`, { method: "DELETE" }),
       reorder: (orgId, ids) => request<void>(`${org(orgId)}/roles/order`, { method: "PUT", json: { ids } }),
-      setFor: (orgId, userId, roleIds) =>
+      setFor: (orgId, userId, roleIds, via) =>
         request<{ roleIds: string[] }>(`${org(orgId)}/members/${enc(userId)}/roles`, {
           method: "PUT",
           json: { roleIds },
+          query: via ? { via } : {},
         }),
     },
     agentGroups: {
@@ -891,12 +923,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId, filter = {}) =>
         (await request<{ approvals: Approval[] }>(`${org(orgId)}/approvals`, { query: filter })).approvals,
       get: (orgId, id) => request<Approval>(`${org(orgId)}/approvals/${enc(id)}`),
-      approve: (orgId, id, reason, always) =>
+      approve: (orgId, id, reason, always, via) =>
         request<Approval>(`${org(orgId)}/approvals/${enc(id)}/approve`, {
-          json: { ...(reason ? { reason } : {}), ...(always ? { always: true } : {}) },
+          json: { ...(reason ? { reason } : {}), ...(always ? { always: true } : {}), ...(via ? { via } : {}) },
         }),
-      refuse: (orgId, id, reason) =>
-        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, { json: reason ? { reason } : {} }),
+      refuse: (orgId, id, reason, via) =>
+        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, {
+          json: { ...(reason ? { reason } : {}), ...(via ? { via } : {}) },
+        }),
       cancel: (orgId, id) => request<Approval>(`${org(orgId)}/approvals/${enc(id)}/cancel`, { json: {} }),
       decideMany: (orgId, input) =>
         request<{ approvals: Approval[]; skipped: string[] }>(`${org(orgId)}/approvals/decide`, { json: input }),
@@ -904,6 +938,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ rules: ApprovalRule[] }>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules`)).rules,
       removeRule: (orgId, agentId, ruleId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules/${enc(ruleId)}`, { method: "DELETE" }),
+      covers: (orgId) => request<ApprovalCovers>(`${org(orgId)}/me/approval-cover`),
+      setCover: (orgId, input) =>
+        request<ApprovalCovers>(`${org(orgId)}/me/approval-cover`, { method: "PUT", json: input }),
+      endCover: (orgId, userId) => request<void>(`${org(orgId)}/approval-covers/${enc(userId)}`, { method: "DELETE" }),
+      rightHand: (orgId) => request<RightHandApprovals>(`${org(orgId)}/me/right-hand-approvals`),
+      setRightHand: (orgId, input) =>
+        request<RightHandApprovals>(`${org(orgId)}/me/right-hand-approvals`, { method: "PUT", json: input }),
+      undoRightHand: (orgId, decisionId) =>
+        request<void>(`${org(orgId)}/right-hand-decisions/${enc(decisionId)}/undo`, { method: "POST", json: {} }),
     },
     connectors: {
       catalog: () => request<ConnectorCatalog>("/api/app/connectors/catalog"),

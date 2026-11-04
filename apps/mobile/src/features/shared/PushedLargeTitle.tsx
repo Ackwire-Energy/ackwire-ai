@@ -23,6 +23,8 @@ export function PushedLargeTitle({
   bottomInset = 24,
   collapsed = false,
   grouped = false,
+  keyboard = false,
+  dock,
   children,
 }: {
   title: string;
@@ -35,6 +37,10 @@ export function PushedLargeTitle({
   collapsed?: boolean;
   /** The grouped gray background with white cards on it (Dashboards), as `LargeTitleScreen`'s. */
   grouped?: boolean;
+  /** A field in the content or the dock: the content makes room for the keyboard and drags it away. */
+  keyboard?: boolean;
+  /** What stays at the screen's bottom over the content (a widget's "Ask for a change"), absolutely placed. */
+  dock?: ReactNode;
   children?: ReactNode;
 }) {
   const c = useColors();
@@ -58,7 +64,8 @@ export function PushedLargeTitle({
           scrollEventThrottle={16}
           contentInsetAdjustmentBehavior="automatic"
           refreshControl={refreshControl}
-          keyboardDismissMode="on-drag"
+          keyboardDismissMode={keyboard ? "interactive" : "on-drag"}
+          automaticallyAdjustKeyboardInsets={keyboard}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: insets.bottom + bottomInset }}
         >
@@ -77,6 +84,7 @@ export function PushedLargeTitle({
           {children}
         </Animated.ScrollView>
       </FocusLive>
+      {dock}
     </View>
   );
 }

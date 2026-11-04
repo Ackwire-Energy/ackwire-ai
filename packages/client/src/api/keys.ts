@@ -60,6 +60,8 @@ export const keys = {
   toolChanges: (orgId: string) => ["org", orgId, "tool-changes"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
   /** What the agent runs without asking ("Aprovar sempre"). */
+  approvalCovers: (orgId: string) => ["org", orgId, "approval-covers"] as const,
+  rightHandApprovals: (orgId: string) => ["org", orgId, "right-hand-approvals"] as const,
   approvalRules: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "approval-rules"] as const,
   runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,
   /** Whether the agent has a run going now (its newest running run, if any). */
@@ -93,6 +95,10 @@ export const keys = {
   /** The usage views; an agent's sits under it, so one invalidation refreshes both. */
   planUsage: (orgId: string) => ["org", orgId, "plan-usage"] as const,
   agentPlanUsage: (orgId: string, agentId: string) => ["org", orgId, "plan-usage", "agent", agentId] as const,
+  /** Uso › Pessoas and a person's month (ADR 0141); one invalidation refreshes both. */
+  peopleUsage: (orgId: string, period: object = {}) => ["org", orgId, "people-usage", period] as const,
+  personUsage: (orgId: string, userId: string) => ["org", orgId, "people-usage", "person", userId] as const,
+  personLimits: (orgId: string) => ["org", orgId, "people-usage", "limits"] as const,
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
   /** All the agents' memories, for the workspace's map. */
@@ -193,6 +199,7 @@ export const keys = {
   sidebarOrder: (orgId: string) => ["org", orgId, "sidebar-order"] as const,
   issuesView: (orgId: string) => ["org", orgId, "issues-view"] as const,
   sidebarToolOrder: (orgId: string) => ["org", orgId, "sidebar-tool-order"] as const,
+  sidebarView: (orgId: string) => ["org", orgId, "sidebar-view"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,

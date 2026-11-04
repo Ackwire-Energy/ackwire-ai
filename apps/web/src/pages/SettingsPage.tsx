@@ -63,6 +63,7 @@ import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AccountSection } from "@/components/AccountSettings";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AiAppsSection } from "@/components/AiApps";
+import { ApprovalsSection } from "@/components/ApprovalCover";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
@@ -78,6 +79,7 @@ import { MachinePage } from "@/components/Machines";
 import { MediaSettingsSection } from "@/components/MediaSettings";
 import { NoticePrefsSection } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
+import { UsageTabs } from "@/components/PeopleUsage";
 import { PlanUsageCards } from "@/components/PlanUsage";
 import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
@@ -111,6 +113,7 @@ export function SettingsPage({
   install,
   skill,
   agent,
+  person,
 }: {
   section?: SettingsSection;
   connected?: string;
@@ -128,6 +131,8 @@ export function SettingsPage({
   machineId?: string;
   /** Auditoria: the agent it opens filtered to. */
   agent?: string;
+  /** Orçamento e uso › Pessoas: the person whose month opens (a limit's notice). */
+  person?: string;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -210,6 +215,7 @@ export function SettingsPage({
         )}
         {current === "account" && <AccountSection />}
         {current === "notifications" && <NoticePrefsSection />}
+        {current === "approvals" && <ApprovalsSection />}
         {current === "apps" && <AiAppsSection />}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
@@ -233,7 +239,7 @@ export function SettingsPage({
         )}
         {current === "storage" && <StorageSection />}
         {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
-        {current === "usage" && <UsageSection />}
+        {current === "usage" && <UsageTabs person={person} summary={<UsageSection />} />}
         {current === "import" && <ImportExportSection />}
         {current === "billing" && <BillingSection />}
       </div>

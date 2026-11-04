@@ -77,8 +77,10 @@ import {
   emailArtAt,
   envSpeechEngines,
   type GitProxyDeps,
+  getAgentCached,
   hubBrainLink,
   isAgentesCloud,
+  isRightHand,
   type JobDeps,
   type Judge,
   type MailDeps,
@@ -91,6 +93,7 @@ import {
   prepareAgentCode,
   queueBudgetEmail,
   type ResolveHost,
+  RIGHT_HAND_TURN,
   ROUTER_QUIET_MS,
   type RunExecutorDeps,
   reauthorizeStream,
@@ -476,7 +479,10 @@ export function buildEngine(o: EngineOptions) {
     hub: machineHub,
     authorize: async (input) => {
       if (sessions && input.request.kind === "terminal") return { refused: STREAM_CLOSE.notFound, reason: NO_TERMINAL };
-      const target = await authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input);
+      const target = await authorizeStream(
+        { db, hub: machineHub, rateLimiter: adapters.rateLimiter, pubsub: adapters.pubsub },
+        input,
+      );
       // Someone opened the agent's desktop: its browser gets ready for the agent's next command meanwhile.
       if (input.request.kind === "desktop" && "machineId" in target && !target.held) {
         warmBrowser({ orgId: input.orgId, agentId: input.agentId, machineId: target.machineId });
@@ -501,10 +507,13 @@ export function buildEngine(o: EngineOptions) {
    * agentes/<handle>/… (what the git proxy accepts).
    */
   const turnPermissions = async (turn: BrainTurn): Promise<BrainTurnRequest["permissions"]> =>
-    (await missionTurnPermissions(db, turn)) ?? {
-      mode: "work",
-      branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
-    };
+    // The team's right hand on a plan: our tools and nothing else (ADR 0137 §4).
+    isRightHand(await getAgentCached(db, turn.orgId, turn.agentId))
+      ? RIGHT_HAND_TURN
+      : ((await missionTurnPermissions(db, turn)) ?? {
+          mode: "work",
+          branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
+        });
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
   // started in the repository it is about, and the "# Your code" block (ADR 0024 addendum).
   const prepareCode = (turn: Parameters<typeof prepareAgentCode>[1], signal: AbortSignal) =>

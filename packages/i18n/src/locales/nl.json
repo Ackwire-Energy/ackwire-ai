@@ -87,6 +87,24 @@
     "fromAdmin": "Van Beheerder",
     "viaAdmin": "Alles, als Beheerder",
     "nothing": "Niets",
+    "computer": {
+      "title": "Computers van agents",
+      "levels": {
+        "none": "Geen",
+        "browser": "Alleen de browser",
+        "full": "Hele computer"
+      },
+      "every": {
+        "none": "Alleen wat Iedereen al mag",
+        "browser": "De browser van elke agent en de inlogverzoeken, nooit het hele scherm of de terminal",
+        "full": "Het hele scherm, de bediening en de terminal van elke agent"
+      },
+      "own": {
+        "none": "Niemand ziet of gebruikt de computers of browsers van agents, ook geen inlogverzoeken",
+        "browser": "De browser van de eigen agents en inlogverzoeken aan de persoon, nooit het hele scherm",
+        "full": "Het hele scherm en de terminal van de eigen agents en van de computers die de persoon heeft gekoppeld"
+      }
+    },
     "everyoneNote": "Geldt voor iedereen in de werkruimte. Andere rollen voegen er alleen iets aan toe.",
     "summary": {
       "owner": "Kan altijd alles. Elke werkruimte heeft minstens één eigenaar.",
@@ -249,6 +267,24 @@
       "desc": "Hun bureaublad en browser bedienen.",
       "short": "schermen overnemen",
       "say": "neemt de schermen van agents over"
+    },
+    "control_browsers": {
+      "title": "Browser van agents gebruiken",
+      "desc": "De browser van elke agent zien en bedienen en inlogverzoeken beantwoorden.",
+      "short": "browser van agents gebruiken",
+      "say": "gebruikt de browser van agents"
+    },
+    "own_computers": {
+      "title": "Computer van eigen agents gebruiken",
+      "desc": "Het hele scherm en de terminal van de agents waarvoor de persoon verantwoordelijk is en van de computers die die heeft gekoppeld.",
+      "short": "computer van eigen agents gebruiken",
+      "say": "gebruikt de computer van eigen agents"
+    },
+    "own_browsers": {
+      "title": "Browser van eigen agents gebruiken",
+      "desc": "De browser van de agents waarvoor de persoon verantwoordelijk is en inlogverzoeken aan die persoon.",
+      "short": "browser van eigen agents gebruiken",
+      "say": "gebruikt de browser van eigen agents"
     },
     "manage_connectors": {
       "title": "Apps koppelen",
@@ -1091,6 +1127,7 @@
     "copyText": "Tekst kopiëren",
     "textCopied": "Tekst gekopieerd.",
     "copyLink": "Link kopiëren",
+    "openComputer": "Computer openen",
     "linkCopied": "Link gekopieerd.",
     "saveToWiki": "Opslaan in de wiki",
     "pin": "Bericht vastzetten",
@@ -1130,6 +1167,63 @@
     "none": {
       "terms": "Deze server heeft geen pagina met voorwaarden",
       "privacy": "Deze server heeft geen privacypagina"
+    }
+  },
+  "approvalCover": {
+    "title": "Wie keurt voor mij goed",
+    "subtitle": "Beslist namens jou wat aan jou gevraagd wordt, en nooit wat die persoon zelf vroeg.",
+    "person": "Persoon",
+    "nobody": "Niemand",
+    "when": "Wanneer",
+    "whenHelp": "Afwezig: als je status zegt dat je er niet bent.",
+    "whileOut": "Alleen als ik afwezig ben",
+    "always": "Altijd",
+    "until": "Tot",
+    "noDate": "Geen datum",
+    "clearDate": "Datum weghalen",
+    "risky": "Merge, deploy en andere risicovolle acties",
+    "riskyOff": "Uit, deze blijven alleen bij jou.",
+    "riskyOn": "Aan, deze persoon beslist deze ook.",
+    "lock": "Altijd bij jou: geld, mensen en rollen, AI-sleutels, je mailbox en verwijderen.",
+    "coveringTitle": "Je keurt goed voor",
+    "coveringSubtitle": "Wat aan deze mensen gevraagd wordt, komt ook bij jou, en je beslist namens hen. Nooit wat je zelf vroeg.",
+    "coveringWhileOut": "Als die persoon afwezig is",
+    "coveringUntil": "tot {{date}}",
+    "coveringNow": "Nu actief",
+    "decline": "Niet meer vervangen",
+    "failed": "Opslaan lukte niet. Probeer het opnieuw."
+  },
+  "rightHandApprovals": {
+    "title": "{{name}} keurt voor je goed",
+    "subtitle": "Alleen wat uit een verzoek van jou kwam. Wat het niet zou goedkeuren, geeft het aan jou door.",
+    "newAgents": "Agents maken die andere agents voorstellen",
+    "newAgentsHelp": "Zonder apps, alleen in open kanalen. Je kunt het 24 uur ongedaan maken.",
+    "agentChanges": "Model, budget en kanalen van een agent wijzigen",
+    "agentChangesHelp": "Het model alleen op hetzelfde AI-account.",
+    "cantDecide": "Dit beslis je nu niet",
+    "budget": "Extra budget voor elke agent",
+    "budgetHelp": "Daarboven gaat het verzoek naar jou.",
+    "perMonth": "/maand",
+    "guidanceLabel": "Hoe {{name}} voor je beslist",
+    "guidanceHelp": "{{name}} leest dit voor elke beslissing. Optioneel.",
+    "guidancePlaceholder": "Bijv.: geen dubbele agents\nAlleen goedkope modellen voor nieuwe agents\nNooit in klantkanalen",
+    "paused": "Gepauzeerd: je hebt deze week 3 beslissingen ongedaan gemaakt. Zet het weer aan wanneer je wilt.",
+    "card": {
+      "deciding": "{{name}} bekijkt het namens {{for}}…",
+      "approved": "Goedgekeurd door {{name}} namens {{for}}",
+      "passed": "{{name}} heeft het aan jou doorgegeven",
+      "passedWhy": "{{name}} heeft het aan jou doorgegeven: {{reason}}",
+      "outside": "Buiten wat {{name}} van jou mag goedkeuren",
+      "own": "{{name}} beslist niet over het eigen verzoek",
+      "limit": "{{name}} heeft de limiet van vandaag bereikt: deze blijft bij jou",
+      "undoneByYou": "Door jou ongedaan gemaakt",
+      "undoneBy": "Door {{name}} ongedaan gemaakt",
+      "why": "Waarom?",
+      "undo": "Ongedaan maken",
+      "undoArchives": "Ongedaan maken archiveert {{name}}. Kan tot {{until}}.",
+      "undoSettings": "Ongedaan maken zet de instellingen terug. Kan tot {{until}}.",
+      "approvedForYou": "Goedgekeurd door {{name}} namens jou",
+      "decidingForYou": "{{name}} bekijkt het namens jou…"
     }
   },
   "noticePrefs": {
@@ -1219,14 +1313,14 @@
       "drive": "Bestanden, rapporten en tabellen",
       "routines": "Wat agents zelf doen, op tijd",
       "calendar": "Vergaderingen en deadlines",
-      "forum": "Als een besluit meerdere blikken nodig heeft"
+      "forum": "Als een besluit meerdere blikken nodig heeft",
+      "team": "Wie is wie: mensen, agents en hun groepen"
     },
     "customizeSidebar": "Zijbalk aanpassen",
     "sidebarMenu": {
       "title": "Zijbalk",
       "newChannel": "Nieuw kanaal",
       "addToChannels": "Nieuw kanaal of nieuwe categorie",
-      "addToDms": "Nieuw bericht of agent",
       "newMessage": "Nieuw bericht",
       "addMembers": "Mensen of agents toevoegen",
       "channelSettings": "Kanaalinstellingen",
@@ -1349,7 +1443,49 @@
     "delete": "Groep verwijderen",
     "deleteTitle": "Groep {{name}} verwijderen?",
     "deleteText": "De agents gaan terug naar Agents.",
-    "dropHere": "Sleep agents hierheen"
+    "dropHere": "Sleep agents hierheen",
+    "moved": "{{name}} zit nu in de groep {{group}}",
+    "movedOut": "{{name}} heeft de groep {{group}} verlaten",
+    "undo": "Ongedaan maken"
+  },
+  "sidebarAgents": {
+    "options": "Opties voor agents",
+    "add": "Nieuwe agent of groep",
+    "order": "Volgorde",
+    "sort": {
+      "workspace": "Die van de werkruimte",
+      "mine": "Mijn agents eerst",
+      "working": "Aan het werk eerst"
+    },
+    "showAll": "Agents tonen die niet met mij praten",
+    "collapseAll": "Alles inklappen",
+    "expandAll": "Alles uitklappen",
+    "organize": "Groepen ordenen in Team",
+    "seeAll_one": "De {{count}} agent bekijken",
+    "seeAll_other": "Alle {{count}} agents bekijken",
+    "createFirst": "De eerste agent maken",
+    "working_one": "{{count}} aan het werk",
+    "working_other": "{{count}} aan het werk",
+    "count_one": "{{count}} agent",
+    "count_other": "{{count}} agents",
+    "workingIn": "aan het werk in #{{channel}}",
+    "talksOnly": "praat alleen met {{name}}",
+    "talksOnlyMore_one": "praat alleen met {{name}} en {{count}} ander",
+    "talksOnlyMore_other": "praat alleen met {{name}} en {{count}} anderen",
+    "changeGroup": "Naar groep verplaatsen",
+    "newGroupWith": "Nieuwe groep met {{name}}",
+    "dmsEmpty": "Je gesprekken met mensen verschijnen hier."
+  },
+  "sidebarPins": {
+    "pin": "Bovenaan vastzetten",
+    "unpin": "Losmaken",
+    "pinned": "Bovenaan vastgezet",
+    "hint": "Je agents blijven bovenaan. Klik met rechts op een gesprek om het vast te zetten.",
+    "full": {
+      "agents": "Je hebt al 5 agents vastgezet. Maak er een los om deze vast te zetten.",
+      "channels": "Je hebt al 5 kanalen vastgezet. Maak er een los om dit vast te zetten.",
+      "people": "Je hebt al 5 mensen vastgezet. Maak er een los om deze vast te zetten."
+    }
   },
   "openOnPhone": {
     "qr": "QR-code om in te loggen in de agentes-app",
@@ -1512,7 +1648,6 @@
       "thinking": "denkt na",
       "writing": "schrijft"
     },
-    "autoReplyChip": "antwoordt zonder vermelding",
     "more": "Meer berichtacties",
     "copyLink": "Link kopiëren",
     "linkCopied": "Link gekopieerd.",
@@ -1597,13 +1732,14 @@
     "typing_other": "{{names}} typen…",
     "callAgent": "Agent roepen",
     "callAgentMenu": "Agents in dit kanaal",
-    "newMessages": "Nieuwe berichten",
+    "toLatest": "Naar de nieuwste berichten",
     "newPill": {
-      "label": "Nieuwe berichten: {{text}}",
+      "label": "Naar de nieuwste berichten: {{text}}",
       "count_one": "{{count}} nieuw",
       "count_other": "{{count}} nieuw",
       "more": "{{names}} en nog {{count}}",
-      "writing": "{{name}} schrijft"
+      "writing": "{{name}} schrijft",
+      "mentionsYou": "je bent vermeld"
     },
     "unreadDivider": "Nieuw",
     "offline": "Geen verbinding. Wat je verstuurt, gaat vanzelf weg zodra de verbinding terug is.",
@@ -1733,7 +1869,13 @@
       "audience": "Wie het mag gebruiken",
       "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
       "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Hij plaatst niets zolang niemand met hem praat.",
-      "audit": "Bekijk wat {{name}} deed"
+      "audit": "Bekijk wat {{name}} deed",
+      "onPlan": "Claude-abonnement · {{account}}",
+      "change": "Wijzigen",
+      "planHelp": "De eigenaar van het abonnement betaalt. Is de computer ervan niet bereikbaar, dan zegt het gesprek dat en biedt het een API-sleutel aan.",
+      "plan": "Een abonnement",
+      "planOffer": "{{name}} kan met je abonnement denken in plaats van met een API-sleutel, op de computer waar het abonnement is ingelogd, zonder iets buiten deze workspace te bereiken.",
+      "usePlan": "Abonnement gebruiken"
     },
     "card": {
       "settings": "{{name}} · Instellingen",
@@ -1763,6 +1905,7 @@
         "budget": "Alleen admins wijzigen het budget van een agent",
         "owner": "Alleen admins wijzigen wie verantwoordelijk is voor een agent",
         "archive": "Alleen admins archiveren een agent",
+        "delete": "Alleen admins verwijderen een agent",
         "audience": "Alleen admins en de verantwoordelijke wijzigen wie met hem praat",
         "channels": "Alleen admins en de verantwoordelijke wijzigen zijn kanalen",
         "ai_account": "Alleen de eigenaar van het account geeft het",
@@ -1787,9 +1930,40 @@
       "somePeople": "Sommige mensen",
       "active": "Actief",
       "archived": "Gearchiveerd",
+      "deleted": "Verwijderd",
       "notIn": "Niet in het kanaal",
       "withoutMention": "Uit zichzelf",
       "mentionOnly": "Alleen bij vermelding"
+    },
+    "remove": {
+      "archiveTitle_one": "{{count}} agent archiveren?",
+      "archiveTitle_other": "{{count}} agents archiveren?",
+      "deleteTitle_one": "{{count}} agent definitief verwijderen?",
+      "deleteTitle_other": "{{count}} agents definitief verwijderen?",
+      "archiveAll": "Alles archiveren",
+      "deleteAll": "Alles verwijderen",
+      "archiveSome_one": "{{count}} archiveren",
+      "archiveSome_other": "{{count}} archiveren",
+      "deleteSome_one": "{{count}} verwijderen",
+      "deleteSome_other": "{{count}} verwijderen",
+      "deleteHelp": "Hun instructies, geheugen en routines verdwijnen definitief. Hun berichten blijven."
+    },
+    "people": {
+      "title": "Personen wijzigen",
+      "gets": "Krijgt {{roles}}",
+      "loses": "Verliest {{roles}}",
+      "done": "Klaar",
+      "onlyOwners": "Alleen eigenaren wijzigen wie eigenaar is",
+      "onlyAdmins": "Alleen admins wijzigen rollen en verwijderen personen"
+    },
+    "approvals": {
+      "title": "Goedkeuringen die op jou wachten",
+      "done": "Besloten"
+    },
+    "open": {
+      "open": "Openen",
+      "web": "Openen op de website",
+      "notAllowed": "Je hebt geen toegang tot dit scherm"
     }
   },
   "routing": {
@@ -1833,6 +2007,14 @@
     "action": "Koppelen",
     "locked": "Wie de AI van {{name}} koppelt: een beheerder, met een API-sleutel, of {{owner}}, met een eigen abonnement.",
     "lockedAdmins": "Alleen een beheerder kan een AI koppelen.",
+    "rightHand": {
+      "computer_away": "{{name}} kan nu niet antwoorden: de computer van het abonnement is niet bereikbaar.",
+      "plan_limit": "{{name}} kan nu niet antwoorden: het abonnement heeft zijn limiet bereikt.",
+      "plan_not_shared": "{{name}} denkt met een abonnement dat alleen de eigenaar antwoordt.",
+      "runner_outdated": "{{name}} kan nu niet antwoorden: het programma op de computer van het abonnement heeft een update nodig.",
+      "plan_tools": "{{name}} stopte voordat het antwoordde: de AI van het abonnement op die computer biedt eigen tools aan.",
+      "useKey": "API-sleutel gebruiken"
+    },
     "receipt": "Niemand antwoordt: geen AI gekoppeld",
     "chip": "Geen AI"
   },
@@ -2042,12 +2224,16 @@
     "extraHint": "Met extra gebruik aan in het abonnement gaat lang werk door na 95%. Uit pauzeert het bij 95% en gaat het verder als het abonnement opnieuw begint."
   },
   "usageQueue": {
-    "title_one": "{{agent}} heeft {{count}} gesprek om op te pakken",
-    "title_other": "{{agent}} heeft {{count}} gesprekken om op te pakken",
-    "line": "Gaat {{when}} verder, als het {{plan}}-abonnement opnieuw begint. Eén tegelijk, in deze volgorde.",
-    "lineUnknown": "Gaat verder zodra het {{plan}}-abonnement opnieuw begint. Eén tegelijk, in deze volgorde.",
-    "lineBudget": "Gaat {{when}} verder, als het budget vernieuwt, of eerder als een admin het verhoogt. Eén tegelijk, in deze volgorde.",
-    "shared": "De rij hoort bij het abonnement: {{agents}} delen hetzelfde account.",
+    "back": "{{agent}} is {{when}} terug",
+    "backPlan": "{{agent}} is terug als het abonnement vernieuwt",
+    "backBudget": "{{agent}} is terug als het budget vernieuwt",
+    "resuming": "{{agent}} pakt het weer op",
+    "shared_one": "{{agents}} gebruikt hetzelfde {{plan}}-abonnement. De gesprekken van allebei komen in dezelfde rij.",
+    "shared_other": "{{agents}} gebruiken hetzelfde {{plan}}-abonnement. Al hun gesprekken komen in dezelfde rij.",
+    "about": "Over de rij",
+    "lists": "Gesprekken",
+    "queuedTab": "In de rij",
+    "skippedTab": "Overgeslagen",
     "dm": "DM met {{name}}",
     "yourDm": "Jouw DM",
     "thread": "Thread in #{{channel}}",
@@ -2055,32 +2241,24 @@
     "work": "Werk: {{name}}",
     "askedBy": "Gevraagd door {{names}} · {{ago}}",
     "paused": "Gepauzeerd {{ago}}",
-    "after_one": "{{count}} bericht sindsdien",
-    "after_other": "{{count}} berichten sindsdien",
-    "nothingAfter": "Sindsdien niets",
-    "wrote_one": "{{names}} schreef sindsdien",
-    "wrote_other": "{{names}} schreven sindsdien",
-    "queued": "In de rij",
-    "answering": "Antwoordt nu",
-    "hidden_one": "+{{count}} in gesprekken die je niet ziet",
-    "hidden_other": "+{{count}} in gesprekken die je niet ziet",
+    "answering": "Antwoordt",
+    "hidden_one": "+{{count}} die je niet ziet",
+    "hidden_other": "+{{count}} die je niet ziet",
     "dontRunAll": "Geen enkele uitvoeren",
-    "confirmAll_one": "{{count}} gesprek niet uitvoeren?",
-    "confirmAll_other": "Deze {{count}} gesprekken niet uitvoeren?",
+    "confirmAll_one": "Deze niet uitvoeren?",
+    "confirmAll_other": "Alle {{count}} niet uitvoeren?",
     "yesDontRun": "Ja, niet uitvoeren",
     "keep": "Behouden",
-    "canceledAll_one": "{{count}} gesprek geannuleerd. {{agent}} beantwoordt het niet als de limiet terug is.",
-    "canceledAll_other": "{{count}} gesprekken geannuleerd. {{agent}} beantwoordt ze niet als de limiet terug is.",
-    "empty": "Niets wacht om opgepakt te worden.",
+    "canceledAll_one": "{{count}} gesprek geannuleerd. {{agent}} beantwoordt het niet.",
+    "canceledAll_other": "{{count}} gesprekken geannuleerd. {{agent}} beantwoordt ze niet.",
+    "empty": "Niets wacht op het abonnement.",
     "waiting_one": "{{count}} gesprek wacht",
     "waiting_other": "{{count}} gesprekken wachten",
-    "closedTitle_one": "{{count}} had geen antwoord nodig",
-    "closedTitle_other": "{{count}} hadden geen antwoord nodig",
-    "closedWhy": "Ze leken geregeld, dus {{agent}} heeft niet geantwoord.",
-    "closedLine": "Ze leken geregeld, dus {{agent}} heeft niet geantwoord. Heeft er een nog een antwoord nodig, kies dan Toch antwoorden.",
-    "seeConversation": "Gesprek bekijken",
-    "answeredAnyway": "Iemand vroeg toch om een antwoord",
-    "toResume": "Om op te pakken",
+    "skip_solved": "{{name}} heeft het al geregeld",
+    "skip_withdrawn": "{{name}} zei dat het niet meer nodig is",
+    "skip_task_canceled": "{{name}} heeft de taak geannuleerd",
+    "skip_mixed": "Al geregeld",
+    "answeredAnyway": "Antwoordt toch",
     "switchAi": "AI van {{name}} wijzigen"
   },
   "actionCard": {
@@ -2424,6 +2602,7 @@
     "messageTo": "Bericht aan {{name}}",
     "audienceEdit": "Bewerken",
     "nowIn": "nu, in #{{channel}}",
+    "answersHere": "Antwoordt hier zonder @",
     "more": "Meer",
     "of": "Profiel van {{name}}",
     "presence": "Aanwezigheid",
@@ -2522,6 +2701,8 @@
       "provider_down": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
       "out_of_plan": "Planlimiet bereikt",
       "out_of_budget": "Maandbudget op",
+      "out_of_planShort": "Limiet bereikt",
+      "out_of_budgetShort": "Budget op",
       "backAt": "terug {{when}}",
       "work": "Op de achtergrond: {{subject}}"
     },
@@ -3114,6 +3295,12 @@
     "outcomeApprovedByYou": "Goedgekeurd door jou",
     "outcomeRefusedBy": "Geweigerd door {{name}}",
     "outcomeRefusedByYou": "Geweigerd door jou",
+    "outcomeApprovedCovering": "Goedgekeurd door {{name}}, namens {{for}}",
+    "outcomeRefusedCovering": "Geweigerd door {{name}}, namens {{for}}",
+    "outcomeApprovedByYouCovering": "Goedgekeurd door jou, namens {{for}}",
+    "outcomeRefusedByYouCovering": "Geweigerd door jou, namens {{for}}",
+    "outcomeApprovedCoveringYou": "Goedgekeurd door {{name}}, namens jou",
+    "outcomeRefusedCoveringYou": "Geweigerd door {{name}}, namens jou",
     "refusedByYou": "Geweigerd door jou · {{when}}",
     "expiresIn": "Verloopt over {{time}}",
     "expired": "Verlopen",
@@ -3338,6 +3525,7 @@
       "routineStalled": "<b>{{name}}</b> wacht op de computer om een routine uit te voeren",
       "agentUnreached": "Een routine kon <b>{{name}}</b> niet bereiken",
       "browserProfileRequest": "<b>{{name}}</b> vraagt om nog een browserprofiel voor <b>{{agent}}</b>",
+      "desktopTaken": "<b>{{name}}</b> heeft het scherm van de computer van <b>{{agent}}</b> overgenomen",
       "routineWaitingPlan": "<b>{{name}}</b> wacht tot zijn abonnement wordt gereset om een routine uit te voeren",
       "planResetUnknown": "{{plan}} heeft niet gezegd wanneer de limiet wordt gereset. Het werk van <b>{{name}}</b> wacht nog.",
       "catchUpClosed_one": "<b>{{name}}</b> is terug en heeft {{count}} gesprek overgeslagen dat geen antwoord nodig had",
@@ -3356,10 +3544,31 @@
       "joinSuggestion": "<b>{{by}}</b> stelde <b>{{name}}</b> voor",
       "changeRequest": "<b>{{name}}</b> vraagt een wijziging voor <b>{{agent}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> vraagt een nieuwe agent: <b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> koos je bij Wie keurt voor mij goed",
+      "approvalCoverDeclined": "<b>{{name}}</b> keurt niet meer voor je goed",
+      "approvalCoverEnded": "<b>{{name}}</b> heeft gestopt wie voor je goedkeurt",
+      "rightHandDecided": "Verzoeken die <b>{{name}}</b> vandaag voor je goedkeurde: {{count}}",
+      "rightHandPaused": "<b>{{name}}</b> keurt niet meer voor je goed: je hebt deze week 3 beslissingen ongedaan gemaakt",
       "invitationAccepted": "<b>{{name}}</b> heeft je uitnodiging geaccepteerd en doet mee in {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> heeft je uitnodiging geaccepteerd",
       "reaction_one": "<b>{{names}}</b> heeft op je bericht gereageerd",
-      "reaction_other": "<b>{{names}}</b> hebben op je bericht gereageerd"
+      "reaction_other": "<b>{{names}}</b> hebben op je bericht gereageerd",
+      "usageLimitWarning": "Je hebt {{percent}}% van je limiet deze maand gebruikt",
+      "usageLimitReachedSelf": "Je hebt je gebruikslimiet voor deze maand bereikt",
+      "usageLimitReached": "<b>{{name}}</b> heeft de limiet van {{amount}} bereikt",
+      "usageLimitRequest": "<b>{{name}}</b> heeft de limiet van {{amount}} bereikt en vraagt om meer",
+      "usageLimitRaised": "<b>{{name}}</b> heeft je limiet voor deze maand verhoogd",
+      "usageLimitRefused": "<b>{{name}}</b> heeft je verzoek om meer gebruik afgewezen"
+    },
+    "usageLimit": {
+      "runs_one": "{{count}} verzoek deze maand",
+      "runs_other": "{{count}} verzoeken deze maand",
+      "top": "{{share}}% met {{agent}}",
+      "fromRole": "Limiet van de rol {{role}}.",
+      "fromRaised": "Limiet deze maand verhoogd.",
+      "fromPerson": "Een limiet voor deze persoon.",
+      "fromDefault": "De standaardlimiet van de workspace.",
+      "line": "{{runs}}. {{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -4203,6 +4412,7 @@
         "credential_wrong_provider": "Het model is van {{modelProvider}}, maar de sleutel is van {{keyProvider}}.",
         "model_unlisted": "OpenRouter biedt {{model}} niet meer aan. Kies een ander model in de instellingen van de agent.",
         "no_ai": "De agent heeft geen AI gekoppeld.",
+        "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt.",
         "org_paused": "De agents van de werkruimte zijn gepauzeerd.",
         "org_suspended": "De werkruimte is niet beschikbaar.",
         "org_deleting": "De werkruimte wordt verwijderd.",
@@ -5963,6 +6173,7 @@
       "agent_archived": "De agent is gearchiveerd",
       "interrupted": "Onderbroken door een herstart van de server",
       "no_ai": "De agent heeft geen AI gekoppeld",
+      "person_limit": "Niet uitgevoerd: wie hem maakte, heeft de gebruikslimiet voor deze maand bereikt",
       "org_paused": "Niet gedraaid: de agents van de werkruimte waren gepauzeerd",
       "org_suspended": "Niet gedraaid: de werkruimte was niet beschikbaar",
       "org_deleting": "Niet gedraaid: de werkruimte werd verwijderd",
@@ -8938,6 +9149,7 @@
     },
     "recommended": "Aanbevolen",
     "free": "Gratis",
+    "opencodeFreeHint": "Andere gratis modellen draaien via OpenCode op de computer van de agent.",
     "modelHelp": "Grotere modellen denken meer na en verbruiken het abonnement sneller.",
     "hidden": "{{owner}} of een beheerder kiest wie denkt.",
     "hiddenAdmins": "Alleen beheerders kiezen wie denkt.",
@@ -11380,7 +11592,7 @@
     "leadCloud": "Waar je agents werken: een computer alleen voor deze werkruimte, altijd aan.",
     "about": "Over deze computer",
     "how": "Zo werken computers",
-    "hostMissing": "Deze server kan ook de computer van je agents zijn: de stappen staan onder “Deze server als computer van de agents” in <code>SELF_HOSTING.md</code>.",
+    "hostMissing": "Deze server kan ook de computer van je agents zijn: <guide>zo werkt het</guide>.",
     "other": {
       "title": "Andere computers",
       "text": "Gekoppeld met een code, zoals een Mac mini thuis of een andere server. Wat elke computer toestaat, stel je op die computer zelf in.",
@@ -11959,7 +12171,8 @@
       "billing": "Abonnement en facturatie",
       "media": "GIF's en stickers",
       "voice": "Spraak",
-      "apps": "AI-apps"
+      "apps": "AI-apps",
+      "approvals": "Goedkeuringen"
     },
     "sectionText": {
       "account": "Je profiel en hoe de app er voor jou uitziet.",
@@ -11974,13 +12187,14 @@
       "skills": "Markdown-instructies die agents openen als ze ze nodig hebben.",
       "keys": "Je abonnementen en de API-sleutels van de werkruimte.",
       "storage": "Waar de bestanden van de werkruimte staan.",
-      "usage": "Budgetten en wat elke agent deze maand heeft uitgegeven.",
+      "usage": "Hoeveel AI elke persoon en elke agent gebruikt, en de limieten van de maand.",
       "audit": "Wat de agents buiten het gesprek deden en wat mensen wijzigden. Alleen beheerders zien het.",
       "import": "Haal agents uit een andere app of werkruimte, en neem deze mee waarheen je wilt.",
       "billing": "Het agentes.chat-abonnement, de kaart en de facturen van deze werkruimte staan op een pagina van ons, buiten de app.",
       "media": "Wat mensen in een gesprek kunnen sturen, en wanneer agents een GIF of sticker sturen.",
       "voice": "Spraakberichten in gesprekken, en wie spraak omzet in tekst.",
-      "apps": "Vraag de agents van deze werkruimte om taken vanuit Claude, Cursor en andere apps."
+      "apps": "Vraag de agents van deze werkruimte om taken vanuit Claude, Cursor en andere apps.",
+      "approvals": "Wie voor je beslist als een agent iets vraagt dat op je goedkeuring wacht."
     },
     "title": "Instellingen",
     "account": {
@@ -12164,6 +12378,149 @@
         "jev": "Agents sturen alleen zelf stickers met Jev.",
         "jevLink": "Jev instellen"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "Overzicht",
+      "people": "Personen",
+      "mine": "Jouw gebruik"
+    },
+    "view": {
+      "usage": "Gebruik",
+      "limits": "Limieten"
+    },
+    "title": "Gebruik per persoon",
+    "about": "Je ziet hoeveel iedereen gebruikt en met welke agents. Wat er in privégesprekken staat, verschijnt hier nooit.",
+    "plansAbout": "Het abonnement is al betaald. Dit bedrag vergelijkt alleen het gebruik tussen personen.",
+    "sub_one": "{{month}} · {{count}} persoon · {{amount}} aan AI",
+    "sub_other": "{{month}} · {{count}} personen · {{amount}} aan AI",
+    "periodLabel": "Periode",
+    "period": {
+      "month": "Deze maand",
+      "last7": "Laatste 7 dagen",
+      "last30": "Laatste 30 dagen",
+      "lastMonth": "Vorige maand"
+    },
+    "role": "Rol",
+    "roleAll": "Rol: alle",
+    "agent": "Agent",
+    "agentAll": "Agent: alle",
+    "chips": {
+      "near": "Bijna aan de limiet",
+      "at": "Aan de limiet",
+      "idle": "Geen gebruik"
+    },
+    "summary": {
+      "near": "{{n}} bijna aan de limiet",
+      "at": "{{n}} aan de limiet",
+      "idle": "{{n}} zonder gebruik in de periode"
+    },
+    "export": "CSV exporteren",
+    "limitsHint": "Stel een limiet per persoon in bij Limieten",
+    "empty": "Niemand heeft deze maand al agents gebruikt.",
+    "owner": "Eigenaar",
+    "member": "Lid",
+    "columns": {
+      "person": "Persoon",
+      "now": "Nu",
+      "runs": "Verzoeken",
+      "agents": "Meest gebruikt",
+      "usage": "Deze maand",
+      "caresFor": "Zorgt voor",
+      "created": "Gemaakt"
+    },
+    "now": {
+      "channel": "Met {{agent}} in #{{channel}}",
+      "private": "In een privégesprek met {{agent}}",
+      "hidden": "Met {{agent}} in een privékanaal",
+      "routine": "Routine {{name}}",
+      "last": "Laatst gebruikt {{when}}",
+      "never": "Geen gebruik"
+    },
+    "meter": {
+      "of": "van {{limit}}",
+      "noLimit": "· zonder limiet",
+      "estimate": "≈ {{amount}} via de API"
+    },
+    "live": {
+      "title": "Nu",
+      "routineOf": "Routine van {{name}}"
+    },
+    "from": {
+      "raised": "deze maand verhoogd",
+      "person": "voor deze persoon ingesteld",
+      "role": "van de rol {{role}}",
+      "default": "standaard van de workspace"
+    },
+    "drawer": {
+      "limit": "Limiet deze maand: {{amount}}",
+      "noLimit": "Geen gebruikslimiet deze maand.",
+      "reached": "Limiet bereikt op {{date}} · {{used}} gebruikt",
+      "used": "{{used}} gebruikt · {{percent}}%",
+      "raise": "Limiet verhogen",
+      "raiseTo": "Nieuwe limiet voor deze maand in US$",
+      "raiseSave": "Verhogen",
+      "raised": "Limiet voor deze maand verhoogd",
+      "asked": "Vroeg om meer",
+      "days": "Gebruik per dag",
+      "agents": "Met welke agents",
+      "runs_one": "{{count}} verzoek",
+      "runs_other": "{{count}} verzoeken",
+      "recent": "Wat deze persoon onlangs deed",
+      "untitled": "Zonder titel",
+      "with": "met {{agent}}",
+      "minutes": "{{n}} min",
+      "private": "Privégesprek met {{agent}}",
+      "hidden": "In een privékanaal met {{agent}}",
+      "routine": "Routine {{name}}",
+      "created": "Gemaakte agents",
+      "createdAt": "gemaakt op {{date}}",
+      "audit": "Acties van de agents bekijken in Audit",
+      "noUse": "Geen gebruik in deze periode."
+    },
+    "limits": {
+      "title": "Gebruikslimiet per persoon",
+      "lead": "Hoeveel AI iedereen per maand mag gebruiken, over alle agents samen. Het telt wat iemand vraagt en de routines die diegene maakte.",
+      "default": "Standaard van de workspace",
+      "defaultHint": "Geldt voor wie geen limiet via een rol of uitzondering heeft.",
+      "byRole": "Per rol",
+      "people": "Uitzonderingen",
+      "addPerson": "Persoon toevoegen",
+      "useDefault": "Standaard gebruiken",
+      "none": "Geen limiet",
+      "amount": "Limiet per maand",
+      "rule": "De eigen limiet van de persoon geldt. Zonder die de hoogste van hun rollen. Zonder enige de standaard. Eigenaren hebben geen limiet.",
+      "whenTitle": "Als iemand de limiet bereikt",
+      "block": "Agents beginnen geen nieuw werk meer voor die persoon",
+      "notify": "Alleen de admins laten weten",
+      "warn": "Waarschuwen bij 80%",
+      "warnHint": "De persoon krijgt een melding, en de admins krijgen er nog een bij 100%.",
+      "saved": "Limieten opgeslagen"
+    },
+    "mine": {
+      "title": "Je hebt {{percent}}% van je limiet deze maand gebruikt",
+      "noLimit": "Je hebt deze maand geen gebruikslimiet",
+      "renews": "Hij wordt vernieuwd op {{date}}.",
+      "near": "Bijna aan de limiet, vraag een admin om meer.",
+      "recent": "Wat je onlangs deed",
+      "ofLimit": "{{percent}}% van de limiet"
+    },
+    "card": {
+      "title": "Je hebt je gebruikslimiet voor deze maand bereikt",
+      "text": "Hij wordt vernieuwd op {{date}}. Om nu door te gaan, vraag het een admin.",
+      "ask": "Om meer vragen",
+      "asked": "Verzoek verstuurd",
+      "see": "Mijn gebruik bekijken",
+      "other": "{{name}} heeft de gebruikslimiet voor deze maand bereikt",
+      "raised": "{{name}} heeft je limiet voor deze maand verhoogd. Je kunt verder.",
+      "raisedOther": "{{name}} heeft de limiet voor deze maand verhoogd",
+      "refused": "{{name}} heeft het verzoek afgewezen. De limiet wordt vernieuwd op {{date}}."
+    },
+    "actions": {
+      "raise": "Verhogen naar {{amount}} deze maand",
+      "refuse": "Afwijzen",
+      "see": "Gebruik bekijken"
     }
   },
   "usageViews": {
@@ -12724,8 +13081,15 @@
       "work_end_canceled": "Gestopt na {{minutes}} min.",
       "work_end_canceledBy": "Gestopt door {{name}} na {{minutes}} min.",
       "no_ai": "Ik kan nog niet antwoorden: ik heb geen AI gekoppeld.",
+      "person_limit": "Wie het vroeg, heeft de gebruikslimiet voor deze maand bereikt. Om nu door te gaan, vraag het een admin.",
       "no_ai_signed_out": "Ik kan nog niet antwoorden: mijn AI is uitgelogd.",
       "no_ai_not_signed_in": "Ik kan nog niet antwoorden: {{brain}} is niet ingelogd op mijn computer.",
+      "no_ai_computer_away": "Ik kan nu niet antwoorden: de computer van mijn abonnement is niet bereikbaar.",
+      "no_ai_plan_limit": "Ik kan nu niet antwoorden: het abonnement waarmee ik denk heeft zijn limiet bereikt.",
+      "no_ai_plan_not_shared": "Ik kan je via dit abonnement niet antwoorden: het antwoordt alleen de eigenaar.",
+      "no_ai_runner_outdated": "Ik kan nu niet antwoorden: het programma op de computer van mijn abonnement heeft een update nodig.",
+      "no_ai_plan_tools": "Ik stopte voordat ik antwoordde: de AI van mijn abonnement op die computer biedt eigen tools aan.",
+      "redacted": "[verwijderd: leek op inloggegevens of een sleutel]",
       "action_connect_ai": "AI koppelen",
       "action_connect_app": "{{name}} koppelen",
       "action_add_mcp": "Een MCP-server toevoegen",
@@ -12761,7 +13125,9 @@
       "stuck": "Ik liep vast en stopte voordat ik klaar was.",
       "forum_suggestion": "Iets voor het forum? “{{title}}”",
       "forum_concluded": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder.",
-      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}})."
+      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}}).",
+      "action_approvals": "Goedkeuringen die op jou wachten",
+      "action_open_page": "Een scherm openen"
     }
   },
   "builtinTools": {
@@ -13374,6 +13740,7 @@
       "noComputerCloud": "De computer van {{name}} wordt klaargezet.",
       "noComputerCloud_female": "De computer van {{name}} wordt klaargezet.",
       "forbidden": "Je kunt deze browser niet zien.",
+      "noRole": "Je rol geeft je geen toegang tot de browsers van agents.",
       "tooMany": "Te veel browsers tegelijk open. Deze verschijnt als er een andere sluit.",
       "unavailable": "De browser kan nu niet getoond worden. Opnieuw proberen…",
       "closed": "De browser van {{name}} is gesloten.",
@@ -13388,7 +13755,12 @@
       "subHidden": "{{person}} heeft de controle · scherm verborgen",
       "full": "Volledig scherm",
       "fullExit": "Volledig scherm sluiten",
-      "goToggle": "Site openen",
+      "navBack": "Terug",
+      "navForward": "Vooruit",
+      "navReload": "Pagina opnieuw laden",
+      "paste": "Plakken",
+      "pasteHint": "Plak wat je hebt gekopieerd in de pagina",
+      "pasteBlocked": "Je browser liet niet lezen wat je hebt gekopieerd. Gebruik {{keys}} op de pagina.",
       "goLabel": "Adres van de site",
       "goPlaceholder": "Typ een adres, zoals example.com",
       "go": "Openen",
@@ -13404,6 +13776,7 @@
       "backLabel": "Notitie voor {{name}}",
       "backLabel_female": "Notitie voor {{name}}",
       "backPlaceholder": "Optioneel: iets wat {{name}} moet weten?",
+      "addNote": "Notitie achterlaten",
       "backPlaceholder_female": "Optioneel: iets wat {{name}} moet weten?"
     },
     "now": {
@@ -13775,7 +14148,8 @@
     "ask": {
       "watching": "Je kijkt alleen mee.",
       "title": "Wil je de controle overnemen?",
-      "working": "{{name}} pauzeert zolang jij de controle hebt."
+      "working": "{{name}} pauzeert zolang jij de controle hebt.",
+      "titleBrowser": "Wil je de browser overnemen?"
     },
     "sub": {
       "control": "Jij hebt de controle · {{name}} wacht",
@@ -13791,7 +14165,9 @@
     },
     "retry": "Opnieuw proberen",
     "takeover": "Controle overnemen",
+    "takeBrowser": "Browser overnemen",
     "taking": "Controle overnemen…",
+    "returning": "Teruggeven aan {{name}}…",
     "clipboard": {
       "got": "Gekopieerd op de computer van {{name}}:",
       "got_female": "Gekopieerd op de computer van {{name}}:",
@@ -13870,12 +14246,19 @@
       "linuxOnly": "Agents gebruiken apps op hun eigen scherm alleen op Linux-computers.",
       "agent": "{{name}} kan nog geen apps op zijn scherm gebruiken op {{computer}}.",
       "agent_female": "{{name}} kan nog geen apps op haar scherm gebruiken op {{computer}}."
+    },
+    "browserOnly": {
+      "title": "Je zit in de browser, niet op de hele computer",
+      "plan": "{{name}} denkt met het abonnement van de eigenaar, dus alleen die en beheerders die agents beheren bedienen de hele computer",
+      "other": "Je kunt de browser van {{name}} bedienen, niet de hele computer",
+      "role": "Je rol geeft je de browser van {{name}}, niet de hele computer"
     }
   },
   "agentComputer": {
     "title": "Computer van {{name}}",
     "title_female": "Computer van {{name}}",
     "open": "Openen",
+    "openOf": "Computer van {{name}} openen",
     "help": "Hulp",
     "button": "Computer",
     "choose": "Kies een computer",
@@ -13943,7 +14326,8 @@
       "noComputer_female": "Kies een computer voor {{name}}.",
       "browserOff": "De browser van {{name}} staat uit op {{computer}}",
       "browserOff_female": "De browser van {{name}} staat uit op {{computer}}",
-      "forbidden": "Je kunt deze computer niet zien."
+      "forbidden": "Je kunt deze computer niet zien.",
+      "noRole": "Je rol geeft je geen toegang tot de computers van agents."
     },
     "closeAsk": "{{name}} wacht 2 min tot je terug bent.",
     "closeAsk_female": "{{name}} wacht 2 min tot je terug bent.",
@@ -14285,6 +14669,9 @@
       "open": "Openen"
     },
     "home": "Mijn start",
+    "seeMore": "Meer bekijken",
+    "seeMoreHidden_one": "nog {{count}}",
+    "seeMoreHidden_other": "nog {{count}}",
     "untitled": "Nieuwe widget",
     "updatedAgo": "bijgewerkt {{when}}",
     "removed": {

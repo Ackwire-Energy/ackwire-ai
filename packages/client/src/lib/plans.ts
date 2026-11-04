@@ -1,4 +1,5 @@
 import {
+  CODING_PLANS,
   type CodingPlan,
   claudeCodeModel,
   type PlanModel,
@@ -42,6 +43,13 @@ export const brainModelChoices = (
         ...(inPlan ? { inPlan } : {}),
         ...(free ? { free } : {}),
       }));
+
+/**
+ * Under OpenCode Go's models (web and phone): Go's key thinks through Claude Code, where OpenCode's free tier
+ * (`glm-5.3-flash-free`…) never answers, so its free models show only on the OpenCode brain (ADR 0132 §7).
+ */
+export const planFreeHint = (t: TFunction, plan: CodingPlan | undefined) =>
+  plan === CODING_PLANS.opencode ? t("brain.opencodeFreeHint") : undefined;
 
 /**
  * The choice a stored model shows as: on a plan, the model it runs there (an alias the plan leaves out or another

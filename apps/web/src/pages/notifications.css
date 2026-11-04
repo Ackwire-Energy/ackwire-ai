@@ -357,9 +357,11 @@ html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* Choices can be whole sentences: each grows with its text and wraps inside the row. */
 .nt-sug button {
-  height: var(--control-h-sm);
-  padding: 0 var(--control-px-sm);
+  max-width: 100%;
+  min-height: var(--control-h-sm);
+  padding: 6px var(--control-px-sm);
   border-radius: var(--control-r-sm);
   border: 0;
   background: var(--sunken);
@@ -367,6 +369,8 @@ html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible {
   font-size: 13px;
   font-weight: 600;
   line-height: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
   color: var(--ink2);
   cursor: pointer;
   transition:

@@ -9,7 +9,15 @@ import {
   parseRunnerFrame,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
-import { cachedExecutors, detectExecutors, resolveCommand } from "../../runner/executors";
+import {
+  cachedCodexVersion,
+  cachedExecutors,
+  detectExecutors,
+  EXECUTORS_EXIT_STRIKES,
+  EXECUTORS_RETRY_MS,
+  EXECUTORS_TTL_MS,
+  resolveCommand,
+} from "../../runner/executors";
 import {
   claudePermissionSettings,
   FOLDER_PATH_PREFIX,
@@ -52,7 +60,7 @@ function manager(home: string, ws: string, over: Partial<ConstructorParameters<t
   return tasks;
 }
 
-test("protocol 7: hello carries the coding CLIs found; detection is best effort and cached", () => {
+test("protocol 7: hello carries the coding CLIs found; detection is best effort and cached", async () => {
   const hello = parseRunnerFrame(
     JSON.stringify({
       type: "hello",
@@ -69,20 +77,109 @@ test("protocol 7: hello carries the coding CLIs found; detection is best effort 
   const calls: string[] = [];
   const run = (command: string) => {
     calls.push(command);
-    return command === "claude"
-      ? { status: 0, stdout: "2.1.300 (Claude Code)\n" }
-      : { status: null, stdout: "", error: new Error("ENOENT") };
+    return command === "claude" ? { status: 0, stdout: "2.1.300 (Claude Code)\n" } : { ...NOT_FOUND };
   };
-  expect(detectExecutors(run)).toEqual({ claude: { version: "2.1.300 (Claude Code)" } });
+  expect(await detectExecutors(run)).toEqual({
+    found: { claude: { version: "2.1.300 (Claude Code)" } },
+    unsure: false,
+  });
   let now = 0;
-  const cached = cachedExecutors(() => now, run);
-  cached();
+  const cached = cachedExecutors({ now: () => now, run });
+  await cached.ready();
   cached();
   // `claude --version` and (protocol 8) `claude auth status` per look.
   expect(calls.filter((c) => c === "claude")).toHaveLength(4);
-  now = 11 * 60_000;
+  now = EXECUTORS_TTL_MS;
   cached();
-  expect(calls.filter((c) => c === "claude")).toHaveLength(6);
+  await waitFor(() => calls.filter((c) => c === "claude").length === 6);
+});
+
+const NOT_FOUND = { status: null, stdout: "", error: Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }) };
+const TIMED_OUT = { status: null, stdout: "", error: Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }) };
+
+test("detection: only a missing binary is not installed; a timeout or failing exit keeps the last good look", async () => {
+  const good = { claude: { version: "2.1.300", loggedIn: true }, codex: { version: "codex-cli 0.80.0" } };
+  const timeouts = () => ({ ...TIMED_OUT });
+  expect(await detectExecutors(timeouts, good)).toEqual({ found: good, unsure: true });
+  const failing = () => ({ status: 1, stdout: "" });
+  expect(await detectExecutors(failing, good)).toEqual({ found: good, unsure: true });
+  // Claude Code answered its version but its login check timed out: the login last seen stands.
+  const authTimeout = (c: string, args: string[]) =>
+    c === "claude" ? (args[0] === "auth" ? { ...TIMED_OUT } : { status: 0, stdout: "2.1.301\n" }) : { ...NOT_FOUND };
+  expect(await detectExecutors(authTimeout, good)).toEqual({
+    found: { claude: { version: "2.1.300", loggedIn: true } },
+    unsure: true,
+  });
+  // Gone from the PATH: not installed any more, and that is a sure answer.
+  expect(await detectExecutors(() => ({ ...NOT_FOUND }), good)).toEqual({ found: {}, unsure: false });
+  // A shim whose interpreter is gone: the shell's "not found" is as sure.
+  expect(await detectExecutors(() => ({ status: 127, stdout: "" }), good)).toEqual({ found: {}, unsure: false });
+  // A launcher left behind keeps failing: dropped after a few looks in a row.
+  const strikes = {};
+  for (let i = 1; i < EXECUTORS_EXIT_STRIKES; i++) {
+    expect(await detectExecutors(failing, good, strikes)).toEqual({ found: good, unsure: true });
+  }
+  expect(await detectExecutors(failing, good, strikes)).toEqual({ found: {}, unsure: false });
+});
+
+test('Codex turn\'s own look: a timeout is "couldn\'t tell" (null), never "not installed"', async () => {
+  let answer: object = { ...TIMED_OUT };
+  const version = cachedCodexVersion(() => answer as { status: number | null; stdout: string });
+  expect(await version()).toBeNull();
+  answer = { status: 0, stdout: "codex-cli 0.80.0\n" };
+  expect(await version()).toBe("codex-cli 0.80.0");
+  answer = { ...NOT_FOUND };
+  expect(await version()).toBe("codex-cli 0.80.0");
+  expect(await cachedCodexVersion(() => ({ ...NOT_FOUND }))()).toBeUndefined();
+});
+
+test("cache: an unsure look is retried soon, never kept for the TTL; hello never waits on a look", async () => {
+  let now = 0;
+  let answer: (command: string) => object = () => ({ ...TIMED_OUT });
+  let release: () => void = () => {};
+  let gate = Promise.resolve();
+  let looks = 0;
+  const run = async (command: string) => {
+    if (command === "claude") looks++;
+    await gate;
+    return answer(command) as { status: number | null; stdout: string };
+  };
+  const changes: unknown[] = [];
+  const home = tempDir("executors-");
+  dirs.push(home);
+  const file = path.join(home, "executors.json");
+  writeFileSync(file, JSON.stringify({ codex: { version: "codex-cli 0.80.0" }, bogus: { version: "x" } }));
+  const cached = cachedExecutors({ now: () => now, run, file, onChange: (found) => changes.push(found) });
+  // The first look hangs: the list kept on disk comes back at once (as `hello` would carry it).
+  gate = new Promise((r) => {
+    release = r;
+  });
+  expect(cached()).toEqual({ codex: { version: "codex-cli 0.80.0" } });
+  release();
+  // Everything timed out: the kept list stands, nothing changed.
+  await cached.ready();
+  await waitFor(() => looks === 1);
+  await Bun.sleep(5);
+  expect(cached()).toEqual({ codex: { version: "codex-cli 0.80.0" } });
+  expect(changes).toEqual([]);
+  // Retried after `EXECUTORS_RETRY_MS`, not the TTL.
+  answer = (c) =>
+    c === "claude"
+      ? { status: 0, stdout: "2.1.300\n" }
+      : c === "codex"
+        ? { status: 0, stdout: "codex-cli 0.80.0\n" }
+        : { ...NOT_FOUND };
+  now = EXECUTORS_RETRY_MS;
+  cached();
+  await waitFor(() => changes.length === 1);
+  expect(cached()).toMatchObject({ claude: { version: "2.1.300" }, codex: { version: "codex-cli 0.80.0" } });
+  expect(JSON.parse(readFileSync(file, "utf8"))).toMatchObject({ claude: { version: "2.1.300" } });
+  // A sure look is kept for the TTL.
+  const before = looks;
+  now += EXECUTORS_RETRY_MS;
+  cached();
+  await Bun.sleep(5);
+  expect(looks).toBe(before);
 });
 
 test("permission profile: work allows git, tests and builds; every push asks the prompt tool; merges and deploys are denied", () => {

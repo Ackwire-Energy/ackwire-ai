@@ -1,6 +1,7 @@
 import {
   DarkTheme,
   DefaultTheme,
+  type Href,
   type NativeStackNavigationOptions,
   type Theme as NavigationTheme,
   router,
@@ -204,14 +205,18 @@ function plateBack(label: string): NativeStackNavigationOptions {
   if (Platform.OS !== "android") return {};
   return {
     headerBackVisible: false,
-    headerLeft: ({ canGoBack }) => (canGoBack ? <IconButton icon="back" label={label} plate onPress={back} /> : null),
+    headerLeft: ({ canGoBack }) =>
+      canGoBack ? <IconButton icon="back" label={label} plate onPress={() => goBack()} /> : null,
   };
 }
 
-/** Back, or home when the screen was opened by a link with nothing under it. */
-function back() {
+/**
+ * Back to the screen this one was opened from, so leaving a flow lands where the person was; `fallback` (home by
+ * default) when it was opened by a link with nothing under it.
+ */
+export function goBack(fallback: Href = "/") {
   if (router.canGoBack()) router.back();
-  else router.replace("/");
+  else router.replace(fallback);
 }
 
 /** The bar of a pushed screen whose content scrolls under it (needs `contentInsetAdjustmentBehavior="automatic"`). */

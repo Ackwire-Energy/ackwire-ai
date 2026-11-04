@@ -62,6 +62,8 @@ export const runAround = (run: RunPosition, aboveHangs: boolean, hangs: boolean)
 export const NEAR_BOTTOM_PX = 120;
 export const nearBottom = (el: { scrollHeight: number; scrollTop: number; clientHeight: number }) =>
   el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
+/** More than one screen of conversation below what is shown: the round "to the latest" button appears. */
+export const screenAboveEnd = (distanceFromEnd: number, viewport: number) => distanceFromEnd > viewport;
 
 /** A key that scrolls a focused list up (Shift+Space is the browser's page up). */
 export const isScrollUpKey = (e: { key: string; shiftKey: boolean }) =>

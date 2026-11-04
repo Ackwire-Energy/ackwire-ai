@@ -466,6 +466,24 @@ export const OPENCODE_PROTOCOL = 39;
  */
 export const CONVERSATION_PROTOCOL = 40;
 /**
+ * From this protocol on (ADR 0137 §4, amended 2026-11-04): every CLI's `brain.turn` takes `permissions.mode: "chat"`,
+ * the team's right hand thinking on a person's plan. The CLI gets none of its own tools it can switch off, only our
+ * MCP bridge, no settings files, plugins, skills or slash commands, no folder but the agent's own (Codex and Cursor:
+ * an empty one), none of the agent's secrets and no permission prompt. The runner checks the tools Claude Code and
+ * OpenCode list (`init`, `debug agent`) before the turn can use one, and kills any CLI at the first call of a tool
+ * that isn't our bridge's (Codex and Cursor list none: their output is all there is), ending the turn with
+ * `tools_not_locked`. An older runner reads any mode but `plan` as `work`: the server never sends it a `chat` turn.
+ */
+export const LOCKED_BRAIN_PROTOCOL = 41;
+
+/**
+ * From this protocol on, the runner sends `executors.changed` when the coding CLIs it finds change mid-session (its
+ * looks run in the background, so `hello` carries the last known list). An older server ignores the frame and learns
+ * the list at the next `hello`; an older runner never sends it.
+ */
+export const EXECUTORS_CHANGED_PROTOCOL = 42;
+
+/**
  * From this protocol on (ADR 0142): the Vault. `vault.key` makes a one-use key pair in the agent's process (its
  * worker in system mode) and answers its public key; the private key lives only in that process's memory, for two
  * minutes, and goes at its first use. Sealed to it: a login's password, typed by the browser command
@@ -1306,7 +1324,7 @@ export interface BrainTurnRequest {
    * The turn's permission profile (ADR 0053 §3): `work` (default) edits and asks a person (or the server's
    * rules) for the rest; `plan` reads only. Codex honours it from `BRAIN_PROFILES_PROTOCOL` on.
    */
-  permissions?: { mode?: "plan" | "work"; branchPrefix?: string; allow?: string[] };
+  permissions?: { mode?: "plan" | "work" | "chat"; branchPrefix?: string; allow?: string[] };
   /** Protocol 13: the account folder to run in (`accounts/<kind>/<id>`); absent: the machine's own sign-in. */
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
@@ -2052,6 +2070,8 @@ export type RunnerFrame =
    * done, a status changed). Protocol 19: or their usage did (`ownUsage`: the computer's own sign-ins').
    */
   | { type: "accounts.changed"; accounts: RunnerAccountInfo[]; ownUsage?: OwnPlanUsage }
+  /** Protocol 41: the coding CLIs found changed since `hello` (`hello.executors`, whole). */
+  | { type: "executors.changed"; executors: NonNullable<RunnerInfo["executors"]> }
   /**
    * Protocol 10: the person answered an `access.request` on the machine (or it
    * expired). `granted` also comes with an `access.changed`.
@@ -2442,6 +2462,8 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       const ownUsage = parseOwnUsage(f.ownUsage);
       return { type: "accounts.changed", accounts: parseAccounts(f.accounts), ...(ownUsage ? { ownUsage } : {}) };
     }
+    case "executors.changed":
+      return isObject(f.executors) ? { type: "executors.changed", executors: parseExecutors(f.executors) } : null;
     case "access.decided": {
       if (!isString(f.requestId)) return null;
       const decision = (["granted", "denied", "expired"] as const).find((d) => d === f.decision);

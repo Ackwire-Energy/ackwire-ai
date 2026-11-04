@@ -1,5 +1,5 @@
 import type { Agent } from "@agenteschat/client";
-import { keys, useAiStatus, useChannels, useMembers } from "@agenteschat/client";
+import { keys, useAiStatus, useChannels, useMembers, useRightHandWave } from "@agenteschat/client";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
@@ -8,11 +8,12 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { PRESET_LOOK, PRESETS, type Preset, presetInput } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
 import { introCards, isRightHand, presetsLeft } from "@agenteschat/client/lib/right-hand";
-import { Button, Icon, Message, MessageText, normalizeAppearance } from "@agenteschat/ui";
+import { AgentSticker, Button, Icon, Message, MessageText, normalizeAppearance, WAVE_SECONDS } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { MESSAGE_STICKER } from "@/chat/ChatMedia";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
@@ -20,13 +21,15 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
 import { RequestCard } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
+import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 
 /**
  * The top of the right hand's DM (ADR 0137), drawn by the app and never stored, so it costs nothing and works before
  * any AI is connected: its greeting, then the first card the workspace needs. No AI yet: Connect AI. An AI and no
  * agent besides it: how to start (the ready-made agents, describing the need, an import or the form). A team and
- * nobody else here yet: inviting people and the first task.
+ * nobody else here yet: inviting people and the first task. On the person's first visit, its waving sticker under the
+ * greeting, drawn as a sticker message is and decorative (the greeting already says hello).
  */
 export function RightHandIntro({ agent }: { agent: Agent }) {
   const { t, i18n } = useTranslation();
@@ -35,6 +38,7 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
   const status = useAiStatus(org.id);
   const members = useMembers(org.id);
   const connect = useConnectAi();
+  const wave = useRightHandWave(org.id, agent.id);
   const team = dir.agents.filter((a) => !isRightHand(a));
   const teamHandles = team.map((a) => a.handle);
   const cards = introCards({
@@ -52,11 +56,23 @@ export function RightHandIntro({ agent }: { agent: Agent }) {
       time={<time dateTime={agent.createdAt}>{formatTime(i18n.language, agent.createdAt)}</time>}
     >
       <MessageText>
-        <p>
-          <b>{t("rightHand.intro.greeting", agentGrammar(agent.name))}</b>
-        </p>
-        <p>{t("rightHand.intro.lead")}</p>
+        {/* The wrapper a typed message's Markdown has (MessageBody): without it, a paragraph keeps the browser's margins. */}
+        <div className="md md--message">
+          <p>
+            <b>{t("rightHand.intro.greeting", agentGrammar(agent.name))}</b>
+          </p>
+          <p>{t("rightHand.intro.lead")}</p>
+        </div>
       </MessageText>
+      {wave && (
+        <AgentSticker
+          appearance={lookOf(agent)}
+          mood="wave"
+          playFor={WAVE_SECONDS}
+          size={MESSAGE_STICKER}
+          className="ac-msg-media"
+        />
+      )}
       {cards.includes("connect") && connect && (
         <div className="waitcard">
           <span className="waitcard__top ac-iconline">

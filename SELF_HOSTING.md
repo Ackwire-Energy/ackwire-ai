@@ -699,7 +699,7 @@ make it private again.
 
 Settings are environment variables in `.env`; the compose file hands the whole file to the app. After
 a change, `docker compose up -d` recreates the app with it. Every variable is documented in
-[`.env.example`](https://github.com/agentes-chat/agentes-chat/blob/main/.env.example). These are the
+[`.env.example`](.env.example). These are the
 ones a self-hosted instance usually touches:
 
 | Variable | Default | What it does |

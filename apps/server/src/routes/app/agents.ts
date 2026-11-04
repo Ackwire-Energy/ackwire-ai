@@ -457,7 +457,19 @@ export function agentRoutes(deps: AppDeps) {
               z.object({
                 agentId: z.uuid(),
                 state: z.enum(["ready", "no_ai", "waiting"]),
-                reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
+                reason: z
+                  .enum([
+                    "no_key",
+                    "not_signed_in",
+                    "no_computer",
+                    "cli_missing",
+                    "computer_away",
+                    "plan_limit",
+                    "plan_not_shared",
+                    "runner_outdated",
+                    "plan_tools",
+                  ])
+                  .optional(),
                 own: z.enum(["claude_code", "codex", "cursor", "opencode"]).optional(),
               }),
             ),
@@ -1305,8 +1317,9 @@ export function agentRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
       const view = await setAgentBrain({ db }, c.get("user").id, orgId, agentId, c.req.valid("json"));
-      // Its computer hears which account each agent thinks with (system mode lends the folders by it).
-      if (view.computer) await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      // Its computers hear which account each agent thinks with (system mode lends the folders by it), on every save:
+      // the one an old plan was on may be none the view shows (the team's right hand, which is on no computer).
+      await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(view, 200);
     },
   );

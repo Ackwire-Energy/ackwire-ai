@@ -1,9 +1,23 @@
-import type { Dashboard, Widget } from "@agenteschat/client";
+import type { Dashboard, HomeTile, Widget } from "@agenteschat/client";
 import { type BoardItem, boardItems, layoutOf, resizeItem, useRefreshWidget, useSaveLayout } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { Button, Card, cx, Icon, Menu, MenuItem, MenuSeparator, WidgetCard } from "@agenteschat/ui";
+import {
+  Button,
+  Card,
+  CardHorizon,
+  CardMore,
+  cx,
+  Dialog,
+  DialogBody,
+  Icon,
+  Menu,
+  MenuItem,
+  MenuSeparator,
+  useCardCut,
+  WidgetCard,
+} from "@agenteschat/ui";
 import { layoutToSize, nextSize, sizeToLayout } from "@agenteschat/ui/widgets/spec";
-import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNow } from "@/hooks/useNow";
 import { type GridMove, useGridDrag } from "@/lib/grid-drag";
@@ -34,6 +48,12 @@ export interface WidgetBoardProps {
   tiles?: Partial<Record<TileKey, BoardTileSlot>>;
   /** The fixed tiles' names, for what a screen reader hears while one moves. */
   tileNames?: Partial<Record<TileKey, string>>;
+  /**
+   * Início showing another board ("Use on Home", ADR 0135 §18): the person's own home board, whose fixed tiles sit
+   * among this board's widgets. Their places are saved on it (the person's alone), the widgets' order on the board
+   * (when the person edits it).
+   */
+  homeTiles?: { boardId: string; tiles: HomeTile[] };
   onOpen: (widgetId: string) => void;
   /** "Change when it updates" (else it opens the widget, whose panel changes it). */
   onChangeSchedule?: (widgetId: string) => void;
@@ -47,23 +67,45 @@ export interface WidgetBoardProps {
  * where it lands), the grip's keys, the size button, remove. Every change is saved at once (`useSaveLayout`,
  * optimistic) and the cells slide to their new places; a remove asks first (`RemoveWidgetDialog`).
  */
-export function WidgetBoard({ orgId, board, arranging, tiles, tileNames, onOpen, onChangeSchedule }: WidgetBoardProps) {
+export function WidgetBoard({
+  orgId,
+  board,
+  arranging,
+  tiles,
+  tileNames,
+  homeTiles,
+  onOpen,
+  onChangeSchedule,
+}: WidgetBoardProps) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const save = useSaveLayout(orgId);
   const [removing, setRemoving] = useState<Widget | null>(null);
   const now = useNow(60_000);
   const helpId = useId();
-  const items = boardItems(board.widgets, board.kind === "home" ? board.tiles.filter((x) => tiles?.[x.key]) : []);
+  const fixed = homeTiles ? homeTiles.tiles : board.kind === "home" ? board.tiles : [];
+  const items = boardItems(
+    board.widgets,
+    fixed.filter((x) => tiles?.[x.key]),
+  );
   const fresh = useArrivals(board.widgets);
   const editable = board.canEdit;
-  const organizing = arranging && editable;
+  // The fixed tiles are the person's own: they move even on a board on Início that the person only sees.
+  const organizing = arranging && (editable || Boolean(homeTiles));
 
-  const commit = (next: BoardItem[]) =>
+  const failed = (e: unknown) => toast.show(errorText(t, e, i18n.language), "error");
+  const commit = (next: BoardItem[]) => {
+    const layout = layoutOf(next);
+    if (!homeTiles) {
+      save.mutate({ dashboardId: board.id, home: board.kind === "home", ...layout }, { onError: failed });
+      return;
+    }
     save.mutate(
-      { dashboardId: board.id, home: board.kind === "home", ...layoutOf(next) },
-      { onError: (e) => toast.show(errorText(t, e, i18n.language), "error") },
+      { dashboardId: homeTiles.boardId, home: true, widgets: [], tiles: layout.tiles ?? [] },
+      { onError: failed },
     );
+    if (editable) save.mutate({ dashboardId: board.id, widgets: layout.widgets }, { onError: failed });
+  };
   const nameOf = (item: BoardItem) =>
     item.type === "widget" ? widgetTitle(t, item.widget) : (tileNames?.[item.id] ?? "");
   const grid = useGridDrag<BoardItem>({
@@ -214,6 +256,7 @@ function BoardWidget({
   const update = () =>
     refresh.mutate(widget.id, { onError: (e) => toast.show(errorText(t, e, i18n.language), "error") });
   const size = layoutToSize(widget.layout);
+  const board = useBoardLabels();
   const removeLabel = t(boardKind === "home" ? "widgets.menu.removeHome" : "widgets.menu.removeBoard");
   return (
     <WidgetCard
@@ -228,6 +271,7 @@ function BoardWidget({
       buildingText={t("widgets.status.building", { name })}
       face={<WidgetFace agentId={widget.agentId} name={name} />}
       onOpen={onOpen}
+      board={board}
       footer={
         <WidgetFoot
           widget={widget}
@@ -310,30 +354,57 @@ function BoardWidget({
   );
 }
 
+/** "See more" on a board's cards, and what a cut hides for screen readers. */
+function useBoardLabels() {
+  const { t } = useTranslation();
+  return useMemo(
+    () => ({ seeMore: t("widgets.seeMore"), hidden: (count: number) => t("widgets.seeMoreHidden", { count }) }),
+    [t],
+  );
+}
+
 /**
  * A fixed tile of a board (Home's "Waiting on you", "Working now"): a card like a widget's, its title and count, an
- * action at the head's end; in Organize, "Fixed" and the grip (the board's drag) in their place.
+ * action at the head's end; in Organize, "Fixed" and the grip (the board's drag) in their place. Like a widget, its
+ * height is capped: rows past it fade out under "See more", which opens the tile whole in a dialog; with room to
+ * spare under its rows (nothing at work), the horizon at its foot.
  */
 export function BoardTile({
   title,
   count,
   action,
+  horizon = true,
   organize,
   children,
 }: {
   title: string;
   count?: number;
   action?: ReactNode;
+  /** False when the body draws its own sky. */
+  horizon?: boolean;
   organize: TileOrganize | null;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const labels = useBoardLabels();
+  const body = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const capped = !organize;
+  const cut = useCardCut(body, capped);
+  const badge = count !== undefined && count > 0 && <span className="wg__badge">{count}</span>;
   return (
-    <Card as="section" className="wg wg--fixed" aria-label={title} data-organize={organize ? "" : undefined}>
+    <Card
+      as="section"
+      className="wg wg--fixed"
+      aria-label={title}
+      data-organize={organize ? "" : undefined}
+      data-capped={capped || undefined}
+      data-cut={cut.cut || undefined}
+    >
       <div className="wg__head">
         <h2 className="wg__title">
           {title}
-          {count !== undefined && count > 0 && <span className="wg__badge">{count}</span>}
+          {badge}
         </h2>
         {organize ? (
           <span className="wg__arr">
@@ -352,7 +423,33 @@ export function BoardTile({
           action
         )}
       </div>
-      <div className="wg__body">{children}</div>
+      <div ref={body} className="wg__body">
+        {children}
+        {cut.cut && (
+          <CardMore
+            label={labels.seeMore}
+            hiddenLabel={cut.hidden ? labels.hidden(cut.hidden) : undefined}
+            hidden={cut.hidden}
+            onOpen={() => setOpen(true)}
+          />
+        )}
+      </div>
+      {capped && horizon && <CardHorizon content={body} />}
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        title={
+          <span className="wg-whole__title">
+            {title}
+            {badge}
+          </span>
+        }
+        closeLabel={t("common.close")}
+        actions={action}
+        className="wg-whole"
+      >
+        <DialogBody className="wg-whole__body">{children}</DialogBody>
+      </Dialog>
     </Card>
   );
 }

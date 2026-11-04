@@ -36,7 +36,7 @@ import { SetupWait } from "../computer/SetupWait";
 import { computerIcon } from "../outages/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useMeId } from "../shared/hooks";
-import { goBack, MONO, successHaptic } from "../shared/parts";
+import { goBack, successHaptic } from "../shared/parts";
 import {
   type AgentComputerPick,
   agentComputerPick,
@@ -224,7 +224,16 @@ function HostComputer() {
         <GroupedFooter>
           <Trans
             i18nKey="computers.hostMissing"
-            components={{ code: <Text variant="footnote" style={styles.mono} /> }}
+            components={{
+              guide: (
+                <Text
+                  variant="footnote"
+                  accessibilityRole="link"
+                  style={styles.link}
+                  onPress={() => openPage(helpUrl("install-on-a-server", i18n.language, "computers"))}
+                />
+              ),
+            }}
           />
         </GroupedFooter>
       )}
@@ -420,5 +429,5 @@ const styles = StyleSheet.create({
   wait: { padding: 16 },
   empty: { alignItems: "center", gap: 8, paddingVertical: 20, paddingHorizontal: 16 },
   bold: { fontWeight: "600" },
-  mono: { fontFamily: MONO },
+  link: { textDecorationLine: "underline" },
 });

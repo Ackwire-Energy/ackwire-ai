@@ -962,15 +962,18 @@ async function doBrainTurn(
   requireTool(ctx, cli ?? "claude");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
-  if (cli) return doCodexTurn(ctx, req, scope, runId);
+  // A locked-down turn (protocol 41) gets neither the agent's secrets nor its folders, and stops at the first tool
+  // that isn't our bridge's.
+  const chat = req.permissions?.mode === "chat";
+  if (cli) return doCodexTurn(ctx, req, scope, runId, chat);
   if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
     folder: ctx.workspaceReal,
-    secrets: secrets ? { env: secrets.env, redact: secrets.redact, hold: secrets.hold } : null,
+    secrets: secrets && !chat ? { env: secrets.env, redact: secrets.redact, hold: secrets.hold } : null,
     signal: scope.signal,
     emit: (event) => scope.emit?.({ type: "brain.event", runId, event }),
-    ...(ctx.grants ? { grants: ctx.grants } : {}),
+    ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
     ...(ctx.grant ? { grant: ctx.grant } : {}),
   });
   signedOut(ctx, req, final);
@@ -1055,6 +1058,7 @@ async function doCodexTurn(
   req: Extract<MachineRequest, { op: "brain.turn" }>,
   scope: RequestScope,
   runId: string,
+  chat: boolean,
 ): Promise<MachineReplies["brain.turn"]> {
   const codex = ctx.codex;
   const cursor = req.kind === "cursor";
@@ -1097,9 +1101,9 @@ async function doCodexTurn(
           folder,
           exec: toolOn(ctx, "opencode"),
           runnerHome: codex.runnerHome,
-          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(ctx.secretsDir && !chat ? { secretsDir: ctx.secretsDir } : {}),
           ...(codex.mcp ? { mcp: codex.mcp } : {}),
-          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
           ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
           ...(codex.spawn ? { spawn: codex.spawn } : {}),
         },
@@ -1112,9 +1116,9 @@ async function doCodexTurn(
           folder,
           exec: toolOn(ctx, "cursor"),
           runnerHome: codex.runnerHome,
-          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(ctx.secretsDir && !chat ? { secretsDir: ctx.secretsDir } : {}),
           ...(codex.mcp ? { mcp: codex.mcp } : {}),
-          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
           ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
           ...(codex.spawn ? { spawn: codex.spawn } : {}),
         },
@@ -1127,9 +1131,9 @@ async function doCodexTurn(
           folder,
           exec: toolOn(ctx, "codex"),
           runnerHome: codex.runnerHome,
-          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(ctx.secretsDir && !chat ? { secretsDir: ctx.secretsDir } : {}),
           ...(codex.mcp ? { mcp: codex.mcp } : {}),
-          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
           ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
           ...(codex.app ? { app: codex.app } : {}),
           ...(codex.spawn ? { spawn: codex.spawn } : {}),

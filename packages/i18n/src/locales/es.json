@@ -88,6 +88,24 @@
     "fromAdmin": "De Administrador",
     "viaAdmin": "Todo, como Administrador",
     "nothing": "Nada",
+    "computer": {
+      "title": "Computadoras de los agentes",
+      "levels": {
+        "none": "Ninguno",
+        "browser": "Solo el navegador",
+        "full": "Computadora entera"
+      },
+      "every": {
+        "none": "Solo lo que Todos ya pueden",
+        "browser": "El navegador de cualquier agente y las solicitudes de inicio de sesión, nunca la pantalla completa ni la terminal",
+        "full": "La pantalla completa, el control y la terminal de cualquier agente"
+      },
+      "own": {
+        "none": "Nadie ve ni usa las computadoras o navegadores de los agentes, ni las solicitudes de inicio de sesión",
+        "browser": "El navegador de sus propios agentes y las solicitudes de inicio de sesión hechas a la persona, nunca la pantalla completa",
+        "full": "La pantalla completa y la terminal de sus propios agentes y de las computadoras que la persona conectó"
+      }
+    },
     "everyoneNote": "Se aplica a todas las personas del espacio de trabajo. Los demás roles solo suman.",
     "summary": {
       "owner": "Puede hacer todo, siempre. Todo espacio de trabajo tiene al menos un propietario.",
@@ -254,6 +272,24 @@
       "desc": "Controlar su escritorio y su navegador.",
       "short": "tomar el control de pantallas",
       "say": "toma el control de las pantallas de los agentes"
+    },
+    "control_browsers": {
+      "title": "Usar el navegador de los agentes",
+      "desc": "Ver y controlar el navegador de cualquier agente y atender las solicitudes de inicio de sesión.",
+      "short": "usar el navegador de los agentes",
+      "say": "usa el navegador de los agentes"
+    },
+    "own_computers": {
+      "title": "Usar la computadora de sus propios agentes",
+      "desc": "La pantalla completa y la terminal de los agentes de los que es responsable y de las computadoras que conectó.",
+      "short": "usar la computadora de sus propios agentes",
+      "say": "usa la computadora de sus propios agentes"
+    },
+    "own_browsers": {
+      "title": "Usar el navegador de sus propios agentes",
+      "desc": "El navegador de los agentes de los que es responsable y las solicitudes de inicio de sesión hechas a la persona.",
+      "short": "usar el navegador de sus propios agentes",
+      "say": "usa el navegador de sus propios agentes"
     },
     "manage_connectors": {
       "title": "Conectar apps",
@@ -1127,6 +1163,7 @@
     "copyText": "Copiar texto",
     "textCopied": "Texto copiado.",
     "copyLink": "Copiar enlace",
+    "openComputer": "Abrir la computadora",
     "linkCopied": "Enlace copiado.",
     "saveToWiki": "Guardar en la wiki",
     "pin": "Fijar mensaje",
@@ -1166,6 +1203,63 @@
     "none": {
       "terms": "Este servidor no tiene página de términos",
       "privacy": "Este servidor no tiene página de privacidad"
+    }
+  },
+  "approvalCover": {
+    "title": "Quién aprueba por mí",
+    "subtitle": "Decide en tu nombre lo que te piden a ti, y nunca lo que esa persona pidió.",
+    "person": "Persona",
+    "nobody": "Nadie",
+    "when": "Cuándo",
+    "whenHelp": "Fuera: cuando tu estado dice que estás fuera de la oficina.",
+    "whileOut": "Solo cuando esté fuera",
+    "always": "Siempre",
+    "until": "Hasta",
+    "noDate": "Sin fecha",
+    "clearDate": "Quitar la fecha",
+    "risky": "Merge, deploy y otras acciones de riesgo",
+    "riskyOff": "Apagado, estas siguen solo contigo.",
+    "riskyOn": "Encendido, esta persona también decide estas.",
+    "lock": "Siempre tuyo: dinero, personas y roles, claves de IA, tu buzón y eliminar.",
+    "coveringTitle": "Apruebas por",
+    "coveringSubtitle": "Lo que les piden a estas personas te llega también, y decides en su nombre. Nunca lo que pediste tú.",
+    "coveringWhileOut": "Cuando esté fuera",
+    "coveringUntil": "hasta el {{date}}",
+    "coveringNow": "Cubriendo ahora",
+    "decline": "No quiero cubrir",
+    "failed": "No se pudo guardar. Inténtalo de nuevo."
+  },
+  "rightHandApprovals": {
+    "title": "{{name}} aprueba por ti",
+    "subtitle": "Solo lo que vino de un pedido tuyo. Lo que no aprobaría, te lo pasa.",
+    "newAgents": "Crear agentes que proponen otros agentes",
+    "newAgentsHelp": "Sin apps, solo en canales abiertos. Puedes deshacerlo durante 24 h.",
+    "agentChanges": "Cambiar el modelo, el presupuesto y los canales de un agente",
+    "agentChangesHelp": "El modelo solo en la misma cuenta de IA.",
+    "cantDecide": "Hoy no decides esto",
+    "budget": "Presupuesto extra, por agente",
+    "budgetHelp": "Por encima de eso, el pedido va a ti.",
+    "perMonth": "/mes",
+    "guidanceLabel": "Cómo decide {{name}} por ti",
+    "guidanceHelp": "{{name}} lo lee antes de decidir. Opcional.",
+    "guidancePlaceholder": "Ej.: nada de agentes duplicados\nSolo modelos baratos para agentes nuevos\nNunca en canales de clientes",
+    "paused": "En pausa: deshiciste 3 de sus decisiones esta semana. Vuelve a activarlo cuando quieras.",
+    "card": {
+      "deciding": "{{name}} lo está analizando en nombre de {{for}}…",
+      "approved": "Aprobado por {{name}} en nombre de {{for}}",
+      "passed": "{{name}} te lo pasó",
+      "passedWhy": "{{name}} te lo pasó: {{reason}}",
+      "outside": "Fuera de lo que dejaste aprobar a {{name}}",
+      "own": "{{name}} no decide su propio pedido",
+      "limit": "{{name}} llegó al límite de hoy: este queda contigo",
+      "undoneByYou": "Deshecho por ti",
+      "undoneBy": "Deshecho por {{name}}",
+      "why": "¿Por qué?",
+      "undo": "Deshacer",
+      "undoArchives": "Deshacer archiva a {{name}}. Vale hasta {{until}}.",
+      "undoSettings": "Deshacer devuelve la configuración. Vale hasta {{until}}.",
+      "approvedForYou": "Aprobado por {{name}} en tu nombre",
+      "decidingForYou": "{{name}} lo está analizando en tu nombre…"
     }
   },
   "noticePrefs": {
@@ -1255,14 +1349,14 @@
       "drive": "Archivos, informes y tablas",
       "routines": "Lo que los agentes hacen solos, a su hora",
       "calendar": "Reuniones y plazos",
-      "forum": "Cuando una decisión necesita varias miradas"
+      "forum": "Cuando una decisión necesita varias miradas",
+      "team": "Quién es quién: personas, agentes y sus grupos"
     },
     "customizeSidebar": "Personalizar la barra lateral",
     "sidebarMenu": {
       "title": "Barra lateral",
       "newChannel": "Nuevo canal",
       "addToChannels": "Nuevo canal o categoría",
-      "addToDms": "Nuevo mensaje o agente",
       "newMessage": "Nuevo mensaje",
       "addMembers": "Agregar personas o agentes",
       "channelSettings": "Configuración del canal",
@@ -1392,7 +1486,53 @@
     "delete": "Eliminar grupo",
     "deleteTitle": "¿Eliminar el grupo {{name}}?",
     "deleteText": "Sus agentes vuelven a Agentes.",
-    "dropHere": "Arrastra agentes aquí"
+    "dropHere": "Arrastra agentes aquí",
+    "moved": "{{name}} pasó al grupo {{group}}",
+    "movedOut": "{{name}} salió del grupo {{group}}",
+    "undo": "Deshacer"
+  },
+  "sidebarAgents": {
+    "options": "Opciones de Agentes",
+    "add": "Nuevo agente o grupo",
+    "order": "Orden",
+    "sort": {
+      "workspace": "El del espacio de trabajo",
+      "mine": "Los míos primero",
+      "working": "Trabajando primero"
+    },
+    "showAll": "Mostrar agentes que no hablan conmigo",
+    "collapseAll": "Contraer todos",
+    "expandAll": "Expandir todos",
+    "organize": "Organizar grupos en Equipo",
+    "seeAll_one": "Ver el {{count}} agente",
+    "seeAll_many": "Ver los {{count}} agentes",
+    "seeAll_other": "Ver los {{count}} agentes",
+    "createFirst": "Crear el primer agente",
+    "working_one": "{{count}} trabajando",
+    "working_many": "{{count}} trabajando",
+    "working_other": "{{count}} trabajando",
+    "count_one": "{{count}} agente",
+    "count_many": "{{count}} agentes",
+    "count_other": "{{count}} agentes",
+    "workingIn": "trabajando en #{{channel}}",
+    "talksOnly": "solo habla con {{name}}",
+    "talksOnlyMore_one": "solo habla con {{name}} y {{count}} más",
+    "talksOnlyMore_many": "solo habla con {{name}} y {{count}} más",
+    "talksOnlyMore_other": "solo habla con {{name}} y {{count}} más",
+    "changeGroup": "Cambiar de grupo",
+    "newGroupWith": "Nuevo grupo con {{name}}",
+    "dmsEmpty": "Tus conversaciones con personas aparecen aquí."
+  },
+  "sidebarPins": {
+    "pin": "Fijar arriba",
+    "unpin": "Quitar de arriba",
+    "pinned": "Fijado arriba",
+    "hint": "Tus agentes quedan arriba. Haz clic derecho en cualquier conversación para fijarla.",
+    "full": {
+      "agents": "Ya fijaste 5 agentes. Quita uno para fijar este.",
+      "channels": "Ya fijaste 5 canales. Quita uno para fijar este.",
+      "people": "Ya fijaste 5 personas. Quita una para fijar esta."
+    }
   },
   "openOnPhone": {
     "qr": "Código QR para iniciar sesión en la app agentes",
@@ -1563,7 +1703,6 @@
       "thinking": "pensando",
       "writing": "escribiendo"
     },
-    "autoReplyChip": "responde sin mención",
     "more": "Más acciones del mensaje",
     "copyLink": "Copiar enlace",
     "linkCopied": "Enlace copiado.",
@@ -1646,14 +1785,15 @@
     "typing_other": "{{names}} están escribiendo…",
     "callAgent": "Llamar a un agente",
     "callAgentMenu": "Agentes en este canal",
-    "newMessages": "Mensajes nuevos",
+    "toLatest": "Ir a los mensajes más recientes",
     "newPill": {
-      "label": "Mensajes nuevos: {{text}}",
+      "label": "Ir a los mensajes más recientes: {{text}}",
       "count_one": "{{count}} nuevo",
       "count_many": "{{count}} nuevos",
       "count_other": "{{count}} nuevos",
       "more": "{{names}} y {{count}} más",
-      "writing": "{{name}} escribiendo"
+      "writing": "{{name}} escribiendo",
+      "mentionsYou": "te mencionaron"
     },
     "unreadDivider": "Nuevos",
     "offline": "Sin conexión. Lo que envíes saldrá solo cuando vuelva.",
@@ -1799,7 +1939,13 @@
       "audience": "Quién puede usarlo",
       "audienceHelp": "Fuera del público, la persona no ve a {{name}} en la barra lateral.",
       "lock": "{{name}} no se puede archivar ni borrar. No publica nada si nadie le habla.",
-      "audit": "Ver lo que hizo {{name}}"
+      "audit": "Ver lo que hizo {{name}}",
+      "onPlan": "Plan de Claude · {{account}}",
+      "change": "Cambiar",
+      "planHelp": "Paga quien es dueño del plan. Si su computadora no está disponible, la conversación lo dice y ofrece una clave de API.",
+      "plan": "Un plan",
+      "planOffer": "{{name}} puede pensar con tu plan en lugar de una clave de API, en la computadora donde el plan tiene la sesión iniciada, sin llegar a nada fuera de este workspace.",
+      "usePlan": "Usar un plan"
     },
     "card": {
       "settings": "{{name}} · Configuración",
@@ -1829,6 +1975,7 @@
         "budget": "Solo los admins cambian el presupuesto de un agente",
         "owner": "Solo los admins cambian el responsable de un agente",
         "archive": "Solo los admins archivan un agente",
+        "delete": "Solo los admins eliminan un agente",
         "audience": "Solo los admins y su responsable cambian quién habla con él",
         "channels": "Solo los admins y su responsable cambian sus canales",
         "ai_account": "Solo el dueño de la cuenta la asigna",
@@ -1853,9 +2000,44 @@
       "somePeople": "Algunas personas",
       "active": "Activo",
       "archived": "Archivado",
+      "deleted": "Eliminado",
       "notIn": "Fuera del canal",
       "withoutMention": "Por su cuenta",
       "mentionOnly": "Solo cuando lo mencionan"
+    },
+    "remove": {
+      "archiveTitle_one": "¿Archivar {{count}} agente?",
+      "archiveTitle_many": "¿Archivar {{count}} agentes?",
+      "archiveTitle_other": "¿Archivar {{count}} agentes?",
+      "deleteTitle_one": "¿Eliminar {{count}} agente para siempre?",
+      "deleteTitle_many": "¿Eliminar {{count}} agentes para siempre?",
+      "deleteTitle_other": "¿Eliminar {{count}} agentes para siempre?",
+      "archiveAll": "Archivar todos",
+      "deleteAll": "Eliminar todos",
+      "archiveSome_one": "Archivar {{count}}",
+      "archiveSome_many": "Archivar {{count}}",
+      "archiveSome_other": "Archivar {{count}}",
+      "deleteSome_one": "Eliminar {{count}}",
+      "deleteSome_many": "Eliminar {{count}}",
+      "deleteSome_other": "Eliminar {{count}}",
+      "deleteHelp": "Sus instrucciones, memoria y rutinas se van para siempre. Sus mensajes se quedan."
+    },
+    "people": {
+      "title": "Cambiar personas",
+      "gets": "Recibe {{roles}}",
+      "loses": "Pierde {{roles}}",
+      "done": "Hecho",
+      "onlyOwners": "Solo los propietarios cambian quién es propietario",
+      "onlyAdmins": "Solo los admins cambian roles y quitan personas"
+    },
+    "approvals": {
+      "title": "Aprobaciones esperándote",
+      "done": "Decididas"
+    },
+    "open": {
+      "open": "Abrir",
+      "web": "Abrir en el sitio",
+      "notAllowed": "No tienes acceso a esta pantalla"
     }
   },
   "routing": {
@@ -1895,6 +2077,14 @@
     "action": "Conectar",
     "locked": "Quién conecta la IA de {{name}}: un admin, con una clave de API, o {{owner}}, con su propio plan.",
     "lockedAdmins": "Solo un admin puede conectar una IA.",
+    "rightHand": {
+      "computer_away": "{{name}} no puede responder ahora: la computadora del plan no está disponible.",
+      "plan_limit": "{{name}} no puede responder ahora: el plan llegó a su límite.",
+      "plan_not_shared": "{{name}} piensa con un plan que solo responde a su dueño.",
+      "runner_outdated": "{{name}} no puede responder ahora: el programa en la computadora del plan necesita una actualización.",
+      "plan_tools": "{{name}} se detuvo antes de responder: la IA del plan en esa computadora ofrece herramientas propias.",
+      "useKey": "Usar una clave de API"
+    },
     "receipt": "Nadie responderá: no hay una IA conectada",
     "chip": "Sin IA"
   },
@@ -2104,13 +2294,17 @@
     "extraHint": "Con el uso extra activado en el plan, el trabajo largo sigue después del 95%. Si está desactivado, se pausa en el 95% y retoma cuando el plan se renueva."
   },
   "usageQueue": {
-    "title_one": "{{agent}} tiene {{count}} conversación por retomar",
-    "title_many": "{{agent}} tiene {{count}} conversaciones por retomar",
-    "title_other": "{{agent}} tiene {{count}} conversaciones por retomar",
-    "line": "Retoma {{when}}, cuando se renueve el plan de {{plan}}. De una en una, en este orden.",
-    "lineUnknown": "Retoma en cuanto se renueve el plan de {{plan}}. De una en una, en este orden.",
-    "lineBudget": "Retoma {{when}}, cuando se renueve el presupuesto, o antes si un admin lo aumenta. De una en una, en este orden.",
-    "shared": "La fila es del plan: {{agents}} comparten la misma cuenta.",
+    "back": "{{agent}} vuelve {{when}}",
+    "backPlan": "{{agent}} vuelve cuando se renueve el plan",
+    "backBudget": "{{agent}} vuelve cuando se renueve el presupuesto",
+    "resuming": "{{agent}} está retomando",
+    "shared_one": "{{agents}} usa el mismo plan de {{plan}}. Las conversaciones de los dos van a la misma fila.",
+    "shared_many": "{{agents}} usan el mismo plan de {{plan}}. Las conversaciones de todos van a la misma fila.",
+    "shared_other": "{{agents}} usan el mismo plan de {{plan}}. Las conversaciones de todos van a la misma fila.",
+    "about": "Sobre la fila",
+    "lists": "Conversaciones",
+    "queuedTab": "En la fila",
+    "skippedTab": "Omitidas",
     "dm": "DM con {{name}}",
     "yourDm": "Tu DM",
     "thread": "Hilo en #{{channel}}",
@@ -2118,39 +2312,28 @@
     "work": "Trabajo: {{name}}",
     "askedBy": "Pedido por {{names}} · {{ago}}",
     "paused": "En pausa {{ago}}",
-    "after_one": "{{count}} mensaje después",
-    "after_many": "{{count}} mensajes después",
-    "after_other": "{{count}} mensajes después",
-    "nothingAfter": "Nada después",
-    "wrote_one": "{{names}} escribió después",
-    "wrote_many": "{{names}} escribieron después",
-    "wrote_other": "{{names}} escribieron después",
-    "queued": "En la fila",
-    "answering": "Respondiendo ahora",
-    "hidden_one": "+{{count}} en conversaciones que no ves",
-    "hidden_many": "+{{count}} en conversaciones que no ves",
-    "hidden_other": "+{{count}} en conversaciones que no ves",
+    "answering": "Respondiendo",
+    "hidden_one": "+{{count}} que no ves",
+    "hidden_many": "+{{count}} que no ves",
+    "hidden_other": "+{{count}} que no ves",
     "dontRunAll": "No ejecutar ninguna",
-    "confirmAll_one": "¿No ejecutar {{count}} conversación?",
-    "confirmAll_many": "¿No ejecutar estas {{count}} conversaciones?",
-    "confirmAll_other": "¿No ejecutar estas {{count}} conversaciones?",
+    "confirmAll_one": "¿No ejecutar esta?",
+    "confirmAll_many": "¿No ejecutar las {{count}}?",
+    "confirmAll_other": "¿No ejecutar las {{count}}?",
     "yesDontRun": "Sí, no ejecutar",
     "keep": "Mantener",
-    "canceledAll_one": "{{count}} conversación cancelada. {{agent}} no la responderá cuando vuelva el límite.",
-    "canceledAll_many": "{{count}} conversaciones canceladas. {{agent}} no las responderá cuando vuelva el límite.",
-    "canceledAll_other": "{{count}} conversaciones canceladas. {{agent}} no las responderá cuando vuelva el límite.",
-    "empty": "Nada esperando para retomar.",
+    "canceledAll_one": "{{count}} conversación cancelada. {{agent}} no la responderá.",
+    "canceledAll_many": "{{count}} conversaciones canceladas. {{agent}} no las responderá.",
+    "canceledAll_other": "{{count}} conversaciones canceladas. {{agent}} no las responderá.",
+    "empty": "Nada esperando al plan.",
     "waiting_one": "{{count}} conversación esperando",
     "waiting_many": "{{count}} conversaciones esperando",
     "waiting_other": "{{count}} conversaciones esperando",
-    "closedTitle_one": "{{count}} no necesitó respuesta",
-    "closedTitle_many": "{{count}} no necesitaron respuesta",
-    "closedTitle_other": "{{count}} no necesitaron respuesta",
-    "closedWhy": "Parecían resueltas, así que {{agent}} no respondió.",
-    "closedLine": "Parecían resueltas, así que {{agent}} no respondió. Si alguna todavía necesita respuesta, elige Responder de todos modos.",
-    "seeConversation": "Ver conversación",
-    "answeredAnyway": "Alguien pidió una respuesta de todos modos",
-    "toResume": "Por retomar",
+    "skip_solved": "{{name}} ya se encargó",
+    "skip_withdrawn": "{{name}} dijo que ya no hace falta",
+    "skip_task_canceled": "{{name}} canceló la tarea",
+    "skip_mixed": "Ya estaba resuelto",
+    "answeredAnyway": "Respondiendo de todos modos",
     "switchAi": "Cambiar la IA de {{name}}"
   },
   "actionCard": {
@@ -2504,6 +2687,7 @@
     "messageTo": "Mensaje para {{name}}",
     "audienceEdit": "Editar",
     "nowIn": "ahora, en #{{channel}}",
+    "answersHere": "Responde aquí sin necesidad de @",
     "more": "Más",
     "of": "Perfil de {{name}}",
     "presence": "Presencia",
@@ -2602,6 +2786,8 @@
       "provider_down": "El proveedor de IA no responde · reintenta solo",
       "out_of_plan": "Sin límite en el plan",
       "out_of_budget": "Presupuesto del mes agotado",
+      "out_of_planShort": "Sin límite",
+      "out_of_budgetShort": "Sin presupuesto",
       "backAt": "vuelve {{when}}",
       "work": "En segundo plano: {{subject}}"
     },
@@ -3199,6 +3385,12 @@
     "outcomeApprovedByYou": "Aprobado por ti",
     "outcomeRefusedBy": "Rechazado por {{name}}",
     "outcomeRefusedByYou": "Rechazado por ti",
+    "outcomeApprovedCovering": "Aprobado por {{name}}, en lugar de {{for}}",
+    "outcomeRefusedCovering": "Rechazado por {{name}}, en lugar de {{for}}",
+    "outcomeApprovedByYouCovering": "Aprobado por ti, en lugar de {{for}}",
+    "outcomeRefusedByYouCovering": "Rechazado por ti, en lugar de {{for}}",
+    "outcomeApprovedCoveringYou": "Aprobado por {{name}}, en tu lugar",
+    "outcomeRefusedCoveringYou": "Rechazado por {{name}}, en tu lugar",
     "refusedByYou": "Rechazado por ti · {{when}}",
     "expiresIn": "Vence en {{time}}",
     "expired": "Vencida",
@@ -3433,6 +3625,7 @@
       "routineStalled": "<b>{{name}}</b> espera la computadora para ejecutar una rutina",
       "agentUnreached": "Una rutina no pudo llamar a <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> pide un perfil de navegador más para <b>{{agent}}</b>",
+      "desktopTaken": "<b>{{name}}</b> tomó el control de la pantalla del computador de <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> espera que su plan se renueve para ejecutar una rutina",
       "planResetUnknown": "{{plan}} no dijo cuándo se renueva su límite. El trabajo de <b>{{name}}</b> sigue esperando.",
       "catchUpClosed_one": "<b>{{name}}</b> volvió y omitió {{count}} conversación que no necesitaba respuesta",
@@ -3452,11 +3645,33 @@
       "joinSuggestion": "<b>{{by}}</b> sugirió a <b>{{name}}</b>",
       "changeRequest": "<b>{{name}}</b> pide un cambio en <b>{{agent}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> pide un agente nuevo: <b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b> te eligió en Quién aprueba por mí",
+      "approvalCoverDeclined": "<b>{{name}}</b> ya no aprobará por ti",
+      "approvalCoverEnded": "<b>{{name}}</b> quitó a quien aprueba por ti",
+      "rightHandDecided": "Pedidos que <b>{{name}}</b> aprobó por ti hoy: {{count}}",
+      "rightHandPaused": "<b>{{name}}</b> dejó de aprobar por ti: deshiciste 3 de sus decisiones esta semana",
       "invitationAccepted": "<b>{{name}}</b> aceptó tu invitación y se unió a {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> aceptó tu invitación",
       "reaction_one": "<b>{{names}}</b> reaccionó a tu mensaje",
       "reaction_many": "<b>{{names}}</b> reaccionaron a tu mensaje",
-      "reaction_other": "<b>{{names}}</b> reaccionaron a tu mensaje"
+      "reaction_other": "<b>{{names}}</b> reaccionaron a tu mensaje",
+      "usageLimitWarning": "Usaste el {{percent}} % de tu límite de este mes",
+      "usageLimitReachedSelf": "Llegaste a tu límite de uso de este mes",
+      "usageLimitReached": "<b>{{name}}</b> llegó al límite de {{amount}}",
+      "usageLimitRequest": "<b>{{name}}</b> llegó al límite de {{amount}} y pide más",
+      "usageLimitRaised": "<b>{{name}}</b> subió tu límite de este mes",
+      "usageLimitRefused": "<b>{{name}}</b> rechazó tu pedido de más uso"
+    },
+    "usageLimit": {
+      "runs_one": "{{count}} pedido este mes",
+      "runs_many": "{{count}} pedidos este mes",
+      "runs_other": "{{count}} pedidos este mes",
+      "top": "{{share}} % con {{agent}}",
+      "fromRole": "Límite del rol {{role}}.",
+      "fromRaised": "Límite subido este mes.",
+      "fromPerson": "Un límite definido para esta persona.",
+      "fromDefault": "El límite predeterminado del workspace.",
+      "line": "{{runs}}. {{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -4297,6 +4512,7 @@
         "credential_wrong_provider": "El modelo es de {{modelProvider}}, pero la clave es de {{keyProvider}}.",
         "model_unlisted": "OpenRouter ya no ofrece {{model}}. Elige otro modelo en la configuración del agente.",
         "no_ai": "El agente no tiene una IA conectada.",
+        "person_limit": "Quien pidió llegó a su límite de uso de este mes.",
         "org_paused": "Los agentes del espacio de trabajo están en pausa.",
         "org_suspended": "El espacio de trabajo no está disponible.",
         "org_deleting": "El espacio de trabajo se está eliminando.",
@@ -6077,6 +6293,7 @@
       "agent_archived": "El agente se archivó",
       "interrupted": "Interrumpida por un reinicio del servidor",
       "no_ai": "El agente no tiene IA conectada",
+      "person_limit": "No se ejecutó: quien la creó llegó a su límite de uso de este mes",
       "org_paused": "No se ejecutó: los agentes del espacio de trabajo estaban en pausa",
       "org_suspended": "No se ejecutó: el espacio de trabajo no estaba disponible",
       "org_deleting": "No se ejecutó: el espacio de trabajo se estaba eliminando",
@@ -9160,6 +9377,7 @@
     },
     "recommended": "Recomendado",
     "free": "Gratis",
+    "opencodeFreeHint": "Otros modelos gratis funcionan con OpenCode en la computadora del agente.",
     "modelHelp": "Los modelos más grandes piensan más y consumen el plan más rápido.",
     "hidden": "{{owner}} o un admin elige quién piensa.",
     "hiddenAdmins": "Solo los admins eligen quién piensa.",
@@ -11663,7 +11881,7 @@
     "leadCloud": "Donde trabajan tus agentes: una computadora solo para este espacio de trabajo, siempre encendida.",
     "about": "Acerca de esta computadora",
     "how": "Cómo funcionan las computadoras",
-    "hostMissing": "Este servidor también puede ser la computadora de tus agentes: los pasos están en “Este servidor como computadora de los agentes” en <code>SELF_HOSTING.md</code>.",
+    "hostMissing": "Este servidor también puede ser la computadora de tus agentes: <guide>mira cómo</guide>.",
     "other": {
       "title": "Otras computadoras",
       "text": "Conectadas con un código, como una Mac mini en casa u otro servidor. Lo que permite cada una se configura en esa computadora.",
@@ -12256,7 +12474,8 @@
       "billing": "Plan y facturación",
       "media": "GIFs y stickers",
       "voice": "Voz",
-      "apps": "Apps de IA"
+      "apps": "Apps de IA",
+      "approvals": "Aprobaciones"
     },
     "sectionText": {
       "account": "Tu perfil y cómo se ve la app para ti.",
@@ -12271,13 +12490,14 @@
       "skills": "Instrucciones en Markdown que los agentes abren cuando las necesitan.",
       "keys": "Tus planes y las claves de API del espacio de trabajo.",
       "storage": "Dónde viven los archivos del espacio de trabajo.",
-      "usage": "Presupuestos y lo que gastó cada agente este mes.",
+      "usage": "Cuánta IA usa cada persona y cada agente, y los límites del mes.",
       "audit": "Lo que hicieron los agentes fuera de la conversación y lo que cambiaron las personas. Solo lo ven los admins.",
       "import": "Trae agentes de otra app o espacio de trabajo, y lleva este adonde quieras.",
       "billing": "El plan de agentes.chat, la tarjeta y las facturas de este espacio de trabajo están en una página nuestra, fuera de la app.",
       "media": "Lo que las personas pueden enviar en una conversación, y cuándo los agentes envían un GIF o un sticker.",
       "voice": "Mensajes de voz en las conversaciones, y quién convierte la voz en texto.",
-      "apps": "Pide tareas a los agentes de este espacio de trabajo desde Claude, Cursor y otras apps."
+      "apps": "Pide tareas a los agentes de este espacio de trabajo desde Claude, Cursor y otras apps.",
+      "approvals": "Quién decide por ti cuando un agente pide algo que espera tu aprobación."
     },
     "title": "Configuración",
     "account": {
@@ -12470,6 +12690,151 @@
         "jev": "Los agentes envían stickers por su cuenta solo con Jev.",
         "jevLink": "Configurar Jev"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "Resumen",
+      "people": "Personas",
+      "mine": "Tu uso"
+    },
+    "view": {
+      "usage": "Uso",
+      "limits": "Límites"
+    },
+    "title": "Uso por persona",
+    "about": "Ves cuánto usa cada persona y con qué agentes. Lo que dicen las conversaciones privadas nunca aparece aquí.",
+    "plansAbout": "El plan ya está pagado. Este valor solo compara el uso entre personas.",
+    "sub_one": "{{month}} · {{count}} persona · {{amount}} de IA",
+    "sub_many": "{{month}} · {{count}} personas · {{amount}} de IA",
+    "sub_other": "{{month}} · {{count}} personas · {{amount}} de IA",
+    "periodLabel": "Período",
+    "period": {
+      "month": "Este mes",
+      "last7": "Últimos 7 días",
+      "last30": "Últimos 30 días",
+      "lastMonth": "Mes pasado"
+    },
+    "role": "Rol",
+    "roleAll": "Rol: todos",
+    "agent": "Agente",
+    "agentAll": "Agente: todos",
+    "chips": {
+      "near": "Cerca del límite",
+      "at": "En el límite",
+      "idle": "Sin uso"
+    },
+    "summary": {
+      "near": "{{n}} cerca del límite",
+      "at": "{{n}} en el límite",
+      "idle": "{{n}} sin uso en el período"
+    },
+    "export": "Exportar CSV",
+    "limitsHint": "Define un límite por persona en Límites",
+    "empty": "Nadie usó agentes este mes todavía.",
+    "owner": "Dueño",
+    "member": "Miembro",
+    "columns": {
+      "person": "Persona",
+      "now": "Ahora",
+      "runs": "Pedidos",
+      "agents": "Más usó",
+      "usage": "Este mes",
+      "caresFor": "Cuida de",
+      "created": "Creó"
+    },
+    "now": {
+      "channel": "Con {{agent}} en #{{channel}}",
+      "private": "En una conversación privada con {{agent}}",
+      "hidden": "Con {{agent}} en un canal privado",
+      "routine": "Rutina {{name}}",
+      "last": "Último uso {{when}}",
+      "never": "Sin uso"
+    },
+    "meter": {
+      "of": "de {{limit}}",
+      "noLimit": "· sin límite",
+      "estimate": "≈ {{amount}} por la API"
+    },
+    "live": {
+      "title": "Ahora",
+      "routineOf": "Rutina de {{name}}"
+    },
+    "from": {
+      "raised": "subido este mes",
+      "person": "definido para la persona",
+      "role": "del rol {{role}}",
+      "default": "predeterminado del workspace"
+    },
+    "drawer": {
+      "limit": "Límite de este mes: {{amount}}",
+      "noLimit": "Sin límite de uso este mes.",
+      "reached": "Llegó al límite el {{date}} · {{used}} usados",
+      "used": "{{used}} usados · {{percent}} %",
+      "raise": "Subir límite",
+      "raiseTo": "Nuevo límite de este mes en US$",
+      "raiseSave": "Subir",
+      "raised": "Límite subido para este mes",
+      "asked": "Pidió más",
+      "days": "Uso por día",
+      "agents": "Con qué agentes",
+      "runs_one": "{{count}} pedido",
+      "runs_many": "{{count}} pedidos",
+      "runs_other": "{{count}} pedidos",
+      "recent": "Lo que hizo últimamente",
+      "untitled": "Sin título",
+      "with": "con {{agent}}",
+      "minutes": "{{n}} min",
+      "private": "Conversación privada con {{agent}}",
+      "hidden": "En un canal privado con {{agent}}",
+      "routine": "Rutina {{name}}",
+      "created": "Agentes que creó",
+      "createdAt": "creado el {{date}}",
+      "audit": "Ver las acciones de los agentes en Auditoría",
+      "noUse": "Ningún uso en este período."
+    },
+    "limits": {
+      "title": "Límite de uso por persona",
+      "lead": "Cuánta IA puede usar cada persona por mes, sumando todos los agentes. Cuenta lo que pide y las rutinas que creó.",
+      "default": "Predeterminado del workspace",
+      "defaultHint": "Vale para quien no tiene límite por rol ni excepción.",
+      "byRole": "Por rol",
+      "people": "Excepciones",
+      "addPerson": "Agregar persona",
+      "useDefault": "Usar el predeterminado",
+      "none": "Sin límite",
+      "amount": "Límite por mes",
+      "rule": "Vale el límite de la persona. Sin él, el mayor entre sus roles. Sin ninguno, el predeterminado. Los dueños no tienen límite.",
+      "whenTitle": "Cuando alguien llega al límite",
+      "block": "Los agentes dejan de empezar trabajo nuevo para esa persona",
+      "notify": "Solo avisar a los admins",
+      "warn": "Avisar al 80 %",
+      "warnHint": "La persona recibe un aviso, y los admins reciben otro al 100 %.",
+      "saved": "Límites guardados"
+    },
+    "mine": {
+      "title": "Usaste el {{percent}} % de tu límite de este mes",
+      "noLimit": "No tienes límite de uso este mes",
+      "renews": "Se renueva el {{date}}.",
+      "near": "Cerca del límite, pide más a un admin.",
+      "recent": "Lo que hiciste últimamente",
+      "ofLimit": "{{percent}} % del límite"
+    },
+    "card": {
+      "title": "Llegaste a tu límite de uso de este mes",
+      "text": "Se renueva el {{date}}. Para seguir ahora, pide a un admin.",
+      "ask": "Pedir más",
+      "asked": "Pedido enviado",
+      "see": "Ver mi uso",
+      "other": "{{name}} llegó al límite de uso de este mes",
+      "raised": "{{name}} subió tu límite de este mes. Puedes seguir.",
+      "raisedOther": "{{name}} subió el límite de este mes",
+      "refused": "{{name}} rechazó el pedido. El límite se renueva el {{date}}."
+    },
+    "actions": {
+      "raise": "Subir a {{amount}} este mes",
+      "refuse": "Rechazar",
+      "see": "Ver el uso"
     }
   },
   "usageViews": {
@@ -13035,8 +13400,15 @@
       "work_end_canceled": "Detenido después de {{minutes}} min.",
       "work_end_canceledBy": "Detenido por {{name}} después de {{minutes}} min.",
       "no_ai": "Todavía no puedo responder: no tengo una IA conectada.",
+      "person_limit": "Quien pidió llegó a su límite de uso de este mes. Para seguir ahora, pide a un admin.",
       "no_ai_signed_out": "Todavía no puedo responder: mi IA tiene la sesión cerrada.",
       "no_ai_not_signed_in": "Todavía no puedo responder: {{brain}} no tiene la sesión iniciada en mi computadora.",
+      "no_ai_computer_away": "Ahora no puedo responder: la computadora de mi plan no está disponible.",
+      "no_ai_plan_limit": "Ahora no puedo responder: el plan con el que pienso llegó a su límite.",
+      "no_ai_plan_not_shared": "No puedo responderte con este plan: solo responde a su dueño.",
+      "no_ai_runner_outdated": "Ahora no puedo responder: el programa en la computadora de mi plan necesita una actualización.",
+      "no_ai_plan_tools": "Me detuve antes de responder: la IA de mi plan en esa computadora ofrece herramientas propias.",
+      "redacted": "[eliminado: parecía un inicio de sesión o una clave]",
       "action_connect_ai": "Conectar una IA",
       "action_connect_app": "Conectar {{name}}",
       "action_add_mcp": "Agregar un servidor MCP",
@@ -13075,7 +13447,9 @@
       "stuck": "Me trabé y me detuve antes de terminar.",
       "forum_suggestion": "¿Vale la pena un foro? \"{{title}}\"",
       "forum_concluded": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo.",
-      "forum_concluded_issues": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo, con {{count}} tarea(s) sugerida(s) para aprobar."
+      "forum_concluded_issues": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo, con {{count}} tarea(s) sugerida(s) para aprobar.",
+      "action_approvals": "Aprobaciones esperándote",
+      "action_open_page": "Abrir una pantalla"
     }
   },
   "builtinTools": {
@@ -13653,6 +14027,7 @@
       "noComputer": "{{name}} no tiene una computadora conectada.",
       "noComputerCloud": "La computadora de {{name}} se está preparando.",
       "forbidden": "No puedes ver este navegador.",
+      "noRole": "Tu rol no te da acceso a los navegadores de los agentes.",
       "tooMany": "Hay demasiados navegadores abiertos a la vez. Este aparece cuando se cierre otro.",
       "unavailable": "El navegador no se puede mostrar ahora. Reintentando…",
       "closed": "El navegador de {{name}} está cerrado.",
@@ -13665,7 +14040,12 @@
       "subHidden": "{{person}} tiene el control · pantalla oculta",
       "full": "Pantalla completa",
       "fullExit": "Salir de pantalla completa",
-      "goToggle": "Abrir un sitio",
+      "navBack": "Volver atrás",
+      "navForward": "Ir adelante",
+      "navReload": "Recargar la página",
+      "paste": "Pegar",
+      "pasteHint": "Pegar en la página lo que copiaste",
+      "pasteBlocked": "Tu navegador no dejó leer lo que copiaste. Usa {{keys}} en la página.",
       "goLabel": "Dirección del sitio",
       "goPlaceholder": "Escribe una dirección, como ejemplo.com",
       "go": "Abrir",
@@ -13676,7 +14056,8 @@
       "backTitle": "Devolverle el control a {{name}}",
       "doneTitle": "Listo. ¿Una nota para {{name}}?",
       "backLabel": "Nota para {{name}}",
-      "backPlaceholder": "Opcional: ¿algo que {{name}} deba saber?"
+      "backPlaceholder": "Opcional: ¿algo que {{name}} deba saber?",
+      "addNote": "Dejar una nota"
     },
     "now": {
       "ready": "Listo en {{computer}}",
@@ -14049,7 +14430,8 @@
     "ask": {
       "watching": "Solo estás mirando.",
       "title": "¿Quieres tomar el control?",
-      "working": "{{name}} se pausa mientras tienes el control."
+      "working": "{{name}} se pausa mientras tienes el control.",
+      "titleBrowser": "¿Quieres tomar el navegador?"
     },
     "sub": {
       "control": "Tienes el control · {{name}} espera",
@@ -14065,7 +14447,9 @@
     },
     "retry": "Intentar de nuevo",
     "takeover": "Tomar el control",
+    "takeBrowser": "Tomar el navegador",
     "taking": "Tomando el control…",
+    "returning": "Devolviéndole el control a {{name}}…",
     "clipboard": {
       "got": "Copiado en la computadora de {{name}}:",
       "got_female": "Copiado en la computadora de {{name}}:",
@@ -14144,11 +14528,18 @@
       "linuxOnly": "Los agentes usan apps en sus propias pantallas solo en computadoras con Linux.",
       "agent": "{{name}} todavía no puede usar apps en su pantalla en {{computer}}.",
       "agent_female": "{{name}} todavía no puede usar apps en su pantalla en {{computer}}."
+    },
+    "browserOnly": {
+      "title": "Estás en el navegador, no en todo el computador",
+      "plan": "{{name}} piensa con el plan de quien es su dueño, así que solo esa persona y los admins que gestionan agentes controlan todo el computador",
+      "other": "Puedes controlar el navegador de {{name}}, no todo el computador",
+      "role": "Tu rol te da el navegador de {{name}}, no la computadora entera"
     }
   },
   "agentComputer": {
     "title": "Computadora de {{name}}",
     "open": "Abrir",
+    "openOf": "Abrir la computadora de {{name}}",
     "help": "Ayuda",
     "button": "Computadora",
     "choose": "Elige una computadora",
@@ -14204,7 +14595,8 @@
       "noScreenHelp": "Permite la pantalla o el navegador en Herramientas y acceso.",
       "noComputer": "Elige una computadora para {{name}}.",
       "browserOff": "El navegador de {{name}} está desactivado en {{computer}}",
-      "forbidden": "No puedes ver esta computadora."
+      "forbidden": "No puedes ver esta computadora.",
+      "noRole": "Tu rol no te da acceso a las computadoras de los agentes."
     },
     "closeAsk": "{{name}} te espera 2 min para que vuelvas.",
     "openAccess": "Abrir Herramientas y acceso",
@@ -14554,6 +14946,10 @@
       "open": "Abrir"
     },
     "home": "Mi inicio",
+    "seeMore": "Ver más",
+    "seeMoreHidden_one": "{{count}} más",
+    "seeMoreHidden_many": "{{count}} más",
+    "seeMoreHidden_other": "{{count}} más",
     "untitled": "Nuevo widget",
     "updatedAgo": "actualizado {{when}}",
     "removed": {

@@ -8,7 +8,18 @@
  * toward it.
  */
 import { avatarSky } from "../sky/avatar";
-import { ACCESSORY_REACH, type DrawAgentOptions, drawAccessory, drawAgent, idlePose, type Pose } from "./engine.js";
+import {
+  ACCESSORY_REACH,
+  bodyTones,
+  type DrawAgentOptions,
+  drawAccessory,
+  drawAgent,
+  drawSleep,
+  EYE_COLOR,
+  idlePose,
+  type Pose,
+  sleepPose,
+} from "./engine.js";
 
 export interface LiveAgent {
   canvas: HTMLCanvasElement;
@@ -19,7 +30,7 @@ export interface LiveAgent {
     color?: DrawAgentOptions["color"];
     eyes?: DrawAgentOptions["eyes"];
     accessory?: string;
-    state: "idle" | "thinking" | "writing" | "waiting";
+    state: "idle" | "thinking" | "writing" | "waiting" | "sleeping";
     expression?: Pose["expression"];
     seed: number;
     /** Plays the transient face started by `playAgentReaction` with this key (e.g. a message id). */
@@ -143,6 +154,7 @@ export function setGaze(point: { x: number; y: number } | null) {
 
 /** In the app expressions are rare (one every ~18 s per agent); thinking speeds the head up. */
 function poseFor(a: ReturnType<LiveAgent["look"]>, t: number, box: HTMLElement, gazing: boolean): Pose {
+  if (a.state === "sleeping") return sleepPose(reduced() ? undefined : t, a.seed);
   if (a.state === "writing") return { writing: true, turn: [Math.sin(t * 1.3 + a.seed) * 0.15, 0.1] };
   // Waiting on you: looking up out of its card, blinking, now and then a glance aside.
   if (a.state === "waiting") {
@@ -211,9 +223,7 @@ export function drawLive(agent: LiveAgent, t: number) {
     eyes: look.eyes,
     pose,
     cells: size <= 28 ? 8 : 16,
-    after: look.accessory
-      ? (g, side, frame) => drawAccessory(g, side, look.accessory as string, frame, t, look.state === "thinking")
-      : undefined,
+    after: decorate(agent, t),
   });
 }
 
@@ -248,20 +258,30 @@ function drawFramed(agent: LiveAgent, ctx: CanvasRenderingContext2D, size: numbe
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(sky, 0, 0, s, s);
   }
-  const accessory = look.accessory;
-  const inner = s * (accessory ? 0.6 : 0.66);
+  const inner = s * (look.accessory ? 0.6 : 0.66);
   const x = (s - inner) / 2;
-  const y = s - inner - s * (accessory ? 0.1 : 0.14);
+  const y = s - inner - s * (look.accessory ? 0.1 : 0.14);
   const { pose, hop } = livePose(agent, t);
   drawAgent(ctx, x, y - hop * inner, inner, {
     color: look.color,
     eyes: look.eyes,
     pose,
     cells: size <= 32 ? 12 : undefined,
-    after: accessory
-      ? (g, side, frame) => drawAccessory(g, side, accessory, frame, t, look.state === "thinking")
-      : undefined,
+    after: decorate(agent, t),
   });
+}
+
+/** What sits on the body: its accessory, then a sleeping agent's zz (the body's darkest tone on a light page). */
+function decorate(agent: LiveAgent, t: number): DrawAgentOptions["after"] {
+  const look = agent.look();
+  const accessory = look.accessory;
+  const sleeping = look.state === "sleeping";
+  if (!accessory && !sleeping) return undefined;
+  const ink = sleeping ? (isDark(agent.box) ? EYE_COLOR : (bodyTones(look.color)[0] ?? EYE_COLOR)) : "";
+  return (g, side, frame) => {
+    if (accessory) drawAccessory(g, side, accessory, frame, t, look.state === "thinking");
+    if (sleeping) drawSleep(g, side, frame, ink, reduced() ? undefined : t);
+  };
 }
 
 /** Redraws every agent at once (a new theme changes their skies; the loop may be standing still). */
@@ -279,10 +299,11 @@ function watchTheme() {
   themeWatch.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ["data-theme"] });
 }
 
-/** Working, waiting on someone, making a face or following the gaze: drawn at the full rate. */
+/** Working, waiting on someone, making a face or following the gaze: drawn at the full rate (asleep: at rest's). */
 const busy = (a: LiveAgent) => {
   const look = a.look();
-  if (look.state !== "idle" || (look.reactionKey && reactions.has(look.reactionKey))) return true;
+  if ((look.state !== "idle" && look.state !== "sleeping") || (look.reactionKey && reactions.has(look.reactionKey)))
+    return true;
   return Boolean(gaze && a.box.closest("[data-gaze]"));
 };
 

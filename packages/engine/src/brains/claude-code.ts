@@ -8,6 +8,7 @@ import {
   brainTopic,
   CONTEXT_LIMIT_PROTOCOL,
   CONVERSATION_PROTOCOL,
+  LOCKED_BRAIN_PROTOCOL,
   type PubSub,
   parseBrainEvent,
   STEER_PROTOCOL,
@@ -18,6 +19,8 @@ import { getAgentCached } from "../agents";
 import type { CodeSetup } from "../git/machine";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
+import { addPersonSpend } from "../person-usage";
+import { apiNano } from "../plan-usage";
 import { computerPrompt, systemWithConversation } from "./prompt";
 import {
   BRAIN_NAMES,
@@ -373,6 +376,17 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           Promise.resolve(deps.personalMcp?.(turn) ?? false),
         ]);
         const permissions = await deps.permissions?.(turn);
+        // The team's right hand on a plan (ADR 0137 §4): only a runner that locks the CLI down to our tools gets it,
+        // in its own empty folder, with no checkout and none of the owner's servers.
+        const chat = permissions?.mode === "chat";
+        if (chat && (status?.protocol ?? 0) < LOCKED_BRAIN_PROTOCOL) {
+          yield err(
+            "runner_outdated",
+            "The runner on the computer is too old to keep Claude Code to the right hand's tools. Update it.",
+            true,
+          );
+          return;
+        }
         // An older runner's `plan` lets the CLI read secrets and loads the project's settings files: the
         // turn waits for an updated runner instead of reading with more power than asked for (§3).
         if (permissions?.mode === "plan" && (status?.protocol ?? 0) < BRAIN_PROFILES_PROTOCOL) {
@@ -383,7 +397,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           );
           return;
         }
-        const code = await (turn.code ?? deps.prepare?.(turn, io.signal))?.catch(() => null);
+        const code = chat ? null : await (turn.code ?? deps.prepare?.(turn, io.signal))?.catch(() => null);
         // A runner that takes the conversation apart reads it at the start of the session: the system text stays the
         // agent's, the same in each of its conversations (and its cached prefix with it).
         const apart = (status?.protocol ?? 0) >= CONVERSATION_PROTOCOL;
@@ -398,7 +412,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           prompt: computerPrompt(turn, code?.start),
           mcp: { token: deps.mcpToken?.(turn) ?? randomBytes(24).toString("base64url") },
           keepAlive: deps.keepAlive !== false,
-          personalMcp,
+          personalMcp: personalMcp && !chat,
           ...(permissions ? { permissions } : {}),
           ...accountFields(status?.protocol, turn),
           ...contextFields(status?.protocol, turn),
@@ -473,6 +487,8 @@ export async function recordPlanUsage(
     agentId: string;
     runId?: string;
     kind?: "agent" | "router";
+    /** The person behind the run (ADR 0141): the row names them and their month counts the API-equivalent. */
+    personId?: string | null;
     /** `claude_code` or `codex`. */
     provider: string;
     /** The computer the turn ran on and the account it spent; `accountId` null: that computer's own sign-in. */
@@ -509,7 +525,19 @@ export async function recordPlanUsage(
       billedTo: "plan",
       machineId: input.machineId ?? null,
       brainAccountId: input.machineId ? (input.accountId ?? null) : null,
+      personId: input.personId ?? null,
     })
-    .returning({ id: schema.usageRecords.id });
+    .returning({ id: schema.usageRecords.id, inputTokens: schema.usageRecords.inputTokens });
+  if (row && input.personId) {
+    // One unit for everything: a plan's tokens count at what they would cost through the API.
+    const equivalent = apiNano(input.model ?? null, {
+      input: row.inputTokens,
+      output: Math.max(0, Math.round(input.outputTokens)),
+      cacheRead,
+      cacheWrite,
+    });
+    if (equivalent)
+      await addPersonSpend(db, { orgId: input.orgId, personId: input.personId, amountNanoUsd: equivalent });
+  }
   return row?.id ?? null;
 }

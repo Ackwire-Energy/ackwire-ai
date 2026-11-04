@@ -67,6 +67,10 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "offer_connect_app",
     "offer_invites",
     "propose_settings_change",
+    "propose_remove_agents",
+    "offer_approvals",
+    "propose_member_changes",
+    "offer_open_page",
   ],
   "sandbox:run": [
     "run_code",
@@ -221,6 +225,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   offer_invites: {
     label: "Offer to invite people",
     description: "Posts a card whose button opens the invite dialog with the addresses filled in.",
+  },
+  propose_remove_agents: {
+    label: "Propose archiving or deleting agents",
+    description: "Posts one card listing the agents to archive or delete. A person who may applies it.",
   },
   propose_settings_change: {
     label: "Propose a teammate's settings",

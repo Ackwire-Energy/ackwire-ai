@@ -16,16 +16,24 @@ import {
   type BrowserHandoffView,
   CONTROL_GRACE_MS,
   handoffView,
-  openHandoffOf,
+  noteComputerTaken,
   openHandoffOn,
   requireBrowserAccess,
+  screenAccess,
   setControlDeadline,
   touchControl,
 } from "./browser/handoff";
 import { HANDOFF_KEEPALIVE_MS } from "./browser/live";
 import { ForbiddenError, NotFoundError } from "./errors";
 import type { MachineCaller, MachineHub } from "./machine-hub";
-import { getMachine, machineOnline, requireComputerDriver } from "./machines";
+import {
+  computerDriving,
+  type DriveRefusal,
+  getMachine,
+  machineOnline,
+  mayDriveComputer,
+  requireComputerDriver,
+} from "./machines";
 import { closedRefusal, OrgDeletingError, orgStanding, standingRefusal } from "./standing";
 import type { Stream, StreamBroker, StreamInput, StreamTarget } from "./streams";
 
@@ -105,9 +113,8 @@ async function streamAccess(
   const controller = open?.status === "active" ? open.controllerUserId : null;
   if (controller && controller !== userId) return refused(STREAM_CLOSE.hidden, "someone_in_control");
   if (request.mode === "watch") return { driven, control: null };
-  if (open?.screen !== "desktop" || controller !== userId) {
-    return refused(STREAM_CLOSE.controlEnded, "not_in_control");
-  }
+  // The browser's handoff too, its window on this screen: who may drive the computer (checked above) helps there.
+  if (!open || controller !== userId) return refused(STREAM_CLOSE.controlEnded, "not_in_control");
   return { driven, control: open.id };
 }
 
@@ -115,6 +122,7 @@ export interface StreamPolicyDeps {
   db: Database;
   hub: Pick<MachineHub, "isLocal">;
   rateLimiter?: RateLimiter;
+  pubsub?: PubSub;
 }
 
 /**
@@ -137,6 +145,12 @@ export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput
   // The agent moved to another computer meanwhile: who drives that one wasn't checked.
   if (access.driven && target.machineId !== access.driven) return refused(STREAM_CLOSE.forbidden, "forbidden");
   if (access.control) await touchControl(deps.db, access.control, input.userId, new Date(), true).catch(() => {});
+  // A shell as the agent's user reaches what its screen does (the owner's sign-in): its owner hears it the same way.
+  if (input.request.kind === "terminal") {
+    await noteComputerTaken(deps, { orgId: input.orgId, agentId: input.agentId, actorId: input.userId }).catch(
+      () => {},
+    );
+  }
   if (input.request.kind === "desktop" && (await standingRefusal(deps.db, input.orgId, input.agentId))) {
     return { ...target, held: true };
   }
@@ -184,7 +198,7 @@ export async function recheckStream(db: Database, stream: Stream) {
  */
 export async function streamClosed(db: Database, s: Stream) {
   if (s.request.kind === "desktop" && s.request.mode === "control") {
-    const open = await openHandoffOf(db, s.orgId, s.agentId, "desktop");
+    const open = await openHandoffOn(db, s.orgId, s.agentId, "desktop");
     if (open?.status === "active" && open.controllerUserId === s.userId) {
       await setControlDeadline(db, open.id, s.userId, new Date(Date.now() + CONTROL_GRACE_MS)).catch(() => {});
     }
@@ -224,6 +238,7 @@ export interface DesktopDeps {
 
 /** The REST reaches a computer through whichever server holds its socket (`hub.call`), unlike a stream. */
 const ANYWHERE = { isLocal: () => true };
+const NO_SCREEN = ["no_agent", "no_desktop", "no_computer", "not_allowed"];
 
 /**
  * An agent's desktop as one person sees it: whether it can be shown and runs, who controls it, what they may
@@ -244,17 +259,16 @@ export interface DesktopStatus {
   viewers: number;
   /** This person may take control. */
   canControl: boolean;
+  /** Why not (`driveRefusal`), so the apps can say it; null when they may. */
+  controlRefusal: DriveRefusal | null;
   /** The agent is held, or its workspace on hold: people may watch, nobody takes control. */
   held: boolean;
 }
 
-const passes = (check: Promise<unknown>) =>
-  check.then(
-    () => true,
-    () => false,
-  );
-
-/** `GET …/agents/{agentId}/desktop`: for whoever may watch it. */
+/**
+ * `GET …/agents/{agentId}/desktop`: for whoever may watch it. Who may see the agent's browser but whose roles don't
+ * give them its whole computer gets a screen that can't be shown (`browser_only`), so the apps show the browser.
+ */
 export async function desktopStatus(
   deps: DesktopDeps,
   userId: string,
@@ -262,11 +276,33 @@ export async function desktopStatus(
   agentId: string,
 ): Promise<DesktopStatus> {
   const { db } = deps;
+  if ((await screenAccess(db, userId, orgId, agentId, undefined, "desktop")).refusal === "level") {
+    await requireBrowserAccess(db, userId, orgId, agentId);
+    const served = await desktopTarget(db, ANYWHERE, orgId, agentId, "desktop");
+    // An agent with no screen to show isn't one whose browser alone they get.
+    const none = "refused" in served && NO_SCREEN.includes(served.reason) ? served.reason : null;
+    return {
+      available: false,
+      reason: none ?? "browser_only",
+      detail: null,
+      running: false,
+      startedAt: null,
+      controllerUserId: null,
+      handoff: null,
+      viewers: 0,
+      canControl: false,
+      controlRefusal: none ? null : "role",
+      held: await standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
+    };
+  }
   await requireDesktopAccess(db, userId, orgId, agentId);
-  const [served, open, canControl, held] = await Promise.all([
+  const [served, open, controlRefusal, held] = await Promise.all([
     desktopTarget(db, ANYWHERE, orgId, agentId, "desktop"),
     openHandoffOn(db, orgId, agentId, "desktop"),
-    passes(requireComputerDriver(db, userId, orgId, agentId)),
+    computerDriving(db, userId, orgId, agentId).then(
+      (d) => d.refusal,
+      (): DriveRefusal => "not_allowed",
+    ),
     standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
   ]);
   const online = "machineId" in served && deps.hub ? (await deps.hub.status(served.machineId))?.online === true : false;
@@ -305,7 +341,8 @@ export async function desktopStatus(
     controllerUserId: open?.status === "active" ? open.controllerUserId : null,
     handoff: open ? handoffView(open) : null,
     viewers: deps.streams?.count(agentId, "desktop") ?? 0,
-    canControl,
+    canControl: controlRefusal === null,
+    controlRefusal,
     held,
   };
 }
@@ -340,7 +377,11 @@ export function createDesktopControl(deps: DesktopControlDeps) {
     if (!deps.streams.some(ofAgent)) return;
     const open = await openHandoffOn(deps.db, orgId, agentId, "desktop");
     const controller = open?.status === "active" ? open.controllerUserId : null;
-    const onDesktop = open?.screen === "desktop" ? controller : null;
+    // The browser's holder drives the screen too where they may drive the computer (`streamAccess`).
+    const onDesktop =
+      controller && (open?.screen === "desktop" || (await mayDriveComputer(deps.db, controller, orgId, agentId)))
+        ? controller
+        : null;
     deps.streams.closeWhere(
       (s) => ofAgent(s) && controller !== null && s.userId !== controller,
       STREAM_CLOSE.hidden,

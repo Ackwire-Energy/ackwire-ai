@@ -25,6 +25,7 @@ export type { HelpBlock, HelpDocument, HelpSection } from "./types";
 
 /** Each page and the edition it speaks to (tests hold a Cloud page to the Cloud's words). */
 export const HELP_PAGES = {
+  "install-on-a-server": "selfhost",
   "run-on-your-computer": "selfhost",
   computers: "selfhost",
   "workspace-computer": "cloud",
@@ -38,6 +39,14 @@ export const HELP_PAGES = {
 } as const;
 
 export type HelpSlug = keyof typeof HELP_PAGES;
+
+/**
+ * Where every self-hosted pointer sends a reader: the installer, the setup, the server's messages and settings. The
+ * files that can't import this (`install.sh`, the MIT setup package, the desktop app's Rust, `.env` descriptions)
+ * hold the URL as text, and a test keeps them equal.
+ */
+export const INSTALL_PAGE = "install-on-a-server" satisfies HelpSlug;
+export const INSTALL_DOCS_URL = docsUrl("en", INSTALL_PAGE);
 
 export const isHelpSlug = (slug: string): slug is HelpSlug => Object.hasOwn(HELP_PAGES, slug);
 

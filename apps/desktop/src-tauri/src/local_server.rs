@@ -226,9 +226,9 @@ fn write_env(folder: &Folder, entries: &[(&str, String)]) -> io::Result<()> {
     write_private(&folder.env(), next.as_bytes(), true)
 }
 
-const ENV_HEADER: &str = "# agentes.chat on this computer, run by the agentes.chat app. Every value is explained in\n\
-# SELF_HOSTING.md. AGENTES_SECRET encrypts the keys stored in the database: it travels with the folder in a\n\
-# backup, and changing it makes them unreadable.\n";
+const ENV_HEADER: &str = "# agentes.chat on this computer, run by the agentes.chat app. Help:\n\
+# https://agentes.chat/docs/run-on-your-computer. AGENTES_SECRET encrypts the keys stored in the database: it\n\
+# travels with the folder in a backup, and changing it makes them unreadable.\n";
 
 /// The port the server takes and the address it answers at.
 pub fn port_of(folder: &Folder) -> Option<u16> {

@@ -1,8 +1,9 @@
+import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { splitAtNames } from "@agenteschat/client/lib/text";
 import { Fragment, type ReactNode } from "react";
 import { Text as RNText, StyleSheet, View } from "react-native";
 import type { AgentLookInput } from "@/agent/looks";
-import { agentLayout, framedByDefault } from "@/agent/poses";
+import { type AgentMode, agentLayout, framedByDefault } from "@/agent/poses";
 import { AgentAvatar, PersonAvatar, WithPresence } from "@/ui";
 import { usePresenceOf } from "../status/hooks";
 import { useDirectory } from "./hooks";
@@ -25,7 +26,7 @@ export function Face({
 }: {
   who: { type: string; id: string | null } | null | undefined;
   size: number;
-  mode?: "idle" | "run" | "think" | "rest";
+  mode?: AgentMode;
   live?: boolean;
   /** Agents only: the sky tile (default by size, see AgentAvatar). */
   framed?: boolean;
@@ -35,26 +36,20 @@ export function Face({
   const dir = useDirectory();
   const member = who?.type !== "agent" && who?.id ? dir.memberById.get(who.id) : undefined;
   const photo = usePersonPhoto(member ? (member.avatarUrl ?? member.image) : null);
-  const look = who?.type === "agent" ? agentLook(who.id ? dir.anyAgent(who.id) : undefined) : null;
-  const face = look ? (
-    <AgentAvatar agent={look} size={size} mode={mode} live={live} framed={framed} />
-  ) : (
-    <PersonAvatar name={dir.nameOf(who) || "?"} size={size} photo={photo} />
-  );
+  if (who?.type === "agent")
+    return (
+      <AgentFace agentId={who.id} size={size} mode={mode} live={live} framed={framed} presence={presence} ring={ring} />
+    );
+  const face = <PersonAvatar name={dir.nameOf(who) || "?"} size={size} photo={photo} />;
   if (!presence || !who?.id) return face;
   return (
-    <Badged
-      who={{ type: who.type, id: who.id }}
-      size={size}
-      ring={ring}
-      inset={look ? agentBadgeInset(look, size, framed) : 0}
-    >
+    <Badged who={{ type: who.type, id: who.id }} size={size} ring={ring} inset={0}>
       {face}
     </Badged>
   );
 }
 
-/** An agent by id (its look from the directory). */
+/** An agent by id (its look from the directory); with `presence`, asleep while it is out of office. */
 export function AgentFace({
   agentId,
   size,
@@ -66,7 +61,7 @@ export function AgentFace({
 }: {
   agentId: string | null | undefined;
   size: number;
-  mode?: "idle" | "run" | "think" | "rest";
+  mode?: AgentMode;
   live?: boolean;
   /** The sky tile (default by size, see AgentAvatar). */
   framed?: boolean;
@@ -77,11 +72,35 @@ export function AgentFace({
 }) {
   const dir = useDirectory();
   const look = agentLook(agentId ? dir.anyAgent(agentId) : undefined);
-  const face = <AgentAvatar agent={look} size={size} mode={mode} live={live} framed={framed} />;
-  if (!presence || !agentId) return face;
+  if (presence && agentId)
+    return (
+      <PresentAgentFace agentId={agentId} look={look} size={size} mode={mode} live={live} framed={framed} ring={ring} />
+    );
+  return <AgentAvatar agent={look} size={size} mode={mode} live={live} framed={framed} />;
+}
+
+function PresentAgentFace({
+  agentId,
+  look,
+  size,
+  mode,
+  live,
+  framed,
+  ring,
+}: {
+  agentId: string;
+  look: AgentLookInput;
+  size: number;
+  mode: AgentMode;
+  live: boolean;
+  framed: boolean | undefined;
+  ring: string | undefined;
+}) {
+  const status = usePresenceOf().agent(agentId)?.status?.status;
+  const asleep = mode === "idle" && isOutOfOffice(status);
   return (
     <Badged who={{ type: "agent", id: agentId }} size={size} ring={ring} inset={agentBadgeInset(look, size, framed)}>
-      {face}
+      <AgentAvatar agent={look} size={size} mode={asleep ? "sleep" : mode} live={live} framed={framed} />
     </Badged>
   );
 }
@@ -121,20 +140,24 @@ function Badged({
 
 /**
  * An agent named in a line of text: its still face, the text's size, then its name (the web's `.ac-who`). A child of a
- * `<Text>`; the face is an inline view lifted onto the capitals.
+ * `<Text>`; the face is an inline view lifted onto the capitals. A space plus 0.2 of the size before it, 0.4 after, as
+ * on the web; `lead` (it opens the text) drops the one before.
  */
 export function AgentWho({
   agentId,
   name,
   size = 14,
+  lead = false,
 }: {
   agentId: string | null | undefined;
   name: string;
   size?: number;
+  lead?: boolean;
 }) {
+  const side = { marginLeft: lead ? 0 : Math.round(size * 0.2), marginRight: Math.round(size * 0.4) };
   return (
     <RNText style={whoStyles.who}>
-      <View style={[whoStyles.face, { width: size, height: size, marginRight: Math.round(size * 0.25) }]}>
+      <View style={[whoStyles.face, { width: size, height: size }, side]}>
         <AgentFace agentId={agentId} size={size} live={false} />
       </View>
       {name}
@@ -159,7 +182,7 @@ export function withAgentFaces(
       <Fragment key={i}>{p}</Fragment>
     ) : (
       // biome-ignore lint/suspicious/noArrayIndexKey: same
-      <AgentWho key={i} agentId={who[p]?.agentId} name={who[p]?.name ?? ""} size={size} />
+      <AgentWho key={i} agentId={who[p]?.agentId} name={who[p]?.name ?? ""} size={size} lead={i === 0} />
     ),
   );
 }

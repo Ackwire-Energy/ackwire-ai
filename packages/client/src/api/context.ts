@@ -40,3 +40,15 @@ export function useApi(): ApiClient {
 export function useAgentReaction(): AgentReactionEffect | undefined {
   return useApiContext().onAgentReaction;
 }
+
+const CardViaContext = createContext<string | undefined>(undefined);
+
+/**
+ * The right hand's card whose rows act here (ADR 0137 §4): its message id goes with the decisions and people changes
+ * made inside it, so the audit reads them "via" the right hand. The server ignores a card that doesn't name them.
+ */
+export function CardVia({ messageId, children }: { messageId: string; children?: ReactNode }) {
+  return createElement(CardViaContext.Provider, { value: messageId }, children);
+}
+
+export const useCardVia = () => useContext(CardViaContext);

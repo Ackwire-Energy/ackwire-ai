@@ -31,6 +31,7 @@ import {
   useMissionControl,
   usePins,
   usePostMessage,
+  useRightHandWave,
   useRoster,
   useSettings,
   useSteerState,
@@ -40,12 +41,13 @@ import {
 } from "@agenteschat/client";
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { runPosition } from "@agenteschat/client/lib/chat";
+import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
+import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import {
   isMediaAfterReply,
   isMediaAlone,
@@ -66,7 +68,7 @@ import type { LegendListRef, OnViewableItemsChanged } from "@legendapp/list/reac
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect, useIsFocused } from "expo-router";
+import { router, useFocusEffect, useIsFocused, useIsPreview } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -81,6 +83,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { frameClock } from "@/agent/clock";
 import { StickerStageContext } from "@/agent/StickerCanvas";
 import { createStickerStage } from "@/agent/sticker-stage";
 import { holdOpenConversation } from "@/lib/push";
@@ -91,6 +94,7 @@ import {
   Button,
   Composer,
   type ComposerWorking,
+  Count,
   Icon,
   IconButton,
   PressScale,
@@ -111,7 +115,7 @@ import { DmQueueButton, QueueButton, useAgentsQueue, useOpenQueue } from "../que
 import { RemindSheet } from "../reminders/RemindSheet";
 import { RightHandIntro } from "../right-hand/Intro";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useMyHandle, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, previewOf } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
@@ -165,7 +169,6 @@ import {
   appendedKeys,
   type HeldRun,
   HOLD_FINISHED_RUN_MS,
-  landsOnDivider,
   lastSeenKey,
   type Place,
   placeCorrection,
@@ -293,6 +296,7 @@ function Chat({
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
+  const myHandle = useMyHandle();
   const api = useApi();
   const dir = useDirectory();
   const c = useColors();
@@ -330,6 +334,10 @@ function Chat({
   useEffect(() => {
     if (rightHand && meId) rightHandSeen.mark(rightHandSeenKey(meId, orgId));
   }, [rightHand, meId, orgId]);
+  // Its wave on the person's first visit, kept here: the greeting moves into the list with the first message, and
+  // the wave neither goes nor plays again.
+  const wave = useRightHandWave(orgId, rightHand && dmAgent ? dmAgent.id : "");
+  const waveFrom = useMemo(() => (wave ? frameClock.time() : undefined), [wave]);
   const member = dm ? true : (channel?.isMember ?? true);
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
   // The computer this conversation's agents share, while turns wait for it: the bar's way into its line.
@@ -614,8 +622,8 @@ function Chat({
 
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther
-  // up nothing moves (the scroll is never taken): a pill says what arrived below and who, a "Novas" line
-  // marks the first of it, and the pill lands there when it is far.
+  // up nothing moves (the scroll is never taken): the round button at the top right counts what arrived below (in
+  // red when it mentions me) and goes back to the end, and a "Novas" line marks the first of it.
   const listRef = useRef<LegendListRef>(null);
   // The person dragging the list, a new hold on their place (see "Keeping the place") and the app moving it on
   // purpose (sending, the pill, a pin): each lets go of a held place.
@@ -634,13 +642,18 @@ function Chat({
         mine: r.kind === "message" && r.message.author.type === "person" && r.message.author.id === meId,
         // An agent's sticker or GIF after its reply (ADR 0091) is never news of its own.
         silent: r.kind === "message" && isMediaAfterReply(r.message.meta),
+        mentionsMe:
+          r.kind === "message" &&
+          !!myHandle &&
+          r.message.author.id !== meId &&
+          mentionsHandle(r.message.body, myHandle),
         ...(r.kind === "message" && r.message.author.id
           ? { who: `${r.message.author.type}:${r.message.author.id}` }
           : r.kind === "run"
             ? { who: `agent:${r.run.agentId}` }
             : {}),
       })),
-    [rows, meId],
+    [rows, meId, myHandle],
   );
   const [atEnd, setAtEnd] = useState(true);
   const atEndRef = useRef(atEnd);
@@ -654,7 +667,10 @@ function Chat({
     if (atEnd) setSeenKey(latestSeen);
   }, [atEnd, latestSeen]);
   const unseen: Unseen = useMemo(
-    () => (atEnd ? { messages: 0, firstKey: null, authors: [], working: [] } : unseenBelow(scrollRows, seenKey)),
+    () =>
+      atEnd
+        ? { messages: 0, firstKey: null, authors: [], working: [], mentionsMe: false }
+        : unseenBelow(scrollRows, seenKey),
     [atEnd, scrollRows, seenKey],
   );
   // "Novas": before the first new row while the person reads above; it fades a while after they reach it.
@@ -691,21 +707,6 @@ function Chat({
     setAtEnd(true);
     requestAnimationFrame(() => void listRef.current?.scrollToEnd({ animated: true }));
   }, [letGo]);
-  // The pill: to the "Novas" line when it is far, else to the end.
-  const toUnseen = useCallback(() => {
-    const state = listRef.current?.getState();
-    const index = shownRows.findIndex((r) => r.key === DIVIDER_KEY);
-    const far = state && landsOnDivider(state.contentLength, state.positionByKey(DIVIDER_KEY), state.scrollLength);
-    if (far && index >= 0) {
-      letGo();
-      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0, viewOffset: 12 });
-      // What is new is in view now: the pill goes, the line fades after a while.
-      setSeenKey(latestSeen);
-      setReached(true);
-      return;
-    }
-    toEnd();
-  }, [shownRows, latestSeen, toEnd, letGo]);
 
   // "Ver" on the requests' line: the list goes to the request and stays there. It stops following the end, as
   // when reading a long message from its top, so a reply streaming in doesn't pull it back down; reaching the end,
@@ -770,12 +771,14 @@ function Chat({
   const markRead = useMarkChannelRead(orgId).mutate;
   const markThreadRead = useMarkThreadRead(orgId).mutate;
   const lastId = list.at(-1)?.id;
+  // Peeked at from the list (iOS's long press preview): nothing is read until it is opened.
+  const peeking = useIsPreview();
   useEffect(() => {
-    if (!member || !lastId || lastId.startsWith("local-")) return;
+    if (peeking || !member || !lastId || lastId.startsWith("local-")) return;
     const mark = readMark(channelId, threadId);
     if (mark.kind === "thread") markThreadRead(mark.id);
     else markRead(mark.id);
-  }, [markRead, markThreadRead, channelId, threadId, member, lastId]);
+  }, [peeking, markRead, markThreadRead, channelId, threadId, member, lastId]);
 
   // ── Older pages (channel view) ──
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -1658,7 +1661,9 @@ function Chat({
   const bottomPad = Math.max(insets.bottom, 10);
   // The header floats over the conversation (glass on iOS 26, a blur before; round plates on Android), which
   // fades under it.
-  const headerHeight = useHeaderHeight();
+  // Peeked at from the list (iOS's long press): no bar over it and no composer, so no room for either.
+  const barHeight = useHeaderHeight();
+  const headerHeight = peeking ? 0 : barHeight;
   const lift = Math.max(0, bottomPad - KEYBOARD_GAP);
   const showList = !loading && !(rows.length === 0 && runs.length === 0);
   // The conversation starts below the clear bar by our own padding, on both platforms (the pinned card, when there
@@ -1694,6 +1699,13 @@ function Chat({
     watchAsks();
     watchRows();
   }, [watchAsks, watchRows]);
+  // More than a screen above the end: the round button shows even with nothing new below.
+  const [far, setFar] = useState(false);
+  const onListScroll = useCallback(() => {
+    watchList();
+    const state = listRef.current?.getState();
+    if (state) setFar(screenAboveEnd(state.distanceFromEnd, state.scrollLength));
+  }, [watchList]);
 
   // The list shows once it sits at the end (no frame of it placing itself), as Bluesky's and Expensify's do; from
   // a little opacity, not none, so the glass inside rows keeps drawing.
@@ -1847,7 +1859,7 @@ function Chat({
                           onStartReached={loadOlder}
                           // A look at the waiting requests' cards and the live rows, once a frame and only while
                           // there is one.
-                          onScroll={watchList}
+                          onScroll={onListScroll}
                           onViewableItemsChanged={onViewable}
                           viewabilityConfig={STICKER_VIEW}
                           onScrollBeginDrag={() => {
@@ -1872,7 +1884,7 @@ function Chat({
                           // The right hand's greeting stays at the conversation's start, once the start is loaded.
                           ListHeaderComponent={
                             dmAgent && rightHand && (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
-                              <RightHandIntro agent={dmAgent} channelId={channelId} />
+                              <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
                             ) : undefined
                           }
                         />
@@ -1880,6 +1892,9 @@ function Chat({
                     </JumpToMessageContext.Provider>
                   </StickerStageContext.Provider>
                   <DatePill day={topDay} shown={dayShown} top={hasPin ? 8 : headerHeight + 8} />
+                  {showList && (readHold || (!atEnd && (far || unseen.messages > 0 || unseen.working.length > 0))) ? (
+                    <ToLatest top={hasPin ? 8 : headerHeight + 8} unseen={unseen} onPress={toEnd} />
+                  ) : null}
                 </View>
               </Animated.View>
               {showList ? null : (
@@ -1887,7 +1902,7 @@ function Chat({
                 <View style={StyleSheet.absoluteFill}>
                   {dmAgent && rightHand ? (
                     <ScrollView contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: composerHeight }}>
-                      <RightHandIntro agent={dmAgent} channelId={channelId} />
+                      <RightHandIntro agent={dmAgent} channelId={channelId} waveFrom={waveFrom} />
                     </ScrollView>
                   ) : dmAgent && !isThread ? (
                     <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
@@ -1910,19 +1925,6 @@ function Chat({
               )}
             </>
           )}
-          <KeyboardStickyView
-            offset={{ opened: lift }}
-            style={[styles.jumpDock, { bottom: composerHeight + 10 }]}
-            pointerEvents="box-none"
-          >
-            {showList && (!atEnd || readHold) ? (
-              unseen.messages > 0 || unseen.working.length > 0 ? (
-                <NewPill unseen={unseen} onPress={toUnseen} />
-              ) : (
-                <ToLatest onPress={toEnd} />
-              )
-            ) : null}
-          </KeyboardStickyView>
           {!hasPin ? (
             // The conversation fades under the floating header, as it does under the box. Not under a pinned bar
             // or card: the list already starts below them, and a header-tall fade there was a dark band over the
@@ -1934,174 +1936,150 @@ function Chat({
               style={[styles.topFade, { height: headerHeight + 28 }]}
             />
           ) : null}
-          <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
-            <View
-              ref={composerRef}
-              onLayout={onComposerBoxLayout}
-              style={[styles.composer, { paddingBottom: bottomPad }]}
-            >
-              {/* The conversation fades under the box: no hard edge above it. */}
-              <LinearGradient
-                pointerEvents="none"
-                colors={[withOpacity(c.bg, 0), withOpacity(c.bg, 0.9), c.bg]}
-                locations={[0, 0.3, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-              <Connection status={realtime} />
-              {banner ? <NoAiBanner banner={banner} /> : null}
-              {/* Who is working, right above the composer (as on the web), while they work; a request waiting out
-                  of view takes the line, with "Ver" (and the working line's stop while one agent works). */}
-              {member && awayAsk ? (
-                <AskBar
-                  away={awayAsk}
-                  onSee={seeAsk}
-                  runs={runs}
-                  consults={lineConsults}
-                  canStop={canStop}
-                  onStop={stopRun}
-                  sight={sight}
+          {peeking ? null : (
+            <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
+              <View
+                ref={composerRef}
+                onLayout={onComposerBoxLayout}
+                style={[styles.composer, { paddingBottom: bottomPad }]}
+              >
+                {/* The conversation fades under the box: no hard edge above it. */}
+                <LinearGradient
+                  pointerEvents="none"
+                  colors={[withOpacity(c.bg, 0), withOpacity(c.bg, 0.9), c.bg]}
+                  locations={[0, 0.3, 1]}
+                  style={StyleSheet.absoluteFill}
                 />
-              ) : null}
-              {member && !awayAsk ? (
-                <WorkingLine
-                  runs={runs}
-                  consults={lineConsults}
-                  typing={typing}
-                  canStop={canStop}
-                  onStop={stopRun}
-                  onOpenBrowser={(agentId) => {
-                    // The agent's browser card opens in the conversation (at the end), not another screen.
-                    toggleBrowser(agentId, true);
-                    toEnd();
-                  }}
-                  sight={sight}
-                  onSee={seeRun}
-                />
-              ) : null}
-              {member && dmAgent && !canTalk(dmAgent) ? (
-                <AgentLocked agent={dmAgent} />
-              ) : member && channel?.can?.post === false ? (
-                // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
-                <Text variant="footnote" tone="muted" style={styles.readOnly}>
-                  {t("channel.perms.readOnlyComposer")}
-                </Text>
-              ) : member ? (
-                <Composer
-                  placeholder={placeholder}
-                  onSend={onSend}
-                  working={working}
-                  onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
-                  media={mediaTabs.length > 0 ? { label: t("media.picker.send"), onPress: openMedia } : null}
-                  inputNativeID={COMPOSER_INPUT_ID}
-                  {...(suggestions.length > 0 ? { suggestions } : {})}
-                  {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
-                  mentionAt={refQuery}
-                  insertMention={insertRef}
-                  prefill={prefill}
-                  mention={({ query, sigil, pick }) =>
-                    sigil === "#" ? (
-                      <ChannelPicker query={query} pick={pick} />
-                    ) : (
-                      <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
-                    )
-                  }
-                  onType={(text) => sendTyping(threadId, text)}
-                  voice={voice}
-                />
-              ) : (
-                <Button
-                  variant="primary"
-                  wide
-                  label={t("mobile.chat.join")}
-                  disabled={join.isPending}
-                  onPress={() => join.mutate()}
-                />
-              )}
-            </View>
-          </KeyboardStickyView>
+                <Connection status={realtime} />
+                {banner ? <NoAiBanner banner={banner} /> : null}
+                {/* Who is working, right above the composer (as on the web), while they work; a request waiting out
+                    of view takes the line, with "Ver" (and the working line's stop while one agent works). */}
+                {member && awayAsk ? (
+                  <AskBar
+                    away={awayAsk}
+                    onSee={seeAsk}
+                    runs={runs}
+                    consults={lineConsults}
+                    canStop={canStop}
+                    onStop={stopRun}
+                    sight={sight}
+                  />
+                ) : null}
+                {member && !awayAsk ? (
+                  <WorkingLine
+                    runs={runs}
+                    consults={lineConsults}
+                    typing={typing}
+                    canStop={canStop}
+                    onStop={stopRun}
+                    onOpenBrowser={(agentId) => {
+                      // The agent's browser card opens in the conversation (at the end), not another screen.
+                      toggleBrowser(agentId, true);
+                      toEnd();
+                    }}
+                    sight={sight}
+                    onSee={seeRun}
+                  />
+                ) : null}
+                {member && dmAgent && !canTalk(dmAgent) ? (
+                  <AgentLocked agent={dmAgent} />
+                ) : member && channel?.can?.post === false ? (
+                  // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
+                  <Text variant="footnote" tone="muted" style={styles.readOnly}>
+                    {t("channel.perms.readOnlyComposer")}
+                  </Text>
+                ) : member ? (
+                  <Composer
+                    placeholder={placeholder}
+                    onSend={onSend}
+                    working={working}
+                    onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
+                    media={mediaTabs.length > 0 ? { label: t("media.picker.send"), onPress: openMedia } : null}
+                    inputNativeID={COMPOSER_INPUT_ID}
+                    {...(suggestions.length > 0 ? { suggestions } : {})}
+                    {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
+                    mentionAt={refQuery}
+                    insertMention={insertRef}
+                    prefill={prefill}
+                    mention={({ query, sigil, pick }) =>
+                      sigil === "#" ? (
+                        <ChannelPicker query={query} pick={pick} />
+                      ) : (
+                        <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
+                      )
+                    }
+                    onType={(text) => sendTyping(threadId, text)}
+                    voice={voice}
+                  />
+                ) : (
+                  <Button
+                    variant="primary"
+                    wide
+                    label={t("mobile.chat.join")}
+                    disabled={join.isPending}
+                    onPress={() => join.mutate()}
+                  />
+                )}
+              </View>
+            </KeyboardStickyView>
+          )}
         </KeyboardGestureArea>
       </View>
     </AskStoreProvider>
   );
 }
 
-/** Back to the latest messages: a round button over the list (nothing new below). */
-function ToLatest({ onPress }: { onPress: () => void }) {
+/**
+ * Back to the latest messages: a round button at the top right, under the bar (and the pinned card), as on the web.
+ * It counts what arrived below, in red when one mentions me; its label says who spoke and who is writing.
+ */
+function ToLatest({ top, unseen, onPress }: { top: number; unseen: Unseen; onPress: () => void }) {
   const { t } = useTranslation();
+  const dir = useDirectory();
   const { colors, shadows } = useTheme();
+  const nameOf = (who: string) => {
+    const at = who.indexOf(":");
+    return dir.nameOf({ type: who.slice(0, at), id: who.slice(at + 1) });
+  };
+  const said = [
+    unseen.messages > 0 ? t("mobile.chat.unseen.count", { count: unseen.messages }) : "",
+    unseen.authors.length > 0 ? listNames(t, unseen.authors.map(nameOf)) : "",
+    unseen.working.length > 0
+      ? t("mobile.chat.unseen.working", { names: listNames(t, unseen.working.map(nameOf)) })
+      : "",
+    unseen.mentionsMe ? t("mobile.chat.unseen.mentionsYou") : "",
+  ].filter(Boolean);
   return (
-    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} style={styles.jumpEnd}>
+    <Animated.View
+      entering={FadeIn.duration(160)}
+      exiting={FadeOut.duration(120)}
+      style={[styles.jumpAt, { top }]}
+      pointerEvents="box-none"
+    >
       <PressScale
         to={0.92}
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={t("mobile.chat.toLatest")}
+        accessibilityLabel={
+          said.length > 0 ? t("mobile.chat.toLatestNew", { text: said.join(" · ") }) : t("mobile.chat.toLatest")
+        }
         style={[styles.jump, { backgroundColor: colors.raised, boxShadow: `${shadows.e2}, ${shadows.top}` }]}
       >
         <View style={styles.jumpIcon}>
-          <Icon name="chev" size={20} color={colors.ink2} />
+          <Icon name="down" size={20} color={colors.ink2} />
         </View>
       </PressScale>
-    </Animated.View>
-  );
-}
-
-/**
- * "↓ 2 novas · Marina e Ada · Theo escrevendo": who spoke below, not just a count, with
- * their stacked faces; it lands on the "Novas" line (or at the end when that is close).
- */
-function NewPill({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) {
-  const { t } = useTranslation();
-  const dir = useDirectory();
-  const reduced = useReducedMotion();
-  const { colors, shadows } = useTheme();
-  const parse = (who: string) => {
-    const at = who.indexOf(":");
-    return { type: who.slice(0, at), id: who.slice(at + 1) };
-  };
-  const nameOf = (who: string) => dir.nameOf(parse(who));
-  const count = unseen.messages > 0 ? t("mobile.chat.unseen.count", { count: unseen.messages }) : "";
-  const working = unseen.working;
-  const rest = [
-    unseen.authors.length > 0 ? listNames(t, unseen.authors.map(nameOf)) : "",
-    working.length > 0 ? t("mobile.chat.unseen.working", { names: listNames(t, working.map(nameOf)) }) : "",
-  ].filter(Boolean);
-  const faces = [...new Set([...unseen.authors, ...working])].slice(0, 3);
-  const label = [count, ...rest].filter(Boolean).join(" · ");
-  return (
-    <Animated.View
-      entering={reduced ? FadeIn.duration(120) : FadeInDown.springify().damping(14).stiffness(260)}
-      exiting={FadeOut.duration(120)}
-      style={styles.pillWrap}
-    >
-      <PressScale
-        to={0.96}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        style={[styles.pill, { backgroundColor: colors.raised, boxShadow: `${shadows.e2}, ${shadows.top}` }]}
-      >
-        <View style={styles.pillIn}>
-          <Icon name="down" size={16} color={colors.ink2} />
-          <View style={styles.faces}>
-            {faces.map((w, i) => (
-              <View key={w} style={[styles.pillFace, i > 0 && styles.pillOverlap, { borderColor: colors.raised }]}>
-                <Face who={parse(w)} size={20} live={false} />
-              </View>
-            ))}
-          </View>
-          <Text variant="footnote" tone="ink" numberOfLines={1} style={styles.pillText}>
-            {count ? (
-              <Text variant="footnote" tone="ink" style={styles.pillCount}>
-                {count}
-              </Text>
-            ) : null}
-            <Text variant="footnote" tone="muted">
-              {(count ? rest.map((x) => ` · ${x}`) : [rest.join(" · ")]).join("")}
-            </Text>
-          </Text>
+      {unseen.messages > 0 ? (
+        <View style={[styles.jumpCount, { borderColor: colors.bg }]} pointerEvents="none">
+          <Count
+            value={unseen.messages}
+            size={11}
+            inverted
+            max={99}
+            {...(unseen.mentionsMe ? { fill: colors.danger, color: colors.raised } : {})}
+          />
         </View>
-      </PressScale>
+      ) : null}
     </Animated.View>
   );
 }
@@ -2180,24 +2158,12 @@ const styles = StyleSheet.create({
   composer: { paddingHorizontal: 10, paddingTop: 6 },
   readOnly: { textAlign: "center", paddingHorizontal: 16, paddingVertical: 12 },
   composerDock: { position: "absolute", left: 0, right: 0, bottom: 0 },
-  jumpDock: { position: "absolute", left: 14, right: 14 },
-  jumpEnd: { alignSelf: "flex-end" },
+  jumpAt: { position: "absolute", right: 14 },
   jump: { width: 40, height: 40, borderRadius: 20 },
   jumpIcon: { flex: 1, alignItems: "center", justifyContent: "center" },
-  // The "↓ novas" pill: centered, the "tato com canto" corner.
-  pillWrap: { alignSelf: "center", maxWidth: "100%" },
-  pill: {
-    minHeight: 36,
-    borderTopLeftRadius: 13,
-    borderTopRightRadius: 13,
-    borderBottomRightRadius: 13,
-    borderBottomLeftRadius: 4,
-  },
-  pillIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 12 },
+  jumpCount: { position: "absolute", top: -6, right: -6, borderWidth: 2, borderRadius: 999 },
   pillFace: { borderWidth: 2, borderRadius: 8 },
   pillOverlap: { marginLeft: -6 },
-  pillText: { flexShrink: 1 },
-  pillCount: { fontWeight: "600" },
   unseen: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginVertical: 6 },
   unseenText: { fontWeight: "700" },
   unseenRule: { flex: 1, height: StyleSheet.hairlineWidth * 2, opacity: 0.45 },

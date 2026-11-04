@@ -4,13 +4,18 @@ import type {
   AgentDraft,
   AgentProposalCard,
   AiStatus,
+  CardDelegate,
   CostKind,
   CostlyDecision,
+  Member,
+  PersonLimitCard,
   ProposedRoutine,
+  Role,
   Skill,
   SuggestedAi,
 } from "../api/types";
 import type { Level } from "./access-levels";
+import { type AppPage, isAppPage } from "./app-pages";
 import type { ConnectedItem } from "./connected";
 import { isHttpsUrl, sameServer } from "./custom-tools";
 import { joinNames } from "./format";
@@ -151,9 +156,47 @@ export interface SettingsProposalCard {
   kind: "settings_proposal";
   forUserId: string | null;
   proposalIds: string[];
+  /** The right hand looked at it for the person it is for (ADR 0139 §2). */
+  delegate?: CardDelegate | null;
+}
+
+/** "Decidir aprovações" (`offer_approvals`, ADR 0137 §4): approvals waiting for this person, decided on the card. */
+export interface ApprovalsCard {
+  kind: "approvals";
+  forUserId: string | null;
+  approvalIds: string[];
+  why: string;
+}
+
+/** One person's change on a people card (`propose_member_changes`). */
+export type MemberChangeRow = { userId: string; name: string } & (
+  | { role: Role }
+  | { addRoleIds: string[]; removeRoleIds: string[] }
+  | { remove: true }
+);
+
+/** "Mudar pessoas": a row per change, applied with the members screen's own calls and confirmation. */
+export interface MemberChangesCard {
+  kind: "member_changes";
+  forUserId: string | null;
+  rows: MemberChangeRow[];
+  why: string;
+}
+
+/** "Abrir …" (`offer_open_page`): one of the app's screens, at an agent or a channel for those two. */
+export interface OpenPageCard {
+  kind: "open_page";
+  forUserId: string | null;
+  page: AppPage;
+  agentId?: string;
+  channelId?: string;
+  why: string;
 }
 
 export type ActionCard =
+  | ApprovalsCard
+  | MemberChangesCard
+  | OpenPageCard
   | ConnectAiCard
   | ConnectAppCard
   | InviteCard
@@ -163,7 +206,16 @@ export type ActionCard =
   | AgentProposalCard
   | StretchCard
   | UsagePauseCard
-  | CostlyProposalCard;
+  | CostlyProposalCard
+  | PersonLimitCard;
+
+/** The card an agent posts when the person behind its run is at their monthly limit (ADR 0141). */
+export const personLimitCardOf = (meta: Record<string, unknown> | null | undefined): PersonLimitCard | null => {
+  const c = meta?.actionCard as Partial<PersonLimitCard> | undefined;
+  return c?.kind === "person_limit" && typeof c.agentId === "string" && typeof c.state === "string"
+    ? (c as PersonLimitCard)
+    : null;
+};
 
 /**
  * An agent asks before costly work nobody asked for directly (ADR 0131 §3): opening a PR, installing packages, a long
@@ -328,17 +380,27 @@ function routineLine(
 }
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
-  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta) ?? usagePauseCardOf(meta) ?? costlyProposalOf(meta);
+  const proposal =
+    agentProposalOf(meta) ??
+    stretchCardOf(meta) ??
+    usagePauseCardOf(meta) ??
+    costlyProposalOf(meta) ??
+    personLimitCardOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;
   if ((raw as { kind?: unknown }).kind === "settings_proposal") {
-    const r = raw as { forUserId?: unknown; proposalIds?: unknown };
+    const r = raw as { forUserId?: unknown; proposalIds?: unknown; delegate?: CardDelegate | null };
     const proposalIds = Array.isArray(r.proposalIds)
       ? r.proposalIds.filter((id): id is string => typeof id === "string")
       : [];
     return proposalIds.length > 0
-      ? { kind: "settings_proposal", forUserId: typeof r.forUserId === "string" ? r.forUserId : null, proposalIds }
+      ? {
+          kind: "settings_proposal",
+          forUserId: typeof r.forUserId === "string" ? r.forUserId : null,
+          proposalIds,
+          delegate: r.delegate ?? null,
+        }
       : null;
   }
   const card = raw as { kind?: unknown; forUserId?: unknown; params?: unknown };
@@ -363,6 +425,34 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
   if (card.kind === "update_skills") {
     const skillIds = Array.isArray(p.skillIds) ? p.skillIds.filter((id): id is string => typeof id === "string") : [];
     return skillIds.length > 0 ? { kind: "update_skills", forUserId, skillIds, why } : null;
+  }
+  if (card.kind === "approvals") {
+    const approvalIds = strings(p.approvalIds);
+    return approvalIds.length > 0 ? { kind: "approvals", forUserId, approvalIds, why } : null;
+  }
+  if (card.kind === "member_changes") {
+    const rows = (Array.isArray(p.rows) ? p.rows : []).flatMap((r): MemberChangeRow[] => {
+      const row = (r ?? {}) as Record<string, unknown>;
+      if (typeof row.userId !== "string") return [];
+      const who = { userId: row.userId, name: typeof row.name === "string" ? row.name : "" };
+      if (row.remove === true) return [{ ...who, remove: true }];
+      if (row.role === "owner" || row.role === "member") return [{ ...who, role: row.role }];
+      const addRoleIds = strings(row.addRoleIds);
+      const removeRoleIds = strings(row.removeRoleIds);
+      return addRoleIds.length || removeRoleIds.length ? [{ ...who, addRoleIds, removeRoleIds }] : [];
+    });
+    return rows.length > 0 ? { kind: "member_changes", forUserId, rows, why } : null;
+  }
+  if (card.kind === "open_page") {
+    if (!isAppPage(p.page)) return null;
+    return {
+      kind: "open_page",
+      forUserId,
+      page: p.page,
+      ...(typeof p.agentId === "string" ? { agentId: p.agentId } : {}),
+      ...(typeof p.channelId === "string" ? { channelId: p.channelId } : {}),
+      why,
+    };
   }
   if (card.kind === "invite_people") {
     const emails = Array.isArray(p.emails) ? p.emails.filter((e): e is string => typeof e === "string") : [];
@@ -400,6 +490,26 @@ export const connectAppDone = (card: ConnectAppCard, items: readonly Pick<Connec
   card.connector
     ? items.some((i) => i.def?.id === card.connector)
     : Boolean(card.url) && items.some((i) => sameServer(i.server?.serverUrl, card.url));
+
+const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+/**
+ * Whether a people card's row is settled now, by the members list: the person's ownership or roles hold, or they are
+ * gone (removed, or left: nothing is left to apply to them).
+ */
+export function memberRowDone(row: MemberChangeRow, members: readonly Pick<Member, "userId" | "role" | "roleIds">[]) {
+  const m = members.find((x) => x.userId === row.userId);
+  if (!m) return true;
+  if ("remove" in row) return false;
+  if ("role" in row) return m.role === row.role;
+  const has = new Set(m.roleIds ?? []);
+  return row.addRoleIds.every((id) => has.has(id)) && row.removeRoleIds.every((id) => !has.has(id));
+}
+
+/** The roles a row leaves the person with: theirs now, with its roles given and taken. */
+export const rolesAfter = (row: { addRoleIds: string[]; removeRoleIds: string[] }, now: readonly string[] = []) => [
+  ...new Set([...now.filter((id) => !row.removeRoleIds.includes(id)), ...row.addRoleIds]),
+];
 
 /** Done once every address is invited (an invitation open or accepted), by the invitations the viewer may list. */
 export const inviteDone = (card: InviteCard, invited: readonly string[]) => {

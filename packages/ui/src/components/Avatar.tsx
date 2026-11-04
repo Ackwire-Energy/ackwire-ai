@@ -12,9 +12,10 @@ export type AvatarKind = "person" | "agent";
  * The agent symbol's state: `idle` blinks now and then, `thinking` looks
  * around (with a halo), `writing` has dash eyes (with a halo), `waiting`
  * looks up at you (waiting on a person's decision, no halo). The halo shows
- * only without the tile (`xs`, `xl`): in a tile the moving face says it.
+ * only without the tile (`xs`, `xl`): in a tile the moving face says it. `sleeping` has closed eyes and a pixel zz
+ * (paused until its plan or budget is back, no halo).
  */
-export type AgentState = "idle" | "thinking" | "writing" | "waiting";
+export type AgentState = "idle" | "thinking" | "writing" | "waiting" | "sleeping";
 
 export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   kind?: AvatarKind;
@@ -151,7 +152,7 @@ export function Avatar({
         kind === "agent" && "ac-avatar--agent",
         size !== "md" && `ac-avatar--${size}`,
         tile && "ac-avatar--framed",
-        agent && mood !== "idle" && mood !== "waiting" && "ac-avatar--running",
+        agent && mood !== "idle" && mood !== "waiting" && mood !== "sleeping" && "ac-avatar--running",
         agent && mood !== "idle" && `ac-avatar--${mood}`,
         className,
       )}

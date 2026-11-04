@@ -18,6 +18,7 @@ import type { AuthClient } from "@/auth/client";
 import { OrgProvider } from "@/components/org-context";
 import { forgetComposerDrafts } from "@/hooks/useComposerDraft";
 import { createI18n } from "@/i18n";
+import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { createToastStore } from "@/lib/toast";
 import { RealtimeProvider } from "@/realtime/context";
 import { routeTree } from "@/routeTree.gen";
@@ -138,8 +139,12 @@ export async function renderApp(
     reload?: boolean;
   },
 ) {
-  // Unsent composer text lives in localStorage: an app starts like a fresh browser unless the test reloads one.
-  if (!options.reload) forgetComposerDrafts();
+  // Unsent composer text lives in localStorage, a flow's way back in sessionStorage: an app starts like a fresh
+  // browser unless the test reloads one.
+  if (!options.reload) {
+    forgetComposerDrafts();
+    sessionStore.remove(STORAGE_KEYS.flowReturn);
+  }
   const sockets = fakeSockets();
   const services = makeServices(options.api, options.auth, options.createSocket ?? sockets.factory);
   const router = createRouter({

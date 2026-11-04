@@ -17,8 +17,10 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { type ActiveCover, activeCoversFrom, activeCoversTo } from "./approval-covers";
 import { addApprovalRules, COMMAND_RULE_TOOL, type RememberedKind, rememberedKindOf } from "./approval-rules";
 import { recordAudit } from "./audit";
+import { approvalCardVia } from "./card-via";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { learnFromRefusal } from "./context/feedback";
 import type { MemoryJudging } from "./context/items";
@@ -34,6 +36,7 @@ import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 import type { ApprovalOrigin } from "./tools/run-policy";
 
 const {
+  approvalCovers,
   approvals,
   organizationMembers,
   channelMembers,
@@ -78,6 +81,8 @@ export interface ApprovalView {
   expiresAt: string;
   createdAt: string;
   decidedByUserId: string | null;
+  /** Decided by someone covering this person (ADR 0139): "Aprovado por Bruno, cobrindo Ana". */
+  decidedForUserId: string | null;
   decidedAt: string | null;
   reason: string | null;
   /** Whether the person asking may approve or refuse it. */
@@ -385,6 +390,7 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   expiresAt: a.expiresAt.toISOString(),
   createdAt: a.createdAt.toISOString(),
   decidedByUserId: a.decidedByUserId,
+  decidedForUserId: a.decidedForUserId ?? null,
   decidedAt: a.decidedAt ? a.decidedAt.toISOString() : null,
   reason: a.reason,
   canDecide: canDecide && a.status === "pending",
@@ -472,7 +478,51 @@ export const decidableBySql = (actorId: string) => sql`(case
     and not coalesce((${approvals.approvers} ->> 'requesterDecides')::boolean, false) then false
   when jsonb_array_length(coalesce(${approvals.approvers} -> 'userIds', '[]'::jsonb)) > 0
     then ${approvals.approvers} -> 'userIds' @> to_jsonb(${actorId}::text)
-  else ${approvals.ownerUserId} is not distinct from ${actorId} end)`;
+  else ${approvals.ownerUserId} is not distinct from ${actorId} end or ${coveredBySql(actorId)})`;
+
+/** `coveredFor` as SQL: someone `actorId` covers now is asked this approval personally (ADR 0139). */
+const coveredBySql = (actorId: string) => sql`(not coalesce((${approvals.approvers} ->> 'required')::boolean, false)
+  and ${approvals.tool} <> ${REQUEST_PERMISSION_TOOL}
+  and ${approvals.requestedByUserId} is distinct from ${actorId}
+  and coalesce(${approvals.approvers} ->> 'requestedBy', '') <> ${actorId}
+  and exists (select 1 from ${approvalCovers} join ${organizationMembers}
+      on ${organizationMembers.orgId} = ${approvalCovers.orgId} and ${organizationMembers.userId} = ${approvalCovers.fromUserId}
+    where ${approvalCovers.orgId} = ${approvals.orgId} and ${approvalCovers.toUserId} = ${actorId}
+      and (${approvalCovers.endsAt} is null or ${approvalCovers.endsAt} > now())
+      and (${approvalCovers.mode} = 'always' or (${organizationMembers.availability} = 'out'
+        and (${organizationMembers.statusUntil} is null or ${organizationMembers.statusUntil} > now())))
+      and (${approvalCovers.risky} or not ${approvals.highRisk})
+      and not (coalesce(${approvals.approvers} ->> 'requestedBy', '') = ${approvalCovers.fromUserId}
+        and not coalesce((${approvals.approvers} ->> 'requesterDecides')::boolean, false))
+      and (case when jsonb_array_length(coalesce(${approvals.approvers} -> 'userIds', '[]'::jsonb)) > 0
+        then ${approvals.approvers} -> 'userIds' @> to_jsonb(${approvalCovers.fromUserId})
+        else ${approvals.ownerUserId} is not distinct from ${approvalCovers.fromUserId} end)))`;
+
+type Coverable = Pick<Approval, "ownerUserId" | "tool"> &
+  Partial<Pick<Approval, "approvers" | "params" | "requestedByUserId" | "highRisk">>;
+
+/** Whether `userId` is asked this approval personally: as the agent's owner, or named by `request_approval`. */
+const askedPersonally = (approval: Coverable, userId: string) => {
+  const named = approval.approvers;
+  if (named?.requestedBy === userId && !named.requesterDecides) return false;
+  return named?.userIds.length ? named.userIds.includes(userId) : approval.ownerUserId === userId;
+};
+
+/**
+ * The person `actorId` decides this approval for, covering them (ADR 0139), or null: one of `covers` (in force now)
+ * makes `actorId` cover someone asked it personally, it isn't `actorId`'s own request, and it is no high-risk action
+ * unless that cover takes them. Never a mailbox's action (only its owner decides) nor access for good (admins'),
+ * whatever the cover; what someone may decide only through a workspace-wide key isn't theirs to pass on.
+ */
+export function coveredFor(approval: Coverable, actorId: string, covers: ActiveCover[]): string | null {
+  if (approval.approvers?.required || adminsDecide(approval)) return null;
+  if (approval.requestedByUserId === actorId || approval.approvers?.requestedBy === actorId) return null;
+  const cover = covers.find(
+    (c) =>
+      c.toUserId === actorId && (c.risky || approval.highRisk === false) && askedPersonally(approval, c.fromUserId),
+  );
+  return cover?.fromUserId ?? null;
+}
 
 /**
  * The people asked to decide (the card's badge, the inbox, push, email): whoever holds its `decidingKeys` (ADR 0085)
@@ -482,7 +532,8 @@ export const decidableBySql = (actorId: string) => sql`(case
  */
 export async function approverIds(
   db: Database,
-  approval: Pick<Approval, "orgId" | "ownerUserId"> & Partial<Pick<Approval, "tool" | "approvers" | "params">>,
+  approval: Pick<Approval, "orgId" | "ownerUserId"> &
+    Partial<Pick<Approval, "tool" | "approvers" | "params" | "requestedByUserId" | "highRisk">>,
 ) {
   const keys = decidingKeys({ tool: approval.tool ?? "", params: approval.params ?? {} });
   const members = await db
@@ -511,6 +562,14 @@ export async function approverIds(
   );
   const requester = named?.requestedBy;
   if (requester && !named.requesterDecides && !admins.includes(requester)) ids.delete(requester);
+  // Whoever covers someone asked it personally is asked too (ADR 0139); while that person is out, only them.
+  const coverable = { ...approval, tool: approval.tool ?? "" };
+  const personal = [...ids].filter((id) => askedPersonally(coverable, id));
+  for (const cover of await activeCoversFrom(db, approval.orgId, personal)) {
+    if (!member.has(cover.toUserId) || !coveredFor(coverable, cover.toUserId, [cover])) continue;
+    ids.add(cover.toUserId);
+    if (cover.fromOut) ids.delete(cover.fromUserId);
+  }
   return ids.size > 0 ? [...ids] : admins;
 }
 
@@ -524,6 +583,15 @@ export async function namesOf(db: Executor, ids: string[]) {
   const rows = await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids));
   const byId = new Map(rows.map((r) => [r.id, r.name]));
   return ids.map((id) => byId.get(id)).filter((n): n is string => !!n);
+}
+
+/** Who decided, as the run that asked reads it: "Bruno (covering Ana)" when they decided in someone's name. */
+export async function deciderName(db: Executor, byUserId: string, forUserId: string | null) {
+  const [by = "a person", covered] = await Promise.all([
+    namesOf(db, [byUserId]).then((n) => n[0]),
+    forUserId ? namesOf(db, [forUserId]).then((n) => n[0]) : undefined,
+  ]);
+  return covered ? `${by} (covering ${covered})` : by;
 }
 
 /**
@@ -649,7 +717,8 @@ export async function decideApproval(
   actorId: string,
   orgId: string,
   approvalId: string,
-  input: { decision: "approve" | "refuse"; reason?: string; always?: boolean },
+  /** `via`: the card message it was decided from (the audit's "via", `approvalCardVia`). */
+  input: { decision: "approve" | "refuse"; reason?: string; always?: boolean; via?: string },
 ): Promise<ApprovalView> {
   const { db } = deps;
   const at = deps.now?.() ?? new Date();
@@ -659,7 +728,9 @@ export async function decideApproval(
     .where(and(eq(approvals.id, approvalId), eq(approvals.orgId, orgId)));
   if (!current) throw new NotFoundError("Approval not found");
   const membership = await requirePermission(db, actorId, current.orgId, "read");
-  if (!decides(current, actorId, membership)) {
+  const direct = decides(current, actorId, membership);
+  const forUserId = direct ? null : coveredFor(current, actorId, await activeCoversTo(db, orgId, actorId, at));
+  if (!direct && !forUserId) {
     throw new ForbiddenError(
       current.approvers?.required
         ? `Only ${current.approvers.label} can decide this: it's their mailbox`
@@ -672,8 +743,10 @@ export async function decideApproval(
               : "Only the agent's owner or an admin can decide this",
     );
   }
+  const via = await approvalCardVia(db, orgId, input.via, approvalId);
   const kind = input.always ? alwaysKindOf(current) : null;
-  if (input.always && (input.decision !== "approve" || !kind)) {
+  // Approving for good outlives the cover and changes the agent for everyone: never in someone else's name.
+  if (input.always && (input.decision !== "approve" || !kind || forUserId)) {
     throw new ConflictError("This request can't be approved for good", "approval.always_unavailable");
   }
 
@@ -689,6 +762,7 @@ export async function decideApproval(
           : {
               status: input.decision === "approve" ? "approved" : "refused",
               decidedByUserId: actorId,
+              decidedForUserId: forUserId,
               decidedAt: at,
               reason: input.reason?.trim().slice(0, 1000) || null,
             },
@@ -715,7 +789,7 @@ export async function decideApproval(
       await addApprovalRules(tx, { orgId, agentId: row.agentId, connectionId: always.connectionId }, always, actorId);
     }
     if (updated?.status === "refused") await settleAheadRoutine(tx, updated);
-    if (updated) await auditDecision(tx, updated, expired ? null : actorId, always);
+    if (updated) await auditDecision(tx, updated, expired ? null : actorId, always, via);
     return expired ? { error: "This request has expired" as const, row: updated } : { row: updated };
   });
   if (outcome.row) await publishApproval(deps, outcome.row, "approval.decided");
@@ -737,13 +811,17 @@ export async function decideApprovals(
   deps: { db: Database; pubsub: PubSub; now?: () => Date; memory?: MemoryJudging },
   actorId: string,
   orgId: string,
-  input: { ids: string[]; decision: "approve" | "refuse"; reason?: string },
+  input: { ids: string[]; decision: "approve" | "refuse"; reason?: string; via?: string },
 ): Promise<{ approvals: ApprovalView[]; skipped: string[] }> {
   const { db } = deps;
   const at = deps.now?.() ?? new Date();
   const ids = [...new Set(input.ids)];
+  const vias = new Map<string, string | null>();
+  if (input.via) for (const id of ids) vias.set(id, await approvalCardVia(db, orgId, input.via, id));
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const allowed = (r: Approval) => decides(r, actorId, membership);
+  const covers = await activeCoversTo(db, orgId, actorId, at);
+  const forUserOf = (r: Approval) => (decides(r, actorId, membership) ? null : coveredFor(r, actorId, covers));
+  const allowed = (r: Approval) => decides(r, actorId, membership) || forUserOf(r) !== null;
   const decided = await db.transaction(async (tx) => {
     const rows = ids.length
       ? await tx
@@ -765,6 +843,7 @@ export async function decideApprovals(
             : {
                 status: input.decision === "approve" ? "approved" : "refused",
                 decidedByUserId: actorId,
+                decidedForUserId: forUserOf(row),
                 decidedAt: at,
                 reason: input.reason?.trim().slice(0, 1000) || null,
               },
@@ -772,7 +851,7 @@ export async function decideApprovals(
         .where(eq(approvals.id, row.id))
         .returning();
       if (!updated) continue;
-      await auditDecision(tx, updated, expired ? null : actorId);
+      await auditDecision(tx, updated, expired ? null : actorId, null, vias.get(row.id) ?? null);
       if (updated.status === "refused") await settleAheadRoutine(tx, updated);
       if (!row.runId || !resumed.has(row.runId)) await enqueueResume(tx, row);
       if (row.runId) resumed.add(row.runId);
@@ -808,6 +887,7 @@ function auditDecision(
   row: Approval,
   personId: string | null,
   always: (RememberedKind & { connectionId: string | null }) | null = null,
+  via: string | null = null,
 ) {
   return recordAudit(tx, {
     orgId: row.orgId,
@@ -820,9 +900,11 @@ function auditDecision(
       title: row.title,
       ...(row.reason ? { reason: row.reason } : {}),
       ...(always ? { always } : {}),
+      ...(via ? { via } : {}),
     },
     runId: row.runId,
     channelId: row.channelId,
+    onBehalfOfUserId: personId ? row.decidedForUserId : null,
   });
 }
 
@@ -1040,6 +1122,7 @@ export const cancelRoutineAhead = (
 const seenBy = (db: Database, orgId: string, actorId: string) =>
   or(
     decidableBySql(actorId),
+    eq(approvals.decidedByUserId, actorId),
     eq(approvals.ownerUserId, actorId),
     sql`coalesce(${approvals.approvers} -> 'userIds', '[]'::jsonb) @> to_jsonb(${actorId}::text)`,
     inArray(
@@ -1081,7 +1164,8 @@ export async function listApprovals(
     )
     .orderBy(desc(approvals.createdAt))
     .limit(Math.min(options.limit ?? 100, 500));
-  return viewsOf(db, rows, (r) => decides(r, actorId, membership));
+  const covers = await activeCoversTo(db, orgId, actorId);
+  return viewsOf(db, rows, (r) => decides(r, actorId, membership) || coveredFor(r, actorId, covers) !== null);
 }
 
 export async function getApproval(db: Database, actorId: string, orgId: string, approvalId: string) {
