@@ -152,7 +152,7 @@ function BoardCard({ board: b, onHome = false }: { board: DashboardSummary; onHo
         </span>
         {onHome && (
           <span className="ac-chip db-card__home">
-            <Icon name="home" size={13} />
+            <Icon name="home" size={14} />
             {t("dashboards.onHome")}
           </span>
         )}
