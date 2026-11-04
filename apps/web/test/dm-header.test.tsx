@@ -97,6 +97,24 @@ describe("the DM's search is the channel's, held to the DM", () => {
     const row = document.querySelector(`article[data-message-id="m-${dm}"]`);
     expect(row?.classList.contains("ac-msg--focus")).toBe(true);
   });
+
+  test("a DM opened for the first time, after the DM list loaded, holds its search to it too", async () => {
+    const { state } = seeded();
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    await act(() =>
+      router.navigate({ to: "/org/$orgId/dm/person/$userId", params: { orgId: ORG_ID, userId: "u-joao" } }),
+    );
+    await settle(8);
+    const header = document.querySelector(".channel__header") as HTMLElement;
+    const box = within(header).getByRole("combobox", { name: "Buscar" }) as HTMLInputElement;
+    await act(async () => fireEvent.change(box, { target: { value: "zebra" } }));
+    await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    await settle(4);
+    const panel = screen().getByRole("complementary", { name: "Resultados da busca" });
+    expect(panel.textContent).not.toContain("uma zebra no general");
+  });
 });
 
 describe("where Lodi's name comes from", () => {

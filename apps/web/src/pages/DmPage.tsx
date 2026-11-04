@@ -41,7 +41,11 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
     queryKey: ["org", org.id, "dm", kind, id],
     queryFn: async () => {
       const res = await api.dms.open(org.id, target);
-      await qc.invalidateQueries({ queryKey: keys.channels(org.id) });
+      // A DM opened for the first time is in the DM list before its header shows: its search holds to it.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: keys.channels(org.id) }),
+        qc.invalidateQueries({ queryKey: keys.dms(org.id) }),
+      ]);
       return res;
     },
     staleTime: Number.POSITIVE_INFINITY,
