@@ -6431,12 +6431,6 @@
   "vault.item.noValue": {
     "value": "Nothing saved"
   },
-  "vault.item.show": {
-    "value": "Show"
-  },
-  "vault.item.hide": {
-    "value": "Hide"
-  },
   "vault.item.change": {
     "value": "Change"
   },
@@ -6452,11 +6446,11 @@
   "vault.item.newValueHelp": {
     "value": "It replaces the saved one when you save."
   },
+  "vault.item.sealedHelp": {
+    "value": "For safety, what's saved here never shows again. To change it, type it again."
+  },
   "vault.item.keepValue": {
     "value": "Keep the current one"
-  },
-  "vault.item.revealHelp": {
-    "value": "Show and Copy are recorded in its recent uses."
   },
   "vault.item.saved": {
     "value": "Saved"
@@ -6490,12 +6484,6 @@
   },
   "vault.use.read": {
     "value": "{{who}} read it"
-  },
-  "vault.use.show": {
-    "value": "{{who}} showed it"
-  },
-  "vault.use.copy": {
-    "value": "{{who}} copied it"
   },
   "vault.use.create": {
     "value": "{{who}} saved it"
@@ -26587,7 +26575,7 @@
     "value": "Someone changed it in the meantime. Open it again."
   },
   "errors.vault.noValue": {
-    "value": "Nothing is saved to show."
+    "value": "There's nothing to save."
   },
   "errors.vault.missing": {
     "value": "It's gone from its password manager."
@@ -28174,12 +28162,6 @@
   },
   "audit.change.vault.item_deleted": {
     "value": "Deleted a Vault item"
-  },
-  "audit.change.vault.item_shown": {
-    "value": "Viewed a password or key in the Vault"
-  },
-  "audit.change.vault.item_copied": {
-    "value": "Copied a password or key from the Vault"
   },
   "audit.change.vault.item_used": {
     "value": "Used a Vault item"

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
-import { importVaultCsv, listVault, revealVaultItem } from "../src";
+import { importVaultCsv, listVault } from "../src";
 import { csvLayout, parseVaultCsv } from "../src/vault/csv";
-import { everythingStored, type VaultFixture, vaultSetup } from "./vault-fixtures";
+import { everythingStored, storedValue, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
  * Importing a passwords export (ADR 0142): Chrome, 1Password, Bitwarden or any CSV with a website and a password;
@@ -111,9 +111,7 @@ describe("importing", () => {
     // Notes never come in: agents read descriptions.
     expect(saved.every((i) => i.description === "")).toBe(true);
     const github = saved.find((i) => i.title === "GitHub");
-    expect(await revealVaultItem(v.deps, v.ana.id, v.f.org.id, github?.id ?? "", "show")).toEqual({
-      value: "gh-Secret-111",
-    });
+    expect(await storedValue(v, github?.id ?? "")).toBe("gh-Secret-111");
     const stored = await everythingStored(v);
     for (const secret of ["gh-Secret-111", "shop-pw-666", "1111-2222"]) expect(stored).not.toContain(secret);
     const [audit] = await v.f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "vault.imported"));
@@ -136,9 +134,7 @@ describe("importing", () => {
       skipped: [{ reason: "duplicate", count: 1 }],
     });
     const shop = (await logins(v.ana.id)).find((i) => i.title === "Shop");
-    expect(await revealVaultItem(v.deps, v.ana.id, v.f.org.id, shop?.id ?? "", "show")).toEqual({
-      value: "shop-NEW-777",
-    });
+    expect(await storedValue(v, shop?.id ?? "")).toBe("shop-NEW-777");
     const [row] = await v.f.db
       .select()
       .from(schema.vaultItems)
@@ -198,9 +194,7 @@ describe("importing", () => {
     // Team imports get the default team access: everyone, no agent yet.
     expect(team.every((i) => i.access.everyone && !i.access.allAgents && i.access.agentIds.length === 0)).toBe(true);
     const deploy = team.find((i) => i.title === "Deploy");
-    expect(await revealVaultItem(v.deps, v.carla.id, v.f.org.id, deploy?.id ?? "", "copy")).toEqual({
-      value: 'op,pw"1',
-    });
+    expect(await storedValue(v, deploy?.id ?? "")).toBe('op,pw"1');
   });
 
   test("files it refuses: no website and password columns, too many rows, too large", async () => {

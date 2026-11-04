@@ -6,7 +6,7 @@ import {
   VaultSourceError,
   type VaultSourceItem,
 } from "@agenteschat/adapters";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
   createAgent,
@@ -16,6 +16,7 @@ import {
   type VaultDeps,
   type VaultRun,
 } from "../src";
+import { readItemValue } from "../src/vault/seal";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
@@ -204,4 +205,17 @@ export async function everythingStored(v: VaultFixture): Promise<string> {
     .select({ label: schema.vaultConnections.label, config: schema.vaultConnections.config })
     .from(schema.vaultConnections);
   return JSON.stringify({ audit, uses, outbox, items, connections, events: v.events });
+}
+
+/**
+ * What an item holds now, read the way the server reads it to seal it for an agent's computer: no person's screen
+ * ever gets it back (ADR 0142 §2), so tests look here.
+ */
+export async function storedValue(v: VaultFixture, itemId: string): Promise<string | null> {
+  const [item] = await v.f.db.select().from(schema.vaultItems).where(eq(schema.vaultItems.id, itemId));
+  if (!item) throw new Error(`No item ${itemId}`);
+  const [connection] = item.connectionId
+    ? await v.f.db.select().from(schema.vaultConnections).where(eq(schema.vaultConnections.id, item.connectionId))
+    : [];
+  return readItemValue(v.deps, item, connection);
 }

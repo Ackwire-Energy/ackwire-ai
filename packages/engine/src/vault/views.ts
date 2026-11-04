@@ -157,7 +157,6 @@ export async function itemView(
     updatedAt: item.updatedAt.toISOString(),
     can: {
       edit: manages,
-      reveal: manages && value && !item.missing,
       // An external item comes back at the next sync: it goes from its source, or here once it is gone from it.
       delete: manages && (item.connectionId === null || item.missing),
     },

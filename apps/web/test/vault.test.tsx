@@ -61,7 +61,7 @@ function vaultItem(patch: Partial<VaultItem> & Pick<VaultItem, "id" | "kind" | "
     lastUsedAt: null,
     createdAt: NOW,
     updatedAt: NOW,
-    can: { edit: true, reveal: true, delete: true },
+    can: { edit: true, delete: true },
     ...patch,
   };
 }
@@ -172,10 +172,6 @@ function fakeVault(
     remove: async (orgId, itemId) => {
       log("remove", orgId, itemId);
       overview.items = overview.items.filter((i) => i.id !== itemId);
-    },
-    reveal: async (orgId, itemId, purpose) => {
-      log("reveal", orgId, itemId, purpose);
-      return { value: "hunter2-from-the-vault" };
     },
     importCsv: async (orgId, input) => {
       log("importCsv", orgId, input.scope, input.dryRun);
@@ -298,7 +294,7 @@ describe("Settings › Vault (ADR 0142)", () => {
   test("a member who doesn't manage the Vault: a team item reads only, and new items stay personal", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
-    const shared = { ...LOGIN, can: { edit: false, reveal: false, delete: false } };
+    const shared = { ...LOGIN, can: { edit: false, delete: false } };
     const { t } = await openVault(state, overviewOf({ items: [shared], connections: [], canManageTeam: false }));
 
     await click(rows()[0] as HTMLElement);
@@ -306,7 +302,6 @@ describe("Settings › Vault (ADR 0142)", () => {
     const dialog = screen().getByRole("dialog", { name: "Acme mail" });
     expect(within(dialog).queryByRole("button", { name: t("common.save") })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: t("vault.item.delete") })).toBeNull();
-    expect(within(dialog).queryByRole("button", { name: t("vault.item.show") })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: t("vault.item.change") })).toBeNull();
     const editAgents = t("vault.access.editOf", { what: t("vault.access.agents") });
     expect(within(dialog).queryByRole("button", { name: editAgents })).toBeNull();
@@ -328,31 +323,22 @@ describe("Settings › Vault (ADR 0142)", () => {
     expect(create.textContent).toContain(t("vault.new.teamLocked"));
   });
 
-  test("Show and Copy ask the server for the value, which records it; nothing else ever carries it", async () => {
-    const copied: string[] = [];
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async (text: string) => void copied.push(text) },
-    });
+  test("a saved value stays behind its dots: no Show or Copy, Change for who manages it, and why", async () => {
     const { state, t } = await openVault();
-    expect(state.calls.some((c) => c.method === "vault.reveal")).toBe(false);
     await click(rows()[0] as HTMLElement);
     await settle(3);
     const dialog = screen().getByRole("dialog", { name: "Acme mail" });
-    expect(dialog.textContent).not.toContain("hunter2");
-
-    await click(within(dialog).getByRole("button", { name: t("vault.item.show") }));
-    await settle(3);
-    expect(state.calls.filter((c) => c.method === "vault.reveal").map((c) => c.args)).toEqual([
-      [ORG_ID, "vi-login", "show"],
-    ]);
-    expect(dialog.textContent).toContain("hunter2-from-the-vault");
-    expect(within(dialog).getByRole("button", { name: t("vault.item.hide") })).toBeTruthy();
-
-    await click(within(dialog).getByRole("button", { name: t("common.copy") }));
-    await settle(3);
-    expect(state.calls.filter((c) => c.method === "vault.reveal").map((c) => c.args[2])).toEqual(["show", "copy"]);
-    expect(copied).toEqual(["hunter2-from-the-vault"]);
+    const value = within(dialog).getByRole("group", { name: t("vault.field.password") });
+    expect(value.textContent).toContain("••••••••••");
+    // Its only action is Change.
+    expect(
+      within(value)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual([t("vault.item.change")]);
+    expect(dialog.textContent).toContain(t("vault.item.sealedHelp"));
+    // Nothing on the page asks for it: the client has no way to.
+    expect(state.calls.some((c) => /reveal/i.test(c.method))).toBe(false);
   });
 });
 

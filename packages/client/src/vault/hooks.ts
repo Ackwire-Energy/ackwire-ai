@@ -14,8 +14,8 @@ import type {
 
 /*
  * The Vault in the apps (ADR 0142). What a person types here (a password, a key, a passwords file, a password
- * manager's credentials) and what `reveal` answers never go into the query cache, and every mutation that carries
- * one is forgotten as soon as nothing watches it (`gcTime: 0`).
+ * manager's credentials) never goes into the query cache, and every mutation that carries one is forgotten as soon
+ * as nothing watches it (`gcTime: 0`). Nothing here ever brings a saved value back: no answer has one (§2).
  */
 
 /** The client's Vault, or an error on a client without one (an older fake). */
@@ -90,23 +90,6 @@ export function useDeleteVaultItem(orgId: string) {
       qc.removeQueries({ queryKey: keys.vaultItem(orgId, itemId) });
       void refresh();
     },
-  });
-}
-
-/**
- * "Show" or "Copy": the value comes back to the caller only (`mutateAsync`), recorded as a use, so the open item's
- * uses refetch. Until the caller calls `reset()` the mutation holds the value as its `data`, so callers reset it as
- * soon as they've read it.
- */
-export function useRevealVaultItem(orgId: string) {
-  const api = useApi();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ itemId, purpose }: { itemId: string; purpose: "show" | "copy" }) =>
-      vaultOf(api).reveal(orgId, itemId, purpose),
-    meta: { silent: true },
-    gcTime: 0,
-    onSuccess: (_revealed, { itemId }) => void qc.invalidateQueries({ queryKey: keys.vaultItem(orgId, itemId) }),
   });
 }
 

@@ -169,12 +169,10 @@ describe("what each run may use", () => {
     expect(bruno.canManageTeam).toBe(false);
     expect(bruno.items.find((i) => i.title === "support-tools")?.can).toEqual({
       edit: false,
-      reveal: false,
       delete: false,
     });
     expect(bruno.items.find((i) => i.title === "bruno-personal")?.can).toEqual({
       edit: true,
-      reveal: true,
       delete: true,
     });
     expect((await listVault(v.deps, v.carla.id, v.f.org.id)).canManageTeam).toBe(true);

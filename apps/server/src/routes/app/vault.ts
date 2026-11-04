@@ -8,7 +8,6 @@ import {
   importVaultCsv,
   listVault,
   NotFoundError,
-  revealVaultItem,
   syncVaultConnection,
   TooManyError,
   updateVaultConnection,
@@ -40,11 +39,7 @@ export const VAULT_CSV_MAX_CHARS = 2 * 1024 * 1024;
 /** Escaping a CSV into JSON can grow it (quotes, line breaks): room for that, not for a bigger file. */
 const IMPORT_BODY_BYTES = 5 * 1024 * 1024;
 
-/**
- * Per person, so a stolen session can't read the whole Vault in a burst and nobody tests a password manager's
- * credentials in bulk through this server (ADR 0142).
- */
-const REVEALS = { limit: 30, windowMs: 60_000 };
+/** Per person, so nobody tests a password manager's credentials in bulk through this server (ADR 0142). */
 const SOURCE_CHECKS = { limit: 10, windowMs: 60_000 };
 const IMPORTS = { limit: 10, windowMs: 60_000 };
 
@@ -142,7 +137,7 @@ export const VaultItem = z
     createdAt: z.string(),
     updatedAt: z.string(),
     can: z
-      .object({ edit: z.boolean(), reveal: z.boolean(), delete: z.boolean() })
+      .object({ edit: z.boolean(), delete: z.boolean() })
       .openapi({ description: "What the viewer may do with it." }),
   })
   .openapi("VaultItem");
@@ -371,7 +366,8 @@ const noStore = (c: Context) => c.header("Cache-Control", "no-store");
 /**
  * The Vault (ADR 0142): logins, keys and contacts the workspace's agents use without seeing a password or a key.
  * Personal items are their owner's alone (admins included: they never see them); team items are edited by who has
- * `manage_credentials` and seen by their audience. No answer here carries a value but `reveal`'s, which is recorded.
+ * `manage_credentials` and seen by their audience. No answer here carries a value: once saved, a password or a key
+ * never comes back to an app (§2).
  */
 export function vaultRoutes(deps: AppDeps) {
   const app = createAppRouter(deps);
@@ -479,29 +475,6 @@ export function vaultRoutes(deps: AppDeps) {
       const { orgId, itemId } = c.req.valid("param");
       await deleteVaultItem(vaultDepsOf(deps), c.get("user").id, orgId, itemId);
       return c.body(null, 204);
-    },
-  );
-
-  app.openapi(
-    createRoute({
-      method: "post",
-      path: "/organizations/{orgId}/vault/items/{itemId}/reveal",
-      tags,
-      security,
-      summary: "Show or copy a login's password or a key's value (recorded)",
-      description:
-        "Who may edit the item (`can.reveal`); 403 otherwise. Recorded as a use and in the audit log (`vault.item_shown`, `vault.item_copied`), never with the value. 400 `vault.no_value` when none is saved; `vault.source.*` when its password manager refuses. 30 a minute per person.",
-      request: { params: ItemParams, body: body(z.object({ purpose: z.enum(["show", "copy"]) })) },
-      responses: { 200: json(z.object({ value: z.string() }).openapi("VaultRevealed")), ...errors, ...tooMany },
-    }),
-    async (c) => {
-      const { orgId, itemId } = c.req.valid("param");
-      const userId = c.get("user").id;
-      await limited(`vault-reveal:${userId}`, REVEALS);
-      const { purpose } = c.req.valid("json");
-      const revealed = await vaultCall(revealVaultItem(vaultDepsOf(deps), userId, orgId, itemId, purpose));
-      noStore(c);
-      return c.json({ value: revealed.value }, 200);
     },
   );
 

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { type VaultSource, VaultSourceError } from "@agenteschat/adapters";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 /*
- * The Vault's routes (ADR 0142): who sees, edits and reveals what, and that no answer but `reveal` ever carries a
- * password or a key.
+ * The Vault's routes (ADR 0142): who sees and edits what, and that no answer ever carries a password or a key: once
+ * saved, a value never comes back to an app (§2).
  */
 
 let t: TestServer;
@@ -33,7 +33,7 @@ interface Item {
   sourceName: string | null;
   accessFromConnection: boolean;
   access: { everyone: boolean; roleIds: string[]; userIds: string[]; allAgents: boolean; agentIds: string[] };
-  can: { edit: boolean; reveal: boolean; delete: boolean };
+  can: { edit: boolean; delete: boolean };
 }
 interface Overview {
   items: Item[];
@@ -41,7 +41,6 @@ interface Overview {
   sources: { kind: string; name: string }[];
   canManageTeam: boolean;
 }
-type Use = { action: string; userId: string | null };
 
 const meId = async (b: Browser) => ((await (await b("/api/app/me")).json()) as { user: { id: string } }).user.id;
 
@@ -71,7 +70,7 @@ async function create(b: Browser, vault: string, input: Record<string, unknown>)
   return { status: res.status, text, item: (res.ok ? JSON.parse(text) : null) as Item | null };
 }
 
-test("team items: who manages credentials creates, edits and reveals; a member sees them without a value", async () => {
+test("team items: who manages credentials creates and edits; a member sees them without a value", async () => {
   const w = await workspace();
   const login = await create(w.owner, w.vault, {
     kind: "login",
@@ -92,7 +91,7 @@ test("team items: who manages credentials creates, edits and reveals; a member s
     hasSecret: true,
     // A new team item: everyone in the workspace sees it, no agent uses it yet.
     access: { everyone: true, allAgents: false, agentIds: [] },
-    can: { edit: true, reveal: true, delete: true },
+    can: { edit: true, delete: true },
   });
   const key = await create(w.owner, w.vault, {
     kind: "key",
@@ -113,27 +112,21 @@ test("team items: who manages credentials creates, edits and reveals; a member s
   expect(seen.text).not.toContain(KEY_VALUE);
   expect(seen.overview.canManageTeam).toBe(false);
   const mine = seen.overview.items.find((i) => i.id === loginId);
-  expect(mine?.can).toEqual({ edit: false, reveal: false, delete: false });
+  expect(mine?.can).toEqual({ edit: false, delete: false });
   expect(seen.overview.items.some((i) => i.id === key.item?.id)).toBe(true);
   const theirs = { kind: "login", scope: "team", title: "Mine", website: "https://acme.example", secret: "pw-x1" };
   expect((await create(w.ana, w.vault, theirs)).status).toBe(403);
   expect((await w.ana(`${w.vault}/items/${loginId}`, { method: "PATCH", json: { title: "Taken" } })).status).toBe(403);
-  expect((await w.ana(`${w.vault}/items/${loginId}/reveal`, { json: { purpose: "show" } })).status).toBe(403);
   expect((await w.ana(`${w.vault}/items/${loginId}`, { method: "DELETE" })).status).toBe(403);
 
-  // Its manager reveals it, recorded as a use and in the audit log, never with the value.
-  const revealed = await w.owner(`${w.vault}/items/${loginId}/reveal`, { json: { purpose: "show" } });
-  expect(revealed.status).toBe(200);
-  expect(revealed.headers.get("cache-control")).toBe("no-store");
-  expect(((await revealed.json()) as { value: string }).value).toBe(PASSWORD);
+  // Not even its manager gets the value back: there is nothing to ask it of (ADR 0142 §2).
+  for (const purpose of ["show", "copy"]) {
+    expect((await w.owner(`${w.vault}/items/${loginId}/reveal`, { json: { purpose } })).status).toBe(404);
+  }
   const detail = await w.owner(`${w.vault}/items/${loginId}`);
   expect(detail.headers.get("cache-control")).toBe("no-store");
-  const detailText = await detail.text();
-  expect(detailText).not.toContain(PASSWORD);
-  const uses = (JSON.parse(detailText) as { uses: Use[] }).uses;
-  expect(uses.some((u) => u.action === "show" && u.userId === w.ownerId)).toBe(true);
+  expect(await detail.text()).not.toContain(PASSWORD);
   const audit = await (await w.owner(`/api/app/organizations/${w.orgId}/audit?kind=change`)).text();
-  expect(audit).toContain("vault.item_shown");
   expect(audit).not.toContain(PASSWORD);
   expect(audit).not.toContain(KEY_VALUE);
 });
@@ -154,7 +147,6 @@ test("a team item shared with some people: only they and its managers see it", a
   expect((await overviewOf(w.ana, w.vault)).overview.items.some((i) => i.id === id)).toBe(false);
   // The same 404 as an item that doesn't exist: nothing says it is there.
   expect((await w.ana(`${w.vault}/items/${id}`)).status).toBe(404);
-  expect((await w.ana(`${w.vault}/items/${id}/reveal`, { json: { purpose: "copy" } })).status).toBe(404);
 
   const shared = await w.owner(`${w.vault}/items/${id}`, {
     method: "PATCH",
@@ -163,8 +155,7 @@ test("a team item shared with some people: only they and its managers see it", a
   expect(shared.status).toBe(200);
   const seen = (await overviewOf(w.ana, w.vault)).overview.items.find((i) => i.id === id);
   expect(seen?.access.userIds).toEqual([w.anaId]);
-  expect(seen?.can.reveal).toBe(false);
-  expect((await w.ana(`${w.vault}/items/${id}/reveal`, { json: { purpose: "copy" } })).status).toBe(403);
+  expect(seen?.can).toEqual({ edit: false, delete: false });
 });
 
 test("personal items are their owner's alone, the workspace's owner included", async () => {
@@ -201,17 +192,12 @@ test("personal items are their owner's alone, the workspace's owner included", a
   expect(ownerView.text).not.toContain("Ana Souza");
   for (const [path, init] of [
     [`${w.vault}/items/${id}`, {}],
-    [`${w.vault}/items/${id}/reveal`, { json: { purpose: "show" } }],
     [`${w.vault}/items/${id}`, { method: "PATCH", json: { title: "Mine now" } }],
     [`${w.vault}/items/${id}`, { method: "DELETE" }],
   ] as const) {
     expect((await w.owner(path, init)).status).toBe(404);
   }
 
-  const copied = await w.ana(`${w.vault}/items/${id}/reveal`, { json: { purpose: "copy" } });
-  expect(((await copied.json()) as { value: string }).value).toBe(TOKEN_VALUE);
-  const uses = ((await (await w.ana(`${w.vault}/items/${id}`)).json()) as { uses: Use[] }).uses;
-  expect(uses.some((u) => u.action === "copy" && u.userId === w.anaId)).toBe(true);
   expect((await w.ana(`${w.vault}/items/${id}`, { method: "DELETE" })).status).toBe(204);
   expect((await w.ana(`${w.vault}/items/${id}`)).status).toBe(404);
 });
@@ -278,8 +264,10 @@ test("Save to the Vault from a request's card: the person asked, a delivered pas
     hasSecret: true,
     access: { allAgents: false, agentIds: [w.agentId] },
   });
-  const value = await w.owner(`${w.vault}/items/${login.id}/reveal`, { json: { purpose: "show" } });
-  expect(((await value.json()) as { value: string }).value).toBe(SITE_PASSWORD);
+  // Sealed in its row, and no app ever gets it back (ADR 0142 §2).
+  const rows = await t.db.select().from(schema.vaultItems).where(eq(schema.vaultItems.id, login.id));
+  expect(rows[0]?.secretCiphertext).toBeTruthy();
+  expect(JSON.stringify(rows)).not.toContain(SITE_PASSWORD);
 
   // A variable becomes a key under its name.
   const env = await request({ name: "ACME_API_KEY" });
@@ -429,8 +417,6 @@ test("a connected password manager: its credentials and passwords never come bac
   expect(seen.text).not.toContain(SOURCE_PASSWORD);
   const external = seen.overview.items.find((i) => i.connectionId === connection.id);
   expect(external).toMatchObject({ kind: "login", sourceName: "AcmePass", accessFromConnection: true });
-  const revealed = await w.owner(`${w.vault}/items/${external?.id}/reveal`, { json: { purpose: "show" } });
-  expect(((await revealed.json()) as { value: string }).value).toBe(SOURCE_PASSWORD);
 
   expect((await w.owner(`${w.vault}/connections/${connection.id}`, { method: "DELETE" })).status).toBe(204);
   const gone = await overviewOf(w.owner, w.vault);

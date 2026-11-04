@@ -28,13 +28,12 @@ import {
   Textarea,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { useVaultItemActions } from "./data";
 import { CONTACT_FIELDS, type ContactField, hostOf, KEY_NAME, KIND_ICON, LIMITS, vaultOrigin } from "./lib";
@@ -43,13 +42,10 @@ import "@/pages/issues.css";
 import "./vault.css";
 
 /*
- * A Vault item, opened (ADR 0142): its fields by kind, the value behind Show / Copy / Change for who may see it, who
+ * A Vault item, opened (ADR 0142): its fields by kind, the value always behind its dots (Change, for who may), who
  * has access in the aside (people, agents, the sentence) and its recent uses. An item from a password manager keeps
  * that manager's fields read-only here: only its note, a key's variable name and its access change in the app.
  */
-
-/** A revealed value goes back behind its dots after this long. */
-const SHOWN_MS = 30_000;
 
 /** The kind's tile (or a connection's, by `icon`): the icon in a neutral square, the same in lists and dialogs. */
 export function VaultTile({ kind, icon, size = "md" }: { kind?: VaultItemKind; icon?: IconName; size?: "md" | "lg" }) {
@@ -301,8 +297,8 @@ export function ItemFields({
 }
 
 /**
- * A saved value behind its dots: Show (for 30 seconds), Copy and Change for who may, each Show and Copy recorded by
- * the server as a use. `value` non-null is a new value being typed in its place.
+ * A saved value, always behind its dots: once saved it never comes back to a screen (ADR 0142 §2). Whoever manages it
+ * types a new one in its place (Change); `value` non-null is that new value being typed.
  */
 function SecretValue({
   item,
@@ -318,15 +314,6 @@ function SecretValue({
   error?: string;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const toast = useToast();
-  const actions = useVaultItemActions(org.id);
-  const [shown, setShown] = useState<string | null>(null);
-  useEffect(() => {
-    if (shown === null) return;
-    const timer = setTimeout(() => setShown(null), SHOWN_MS);
-    return () => clearTimeout(timer);
-  }, [shown]);
   const label = t(item.kind === "login" ? "vault.field.password" : "vault.field.value");
   if (value !== null)
     return (
@@ -347,25 +334,12 @@ function SecretValue({
         </span>
       </Field>
     );
-  const reveal = async () => {
-    if (shown !== null) return setShown(null);
-    const v = await actions.reveal(item.id, "show");
-    if (v !== null) setShown(v);
-  };
-  const copy = async () => {
-    const v = await actions.reveal(item.id, "copy");
-    if (v !== null) await copyText(v, () => toast.show(t("common.copied")));
-  };
   return (
     <div className="ac-field">
       <span className="ac-field__label">{label}</span>
       {/* biome-ignore lint/a11y/useSemanticElements: the value and what acts on it, named as one */}
       <div className="vlt-secret" role="group" aria-label={label}>
-        {shown !== null ? (
-          <span className="vlt-secret__value" data-code={item.kind === "key" || undefined}>
-            {shown}
-          </span>
-        ) : item.hasSecret ? (
+        {item.hasSecret ? (
           <span className="vlt-secret__value">
             <span className="vlt-secret__dots" aria-hidden="true">
               ••••••••••
@@ -377,22 +351,6 @@ function SecretValue({
           <span className="vlt-secret__value vlt-secret__value--none">{t("vault.item.noValue")}</span>
         )}
         <span className="vlt-secret__acts">
-          {item.can.reveal && item.hasSecret && (
-            <>
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={shown !== null ? "eyeOff" : "eye"}
-                disabled={actions.revealing}
-                onClick={() => void reveal()}
-              >
-                {shown !== null ? t("vault.item.hide") : t("vault.item.show")}
-              </Button>
-              <Button size="sm" variant="ghost" icon="copy" disabled={actions.revealing} onClick={() => void copy()}>
-                {t("common.copy")}
-              </Button>
-            </>
-          )}
           {canChange && (
             <Button size="sm" variant="ghost" icon="edit" onClick={() => onValue("")}>
               {item.hasSecret ? t("vault.item.change") : t("vault.item.add")}
@@ -403,7 +361,7 @@ function SecretValue({
       {error ? (
         <span className="ac-field__error">{error}</span>
       ) : (
-        item.can.reveal && item.hasSecret && <span className="ac-field__help">{t("vault.item.revealHelp")}</span>
+        canChange && item.hasSecret && <span className="ac-field__help">{t("vault.item.sealedHelp")}</span>
       )}
     </div>
   );

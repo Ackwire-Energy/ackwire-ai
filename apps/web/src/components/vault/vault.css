@@ -246,11 +246,6 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   gap: 10px;
   font-size: 14px;
   overflow-wrap: anywhere;
-  user-select: all;
-}
-.vlt-secret__value[data-code] {
-  font-family: var(--font-mono);
-  font-size: 13px;
 }
 .vlt-secret__value--none {
   color: var(--faint);

@@ -1,8 +1,8 @@
 /**
- * The Vault for people (ADR 0142): what the app's Settings, Vault lists, saves, changes, shows and deletes. Every
+ * The Vault for people (ADR 0142): what the app's Settings, Vault lists, saves, changes and deletes. Every
  * function checks the person itself (`access.ts`): an item they may not see is `NotFoundError`, the same as one that
  * doesn't exist, and what they see but don't manage is `ForbiddenError`. Values are sealed before any write
- * (`seal.ts`), and only `revealVaultItem` answers with one, recorded as a use and in the audit log.
+ * (`seal.ts`) and never come back to a person: no answer carries one, and changing one means typing a new one (§2).
  */
 import { isReservedSecretName, MAX_SECRET_BYTES, SECRET_NAME, vaultOrigin } from "@agenteschat/adapters";
 import { and, count, type Database, type Executor, eq, isNull, schema } from "@agenteschat/db";
@@ -20,7 +20,7 @@ import {
   viewerManages,
   viewerSees,
 } from "./access";
-import { readItemValue, sealItemValue } from "./seal";
+import { sealItemValue } from "./seal";
 import {
   CONTACT_FIELDS,
   VAULT_ITEM_KINDS,
@@ -76,7 +76,7 @@ export async function visibleItem(db: Executor, orgId: string, itemId: string, v
   return { item, connection };
 }
 
-/** An item the person manages (edits, reveals, deletes). Seen but not managed is forbidden. */
+/** An item the person manages (edits, deletes). Seen but not managed is forbidden. */
 async function managedItem(db: Executor, orgId: string, itemId: string, viewer: VaultViewer) {
   const found = await visibleItem(db, orgId, itemId, viewer);
   if (!viewerManages(found.item.ownerUserId, viewer)) throw new ForbiddenError();
@@ -520,32 +520,4 @@ export async function deleteVaultItem(deps: VaultDeps, userId: string, orgId: st
     await auditItem(tx, orgId, userId, "vault.item_deleted", item);
   });
   await publishVaultChanged(deps.pubsub, orgId);
-}
-
-/**
- * A login's password or a key's value, for the person who manages it to see or copy: recorded as a use and in the
- * audit log (`vault.item_shown`, `vault.item_copied`), never with the value. A source's refusal throws its
- * `VaultSourceError`. A use alone isn't a change to the Vault: no `vault.changed` goes to every open app for it
- * (ADR 0142 §7), and the person's own app refetches the item it shows.
- */
-export async function revealVaultItem(
-  deps: VaultDeps,
-  userId: string,
-  orgId: string,
-  itemId: string,
-  purpose: "show" | "copy",
-): Promise<{ value: string }> {
-  if (purpose !== "show" && purpose !== "copy") throw new ValidationError("Unknown purpose", "vault.invalid");
-  const { db } = deps;
-  const viewer = await vaultViewer(db, userId, orgId);
-  const { item, connection } = await managedItem(db, orgId, itemId, viewer);
-  if (item.kind === "contact") throw new ValidationError("A contact has no value to show", "vault.no_value");
-  if (item.missing) throw new ValidationError("It is gone from its password manager", "vault.missing");
-  const value = await readItemValue(deps, item, connection);
-  if (value === null) throw new ValidationError("Nothing is saved", "vault.no_value");
-  await db.transaction(async (tx) => {
-    await recordPersonUse(tx, { orgId, itemId: item.id, userId, action: purpose });
-    await auditItem(tx, orgId, userId, purpose === "show" ? "vault.item_shown" : "vault.item_copied", item);
-  });
-  return { value };
 }

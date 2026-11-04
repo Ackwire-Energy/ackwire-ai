@@ -439,8 +439,6 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       update: (orgId, itemId, patch) =>
         request<VaultItem>(`${org(orgId)}/vault/items/${enc(itemId)}`, { method: "PATCH", json: patch }),
       remove: (orgId, itemId) => request<void>(`${org(orgId)}/vault/items/${enc(itemId)}`, { method: "DELETE" }),
-      reveal: (orgId, itemId, purpose) =>
-        request<{ value: string }>(`${org(orgId)}/vault/items/${enc(itemId)}/reveal`, { json: { purpose } }),
       importCsv: (orgId, input) => request<VaultImportResult>(`${org(orgId)}/vault/import`, { json: input }),
       connect: (orgId, input) => request<VaultConnection>(`${org(orgId)}/vault/connections`, { json: input }),
       updateConnection: (orgId, connectionId, patch) =>

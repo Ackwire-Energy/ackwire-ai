@@ -1,6 +1,6 @@
 /**
- * The Vault as the apps see it (ADR 0142). Never a password or a key: only `reveal` answers with one, to a person
- * who manages the item, and that is recorded as a use.
+ * The Vault as the apps see it (ADR 0142). Never a password or a key: once saved, a value never comes back to an app
+ * (§2); only agents' computers get one, sealed for them.
  */
 
 export type VaultItemKind = "login" | "key" | "contact";
@@ -72,10 +72,10 @@ export interface VaultItem {
   createdAt: string;
   updatedAt: string;
   /** What the viewer may do with it. */
-  can: { edit: boolean; reveal: boolean; delete: boolean };
+  can: { edit: boolean; delete: boolean };
 }
 
-export type VaultUseAction = "fill" | "key" | "read" | "show" | "copy" | "create" | "edit";
+export type VaultUseAction = "fill" | "key" | "read" | "create" | "edit";
 
 export interface VaultUse {
   id: string;

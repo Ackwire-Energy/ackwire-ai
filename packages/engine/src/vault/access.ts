@@ -3,10 +3,10 @@
  * tools' (agents). Items are few per workspace, so callers load them (`VAULT_MAX_ITEMS`) and filter here in code.
  *
  * People:
- * - A personal item or connection is its owner's alone: they see, edit, reveal and delete it. Admins don't see
+ * - A personal item or connection is its owner's alone: they see, edit and delete it. Admins don't see
  *   anyone else's.
  * - A team item is seen by whoever manages credentials (`manage_credentials`) and by its audience (everyone, its
- *   roles, its people). Only those who manage credentials edit, reveal or delete it, and only they see and change
+ *   roles, its people). Only those who manage credentials edit or delete it, and only they see and change
  *   team connections.
  *
  * Agents: the person behind the run (the one who asked, else a routine's creator, else nobody), counted only while
@@ -80,7 +80,7 @@ export function viewerSees(ownerUserId: string | null, columns: AccessColumns, v
   return viewer.manages || inAudience(columns, viewer);
 }
 
-/** Whether a person edits, reveals and deletes an item, or sees and changes a connection. */
+/** Whether a person edits and deletes an item, or sees and changes a connection. */
 export function viewerManages(ownerUserId: string | null, viewer: VaultViewer): boolean {
   return ownerUserId ? ownerUserId === viewer.userId : viewer.manages;
 }

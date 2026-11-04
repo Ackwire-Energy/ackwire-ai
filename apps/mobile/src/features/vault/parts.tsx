@@ -1,31 +1,18 @@
-import { useRevealVaultItem, useRoles, type VaultAccess, type VaultScope } from "@agenteschat/client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRoles, type VaultAccess, type VaultScope } from "@agenteschat/client";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, TextInput, type TextInputProps, View } from "react-native";
-import {
-  Button,
-  fieldText,
-  GroupedField,
-  GroupedFooter,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  Text,
-  useToast,
-} from "@/ui";
+import { StyleSheet, TextInput, type TextInputProps, View } from "react-native";
+import { Button, fieldText, GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
-import { ActionList, copyText, MONO, successHaptic } from "../shared/parts";
+import { ActionList, MONO } from "../shared/parts";
 import { agentOn, type Names, toggleAgent } from "./logic";
 
 /*
  * What the Vault's screens share (ADR 0142): names for the summaries, a field row, the scope choice, the agents'
- * switches, and a saved value with Show and Copy.
+ * switches, and a saved value, always behind its dots.
  */
-
-/** How long a shown value stays on screen before it hides again. */
-const SHOWN_MS = 30_000;
 
 /** Agents', roles' and people's names for the summaries (unknown ones still read as someone). */
 export function useVaultNames(): Names {
@@ -237,97 +224,23 @@ export function AgentPickSheet({
   );
 }
 
-/**
- * A saved password or key, hidden: "Show" for 30 seconds and "Copy", for who may (each one recorded as a use on the
- * item). The value is asked of the server at that moment and kept only while it shows, never in a cache. A key shows
- * in code type (`code`); a password in the text's own.
- */
-export function SavedValue({
-  itemId,
-  label,
-  canReveal,
-  code = false,
-}: {
-  itemId: string;
-  label: string;
-  canReveal: boolean;
-  code?: boolean;
-}) {
+/** A saved password or key, always hidden: once saved, it never comes back to a screen (ADR 0142 §2). */
+export function SavedValue({ label }: { label: string }) {
   const { t } = useTranslation();
-  const toast = useToast();
-  const reveal = useRevealVaultItem(useOrgId());
-  const [shown, setShown] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"show" | "copy" | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-  // Hidden again: the value leaves the screen and the request that brought it.
-  const hide = () => {
-    if (timer.current) clearTimeout(timer.current);
-    setShown(null);
-    reveal.reset();
-  };
-  const ask = async (purpose: "show" | "copy") => {
-    setBusy(purpose);
-    try {
-      const { value } = await reveal.mutateAsync({ itemId, purpose });
-      if (purpose === "show") {
-        setShown(value);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(hide, SHOWN_MS);
-      } else {
-        const copied = await copyText(value);
-        reveal.reset();
-        if (copied) {
-          successHaptic();
-          toast({ title: t("mobile.vault.item.copied"), icon: "copy" });
-        }
-      }
-    } catch {
-      toast({ title: t("mobile.app.failed"), icon: "x" });
-    } finally {
-      setBusy(null);
-    }
-  };
   return (
     <GroupedField label={label}>
       <View style={styles.valueRow}>
         <Text
           variant="callout"
-          selectable={shown !== null}
-          numberOfLines={shown ? 3 : 1}
-          style={[styles.grow, shown && code ? styles.mono : null]}
-          accessibilityLabel={shown ? undefined : t("mobile.vault.item.hidden")}
+          numberOfLines={1}
+          style={styles.grow}
+          accessibilityLabel={t("mobile.vault.item.hidden")}
         >
-          {shown ?? "••••••••••"}
+          ••••••••••
         </Text>
-        {canReveal ? (
-          <>
-            <Pressable
-              onPress={() => (shown ? hide() : void ask("show"))}
-              disabled={busy !== null}
-              accessibilityRole="button"
-              hitSlop={8}
-            >
-              <Text variant="subhead" tone={busy === "show" ? "faint" : "ink2"} style={styles.action}>
-                {shown ? t("mobile.vault.item.hide") : t("mobile.vault.item.show")}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => void ask("copy")} disabled={busy !== null} accessibilityRole="button" hitSlop={8}>
-              <Text variant="subhead" tone={busy === "copy" ? "faint" : "ink2"} style={styles.action}>
-                {t("common.copy")}
-              </Text>
-            </Pressable>
-          </>
-        ) : (
-          <Text variant="footnote" tone="faint">
-            {t("mobile.vault.item.saved")}
-          </Text>
-        )}
+        <Text variant="footnote" tone="faint">
+          {t("mobile.vault.item.saved")}
+        </Text>
       </View>
     </GroupedField>
   );
@@ -339,5 +252,4 @@ const styles = StyleSheet.create({
   mono: { fontFamily: MONO, fontSize: 14 },
   grow: { flex: 1, minWidth: 0 },
   valueRow: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: 50 },
-  action: { fontWeight: "600" },
 });

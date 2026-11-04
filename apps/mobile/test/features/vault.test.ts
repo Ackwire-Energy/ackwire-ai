@@ -98,7 +98,7 @@ const item = (over: Partial<VaultItem> & { id: string }): VaultItem => ({
   lastUsedAt: null,
   createdAt: minutesAgo(600),
   updatedAt: minutesAgo(600),
-  can: { edit: true, reveal: true, delete: true },
+  can: { edit: true, delete: true },
   ...over,
 });
 
@@ -380,7 +380,7 @@ describe("recent uses", () => {
     expect(usageWords(t, use({ agentId: "a1", origin: "https://github.com" }), names)).toBe(
       'mobile.vault.use.fillOn{"name":"Dev","host":"github.com"}',
     );
-    expect(usageWords(t, use({ action: "copy", userId: "u1" }), names)).toBe('mobile.vault.use.copy{"name":"Ana"}');
+    expect(usageWords(t, use({ action: "edit", userId: "u1" }), names)).toBe('mobile.vault.use.edit{"name":"Ana"}');
     expect(usageWords(t, use({ action: "key", agentId: "a2" }), names)).toBe('mobile.vault.use.key{"name":"Infra"}');
     expect(usageFacts(t, "en", use({ agentId: "a1", onBehalfOfUserId: "u2" }), names, NOW)).toStartWith(
       'mobile.vault.use.for{"name":"Bruno"} · ',
@@ -388,7 +388,7 @@ describe("recent uses", () => {
     expect(usageFacts(t, "en", use({ agentId: "a1", routineName: "Daily report" }), names, NOW)).toStartWith(
       'mobile.vault.use.routine{"name":"Daily report"} · ',
     );
-    expect(usageFacts(t, "en", use({ action: "show", userId: "u1" }), names, NOW)).not.toContain(" · ");
+    expect(usageFacts(t, "en", use({ action: "edit", userId: "u1" }), names, NOW)).not.toContain(" · ");
   });
 });
 

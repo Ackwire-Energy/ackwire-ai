@@ -8,7 +8,6 @@ import {
   enqueueVaultSyncs,
   getVaultItem,
   listVault,
-  revealVaultItem,
   runVaultSync,
   syncVaultConnection,
   updateVaultConnection,
@@ -18,7 +17,14 @@ import {
   type VaultAccess,
 } from "../src";
 import { sourceConnection, sourceOf } from "../src/vault/seal";
-import { everythingStored, SOURCE_PASSWORD, SOURCE_TOKEN, type VaultFixture, vaultSetup } from "./vault-fixtures";
+import {
+  everythingStored,
+  SOURCE_PASSWORD,
+  SOURCE_TOKEN,
+  storedValue,
+  type VaultFixture,
+  vaultSetup,
+} from "./vault-fixtures";
 
 /**
  * Password managers in the Vault (ADR 0142): connecting checks the credentials and reads the items before it answers;
@@ -327,7 +333,7 @@ describe("syncing", () => {
       access: { everyone: false, roleIds: [v.supportRoleId], userIds: [], allAgents: true, agentIds: [] },
     });
     expect(changed).toMatchObject({ accessFromConnection: false, access: { roleIds: [v.supportRoleId] } });
-    expect(await revealVaultItem(v.deps, v.carla.id, v.f.org.id, row.id, "show")).toEqual({ value: SOURCE_PASSWORD });
+    expect(await storedValue(v, row.id)).toBe(SOURCE_PASSWORD);
     // Back to the connection's access.
     const back = await updateVaultItem(v.deps, v.carla.id, v.f.org.id, row.id, { accessFromConnection: true });
     expect(back).toMatchObject({ accessFromConnection: true, access: { everyone: true } });

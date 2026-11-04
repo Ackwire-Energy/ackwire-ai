@@ -196,9 +196,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
             autoCapitalize="characters"
           />
         ) : null}
-        {hasValue && item.hasSecret ? (
-          <SavedValue itemId={item.id} label={valueLabel} canReveal={item.can.reveal} code={item.kind === "key"} />
-        ) : null}
+        {hasValue && item.hasSecret ? <SavedValue label={valueLabel} /> : null}
         {item.kind === "contact"
           ? CONTACT_FIELDS.map((field) => (
               <InputField
@@ -217,6 +215,8 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
         <GroupedFooter>{t("mobile.vault.item.externalText", { name: item.sourceName ?? "" })}</GroupedFooter>
       ) : hasValue && !item.hasSecret ? (
         <GroupedFooter>{t("mobile.vault.item.noValue")}</GroupedFooter>
+      ) : hasValue && ownFields ? (
+        <GroupedFooter>{t("mobile.vault.item.sealedHelp")}</GroupedFooter>
       ) : null}
 
       {hasValue && ownFields ? (

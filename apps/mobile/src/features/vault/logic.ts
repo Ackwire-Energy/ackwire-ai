@@ -430,7 +430,7 @@ export interface UseNames {
   person: (id: string) => string;
 }
 
-/** Who did what: "Dev, on github.com", "Dev used it in a command", "Ana showed it". */
+/** Who did what: "Dev, on github.com", "Dev used it in a command", "Ana changed it". */
 export function usageWords(t: TFunction, use: VaultUse, names: UseNames): string {
   const agent = use.agentId ? names.agent(use.agentId) : "";
   const person = use.userId ? names.person(use.userId) : "";
@@ -444,10 +444,6 @@ export function usageWords(t: TFunction, use: VaultUse, names: UseNames): string
       return t("mobile.vault.use.key", { name });
     case "read":
       return t("mobile.vault.use.read", { name });
-    case "show":
-      return t("mobile.vault.use.show", { name });
-    case "copy":
-      return t("mobile.vault.use.copy", { name });
     case "create":
       return t("mobile.vault.use.create", { name });
     case "edit":

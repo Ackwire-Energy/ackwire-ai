@@ -1,6 +1,6 @@
 /**
  * Every use of a Vault item (ADR 0142): a row in `vault_uses` (the item's "Recent uses") and, for what an agent typed
- * or gave to a command and what a person showed or copied, a line in the audit log. Never the value. A login's
+ * or gave to a command, a line in the audit log. Never the value. A login's
  * place is kept as its origin only: a page's path or query may carry a token.
  */
 import { vaultOrigin } from "@agenteschat/adapters";
@@ -8,7 +8,14 @@ import { and, desc, type Executor, eq, inArray, type SQL, schema, sql } from "@a
 import { recordAudit } from "../audit";
 import { UUID } from "../authority";
 import { type VaultRunPerson, vaultPersonOfRun } from "./access";
-import { type VaultDeps, type VaultRun, type VaultUse, type VaultUseAction, vaultNow } from "./service";
+import {
+  VAULT_USE_ACTIONS,
+  type VaultDeps,
+  type VaultRun,
+  type VaultUse,
+  type VaultUseAction,
+  vaultNow,
+} from "./service";
 
 const { routines, vaultItems, vaultUses } = schema;
 
@@ -19,9 +26,9 @@ function routineRef(orgId: string, routineId: string | null): SQL | null {
     where ${routines.id} = ${routineId}::uuid and ${routines.orgId} = ${orgId}::uuid)`;
 }
 
-type PersonUse = Extract<VaultUseAction, "show" | "copy" | "create" | "edit">;
+type PersonUse = Extract<VaultUseAction, "create" | "edit">;
 
-/** What a person did with an item (show, copy, create, edit), in the caller's transaction. */
+/** What a person did with an item (create, edit), in the caller's transaction. */
 export async function recordPersonUse(
   db: Executor,
   input: { orgId: string; itemId: string; userId: string; action: PersonUse },
@@ -163,7 +170,10 @@ export async function listUses(db: Executor, orgId: string, itemId: string, limi
     })
     .from(vaultUses)
     .leftJoin(routines, eq(routines.id, vaultUses.routineId))
-    .where(and(eq(vaultUses.orgId, orgId), eq(vaultUses.itemId, itemId)))
+    // Only the actions this version records: a row of any other kind isn't listed.
+    .where(
+      and(eq(vaultUses.orgId, orgId), eq(vaultUses.itemId, itemId), inArray(vaultUses.action, [...VAULT_USE_ACTIONS])),
+    )
     .orderBy(desc(vaultUses.createdAt), desc(vaultUses.id))
     .limit(limit);
   return rows.map((r) => ({

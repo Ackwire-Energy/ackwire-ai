@@ -4424,6 +4424,9 @@
   "vault.item.noValue": {
     "value": "No value is saved yet."
   },
+  "vault.item.sealedHelp": {
+    "value": "For safety, what's saved here never shows again. To change it, type it again."
+  },
   "vault.item.changePassword": {
     "value": "Change password"
   },
@@ -4433,20 +4436,11 @@
   "vault.item.changeHelp": {
     "value": "Tap Save to keep it. Agents use the new one from then on."
   },
-  "vault.item.show": {
-    "value": "Show"
-  },
-  "vault.item.hide": {
-    "value": "Hide"
-  },
   "vault.item.hidden": {
     "value": "Hidden"
   },
   "vault.item.saved": {
     "value": "Saved"
-  },
-  "vault.item.copied": {
-    "value": "Copied. Paste it where you need it."
   },
   "vault.item.delete": {
     "value": "Delete"
@@ -4726,12 +4720,6 @@
   },
   "vault.use.read": {
     "value": "{{name}} read it"
-  },
-  "vault.use.show": {
-    "value": "{{name}} showed it"
-  },
-  "vault.use.copy": {
-    "value": "{{name}} copied it"
   },
   "vault.use.create": {
     "value": "{{name}} saved it"

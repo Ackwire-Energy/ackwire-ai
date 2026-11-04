@@ -110,8 +110,6 @@ const VAULT_ACTIONS = [
   "item_created",
   "item_changed",
   "item_deleted",
-  "item_shown",
-  "item_copied",
   "item_used",
   "imported",
   "connection_added",

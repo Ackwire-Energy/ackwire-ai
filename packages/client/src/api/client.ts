@@ -1652,9 +1652,8 @@ export interface ApiClient {
   };
   /**
    * The Vault (ADR 0142): logins, keys and contacts agents use without seeing a password or a key. No answer carries
-   * a value but `reveal`'s, to who may edit the item, and that is recorded. Personal items are their owner's alone;
-   * team items take `manage_credentials` to create, edit and reveal. Optional so older fakes type-check
-   * (`createHttpApi` has it).
+   * a value: once saved, it never comes back to an app (§2). Personal items are their owner's alone; team items take
+   * `manage_credentials` to create and edit. Optional so older fakes type-check (`createHttpApi` has it).
    */
   vault?: {
     overview(orgId: string): Promise<VaultOverview>;
@@ -1663,8 +1662,6 @@ export interface ApiClient {
     create(orgId: string, input: VaultItemInput): Promise<VaultItem>;
     update(orgId: string, itemId: string, patch: VaultItemPatch): Promise<VaultItem>;
     remove(orgId: string, itemId: string): Promise<void>;
-    /** "Show" or "Copy": the password or the key's value, recorded as a use. 429 past 30 a minute. */
-    reveal(orgId: string, itemId: string, purpose: "show" | "copy"): Promise<{ value: string }>;
     /** A passwords file's text; `dryRun` only counts. 413 `vault.csv_too_large` past 2 MB. */
     importCsv(orgId: string, input: { csv: string; scope: VaultScope; dryRun: boolean }): Promise<VaultImportResult>;
     /** Checked with the password manager first: 400 `vault.source.<code>` when it refuses. */

@@ -1,16 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
-import {
-  createVaultItem,
-  deleteVaultItem,
-  getVaultItem,
-  listVault,
-  revealVaultItem,
-  updateVaultItem,
-  type VaultAccess,
-} from "../src";
+import { createVaultItem, deleteVaultItem, getVaultItem, listVault, updateVaultItem, type VaultAccess } from "../src";
 import { itemAad, openItemValue } from "../src/vault/seal";
-import { everythingStored, type VaultFixture, vaultSetup } from "./vault-fixtures";
+import { everythingStored, storedValue, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
  * Vault items for people (ADR 0142): saved sealed and bound to their workspace, id, owner and version; never a value
@@ -67,7 +59,7 @@ describe("saving", () => {
       connectionId: null,
       // A personal item has no audience, whatever was sent.
       access: { everyone: false, roleIds: [], userIds: [], allAgents: true, agentIds: [] },
-      can: { edit: true, reveal: true, delete: true },
+      can: { edit: true, delete: true },
     });
     const row = await rowOf(item.id);
     expect(row.secretVersion).toBe(1);
@@ -199,7 +191,7 @@ describe("sealing", () => {
 
     // The row handed to another person in the database: it no longer opens, even for them.
     await v.f.db.update(schema.vaultItems).set({ ownerUserId: v.dora.id }).where(eq(schema.vaultItems.id, item.id));
-    await expect(revealVaultItem(v.deps, v.dora.id, v.f.org.id, item.id, "show")).rejects.toThrow();
+    await expect(storedValue(v, item.id)).rejects.toThrow();
   });
 
   test("a new value takes the next version, and the old ciphertext put back doesn't open", async () => {
@@ -271,7 +263,7 @@ describe("changing, showing, deleting", () => {
     expect(audit?.details).toMatchObject({ kind: "login", title: "Status page", fields: expect.any(Array) });
   });
 
-  test("showing and copying: who manages it, recorded as a use and in the audit log, never with the value", async () => {
+  test("a saved value never comes back to a person: their screens learn it is saved, agents' computers get it", async () => {
     v = await vaultSetup();
     const item = await createVaultItem(v.deps, v.carla.id, v.f.org.id, {
       kind: "login",
@@ -280,53 +272,22 @@ describe("changing, showing, deleting", () => {
       website: "https://bank.example.com",
       secret: PASSWORD,
     });
-    await expect(revealVaultItem(v.deps, v.dora.id, v.f.org.id, item.id, "show")).rejects.toMatchObject({
-      name: "ForbiddenError",
-    });
-    const changes = () =>
-      v.events.filter((e) => (e as { event?: { type?: string } }).event?.type === "vault.changed").length;
-    const before = changes();
-    expect(await revealVaultItem(v.deps, v.carla.id, v.f.org.id, item.id, "show")).toEqual({ value: PASSWORD });
-    expect(await revealVaultItem(v.deps, v.ana.id, v.f.org.id, item.id, "copy")).toEqual({ value: PASSWORD });
-    // A use alone isn't a change: no app reloads the Vault for it (ADR 0142 §7).
-    expect(changes()).toBe(before);
     const detail = await getVaultItem(v.deps, v.carla.id, v.f.org.id, item.id);
-    expect(detail.uses.map((u) => [u.action, u.userId])).toEqual([
-      ["copy", v.ana.id],
-      ["show", v.carla.id],
-      ["create", v.carla.id],
-    ]);
-    // Someone who only sees it doesn't see who used it.
-    expect((await getVaultItem(v.deps, v.dora.id, v.f.org.id, item.id)).uses).toEqual([]);
-    const actions = (await v.f.db.select().from(schema.auditLog).where(eq(schema.auditLog.targetId, item.id))).map(
-      (a) => a.action,
-    );
-    expect(actions.sort()).toEqual(["vault.item_copied", "vault.item_created", "vault.item_shown"]);
-    const shown = await v.f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "vault.item_shown"));
-    expect(shown[0]?.details).toMatchObject({ title: "Bank" });
-
-    const contact = await createVaultItem(v.deps, v.carla.id, v.f.org.id, {
-      kind: "contact",
-      scope: "team",
-      title: "Acme",
-      contact: { company: "Acme" },
-    });
-    await expect(revealVaultItem(v.deps, v.carla.id, v.f.org.id, contact.id, "show")).rejects.toMatchObject({
-      code: "vault.no_value",
-    });
-    const empty = await createVaultItem(v.deps, v.carla.id, v.f.org.id, {
-      kind: "login",
-      scope: "team",
-      title: "No password yet",
-      website: "https://new.example.com",
-    });
-    expect(empty.hasSecret).toBe(false);
-    await expect(revealVaultItem(v.deps, v.carla.id, v.f.org.id, empty.id, "show")).rejects.toMatchObject({
-      code: "vault.no_value",
-    });
+    expect(detail.hasSecret).toBe(true);
+    expect(detail.can).toEqual({ edit: true, delete: true });
+    expect(JSON.stringify(detail)).not.toContain(PASSWORD);
+    // Nothing in the engine answers a person with a value (ADR 0142 §2).
+    const engine = await import("../src");
+    expect(Object.keys(engine).filter((name) => /vault/i.test(name) && /reveal|show|copy/i.test(name))).toEqual([]);
+    // Someone who only sees it can't change it, and doesn't see who used it.
+    const seen = await getVaultItem(v.deps, v.dora.id, v.f.org.id, item.id);
+    expect(seen.can).toEqual({ edit: false, delete: false });
+    expect(seen.uses).toEqual([]);
+    // Agents still use it: the server opens it only to seal it for their computer.
+    expect(await storedValue(v, item.id)).toBe(PASSWORD);
   });
 
-  test("no value anywhere but reveal's answer: lists, details, audit, uses, jobs, events", async () => {
+  test("no value anywhere: lists, details, audit, uses, jobs, events", async () => {
     v = await vaultSetup();
     const login = await createVaultItem(v.deps, v.ana.id, v.f.org.id, {
       kind: "login",
@@ -343,7 +304,6 @@ describe("changing, showing, deleting", () => {
       secret: KEY,
     });
     await updateVaultItem(v.deps, v.ana.id, v.f.org.id, key.id, { secret: `${KEY}-rotated` });
-    await revealVaultItem(v.deps, v.ana.id, v.f.org.id, login.id, "copy");
     const views = JSON.stringify([
       await listVault(v.deps, v.ana.id, v.f.org.id),
       await getVaultItem(v.deps, v.ana.id, v.f.org.id, login.id),

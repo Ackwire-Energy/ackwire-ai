@@ -41,7 +41,7 @@ A code from a text message or an email is asked of the person when it's needed (
 
 ### 2. Personal or the team's, and one rule for use
 
-Each item is **personal** (its owner alone sees, edits, shows and deletes it) or **the team's** (created and edited
+Each item is **personal** (its owner alone sees, edits and deletes it) or **the team's** (created and edited
 with `manage_credentials`; its audience, everyone or roles or people, says who sees it). Each item also lists the
 agents that may use it, or all of them.
 
@@ -53,6 +53,12 @@ An agent may use an item in a run when:
 The check runs at every use, with no cache: someone who leaves a role or the workspace stops counting at once. A
 person who leaves takes their personal items and connections with them. New team items start open to everyone and
 to no agent; an item saved from a request card starts with the agent that asked.
+
+**A saved value never comes back to a person.** Once a password or a key is saved, no answer carries it to anyone:
+not its owner, not the people who manage credentials. An item's page says one is saved (a key, by its last four
+characters), and changing it means typing a new one. Only an agent's computer gets it, sealed for one use (§4), so a
+value leaves a person's screen once, as it is typed, and never comes back to one. A contact isn't a secret:
+whoever sees the item reads it.
 
 Two narrower rules:
 - **Routines type logins but give no key to a command.** A run a routine feeds (ADR 0053 §3: its own run, or one its
@@ -176,12 +182,12 @@ In Portuguese the feature is called **Cofre**; every other language keeps **Vaul
 
 Settings › Vault, on the web and the phone: Team, Personal and Connections, each item with who may use it and its
 last use (a contact by its title and description: the list carries no contact's details, so it opens no contact's
-seal); an item's page with its fields (shown or copied only by who manages it, and recorded; a contact whose saved
+seal); an item's page with its fields (a password or a key always behind its dots, §2; a contact whose saved
 details don't open on this server says so, and is never changed on top of nothing, for a person to save them again),
 who has access in one sentence and its recent uses; a new item by kind; a CSV import from a browser or password manager export (web),
 which keeps nothing of the file; and one card per source to connect, generated from what the source describes.
 The apps reload the Vault on `vault.changed`, sent when an item, a connection or an access changes, never for a use
-alone (a fill, a key, a read, a show or a copy): agents at work don't make every open app reload it.
+alone (a fill, a key or a read): agents at work don't make every open app reload it.
 
 ## Consequences
 

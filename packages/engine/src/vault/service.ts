@@ -3,9 +3,9 @@
  * the engine and the API see: the dependencies, the shapes people and agents get, and the inputs they send. The
  * shapes match `packages/client/src/vault/types.ts`, so a route hands them over as they are.
  *
- * A value (a password, a key) never appears in any of these shapes: only `revealVaultItem` answers with one, to a
- * person who manages the item, and agents get one only through `releaseVaultLogin`/`releaseVaultKeys`, on their way
- * into a box sealed for their own computer.
+ * A value (a password, a key) never appears in any of these shapes, nor in any answer to a person once it is saved
+ * (§2): agents get one only through `releaseVaultLogin`/`releaseVaultKeys`, on their way into a box sealed for their
+ * own computer.
  */
 import type { KeyWrapper, PubSub, VaultMatch, VaultOriginRule, VaultSources } from "@agenteschat/adapters";
 import type { Database } from "@agenteschat/db";
@@ -103,10 +103,12 @@ export interface VaultItem {
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  can: { edit: boolean; reveal: boolean; delete: boolean };
+  can: { edit: boolean; delete: boolean };
 }
 
-export type VaultUseAction = "fill" | "key" | "read" | "show" | "copy" | "create" | "edit";
+/** What a use records: an agent's fill, key or read, a person's or an agent's create or edit. */
+export const VAULT_USE_ACTIONS = ["fill", "key", "read", "create", "edit"] as const;
+export type VaultUseAction = (typeof VAULT_USE_ACTIONS)[number];
 
 export interface VaultUse {
   id: string;
