@@ -148,7 +148,9 @@ export const ApprovalRule = z
 
 const ApprovalParams = OrgParams.extend({ approvalId: z.uuid() });
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
-const Decision = z.object({ reason: z.string().max(1000).optional() });
+/** The card it was decided from, for the audit's "via" (ADR 0137 §4): ignored unless that card lists it. */
+const Via = z.uuid().optional().openapi({ description: "The right hand's approvals card it was decided from." });
+const Decision = z.object({ reason: z.string().max(1000).optional(), via: Via });
 const Approve = Decision.extend({
   always: z.boolean().optional().openapi({
     description:
@@ -220,6 +222,7 @@ export function approvalRoutes(deps: AppDeps) {
             ids: z.array(z.uuid()).min(1).max(50),
             decision: z.enum(["approve", "refuse"]),
             reason: z.string().max(1000).optional(),
+            via: Via,
           }),
         ),
       },
@@ -266,7 +269,7 @@ export function approvalRoutes(deps: AppDeps) {
       }),
       async (c) => {
         const { orgId, approvalId } = c.req.valid("param");
-        const input: { reason?: string; always?: boolean } = c.req.valid("json");
+        const input: { reason?: string; always?: boolean; via?: string } = c.req.valid("json");
         const view = await decideApproval(
           {
             db,
@@ -276,7 +279,7 @@ export function approvalRoutes(deps: AppDeps) {
           c.get("user").id,
           orgId,
           approvalId,
-          { decision, reason: input.reason, always: decision === "approve" && input.always === true },
+          { decision, reason: input.reason, always: decision === "approve" && input.always === true, via: input.via },
         );
         deps.wakeWorkers?.();
         return c.json(view, 200);

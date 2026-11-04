@@ -1847,6 +1847,23 @@
       "deleteSome_one": "{{count}} löschen",
       "deleteSome_other": "{{count}} löschen",
       "deleteHelp": "Ihre Anweisungen, ihr Gedächtnis und ihre Routinen sind dann endgültig weg. Ihre Nachrichten bleiben."
+    },
+    "people": {
+      "title": "Personen ändern",
+      "gets": "Erhält {{roles}}",
+      "loses": "Verliert {{roles}}",
+      "done": "Erledigt",
+      "onlyOwners": "Nur Inhaber ändern, wer Inhaber ist",
+      "onlyAdmins": "Nur Admins ändern Rollen und entfernen Personen"
+    },
+    "approvals": {
+      "title": "Freigaben, die auf dich warten",
+      "done": "Entschieden"
+    },
+    "open": {
+      "open": "Öffnen",
+      "web": "Auf der Website öffnen",
+      "notAllowed": "Du hast keinen Zugriff auf diese Seite"
     }
   },
   "routing": {
@@ -12456,7 +12473,9 @@
       "stuck": "Ich bin hängen geblieben und habe aufgehört, bevor ich fertig war.",
       "forum_suggestion": "Ein Thema fürs Forum? „{{title}}“",
       "forum_concluded": "Das Forum „{{title}}“ ist beendet. Die Zusammenfassung steht in der Datei unten.",
-      "forum_concluded_issues": "Das Forum „{{title}}“ ist beendet. Die Zusammenfassung steht in der Datei unten, mit {{count}} vorgeschlagenen Aufgabe(n) zum Freigeben."
+      "forum_concluded_issues": "Das Forum „{{title}}“ ist beendet. Die Zusammenfassung steht in der Datei unten, mit {{count}} vorgeschlagenen Aufgabe(n) zum Freigeben.",
+      "action_approvals": "Freigaben, die auf dich warten",
+      "action_open_page": "Eine Seite öffnen"
     }
   },
   "builtinTools": {

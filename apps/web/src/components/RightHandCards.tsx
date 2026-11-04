@@ -1,10 +1,15 @@
 import type { AppNotification, Message, Proposal } from "@agenteschat/client";
 import {
+  CardVia,
   keys,
   useAgentActions,
   useAgentProposal,
+  useApproval,
+  useApprovals,
   useAskProposal,
+  useAuthConfig,
   useCardProposals,
+  useChangeRole,
   useChannels,
   useDecideProposal,
   useDecideProposals,
@@ -12,11 +17,22 @@ import {
   useModelLabel,
   useRoles,
   useSendDm,
+  useSetMemberRoles,
 } from "@agenteschat/client";
-import type { SettingsProposalCard } from "@agenteschat/client/lib/action-cards";
+import {
+  type ApprovalsCard,
+  type MemberChangeRow,
+  type MemberChangesCard,
+  memberRowDone,
+  type OpenPageCard,
+  rolesAfter,
+  type SettingsProposalCard,
+} from "@agenteschat/client/lib/action-cards";
+import { APP_PAGES, appPagePath } from "@agenteschat/client/lib/app-pages";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   cardOutcome,
   chosenRows,
@@ -30,15 +46,20 @@ import {
 } from "@agenteschat/client/lib/proposals";
 import { Button, Icon, Switch } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentProposalCardView } from "@/components/ActionCard";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
+import { ApprovalAsk } from "@/components/ApprovalAsk";
+import { InlineApproval } from "@/components/ApprovalItem";
 import { DeleteAgentsDialog } from "@/components/DeleteAgentDialog";
 import { useOrg } from "@/components/org-context";
+import { RemoveMemberDialog } from "@/components/RemoveMember";
 import { RequestCard, RequestDone } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
+import { SETTINGS_SECTIONS } from "@/pages/settings-sections";
 import "./proposals.css";
 
 /**
@@ -462,5 +483,201 @@ export function ChangeRequestCard({ n }: { n: AppNotification }) {
       sentAt={n.createdAt}
       card={agentCard}
     />
+  );
+}
+
+/**
+ * The right hand's approvals card (`offer_approvals`, ADR 0137 §4): each approval as the conversation shows it, with its
+ * own buttons, holds and confirmations, decided as whoever clicks (audited via the right hand); decided, its one line.
+ */
+export function ApprovalsCardView({ message, card }: { message: Message; card: ApprovalsCard }) {
+  const { t } = useTranslation();
+  return (
+    <CardVia messageId={message.id}>
+      {/* biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset */}
+      <div className="rh-cards" role="group" aria-label={t("rightHand.approvals.title")}>
+        {card.why && <p>{card.why}</p>}
+        {card.approvalIds.map((id) => (
+          <CardApproval key={id} id={id} />
+        ))}
+      </div>
+    </CardVia>
+  );
+}
+
+function CardApproval({ id }: { id: string }) {
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const list = useApprovals(org.id);
+  const listed = list.data?.find((a) => a.id === id);
+  const one = useApproval(org.id, id, !listed && list.isSuccess);
+  const people = useMembers(org.id).data;
+  const members = new Map((people ?? []).map((m) => [m.userId, m]));
+  const approval = listed ?? one.data;
+  if (!approval) return null;
+  const agent = dir.anyAgent(approval.agentId);
+  return approval.status === "pending" ? (
+    <ApprovalAsk approval={approval} agent={agent} members={members} />
+  ) : (
+    <InlineApproval approval={approval} agent={agent} members={members} />
+  );
+}
+
+/**
+ * The right hand's people card (`propose_member_changes`): a row per person and change ("Ganha Dono", "Perde Vendas",
+ * "Remover do workspace"), each applied with the members screen's own call as whoever clicks, removal through its
+ * confirmation. Who can't reads who may. Done from the members list.
+ */
+export function MemberChangesCardView({ message, card }: { message: Message; card: MemberChangesCard }) {
+  return (
+    <CardVia messageId={message.id}>
+      <MemberChanges message={message} card={card} />
+    </CardVia>
+  );
+}
+
+function MemberChanges({ message, card }: { message: Message; card: MemberChangesCard }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const members = useMembers(org.id);
+  const roles = useRoles(org.id).data?.roles ?? [];
+  const change = useChangeRole(org.id);
+  const setRoles = useSetMemberRoles(org.id);
+  const toast = useToast();
+  const [removing, setRemoving] = useState<{ userId: string; name: string } | null>(null);
+  const people = members.data ?? [];
+  const title = t("rightHand.people.title");
+  const roleNames = (ids: string[]) =>
+    ids
+      .map((id) => roles.find((r) => r.id === id)?.name ?? "")
+      .filter(Boolean)
+      .join(", ");
+  const owner = t("roles.owner");
+  const what = (r: MemberChangeRow) =>
+    "remove" in r
+      ? t("members.remove.item")
+      : "role" in r
+        ? t(r.role === "owner" ? "rightHand.people.gets" : "rightHand.people.loses", { roles: owner })
+        : [
+            r.addRoleIds.length ? t("rightHand.people.gets", { roles: roleNames(r.addRoleIds) }) : "",
+            r.removeRoleIds.length ? t("rightHand.people.loses", { roles: roleNames(r.removeRoleIds) }) : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+  const may = (r: MemberChangeRow) =>
+    "role" in r || ("remove" in r && people.find((p) => p.userId === r.userId)?.role === "owner")
+      ? can(org, "manage_owners")
+      : can(org, "manage_members");
+  const done = (r: MemberChangeRow) => members.isSuccess && memberRowDone(r, people);
+  const failed = (e: unknown) => toast.show(errorText(t, e), "error");
+  const apply = (r: MemberChangeRow) => {
+    if ("remove" in r) return setRemoving({ userId: r.userId, name: r.name });
+    if ("role" in r) return change.mutate({ userId: r.userId, role: r.role }, { onError: failed });
+    const now = people.find((p) => p.userId === r.userId)?.roleIds;
+    setRoles.mutate({ userId: r.userId, roleIds: rolesAfter(r, now) }, { onError: failed });
+  };
+  if (members.isSuccess && card.rows.every(done)) {
+    return (
+      <RequestDone done label={title}>
+        {t("rightHand.people.done")}: <b>{[...new Set(card.rows.map((r) => r.name))].join(", ")}</b>
+      </RequestDone>
+    );
+  }
+  const open = card.rows.filter((r) => !done(r));
+  const mine = open.some(may);
+  const blocked = open.some((r) => "role" in r && !may(r))
+    ? "rightHand.people.onlyOwners"
+    : "rightHand.people.onlyAdmins";
+  return (
+    <>
+      <RemoveMemberDialog person={removing} onClose={() => setRemoving(null)} />
+      <RequestCard
+        id={message.id}
+        kind="proposal"
+        agent={dir.anyAgent(message.author.id ?? "")}
+        label={title}
+        mine={mine}
+        waitingFor={mine ? undefined : t(blocked)}
+        lead={card.why}
+        body={
+          <ul className="proposal-rows">
+            {card.rows.map((r) => (
+              <li key={`${r.userId}:${what(r)}`} className="proposal-row">
+                <PersonAvatar id={r.userId} name={r.name} size="sm" />
+                <span className="proposal-row__what">
+                  <span className="proposal-row__name">{r.name}</span>
+                  <span>{what(r)}</span>
+                </span>
+                {done(r) ? (
+                  <span className="proposal-row__status">{t("rightHand.people.done")}</span>
+                ) : (
+                  may(r) && (
+                    <Button
+                      size="sm"
+                      variant={"remove" in r ? "danger" : "primary"}
+                      loading={
+                        (change.isPending && change.variables?.userId === r.userId) ||
+                        (setRoles.isPending && setRoles.variables?.userId === r.userId)
+                      }
+                      onClick={() => apply(r)}
+                    >
+                      {"remove" in r ? t("members.remove.item") : t("rightHand.card.apply")}
+                    </Button>
+                  )
+                )}
+              </li>
+            ))}
+          </ul>
+        }
+        what={title}
+      />
+    </>
+  );
+}
+
+/**
+ * The right hand's "Abrir" card (`offer_open_page`): the screen's name, its line, and Abrir, which goes there; the screen
+ * asks what it always asks (a deletion's code and typed name, Stripe, our key dialogs) and checks who may. Who can't
+ * reads it.
+ */
+export function OpenPageCardView({ card }: { card: OpenPageCard }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const channels = useChannels(org.id);
+  const server = useAuthConfig().data;
+  const navigate = useNavigate();
+  const page = APP_PAGES[card.page];
+  const title =
+    card.page === "agent"
+      ? (dir.anyAgent(card.agentId ?? "")?.name ?? t("channel.unknownAgent"))
+      : card.page === "channel"
+        ? `#${channels.data?.find((c) => c.id === card.channelId)?.name ?? ""}`
+        : t(page.label as never);
+  const path = appPagePath(page.web, card);
+  const section = SETTINGS_SECTIONS.find(
+    (s) => page.web === `/settings/${s.id}` || page.web.startsWith(`/settings/${s.id}?`),
+  );
+  const allowed = section
+    ? section.allowed(org, server) && (!page.may || can(org, page.may))
+    : !page.may || can(org, page.may);
+  return (
+    <div className="waitcard">
+      <span className="waitcard__top ac-iconline">
+        <Icon name="external" size={16} />
+        <span>{title}</span>
+      </span>
+      {card.why && <p>{card.why}</p>}
+      <span className="waitcard__acts">
+        {allowed && path ? (
+          <Button size="sm" onClick={() => void navigate({ href: `/org/${org.id}${path}` })}>
+            {t("rightHand.open.open")}
+          </Button>
+        ) : (
+          <span className="small muted">{t("rightHand.open.notAllowed")}</span>
+        )}
+      </span>
+    </div>
   );
 }

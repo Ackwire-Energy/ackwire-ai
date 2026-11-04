@@ -1920,6 +1920,23 @@
       "deleteSome_many": "Eliminar {{count}}",
       "deleteSome_other": "Eliminar {{count}}",
       "deleteHelp": "Sus instrucciones, memoria y rutinas se van para siempre. Sus mensajes se quedan."
+    },
+    "people": {
+      "title": "Cambiar personas",
+      "gets": "Recibe {{roles}}",
+      "loses": "Pierde {{roles}}",
+      "done": "Hecho",
+      "onlyOwners": "Solo los propietarios cambian quién es propietario",
+      "onlyAdmins": "Solo los admins cambian roles y quitan personas"
+    },
+    "approvals": {
+      "title": "Aprobaciones esperándote",
+      "done": "Decididas"
+    },
+    "open": {
+      "open": "Abrir",
+      "web": "Abrir en el sitio",
+      "notAllowed": "No tienes acceso a esta pantalla"
     }
   },
   "routing": {
@@ -12861,7 +12878,9 @@
       "stuck": "Me trabé y me detuve antes de terminar.",
       "forum_suggestion": "¿Vale la pena un foro? \"{{title}}\"",
       "forum_concluded": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo.",
-      "forum_concluded_issues": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo, con {{count}} tarea(s) sugerida(s) para aprobar."
+      "forum_concluded_issues": "El foro \"{{title}}\" terminó. La síntesis está en el archivo de abajo, con {{count}} tarea(s) sugerida(s) para aprobar.",
+      "action_approvals": "Aprobaciones esperándote",
+      "action_open_page": "Abrir una pantalla"
     }
   },
   "builtinTools": {

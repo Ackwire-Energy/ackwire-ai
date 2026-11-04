@@ -1923,6 +1923,23 @@
       "deleteSome_many": "Supprimer {{count}}",
       "deleteSome_other": "Supprimer {{count}}",
       "deleteHelp": "Leurs instructions, leur mémoire et leurs routines disparaissent définitivement. Leurs messages restent."
+    },
+    "people": {
+      "title": "Modifier des personnes",
+      "gets": "Reçoit {{roles}}",
+      "loses": "Perd {{roles}}",
+      "done": "Fait",
+      "onlyOwners": "Seuls les propriétaires changent qui est propriétaire",
+      "onlyAdmins": "Seuls les admins changent les rôles et retirent des personnes"
+    },
+    "approvals": {
+      "title": "Approbations qui vous attendent",
+      "done": "Décidées"
+    },
+    "open": {
+      "open": "Ouvrir",
+      "web": "Ouvrir sur le site",
+      "notAllowed": "Vous n'avez pas accès à cet écran"
     }
   },
   "routing": {
@@ -12943,7 +12960,9 @@
       "stuck": "J'ai été bloqué et je me suis arrêté avant de terminer.",
       "forum_suggestion": "Cela mérite un forum ? « {{title}} »",
       "forum_concluded": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous.",
-      "forum_concluded_issues": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous, avec {{count}} tâche(s) suggérée(s) à approuver."
+      "forum_concluded_issues": "Le forum « {{title}} » est terminé. La synthèse est dans le fichier ci-dessous, avec {{count}} tâche(s) suggérée(s) à approuver.",
+      "action_approvals": "Approbations qui vous attendent",
+      "action_open_page": "Ouvrir un écran"
     }
   },
   "builtinTools": {

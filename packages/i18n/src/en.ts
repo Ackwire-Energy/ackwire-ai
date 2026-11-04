@@ -1846,6 +1846,19 @@ export const en = {
       deleteSome_other: "Delete {{count}}",
       deleteHelp: "Their instructions, memory and routines go for good. Their messages stay.",
     },
+    /** The right hand's people card (`propose_member_changes`, ADR 0137 §4): a row per change. */
+    people: {
+      title: "Change people",
+      gets: "Gets {{roles}}",
+      loses: "Loses {{roles}}",
+      done: "Done",
+      onlyOwners: "Only owners change who is an owner",
+      onlyAdmins: "Only admins change people's roles and remove people",
+    },
+    /** Its approvals card (`offer_approvals`): each decided on it, as whoever clicks. */
+    approvals: { title: "Approvals waiting for you", done: "Decided" },
+    /** Its "Abrir" card (`offer_open_page`): one of the app's screens. */
+    open: { open: "Open", web: "Open on the website", notAllowed: "You don't have access to this screen" },
   },
   routing: {
     title: "Who picks the agents",
@@ -11898,6 +11911,8 @@ export const en = {
       action_invite_people: "Invite people",
       action_install_skill: "Install a skill",
       action_update_skills: "Update skills",
+      action_approvals: "Approvals waiting for you",
+      action_open_page: "Open a screen",
       agent_proposal: "Proposed a new agent: {{name}}",
       settings_proposal: "Proposed a change to {{names}}",
       approval_request: "Approval request: {{title}}",

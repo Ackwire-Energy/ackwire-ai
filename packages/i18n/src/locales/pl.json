@@ -1996,6 +1996,23 @@
       "deleteSome_many": "Usuń {{count}}",
       "deleteSome_other": "Usuń {{count}}",
       "deleteHelp": "Ich instrukcje, pamięć i rutyny znikną na zawsze. Ich wiadomości zostaną."
+    },
+    "people": {
+      "title": "Zmień osoby",
+      "gets": "Dostaje: {{roles}}",
+      "loses": "Traci: {{roles}}",
+      "done": "Gotowe",
+      "onlyOwners": "Tylko właściciele zmieniają, kto jest właścicielem",
+      "onlyAdmins": "Tylko admini zmieniają role i usuwają osoby"
+    },
+    "approvals": {
+      "title": "Zatwierdzenia czekające na ciebie",
+      "done": "Rozstrzygnięte"
+    },
+    "open": {
+      "open": "Otwórz",
+      "web": "Otwórz w witrynie",
+      "notAllowed": "Nie masz dostępu do tego ekranu"
     }
   },
   "routing": {
@@ -13303,7 +13320,9 @@
       "stuck": "Praca utknęła i została przerwana przed zakończeniem.",
       "forum_suggestion": "Warto na forum? „{{title}}”",
       "forum_concluded": "Forum „{{title}}” zakończone. Podsumowanie jest w pliku poniżej.",
-      "forum_concluded_issues": "Forum „{{title}}” zakończone. Podsumowanie jest w pliku poniżej, razem z propozycjami zadań do zatwierdzenia: {{count}}."
+      "forum_concluded_issues": "Forum „{{title}}” zakończone. Podsumowanie jest w pliku poniżej, razem z propozycjami zadań do zatwierdzenia: {{count}}.",
+      "action_approvals": "Zatwierdzenia czekające na ciebie",
+      "action_open_page": "Otwórz ekran"
     }
   },
   "builtinTools": {
