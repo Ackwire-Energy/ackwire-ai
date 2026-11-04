@@ -43,6 +43,7 @@ import {
   releaseJobs,
   sweepEndedInboxes,
   sweepExpiredVoice,
+  sweepWidgetDrafts,
   type VoiceDeps,
   wakeSnoozedNotifications,
 } from "@agenteschat/engine";
@@ -130,6 +131,8 @@ export const WORKER_INTERVALS_MS = {
   apps: 3600_000,
   /** Alerts the autonomy brakes held as noise, posted as one digest per agent and conversation (ADR 0131 §5). */
   autonomyDigest: 10 * 60_000,
+  /** Widget tests nobody confirmed within a day go, with their routines (ADR 0135 §16). */
+  widgetDrafts: 3600_000,
   /** Skills that update by themselves: each workspace queued once a day (the date in the job's dedupe key). */
   skillUpdates: 3600_000,
 };
@@ -270,6 +273,11 @@ export function startWorkers(deps: WorkerDeps) {
       if (purged > 0) log.info("deleted files purged", { versions: purged });
     });
   }
+
+  every("widgetDrafts", WORKER_INTERVALS_MS.widgetDrafts, async () => {
+    const swept = await sweepWidgetDrafts({ db, pubsub: deps.pubsub });
+    if (swept > 0) log.info("unconfirmed widget tests deleted", { swept });
+  });
 
   every("autonomyDigest", WORKER_INTERVALS_MS.autonomyDigest, async () => {
     const posted = await postAutonomyDigests({ db, pubsub: deps.pubsub });

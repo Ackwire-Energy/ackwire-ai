@@ -3,9 +3,10 @@ import { type Href, router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { openOwnPage } from "@/features/ai/parts";
-import { linkWorkspace, resolveLink } from "@/features/links/app-links";
+import { linkWorkspace, resolveLink, searchHref } from "@/features/links/app-links";
 import { takeLink } from "@/features/links/pending";
 import { useColors } from "@/features/shared/hooks";
+import { SEARCH_IN_BAR } from "@/features/shared/tabHeader";
 import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 
@@ -51,7 +52,8 @@ export default function LinkRoute() {
     resolveLink(api, orgId, { to, thread, agent, person, notification, m })
       .catch(() => "/")
       .then((href) => {
-        if (alive) router.replace(href as Href);
+        // Search opens at `/find` where it isn't a tab (`searchHref`).
+        if (alive) router.replace(searchHref(href, SEARCH_IN_BAR) as Href);
       });
     return () => {
       alive = false;

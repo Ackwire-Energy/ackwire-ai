@@ -344,6 +344,9 @@ export type OpenTarget =
       to: "/org/$orgId/settings/$section";
       params: { section: "computers" | "members" | "usage" | "connectors" | "billing" };
     }
+  | { to: "/org/$orgId/home"; search?: { widget: string } }
+  | { to: "/org/$orgId/dashboards" }
+  | { to: "/org/$orgId/dashboards/$dashboardId"; params: { dashboardId: string }; search?: { widget: string } }
   | { to: "/org/$orgId/settings/$section"; params: { section: "skills" }; search?: { skill: string } };
 
 /** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
@@ -352,6 +355,13 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
   "routine_paused",
   "routine_stalled",
   "routine_waiting_plan",
+]);
+
+/** A board's notices (ADR 0135): a widget's alert, a widget that stopped updating, an agent's request to publish. */
+export const WIDGET_NOTICES: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
+  "widget_alert",
+  "widget_failed",
+  "dashboard_proposal",
 ]);
 
 /**
@@ -377,6 +387,16 @@ export function openTarget(n: AppNotification): OpenTarget | null {
       ? { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id } }
       : { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   }
+  // A widget's alert or failure, an agent's request to publish a board (ADR 0135): the board, the widget's panel open.
+  // A home board's widget opens on Home: the web knows its home board (`homeTarget`), the address alone doesn't.
+  if (WIDGET_NOTICES.has(n.kind))
+    return s.dashboardId
+      ? {
+          to: "/org/$orgId/dashboards/$dashboardId",
+          params: { dashboardId: s.dashboardId },
+          ...(s.widgetId ? { search: { widget: s.widgetId } } : {}),
+        }
+      : { to: "/org/$orgId/dashboards" };
   // What an AI app created as me: the newest agent, else the newest routine.
   if (n.kind === "app_created")
     return s.agentId
@@ -444,6 +464,38 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (channelId) return { to: "/org/$orgId/c/$channelId", params: { channelId }, ...at };
   if (s.missionId) return { to: "/org/$orgId/threads", search: { tab: "missions" } };
   return null;
+}
+
+/**
+ * A board's target on the person's own home board goes to Home instead (`homeId`: their home board's id, when
+ * known): My Home has no page of its own among the boards.
+ */
+export function homeTarget(target: OpenTarget, homeId: string | null | undefined): OpenTarget {
+  if (target.to !== "/org/$orgId/dashboards/$dashboardId" || !homeId || target.params.dashboardId !== homeId)
+    return target;
+  return target.search ? { to: "/org/$orgId/home", search: target.search } : { to: "/org/$orgId/home" };
+}
+
+/**
+ * What a board's notice is about and what can be done from the inbox and Home (ADR 0135): an alert opens its
+ * widget, a failure is resolved by running it again, a request to publish is decided (Publish, Keep only for me).
+ * Null for any other notice.
+ */
+export function widgetNoticeOf(n: Pick<AppNotification, "kind" | "source" | "latest" | "actors">) {
+  if (!WIDGET_NOTICES.has(n.kind)) return null;
+  const s = n.source;
+  const agentId = s.agentId ?? (n.actors[0]?.type === "agent" ? n.actors[0].id : null);
+  const base = { dashboardId: s.dashboardId ?? null, widgetId: s.widgetId ?? null, agentId, title: s.label ?? "" };
+  if (n.kind === "widget_alert") return { ...base, kind: "alert" as const, text: n.latest.text ?? "" };
+  if (n.kind === "widget_failed")
+    return { ...base, kind: "failed" as const, reason: n.latest.reason ?? "error", text: n.latest.text ?? null };
+  return {
+    ...base,
+    kind: "proposal" as const,
+    audience: n.latest.statusTo === "roles" ? ("roles" as const) : ("workspace" as const),
+    roles: n.latest.names ?? [],
+    text: n.latest.text ?? "",
+  };
 }
 
 /**
@@ -527,6 +579,9 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
   // No actor (they aren't a member yet): the first who asked is the title; `joinRequestLine` says them all.
   if (n.kind === "join_request")
     return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };
+  // A board's notice (ADR 0135) has nobody to answer: it opens the widget or the board, where it is decided.
+  if (WIDGET_NOTICES.has(n.kind))
+    return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "open" };
   // A connected server changed approved tools (ADR 0117): reviewed in Connectors, never answered like a question.
   if (n.kind === "connector_tool_changed")
     return { kind: "tools", title: l.title ?? "", expiresAt: null, action: "review" };

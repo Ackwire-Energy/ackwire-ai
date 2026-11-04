@@ -51,6 +51,8 @@ export interface ActionItem {
   leading?: ReactNode;
   label: string;
   hint?: string;
+  /** The label and the hint each on one line, cut with an ellipsis (a pick list of names and roles). */
+  oneLine?: boolean;
   /** A slash command shown on the right (`/mission`), in mono: it is code. */
   code?: string;
   trailing?: ReactNode;
@@ -83,11 +85,11 @@ export function ActionList({ items }: { items: ActionItem[] }) {
         >
           {it.leading ?? (it.icon ? <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} /> : null)}
           <View style={styles.actionText}>
-            <Text variant="body" tone={it.danger ? "danger" : "ink"}>
+            <Text variant="body" tone={it.danger ? "danger" : "ink"} {...(it.oneLine ? { numberOfLines: 1 } : {})}>
               {it.label}
             </Text>
             {it.hint ? (
-              <Text variant="small" tone="faint">
+              <Text variant="small" tone="faint" {...(it.oneLine ? { numberOfLines: 1 } : {})}>
                 {it.hint}
               </Text>
             ) : null}

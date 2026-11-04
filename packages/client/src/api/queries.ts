@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
+import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
@@ -69,6 +70,7 @@ import type {
   AuditPage,
   AuditQuery,
   AuditRow,
+  BlockState,
   CalendarEventInput,
   CalendarEventPatch,
   Channel,
@@ -3138,6 +3140,88 @@ export const useBlockReply = (orgId: string, id: string) => {
       api.artifacts.reply(orgId, id, text, clientId),
   });
 };
+
+/** How long a block's changes gather before they go: a dragged slider sends a few values, not one per step. */
+const BLOCK_SEND_MS = 250;
+
+/**
+ * A live block's state, one for everyone in the conversation (ADR 0113): what the person changes in the page goes
+ * to the server, what others change arrives over the socket (`block.state`), and a random pick is the server's
+ * (`draw`). `forPage` is what the running page should show, leaving out the values the person is still changing.
+ */
+export function useSharedBlock(orgId: string, id: string, version: number) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: keys.blockState(orgId, id, version),
+    queryFn: () => api.artifacts.blockState(orgId, id, version),
+  });
+  /** Changed in the page and not sent yet, and sent with no answer yet. */
+  const queued = useRef<Record<string, unknown>>({});
+  const sending = useRef<Record<string, unknown>>({});
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const keep = useCallback(
+    (next: BlockState) =>
+      qc.setQueryData<BlockState>(keys.blockState(orgId, id, version), (old) => newerBlockState(old, next)),
+    [qc, orgId, id, version],
+  );
+
+  const flush = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const values = queued.current;
+    if (Object.keys(values).length === 0) return;
+    queued.current = {};
+    Object.assign(sending.current, values);
+    const done = () => {
+      for (const key of Object.keys(values)) if (sending.current[key] === values[key]) delete sending.current[key];
+    };
+    api.artifacts.setBlockState(orgId, id, version, values).then(
+      (next) => {
+        done();
+        keep(next);
+      },
+      () => {
+        done();
+        // Not kept: the page goes back to what everyone sees.
+        void qc.invalidateQueries({ queryKey: keys.blockState(orgId, id, version) });
+      },
+    );
+  }, [api, qc, keep, orgId, id, version]);
+
+  useEffect(() => () => flush(), [flush]);
+
+  /** What the page holds now; only what the person changed (`used`) is shared. */
+  const fromPage = useCallback(
+    (local: Record<string, unknown>, used: boolean) => {
+      const shared = qc.getQueryData<BlockState>(keys.blockState(orgId, id, version));
+      if (!used || !shared) return;
+      const changes = stateChanges(local, { ...shared.state, ...sending.current, ...queued.current });
+      if (!changes) return;
+      Object.assign(queued.current, changes);
+      timer.current ??= setTimeout(flush, BLOCK_SEND_MS);
+    },
+    [qc, flush, orgId, id, version],
+  );
+
+  const draw = useCallback(
+    (name: string, options: string[]) =>
+      api.artifacts.drawBlock(orgId, id, version, name, options).then(keep, () => {}),
+    [api, keep, orgId, id, version],
+  );
+
+  const block = query.data;
+  const changing = new Set([...Object.keys(queued.current), ...Object.keys(sending.current)]);
+  return {
+    block,
+    /** The state came, or can't: a page waits for it, so it never starts from its own defaults over everyone's. */
+    loaded: query.isSuccess || query.isError,
+    forPage: block ? stateForPage(block, changing) : null,
+    fromPage,
+    draw,
+  };
+}
 
 export const useArtifactVersions = (orgId: string, id: string | null) => {
   const api = useApi();

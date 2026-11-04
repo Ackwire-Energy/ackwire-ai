@@ -81,6 +81,7 @@
   },
   "tabs": {
     "chats": "チャット",
+    "dashboards": "ダッシュボード",
     "threads": "スレッド",
     "agents": "エージェント",
     "activity": "アクティビティ",
@@ -1625,5 +1626,71 @@
     "noEmoji": "絵文字なし",
     "cleared": "ステータスをクリアしました",
     "bySelfUntil": "{{name}}が設定 · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "あなただけ · 自分のウィジェット",
+    "loadFailed": "ダッシュボードを読み込めませんでした。",
+    "onlyHome": "ワークスペースやあなたのロールのダッシュボードがここに表示されます。",
+    "create": "作成",
+    "routineTarget": "そのウィジェット",
+    "pin": {
+      "which": "どのグラフ"
+    },
+    "organize": {
+      "hint": "ウィジェットを長押しして新しい場所までドラッグするか、矢印を使って、それぞれのサイズを選びます。「完了」で順番を保存します。",
+      "holdHint": "長押ししてドラッグすると移動できます。",
+      "up": "上へ移動",
+      "down": "下へ移動",
+      "position": "{{count}}個中{{at}}番目",
+      "saved": "ダッシュボードを並べ替えました"
+    },
+    "edit": {
+      "saved": "ダッシュボードを保存しました"
+    },
+    "pinned": "上部に固定しました",
+    "unpinned": "固定を解除しました",
+    "sizeHint": {
+      "s": "スマートフォンでは半列、Webではダッシュボードの4分の1。",
+      "m": "スマートフォンでは1列全体、Webではダッシュボードの半分。",
+      "l": "1列全体に大きく表示。Webではダッシュボードの半分で、高さは2倍。"
+    },
+    "widget": {
+      "caresFor": "{{name}}が担当しています",
+      "refreshing": "{{name}}が更新しています。",
+      "scheduleSaved": "{{schedule}}更新するようにしました",
+      "alertSaved": "アラートを保存しました",
+      "removed": "ウィジェットを削除しました。ルーティンは停止しました。",
+      "routine": "ルーティン",
+      "onBoard": "配置場所",
+      "title": "タイトル",
+      "titlePlaceholder": "ウィジェットの短い名前",
+      "titleSaved": "タイトルを保存しました"
+    },
+    "formatAuto": "{{name}}が最適なものを選びます",
+    "newWidget": {
+      "titleHint": "タイトル · テスト時に{{name}}が提案します",
+      "alerts": "アラートあり",
+      "realData": "実データ",
+      "editAsk": "依頼を変更",
+      "asked": "「{{ask}}」",
+      "autoFormat": "自動の形式"
+    },
+    "agentPick": {
+      "search": "エージェントを検索",
+      "noMatch": "その名前や役割のエージェントはいません。",
+      "note": "各エージェントは、アクセス権のあるアプリだけを読み取ります。",
+      "reads": "{{apps}}を読みます",
+      "noApps": "接続されたアプリなし"
+    },
+    "notice": {
+      "widget_alert_other": "{{names}}がウィジェットでアラートを出しました",
+      "widget_failed_other": "{{names}}がウィジェットを更新できませんでした",
+      "dashboard_proposal_other": "{{names}}がダッシュボードの公開を提案しています",
+      "card": {
+        "alert": "アラート",
+        "failed": "更新されませんでした",
+        "proposal": "ダッシュボード"
+      }
+    }
   }
 }

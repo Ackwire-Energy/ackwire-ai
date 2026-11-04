@@ -91,6 +91,7 @@
   },
   "tabs": {
     "chats": "Discussions",
+    "dashboards": "Tableaux de bord",
     "threads": "Fils",
     "agents": "Agents",
     "activity": "Activité",
@@ -1797,5 +1798,77 @@
     "noEmoji": "Pas d'emoji",
     "cleared": "Statut effacé",
     "bySelfUntil": "Écrit par {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Vous seul · vos propres widgets",
+    "loadFailed": "Impossible de charger les tableaux de bord.",
+    "onlyHome": "Les tableaux de bord de l'espace de travail ou de vos rôles apparaissent ici.",
+    "create": "Créer",
+    "routineTarget": "son widget",
+    "pin": {
+      "which": "Quel graphique"
+    },
+    "organize": {
+      "hint": "Maintenez un widget appuyé et faites-le glisser à sa nouvelle place, ou utilisez les flèches, et choisissez la taille de chacun. Terminé enregistre l'ordre.",
+      "holdHint": "Maintenez appuyé et faites glisser pour le déplacer.",
+      "up": "Monter",
+      "down": "Descendre",
+      "position": "{{at}} sur {{count}}",
+      "saved": "Tableau de bord organisé"
+    },
+    "edit": {
+      "saved": "Tableau de bord enregistré"
+    },
+    "pinned": "Épinglé en haut",
+    "unpinned": "Désépinglé",
+    "sizeHint": {
+      "s": "Une demi-ligne sur le téléphone, un quart du tableau sur le web.",
+      "m": "Toute la ligne sur le téléphone, la moitié du tableau sur le web.",
+      "l": "Toute la ligne, en grand. La moitié du tableau et deux fois plus haut sur le web."
+    },
+    "widget": {
+      "caresFor": "{{name}} s'en occupe",
+      "refreshing": "{{name}} le met à jour.",
+      "scheduleSaved": "Il se met maintenant à jour {{schedule}}",
+      "alertSaved": "Alerte enregistrée",
+      "removed": "Widget retiré. Sa routine s'est arrêtée.",
+      "routine": "Sa routine",
+      "onBoard": "Où il se trouve",
+      "title": "Titre",
+      "titlePlaceholder": "Un nom court pour le widget",
+      "titleSaved": "Titre enregistré"
+    },
+    "formatAuto": "{{name}} choisit le meilleur",
+    "newWidget": {
+      "titleHint": "Titre · {{name}} en propose un au test",
+      "alerts": "Alerte activée",
+      "realData": "Vraies données",
+      "editAsk": "Modifier la demande",
+      "asked": "« {{ask}} »",
+      "autoFormat": "Affichage automatique"
+    },
+    "agentPick": {
+      "search": "Rechercher des agents",
+      "noMatch": "Aucun agent avec ce nom ou ce rôle.",
+      "note": "Chaque agent ne lit que les apps auxquelles il a accès.",
+      "reads": "Lit {{apps}}",
+      "noApps": "Aucune app connectée"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} a signalé un widget",
+      "widget_alert_many": "{{names}} ont signalé un widget",
+      "widget_alert_other": "{{names}} ont signalé un widget",
+      "widget_failed_one": "{{names}} n'a pas pu mettre à jour un widget",
+      "widget_failed_many": "{{names}} n'ont pas pu mettre à jour un widget",
+      "widget_failed_other": "{{names}} n'ont pas pu mettre à jour un widget",
+      "dashboard_proposal_one": "{{names}} veut publier un tableau de bord",
+      "dashboard_proposal_many": "{{names}} veulent publier un tableau de bord",
+      "dashboard_proposal_other": "{{names}} veulent publier un tableau de bord",
+      "card": {
+        "alert": "Alerte",
+        "failed": "Pas mis à jour",
+        "proposal": "Tableau de bord"
+      }
+    }
   }
 }

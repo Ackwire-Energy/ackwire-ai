@@ -1,6 +1,7 @@
 import {
   type Approval,
   applyComputerEvent,
+  applyDashboardEvent,
   applyMachineEvent,
   applyNotificationEvent,
   applyUnreadEvent,
@@ -66,6 +67,8 @@ export function useUserEvents() {
       // The workspace's standing (the suspended screen comes and goes), its own computer on its way, and the groups
       // of agents (Agentes' sections).
       applyWorkspaceEvent(qc, orgId, event);
+      // Dashboards and widgets (ADR 0135): a board changed, a widget updated, failed or was removed.
+      applyDashboardEvent(qc, orgId, event);
       // Org event: someone changed the task board's columns. Deleting one moves its tasks, so the
       // tasks refresh too (the columns live under the same key).
       if (event.type === "issue.columns") void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
@@ -89,6 +92,8 @@ export function useUserEvents() {
       void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
       // The groups of agents someone changed meanwhile.
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
+      // Boards and widgets that changed meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.dashboards(orgId) });
     });
     return () => {
       offUser();

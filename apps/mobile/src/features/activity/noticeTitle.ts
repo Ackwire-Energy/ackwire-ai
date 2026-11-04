@@ -3,6 +3,7 @@ import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { formatUsd } from "@agenteschat/client/lib/format";
 import { restrictionOf, workspaceHeadline } from "@agenteschat/client/lib/notifications";
 import { useTranslation } from "react-i18next";
+import { isDashboardNotice } from "../dashboards/logic";
 import { useDirectory } from "../shared/hooks";
 import { runFailedLines, whoOf } from "./logic";
 
@@ -36,25 +37,28 @@ export function useNoticeTitle(n: AppNotification) {
         : n.kind === "usage_limit"
           ? `usage_limit_${n.latest.statusTo ?? "refused"}`
           : n.kind;
+  // A widget's alert or failure, an agent asking to publish a dashboard (ADR 0135): the dashboards' own words.
   const template = held
     ? t("standing.notification.agentHold", { name: NAMES })
     : n.kind === "app_created"
       ? appCreatedLine(t, n)
-      : n.kind === "skill_update"
-        ? t(workspaceHeadline(n) ?? "skills.notice.updated", { name: n.source.label ?? "" })
-        : t(`mobile.activity.kind.${kind}`, {
-            names: NAMES,
-            // `catch_up_closed`: the conversations it skipped.
-            count: n.kind === "catch_up_closed" ? n.count : who.total,
-            // `plan_reset_unknown`: the plan's name.
-            plan: n.latest.title ?? "",
-            // `catch_up_closed_asker`: who was credited.
-            who: n.latest.title ?? "",
-            // `usage_limit`: the limit (who decides only) and the share used.
-            amount: n.latest.limitUsd !== undefined ? formatUsd(i18n.language, n.latest.limitUsd) : "",
-            percent: Math.round(n.latest.percent ?? 0),
-            defaultValue: NAMES,
-          });
+      : isDashboardNotice(n.kind)
+        ? t(`mobile.dashboards.notice.${n.kind}`, { names: NAMES, count: who.total, defaultValue: NAMES })
+        : n.kind === "skill_update"
+          ? t(workspaceHeadline(n) ?? "skills.notice.updated", { name: n.source.label ?? "" })
+          : t(`mobile.activity.kind.${kind}`, {
+              names: NAMES,
+              // `catch_up_closed`: the conversations it skipped.
+              count: n.kind === "catch_up_closed" ? n.count : who.total,
+              // `plan_reset_unknown`: the plan's name.
+              plan: n.latest.title ?? "",
+              // `catch_up_closed_asker`: who was credited.
+              who: n.latest.title ?? "",
+              // `usage_limit`: the limit (who decides only) and the share used.
+              amount: n.latest.limitUsd !== undefined ? formatUsd(i18n.language, n.latest.limitUsd) : "",
+              percent: Math.round(n.latest.percent ?? 0),
+              defaultValue: NAMES,
+            });
   // Agents that failed for one cause close together: one line for all, who they are under it.
   const failed = runFailedLines(t, n, (id) => dir.nameOf({ type: "agent", id }));
   const parts = failed ? [failed.title] : template.split(NAMES);

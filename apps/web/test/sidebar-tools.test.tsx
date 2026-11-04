@@ -85,10 +85,17 @@ describe("the tools on top", () => {
   test("by default Threads, Tarefas, Drive and Equipe, Aprovações while some wait; the rest in More, then Personalizar", async () => {
     await go();
     expect(rows()[0]).toBe("Início");
+    // Dashboards (ADR 0135) is no row of its own: it is in More.
+    expect(rows()).not.toContain("Painéis");
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive", "Equipe"]);
     const more = await openMore();
-    // The task manager (ADR 0128) is always there, after the tools a person places.
-    expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum", "Gerenciador de tarefas"]);
+    // Dashboards (ADR 0135) and the task manager (ADR 0128) are always there, after the tools a person places.
+    expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum", "Painéis", "Gerenciador de tarefas"]);
+    expect(
+      within(more)
+        .getByRole("link", { name: /Painéis/ })
+        .getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/dashboards`);
     expect(
       within(more)
         .getByRole("link", { name: /Gerenciador de tarefas/ })
@@ -104,6 +111,7 @@ describe("the tools on top", () => {
       "Rotinas",
       "Calendário",
       "Fórum",
+      "Painéis",
       "Gerenciador de tarefas",
     ]);
   });
@@ -187,6 +195,7 @@ describe("the tools on top", () => {
       "Drive",
       "Calendário",
       "Fórum",
+      "Painéis",
       "Gerenciador de tarefas",
     ]);
   });

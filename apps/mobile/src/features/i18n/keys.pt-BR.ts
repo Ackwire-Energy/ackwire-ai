@@ -95,6 +95,7 @@ export const featureKeysPtBR = {
   },
   tabs: {
     chats: "Conversas",
+    dashboards: "Painéis",
     threads: "Threads",
     agents: "Agentes",
     activity: "Atividade",
@@ -1714,5 +1715,77 @@ export const featureKeysPtBR = {
     noEmoji: "Sem emoji",
     cleared: "Status limpo",
     bySelfUntil: "Escrito por {{name}} · {{when}}",
+  },
+  // Dashboards on the phone (ADR 0135); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
+  dashboards: {
+    homeRow: "Só você · seus próprios widgets",
+    loadFailed: "Não deu para carregar os painéis.",
+    onlyHome: "Os painéis do workspace ou dos seus papéis aparecem aqui.",
+    create: "Criar",
+    routineTarget: "o widget dela",
+    pin: {
+      which: "Qual gráfico",
+    },
+    organize: {
+      hint: "Segure um widget e arraste para o novo lugar, ou use as setas, e escolha o tamanho de cada um. Pronto salva a ordem.",
+      holdHint: "Segure e arraste para mudar de lugar.",
+      up: "Subir",
+      down: "Descer",
+      position: "{{at}} de {{count}}",
+      saved: "Painel organizado",
+    },
+    edit: {
+      saved: "Painel salvo",
+    },
+    pinned: "Fixado no topo",
+    unpinned: "Desafixado",
+    sizeHint: {
+      s: "Meia linha no celular, um quarto do painel no web.",
+      m: "A linha inteira no celular, metade do painel no web.",
+      l: "A linha inteira, desenhado grande. Metade do painel e o dobro da altura no web.",
+    },
+    widget: {
+      caresFor: "{{name}} cuida",
+      refreshing: "{{name}} está atualizando.",
+      scheduleSaved: "Agora atualiza {{schedule}}",
+      alertSaved: "Aviso salvo",
+      removed: "Widget tirado. A rotina parou.",
+      routine: "A rotina dele",
+      onBoard: "Onde está",
+      title: "Título",
+      titlePlaceholder: "Um nome curto para o widget",
+      titleSaved: "Título salvo",
+    },
+    formatAuto: "{{name}} escolhe o melhor",
+    /** New widget's card, which is the form. */
+    newWidget: {
+      titleHint: "Título · {{name}} sugere ao testar",
+      alerts: "Avisa",
+      realData: "Dados de verdade",
+      editAsk: "Mudar o pedido",
+      asked: "“{{ask}}”",
+      autoFormat: "Formato automático",
+    },
+    /** "Who looks after it", pushed from New widget's card. */
+    agentPick: {
+      search: "Buscar agentes",
+      noMatch: "Nenhum agente com esse nome ou papel.",
+      note: "Cada agente lê só os apps a que tem acesso.",
+      reads: "Lê {{apps}}",
+      noApps: "Nenhum app conectado",
+    },
+    notice: {
+      widget_alert_one: "{{names}} sinalizou um widget",
+      widget_alert_other: "{{names}} sinalizaram um widget",
+      widget_failed_one: "{{names}} não conseguiu atualizar um widget",
+      widget_failed_other: "{{names}} não conseguiram atualizar um widget",
+      dashboard_proposal_one: "{{names}} quer publicar um painel",
+      dashboard_proposal_other: "{{names}} querem publicar um painel",
+      card: {
+        alert: "Aviso",
+        failed: "Não atualizou",
+        proposal: "Painel",
+      },
+    },
   },
 } satisfies LocaleStrings;

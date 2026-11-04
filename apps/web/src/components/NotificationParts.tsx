@@ -2,7 +2,13 @@ import type { AppNotification, NotificationActor } from "@agenteschat/client";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { formatUsd, namesText } from "@agenteschat/client/lib/format";
-import { askersOf, channelOf, runFailedGroupOf, workspaceHeadline } from "@agenteschat/client/lib/notifications";
+import {
+  askersOf,
+  channelOf,
+  runFailedGroupOf,
+  widgetNoticeOf,
+  workspaceHeadline,
+} from "@agenteschat/client/lib/notifications";
 import type { Words } from "@agenteschat/client/lib/routine-view";
 import { Avatar, ComputerIcon, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -72,6 +78,9 @@ export function Face({
  * asking to join isn't a member yet: their initials.
  */
 export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
+  // A board's notice with nobody named: its agent (ADR 0135).
+  const widget = widgetNoticeOf(n);
+  if (widget?.agentId) return <AgentAvatar agentId={widget.agentId} name="" size="md" className={className} />;
   if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
   if (n.kind === "computer_ready")
     return (
@@ -207,6 +216,20 @@ export function Headline({
   const own = workspaceHeadline(n);
   if (own) return t(own, { name: n.source.label });
   if (n.kind === "app_created") return appCreatedLine(t, n);
+  // A board's notice (ADR 0135): the agent who looks after the widget or asks to publish the board.
+  const widget = widgetNoticeOf(n);
+  if (widget) {
+    const agent = widget.agentId ? (dir.anyAgent(widget.agentId)?.name ?? t("channel.unknownAgent")) : name;
+    const key =
+      widget.kind === "alert"
+        ? "widgets.notice.alert"
+        : widget.kind === "failed"
+          ? "widgets.notice.failed"
+          : "widgets.notice.proposal";
+    return (
+      <Trans i18nKey={key} values={{ name: agent, title: widget.title }} components={{ b: <b /> }} {...TYPED_VALUES} />
+    );
+  }
   switch (n.kind) {
     case "mention":
       if (n.source.issueId) return k("mentionComment", { name });

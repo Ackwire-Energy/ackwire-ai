@@ -81,6 +81,7 @@
   },
   "tabs": {
     "chats": "Obrolan",
+    "dashboards": "Dasbor",
     "threads": "Utas",
     "agents": "Agen",
     "activity": "Aktivitas",
@@ -1625,5 +1626,71 @@
     "noEmoji": "Tanpa emoji",
     "cleared": "Status dihapus",
     "bySelfUntil": "Ditulis oleh {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Hanya kamu · widget milikmu sendiri",
+    "loadFailed": "Dasbor tidak bisa dimuat.",
+    "onlyHome": "Dasbor untuk ruang kerja atau peranmu muncul di sini.",
+    "create": "Buat",
+    "routineTarget": "widget-nya",
+    "pin": {
+      "which": "Grafik yang mana"
+    },
+    "organize": {
+      "hint": "Tahan widget lalu seret ke tempat barunya, atau pakai tanda panah, dan pilih ukuran masing-masing. Selesai menyimpan urutannya.",
+      "holdHint": "Tahan dan seret untuk memindahkannya.",
+      "up": "Pindah ke atas",
+      "down": "Pindah ke bawah",
+      "position": "{{at}} dari {{count}}",
+      "saved": "Dasbor sudah diatur"
+    },
+    "edit": {
+      "saved": "Dasbor disimpan"
+    },
+    "pinned": "Disematkan di atas",
+    "unpinned": "Sematan dilepas",
+    "sizeHint": {
+      "s": "Setengah baris di ponsel, seperempat dasbor di web.",
+      "m": "Satu baris penuh di ponsel, setengah dasbor di web.",
+      "l": "Satu baris penuh, digambar besar. Setengah dasbor dan dua kali lebih tinggi di web."
+    },
+    "widget": {
+      "caresFor": "{{name}} mengurusnya",
+      "refreshing": "{{name}} sedang memperbaruinya.",
+      "scheduleSaved": "Sekarang diperbarui {{schedule}}",
+      "alertSaved": "Peringatan disimpan",
+      "removed": "Widget dihapus. Rutinitasnya berhenti.",
+      "routine": "Rutinitasnya",
+      "onBoard": "Lokasinya",
+      "title": "Judul",
+      "titlePlaceholder": "Nama singkat untuk widget",
+      "titleSaved": "Judul disimpan"
+    },
+    "formatAuto": "{{name}} memilih yang terbaik",
+    "newWidget": {
+      "titleHint": "Judul · {{name}} menyarankan satu saat diuji",
+      "alerts": "Peringatan aktif",
+      "realData": "Data sungguhan",
+      "editAsk": "Ubah permintaan",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Bentuk otomatis"
+    },
+    "agentPick": {
+      "search": "Cari agen",
+      "noMatch": "Tidak ada agen dengan nama atau peran itu.",
+      "note": "Setiap agen hanya membaca aplikasi yang boleh ia akses.",
+      "reads": "Membaca {{apps}}",
+      "noApps": "Tidak ada aplikasi terhubung"
+    },
+    "notice": {
+      "widget_alert_other": "{{names}} menandai sebuah widget",
+      "widget_failed_other": "{{names}} tidak bisa memperbarui sebuah widget",
+      "dashboard_proposal_other": "{{names}} ingin memublikasikan dasbor",
+      "card": {
+        "alert": "Peringatan",
+        "failed": "Tidak diperbarui",
+        "proposal": "Dasbor"
+      }
+    }
   }
 }

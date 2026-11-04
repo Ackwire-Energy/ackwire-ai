@@ -1,3 +1,4 @@
+import { createDashboardsApi } from "../dashboards/api";
 import { humanCheckHeaders } from "../lib/human-check";
 import type { OnboardingStepId } from "../lib/onboarding";
 import { CLOUD_SERVER } from "../lib/server";
@@ -44,6 +45,7 @@ import type {
   AuditPage,
   AuthConfig,
   BatchInviteResult,
+  BlockState,
   BrainMachine,
   BrowserHandoff,
   BrowserProfile,
@@ -1146,6 +1148,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ id: string }>(`${org(orgId)}/artifacts/${enc(id)}/reply`, {
           json: { text, clientId },
         }),
+      blockState: (orgId, id, version) =>
+        request<BlockState>(`${org(orgId)}/blocks/${enc(id)}/state`, { query: { version } }),
+      setBlockState: (orgId, id, version, values) =>
+        request<BlockState>(`${org(orgId)}/blocks/${enc(id)}/state`, { method: "PUT", json: { version, values } }),
+      drawBlock: (orgId, id, version, name, options) =>
+        request<BlockState>(`${org(orgId)}/blocks/${enc(id)}/draw`, { json: { version, name, options } }),
       poll: (orgId, id) => request<Poll>(`${org(orgId)}/polls/${enc(id)}`),
       vote: (orgId, id, options) =>
         request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", json: { options } }),
@@ -1248,6 +1256,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       act: (orgId, threadId, action) =>
         request<ThreadInfo>(`${org(orgId)}/threads/${enc(threadId)}/${action}`, { json: {} }),
     },
+    dashboards: createDashboardsApi(request),
     missions: ((): HttpApi["missions"] => {
       const one = (orgId: string, missionId: string) => `${org(orgId)}/missions/${enc(missionId)}`;
       return {

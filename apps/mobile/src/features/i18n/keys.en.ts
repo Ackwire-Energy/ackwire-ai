@@ -89,6 +89,7 @@ export const featureKeysEn = {
   },
   tabs: {
     chats: "Chats",
+    dashboards: "Dashboards",
     threads: "Threads",
     agents: "Agents",
     activity: "Activity",
@@ -1709,6 +1710,80 @@ export const featureKeysEn = {
     noEmoji: "No emoji",
     cleared: "Status cleared",
     bySelfUntil: "Written by {{name}} · {{when}}",
+  },
+  // Dashboards on the phone (ADR 0135); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
+  dashboards: {
+    homeRow: "Only you · your own widgets",
+    loadFailed: "Couldn't load the dashboards.",
+    /** Under "My Home" when the person sees no other board; "+" in the bar makes one. */
+    onlyHome: "Dashboards for the workspace or your roles show up here.",
+    create: "Create",
+    routineTarget: "its widget",
+    pin: {
+      which: "Which chart",
+    },
+    organize: {
+      hint: "Hold a widget and drag it to its new place, or use the arrows, and pick each one's size. Done saves the order.",
+      holdHint: "Hold and drag to move it.",
+      up: "Move up",
+      down: "Move down",
+      position: "{{at}} of {{count}}",
+      saved: "Dashboard organized",
+    },
+    edit: {
+      saved: "Dashboard saved",
+    },
+    pinned: "Pinned to the top",
+    unpinned: "Unpinned",
+    sizeHint: {
+      s: "Half a row on the phone, a quarter of the board on the web.",
+      m: "The whole row on the phone, half the board on the web.",
+      l: "The whole row, drawn big. Half the board and twice as tall on the web.",
+    },
+    widget: {
+      caresFor: "{{name}} looks after it",
+      refreshing: "{{name}} is updating it.",
+      scheduleSaved: "It updates {{schedule}} now",
+      alertSaved: "Alert saved",
+      removed: "Widget removed. Its routine stopped.",
+      routine: "Its routine",
+      onBoard: "Where it is",
+      title: "Title",
+      titlePlaceholder: "A short name for the widget",
+      titleSaved: "Title saved",
+    },
+    /** The second line of "Automatic" in New widget's Format menu. */
+    formatAuto: "{{name}} picks the best one",
+    /** New widget's card, which is the form. */
+    newWidget: {
+      titleHint: "Title · {{name}} suggests one when testing",
+      alerts: "Alerts",
+      realData: "Real data",
+      editAsk: "Change the ask",
+      asked: "“{{ask}}”",
+      autoFormat: "Auto format",
+    },
+    /** "Who looks after it", pushed from New widget's card. */
+    agentPick: {
+      search: "Search agents",
+      noMatch: "No agent with that name or role.",
+      note: "Each agent reads only the apps it was given access to.",
+      reads: "Reads {{apps}}",
+      noApps: "No connected apps",
+    },
+    notice: {
+      widget_alert_one: "{{names}} flagged a widget",
+      widget_alert_other: "{{names}} flagged a widget",
+      widget_failed_one: "{{names}} couldn't update a widget",
+      widget_failed_other: "{{names}} couldn't update a widget",
+      dashboard_proposal_one: "{{names}} wants to publish a dashboard",
+      dashboard_proposal_other: "{{names}} want to publish a dashboard",
+      card: {
+        alert: "Alert",
+        failed: "Didn't update",
+        proposal: "Dashboard",
+      },
+    },
   },
 };
 

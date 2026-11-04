@@ -1,6 +1,12 @@
-import type { AiStatus, AppNotification } from "@agenteschat/client";
+import type { AiStatus, AppNotification, Dashboard } from "@agenteschat/client";
 import { cacheNotification, keys, useApi } from "@agenteschat/client";
-import { type OpenTarget, opensConnectAi, opensOnComputer, openTarget } from "@agenteschat/client/lib/notifications";
+import {
+  homeTarget,
+  type OpenTarget,
+  opensConnectAi,
+  opensOnComputer,
+  openTarget,
+} from "@agenteschat/client/lib/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useContext, useEffect, useRef } from "react";
@@ -53,6 +59,7 @@ export type Opened = "page" | "dialog" | null;
  */
 export function useNotificationOpener() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const connect = useConnectAi();
   const openDetails = useContext(OpenDetailsContext);
   const openComputer = useOpenComputer();
@@ -74,8 +81,10 @@ export function useNotificationOpener() {
         openDetails({ kind: "usage_queue", id: agent.id, tab: "skipped" });
         return "dialog";
       }
-      const target = openTarget(n);
-      if (!target) return null;
+      const found = openTarget(n);
+      if (!found) return null;
+      // A widget of My Home opens on Home (ADR 0135), when this tab knows which board that is.
+      const target = homeTarget(found, qc.getQueryData<Dashboard>(keys.dashboardHome(orgId))?.id);
       // A routine's trouble: its details over the page the person is on, its state and fix in view.
       const routineId = routineOf(target);
       if (openDetails && routineId) {
@@ -87,7 +96,7 @@ export function useNotificationOpener() {
       goToTarget(navigate, orgId, target, options.replace ?? false);
       return "page";
     },
-    [navigate, connect, openDetails, openComputer],
+    [navigate, qc, connect, openDetails, openComputer],
   );
 }
 

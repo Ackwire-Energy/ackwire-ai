@@ -1,4 +1,5 @@
 import type { AppLocale } from "@agenteschat/i18n/locale";
+import type { DashboardsApi } from "../dashboards/api";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { WikiAccess } from "../lib/wiki";
 import type {
@@ -53,6 +54,7 @@ import type {
   AuthConfig,
   BatchInviteResult,
   BillingFrom,
+  BlockState,
   BrainKind,
   BrainMachine,
   BrowserHandoff,
@@ -1048,6 +1050,8 @@ export interface ApiClient {
     /** Tirar do canal / Devolver ao canal / Fechar / Reabrir / Arquivar / Desarquivar. */
     act(orgId: string, threadId: string, action: ThreadAction): Promise<ThreadInfo>;
   };
+  /** Boards and widgets (ADR 0135). */
+  dashboards: DashboardsApi;
   /** Missions (ADR 0029): long work by the agent's executor on a connected computer, in one thread. */
   missions: {
     /** Missions you can see (the Missões tab), most recently changed first, with the counts for the tabs. */
@@ -1341,6 +1345,12 @@ export interface ApiClient {
     keep(orgId: string, id: string): Promise<Artifact>;
     /** Sends what a person picked in a block to the agent that made it, as their own message. */
     reply(orgId: string, id: string, text: string, clientId: string): Promise<{ id: string }>;
+    /** A block's state, the same for everyone (ADR 0113). */
+    blockState(orgId: string, id: string, version: number): Promise<BlockState>;
+    /** Sets values in a block for everyone. */
+    setBlockState(orgId: string, id: string, version: number, values: Record<string, unknown>): Promise<BlockState>;
+    /** A random pick the server makes once, for everyone. */
+    drawBlock(orgId: string, id: string, version: number, name: string, options: string[]): Promise<BlockState>;
     poll(orgId: string, id: string): Promise<Poll>;
     /** Replaces the viewer's marks in a vote; empty takes them back. */
     vote(orgId: string, id: string, options: number[]): Promise<Poll>;
