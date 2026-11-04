@@ -393,6 +393,8 @@ export class RunnerDaemon implements RequestObserver {
   private logoSync: Promise<void> | null = null;
   private readonly self: { command: string[]; compiled: boolean };
   private readonly executors: () => NonNullable<RunnerInfo["executors"]>;
+  /** False until the first look on a new install: `hello` then leaves the CLIs out, so the server keeps "unknown". */
+  private readonly executorsKnown: () => boolean;
   private readonly now: () => number;
   /** The computer brains' accounts (ADR 0041): machine-wide, kept across pairings and sessions. */
   readonly accounts: AccountManager;
@@ -419,6 +421,7 @@ export class RunnerDaemon implements RequestObserver {
         onChange: () => this.executorsChanged(),
       });
     this.executors = () => exec() ?? {};
+    this.executorsKnown = () => !("known" in exec) || exec.known === true;
     // System mode is set at install and kept through pairings: account folders are lent to agents' users.
     let system = false;
     try {
@@ -1520,7 +1523,8 @@ export class RunnerDaemon implements RequestObserver {
   }
 
   /** The coding CLIs for `hello`: the ones installed (whether each may run is `access.tools`). */
-  private helloExecutors(): NonNullable<RunnerInfo["executors"]> {
+  private helloExecutors(): RunnerInfo["executors"] {
+    if (!this.executorsKnown()) return undefined;
     const found = this.executors();
     // Claude Code installed or logged in since the last look: the app shows it.
     const seen = JSON.stringify(found);
@@ -1539,6 +1543,7 @@ export class RunnerDaemon implements RequestObserver {
    */
   private executorsChanged() {
     this.queueStatus();
+    if (!this.executorsKnown()) return;
     const executors = this.executors();
     const seen = JSON.stringify(executors);
     if (seen !== this.lastExecutors && this.send({ type: "executors.changed", executors })) this.lastExecutors = seen;

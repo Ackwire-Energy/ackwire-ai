@@ -265,6 +265,24 @@ test("hello never waits on the CLIs' looks; what a look finds later reaches the 
   });
 });
 
+test("a new install's hello leaves the CLIs out until the first look, then sends what it found", async () => {
+  const { home } = pairedHome();
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  const executorRun = async () => {
+    await gate;
+    return { status: null, stdout: "", error: Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }) };
+  };
+  const c = control(home, { executors: undefined, executorRun });
+  const s = await c.connect();
+  expect(s.of("hello")[0]).not.toHaveProperty("executors");
+  release();
+  await waitFor(() => s.of("executors.changed").length === 1);
+  expect(s.of("executors.changed")[0]).toEqual({ type: "executors.changed", executors: {} });
+});
+
 test("reconnect from the app: the socket is dropped and dialed again at once, with a fresh hello", async () => {
   const unpaired = tempDir("home-");
   dirs.push(unpaired);

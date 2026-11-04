@@ -22,17 +22,28 @@ import { SHARED_BIN_ENV } from "./shared-folder";
 export const EXECUTORS_TTL_MS = 10 * 60_000;
 /** After a look that couldn't tell (a CLI timed out or failed), the next one comes this soon, then doubles up to the TTL. */
 export const EXECUTORS_RETRY_MS = 30_000;
+/** A CLI whose `--version` keeps failing this many looks in a row is gone (a broken shim, a launcher left behind). */
+export const EXECUTORS_EXIT_STRIKES = 3;
 
 type Executors = NonNullable<RunnerInfo["executors"]>;
-type RunResult = { status: number | null; stdout: string; error?: unknown };
+type RunResult = { status: number | null; stdout: string; stderr?: string; error?: unknown };
 export type ExecutorRun = (command: string, args: string[]) => RunResult | Promise<RunResult>;
 type Run = ExecutorRun;
 
+/** Shells' "command not found" (127), "not executable" (126) and cmd.exe's (9009). */
+const NOT_FOUND_EXITS = new Set([126, 127, 9009]);
+
 /**
- * Only a binary that isn't there is missing. A timeout, a crash or a failing exit (a busy machine, a CLI mid-update)
- * says nothing about what is installed, so the last good look stands.
+ * Only a binary that isn't there is missing: not found, or a shell saying so (Windows runs CLIs through cmd.exe, an
+ * npm shim whose `node` is gone exits 127). A timeout or a crash (a busy machine, a CLI mid-update) says nothing
+ * about what is installed, so the last good look stands.
  */
-const missing = (r: RunResult) => (r.error as { code?: unknown } | undefined)?.code === "ENOENT";
+const missing = (r: RunResult) =>
+  (r.error as { code?: unknown } | undefined)?.code === "ENOENT" ||
+  (r.status !== null && NOT_FOUND_EXITS.has(r.status)) ||
+  (process.platform === "win32" &&
+    r.status !== 0 &&
+    /is not recognized as an internal or external command/i.test(r.stderr ?? ""));
 
 /**
  * `command`'s full path on the current `process.env.PATH`, or the bare name. The app mode adopts the login
@@ -71,12 +82,12 @@ const defaultRun: Run = (command, args) =>
         // Windows finds `claude.cmd` / `codex.cmd` only through the shell.
         shell: process.platform === "win32",
       },
-      (err, stdout) => {
+      (err, stdout, stderr) => {
         const code = (err as { code?: unknown } | null)?.code;
         const out = `${stdout ?? ""}`;
         resolve(
           typeof code === "number"
-            ? { status: code, stdout: out }
+            ? { status: code, stdout: out, stderr: `${stderr ?? ""}` }
             : err
               ? { status: null, stdout: out, error: err }
               : { status: 0, stdout: out },
@@ -231,8 +242,14 @@ function detectOpencode(run: Run): Promise<Probe> {
   return detectWithModels(run, OPENCODE_BIN, OPENCODE_VERSION, parseOpencodeModels);
 }
 
-/** One CLI's look: what it found, and whether it couldn't tell (then the last good look stands). */
-type Probe = { entry?: RunnerExecutorInfo; unsure?: boolean };
+/**
+ * One CLI's look: what it found, and whether it couldn't tell (then the last good look stands). `exited`: unsure
+ * because `--version` failed with an exit code, counted toward `EXECUTORS_EXIT_STRIKES`.
+ */
+type Probe = { entry?: RunnerExecutorInfo; unsure?: boolean; exited?: boolean };
+
+const versionFailed = (r: RunResult): Probe =>
+  missing(r) ? {} : r.error ? { unsure: true } : { unsure: true, exited: true };
 
 const firstLine = (r: RunResult) => r.stdout.trim().split("\n")[0]?.trim().slice(0, 80) ?? "";
 
@@ -244,7 +261,7 @@ async function detectWithModels(
   parse: (output: string) => CursorModelInfo[],
 ): Promise<Probe> {
   const r = await run(bin, ["--version"]);
-  if (r.error || r.status !== 0) return missing(r) ? {} : { unsure: true };
+  if (r.error || r.status !== 0) return versionFailed(r);
   const version = firstLine(r);
   if (!shape.test(version)) return {};
   const m = await run(bin, ["models"]);
@@ -257,7 +274,7 @@ async function detectWithModels(
 
 async function detectVersion(run: Run, name: "claude" | "codex"): Promise<Probe> {
   const r = await run(name, ["--version"]);
-  if (r.error || r.status !== 0) return missing(r) ? {} : { unsure: true };
+  if (r.error || r.status !== 0) return versionFailed(r);
   const version = firstLine(r);
   if (!version) return {};
   if (name !== "claude") return { entry: { version } };
@@ -267,11 +284,13 @@ async function detectVersion(run: Run, name: "claude" | "codex"): Promise<Probe>
 
 /**
  * Every CLI looked up at once. One that couldn't tell keeps its entry from `prev` (the last good look), and the
- * whole look is `unsure`, so it is retried soon instead of cached.
+ * whole look is `unsure`, so it is retried soon instead of cached. `strikes` counts each CLI's failing exits in a
+ * row across looks (the caller keeps it).
  */
 export async function detectExecutors(
   run: Run = defaultRun,
   prev: Executors = {},
+  strikes: Partial<Record<string, number>> = {},
 ): Promise<{ found: Executors; unsure: boolean }> {
   const safe = (p: () => Promise<Probe>) => p().catch((): Probe => ({ unsure: true }));
   const names = ["claude", "codex", "cursor", "opencode"] as const;
@@ -284,7 +303,9 @@ export async function detectExecutors(
   const found: Executors = {};
   let unsure = false;
   names.forEach((name, i) => {
-    const p = probes[i] ?? {};
+    let p = probes[i] ?? {};
+    strikes[name] = p.exited ? (strikes[name] ?? 0) + 1 : 0;
+    if ((strikes[name] ?? 0) >= EXECUTORS_EXIT_STRIKES) p = {};
     const entry = p.unsure ? (prev[name] ?? p.entry) : p.entry;
     if (entry) found[name] = entry;
     if (p.unsure) unsure = true;
@@ -292,17 +313,19 @@ export async function detectExecutors(
   return { found, unsure };
 }
 
-/** The last list kept on disk is believed only as far as `hello` would carry it. */
-function keptExecutors(file: string): Executors {
+/** The last list kept on disk, believed only as far as `hello` would carry it; null when there is none. */
+function keptExecutors(file: string): Executors | null {
   const kept = readSmallJson(file, 1024 * 1024);
   return kept && typeof kept === "object" && !Array.isArray(kept)
     ? parseExecutors(kept as Record<string, unknown>)
-    : {};
+    : null;
 }
 
 export interface ExecutorsCache {
   /** The last known list, at once; a look starts in the background when it is due. */
   (): Executors;
+  /** False until a list is known (kept on disk or looked up): an empty list then means "not looked yet", not "none". */
+  readonly known: boolean;
   /** The list, waiting for the first look when none is known yet. */
   ready(): Promise<Executors>;
 }
@@ -316,20 +339,22 @@ export function cachedExecutors(
   opts: { now?: () => number; run?: Run; file?: string; onChange?: (found: Executors) => void } = {},
 ): ExecutorsCache {
   const now = opts.now ?? Date.now;
-  let value: Executors = opts.file ? keptExecutors(opts.file) : {};
-  let known = Object.keys(value).length > 0;
+  const kept = opts.file ? keptExecutors(opts.file) : null;
+  let value: Executors = kept ?? {};
+  let known = kept !== null;
   let at = Number.NEGATIVE_INFINITY;
   let wait = EXECUTORS_TTL_MS;
   let retry = 0;
   let running: Promise<Executors> | null = null;
+  const strikes: Partial<Record<string, number>> = {};
   const look = (): Promise<Executors> =>
-    (running ??= detectExecutors(opts.run, value)
+    (running ??= detectExecutors(opts.run, value, strikes)
       .then(({ found, unsure }) => {
         at = now();
         retry = unsure ? Math.min(retry ? retry * 2 : EXECUTORS_RETRY_MS, EXECUTORS_TTL_MS) : 0;
         wait = retry || EXECUTORS_TTL_MS;
         if (unsure) setTimeout(() => void look(), wait).unref?.();
-        const changed = JSON.stringify(found) !== JSON.stringify(value);
+        const changed = !known || JSON.stringify(found) !== JSON.stringify(value);
         value = found;
         known = true;
         if (changed) {
@@ -352,5 +377,21 @@ export function cachedExecutors(
     return value;
   }) as ExecutorsCache;
   get.ready = () => (known ? Promise.resolve(get()) : look());
+  Object.defineProperty(get, "known", { get: () => known });
   return get;
+}
+
+/**
+ * `codex --version` alone, for a Codex turn: a good answer is kept for the TTL; null when it couldn't tell (timed
+ * out, failed), never cached.
+ */
+export function cachedCodexVersion(run: Run = defaultRun, now: () => number = Date.now) {
+  let kept: { version?: string; at: number } | undefined;
+  return async (): Promise<string | undefined | null> => {
+    if (kept && now() - kept.at < EXECUTORS_TTL_MS) return kept.version;
+    const p = await detectVersion(run, "codex").catch((): Probe => ({ unsure: true }));
+    if (p.unsure) return null;
+    kept = { ...(p.entry ? { version: p.entry.version } : {}), at: now() };
+    return kept.version;
+  };
 }

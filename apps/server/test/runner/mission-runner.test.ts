@@ -10,8 +10,10 @@ import {
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
 import {
+  cachedCodexVersion,
   cachedExecutors,
   detectExecutors,
+  EXECUTORS_EXIT_STRIKES,
   EXECUTORS_RETRY_MS,
   EXECUTORS_TTL_MS,
   resolveCommand,
@@ -110,6 +112,25 @@ test("detection: only a missing binary is not installed; a timeout or failing ex
   });
   // Gone from the PATH: not installed any more, and that is a sure answer.
   expect(await detectExecutors(() => ({ ...NOT_FOUND }), good)).toEqual({ found: {}, unsure: false });
+  // A shim whose interpreter is gone: the shell's "not found" is as sure.
+  expect(await detectExecutors(() => ({ status: 127, stdout: "" }), good)).toEqual({ found: {}, unsure: false });
+  // A launcher left behind keeps failing: dropped after a few looks in a row.
+  const strikes = {};
+  for (let i = 1; i < EXECUTORS_EXIT_STRIKES; i++) {
+    expect(await detectExecutors(failing, good, strikes)).toEqual({ found: good, unsure: true });
+  }
+  expect(await detectExecutors(failing, good, strikes)).toEqual({ found: {}, unsure: false });
+});
+
+test('Codex turn\'s own look: a timeout is "couldn\'t tell" (null), never "not installed"', async () => {
+  let answer: object = { ...TIMED_OUT };
+  const version = cachedCodexVersion(() => answer as { status: number | null; stdout: string });
+  expect(await version()).toBeNull();
+  answer = { status: 0, stdout: "codex-cli 0.80.0\n" };
+  expect(await version()).toBe("codex-cli 0.80.0");
+  answer = { ...NOT_FOUND };
+  expect(await version()).toBe("codex-cli 0.80.0");
+  expect(await cachedCodexVersion(() => ({ ...NOT_FOUND }))()).toBeUndefined();
 });
 
 test("cache: an unsure look is retried soon, never kept for the TTL; hello never waits on a look", async () => {

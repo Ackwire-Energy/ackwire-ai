@@ -28,7 +28,7 @@ import {
 import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { cutText } from "./format";
-import { applyAccessDecided, storeMachineAccess, storeMachineExecutors } from "./machine-access";
+import { applyAccessDecided, storedExecutors, storeMachineAccess, storeMachineExecutors } from "./machine-access";
 import {
   accountsToRemove,
   forgetRemovedAccount,
@@ -584,14 +584,16 @@ export function createMachineHub(deps: MachineHubDeps) {
         ...(frame.executors || frame.browser || frame.desktop || frame.terminal || frame.desktopUse
           ? {
               executors: {
-                ...(frame.executors ?? {}),
+                // A runner that hasn't looked yet leaves the CLIs out: the last ones stored stand.
+                ...(frame.executors
+                  ? { ...frame.executors, detectedAt: now.toISOString() }
+                  : storedExecutors(machine.executors)),
                 ...(frame.browser ? { browser: frame.browser } : {}),
                 ...(frame.desktop ? { desktop: frame.desktop } : {}),
                 ...(frame.terminal ? { terminal: frame.terminal } : {}),
                 ...(frame.desktopUse ? { desktopUse: frame.desktopUse } : {}),
                 ...(system ? { mode: "system" as const } : {}),
                 ...(Object.keys(ownUsage).length > 0 ? { ownUsage } : {}),
-                detectedAt: now.toISOString(),
               },
             }
           : {}),

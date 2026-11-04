@@ -573,6 +573,11 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     await runner.frame({ type: "executors.changed", executors: "nope" });
     await Bun.sleep(5);
     expect((await row())?.claude).toMatchObject({ version: "2.1.300" });
+    // A hello from a runner that hasn't looked yet leaves the CLIs out: the stored ones stand.
+    const detectedAt = (await row())?.detectedAt;
+    await fakeRunner(hub).hello(paired.token, { browser: { available: false } });
+    await Bun.sleep(5);
+    expect(await row()).toMatchObject({ claude: { version: "2.1.300" }, browser: { available: false }, detectedAt });
   });
 
   test("a brain turn that goes quiet fails; its own events and bridge calls keep a long one alive", async () => {

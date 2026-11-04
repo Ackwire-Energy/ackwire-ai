@@ -67,6 +67,15 @@ export async function storeMachineAccess(deps: AccessDeps, machineId: string, ac
   if (row) await publishMachineUpdated(deps.pubsub, row.orgId, machineId, { access: true });
 }
 
+/** What `machines.executors` keeps of the coding CLIs: each one found and when they were looked up. */
+export function storedExecutors(stored: schema.MachineExecutors | null | undefined): schema.MachineExecutors {
+  if (!stored) return {};
+  const { claude, codex, cursor, opencode, detectedAt } = stored;
+  return Object.fromEntries(
+    Object.entries({ claude, codex, cursor, opencode, detectedAt }).filter(([, v]) => v !== undefined),
+  );
+}
+
 /**
  * `executors.changed` (protocol 41): the coding CLIs the runner found since `hello`. Only those keys are replaced;
  * what `hello` stored beside them (the browser, the desktops, the own sign-ins' usage) stays.
