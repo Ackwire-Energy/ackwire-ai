@@ -172,6 +172,8 @@ unchanged.
 
 ### 7. Screens
 
+In Portuguese the feature is called **Cofre**; every other language keeps **Vault** as its name.
+
 Settings › Vault, on the web and the phone: Team, Personal and Connections, each item with who may use it and its
 last use (a contact by its title and description: the list carries no contact's details, so it opens no contact's
 seal); an item's page with its fields (shown or copied only by who manages it, and recorded; a contact whose saved

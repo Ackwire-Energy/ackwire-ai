@@ -541,7 +541,7 @@ describe("Configurações do workspace", () => {
       // The people, where a member who may not invite suggests someone (ADR 0090).
       "Membros e convites",
       // Their own logins, keys and contacts (ADR 0139).
-      "Vault",
+      "Cofre",
       "Conectores e MCPs",
       "Computadores",
       // Their own plans' meters, in percentages (ADR 0063).
