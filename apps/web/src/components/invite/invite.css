@@ -418,10 +418,10 @@ html:not([data-pointer]) .invite-each:focus-visible {
  * confetti is `pixelConfetti`); each "Enviado" check draws itself. With reduced motion all of it is there at once.
  */
 .invite-screen[data-sent] .invite-answer {
-  animation: none;
+  transition: none;
 }
 .invite-screen[data-sent] .auth__bubble {
-  animation-delay: 120ms;
+  transition-delay: 120ms;
 }
 .invite-screen[data-sent] .invite-person {
   animation: invite-row-in 0.32s var(--out) both;
@@ -457,7 +457,9 @@ html:not([data-pointer]) .invite-each:focus-visible {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .invite-screen[data-sent] .auth__bubble,
+  .invite-screen[data-sent] .auth__bubble {
+    transition: none;
+  }
   .invite-screen[data-sent] .invite-person,
   .invite-screen[data-sent] .invite-host__face,
   .invite-screen[data-sent] .invite-person[data-ok] .invite-state .ac-icon path {

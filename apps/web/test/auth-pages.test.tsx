@@ -402,6 +402,23 @@ describe("Criar conta (e-mail novo)", () => {
     expect(router.state.location.pathname).toBe("/login");
   });
 
+  test("the first character typed or erased keeps the step in place: no new step, nothing to replay its entrance", async () => {
+    const { api } = authApi(NEW);
+    await renderApp("/signup", { api, auth: createFakeAuth().auth });
+    await type("E-mail", "walter@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    const step = document.querySelector(".auth__step");
+    const field = screen().getByLabelText("Seu nome");
+    const button = screen().getByRole("button", { name: /^Continuar(?! com)/ });
+    for (const value of ["W", "", "W"]) {
+      await type("Seu nome", value);
+      expect(document.querySelector(".auth__step")).toBe(step);
+      expect(screen().getByLabelText("Seu nome")).toBe(field);
+      expect(screen().getByRole("button", { name: /^Continuar(?! com)/ })).toBe(button);
+      expect(button.hasAttribute("disabled")).toBe(value === "");
+    }
+  });
+
   test("a server that emails: the onboarding learns where the confirmation went; the name isn't spell-checked", async () => {
     const { api } = authApi(NEW, { reset: true });
     const { auth } = createFakeAuth();
