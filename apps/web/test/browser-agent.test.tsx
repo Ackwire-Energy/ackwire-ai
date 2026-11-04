@@ -140,8 +140,11 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
     await push(frame());
     expect(card().querySelector(".brw-ac__page img")).toBeTruthy();
     expect(sub()).toBe("Ao vivo · você está assistindo");
-    // One head: the site above the page, no fold, no Parar.
-    expect(document.querySelector(".cmp-site")?.textContent).toBe("loja.example.com/carrinho");
+    // One head: the page's address above it, as a browser's bar, read only while watching; no fold, no Parar.
+    const watched = within(card()).getByRole("textbox", { name: "Endereço do site" }) as HTMLInputElement;
+    expect(watched.value).toBe("loja.example.com/carrinho");
+    expect(watched.readOnly).toBe(true);
+    expect(within(card()).queryByRole("button", { name: "Voltar à página anterior" })).toBeNull();
     expect(within(dialog() as HTMLElement).queryByRole("button", { name: "Recolher" })).toBeNull();
     expect(within(dialog() as HTMLElement).queryByRole("button", { name: "Parar" })).toBeNull();
 
@@ -166,17 +169,36 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
     expect(card().textContent).toContain("Digite um endereço acima para abrir um site.");
     expect(sub()).toBe("Você no controle · a\u00a0Ada espera");
 
-    // Outside the agent's sites: said under the field, nothing opens.
-    const address = within(card()).getByRole("textbox", { name: "Endereço do site" });
-    await act(async () => fireEvent.change(address, { target: { value: "outro.com" } }));
-    await click(within(card()).getByRole("button", { name: "Abrir" }));
+    // Outside the agent's sites: said under the field, nothing opens. Enter opens what is typed: no button for it.
+    const address = within(card()).getByRole("textbox", { name: "Endereço do site" }) as HTMLInputElement;
+    expect(address.readOnly).toBe(false);
+    expect(within(card()).queryByRole("button", { name: "Abrir" })).toBeNull();
+    expect(within(card()).queryByRole("button", { name: "Abrir um site" })).toBeNull();
+    const enter = (value: string) =>
+      act(async () => {
+        fireEvent.focus(address);
+        fireEvent.change(address, { target: { value } });
+        fireEvent.submit(address.closest("form") as HTMLFormElement);
+      });
+    await enter("outro.com");
+    await settle(4);
     expect(within(card()).getByRole("alert").textContent).toBe("Fora dos sites que a Ada pode abrir.");
-    await act(async () => fireEvent.change(address, { target: { value: "loja.example.com" } }));
-    await click(within(card()).getByRole("button", { name: "Abrir" }));
+    await enter("loja.example.com");
+    await settle(4);
     expect(calls(s, "browser.open").at(-1)).toEqual([ORG_ID, ADA_ID, "loja.example.com"]);
     await push(frame("https://loja.example.com/"));
     expect(card().querySelector(".brw-ac__page img")).toBeTruthy();
     expect(card().classList.contains("is-closed")).toBe(false);
+    // At rest the bar shows where the page is; back, forward and reload are the browser's own.
+    expect(address.value).toBe("loja.example.com");
+    for (const [name, go] of [
+      ["Voltar à página anterior", "back"],
+      ["Avançar para a próxima página", "forward"],
+      ["Recarregar a página", "reload"],
+    ] as const) {
+      await click(within(card()).getByRole("button", { name }));
+      expect(calls(s, "browser.open").at(-1)).toEqual([ORG_ID, ADA_ID, { go }]);
+    }
   });
 
   test("a request for me: the entry says so with Ajudar, which takes it and opens the page in my control", async () => {

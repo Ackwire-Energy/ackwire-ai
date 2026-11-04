@@ -191,6 +191,7 @@ import type {
   OrgPlanUsage,
   OrgRoles,
   OrgSettings,
+  PageTarget,
   Person,
   PersonalTokenInput,
   PhoneSignIn,
@@ -1548,11 +1549,11 @@ export interface ApiClient {
      */
     takeover(orgId: string, agentId: string, runId?: string, screen?: ScreenKind): Promise<BrowserHandoff>;
     /**
-     * The person in control opens a site (a bare host gets https://); a closed browser opens. 409
-     * `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
+     * The person in control opens a site (a bare host gets https://), or goes back, forward or reloads; a closed
+     * browser opens. 409 `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
      * `browser.bad_address` or `browser.open_failed`.
      */
-    open(orgId: string, agentId: string, url: string): Promise<void>;
+    open(orgId: string, agentId: string, to: PageTarget): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
     stop(orgId: string, agentId: string): Promise<void>;
     /**
@@ -1576,8 +1577,8 @@ export interface ApiClient {
     takeover(orgId: string, profileId: string): Promise<BrowserProfile>;
     /** "Devolver". */
     handback(orgId: string, profileId: string): Promise<BrowserProfile>;
-    /** The person in control opens a site. */
-    open(orgId: string, profileId: string, url: string): Promise<void>;
+    /** The person in control opens a site, or goes back, forward or reloads. */
+    open(orgId: string, profileId: string, to: PageTarget): Promise<void>;
     /** The agent's default browser: a profile it may use, or null for its own. */
     setDefault(orgId: string, agentId: string, profileId: string | null): Promise<void>;
     /** "Pedir mais um perfil": the people who grant profiles hear of it. */

@@ -1449,6 +1449,8 @@ export const featureKeysPtBR = {
       typeMarked: "Digite no campo marcado",
       typeMarkedSecret: "Senha do campo marcado",
       keys: "Teclas",
+      paste: "Colar",
+      pasteHint: "Colar na página o que você copiou",
       secureOn: "Mostrar o texto",
       secureOff: "Esconder o texto (senha)",
       send: "Enviar",

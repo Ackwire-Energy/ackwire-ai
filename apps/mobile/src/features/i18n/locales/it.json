@@ -1530,6 +1530,8 @@
       "typeMarked": "Scrivi nel campo evidenziato",
       "typeMarkedSecret": "Password per il campo evidenziato",
       "keys": "Tasti",
+      "paste": "Incolla",
+      "pasteHint": "Incolla nella pagina ciò che hai copiato",
       "secureOn": "Mostra il testo",
       "secureOff": "Nascondi il testo (password)",
       "send": "Invia",

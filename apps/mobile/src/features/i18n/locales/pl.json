@@ -1613,6 +1613,8 @@
       "typeMarked": "Pisz w zaznaczonym polu",
       "typeMarkedSecret": "Hasło do zaznaczonego pola",
       "keys": "Klawisze",
+      "paste": "Wklej",
+      "pasteHint": "Wklej na stronę to, co skopiowano",
       "secureOn": "Pokaż tekst",
       "secureOff": "Ukryj tekst (hasło)",
       "send": "Wyślij",

@@ -572,6 +572,50 @@ describe("the browser and the desktop show one window", () => {
     live.close();
   });
 
+  test("helping in the browser on its window: who may drive the computer drives the whole screen, audited; who may only use the browser watches it", async () => {
+    const { opened, setMachine, systemMode } = await start();
+    await setMachine({ protocol: DESKTOP_SWITCH_PROTOCOL });
+    await systemMode();
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    const isMode = (s: Stream, mode: string) => s.request.kind === "desktop" && s.request.mode === mode;
+    const taken = () =>
+      f.db
+        .select()
+        .from(schema.auditLog)
+        .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, "desktop.control_taken")));
+
+    // The owner's own: their watching turns to control on the same sockets, and back with the hand back.
+    const mine = await opened(f.owner.id, WATCH, true);
+    const own = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+    expect(own.screen).toBe("browser");
+    await until(() => isMode(mine.stream, "control"), "the owner's control");
+    expect(mine.viewer.closed).toBeNull();
+    await finishHandoff(deps(), f.owner.id, f.org.id, own.id, { result: "done" });
+    await until(() => isMode(mine.stream, "watch"), "the owner watching again");
+    expect(await taken()).toEqual([]);
+
+    // An admin who may drive it: the same, and the owner's log says so.
+    const hers = await opened(bia.id, WATCH, true);
+    const helped = await startTakeover(deps(), bia.id, f.org.id, f.agent.id);
+    await until(() => isMode(hers.stream, "control"), "her control");
+    expect(await reauthorizeStream(f.db, hers.stream, "control")).toBeNull();
+    expect((await taken()).map((r) => r.details)).toEqual([{ machineId: helped.machineId, handoffId: helped.id }]);
+    await finishHandoff(deps(), bia.id, f.org.id, helped.id, { result: "done" });
+    await until(() => isMode(hers.stream, "watch"), "her watching again");
+
+    // Off system mode the computer is the owner's alone: she helps in the page, and her view stays watching.
+    await setMachine({ executors: { browser: { available: true }, desktop: { available: true } } });
+    const page = await startTakeover(deps(), bia.id, f.org.id, f.agent.id);
+    await Bun.sleep(50);
+    expect(isMode(hers.stream, "watch")).toBe(true);
+    expect(await reauthorizeStream(f.db, hers.stream, "control")).toEqual({
+      refused: STREAM_CLOSE.forbidden,
+      reason: "forbidden",
+    });
+    expect(await taken()).toHaveLength(1);
+    await finishHandoff(deps(), bia.id, f.org.id, page.id, { result: "done" });
+  });
+
   test("a browser that doesn't run on the desktop (its switch off) keeps the two screens apart", async () => {
     const { setMachine } = await start();
     await setMachine({ access: { ...ACCESS, tools: { ...ACCESS.tools, desktop: false } } });

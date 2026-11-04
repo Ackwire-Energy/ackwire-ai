@@ -425,6 +425,42 @@ describe("the computer dialog, live", () => {
     expect(couldnt.className).toContain("cmp-couldnt ac-btn--glyph");
   });
 
+  test("a sign-in request in the browser, its window on the screen: who may drive the screen helps on the whole screen, the request on top", async () => {
+    const browserAsk = screenAsk({ id: "h-sign-in", screen: "browser", instructions: "Entrar no painel da loja" });
+    const b = await backend({ handoff: browserAsk, browser: true });
+    b.fake.sameWindow.add(ADA_ID);
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    await renderPage(<ComputerDialog agent={ada} open onClose={() => {}} />, {
+      api: b.api,
+      org: true,
+      createSocket: b.sockets.factory,
+    });
+    await settle(8);
+    const banner = box().querySelector(".cmp-banner") as HTMLElement;
+    expect(banner.textContent).toContain("Entrar no painel da loja");
+    await click(within(banner).getByRole("button", { name: "Ajudar" }));
+    expect(calls(b, "browser.takeControl")).toEqual([[ORG_ID, "h-sign-in"]]);
+    await settle(4);
+    // The screen in control, never the page alone: the keys and the paste go through the screen.
+    expect(box().querySelector(":scope > .cmp-body > .dsk.is-control")).not.toBeNull();
+    expect(box().querySelector(".brw-ac")).toBeNull();
+    expect(b.sockets.screens.at(-1)?.url).toContain("mode=control");
+    expect(box().querySelector(":scope > .cmp-body > .dsk > .cmp-asked")?.textContent).toBe(
+      "“Entrar no painel da loja”",
+    );
+    expect(view().getByRole("button", { name: "Pronto" })).toBeTruthy();
+  });
+
+  test("the same request for who may drive only the browser: the page, labelled as the browser", async () => {
+    const browserAsk = screenAsk({ id: "h-sign-in", screen: "browser", instructions: "Entrar no painel da loja" });
+    const t = await dialog({ handoff: browserAsk, browser: true, desktop: { ...RUNNING, canControl: false } });
+    t.fake.sameWindow.add(ADA_ID);
+    await click(within(box().querySelector(".cmp-banner") as HTMLElement).getByRole("button", { name: "Ajudar" }));
+    await settle(4);
+    expect(box().querySelector(".brw-ac.is-surface.is-control")).not.toBeNull();
+    expect(box().querySelector(".dsk")).toBeNull();
+  });
+
   test("Ajudar refused (someone got there first): said in the head for a moment, not in a toast over the window", async () => {
     const t = await dialog({ handoff: screenAsk() });
     t.api.browser.takeControl = async () => {

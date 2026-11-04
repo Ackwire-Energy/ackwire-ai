@@ -1364,6 +1364,8 @@
       "typeMarked": "マークされた欄に入力",
       "typeMarkedSecret": "マークされた欄のパスワード",
       "keys": "キー",
+      "paste": "貼り付け",
+      "pasteHint": "コピーした内容をページに貼り付け",
       "secureOn": "テキストを表示",
       "secureOff": "テキストを隠す（パスワード）",
       "send": "送信",

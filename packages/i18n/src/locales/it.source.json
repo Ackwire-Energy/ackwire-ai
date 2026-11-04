@@ -30653,8 +30653,23 @@
   "browser.inCard.fullExit": {
     "value": "Exit full screen"
   },
-  "browser.inCard.goToggle": {
-    "value": "Open a site"
+  "browser.inCard.navBack": {
+    "value": "Go back"
+  },
+  "browser.inCard.navForward": {
+    "value": "Go forward"
+  },
+  "browser.inCard.navReload": {
+    "value": "Reload the page"
+  },
+  "browser.inCard.paste": {
+    "value": "Paste"
+  },
+  "browser.inCard.pasteHint": {
+    "value": "Paste what you copied into the page"
+  },
+  "browser.inCard.pasteBlocked": {
+    "value": "Your browser didn't let the page read what you copied. Use {{keys}} on the page."
   },
   "browser.inCard.goLabel": {
     "value": "Site address"

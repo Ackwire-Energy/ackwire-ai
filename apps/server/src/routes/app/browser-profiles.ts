@@ -13,6 +13,7 @@ import {
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { PageTarget, pageTarget } from "./browser";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
 const tags = ["Browser profiles"];
@@ -180,13 +181,13 @@ export function browserProfileRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/browser-profiles/{profileId}/open",
       tags,
       security,
-      summary: "Open a site in the profile (the person in control)",
-      request: { params: ProfileParams, body: body(z.object({ url: z.string().min(1).max(2048) })) },
+      summary: "Open a site in the profile (the person in control), or go back, forward or reload (`go`)",
+      request: { params: ProfileParams, body: body(PageTarget) },
       responses: { 204: { description: "Opened" }, ...errors },
     }),
     async (c) => {
       const { orgId, profileId } = c.req.valid("param");
-      await openProfilePage(control, c.get("user").id, orgId, profileId, c.req.valid("json").url);
+      await openProfilePage(control, c.get("user").id, orgId, profileId, pageTarget(c.req.valid("json")));
       return c.body(null, 204);
     },
   );

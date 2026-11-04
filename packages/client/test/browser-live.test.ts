@@ -25,12 +25,14 @@ import {
   modifiersOf,
   pagePoint,
   parseBrowserLiveMessage,
+  pasteEvents,
   pressEvents,
   releaseEvent,
   usesBrowser,
   wheelEvent,
 } from "../src/browser";
 import { toolActivity } from "../src/lib/activity";
+import { shownAddress } from "../src/lib/sites";
 
 const AGENT = "11111111-1111-4111-8111-111111111111";
 
@@ -374,6 +376,23 @@ describe("agent browser live connection (ADR 0040)", () => {
     expect(live.sendInput(events)).toBe(true);
     expect(sent.map((f) => f.events?.length)).toEqual([BROWSER_INPUT_BATCH, 5]);
     expect(live.sendInput([])).toBe(false);
+    // A long paste: its pieces, one event's worth of text a frame (the server drops larger frames).
+    sent.length = 0;
+    const long = `${"x".repeat(9_999)}😀${"y".repeat(12_000)}\r\nfim`;
+    const pieces = pasteEvents(long);
+    expect(pieces.map((e) => (e as { text: string }).text.length)).toEqual([9_999, 10_000, 2_006]);
+    expect(pieces.map((e) => (e as { text: string }).text).join("")).toBe(long.replace("\r\n", "\n"));
+    live.sendInput(pieces);
+    expect(sent.map((f) => f.events?.length)).toEqual([1, 1, 1]);
+    expect(pasteEvents("")).toEqual([]);
+  });
+
+  test("the address bar at rest: where the page is, as a browser shows it", () => {
+    expect(shownAddress("https://www.google.com/search?q=test")).toBe("www.google.com/search?q=test");
+    expect(shownAddress("https://loja.example.com/")).toBe("loja.example.com");
+    expect(shownAddress("http://intranet:8080/a/")).toBe("intranet:8080/a/");
+    expect(shownAddress("about:blank")).toBe("");
+    expect(shownAddress(null)).toBe("");
   });
 
   test("messages are checked", () => {

@@ -1,5 +1,6 @@
 import type { BrowserHandoff } from "@agenteschat/client";
 import {
+  drivesOnDesktop,
   handoffFuse,
   handoffIsMine,
   handoffScreen,
@@ -8,6 +9,7 @@ import {
   keys,
   useApi,
   useBrowserHandoffMutations,
+  useDesktopStatus,
 } from "@agenteschat/client";
 import { formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -72,10 +74,13 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const status = current.status === "pending" ? "expired" : current.status;
   const left = handoffTimeLeft(t, current);
   const onDesktop = handoffScreen(current) === "desktop";
-  // The agent's browser opens right here, under the request; a request on its screen, in the computer dialog.
+  // The window of a browser request on the agent's screen, for someone who may drive that screen: they help there.
+  const desktop = useDesktopStatus(org.id, current.agentId, { enabled: !onDesktop && (waiting || active) });
+  const opensDesktop = drivesOnDesktop(current, desktop.data);
+  // The agent's browser opens right here, under the request; on its screen, in the computer dialog.
   const [here, setHere] = useState(false);
   const openComputer = useOpenComputer();
-  const show = () => (onDesktop ? openComputer(current.agentId) : setHere(true));
+  const show = () => (opensDesktop ? openComputer(current.agentId) : setHere(true));
   const take = () =>
     actions.takeControl.mutate(current.id, {
       onSuccess: show,
@@ -94,7 +99,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
     if (latest.current.waiting) latest.current.take();
     else latest.current.show();
   }, [asked]);
-  const showBrowser = !onDesktop && ((here && (waiting || active)) || mineInControl);
+  const showBrowser = !opensDesktop && ((here && (waiting || active)) || mineInControl);
   const time = current.resolvedAt ? formatTime(i18n.language, current.resolvedAt) : "";
   const screenIcon = onDesktop ? "computer" : "globe";
   const groupLabel = onDesktop ? t("desktop.card.group", g) : t("browser.card.group", g);
@@ -125,8 +130,8 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
             detail: agent?.handle ? `@${agent.handle}` : undefined,
             more: t("ask.seeScreen"),
           }}
-          open={!onDesktop && showBrowser}
-          onOpenChange={(open) => (onDesktop ? openComputer(current.agentId) : setHere(open))}
+          open={!opensDesktop && showBrowser}
+          onOpenChange={(open) => (opensDesktop ? openComputer(current.agentId) : setHere(open))}
           actions={
             mine ? (
               <Button
@@ -255,7 +260,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
           {active && !showBrowser && (
             <div className="brw-rq__acts">
               <Button icon={screenIcon} onClick={show}>
-                {onDesktop && mineInControl ? t("agentComputer.open") : t("browser.card.watch")}
+                {opensDesktop && mineInControl ? t("agentComputer.open") : t("browser.card.watch")}
               </Button>
             </div>
           )}

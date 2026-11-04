@@ -1442,6 +1442,8 @@ export const featureKeysEn = {
       typeMarked: "Type into the marked field",
       typeMarkedSecret: "Password for the marked field",
       keys: "Keys",
+      paste: "Paste",
+      pasteHint: "Paste what you copied into the page",
       secureOn: "Show the text",
       secureOff: "Hide the text (password)",
       send: "Send",

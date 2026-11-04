@@ -149,6 +149,7 @@ import type {
   OrgPlanUsage,
   OrgRoles,
   OrgSettings,
+  PageTarget,
   Person,
   PhoneSignIn,
   Poll,
@@ -217,6 +218,7 @@ const filterQuery = (f: SearchFilterInput | undefined) =>
       )
     : {};
 
+const pageBody = (to: PageTarget) => (typeof to === "string" ? { url: to } : to);
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
 /** The most agents one `POST …/agent-setup` takes (the server's `SETUP_AGENTS_MAX`). */
 const SETUP_AGENTS_PER_CALL = 200;
@@ -390,8 +392,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<BrowserHandoff>(`${org(orgId)}/agents/${enc(agentId)}/${screen}/takeover`, {
           json: runId ? { runId } : {},
         }),
-      open: (orgId, agentId, url) =>
-        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
+      open: (orgId, agentId, to) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: pageBody(to) }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
       restart: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/restart`, { json: {} }),
     },
@@ -411,8 +413,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}/takeover`, { json: {} }),
       handback: (orgId, profileId) =>
         request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}/handback`, { json: {} }),
-      open: (orgId, profileId, url) =>
-        request<void>(`${org(orgId)}/browser-profiles/${enc(profileId)}/open`, { json: { url } }),
+      open: (orgId, profileId, to) =>
+        request<void>(`${org(orgId)}/browser-profiles/${enc(profileId)}/open`, { json: pageBody(to) }),
       setDefault: (orgId, agentId, profileId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser-profile`, { method: "PUT", json: { profileId } }),
       request: (orgId, agentId) =>

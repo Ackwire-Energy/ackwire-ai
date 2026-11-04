@@ -6413,6 +6413,9 @@ export type ScreenKind = "browser" | "desktop";
  * watching took over (`takeover`: no card of its own; its browser card stays
  * with the run it is bound to, `runId`).
  */
+/** Where the person in control sends the agent's page: an address they typed, or the address bar's arrows and reload. */
+export type PageTarget = string | { go: "back" | "forward" | "reload" };
+
 export interface BrowserHandoff {
   id: string;
   agentId: string;

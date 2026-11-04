@@ -17,7 +17,6 @@ import {
   CONTROL_GRACE_MS,
   handoffView,
   noteComputerTaken,
-  openHandoffOf,
   openHandoffOn,
   requireBrowserAccess,
   setControlDeadline,
@@ -26,7 +25,14 @@ import {
 import { HANDOFF_KEEPALIVE_MS } from "./browser/live";
 import { ForbiddenError, NotFoundError } from "./errors";
 import type { MachineCaller, MachineHub } from "./machine-hub";
-import { computerDriving, type DriveRefusal, getMachine, machineOnline, requireComputerDriver } from "./machines";
+import {
+  computerDriving,
+  type DriveRefusal,
+  getMachine,
+  machineOnline,
+  mayDriveComputer,
+  requireComputerDriver,
+} from "./machines";
 import { closedRefusal, OrgDeletingError, orgStanding, standingRefusal } from "./standing";
 import type { Stream, StreamBroker, StreamInput, StreamTarget } from "./streams";
 
@@ -106,9 +112,8 @@ async function streamAccess(
   const controller = open?.status === "active" ? open.controllerUserId : null;
   if (controller && controller !== userId) return refused(STREAM_CLOSE.hidden, "someone_in_control");
   if (request.mode === "watch") return { driven, control: null };
-  if (open?.screen !== "desktop" || controller !== userId) {
-    return refused(STREAM_CLOSE.controlEnded, "not_in_control");
-  }
+  // The browser's handoff too, its window on this screen: who may drive the computer (checked above) helps there.
+  if (!open || controller !== userId) return refused(STREAM_CLOSE.controlEnded, "not_in_control");
   return { driven, control: open.id };
 }
 
@@ -192,7 +197,7 @@ export async function recheckStream(db: Database, stream: Stream) {
  */
 export async function streamClosed(db: Database, s: Stream) {
   if (s.request.kind === "desktop" && s.request.mode === "control") {
-    const open = await openHandoffOf(db, s.orgId, s.agentId, "desktop");
+    const open = await openHandoffOn(db, s.orgId, s.agentId, "desktop");
     if (open?.status === "active" && open.controllerUserId === s.userId) {
       await setControlDeadline(db, open.id, s.userId, new Date(Date.now() + CONTROL_GRACE_MS)).catch(() => {});
     }
@@ -348,7 +353,11 @@ export function createDesktopControl(deps: DesktopControlDeps) {
     if (!deps.streams.some(ofAgent)) return;
     const open = await openHandoffOn(deps.db, orgId, agentId, "desktop");
     const controller = open?.status === "active" ? open.controllerUserId : null;
-    const onDesktop = open?.screen === "desktop" ? controller : null;
+    // The browser's holder drives the screen too where they may drive the computer (`streamAccess`).
+    const onDesktop =
+      controller && (open?.screen === "desktop" || (await mayDriveComputer(deps.db, controller, orgId, agentId)))
+        ? controller
+        : null;
     deps.streams.closeWhere(
       (s) => ofAgent(s) && controller !== null && s.userId !== controller,
       STREAM_CLOSE.hidden,
