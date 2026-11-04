@@ -1418,7 +1418,7 @@
     "collapseAll": "すべて折りたたむ",
     "expandAll": "すべて展開",
     "organize": "チームでグループを整理",
-    "more_other": "チームにエージェントがあと {{count}} 件",
+    "more_other": "チームにエージェントがあと {{count}} 体",
     "createFirst": "最初のエージェントを作成",
     "working_other": "{{count}} 件が作業中",
     "count_other": "エージェント {{count}} 件",
