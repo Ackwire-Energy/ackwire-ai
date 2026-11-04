@@ -311,6 +311,7 @@
     "failed": "Niet verstuurd · Probeer opnieuw",
     "notSent": "Het bericht is niet verstuurd.",
     "toLatest": "Naar de nieuwste berichten",
+    "toLatestNew": "Naar de nieuwste berichten: {{text}}",
     "stopAgent": "{{name}} stoppen",
     "offlineWait": "Gaat weg zodra de verbinding terug is",
     "turn": {
@@ -342,6 +343,7 @@
       "count_one": "{{count}} nieuw",
       "count_other": "{{count}} nieuw",
       "working": "Aan het schrijven: {{names}}",
+      "mentionsYou": "je bent vermeld",
       "divider": "Nieuw"
     },
     "connection": {

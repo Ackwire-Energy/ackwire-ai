@@ -314,6 +314,7 @@ export const featureKeysEn = {
     failed: "Not sent · Try again",
     notSent: "The message wasn't sent.",
     toLatest: "Go to the latest messages",
+    toLatestNew: "Go to the latest messages: {{text}}",
     stopAgent: "Stop {{name}}",
     offlineWait: "Goes out when the connection is back",
     turn: {
@@ -345,6 +346,7 @@ export const featureKeysEn = {
       count_one: "{{count}} new",
       count_other: "{{count}} new",
       working: "{{names}} writing",
+      mentionsYou: "you were mentioned",
       divider: "New",
     },
     connection: {

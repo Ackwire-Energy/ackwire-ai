@@ -325,6 +325,7 @@
     "failed": "Non inviato · Riprova",
     "notSent": "Il messaggio non è stato inviato.",
     "toLatest": "Vai agli ultimi messaggi",
+    "toLatestNew": "Vai agli ultimi messaggi: {{text}}",
     "stopAgent": "Ferma {{name}}",
     "offlineWait": "Parte appena torna la connessione",
     "turn": {
@@ -357,6 +358,7 @@
       "count_many": "{{count}} nuovi",
       "count_other": "{{count}} nuovi",
       "working": "{{names}} sta scrivendo",
+      "mentionsYou": "ti hanno menzionato",
       "divider": "Nuovi"
     },
     "connection": {

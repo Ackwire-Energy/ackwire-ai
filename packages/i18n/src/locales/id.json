@@ -1635,12 +1635,13 @@
     "typing_other": "{{names}} sedang mengetik…",
     "callAgent": "Panggil agen",
     "callAgentMenu": "Agen di kanal ini",
-    "newMessages": "Pesan baru",
+    "toLatest": "Ke pesan terbaru",
     "newPill": {
-      "label": "Pesan baru: {{text}}",
+      "label": "Ke pesan terbaru: {{text}}",
       "count_other": "{{count}} baru",
       "more": "{{names}} dan {{count}} lainnya",
-      "writing": "{{name}} sedang menulis"
+      "writing": "{{name}} sedang menulis",
+      "mentionsYou": "kamu disebut"
     },
     "unreadDivider": "Baru",
     "offline": "Tidak ada koneksi. Apa pun yang kamu kirim akan terkirim sendiri saat koneksi kembali.",

@@ -1,31 +1,34 @@
 import type { Message } from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import type { TFunction } from "i18next";
 
 /**
- * Scrolled up while things arrive: a "Novas"
- * divider before the first unseen message, and the pill says who spoke ("↓ 2 novas · Marina e Ada ·
- * Theo escrevendo"). A click lands on the divider when it is far, else at the end. The sticker or GIF an agent adds
- * after its reply (ADR 0091) is never news of its own: it neither counts nor opens the divider.
+ * Scrolled up while things arrive: a "Novas" divider before the first unseen message, and the round button at the
+ * top right counts them (in red when one mentions me); its label says who spoke ("2 novas · Marina e Ada ·
+ * Theo escrevendo"). A click goes to the end; a catch-up while away lands on the divider when it is far. The sticker
+ * or GIF an agent adds after its reply (ADR 0091) is never news of its own: it neither counts nor opens the divider.
  */
 
-/** The messages from `fromKey` to the end that someone else wrote, and their authors in order. */
-export function unseenOf(items: TimelineItem[], fromKey: string | null, meId: string) {
+/** From `fromKey` to the end: how many someone else wrote, their authors in order, whether one @mentions me. */
+export function unseenOf(items: TimelineItem[], fromKey: string | null, meId: string, myHandle?: string) {
   const authors: Message["author"][] = [];
   let count = 0;
-  if (!fromKey) return { count, authors };
+  let mentionsMe = false;
+  if (!fromKey) return { count, authors, mentionsMe };
   const at = items.findIndex((i) => i.key === fromKey);
-  if (at < 0) return { count, authors };
+  if (at < 0) return { count, authors, mentionsMe };
   for (const item of items.slice(at)) {
     if (item.kind !== "message" || isMediaAfterReply(item.message.meta)) continue;
     const a = item.message.author;
     if (a.type === "person" && a.id === meId) continue;
     count++;
+    if (myHandle && !mentionsMe) mentionsMe = mentionsHandle(item.message.body, myHandle);
     if (!authors.some((x) => x.type === a.type && x.id === a.id)) authors.push(a);
   }
-  return { count, authors };
+  return { count, authors, mentionsMe };
 }
 
 /** The first row after `previousLastKey` (where the divider goes), or null when nothing is new. */
@@ -36,8 +39,8 @@ export function firstNewKey(items: TimelineItem[], previousLastKey: string | und
   return at < 0 ? null : (next?.key ?? null);
 }
 
-/** "2 novas", "Marina e Ada" (or "Marina, Ada e mais 2"), "Theo escrevendo": the pieces that apply. */
-export function pillParts(t: TFunction, count: number, names: string[], writing: string[]) {
+/** "2 novas", "Marina e Ada" (or "Marina, Ada e mais 2"), "Theo escrevendo", "mencionaram você": what applies. */
+export function pillParts(t: TFunction, count: number, names: string[], writing: string[], mentionsMe = false) {
   const said =
     names.length === 0
       ? ""
@@ -48,6 +51,7 @@ export function pillParts(t: TFunction, count: number, names: string[], writing:
     count > 0 ? t("channel.newPill.count", { count }) : "",
     said,
     ...writing.map((name) => t("channel.newPill.writing", { name })),
+    mentionsMe ? t("channel.newPill.mentionsYou") : "",
   ].filter(Boolean);
 }
 

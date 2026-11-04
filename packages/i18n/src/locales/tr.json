@@ -1691,13 +1691,14 @@
     "typing_other": "{{names}} yazıyor…",
     "callAgent": "Bir ajana seslen",
     "callAgentMenu": "Bu kanaldaki ajanlar",
-    "newMessages": "Yeni mesajlar",
+    "toLatest": "En son mesajlara git",
     "newPill": {
-      "label": "Yeni mesajlar: {{text}}",
+      "label": "En son mesajlara git: {{text}}",
       "count_one": "{{count}} yeni",
       "count_other": "{{count}} yeni",
       "more": "{{names}} ve {{count}} kişi daha",
-      "writing": "{{name}} yazıyor"
+      "writing": "{{name}} yazıyor",
+      "mentionsYou": "sizden bahsedildi"
     },
     "unreadDivider": "Yeni",
     "offline": "Bağlantı yok. Gönderdikleriniz bağlantı gelince kendiliğinden gider.",

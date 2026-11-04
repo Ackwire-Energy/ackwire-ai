@@ -1747,14 +1747,15 @@
     "typing_other": "{{names}} están escribiendo…",
     "callAgent": "Llamar a un agente",
     "callAgentMenu": "Agentes en este canal",
-    "newMessages": "Mensajes nuevos",
+    "toLatest": "Ir a los mensajes más recientes",
     "newPill": {
-      "label": "Mensajes nuevos: {{text}}",
+      "label": "Ir a los mensajes más recientes: {{text}}",
       "count_one": "{{count}} nuevo",
       "count_many": "{{count}} nuevos",
       "count_other": "{{count}} nuevos",
       "more": "{{names}} y {{count}} más",
-      "writing": "{{name}} escribiendo"
+      "writing": "{{name}} escribiendo",
+      "mentionsYou": "te mencionaron"
     },
     "unreadDivider": "Nuevos",
     "offline": "Sin conexión. Lo que envíes saldrá solo cuando vuelva.",

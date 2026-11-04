@@ -297,6 +297,7 @@
     "failed": "Tidak terkirim · Coba lagi",
     "notSent": "Pesan tidak terkirim.",
     "toLatest": "Ke pesan terbaru",
+    "toLatestNew": "Ke pesan terbaru: {{text}}",
     "stopAgent": "Hentikan {{name}}",
     "offlineWait": "Terkirim saat koneksi kembali",
     "turn": {
@@ -327,6 +328,7 @@
     "unseen": {
       "count_other": "{{count}} baru",
       "working": "{{names}} sedang menulis",
+      "mentionsYou": "kamu disebut",
       "divider": "Baru"
     },
     "connection": {

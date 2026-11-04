@@ -3931,11 +3931,11 @@
   "channel.callAgentMenu": {
     "value": "Agents in this channel"
   },
-  "channel.newMessages": {
-    "value": "New messages"
+  "channel.toLatest": {
+    "value": "Go to the latest messages"
   },
   "channel.newPill.label": {
-    "value": "New messages: {{text}}"
+    "value": "Go to the latest messages: {{text}}"
   },
   "channel.newPill.count": {
     "value": {
@@ -3948,6 +3948,9 @@
   },
   "channel.newPill.writing": {
     "value": "{{name}} writing"
+  },
+  "channel.newPill.mentionsYou": {
+    "value": "you were mentioned"
   },
   "channel.unreadDivider": {
     "value": "New"

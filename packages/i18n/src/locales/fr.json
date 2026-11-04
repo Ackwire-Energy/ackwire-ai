@@ -1750,14 +1750,15 @@
     "typing_other": "{{names}} écrivent…",
     "callAgent": "Appeler un agent",
     "callAgentMenu": "Agents de ce canal",
-    "newMessages": "Nouveaux messages",
+    "toLatest": "Aller aux derniers messages",
     "newPill": {
-      "label": "Nouveaux messages : {{text}}",
+      "label": "Aller aux derniers messages : {{text}}",
       "count_one": "{{count}} nouveau",
       "count_many": "{{count}} nouveaux",
       "count_other": "{{count}} nouveaux",
       "more": "{{names}} et {{count}} de plus",
-      "writing": "{{name}} écrit"
+      "writing": "{{name}} écrit",
+      "mentionsYou": "on vous a mentionné"
     },
     "unreadDivider": "Nouveau",
     "offline": "Pas de connexion. Ce que vous envoyez partira tout seul au retour de la connexion.",

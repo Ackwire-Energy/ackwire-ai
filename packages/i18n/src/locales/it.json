@@ -1750,14 +1750,15 @@
     "typing_other": "{{names}} stanno scrivendo…",
     "callAgent": "Chiama un agente",
     "callAgentMenu": "Agenti in questo canale",
-    "newMessages": "Nuovi messaggi",
+    "toLatest": "Vai agli ultimi messaggi",
     "newPill": {
-      "label": "Nuovi messaggi: {{text}}",
+      "label": "Vai agli ultimi messaggi: {{text}}",
       "count_one": "{{count}} nuovo",
       "count_many": "{{count}} nuovi",
       "count_other": "{{count}} nuovi",
       "more": "{{names}} e altri {{count}}",
-      "writing": "{{name}} sta scrivendo"
+      "writing": "{{name}} sta scrivendo",
+      "mentionsYou": "ti hanno menzionato"
     },
     "unreadDivider": "Nuovi",
     "offline": "Nessuna connessione. Quello che invii parte da solo quando torna.",

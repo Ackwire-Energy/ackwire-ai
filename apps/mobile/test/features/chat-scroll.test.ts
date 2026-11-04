@@ -3,7 +3,6 @@ import {
   appendedKeys,
   type HeldRun,
   HOLD_FINISHED_RUN_MS,
-  landsOnDivider,
   lastSeenKey,
   type Place,
   placeCorrection,
@@ -61,6 +60,7 @@ describe("what arrived below", () => {
       firstKey: "b",
       authors: ["person:marina", "agent:ada"],
       working: ["agent:theo"],
+      mentionsMe: false,
     });
     expect(unseenBelow(rows, "c").messages).toBe(1);
     expect(unseenBelow(rows, "c").firstKey).toBe("d");
@@ -71,17 +71,17 @@ describe("what arrived below", () => {
     expect(u.firstKey).toBe("turn-1");
     expect(u.working).toEqual(["agent:theo"]);
   });
+  test("a new message that mentions me turns the round button's count red; one I already saw doesn't", () => {
+    const called = { ...row("b", "message", false, "person:marina"), mentionsMe: true };
+    expect(unseenBelow([row("a"), called, row("c")], "a").mentionsMe).toBe(true);
+    expect(unseenBelow([row("a"), called, row("c")], "b").mentionsMe).toBe(false);
+  });
   test("my own messages never count", () => {
     expect(unseenBelow([row("a"), row("mine", "message", true)], "a").firstKey).toBeNull();
   });
   test("nothing seen yet, or the seen row is gone: nothing counts", () => {
     expect(unseenBelow([row("a"), row("b")], null).messages).toBe(0);
     expect(unseenBelow([row("a"), row("b")], "zz").firstKey).toBeNull();
-  });
-  test("the pill lands on the line only when it is far from the end", () => {
-    expect(landsOnDivider(5000, 2000, 800)).toBe(true);
-    expect(landsOnDivider(5000, 4500, 800)).toBe(false);
-    expect(landsOnDivider(5000, undefined, 800)).toBe(false);
   });
 });
 

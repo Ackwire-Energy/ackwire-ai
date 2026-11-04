@@ -178,6 +178,8 @@ export const extraIcons = {
   bolt: [["path", { d: "M11 3 5 11h5l-1 6 6-8h-5z" }]],
   /** Issues: high priority. */
   arrowUp: [["path", { d: "M10 15V5M5.5 9.5 10 5l4.5 4.5" }]],
+  /** Conversation: back to the latest messages. */
+  arrowDown: [["path", { d: "M10 5v10M5.5 10.5 10 15l4.5-4.5" }]],
   /** Calendar: next week. */
   chevronRight: [["path", { d: "m8 5 5 5-5 5" }]],
   /** "…" menu (more actions). */

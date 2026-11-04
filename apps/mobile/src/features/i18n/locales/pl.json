@@ -339,6 +339,7 @@
     "failed": "Nie wysłano · Spróbuj ponownie",
     "notSent": "Wiadomość nie została wysłana.",
     "toLatest": "Przejdź do najnowszych wiadomości",
+    "toLatestNew": "Przejdź do najnowszych wiadomości: {{text}}",
     "stopAgent": "Zatrzymaj: {{name}}",
     "offlineWait": "Wyśle się po powrocie połączenia",
     "turn": {
@@ -372,6 +373,7 @@
       "count_many": "{{count}} nowych",
       "count_other": "{{count}} nowej",
       "working": "{{names}} pisze",
+      "mentionsYou": "ktoś cię wspomniał",
       "divider": "Nowe"
     },
     "connection": {

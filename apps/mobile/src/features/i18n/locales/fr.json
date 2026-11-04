@@ -325,6 +325,7 @@
     "failed": "Non envoyé · Réessayer",
     "notSent": "Le message n'a pas été envoyé.",
     "toLatest": "Aller aux derniers messages",
+    "toLatestNew": "Aller aux derniers messages : {{text}}",
     "stopAgent": "Arrêter {{name}}",
     "offlineWait": "Partira au retour de la connexion",
     "turn": {
@@ -357,6 +358,7 @@
       "count_many": "{{count}} nouveaux",
       "count_other": "{{count}} nouveaux",
       "working": "{{names}} écrit",
+      "mentionsYou": "on vous a mentionné",
       "divider": "Nouveau"
     },
     "connection": {

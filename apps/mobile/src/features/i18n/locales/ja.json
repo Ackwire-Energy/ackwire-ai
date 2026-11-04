@@ -297,6 +297,7 @@
     "failed": "未送信 · もう一度試す",
     "notSent": "メッセージは送信されませんでした。",
     "toLatest": "最新のメッセージへ",
+    "toLatestNew": "最新のメッセージへ: {{text}}",
     "stopAgent": "{{name}}を止める",
     "offlineWait": "接続が戻ると送信されます",
     "turn": {
@@ -327,6 +328,7 @@
     "unseen": {
       "count_other": "{{count}}件の新着",
       "working": "{{names}}が入力中",
+      "mentionsYou": "メンションされました",
       "divider": "新着"
     },
     "connection": {
