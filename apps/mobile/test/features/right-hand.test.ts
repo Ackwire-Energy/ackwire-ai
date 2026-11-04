@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import type { DirectMessage } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { introCards, presetsLeft, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { firstVisitOf, introCards, presetsLeft, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
+import { stickerFrame } from "../../src/agent/sticker";
 import { agentStarters, buildConversations, homeLayout, rightHandPin } from "../../src/features/chats/logic";
 import { SETTINGS_SECTIONS, visibleSections } from "../../src/features/settings/logic";
 import { agent, at } from "./fixtures";
@@ -92,4 +94,25 @@ test("its DM, cards and profile treat it apart through the one shared helper", (
     "chat/ChannelMembers.tsx",
   ])
     expect(src(f)).not.toMatch(/coordinator/i);
+});
+
+test("it waves on the person's first visit only: its DM never read by them, on any device", () => {
+  expect(firstVisitOf(undefined, lodi.id)).toBeUndefined();
+  expect(firstVisitOf([dm(theo, 1)], lodi.id)).toBeUndefined();
+  expect(firstVisitOf([{ ...dm(lodi, 1), everRead: false }], lodi.id)).toBe(true);
+  expect(firstVisitOf([{ ...dm(lodi, 1), everRead: true }], lodi.id)).toBe(false);
+  // An older server says nothing: no wave.
+  expect(firstVisitOf([dm(lodi, 1)], lodi.id)).toBe(false);
+  // Under the greeting, decorative, playing once.
+  const intro = readFileSync(new URL("../../src/features/right-hand/Intro.tsx", import.meta.url), "utf8");
+  expect(intro).toContain("useRightHandWave(orgId, agent.id)");
+  expect(intro).toMatch(/mood="wave"[\s\S]*playFor=\{WAVE_SECONDS\}/);
+  expect(intro).toContain('importantForAccessibility="no-hide-descendants"');
+});
+
+test("its wave moves, then ends on its still frame, so stopping shows no jump", () => {
+  const look = { color: "teal", eyes: "happy", accessory: "headset" };
+  const still = JSON.stringify(stickerFrame(look, "wave", 110, STICKER_STILL_T));
+  expect(JSON.stringify(stickerFrame(look, "wave", 110, 0.1))).not.toBe(still);
+  expect(JSON.stringify(stickerFrame(look, "wave", 110, WAVE_SECONDS))).toBe(still);
 });

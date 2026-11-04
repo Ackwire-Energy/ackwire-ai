@@ -3,12 +3,15 @@
  * ones in view (a picker full of them, or a long conversation, costs what is visible). With reduced motion the loop
  * stands still: each sticker is drawn once, at its still frame, and again when what it shows changes.
  */
-import { drawSticker, STICKER_STILL_T, type StickerLook, type StickerMood } from "./stickers";
+import { type DrawnMood, drawSticker, STICKER_STILL_T, type StickerLook } from "./stickers";
 
 export interface LiveSticker {
   canvas: HTMLCanvasElement;
-  /** Read at each frame: what to draw, and the canvas's side in CSS pixels. */
-  spec: () => { look: StickerLook; mood: StickerMood; size: number; seed: number };
+  /**
+   * Read at each frame: what to draw, and the canvas's side in CSS pixels. With `end`, it plays once: `seed` is minus
+   * the moment it started, and from `end` seconds in it holds that frame.
+   */
+  spec: () => { look: StickerLook; mood: DrawnMood; size: number; seed: number; end?: number };
 }
 
 const stickers = new Set<LiveSticker>();
@@ -32,7 +35,8 @@ const reduced = () => {
   return motionQuery?.matches === true;
 };
 
-const now = () => (typeof performance === "object" ? performance.now() : Date.now()) / 1000;
+/** The loop's clock, in seconds. */
+export const stickerNow = () => (typeof performance === "object" ? performance.now() : Date.now()) / 1000;
 
 /** How many stickers the loop is drawing (tests). */
 export function liveStickerCount() {
@@ -42,7 +46,7 @@ export function liveStickerCount() {
 /** Draws one sticker now, at `t` seconds (its seed added), sizing its canvas to the screen's pixels. */
 export function drawLiveSticker(sticker: LiveSticker, t: number) {
   const { canvas } = sticker;
-  const { look, mood, size, seed } = sticker.spec();
+  const { look, mood, size, seed, end } = sticker.spec();
   let ctx: CanvasRenderingContext2D | null = null;
   try {
     ctx = canvas.getContext("2d");
@@ -57,7 +61,8 @@ export function drawLiveSticker(sticker: LiveSticker, t: number) {
     canvas.height = side;
   }
   ctx.clearRect(0, 0, side, side);
-  drawSticker(ctx, look, mood, reduced() ? STICKER_STILL_T : t + seed, side);
+  const at = end === undefined ? t + seed : Math.min(Math.max(0, t + seed), end);
+  drawSticker(ctx, look, mood, reduced() ? STICKER_STILL_T : at, side);
 }
 
 function tick(time: number) {
@@ -93,7 +98,7 @@ export function addLiveSticker(sticker: LiveSticker): () => void {
     });
     observer.observe(sticker.canvas);
   } else visible.add(sticker.canvas);
-  drawLiveSticker(sticker, now());
+  drawLiveSticker(sticker, stickerNow());
   start();
   return () => {
     stickers.delete(sticker);

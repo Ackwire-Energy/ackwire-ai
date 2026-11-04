@@ -21,6 +21,13 @@ import {
 export const STICKER_MOODS = ["celebrate", "love", "deal", "thinking", "wow", "dizzy"] as const;
 export type StickerMood = (typeof STICKER_MOODS)[number];
 
+/**
+ * The right hand's hello under its greeting on a person's first visit to its DM (ADR 0137 §6): drawn like a mood,
+ * never one an agent or a person sends (not in `STICKER_MOODS`). One wave lasts `WAVE_SECONDS`, then the hand stays up.
+ */
+export type DrawnMood = StickerMood | "wave";
+export const WAVE_SECONDS = 1.6;
+
 /** An agent's look as stored (unknown values draw the default look). */
 export interface StickerLook {
   color?: string;
@@ -38,6 +45,7 @@ const PROPS = {
   bang: ["1", "1", "1", "1", "0", "1"],
   star: ["00100", "01110", "11111", "01110", "01010"],
   check: ["0000001", "0000011", "1000110", "1101100", "0111000", "0010000"],
+  hand: ["0101010", "0101010", "0101010", "0111110", "1111110", "0111110", "0011100"],
 } as const;
 
 function pixels(ctx: Ctx2D, map: readonly string[], x: number, y: number, cell: number, color: string) {
@@ -67,13 +75,15 @@ export function stickerSeed(key: string): number {
  * One frame of a sticker: the agent in its mood (pose and face), its shadow on the floor and the mood's pixel props
  * in the agent's tones. `S` is the square's side in canvas pixels; `t` seconds (a seed added keeps neighbors apart).
  */
-export function drawSticker(ctx: Ctx2D, look: StickerLook, mood: StickerMood, t: number, S: number): void {
+export function drawSticker(ctx: Ctx2D, look: StickerLook, mood: DrawnMood, t: number, S: number): void {
   const [c1, c2] = gradientOf(look.color);
   const s = Math.round(S * 0.56);
   const cell = S / 64;
   let bounce = 0;
   let ox = 0;
   let pose: Pose = {};
+  // The wave's rock in pixel steps (-1, 0, 1): none at the still frame and from the end on, so both draw the same.
+  const lean = mood === "wave" && t < WAVE_SECONDS ? Math.round(Math.sin(t * Math.PI * 5)) : 0;
   switch (mood) {
     case "celebrate": {
       const k = Math.abs(Math.sin(t * 5));
@@ -97,6 +107,9 @@ export function drawSticker(ctx: Ctx2D, look: StickerLook, mood: StickerMood, t:
       break;
     case "dizzy":
       pose = { expression: "dizzy", turn: [Math.cos(t * 3) * 0.8, Math.sin(t * 3) * 0.4] };
+      break;
+    case "wave":
+      pose = { expression: "happy", turn: [0.2 + lean * 0.15, 0] };
       break;
   }
   const x0 = Math.round((S - s) / 2 + ox);
@@ -149,5 +162,13 @@ export function drawSticker(ctx: Ctx2D, look: StickerLook, mood: StickerMood, t:
         pixels(ctx, PROPS.star, x, S * 0.2 + Math.sin(a) * S * 0.06, cell * 1.5, i % 2 ? c1 : c2);
       }
       break;
+    case "wave": {
+      // Its hand up beside it, the fingers leaning further than the palm.
+      const hand = cell * 2;
+      PROPS.hand.forEach((row, r) => {
+        pixels(ctx, [row], S * 0.74 + lean * Math.max(0, 3 - r) * hand * 0.5, S * 0.22 + r * hand, hand, c2);
+      });
+      break;
+    }
   }
 }

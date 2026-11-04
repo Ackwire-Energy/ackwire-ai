@@ -31,6 +31,7 @@ import {
 } from "../lib/notifications";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
+import { firstVisitOf } from "../lib/right-hand";
 import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_ITEMS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
@@ -5063,6 +5064,25 @@ export function useMarkChannelRead(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.unreadThreads(orgId) });
     },
   });
+}
+
+/**
+ * The right hand waves under its greeting on the person's first visit to its DM (ADR 0137 §6): decided once, as the
+ * DM opens, and kept for the visit. That visit marks the DM read, even with nothing in it yet, so the next one, on
+ * any device, has no wave.
+ */
+export function useRightHandWave(orgId: string, agentId: string): boolean {
+  const dms = useDms(orgId);
+  const markRead = useMarkChannelRead(orgId).mutate;
+  const first = firstVisitOf(dms.data, agentId);
+  const [wave, setWave] = useState(first);
+  const channelId = dms.data?.find((d) => d.with.type === "agent" && d.with.id === agentId)?.channelId;
+  useEffect(() => {
+    if (first === undefined) return;
+    setWave((w) => w ?? first);
+    if (first && channelId) markRead(channelId);
+  }, [first, channelId, markRead]);
+  return wave === true;
 }
 
 /** A conversation shows nothing unread in the cached lists (read here or on another device). */

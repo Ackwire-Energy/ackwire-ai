@@ -1,7 +1,8 @@
-import { STICKER_STILL_T, type StickerLook, type StickerMood, stickerSeed } from "@agenteschat/ui/agent/stickers";
+import { type DrawnMood, STICKER_STILL_T, type StickerLook, stickerSeed } from "@agenteschat/ui/agent/stickers";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
-import { createContext, memo, useContext, useMemo, useSyncExternalStore } from "react";
+import { createContext, memo, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useReducedMotion } from "@/ui/theme";
+import { frameClock } from "./clock";
 import { useFrameTime } from "./live";
 import { replay } from "./skia-ctx";
 import { STICKER_FPS, stickerFrame } from "./sticker";
@@ -27,22 +28,33 @@ function StickerCanvasView({
   size,
   seed,
   live,
+  playFor,
 }: {
   look: StickerLook;
-  mood: StickerMood;
+  mood: DrawnMood;
   size: number;
   /** Keeps stickers side by side out of step: the agent's id. */
   seed: string;
   live: boolean;
+  /** Plays once, for this many seconds from when it shows, then stands at its still frame; without it, it loops. */
+  playFor?: number;
 }) {
   const reduced = useReducedMotion();
-  const t = useFrameTime(live && !reduced, STOPPED, STICKER_FPS);
+  const [from] = useState(() => frameClock.time());
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (playFor === undefined) return;
+    const id = setTimeout(() => setDone(true), playFor * 1000);
+    return () => clearTimeout(id);
+  }, [playFor]);
+  const t = useFrameTime(live && !reduced && !done, STOPPED, STICKER_FPS);
   const { color, eyes, accessory } = look;
   const picture = useMemo(() => {
-    const at = t === STOPPED ? STICKER_STILL_T : t + stickerSeed(seed);
+    const once = playFor === undefined ? undefined : Math.min(Math.max(0, t - from), playFor);
+    const at = t === STOPPED ? STICKER_STILL_T : (once ?? t + stickerSeed(seed));
     const ops = stickerFrame({ color, eyes, accessory }, mood, size, at);
     return createPicture((canvas) => replay(canvas, ops), { width: size, height: size });
-  }, [color, eyes, accessory, mood, size, seed, t]);
+  }, [color, eyes, accessory, mood, size, seed, t, from, playFor]);
   return (
     <Canvas style={{ width: size, height: size }}>
       <Picture picture={picture} />
@@ -53,7 +65,8 @@ function StickerCanvasView({
 /**
  * An agent's sticker on a Skia canvas, drawn by the shared agent engine: never any other way. While `live` it plays
  * on the one frame clock, at `STICKER_FPS`, its seed keeping it out of step with its neighbors; with reduced motion,
- * on a screen that isn't showing or with the app in the background it holds its still frame.
+ * on a screen that isn't showing or with the app in the background it holds its still frame. A sticker that plays
+ * once (`playFor`) ends on a frame drawn like its still one, so stopping shows no jump.
  */
 export const StickerCanvas = memo(
   StickerCanvasView,
@@ -62,6 +75,7 @@ export const StickerCanvas = memo(
     a.size === b.size &&
     a.seed === b.seed &&
     a.live === b.live &&
+    a.playFor === b.playFor &&
     a.look.color === b.look.color &&
     a.look.eyes === b.look.eyes &&
     a.look.accessory === b.look.accessory,

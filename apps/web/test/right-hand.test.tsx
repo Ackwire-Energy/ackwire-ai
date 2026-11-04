@@ -154,6 +154,28 @@ describe("the right hand elsewhere", () => {
     expect(wrapper?.parentElement?.classList.contains("ac-msg__text")).toBe(true);
   });
 
+  test("on the first visit it waves under its greeting, once: the visit marks its DM read, so the next has no wave", async () => {
+    const state = withRightHand(seedState());
+    state.dms.push({
+      channelId: "dm-lodi",
+      with: { type: "agent", id: LODI_ID, name: "Lodi", handle: "lodi" },
+      everRead: false,
+    });
+    state.channelMembers["dm-lodi"] = [
+      { type: "person", id: state.me?.user.id ?? "" },
+      { type: "agent", id: LODI_ID },
+    ];
+    await go(state, `dm/agent/${LODI_ID}`);
+    const sticker = document.querySelector('.ac-msg canvas.ac-sticker[data-mood="wave"]');
+    expect(sticker?.getAttribute("aria-hidden")).toBe("true");
+    expect(sticker?.classList.contains("ac-msg-media")).toBe(true);
+    expect(state.calls).toContainEqual({ method: "dms.markRead", args: [ORG_ID, "dm-lodi"] });
+    cleanup();
+    await go(state, `dm/agent/${LODI_ID}`);
+    expect(document.querySelector(".ac-msg__text b")?.textContent).toStartWith("Oi, eu sou o Lodi");
+    expect(document.querySelector('canvas[data-mood="wave"]')).toBeNull();
+  });
+
   test("Settings › Lodi: its name and face in the nav, the lock line and its audit link", async () => {
     await go(withRightHand(seedState()), "settings/right_hand");
     const link = within(screen().getByRole("navigation", { name: "Seções das configurações" })).getByRole("link", {
