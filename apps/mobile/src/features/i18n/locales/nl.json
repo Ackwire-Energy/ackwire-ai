@@ -1455,6 +1455,8 @@
       "typeMarked": "Typ in het gemarkeerde veld",
       "typeMarkedSecret": "Wachtwoord voor het gemarkeerde veld",
       "keys": "Toetsen",
+      "paste": "Plakken",
+      "pasteHint": "Plak wat je hebt gekopieerd in de pagina",
       "secureOn": "De tekst tonen",
       "secureOff": "De tekst verbergen (wachtwoord)",
       "send": "Versturen",

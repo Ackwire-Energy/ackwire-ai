@@ -1538,6 +1538,8 @@
       "typeMarked": "Tapez dans le champ indiqué",
       "typeMarkedSecret": "Mot de passe du champ indiqué",
       "keys": "Touches",
+      "paste": "Coller",
+      "pasteHint": "Coller dans la page ce que vous avez copié",
       "secureOn": "Afficher le texte",
       "secureOff": "Masquer le texte (mot de passe)",
       "send": "Envoyer",

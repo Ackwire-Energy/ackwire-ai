@@ -718,6 +718,19 @@ html:not([data-pointer]) .brw-ac__page.is-control:focus-visible {
   outline: 2px solid var(--focus-color);
   outline-offset: 2px;
 }
+/* The field the person's paste keys land in for a moment (`pasteRef`): there, never seen. */
+.brw-paste {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  resize: none;
+  pointer-events: none;
+}
 /* Before the first frame: a page-shaped placeholder (a site is a light page in both themes). */
 .brw-ac__page--blank {
   background: var(--site-blank);
@@ -1335,7 +1348,7 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
   cursor: default;
 }
 
-/* The address bar while in control: under the card's head, like a browser's own. */
+/* The address bar: under the card's head, like a browser's own; its arrows and reload before the field. */
 .brw-go {
   display: flex;
   flex-wrap: wrap;
@@ -1343,6 +1356,15 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
   gap: 6px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--line);
+}
+.brw-go__nav {
+  display: flex;
+  gap: 2px;
+}
+/* Watching: the address alone, quiet. */
+.brw-go.is-read .brw-go__field {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .brw-go__field {
   flex: 1 1 220px;

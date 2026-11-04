@@ -5,6 +5,7 @@ import type {
   BrowserProfileWait,
   BrowserStep,
   LiveRun,
+  PageTarget,
   ScreenKind,
 } from "@agenteschat/client";
 import {
@@ -21,12 +22,12 @@ import {
   keyEvents,
   modifiersOf,
   pagePoint,
+  pasteEvents,
   pressEvents,
   profileLiveKey,
   releaseEvent,
   rememberHeldPlace,
   runProfile,
-  textEvent,
   useAgentBrowserHandoff,
   useAgentBrowserSettings,
   useAgentScreenControl,
@@ -50,10 +51,12 @@ import {
   FilterToggle,
   Icon,
   type IconName,
+  isApple,
   onScreenKeyboard,
   onScreenNow,
   PixelSpinner,
   SkyStrip,
+  shortcut,
   Textarea,
 } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -72,11 +75,13 @@ import { Trans, useTranslation } from "react-i18next";
 import { withAgentFace } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
+import { pastes } from "@/lib/keys";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
 import { AgentWho } from "../AgentAvatar";
 import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
+import { PASTE_MAX_BYTES, pasteBytes } from "../desktop/paste";
 import { useOrg } from "../org-context";
 import { ComputerSky, colorOf } from "../Sky";
 import { useComputerEdition } from "../WorkspaceComputer";
@@ -452,13 +457,14 @@ export function BrowserCard({
   const backRef = useRef<HTMLTextAreaElement>(null);
   const [confirmStop, setConfirmStop] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
-  const [goOpen, setGoOpen] = useState(false);
   // On touch the text bar types into the page; a mouse and keyboard type into it directly (`onPageKey`).
   const touch = useMatchMedia(TOUCH);
   const [full, setFull] = useState(false);
   // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
   const [capturing, setCapturing] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+  // Where the person's paste keys put the focus for a moment: only an editable element gets a paste in every browser.
+  const pasteRef = useRef<HTMLTextAreaElement>(null);
   // The wheel is scrolling the page right now: only then the hint says how to give the wheel back.
   const [scrolling, setScrolling] = useState(false);
   const scrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -696,16 +702,36 @@ export function BrowserCard({
 
   const onPageKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!inControl) return;
+    // The browser's own paste, into the field nobody sees: its paste event brings the person's text (`pasteText`).
+    if (pastes(e.nativeEvent, isApple())) {
+      pasteRef.current?.focus({ preventScroll: true });
+      return;
+    }
     const events = keyboardEvents(e, remoteIsMac);
     if (!events) return;
     e.preventDefault();
     send(events);
   };
 
+  /** What the person pasted, typed into the page's focused field as text (CDP `Input.insertText`). */
+  const pasteText = (pasted: string) => {
+    if (!pasted) return sayFailed(t("desktop.clipboard.textOnly", g));
+    if (pasteBytes(pasted) > PASTE_MAX_BYTES) return sayFailed(t("desktop.clipboard.tooLong", g));
+    send(pasteEvents(pasted));
+  };
+  /** Colar: the person's clipboard, where their browser lets the page read it (it may ask first). */
+  const pasteClipboard = async () => {
+    try {
+      pasteText(await navigator.clipboard.readText());
+    } catch {
+      sayFailed(t("browser.inCard.pasteBlocked", { keys: shortcut("V") }));
+    }
+    pageRef.current?.focus({ preventScroll: true });
+  };
+
   const sendText = () => {
-    const ev = textEvent(text);
-    if (!ev) return;
-    send([ev]);
+    if (!text) return;
+    send(pasteEvents(text));
     setText("");
   };
 
@@ -790,15 +816,14 @@ export function BrowserCard({
       onError: didntWork,
     });
 
-  /** A site typed in the address bar: the card waits for its first frame. */
-  const openSite = (url: string) => {
+  /** A site typed in the address bar (the card waits for its first frame), or its arrows and reload. */
+  const openSite = (url: PageTarget) => {
     const before = live.frame;
     const opened = profile
       ? profileActions.open.mutateAsync({ profileId: profile.id, url })
       : actions.open.mutateAsync({ agentId, url });
     return opened.then(() => {
-      setGoOpen(false);
-      setWait({ frame: before, why: "opening", site: hostAndPath(url)[0] || url });
+      if (typeof url === "string") setWait({ frame: before, why: "opening", site: hostAndPath(url)[0] || url });
     });
   };
 
@@ -911,9 +936,9 @@ export function BrowserCard({
   // The frame (the conversation, not full screen): the steps are its history on hover, not a column.
   const framed = chat && !full;
   const showLog = working && !starting && steps.length > 0 && !surface && !framed;
-  // A blank page or a closed browser: the person in control gets the address bar without asking.
-  const goForced = closed || (Boolean(frame) && isBlankPage(frame?.metadata.url));
-  const goShown = inControl && (goOpen || goForced);
+  // A blank page or a closed browser: the address bar takes the person's typing at once.
+  const goFocus = closed || (Boolean(frame) && isBlankPage(frame?.metadata.url));
+  const pageUrl = pic?.metadata.url ?? null;
 
   const asTitle = titleKind({ inControl, ask, host, opening: starting && !stuck });
   const title =
@@ -1016,20 +1041,6 @@ export function BrowserCard({
       </>
     ))
   );
-  const goToggle = (tool: boolean) => (
-    <Button
-      size="sm"
-      variant="ghost"
-      iconOnly
-      icon="globe"
-      className={tool ? "brw-tfield__tool" : undefined}
-      aria-pressed={goShown}
-      aria-label={t("browser.inCard.goToggle")}
-      title={t("browser.inCard.goToggle")}
-      disabled={goForced}
-      onClick={() => setGoOpen((v) => !v)}
-    />
-  );
   const controlActs = (
     <>
       {ask && (
@@ -1059,7 +1070,6 @@ export function BrowserCard({
           <span className="cmp-act-label">{handBackLabel}</span>
         </Button>
       )}
-      {!touch && goToggle(false)}
     </>
   );
   const seeWhole = onDesktop && !full && (
@@ -1194,19 +1204,7 @@ export function BrowserCard({
               </>
             }
           />
-          {asTitle === "ask" ? (
-            <p className="cmp-asked">“{title}”</p>
-          ) : (
-            asTitle === "host" && (
-              <p className="cmp-site">
-                <Icon name="globe" size={14} />
-                <span>
-                  {host}
-                  {path && <span className="brw-ac__path">{path}</span>}
-                </span>
-              </p>
-            )
-          )}
+          {asTitle === "ask" && <p className="cmp-asked">“{title}”</p>}
         </>
       ) : (
         <div className="brw-ac__head">
@@ -1237,7 +1235,32 @@ export function BrowserCard({
         </div>
       )}
 
-      {goShown && <AddressBar grammar={g} focus={closed} onOpen={openSite} cloud={cloud} />}
+      {(inControl || (surface && pic)) && (
+        // Watching in the dialog, the address alone; in control, the person's to type in, like a browser's own.
+        <AddressBar
+          grammar={g}
+          url={pageUrl}
+          host={host}
+          readOnly={!inControl}
+          focus={inControl && goFocus}
+          onOpen={openSite}
+          cloud={cloud}
+          end={
+            inControl &&
+            !touch && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                title={t("browser.inCard.pasteHint")}
+                onClick={() => void pasteClipboard()}
+              >
+                {t("browser.inCard.paste")}
+              </Button>
+            )
+          }
+        />
+      )}
       <div className={showLog ? "brw-ac__body brw-ac__body--split" : "brw-ac__body"}>
         <div className="brw-ac__stage">
           {src ? (
@@ -1256,13 +1279,13 @@ export function BrowserCard({
               onPointerLeave={onPagePointerLeave}
               onLostPointerCapture={onPagePointerCancel}
               onPaste={(e) => {
-                const pasted = e.clipboardData.getData("text");
-                if (pasted) {
-                  e.preventDefault();
-                  send([{ kind: "text", text: pasted }]);
-                }
+                if (!inControl) return;
+                e.preventDefault();
+                pasteText(e.clipboardData.getData("text/plain"));
+                if (e.target === pasteRef.current) pageRef.current?.focus({ preventScroll: true });
               }}
             >
+              {inControl && <textarea ref={pasteRef} className="brw-paste" tabIndex={-1} aria-hidden="true" />}
               <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
               {(sliding || scrolling) && (
@@ -1453,7 +1476,6 @@ export function BrowserCard({
                 title={t("browser.inCard.keysLabel")}
                 onClick={() => setKeysOpen((v) => !v)}
               />
-              {goToggle(true)}
               <Button
                 variant="primary"
                 size="sm"

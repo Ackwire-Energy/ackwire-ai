@@ -1372,6 +1372,8 @@
       "typeMarked": "표시된 칸에 입력",
       "typeMarkedSecret": "표시된 칸의 비밀번호",
       "keys": "키",
+      "paste": "붙여넣기",
+      "pasteHint": "복사한 내용을 페이지에 붙여넣기",
       "secureOn": "텍스트 보기",
       "secureOff": "텍스트 숨기기 (비밀번호)",
       "send": "보내기",

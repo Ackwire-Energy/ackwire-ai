@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import type { BrowserHandoff, DesktopStatus, Edition, Machine } from "../api/types";
-import { handoffScreen, handoffTimeLeft, isWaitingHandoff } from "../browser";
+import { handoffTimeLeft, isWaitingHandoff } from "../browser";
+import { drivesOnDesktop } from "../desktop";
 import {
   type EtaView,
   etaLine,
@@ -30,7 +31,9 @@ export interface AgentComputerFacts {
   /** The computer the agent works on, from the computers list; null: none. */
   machine: Pick<Machine, "name" | "online" | "lastSeenAt" | "paused" | "desktopUse"> | null;
   /** Its screen as `GET …/desktop` says it; null while unknown. */
-  desktop: Pick<DesktopStatus, "available" | "reason"> | null;
+  desktop:
+    | (Pick<DesktopStatus, "available" | "reason"> & Partial<Pick<DesktopStatus, "canControl" | "handoff">>)
+    | null;
   /** Its browser can run on its computer now. */
   browser: boolean;
   /** The agent may use its browser (`browser:use`). */
@@ -241,15 +244,16 @@ export type ComputerSurface =
   | "cover";
 
 /**
- * The dialog's stage. A person helping with a browser request gets the page, never the whole screen; a
- * computer that serves screens shows the agent's; one without them (a Mac) its browser's page. An offline
- * computer gets its cover: the browser it last reported can't open there now.
+ * The dialog's stage. A person helping with a browser request gets the page unless they may drive the screen its
+ * window is on (`drivesOnDesktop`): then the whole screen, as everyone who may; a computer that serves screens shows
+ * the agent's; one without them (a Mac) its browser's page. An offline computer gets its cover: the browser it last
+ * reported can't open there now.
  */
 export function surfaceOf(f: AgentComputerFacts): ComputerSurface {
   if (f.held && waitsForWorkspace(f)) return "held";
   if (waitsForWorkspace(f)) return "preparing";
   const h = f.handoff;
-  if (h?.status === "active" && h.controllerUserId === f.userId && handoffScreen(h) === "browser") return "page";
+  if (h?.status === "active" && h.controllerUserId === f.userId && !drivesOnDesktop(h, f.desktop)) return "page";
   if (f.machine && !f.machine.online) return "cover";
   if (f.desktop?.available) return "screen";
   if (f.browser) return "page";

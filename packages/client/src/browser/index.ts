@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, ScreenKind } from "../api/types";
+import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, PageTarget, ScreenKind } from "../api/types";
 import { timeLeft } from "../lib/format";
 import { isBlankPage } from "../lib/sites";
 import type { LiveWork } from "../realtime/streams";
@@ -300,10 +300,10 @@ export interface DoneInput {
   note?: string;
 }
 
-/** A site the person in control opens in the agent's browser (a bare host gets https://). */
+/** A site the person in control opens in the agent's browser (a bare host gets https://), or an arrow. */
 export interface OpenPageInput {
   agentId: string;
-  url: string;
+  url: PageTarget;
 }
 
 /**

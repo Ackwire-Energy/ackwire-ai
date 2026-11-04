@@ -1455,6 +1455,8 @@
       "typeMarked": "Ins markierte Feld tippen",
       "typeMarkedSecret": "Passwort für das markierte Feld",
       "keys": "Tasten",
+      "paste": "Einfügen",
+      "pasteHint": "Das Kopierte in die Seite einfügen",
       "secureOn": "Text anzeigen",
       "secureOff": "Text verbergen (Passwort)",
       "send": "Senden",

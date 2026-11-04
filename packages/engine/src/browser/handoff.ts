@@ -29,7 +29,14 @@ import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, Valida
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { formatDuration } from "../machine-tasks";
-import { computerDrivers, drivesComputer, getMachine, requireComputerDriver, servesDesktops } from "../machines";
+import {
+  computerDrivers,
+  drivesComputer,
+  getMachine,
+  mayDriveComputer,
+  requireComputerDriver,
+  servesDesktops,
+} from "../machines";
 import { insertMessage, messageView } from "../messages";
 import { missionOfRun } from "../mission-context";
 import {
@@ -314,7 +321,17 @@ function noteControl(deps: HandoffDeps, row: BrowserHandoffRow) {
  * hears it quietly.
  */
 async function noteDesktopTaken(deps: HandoffDeps, row: BrowserHandoffRow) {
-  if (row.screen !== "desktop" || !row.controllerUserId) return;
+  if (!row.controllerUserId) return;
+  // The browser's handoff puts who may drive the computer on the whole screen its window is on (`streamAccess`).
+  if (
+    row.screen !== "desktop" &&
+    !(
+      (await browserOnDesktop(deps.db, row.orgId, row.agentId, row.machineId)) &&
+      (await mayDriveComputer(deps.db, row.controllerUserId, row.orgId, row.agentId))
+    )
+  ) {
+    return;
+  }
   await noteComputerTaken(deps, {
     orgId: row.orgId,
     agentId: row.agentId,
@@ -1588,6 +1605,18 @@ export function webAddress(typed: string): string | null {
   }
 }
 
+/** The address bar's arrows and reload, as the browser's own commands. */
+export const PAGE_MOVES = ["back", "forward", "reload"] as const;
+export type PageMove = (typeof PAGE_MOVES)[number];
+
+/** The browser's command for what the person typed in the address bar (400 when it's no web address), or an arrow. */
+export function pageCommand(to: string | { go: PageMove }): { command: string; args: string[] } {
+  if (typeof to !== "string") return { command: to.go, args: [] };
+  const url = webAddress(to);
+  if (!url) throw new ValidationError("Type a web address (https://…)", "browser.bad_address");
+  return { command: "open", args: [url] };
+}
+
 /** How long a person's open may take on the computer (a slow page, or Chrome starting). */
 const OPEN_PAGE_SECONDS = 60;
 
@@ -1617,15 +1646,14 @@ export async function openPageInControl(
   actorId: string,
   orgId: string,
   agentId: string,
-  typed: string,
+  to: string | { go: PageMove },
 ) {
   const open = await openHandoffOf(deps.db, orgId, agentId);
   await requireBrowserControl(deps.db, actorId, orgId, agentId, open);
   if (open?.status !== "active" || open.controllerUserId !== actorId) {
     throw new ConflictError("Take control of the browser first", "browser.not_in_control");
   }
-  const url = webAddress(typed);
-  if (!url) throw new ValidationError("Type a web address (https://…)", "browser.bad_address");
+  const { command, args } = pageCommand(to);
   if (!hub) throw new ValidationError("Connected computers are not available on this server");
   // Its computer's switch too, as for its browser tools: the runner checks only the computer's.
   await requireAgentBrowserSwitch(deps.db, orgId, agentId);
@@ -1642,8 +1670,8 @@ export async function openPageInControl(
       {
         op: "browser.act",
         agent: { id: agentId, handle: agent.handle, ...(agent.name ? { name: agent.name } : {}) },
-        command: "open",
-        args: [url],
+        command,
+        args,
         timeoutSeconds: OPEN_PAGE_SECONDS,
         ...(agent.browserAllowedDomains ? { allowedDomains: agent.browserAllowedDomains } : {}),
         link: agentBrowserLink(orgId, agentId),

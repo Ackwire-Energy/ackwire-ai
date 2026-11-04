@@ -5,7 +5,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from ".
 import type { MachineCaller } from "../machine-hub";
 import { type NotificationDeps, notify } from "../notifications";
 import { can, requireActiveMembership, requirePermission } from "../organizations";
-import { BROWSER_HANDOFF_TOPIC, webAddress } from "./handoff";
+import { BROWSER_HANDOFF_TOPIC, type PageMove, pageCommand } from "./handoff";
 
 const { agents, agentRuns, browserProfiles, browserProfileGrants, machines, organizationMembers } = schema;
 
@@ -796,14 +796,13 @@ export async function openProfilePage(
   userId: string,
   orgId: string,
   profileId: string,
-  typed: string,
+  to: string | { go: PageMove },
 ) {
   const row = await requireProfileDriver(deps.db, userId, orgId, profileId);
   if (holderOf(row)?.type !== "person" || row.heldByUserId !== userId) {
     throw new ConflictError("Take control of the profile first", "browser.not_in_control");
   }
-  const url = webAddress(typed);
-  if (!url) throw new ValidationError("Type a web address (https://…)", "browser.bad_address");
+  const { command, args } = pageCommand(to);
   if (!deps.hub) throw new ValidationError("Connected computers are not available on this server");
   const reply = await deps.hub.call<"browser.act">(
     row.machineId,
@@ -811,8 +810,8 @@ export async function openProfilePage(
       op: "browser.act",
       agent: profileScope(profileId),
       profile: { id: profileId },
-      command: "open",
-      args: [url],
+      command,
+      args,
       timeoutSeconds: OPEN_PAGE_SECONDS,
     },
     { timeoutMs: (OPEN_PAGE_SECONDS + 30) * 1000 },

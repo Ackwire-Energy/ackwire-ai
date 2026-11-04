@@ -326,6 +326,13 @@ export async function computerDriving(db: Database, userId: string, orgId: strin
   return { machine, refusal: driveRefusal(machine, person, lentAccount(agent) !== null) };
 }
 
+/** Whether this person may drive the agent's computer now (`computerDriving`); false where it has none. */
+export const mayDriveComputer = (db: Database, userId: string, orgId: string, agentId: string) =>
+  computerDriving(db, userId, orgId, agentId).then(
+    (d) => d.refusal === null,
+    () => false,
+  );
+
 /**
  * Who an agent asks for help on its desktop: only people who may drive its computer. Its owner when they may,
  * else everyone who may (the person who paired it; the admins in system mode). Empty: nobody here may.

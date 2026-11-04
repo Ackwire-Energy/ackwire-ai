@@ -1455,6 +1455,8 @@
       "typeMarked": "İşaretli alana yazın",
       "typeMarkedSecret": "İşaretli alanın şifresi",
       "keys": "Tuşlar",
+      "paste": "Yapıştır",
+      "pasteHint": "Kopyaladığını sayfaya yapıştır",
       "secureOn": "Metni göster",
       "secureOff": "Metni gizle (şifre)",
       "send": "Gönder",

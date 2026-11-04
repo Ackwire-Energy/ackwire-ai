@@ -1538,6 +1538,8 @@
       "typeMarked": "Escribe en el campo marcado",
       "typeMarkedSecret": "Contraseña para el campo marcado",
       "keys": "Teclas",
+      "paste": "Pegar",
+      "pasteHint": "Pegar en la página lo que copiaste",
       "secureOn": "Mostrar el texto",
       "secureOff": "Ocultar el texto (contraseña)",
       "send": "Enviar",

@@ -3569,6 +3569,12 @@
   "browser.live.keys": {
     "value": "Keys"
   },
+  "browser.live.paste": {
+    "value": "Paste"
+  },
+  "browser.live.pasteHint": {
+    "value": "Paste what you copied into the page"
+  },
   "browser.live.secureOn": {
     "value": "Show the text"
   },

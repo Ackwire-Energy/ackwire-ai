@@ -1372,6 +1372,8 @@
       "typeMarked": "Ketik di kolom yang ditandai",
       "typeMarkedSecret": "Kata sandi untuk kolom yang ditandai",
       "keys": "Tombol",
+      "paste": "Tempel",
+      "pasteHint": "Tempel yang kamu salin ke halaman",
       "secureOn": "Tampilkan teks",
       "secureOff": "Sembunyikan teks (kata sandi)",
       "send": "Kirim",

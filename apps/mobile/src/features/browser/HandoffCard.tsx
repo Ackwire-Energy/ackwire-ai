@@ -1,9 +1,11 @@
 import {
   type BrowserHandoff,
+  drivesOnDesktop,
   handoffIsMine,
   handoffScreen,
   useBrowserHandoff,
   useBrowserHandoffActions,
+  useDesktopStatus,
 } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
@@ -46,6 +48,11 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
   const h: BrowserHandoff = fresh.data ?? fromMessage;
   const state = cardStateOf(h, meId);
   const desktop = handoffScreen(h) === "desktop";
+  // A browser request whose window is on the agent's screen, for someone who may drive the screen: helped there.
+  const screenQ = useDesktopStatus(orgId, h.agentId, {
+    enabled: !desktop && (state === "waiting" || state === "mine"),
+  });
+  const opensScreen = drivesOnDesktop(h, screenQ.data);
   // Opened from here (Abrir, a push): the browser card that takes the request's place starts open.
   const [open, setOpen] = useState(false);
 
@@ -65,7 +72,7 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
       </View>
     );
   }
-  if (desktop && (state === "mine" || state === "helping")) {
+  if (opensScreen && (state === "mine" || state === "helping")) {
     const helper = h.controllerUserId ? dir.memberById.get(h.controllerUserId)?.name : undefined;
     return (
       <Pressable
@@ -83,7 +90,9 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
     );
   }
   if (state === "waiting") {
-    return <HandoffAsk handoff={h} desktop={desktop} claim={openId === h.id} onOpened={setOpen} />;
+    return (
+      <HandoffAsk handoff={h} desktop={desktop} opensScreen={opensScreen} claim={openId === h.id} onOpened={setOpen} />
+    );
   }
   return <BrowserCard agentId={h.agentId} handoff={h} claim={openId === h.id} open={open} onToggle={setOpen} />;
 }
@@ -92,11 +101,14 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
 function HandoffAsk({
   handoff: h,
   desktop,
+  opensScreen,
   claim,
   onOpened,
 }: {
   handoff: BrowserHandoff;
   desktop: boolean;
+  /** Helped on the agent's whole screen (`drivesOnDesktop`): Abrir goes to the computer's full view. */
+  opensScreen: boolean;
   claim: boolean;
   onOpened: (open: boolean) => void;
 }) {
@@ -123,7 +135,7 @@ function HandoffAsk({
     try {
       await actions.takeControl(h.id);
       asks?.settle(h.id);
-      if (desktop) router.push(`/computer/${h.agentId}`);
+      if (opensScreen) router.push(`/computer/${h.agentId}`);
     } catch {
       failed();
     }
@@ -137,11 +149,11 @@ function HandoffAsk({
     onOpened(true);
     actions.takeControl(h.id).then(
       () => {
-        if (desktop) router.push(`/computer/${h.agentId}`);
+        if (opensScreen) router.push(`/computer/${h.agentId}`);
       },
       () => {},
     );
-  }, [claim, desktop, mine, h.id, h.status]);
+  }, [claim, opensScreen, mine, h.id, h.status]);
 
   // "Agora não": the agent hears it couldn't be done now, with the reason if one is given.
   const notNow = () => {

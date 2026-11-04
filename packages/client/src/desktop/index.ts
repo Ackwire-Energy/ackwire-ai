@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { DesktopStatus } from "../api/types";
+import type { BrowserHandoff, DesktopStatus } from "../api/types";
 import { handoffScreen } from "../browser";
 import { type SocketBase, socketUrl } from "../realtime/connection";
 
@@ -105,12 +105,26 @@ export function desktopStatusState(status: DesktopStatus, userId: string): Deskt
   return null;
 }
 
-/** Control only while the desktop's own handoff is this person's; the browser's (same window) leaves them watching. */
-export function desktopMode(status: Pick<DesktopStatus, "handoff">, userId: string): DesktopMode {
+/**
+ * Whether helping with `h` happens on the agent's whole screen: a request on the screen itself, or one in its browser
+ * whose window is on that screen (`status.handoff` is the same one) for someone who may drive the screen. Who may only
+ * drive the browser helps in its page.
+ */
+export function drivesOnDesktop(
+  h: Pick<BrowserHandoff, "id" | "screen">,
+  status: Partial<Pick<DesktopStatus, "available" | "canControl" | "handoff">> | null | undefined,
+): boolean {
+  if (handoffScreen(h) === "desktop") return true;
+  return status?.available === true && status.canControl === true && status.handoff?.id === h.id;
+}
+
+/** Control while the handoff holding the desktop is this person's and they help there (`drivesOnDesktop`). */
+export function desktopMode(
+  status: Pick<DesktopStatus, "handoff" | "available" | "canControl">,
+  userId: string,
+): DesktopMode {
   const h = status.handoff;
-  return h?.status === "active" && handoffScreen(h) === "desktop" && h.controllerUserId === userId
-    ? "control"
-    : "watch";
+  return h?.status === "active" && h.controllerUserId === userId && drivesOnDesktop(h, status) ? "control" : "watch";
 }
 
 /** Why this person drives only the agent's browser, not its whole computer (`controlRefusal`), as its words' key. */
@@ -160,3 +174,14 @@ export const useDesktopStatus = (
     refetchInterval: options.poll ?? false,
   });
 };
+
+/**
+ * Xvnc's MaxCutText (its default): a larger clipboard from a viewer is dropped without a word. It counts what noVNC
+ * sends: UTF-8 with every line break as CRLF, and a NUL at the end. The agent's browser takes the same at most: a
+ * paste goes in 10,000-character frames, and the server takes 60 frames a second.
+ */
+export const PASTE_MAX_BYTES = 262_144;
+
+/** What a text takes on the desktop's clipboard, in the bytes `PASTE_MAX_BYTES` counts. */
+export const pasteBytes = (text: string) =>
+  new TextEncoder().encode(text.replace(/\r\n|\r|\n/g, "\r\n")).byteLength + 1;
