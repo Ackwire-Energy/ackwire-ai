@@ -248,6 +248,39 @@ async function allOpen(db: Database, orgId: string, ids: string[]) {
   return rows.length === new Set(ids).size;
 }
 
+/**
+ * Whether someone else wrote into a run of the chain while it worked (`meta.steeredRunIds`): a person other than
+ * `forUserId`, or an agent whose message isn't theirs. Their words reached the run outside the request it roots in.
+ */
+async function steeredByOthers(db: Database, orgId: string, forUserId: string, runIds: string[]) {
+  const runs = await db
+    .select({ channelId: schema.agentRuns.channelId, createdAt: schema.agentRuns.createdAt })
+    .from(schema.agentRuns)
+    .where(and(eq(schema.agentRuns.orgId, orgId), inArray(schema.agentRuns.id, runIds)));
+  if (runs.length === 0) return false;
+  const since = new Date(Math.min(...runs.map((r) => r.createdAt.getTime())));
+  const written = await db
+    .select({ id: messages.id, authorType: messages.authorType, authorUserId: messages.authorUserId })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        inArray(messages.channelId, [...new Set(runs.map((r) => r.channelId))]),
+        gte(messages.createdAt, since),
+        sql`${messages.meta} -> 'steeredRunIds' ?| ${`{${runIds.join(",")}}`}::text[]`,
+      ),
+    );
+  for (const m of written) {
+    if (m.authorType === "person") {
+      if (m.authorUserId !== forUserId) return true;
+      continue;
+    }
+    const root = await messageRoot(db, orgId, m.id);
+    if (root.kind !== "person" || root.personId !== forUserId) return true;
+  }
+  return false;
+}
+
 const providerOf = async (db: Database, agent: Agent, model: string) =>
   isAutoModel(model) ? autoProvider(db, agent) : ((await modelInfoFor(db, model))?.provider ?? null);
 
@@ -291,7 +324,12 @@ async function inReach(
       }
     }
   }
-  // The cap is per agent per month: what it already added to this one counts.
+  if (added + (await givenTo(db, orgId, forUserId, targetId)) > settings.budgetCapNanoUsd) return null;
+  return { budgetAdded: added, targetAgentId: targetId, what: agent.name };
+}
+
+/** The budget it already added to this agent this month for the person (the cap is per agent per month). */
+async function givenTo(db: Database, orgId: string, forUserId: string, agentId: string) {
   const [given] = await db
     .select({ sum: sql<number>`coalesce(sum(${rightHandDecisions.budgetAddedNanoUsd}), 0)::bigint` })
     .from(rightHandDecisions)
@@ -299,14 +337,13 @@ async function inReach(
       and(
         eq(rightHandDecisions.orgId, orgId),
         eq(rightHandDecisions.forUserId, forUserId),
-        eq(rightHandDecisions.targetAgentId, targetId),
+        eq(rightHandDecisions.targetAgentId, agentId),
         ne(rightHandDecisions.outcome, "passed"),
         isNull(rightHandDecisions.undoneAt),
         gte(rightHandDecisions.createdAt, sql`${monthStart}`),
       ),
     );
-  if (added + Number(given?.sum ?? 0) > settings.budgetCapNanoUsd) return null;
-  return { budgetAdded: added, targetAgentId: targetId, what: agent.name };
+  return Number(given?.sum ?? 0);
 }
 
 /** The model on the same AI account, a budget, open channels and the reply mode there: nothing else. */
@@ -483,7 +520,8 @@ export async function considerCard(deps: RightHandDeps, orgId: string, messageId
 
   // Its own: a card it posted, or one whose chain passed through it (an agent asked it, it asked an agent).
   const chain = await runChain(db, orgId, run.id);
-  if (message.authorAgentId === rightHand.id || !chain || chain.agentIds.includes(rightHand.id)) return note("own");
+  if (!chain) return note("outside");
+  if (message.authorAgentId === rightHand.id || chain.agentIds.includes(rightHand.id)) return note("own");
   // No generations: an agent its decisions created never gets its own cards decided by it.
   const [born] = await db
     .select({ id: rightHandDecisions.id })
@@ -498,21 +536,30 @@ export async function considerCard(deps: RightHandDeps, orgId: string, messageId
     )
     .limit(1);
   if (born) return note("outside");
+  // Only the person's own words: another person (or their agent) writing into a run of the chain mid-task goes to them.
+  if (await steeredByOthers(db, orgId, forUserId, chain.runIds)) return note("outside");
 
   const item: Card = proposal
     ? { kind: "agent_new", card: proposal }
     : { kind: "agent_settings", card: settingsCard as SettingsProposalCard, rows };
   const reach = await inReach(db, orgId, forUserId, item, settings);
   if (!reach) return note("outside");
+  // An agent of the chain changing its own settings (its budget, its model) is the person's to decide.
+  if (reach.targetAgentId && chain.agentIds.includes(reach.targetAgentId)) return note("outside");
 
   // The caps, and the row that holds this card's place under them, under one lock per person.
   const decisionId = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`right_hand:${orgId}:${forUserId}`}))`);
-    const used = await usage(tx as unknown as Database, orgId, forUserId, now);
+    const locked = tx as unknown as Database;
+    const used = await usage(locked, orgId, forUserId, now);
     if (
       used.calls >= RIGHT_HAND_CAPS.decisionsPerDay ||
       (kind === "agent_new" && used.newAgents >= RIGHT_HAND_CAPS.newAgentsPerDay) ||
-      used.month + reach.budgetAdded > RIGHT_HAND_CAPS.monthNanoUsd
+      used.month + reach.budgetAdded > RIGHT_HAND_CAPS.monthNanoUsd ||
+      // Read again under the lock: two cards on one agent at once can't both fit the per-agent cap.
+      (reach.targetAgentId &&
+        reach.budgetAdded > 0 &&
+        reach.budgetAdded + (await givenTo(locked, orgId, forUserId, reach.targetAgentId)) > settings.budgetCapNanoUsd)
     )
       return null;
     const [row] = await tx
@@ -600,6 +647,7 @@ export async function considerCard(deps: RightHandDeps, orgId: string, messageId
 
   // Applied as the person, through what their click calls; a person deciding it meanwhile wins.
   let targetAgentId = reach.targetAgentId;
+  let applied = 0;
   try {
     if (item.kind === "agent_new") {
       const made = await createProposedAgent({ db, pubsub: deps.pubsub }, forUserId, orgId, messageId, {
@@ -607,12 +655,17 @@ export async function considerCard(deps: RightHandDeps, orgId: string, messageId
       });
       targetAgentId = made.agent.id;
     } else {
-      for (const row of rows)
+      for (const row of rows) {
         await decideProposal(db, forUserId, orgId, row.id, "accept", { pubsub: deps.pubsub, via: rightHand.name });
+        applied++;
+      }
     }
   } catch {
-    await db.delete(rightHandDecisions).where(eq(rightHandDecisions.id, decisionId));
-    return markCard(deps, message, null);
+    // A row it already applied stays its decision (with Desfazer); none applied: the card is the person's again.
+    if (applied === 0) {
+      await db.delete(rightHandDecisions).where(eq(rightHandDecisions.id, decisionId));
+      return markCard(deps, message, null);
+    }
   }
   const at = new Date();
   const undoUntil = new Date(at.getTime() + RIGHT_HAND_CAPS.undoMs).toISOString();

@@ -5,6 +5,7 @@ import {
   type AgentProposalCard,
   agentProposalOf,
   type CardDelegate,
+  createAgent,
   createChannel,
   createSetupToolSource,
   createToolGateway,
@@ -344,8 +345,16 @@ describe("the right hand approves for a person (ADR 0138 §2)", () => {
   test("settings: a budget raise within the cap is applied as Ana and undone; past it, another AI or archiving is hers", async () => {
     await world();
     await on();
-    const settings = async (change: Record<string, unknown>) => {
-      const out = await call(await runFor({ userId: f.owner.id }), PROPOSE_SETTINGS_TOOL, {
+    // Another agent proposes @dev's settings: an agent asking for its own is Ana's to decide.
+    const ops = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Ops", handle: "ops", role: "Ops", instructions: "x", credentialId: f.agent.credentialId },
+      { model: "claude-sonnet-5-5" },
+    );
+    const settings = async (change: Record<string, unknown>, by = ops.id) => {
+      const out = await call(await runFor({ userId: f.owner.id }, by), PROPOSE_SETTINGS_TOOL, {
         changes: [{ agent: "@dev", ...change }],
         reason: "mais folga",
       });
@@ -374,6 +383,29 @@ describe("the right hand approves for a person (ADR 0138 §2)", () => {
     expect((await settings({ archive: true })).delegate?.state).toBe("outside");
     expect((await settings({ model: "gpt-6-luna" })).delegate?.state).toBe("outside");
     expect((await settings({ model: "claude-haiku-5-5" })).delegate?.state).toBe("approved");
+    // @dev raising its own budget: Ana's, with no call.
+    const calls = decisionCalls().length;
+    expect((await settings({ budget_usd: 12 }, f.agent.id)).delegate?.state).toBe("outside");
+    expect(decisionCalls()).toHaveLength(calls);
+  });
+
+  test("only Ana's own words: Bruno writing into the run that proposed it sends the card to Ana", async () => {
+    await world();
+    await on();
+    const bruno = await addMember(f.db, f.org.id, "member", "bruno");
+    const ctx = await runFor({ userId: f.owner.id });
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: ctx.threadRootId,
+      author: { type: "person", userId: bruno.id },
+      body: "@dev propõe uma agente Triagem pra mim",
+      meta: { steeredRunIds: [ctx.runId] },
+    });
+    const { card, delegate } = await proposeAndDecide(ctx);
+    expect(delegate?.state).toBe("outside");
+    expect(card.state).toBe("pending");
+    expect(decisionCalls()).toHaveLength(0);
   });
 
   test("the settings: the budget per agent stops at US$ 50, guidance at 2,000 characters", async () => {

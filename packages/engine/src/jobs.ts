@@ -1003,7 +1003,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (!deps.context) return;
       await consolidateOrg(deps.context, orgOf(job));
     },
-    // Yesterday's stall-and-noise report, to the people who run the server (`OPS_REPORT_EMAIL`).
     // The right hand looks at a card for the person behind it (ADR 0138 §2).
     [RIGHT_HAND_DECIDE_JOB]: async (job) => {
       await considerCard(
@@ -1012,6 +1011,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         String(job.payload.messageId),
       );
     },
+    // Yesterday's stall-and-noise report, to the people who run the server (`OPS_REPORT_EMAIL`).
     [AUTONOMY_REPORT_JOB]: async (job) => {
       await queueAutonomyEmail(deps.db, job.payload, { router: deps.router?.enabled ?? false });
     },
