@@ -37,6 +37,8 @@ import {
   snoozeTimes,
   sortWaiting,
   stepCells,
+  WIDGET_NOTICES,
+  widgetNoticeOf,
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords } from "@agenteschat/client/lib/routine-view";
@@ -83,6 +85,7 @@ import { useOrg } from "@/components/org-context";
 import { AllowTalkButton } from "@/components/ReachLines";
 import { ChangeRequestCard } from "@/components/RightHandCards";
 import { colorOf, prepareBurst } from "@/components/Sky";
+import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow } from "@/hooks/useMatchMedia";
 import { useWraps } from "@/hooks/useWraps";
@@ -165,7 +168,8 @@ function SourceChip({
   if (runFailedGroupOf(n) || (n.kind === "catch_up_closed" && n.count > 1)) return null;
   let icon: IconName = "channel";
   let label = "";
-  if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
+  if (WIDGET_NOTICES.has(n.kind)) [icon, label] = ["grid", t("notifications.source.dashboard")];
+  else if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
   else if (n.kind === "join_request" || n.kind === "invitation_accepted")
     [icon, label] = ["members", t("notifications.source.members")];
   else if (n.kind === "composio_limit") [icon, label] = ["wallet", t("notifications.source.usage")];
@@ -623,15 +627,19 @@ function Row({
   // run what went wrong (never the server's English).
   const why = routineNotificationWords(n);
   const restriction = restrictionOf(n);
+  // A board's notice says what the agent saw, why the widget stopped, or whom it would show the board to (ADR 0135).
+  const widgetLine = widgetNoticeLine(t, n, dir);
   // A GIF or a sticker has no words: its word stands for it (ADR 0091).
   const media = mediaKindOf(l.media);
   const text = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
-    : why
-      ? sayWords(t, why, l.text ?? "")
-      : media === "voice"
-        ? mediaWord(t, media)
-        : l.text || (media ? mediaWord(t, media) : l.text);
+    : widgetLine
+      ? widgetLine
+      : why
+        ? sayWords(t, why, l.text ?? "")
+        : media === "voice"
+          ? mediaWord(t, media)
+          : l.text || (media ? mediaWord(t, media) : l.text);
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -731,6 +739,11 @@ function Row({
             )}
             {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
               <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
+            )}
+            {widgetNoticeOf(n) && !n.doneAt && (
+              <div className="nt-steprow">
+                <WidgetNoticeActions n={n} onOpen={() => h.onOpen(n)} open={false} />
+              </div>
             )}
             {expandable && (
               <>
@@ -1331,7 +1344,7 @@ function WaitRow({
       ? null
       : n.kind === "secret_request"
         ? secretNoticeLine(n)
-        : (n.latest.title ?? n.latest.text);
+        : (widgetNoticeLine(t, n, dir) ?? n.latest.title ?? n.latest.text);
   const l1 = useRef<HTMLDivElement>(null);
   const wraps = useWraps(l1);
   return (
@@ -1367,6 +1380,8 @@ function WaitRow({
           {sub && <p className="nt-wr__sub">{sub}</p>}
         </div>
         <div className="nt-wr__acts ac-acts">
+          {/* A board's notice is decided or resolved right here (ADR 0135). */}
+          <WidgetNoticeActions n={n} onOpen={() => h.onOpen(n)} open={false} />
           <Button size="sm" className="nt-wr__open" title={t("notifications.openTip")} onClick={() => h.onOpen(n)}>
             {t("notifications.open")}
           </Button>

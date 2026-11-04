@@ -1096,6 +1096,7 @@ export async function removeMember(
   const { cancelSecretRequestsFor, publishSecret } = await import("./secrets");
   const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
   const { dropMailOfOwner } = await import("./tools/scopes");
+  const { dropMemberDashboards } = await import("./dashboards/service");
   const { released, removed, handed, changed, heir, secrets, mailActions } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
@@ -1147,6 +1148,8 @@ export async function removeMember(
     if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
     // Their AI apps and personal tokens here stop now (ADR 0119).
     await revokeMemberApps(tx, orgId, targetUserId);
+    // Their home and private dashboards go, with their widgets' routines (ADR 0135).
+    await dropMemberDashboards(tx, orgId, targetUserId);
     // The secrets agents are waiting on from them won't come.
     const secrets = await cancelSecretRequestsFor(tx, orgId, targetUserId);
     // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an

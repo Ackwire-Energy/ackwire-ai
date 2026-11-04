@@ -179,6 +179,7 @@ export const keys = {
     ["org", orgId, "artifacts", "one", id, version ?? "latest"] as const,
   artifactVersions: (orgId: string, id: string) => ["org", orgId, "artifacts", "versions", id] as const,
   poll: (orgId: string, id: string) => ["org", orgId, "polls", id] as const,
+  blockState: (orgId: string, id: string, version: number) => ["org", orgId, "blocks", id, version] as const,
   choices: (orgId: string, id: string) => ["org", orgId, "choices", id] as const,
   storageMigration: (orgId: string) => ["org", orgId, "storage", "migration"] as const,
   search: (orgId: string, q: string, kinds: string) => ["org", orgId, "search", q, kinds] as const,
@@ -239,4 +240,15 @@ export const keys = {
   agentDesktop: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId] as const,
   /** Every agent's screen (`agentDesktop`'s prefix). */
   agentDesktops: (orgId: string) => ["org", orgId, "desktop"] as const,
+  /** Boards and widgets (ADR 0135): everything below (prefix); `dashboard.*` events refresh it. */
+  dashboards: (orgId: string) => ["org", orgId, "dashboards"] as const,
+  dashboardList: (orgId: string) => ["org", orgId, "dashboards", "list"] as const,
+  dashboard: (orgId: string, dashboardId: string) => ["org", orgId, "dashboards", "one", dashboardId] as const,
+  /** My home board ("My Home", the Home mural). */
+  dashboardHome: (orgId: string) => ["org", orgId, "dashboards", "home"] as const,
+  widget: (orgId: string, widgetId: string) => ["org", orgId, "dashboards", "widget", widgetId] as const,
+  widgetCost: (orgId: string, agentId: string, schedule: string) =>
+    ["org", orgId, "dashboards", "cost", agentId, schedule] as const,
+  widgetSuggestions: (orgId: string, agentId: string) => ["org", orgId, "dashboards", "suggestions", agentId] as const,
+  widgetPinnable: (orgId: string) => ["org", orgId, "dashboards", "pinnable"] as const,
 };

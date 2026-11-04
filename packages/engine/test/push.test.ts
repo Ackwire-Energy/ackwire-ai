@@ -158,6 +158,38 @@ describe("push text", () => {
     expect(long.body.length).toBeLessThanOrEqual(180);
   });
 
+  test("widgets and dashboards: the alert in the agent's words, why a widget didn't update, a board to publish", () => {
+    const alert = renderPush("pt-BR", {
+      kind: "widget_alert",
+      waiting: true,
+      actorName: "Theo",
+      actorType: "agent",
+      label: "Vendas hoje",
+      title: "Vendas hoje",
+      text: "As vendas caíram 25% abaixo de ontem.",
+    });
+    expect(alert).toEqual({ title: "Theo: Vendas hoje", body: "As vendas caíram 25% abaixo de ontem." });
+    expect(
+      renderPush("en", { kind: "widget_failed", waiting: false, title: "Open tickets", reason: "budget_exceeded" }),
+    ).toEqual({ title: "“Open tickets” didn't update", body: "The agent reached its budget for the month." });
+    // The agent said why itself: its words.
+    expect(
+      renderPush("pt-BR", {
+        kind: "widget_failed",
+        waiting: false,
+        title: "Vendas",
+        reason: "agent_reported",
+        text: "O Stripe não está conectado.",
+      }).body,
+    ).toBe("O Stripe não está conectado.");
+    expect(renderPush("en", { kind: "widget_failed", waiting: false, title: "X", reason: "something_new" }).body).toBe(
+      "Tap to see why.",
+    );
+    expect(
+      renderPush("pt-BR", { kind: "dashboard_proposal", waiting: true, actorName: "Theo", title: "Black Friday" }),
+    ).toEqual({ title: "Theo quer publicar um painel", body: "“Black Friday” · Toque para decidir." });
+  });
+
   test("high risk follows the approval card's rule", () => {
     expect(approvalIsHighRisk({ tool: "github.merge_pull_request", scope: "github:merge" })).toBe(false);
     expect(approvalIsHighRisk({ tool: "deploy", scope: "railway:deploy" })).toBe(true);

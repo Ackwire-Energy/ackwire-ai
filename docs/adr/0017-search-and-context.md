@@ -41,7 +41,7 @@ Reflection was left as it is: the agent knows the exact details when it finishes
 
 ## Addendum (2026-11-03): reading a conversation, and where an agent was asked
 
-ADR 0135 adds `read_conversation` (`context:read`, on demand): a message by id or link with those around it, or a
+ADR 0138 adds `read_conversation` (`context:read`, on demand): a message by id or link with those around it, or a
 channel's or thread's messages, each with who wrote it, where and its link, within the same channels as
 `search_context` (the run's channel and the agent's public channels; the agents' DM keeps its per-person rule).
 `search_context` message hits now name their author, place and link. One narrow exception: from a conversation where

@@ -4,6 +4,7 @@ import {
   dayGroupOf,
   groupByDay,
   headlineNames,
+  homeTarget,
   isExpandable,
   matchesFilter,
   type NotificationPages,
@@ -16,6 +17,8 @@ import {
   stepCells,
   targetPath,
   upsertInPages,
+  waitingCardOf,
+  widgetNoticeOf,
 } from "@agenteschat/client/lib/notifications";
 import { notification } from "./fakes/notifications";
 
@@ -289,5 +292,50 @@ describe("pieces", () => {
     // From a Monday, the Monday after.
     const monday = snoozeTimes(new Date(2026, 9, 19, 8, 0));
     expect([monday.nextWeek.getDay(), monday.nextWeek.getDate()]).toEqual([1, 26]);
+  });
+});
+
+describe("a board's notices (ADR 0135)", () => {
+  const alert = notification({
+    id: "a",
+    kind: "widget_alert",
+    waiting: true,
+    actors: [{ type: "agent", id: "ada" }],
+    source: { dashboardId: "d1", widgetId: "w1", agentId: "ada", label: "Vendas hoje" },
+    latest: { text: "Caiu 24%." },
+  });
+
+  test("open the board with the widget's panel; on my home board, Home", () => {
+    const target = openTarget(alert);
+    expect(target).toEqual({
+      to: "/org/$orgId/dashboards/$dashboardId",
+      params: { dashboardId: "d1" },
+      search: { widget: "w1" },
+    });
+    if (!target) throw new Error("no target");
+    expect(homeTarget(target, "d1")).toEqual({ to: "/org/$orgId/home", search: { widget: "w1" } });
+    expect(homeTarget(target, "other")).toBe(target);
+    expect(targetPath("o", target)).toBe("/org/o/dashboards/d1?widget=w1");
+    // Without a board, the boards.
+    expect(openTarget(notification({ id: "b", kind: "dashboard_proposal" }))).toEqual({ to: "/org/$orgId/dashboards" });
+  });
+
+  test("what each says and offers: an alert's words, a failure's reason, a request's audience", () => {
+    expect(widgetNoticeOf(alert)).toMatchObject({ kind: "alert", widgetId: "w1", agentId: "ada", text: "Caiu 24%." });
+    expect(
+      widgetNoticeOf(notification({ id: "f", kind: "widget_failed", latest: { reason: "budget_exceeded" } })),
+    ).toMatchObject({ kind: "failed", reason: "budget_exceeded", text: null });
+    expect(
+      widgetNoticeOf(
+        notification({ id: "p", kind: "dashboard_proposal", latest: { statusTo: "roles", names: ["Vendas"] } }),
+      ),
+    ).toMatchObject({ kind: "proposal", audience: "roles", roles: ["Vendas"] });
+    expect(widgetNoticeOf(notification({ id: "m", kind: "mention" }))).toBeNull();
+  });
+
+  test("waiting, they open (the widget or the board): nobody to answer", () => {
+    expect(waitingCardOf(alert)).toMatchObject({ action: "open", title: "Caiu 24%." });
+    for (const kind of ["widget_failed", "dashboard_proposal"] as const)
+      expect(waitingCardOf(notification({ id: kind, kind, waiting: true })).action).toBe("open");
   });
 });

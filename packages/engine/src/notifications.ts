@@ -155,6 +155,25 @@ export const NOTIFICATION_KINDS = [
    */
   "app_created",
   /**
+   * A widget's alert condition was met (ADR 0135 §6): whoever turned its alert on hears what the agent saw, waiting,
+   * one row per widget merging while open (`widget-alert:<widgetId>`), `source.widgetId`, `source.dashboardId`,
+   * `source.agentId`, the widget's title in `source.label`, the agent's words in `latest.text`.
+   */
+  "widget_alert",
+  /**
+   * A widget stopped updating (ADR 0135 §6): its creator, once per failure streak (`widget-failed:<widgetId>`), the
+   * coded reason in `latest.reason` (`agent_reported`: the agent's words in `latest.text`). Resolved by its next good
+   * update. Inbox only.
+   */
+  "widget_failed",
+  /**
+   * An agent asks to show a board to more people (ADR 0135 §11): the person it was made for, waiting
+   * (`dashboard-proposal:<dashboardId>`), `source.dashboardId`, `source.agentId`, the board's title in `source.label`,
+   * the audience in `latest.statusTo` (`workspace` or `roles`, the roles' names in `latest.names`) and the agent's
+   * reason in `latest.text`. Resolved by Publish or Keep only for me.
+   */
+  "dashboard_proposal",
+  /**
    * An update of a skill from its link (`skill-updates.ts`), `source.skillId` and its name in `source.label`;
    * `latest.statusTo`: `updated` (who turned "Atualizar sozinha" on), `waiting` (it changes what runs: who manages
    * skills, waiting, the files in `latest.title`, resolved once applied or refused) or `failed` (once per reason, its
@@ -203,11 +222,15 @@ export interface NotificationSource {
   proposalId?: string;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
   userId?: string;
-  /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */
+  /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`); a widget's agent. */
   agentId?: string;
+  /** A board (ADR 0135): `widget_alert`, `widget_failed`, `dashboard_proposal`. */
+  dashboardId?: string;
+  /** A widget (ADR 0135): `widget_alert`, `widget_failed`. */
+  widgetId?: string;
   /** A skill of the library (`skill_update`). */
   skillId?: string;
-  /** Channel name, thread title, issue title, topic title, mission or routine name. */
+  /** Channel name, thread title, issue title, topic title, mission or routine name, widget or board title. */
   label?: string;
 }
 
@@ -312,6 +335,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   // One per approval card: requests joining it update it, read or not (`notifyApproval`).
   "approval",
   "app_created",
+  // A widget's alerts while one is open: the latest words replace the older ones.
+  "widget_alert",
   // An agent's changes to a skill gather in one row while unread (`notifySkillUpdate` `edited`); its other notices
   // have a key of their own each.
   "skill_update",

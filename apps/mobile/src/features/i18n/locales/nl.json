@@ -86,6 +86,7 @@
   },
   "tabs": {
     "chats": "Gesprekken",
+    "dashboards": "Dashboards",
     "threads": "Threads",
     "agents": "Agents",
     "activity": "Activiteit",
@@ -1704,5 +1705,74 @@
     "noEmoji": "Geen emoji",
     "cleared": "Status gewist",
     "bySelfUntil": "Geschreven door {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Alleen jij · je eigen widgets",
+    "loadFailed": "De dashboards konden niet worden geladen.",
+    "onlyHome": "Dashboards van de werkruimte of jouw rollen verschijnen hier.",
+    "create": "Maken",
+    "routineTarget": "zijn widget",
+    "pin": {
+      "which": "Welke grafiek"
+    },
+    "organize": {
+      "hint": "Houd een widget vast en sleep hem naar zijn nieuwe plek, of gebruik de pijltjes, en kies voor elk de grootte. Klaar bewaart de volgorde.",
+      "holdHint": "Vasthouden en slepen om hem te verplaatsen.",
+      "up": "Omhoog",
+      "down": "Omlaag",
+      "position": "{{at}} van {{count}}",
+      "saved": "Dashboard geordend"
+    },
+    "edit": {
+      "saved": "Dashboard opgeslagen"
+    },
+    "pinned": "Bovenaan vastgezet",
+    "unpinned": "Losgemaakt",
+    "sizeHint": {
+      "s": "Een halve rij op de telefoon, een kwart van het dashboard op het web.",
+      "m": "De hele rij op de telefoon, de helft van het dashboard op het web.",
+      "l": "De hele rij, groot getekend. De helft van het dashboard en twee keer zo hoog op het web."
+    },
+    "widget": {
+      "caresFor": "{{name}} zorgt ervoor",
+      "refreshing": "{{name}} werkt hem bij.",
+      "scheduleSaved": "Hij werkt nu {{schedule}} bij",
+      "alertSaved": "Melding opgeslagen",
+      "removed": "Widget verwijderd. Zijn routine is gestopt.",
+      "routine": "Zijn routine",
+      "onBoard": "Waar hij staat",
+      "title": "Titel",
+      "titlePlaceholder": "Een korte naam voor de widget",
+      "titleSaved": "Titel opgeslagen"
+    },
+    "formatAuto": "{{name}} kiest de beste",
+    "newWidget": {
+      "titleHint": "Titel · {{name}} stelt er een voor bij het testen",
+      "alerts": "Melding aan",
+      "realData": "Echte gegevens",
+      "editAsk": "Vraag wijzigen",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Automatische vorm"
+    },
+    "agentPick": {
+      "search": "Agents zoeken",
+      "noMatch": "Geen agent met die naam of rol.",
+      "note": "Elke agent leest alleen de apps waar hij toegang toe heeft.",
+      "reads": "Leest {{apps}}",
+      "noApps": "Geen gekoppelde apps"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} heeft een widget gemarkeerd",
+      "widget_alert_other": "{{names}} hebben een widget gemarkeerd",
+      "widget_failed_one": "{{names}} kon een widget niet bijwerken",
+      "widget_failed_other": "{{names}} konden een widget niet bijwerken",
+      "dashboard_proposal_one": "{{names}} wil een dashboard publiceren",
+      "dashboard_proposal_other": "{{names}} willen een dashboard publiceren",
+      "card": {
+        "alert": "Melding",
+        "failed": "Niet bijgewerkt",
+        "proposal": "Dashboard"
+      }
+    }
   }
 }

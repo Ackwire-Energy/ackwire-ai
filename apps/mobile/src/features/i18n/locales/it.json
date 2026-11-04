@@ -91,6 +91,7 @@
   },
   "tabs": {
     "chats": "Chat",
+    "dashboards": "Dashboard",
     "threads": "Thread",
     "agents": "Agenti",
     "activity": "Attività recenti",
@@ -1790,5 +1791,77 @@
     "noEmoji": "Nessuna emoji",
     "cleared": "Stato cancellato",
     "bySelfUntil": "Scritto da {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Solo tu · i tuoi widget",
+    "loadFailed": "Impossibile caricare le dashboard.",
+    "onlyHome": "Le dashboard dello spazio di lavoro o dei tuoi ruoli compaiono qui.",
+    "create": "Crea",
+    "routineTarget": "il suo widget",
+    "pin": {
+      "which": "Quale grafico"
+    },
+    "organize": {
+      "hint": "Tieni premuto un widget e trascinalo nel nuovo posto, o usa le frecce, e scegli la dimensione di ciascuno. Fatto salva l'ordine.",
+      "holdHint": "Tieni premuto e trascina per spostarlo.",
+      "up": "Sposta su",
+      "down": "Sposta giù",
+      "position": "{{at}} di {{count}}",
+      "saved": "Dashboard organizzata"
+    },
+    "edit": {
+      "saved": "Dashboard salvata"
+    },
+    "pinned": "Fissata in alto",
+    "unpinned": "Rimossa dai fissati",
+    "sizeHint": {
+      "s": "Mezza riga sul telefono, un quarto della dashboard sul web.",
+      "m": "Tutta la riga sul telefono, metà della dashboard sul web.",
+      "l": "Tutta la riga, in grande. Metà della dashboard e alto il doppio sul web."
+    },
+    "widget": {
+      "caresFor": "{{name}} se ne occupa",
+      "refreshing": "{{name}} lo sta aggiornando.",
+      "scheduleSaved": "Ora si aggiorna {{schedule}}",
+      "alertSaved": "Avviso salvato",
+      "removed": "Widget rimosso. La sua routine si è fermata.",
+      "routine": "La sua routine",
+      "onBoard": "Dove si trova",
+      "title": "Titolo",
+      "titlePlaceholder": "Un nome breve per il widget",
+      "titleSaved": "Titolo salvato"
+    },
+    "formatAuto": "{{name}} sceglie il migliore",
+    "newWidget": {
+      "titleHint": "Titolo · {{name}} ne suggerisce uno nel test",
+      "alerts": "Avvisa",
+      "realData": "Dati reali",
+      "editAsk": "Cambia la richiesta",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Formato automatico"
+    },
+    "agentPick": {
+      "search": "Cerca agenti",
+      "noMatch": "Nessun agente con questo nome o ruolo.",
+      "note": "Ogni agente legge solo le app a cui ha accesso.",
+      "reads": "Legge {{apps}}",
+      "noApps": "Nessuna app collegata"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} ha segnalato un widget",
+      "widget_alert_many": "{{names}} hanno segnalato un widget",
+      "widget_alert_other": "{{names}} hanno segnalato un widget",
+      "widget_failed_one": "{{names}} non è riuscito ad aggiornare un widget",
+      "widget_failed_many": "{{names}} non sono riusciti ad aggiornare un widget",
+      "widget_failed_other": "{{names}} non sono riusciti ad aggiornare un widget",
+      "dashboard_proposal_one": "{{names}} vuole pubblicare una dashboard",
+      "dashboard_proposal_many": "{{names}} vogliono pubblicare una dashboard",
+      "dashboard_proposal_other": "{{names}} vogliono pubblicare una dashboard",
+      "card": {
+        "alert": "Avviso",
+        "failed": "Non aggiornato",
+        "proposal": "Dashboard"
+      }
+    }
   }
 }

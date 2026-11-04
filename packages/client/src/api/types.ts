@@ -1167,6 +1167,8 @@ export type ChannelEvent =
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: Poll }
+  /** Someone changed what a live block shows, for everyone (ADR 0113): keep the newest `rev`. */
+  | { type: "block.state"; channelId: string; block: BlockState }
   /** A choice card was answered (ADR 0124). */
   | { type: "choices.updated"; channelId: string; choices: Choices }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
@@ -2826,6 +2828,24 @@ export interface Choices {
   answer: { userId: string; picks: number[]; messageId: string | null; at: string } | null;
 }
 
+/** Who set a block's value last; `drawn`: the server picked it among that many options. */
+export interface BlockChange {
+  by: string;
+  name: string;
+  at: string;
+  drawn?: number;
+}
+
+/** What a live block shows, the same for everyone in its conversation (ADR 0113). */
+export interface BlockState {
+  id: string;
+  version: number;
+  state: Record<string, unknown>;
+  changes: Record<string, BlockChange>;
+  /** Goes up on every change: the newest one wins. */
+  rev: number;
+}
+
 /** One person's mark in a poll: a row per option they chose. */
 export interface PollVote {
   userId: string;
@@ -3175,7 +3195,9 @@ export type RoutineTargetInput =
  */
 export type RoutineTarget =
   | RoutineTargetInput
-  | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string };
+  | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string }
+  /** A widget's own routine (ADR 0135): it redoes the widget in place; changed from the widget, not here. */
+  | { type: "widget"; widgetId: string; dashboardId: string };
 
 /** Every routine acts with its agent's own permissions (ADR 0109); `read` is an old stored value the server reads as `act`. */
 export type RoutineAccess = "read" | "act";
@@ -3263,6 +3285,11 @@ export interface Routine {
   usage: { runs: number; tokens: number; costNanoUsd: number; billedTo: "api" | "plan" | "mixed" };
   /** Actions prepared for its runs that may still run (waiting for a person, or approved ahead), soonest first. */
   ahead?: RoutineAhead[];
+  /**
+   * A widget's routine (ADR 0135, target `widget`): the widget's title and board, to tag the row and open the widget
+   * (its schedule and instructions are changed there). Absent for any other routine and from older servers.
+   */
+  widget?: { id: string; dashboardId: string; title: string } | null;
 }
 
 /** An action prepared ahead for one of a routine's runs (`schedule_action`): its approval, in short. */
@@ -5744,6 +5771,23 @@ export type NotificationKind =
    */
   | "app_created"
   /**
+   * ADR 0135: a widget's alert condition was met (whoever turned its alert on). Waiting; `source.widgetId`,
+   * `source.dashboardId`, `source.agentId`, the widget's title in `source.label`, what the agent saw in `latest.text`.
+   * Opens the widget.
+   */
+  | "widget_alert"
+  /**
+   * ADR 0135: a widget stopped updating (its creator), once per failure streak. `latest.reason` the coded reason
+   * (`widgetFailureKey`); `agent_reported`: the agent's words in `latest.text`. Inbox only. Opens the widget.
+   */
+  | "widget_failed"
+  /**
+   * ADR 0135: an agent asks to show a board to more people (the person it made it for). Waiting; `source.dashboardId`,
+   * `source.agentId`, the board's title in `source.label`, `latest.statusTo` `workspace` or `roles` (the roles' names
+   * in `latest.names`), the agent's reason in `latest.text`. Opens the board, where Publish / Keep only for me are.
+   */
+  | "dashboard_proposal"
+  /**
    * An update of a skill from its link: `latest.statusTo` `updated`, `waiting` (it changes files that run: who manages
    * skills, waiting, the files in `latest.title`) or `failed` (`latest.reason` its code). `source.skillId`, its name in
    * `source.label`. Opens the skill.
@@ -5787,8 +5831,12 @@ export interface NotificationSource {
   screen?: ScreenKind;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
   userId?: string;
-  /** `org_standing` to `agent_hold`: the agent held (its name in `label`). */
+  /** `org_standing` to `agent_hold`: the agent held (its name in `label`); a widget's or board's agent. */
   agentId?: string;
+  /** `widget_alert`, `widget_failed`, `dashboard_proposal`: the board (ADR 0135). */
+  dashboardId?: string;
+  /** `widget_alert`, `widget_failed`: the widget. */
+  widgetId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
   label?: string;
 }

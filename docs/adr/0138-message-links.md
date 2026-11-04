@@ -1,4 +1,4 @@
-# 0135. Message links: one permalink, a pill in messages, agents that cite where they were asked
+# 0138. Message links: one permalink, a pill in messages, agents that cite where they were asked
 
 - Status: Accepted (built)
 - Date: 2026-11-03

@@ -361,6 +361,7 @@ export function presentTools(
 /** A tool's group: its scope's prefix (`drive:write` → `drive`), each custom connector on its own; "" = conversation. */
 export function toolGroupKey(tool: Pick<ToolDefinition, "scope" | "connectionId"> & { name?: string }) {
   if (tool.name && RARE_TOOLS.has(tool.name)) return RARE_GROUP;
+  if (tool.name && DASHBOARD_TOOLS.has(tool.name) && !tool.connectionId) return DASHBOARD_GROUP;
   const prefix = tool.scope.split(":")[0] ?? "";
   return prefix.startsWith("custom") ? `custom:${tool.connectionId ?? prefix}` : prefix;
 }
@@ -395,6 +396,18 @@ export const RARE_TOOLS: ReadonlySet<string> = new Set([
 ]);
 const RARE_GROUP = "more";
 
+/**
+ * Boards and widgets (ADR 0135 §10): built-in for every agent (no scope), loaded when a run needs them, like a scope's
+ * group. `update_widget` stays with the conversation's tools: it is listed only on a widget's own run.
+ */
+export const DASHBOARD_TOOLS: ReadonlySet<string> = new Set([
+  "list_dashboards",
+  "create_dashboard",
+  "create_widget",
+  "share_dashboard",
+]);
+const DASHBOARD_GROUP = "dashboards";
+
 export const isCore = (tool: Pick<ToolDefinition, "name" | "scope" | "connectionId">) =>
   !RARE_TOOLS.has(tool.name) && (CORE_GROUPS.has(toolGroupKey(tool)) || CORE_TOOLS.has(tool.name));
 
@@ -410,6 +423,7 @@ const GROUP_LABELS: Record<string, string> = {
   [RARE_GROUP]:
     "More of the conversation (reading a channel or a message by its link, stickers, your status, threads, adding agents to channels, the agents' directory, your usage, instruction changes)",
   drive: "Files (Drive)",
+  [DASHBOARD_GROUP]: "Dashboards and widgets (numbers and charts kept up to date, boards to share)",
   issues: "Issues",
   calendar: "Calendar",
   schedule: "Schedule, reminders and routines",

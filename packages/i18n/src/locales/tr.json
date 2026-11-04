@@ -2796,6 +2796,7 @@
     },
     "working": {
       "title": "Şu anda çalışanlar",
+      "none": "Şu anda çalışan ajan yok.",
       "dm": "Konuşmanızda",
       "in": "#{{channel}}",
       "mission": "Misyon · {{done}}/{{total}}"
@@ -2999,7 +3000,8 @@
       "browser": "Tarayıcı",
       "members": "Üyeler",
       "usage": "Kullanım",
-      "connectors": "Bağlayıcılar"
+      "connectors": "Bağlayıcılar",
+      "dashboard": "Pano"
     },
     "reactions_one": "{{count}} tepki",
     "reactions_other": "{{count}} tepki",
@@ -5161,13 +5163,18 @@
     "subtitle": "Ajanların bir zamanlamaya göre ya da bir şey olduğunda kendi başlarına yaptıkları.",
     "new": "Yeni rutin",
     "deliversTo": "{{agent}} · {{target}} hedefine gönderir",
+    "widgetLine": "{{agent}} · widget'ını günceller, mesaj göndermez",
+    "widgetChip": "Pano widget'ı",
+    "widgetFixed": "Ne gösterdiği, ne zaman güncellendiği ve kimin ilgilendiği widget'ından değiştirilir.",
     "target": {
       "forum": "Bir forum konusu",
       "forumShort": "Forum",
       "dm": "Ajanla doğrudan mesajım",
       "artifact": "Drive'da bir belge",
       "dmShort": "DM",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "Bir pano widget'ı",
+      "widgetNamed": "“{{title}}” widget'ı"
     },
     "active": "Etkin",
     "activeLabel": "Etkin: {{name}}",
@@ -5262,7 +5269,8 @@
         "channel": "Kanaldaki herkes görür",
         "dm": "Yalnızca siz görürsünüz",
         "forum": "Ajanlar bir forum konusunda tartışır",
-        "artifact": "Drive'da bir belgeye dönüşür"
+        "artifact": "Drive'da bir belgeye dönüşür",
+        "widget": "Widget'ını günceller, mesaj göndermez"
       },
       "ahead": "Sonrası için hazırlandı",
       "createdBy": "Oluşturan: {{name}} · {{date}}",
@@ -13384,6 +13392,418 @@
         "done": "Bugün bitenler"
       },
       "none": "{{name}} şu an boşta."
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "Otomatik",
+      "kpi": "Sayı",
+      "goal": "Hedef",
+      "bars": "Çubuklar",
+      "line": "Çizgi",
+      "list": "Liste",
+      "text": "Özet"
+    },
+    "schedules": {
+      "half": "30 dakikada bir",
+      "hour": "Saatte bir",
+      "day": "Her gün 8:00'de",
+      "week": "Her pazartesi 8:00'de",
+      "manual": "Yalnızca siz istediğinizde"
+    },
+    "schedulesShort": {
+      "half": "30 dakika",
+      "hour": "Saatte bir",
+      "day": "Her gün · 8:00",
+      "week": "Her pazartesi",
+      "manual": "İstediğimde"
+    },
+    "schedulesInline": {
+      "half": "30 dakikada bir",
+      "hour": "saatte bir",
+      "day": "her gün 8:00'de",
+      "week": "her pazartesi 8:00'de",
+      "manual": "istendiğinde"
+    },
+    "sizes": {
+      "label": "Boyut",
+      "s": "S",
+      "m": "M",
+      "l": "L"
+    },
+    "status": {
+      "building": "{{name}} widget'ı ve onu güncelleyecek rutini oluşturuyor…",
+      "updating": "{{name}} güncelliyor…",
+      "failed": "Güncellenmedi"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "Çöz",
+      "agent_reported": "{{detail}}",
+      "no_update": "Son güncelleme veri olmadan bitti.",
+      "error": "Son güncelleme başarısız oldu.",
+      "budget_exceeded": "{{name}} bu ayki bütçesine ulaştı.",
+      "waiting_computer": "{{name}} adlı ajanın bilgisayarına ulaşılamıyor.",
+      "waiting_plan": "{{name}} adlı ajanın planı sınırında.",
+      "waiting_budget": "{{name}} adlı ajanın bütçesi sınırında.",
+      "creator_left": "Onu kuran kişi çalışma alanından ayrıldı.",
+      "creator_no_access": "Onu kuran kişi artık kullanamıyor.",
+      "agent_archived": "{{name}} arşivlendi.",
+      "audience": "Onu kuran kişi artık {{name}} ile konuşamıyor.",
+      "failing": "Art arda birkaç kez başarısız oldu ve durdu.",
+      "stopped": "Güncelleme durduruldu.",
+      "missing_credential": "{{name}} için çalışacak bir yapay zeka anahtarı ya da plan yok.",
+      "timeout": "Güncelleme çok uzun sürdü.",
+      "invalid_data": "{{name}} verileri bu biçime getiremedi."
+    },
+    "menu": {
+      "label": "Daha fazla",
+      "open": "Aç",
+      "refresh": "Şimdi güncelle",
+      "change": "{{name}} adlı ajandan değişiklik isteyin",
+      "schedule": "Ne zaman güncelleneceğini değiştir",
+      "removeHome": "Ana sayfadan kaldır",
+      "removeBoard": "Panodan kaldır"
+    },
+    "organize": {
+      "start": "Düzenle",
+      "done": "Bitti",
+      "size": "Boyut",
+      "remove": "Kaldır",
+      "drag": "Taşımak için sürükleyin",
+      "fixed": "Sabit",
+      "role": "taşınabilir widget",
+      "help": "Boşluk veya Enter kartı alır, ok tuşları taşır, Boşluk veya Enter bırakır ve Esc iptal eder. Yalnızca ok tuşları onu bir sıra taşır.",
+      "picked": "“{{title}}” widget'ını aldınız. Ok tuşları taşır, Boşluk bırakır, Esc iptal eder.",
+      "moved": "“{{title}}”: {{total}} içinde {{position}}. sıra.",
+      "dropped": "“{{title}}” bırakıldı: {{total}} içinde {{position}}. sıra.",
+      "canceled": "“{{title}}” yerine döndü."
+    },
+    "add": {
+      "label": "Widget ekle",
+      "short": "Widget"
+    },
+    "alert": {
+      "label": "Bir şeyler ters gidince bana haber ver",
+      "hint": "Uyarı, neyin değiştiğiyle birlikte “Sizi bekleyenler” bölümüne gelir.",
+      "condition": "Şu durumda uyar",
+      "placeholder": "bir şeyler ters giderse",
+      "line": "Uyarı koşulu: {{condition}}",
+      "lineAny": "Bir şeyler ters gidince uyar",
+      "where": "“Sizi bekleyenler” bölümünde",
+      "none": "Uyarı yok"
+    },
+    "cost": {
+      "day": "{{name}} bütçesinden günde ≈ {{amount}}",
+      "week": "{{name}} bütçesinden haftada ≈ {{amount}}",
+      "manual": "Yalnızca güncelleme istediğinizde harcar",
+      "plan": "{{name}} adlı ajanın planını kullanır",
+      "unknown": "Her güncelleme {{name}} bütçesini kullanır"
+    },
+    "exposure": "Panoyu gören kişi, verinin geldiği hesaplara erişimi olmasa bile ajanların getirdiklerini görür. Ajanlar da pano oluşturur. Bir panoyu isteyen kişiden daha fazla kişiye göstermek için önce “Sizi bekleyenler” bölümünde sorarlar.",
+    "panel": {
+      "caresFor": "Bu widget ile {{name}} ilgileniyor",
+      "caresForOn": "Bu widget ile {{name}} ilgileniyor · {{board}}",
+      "how": "Nasıl güncellenir",
+      "next": "{{name}} rutini · sonraki {{when}}",
+      "noRoutine": "Kendi kendine güncellenmez",
+      "askAnytime": "Menüden güncelleme isteyebilirsiniz",
+      "editRoutine": "Rutini düzenle",
+      "changeAlert": "Değiştir",
+      "reads": "{{name}} oluşturmak için neleri okur",
+      "history": "Son güncellemeler",
+      "noHistory": "Henüz güncelleme yok.",
+      "alerted": "uyardı: {{text}}",
+      "changed": "Değişti: {{text}}",
+      "ask": "Değişiklik iste",
+      "askPlaceholder": "Örn.: kanala göre ayır ya da geçen yılın aynı haftasıyla karşılaştır",
+      "askTo": "alıcı: {{name}}",
+      "send": "Gönder",
+      "sent": "{{name}} widget'ı yeniden yapıyor.",
+      "updated": "Güncellendi",
+      "rename": "Yeniden adlandır",
+      "titleLabel": "Widget başlığı"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b> “{{title}}” için uyardı",
+      "failed": "“{{title}}” artık güncellenmiyor",
+      "proposal": "<b>{{name}}</b> bir pano yayımlamak istiyor",
+      "proposalWorkspace": "“{{title}}” tüm çalışma alanı için · bugün yalnızca siz görüyorsunuz",
+      "proposalRoles": "“{{title}}” {{roles}} için · bugün yalnızca siz görüyorsunuz",
+      "openBoard": "Panoyu görüntüle",
+      "openWidget": "Widget'ı aç",
+      "resolving": "“{{title}}” yeniden güncelleniyor"
+    },
+    "example": {
+      "days": {
+        "d1": "Çar",
+        "d2": "Per",
+        "d3": "Cum",
+        "d4": "Cmt",
+        "d5": "Paz",
+        "d6": "Pzt",
+        "d7": "Sal"
+      },
+      "vsYesterday": "düne göre",
+      "goalLine": "100'de 48",
+      "goalNote": "Bu hızla ayın 29'unda ulaşılır.",
+      "lineNote": "Dün 40 · bu hafta +%48",
+      "row1": "Birinci öğe",
+      "row2": "İkinci öğe",
+      "row3": "Üçüncü öğe",
+      "meta1": "şimdi",
+      "meta2": "1 sa önce",
+      "meta3": "dün",
+      "item1": "Neyin değiştiğine dair kısa bir özet.",
+      "item2": "Ajan bunu her güncellemede yeniden yazar."
+    },
+    "preview": {
+      "label": "Önizleme",
+      "example": "örnek veri"
+    },
+    "pin": {
+      "action": "Sabitle",
+      "label": "Bir panoya sabitle",
+      "done": "Sabitlendi: {{where}}",
+      "doneUpdating": "Sabitlendi: {{where}} · {{name}} onu {{schedule}} yeniden yapar",
+      "subtitle": "Grafiğin verilerini saklar. Ajanı onu güncel de tutabilir.",
+      "open": "Aç"
+    },
+    "home": "Ana sayfam",
+    "untitled": "Yeni widget",
+    "updatedAgo": "{{when}} güncellendi",
+    "removed": {
+      "home": "“{{title}}” ana sayfadan çıktı ve {{name}} rutini durdu",
+      "board": "“{{title}}” panodan çıktı ve {{name}} rutini durdu"
+    },
+    "removeConfirm": {
+      "title": "“{{title}}” kaldırılsın mı?",
+      "textRoutine": "Onu güncelleyen {{name}} rutini durur ve güncelleme geçmişi de onunla birlikte gider.",
+      "textManual": "Güncelleme geçmişi de onunla birlikte gider.",
+      "confirm": "Kaldır"
+    }
+  },
+  "agentPicker": {
+    "search": "Ajan ara",
+    "list": "Ajanlar",
+    "empty": "“{{q}}” ile eşleşen ajan yok",
+    "noConnectors": "Bağlayıcı yok",
+    "more": "+{{count}}"
+  },
+  "dashboards": {
+    "title": "Panolar",
+    "subtitle": "Ajanların güncel tuttuğu sayılar ve grafikler. Tüm çalışma alanı ya da yalnızca bazı roller için.",
+    "sidebar": "Panolar",
+    "navWhat": "Ajanların güncel tuttuğu sayılar ve grafikler",
+    "new": "Yeni pano",
+    "back": "Panolar",
+    "home": "Ana sayfam",
+    "groups": {
+      "workspace": "Çalışma alanı",
+      "workspaceHint": "herkes görür",
+      "roles": "Rolleriniz",
+      "rolesHint": "{{roles}} içindesiniz",
+      "mine": "Yalnızca sizin",
+      "mineHint": "başka kimse görmez"
+    },
+    "audience": {
+      "label": "Kimler görür",
+      "workspace": "Tüm çalışma alanı",
+      "workspaceHint_one": "{{count}} üye görür ve Panolar'da bulur",
+      "workspaceHint_other": "{{count}} üyenin tamamı görür ve Panolar'da bulur",
+      "roles": "Roller",
+      "rolesHint": "Yalnızca seçilen rollerden birine sahip kişiler",
+      "private": "Yalnızca siz",
+      "privateHint": "Siz paylaşana kadar başka kimse görmez",
+      "noRoles": "Çalışma alanında henüz rol yok.",
+      "people_one": "{{count}} kişi",
+      "people_other": "{{count}} kişi"
+    },
+    "edit": {
+      "label": "Kimler düzenler",
+      "viewers": "Görebilen herkes",
+      "owner": "Yalnızca siz ve yöneticiler",
+      "roles": "Ya da bu rollere sahip kişiler",
+      "twoRoles": "{{first}} ve {{second}}",
+      "manyRoles_one": "{{count}} rol",
+      "manyRoles_other": "{{count}} rol",
+      "cantSee": "Bu panoyu görmez",
+      "someRoles": "Bazı roller…",
+      "rolesNote": "Bu rollere sahip kişiler panoyu da görüyorsa düzenler. Siz ve yöneticiler her zaman düzenler."
+    },
+    "meta": {
+      "by": "{{name}} oluşturdu",
+      "byYou": "Siz oluşturdunuz",
+      "widgets_one": "{{count}} widget",
+      "widgets_other": "{{count}} widget",
+      "updated": "{{when}} güncellendi"
+    },
+    "share": {
+      "action": "Paylaş",
+      "title": "“{{title}}” panosunu paylaş",
+      "access": "Erişimi olanlar",
+      "you": "{{name}} (siz)",
+      "owner": "Çalışma alanının sahibi",
+      "edits": "Düzenler",
+      "sees": "Görür",
+      "none": "Görmez",
+      "copyLink": "Bağlantıyı kopyala",
+      "copied": "Bağlantı kopyalandı",
+      "save": "Kaydet",
+      "nowWorkspace": "“{{title}}” artık çalışma alanının",
+      "nowPrivate": "“{{title}}” panosunu yalnızca siz görüyorsunuz",
+      "nowRoles": "{{roles}} artık “{{title}}” panosunu görüyor"
+    },
+    "proposal": {
+      "title": "{{name}} bu panoyu sizin için hazırladı",
+      "workspace": "Ve tüm çalışma alanında yayımlamayı öneriyor. Bugün yalnızca siz görüyorsunuz.",
+      "roles": "Ve {{roles}} ile paylaşmayı öneriyor. Bugün yalnızca siz görüyorsunuz.",
+      "keep": "Yalnızca bende kalsın",
+      "publishWorkspace": "Çalışma alanında yayımla",
+      "publishRoles": "{{roles}} için göster",
+      "published": "“{{title}}” yayımlandı",
+      "kept": "“{{title}}” panosunu yalnızca siz görüyorsunuz"
+    },
+    "empty": {
+      "title": "Boş pano",
+      "text": "Widget ekleyin: bir ajandan isteyin ya da sohbetten bir blok sabitleyin."
+    },
+    "onlyHome": "“Yeni pano” ile çalışma alanı ya da bazı roller için bir pano oluşturun.",
+    "create": {
+      "title": "Yeni pano",
+      "subtitle": "Widget'lar tek sayfada bir arada. Sizin için ya da ekip için.",
+      "name": "Ad",
+      "namePlaceholder": "Örn.: Satışlar, Black Friday, Çeyrek hedefleri",
+      "askHint": "Bir sohbette bir ajandan da pano oluşturmasını isteyebilirsiniz.",
+      "submit": "Pano oluştur",
+      "created": "“{{title}}” oluşturuldu"
+    },
+    "newWidget": {
+      "title": "Yeni widget",
+      "subtitle": "Bir ajanın güncel tuttuğu bir sayı, grafik ya da liste.",
+      "tabAsk": "Bir ajandan iste",
+      "tabPin": "Sohbetten sabitle",
+      "what": "Neyi takip etmek istiyorsunuz?",
+      "whatPlaceholder": "Örn.: bugünkü satışların dünle karşılaştırması",
+      "who": "Kim ilgilenecek",
+      "format": "Biçim",
+      "updates": "Güncelleme",
+      "destination": "Eklenecek yer",
+      "create": "Widget oluştur",
+      "pin": "Sabitle",
+      "fromChat": "Ajanların sohbette gönderdiği bloklar",
+      "pinHint": "Doğrudan mesajdan da sabitleyebilirsiniz: bloktaki “Sabitle”.",
+      "keepUpdated": "Güncel tut",
+      "onlyPin": "Hayır, sadece sabitle",
+      "emptyPreview": "Neyi takip etmek istediğinizi yazın, {{name}} nasıl görüneceğini burada göstersin.",
+      "pickBlock": "Sohbetten bir blok seçin.",
+      "noBlocks": "Konuşmalarınızda henüz grafik yok.",
+      "suggestions": "Öneriler",
+      "theAgent": "Ajan",
+      "noAgents": "Henüz konuşabileceğiniz bir ajan yok.",
+      "place": {
+        "channel": "{{name}}, #{{channel}} kanalında · {{when}}",
+        "thread": "{{name}}, #{{channel}} kanalındaki bir ileti dizisinde · {{when}}",
+        "dm": "{{name}}, konuşmanızda · {{when}}",
+        "unnamed": "{{name}}, bir konuşmada · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}} onu şimdi gerçek verilerle oluşturur",
+        "reads": "{{sources}} okur",
+        "routine": "“{{title}}” rutinini oluşturur",
+        "routineHint": "{{schedule}} · Rutinler'de görünür",
+        "noRoutine": "Rutin yok: siz istediğinizde güncellenir",
+        "alert": "“Sizi bekleyenler” bölümünde uyarır, koşul: {{condition}}",
+        "alertHint": "Aksi halde yalnızca widget'ı günceller, mesaj göndermez",
+        "noAlert": "Uyarı yok",
+        "noAlertHint": "Yalnızca widget'ı günceller, mesaj göndermez",
+        "pinAsIs": "Bloğu sohbetteki haliyle sabitler",
+        "redoes": "{{name}} onu {{schedule}} yeniden yapar",
+        "redoesHint": "Bir rutinle, sohbette mesaj olmadan",
+        "noRedo": "Kendi kendine güncellenmez",
+        "noRedoHint": "Menüden güncelleme isteyebilirsiniz"
+      },
+      "created": "Widget şuraya eklendi: {{where}}",
+      "test": "Test et",
+      "testAgain": "Yeniden test et",
+      "testing": "{{name}} gerçek verilerle hazırlıyor…",
+      "tested": "Gerçek veriler · {{when}}",
+      "stale": "Testten sonra değişti",
+      "testFailed": "Olmadı: {{reason}}",
+      "tryAgain": "Tekrar dene",
+      "testCost": "Bu testin maliyeti: {{cost}}",
+      "testFirst": "Gerçek sonucu görmek için önce test edin",
+      "titleField": "Başlık",
+      "titlePlaceholder": "Başlık · {{name}} testte bir tane önerir",
+      "cardSubtitle": "Görmek istediğinizi karta yazın. Kimin ilgileneceğini, ne zaman güncelleneceğini, uyarıyı ve boyutu değiştirmek için parçalarına dokunun.",
+      "pinTitle": "Sohbetten bir blok sabitle",
+      "pinSubtitle": "Kart sohbetten gelir. Başlığını ve yeniden yapılıp yapılmayacağını siz seçersiniz.",
+      "pickFromChat": "Bir ajanın zaten gönderdiği bir blok seçin:",
+      "orPin": "Ya da sohbete zaten gelmiş bir bloğu sabitleyin",
+      "repick": "Başka blok seç",
+      "formatAuto": "Otomatik biçim",
+      "enterTests": "Enter yeniden test eder",
+      "quoted": "“{{ask}}”",
+      "editAsk": "İsteği değiştir",
+      "editAskOf": "İsteği değiştir: {{ask}}",
+      "testingShort": "Test ediliyor…",
+      "buildingFoot": "{{name}} hazırlıyor…",
+      "failedTitle": "{{name}} hazırlayamadı",
+      "staleHint": "Nasıl göründüğünü görmek için yeniden test edin.",
+      "whoButton": "Kim ilgilenecek: {{name}}",
+      "whoHint": "İlgilenen ajan, widget'ı bağlayıcıları üzerinden okuduklarıyla hazırlar.",
+      "alert": "Uyarı",
+      "alertOn": "Uyarı açık",
+      "alertDone": "Bitti",
+      "manual": "Yalnızca ben istediğimde",
+      "manualInline": "yalnızca ben istediğimde",
+      "noUpdate": "Güncellenmesin",
+      "noUpdateInline": "güncellenmez",
+      "inRoutines": "rutin Rutinler'de görünür",
+      "pinAsIs": "Olduğu gibi kalır, rutin yok",
+      "pinRedoes": "{{name}} bir rutinle {{schedule}} yeniden yapar",
+      "formatHints": {
+        "auto": "En iyi gösteren biçimi {{name}} seçer",
+        "kpi": "Büyük bir sayı ve nasıl değiştiği",
+        "goal": "Bir hedefe doğru ilerleme",
+        "bars": "Yan yana birkaç değer",
+        "line": "Zaman içinde nasıl değiştiği",
+        "list": "Kısa bir öğe listesi",
+        "text": "Özetleyen birkaç cümle"
+      }
+    },
+    "pinTop": "En üste sabitle",
+    "unpin": "Sabitlemeyi kaldır",
+    "rename": "Yeniden adlandır",
+    "about": "Açıklama",
+    "aboutPlaceholder": "Bu pano ne için",
+    "delete": {
+      "action": "Panoyu sil",
+      "title": "“{{title}}” silinsin mi?",
+      "text": "Widget'ları ve rutinleri de silinir.",
+      "confirm": "Sil",
+      "done": "“{{title}}” silindi"
+    },
+    "errors": {
+      "notFound": "Bu pano yok ya da onu göremiyorsunuz.",
+      "forbidden": "Bunu yalnızca bu panoyu düzenleyenler yapabilir.",
+      "homeFixed": "Ana sayfanız paylaşılamaz ve silinemez.",
+      "rolesRequired": "En az bir rol seçin.",
+      "roleUnknown": "Bu rollerden biri artık çalışma alanında yok.",
+      "titleRequired": "Panoya bir ad verin.",
+      "tooMany": "Çalışma alanı olabilecek en fazla panoya sahip. Önce birini silin.",
+      "publishForbidden": "Rolleriniz panoları başkalarına göstermenize izin vermiyor.",
+      "proposalNone": "O istek için zaten karar verildi.",
+      "proposalNotYours": "Yalnızca ajanın sorduğu kişi karar verir.",
+      "widgetNotFound": "Bu widget artık yok.",
+      "widgetTooMany": "Bu pano dolu. Bir widget kaldırın ya da başka bir pano kullanın.",
+      "scheduledCap": "Çalışma alanı zaten {{max}} widget'ı bir programla güncel tutuyor. Birini yalnızca istendiğinde güncellenecek şekilde ayarlayın ya da birini kaldırın.",
+      "agentUnreachable": "Bu ajanla konuşamazsınız.",
+      "agentArchived": "Bu ajan arşivlendi.",
+      "blockNotFound": "O grafik artık mesajda yok.",
+      "notAgentMessage": "Yalnızca bir ajanın grafiği sabitlenebilir.",
+      "promptRequired": "Widget'ın ne göstermesi gerektiğini yazın.",
+      "notTested": "Önce test edin: widget, testi başarılı olunca oluşturulur."
     }
   }
 }

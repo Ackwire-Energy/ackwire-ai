@@ -46,7 +46,7 @@ export const BLOCK_REPLY_CHARS = 2000;
 /** The manual an agent writes blocks from: every part of the kit (`packages/client/src/lib/block-kit.ts`). */
 export const BLOCK_MANUAL = `A live block is a small interactive thing inside your reply: something the person uses now (a simulator, a filterable view, options to see side by side, a short form). Reports and documents are files, not blocks; a question with plain choices is ask_user.
 
-Write short HTML, with no <html>, <head> or <body>. There is no network: no fetch, no CDN, no outside images. Put the data in the block. For passwords and keys use request_secret, never a block.
+Write short HTML, with no <html>, <head> or <body>. There is no network: no fetch, no CDN, no outside images. Put the data in the block. Everyone in the conversation sees what is typed in a block, so never ask for passwords, keys or card numbers in one: use request_secret.
 
 It must look like part of the app, in both light and dark:
 - Build from the parts below. Plain HTML (headings, text, lists, links, inputs, selects, checkboxes, tables, progress) is already styled: leave it.
@@ -72,13 +72,18 @@ Parts (every input has a name; its value is in the state under that name):
 - <ac-row> side by side, also for cards; <ac-stats> a row of stats
 - Any element: when="name=value" or when="name!=value" shows it only then
 
+Everyone in the conversation sees the same block: what one person sets reaches the others at once, and you read it in the conversation. So whatever the block shows lives in the state, never only in the page: a result written straight into the page is seen by one person, and you never see it.
+
 Script:
 - agentes.compute(s => ({ ... })) derives values from the state s; they can be bound like inputs. It runs on every change.
-- agentes.on(s => { ... }) runs on every change, for your own drawing.
-- agentes.set(name, value) changes the state.
+- agentes.on(s => { ... }) runs on every change, for your own drawing; it runs once at the start too.
+- agentes.set(name, value) changes the state, for everyone.
+- agentes.draw(name, ["A", "B"]) draws one option at random on the server, for a draw, a wheel, dice or a shuffle: the pick reaches everyone as name in the state, the same for all. Never Math.random for anything people see: each would see a different result. Show the result from agentes.on when name changes (animate it there, so everyone sees it land).
+- agentes.who(name) is who set it last: {name, at, drawn}.
+- Values come from people: put them in the page with textContent or the parts, never innerHTML.
 - CSS variables: --ink, --muted, --faint for text; --raised, --well, --sunken for surfaces; --line, --line2 for lines; --s1 to --s6 for categories, your own tones in order, with --on-s for text on them.
 
-To get an answer, add <ac-send label="Use this" text="Text with {name} or {name:format}" needs="a,b" hint="Why it's disabled">. The app shows the text and the button outside the block and the person decides; it reaches you as their message. needs lists values that must be filled or true. Add it only when your next step depends on the answer.
+You see what people set even without a send. To get an answer, add <ac-send label="Use this" text="Text with {name} or {name:format}" needs="a,b" hint="Why it's disabled">. The app shows the text and the button outside the block and the person decides; it reaches you as their message. needs lists values that must be filled or true. Add it only when your next step depends on the answer.
 
 When a number comes from your own formula, show how in <ac-more> and call it an estimate.
 
@@ -86,7 +91,11 @@ Example:
 <ac-slider name="preco" label="Preço" min="50" max="200" step="10" value="100" format="brl"></ac-slider>
 <ac-stat label="Margem" bind="margem" format="pct"></ac-stat>
 <ac-send label="Usar este preço" text="Usar {preco:brl}."></ac-send>
-<script>agentes.compute(s => ({ margem: (s.preco - 40) / s.preco * 100 }));</script>`;
+<script>agentes.compute(s => ({ margem: (s.preco - 40) / s.preco * 100 }));</script>
+
+A draw:
+<ac-result label="Sorteado" bind="nome"></ac-result>
+<ac-actions><button onclick="agentes.draw('nome', ['Ana', 'Bia'])">Sortear</button></ac-actions>`;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const failed = (error: unknown): ToolOutput => ({

@@ -24,6 +24,9 @@ import type { ToolDefinition } from "./types";
  *   (`routines.own_actions`: the gateway lets those through, `ownJobCovers`). It reaches other agents (`ask_agent`,
  *   `tell_agent`) and posts where its creator can post (`post_message`, `send_dm` to its creator): the
  *   tools hold it to its creator's rooms and agents (ADR 0053 §2, amended 2026-10-31).
+ * - `routine` redoing a widget (its brief's `widget`, ADR 0135 §5): it only reads (built-in reads, connected apps'
+ *   reads, the web, the browser) and answers through `update_widget`; everything else is refused with why,
+ *   `hand_off` included: a widget's refresh never posts. `update_widget` is no other run's.
  *
  * Tool names are written here as plain strings (not imported) so the table loads before the tool
  * modules, which import the gateway.
@@ -57,10 +60,12 @@ export type ToolKind =
   | { kind: "computer" }
   /** A mission's machine tools for its main session (`start_task`, `upload_artifact`): its own work only. */
   | { kind: "mission" }
+  /** `update_widget`: a widget's refresh run reports its data (ADR 0135 §5); no other run's. */
+  | { kind: "widget" }
   /** A tool this table doesn't know (no scope it reads): never a routine's. */
   | { kind: "unknown" };
 
-export type InternalArea = "issues" | "memory" | "drive" | "wiki" | "code" | "browser" | "desktop";
+export type InternalArea = "issues" | "memory" | "drive" | "wiki" | "code" | "browser" | "desktop" | "dashboards";
 
 export type PolicyTool = Pick<ToolDefinition, "name" | "scope" | "connectionId" | "sensitive">;
 
@@ -137,6 +142,7 @@ const READS = new Set([
   "get_context",
   "web_search",
   "web_fetch",
+  "list_dashboards",
 ]);
 
 /**
@@ -159,6 +165,10 @@ const MISSION = new Set([
 const INTERNAL_BY_NAME: Readonly<Record<string, InternalArea>> = {
   git_clone: "code",
   open_pull_request: "code",
+  // Boards and widgets for the person behind the run (ADR 0135 §10): private until the person widens them.
+  create_dashboard: "dashboards",
+  create_widget: "dashboards",
+  share_dashboard: "dashboards",
 };
 
 /** Built-in scopes of internal changes (`issues:write` → issues…). */
@@ -191,6 +201,7 @@ export function toolKind(tool: PolicyTool): ToolKind {
   // before consulting the built-in name table.
   if (tool.connectionId) return isReadScope(tool.scope) && !tool.sensitive ? { kind: "read" } : { kind: "external" };
   if (tool.name === "hand_off") return { kind: "hand_off" };
+  if (tool.name === "update_widget" && tool.scope === "") return { kind: "widget" };
   if (tool.name === "pass") return { kind: "pass" };
   if (tool.name === "set_status" || tool.name === "withdraw_request") return { kind: "self" };
   // Long work (ADR 0121): the run's own work only; who may go to the background is the tool source's.
@@ -230,6 +241,9 @@ export const REFUSALS = {
   missionOnly:
     "A routine's background work doesn't start a mission's tasks or upload its files: put what you'd do in hand_off; the people decide.",
   unknownTool: "A routine's background work can't use this tool: put what you'd do in hand_off; the people decide.",
+  widgetOnly:
+    "This run keeps a widget up to date: it only reads (your tools' reads, the web, your browser) and answers with update_widget. Nothing else here: no posting, handing off, changing or asking anyone. If you can't get the data, call update_widget with `failed` and why.",
+  widgetToolOnly: "update_widget belongs to a widget's update run; in a conversation, use create_widget instead.",
 } as const;
 
 /** Tools that speak here whose refusal in a routine says what it does instead, by name; any other: `routineHere`. */
@@ -243,6 +257,9 @@ const ROUTINE_HERE_REFUSAL: Readonly<Record<string, string>> = {
 /** The table (see the file's comment): what `authority` may do with `tool`. */
 export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDecision {
   const what = toolKind(tool);
+  // A widget's refresh (ADR 0135 §5): reads and `update_widget`, nothing else.
+  if (authority.kind === "routine" && authority.brief?.widget) return widgetRunPolicy(what);
+  if (what.kind === "widget") return refuse(REFUSALS.widgetToolOnly);
   if (what.kind === "directory" || what.kind === "pass" || what.kind === "self" || what.kind === "computer") {
     return ALLOW;
   }
@@ -270,6 +287,25 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
       return refuse(fed ? REFUSALS.fedMission : REFUSALS.missionOnly);
     case "unknown":
       return refuse(fed ? REFUSALS.fedElsewhere : REFUSALS.unknownTool);
+  }
+}
+
+/**
+ * A widget's refresh run (ADR 0135 §5): the directory's way in (the real tool is judged on its own), the computer's
+ * prompt, reads (built-in, connected apps', the web) and the browser to read with, and `update_widget`. Anything else
+ * is refused with why, `hand_off` and `pass` included: it ends by calling `update_widget`.
+ */
+function widgetRunPolicy(what: ToolKind): PolicyDecision {
+  switch (what.kind) {
+    case "directory":
+    case "computer":
+    case "read":
+    case "widget":
+      return ALLOW;
+    case "internal":
+      return what.area === "browser" ? ALLOW : refuse(REFUSALS.widgetOnly);
+    default:
+      return refuse(REFUSALS.widgetOnly);
   }
 }
 

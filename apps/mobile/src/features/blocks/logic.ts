@@ -17,9 +17,11 @@ export function blockMayLoad(url: string) {
   return url === "about:blank" || url === "about:srcdoc";
 }
 
-/** What a theme change says to the page already running. */
-export const themeScript = (theme: "light" | "dark") =>
-  `window.__agentesHost&&window.__agentesHost(${JSON.stringify({ theme })});true;`;
+/** What the app says to the page already running: a theme change, or everyone's state when it moved. */
+export const hostScript = (message: object) =>
+  `window.__agentesHost&&window.__agentesHost(${JSON.stringify(message)});true;`;
+
+export const themeScript = (theme: "light" | "dark") => hostScript({ theme });
 
 /**
  * The frames allowed to run, newest in. Whoever asks last gets a place, and the oldest one past the limit gives it

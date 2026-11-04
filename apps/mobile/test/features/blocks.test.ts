@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { blockMayLoad, MAX_LIVE_BLOCKS, themeScript, withLiveBlock } from "../../src/features/blocks/logic";
+import { blockMayLoad, hostScript, MAX_LIVE_BLOCKS, themeScript, withLiveBlock } from "../../src/features/blocks/logic";
 
 describe("live blocks on the phone", () => {
   test("a block never leaves its page", () => {
@@ -26,5 +26,11 @@ describe("live blocks on the phone", () => {
 
   test("a theme reaches the page without a reload", () => {
     expect(themeScript("dark")).toBe('window.__agentesHost&&window.__agentesHost({"theme":"dark"});true;');
+  });
+
+  test("everyone's state reaches the running page the same way", () => {
+    expect(hostScript({ state: { nome: "Bento" }, who: {} })).toBe(
+      'window.__agentesHost&&window.__agentesHost({"state":{"nome":"Bento"},"who":{}});true;',
+    );
   });
 });

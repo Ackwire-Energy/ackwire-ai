@@ -81,6 +81,7 @@
   },
   "tabs": {
     "chats": "聊天",
+    "dashboards": "仪表盘",
     "threads": "话题",
     "agents": "智能体",
     "activity": "动态",
@@ -1618,5 +1619,71 @@
     "noEmoji": "无表情",
     "cleared": "状态已清除",
     "bySelfUntil": "由 {{name}} 填写 · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "仅你自己 · 你自己的小组件",
+    "loadFailed": "无法加载仪表盘。",
+    "onlyHome": "工作区或你的角色的仪表盘会显示在这里。",
+    "create": "创建",
+    "routineTarget": "它的小组件",
+    "pin": {
+      "which": "哪个图表"
+    },
+    "organize": {
+      "hint": "按住小组件拖到新位置，或使用箭头，并为每个选择大小。点“完成”保存顺序。",
+      "holdHint": "按住并拖动即可移动。",
+      "up": "上移",
+      "down": "下移",
+      "position": "第 {{at}} 个，共 {{count}} 个",
+      "saved": "仪表盘已整理"
+    },
+    "edit": {
+      "saved": "仪表盘已保存"
+    },
+    "pinned": "已置顶",
+    "unpinned": "已取消置顶",
+    "sizeHint": {
+      "s": "手机上占半行，网页上占仪表盘的四分之一。",
+      "m": "手机上占整行，网页上占仪表盘的一半。",
+      "l": "占整行，放大显示。网页上占仪表盘的一半，高度加倍。"
+    },
+    "widget": {
+      "caresFor": "{{name}} 负责",
+      "refreshing": "{{name}} 正在更新。",
+      "scheduleSaved": "现在{{schedule}}更新",
+      "alertSaved": "提醒已保存",
+      "removed": "小组件已移除。它的例行工作已停止。",
+      "routine": "它的例行工作",
+      "onBoard": "所在位置",
+      "title": "标题",
+      "titlePlaceholder": "小组件的简短名称",
+      "titleSaved": "标题已保存"
+    },
+    "formatAuto": "{{name}} 会选最合适的",
+    "newWidget": {
+      "titleHint": "标题 · {{name}} 会在测试时建议一个",
+      "alerts": "提醒已开",
+      "realData": "真实数据",
+      "editAsk": "修改需求",
+      "asked": "“{{ask}}”",
+      "autoFormat": "自动形式"
+    },
+    "agentPick": {
+      "search": "搜索智能体",
+      "noMatch": "没有这个名称或角色的智能体。",
+      "note": "每个智能体只读取它有权访问的应用。",
+      "reads": "读取 {{apps}}",
+      "noApps": "没有已连接的应用"
+    },
+    "notice": {
+      "widget_alert_other": "{{names}} 对一个小组件发出了提醒",
+      "widget_failed_other": "{{names}} 未能更新一个小组件",
+      "dashboard_proposal_other": "{{names}} 想发布一个仪表盘",
+      "card": {
+        "alert": "提醒",
+        "failed": "未更新",
+        "proposal": "仪表盘"
+      }
+    }
   }
 }

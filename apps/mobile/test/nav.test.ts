@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { contrastRatio, needsHeaderBlur, TAB_BADGE, tabBadge } from "../src/lib/nav";
+import {
+  BAR_TABS_MAX,
+  barTabs,
+  contrastRatio,
+  needsHeaderBlur,
+  searchApart,
+  searchInBar,
+  TAB_BADGE,
+  tabBadge,
+} from "../src/lib/nav";
 import { coverTransform, PARALLAX, progress } from "../src/lib/parallax";
 import { parseTabGlyphKey, TAB_GLYPHS, tabGlyphKey, tabGlyphSvg } from "../src/ui/tabGlyphs";
 
@@ -30,6 +39,19 @@ describe("native navigation helpers", () => {
   test("tab badge colors: white text is legible on the badge (iOS draws it white)", () => {
     expect(TAB_BADGE.text).toBe("#ffffff");
     expect(contrastRatio(TAB_BADGE.background, TAB_BADGE.text)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test("the bar never holds more than five tabs: search leaves it where it would take a sixth slot", () => {
+    const tabs = TAB_GLYPHS.map((glyph) => ({ glyph, ...(glyph === "search" ? { role: "search" as const } : {}) }));
+    expect(tabs).toHaveLength(6);
+    const glyphs = (os: string, version: string | number) => barTabs(tabs, os, version).map((tab) => tab.glyph);
+    expect(glyphs("ios", "26.1")).toEqual([...TAB_GLYPHS]);
+    expect(glyphs("android", 35)).toEqual(["chats", "dashboards", "threads", "agents", "activity"]);
+    expect(glyphs("ios", "18.4")).toHaveLength(BAR_TABS_MAX);
+    expect(searchInBar(6, "android", 35)).toBe(false);
+    expect(searchInBar(6, "ios", "26.0")).toBe(true);
+    expect(searchInBar(5, "android", 35)).toBe(true);
+    expect(searchApart("ios", "unknown")).toBe(false);
   });
 });
 
@@ -71,8 +93,16 @@ describe("cover parallax", () => {
 });
 
 describe("tab glyphs", () => {
-  test("five tabs: Conversas, Threads, Agentes, Atividade and Buscar", () => {
-    expect([...TAB_GLYPHS]).toEqual(["chats", "threads", "agents", "activity", "search"]);
+  test("six tabs: Chats, Dashboards, Threads, Agents, Activity and Search", () => {
+    expect([...TAB_GLYPHS]).toEqual(["chats", "dashboards", "threads", "agents", "activity", "search"]);
+  });
+
+  test("Dashboards: four tiles, outlined, each filled when selected (ADR 0135)", () => {
+    const outline = tabGlyphSvg("dashboards", false, "#000");
+    const filled = tabGlyphSvg("dashboards", true, "#000");
+    expect(outline.match(/<path /g)?.length).toBe(4);
+    expect(outline.match(/fill="none"/g)?.length).toBe(4);
+    expect(filled.match(/fill="#000"/g)?.length).toBe(4);
   });
 
   test("every glyph in both states is a 24×24 SVG with finite numbers", () => {

@@ -55,6 +55,7 @@
       "connectors.mcp.title",
       "connectors.names.cloudflare_bindings",
       "connectors.names.cloudflare_observability",
+      "dashboards.meta.widgets",
       "database.provider.neon",
       "database.provider.railway",
       "database.provider.rds",
@@ -198,6 +199,9 @@
       "toolReview.ok",
       "usageViews.tokens",
       "webPushAsk.minutes",
+      "widgets.add.short",
+      "widgets.schedulesShort.half",
+      "widgets.sizes.m",
       "wiki.editor.link",
       "wiki.form.tags",
       "wiki.import.stat.links",
@@ -257,6 +261,8 @@
       "connectors.category.marketing",
       "connectors.names.cloudflare_bindings",
       "connectors.names.cloudflare_observability",
+      "dashboards.edit.manyRoles",
+      "dashboards.meta.widgets",
       "database.provider.neon",
       "database.provider.railway",
       "database.provider.rds",
@@ -369,6 +375,8 @@
       "toolReview.ok",
       "usageViews.tokens",
       "webPushAsk.minutes",
+      "widgets.add.short",
+      "widgets.sizes.m",
       "wiki.audienceRoles",
       "wiki.legend.obsidian",
       "wiki.markdown",
@@ -692,7 +700,13 @@
       "work.duration.hoursMinutes",
       "work.duration.minutes",
       "usageQueue.routine",
-      "rightHand.profile.message"
+      "rightHand.profile.message",
+      "agentPicker.list",
+      "dashboards.about",
+      "dashboards.meta.widgets",
+      "dashboards.newWidget.suggestions",
+      "widgets.add.short",
+      "widgets.sizes.m"
     ],
     "de": [
       "access.agentCol",
@@ -1023,7 +1037,18 @@
       "wiki.tags",
       "usageQueue.thread",
       "usageQueue.routine",
-      "rightHand.field.archive"
+      "rightHand.field.archive",
+      "dashboards.back",
+      "dashboards.create.name",
+      "dashboards.groups.workspace",
+      "dashboards.newWidget.place.channel",
+      "dashboards.sidebar",
+      "dashboards.title",
+      "notifications.source.dashboard",
+      "widgets.add.short",
+      "widgets.sizes.l",
+      "widgets.sizes.m",
+      "widgets.sizes.s"
     ],
     "it": [
       "access.area.browser",
@@ -1293,7 +1318,12 @@
       "work.duration.hoursMinutes",
       "work.duration.minutes",
       "usageQueue.thread",
-      "usageQueue.routine"
+      "usageQueue.routine",
+      "dashboards.meta.widgets",
+      "dashboards.newWidget.place.channel",
+      "notifications.source.dashboard",
+      "widgets.add.short",
+      "widgets.sizes.m"
     ],
     "nl": [
       "access.agentCol",
@@ -1758,7 +1788,18 @@
       "usageQueue.routine",
       "rightHand.field.archive",
       "rightHand.field.model",
-      "rightHand.profile.model"
+      "rightHand.profile.model",
+      "agentPicker.list",
+      "dashboards.back",
+      "dashboards.meta.widgets",
+      "dashboards.newWidget.place.channel",
+      "dashboards.sidebar",
+      "dashboards.title",
+      "notifications.source.dashboard",
+      "widgets.add.short",
+      "widgets.sizes.l",
+      "widgets.sizes.m",
+      "widgets.sizes.s"
     ],
     "ja": [
       "agent.builtinName",
@@ -2260,7 +2301,11 @@
       "wiki.props.addTag",
       "rightHand.field.archive",
       "rightHand.field.model",
-      "rightHand.profile.model"
+      "rightHand.profile.model",
+      "widgets.add.short",
+      "widgets.sizes.l",
+      "widgets.sizes.m",
+      "widgets.sizes.s"
     ],
     "tr": [
       "access.area.forum",
@@ -2385,7 +2430,12 @@
       "wiki.legend.obsidian",
       "wiki.markdown",
       "rightHand.field.model",
-      "rightHand.profile.model"
+      "rightHand.profile.model",
+      "dashboards.meta.widgets",
+      "widgets.add.short",
+      "widgets.sizes.l",
+      "widgets.sizes.m",
+      "widgets.sizes.s"
     ],
     "pl": [
       "access.agentCol",
@@ -2594,7 +2644,12 @@
       "wiki.props.addTag",
       "work.duration.minutes",
       "rightHand.field.model",
-      "rightHand.profile.model"
+      "rightHand.profile.model",
+      "dashboards.newWidget.alert",
+      "notifications.source.dashboard",
+      "widgets.sizes.l",
+      "widgets.sizes.m",
+      "widgets.sizes.s"
     ],
     "ru": [
       "agent.builtinName",
@@ -2679,6 +2734,9 @@
       "taskManager.program.agentes",
       "team.cap.linear",
       "team.cap.sentry",
+      "widgets.sizes.l",
+      "widgets.sizes.m",
+      "widgets.sizes.s",
       "wiki.legend.obsidian",
       "wiki.markdown"
     ]
@@ -2811,6 +2869,7 @@
       "chats.wait.chip.mission",
       "chats.waitIn",
       "code.label",
+      "dashboards.notice.card.proposal",
       "files.type.code",
       "files.type.pdf",
       "files.type.text",
@@ -2835,6 +2894,7 @@
       "plus.audio",
       "status.title",
       "tabs.chats",
+      "tabs.dashboards",
       "tabs.threads",
       "thread.missionIn",
       "thread.threadIn",
@@ -2852,6 +2912,7 @@
       "chat.threadIn",
       "chats.thread",
       "chats.waitIn",
+      "dashboards.notice.card.proposal",
       "drive.kind.diff",
       "drive.kind.file",
       "files.type.file",
@@ -2888,6 +2949,7 @@
       "chats.waitIn",
       "code.label",
       "connectors.title",
+      "dashboards.notice.card.proposal",
       "drive.kind.diff",
       "drive.kind.document",
       "drive.type.diffs",
@@ -2916,6 +2978,7 @@
       "plus.camera",
       "status.title",
       "tabs.agents",
+      "tabs.dashboards",
       "tabs.threads",
       "thread.threadIn",
       "threads.section.threads"
@@ -2981,6 +3044,8 @@
       "browser.live.key.Escape",
       "browser.live.key.Tab",
       "chat.agentsHere",
+      "dashboards.notice.card.alert",
+      "dashboards.notice.card.proposal",
       "files.type.diagram",
       "files.type.pdf",
       "intentAgents.uses.area.forum",

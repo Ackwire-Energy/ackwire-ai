@@ -8,10 +8,14 @@ import {
   artifactFile,
   attachmentDisposition,
   BLOCK_REPLY_CHARS,
+  BLOCK_STATE_KEYS,
   createArtifact,
   createFileArtifact,
+  DRAW_OPTIONS,
   deleteArtifact,
+  drawBlock,
   getArtifact,
+  getBlockState,
   getChoices,
   getPoll,
   keepBlock,
@@ -21,6 +25,7 @@ import {
   purgeArtifactNow,
   replyToBlock,
   restoreArtifact,
+  setBlockState,
   updateArtifact,
   ValidationError,
   votePoll,
@@ -146,6 +151,24 @@ const Poll = z
     votes: z.array(z.object({ userId: z.string(), option: z.number() })),
   })
   .openapi("Poll");
+
+const BlockState = z
+  .object({
+    id: z.string(),
+    version: z.number(),
+    state: z.record(z.string(), z.unknown()),
+    changes: z.record(
+      z.string(),
+      z.object({
+        by: z.string(),
+        name: z.string(),
+        at: z.string(),
+        drawn: z.number().optional().openapi({ description: "Drawn by the server among this many options." }),
+      }),
+    ),
+    rev: z.number().openapi({ description: "Goes up on every change: keep the newest." }),
+  })
+  .openapi("BlockState");
 
 const Choices = z
   .object({
@@ -511,6 +534,82 @@ export function artifactRoutes(deps: AppDeps) {
       );
       deps.wakeWorkers?.();
       return c.json({ id: message.id }, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/blocks/{artifactId}/state",
+      tags,
+      security,
+      summary: "What a live block shows, the same for everyone in its conversation (ADR 0113)",
+      request: { params: ArtifactParams, query: z.object({ version: z.coerce.number().int().min(1) }) },
+      responses: { 200: json(BlockState), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      const { version } = c.req.valid("query");
+      return c.json(await getBlockState(artifacts(), c.get("user").id, orgId, artifactId, version), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/blocks/{artifactId}/state",
+      tags,
+      security,
+      summary: "Set values in a live block, for everyone who sees it",
+      description: "Merged into the block's state; everyone in the conversation gets `block.state`.",
+      request: {
+        params: ArtifactParams,
+        body: body(
+          z.object({
+            version: z.number().int().min(1),
+            values: z.record(z.string().max(64), z.unknown()).refine((v) => Object.keys(v).length <= BLOCK_STATE_KEYS),
+          }),
+        ),
+      },
+      responses: { 200: json(BlockState), ...errors, 429: errorResponse("Too many changes (`rate_limited`)") },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      const user = c.get("user");
+      const limit = await deps.adapters.rateLimiter.consume(`block:${user.id}`, { limit: 60, windowMs: 10_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
+      return c.json(await setBlockState(artifacts(), user.id, orgId, artifactId, c.req.valid("json")), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/blocks/{artifactId}/draw",
+      tags,
+      security,
+      summary: "Draw one of the options at random for a live block, once, the same for everyone",
+      request: {
+        params: ArtifactParams,
+        body: body(
+          z.object({
+            version: z.number().int().min(1),
+            name: z.string().min(1).max(64),
+            options: z
+              .array(z.union([z.string().max(200), z.number()]))
+              .min(2)
+              .max(DRAW_OPTIONS),
+          }),
+        ),
+      },
+      responses: { 200: json(BlockState), ...errors, 429: errorResponse("Too many changes (`rate_limited`)") },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      const user = c.get("user");
+      const limit = await deps.adapters.rateLimiter.consume(`block:${user.id}`, { limit: 60, windowMs: 10_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
+      return c.json(await drawBlock(artifacts(), user.id, orgId, artifactId, c.req.valid("json")), 200);
     },
   );
 

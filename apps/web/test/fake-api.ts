@@ -101,6 +101,7 @@ import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
+import { createFakeDashboards, type FakeDashboards } from "./fakes/dashboards";
 import { createFakeDatabases, type FakeDatabases } from "./fakes/databases";
 import { createFakeForum } from "./fakes/forum";
 import { createFakeMachines, type FakeMachines } from "./fakes/machines";
@@ -1135,6 +1136,7 @@ type FakedParts =
   | "routines"
   | "threads"
   | "missions"
+  | "dashboards"
   | "calendar"
   | "customConnectors"
   | "mail"
@@ -3282,6 +3284,9 @@ export const fakeBrowserOf = new WeakMap<ApiClient, FakeBrowser>();
 /** The AI apps fake behind each `createFakeApi` client (tests add consents and connect apps with it). */
 export const fakeAppsOf = new WeakMap<ApiClient, FakeApps>();
 
+/** The boards and widgets fake behind each `createFakeApi` client (tests add boards and finish widgets with it). */
+export const fakeDashboardsOf = new WeakMap<ApiClient, FakeDashboards>();
+
 /** Full client: fake HTTP + the real in-memory mocks (seeded like development). */
 export function createFakeApi(state: FakeState = seedState(), options: { seed?: boolean } = {}): ApiClient {
   const http = createFakeHttpApi(state);
@@ -3317,6 +3322,11 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     () => state.me?.user.id ?? null,
   );
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const dashboards = createFakeDashboards(
+    (method, ...args) => state.calls.push({ method, args }),
+    ctx.now,
+    () => state.me?.user.id ?? null,
+  );
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const apps = createFakeApps((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const artifacts = createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args }));
@@ -3513,6 +3523,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     customConnectors,
     mail: mail.client,
     databases: databases.client,
+    dashboards: dashboards.client,
     browser: browser.client,
     desktop: browser.desktop,
     // "Trabalhando agora" and the task manager only for a test that gives the task manager (`state.taskManager`).
@@ -3536,6 +3547,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   fakeMachinesOf.set(client, machines);
   fakeMailOf.set(client, mail);
   fakeDatabasesOf.set(client, databases);
+  fakeDashboardsOf.set(client, dashboards);
   fakeBrowserOf.set(client, browser);
   fakeAppsOf.set(client, apps);
   return client;

@@ -22,10 +22,12 @@ import { readerOf, readerOfMessage } from "./agents-dm-reads";
 import type { AiStatusDeps } from "./ai-status";
 import { NO_PERSON, speakerFor } from "./audience";
 import { runAuthority, UUID } from "./authority";
+import { blockStateNotes } from "./block-state";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { peopleAllIn } from "./channels";
 import { type HandOff, handOffsFrom } from "./consultations";
+import { widgetRunContext } from "./dashboards/refresh-context";
 import { isAgentOnlyDm } from "./dms";
 import { cutText } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
@@ -1063,6 +1065,7 @@ export async function buildRunContext(
       origins,
       canAddAgents: channel.kind === "channel",
       cutOld: options.expand === true,
+      blocks: await blockStateNotes(db, run.orgId, history, zone),
     }),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
@@ -1240,6 +1243,14 @@ async function routineContext(
     dueAt: (current?.at ?? trigger.createdAt).toISOString(),
   };
   const zone = safeZone(row?.timezone ?? orgZone);
+  // A widget's refresh (ADR 0135 §5): its widget's own block; it speaks only through update_widget.
+  if (brief.widget) {
+    const widget = await widgetRunContext(db, run.orgId, brief.widget, current?.event ?? null);
+    if (widget) {
+      const lastAt = last ? (last.startedAt ?? last.at) : null;
+      return { zone, ...widget, timeLine: routineTimeLine(brief, zone, lastAt, now) };
+    }
+  }
   const dueAt = new Date(brief.dueAt);
   const [creator, place, said, prepared] = await Promise.all([
     brief.creatorUserId ? userNameOf(db, brief.creatorUserId) : Promise.resolve(null),
@@ -1995,7 +2006,13 @@ export function toTurns(
   agentId: string,
   names: Map<string, string>,
   currentId?: string,
-  options: { canAddAgents?: boolean; cutOld?: boolean; origins?: Map<string, string> } = {},
+  options: {
+    canAddAgents?: boolean;
+    cutOld?: boolean;
+    origins?: Map<string, string>;
+    /** What people left in the blocks a message showed (`blockStateNotes`), by message id. */
+    blocks?: Map<string, string>;
+  } = {},
 ): ModelMessage[] {
   const turns: { role: "user" | "assistant"; parts: { id: string; text: string }[] }[] = [];
   const cutIds = new Set<string>();
@@ -2081,10 +2098,13 @@ export function toTurns(
           .filter(Boolean)
           .join("\n")
       : "";
-    if (news) {
+    // A block's state is everyone's (ADR 0113): the agent reads it on the people's side, right after the block.
+    const block = options.blocks?.get(m.id);
+    const after = [news, block].filter(Boolean).join("\n");
+    if (after) {
       const last = turns.at(-1);
-      if (last && last.role === "user") last.parts.push({ id: `${m.id}:notes`, text: news });
-      else turns.push({ role: "user", parts: [{ id: `${m.id}:notes`, text: news }] });
+      if (last && last.role === "user") last.parts.push({ id: `${m.id}:notes`, text: after });
+      else turns.push({ role: "user", parts: [{ id: `${m.id}:notes`, text: after }] });
     }
   }
   while (turns[0]?.role === "assistant") turns.shift();

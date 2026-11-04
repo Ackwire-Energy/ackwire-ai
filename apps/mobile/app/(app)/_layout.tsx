@@ -115,6 +115,19 @@ function AppStack() {
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/zone" options={{ ...pushed, ...scrollUnder }} />
+      {/* Dashboards (ADR 0135): every screen pushed with back, never a sheet. */}
+      <Stack.Screen name="board/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-share/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-organize/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-edit/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-edit-roles" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="widget/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="widget-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-pick" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="widget-pin" options={{ ...pushed, ...scrollUnder }} />
+      {/* Search where the tab bar has no room for it (Android, iOS before 26). */}
+      <Stack.Screen name="find" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/[runId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }} />
