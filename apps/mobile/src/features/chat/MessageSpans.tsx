@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { type ComponentRef, useEffect, useRef, useState } from "react";
 import { Text as RNText, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { ScrollView as GestureScrollView } from "react-native-gesture-handler";
 import { Text } from "@/ui";
@@ -92,7 +92,7 @@ export function Table({
   const [drawn, setDrawn] = useState<Record<number, number>>({});
   const [frame, setFrame] = useState(0);
   const [x, setX] = useState(0);
-  const scroller = useRef<GestureScrollView>(null);
+  const scroller = useRef<ComponentRef<typeof GestureScrollView>>(null);
   const flashed = useRef(false);
   const widths = tableColumnWidths(header, rows, drawn, fontScale);
   // The content's width said outright (not left to layout), so the box always knows it has more to scroll.
