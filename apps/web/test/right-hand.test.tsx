@@ -139,6 +139,17 @@ describe("the right hand elsewhere", () => {
     );
   });
 
+  test("Mudar visual: the face and the choices in the dialog's body, Cancelar and Salvar in its footer", async () => {
+    await go(withRightHand(seedState()), "settings/right_hand");
+    await click(screen().getByRole("button", { name: "Mudar visual" }));
+    const dialog = screen().getByRole("dialog", { name: "Mudar visual" });
+    const body = dialog.querySelector(":scope > .ac-dialog__body") as HTMLElement;
+    expect(body.querySelector(".rh-set__face")).not.toBeNull();
+    expect(body.querySelector(".agp-look")).not.toBeNull();
+    const foot = dialog.querySelector(":scope > .ac-dialog__foot") as HTMLElement;
+    expect([...foot.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Cancelar", "Salvar"]);
+  });
+
   test("renaming it there saves the name and its @", async () => {
     const { state } = await go(withRightHand(seedState()), "settings/right_hand");
     const name = screen().getByRole("textbox", { name: "Nome e visual" });

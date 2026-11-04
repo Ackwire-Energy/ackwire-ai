@@ -7,7 +7,17 @@ import { handleAfterRename } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
-import { AffixInput, Button, Card, CardFooter, CardHeader, Dialog, Input } from "@agenteschat/ui";
+import {
+  AffixInput,
+  Button,
+  Card,
+  CardFooter,
+  CardHeader,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Input,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -168,11 +178,13 @@ function RightHandForm({ agent }: { agent: Agent }) {
         closeLabel={t("common.close")}
         width={480}
       >
-        <span className="rh-set__face">
-          <AgentAvatar name={agent.name} appearance={look} size="lg" />
-        </span>
-        <LookRows look={look} onChange={setLook} />
-        <div className="rh-set__acts">
+        <DialogBody>
+          <span className="rh-set__face">
+            <AgentAvatar name={agent.name} appearance={look} size="lg" />
+          </span>
+          <LookRows look={look} onChange={setLook} />
+        </DialogBody>
+        <DialogFooter>
           <Button variant="ghost" onClick={() => setLooking(false)}>
             {t("common.cancel")}
           </Button>
@@ -183,7 +195,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
           >
             {t("common.save")}
           </Button>
-        </div>
+        </DialogFooter>
       </Dialog>
     </>
   );
