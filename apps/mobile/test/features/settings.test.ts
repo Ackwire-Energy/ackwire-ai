@@ -249,7 +249,8 @@ describe("Skills", () => {
 
   test("its page while an update waits on both sides: the choice, who changed it, and Desfazer after either", async () => {
     const t = await translator("pt-BR");
-    const at = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    // Minutes, not hours: "há 2 h" turns into "ontem" for a run in the two hours after midnight.
+    const at = new Date(Date.now() - 2 * 60_000).toISOString();
     const base = { body: "# v1", description: "Antes do deploy.", at: new Date(Date.now() - 86_400_000).toISOString() };
     const change = { id: "c1", agentId: "ada", at, before: "# v1", after: "# v1\nCache.", undone: false };
     const skill = {
@@ -272,12 +273,12 @@ describe("Skills", () => {
     const words = skillUpdateWords(t, "pt-BR", skill);
     expect(words.waiting).toMatchObject({
       title: "O link tem uma versão nova, e os agentes também mudaram esta skill",
-      since: "Versão nova no link há 2 h",
+      since: "Versão nova no link há 2 min",
       apply: "Usar a versão do link",
       keep: "Manter a dos agentes",
     });
     expect(changedByText(t, "pt-BR", changesSinceLink(skill), () => "Ada")).toBe(
-      "Ada mudou esta skill, a última vez há 2 h",
+      "Ada mudou esta skill, a última vez há 2 min",
     );
     expect(skillPendingViews(skill).map((v) => t(`skills.diff.${v.id}`))).toEqual([
       "O que os agentes mudaram",
@@ -288,13 +289,13 @@ describe("Skills", () => {
       ...skill,
       pendingUpdate: { ...skill.pendingUpdate, dismissed: true, dismissedAt: at },
     });
-    expect([kept.waiting, kept.kept]).toEqual([null, "Ficou a versão dos agentes há 2 h"]);
+    expect([kept.waiting, kept.kept]).toEqual([null, "Ficou a versão dos agentes há 2 min"]);
     const chosen = skillUpdateWords(t, "pt-BR", {
       ...skill,
       pendingUpdate: null,
       lastUpdate: { fromVersion: 3, at, agentId: null, waited: true },
     });
-    expect(chosen.last).toEqual({ line: "Ficou a versão do link há 2 h", undo: "Desfazer" });
+    expect(chosen.last).toEqual({ line: "Ficou a versão do link há 2 min", undo: "Desfazer" });
   });
 
   test("a long install's line moves on and stays on the last step", () => {
