@@ -228,15 +228,6 @@ export function AgentScreen({
     if (ready) call(screenCall("set", { connect, mode }));
   }, [ready, connect, mode]);
 
-  useEffect(() => {
-    if (!connect || shown !== "connecting") {
-      setStuck(false);
-      return;
-    }
-    const id = setTimeout(() => setStuck(true), STUCK_MS);
-    return () => clearTimeout(id);
-  }, [connect, shown]);
-
   const s = useSharedValue(0.25);
   const x = useSharedValue(0);
   const y = useSharedValue(0);
@@ -277,6 +268,17 @@ export function AgentScreen({
     mode: taking ? "control" : finishing ? "watch" : mode,
     session,
   });
+  // Opening, or a switch the stream never takes: past `STUCK_MS` it says so, with Tentar de novo.
+  const waitsOn = connect && (shown === "connecting" || (live && switching !== null));
+  useEffect(() => {
+    if (!waitsOn) {
+      setStuck(false);
+      return;
+    }
+    const id = setTimeout(() => setStuck(true), STUCK_MS);
+    return () => clearTimeout(id);
+  }, [waitsOn]);
+  const lost = stuck && waitsOn;
   const words = askControlWords(status, Boolean(f?.browser), Boolean(run));
   // Watching, a tap on the screen asks before control and reaches nothing there; the question stays until Cancelar.
   const offer = live && !inControl && !switching && !status?.controllerUserId && !waiting && canTakeOver;
@@ -736,7 +738,9 @@ export function AgentScreen({
             ) : null}
           </Animated.View>
         </GestureDetector>
-        {switching && (live || shown === "connecting") ? (
+        {lost ? (
+          cantShow
+        ) : switching && (live || shown === "connecting") ? (
           <Cover
             fill
             clear
