@@ -1,4 +1,4 @@
-import { type SidebarPins, useDms, useSetSidebarView, useSidebarView } from "@agenteschat/client";
+import { type SidebarPins, useAgentGroups, useDms, useSetSidebarView, useSidebarView } from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayOnePins, type PinKind, pinsOf, togglePin } from "@agenteschat/client/lib/sidebar-view";
@@ -23,6 +23,7 @@ export function usePins(): {
   const toast = useToast();
   const dir = useDirectory();
   const dms = useDms(orgId).data;
+  const groups = useAgentGroups(orgId).data;
   const view = useSidebarView(orgId);
   const setView = useSetSidebarView(orgId);
   const lastActive = new Map<string, string>();
@@ -33,6 +34,7 @@ export function usePins(): {
         dir.agents.filter((a) => !isRightHand(a) && listsAgent(org, a)),
         meId,
         lastActive,
+        groups,
       )
     : [];
   const pins = pinsOf(view, dayOne);

@@ -11996,8 +11996,9 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   opacity: 0;
 }
 
-/* Back to the latest messages: a round button at the top right of the list (below the header and the pinned bar,
-   clear of the scrollbar), with what arrived below as a count, red when it mentions me. */
+/* Back to the latest messages: a round button at the bottom right of the list, right above the composer and its
+   working bar (clear of the scrollbar), with what arrived below as a count, red when it mentions me. Placed after the
+   list, so the button rises from the list's bottom edge. */
 .channel__latest {
   position: relative;
   height: 0;
@@ -12010,7 +12011,7 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
 }
 .channel__latest-at {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   right: 24px;
 }
 .channel__latest[data-shown] .channel__latest-at {
@@ -12046,7 +12047,7 @@ html:not([data-pointer]) .channel__latest-btn.ac-btn:focus-visible {
   }
   .channel__latest-at {
     transition: transform 0.22s cubic-bezier(0.34, 1.5, 0.5, 1);
-    transform: translateY(-6px) scale(0.92);
+    transform: translateY(6px) scale(0.92);
   }
   .channel__latest[data-shown] .channel__latest-at {
     transform: none;

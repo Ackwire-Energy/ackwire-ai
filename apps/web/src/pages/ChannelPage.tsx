@@ -2113,17 +2113,6 @@ function ChannelView({
                       </div>
                     )}
                     {olderState !== "loading" && <DatePill scroller={scroller} ref={datePill} />}
-                    <ToLatest
-                      shown={!adjustThreadId && (far || pillOn)}
-                      count={unseenSummary.count}
-                      mentionsMe={unseenSummary.mentionsMe}
-                      label={
-                        pillText.length > 0
-                          ? t("channel.newPill.label", { text: pillText.join(" · ") })
-                          : t("channel.toLatest")
-                      }
-                      onClick={() => toBottom(true)}
-                    />
                     <RowsProvider asks={askRegistry} stop={stopTarget?.runId} drawn={rowDrawn}>
                       <section
                         ref={scroller}
@@ -2267,6 +2256,17 @@ function ChannelView({
                         <LiveNotices channelId={channel.id} />
                       </section>
                     </RowsProvider>
+                    <ToLatest
+                      shown={!adjustThreadId && (far || pillOn)}
+                      count={unseenSummary.count}
+                      mentionsMe={unseenSummary.mentionsMe}
+                      label={
+                        pillText.length > 0
+                          ? t("channel.newPill.label", { text: pillText.join(" · ") })
+                          : t("channel.toLatest")
+                      }
+                      onClick={() => toBottom(true)}
+                    />
                     {holding && (
                       <div className="channel__pill">
                         <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
