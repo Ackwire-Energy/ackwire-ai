@@ -48,8 +48,21 @@ test("people upload files as is: download with the real name and type, versions,
   expect(file.headers.get("x-content-type-options")).toBe("nosniff");
   expect(file.headers.get("content-security-policy")).toBe("sandbox");
   expect(file.headers.get("cache-control")).toBe("private, no-store, no-transform");
+  expect(file.headers.get("accept-ranges")).toBe("bytes");
   expect(new Uint8Array(await file.arrayBuffer())).toEqual(PDF);
   expect((await api(`/artifacts/${a.id}/file?format=pdf`)).status).toBe(400);
+
+  // In parts, as a video player asks: the same safe headers on every part.
+  const part = await api(`/artifacts/${a.id}/file`, { headers: { range: "bytes=1-4" } });
+  expect(part.status).toBe(206);
+  expect(part.headers.get("content-range")).toBe(`bytes 1-4/${PDF.byteLength}`);
+  expect(part.headers.get("content-length")).toBe("4");
+  expect(part.headers.get("content-disposition")).toStartWith("attachment;");
+  expect(part.headers.get("content-security-policy")).toBe("sandbox");
+  expect(new Uint8Array(await part.arrayBuffer())).toEqual(PDF.subarray(1, 5));
+  const past = await api(`/artifacts/${a.id}/file`, { headers: { range: `bytes=${PDF.byteLength}-` } });
+  expect(past.status).toBe(416);
+  expect(past.headers.get("content-range")).toBe(`bytes */${PDF.byteLength}`);
 
   // A new version, by upload only.
   const v2 = await upload(owner, `${base}/artifacts/${a.id}/files`, {
