@@ -2044,6 +2044,8 @@ export const en = {
       useKey: "Use an API key now",
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
     },
+    /** A plan's panel for an agent that never thinks on a computer (the team's right hand): an API key it can use. */
+    keyOnly: "{{name}} thinks only with an API key. Plans run on an agent's computer, and {{name}} never uses one.",
     /** The Cloud's one computer in a plan's sign-in, unnamed: "Send to the computer". */
     theComputer: "the computer",
     own: {

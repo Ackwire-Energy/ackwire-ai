@@ -2072,6 +2072,7 @@
       "useKey": "Nu een API-sleutel gebruiken",
       "connecting": "De computer van deze server maakt binnen een minuut verbinding. Je logt hier in zodra dat gebeurt."
     },
+    "keyOnly": "{{name}} denkt alleen met een API-sleutel. Abonnementen draaien op de computer van een agent, en {{name}} gebruikt er nooit een.",
     "theComputer": "de computer",
     "own": {
       "shared": "Het account dat je agents delen",

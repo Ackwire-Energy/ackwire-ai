@@ -145,8 +145,10 @@ export type PlanGate =
   /** The Cloud's computer on its way; `view` null: it said ready and the agent gets it on the next refresh. */
   | { state: "preparing"; view: SetupView | null }
   | { state: "offline" }
-  /** Self-host with no computer for the agent (none connected). */
+  /** No computer for the agent: none connected (self-host), or the Cloud's said ready and still gave it none. */
   | { state: "missing" }
+  /** The agent never thinks on a computer (the right hand, ADR 0137): a plan can't think for it, an API key can. */
+  | { state: "key_only" }
   | { state: "unsupported"; reason: BrainUnavailable | "keys" }
   /** `owner`: the viewer doesn't own the agent; `computer`: only whoever connected it adds a sign-in there. */
   | { state: "locked"; who: "owner" | "computer" }
@@ -154,7 +156,9 @@ export type PlanGate =
 
 /**
  * The gate, first match wins. `brain` is the chosen agent's view (undefined while it loads); `computer` is that
- * computer's `/ai-accounts` row, which says whether it takes a coding plan's key.
+ * computer's `/ai-accounts` row, which says whether it takes a coding plan's key. `keyOnly`: the agent never thinks
+ * on a computer. `caughtUp`: the view was asked again after the Cloud's computer said ready (`catchUp`), so a view
+ * with no computer still has none, and nothing is coming.
  */
 export function planGate({
   choice,
@@ -162,17 +166,23 @@ export function planGate({
   setup,
   brain,
   computer,
+  keyOnly = false,
+  caughtUp = false,
 }: {
   choice: PlanChoice;
   edition: Edition | null;
   setup: SetupView | null;
   brain: AgentBrain | undefined;
   computer: AiComputer | undefined;
+  keyOnly?: boolean;
+  caughtUp?: boolean;
 }): PlanGate {
+  if (keyOnly) return { state: "key_only" };
   if (edition === "cloud" && setupPending(setup)) return { state: "preparing", view: setup };
   if (!brain || !edition) return { state: "loading" };
   if (!brain.canUsePlans) return { state: "locked", who: "owner" };
-  if (!brain.computer) return edition === "cloud" ? { state: "preparing", view: null } : { state: "missing" };
+  if (!brain.computer)
+    return edition === "cloud" && !caughtUp ? { state: "preparing", view: null } : { state: "missing" };
   if (!brain.computer.online) return { state: "offline" };
   const option = brain.options.find((o) => o.kind === kindOf(choice));
   if (!option?.available) return { state: "unsupported", reason: option?.reason ?? "not_installed" };
@@ -261,7 +271,29 @@ export const ownSignInFor = (choice: PlanChoice, brain: AgentBrain | undefined, 
   !isPlanId(choice) && ownSignInReady(brain, computer, kindOf(choice));
 
 /** A plan tile reads dimmed when its plan can't sign in there at all (it still opens its panel, which says why). */
-export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.state === "unsupported";
+export const gateDims = (gate: PlanGate) =>
+  gate.state === "missing" || gate.state === "unsupported" || gate.state === "key_only";
+
+/** The longest a plan's panel shows its sign-in loading while the agent's view is asked again (`catchUp`). */
+export const CATCH_UP_MS = 8000;
+
+/**
+ * The workspace's computer said ready while the agent's view from before has none (`behindComputer`): the reads asked
+ * again, done when they settle or after `CATCH_UP_MS`, whichever comes first, so the sign-in never loads with no end.
+ */
+export const catchUp = (reads: readonly Promise<unknown>[], ms = CATCH_UP_MS): Promise<void> =>
+  Promise.race([Promise.allSettled(reads).then(() => undefined), new Promise<void>((done) => setTimeout(done, ms))]);
+
+/**
+ * The Cloud's computer is ready and the agent's view says it has none: a view from before it was given that computer.
+ * Never for an agent that thinks on no computer (`keyOnly`), which none is ever given.
+ */
+export const behindComputer = (s: {
+  edition: Edition | null;
+  setup: SetupView | null;
+  brain: Pick<AgentBrain, "computer"> | undefined;
+  keyOnly: boolean;
+}) => !s.keyOnly && s.edition === "cloud" && s.setup?.phase === "ready" && s.brain !== undefined && !s.brain.computer;
 
 /** The option a message asked for (Jev, a card); null for `any` and `task`. */
 export const choiceOfIntent = (intent: ConnectIntent | undefined): AiChoice | null =>
@@ -269,7 +301,7 @@ export const choiceOfIntent = (intent: ConnectIntent | undefined): AiChoice | nu
 
 /**
  * The option chosen when the picker opens: what was asked for; the API key for someone who owns no agent but may
- * add keys, or where Claude can't sign in at all (self-host with no computer); else the plan the agent it's for
+ * add keys, or where Claude can't sign in at all (no computer, or an agent that thinks on none); else the plan the agent it's for
  * thinks with (`plan`, `agentPlan`), else Claude.
  */
 export function defaultChoice({
@@ -288,7 +320,7 @@ export function defaultChoice({
   const asked = choiceOfIntent(intent);
   if (asked) return asked;
   if (!ownsAgents && mayAddKey) return "key";
-  return claudeGate.state === "missing" ? "key" : (plan ?? "claude");
+  return claudeGate.state === "missing" || claudeGate.state === "key_only" ? "key" : (plan ?? "claude");
 }
 
 /** "For which agent": the one asked for, else the first with no AI, else the first. */

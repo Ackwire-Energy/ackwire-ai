@@ -2145,6 +2145,7 @@
       "useKey": "Usa una chiave API ora",
       "connecting": "Il computer di questo server si collega entro un minuto. Accedi qui appena è collegato."
     },
+    "keyOnly": "{{name}} pensa solo con una chiave API. I piani girano sul computer di un agente, e {{name}} non ne usa mai uno.",
     "theComputer": "computer",
     "own": {
       "shared": "L'account condiviso dai tuoi agenti",

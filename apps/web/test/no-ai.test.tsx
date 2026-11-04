@@ -608,6 +608,42 @@ describe("the agent's no-AI card", () => {
     expect(within(plan).getByRole("region", { name: "Chave de API" })).toBeTruthy();
   });
 
+  test("the workspace's computer ready and still none for her after asking again: the sign-in stops loading and says what's needed", async () => {
+    const state = walters(withCard({ intent: "claude" }), ADA_ID);
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    const brain = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({ ...(await brain(orgId, agentId)), computer: null, accounts: [] });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 10);
+    const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    const panel = within(plan).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.querySelector("[aria-busy='true']")).toBeNull();
+    expect(panel.textContent).toContain("As contas ficam num computador conectado.");
+    expect(within(panel).getByRole("button", { name: "Conectar um computador" })).toBeTruthy();
+  });
+
+  test("its views don't load: the plan's panel says so with Tentar de novo, which asks again", async () => {
+    const state = walters(withCard({ intent: "claude" }), ADA_ID);
+    const api = createFakeApi(state);
+    const brain = api.agents.brain;
+    let down = true;
+    api.agents.brain = async (orgId, agentId) => {
+      if (down) throw new ApiError(500, "internal", "down");
+      return brain(orgId, agentId);
+    };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 10);
+    const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    const panel = within(plan).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("Não foi possível carregar");
+    down = false;
+    await click(within(panel).getByRole("button", { name: "Tentar de novo" }), 10);
+    expect(within(plan).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
+  });
+
   test("connected elsewhere: 'Responder agora'; still no AI: it says so and keeps Connect", async () => {
     const state = withCard({}, aiStatus(true));
     await open(state);

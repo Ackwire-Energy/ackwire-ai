@@ -28,6 +28,7 @@ import {
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { Button, Dialog, DialogBody, DialogFooter, Spinner } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -276,10 +277,13 @@ function ConnectAiDialog({
 
   // Someone else's agent, or no agent of theirs among those: who connects a plan instead.
   const owner = one?.ownerUserId ? dir.memberById.get(one.ownerUserId)?.name : undefined;
+  // The right hand thinks on no computer (ADR 0137): nobody's plan can, its owner's neither.
   const locked = theirs
-    ? owner
-      ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
-      : t("noAi.lockedAdmins")
+    ? isRightHand(one)
+      ? t("connectAi.keyOnly", agentGrammar(one.name))
+      : owner
+        ? t("noAi.locked", { name: one.name, owner: owner.split(" ")[0] })
+        : t("noAi.lockedAdmins")
     : named && agents.length === 0
       ? t("noAi.lockedAdmins")
       : undefined;

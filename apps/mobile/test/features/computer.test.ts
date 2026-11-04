@@ -342,6 +342,9 @@ describe("the workspace's computer on its way, on Conversas", () => {
     expect(offersKeyNow({ state: "offline" }, false)).toBe(true);
     expect(offersKeyNow({ state: "missing" }, false)).toBe(true);
     expect(offersKeyNow({ state: "unsupported", reason: "keys" }, false)).toBe(true);
+    // An agent that thinks on no computer (the right hand): the key is its only way.
+    expect(offersKeyNow({ state: "key_only" }, false)).toBe(true);
+    expect(pollsPlan("key_only")).toBe(false);
     expect(offersKeyNow({ state: "ready" }, false)).toBe(false);
     expect(offersKeyNow({ state: "loading" }, false)).toBe(false);
     expect(offersKeyNow({ state: "locked", who: "owner" }, false)).toBe(false);

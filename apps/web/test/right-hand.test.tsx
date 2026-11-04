@@ -10,6 +10,7 @@ import {
   createFakeApi,
   ENG_ID,
   type FakeState,
+  fakeMachinesOf,
   GENERAL_ID,
   LODI_ID,
   ORG_ID,
@@ -221,5 +222,47 @@ describe("the right hand elsewhere", () => {
     await go(state, "settings/account");
     const settingsNav = screen().getByRole("navigation", { name: "Seções das configurações" });
     expect(within(settingsNav).queryByRole("link", { name: "Lodi" })).toBeNull();
+  });
+});
+
+describe("the right hand's Connect AI", () => {
+  test("it thinks on no computer: the dialog opens on the API key, and a plan says why it can't, never a sign-in loading", async () => {
+    const state = withRightHand(seedState());
+    state.aiStatus = { any: false, agents: [{ agentId: LODI_ID, state: "no_ai", reason: "no_key" }] };
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    // As the server answers for it: the workspace's computer is ready, and none is ever given to it.
+    const brain = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({
+      ...(await brain(orgId, agentId)),
+      ...(agentId === LODI_ID ? { computer: null, accounts: [] } : {}),
+    });
+    await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Conectar" }), 10);
+    const box = screen().getByRole("dialog", { name: "Conectar uma IA para o Lodi" });
+    expect(within(box).getByRole("region", { name: "Chave de API" })).toBeTruthy();
+    const group = within(box).getByRole("group", { name: "Qual IA eles vão usar?" });
+    await click(within(group).getByRole("button", { name: "Claude" }), 10);
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("O Lodi pensa só com uma chave de API.");
+    expect(within(panel).queryByRole("button", { name: "Entrar com Claude" })).toBeNull();
+    expect(panel.querySelector("[aria-busy='true']")).toBeNull();
+    await click(within(panel).getByRole("button", { name: "Usar uma chave de API agora" }));
+    expect(within(box).getByRole("region", { name: "Chave de API" })).toBeTruthy();
+  });
+
+  test("someone else's right hand: the plan's panel says it thinks with a key only, not that its owner's plan would do", async () => {
+    const state = withRightHand(seedState(), { ownerUserId: "u-joao" });
+    state.aiStatus = { any: false, agents: [{ agentId: LODI_ID, state: "no_ai", reason: "no_key" }] };
+    await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Conectar" }), 10);
+    const box = screen().getByRole("dialog", { name: "Conectar uma IA para o Lodi" });
+    const group = within(box).getByRole("group", { name: "Qual IA eles vão usar?" });
+    await click(within(group).getByRole("button", { name: "Claude" }), 10);
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("O Lodi pensa só com uma chave de API.");
+    expect(panel.textContent).not.toContain("com o próprio plano");
   });
 });

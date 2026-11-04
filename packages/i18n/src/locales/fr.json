@@ -2145,6 +2145,7 @@
       "useKey": "Utiliser une clé API maintenant",
       "connecting": "L'ordinateur de ce serveur se connecte en moins d'une minute. Vous vous connectez ici dès que c'est fait."
     },
+    "keyOnly": "{{name}} pense uniquement avec une clé API. Les forfaits tournent sur l'ordinateur d'un agent, et {{name}} n'en utilise jamais.",
     "theComputer": "ordinateur",
     "own": {
       "shared": "Le compte partagé par vos agents",

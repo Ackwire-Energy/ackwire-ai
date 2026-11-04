@@ -2071,6 +2071,7 @@
       "useKey": "Jetzt einen API-Schlüssel nutzen",
       "connecting": "Der Computer dieses Servers verbindet sich innerhalb einer Minute. Sobald er so weit ist, meldest du dich hier an."
     },
+    "keyOnly": "{{name}} denkt nur mit einem API-Schlüssel. Pläne laufen auf dem Computer eines Agenten, und {{name}} nutzt nie einen.",
     "theComputer": "Computer",
     "own": {
       "shared": "Das Konto, das deine Agenten teilen",

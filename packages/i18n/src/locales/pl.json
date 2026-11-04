@@ -2216,6 +2216,7 @@
       "useKey": "Użyj teraz klucza API",
       "connecting": "Komputer tego serwera połączy się w ciągu minuty. Zalogujesz się tutaj, gdy tylko to nastąpi."
     },
+    "keyOnly": "{{name}} myśli tylko z kluczem API. Plany działają na komputerze agenta, a {{name}} nigdy go nie używa.",
     "theComputer": "komputer",
     "own": {
       "shared": "Konto wspólne dla twoich agentów",
