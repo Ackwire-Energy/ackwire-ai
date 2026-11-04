@@ -84,7 +84,7 @@ export function WidgetPeek({
   return (
     <Link href={href} asChild>
       <Link.Trigger withAppleZoom>
-        <WidgetCard widget={data} compact={compact} />
+        <PeekTrigger widget={data} compact={compact} />
       </Link.Trigger>
       <Link.Preview style={{ width: width - 32, height: PREVIEW_HEIGHT }}>
         {/* The card fills the preview; the surface behind it keeps its corners from showing white. */}
@@ -110,6 +110,21 @@ export function WidgetPeek({
   );
 }
 
+/**
+ * What the long press lifts: the card in a clear box. iOS fills the lifted shape (a rectangle) with the touched
+ * view's background, so with the card itself there its gray showed square past the rounded corners; a clear box
+ * kept as a real view (`collapsable={false}`, never flattened away) lets the card's own corners show. `onPress`
+ * comes from the link (`Link.Trigger` passes it on).
+ */
+function PeekTrigger({ widget, compact, onPress }: { widget: WidgetCardData; compact: boolean; onPress?: () => void }) {
+  return (
+    <View collapsable={false} style={styles.trigger}>
+      <WidgetCard widget={widget} compact={compact} onPress={onPress} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   preview: { flex: 1 },
+  trigger: { flexGrow: 1, backgroundColor: "transparent" },
 });
