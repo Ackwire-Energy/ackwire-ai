@@ -395,6 +395,7 @@ html:not([data-pointer]) :is(.db-role, .db-sug, .db-pick):focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* An `.ac-iconline`: its icon sits on the first line's capitals' middle. */
 .db-note {
   display: flex;
   align-items: flex-start;
@@ -403,10 +404,6 @@ html:not([data-pointer]) :is(.db-role, .db-sug, .db-pick):focus-visible {
   font-size: 13px;
   line-height: 19px;
   color: var(--muted);
-}
-.db-note .ac-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .db-people {
   margin: 0;
@@ -494,6 +491,7 @@ html:not([data-pointer]) :is(.db-role, .db-sug, .db-pick):focus-visible {
   line-height: 18px;
   color: var(--muted);
 }
+/* An `.ac-iconline`: its icon sits on the first line's capitals' middle. */
 .nw-footnote {
   display: flex;
   align-items: flex-start;
@@ -504,10 +502,6 @@ html:not([data-pointer]) :is(.db-role, .db-sug, .db-pick):focus-visible {
   line-height: 18px;
   color: var(--muted);
   text-align: center;
-}
-.nw-footnote .ac-icon {
-  flex: none;
-  margin-top: 2px;
 }
 .nw-quiet {
   display: inline-flex;
@@ -930,7 +924,8 @@ html:not([data-pointer]) :is(.nw-sug, .nw-pick, .nw-alert__sugs button):focus-vi
   height: 22px;
   border-radius: 999px;
 }
-/* Why the test didn't work, in the card, with Try again and Change the ask. */
+/* Why the test didn't work, in the card, with Try again and Change the ask: an `.ac-iconline`, its icon on the
+   title's line. */
 .nw-fail {
   display: flex;
   align-items: flex-start;
@@ -938,8 +933,6 @@ html:not([data-pointer]) :is(.nw-sug, .nw-pick, .nw-alert__sugs button):focus-vi
   padding: 4px 0 8px;
 }
 .nw-fail > .ac-icon {
-  flex: none;
-  margin-top: 1px;
   color: var(--warn);
 }
 .nw-fail b {

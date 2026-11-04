@@ -31776,7 +31776,7 @@
     "value": "Pin a block from the chat"
   },
   "dashboards.newWidget.pinSubtitle": {
-    "value": "The card comes from the chat; you choose its title and whether it is redone."
+    "value": "The card comes from the chat. You choose its title and whether it is redone."
   },
   "dashboards.newWidget.pickFromChat": {
     "value": "Choose a block an agent already sent:"

@@ -278,8 +278,9 @@ describe("create_widget", () => {
     other = hers.id;
     await ask("fixa os PRs no meu início");
     const [home] = (await boards()).filter((b) => b.kind === "home");
-    expect(home?.ownerUserId).toBe(f.owner.id);
-    expect((await widgets()).map((w) => [w.dashboardId, w.title])).toEqual([[home?.id, "PRs"]]);
+    if (!home) throw new Error("no home board");
+    expect(home.ownerUserId).toBe(f.owner.id);
+    expect((await widgets()).map((w) => [w.dashboardId, w.title])).toEqual([[home.id, "PRs"]]);
     await ask("põe no outro painel");
     expect(results.at(-1)).toContain(`No dashboard ${other}`);
     expect(await widgets()).toHaveLength(1);

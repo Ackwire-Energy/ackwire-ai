@@ -517,7 +517,10 @@ export async function listDashboards(deps: DashboardDeps, actorId: string, orgId
     .select()
     .from(dashboards)
     .where(and(eq(dashboards.orgId, orgId), dashboardSeerSql("dashboards", actorId, viewer.admin)));
-  const widgets = await widgetsOf(deps.db, rows.map((r) => r.id));
+  const widgets = await widgetsOf(
+    deps.db,
+    rows.map((r) => r.id),
+  );
   const views = await summarize(deps.db, rows, viewer, widgets);
   const home = views.find((v) => v.kind === "home" && v.ownerUserId === actorId) ?? null;
   return { home, dashboards: views.filter((v) => v.kind === "board").sort(byListOrder) };
@@ -707,7 +710,12 @@ export async function deleteDashboard(
     .update(dashboards)
     .set({ deletedAt: at, updatedAt: at, proposal: null, pinned: false })
     .where(eq(dashboards.id, board.id));
-  await resolveBoardNotices(deps, orgId, board.id, widgets.map((w) => w.id));
+  await resolveBoardNotices(
+    deps,
+    orgId,
+    board.id,
+    widgets.map((w) => w.id),
+  );
   await publishDashboardChanged(deps.pubsub, board, { deleted: true });
 }
 
@@ -1049,7 +1057,10 @@ export async function updateWidget(
   }
   const status = row.status as WidgetStatus;
   if (target) {
-    await deps.db.update(dashboards).set({ updatedAt: at }).where(inArray(dashboards.id, [board.id, target.id]));
+    await deps.db
+      .update(dashboards)
+      .set({ updatedAt: at })
+      .where(inArray(dashboards.id, [board.id, target.id]));
     await publishWidgetChanged(deps.pubsub, board, { id: row.id, status: "removed" });
     await publishDashboardChanged(deps.pubsub, board);
     await publishWidgetChanged(deps.pubsub, target, { id: row.id, status });
@@ -1079,7 +1090,10 @@ async function discardWidget(deps: DashboardDeps, orgId: string, widget: WidgetR
   await dropWidgetRoutine(deps, orgId, widget.id);
   await deps.db.delete(dashboardWidgets).where(eq(dashboardWidgets.id, widget.id));
   if (!widget.draft) {
-    await deps.db.update(dashboards).set({ updatedAt: nowOf(deps) }).where(eq(dashboards.id, board.id));
+    await deps.db
+      .update(dashboards)
+      .set({ updatedAt: nowOf(deps) })
+      .where(eq(dashboards.id, board.id));
   }
   await resolveWidgetNotices({ db: deps.db, pubsub: deps.pubsub, now: deps.now }, orgId, widget.id);
   await publishWidgetChanged(deps.pubsub, board, widgetEvent(widget, "removed"));

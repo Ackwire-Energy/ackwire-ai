@@ -1725,8 +1725,7 @@ export const featureKeysEn = {
       which: "Which chart",
     },
     organize: {
-      hint:
-        "Hold a widget and drag it to its new place, or use the arrows, and pick each one's size. Done saves the order.",
+      hint: "Hold a widget and drag it to its new place, or use the arrows, and pick each one's size. Done saves the order.",
       holdHint: "Hold and drag to move it.",
       up: "Move up",
       down: "Move down",

@@ -30,10 +30,7 @@ export function orderWidgets<T extends { id: string; type: "widget" | "tile" }>(
 ): T[] {
   const widgets = items.filter((item) => item.type === "widget");
   const byId = new Map(widgets.map((w) => [w.id, w]));
-  const queue = [
-    ...ids.flatMap((id) => byId.get(id) ?? []),
-    ...widgets.filter((w) => !ids.includes(w.id)),
-  ];
+  const queue = [...ids.flatMap((id) => byId.get(id) ?? []), ...widgets.filter((w) => !ids.includes(w.id))];
   let k = 0;
   return items.map((item) => (item.type === "widget" ? (queue[k++] ?? item) : item));
 }

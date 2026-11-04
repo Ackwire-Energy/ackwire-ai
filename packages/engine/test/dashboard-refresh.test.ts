@@ -419,7 +419,10 @@ describe("the refresh run", () => {
       code: "widget.not_this_run",
     });
     // The kind holds: a kpi widget refuses bars without a person's change request.
-    await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, rr.agentRunId ?? ""));
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "done" })
+      .where(eq(schema.agentRuns.id, rr.agentRunId ?? ""));
     const next = await fireWidget(routineId);
     await expect(
       applyWidgetUpdate(dash(), {

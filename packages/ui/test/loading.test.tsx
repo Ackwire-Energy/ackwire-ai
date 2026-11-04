@@ -83,9 +83,10 @@ describe("Button loading", () => {
   });
 
   test("the label's text never shows under the spinner, disabled or not, whatever the variant", async () => {
-    const css = (
-      await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()
-    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
     const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m, i) => ({
       i,
       selectors: (m[1] ?? "").split(",").map((s) => s.replace(/\s+/g, " ").trim()),

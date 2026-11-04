@@ -135,7 +135,7 @@ describe("a widget's body, by kind", () => {
     const bars = [...container.querySelectorAll(".wk-bar")];
     expect(bars.map((b) => b.querySelector(".wk-bar__v")?.textContent)).toEqual(["14", "9", "31", "2"]);
     expect(bars[3]?.hasAttribute("data-alert")).toBe(true);
-    expect((bars[2]?.querySelector(".wk-bar__b") as HTMLElement).style.height).toBe("100%");
+    expect((bars[2]?.querySelector(".wk-bar__b") as HTMLElement | null)?.style.height).toBe("100%");
     expect([...container.querySelectorAll(".wk-axis span")].map((s) => s.textContent)).toEqual([
       "Novos",
       "Separando",

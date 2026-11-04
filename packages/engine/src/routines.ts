@@ -1464,11 +1464,19 @@ export async function listRoutines(db: Database, actorId: string, orgId: string,
   const boardIds = [...new Set(rows.map(widgetBoardOf).filter(Boolean))];
   const viewer = viewerOf(membership, actorId);
   const boards = await lookup(boardIds, () =>
-    db.select().from(dashboards).where(and(eq(dashboards.orgId, orgId), inArray(dashboards.id, boardIds))),
+    db
+      .select()
+      .from(dashboards)
+      .where(and(eq(dashboards.orgId, orgId), inArray(dashboards.id, boardIds))),
   );
   const seenBoards = new Set(boards.filter((b) => dashboardRights(b, viewer).see).map((b) => b.id));
   const listed = (r: RoutineRow) => listedInRoutines(r) && (!widgetBoardOf(r) || seenBoards.has(widgetBoardOf(r)));
-  return views(db, rows.filter((r) => sees(r) && listed(r)), actorId, hooks);
+  return views(
+    db,
+    rows.filter((r) => sees(r) && listed(r)),
+    actorId,
+    hooks,
+  );
 }
 
 /**

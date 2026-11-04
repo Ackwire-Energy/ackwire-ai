@@ -12831,8 +12831,7 @@ export const ptBR = {
       drag: "Arraste para mover",
       fixed: "Fixo",
       role: "widget móvel",
-      help:
-        "Espaço ou Enter pega o card, as setas movem, Espaço ou Enter solta e Esc cancela. Só as setas movem uma casa.",
+      help: "Espaço ou Enter pega o card, as setas movem, Espaço ou Enter solta e Esc cancela. Só as setas movem uma casa.",
       picked: "Você pegou “{{title}}”. As setas movem, Espaço solta, Esc cancela.",
       moved: "“{{title}}”: posição {{position}} de {{total}}.",
       dropped: "Você soltou “{{title}}” na posição {{position}} de {{total}}.",
@@ -13087,7 +13086,7 @@ export const ptBR = {
       cardSubtitle:
         "Escreva no card o que quer ver. Toque nas partes dele para mudar quem cuida, quando atualiza, o aviso e o tamanho.",
       pinTitle: "Fixar um bloco do chat",
-      pinSubtitle: "O card vem do chat; você escolhe o título e se ele se refaz.",
+      pinSubtitle: "O card vem do chat. Você escolhe o título e se ele se refaz.",
       pickFromChat: "Escolha um bloco que um agente já mandou:",
       orPin: "Ou fixe um bloco que já veio no chat",
       repick: "Escolher outro bloco",

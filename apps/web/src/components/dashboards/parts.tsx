@@ -218,7 +218,7 @@ export function AudienceFields({
         </RadioGroup>
       </div>
       <EditorsField value={value} onChange={onChange} roles={roles} />
-      <p className="db-note">
+      <p className="db-note ac-iconline">
         <Icon name="shield" size={16} />
         <span>{t("widgets.exposure")}</span>
       </p>

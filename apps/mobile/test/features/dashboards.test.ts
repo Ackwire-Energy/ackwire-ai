@@ -385,7 +385,15 @@ describe("dashboards on the phone (ADR 0134)", () => {
     expect(accessPerson({ userId: "u1", role: "owner" }, roles)).toEqual({ userId: "u1", roleIds: [], admin: true });
     expect(accessPerson({ userId: "u2", role: "member", roleIds: ["admin"] }, roles).admin).toBe(true);
     expect(accessPerson({ userId: "u3", role: "member", roleIds: ["sales"] }, roles).admin).toBe(false);
-    expect(roleNamesOf(["b", "x"], [{ id: "a", name: "Sales" }, { id: "b", name: "Board" }])).toEqual(["Board"]);
+    expect(
+      roleNamesOf(
+        ["b", "x"],
+        [
+          { id: "a", name: "Sales" },
+          { id: "b", name: "Board" },
+        ],
+      ),
+    ).toEqual(["Board"]);
   });
 
   test("Organize: a widget trades places with the next widget; a home board's tiles keep theirs", () => {

@@ -1,4 +1,4 @@
-import { dashboardGroups, type DashboardSummary, useDashboards } from "@agenteschat/client";
+import { type DashboardSummary, dashboardGroups, useDashboards } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";

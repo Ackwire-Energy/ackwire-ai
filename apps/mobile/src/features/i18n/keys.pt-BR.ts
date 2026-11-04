@@ -1729,8 +1729,7 @@ export const featureKeysPtBR = {
       which: "Qual gráfico",
     },
     organize: {
-      hint:
-        "Segure um widget e arraste para o novo lugar, ou use as setas, e escolha o tamanho de cada um. Pronto salva a ordem.",
+      hint: "Segure um widget e arraste para o novo lugar, ou use as setas, e escolha o tamanho de cada um. Pronto salva a ordem.",
       holdHint: "Segure e arraste para mudar de lugar.",
       up: "Subir",
       down: "Descer",

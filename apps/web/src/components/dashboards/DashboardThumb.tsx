@@ -20,8 +20,8 @@ export function DashboardThumb({ thumbs }: { thumbs: DashboardSummary["thumbs"] 
         <i className="db-thumb__tile db-thumb__tile--empty" style={{ gridColumn: `span ${BOARD_COLUMNS}` }} />
       ) : (
         thumbs.map((thumb, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: the first widgets in their order, never reordered here
           <i
+            // biome-ignore lint/suspicious/noArrayIndexKey: the first widgets in their order, never reordered here
             key={i}
             className="db-thumb__tile"
             style={{ gridColumn: `span ${thumb.w}`, ...widgetTileVars(colorOf(dir.anyAgent(thumb.agentId)), dark) }}

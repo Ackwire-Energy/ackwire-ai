@@ -249,7 +249,7 @@ html:not([data-pointer]) button.wg__title:focus-visible {
 .wg__dot {
   color: var(--faint);
 }
-/* A failure's reason and Resolve, in the attention tone. */
+/* A failure's reason and Resolve, in the attention tone: an `.ac-iconline`, its icon on the first line. */
 .wg__warn {
   display: flex;
   align-items: flex-start;
@@ -257,10 +257,6 @@ html:not([data-pointer]) button.wg__title:focus-visible {
   min-width: 0;
   color: var(--warn);
   line-height: 17px;
-}
-.wg__warn .ac-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .wg__resolve {
   padding: 0;

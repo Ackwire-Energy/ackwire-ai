@@ -270,5 +270,5 @@ export function BuildingDither({ color, still = false }: { color: string; still?
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [color, dark, still]);
-  return <canvas ref={canvas} className="wk-build__dither" aria-hidden="true" />;
+  return <canvas ref={canvas} className="wk-build__dither" />;
 }

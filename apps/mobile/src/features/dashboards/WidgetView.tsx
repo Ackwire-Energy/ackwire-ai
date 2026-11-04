@@ -162,7 +162,13 @@ function Kpi({
   const { colors: c } = useTheme();
   const spark = spec.spark ?? [];
   const trend = useMemo(
-    () => (!bleed && spark.length > 1 ? lineSpec(spark.map((_, i) => String(i)), spark) : null),
+    () =>
+      !bleed && spark.length > 1
+        ? lineSpec(
+            spark.map((_, i) => String(i)),
+            spark,
+          )
+        : null,
     [spark, bleed],
   );
   return (

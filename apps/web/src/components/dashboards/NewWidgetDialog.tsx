@@ -578,7 +578,7 @@ function NewWidgetBody({
         <p>{t("dashboards.newWidget.testing", { name })}</p>
       </div>
     ) : phase === "failed" ? (
-      <div className="nw-fail" role="status">
+      <div className="nw-fail ac-iconline" role="status">
         <Icon name="alert" size={18} />
         <div>
           <b>{t("dashboards.newWidget.failedTitle", { name })}</b>
@@ -659,7 +659,7 @@ function NewWidgetBody({
           >
             {agent && <AgentAvatar agentId={agent.id} name={agent.name} size="xs" />}
             <b>{agent?.name ?? t("dashboards.newWidget.noAgents")}</b>
-            <Icon name="chevronDown" size={12} />
+            <Icon name="chevronDown" size={14} />
           </button>
         ) : (
           owner && (
@@ -750,7 +750,7 @@ function NewWidgetBody({
   const readsFrom = tested?.sources.length ? tested.sources : sources;
   const below: ReactNode =
     mode === "ask" && tested ? (
-      <p className="nw-footnote">
+      <p className="nw-footnote ac-iconline">
         <Icon name="plug" size={14} />
         <span>
           {[
@@ -762,7 +762,7 @@ function NewWidgetBody({
         </span>
       </p>
     ) : mode === "pin" && chosen ? (
-      <p className="nw-footnote">
+      <p className="nw-footnote ac-iconline">
         <Icon name="pin" size={14} />
         <span>
           {schedule === "manual"

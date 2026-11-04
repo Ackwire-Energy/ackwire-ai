@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Dashboard, Widget, WidgetSpec } from "@agenteschat/client";
+import type { Dashboard, DashboardLayoutInput, Widget, WidgetSpec } from "@agenteschat/client";
 import { box, place } from "@agenteschat/ui/testing";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, type FakeState, fakeDashboardsOf, ORG_ID, seedState } from "./fake-api";
@@ -167,7 +167,7 @@ describe("My Home as a mural (ADR 0134)", () => {
     // S → M.
     await click(within(widget("Vendas hoje")).getByRole("button", { name: "Tamanho: P" }));
     await settle(3);
-    const sized = last(state, "dashboards.saveLayout") as [string, string, { widgets: { id: string; w: number }[] }];
+    const sized = last(state, "dashboards.saveLayout") as [string, string, DashboardLayoutInput];
     expect(sized[1]).toBe(home.id);
     expect(sized[2].widgets.find((w) => w.id === sales.id)).toEqual({ id: sales.id, position: 1, w: 2, h: 1 });
     expect(within(widget("Vendas hoje")).getByRole("button", { name: "Tamanho: M" })).toBeTruthy();

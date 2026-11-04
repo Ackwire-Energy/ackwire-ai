@@ -605,11 +605,8 @@ function createEngine<T extends GridItem>(ctx: EngineContext<T>) {
         }
         if (distance > MOUSE_SLOP) {
           press = null;
+          // The card lifts where the pointer is now: start places the gesture at these coordinates.
           start(p, e.clientX, e.clientY);
-          if (gesture) {
-            gesture.x = e.clientX;
-            gesture.y = e.clientY;
-          }
         }
       };
       const onUp = () => {

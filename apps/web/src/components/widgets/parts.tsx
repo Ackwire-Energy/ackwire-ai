@@ -87,7 +87,7 @@ export function WidgetFoot({
     );
   if (widget.status === "failed")
     return (
-      <span className="wg__warn" role="status">
+      <span className="wg__warn ac-iconline" role="status">
         <Icon name="alert" size={14} />
         <span>
           {failureText(t, widget.failure, name)}{" "}

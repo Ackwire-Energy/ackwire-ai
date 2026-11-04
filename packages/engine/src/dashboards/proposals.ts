@@ -119,7 +119,12 @@ export async function decideDashboardProposal(
     if (proposal.audience === "roles" && roles.length === 0) {
       throw new ValidationError("The roles it asked for are gone", DASHBOARD_ERRORS.rolesRequired);
     }
-    next = await setDashboardAudience(deps, board, proposal.audience, roles.map((r) => r.id));
+    next = await setDashboardAudience(
+      deps,
+      board,
+      proposal.audience,
+      roles.map((r) => r.id),
+    );
   }
   const [cleared] = await db
     .update(dashboards)

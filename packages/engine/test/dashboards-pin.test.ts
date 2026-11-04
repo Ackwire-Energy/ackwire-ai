@@ -57,11 +57,9 @@ const board = (actorId: string) =>
 
 describe("Pin (ADR 0134 §3)", () => {
   test("a chart an agent sent becomes a widget with its data, looked after by that agent", async () => {
-    const m = await message(
-      f.general.id,
-      `Here is today so far:\n${fence(KPI)}\nUp from yesterday.\n${fence(BARS)}`,
-      { agentId: f.agent.id },
-    );
+    const m = await message(f.general.id, `Here is today so far:\n${fence(KPI)}\nUp from yesterday.\n${fence(BARS)}`, {
+      agentId: f.agent.id,
+    });
     const made = await board(f.owner.id);
     const w = await pinMessageAsWidget(deps, f.owner.id, f.org.id, made.id, {
       messageId: m.id,

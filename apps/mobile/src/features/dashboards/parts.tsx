@@ -207,7 +207,7 @@ export function ProposalBanner({ board }: { board: Dashboard }) {
   const decide = useDecideDashboardProposal(orgId);
   const p = board.proposal;
   const look = useAgentLook(p?.agentId);
-  if (!p || !p.canDecide) return null;
+  if (!p?.canDecide) return null;
   const names = roleNamesOf(p.roleIds, roles).join(", ");
   const toRoles = p.audience === "roles" && names.length > 0;
   const publish = toRoles

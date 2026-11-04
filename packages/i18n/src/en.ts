@@ -12488,8 +12488,7 @@ export const en = {
       drag: "Drag to move",
       fixed: "Fixed",
       role: "movable widget",
-      help:
-        "Space or Enter picks the card up, the arrows move it, Space or Enter drops it and Esc cancels. The arrows alone move it one place.",
+      help: "Space or Enter picks the card up, the arrows move it, Space or Enter drops it and Esc cancels. The arrows alone move it one place.",
       picked: "You picked up “{{title}}”. The arrows move it, Space drops it, Esc cancels.",
       moved: "“{{title}}”: position {{position}} of {{total}}.",
       dropped: "You dropped “{{title}}” at position {{position}} of {{total}}.",
@@ -12756,7 +12755,7 @@ export const en = {
       cardSubtitle:
         "Write on the card what you want to see. Its parts change who looks after it, when it updates, the alert and its size.",
       pinTitle: "Pin a block from the chat",
-      pinSubtitle: "The card comes from the chat; you choose its title and whether it is redone.",
+      pinSubtitle: "The card comes from the chat. You choose its title and whether it is redone.",
       pickFromChat: "Choose a block an agent already sent:",
       orPin: "Or pin a block that already came in the chat",
       repick: "Choose another block",

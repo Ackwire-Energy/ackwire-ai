@@ -17,9 +17,9 @@ import { useMeId, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import {
+  type AudienceDraft,
   accessPerson,
   audienceChanged,
-  type AudienceDraft,
   audienceDraftOf,
   audienceReady,
   roleNamesOf,

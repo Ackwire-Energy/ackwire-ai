@@ -21,8 +21,8 @@ import { chartAreaTones, chartInk } from "@agenteschat/ui/sky/chart";
 import { bayerAt } from "@agenteschat/ui/sky/math";
 import {
   defaultSize,
-  exampleWidgetSpec,
   type ExampleWords,
+  exampleWidgetSpec,
   phoneSpan,
   sizeToLayout,
   type WidgetSize,
@@ -491,10 +491,7 @@ export function accessPerson(
 }
 
 /** The names of a board's roles, in the workspace's order (unknown ones left out). */
-export function roleNamesOf(
-  roleIds: readonly string[],
-  roles: readonly Pick<OrgRole, "id" | "name">[],
-): string[] {
+export function roleNamesOf(roleIds: readonly string[], roles: readonly Pick<OrgRole, "id" | "name">[]): string[] {
   return roles.filter((r) => roleIds.includes(r.id)).map((r) => r.name);
 }
 

@@ -595,10 +595,7 @@ describe("widgets", () => {
     // A deleted board's widgets update no more: they free their places.
     const first = boards[0];
     if (!first) throw new Error("no board");
-    await f.db
-      .update(schema.dashboards)
-      .set({ deletedAt: new Date() })
-      .where(eq(schema.dashboards.id, first.id));
+    await f.db.update(schema.dashboards).set({ deletedAt: new Date() }).where(eq(schema.dashboards.id, first.id));
     await assertScheduledRoom(f.db, f.org.id);
   });
 
