@@ -2558,6 +2558,7 @@
     },
     "working": {
       "title": "作業中",
+      "none": "いま作業中のエージェントはいません。",
       "dm": "あなたとの会話で",
       "in": "#{{channel}}",
       "mission": "ミッション · {{total}}件中{{done}}件"
@@ -2743,7 +2744,8 @@
       "browser": "ブラウザ",
       "members": "メンバー",
       "usage": "使用量",
-      "connectors": "コネクタ"
+      "connectors": "コネクタ",
+      "dashboard": "ダッシュボード"
     },
     "reactions_other": "リアクション{{count}}件",
     "quote": "「{{text}}」",
@@ -4851,13 +4853,18 @@
     "subtitle": "スケジュールに沿って、または何かが起きたときに、エージェントが自動で行う作業です。",
     "new": "新しいルーティン",
     "deliversTo": "{{agent}} · 送信先: {{target}}",
+    "widgetLine": "{{agent}} · ウィジェットを更新（メッセージなし）",
+    "widgetChip": "ダッシュボードのウィジェット",
+    "widgetFixed": "表示内容、更新のタイミング、担当者はウィジェットから変更します。",
     "target": {
       "forum": "フォーラムのトピック",
       "forumShort": "フォーラム",
       "dm": "エージェントとの自分のDM",
       "artifact": "Driveのドキュメント",
       "dmShort": "DM",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "ダッシュボードのウィジェット",
+      "widgetNamed": "ウィジェット「{{title}}」"
     },
     "active": "有効",
     "activeLabel": "有効: {{name}}",
@@ -4952,7 +4959,8 @@
         "channel": "チャンネルの全員に表示されます",
         "dm": "あなただけに表示されます",
         "forum": "エージェントがフォーラムのトピックで話し合います",
-        "artifact": "Driveのドキュメントになります"
+        "artifact": "Driveのドキュメントになります",
+        "widget": "ウィジェットを更新します（メッセージなし）"
       },
       "ahead": "あとで実行する準備済み",
       "createdBy": "作成者: {{name}} · {{date}}",
@@ -12737,6 +12745,414 @@
         "done": "今日完了"
       },
       "none": "{{name}}は今、手が空いています。"
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "自動",
+      "kpi": "数値",
+      "goal": "目標",
+      "bars": "棒グラフ",
+      "line": "折れ線",
+      "list": "リスト",
+      "text": "要約"
+    },
+    "schedules": {
+      "half": "30分ごと",
+      "hour": "1時間ごと",
+      "day": "毎日8:00",
+      "week": "毎週月曜8:00",
+      "manual": "頼んだときだけ"
+    },
+    "schedulesShort": {
+      "half": "30分",
+      "hour": "1時間ごと",
+      "day": "毎日 · 8:00",
+      "week": "毎週月曜",
+      "manual": "頼んだとき"
+    },
+    "schedulesInline": {
+      "half": "30分ごと",
+      "hour": "1時間ごと",
+      "day": "毎日8:00",
+      "week": "毎週月曜8:00",
+      "manual": "依頼時のみ"
+    },
+    "sizes": {
+      "label": "サイズ",
+      "s": "小",
+      "m": "中",
+      "l": "大"
+    },
+    "status": {
+      "building": "{{name}}がウィジェットと、それを更新するルーティンを作っています…",
+      "updating": "{{name}}が更新中…",
+      "failed": "更新されませんでした"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "解決",
+      "agent_reported": "{{detail}}",
+      "no_update": "前回の更新はデータなしで終わりました。",
+      "error": "前回の更新に失敗しました。",
+      "budget_exceeded": "{{name}}が今月の予算に達しました。",
+      "waiting_computer": "{{name}}のコンピューターに接続できません。",
+      "waiting_plan": "{{name}}のプランが上限に達しています。",
+      "waiting_budget": "{{name}}の予算が上限に達しています。",
+      "creator_left": "設定した人がワークスペースを離れました。",
+      "creator_no_access": "設定した人がもう使えません。",
+      "agent_archived": "{{name}}はアーカイブされました。",
+      "audience": "設定した人がもう{{name}}と話せません。",
+      "failing": "続けて何度も失敗したため停止しました。",
+      "stopped": "更新は停止されました。",
+      "missing_credential": "{{name}}には作業に使うAIキーもプランもありません。",
+      "timeout": "更新に時間がかかりすぎました。",
+      "invalid_data": "{{name}}はデータをこの形式にできませんでした。"
+    },
+    "menu": {
+      "label": "その他",
+      "open": "開く",
+      "refresh": "今すぐ更新",
+      "change": "{{name}}に変更を頼む",
+      "schedule": "更新のタイミングを変更",
+      "removeHome": "ホームから削除",
+      "removeBoard": "ダッシュボードから削除"
+    },
+    "organize": {
+      "start": "並べ替え",
+      "done": "完了",
+      "size": "サイズ",
+      "remove": "削除",
+      "drag": "ドラッグして移動",
+      "fixed": "固定",
+      "role": "移動できるウィジェット",
+      "help": "スペースまたはEnterでカードを持ち上げ、矢印キーで移動し、スペースまたはEnterで置き、Escでキャンセルします。矢印キーだけなら1つずつ移動します。",
+      "picked": "「{{title}}」を持ち上げました。矢印キーで移動、スペースで置く、Escでキャンセルです。",
+      "moved": "「{{title}}」：{{total}}件中{{position}}番目。",
+      "dropped": "「{{title}}」を{{total}}件中{{position}}番目に置きました。",
+      "canceled": "「{{title}}」は元の場所に戻りました。"
+    },
+    "add": {
+      "label": "ウィジェットを追加",
+      "short": "ウィジェット"
+    },
+    "alert": {
+      "label": "何かおかしいときに知らせる",
+      "hint": "アラートは変化した内容と一緒に「あなたの対応待ち」に届きます。",
+      "condition": "アラートの条件",
+      "placeholder": "何かおかしいとき",
+      "line": "アラート条件: {{condition}}",
+      "lineAny": "何かおかしいときにアラート",
+      "where": "「あなたの対応待ち」に届く",
+      "none": "アラートなし"
+    },
+    "cost": {
+      "day": "{{name}}の予算から1日あたり約{{amount}}",
+      "week": "{{name}}の予算から1週間あたり約{{amount}}",
+      "manual": "更新を頼んだときだけ費用がかかります",
+      "plan": "{{name}}のプランを使います",
+      "unknown": "更新のたびに{{name}}の予算を使います"
+    },
+    "exposure": "ダッシュボードを見られる人は、元のアカウントにアクセスできなくても、エージェントが集めた内容を見られます。エージェントもダッシュボードを作ります。依頼した人以外にも見せるときは、まず「あなたの対応待ち」で確認を求めます。",
+    "panel": {
+      "caresFor": "{{name}}がこのウィジェットを担当しています",
+      "caresForOn": "{{name}}がこのウィジェットを担当しています · {{board}}",
+      "how": "更新の方法",
+      "next": "{{name}}のルーティン · 次回{{when}}",
+      "noRoutine": "自動では更新されません",
+      "askAnytime": "メニューから更新を頼めます",
+      "editRoutine": "ルーティンを編集",
+      "changeAlert": "変更",
+      "reads": "{{name}}が作成のために読むもの",
+      "history": "最近の更新",
+      "noHistory": "まだ更新はありません。",
+      "alerted": "アラート: {{text}}",
+      "changed": "変更: {{text}}",
+      "ask": "変更を頼む",
+      "askPlaceholder": "例: チャネル別に分ける、または昨年の同じ週と比べる",
+      "askTo": "宛先: {{name}}",
+      "send": "送信",
+      "sent": "{{name}}がウィジェットを作り直しています。",
+      "updated": "更新済み",
+      "rename": "名前を変更",
+      "titleLabel": "ウィジェットのタイトル"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b>が「{{title}}」でアラートを出しました",
+      "failed": "「{{title}}」の更新が止まりました",
+      "proposal": "<b>{{name}}</b>がダッシュボードの公開を提案しています",
+      "proposalWorkspace": "「{{title}}」をワークスペース全体に · 今はあなただけが見られます",
+      "proposalRoles": "「{{title}}」を{{roles}}に · 今はあなただけが見られます",
+      "openBoard": "ダッシュボードを見る",
+      "openWidget": "ウィジェットを開く",
+      "resolving": "「{{title}}」をもう一度更新しています"
+    },
+    "example": {
+      "days": {
+        "d1": "水",
+        "d2": "木",
+        "d3": "金",
+        "d4": "土",
+        "d5": "日",
+        "d6": "月",
+        "d7": "火"
+      },
+      "vsYesterday": "前日比",
+      "goalLine": "100件中48件",
+      "goalNote": "このペースなら29日に達成します。",
+      "lineNote": "昨日40 · 今週+48%",
+      "row1": "1つ目の項目",
+      "row2": "2つ目の項目",
+      "row3": "3つ目の項目",
+      "meta1": "たった今",
+      "meta2": "1時間前",
+      "meta3": "昨日",
+      "item1": "変化した内容の短い要約です。",
+      "item2": "エージェントが更新のたびに書き直します。"
+    },
+    "preview": {
+      "label": "プレビュー",
+      "example": "サンプルデータ"
+    },
+    "pin": {
+      "action": "固定",
+      "label": "ダッシュボードに固定",
+      "done": "{{where}}に固定しました",
+      "doneUpdating": "{{where}}に固定しました · {{name}}が{{schedule}}作り直します",
+      "subtitle": "グラフのデータを保持します。担当エージェントが最新に保つこともできます。",
+      "open": "開く"
+    },
+    "home": "マイホーム",
+    "untitled": "新しいウィジェット",
+    "updatedAgo": "{{when}}に更新",
+    "removed": {
+      "home": "「{{title}}」をホームから外し、{{name}}のルーティンを停止しました",
+      "board": "「{{title}}」をダッシュボードから外し、{{name}}のルーティンを停止しました"
+    },
+    "removeConfirm": {
+      "title": "「{{title}}」を削除しますか？",
+      "textRoutine": "これを更新している{{name}}のルーティンが停止し、更新履歴も消えます。",
+      "textManual": "更新履歴も消えます。",
+      "confirm": "削除"
+    }
+  },
+  "agentPicker": {
+    "search": "エージェントを検索",
+    "list": "エージェント",
+    "empty": "「{{q}}」に一致するエージェントはいません",
+    "noConnectors": "コネクタなし",
+    "more": "+{{count}}"
+  },
+  "dashboards": {
+    "title": "ダッシュボード",
+    "subtitle": "エージェントが最新に保つ数値やグラフ。ワークスペース全体にも、一部のロールだけにも。",
+    "sidebar": "ダッシュボード",
+    "navWhat": "エージェントが最新に保つ数値やグラフ",
+    "new": "新しいダッシュボード",
+    "back": "ダッシュボード",
+    "home": "マイホーム",
+    "groups": {
+      "workspace": "ワークスペース",
+      "workspaceHint": "全員が見られます",
+      "roles": "あなたのロール",
+      "rolesHint": "あなたは{{roles}}です",
+      "mine": "あなただけ",
+      "mineHint": "ほかの人には見えません"
+    },
+    "audience": {
+      "label": "見られる人",
+      "workspace": "ワークスペース全体",
+      "workspaceHint_other": "{{count}}人のメンバー全員が見られ、ダッシュボードから開けます",
+      "roles": "ロール",
+      "rolesHint": "選んだロールのいずれかを持つ人だけ",
+      "private": "あなただけ",
+      "privateHint": "共有するまでほかの人には見えません",
+      "noRoles": "ワークスペースにはまだロールがありません。",
+      "people_other": "{{count}}人"
+    },
+    "edit": {
+      "label": "編集できる人",
+      "viewers": "見られる人",
+      "owner": "あなたと管理者だけ",
+      "roles": "またはこれらのロールを持つ人",
+      "twoRoles": "{{first}}と{{second}}",
+      "manyRoles_other": "{{count}}個のロール",
+      "cantSee": "このダッシュボードを見られません",
+      "someRoles": "一部のロール…",
+      "rolesNote": "これらのロールを持つ人は、ダッシュボードを見られる場合に編集できます。あなたと管理者はいつでも編集できます。"
+    },
+    "meta": {
+      "by": "{{name}}が作成",
+      "byYou": "あなたが作成",
+      "widgets_other": "{{count}}個のウィジェット",
+      "updated": "{{when}}に更新"
+    },
+    "share": {
+      "action": "共有",
+      "title": "「{{title}}」を共有",
+      "access": "アクセスできる人",
+      "you": "{{name}}（あなた）",
+      "owner": "ワークスペースのオーナー",
+      "edits": "編集できる",
+      "sees": "閲覧できる",
+      "none": "閲覧不可",
+      "copyLink": "リンクをコピー",
+      "copied": "リンクをコピーしました",
+      "save": "保存",
+      "nowWorkspace": "「{{title}}」はワークスペースのものになりました",
+      "nowPrivate": "「{{title}}」はあなただけが見られます",
+      "nowRoles": "{{roles}}が「{{title}}」を見られます"
+    },
+    "proposal": {
+      "title": "{{name}}があなたのためにこのダッシュボードを作りました",
+      "workspace": "ワークスペース全体への公開も提案しています。今はあなただけが見られます。",
+      "roles": "{{roles}}への公開も提案しています。今はあなただけが見られます。",
+      "keep": "自分だけにしておく",
+      "publishWorkspace": "ワークスペースに公開",
+      "publishRoles": "{{roles}}に公開",
+      "published": "「{{title}}」を公開しました",
+      "kept": "「{{title}}」はあなただけが見られます"
+    },
+    "empty": {
+      "title": "空のダッシュボード",
+      "text": "ウィジェットを追加しましょう。エージェントに頼むか、チャットのブロックを固定します。"
+    },
+    "onlyHome": "「新しいダッシュボード」から、ワークスペースや一部のロール向けのダッシュボードを作成できます。",
+    "create": {
+      "title": "新しいダッシュボード",
+      "subtitle": "ウィジェットを1ページにまとめます。あなた用にもチーム用にも。",
+      "name": "名前",
+      "namePlaceholder": "例: 売上、ブラックフライデー、四半期の目標",
+      "askHint": "チャットでエージェントに作成を頼むこともできます。",
+      "submit": "ダッシュボードを作成",
+      "created": "「{{title}}」を作成しました"
+    },
+    "newWidget": {
+      "title": "新しいウィジェット",
+      "subtitle": "エージェントが最新に保つ数値、グラフ、リスト。",
+      "tabAsk": "エージェントに頼む",
+      "tabPin": "チャットから固定",
+      "what": "何を追いかけますか？",
+      "whatPlaceholder": "例: 今日の売上を昨日と比べて",
+      "who": "担当",
+      "format": "形式",
+      "updates": "更新",
+      "destination": "追加先",
+      "create": "ウィジェットを作成",
+      "pin": "固定",
+      "fromChat": "エージェントがチャットで送ったブロック",
+      "pinHint": "メッセージから直接固定することもできます。ブロックの「固定」を押してください。",
+      "keepUpdated": "最新に保つ",
+      "onlyPin": "いいえ、固定だけ",
+      "emptyPreview": "追いかけたいことを書くと、{{name}}がここに完成イメージを表示します。",
+      "pickBlock": "チャットからブロックを選んでください。",
+      "noBlocks": "会話にはまだグラフがありません。",
+      "suggestions": "おすすめ",
+      "theAgent": "エージェント",
+      "noAgents": "話せるエージェントはまだいません。",
+      "place": {
+        "channel": "#{{channel}}の{{name}} · {{when}}",
+        "thread": "#{{channel}}のスレッドの{{name}} · {{when}}",
+        "dm": "あなたとの会話の{{name}} · {{when}}",
+        "unnamed": "会話の{{name}} · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}}が実データで今すぐ作ります",
+        "reads": "{{sources}}を読みます",
+        "routine": "ルーティン「{{title}}」を作成します",
+        "routineHint": "{{schedule}} · ルーティンに表示されます",
+        "noRoutine": "ルーティンなし: 頼んだときに更新します",
+        "alert": "{{condition}}なら「あなたの対応待ち」でアラート",
+        "alertHint": "それ以外はウィジェットを更新するだけで、メッセージは送りません",
+        "noAlert": "アラートなし",
+        "noAlertHint": "ウィジェットを更新するだけで、メッセージは送りません",
+        "pinAsIs": "チャットのブロックをそのまま固定します",
+        "redoes": "{{name}}が{{schedule}}作り直します",
+        "redoesHint": "ルーティンで更新し、チャットにメッセージは送りません",
+        "noRedo": "自動では更新されません",
+        "noRedoHint": "メニューから更新を頼めます"
+      },
+      "created": "ウィジェットを{{where}}に追加しました",
+      "test": "テスト",
+      "testAgain": "もう一度テスト",
+      "testing": "{{name}}が実際のデータで作成しています…",
+      "tested": "実際のデータ · {{when}}",
+      "stale": "テスト後に変更されました",
+      "testFailed": "うまくいきませんでした：{{reason}}",
+      "tryAgain": "もう一度試す",
+      "testCost": "このテストの費用は{{cost}}です",
+      "testFirst": "先にテストして実際の結果を確認してください",
+      "titleField": "タイトル",
+      "titlePlaceholder": "タイトル · テスト時に{{name}}が提案します",
+      "cardSubtitle": "見たい内容をカードに書いてください。カードの各部分をタップすると、担当、更新のタイミング、アラート、サイズを変更できます。",
+      "pinTitle": "チャットのブロックを固定",
+      "pinSubtitle": "カードはチャットから作られます。タイトルと、作り直すかどうかを選べます。",
+      "pickFromChat": "エージェントがすでに送ったブロックを選んでください：",
+      "orPin": "またはチャットに届いたブロックを固定",
+      "repick": "別のブロックを選ぶ",
+      "formatAuto": "自動の形式",
+      "enterTests": "Enterで再テスト",
+      "quoted": "「{{ask}}」",
+      "editAsk": "依頼を変更",
+      "editAskOf": "依頼を変更：{{ask}}",
+      "testingShort": "テスト中…",
+      "buildingFoot": "{{name}}が作成中…",
+      "failedTitle": "{{name}}は作成できませんでした",
+      "staleHint": "もう一度テストして仕上がりを確認してください。",
+      "whoButton": "担当：{{name}}",
+      "whoHint": "担当のエージェントは、コネクタで読み取った内容からウィジェットを作ります。",
+      "alert": "アラート",
+      "alertOn": "アラートあり",
+      "alertDone": "完了",
+      "manual": "依頼したときだけ",
+      "manualInline": "依頼したときだけ",
+      "noUpdate": "更新しない",
+      "noUpdateInline": "更新しない",
+      "inRoutines": "ルーティンは「ルーティン」に表示されます",
+      "pinAsIs": "そのまま、ルーティンなし",
+      "pinRedoes": "{{name}}がルーティンで{{schedule}}作り直します",
+      "formatHints": {
+        "auto": "{{name}}がいちばん分かりやすい形式を選びます",
+        "kpi": "大きな数字1つとその変化",
+        "goal": "目標までの進み具合",
+        "bars": "いくつかの値を並べて表示",
+        "line": "時間とともにどう変わったか",
+        "list": "項目の短いリスト",
+        "text": "要点をまとめた数文"
+      }
+    },
+    "pinTop": "上部に固定",
+    "unpin": "固定を解除",
+    "rename": "名前を変更",
+    "about": "説明",
+    "aboutPlaceholder": "このダッシュボードの目的",
+    "delete": {
+      "action": "ダッシュボードを削除",
+      "title": "「{{title}}」を削除しますか？",
+      "text": "ウィジェットとそのルーティンも削除されます。",
+      "confirm": "削除",
+      "done": "「{{title}}」を削除しました"
+    },
+    "errors": {
+      "notFound": "このダッシュボードは存在しないか、表示する権限がありません。",
+      "forbidden": "このダッシュボードを編集できる人だけが操作できます。",
+      "homeFixed": "ホームは共有も削除もできません。",
+      "rolesRequired": "ロールを1つ以上選んでください。",
+      "roleUnknown": "このうちのいずれかのロールはもうワークスペースにありません。",
+      "titleRequired": "ダッシュボードに名前を付けてください。",
+      "tooMany": "ワークスペースのダッシュボードが上限に達しています。先に1つ削除してください。",
+      "publishForbidden": "あなたのロールでは、ほかの人にダッシュボードを公開できません。",
+      "proposalNone": "このリクエストはすでに判断済みです。",
+      "proposalNotYours": "判断できるのは、エージェントが尋ねた人だけです。",
+      "widgetNotFound": "このウィジェットはもうありません。",
+      "widgetTooMany": "このダッシュボードはいっぱいです。ウィジェットを削除するか、別のダッシュボードを使ってください。",
+      "scheduledCap": "ワークスペースではすでに{{max}}個のウィジェットを定期更新しています。1つを依頼時のみの更新に変えるか、削除してください。",
+      "agentUnreachable": "このエージェントとは話せません。",
+      "agentArchived": "このエージェントはアーカイブされました。",
+      "blockNotFound": "そのグラフはもうメッセージにありません。",
+      "notAgentMessage": "固定できるのはエージェントのグラフだけです。",
+      "promptRequired": "ウィジェットに表示する内容を書いてください。",
+      "notTested": "先にテストしてください。テストが成功するとウィジェットが作成されます。"
     }
   }
 }

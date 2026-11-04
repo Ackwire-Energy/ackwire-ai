@@ -46,7 +46,7 @@ import {
   Text,
 } from "@/ui";
 import { approvalTitleText, useCancelAhead } from "../approvals/parts";
-import { chatHref } from "../links/logic";
+import { chatHref, widgetHref } from "../links/logic";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { AgentFace } from "../shared/Face";
@@ -202,11 +202,14 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
       : r.target.type === "dm"
         ? "dm"
         : r.target.type;
-  // Where it delivers opens when it is a conversation the phone has (a channel, a thread).
+  // Where it delivers opens when it is a conversation the phone has (a channel, a thread), or its widget (ADR 0135).
   const whereChannel = routineChannelOf(r.target);
-  const whereHref = whereChannel
-    ? chatHref(whereChannel, r.target.type === "conversation" ? r.target.threadId : null)
-    : null;
+  const widget = r.target.type === "widget" ? r.target : null;
+  const whereHref = widget
+    ? widgetHref(widget.widgetId, widget.dashboardId)
+    : whereChannel
+      ? chatHref(whereChannel, r.target.type === "conversation" ? r.target.threadId : null)
+      : null;
   const list = runs.data ?? r.recentRuns;
   const next = done ? "" : nextText(r, at);
   return (
@@ -250,13 +253,24 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                   onPress={() => openSwitchComputer(outage.machineId)}
                 />
               ) : null}
-              <Button
-                size="sm"
-                variant="secondary"
-                icon="pen"
-                label={t("routines.edit")}
-                onPress={() => router.push(editRoutineHref(r.id))}
-              />
+              {/* A widget's routine is changed from its widget. */}
+              {widget ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon="chart"
+                  label={t("widgets.notice.openWidget")}
+                  onPress={() => router.push(widgetHref(widget.widgetId, widget.dashboardId))}
+                />
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon="pen"
+                  label={t("routines.edit")}
+                  onPress={() => router.push(editRoutineHref(r.id))}
+                />
+              )}
               {/* Parar for a run at work (a paused routine's too); "Rodar agora" while it may run. */}
               {(stoppable || !fired) && !reminder ? (
                 stoppable ? (
@@ -423,7 +437,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
           <Section title={t("routines.panel.where")}>
             <GroupedRow
               icon={targetIcon(r.target)}
-              label={targetLabel(r.target)}
+              label={r.widget?.title ?? targetLabel(r.target)}
               sub={t(`routines.panel.whereHint.${whereHint}`)}
               subLines={2}
               chevron={Boolean(whereHref)}

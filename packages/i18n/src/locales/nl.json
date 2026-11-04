@@ -2646,6 +2646,7 @@
     },
     "working": {
       "title": "Nu bezig",
+      "none": "Er werkt nu geen agent.",
       "dm": "In jouw gesprek",
       "in": "#{{channel}}",
       "mission": "Missie · {{done}} van {{total}}"
@@ -2842,7 +2843,8 @@
       "browser": "Browser",
       "members": "Leden",
       "usage": "Gebruik",
-      "connectors": "Connectors"
+      "connectors": "Connectors",
+      "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} reactie",
     "reactions_other": "{{count}} reacties",
@@ -5076,13 +5078,18 @@
     "subtitle": "Wat de agents zelf doen, volgens een schema of als er iets gebeurt.",
     "new": "Nieuwe routine",
     "deliversTo": "{{agent}} · levert in {{target}}",
+    "widgetLine": "{{agent}} · werkt zijn widget bij, zonder bericht",
+    "widgetChip": "Dashboardwidget",
+    "widgetFixed": "Wat hij toont, wanneer hij bijwerkt en wie ervoor zorgt, pas je aan in zijn widget.",
     "target": {
       "forum": "Een forumonderwerp",
       "forumShort": "Forum",
       "dm": "Mijn DM met de agent",
       "artifact": "Een document in de Drive",
       "dmShort": "DM",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "Een dashboardwidget",
+      "widgetNamed": "De widget “{{title}}”"
     },
     "active": "Actief",
     "activeLabel": "Actief: {{name}}",
@@ -5177,7 +5184,8 @@
         "channel": "Iedereen in het kanaal ziet het",
         "dm": "Alleen jij ziet het",
         "forum": "De agents overleggen in een forumonderwerp",
-        "artifact": "Wordt een document in de Drive"
+        "artifact": "Wordt een document in de Drive",
+        "widget": "Werkt zijn widget bij, zonder bericht"
       },
       "ahead": "Klaargezet voor later",
       "createdBy": "Gemaakt door {{name}} · {{date}}",
@@ -13370,6 +13378,418 @@
         "done": "Vandaag klaar"
       },
       "none": "{{name}} is nu vrij."
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "Automatisch",
+      "kpi": "Getal",
+      "goal": "Doel",
+      "bars": "Staven",
+      "line": "Lijn",
+      "list": "Lijst",
+      "text": "Samenvatting"
+    },
+    "schedules": {
+      "half": "Elke 30 minuten",
+      "hour": "Elk uur",
+      "day": "Elke dag om 8:00",
+      "week": "Elke maandag om 8:00",
+      "manual": "Alleen als je erom vraagt"
+    },
+    "schedulesShort": {
+      "half": "30 minuten",
+      "hour": "Elk uur",
+      "day": "Elke dag · 8:00",
+      "week": "Elke maandag",
+      "manual": "Op verzoek"
+    },
+    "schedulesInline": {
+      "half": "elke 30 minuten",
+      "hour": "elk uur",
+      "day": "elke dag om 8:00",
+      "week": "elke maandag om 8:00",
+      "manual": "op verzoek"
+    },
+    "sizes": {
+      "label": "Grootte",
+      "s": "S",
+      "m": "M",
+      "l": "L"
+    },
+    "status": {
+      "building": "{{name}} bouwt de widget en de routine die hem bijwerkt…",
+      "updating": "{{name}} werkt bij…",
+      "failed": "Niet bijgewerkt"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "Oplossen",
+      "agent_reported": "{{detail}}",
+      "no_update": "De laatste update eindigde zonder gegevens.",
+      "error": "De laatste update is mislukt.",
+      "budget_exceeded": "{{name}} heeft het budget voor deze maand bereikt.",
+      "waiting_computer": "De computer van {{name}} is niet bereikbaar.",
+      "waiting_plan": "Het abonnement van {{name}} zit aan de limiet.",
+      "waiting_budget": "Het budget van {{name}} zit aan de limiet.",
+      "creator_left": "Wie hem heeft ingesteld, heeft de werkruimte verlaten.",
+      "creator_no_access": "Wie hem heeft ingesteld, kan hem niet meer gebruiken.",
+      "agent_archived": "{{name}} is gearchiveerd.",
+      "audience": "Wie hem heeft ingesteld, kan niet meer met {{name}} praten.",
+      "failing": "Hij is meerdere keren achter elkaar mislukt en gestopt.",
+      "stopped": "De update is gestopt.",
+      "missing_credential": "{{name}} heeft geen AI-sleutel of abonnement om mee te werken.",
+      "timeout": "De update duurde te lang.",
+      "invalid_data": "{{name}} kon de gegevens niet in deze vorm zetten."
+    },
+    "menu": {
+      "label": "Meer",
+      "open": "Openen",
+      "refresh": "Nu bijwerken",
+      "change": "{{name}} om een wijziging vragen",
+      "schedule": "Wijzigen wanneer hij bijwerkt",
+      "removeHome": "Verwijderen van Start",
+      "removeBoard": "Verwijderen van dashboard"
+    },
+    "organize": {
+      "start": "Ordenen",
+      "done": "Klaar",
+      "size": "Grootte",
+      "remove": "Verwijderen",
+      "drag": "Sleep om te verplaatsen",
+      "fixed": "Vast",
+      "role": "verplaatsbare widget",
+      "help": "Spatie of Enter pakt de kaart op, de pijltjes verplaatsen hem, Spatie of Enter zet hem neer en Esc annuleert. Alleen de pijltjes verplaatsen hem één plek.",
+      "picked": "Je hebt “{{title}}” opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "“{{title}}”: positie {{position}} van {{total}}.",
+      "dropped": "Je hebt “{{title}}” neergezet op positie {{position}} van {{total}}.",
+      "canceled": "“{{title}}” staat weer op zijn plek."
+    },
+    "add": {
+      "label": "Widget toevoegen",
+      "short": "Widget"
+    },
+    "alert": {
+      "label": "Laat het me weten als er iets mis is",
+      "hint": "De melding komt in “Wacht op jou”, met wat er veranderd is.",
+      "condition": "Melden als",
+      "placeholder": "er iets mis is",
+      "line": "Melden als {{condition}}",
+      "lineAny": "Melden als er iets mis is",
+      "where": "In “Wacht op jou”",
+      "none": "Geen meldingen"
+    },
+    "cost": {
+      "day": "≈ {{amount}} per dag van het budget van {{name}}",
+      "week": "≈ {{amount}} per week van het budget van {{name}}",
+      "manual": "Kost alleen iets als je om een update vraagt",
+      "plan": "Gebruikt het abonnement van {{name}}",
+      "unknown": "Elke update gebruikt het budget van {{name}}"
+    },
+    "exposure": "Wie het dashboard ziet, ziet wat de agents hebben opgehaald, ook zonder toegang tot de accounts waar het vandaan komt. Agents maken ook dashboards. Om er een aan meer mensen te tonen dan wie erom vroeg, vragen ze het eerst, in “Wacht op jou”.",
+    "panel": {
+      "caresFor": "{{name}} zorgt voor deze widget",
+      "caresForOn": "{{name}} zorgt voor deze widget · {{board}}",
+      "how": "Hoe hij bijwerkt",
+      "next": "Routine van {{name}} · volgende {{when}}",
+      "noRoutine": "Werkt niet vanzelf bij",
+      "askAnytime": "Je kunt in het menu om een update vragen",
+      "editRoutine": "Routine bewerken",
+      "changeAlert": "Wijzigen",
+      "reads": "Wat {{name}} leest om hem te bouwen",
+      "history": "Laatste updates",
+      "noHistory": "Nog geen updates.",
+      "alerted": "gemeld: {{text}}",
+      "changed": "Gewijzigd: {{text}}",
+      "ask": "Om een wijziging vragen",
+      "askPlaceholder": "Bijv.: splits het per kanaal, of vergelijk met dezelfde week vorig jaar",
+      "askTo": "aan {{name}}",
+      "send": "Versturen",
+      "sent": "{{name}} maakt de widget opnieuw.",
+      "updated": "Bijgewerkt",
+      "rename": "Hernoemen",
+      "titleLabel": "Titel van de widget"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b> heeft “{{title}}” gemarkeerd",
+      "failed": "“{{title}}” wordt niet meer bijgewerkt",
+      "proposal": "<b>{{name}}</b> wil een dashboard publiceren",
+      "proposalWorkspace": "“{{title}}” voor de hele werkruimte · vandaag zie alleen jij het",
+      "proposalRoles": "“{{title}}” voor {{roles}} · vandaag zie alleen jij het",
+      "openBoard": "Dashboard bekijken",
+      "openWidget": "Widget openen",
+      "resolving": "“{{title}}” wordt opnieuw bijgewerkt"
+    },
+    "example": {
+      "days": {
+        "d1": "wo",
+        "d2": "do",
+        "d3": "vr",
+        "d4": "za",
+        "d5": "zo",
+        "d6": "ma",
+        "d7": "di"
+      },
+      "vsYesterday": "t.o.v. gisteren",
+      "goalLine": "48 van 100",
+      "goalNote": "In dit tempo is het op de 29e bereikt.",
+      "lineNote": "40 gisteren · +48% deze week",
+      "row1": "Eerste item",
+      "row2": "Tweede item",
+      "row3": "Derde item",
+      "meta1": "nu",
+      "meta2": "1 u geleden",
+      "meta3": "gisteren",
+      "item1": "Een korte samenvatting van wat er veranderd is.",
+      "item2": "De agent schrijft hem bij elke update opnieuw."
+    },
+    "preview": {
+      "label": "Voorbeeld",
+      "example": "voorbeeldgegevens"
+    },
+    "pin": {
+      "action": "Vastzetten",
+      "label": "Vastzetten op een dashboard",
+      "done": "Vastgezet op {{where}}",
+      "doneUpdating": "Vastgezet op {{where}} · {{name}} maakt hem {{schedule}} opnieuw",
+      "subtitle": "Hij houdt de gegevens van de grafiek. Zijn agent kan hem ook actueel houden.",
+      "open": "Openen"
+    },
+    "home": "Mijn start",
+    "untitled": "Nieuwe widget",
+    "updatedAgo": "bijgewerkt {{when}}",
+    "removed": {
+      "home": "“{{title}}” staat niet meer op Start en de routine van {{name}} is gestopt",
+      "board": "“{{title}}” staat niet meer op het dashboard en de routine van {{name}} is gestopt"
+    },
+    "removeConfirm": {
+      "title": "“{{title}}” verwijderen?",
+      "textRoutine": "De routine van {{name}} die hem bijwerkt stopt, en zijn updategeschiedenis gaat mee.",
+      "textManual": "Zijn updategeschiedenis gaat mee.",
+      "confirm": "Verwijderen"
+    }
+  },
+  "agentPicker": {
+    "search": "Agents zoeken",
+    "list": "Agents",
+    "empty": "Geen agent past bij “{{q}}”",
+    "noConnectors": "Geen connectors",
+    "more": "+{{count}}"
+  },
+  "dashboards": {
+    "title": "Dashboards",
+    "subtitle": "Getallen en grafieken die de agents actueel houden, voor de werkruimte of alleen voor sommige rollen.",
+    "sidebar": "Dashboards",
+    "navWhat": "Getallen en grafieken die de agents actueel houden",
+    "new": "Nieuw dashboard",
+    "back": "Dashboards",
+    "home": "Mijn start",
+    "groups": {
+      "workspace": "Werkruimte",
+      "workspaceHint": "iedereen ziet het",
+      "roles": "Jouw rollen",
+      "rolesHint": "je zit in {{roles}}",
+      "mine": "Alleen van jou",
+      "mineHint": "niemand anders ziet ze"
+    },
+    "audience": {
+      "label": "Wie het ziet",
+      "workspace": "Hele werkruimte",
+      "workspaceHint_one": "{{count}} lid ziet het en vindt het bij Dashboards",
+      "workspaceHint_other": "Alle {{count}} leden zien het en vinden het bij Dashboards",
+      "roles": "Rollen",
+      "rolesHint": "Alleen mensen met een van de gekozen rollen",
+      "private": "Alleen jij",
+      "privateHint": "Niemand anders ziet het tot je het deelt",
+      "noRoles": "De werkruimte heeft nog geen rollen.",
+      "people_one": "{{count}} persoon",
+      "people_other": "{{count}} personen"
+    },
+    "edit": {
+      "label": "Wie bewerkt",
+      "viewers": "Wie het ziet",
+      "owner": "Alleen jij en beheerders",
+      "roles": "Of mensen met deze rollen",
+      "twoRoles": "{{first}} en {{second}}",
+      "manyRoles_one": "{{count}} rol",
+      "manyRoles_other": "{{count}} rollen",
+      "cantSee": "Ziet dit dashboard niet",
+      "someRoles": "Enkele rollen…",
+      "rolesNote": "Mensen met deze rollen bewerken het als ze het ook zien. Jij en beheerders altijd."
+    },
+    "meta": {
+      "by": "Gemaakt door {{name}}",
+      "byYou": "Door jou gemaakt",
+      "widgets_one": "{{count}} widget",
+      "widgets_other": "{{count}} widgets",
+      "updated": "bijgewerkt {{when}}"
+    },
+    "share": {
+      "action": "Delen",
+      "title": "“{{title}}” delen",
+      "access": "Wie toegang heeft",
+      "you": "{{name}} (jij)",
+      "owner": "Eigenaar van de werkruimte",
+      "edits": "Bewerkt",
+      "sees": "Ziet",
+      "none": "Ziet niet",
+      "copyLink": "Link kopiëren",
+      "copied": "Link gekopieerd",
+      "save": "Opslaan",
+      "nowWorkspace": "“{{title}}” is nu van de werkruimte",
+      "nowPrivate": "Alleen jij ziet “{{title}}”",
+      "nowRoles": "{{roles}} zien “{{title}}”"
+    },
+    "proposal": {
+      "title": "{{name}} heeft dit dashboard voor je gemaakt",
+      "workspace": "En stelt voor het in de hele werkruimte te publiceren. Vandaag zie alleen jij het.",
+      "roles": "En stelt voor het aan {{roles}} te tonen. Vandaag zie alleen jij het.",
+      "keep": "Alleen voor mij houden",
+      "publishWorkspace": "In de werkruimte publiceren",
+      "publishRoles": "Aan {{roles}} tonen",
+      "published": "“{{title}}” is gepubliceerd",
+      "kept": "Alleen jij ziet “{{title}}”"
+    },
+    "empty": {
+      "title": "Leeg dashboard",
+      "text": "Voeg widgets toe: vraag het een agent of zet een blok uit de chat vast."
+    },
+    "onlyHome": "Maak met “Nieuw dashboard” een dashboard voor de werkruimte of voor sommige rollen.",
+    "create": {
+      "title": "Nieuw dashboard",
+      "subtitle": "Widgets samen op één pagina, voor jou of voor het team.",
+      "name": "Naam",
+      "namePlaceholder": "Bijv.: Verkoop, Black Friday, Kwartaaldoelen",
+      "askHint": "Je kunt ook in een chat een agent vragen er een te maken.",
+      "submit": "Dashboard maken",
+      "created": "“{{title}}” gemaakt"
+    },
+    "newWidget": {
+      "title": "Nieuwe widget",
+      "subtitle": "Een getal, grafiek of lijst die een agent actueel houdt.",
+      "tabAsk": "Een agent vragen",
+      "tabPin": "Vastzetten uit de chat",
+      "what": "Wat wil je volgen?",
+      "whatPlaceholder": "Bijv.: de verkoop van vandaag vergeleken met gisteren",
+      "who": "Wie ervoor zorgt",
+      "format": "Vorm",
+      "updates": "Bijwerken",
+      "destination": "Toevoegen aan",
+      "create": "Widget maken",
+      "pin": "Vastzetten",
+      "fromChat": "Blokken die de agents in de chat stuurden",
+      "pinHint": "Je kunt ook direct vanuit het bericht vastzetten: “Vastzetten” op het blok.",
+      "keepUpdated": "Actueel houden",
+      "onlyPin": "Nee, alleen vastzetten",
+      "emptyPreview": "Zeg wat je wilt volgen en {{name}} laat hier zien hoe het eruitziet.",
+      "pickBlock": "Kies een blok uit de chat.",
+      "noBlocks": "Nog geen grafieken in je gesprekken.",
+      "suggestions": "Suggesties",
+      "theAgent": "De agent",
+      "noAgents": "Nog geen agent met wie je kunt praten.",
+      "place": {
+        "channel": "{{name}} in #{{channel}} · {{when}}",
+        "thread": "{{name}} in een thread in #{{channel}} · {{when}}",
+        "dm": "{{name}} in jullie gesprek · {{when}}",
+        "unnamed": "{{name}} in een gesprek · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}} bouwt hem nu, met echte gegevens",
+        "reads": "Leest {{sources}}",
+        "routine": "Maakt de routine “{{title}}”",
+        "routineHint": "{{schedule}} · staat in Routines",
+        "noRoutine": "Geen routine: werkt bij als je erom vraagt",
+        "alert": "Meldt in “Wacht op jou” als {{condition}}",
+        "alertHint": "Anders werkt hij alleen de widget bij, zonder bericht",
+        "noAlert": "Geen meldingen",
+        "noAlertHint": "Werkt alleen de widget bij, zonder bericht",
+        "pinAsIs": "Zet het blok vast zoals het in de chat staat",
+        "redoes": "{{name}} maakt hem {{schedule}} opnieuw",
+        "redoesHint": "Met een routine, zonder bericht in de chat",
+        "noRedo": "Werkt niet vanzelf bij",
+        "noRedoHint": "Je kunt in het menu om een update vragen"
+      },
+      "created": "Widget toegevoegd aan {{where}}",
+      "test": "Testen",
+      "testAgain": "Opnieuw testen",
+      "testing": "{{name}} bouwt hem met echte gegevens…",
+      "tested": "Echte gegevens · {{when}}",
+      "stale": "Gewijzigd sinds de test",
+      "testFailed": "Het is niet gelukt: {{reason}}",
+      "tryAgain": "Opnieuw proberen",
+      "testCost": "Deze test kostte {{cost}}",
+      "testFirst": "Test hem eerst om het echte resultaat te zien",
+      "titleField": "Titel",
+      "titlePlaceholder": "Titel · {{name}} stelt er een voor bij het testen",
+      "cardSubtitle": "Schrijf op de kaart wat je wilt zien. Tik op de onderdelen om te wijzigen wie ervoor zorgt, wanneer hij bijwerkt, de melding en de grootte.",
+      "pinTitle": "Een blok uit de chat vastzetten",
+      "pinSubtitle": "De kaart komt uit de chat. Jij kiest de titel en of hij opnieuw gemaakt wordt.",
+      "pickFromChat": "Kies een blok dat een agent al heeft gestuurd:",
+      "orPin": "Of zet een blok vast dat al in de chat kwam",
+      "repick": "Ander blok kiezen",
+      "formatAuto": "Automatische vorm",
+      "enterTests": "Enter test opnieuw",
+      "quoted": "“{{ask}}”",
+      "editAsk": "Vraag wijzigen",
+      "editAskOf": "Vraag wijzigen: {{ask}}",
+      "testingShort": "Testen…",
+      "buildingFoot": "{{name}} bouwt hem…",
+      "failedTitle": "{{name}} kon hem niet bouwen",
+      "staleHint": "Test opnieuw om te zien hoe het eruitziet.",
+      "whoButton": "Wie ervoor zorgt: {{name}}",
+      "whoHint": "Wie ervoor zorgt, bouwt de widget met wat hij via zijn connectors leest.",
+      "alert": "Melding",
+      "alertOn": "Melding aan",
+      "alertDone": "Klaar",
+      "manual": "Alleen als ik het vraag",
+      "manualInline": "alleen als ik het vraag",
+      "noUpdate": "Niet bijwerken",
+      "noUpdateInline": "werkt niet bij",
+      "inRoutines": "de routine staat in Routines",
+      "pinAsIs": "Blijft zoals hij is, zonder routine",
+      "pinRedoes": "{{name}} maakt hem {{schedule}} opnieuw met een routine",
+      "formatHints": {
+        "auto": "{{name}} kiest de vorm die het het best laat zien",
+        "kpi": "Eén groot getal en hoe het veranderde",
+        "goal": "De voortgang naar een doel",
+        "bars": "Een paar waarden naast elkaar",
+        "line": "Hoe het veranderde in de tijd",
+        "list": "Een korte lijst met items",
+        "text": "Een paar zinnen die het samenvatten"
+      }
+    },
+    "pinTop": "Bovenaan vastzetten",
+    "unpin": "Losmaken",
+    "rename": "Hernoemen",
+    "about": "Beschrijving",
+    "aboutPlaceholder": "Waar dit dashboard voor is",
+    "delete": {
+      "action": "Dashboard verwijderen",
+      "title": "“{{title}}” verwijderen?",
+      "text": "De widgets en hun routines gaan ook weg.",
+      "confirm": "Verwijderen",
+      "done": "“{{title}}” verwijderd"
+    },
+    "errors": {
+      "notFound": "Dit dashboard bestaat niet, of je ziet het niet.",
+      "forbidden": "Alleen wie dit dashboard bewerkt, kan dat doen.",
+      "homeFixed": "Je start wordt niet gedeeld of verwijderd.",
+      "rolesRequired": "Kies minstens één rol.",
+      "roleUnknown": "Een van deze rollen bestaat niet meer in de werkruimte.",
+      "titleRequired": "Geef het dashboard een naam.",
+      "tooMany": "De werkruimte heeft het maximale aantal dashboards. Verwijder er eerst een.",
+      "publishForbidden": "Met je rollen kun je geen dashboards aan anderen tonen.",
+      "proposalNone": "Over dat verzoek is al beslist.",
+      "proposalNotYours": "Alleen de persoon die de agent het vroeg, beslist.",
+      "widgetNotFound": "Deze widget bestaat niet meer.",
+      "widgetTooMany": "Dit dashboard is vol. Verwijder een widget of gebruik een ander dashboard.",
+      "scheduledCap": "De werkruimte houdt al {{max}} widgets volgens schema actueel. Laat er een alleen op verzoek bijwerken, of verwijder er een.",
+      "agentUnreachable": "Je kunt niet met deze agent praten.",
+      "agentArchived": "Deze agent is gearchiveerd.",
+      "blockNotFound": "Die grafiek staat niet meer in het bericht.",
+      "notAgentMessage": "Alleen de grafiek van een agent kan worden vastgezet.",
+      "promptRequired": "Zeg wat de widget moet tonen.",
+      "notTested": "Test hem eerst: de widget wordt gemaakt zodra de test lukt."
     }
   }
 }

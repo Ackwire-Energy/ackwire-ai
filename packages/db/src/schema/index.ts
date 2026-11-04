@@ -5,6 +5,7 @@ export * from "./browser";
 export * from "./chat";
 export * from "./connectors";
 export * from "./context";
+export * from "./dashboards";
 export * from "./databases";
 export * from "./early-access";
 export * from "./forum";

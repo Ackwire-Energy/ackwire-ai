@@ -81,6 +81,7 @@
   },
   "tabs": {
     "chats": "채팅",
+    "dashboards": "대시보드",
     "threads": "스레드",
     "agents": "에이전트",
     "activity": "활동",
@@ -1631,5 +1632,71 @@
     "noEmoji": "이모지 없음",
     "cleared": "상태를 지웠어요",
     "bySelfUntil": "{{name}} 작성 · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "나만 · 내 위젯",
+    "loadFailed": "대시보드를 불러오지 못했어요.",
+    "onlyHome": "워크스페이스나 내 역할의 대시보드가 여기에 표시돼요.",
+    "create": "만들기",
+    "routineTarget": "해당 위젯",
+    "pin": {
+      "which": "어떤 차트"
+    },
+    "organize": {
+      "hint": "위젯을 길게 눌러 새 위치로 끌거나 화살표를 사용하고, 각각의 크기를 고르세요. 완료를 누르면 순서가 저장돼요.",
+      "holdHint": "길게 눌러 끌면 옮길 수 있어요.",
+      "up": "위로 이동",
+      "down": "아래로 이동",
+      "position": "{{count}}개 중 {{at}}번째",
+      "saved": "대시보드를 정리했어요"
+    },
+    "edit": {
+      "saved": "대시보드를 저장했어요"
+    },
+    "pinned": "맨 위에 고정했어요",
+    "unpinned": "고정을 해제했어요",
+    "sizeHint": {
+      "s": "휴대폰에서는 한 줄의 절반, 웹에서는 대시보드의 4분의 1.",
+      "m": "휴대폰에서는 한 줄 전체, 웹에서는 대시보드의 절반.",
+      "l": "한 줄 전체를 크게 표시. 웹에서는 대시보드의 절반에 높이는 두 배."
+    },
+    "widget": {
+      "caresFor": "{{name}}이(가) 맡고 있어요",
+      "refreshing": "{{name}}이(가) 업데이트하고 있어요.",
+      "scheduleSaved": "이제 {{schedule}} 업데이트해요",
+      "alertSaved": "알림을 저장했어요",
+      "removed": "위젯을 제거했어요. 루틴이 멈췄어요.",
+      "routine": "루틴",
+      "onBoard": "위치",
+      "title": "제목",
+      "titlePlaceholder": "위젯의 짧은 이름",
+      "titleSaved": "제목을 저장했어요"
+    },
+    "formatAuto": "{{name}}이(가) 가장 좋은 걸 골라요",
+    "newWidget": {
+      "titleHint": "제목 · 테스트할 때 {{name}}이(가) 제안해요",
+      "alerts": "알림 켜짐",
+      "realData": "실제 데이터",
+      "editAsk": "요청 바꾸기",
+      "asked": "“{{ask}}”",
+      "autoFormat": "자동 형식"
+    },
+    "agentPick": {
+      "search": "에이전트 검색",
+      "noMatch": "그 이름이나 역할의 에이전트가 없어요.",
+      "note": "각 에이전트는 접근 권한이 있는 앱만 읽어요.",
+      "reads": "{{apps}}을(를) 읽어요",
+      "noApps": "연결된 앱 없음"
+    },
+    "notice": {
+      "widget_alert_other": "{{names}}이(가) 위젯에 알림을 보냈어요",
+      "widget_failed_other": "{{names}}이(가) 위젯을 업데이트하지 못했어요",
+      "dashboard_proposal_other": "{{names}}이(가) 대시보드를 게시하려고 해요",
+      "card": {
+        "alert": "알림",
+        "failed": "업데이트되지 않음",
+        "proposal": "대시보드"
+      }
+    }
   }
 }

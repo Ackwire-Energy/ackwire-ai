@@ -86,6 +86,7 @@
   },
   "tabs": {
     "chats": "Sohbetler",
+    "dashboards": "Panolar",
     "threads": "İleti dizileri",
     "agents": "Ajanlar",
     "activity": "Etkinlik",
@@ -1713,5 +1714,74 @@
     "noEmoji": "Emoji yok",
     "cleared": "Durum temizlendi",
     "bySelfUntil": "Yazan: {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Yalnızca siz · kendi widget'larınız",
+    "loadFailed": "Panolar yüklenemedi.",
+    "onlyHome": "Çalışma alanının ya da rollerinizin panoları burada görünür.",
+    "create": "Oluştur",
+    "routineTarget": "widget'ı",
+    "pin": {
+      "which": "Hangi grafik"
+    },
+    "organize": {
+      "hint": "Bir widget'a basılı tutup yeni yerine sürükleyin ya da okları kullanın ve her birinin boyutunu seçin. Bitti sırayı kaydeder.",
+      "holdHint": "Taşımak için basılı tutup sürükleyin.",
+      "up": "Yukarı taşı",
+      "down": "Aşağı taşı",
+      "position": "{{at}}/{{count}}",
+      "saved": "Pano düzenlendi"
+    },
+    "edit": {
+      "saved": "Pano kaydedildi"
+    },
+    "pinned": "En üste sabitlendi",
+    "unpinned": "Sabitleme kaldırıldı",
+    "sizeHint": {
+      "s": "Telefonda yarım satır, web'de panonun dörtte biri.",
+      "m": "Telefonda tam satır, web'de panonun yarısı.",
+      "l": "Tam satır, büyük çizilir. Web'de panonun yarısı ve iki kat yüksek."
+    },
+    "widget": {
+      "caresFor": "Onunla {{name}} ilgileniyor",
+      "refreshing": "{{name}} onu güncelliyor.",
+      "scheduleSaved": "Artık {{schedule}} güncelleniyor",
+      "alertSaved": "Uyarı kaydedildi",
+      "removed": "Widget kaldırıldı. Rutini durdu.",
+      "routine": "Rutini",
+      "onBoard": "Bulunduğu yer",
+      "title": "Başlık",
+      "titlePlaceholder": "Widget için kısa bir ad",
+      "titleSaved": "Başlık kaydedildi"
+    },
+    "formatAuto": "En iyisini {{name}} seçer",
+    "newWidget": {
+      "titleHint": "Başlık · {{name}} testte bir tane önerir",
+      "alerts": "Uyarı açık",
+      "realData": "Gerçek veriler",
+      "editAsk": "İsteği değiştir",
+      "asked": "“{{ask}}”",
+      "autoFormat": "Otomatik biçim"
+    },
+    "agentPick": {
+      "search": "Ajan ara",
+      "noMatch": "Bu ad veya rolde ajan yok.",
+      "note": "Her ajan yalnızca erişim verilen uygulamaları okur.",
+      "reads": "{{apps}} okur",
+      "noApps": "Bağlı uygulama yok"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} bir widget için uyardı",
+      "widget_alert_other": "{{names}} bir widget için uyardı",
+      "widget_failed_one": "{{names}} bir widget'ı güncelleyemedi",
+      "widget_failed_other": "{{names}} bir widget'ı güncelleyemedi",
+      "dashboard_proposal_one": "{{names}} bir pano yayımlamak istiyor",
+      "dashboard_proposal_other": "{{names}} bir pano yayımlamak istiyor",
+      "card": {
+        "alert": "Uyarı",
+        "failed": "Güncellenmedi",
+        "proposal": "Pano"
+      }
+    }
   }
 }

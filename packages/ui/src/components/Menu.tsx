@@ -146,14 +146,20 @@ export function MenuSub({ icon, label, children }: { icon?: IconName; label: Rea
   );
 }
 
-/** An on/off item ("Mostrar canceladas"): a check at its end when on; the menu stays open. */
+/**
+ * An on/off item ("Mostrar canceladas"): a check at its end when on; the menu stays open, unless `closes` (a choice
+ * that settles the menu, beside checkable ones).
+ */
 export function MenuCheckboxItem({
   checked,
   onCheckedChange,
   icon,
   leading,
   children,
+  description,
   hint,
+  disabled,
+  closes = false,
 }: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
@@ -162,15 +168,21 @@ export function MenuCheckboxItem({
   /** In place of the icon: whose item it is (an agent's face, a person's avatar), as in `MenuItem`. */
   leading?: ReactNode;
   children: ReactNode;
+  /** A second line under its name (why it can't be picked). */
+  description?: ReactNode;
   /** Quiet text on the right (how many it shows). */
   hint?: ReactNode;
+  disabled?: boolean;
+  /** Picking it closes the menu. */
+  closes?: boolean;
 }) {
   return (
     <DropdownMenu.CheckboxItem
       className="ac-menu__item"
       checked={checked}
+      disabled={disabled}
       onCheckedChange={(v) => onCheckedChange(v === true)}
-      onSelect={(e) => e.preventDefault()}
+      onSelect={closes ? undefined : (e) => e.preventDefault()}
     >
       {leading ? (
         <span className="ac-menu__leading" aria-hidden="true">
@@ -179,7 +191,10 @@ export function MenuCheckboxItem({
       ) : (
         icon && <Icon name={icon} />
       )}
-      <span className="ac-menu__label">{children}</span>
+      <span className="ac-menu__label">
+        {children}
+        {description && <span className="ac-menu__desc">{description}</span>}
+      </span>
       {hint && <span className="ac-menu__hint">{hint}</span>}
       <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
         <path d="m5.5 10.5 3 3 6-7" />

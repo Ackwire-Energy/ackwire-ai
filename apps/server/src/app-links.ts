@@ -19,6 +19,8 @@ export const APP_LINK_PATHS = [
   "/reset-password",
   "/signup",
   "/org/*/home",
+  "/org/*/dashboards",
+  "/org/*/dashboards/*",
   "/org/*/c/*",
   "/org/*/dm/*",
   "/org/*/threads",

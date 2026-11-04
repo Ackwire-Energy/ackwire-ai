@@ -37,6 +37,13 @@ export interface PushStrings {
   desktopHandoffBody: string;
   secretTitle: (actor: string) => string;
   secretBody: string;
+  widgetAlertTitle: (actor: string, widget: string) => string;
+  widgetFailedTitle: (widget: string) => string;
+  /** Why a widget didn't update, by its coded reason (`widgets.failure.*` in the apps); others: `widgetFailedBody`. */
+  widgetFailedReasons: Record<string, string>;
+  widgetFailedBody: string;
+  dashboardProposalTitle: (actor: string) => string;
+  dashboardProposalBody: (dashboard: string) => string;
   joinRequestTitle: (name: string, org: string) => string;
   joinSuggestionTitle: (by: string, name: string, org: string) => string;
   joinRequestBody: string;
@@ -85,6 +92,23 @@ export const en: PushStrings = {
   desktopHandoffBody: "Open agentes.chat on a laptop to help.",
   secretTitle: (a) => `${a} needs a secret from you`,
   secretBody: "Tap to send it securely.",
+  widgetAlertTitle: (a, w) => (w ? `${a}: ${w}` : `${a} flagged a widget`),
+  widgetFailedTitle: (w) => (w ? `“${w}” didn't update` : "A widget didn't update"),
+  widgetFailedReasons: {
+    no_update: "The last update ended without data.",
+    budget_exceeded: "The agent reached its budget for the month.",
+    waiting_computer: "The agent's computer is away.",
+    waiting_plan: "The agent's plan is at its limit.",
+    waiting_budget: "The agent's budget is at its limit.",
+    missing_credential: "The agent has no AI key or plan to work with.",
+    timeout: "The update took too long.",
+    creator_left: "Whoever set it up left the workspace.",
+    creator_no_access: "Whoever set it up can no longer use it.",
+    failing: "It failed several times in a row and stopped.",
+  },
+  widgetFailedBody: "Tap to see why.",
+  dashboardProposalTitle: (a) => `${a} wants to publish a dashboard`,
+  dashboardProposalBody: (d) => (d ? `“${d}” · Tap to decide.` : "Tap to decide."),
   joinRequestTitle: (name, org) => `${name} asks to join ${org}`,
   joinSuggestionTitle: (by, name, org) => `${by} suggested ${name} for ${org}`,
   joinRequestBody: "Tap to approve or deny.",
