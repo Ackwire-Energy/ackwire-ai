@@ -1,6 +1,6 @@
 import { type AgentAudience, useAgentDetail, useAgentGroups, useSettings, useUsage } from "@agenteschat/client";
 import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
-import { audienceBlocked, audienceSummary } from "@agenteschat/client/lib/audience";
+import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
@@ -23,7 +23,7 @@ import {
   SettingRow,
   Switch,
 } from "@agenteschat/ui";
-import { type CSSProperties, type ReactNode, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -234,14 +234,8 @@ export function SettingsTab({
   );
   const look = draft.look;
   const coordination = coordinatorNote(t, dir.agents, agent.id, draft.coordinator);
-  // On a plan (ADR 0059 §5) only its owner lets more people in.
   const onPlan = engineOfBrain(agent.brain?.kind) !== "agent";
-  const [blocked, setBlocked] = useState(false);
-  const chooseAudience = (next: AgentAudience) => {
-    if (audienceBlocked(agent, next, me.user.id)) return setBlocked(true);
-    setBlocked(false);
-    set("audience", next);
-  };
+  const chooseAudience = (next: AgentAudience) => set("audience", next);
   return (
     <>
       <ReadOnlyNote />
@@ -457,11 +451,6 @@ export function SettingsTab({
                   idPrefix="agp-audience"
                   onPlan={onPlan}
                 />
-                {blocked && (
-                  <SettingNote icon="lock" live>
-                    {t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })}
-                  </SettingNote>
-                )}
                 {errors.audience && (
                   <span className="newag__err" role="alert">
                     <Icon name="info" size={14} />

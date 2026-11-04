@@ -200,7 +200,7 @@ function useTargetLabel() {
   const { org } = useOrg();
   const channels = useChannels(org.id);
   const dms = useDms(org.id);
-  // A widget's routine (ADR 0134) is named by its widget's title when the caller has it.
+  // A widget's routine (ADR 0135) is named by its widget's title when the caller has it.
   return (target: RoutineTarget, widgetTitle?: string) => {
     if (target.type === "channel") {
       const c = channels.data?.find((x) => x.id === target.channelId);
@@ -479,7 +479,7 @@ export function RoutinesPage() {
 }
 
 /**
- * A widget's own routine (ADR 0134 §4): it redoes its widget in place, so its agent, schedule, instructions and
+ * A widget's own routine (ADR 0135 §4): it redoes its widget in place, so its agent, schedule, instructions and
  * target change from the widget; here it can be paused, resumed, run, stopped or deleted.
  */
 const isWidgetRoutine = (r: Pick<Routine, "target">) => r.target.type === "widget";
@@ -726,7 +726,7 @@ function RoutineRow({
   const look = useLook()(r.agentId);
   const agent = { type: "agent" as const, id: r.agentId };
   const widget = isWidgetRoutine(r) ? r.widget : null;
-  // A widget's routine reads as its widget (ADR 0134 §4).
+  // A widget's routine reads as its widget (ADR 0135 §4).
   const title = widget?.title || routineTitle(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const done = isDoneOnce(r);
@@ -1786,7 +1786,7 @@ function RoutineAside({
           {t("widgets.notice.openWidget")}
         </Link>
       )}
-      {/* A widget's update never posts, so what it reports doesn't apply (ADR 0134 §5). */}
+      {/* A widget's update never posts, so what it reports doesn't apply (ADR 0135 §5). */}
       {isWidgetRoutine(r) ? null : edits ? (
         <Field label={t("routines.panel.report")} id={`rt-report-${r.id}`} hint={reportHint}>
           <Select

@@ -8,7 +8,7 @@ import {
   type MailAdapters,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(async () => {
@@ -166,6 +166,51 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   expect(((await (await api("/mail/accounts")).json()) as { accounts: unknown[] }).accounts).toHaveLength(1);
   const scopes = await t.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.connectionId, account.id));
   expect(scopes).toEqual([]);
+});
+
+test("before an admin lets more people talk to an agent, the apps learn whose mailbox it would lose, and keep it", async () => {
+  const fake = fakeMail();
+  t = await createTestServer({ mail: fake.mail });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const carla = await joinByInvitation(t, owner, orgId, "carla@example.com", { role: "admin" });
+  const org = `/api/app/organizations/${orgId}`;
+  const created = await owner(`${org}/mail/accounts/imap`, {
+    json: { preset: "icloud", address: "support@example.com", password: "abcd-efgh-ijkl" },
+  });
+  const { account } = (await created.json()) as { account: { id: string } };
+  await owner(`${org}/agents/${agentId}`, { method: "PATCH", json: { audience: { mode: "owner", userIds: [] } } });
+  const put = await owner(`${org}/agents/${agentId}/mail/${account.id}`, {
+    method: "PUT",
+    json: emailCardSave(undefined, "read"),
+  });
+  expect(put.status).toBe(200);
+
+  const loss = (who: typeof owner) =>
+    who(`${org}/agents/${agentId}/audience/mail-loss`, { json: { audience: { mode: "everyone", userIds: [] } } });
+  const asked = await loss(carla);
+  expect(asked.status).toBe(200);
+  expect(await asked.json()).toMatchObject({
+    mailboxes: [{ accountId: account.id, address: "support@example.com", ownerName: "owner" }],
+  });
+  // Its own mailbox stays with the person widening it; asking took nothing.
+  expect(await (await loss(owner)).json()).toEqual({ mailboxes: [] });
+  const after = (await (await owner(`${org}/agents/${agentId}/mail`)).json()) as {
+    mailboxes: { accountId: string; level: string }[];
+  };
+  expect(after.mailboxes.find((x) => x.accountId === account.id)?.level).toBe("read");
+
+  // Saving with what she was asked before the mailbox came: refused, nothing changes; with it, saved.
+  const save = (mailLossSeen: string[]) =>
+    carla(`${org}/agents/${agentId}`, {
+      method: "PATCH",
+      json: { audience: { mode: "everyone", userIds: [] }, mailLossSeen },
+    });
+  const stale = await save([]);
+  expect(stale.status).toBe(409);
+  expect(await stale.json()).toMatchObject({ error: { code: "agent.mail_loss_changed" } });
+  expect((await save([account.id])).status).toBe(200);
 });
 
 /** What the agent page's Email card (MailAccess.tsx) sends: its draft from the GET answer, with the level picked. */

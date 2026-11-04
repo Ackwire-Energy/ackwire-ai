@@ -307,6 +307,18 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     orgName: "Souza Bakery",
     url: `${APP}/org/${ORG}/settings/apps`,
   },
+  /** An admin let everyone talk to an agent on its owner's plan that answered a person and a role. */
+  "plan_opened.en": {
+    kind: "plan_opened",
+    locale: "en",
+    orgName: "Souza Bakery",
+    byName: "Carlos Souza",
+    agentName: "Ada",
+    plan: "Claude",
+    was: { mode: "people", names: ["Design", "Bia Lima"] },
+    now: { mode: "everyone", names: [] },
+    url: `${APP}/org/${ORG}/agents/${ORG}?tab=settings&sec=audience`,
+  },
   /** Two workspaces closed with it, on a server with a support address. */
   "account_deleted.en": {
     kind: "account_deleted",

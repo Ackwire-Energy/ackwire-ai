@@ -20,7 +20,7 @@ export interface PushOpenData {
   missionId?: string;
   handoffId?: string;
   messageId?: string;
-  /** A board's notice (ADR 0134), when the push names its board and widget. */
+  /** A board's notice (ADR 0135), when the push names its board and widget. */
   dashboardId?: string;
   widgetId?: string;
 }
@@ -125,7 +125,7 @@ export function fallbackTarget(data: PushOpenData): OpenTarget | null {
   if (kind === "machine_connected" || kind === "computer_ready")
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   if (kind && ROUTINE_TROUBLE.has(kind as NotificationKind)) return { to: "/org/$orgId/routines" };
-  // A board's notice (ADR 0134): its board with the widget open when the push names them, else the boards.
+  // A board's notice (ADR 0135): its board with the widget open when the push names them, else the boards.
   if (kind && WIDGET_NOTICES.has(kind as NotificationKind))
     return data.dashboardId
       ? {

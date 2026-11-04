@@ -19,7 +19,7 @@ import { getAgent } from "./agents";
 import { decidesAgentApprovals } from "./approval-rules";
 import { cancelRoutineAhead, type RoutineAheadView, routinesAhead } from "./approvals";
 import type { ArtifactDeps } from "./artifacts";
-import { audienceError, canTalkTo, speakerFor, speakerOf } from "./audience";
+import { audienceError, audienceSql, canTalkTo, speakerFor, speakerOf } from "./audience";
 import { recordAudit } from "./audit";
 import { UUID } from "./authority";
 import { brainOf } from "./brain-settings";
@@ -136,7 +136,7 @@ export type RoutineTarget =
   /** Opens a forum topic each time (ADR 0022): the prompt is its goal, these agents discuss it. */
   | { type: "forum"; agentIds: string[]; rounds?: number }
   /**
-   * Redoes a widget in place (ADR 0134 §4): its runs speak only through `update_widget`. Its schedule, instructions
+   * Redoes a widget in place (ADR 0135 §4): its runs speak only through `update_widget`. Its schedule, instructions
    * and name follow the widget (`syncWidgetRoutine`); people change them from the widget, never here.
    */
   | { type: "widget"; widgetId: string; dashboardId: string };
@@ -344,7 +344,7 @@ export interface RoutineView {
   usage: { runs: number; tokens: number; costNanoUsd: number; billedTo: "api" | "plan" | "mixed" };
   /** Actions approved ahead for its runs (or waiting to be) that may still run, soonest first; readers only. */
   ahead: RoutineAheadView[];
-  /** A widget's routine (ADR 0134 §4): the widget it redoes, which it opens; absent for any other routine. */
+  /** A widget's routine (ADR 0135 §4): the widget it redoes, which it opens; absent for any other routine. */
   widget?: { id: string; dashboardId: string; title: string } | null;
 }
 
@@ -426,7 +426,7 @@ const widgetBoardOf = (r: RoutineRow) => {
 };
 
 /**
- * Routines lists a widget's routine only while the widget updates on a schedule (ADR 0134 §4): one that updates only
+ * Routines lists a widget's routine only while the widget updates on a schedule (ADR 0135 §4): one that updates only
  * when asked has no slot of its own to show.
  */
 const listedInRoutines = (r: RoutineRow) => targetOf(r).type !== "widget" || Boolean(r.cron);
@@ -898,7 +898,7 @@ async function views(
   );
   const machineName = new Map(machineRows.map((m) => [m.id, m.name]));
   const agentById = new Map(agentRows.map((a) => [a.id, a]));
-  // A widget's routine is shown with its widget (ADR 0134 §4).
+  // A widget's routine is shown with its widget (ADR 0135 §4).
   const widgetIds = [...new Set(rows.map(widgetIdOf).filter(Boolean))];
   const widgetRows = await lookup(widgetIds, () =>
     db
@@ -1291,7 +1291,7 @@ async function checkRoutineCap(db: Database, orgId: string, agentId: string, exc
         isNull(routines.deletedAt),
         ne(routines.triggerType, "once"),
         sql`coalesce(${routines.target}->>'reminder', 'false') <> 'true'`,
-        // A widget's routine counts in the workspace's cap of scheduled widgets instead (ADR 0134 §7).
+        // A widget's routine counts in the workspace's cap of scheduled widgets instead (ADR 0135 §7).
         sql`coalesce(${routines.target}->>'type', '') <> 'widget'`,
         exceptId ? ne(routines.id, exceptId) : undefined,
       ),
@@ -1460,7 +1460,7 @@ export async function listRoutines(db: Database, actorId: string, orgId: string,
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
   const sees = await routineSeer(db, orgId, actorId);
-  // A widget's routine shows only to who sees its board (ADR 0134 §8): a private board's are its owner's alone.
+  // A widget's routine shows only to who sees its board (ADR 0135 §8): a private board's are its owner's alone.
   const boardIds = [...new Set(rows.map(widgetBoardOf).filter(Boolean))];
   const viewer = viewerOf(membership, actorId);
   const boards = await lookup(boardIds, () =>
@@ -1606,7 +1606,7 @@ export async function updateRoutine(
   const { db } = deps;
   const current = await loadRoutine(db, orgId, id);
   await requireRoutineEditor(db, actorId, orgId, current);
-  // A widget's routine follows its widget (ADR 0134 §4): only pausing and resuming it happen here.
+  // A widget's routine follows its widget (ADR 0135 §4): only pausing and resuming it happen here.
   if (
     targetOf(current).type === "widget" &&
     (patch.name !== undefined ||
@@ -1771,7 +1771,7 @@ export async function updateRoutine(
   return view as RoutineView;
 }
 
-/** Why a widget's routine isn't changed here (ADR 0134 §4). */
+/** Why a widget's routine isn't changed here (ADR 0135 §4). */
 export const WIDGET_ROUTINE_FIXED = "This routine keeps a widget up to date: change it from its widget";
 
 /** Deletes a routine: it never fires again and its work in progress stops (§6.7); its run history stays. */
@@ -1808,7 +1808,7 @@ async function dropRoutine(deps: RoutineDeps, actorId: string, current: RoutineR
     .set({ active: false, nextRunAt: null, deletedAt: new Date(), updatedAt: new Date() })
     .where(eq(routines.id, current.id));
   await haltRoutineRuns(deps, orgId, current.id, { code: "deleted", byUserId: actorId });
-  // Its widget stays, updating only when asked (ADR 0134 §4).
+  // Its widget stays, updating only when asked (ADR 0135 §4).
   if (targetOf(current).type === "widget") await widgetRoutineGone(deps, orgId, current.id);
   await cancelRoutineAhead(deps, orgId, current.id, actorId);
   // A mail routine's watch (and its Composio trigger) goes with it.
@@ -1837,7 +1837,7 @@ export async function duplicateRoutine(
   const { db } = deps;
   const current = await loadRoutine(db, orgId, id);
   await requireRoutineManager(db, actorId, orgId, current.agentId);
-  // A widget has one routine (ADR 0134 §4): a copy would redo it twice.
+  // A widget has one routine (ADR 0135 §4): a copy would redo it twice.
   if (targetOf(current).type === "widget") throw new ForbiddenError(WIDGET_ROUTINE_FIXED, "routine.widget_fixed");
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
@@ -2110,7 +2110,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   };
   const [routine] = await db.select().from(routines).where(eq(routines.id, run.routineId));
   if (!routine || routine.deletedAt) return skip("deleted");
-  // A widget's change request is a person's ask too: it runs while a person keeps that routine paused (ADR 0134 §6).
+  // A widget's change request is a person's ask too: it runs while a person keeps that routine paused (ADR 0135 §6).
   if (!routine.active && run.trigger !== "manual" && !isWidgetChangeRun(run)) return skip("paused");
   // Its workspace is on hold or suspended, or its agent held: the slot passes, the routine keeps its
   // schedule (`standing.ts`).
@@ -2118,7 +2118,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   if (refusal) return skip(refusal.code.replace(".", "_"));
   const paused = async (reason: RoutinePausedReason) => {
     await pauseRoutine(deps, routine, reason);
-    // A widget's routine says it on its widget (ADR 0134 §6).
+    // A widget's routine says it on its widget (ADR 0135 §6).
     if (targetOf(routine).type === "widget") await widgetRoutineHeld(deps, routine, reason).catch(() => {});
     return skip(reason);
   };
@@ -2220,7 +2220,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     return;
   }
 
-  // A widget's refresh (ADR 0134 §4): its widget and board are still there and its creator still sees the board.
+  // A widget's refresh (ADR 0135 §4): its widget and board are still there and its creator still sees the board.
   let widget: RoutineBrief["widget"];
   if (target.type === "widget") {
     const firing = await widgetFiring(db, routine.orgId, target, creator, membership);
@@ -2233,6 +2233,12 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   let deliverTo: RoutineBrief["deliverTo"];
   if (target.type === "channel" || target.type === "conversation") {
     if (!(await personCanPost(db, routine.orgId, creator, target.channelId))) return paused("creator_no_access");
+    // Its run is the creator calling the agent there: a channel exception that takes that away pauses it (ADR 0134).
+    const [talks] = await db
+      .select({ ok: audienceSql("agents", sql`${creator}::text`, { channelId: sql`${target.channelId}::uuid` }) })
+      .from(agents)
+      .where(eq(agents.id, agent.id));
+    if (!talks?.ok) return paused("audience");
     const [member] = await db
       .select({ id: channelMembers.id })
       .from(channelMembers)

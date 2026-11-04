@@ -77,13 +77,12 @@ describe("uploaded files in the Drive", () => {
     await settle(8);
     const dialog = screen().getByRole("dialog", { name: "grafico.png" });
     expect(dialog.textContent).toContain("Arquivo");
-    expect(dialog.querySelector(".file-summary")?.textContent).toMatch(/grafico\.png7\s?(byte|B)/);
+    expect(dialog.querySelector(".ac-details__subtitle")?.textContent).toMatch(/7\s?(byte|B)/);
     const img = within(dialog).getByRole("img", { name: "Imagem: grafico.png" });
     expect(img.getAttribute("src")).toMatch(/^blob:preview-/);
     // Text kinds' Editar never shows for files; Baixar saves the original with its name.
     expect(within(dialog).queryByRole("button", { name: "Editar" })).toBeNull();
-    const downloads = within(dialog).getAllByRole("button", { name: "Baixar" });
-    await click(downloads[0] as HTMLElement);
+    await click(within(dialog).getByRole("button", { name: "Baixar" }));
     expect(saved[0]).toEqual({
       url: `/api/app/organizations/${ORG_ID}/artifacts/${file.id}/file?version=1`,
       name: "grafico.png",
@@ -216,22 +215,42 @@ describe("uploaded files in the Drive", () => {
   test("Enviar nova versão on a file I can edit", async () => {
     const state = seedState();
     const api = createFakeApi(state);
-    const file = await api.artifacts.upload(ORG_ID, png());
+    const csv = (name: string) => new File(["a,b\n1,2\n"], name, { type: "text/csv" });
+    const file = await api.artifacts.upload(ORG_ID, csv("vendas.csv"));
     await renderApp(`/org/${ORG_ID}/drive?artifact=${file.id}`, { api });
     await settle(8);
-    const dialog = screen().getByRole("dialog", { name: "grafico.png" });
+    const dialog = screen().getByRole("dialog", { name: "vendas.csv" });
     expect(within(dialog).getByRole("button", { name: "Enviar nova versão" })).toBeTruthy();
-    await choose(dialog.querySelector("input[data-upload-input]") as HTMLInputElement, [png("grafico-v2.png")]);
+    await choose(dialog.querySelector("input[data-upload-input]") as HTMLInputElement, [csv("vendas-v2.csv")]);
     await settle(6);
     expect(state.calls.find((c) => c.method === "artifacts.uploadVersion")?.args.slice(0, 3)).toEqual([
       ORG_ID,
       file.id,
-      "grafico-v2.png",
+      "vendas-v2.csv",
     ]);
     expect(screen().getByText("Versão 2 salva.")).toBeTruthy();
     const history = within(screen().getByRole("dialog")).getByRole("navigation", { name: "Versões" });
     expect(within(history).getAllByRole("button")).toHaveLength(2);
   });
+});
+
+test("a picture (an agent's screenshot): a big viewer, its details in the header, no file card, no versions", async () => {
+  const api = createFakeApi(seedState());
+  const file = await api.artifacts.upload(ORG_ID, png("tela.png"));
+  await renderApp(`/org/${ORG_ID}/drive?artifact=${file.id}`, { api });
+  await settle(8);
+  const dialog = screen().getByRole("dialog", { name: "tela.png" });
+  expect(dialog.classList.contains("ac-details--xl")).toBe(true);
+  // The title, its icon and details on the bar with the buttons, the size among the details.
+  const bar = dialog.querySelector(".ac-details__bar") as HTMLElement;
+  expect(bar.querySelector(".ac-details__title")?.textContent).toBe("tela.png");
+  expect(bar.querySelector(".ac-details__subtitle")?.textContent).toBe(
+    "Arquivo · Walter · sem canal · agora · 7 bytes",
+  );
+  expect(within(bar).getByRole("button", { name: "Baixar" })).toBeTruthy();
+  expect(dialog.querySelector(".file-view__head, .file-summary")).toBeNull();
+  expect(within(dialog).queryByRole("button", { name: "Enviar nova versão" })).toBeNull();
+  expect(within(dialog).queryByRole("navigation", { name: "Versões" })).toBeNull();
 });
 
 describe("Configurações → Computadores", () => {

@@ -54,7 +54,7 @@ export const isReminder = (r: Pick<Routine, "target">) =>
 
 /**
  * A title for the row: a routine made from a chat message may be named with its whole prompt; a widget's routine is
- * its widget's title (ADR 0134).
+ * its widget's title (ADR 0135).
  */
 export function routineTitle(r: Pick<Routine, "name" | "prompt"> & Partial<Pick<Routine, "widget">>): string {
   if (r.widget?.title) return r.widget.title;

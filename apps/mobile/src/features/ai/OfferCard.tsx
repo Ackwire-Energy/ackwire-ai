@@ -5,8 +5,15 @@ import {
   useConnections,
   useCustomServers,
   useMembers,
+  useSkills,
 } from "@agenteschat/client";
-import { actionCardOf, connectAppDone, inviteDone } from "@agenteschat/client/lib/action-cards";
+import {
+  actionCardOf,
+  connectAppDone,
+  installSkillDone,
+  inviteDone,
+  skillUpdateState,
+} from "@agenteschat/client/lib/action-cards";
 import { connectedItems } from "@agenteschat/client/lib/connected";
 import { hostOf } from "@agenteschat/client/lib/import/shared";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -28,6 +35,8 @@ export function OfferCard({ message: m }: { message: Message }) {
   if (m.author.type !== "agent" || !card) return null;
   if (card.kind === "connect_app") return <ConnectApp card={card} />;
   if (card.kind === "invite_people") return <Invite card={card} />;
+  if (card.kind === "install_skill") return <InstallSkill card={card} />;
+  if (card.kind === "update_skills") return <UpdateSkills card={card} postedAt={m.createdAt} />;
   return null;
 }
 
@@ -84,6 +93,53 @@ function Invite({ card }: { card: Extract<Card, { kind: "invite_people" }> }) {
   );
 }
 
+function InstallSkill({ card }: { card: Extract<Card, { kind: "install_skill" }> }) {
+  const { t } = useTranslation();
+  const { orgId, org } = useOrg();
+  const may = can(org, "manage_agents");
+  const skills = useSkills(orgId, may);
+  return (
+    <Shell
+      icon="brain"
+      title={t("actionCard.install_skill.title")}
+      why={card.why}
+      detail={card.url}
+      done={installSkillDone(card, skills.data ?? []) ? `${t("actionCard.install_skill.done")}: ${card.url}` : null}
+      action={may ? t("actionCard.install_skill.open") : null}
+      onAction={() => router.push(`/settings/skills/new?url=${encodeURIComponent(card.url)}` as never)}
+      blocked={t("actionCard.install_skill.adminOnly")}
+    />
+  );
+}
+
+/** The web's update card: the skills by name, Revisar opening the first one not done (its waiting update first). */
+function UpdateSkills({ card, postedAt }: { card: Extract<Card, { kind: "update_skills" }>; postedAt: string }) {
+  const { t } = useTranslation();
+  const { orgId, org } = useOrg();
+  const skills = useSkills(orgId, true);
+  const rows = card.skillIds.map((id) => {
+    const skill = skills.data?.find((s) => s.id === id);
+    return { id, name: skill?.name ?? "", state: skillUpdateState(skill, postedAt) };
+  });
+  const next = rows.find((r) => r.state === "waiting") ?? rows.find((r) => r.state === "open");
+  const names = rows
+    .map((r) => r.name)
+    .filter(Boolean)
+    .join(", ");
+  return (
+    <Shell
+      icon="brain"
+      title={t("actionCard.update_skills.title", { count: rows.length })}
+      why={card.why}
+      detail={names}
+      done={skills.data && !next ? `${t("actionCard.update_skills.done")}: ${names}` : null}
+      action={can(org, "manage_agents") ? t("actionCard.update_skills.review") : null}
+      onAction={() => router.push(`/settings/skills/${next?.id ?? ""}` as never)}
+      blocked={t("actionCard.update_skills.adminOnly")}
+    />
+  );
+}
+
 function Shell({
   icon,
   title,
@@ -94,7 +150,7 @@ function Shell({
   onAction,
   blocked,
 }: {
-  icon: "globe" | "person";
+  icon: "globe" | "person" | "brain";
   title: string;
   why: string;
   detail?: string;

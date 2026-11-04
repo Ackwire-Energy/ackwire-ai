@@ -48,7 +48,7 @@ const {
 } = schema;
 
 /**
- * How a widget is redone (ADR 0134 §4–§6): a routine of its own (`routines.target` `{ type: "widget", widgetId,
+ * How a widget is redone (ADR 0135 §4–§6): a routine of its own (`routines.target` `{ type: "widget", widgetId,
  * dashboardId }`) whose background run reads, then hands its data to `update_widget`, posting nothing in chat.
  */
 
@@ -104,7 +104,7 @@ async function widgetRow(db: Database, widgetId: string): Promise<WidgetRow> {
   return row;
 }
 
-/** The zone a widget's schedule is read in (ADR 0134 §7): its routine creator's, else the workspace's, else UTC. */
+/** The zone a widget's schedule is read in (ADR 0135 §7): its routine creator's, else the workspace's, else UTC. */
 async function zoneOf(db: Database, orgId: string, userId: string | null): Promise<string> {
   const [member] = userId
     ? await db
@@ -134,7 +134,7 @@ async function defaultCreator(db: Database, widget: WidgetRow, board: DashboardR
  * Makes the widget's routine match its row (at most one per widget: name = its title, prompt = its instructions,
  * created by `options.creatorUserId` ?? the widget's creator, access `act`, report `when_new`, trigger `schedule`). A
  * schedule other than `manual` sets `cron` = `WIDGET_SCHEDULE_CRON[schedule]` in its creator's time zone and its next
- * run (every schedule is 30 minutes apart at the least: the floor, ADR 0134 §7; anything else stored reads as
+ * run (every schedule is 30 minutes apart at the least: the floor, ADR 0135 §7; anything else stored reads as
  * `manual`). A `manual` widget keeps an existing routine with no next run (`cron` and `rule` null), and gets none
  * until a run is asked (`options.ensure`, as `refreshWidgetNow` does). Returns the routine's id (written to
  * `dashboard_widgets.routine_id`), or null when it has none. Widget routines don't count in `MAX_ACTIVE_ROUTINES`
@@ -148,7 +148,7 @@ export async function syncWidgetRoutine(
 ): Promise<string | null> {
   const { db } = deps;
   const { widget, board } = await loadWidget(db, orgId, widgetId);
-  // A draft's routine runs only its test build: never on a schedule (ADR 0134 §16).
+  // A draft's routine runs only its test build: never on a schedule (ADR 0135 §16).
   const schedule: WidgetSchedule = !widget.draft && isWidgetSchedule(widget.schedule) ? widget.schedule : "manual";
   const [existing] = widget.routineId
     ? await db
@@ -162,7 +162,7 @@ export async function syncWidgetRoutine(
     }
     return null;
   }
-  // An existing routine keeps its creator, even one who left (it pauses until an editor presses Resolve, ADR 0134 §6).
+  // An existing routine keeps its creator, even one who left (it pauses until an editor presses Resolve, ADR 0135 §6).
   const creator =
     options?.creatorUserId ?? (existing ? existing.createdByUserId : await defaultCreator(db, widget, board));
   const zone =
@@ -257,7 +257,7 @@ async function creatorFits(
 }
 
 /**
- * The widget's routine, made when missing, ready for a run a person asks for (ADR 0134 §6, "Resolve"): one whose
+ * The widget's routine, made when missing, ready for a run a person asks for (ADR 0135 §6, "Resolve"): one whose
  * creator left or can no longer talk to the agent or see the board is taken over by `actorId`, and one that paused
  * itself (`paused_reason`: failures, its creator gone) is resumed. One a person paused on purpose (in Routines:
  * inactive with no reason) stays paused: this run goes ahead once, the schedule waits for Resume in Routines. With
@@ -383,7 +383,7 @@ export async function askWidgetChange(
   return widgetView(deps.db, row);
 }
 
-/** Who hears a widget's alert (ADR 0134 §6): whoever set it (else its creator), while they still see its board. */
+/** Who hears a widget's alert (ADR 0135 §6): whoever set it (else its creator), while they still see its board. */
 async function alertRecipients(db: Database, orgId: string, widget: WidgetRow, board: DashboardRow) {
   const userId = widget.alertUserId ?? widget.createdByUserId;
   if (!userId) return [];
@@ -488,7 +488,7 @@ export async function applyWidgetUpdate(
   const spec = check.spec;
   const firstBuild = widget.spec === null || widget.kind === null;
   // The agent names it on its first build (a draft's test too) and on a change request, never over a person's title
-  // and never on a plain refresh (ADR 0134 §17). Too long is refused, never cut mid-word.
+  // and never on a plain refresh (ADR 0135 §17). Too long is refused, never cut mid-word.
   const naming = (firstBuild || change !== null) && !widget.titleSetByUser;
   const named = (update.title ?? "")
     .replace(/\s+/g, " ")
@@ -525,7 +525,7 @@ export async function applyWidgetUpdate(
   const prompt = change && update.prompt?.trim() ? update.prompt.trim().slice(0, WIDGET_PROMPT_MAX) : widget.prompt;
   // A change that asked for another kind moves a fixed format with it.
   const format = change && widget.format !== "auto" && spec.kind !== widget.format ? spec.kind : widget.format;
-  // A draft raises no alert: nobody is watching it yet (ADR 0134 §16).
+  // A draft raises no alert: nobody is watching it yet (ADR 0135 §16).
   const alert =
     widget.alertEnabled && !widget.draft && update.alert?.trim() ? update.alert.trim().slice(0, ALERT_MAX) : null;
   const summary = (update.summary ?? "").replace(/\s+/g, " ").trim().slice(0, SUMMARY_MAX);
@@ -563,7 +563,7 @@ export async function applyWidgetUpdate(
       createdAt: now,
     });
     await trimWidgetHistory(tx, orgId, widget.id);
-    // Its run reported: what it found reached people, in place (ADR 0134 §5).
+    // Its run reported: what it found reached people, in place (ADR 0135 §5).
     await tx
       .update(routineRuns)
       .set({ status: "reported", code: null, summary })

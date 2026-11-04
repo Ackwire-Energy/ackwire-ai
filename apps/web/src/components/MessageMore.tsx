@@ -104,7 +104,7 @@ export function useMessageMenu(
   const [picking, setPicking] = useState(false);
   const labels = useEmojiLabels();
   const pin = usePinMessage(org.id);
-  // An agent's chart can go on a board as a widget (ADR 0134): the first one the message has that reads as one.
+  // An agent's chart can go on a board as a widget (ADR 0135): the first one the message has that reads as one.
   const chart = useMemo(
     () =>
       message.author.type === "agent" && message.author.id && !message.local && !options.readOnly

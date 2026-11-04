@@ -16,6 +16,12 @@ test("the members column: 264px on the sidebar's surface, offline rows quieter, 
 
   expect(last(shipped, ".members-side", "width")).toBe("264px");
   expect(last(shipped, ".members-side", "background")).toBe("var(--side)");
+  // Inside the chat's main, beside the conversation's column and under the header (whose line spans both).
+  expect(last(shipped, ".members-side", "height")).toBeUndefined();
+  expect(last(shipped, ".channel__body", "display")).toBe("flex");
+  expect(last(shipped, ".channel__body", "min-height")).toBe("0");
+  expect(last(shipped, ".channel__col", "flex-direction")).toBe("column");
+  expect(last(shipped, ".channel__col", "min-width")).toBe("0");
   expect(last(shipped, ".members-side__inner[data-presence=offline]", "opacity")).toBe(".45");
   // The open card's row keeps the chosen plate, hover the lighter one.
   expect(last(shipped, ".members-side__row.profile-trigger[data-state=open]", "background")).toBe("var(--side-chosen)");
@@ -26,4 +32,20 @@ test("the members column: 264px on the sidebar's surface, offline rows quieter, 
   expect(last(phone, ".members-side", "display")).toBe("none");
   expect(last(shipped, ".members-sheet", "width")).toBe("86%");
   expect(last(phone, ".channel__acts>.channel__threads", "display")).toBe("none");
+});
+
+test("the column's add row: a 24px plus tile and 13px text, so it fits one line in the 264px column", async () => {
+  const shipped = topLevel(await builtCss("src/styles.css", "src/components/members/members.css"));
+  const last = (selector: string, property: string) =>
+    declarations(shipped, selector)
+      .filter(([p]) => p === property)
+      .at(-1)?.[1];
+  expect(last(".members-side__add", "font-size")).toBe("13px");
+  expect(last(".members-side__add", "padding")).toBe("5px 4px 5px 8px");
+  expect(last(".members-side__add", "gap")).toBe("8px");
+  expect(last(".members-side__add .member-row__plus", "width")).toBe("24px");
+  expect(last(".members-side__add .member-row__plus", "height")).toBe("24px");
+  expect(last(".members-side__add .member-row__plus .ac-icon", "width")).toBe("14px");
+  // The dialogs' add rows keep the 32px tile beside their 32px avatars.
+  expect(last(".member-row__plus", "width")).toBe("32px");
 });

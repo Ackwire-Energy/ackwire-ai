@@ -23,12 +23,14 @@ export type AppHref =
   | `/issues/${number}`
   | `/routines/${string}`
   | `/settings/computers/${string}`
+  | `/settings/skills/${string}`
   | `/consultation/${string}?channel=${string}`
   | "/routines"
   | "/issues"
   | "/connectors"
   | "/me/members"
   | "/settings/computers"
+  | "/settings/skills"
   | "/activity"
   | "/threads"
   | "/join-requests"
@@ -56,7 +58,7 @@ export const consultationHref = (consultationId: string, channelId: string): App
 export const routineHref = (routineId: unknown): AppHref =>
   isSafeId(routineId) ? `/routines/${routineId}` : "/routines";
 
-/** A dashboard (ADR 0134), "home" for My Home, or the Dashboards tab when the id isn't one. */
+/** A dashboard (ADR 0135), "home" for My Home, or the Dashboards tab when the id isn't one. */
 export const boardHref = (dashboardId: unknown): AppHref =>
   isSafeId(dashboardId) ? `/board/${dashboardId}` : "/dashboards";
 
@@ -235,13 +237,15 @@ export function notificationHref(
   if (n.kind === "invitation_accepted") return "/me/members";
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed") return "/connectors";
+  // An update of a skill from its link: the skill's page, where what waits is applied.
+  if (n.kind === "skill_update") return isSafeId(s.skillId) ? `/settings/skills/${s.skillId}` : "/settings/skills";
   if (n.kind === "machine_connected")
     return isSafeId(s.machineId) ? `/settings/computers/${s.machineId}` : "/settings/computers";
   // An agent held on agentes.chat Cloud: its page, where the hold shows. The workspace's own hold: the web's.
   if (n.kind === "org_standing") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";
-  // A widget's alert or failure opens the widget; an agent asking to publish a dashboard, the dashboard (ADR 0134).
+  // A widget's alert or failure opens the widget; an agent asking to publish a dashboard, the dashboard (ADR 0135).
   if (n.kind === "widget_alert" || n.kind === "widget_failed") return widgetHref(s.widgetId, s.dashboardId);
   if (n.kind === "dashboard_proposal") return boardHref(s.dashboardId);
   // A computer's disk is almost full (ADR 0115): that computer, where its shared folder's size shows.

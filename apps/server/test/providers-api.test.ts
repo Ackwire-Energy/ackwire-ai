@@ -174,4 +174,5 @@ test("an OpenRouter key: checked before it is stored, then its models listed, th
   expect(((await (await api("/settings")).json()) as { autoModels: unknown }).autoModels).toEqual({
     openrouter: { large: "anthropic/claude-sonnet-5.5" },
   });
-});
+  // About 2.5 s alone (a server, a sign-up's password hash, a dozen requests); past bun's 5 s default under a full run.
+}, 20_000);

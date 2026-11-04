@@ -1,9 +1,26 @@
-import { type Agent, type Message, useChannels, useUpdateAgent } from "@agenteschat/client";
-import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
+import {
+  type Agent,
+  type AgentAudience,
+  type ForeignMailbox,
+  type Message,
+  useChannels,
+  useRoles,
+  useWidenAudience,
+} from "@agenteschat/client";
+import {
+  audienceNotice,
+  audienceWith,
+  audienceWithMe,
+  canEditAudience,
+  modeOf,
+  opensOthersPlan,
+  widenQuestion,
+} from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Icon, PillButton, Text, useTheme, useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -88,7 +105,8 @@ export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string 
   const me = useMeId();
   const dir = useDirectory();
   const toast = useToast();
-  const update = useUpdateAgent(orgId, agent.id);
+  const save = useWidenAudience(orgId, agent.id);
+  const ask = useWidenAsk(agent);
   const person = dir.memberById.get(userId)?.name;
   const audience = audienceWith(agent, userId);
   if (!person || !audience || !me || modeOf(agent) === "everyone" || !canEditAudience(org ?? undefined, agent, me))
@@ -98,19 +116,105 @@ export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string 
     <PillButton
       label={t("reach.allow", { person, context: g.context })}
       onPress={() => {
-        if (update.isPending || update.isSuccess) return;
+        if (save.busy || save.done) return;
         tapHaptic();
-        update.mutate(
-          { audience },
-          { onSuccess: () => toast({ title: t("reach.allowed", { person, name: g.name }) }) },
-        );
+        save.widen(audience, ask(audience), () => toast({ title: t("reach.allowed", { person, name: g.name }) }));
       }}
     />
   );
 }
 
+/**
+ * "Quero falar com ele": who manages agents (or owns it) lets themselves into an agent that keeps them out. Nothing
+ * when it answers them already. On someone else's plan it asks first (`useWidenAsk`).
+ */
+export function LetMeTalkPill({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const { org } = useOrg();
+  const me = useMeId();
+  const toast = useToast();
+  const save = useWidenAudience(orgId, agent.id);
+  const ask = useWidenAsk(agent);
+  const audience = me ? audienceWithMe(org ?? undefined, agent, me) : null;
+  if (!audience) return null;
+  const g = agentGrammar(agent.name);
+  return (
+    <PillButton
+      label={t("reach.allowMe", g)}
+      onPress={() => {
+        if (save.busy || save.done) return;
+        tapHaptic();
+        save.widen(audience, ask(audience), () => toast({ title: t("reach.allowedMe", g) }));
+      }}
+    />
+  );
+}
+
+/**
+ * In place of the composer, in a conversation with an agent that doesn't answer me (who manages agents opens it): why,
+ * and "Quero falar com ele" when I may let myself in.
+ */
+export function AgentLocked({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const dir = useDirectory();
+  const roles = useRoles(useOrgId()).data?.roles;
+  const notice = audienceNotice(
+    t,
+    agent,
+    (id) => dir.memberById.get(id)?.name,
+    (id) => roles?.find((r) => r.id === id)?.name,
+  );
+  return (
+    <View style={styles.locked}>
+      <Text variant="small" tone="muted" style={styles.lockedText}>
+        {notice}
+      </Text>
+      <LetMeTalkPill agent={agent} />
+    </View>
+  );
+}
+
+/**
+ * The one question before a wider audience (`widenQuestion`), as an alert: on someone else's plan, that it uses their
+ * plan and they get an email, and the mailboxes other people gave the agent that it loses. `ask(next)(mailboxes)`
+ * answers whether to go on, at once when there is nothing to ask. Every save that widens an audience goes through it.
+ */
+export function useWidenAsk(agent: Agent | undefined) {
+  const { t } = useTranslation();
+  const dir = useDirectory();
+  const me = useMeId();
+  return (next: AgentAudience) =>
+    (mailboxes: ForeignMailbox[]): Promise<boolean> => {
+      if (!agent) return Promise.resolve(true);
+      const owner =
+        me && opensOthersPlan(agent, next, me)
+          ? (dir.memberById.get(agent.ownerUserId ?? "")?.name ?? t("channel.unknownPerson"))
+          : null;
+      return confirmQuestion(t, widenQuestion(t, agent, owner, mailboxes));
+    };
+}
+
+/** Asks `question` with Cancel and Continue (none: yes at once). */
+export function confirmQuestion(t: TFunction, question: { title: string; description: string } | null) {
+  if (!question) return Promise.resolve(true);
+  return new Promise<boolean>((answer) =>
+    Alert.alert(
+      question.title,
+      question.description,
+      [
+        { text: t("common.cancel"), style: "cancel", onPress: () => answer(false) },
+        { text: t("common.continue"), onPress: () => answer(true) },
+      ],
+      { cancelable: true, onDismiss: () => answer(false) },
+    ),
+  );
+}
+
 const styles = StyleSheet.create({
   list: { marginTop: 12, gap: 8 },
+  locked: { alignItems: "center", gap: 10, paddingVertical: 6 },
+  lockedText: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   one: {

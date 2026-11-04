@@ -1,5 +1,5 @@
 /*
- * Home (ADR 0108): the greeting, the ask composer, then the mural (ADR 0134): a 4-column board where "Waiting on
+ * Home (ADR 0108): the greeting, the ask composer, then the mural (ADR 0135): a 4-column board where "Waiting on
  * you" and "Working now" are fixed tiles among the person's widgets; what got done and what comes next under it.
  */
 .page--list.home {

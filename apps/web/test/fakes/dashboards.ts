@@ -1,5 +1,5 @@
 /**
- * Test fake — boards and widgets (ADR 0134), same shapes as the server's `…/dashboards/*`, `…/widgets/*` and
+ * Test fake — boards and widgets (ADR 0135), same shapes as the server's `…/dashboards/*`, `…/widgets/*` and
  * `…/widget-*` routes. Empty until a test adds boards (`fake.boards`) or calls the client; the home board is made on
  * first read. Every widget the fake makes starts as the server's would (`building` when asked of an agent, `ok` when
  * pinned) and stays so until a test changes it (`fake.finish`). Changes are logged; reads are not.

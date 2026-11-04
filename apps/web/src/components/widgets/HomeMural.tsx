@@ -17,14 +17,14 @@ export interface MuralTile {
   body: ReactNode;
 }
 
-/** Where Home's fixed tiles start, until the person's home board has come (ADR 0134 §9). */
+/** Where Home's fixed tiles start, until the person's home board has come (ADR 0135 §9). */
 const DEFAULT_TILES: HomeTile[] = [
   { key: "waiting", position: 0, w: 2, h: 1 },
   { key: "working", position: 3, w: 2, h: 1 },
 ];
 
 /**
- * Home as a mural (ADR 0134, on ADR 0108): "Waiting on you" and "Working now" are fixed tiles of the person's home
+ * Home as a mural (ADR 0135, on ADR 0108): "Waiting on you" and "Working now" are fixed tiles of the person's home
  * board, among their widgets, in its 4 columns. "Organize" drags and resizes; the header's "+" asks an agent for a
  * widget or pins a chart from the chat; a widget opens in its side panel (`?widget=<id>`).
  */

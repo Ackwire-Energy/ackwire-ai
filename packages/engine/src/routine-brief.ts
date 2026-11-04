@@ -45,7 +45,7 @@ export interface RoutineBrief {
   /** The slot it was due at (ISO); for a manual or event run, when it was asked. */
   dueAt: string;
   /**
-   * A widget's refresh (ADR 0134 §4–§5): the routine redoes this widget in place and speaks only through
+   * A widget's refresh (ADR 0135 §4–§5): the routine redoes this widget in place and speaks only through
    * `update_widget`, never in a conversation.
    */
   widget?: { widgetId: string; dashboardId: string };
@@ -72,7 +72,7 @@ export function routineBriefOf(meta: Record<string, unknown> | null | undefined)
   };
 }
 
-/** A brief's widget (ADR 0134 §4), when well formed. */
+/** A brief's widget (ADR 0135 §4), when well formed. */
 function widgetOf(raw: unknown): Pick<RoutineBrief, "widget"> {
   const w = raw as Partial<NonNullable<RoutineBrief["widget"]>> | undefined;
   if (!w || typeof w !== "object" || typeof w.widgetId !== "string" || typeof w.dashboardId !== "string") return {};

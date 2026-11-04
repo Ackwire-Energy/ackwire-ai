@@ -32,7 +32,7 @@ export interface WidgetBodyProps {
 }
 
 /**
- * What a widget draws (ADR 0134), by kind: one big number with how it moved and its trend, a goal's progress, bars,
+ * What a widget draws (ADR 0135), by kind: one big number with how it moved and its trend, a goal's progress, bars,
  * a line, a short list, a few sentences. Charts in the chat's style (a clean stroke over a 2px dither in the agent's
  * tones); numbers in the app's font, bold, tabular. Being built, the agent's dither moves under the words. A note
  * keeps to two lines and ends in an ellipsis past them (`wk-clamp`), never cut inside a word.

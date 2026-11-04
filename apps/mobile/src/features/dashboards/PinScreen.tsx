@@ -14,7 +14,7 @@ import { ChoiceChips, ScheduleChoice, SizeChoice } from "./parts";
 import { WidgetCard } from "./WidgetView";
 
 /**
- * "Pin to a dashboard", pushed from a message's actions (ADR 0134): the chart as a widget (which one, when the message
+ * "Pin to a dashboard", pushed from a message's actions (ADR 0135): the chart as a widget (which one, when the message
  * has several), whether its agent keeps it updated and how often (or "just pin" as it is), and where it goes. "Pin"
  * in the bar. The message's charts come from the actions (`setPinDraft`): a route can't carry them.
  */

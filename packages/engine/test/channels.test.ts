@@ -137,6 +137,17 @@ test("archiving a channel: creator or admin; access ends and subscribers are tol
   expect(events).toEqual([{ type: "channel.archived", orgId: f.org.id, channelId: eng.id }]);
 });
 
+test("joining a channel tells its members, so their members column shows the newcomer", async () => {
+  const member = await addMember(f.db, f.org.id, "member", "dani");
+  const eng = await createChannel(f.db, f.owner.id, f.org.id, { name: "eng" });
+  const events = f.listen(eng.id);
+  await joinChannel(f.db, member.id, f.org.id, eng.id, { pubsub: f.pubsub });
+  await Bun.sleep(5);
+  expect(events).toEqual([
+    { type: "channel.member_added", channelId: eng.id, member: { type: "person", id: member.id } },
+  ]);
+});
+
 test("adding members: creator or admin; agents need an admin or their owner; events and auto-reply", async () => {
   const bia = await addMember(f.db, f.org.id, "member", "bia");
   const caio = await addMember(f.db, f.org.id, "member", "caio");

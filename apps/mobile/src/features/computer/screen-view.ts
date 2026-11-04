@@ -124,3 +124,54 @@ export const followCursor = (camera: Point, s: number, cursor: Point, box: Size,
   else if (py > box.height - margin) y += (py - box.height + margin) / s;
   return boundCamera(x, y, s, box, desk);
 };
+
+/** How soon after a tap a touch that moves presses and drags: a trackpad's tap and drag. */
+export const TAP_DRAG_MS = 300;
+
+/**
+ * Pressing and dragging with one finger (selecting text, moving a window, a slider). A hold where the finger rests
+ * presses the left button, and so does a touch soon after a tap once it moves. The button is let go when the finger
+ * lifts, wherever it went: the hold's own gesture ends once the finger travels a few points, so the lift lets go,
+ * never the hold.
+ */
+export interface Drag {
+  /** When the last tap that clicked was; null is none, or one that only let go of a press. */
+  tapAt: number | null;
+  /** This touch: plain, `armed` (it came soon after a tap: moving presses), or `down` (the button is held). */
+  touch: "plain" | "armed" | "down";
+  /** This touch pressed the button: its tap is no click, since its lift lets go. Kept until the next touch. */
+  pressed: boolean;
+}
+
+export const DRAG_REST: Drag = { tapAt: null, touch: "plain", pressed: false };
+
+/** What a finger did: came down, started moving, held still, tapped (a quick lift), lifted (any end). */
+export type DragEvent = "touch" | "move" | "hold" | "tap" | "lift";
+
+/** What goes to the screen: the button pressed or let go where the cursor is, or a click. */
+export type DragAct = "press" | "release" | "click" | null;
+
+/** The next state of the finger's drag, and what it sends. The tap and the lift may come in either order. */
+export const dragStep = (d: Drag, event: DragEvent, at: number): { drag: Drag; act: DragAct } => {
+  "worklet";
+  switch (event) {
+    case "touch": {
+      const soon = d.tapAt !== null && at - d.tapAt <= TAP_DRAG_MS;
+      // A lift that never came lets go first.
+      return {
+        drag: { tapAt: d.tapAt, touch: soon ? "armed" : "plain", pressed: false },
+        act: d.touch === "down" ? "release" : null,
+      };
+    }
+    case "move":
+      if (d.touch !== "armed") return { drag: d, act: null };
+      return { drag: { ...d, touch: "down", pressed: true }, act: "press" };
+    case "hold":
+      if (d.touch === "down") return { drag: d, act: null };
+      return { drag: { ...d, touch: "down", pressed: true }, act: "press" };
+    case "tap":
+      return d.pressed ? { drag: { ...d, tapAt: null }, act: null } : { drag: { ...d, tapAt: at }, act: "click" };
+    case "lift":
+      return { drag: { ...d, touch: "plain" }, act: d.touch === "down" ? "release" : null };
+  }
+};

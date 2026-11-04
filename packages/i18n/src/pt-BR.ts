@@ -383,6 +383,8 @@ export const ptBR = {
       name: "Prazer. Esse e-mail é novo por aqui.",
       nameLead: "Como o time te chama?",
       namePlaceholder: "Seu nome",
+      nameIsPassword: "Esse é o seu nome? É igual à senha que você digitou.",
+      nameLooksLikePassword: "Isso parece uma senha. Aqui vai o seu nome.",
       newPassword: "Agora uma senha.",
       newPasswordNamed: "Boa, {{name}}. Agora uma senha.",
       closed: "Esse e-mail ainda não tem conta.",
@@ -1245,6 +1247,7 @@ export const ptBR = {
     timezone: "Fuso horário",
     profileTitle: "Seu perfil neste workspace",
     handle: "Seu @",
+    nameEmpty: "Escreva seu nome.",
     timezoneHelp: "Mostra a sua hora local no seu cartão de perfil.",
     timezoneInvalid: "Use um fuso como America/Sao_Paulo.",
     useOrgZone: "Usar o fuso do workspace",
@@ -1414,6 +1417,58 @@ export const ptBR = {
     working_other: "{{count}} agentes trabalhando",
   },
   channel: {
+    /** Channel settings' sections, for who manages it (ADR 0134). */
+    settingsNav: {
+      label: "Configurações do canal",
+      overview: "Visão geral",
+      permissions: "Permissões",
+      members: "Membros",
+    },
+    /** A channel's exceptions to the workspace's roles (ADR 0134), said for people who never used Discord. */
+    perms: {
+      advanced: "Permissões avançadas",
+      intro: "Exceções valem só neste canal. Padrão segue os papéis do workspace.",
+      targets: "Papéis e pessoas com exceção",
+      add: "Adicionar papel ou pessoa",
+      addSearch: "Buscar papel ou pessoa",
+      addNone: "Nenhum papel ou pessoa encontrado",
+      groupRoles: "Papéis",
+      groupPeople: "Pessoas",
+      clear: "Tirar exceção",
+      /** The three-state control's name for screen readers: "Enviar mensagens para Vendas". */
+      stateLabel: "{{key}} para {{target}}",
+      state: {
+        deny: "Negar",
+        inherit: "Padrão",
+        allow: "Permitir",
+      },
+      keys: {
+        post: {
+          title: "Enviar mensagens",
+          line: "Escrever, responder em conversas e fixar mensagens aqui",
+        },
+        callAgents: {
+          title: "Chamar agentes",
+          line: "Receber respostas dos agentes deste canal",
+        },
+        manage: {
+          title: "Gerenciar o canal",
+          line: "Mudar nome, quem vê, membros e estas permissões",
+        },
+      },
+      /** What "Padrão" means right now for the role or person picked. */
+      default: {
+        allowedBy: "Padrão: permitido pelo papel {{role}}",
+        notHeld: "Padrão: não permitido pelo papel {{role}}",
+        followsEveryone: "Padrão: segue {{role}} neste canal",
+        person: "Padrão: segue os papéis dessa pessoa",
+      },
+      /** In place of the composer when the channel's exceptions keep me from sending. */
+      readOnlyComposer: "Você não pode enviar mensagens neste canal",
+      /** Only for me, after my message mentioned an agent here. */
+      agentsDenied: "Você não pode chamar agentes neste canal",
+      forbidden: "Você só pode mudar permissões que tem, de papéis e pessoas abaixo de você",
+    },
     pins: {
       title: "Fixadas",
       button_one: "Mensagens fixadas ({{count}})",
@@ -1876,6 +1931,21 @@ export const ptBR = {
       done: "Convite enviado",
       adminOnly: "Quem pode convidar envia",
     },
+    install_skill: {
+      title: "Instalar uma skill",
+      open: "Instalar",
+      done: "Instalada",
+      adminOnly: "Quem gerencia agentes instala",
+    },
+    update_skills: {
+      title_one: "Atualizar uma skill",
+      title_other: "Atualizar {{count}} skills",
+      update: "Atualizar",
+      review: "Revisar",
+      done: "Em dia",
+      waiting: "Esperando revisão",
+      adminOnly: "Quem gerencia agentes atualiza",
+    },
     agentProposal: {
       title: "{{agent}} propõe um novo agente",
       review: "Revisar",
@@ -1938,6 +2008,18 @@ export const ptBR = {
     allow: "Deixar {{person}} falar com ele",
     allow_female: "Deixar {{person}} falar com ela",
     allowed: "Pronto: {{person}} já pode falar com {{name}}.",
+    allowMe: "Quero falar com ele",
+    allowMe_female: "Quero falar com ela",
+    allowedMe: "Pronto: você já pode falar com {{name}}.",
+    mailLossTitle: "Tirar o acesso à caixa de email?",
+    mailLoss:
+      "{{name}} tem acesso à caixa de email de {{owners}}. Com mais pessoas falando com ele, elas poderiam chegar a esses emails por ele, então esse acesso é removido. Quem conectou a caixa de email pode dar de novo.",
+    mailLoss_female:
+      "{{name}} tem acesso à caixa de email de {{owners}}. Com mais pessoas falando com ela, elas poderiam chegar a esses emails por ela, então esse acesso é removido. Quem conectou a caixa de email pode dar de novo.",
+    planTitle: "Usar o plano de {{owner}}?",
+    planOpen:
+      "As conversas com {{name}} vão usar o plano do {{plan}} de {{owner}} e os limites dele. {{owner}} vai receber um email avisando.",
+    plansTitle: "Usar os planos de {{owners}}?",
   },
   teamChecks: {
     group: "O que o agente não repetiu",
@@ -2129,13 +2211,18 @@ export const ptBR = {
     editChannel: "Editar canal",
   },
   channelMembers: {
+    /** A small line on top of the members column and sheet: what the list is. */
+    caption: "Quem pode ver este canal",
+    /** The same line in the channel settings' members, for a public channel: no list limits who sees it. */
+    captionOpen: "Aberto para todo o workspace",
     addRow: "Adicionar pessoa ou agente",
     /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Convidar {{email}} para a {{org}} e para #{{channel}}",
     inviteOrg: "Convidar {{email}} para a {{org}}",
     addTitle: "Adicionar a #{{channel}}",
     addSearch: "Buscar pessoa ou agente",
-    addEmpty: "Todo mundo já está no canal, ou ninguém encontrado com “{{q}}”.",
+    addEmpty: "Ninguém fora do canal com “{{q}}”.",
+    addEveryone: "Todo mundo da {{org}} já está em #{{channel}}.",
     addConfirm_one: "Adicionar {{count}}",
     addConfirm_other: "Adicionar {{count}}",
     actions: "Opções de {{name}}",
@@ -2195,7 +2282,16 @@ export const ptBR = {
     busy: "Ocupado",
     hidden: "Oculto",
     offline: "Offline",
-    lower: { online: "online", away: "ausente", busy: "ocupado", hidden: "oculto", offline: "offline" },
+    /** An agent out of office (ADR 0084 §12): its plan or budget ran out until a reset. */
+    out: "Fora do escritório",
+    lower: {
+      online: "online",
+      away: "ausente",
+      busy: "ocupado",
+      hidden: "oculto",
+      offline: "offline",
+      out: "fora do escritório",
+    },
     setStatus: "Definir status",
     seen: "visto {{when}}",
     title: "Definir status",
@@ -2217,6 +2313,7 @@ export const ptBR = {
       auto: "Online enquanto o agentes.chat estiver aberto.",
       away: "Fora por um tempo: as pessoas sabem que a resposta pode demorar.",
       busy: "Todo mundo vê que é melhor não interromper agora.",
+      out: "Longe do trabalho (férias, folga): todo mundo vê até o seu status sumir.",
       hidden: "Você aparece offline para todo mundo, mas continua usando tudo.",
     },
     suggest: {
@@ -2256,6 +2353,10 @@ export const ptBR = {
       waiting_plan: "Esperando o plano renovar",
       waiting_budget: "Esperando o orçamento renovar",
       provider_down: "O provedor de IA está fora do ar · tenta de novo sozinho",
+      out_of_plan: "Sem limite no plano",
+      out_of_budget: "Orçamento do mês esgotado",
+      /** After an out-of-office line: "volta às 15:00", "volta sexta às 9:00" (`chat.usageWhen`). */
+      backAt: "volta {{when}}",
       work: "Em segundo plano: {{subject}}",
     },
     agentWhy: {
@@ -2264,6 +2365,7 @@ export const ptBR = {
       away: "Parado desde {{when}}",
       awayNever: "Ainda não trabalhou",
       offline: "Pausado",
+      out: "Sem limite agora · responde quando renovar",
       noAi: "Sem IA conectada",
     },
     bySelf: "Escrito por {{name}} · some quando terminar",
@@ -2342,6 +2444,10 @@ export const ptBR = {
     withdrawn: "O {{name}} não precisa mais da resposta.",
     withdrawn_female: "A {{name}} não precisa mais da resposta.",
     failed: "Não foi possível enviar a resposta. Tente de novo.",
+    skip: "Pular",
+    skipFailed: "Não foi possível pular a pergunta. Tente de novo.",
+    dismissed: "{{name}} pulou esta pergunta.",
+    dismissedByYou: "Você pulou esta pergunta.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
   ask: {
@@ -2421,6 +2527,11 @@ export const ptBR = {
       noteTarget: "Cobre {{actions}}, de agora em diante. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
       noteTarget_female:
         "Cobre {{actions}}, de agora em diante. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      noteCommand:
+        "Cobre {{actions}} no computador, de agora em diante, com quaisquer argumentos. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
+      noteCommand_female:
+        "Cobre {{actions}} no computador, de agora em diante, com quaisquer argumentos. Para desfazer: Ferramentas e acesso, na página da {{name}}.",
+      computer: "Comandos no computador",
       /** `target`: the call's other arguments, as `project_id=abc`. */
       noteReads:
         "Cobre só leituras de {{actions}}, neste projeto ({{target}}), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página do {{name}}.",
@@ -3016,6 +3127,8 @@ export const ptBR = {
         label: "Como trabalha",
         computer: "Trabalha no",
         brain: "Pensa com",
+        /** On a plan: the plan in the label, the model and its effort on the line under it. */
+        brainWith: "Pensa com {{plan}}",
         browser: "Navegador",
         effort: "esforço {{level}}",
       },
@@ -3068,7 +3181,10 @@ export const ptBR = {
         none: "Nenhum computador tem",
         planModel: "Modelo",
         account: "Conta",
-        accountLocked: "Só {{name}} troca",
+        /** To an admin: the accounts are the agent's owner's, since a plan thinks only for its owner's agents. */
+        accountWho: "Só contas de {{owner}}, responsável pelo {{name}}: um plano só pensa pelos agentes do seu dono.",
+        accountWho_female:
+          "Só contas de {{owner}}, responsável pela {{name}}: um plano só pensa pelos agentes do seu dono.",
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
         accountMove: "Em uso por {{agents}} · Mover para cá",
@@ -3088,7 +3204,7 @@ export const ptBR = {
         efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
         effortsLower: { auto: "automático", low: "baixo", medium: "médio", high: "alto", max: "máximo" },
         effortText: {
-          auto: "Escolhe o esforço para cada tarefa.",
+          auto: "O modelo Automático escolhe o esforço de cada tarefa. Escolha um modelo para fixar o esforço.",
           low: "Responde rápido. Bom para perguntas simples.",
           medium: "O padrão. Pensa o suficiente na maioria das vezes.",
           high: "Pensa mais em tarefas difíceis. Demora e gasta mais.",
@@ -3116,7 +3232,13 @@ export const ptBR = {
           answers: "Quem atende",
           defaults: "Voltar ao padrão",
           done: "Pronto",
-          /** The row's line: nothing changed from the defaults, else only what did. */
+          /** The row's line: what the dialog holds. The effort shows only with a fixed model on a plan. */
+          contents: {
+            model: "Janela de contexto",
+            auto: "Janela de contexto e quem atende",
+            fixed: "Esforço, janela de contexto e quem atende",
+          },
+          /** After a save: nothing changed from the defaults, else only what did. */
           allDefault: "Tudo no padrão",
           effort: "Esforço {{level}}",
           context: "Contexto de {{size}}",
@@ -4422,6 +4544,15 @@ export const ptBR = {
     github_pr_merge: { label: "Fazer merge", description: "Fazer merge de um PR. Sempre pede aprovação." },
     github_issues_read: { label: "Ler issues", description: "Listar e ler issues do GitHub." },
     github_issues_write: { label: "Criar issues", description: "Criar issues e comentar." },
+    github_actions_read: { label: "Ler Actions", description: "Listar workflows e execuções e ler os jobs e logs." },
+    github_projects_read: {
+      label: "Ler Projects",
+      description: "Listar e ler os GitHub Projects, os campos e os itens.",
+    },
+    github_projects_write: {
+      label: "Editar Projects",
+      description: "Adicionar itens aos GitHub Projects e mover ou editar os itens.",
+    },
     github_actions_run: {
       label: "Rodar workflows",
       description: "Iniciar workflows do GitHub Actions (pode fazer deploy). Sempre pede aprovação.",
@@ -5521,6 +5652,10 @@ export const ptBR = {
       allowedBy: "Aprovado por {{name}} · {{time}}",
       deniedBy: "Recusado por {{name}} · {{time}}",
       alwaysBy: "Liberado nesta missão por {{name}} · {{time}}: {{rules}}",
+      alwaysAgent: "Aprovar sempre para este agente",
+      alwaysAgentHint:
+        "Aprovar sempre para este agente libera {{kind}} com quaisquer argumentos, em toda missão e conversa. Para desfazer: Ferramentas e acesso, na página do agente.",
+      alwaysAgentBy: "Liberado para este agente por {{name}} · {{time}}: {{kind}}",
       state: { allowed: "Aprovado", denied: "Recusado", expired: "Sem resposta", pending: "Esperando" },
       blockedLabel: "Comandos bloqueados",
       blocked: "Bloqueado:",
@@ -6410,6 +6545,48 @@ export const ptBR = {
     saved: "{{name}} salva.",
     refresh: "Atualizar do link",
     refreshed: "{{name}} atualizada do link.",
+    upToDate: "{{name}} já tem o que o link tem.",
+    waitingToast: "A atualização de {{name}} muda arquivos que rodam, então espera uma revisão.",
+    autoUpdate: "Atualizar sozinha",
+    autoUpdateHelp:
+      "Lê o link todo dia. Texto novo entra com Desfazer. Mudanças em scripts esperam alguém que gerencia skills.",
+    autoChip: "Atualiza sozinha",
+    waitingChip: "Atualização esperando",
+    lastUpdate: "Atualizada do link {{when}}",
+    undoUpdate: "Desfazer atualização",
+    undone: "{{name}} voltou para a versão {{version}}.",
+    agentsImprove: "Agentes melhoram as skills sozinhos",
+    agentsImproveHelp:
+      "Quando um agente acha uma skill errada ou faltando um passo, ele corrige na hora: uma versão nova que dá para desfazer, e quem fez a skill fica sabendo. Mudanças em scripts esperam alguém que gerencia skills.",
+    agentsImproveThis: "Agentes melhoram esta skill sozinhos",
+    agentChange: "{{agent}} mudou {{when}}",
+    undoAgentChange: "Desfazer mudança",
+    pending: {
+      title: "A atualização do link muda arquivos que rodam: {{files}}",
+      lead: "Aplique só se confiar nesses arquivos. Os agentes rodam eles nos computadores deles.",
+      edited: "A atualização do link substituiria o que os agentes mudaram nela",
+      editedLead: "Aplique para ficar com a versão do link. Dá para desfazer depois.",
+      apply: "Aplicar atualização",
+      dismiss: "Não aplicar",
+      applied: "{{name}} atualizada do link.",
+      changedAgain: "O link mudou de novo. Revise os arquivos novos.",
+      dismissed: "Atualização não aplicada. Uma mudança nova no link pergunta de novo.",
+    },
+    updateFailed: {
+      no_skill_md: "Não deu para atualizar: o link não tem mais um SKILL.md.",
+      connection_gone: "Não deu para atualizar: a conexão com o GitHub que leu ela não existe mais.",
+      link_holds_several: "Não deu para atualizar: o link agora tem várias skills.",
+      link_renamed: "Não deu para atualizar: o link agora tem outra skill.",
+      owner_gone: "Não deu para atualizar: quem ligou a atualização sozinha não gerencia mais skills. Ligue de novo.",
+      other: "Não deu para atualizar do link.",
+    },
+    notice: {
+      updated: "{{name}} foi atualizada do link",
+      waiting: "Uma atualização de {{name}} muda os scripts dela",
+      waitingEdited: "Uma atualização de {{name}} substituiria o que os agentes mudaram",
+      failed: "{{name}} não conseguiu se atualizar do link",
+      edited: "Agentes melhoraram {{name}}",
+    },
     remove: "Remover",
     removeTitle: "Remover {{name}}?",
     removeAgents_one: "{{names}} usa esta skill e deixa de ter acesso a ela.",
@@ -6484,12 +6661,6 @@ export const ptBR = {
       switch: "Atende outras pessoas",
       /** The same switch for every agent a plan's panel connects. */
       switchAll: "Atendem outras pessoas",
-      /** Off, as someone who isn't the plan's owner sees it. */
-      switchOther: "Só atende {{owner}}",
-      /** Who decides, for someone who isn't the plan's owner: under the switch, and in "Quem pode falar". */
-      onOther: "O {{name}} pensa com o plano de {{owner}}. Só {{owner}} pode deixar outras pessoas falarem com ele.",
-      onOther_female:
-        "A {{name}} pensa com o plano de {{owner}}. Só {{owner}} pode deixar outras pessoas falarem com ela.",
       /** Under the switch, by its state: whom the agent answers and on which plan. `*All`: every agent of a panel. */
       line: {
         off: "O {{name}} só atende você, pelo seu {{plan}}.",
@@ -6498,6 +6669,13 @@ export const ptBR = {
         on_female: "A {{name}} atende quem pode falar com ela, pelo seu {{plan}}.",
         offAll: "Só atendem você, pelo seu {{plan}}.",
         onAll: "Atendem quem pode falar com eles, pelo seu {{plan}}.",
+      },
+      /** The same line to an admin, on the plan of the agent's owner. */
+      lineOf: {
+        off: "O {{name}} só atende {{owner}}, pelo {{plan}} de {{owner}}.",
+        off_female: "A {{name}} só atende {{owner}}, pelo {{plan}} de {{owner}}.",
+        on: "O {{name}} atende quem pode falar com ele, pelo {{plan}} de {{owner}}.",
+        on_female: "A {{name}} atende quem pode falar com ela, pelo {{plan}} de {{owner}}.",
       },
       /** The line's plan, after "pelo seu": a personal plan, a seat (Team, Enterprise) or a coding plan by its name. */
       plan: {
@@ -6517,6 +6695,8 @@ export const ptBR = {
       savedEveryone_female: "Agora a {{name}} atende outras pessoas.",
       savedOwner: "O {{name}} agora só atende você.",
       savedOwner_female: "A {{name}} agora só atende você.",
+      savedOwnerOf: "O {{name}} agora só atende {{owner}}.",
+      savedOwnerOf_female: "A {{name}} agora só atende {{owner}}.",
       backOnApi: "O {{name}} voltou a pensar pela API e ainda só atende você.",
       backOnApi_female: "A {{name}} voltou a pensar pela API e ainda só atende você.",
       letEveryone: "Deixar o {{name}} atender todos",
@@ -6528,10 +6708,6 @@ export const ptBR = {
         "O {{name}} só atende as pessoas escolhidas, e ninguém foi escolhido ainda. Escolha em Quem pode falar.",
       pickPeople_female:
         "A {{name}} só atende as pessoas escolhidas, e ninguém foi escolhido ainda. Escolha em Quem pode falar.",
-    },
-    errors: {
-      planOwnerOnly:
-        "Só o responsável por {{agentName}} libera para mais gente: {{agentName}} atende pelo plano dessa pessoa.",
     },
     add: {
       paste: "Colar",
@@ -8231,6 +8407,7 @@ export const ptBR = {
     countsLabel: "{{added}} linhas adicionadas, {{removed}} removidas",
     htmlPreview: "Página interativa. Abra para ver.",
     subtitle: "{{kind}} · {{name}} · {{where}} · {{when}}",
+    subtitleSize: "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     noChannel: "sem canal",
     download: "Baixar",
     downloadCsv: "Baixar CSV",
@@ -8780,6 +8957,8 @@ export const ptBR = {
     connectedList: "Conectados",
     connected: "Conectado",
     connectedAs: "Conectado como {{account}}",
+    reconnectAdds: "Reconecte o {{name}} para os agentes também poderem {{what}}.",
+    adds: { github_project: "usar o GitHub Projects (ler quadros e mover cards)" },
     toolsCount_one: "{{count}} ferramenta",
     toolsCount_other: "{{count}} ferramentas",
     active: "Ativo",
@@ -9833,6 +10012,7 @@ export const ptBR = {
     },
     artifact: {
       fileTooLarge: "O arquivo passa de {{max}} MB, o limite por arquivo.",
+      notVersioned: "Imagem, vídeo ou gravação não tem versões. Envie como um arquivo novo.",
       fileRequired: "Escolha um arquivo para enviar.",
       fileNameRequired: "O arquivo precisa de um nome.",
       notFound: "Este arquivo não existe mais ou você não tem acesso.",
@@ -9864,6 +10044,10 @@ export const ptBR = {
       tooManyFiles: "A skill tem arquivos demais (máximo de {{max}}).",
       connectionGone:
         "A conexão do GitHub que lia {{repo}} não existe mais. Conecte o GitHub de novo para atualizar esta skill.",
+      linkHoldsSeveral: "O link agora tem várias skills. Instale esta de novo pela pasta dela.",
+      linkRenamed: "O link agora tem a skill {{name}}.",
+      noLink: "Só uma skill instalada de um link se atualiza dele.",
+      noPendingUpdate: "Nenhuma atualização desta skill está esperando.",
     },
     agentGroup: {
       notFound: "Este grupo não existe mais.",
@@ -10253,18 +10437,19 @@ export const ptBR = {
       address: "Endereço do servidor",
       open: "Abrir o {{app}}",
       client: {
-        claude: "Claude",
-        claude_code: "Claude Code",
-        chatgpt: "ChatGPT",
-        cursor: "Cursor",
         other: "Outro app",
       },
       clientText: {
         claude: "claude.ai, app e celular",
-        claude_code: "No terminal",
-        chatgpt: "chatgpt.com",
-        cursor: "O editor",
-        other: "VS Code e mais",
+        terminal: "No terminal",
+        editor: "Editor de código",
+        extension: "Extensão de editor",
+        desktop: "App de desktop",
+        other: "Qualquer app com MCP",
+      },
+      group: {
+        chat: "Apps de chat",
+        code: "Editores e terminais",
       },
       waiting: "Esperando o app se conectar",
       connected: "Conectado: {{name}}",
@@ -10288,28 +10473,72 @@ export const ptBR = {
         step2: "No Claude Code, digite <code>/mcp</code>, escolha agentes e Authenticate.",
         scope: "Ele fica disponível em todas as pastas. Para só a pasta atual, tire <code>--scope user</code>.",
       },
-      chatgpt: {
-        step1: "Abra chatgpt.com/plugins.",
-        step2: "Clique em + e depois em Adicionar servidor MCP personalizado.",
-        step3: "Cole o endereço e conecte.",
-        plans: "Disponível nos planos pagos do ChatGPT.",
-      },
       cursor: {
         add: "Adicionar ao Cursor",
         manual: "Ou cole em <code>~/.cursor/mcp.json</code>:",
         signIn: "O Cursor pede para entrar na primeira vez que usar.",
       },
+      vscode: {
+        add: "Adicionar ao VS Code",
+        manual: "Ou cole em <code>.vscode/mcp.json</code>:",
+      },
+      codex: {
+        step: "Rode no terminal. O Codex abre a página para você entrar:",
+      },
+      copilotIdes: {
+        config: "Nas configurações do GitHub Copilot no IDE, abra o <code>mcp.json</code> e cole:",
+      },
       other: {
-        tabs: "Qual app",
-        vscode: "VS Code",
-        codex: "Codex",
-        any: "Qualquer app com MCP",
-        vscodeAdd: "Adicionar ao VS Code",
-        vscodeManual: "Ou cole em <code>.vscode/mcp.json</code>:",
-        codexStep: "Rode no terminal. O Codex abre a página para você entrar:",
         anyStep: "Cole o endereço no app. Ele abre esta página para você entrar.",
         anyToken: "Apps sem login OAuth usam um token pessoal no cabeçalho Authorization: Bearer.",
         toTokens: "Criar um token pessoal",
+      },
+      step: {
+        open: "Abra {{place}}.",
+        click: "Clique em {{button}}.",
+        clickThen: "Clique em {{button}} e depois em {{next}}.",
+        name: "Dê o nome agentes.chat e cole o endereço.",
+        nameDescribe: "Dê o nome agentes.chat e escreva uma descrição.",
+        nameConnect: "Dê o nome agentes.chat e clique em {{button}}.",
+        paste: "Cole o endereço.",
+        pasteIn: "Cole o endereço em {{field}}.",
+        choosePaste: "Escolha {{option}} e cole o endereço.",
+        emptySecret: "Deixe o client ID e o secret vazios e clique em {{button}}.",
+        choose: "Escolha {{option}}.",
+        chooseThen: "Escolha {{option}}, clique em {{button}} e depois em {{next}}.",
+        chooseConfig: "Escolha {{option}} e cole:",
+        auth: "Na autenticação, escolha {{option}}.",
+        tick: "Marque “{{box}}” e clique em {{button}}.",
+        run: "Rode no terminal:",
+        orRun: "Ou rode no terminal:",
+        runCommand: "Rode o comando {{command}}.",
+        file: "Cole em <code>{{file}}</code>:",
+        orFile: "Ou cole em <code>{{file}}</code>:",
+        pasteConfig: "Cole:",
+        mode: "No chat, mude para o modo {{mode}}.",
+        loginRun: "Para entrar, rode <code>{{command}}</code>.",
+        loginType: "Para entrar, digite <code>{{command}}</code> no app.",
+        signIn: "Entre com sua conta do agentes.chat na página que abrir.",
+        signInFirst: "O app pede para você entrar na primeira vez que usar.",
+        token: "Crie um token pessoal e coloque no lugar de {{placeholder}}.",
+        install: "Adicionar ao {{app}}",
+      },
+      note: {
+        untested: "Ainda não testamos a entrada por este app. Se falhar, avise a gente.",
+        chatgptPlans: "Nos planos pagos do ChatGPT, menos Free e Go. No Business, só admins adicionam.",
+        chatgptPhone:
+          "Não dá para adicionar pelo app do celular. Depois de adicionado na web, ele aparece no desktop e no celular.",
+        geminiPlans: "Só na web, com uma conta pessoal do Google. Pode pedir o Google AI Pro ou Ultra.",
+        codex:
+          "Pede um plano do ChatGPT com Codex. O app do ChatGPT no computador, a CLI do Codex e a extensão usam a mesma configuração.",
+        copilotPolicy:
+          "No Copilot Business e Enterprise, um admin precisa ligar a política MCP servers in Copilot, que vem desligada.",
+        grokAdmin: "No Grok Business e Enterprise, um admin adiciona o conector.",
+        perplexityPlans: "Nos planos Pro, Max e Enterprise do Perplexity.",
+        leChatAdmin: "No plano Team, quem adiciona o conector é um admin.",
+        raycastPro: "Só no Raycast Pro.",
+        visualStudio: "Visual Studio 2022 17.14 ou mais novo, com o GitHub Copilot.",
+        continueAgent: "Só funciona no modo Agent.",
       },
     },
     consent: {
@@ -11184,6 +11413,8 @@ export const ptBR = {
         creatingChannel: "Criou um canal",
         offeringConnectAi: "Ofereceu conectar uma IA",
         offeringConnectApp: "Ofereceu conectar um app",
+        offeringSkill: "Ofereceu instalar uma skill",
+        updatingSkills: "Atualizou skills",
         offeringInvites: "Ofereceu convidar pessoas",
         proposingAgent: "Propôs um agente",
         askingAgent: "Perguntou a outro agente",
@@ -11268,6 +11499,8 @@ export const ptBR = {
       creatingChannel: "criando um canal",
       offeringConnectAi: "preparando a conexão de uma IA",
       offeringConnectApp: "preparando a conexão de um app",
+      offeringSkill: "preparando a instalação de uma skill",
+      updatingSkills: "atualizando skills",
       offeringInvites: "preparando os convites",
       proposingAgent: "propondo um agente",
       askingAgent: "perguntando a outro agente",
@@ -11388,6 +11621,8 @@ export const ptBR = {
       action_connect_app: "Conectar {{name}}",
       action_add_mcp: "Adicionar um servidor MCP",
       action_invite_people: "Convidar pessoas",
+      action_install_skill: "Instalar uma skill",
+      action_update_skills: "Atualizar skills",
       agent_proposal: "Propôs um novo agente: {{name}}",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "{{agent}} pediu uma chave: {{name}}",
@@ -11604,6 +11839,14 @@ export const ptBR = {
     offer_invites: {
       label: "Oferecer convidar pessoas",
       description: "Posta um card cujo botão abre o convite com os endereços já preenchidos.",
+    },
+    offer_install_skill: {
+      label: "Oferecer instalar uma skill",
+      description: "Posta um cartão cujo botão abre a instalação com o link da skill preenchido.",
+    },
+    update_skill_from_source: {
+      label: "Atualizar skills dos links",
+      description: "Atualiza skills de onde foram instaladas. Mudanças em scripts esperam uma pessoa.",
     },
     propose_agent: {
       label: "Propor um agente",
@@ -12756,7 +12999,7 @@ export const ptBR = {
       none: "{{name}} está livre agora.",
     },
   },
-  // Widgets (ADR 0134).
+  // Widgets (ADR 0135).
   widgets: {
     kinds: {
       auto: "Automático",
@@ -12937,7 +13180,7 @@ export const ptBR = {
     noConnectors: "Sem conectores",
     more: "+{{count}}",
   },
-  // Painéis (ADR 0134).
+  // Painéis (ADR 0135).
   dashboards: {
     title: "Painéis",
     subtitle: "Números e gráficos que os agentes mantêm em dia, para o workspace ou só para alguns papéis.",

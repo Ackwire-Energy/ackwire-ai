@@ -114,7 +114,7 @@ const savedWidgets = (state: FakeState) =>
   (last(state, "dashboards.saveLayout") as [string, string, { widgets: { id: string; position: number }[] }])[2]
     .widgets;
 
-describe("My Home as a mural (ADR 0134)", () => {
+describe("My Home as a mural (ADR 0135)", () => {
   test("Waiting on you and Working now are fixed tiles among my widgets, in the board's order", async () => {
     const { sales, orders, builds } = await open(`/org/${ORG_ID}/home`);
     expect(order()).toEqual(["waiting", sales.id, orders.id, "working", builds.id]);

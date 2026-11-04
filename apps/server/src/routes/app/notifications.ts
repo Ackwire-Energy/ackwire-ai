@@ -53,7 +53,7 @@ const Notification = z
       dashboardId: z
         .string()
         .optional()
-        .openapi({ description: "`widget_alert`, `widget_failed`, `dashboard_proposal`: the board (ADR 0134)." }),
+        .openapi({ description: "`widget_alert`, `widget_failed`, `dashboard_proposal`: the board (ADR 0135)." }),
       widgetId: z.string().optional().openapi({ description: "`widget_alert`, `widget_failed`: the widget." }),
       label: z.string().optional(),
     }),

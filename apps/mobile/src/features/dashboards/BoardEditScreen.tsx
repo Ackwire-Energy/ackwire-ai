@@ -9,11 +9,11 @@ import { useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 
-/** The longest name and description the server takes (ADR 0134). */
+/** The longest name and description the server takes (ADR 0135). */
 const TITLE_MAX = 80;
 const ABOUT_MAX = 280;
 
-/** "Rename" a dashboard, pushed from its "…" (ADR 0134): its name and what it is for. "Save" in the bar. */
+/** "Rename" a dashboard, pushed from its "…" (ADR 0135): its name and what it is for. "Save" in the bar. */
 export function BoardEditScreen({ id }: { id: string }) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();

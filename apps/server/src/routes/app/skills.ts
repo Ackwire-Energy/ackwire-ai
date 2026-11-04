@@ -2,23 +2,30 @@ import { connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import {
   agentMadeSkills,
   agentSkillList,
+  approveSkillUpdate,
   deleteSkill,
+  dismissSkillUpdate,
   getSkill,
   getSkillFile,
+  getSkillSettings,
   importPickedSkills,
   importSkillFromUrl,
   importSkillZip,
   listSkills,
   parseSkillMarkdown,
-  reimportSkill,
   restoreSkill,
   revertSkillChange,
   SKILL_LIMITS,
   type SkillDeps,
   saveSkill,
   setAgentSkills,
+  setSkillAgentsImprove,
+  setSkillAutoUpdate,
   setSkillLocked,
+  setSkillSettings,
+  undoSkillUpdate,
   updateSkill,
+  updateSkillFromSource,
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -58,6 +65,33 @@ const Skill = z
     locked: z.boolean().openapi({ description: "Agents can't change it; never archived for disuse." }),
     useCount: z.number(),
     lastUsedAt: z.string().nullable(),
+    autoUpdate: z.boolean().openapi({ description: "Read from its link every day and updated from it." }),
+    checkedAt: z.string().nullable().openapi({ description: "When its link was last read to update it." }),
+    pendingUpdate: z
+      .object({ scripts: z.array(z.string()), at: z.string(), dismissed: z.boolean(), edited: z.boolean() })
+      .nullable()
+      .openapi({
+        description:
+          "An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or it would replace what agents changed since (`edited`); `dismissed`: refused.",
+      }),
+    updateError: z
+      .string()
+      .nullable()
+      .openapi({ description: "Why its last update from its link failed: a stable code the app translates." }),
+    lastUpdate: z
+      .object({
+        fromVersion: z.number(),
+        at: z.string(),
+        agentId: z.uuid().nullable().openapi({ description: "The agent that changed it; null: its link." }),
+      })
+      .nullable()
+      .openapi({
+        description: "Its last update from its link, or an agent's last change to it, while it can be undone.",
+      }),
+    agentsImprove: z.boolean().nullable().openapi({
+      description:
+        "Agents change it at once when they fix it (a new version, with undo) instead of proposing; files that run always wait. Null: the workspace's setting.",
+    }),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -123,7 +157,14 @@ export function skillRoutes(deps: AppDeps) {
   const skills = (): SkillDeps => {
     const blobs = deps.extras?.artifacts?.blobs;
     if (!blobs) throw new Error("storage is not configured on this server");
-    return { db, blobs, fetch: deps.extras?.http, resolveHost: deps.extras?.resolveHost, github };
+    return {
+      db,
+      blobs,
+      fetch: deps.extras?.http,
+      resolveHost: deps.extras?.resolveHost,
+      github,
+      pubsub: deps.adapters.pubsub,
+    };
   };
   const linkReadAllowed = async (userId: string) =>
     (await deps.adapters.rateLimiter.consume(`skill-link:${userId}`, LINK_READS)).allowed;
@@ -140,6 +181,40 @@ export function skillRoutes(deps: AppDeps) {
       responses: { 200: json(z.object({ skills: z.array(SkillListItem) })), ...errors },
     }),
     async (c) => c.json({ skills: await listSkills(db, c.get("user").id, c.req.valid("param").orgId) }, 200),
+  );
+
+  const SkillSettings = z
+    .object({
+      agentsImprove: z.boolean().openapi({
+        description:
+          "Agentes melhoram as skills sozinhos: an agent's fix to a skill a person made applies at once (a new version, with undo, its author told) instead of waiting as a proposal. Files that run always wait for a person, and so does a fix after the agent read outside content.",
+      }),
+    })
+    .openapi("SkillSettings");
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/skill-settings",
+      tags,
+      security,
+      summary: "The workspace's skill settings",
+      request: { params: OrgParams },
+      responses: { 200: json(SkillSettings), ...errors },
+    }),
+    async (c) => c.json(await getSkillSettings(db, c.get("user").id, c.req.valid("param").orgId), 200),
+  );
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/skill-settings",
+      tags,
+      security,
+      summary: "Change the workspace's skill settings (who manages agents)",
+      request: { params: OrgParams, body: body(SkillSettings) },
+      responses: { 200: json(SkillSettings), ...errors },
+    }),
+    async (c) =>
+      c.json(await setSkillSettings(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json")), 200),
   );
 
   app.openapi(
@@ -320,6 +395,15 @@ export function skillRoutes(deps: AppDeps) {
             body: z.string().max(200_000).optional(),
             defaultForNewAgents: z.boolean().optional(),
             locked: z.boolean().optional().openapi({ description: "Freeze it: agents can't change it." }),
+            autoUpdate: z
+              .boolean()
+              .optional()
+              .openapi({ description: "Update it from its link every day, with the rights of whoever turns it on." }),
+            agentsImprove: z
+              .boolean()
+              .nullable()
+              .optional()
+              .openapi({ description: "Agents improve it by themselves (null: as the workspace says)." }),
           }),
         ),
       },
@@ -327,12 +411,13 @@ export function skillRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, skillId } = c.req.valid("param");
-      const { locked, ...rest } = c.req.valid("json");
+      const { locked, autoUpdate, agentsImprove, ...rest } = c.req.valid("json");
       const actor = c.get("user").id;
-      if (locked !== undefined) {
-        const detail = await setSkillLocked(db, actor, orgId, skillId, locked);
-        if (Object.values(rest).every((v) => v === undefined)) return c.json(detail, 200);
-      }
+      let detail: Awaited<ReturnType<typeof getSkill>> | undefined;
+      if (locked !== undefined) detail = await setSkillLocked(db, actor, orgId, skillId, locked);
+      if (autoUpdate !== undefined) detail = await setSkillAutoUpdate(db, actor, orgId, skillId, autoUpdate);
+      if (agentsImprove !== undefined) detail = await setSkillAgentsImprove(db, actor, orgId, skillId, agentsImprove);
+      if (detail && Object.values(rest).every((v) => v === undefined)) return c.json(detail, 200);
       return c.json(await updateSkill(skills(), actor, orgId, skillId, rest), 200);
     },
   );
@@ -377,7 +462,7 @@ export function skillRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/skills/{skillId}/reimport",
       tags,
       security,
-      summary: "Import again from its URL (a new version)",
+      summary: "Import again from its URL (a new version); files that run wait for approval, as `…/update`",
       request: { params: SkillParams },
       responses: {
         200: json(SkillDetail),
@@ -389,7 +474,100 @@ export function skillRoutes(deps: AppDeps) {
       const { orgId, skillId } = c.req.valid("param");
       const actor = c.get("user").id;
       if (!(await linkReadAllowed(actor))) return apiError(c, 429, "rate_limited", tooManyReads);
-      return c.json(await reimportSkill(skills(), actor, orgId, skillId), 200);
+      // Apps released before `…/update` still call this: the same gate on files that run.
+      return c.json((await updateSkillFromSource(skills(), actor, orgId, skillId)).skill, 200);
+    },
+  );
+
+  const SourceUpdate = z
+    .object({
+      status: z.enum(["unchanged", "updated", "waiting"]).openapi({
+        description:
+          "`waiting`: it adds or changes files that run, so it waits for `…/update/approve` (or `…/update/dismiss`).",
+      }),
+      skill: SkillDetail,
+      scripts: z.array(z.string()).optional().openapi({ description: "`waiting`: the files that run it changes." }),
+    })
+    .openapi("SkillSourceUpdate");
+  const sourceUpdate = (r: Awaited<ReturnType<typeof updateSkillFromSource>>) => ({
+    status: r.status,
+    skill: r.skill,
+    ...(r.status === "waiting" ? { scripts: r.scripts } : {}),
+  });
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/skills/{skillId}/update",
+      tags,
+      security,
+      summary: "Update it from its link: new text applies (undoable); files that run wait for approval",
+      request: { params: SkillParams },
+      responses: {
+        200: json(SourceUpdate),
+        429: errorResponse("Too many links read, or GitHub limiting this server"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, skillId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      if (!(await linkReadAllowed(actor))) return apiError(c, 429, "rate_limited", tooManyReads);
+      return c.json(sourceUpdate(await updateSkillFromSource(skills(), actor, orgId, skillId)), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/skills/{skillId}/update/approve",
+      tags,
+      security,
+      summary: "Apply the waiting update as it was shown (if its link changed since, it waits again)",
+      request: { params: SkillParams },
+      responses: {
+        200: json(SourceUpdate),
+        429: errorResponse("Too many links read, or GitHub limiting this server"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, skillId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      if (!(await linkReadAllowed(actor))) return apiError(c, 429, "rate_limited", tooManyReads);
+      return c.json(sourceUpdate(await approveSkillUpdate(skills(), actor, orgId, skillId)), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/skills/{skillId}/update/dismiss",
+      tags,
+      security,
+      summary: "Refuse the waiting update (the same content isn't raised again)",
+      request: { params: SkillParams },
+      responses: { 200: json(SkillDetail), ...errors },
+    }),
+    async (c) => {
+      const { orgId, skillId } = c.req.valid("param");
+      return c.json(await dismissSkillUpdate(skills(), c.get("user").id, orgId, skillId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/skills/{skillId}/update/undo",
+      tags,
+      security,
+      summary: "Back to the version before its last update from its link",
+      request: { params: SkillParams },
+      responses: { 200: json(SkillDetail), ...errors },
+    }),
+    async (c) => {
+      const { orgId, skillId } = c.req.valid("param");
+      return c.json(await undoSkillUpdate(skills(), c.get("user").id, orgId, skillId), 200);
     },
   );
 

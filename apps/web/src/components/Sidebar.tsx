@@ -1177,7 +1177,7 @@ function MoreTools({
             {countOf(id)}
           </Link>
         ))}
-        {/* Dashboards (ADR 0134 §14) and the task manager (ADR 0128): always here, not tools a person places. */}
+        {/* Dashboards (ADR 0135 §14) and the task manager (ADR 0128): always here, not tools a person places. */}
         <Link
           to="/org/$orgId/dashboards"
           params={{ orgId: org.id }}
@@ -1260,7 +1260,7 @@ function AgentRow({
   onPrefetch: () => void;
   onOpen: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const state = useStreams((st) => agentStateIn(st, a.id));
   const busy = state !== "idle" && !waitingFor;
@@ -1272,7 +1272,7 @@ function AgentRow({
   // Background work's minutes move with the anchor's line, every half minute.
   useNow(shown?.line?.kind === "work", 30_000);
   const word = shown ? t(`presence.${shown.presence}`) : null;
-  const line = agentLine(t, shown?.line ?? null);
+  const line = agentLine(t, shown?.line ?? null, i18n.language);
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const agentEntries = useAgentMenu();
@@ -1566,7 +1566,7 @@ function AccountMenu() {
           {t("auth.signOut")}
         </MenuItem>
       </Menu>
-      <ProfileDialog focus={profile ? "handle" : null} onClose={() => setProfile(false)} />
+      <ProfileDialog focus={profile ? "name" : null} onClose={() => setProfile(false)} />
       <SetStatusDialog open={statusOpen} onClose={() => setStatusOpen(false)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
       <AddPasswordDialog

@@ -102,7 +102,7 @@ export function MessageActions({
   const rootId = m.threadId ?? m.id;
   // A voice message is its audio: no words to preview or copy here.
   const text = voiceOf(m.meta) ? "" : previewOf(m.body);
-  // An agent's charts can be pinned to a dashboard as widgets (ADR 0134).
+  // An agent's charts can be pinned to a dashboard as widgets (ADR 0135).
   const charts = m.local || m.author.type !== "agent" ? [] : chartBlocksOf(m.body);
   const pinChart = () => {
     sheet.close();

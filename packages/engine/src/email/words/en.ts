@@ -350,6 +350,28 @@ export const en = {
     table: (day: string) => `The whole table: bun run report:autonomy --day ${day}`,
     why: "You got this email because this address is in OPS_REPORT_EMAIL on this server. It goes out once a day.",
   },
+  planOpened: {
+    subject: (plan: string) => `More people can talk to your agent on your ${plan} plan`,
+    preheader: (plan: string) => `Their conversations use your ${plan} plan and its limits.`,
+    headline: "More people can talk to your agent",
+    body: (by: string, agent: string, plan: string): Text => [
+      { b: by },
+      " let more people talk to ",
+      { b: agent },
+      `. Their conversations with it use your ${plan} plan and its limits.`,
+    ],
+    agent: "Agent",
+    by: "Changed by",
+    was: "Before",
+    now: "Now",
+    everyone: "Everyone in the workspace",
+    onlyYou: "Only you",
+    you: "You",
+    note: "To undo it, change Who can talk on the agent's page.",
+    button: "See who can talk",
+    why: (org: string) =>
+      `You got this email because an agent of yours in ${org} thinks with your plan and someone else changed who can talk to it.`,
+  },
 };
 
 /** Every email's words: English has them all; another language what it translated (`Partial`), English for the rest. */

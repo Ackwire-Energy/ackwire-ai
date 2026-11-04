@@ -49,7 +49,7 @@ import {
 } from "./logic";
 import { usePickMenu } from "./menu";
 
-/** Pieces the dashboards' screens share (ADR 0134). */
+/** Pieces the dashboards' screens share (ADR 0135). */
 
 const THUMB_W = 56;
 const THUMB_H = 44;
@@ -194,7 +194,7 @@ export function AudienceLine({ board, after }: { board: Pick<Dashboard, "audienc
 }
 
 /**
- * An agent asks to show this board to more people (ADR 0134 §11): only the person it asked decides, here or in
+ * An agent asks to show this board to more people (ADR 0135 §11): only the person it asked decides, here or in
  * Activity. Publish shows it to the workspace (or the roles it named); Keep only for me leaves it private.
  */
 export function ProposalBanner({ board }: { board: Dashboard }) {

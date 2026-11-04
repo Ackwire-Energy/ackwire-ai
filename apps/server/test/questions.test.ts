@@ -58,3 +58,26 @@ test("questions API: the card's answer resumes the agent; a second answer is a c
   };
   expect(after.messages.at(-1)?.body).toBe("production");
 });
+
+test("questions API: skipping closes the card and the notification, and the agent goes on", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  await api(`/channels/${channelId}/messages`, { json: { body: "@dev deploy it" } });
+  await t.drain();
+  const page = (await (await api("/notifications?filter=mentions")).json()) as {
+    items: { kind: string; source: { questionId?: string } }[];
+  };
+  const id = page.items.find((i) => i.kind === "agent_question")?.source.questionId;
+  const res = await api(`/questions/${id}/dismiss`, { json: {} });
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ id, status: "answered", answer: null, dismissed: true });
+  expect((await api(`/questions/${id}/dismiss`, { json: {} })).status).toBe(409);
+  const after = (await (await api("/notifications")).json()) as { items: { kind: string }[] };
+  expect(after.items.some((i) => i.kind === "agent_question")).toBe(false);
+  await t.drain();
+  const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as { messages: { body: string }[] };
+  expect(timeline.messages.at(-1)?.body).toBe("?");
+});

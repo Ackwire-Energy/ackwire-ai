@@ -19,7 +19,7 @@ interface MenuItem {
 }
 
 /**
- * A board's "…" (ADR 0134): Organize, Share, Rename, Pin to the top or Unpin, and Delete (with a confirmation), only
+ * A board's "…" (ADR 0135): Organize, Share, Rename, Pin to the top or Unpin, and Delete (with a confirmation), only
  * what the viewer may do. As the routines' menu: the system's action sheet on iOS, the app's own list in a sheet on
  * Android (the screen hosts it: `SheetHostProvider`). Called before the board loads: it offers nothing until then.
  */

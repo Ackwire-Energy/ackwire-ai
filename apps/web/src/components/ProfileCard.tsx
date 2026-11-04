@@ -12,11 +12,11 @@ import {
   useUpdateAgent,
 } from "@agenteschat/client";
 import {
-  audienceBlocked,
   audienceLines,
   audienceNotice,
   audienceOf,
   audiencePatch,
+  audienceWithMe,
   canEditAudience,
   canTalk,
   modeOf,
@@ -51,7 +51,6 @@ import {
   Popover,
   ProviderLogo,
   RoleMark,
-  SettingNote,
   Token,
   useHoverCard,
 } from "@agenteschat/ui";
@@ -65,6 +64,7 @@ import { CoordinatorChip } from "@/components/CoordinatorChip";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
+import { LetMeTalkButton, useWidenAsk } from "@/components/ReachLines";
 import { useEmojiLabels } from "@/components/Reactions";
 import { RolesPicker } from "@/components/roles/RolesPicker";
 import { colorOf, ProfileSky } from "@/components/Sky";
@@ -469,7 +469,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
       : null;
   // Its presence from its work and its line (ADR 0084): its own words or what it is doing now, and where.
   const shown = useAgentPresence(agent.id);
-  const line = agentLine(t, shown?.line ?? null);
+  const line = agentLine(t, shown?.line ?? null, i18n.language);
   const workingIn = useStreams((s) => agentWorkingIn(s, agent.id));
   const busy = workingIn !== null;
   const here = workingIn ? channels?.find((c) => c.id === workingIn)?.name : undefined;
@@ -583,7 +583,11 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         <>
           <p className="small muted">{audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName)}</p>
           <div className="profile-card__actions">
-            <AskAccessButton agent={agent} />
+            {audienceWithMe(org, agent, me.user.id) ? (
+              <LetMeTalkButton agent={agent} />
+            ) : (
+              <AskAccessButton agent={agent} />
+            )}
           </div>
         </>
       )}
@@ -592,84 +596,74 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
 }
 
 /**
- * "Editar" beside "Quem pode falar": the agent Settings tab's choice (roles and people), saved the same way. On a
- * plan only its owner lets more people in (ADR 0059 §5).
+ * "Editar" beside "Quem pode falar": the agent Settings tab's choice (roles and people), saved the same way.
  */
 function AudienceEdit({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const dir = useDirectory(org.id);
+  const { org } = useOrg();
   const toast = useToast();
   const update = useUpdateAgent(org.id, agent.id);
+  const asks = useWidenAsk(agent);
   const g = agentGrammar(agent.name);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<AgentAudience>(() => audienceOf(agent));
-  const [blocked, setBlocked] = useState(false);
   const valid = audienceValid(draft, agent.ownerUserId);
-  const ownerName = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : undefined;
-  const ownerFirst = ownerName ? firstName(ownerName) : undefined;
   return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) return;
-        setDraft(audienceOf(agent));
-        setBlocked(false);
-      }}
-      side="right"
-      align="start"
-      label={t("audience.title", g)}
-      className="mcard-audience"
-      trigger={
-        <button type="button" className="mcard__edit">
-          {t("profile.audienceEdit")}
-        </button>
-      }
-    >
-      <span className="mcard-audience__title">{t("audience.title", g)}</span>
-      <AudienceChoice
-        compact
-        value={draft}
-        onChange={(next) => {
-          const stop = audienceBlocked(agent, next, me.user.id);
-          setBlocked(stop);
-          if (!stop) setDraft(next);
+    <>
+      <Popover
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) return;
+          setDraft(audienceOf(agent));
         }}
-        ownerUserId={agent.ownerUserId}
-        agentName={agent.name}
-        idPrefix={`mcard-audience-${agent.id}`}
-        onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
-      />
-      {blocked && (
-        <SettingNote icon="lock" live>
-          {t("aiAccounts.share.onOther", { ...g, owner: ownerFirst ?? "" })}
-        </SettingNote>
-      )}
-      {!valid && (
-        <span className="small mcard-audience__err" role="alert">
-          {draft.mode === "owner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone")}
-        </span>
-      )}
-      <div className="mcard-audience__acts">
-        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          {t("common.cancel")}
-        </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={!valid || update.isPending}
-          onClick={() =>
-            update.mutate(
-              { audience: audiencePatch(draft) },
-              { onSuccess: () => setOpen(false), onError: (e) => toast.show(errorText(t, e), "error") },
-            )
-          }
-        >
-          {t("common.save")}
-        </Button>
-      </div>
-    </Popover>
+        side="right"
+        align="start"
+        label={t("audience.title", g)}
+        className="mcard-audience"
+        trigger={
+          <button type="button" className="mcard__edit">
+            {t("profile.audienceEdit")}
+          </button>
+        }
+      >
+        <span className="mcard-audience__title">{t("audience.title", g)}</span>
+        <AudienceChoice
+          compact
+          value={draft}
+          onChange={setDraft}
+          ownerUserId={agent.ownerUserId}
+          agentName={agent.name}
+          idPrefix={`mcard-audience-${agent.id}`}
+          onPlan={engineOfBrain(agent.brain?.kind) !== "agent"}
+        />
+        {!valid && (
+          <span className="small mcard-audience__err" role="alert">
+            {draft.mode === "owner" ? t("audience.modeText.noOwner") : t("audience.pickSomeone")}
+          </span>
+        )}
+        <div className="mcard-audience__acts">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={!valid || update.isPending}
+            onClick={async () => {
+              if (!(await asks.ask(draft)([]))) return;
+              update.mutate(
+                { audience: audiencePatch(draft) },
+                { onSuccess: () => setOpen(false), onError: (e) => toast.show(errorText(t, e), "error") },
+              );
+            }}
+          >
+            {t("common.save")}
+          </Button>
+        </div>
+      </Popover>
+      {asks.dialog}
+    </>
   );
 }
 

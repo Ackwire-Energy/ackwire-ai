@@ -47,7 +47,7 @@ import {
 const { dashboards, dashboardWidgets, messages, orgRoles, users, agents } = schema;
 
 /**
- * Agents' dashboard tools (ADR 0134 §10, §11), built in for every agent (no scope): boards and widgets for the person
+ * Agents' dashboard tools (ADR 0135 §10, §11), built in for every agent (no scope): boards and widgets for the person
  * behind the run, private until that person widens them. Every widening an agent asks for (a wider audience on
  * `create_dashboard` or `share_dashboard`, any from a routine's or unattended run) is a request on the board that
  * waits on its person (`proposeDashboardAudience`); narrowing applies at once. A widget's refresh run lists only
@@ -60,7 +60,7 @@ const { dashboards, dashboardWidgets, messages, orgRoles, users, agents } = sche
  *   that person edits (default: their home); `data` (a `WidgetSpec`) shows at once, else the first build is queued.
  * - `share_dashboard` `{ dashboard_id, audience?, roles?, why?, edit?, edit_roles? }`: narrower applies (on a board
  *   the agent made or the person manages), wider is a proposal; a routine's or unattended run only ever proposes.
- *   Who edits (`edit`, `edit_roles`) applies at once: editing isn't seeing (ADR 0134 §8).
+ *   Who edits (`edit`, `edit_roles`) applies at once: editing isn't seeing (ADR 0135 §8).
  * - `update_widget` `{ data?, summary, sources?, title?, prompt?, alert?, failed? }`: listed only on a widget's refresh
  *   run (its brief's `widget`), once per run.
  */
@@ -234,7 +234,7 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
         .where(and(eq(dashboards.orgId, ctx.orgId), dashboardSeerSql("dashboards", person.userId, person.viewer.admin)))
         .orderBy(sql`${dashboards.pinned} desc`, asc(dashboards.position), asc(dashboards.title));
       // With nobody behind the run, what it says may reach a conversation that person isn't alone in: only the
-      // workspace's boards and the ones this agent made are named (ADR 0134 §8).
+      // workspace's boards and the ones this agent made are named (ADR 0135 §8).
       const named = (b: DashboardRow) => !routine || b.audience === "workspace" || b.ownerAgentId === ctx.agentId;
       const editable = rows.filter((b) => named(b) && mayEdit(b, person, ctx.agentId));
       const ids = editable.map((b) => b.id);
@@ -249,7 +249,7 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
                 status: dashboardWidgets.status,
               })
               .from(dashboardWidgets)
-              // A person's draft (a test not created yet) is on no board (ADR 0134 §16).
+              // A person's draft (a test not created yet) is on no board (ADR 0135 §16).
               .where(
                 and(
                   eq(dashboardWidgets.orgId, ctx.orgId),
@@ -611,7 +611,7 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
   return {
     name: "dashboards",
     async tools(ctx) {
-      // A widget's refresh run speaks only through update_widget (ADR 0134 §5); no other run has it.
+      // A widget's refresh run speaks only through update_widget (ADR 0135 §5); no other run has it.
       const brief = await briefOf(ctx);
       if (brief?.widget) return [updateWidget];
       return [listDashboards, createDashboard, createWidget, shareDashboard];

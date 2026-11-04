@@ -11,7 +11,7 @@ import type {
 import type { ContextDeps } from "../context/summaries";
 
 /**
- * Dashboards and widgets (ADR 0134): the shapes the engine returns to the HTTP layer (JSON-ready: times as ISO
+ * Dashboards and widgets (ADR 0135): the shapes the engine returns to the HTTP layer (JSON-ready: times as ISO
  * strings) and takes from it. `packages/client/src/dashboards/types.ts` mirrors them for the apps; the spec itself
  * and its rules live in `@agenteschat/ui/widgets/spec`, shared by every package.
  */
@@ -60,11 +60,11 @@ export const WIDGET_TITLE_MAX = 80;
 export const WIDGET_PROMPT_MAX = 2000;
 export const WIDGET_ALERT_CONDITION_MAX = 200;
 export const WIDGET_CHANGE_MAX = 1000;
-/** The title an agent writes on a first build or a change: short, in the person's language (ADR 0134 §17). */
+/** The title an agent writes on a first build or a change: short, in the person's language (ADR 0135 §17). */
 export const WIDGET_AGENT_TITLE_MAX = 40;
-/** Drafts a person keeps per workspace ("Test" in New widget); one more drops their oldest (ADR 0134 §16). */
+/** Drafts a person keeps per workspace ("Test" in New widget); one more drops their oldest (ADR 0135 §16). */
 export const WIDGET_DRAFTS_MAX = 5;
-/** A draft nobody confirmed is deleted after this long (ADR 0134 §16). */
+/** A draft nobody confirmed is deleted after this long (ADR 0135 §16). */
 export const WIDGET_DRAFT_TTL_MS = 24 * 3600_000;
 
 /** The error codes the engine throws (the apps translate them under `dashboards.errors.*`). */
@@ -105,7 +105,7 @@ export const DASHBOARD_ERRORS = {
   notAgentMessage: "widget.not_agent_message",
   /** 400. */
   promptRequired: "widget.prompt_required",
-  /** 409: a draft is confirmed only once its test build worked (`ok`, ADR 0134 §16). */
+  /** 409: a draft is confirmed only once its test build worked (`ok`, ADR 0135 §16). */
   notTested: "widget.not_tested",
 } as const;
 
@@ -140,7 +140,7 @@ export interface DashboardOwnerView {
   name: string;
 }
 
-/** An agent's pending request to show a board to more people (ADR 0134 §11). */
+/** An agent's pending request to show a board to more people (ADR 0135 §11). */
 export interface DashboardProposalView {
   audience: "workspace" | "roles";
   roleIds: string[];
@@ -210,7 +210,7 @@ export interface WidgetView {
   routineId: string | null;
   sourceMessageId: string | null;
   createdBy: { kind: "person" | "agent"; id: string } | null;
-  /** A test not created yet (ADR 0134 §16): only its creator sees it, on no board. */
+  /** A test not created yet (ADR 0135 §16): only its creator sees it, on no board. */
   draft: boolean;
   /** What its latest update cost ("This test cost $0.01"); null on a plan, or before it is known. */
   lastCostUsd: number | null;
@@ -332,7 +332,7 @@ export interface CreateWidgetInput {
   size?: WidgetSize;
 }
 
-/** "Create widget" after a test: where the draft goes and how it updates (ADR 0134 §16). */
+/** "Create widget" after a test: where the draft goes and how it updates (ADR 0135 §16). */
 export interface ConfirmWidgetInput {
   dashboardId: string;
   /** A person's title (kept from then on); absent: the one its agent wrote on the test. */
@@ -363,7 +363,7 @@ export interface UpdateWidgetInput {
 
 export type DashboardProposalDecision = "publish" | "keep";
 
-/** What `update_widget` hands in (ADR 0134 §5). */
+/** What `update_widget` hands in (ADR 0135 §5). */
 export interface WidgetUpdateInput {
   /** The new data; absent with `failed`. */
   spec?: WidgetSpec;

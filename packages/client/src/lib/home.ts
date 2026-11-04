@@ -43,7 +43,7 @@ export const homeWaiting = (items: AppNotification[], now = Date.now()) =>
   sortWaiting(items.filter((n) => n.waiting && isVisible(n, now)));
 
 /**
- * My widgets that stopped updating (ADR 0134): they show in "Waiting on you" with Resolve until their next good
+ * My widgets that stopped updating (ADR 0135): they show in "Waiting on you" with Resolve until their next good
  * update resolves them, though nothing waits on them. Newest first.
  */
 export const homeWidgetFailures = (items: AppNotification[], now = Date.now()) =>
@@ -67,7 +67,7 @@ export const homeDone = (items: AppNotification[], now = Date.now()) =>
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
 /**
- * The next runs of active scheduled routines, soonest first. A widget's own routine (ADR 0134) is left out: it redoes
+ * The next runs of active scheduled routines, soonest first. A widget's own routine (ADR 0135) is left out: it redoes
  * its widget in place, and one every 30 minutes would fill the list.
  */
 export function upcomingRoutines<T extends Pick<Routine, "active" | "nextRunAt"> & { target?: Routine["target"] }>(

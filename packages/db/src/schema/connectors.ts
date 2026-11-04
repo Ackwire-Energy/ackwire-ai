@@ -72,6 +72,11 @@ export const connectorConnections = pgTable(
     icon: text(),
     /** A service through Composio: its connected account (`ca_…`). */
     composioAccountId: text(),
+    /**
+     * A catalog connector's OAuth sign-in: the scopes it granted, space-separated. Fewer than the catalog asks for
+     * now: Reconectar adds the rest. Null: a key, a server's own sign-in or Composio.
+     */
+    oauthScopes: text(),
     /** `active`, or `needs_reconnect` (a Composio account that stopped working: no tools until Reconectar). */
     status: text().notNull().default("active"),
     /** Why it needs reconnecting. */

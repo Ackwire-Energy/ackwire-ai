@@ -8,14 +8,15 @@ import { requirePermission } from "./organizations";
  * A person's status in an organization: what they chose to show (`availability`) and a line they
  * wrote about what they are doing. Whether they are connected comes from the `Presence` adapter.
  */
-export const AVAILABILITIES = ["auto", "away", "busy", "hidden"] as const;
+export const AVAILABILITIES = ["auto", "away", "busy", "out", "hidden"] as const;
 export type Availability = (typeof AVAILABILITIES)[number];
 
 /**
  * What a viewer sees. `hidden` only reaches the person themselves: everyone else sees `offline`,
- * so a hidden person can't be told apart from one who is away.
+ * so a hidden person can't be told apart from one who is away. `out` (out of office, ADR 0084 §14) shows whether
+ * they are connected or not, until their line's end.
  */
-export type MemberPresence = "online" | "away" | "busy" | "hidden" | "offline";
+export type MemberPresence = "online" | "away" | "busy" | "out" | "hidden" | "offline";
 
 export const STATUS_TEXT_MAX = 100;
 export const STATUS_EMOJI_MAX = 16;
@@ -34,14 +35,29 @@ export interface StatusColumns {
   statusUntil: Date | null;
 }
 
+/**
+ * What a person picked, as it holds at `now`: out of office ends with their line's end (`statusUntil`, "back
+ * Monday"), then they read as `auto` again. Checked on read, no job.
+ */
+export function availabilityNow(
+  row: Pick<StatusColumns, "availability"> & Partial<Pick<StatusColumns, "statusUntil">>,
+  now = new Date(),
+): Availability {
+  return row.availability === "out" && row.statusUntil && row.statusUntil <= now ? "auto" : row.availability;
+}
+
 export function memberPresence(
-  row: Pick<StatusColumns, "availability">,
+  row: Pick<StatusColumns, "availability"> & Partial<Pick<StatusColumns, "statusUntil">>,
   connected: boolean,
   isSelf: boolean,
+  now = new Date(),
 ): MemberPresence {
-  if (row.availability === "hidden") return isSelf ? "hidden" : "offline";
+  const availability = availabilityNow(row, now);
+  if (availability === "hidden") return isSelf ? "hidden" : "offline";
+  // Out of office tells everyone, connected or not: that is its point.
+  if (availability === "out") return "out";
   if (!connected) return "offline";
-  return row.availability === "auto" ? "online" : row.availability;
+  return availability === "auto" ? "online" : availability;
 }
 
 /** The written status, or null when there is none or its time is up (cleared on read, no job needed). */
@@ -69,7 +85,7 @@ export async function setMyStatus(
   const set: Partial<StatusColumns> = {};
   if (input.availability !== undefined) {
     if (!AVAILABILITIES.includes(input.availability))
-      throw new ValidationError("availability: auto, away, busy or hidden");
+      throw new ValidationError("availability: auto, away, busy, out or hidden");
     set.availability = input.availability;
   }
   if (input.status !== undefined) {

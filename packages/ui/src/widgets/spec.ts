@@ -1,5 +1,5 @@
 /**
- * Widgets (ADR 0134), without React: what a widget shows (`WidgetSpec`), checked the same way by the server, the
+ * Widgets (ADR 0135), without React: what a widget shows (`WidgetSpec`), checked the same way by the server, the
  * agents' tools and the apps, plus the small rules every surface shares (schedules, sizes, the chat chart block as a
  * widget). The web draws a spec with the components in this folder; the phone with its own renderer.
  */

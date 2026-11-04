@@ -4,6 +4,7 @@ import { publishOrgEvent } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { requirePermission } from "./organizations";
+import { type OutOfOffice, type OutOfOfficeOptions, outOfOffice } from "./out-of-office";
 import { routineSeer } from "./routines";
 import { outageParkedSql } from "./runs";
 import { toolGroupKey } from "./tools/directory";
@@ -18,10 +19,12 @@ type AgentRunRow = typeof agentRuns.$inferSelect;
  * - `busy`: on heavy work (a routine, a task, a run going for a while, or one Jev rated heavy), or it said so.
  * - `online`: answering someone, waiting on an answer, or active recently.
  * - `away`: idle for a while.
+ * - `out`: out of office (§12): its plan hit its limit or its monthly budget is spent, so it can't think until a
+ *   reset (`out-of-office.ts`). Its line says why and until when.
  * - `offline`: held by the people who run the server. An agent with no AI is drawn offline by the apps,
  *   which already know it (`GET …/ai-status`).
  */
-export type AgentPresence = "online" | "busy" | "away" | "offline";
+export type AgentPresence = "online" | "busy" | "away" | "out" | "offline";
 
 /** What a line the server picked says (ADR 0084 §8); the apps word it in their language. */
 export type AgentStatusKind =
@@ -46,6 +49,10 @@ export type AgentStatusKind =
   | "waiting_plan"
   | "waiting_budget"
   | "provider_down"
+  /** Out of office (§12): its plan hit its limit, back at `until` (null: the plan didn't say when). */
+  | "out_of_plan"
+  /** Out of office (§12): its monthly budget is spent, back at `until` (the next month). */
+  | "out_of_budget"
   /** Long work in the background (ADR 0121): `subject` its title (only where everyone may read it), `count` how many. */
   | "work";
 
@@ -105,21 +112,31 @@ const WAITING = ["waiting_approval", "waiting_input"] as const;
  * Every agent's presence and written status, for a member of the organization. An agent hidden from them (the
  * agents list's rule, `routineSeer`) keeps its presence but not its line, which can name a routine, task or channel.
  */
-export async function agentStatuses(db: Database, actorId: string, orgId: string, now = new Date()) {
+export async function agentStatuses(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  now = new Date(),
+  options: Pick<OutOfOfficeOptions, "hasModel"> = {},
+) {
   await requirePermission(db, actorId, orgId, "read");
-  const [list, sees] = await Promise.all([loadAgentStatuses(db, orgId, now), routineSeer(db, orgId, actorId)]);
+  const [list, sees] = await Promise.all([
+    loadAgentStatuses(db, orgId, now, undefined, options),
+    routineSeer(db, orgId, actorId),
+  ]);
   return list.map((s) => (sees({ agentId: s.agentId, createdByUserId: null }) ? s : { ...s, status: null }));
 }
 
 /**
  * Every agent's presence and line in an organization, at `now` (no permission check), or only `ids`'. Checked on
- * read, no job.
+ * read, no job. `hasModel` (the gateway's key check) tells whether a plan at its limit still falls back to a model.
  */
 export async function loadAgentStatuses(
   db: Database,
   orgId: string,
   now = new Date(),
   ids?: string[],
+  options: Pick<OutOfOfficeOptions, "hasModel"> = {},
 ): Promise<AgentStatusView[]> {
   if (ids?.length === 0) return [];
   const ofAgents = ids ? [inArray(agents.id, ids)] : [];
@@ -128,6 +145,14 @@ export async function loadAgentStatuses(
     db
       .select({
         id: agents.id,
+        orgId: agents.orgId,
+        model: agents.model,
+        credentialId: agents.credentialId,
+        brain: agents.brain,
+        brainFallback: agents.brainFallback,
+        brainAccountId: agents.brainAccountId,
+        machineId: agents.machineId,
+        monthlyBudgetNanoUsd: agents.monthlyBudgetNanoUsd,
         heldAt: agents.operatorHoldAt,
         statusText: agents.statusText,
         statusEmoji: agents.statusEmoji,
@@ -172,7 +197,10 @@ export async function loadAgentStatuses(
       )
       .groupBy(agentRuns.agentId),
   ]);
-  const works = await liveWorksByAgent(db, orgId, ids);
+  const [works, outs] = await Promise.all([
+    liveWorksByAgent(db, orgId, ids),
+    outOfOffice(db, orgId, list, { now, ...options }),
+  ]);
   const publicIds = await publicChannelIds(
     db,
     orgId,
@@ -216,16 +244,36 @@ export async function loadAgentStatuses(
       working.some((r) => r.background || r.issueId !== null || long(r)) ||
       (stored?.busy === true && working.length > 0);
     const activeAt = runs.length > 0 || mine.length > 0 ? now : (lastAt.get(a.id) ?? null);
+    // Out of office (§12) while nothing of its own is thinking: whatever waits, waits for the reset. Its own words
+    // stay.
+    const out = outs.get(a.id);
+    const outNow =
+      out &&
+      !working.some((r) => r.status === "running") &&
+      !mine.some((w) => w.status === "live" && (w.state === null || w.state === "working"));
+    if (outNow && stored?.line.by !== "self") status = outLine(out);
     const presence: AgentPresence = a.heldAt
       ? "offline"
-      : heavy
-        ? "busy"
-        : runs.length > 0 || (activeAt && ms - activeAt.getTime() < AGENT_AWAY_AFTER_MS)
-          ? "online"
-          : "away";
+      : outNow
+        ? "out"
+        : heavy
+          ? "busy"
+          : runs.length > 0 || (activeAt && ms - activeAt.getTime() < AGENT_AWAY_AFTER_MS)
+            ? "online"
+            : "away";
     return { agentId: a.id, presence, status, activeAt: activeAt?.toISOString() ?? null };
   });
 }
+
+/** An out-of-office agent's line (§12): why, and when it is back. */
+const outLine = (out: OutOfOffice): AgentStatusLine => ({
+  by: "auto",
+  text: null,
+  kind: out.reason === "plan" ? "out_of_plan" : "out_of_budget",
+  subject: null,
+  emoji: null,
+  until: out.until?.toISOString() ?? null,
+});
 
 const WORK_WAITS: Partial<Record<NonNullable<WorkView["state"]>, AgentStatusLine["wait"]>> = {
   waiting_approval: "approval",
@@ -360,6 +408,8 @@ export function lineInEnglish(line: AgentStatusLine): string | null {
     waiting_plan: "waiting for its plan to reset",
     waiting_budget: "waiting for its budget to renew",
     provider_down: "waiting for its AI provider to come back (it retries by itself)",
+    out_of_plan: `out of office: its AI plan hit its limit${line.until ? `, back at ${line.until}` : ""}; what you send waits until then`,
+    out_of_budget: `out of office: its monthly budget is spent${line.until ? `, back at ${line.until}` : ""}; what you send waits until then`,
     work:
       (line.count ?? 1) > 1
         ? `on ${line.count} background works${s ? ` ("${s}"…)` : ""}`

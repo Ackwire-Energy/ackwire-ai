@@ -82,7 +82,7 @@ export function HomePage() {
 
   const listed = (id: string) => listsAgent(org, dir.agentById.get(id));
   const waiting = homeWaiting(allItems(waitingList.data), now);
-  // My widgets that stopped updating wait on me too (ADR 0134), with Resolve.
+  // My widgets that stopped updating wait on me too (ADR 0135), with Resolve.
   const failures = homeWidgetFailures(allItems(inbox.data), now);
   const missions = mine.filter((m) => waitingParts(m).length > 0);
   const mentions = homeMentions(allItems(inbox.data), now);
@@ -438,7 +438,7 @@ function InboxRow({ n, dir, now }: { n: AppNotification; dir: Dir; now: number }
 }
 
 /**
- * A board's notice (ADR 0134): an agent's alert on a widget, a widget that stopped updating, a request to publish a
+ * A board's notice (ADR 0135): an agent's alert on a widget, a widget that stopped updating, a request to publish a
  * board. Who and what, the agent's words (or why), and what can be done right here: Open widget, Resolve, Publish or
  * Keep only for me.
  */
@@ -503,7 +503,7 @@ function WorkRow({ w, dir, now }: { w: WorkItem; dir: Dir; now: number }) {
   const { org } = useOrg();
   const agent = dir.agentById.get(w.agentId);
   const shown = useAgentPresence(w.agentId);
-  const line = agentLine(t, shown?.line ?? null);
+  const line = agentLine(t, shown?.line ?? null, i18n.language);
   const name = agent?.name ?? t("channel.unknownAgent");
   const where =
     w.kind === "mission" && w.plan

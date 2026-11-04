@@ -61,12 +61,12 @@ import { type PickItem, usePickMenu } from "./menu";
 import { KindGlyph } from "./parts";
 import { BuildingSweep, WidgetBody, WidgetCard } from "./WidgetView";
 
-/** The longest ask and alert condition the server takes (ADR 0134). */
+/** The longest ask and alert condition the server takes (ADR 0135). */
 const PROMPT_MAX = 2000;
 const CONDITION_MAX = 200;
 
 /**
- * "New widget", pushed (never a sheet; ADR 0134). The card is the form: the ask is typed inside the card, with the
+ * "New widget", pushed (never a sheet; ADR 0135). The card is the form: the ask is typed inside the card, with the
  * agent's suggestions under it while it is empty; the card's header holds its title, a bell that turns the alert on
  * (and its condition, in the card) and the size; its footer says who looks after it (a pushed screen to change) and
  * how often it updates (a pick menu). "Test" in the bar has the agent build a draft with real data in place; then the

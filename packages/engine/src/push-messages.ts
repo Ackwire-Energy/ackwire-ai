@@ -49,7 +49,7 @@ export interface PushTextInput {
   screen?: string | null;
   /** `browser_handoff` still unanswered an hour later: the title says the agent still needs them. */
   reminder?: boolean;
-  /** `widget_failed`: its coded reason (ADR 0134 §6); `agent_reported` sends the agent's words in `text`. */
+  /** `widget_failed`: its coded reason (ADR 0135 §6); `agent_reported` sends the agent's words in `text`. */
   reason?: string | null;
 }
 
@@ -135,7 +135,7 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       // What it is for, in the agent's words: the value is typed in the app, sealed there, never here.
       return out(s.secretTitle(actor), text || what || s.secretBody);
     case "widget_alert":
-      // What the agent saw, in its words; never in the chat (ADR 0134 §6).
+      // What the agent saw, in its words; never in the chat (ADR 0135 §6).
       return out(s.widgetAlertTitle(actor, what), text || s.openBody);
     case "widget_failed":
       // The agent's own words when it said why, else its coded reason in words.

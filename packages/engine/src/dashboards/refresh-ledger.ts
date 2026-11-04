@@ -12,7 +12,7 @@ import { type DashboardRow, WIDGET_FAILURES, type WidgetRow, type WidgetStatus }
 const { dashboards, dashboardWidgets, dashboardWidgetUpdates, routines, routineRuns, usageRecords, agents } = schema;
 
 /*
- * A widget's side of the routine ledger (ADR 0134 §5, §6): what a widget routine's ending, pause or deletion does to
+ * A widget's side of the routine ledger (ADR 0135 §5, §6): what a widget routine's ending, pause or deletion does to
  * its widget. Kept apart from `refresh.ts` (which reads `routines.ts`) so the ledger and the firing code can call it
  * without an import cycle.
  */
@@ -147,7 +147,7 @@ async function failureRecipient(db: Executor, widget: WidgetRow, board: Dashboar
 }
 
 /**
- * Fails a widget (ADR 0134 §6): `failed` with its reason, a failed row in its history, and, on the first failure of a
+ * Fails a widget (ADR 0135 §6): `failed` with its reason, a failed row in its history, and, on the first failure of a
  * streak (it had no failure since its last good update), one `widget_failed` to its creator. `fatigued`: this failure
  * pauses its routine (the fifth in a row), so the widget says it stopped (`failing`) and its history keeps why.
  */
@@ -186,7 +186,7 @@ export async function failWidget(
     change: failure.change ?? null,
   });
   await trimWidgetHistory(db, widget.orgId, widget.id);
-  // A draft's failure shows in the test's preview only: nobody is told (ADR 0134 §16).
+  // A draft's failure shows in the test's preview only: nobody is told (ADR 0135 §16).
   if (firstOfStreak && !widget.draft) {
     await notifyWidgetFailed(deps, {
       orgId: widget.orgId,
@@ -288,7 +288,7 @@ export async function widgetRoutineEnded(
       )
       .limit(1);
     if (applied && widget.draft) {
-      // The test's cost is known only now: its creator's preview reads it again ("This test cost …", ADR 0134 §16).
+      // The test's cost is known only now: its creator's preview reads it again ("This test cost …", ADR 0135 §16).
       const [current] = await db
         .select({ status: dashboardWidgets.status })
         .from(dashboardWidgets)

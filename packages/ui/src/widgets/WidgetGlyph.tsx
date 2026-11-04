@@ -53,7 +53,7 @@ const GLYPHS: Record<WidgetKind | "auto", ReactNode> = {
 };
 
 /**
- * The small drawing of a widget's format (ADR 0134), for the format chips and lists: a number, a line, bars, a list,
+ * The small drawing of a widget's format (ADR 0135), for the format chips and lists: a number, a line, bars, a list,
  * a summary, a goal, or "auto". Decorative: the chip's word names it.
  */
 export function WidgetGlyph({ kind, size = 28 }: { kind: WidgetKind | "auto"; size?: number }) {

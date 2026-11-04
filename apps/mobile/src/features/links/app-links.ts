@@ -74,7 +74,7 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
   const [page = "", id, sub] = rest;
   const m = isSafeId(q.m) ? q.m : null;
   const open = isSafeId(q.open) ? q.open : null;
-  // A widget open on Home or on its dashboard (`?widget=`, ADR 0134): its own screen.
+  // A widget open on Home or on its dashboard (`?widget=`, ADR 0135): its own screen.
   const widget = isSafeId(q.widget) ? q.widget : null;
   switch (page) {
     case "":

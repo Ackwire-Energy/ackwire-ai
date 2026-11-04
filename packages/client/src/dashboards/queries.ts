@@ -18,7 +18,7 @@ import type {
 } from "./types";
 
 /**
- * React Query hooks for boards and widgets (ADR 0134). Every write puts what came back in the cache and refreshes the
+ * React Query hooks for boards and widgets (ADR 0135). Every write puts what came back in the cache and refreshes the
  * list; `dashboard.changed` and `dashboard.widget` events (`applyDashboardEvent`) keep everything live. Errors are the
  * caller's to say (`meta.silent`), translated by code.
  */

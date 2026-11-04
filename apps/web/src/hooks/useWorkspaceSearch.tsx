@@ -64,7 +64,7 @@ export function hitLink(
  * The workspace search (`GET …/search`, ADR 0123): words and filter chips, recent searches, the kind and sort, the
  * search as you type and its hits. The search page and the channel header's field each hold one.
  */
-export function useWorkspaceSearch() {
+export function useWorkspaceSearch(lazy = false) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const channels = useChannels(org.id);
@@ -109,11 +109,15 @@ export function useWorkspaceSearch() {
   }, [input, directory, words]);
   const filtered = chips.length > 0;
   const effectiveSort = searchSortFor(sort, q);
+  // `lazy` (the header's field, which starts with its channel's chip): filters alone wait for the results to show,
+  // so arriving in a channel runs no search.
+  const [shown, setShown] = useState(false);
+  const held = lazy && !shown && !q.trim();
   const search = useSearch(
     org.id,
     q,
     filtered ? ["message"] : KINDS[filter],
-    filtered || sort ? searchFilterInput(chips, effectiveSort) : undefined,
+    !held && (filtered || sort) ? searchFilterInput(chips, effectiveSort) : undefined,
   );
   return {
     words,
@@ -134,6 +138,7 @@ export function useWorkspaceSearch() {
     hits: search.data ?? [],
     active: hasSearch(chips, q),
     filtered,
+    setShown,
     placeOf: (id: string | undefined) => places.find((p) => p.id === id),
     dmWith: (id: string | undefined) => dms.data?.find((d) => d.channelId === id)?.with,
     /** The search as typed, kept with the recent ones. */
@@ -164,7 +169,7 @@ const HeaderSearchContext = createContext<HeaderSearch | null>(null);
 
 /** The channel header's search, held by the workspace so its query outlives a channel switch ("Ir para"). */
 export function HeaderSearchProvider({ children }: { children: ReactNode }) {
-  const search = useWorkspaceSearch();
+  const search = useWorkspaceSearch(true);
   const field = useRef<{ focus: () => void } | null>(null);
   return <HeaderSearchContext.Provider value={{ ...search, field }}>{children}</HeaderSearchContext.Provider>;
 }

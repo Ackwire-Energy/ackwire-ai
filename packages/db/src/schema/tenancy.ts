@@ -115,7 +115,7 @@ export const organizationMembers = pgTable(
      * (online but not to be interrupted) or `hidden` (seen as offline by everyone else). Checked in
      * `memberPresence` (ADR 0084).
      */
-    availability: text().$type<"auto" | "away" | "busy" | "hidden">().notNull().default("auto"),
+    availability: text().$type<"auto" | "away" | "busy" | "out" | "hidden">().notNull().default("auto"),
     /** A line the person wrote about what they are doing ("Em reunião até 15h"), with an optional emoji. */
     statusText: text(),
     statusEmoji: text(),

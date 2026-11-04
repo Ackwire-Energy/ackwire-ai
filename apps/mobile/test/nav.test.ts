@@ -97,7 +97,7 @@ describe("tab glyphs", () => {
     expect([...TAB_GLYPHS]).toEqual(["chats", "dashboards", "threads", "agents", "activity", "search"]);
   });
 
-  test("Dashboards: four tiles, outlined, each filled when selected (ADR 0134)", () => {
+  test("Dashboards: four tiles, outlined, each filled when selected (ADR 0135)", () => {
     const outline = tabGlyphSvg("dashboards", false, "#000");
     const filled = tabGlyphSvg("dashboards", true, "#000");
     expect(outline.match(/<path /g)?.length).toBe(4);

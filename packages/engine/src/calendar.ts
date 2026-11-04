@@ -912,7 +912,7 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
         eq(routines.orgId, orgId),
         eq(routines.active, true),
         eq(routines.triggerType, "schedule"),
-        // A widget's refreshes aren't slots on a calendar (every 30 minutes would fill it; ADR 0134 §4).
+        // A widget's refreshes aren't slots on a calendar (every 30 minutes would fill it; ADR 0135 §4).
         sql`coalesce(${routines.target}->>'type', '') <> 'widget'`,
       ),
     );

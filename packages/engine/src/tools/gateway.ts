@@ -1,7 +1,8 @@
-import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
+import { commandKind, PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import {
+  COMMAND_RULE_TOOL,
   coveringRules,
   decidesAgentApprovals,
   type RememberedKind,
@@ -90,7 +91,9 @@ export const alwaysAsks = (name: string) => {
  * remembered (`rememberAs`), whose wrapped actions, when it runs others, are a shape we know with none sensitive,
  * and with nothing in its names that always asks (merge, deploy, rollback and the rest above, GraphQL, SQL, a raw
  * request). A tool that names one exact target per call (`rememberTarget`) is remembered by that target, without
- * the name checks: they read connector actions, and a branch named release-x is still only that branch.
+ * the name checks: they read connector actions, and a branch named release-x is still only that branch. A tool that
+ * runs one shell command on the agent's computer (`rememberCommand`) is remembered by the command's kind
+ * (`commandKind`, which never offers the deny list, pushes or anything sensitive), for that agent alone.
  */
 export function rememberable(
   tool: ToolDefinition,
@@ -99,6 +102,11 @@ export function rememberable(
   decision: PolicyDecision,
 ): RememberedKind | null {
   if (!authority || authority.kind === "routine" || decision.action === "approve") return null;
+  if (tool.rememberCommand && !tool.connectionId) {
+    const command = tool.rememberCommand(input);
+    const kind = command ? commandKind(command) : null;
+    return kind ? { tool: COMMAND_RULE_TOOL, actions: [kind] } : null;
+  }
   if (tool.rememberTarget && tool.connectionId) {
     const target = tool.rememberTarget(input);
     return target ? { tool: tool.name, actions: [target] } : null;
@@ -934,8 +942,8 @@ export function createToolGateway(deps: {
         : tool.sqlReads
           ? await rememberableSqlRead(tool, call.input, authority, decision)
           : rememberable(tool, call.input, authority, decision);
-      if (remember && tool.connectionId) {
-        const at = { orgId: ctx.orgId, agentId: ctx.agentId, connectionId: tool.connectionId };
+      if (remember) {
+        const at = { orgId: ctx.orgId, agentId: ctx.agentId, connectionId: tool.connectionId ?? null };
         approvedBy = await coveringRules(ctx.db, at, remember);
         if (approvedBy) {
           approves = false;

@@ -22,7 +22,7 @@ const BUSY_POLL_MS = 15_000;
 export const newWidgetHref = (dashboardId: string) => `/widget-new?dashboardId=${dashboardId}` as const;
 
 /**
- * A dashboard, pushed (ADR 0134): its widgets on two columns (a 2-wide one takes the whole row, a 2-high one draws
+ * A dashboard, pushed (ADR 0135): its widgets on two columns (a 2-wide one takes the whole row, a 2-high one draws
  * its data big), who sees it and how many widgets, an agent's request to publish it (empty: "Add widget").
  * Share (the globe or the lock), "+" and "…" (Organize, Rename, Pin, Delete) in the bar. `id` is `home` for My Home,
  * made the first time it is opened.

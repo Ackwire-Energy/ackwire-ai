@@ -43,10 +43,19 @@ export function Skeleton({ shape = "line", width, height, className, style }: Sk
   );
 }
 
+/** A skeleton that takes over from one on screen this recently (the next stage of the same load) shows at once. */
+const TAKE_OVER_MS = 300;
+let groupsOnScreen = 0;
+let lastOnScreenAt = 0;
+
+/** A skeleton is on screen, or was a moment ago: what replaces it continues it (no blank gap, no second entrance). */
+export const skeletonOnScreen = () => groupsOnScreen > 0 || Date.now() - lastOnScreenAt < TAKE_OVER_MS;
+
 /**
  * A loading region: `role="status"` with a label ("Carregando mensagens"). Its
  * shapes take their final size at once (no layout shift) but stay invisible
- * for `delayMs`, so fast loads never flash.
+ * for `delayMs`, so fast loads never flash. One that takes over from another
+ * on screen shows at once: the load goes on, it doesn't blank and start again.
  */
 export function SkeletonGroup({
   label,
@@ -59,7 +68,16 @@ export function SkeletonGroup({
   className?: string;
   children: ReactNode;
 }) {
-  const visible = useDelayed(true, delayMs);
+  const [takesOver] = useState(skeletonOnScreen);
+  const visible = useDelayed(true, takesOver ? 0 : delayMs);
+  useEffect(() => {
+    if (!visible) return;
+    groupsOnScreen += 1;
+    return () => {
+      groupsOnScreen -= 1;
+      lastOnScreenAt = Date.now();
+    };
+  }, [visible]);
   return (
     <div
       role="status"
@@ -142,23 +160,36 @@ export function SkeletonCard({ lines = 3, seed = 0 }: { lines?: number; seed?: n
   );
 }
 
-/** A realistic conversation: mixed authors, some grouped follow-ups, 1–3 lines each. */
-export function SkeletonConversation({ label, count = 6 }: { label: string; count?: number }) {
-  const pattern = [
-    { lines: 2 },
-    { lines: 1, grouped: true },
-    { lines: 3, agent: true },
-    { lines: 1 },
-    { lines: 2, agent: true },
-    { lines: 1, grouped: true, agent: true },
-  ];
+const CONVERSATION = [
+  { lines: 2 },
+  { lines: 1, grouped: true },
+  { lines: 3, agent: true },
+  { lines: 1 },
+  { lines: 2, agent: true },
+  { lines: 1, grouped: true, agent: true },
+];
+
+/**
+ * The messages of `SkeletonConversation`, for a loading view that holds them in its own group (a whole conversation
+ * loading): the same rows, so the view that follows it keeps them where they are.
+ */
+export function SkeletonConversationRows({ count = 6 }: { count?: number }) {
   return (
-    <SkeletonGroup label={label} className="ac-skeleton-conversation">
+    <div className="ac-skeleton-conversation">
       {Array.from({ length: count }, (_, i) => {
-        const p = pattern[i % pattern.length] ?? { lines: 1 };
+        const p = CONVERSATION[i % CONVERSATION.length] ?? { lines: 1 };
         // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholder rows
         return <SkeletonMessage key={i} seed={i} {...p} />;
       })}
+    </div>
+  );
+}
+
+/** A realistic conversation: mixed authors, some grouped follow-ups, 1–3 lines each. */
+export function SkeletonConversation({ label, count = 6 }: { label: string; count?: number }) {
+  return (
+    <SkeletonGroup label={label}>
+      <SkeletonConversationRows count={count} />
     </SkeletonGroup>
   );
 }

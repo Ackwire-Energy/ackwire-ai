@@ -2,7 +2,16 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { Connection, ConnectorDef, CustomServer } from "../src/api/types";
 import { composioOffText, composioUsageText, hiddenWithoutComposio, nearComposioLimit } from "../src/lib/composio";
-import { accountUnchecked, appConnector, connectedItems, isMcpItem, itemName, outcomeText } from "../src/lib/connected";
+import {
+  accountUnchecked,
+  appConnector,
+  connectedItems,
+  fromConnection,
+  isMcpItem,
+  itemName,
+  outcomeText,
+  reconnectAddsText,
+} from "../src/lib/connected";
 
 /** The app's words for the keys these tests need; any other key comes back with its values. */
 const WORDS: Record<string, string> = { "connectors.names.atlassian": "Atlassian (Jira e Confluence)" };
@@ -195,4 +204,18 @@ test("an MCP is a server by address the catalog doesn't list; a one-click server
   expect(isMcpItem(item(true, true))).toBe(false);
   expect(isMcpItem(item(true, false, true))).toBe(false);
   expect(isMcpItem(item(false, true))).toBe(false);
+});
+
+describe("what Reconectar adds", () => {
+  test("a sign-in without the scopes the connector asks for now says what reconnecting lets agents do", () => {
+    const words = ((key: string, o?: Record<string, unknown>) =>
+      key === "connectors.adds.github_project"
+        ? "usar o GitHub Projects"
+        : `${key} ${JSON.stringify(o ?? {})}`) as unknown as TFunction;
+    const old = fromConnection({ ...connection("GitHub", null), reconnectAdds: ["project"] }, [GITHUB]);
+    expect(reconnectAddsText(words, old)).toBe(
+      'connectors.reconnectAdds {"name":"GitHub","what":"usar o GitHub Projects"}',
+    );
+    expect(reconnectAddsText(words, fromConnection(connection("GitHub", null), [GITHUB]))).toBeNull();
+  });
 });

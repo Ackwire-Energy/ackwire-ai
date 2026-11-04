@@ -317,7 +317,7 @@ export async function pauseRoutinesOfCreator(deps: FiringDeps, orgId: string, us
   for (const r of rows) {
     await pauseRoutine(deps, r, "creator_left");
     await haltRoutineRuns(deps, orgId, r.id, { code: "creator_left" });
-    // A widget's routine says it on its widget now, not at its next Resolve (ADR 0134 §6).
+    // A widget's routine says it on its widget now, not at its next Resolve (ADR 0135 §6).
     if ((r.target as { type?: unknown } | null)?.type === "widget") {
       await widgetRoutineHeld(deps, r, "creator_left").catch(() => {});
     }

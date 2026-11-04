@@ -11,13 +11,13 @@ import {
 } from "react";
 
 /**
- * Moving cards on a grid of spans (a board's widgets, ADR 0134) with a mouse, a finger or the keyboard. The card lifts
+ * Moving cards on a grid of spans (a board's widgets, ADR 0135) with a mouse, a finger or the keyboard. The card lifts
  * as a copy that leans the way it goes, the others slide to their new cells, a pixel well with the card's span marks
  * where it lands, and the drop is handed to the page (`onDrop`), which saves it. The browser's own drag only greys the
  * card out (WebKit often never fires its drop), works on no phone and has no keyboard way, hence pointer events.
  *
  * It has the shape and the feel of the task board's drag (`pages/issue-drag.ts`): the same press, lift, lean, flight,
- * landing and keys, for one grid instead of columns. The two are meant to become one module (ADR 0134).
+ * landing and keys, for one grid instead of columns. The two are meant to become one module (ADR 0135).
  *
  * The cards slide (FLIP) on every move under the pointer or the keys, and on a change the page announces with
  * `animateNext` before making it (a resize, a removal): the next render whose order or sizes differ slides from there.

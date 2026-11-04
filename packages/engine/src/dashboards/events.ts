@@ -3,7 +3,7 @@ import { publishOrgEvent, publishUserEvent } from "../events";
 import type { DashboardRow, WidgetStatus } from "./types";
 
 /**
- * Live updates of boards and widgets (ADR 0134 §13). Only ids and a widget's status go out: what each person may see
+ * Live updates of boards and widgets (ADR 0135 §13). Only ids and a widget's status go out: what each person may see
  * stays behind the boards' own endpoints, which the apps call again. A private or home board's events go to its
  * owner alone; any other board's to the whole workspace (as `routine.runs` does), and so does a change that took a
  * board away from people (`wide`), so their lists drop it.
@@ -54,7 +54,7 @@ export function publishDashboardChanged(
 }
 
 /**
- * A widget of `board` changed (`removed`: it was taken off). A draft's (`draft` with its `createdByUserId`, ADR 0134
+ * A widget of `board` changed (`removed`: it was taken off). A draft's (`draft` with its `createdByUserId`, ADR 0135
  * §16) goes to its creator alone, whoever sees the board: nobody else knows it exists.
  */
 export async function publishWidgetChanged(

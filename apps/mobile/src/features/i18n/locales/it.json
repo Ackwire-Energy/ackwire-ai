@@ -263,16 +263,16 @@
     "chatSearch": "Cerca una persona o un agente",
     "people": "Persone",
     "nobody": "Ancora nessuno qui.",
-    "ask": {
-      "question": "Di cosa hai bisogno?",
-      "placeholder": "Es. rivedi i testi della pagina prezzi entro venerdì",
-      "to": "Per",
-      "sendF": "Chiedi a {{name}}",
-      "sendM": "Chiedi a {{name}}",
-      "more": "Oppure inizia qualcosa di nuovo",
-      "person": "Chatta con una persona",
-      "noAgents": "Per chiedere qualcosa a un agente, inizia creando il tuo."
-    },
+    "search": "Persona o agente",
+    "create": "Crea",
+    "agentHint": "Un nome e cosa fa",
+    "chatShort": "Conversazione",
+    "chatHint": "Una persona o un agente",
+    "taskHint": "Con responsabile e scadenza",
+    "routineHint": "Un agente lo fa da solo, all'orario previsto",
+    "wikiPage": "Pagina wiki",
+    "wikiHint": "Da leggere per il team e gli agenti",
+    "inviteHint": "Via email o link",
     "agent": {
       "question": "Cosa farà?"
     }
@@ -1268,7 +1268,8 @@
       "forum": "Tocca a te",
       "browser": "Browser",
       "secret": "Segreto",
-      "join": "Membri"
+      "join": "Membri",
+      "tools": "Strumenti"
     },
     "review": "Rivedi",
     "answer": "Rispondi",

@@ -58,7 +58,7 @@ export type WidgetCardProps = {
 const FLASH_MS = 1200;
 
 /**
- * A widget on a board (ADR 0134): a neutral card with the cut corner, its title, the block it shows, and a footer.
+ * A widget on a board (ADR 0135): a neutral card with the cut corner, its title, the block it shows, and a footer.
  * A refresh draws a dither sweep along its top edge and dims the last data under it; new data flashes once in the
  * agent's tone and a number counts up to it. A failure greys the last data out.
  */

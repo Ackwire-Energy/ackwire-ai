@@ -12,6 +12,7 @@ import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, EmptyState, fieldText, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { useWidenAsk } from "../chat/ReachLines";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic } from "../shared/parts";
@@ -41,6 +42,7 @@ export function AgentEditScreen({ id }: { id: string }) {
   const org = useOrg().org;
   const agent = dir.agentById.get(id);
   const update = useUpdateAgent(useOrgId(), id);
+  const ask = useWidenAsk(agent);
   const admin = can(org, "manage_agents");
   const owner = Boolean(meId && agent?.ownerUserId === meId);
   const fields = editableFields({ admin, owner });
@@ -93,8 +95,9 @@ export function AgentEditScreen({ id }: { id: string }) {
   }
 
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) => setEdits((e) => ({ ...e, [key]: value }));
-  const save = () => {
+  const save = async () => {
     if (!changes || nameMissing || handleIssue || update.isPending) return;
+    if (changes.audience && !(await ask(changes.audience)([]))) return;
     update.mutate(changes, {
       onSuccess: () => {
         done.current = true;
@@ -125,7 +128,7 @@ export function AgentEditScreen({ id }: { id: string }) {
         solid={false}
         action={{
           label: t("common.save"),
-          onPress: save,
+          onPress: () => void save(),
           disabled: !changes || nameMissing || Boolean(handleIssue) || update.isPending,
         }}
       />

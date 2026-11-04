@@ -19,7 +19,7 @@ import type {
   WidgetSuggestions,
 } from "./types";
 
-/** The boards and widgets of a workspace (ADR 0134), `/api/app/organizations/{orgId}/…`. */
+/** The boards and widgets of a workspace (ADR 0135), `/api/app/organizations/{orgId}/…`. */
 export interface DashboardsApi {
   /** The boards I see, and my home board once it exists. */
   list(orgId: string): Promise<DashboardList>;

@@ -382,6 +382,8 @@
       "name": "반가워요. 처음 보는 이메일이에요.",
       "nameLead": "팀에서 뭐라고 부르나요?",
       "namePlaceholder": "이름",
+      "nameIsPassword": "이게 이름인가요? 입력한 비밀번호와 같아요.",
+      "nameLooksLikePassword": "비밀번호처럼 보여요. 여기에는 이름을 적어요.",
       "newPassword": "이제 비밀번호를 정하세요.",
       "newPasswordNamed": "좋아요, {{name}}님. 이제 비밀번호를 정하세요.",
       "closed": "이 이메일로 만든 계정이 아직 없어요.",
@@ -1231,6 +1233,7 @@
     "timezone": "시간대",
     "profileTitle": "이 워크스페이스의 내 프로필",
     "handle": "내 @",
+    "nameEmpty": "이름을 적어 주세요.",
     "timezoneHelp": "프로필 카드에 현지 시간을 표시해요.",
     "timezoneInvalid": "America/Sao_Paulo 같은 형식의 시간대를 사용하세요.",
     "useOrgZone": "워크스페이스 시간대 사용",
@@ -1390,6 +1393,52 @@
     "working_other": "에이전트 {{count}}명 작업 중"
   },
   "channel": {
+    "settingsNav": {
+      "label": "채널 설정",
+      "overview": "개요",
+      "permissions": "권한",
+      "members": "멤버"
+    },
+    "perms": {
+      "advanced": "고급 권한",
+      "intro": "예외는 이 채널에만 적용돼요. 기본값은 워크스페이스의 역할을 따라요.",
+      "targets": "예외가 있는 역할과 사람",
+      "add": "역할 또는 사람 추가",
+      "addSearch": "역할이나 사람 검색",
+      "addNone": "찾은 역할이나 사람이 없어요",
+      "groupRoles": "역할",
+      "groupPeople": "사람",
+      "clear": "예외 없애기",
+      "stateLabel": "{{target}}의 {{key}}",
+      "state": {
+        "deny": "거부",
+        "inherit": "기본값",
+        "allow": "허용"
+      },
+      "keys": {
+        "post": {
+          "title": "메시지 보내기",
+          "line": "여기서 글쓰기, 스레드에 답하기, 메시지 고정하기"
+        },
+        "callAgents": {
+          "title": "에이전트 부르기",
+          "line": "이 채널의 에이전트에게 답장 받기"
+        },
+        "manage": {
+          "title": "채널 관리",
+          "line": "이름, 볼 수 있는 사람, 멤버, 이 권한 바꾸기"
+        }
+      },
+      "default": {
+        "allowedBy": "기본값: {{role}} 역할로 허용",
+        "notHeld": "기본값: {{role}} 역할로 허용 안 됨",
+        "followsEveryone": "기본값: 이 채널의 {{role}}을(를) 따라요",
+        "person": "기본값: 이 사람의 역할을 따라요"
+      },
+      "readOnlyComposer": "이 채널에서는 메시지를 보낼 수 없어요",
+      "agentsDenied": "이 채널에서는 에이전트를 부를 수 없어요",
+      "forbidden": "내가 가진 권한만, 나보다 아래인 역할과 사람에게만 바꿀 수 있어요"
+    },
     "pins": {
       "title": "고정됨",
       "button_other": "고정된 메시지({{count}})",
@@ -1826,6 +1875,20 @@
       "done": "초대 보냄",
       "adminOnly": "초대할 수 있는 사람이 보내요"
     },
+    "install_skill": {
+      "title": "스킬 설치",
+      "open": "설치",
+      "done": "설치됨",
+      "adminOnly": "에이전트를 관리하는 사람이 설치해요"
+    },
+    "update_skills": {
+      "title_other": "스킬 {{count}}개 업데이트",
+      "update": "업데이트",
+      "review": "검토",
+      "done": "최신이에요",
+      "waiting": "검토 대기 중",
+      "adminOnly": "에이전트를 관리하는 사람이 업데이트해요"
+    },
     "agentProposal": {
       "title": "{{agent}}이(가) 새 에이전트를 제안해요",
       "review": "검토",
@@ -1887,7 +1950,16 @@
     "added": "{{name}}이(가) 채널에 참여했어요.",
     "allow": "{{person}}이(가) 이 에이전트와 대화할 수 있게 허용",
     "allow_female": "{{person}}이(가) 이 에이전트와 대화할 수 있게 허용",
-    "allowed": "완료: 이제 {{person}}이(가) {{name}}와(과) 대화할 수 있어요."
+    "allowed": "완료: 이제 {{person}}이(가) {{name}}와(과) 대화할 수 있어요.",
+    "allowMe": "나도 대화할 수 있게 하기",
+    "allowMe_female": "나도 대화할 수 있게 하기",
+    "allowedMe": "완료: 이제 {{name}}와 대화할 수 있어요.",
+    "mailLossTitle": "메일함 접근 권한을 해제할까요?",
+    "mailLoss": "{{name}}은(는) {{owners}}의 메일함에 접근할 수 있어요. 대화할 수 있는 사람이 늘어나면 {{name}}을(를) 통해 그 메일에 닿을 수 있으므로 이 접근 권한은 해제돼요. 메일함을 연결한 사람이 다시 허용할 수 있어요.",
+    "mailLoss_female": "{{name}}은(는) {{owners}}의 메일함에 접근할 수 있어요. 대화할 수 있는 사람이 늘어나면 {{name}}을(를) 통해 그 메일에 닿을 수 있으므로 이 접근 권한은 해제돼요. 메일함을 연결한 사람이 다시 허용할 수 있어요.",
+    "planTitle": "{{owner}} 님의 플랜을 사용할까요?",
+    "planOpen": "{{name}}와의 대화에는 {{owner}} 님의 {{plan}} 플랜과 그 한도가 쓰여요. {{owner}} 님에게 이메일로 알려요.",
+    "plansTitle": "{{owners}} 님의 플랜을 사용할까요?"
   },
   "teamChecks": {
     "group": "에이전트가 반복하지 않은 일",
@@ -2071,12 +2143,15 @@
     "editChannel": "채널 편집"
   },
   "channelMembers": {
+    "caption": "이 채널을 볼 수 있는 사람",
+    "captionOpen": "워크스페이스 전체에 공개",
     "addRow": "사람 또는 에이전트 추가",
     "invite": "{{email}}을(를) {{org}}와 #{{channel}}에 초대",
     "inviteOrg": "{{email}}을(를) {{org}}에 초대",
     "addTitle": "#{{channel}}에 추가",
     "addSearch": "사람 또는 에이전트 검색",
-    "addEmpty": "모두 이미 여기에 있거나 “{{q}}”에 해당하는 사람이 없어요.",
+    "addEmpty": "채널 밖에 “{{q}}”와 일치하는 사람이 없어요.",
+    "addEveryone": "{{org}}의 모두가 이미 #{{channel}}에 있어요.",
     "addConfirm_other": "{{count}}명 추가",
     "actions": "{{name}} 옵션",
     "remove": "채널에서 내보내기",
@@ -2137,12 +2212,14 @@
     "busy": "바쁨",
     "hidden": "숨김",
     "offline": "오프라인",
+    "out": "부재 중",
     "lower": {
       "online": "온라인",
       "away": "자리 비움",
       "busy": "바쁨",
       "hidden": "숨김",
-      "offline": "오프라인"
+      "offline": "오프라인",
+      "out": "부재 중"
     },
     "setStatus": "상태 설정",
     "seen": "{{when}} 접속",
@@ -2165,6 +2242,7 @@
       "auto": "agentes.chat이 열려 있는 동안 온라인이에요.",
       "away": "잠시 자리를 비워요. 답장이 늦을 수 있다는 걸 다른 사람들이 알 수 있어요.",
       "busy": "지금은 방해하지 않는 게 좋다는 걸 모두가 알 수 있어요.",
+      "out": "업무에서 떠나 있음(휴가, 휴무): 상태가 사라질 때까지 모두에게 보입니다.",
       "hidden": "모두에게 오프라인으로 보이지만 모든 기능을 그대로 쓸 수 있어요."
     },
     "suggest": {
@@ -2204,6 +2282,9 @@
       "waiting_plan": "요금제 초기화 대기 중",
       "waiting_budget": "예산 초기화 대기 중",
       "provider_down": "AI 제공업체 장애 · 자동으로 다시 시도해요",
+      "out_of_plan": "플랜 한도에 도달함",
+      "out_of_budget": "이번 달 예산 소진",
+      "backAt": "복귀: {{when}}",
       "work": "백그라운드: {{subject}}"
     },
     "agentWhy": {
@@ -2212,6 +2293,7 @@
       "away": "{{when}}부터 쉬는 중",
       "awayNever": "아직 일한 적 없음",
       "offline": "일시 중지됨",
+      "out": "지금은 한도 초과 · 초기화 후 답변",
       "noAi": "연결된 AI 없음"
     },
     "bySelf": "{{name}}이(가) 작성 · 끝나면 지워져요",
@@ -2287,7 +2369,11 @@
     "closed": "답변 없이 닫혔어요.",
     "failed": "답변을 보내지 못했어요. 다시 시도해 주세요.",
     "withdrawn": "{{name}}에게 더 이상 답변이 필요하지 않아요.",
-    "withdrawn_female": "{{name}}에게 더 이상 답변이 필요하지 않아요."
+    "withdrawn_female": "{{name}}에게 더 이상 답변이 필요하지 않아요.",
+    "skip": "건너뛰기",
+    "skipFailed": "질문을 건너뛸 수 없습니다. 다시 시도해 주세요.",
+    "dismissed": "{{name}}님이 이 질문을 건너뛰었습니다.",
+    "dismissedByYou": "이 질문을 건너뛰었습니다."
   },
   "ask": {
     "kind": {
@@ -2353,6 +2439,8 @@
       "reads": "읽기 항상 승인",
       "note": "지금부터 {{actions}}에 값과 관계없이 적용돼요. 되돌리려면 {{name}} 페이지의 도구 및 접근 권한으로 가세요.",
       "noteTarget": "지금부터 {{actions}}에 적용돼요. 되돌리려면 {{name}} 페이지의 도구 및 접근 권한으로 가세요.",
+      "noteCommand": "지금부터 컴퓨터에서 {{actions}}에 인수와 상관없이 적용돼요. 되돌리려면 {{name}} 페이지의 도구 및 접근 권한으로 가세요.",
+      "computer": "컴퓨터의 명령",
       "noteReads": "지금부터 이 프로젝트({{target}})에서 {{actions}}의 읽기에만 적용돼요. 데이터를 바꾸는 작업은 계속 승인을 요청해요. 되돌리려면 {{name}} 페이지의 도구 및 접근 권한으로 가세요.",
       "noteReadsAll": "지금부터 이 연결에서 {{actions}}의 읽기에만 적용돼요. 데이터를 바꾸는 작업은 계속 승인을 요청해요. 되돌리려면 {{name}} 페이지의 도구 및 접근 권한으로 가세요.",
       "readsRule": "{{tool}} 읽기",
@@ -2870,6 +2958,14 @@
     "nameLabel": "이름",
     "roleLabel": "역할",
     "roleHelp": "팀을 위해 하는 일이에요. 예: 이메일 및 캘린더 어시스턴트.",
+    "editName": "이름 편집: {{name}}",
+    "editHandle": "멘션 편집: @{{handle}}",
+    "editRole": "역할 편집: {{role}}",
+    "noRole": "역할 없음",
+    "rolePlaceholder": "예: 고객 지원",
+    "roleList": "역할 목록",
+    "roleUse": "“{{role}}” 사용",
+    "roleCurrent": "현재",
     "edit": "편집",
     "chat": "채팅",
     "moreActions": "더 보기",
@@ -2914,15 +3010,7 @@
     "budgetDefaultHelp": "비워 두면 워크스페이스 기본값이 적용돼요.",
     "budgetDefaultHelpAmount": "비워 두면 워크스페이스 기본값({{amount}})이 적용돼요.",
     "budgetInvalid": "0보다 큰 값을 입력하세요.",
-    "notFound": "이 에이전트는 존재하지 않거나 보관되었어요.",
-    "editName": "이름 편집: {{name}}",
-    "editHandle": "멘션 편집: @{{handle}}",
-    "editRole": "역할 편집: {{role}}",
-    "noRole": "역할 없음",
-    "rolePlaceholder": "예: 고객 지원",
-    "roleList": "역할 목록",
-    "roleUse": "“{{role}}” 사용",
-    "roleCurrent": "현재"
+    "notFound": "이 에이전트는 존재하지 않거나 보관되었어요."
   },
   "agentPage": {
     "work": {
@@ -2934,6 +3022,7 @@
         "label_female": "작동 방식",
         "computer": "작업 위치",
         "brain": "생각하는 AI",
+        "brainWith": "{{plan}}(으)로 생각해요",
         "browser": "브라우저",
         "effort": "사고 수준 {{level}}"
       },
@@ -2976,7 +3065,7 @@
         "none": "이 계정이 있는 컴퓨터가 없어요",
         "planModel": "모델",
         "account": "계정",
-        "accountLocked": "{{name}}님만 바꿀 수 있어요",
+        "accountWho": "{{name}} 담당자인 {{owner}}님의 계정만 있어요. 플랜은 주인의 에이전트를 위해서만 생각해요.",
         "accountSignedOut": "로그아웃됨, 다시 로그인하세요",
         "thisComputer": "{{computer}}의 계정",
         "accountMove": "{{agents}}이(가) 사용 중 · 여기로 옮기기",
@@ -3004,7 +3093,7 @@
           "max": "최대"
         },
         "effortText": {
-          "auto": "작업마다 사고 수준을 골라요.",
+          "auto": "자동 모델이 작업마다 사고 수준을 골라요. 사고 수준을 정하려면 모델을 고르세요.",
           "low": "빠르게 답해요. 간단한 질문에 좋아요.",
           "medium": "기본값이에요. 대부분 충분히 생각해요.",
           "high": "어려운 작업에서 더 생각해요. 더 느리고 비용이 더 들어요.",
@@ -3029,6 +3118,11 @@
           "answers": "답하는 대상",
           "defaults": "기본값으로 되돌리기",
           "done": "완료",
+          "contents": {
+            "model": "컨텍스트 창",
+            "auto": "컨텍스트 창과 답하는 대상",
+            "fixed": "사고 수준, 컨텍스트 창, 답하는 대상"
+          },
           "allDefault": "모두 기본값",
           "effort": "사고 수준: {{level}}",
           "context": "컨텍스트: {{size}}",
@@ -3973,20 +4067,6 @@
     },
     "dialog": {
       "title": "{{org}}에 초대",
-      "emails": "이메일",
-      "moreEmails": "이메일 더 보기…",
-      "checkMarked": "표시된 이메일을 확인하세요. 해당 주소로는 초대가 가지 않아요.",
-      "withNote": "메모 포함",
-      "alsoJoin": "함께 참여할 채널",
-      "generalAlways": "모두 #{{channel}}에 참여해요",
-      "note": "이메일에 넣을 메모",
-      "optional": "(선택 사항)",
-      "notePlaceholder": "안녕하세요. {{org}}에 함께해요. 팀과 에이전트가 모두 여기 있어요.",
-      "or": "또는 링크 보내기",
-      "send_other": "{{count}}명 초대",
-      "sent": "{{email}}에게 초대를 보냈어요.",
-      "sentMany": "초대 {{count}}개를 보냈어요.",
-      "alsoIn": "{{channels}}에도 참여해요.",
       "stepOf": "{{total}}단계 중 {{n}}단계 · {{step}}",
       "steps": {
         "who": "누구",
@@ -3994,9 +4074,23 @@
         "where": "시작 채널",
         "note": "메모"
       },
+      "emails": "이메일",
+      "moreEmails": "이메일 더 보기…",
+      "checkMarked": "표시된 이메일을 확인하세요. 해당 주소로는 초대가 가지 않아요.",
       "pasteHelp": "원하면 목록을 붙여 넣어도 돼요. 쉼표, 공백, 또는 한 줄에 하나씩 넣으세요.",
       "leftOut": "이미 있거나 이미 초대받은 사람은 빠져요.",
+      "withNote": "메모 포함",
+      "alsoJoin": "함께 참여할 채널",
+      "generalAlways": "모두 #{{channel}}에 참여해요",
+      "note": "이메일에 넣을 메모",
+      "optional": "(선택 사항)",
+      "notePlaceholder": "안녕하세요. {{org}}에 함께해요. 팀과 에이전트가 모두 여기 있어요.",
+      "or": "또는 링크 보내기",
       "continueWith": "{{count}}명으로 계속",
+      "send_other": "{{count}}명 초대",
+      "sent": "{{email}}에게 초대를 보냈어요.",
+      "sentMany": "초대 {{count}}개를 보냈어요.",
+      "alsoIn": "{{channels}}에도 참여해요.",
       "who": {
         "title": "누구를 데려올까요?",
         "lead": "이메일을 알려 주세요. 각자 초대를 받고 바로 참여해요."
@@ -4270,6 +4364,18 @@
       "label": "이슈 쓰기",
       "description": "이슈를 만들고 코멘트를 남겨요."
     },
+    "github_actions_read": {
+      "label": "Actions 읽기",
+      "description": "워크플로와 실행을 나열하고 작업과 로그를 읽어요."
+    },
+    "github_projects_read": {
+      "label": "Projects 읽기",
+      "description": "GitHub Projects와 그 필드, 항목을 나열하고 읽어요."
+    },
+    "github_projects_write": {
+      "label": "Projects 편집",
+      "description": "GitHub Projects에 항목을 추가하고 옮기거나 편집해요."
+    },
     "github_actions_run": {
       "label": "워크플로 실행",
       "description": "GitHub Actions 워크플로를 시작해요(배포될 수 있어요). 항상 승인을 요청해요."
@@ -4380,6 +4486,54 @@
     "flowHint": "작업은 각 단계의 첫 열로 알아서 이동해요. 에이전트가 시작하면 진행 중, 확인할 준비가 되면 검토 중, 승인하면 완료로 가요.",
     "moreOptions": "옵션 더 보기",
     "showCanceled": "취소된 작업 보기",
+    "filterButton": "필터",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "나",
+    "display": {
+      "title": "표시",
+      "label": "표시: {{layout}} · {{group}}",
+      "layout": "레이아웃",
+      "group": "그룹 기준",
+      "sort": "정렬 기준",
+      "fields": "카드에 표시",
+      "saved": "이 워크스페이스에 내 설정으로 저장돼요",
+      "reset": "기본값으로 되돌리기",
+      "by": {
+        "stage": "단계",
+        "assignee": "담당자",
+        "priority": "우선순위"
+      },
+      "order": {
+        "manual": "수동",
+        "priority": "우선순위",
+        "due": "마감일"
+      },
+      "field": {
+        "assignee": "담당자",
+        "priority": "우선순위",
+        "due": "마감일",
+        "criteria": "조건",
+        "pullRequest": "풀 리퀘스트",
+        "label": "라벨"
+      }
+    },
+    "drop": {
+      "stage": "{{name}}에 놓기",
+      "assignee": "놓아서 {{name}}에게 맡기기",
+      "unassign": "놓아서 담당자 빼기",
+      "priority": "놓아서 우선순위를 {{priority}}(으)로"
+    },
+    "drag": {
+      "role": "끌 수 있는 작업",
+      "help": "스페이스로 작업을 집고, 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
+      "picked": "#{{number}}을(를) 집었어요. 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
+      "moved": "#{{number}}: {{group}}, {{total}}개 중 {{position}}번째예요.",
+      "dropped": "#{{number}}을(를) {{group}}에 놓았어요.",
+      "canceled": "#{{number}}이(가) 제자리로 돌아갔어요.",
+      "assigned": "#{{number}}은(는) 이제 {{name}} 담당이에요.",
+      "unassigned": "#{{number}}에 이제 담당자가 없어요.",
+      "prioritized": "#{{number}}의 우선순위가 이제 {{priority}}이에요."
+    },
     "canceledColumn": "취소됨",
     "columns": {
       "add": "열 추가",
@@ -4613,54 +4767,6 @@
       "agent_asked": "{{name}}에게 맡겼어요",
       "forum_opened": "포럼으로 가져갔어요: {{title}}",
       "forum_evaluated": "포럼의 결과를 가져왔어요: {{title}}"
-    },
-    "filterButton": "필터",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "나",
-    "display": {
-      "title": "표시",
-      "label": "표시: {{layout}} · {{group}}",
-      "layout": "레이아웃",
-      "group": "그룹 기준",
-      "sort": "정렬 기준",
-      "fields": "카드에 표시",
-      "saved": "이 워크스페이스에 내 설정으로 저장돼요",
-      "reset": "기본값으로 되돌리기",
-      "by": {
-        "stage": "단계",
-        "assignee": "담당자",
-        "priority": "우선순위"
-      },
-      "order": {
-        "manual": "수동",
-        "priority": "우선순위",
-        "due": "마감일"
-      },
-      "field": {
-        "assignee": "담당자",
-        "priority": "우선순위",
-        "due": "마감일",
-        "criteria": "조건",
-        "pullRequest": "풀 리퀘스트",
-        "label": "라벨"
-      }
-    },
-    "drop": {
-      "stage": "{{name}}에 놓기",
-      "assignee": "놓아서 {{name}}에게 맡기기",
-      "unassign": "놓아서 담당자 빼기",
-      "priority": "놓아서 우선순위를 {{priority}}(으)로"
-    },
-    "drag": {
-      "role": "끌 수 있는 작업",
-      "help": "스페이스로 작업을 집고, 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
-      "picked": "#{{number}}을(를) 집었어요. 화살표로 옮기고, 스페이스로 놓고, Esc로 취소해요.",
-      "moved": "#{{number}}: {{group}}, {{total}}개 중 {{position}}번째예요.",
-      "dropped": "#{{number}}을(를) {{group}}에 놓았어요.",
-      "canceled": "#{{number}}이(가) 제자리로 돌아갔어요.",
-      "assigned": "#{{number}}은(는) 이제 {{name}} 담당이에요.",
-      "unassigned": "#{{number}}에 이제 담당자가 없어요.",
-      "prioritized": "#{{number}}의 우선순위가 이제 {{priority}}이에요."
     }
   },
   "routines": {
@@ -4853,7 +4959,6 @@
         "widget": "위젯을 업데이트해요, 메시지 없이"
       },
       "ahead": "나중을 위해 준비됨",
-      "ownActions": "직접 수행하는 작업",
       "createdBy": "{{name}}이(가) 만듦 · {{date}}",
       "nameLabel": "루틴 이름",
       "editName": "이름 편집",
@@ -4870,7 +4975,8 @@
       "reportHint": {
         "always": "새로운 내용이 없어도",
         "when_new": "새로운 내용이 없으면 조용히 있어요"
-      }
+      },
+      "ownActions": "직접 수행하는 작업"
     },
     "ownActions": {
       "hint": "실행할 때마다 연결된 앱에서 이 작업을 묻지 않고 수행해요. 그 밖의 작업은 먼저 사람의 승인을 받고, 병합, 배포, 롤백은 항상 승인을 받아요.",
@@ -5361,6 +5467,9 @@
       "allowedBy": "{{name}} 님이 승인 · {{time}}",
       "deniedBy": "{{name}} 님이 거절 · {{time}}",
       "alwaysBy": "{{name}} 님이 이 미션에서 허용 · {{time}}: {{rules}}",
+      "alwaysAgent": "이 에이전트에 항상 승인",
+      "alwaysAgentHint": "이 에이전트에 항상 승인하면 모든 미션과 대화에서 인수와 상관없이 {{kind}}을(를) 허용해요. 되돌리려면 에이전트 페이지의 도구 및 접근 권한으로 가세요.",
+      "alwaysAgentBy": "{{name}}님이 이 에이전트에 허용 · {{time}}: {{kind}}",
       "state": {
         "allowed": "승인됨",
         "denied": "거절됨",
@@ -6271,6 +6380,46 @@
     "saved": "{{name}}을(를) 저장했어요.",
     "refresh": "링크에서 업데이트",
     "refreshed": "{{name}}을(를) 링크에서 업데이트했어요.",
+    "upToDate": "{{name}}은(는) 이미 링크와 같아요.",
+    "waitingToast": "{{name}} 업데이트는 실행되는 파일을 바꿔서 검토를 기다려요.",
+    "autoUpdate": "자동으로 업데이트",
+    "autoUpdateHelp": "매일 링크를 읽어요. 새 텍스트는 실행 취소할 수 있게 반영돼요. 스크립트 변경은 스킬을 관리하는 사람을 기다려요.",
+    "autoChip": "자동으로 업데이트돼요",
+    "waitingChip": "업데이트 대기 중",
+    "lastUpdate": "{{when}} 링크에서 업데이트됨",
+    "undoUpdate": "업데이트 실행 취소",
+    "undone": "{{name}}을(를) 버전 {{version}}(으)로 되돌렸어요.",
+    "agentsImprove": "에이전트가 스킬을 스스로 개선해요",
+    "agentsImproveHelp": "에이전트가 스킬이 틀렸거나 단계가 빠진 걸 발견하면 바로 고쳐요. 새 버전은 실행 취소할 수 있고, 스킬을 만든 사람에게 알려요. 스크립트 변경은 스킬을 관리하는 사람을 기다려요.",
+    "agentsImproveThis": "에이전트가 이 스킬을 스스로 개선해요",
+    "agentChange": "{{agent}}이(가) {{when}} 변경함",
+    "undoAgentChange": "변경 실행 취소",
+    "pending": {
+      "title": "링크에서 받은 업데이트가 실행되는 파일을 바꿔요: {{files}}",
+      "lead": "이 파일들을 믿을 수 있을 때만 적용하세요. 에이전트가 자기 컴퓨터에서 이 파일들을 실행해요.",
+      "edited": "링크에서 받은 업데이트가 에이전트가 바꾼 내용을 덮어써요",
+      "editedLead": "링크의 버전으로 바꾸려면 적용하세요. 나중에 되돌릴 수 있어요.",
+      "apply": "업데이트 적용",
+      "dismiss": "적용하지 않기",
+      "applied": "{{name}}을(를) 링크에서 업데이트했어요.",
+      "changedAgain": "링크가 또 바뀌었어요. 새 파일을 검토하세요.",
+      "dismissed": "업데이트를 적용하지 않았어요. 링크가 새로 바뀌면 다시 물어봐요."
+    },
+    "updateFailed": {
+      "no_skill_md": "업데이트할 수 없어요: 링크에 SKILL.md가 더 이상 없어요.",
+      "connection_gone": "업데이트할 수 없어요: 읽어 온 GitHub 연결이 없어졌어요.",
+      "link_holds_several": "업데이트할 수 없어요: 링크에 이제 스킬이 여러 개 있어요.",
+      "link_renamed": "업데이트할 수 없어요: 링크에 이제 다른 스킬이 있어요.",
+      "owner_gone": "업데이트할 수 없어요: 자동 업데이트를 켠 사람이 더 이상 스킬을 관리할 수 없어요. 다시 켜 주세요.",
+      "other": "링크에서 업데이트할 수 없었어요."
+    },
+    "notice": {
+      "updated": "{{name}}이(가) 링크에서 업데이트됐어요",
+      "waiting": "{{name}} 업데이트가 스크립트를 바꿔요",
+      "waitingEdited": "{{name}} 업데이트가 에이전트가 바꾼 내용을 덮어써요",
+      "failed": "{{name}}을(를) 링크에서 업데이트하지 못했어요",
+      "edited": "에이전트가 {{name}}을(를) 개선했어요"
+    },
     "remove": "삭제",
     "removeTitle": "{{name}}을(를) 삭제할까요?",
     "removeAgents_other": "{{names}}이(가) 이 스킬을 사용하고 있어서 더 이상 쓸 수 없게 돼요.",
@@ -6338,15 +6487,16 @@
     "share": {
       "switch": "다른 사람에게도 답해요",
       "switchAll": "다른 사람에게도 답하기",
-      "switchOther": "{{owner}}님에게만 답해요",
-      "onOther": "{{name}}은(는) {{owner}}님의 요금제로 생각해요. 다른 사람이 대화할 수 있게 하는 건 {{owner}}님만 할 수 있어요.",
-      "onOther_female": "{{name}}은(는) {{owner}}님의 요금제로 생각해요. 다른 사람이 대화할 수 있게 하는 건 {{owner}}님만 할 수 있어요.",
       "line": {
         "off": "{{name}}은(는) 내 {{plan}}(으)로 나에게만 답해요.",
         "on": "{{name}}은(는) 내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요.",
         "on_female": "{{name}}은(는) 내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요.",
         "offAll": "내 {{plan}}(으)로 나에게만 답해요.",
         "onAll": "내 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요."
+      },
+      "lineOf": {
+        "off": "{{name}}은(는) {{owner}}님의 {{plan}}(으)로 {{owner}}님에게만 답해요.",
+        "on": "{{name}}은(는) {{owner}}님의 {{plan}}(으)로 대화할 수 있는 누구에게나 답해요."
       },
       "plan": {
         "own": "{{provider}} 요금제",
@@ -6361,13 +6511,11 @@
       },
       "savedEveryone": "이제 {{name}}은(는) 다른 사람에게도 답해요.",
       "savedOwner": "이제 {{name}}은(는) 나에게만 답해요.",
+      "savedOwnerOf": "이제 {{name}}은(는) {{owner}}님에게만 답해요.",
       "backOnApi": "{{name}}은(는) 다시 API를 쓰고 여전히 나에게만 답해요.",
       "letEveryone": "{{name}}이(가) 모두에게 답하게 하기",
       "letPeople": "{{name}}이(가) 다른 사람에게도 답하게 하기",
       "pickPeople": "{{name}}은(는) 선택한 사람에게만 답하는데, 아직 선택한 사람이 없어요. 대화할 수 있는 사람에서 선택하세요."
-    },
-    "errors": {
-      "planOwnerOnly": "{{agentName}}의 책임자만 더 많은 사람을 허용할 수 있어요. {{agentName}}은(는) 그 사람의 요금제로 답해요."
     },
     "add": {
       "paste": "붙여넣기",
@@ -8032,6 +8180,7 @@
     "countsLabel": "{{added}}줄 추가, {{removed}}줄 삭제",
     "htmlPreview": "인터랙티브 페이지예요. 열어서 확인하세요.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "채널 없음",
     "download": "다운로드",
     "downloadCsv": "CSV 다운로드",
@@ -8749,6 +8898,10 @@
     "connectedList": "연결됨",
     "connected": "연결됨",
     "connectedAs": "{{account}}(으)로 연결됨",
+    "reconnectAdds": "{{name}}을(를) 다시 연결하면 에이전트가 {{what}} 수도 있어요.",
+    "adds": {
+      "github_project": "GitHub Projects를 쓸(보드를 읽고 카드를 옮길)"
+    },
     "toolsCount_other": "도구 {{count}}개",
     "active": "활성",
     "notReviewed": "검토 대기 중",
@@ -9849,6 +10002,7 @@
     },
     "artifact": {
       "fileTooLarge": "파일이 파일당 한도인 {{max}}MB를 넘어요.",
+      "notVersioned": "이미지, 동영상, 녹음에는 버전이 없어요. 새 파일로 보내 주세요.",
       "fileRequired": "업로드할 파일을 고르세요.",
       "fileNameRequired": "파일에 이름이 필요해요.",
       "notFound": "이 파일은 더 이상 없거나 접근 권한이 없어요."
@@ -9877,7 +10031,11 @@
       "invalidDescription": "설명은 1~{{max}}자여야 해요.",
       "tooLarge": "스킬이 너무 커요(최대 {{max}}MB).",
       "tooManyFiles": "스킬의 파일이 너무 많아요(최대 {{max}}개).",
-      "connectionGone": "{{repo}}을(를) 읽은 GitHub 연결이 없어졌어요. 이 스킬을 업데이트하려면 GitHub를 다시 연결하세요."
+      "connectionGone": "{{repo}}을(를) 읽은 GitHub 연결이 없어졌어요. 이 스킬을 업데이트하려면 GitHub를 다시 연결하세요.",
+      "linkHoldsSeveral": "링크에 이제 스킬이 여러 개 있어요. 이 스킬의 폴더에서 다시 설치하세요.",
+      "linkRenamed": "링크에 이제 {{name}} 스킬이 있어요.",
+      "noLink": "링크에서 설치한 스킬만 그 링크에서 업데이트돼요.",
+      "noPendingUpdate": "이 스킬의 대기 중인 업데이트가 없어요."
     },
     "agentGroup": {
       "notFound": "이 그룹은 더 이상 없어요.",
@@ -10254,18 +10412,19 @@
       "address": "서버 주소",
       "open": "{{app}} 열기",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "다른 앱"
       },
       "clientText": {
         "claude": "claude.ai, 앱, 휴대폰",
-        "claude_code": "터미널에서",
-        "chatgpt": "chatgpt.com",
-        "cursor": "에디터",
-        "other": "VS Code 등"
+        "terminal": "터미널에서",
+        "editor": "코드 편집기",
+        "extension": "편집기 확장 프로그램",
+        "desktop": "데스크톱 앱",
+        "other": "모든 MCP 앱"
+      },
+      "group": {
+        "chat": "채팅 앱",
+        "code": "편집기와 터미널"
       },
       "waiting": "앱 연결을 기다리는 중",
       "connected": "연결됨: {{name}}",
@@ -10287,28 +10446,69 @@
         "step2": "Claude Code에서 <code>/mcp</code>를 입력하고 agentes를 고른 다음 Authenticate를 선택하세요.",
         "scope": "모든 폴더에서 작동해요. 현재 폴더에서만 쓰려면 <code>--scope user</code>를 빼세요."
       },
-      "chatgpt": {
-        "step1": "chatgpt.com/plugins를 여세요.",
-        "step2": "+를 클릭한 다음 사용자 지정 MCP 서버 추가를 선택하세요.",
-        "step3": "주소를 붙여넣고 연결하세요.",
-        "plans": "ChatGPT 유료 요금제에서 사용할 수 있어요."
-      },
       "cursor": {
         "add": "Cursor에 추가",
         "manual": "또는 <code>~/.cursor/mcp.json</code>에 붙여넣으세요:",
         "signIn": "처음 사용할 때 Cursor가 로그인을 요청해요."
       },
+      "vscode": {
+        "add": "VS Code에 추가",
+        "manual": "또는 <code>.vscode/mcp.json</code>에 붙여넣으세요:"
+      },
+      "codex": {
+        "step": "터미널에서 실행하세요. Codex가 로그인 페이지를 열어 줘요:"
+      },
+      "copilotIdes": {
+        "config": "IDE의 GitHub Copilot 설정에서 <code>mcp.json</code>을 열고 붙여넣으세요:"
+      },
       "other": {
-        "tabs": "앱 선택",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "모든 MCP 앱",
-        "vscodeAdd": "VS Code에 추가",
-        "vscodeManual": "또는 <code>.vscode/mcp.json</code>에 붙여넣으세요:",
-        "codexStep": "터미널에서 실행하세요. Codex가 로그인 페이지를 열어 줘요:",
         "anyStep": "앱에 주소를 붙여넣으세요. 앱이 로그인할 수 있도록 이 페이지를 열어 줘요.",
         "anyToken": "OAuth 로그인이 없는 앱은 Authorization: Bearer 헤더에 개인 토큰을 사용해요.",
         "toTokens": "개인 토큰 만들기"
+      },
+      "step": {
+        "open": "{{place}} 화면을 여세요.",
+        "click": "{{button}} 버튼을 클릭하세요.",
+        "clickThen": "{{button}} 버튼을 클릭한 다음 {{next}} 버튼을 클릭하세요.",
+        "name": "이름을 agentes.chat으로 정하고 주소를 붙여넣으세요.",
+        "nameDescribe": "이름을 agentes.chat으로 정하고 설명을 쓰세요.",
+        "nameConnect": "이름을 agentes.chat으로 정하고 {{button}} 버튼을 클릭하세요.",
+        "paste": "주소를 붙여넣으세요.",
+        "pasteIn": "{{field}} 칸에 주소를 붙여넣으세요.",
+        "choosePaste": "{{option}} 항목을 고르고 주소를 붙여넣으세요.",
+        "emptySecret": "client ID와 secret은 비워 두고 {{button}} 버튼을 클릭하세요.",
+        "choose": "{{option}} 항목을 고르세요.",
+        "chooseThen": "{{option}} 항목을 고르고 {{button}} 버튼을 클릭한 다음 {{next}} 버튼을 클릭하세요.",
+        "chooseConfig": "{{option}} 항목을 고르고 붙여넣으세요:",
+        "auth": "인증에서 {{option}} 항목을 고르세요.",
+        "tick": "“{{box}}”에 체크하고 {{button}} 버튼을 클릭하세요.",
+        "run": "터미널에서 실행하세요:",
+        "orRun": "또는 터미널에서 실행하세요:",
+        "runCommand": "{{command}} 명령을 실행하세요.",
+        "file": "<code>{{file}}</code>에 붙여넣으세요:",
+        "orFile": "또는 <code>{{file}}</code>에 붙여넣으세요:",
+        "pasteConfig": "붙여넣으세요:",
+        "mode": "채팅에서 {{mode}} 모드로 바꾸세요.",
+        "loginRun": "로그인하려면 <code>{{command}}</code> 명령을 실행하세요.",
+        "loginType": "로그인하려면 앱에서 <code>{{command}}</code> 명령을 입력하세요.",
+        "signIn": "열린 페이지에서 agentes.chat 계정으로 로그인하세요.",
+        "signInFirst": "처음 사용할 때 앱이 로그인을 요청해요.",
+        "token": "개인 토큰을 만들어 {{placeholder}} 자리에 넣으세요.",
+        "install": "{{app}}에 추가"
+      },
+      "note": {
+        "untested": "이 앱에서 로그인하는 것은 아직 테스트하지 않았어요. 안 되면 알려 주세요.",
+        "chatgptPlans": "ChatGPT 유료 요금제에서 쓸 수 있어요. Free와 Go는 제외예요. Business에서는 관리자만 추가할 수 있어요.",
+        "chatgptPhone": "휴대폰 앱에서는 추가할 수 없어요. 웹에서 추가하면 데스크톱과 휴대폰에도 표시돼요.",
+        "geminiPlans": "웹에서만, 개인 Google 계정으로 쓸 수 있어요. Google AI Pro 또는 Ultra가 필요할 수 있어요.",
+        "codex": "Codex가 포함된 ChatGPT 요금제가 필요해요. ChatGPT 데스크톱 앱, Codex CLI, IDE 확장 프로그램이 이 설정을 함께 써요.",
+        "copilotPolicy": "Copilot Business와 Enterprise에서는 관리자가 MCP servers in Copilot 정책을 켜야 해요. 기본값은 꺼짐이에요.",
+        "grokAdmin": "Grok Business와 Enterprise에서는 관리자가 커넥터를 추가해요.",
+        "perplexityPlans": "Perplexity Pro, Max, Enterprise에서 쓸 수 있어요.",
+        "leChatAdmin": "Team 요금제에서는 관리자가 커넥터를 추가해요.",
+        "raycastPro": "Raycast Pro에서만 돼요.",
+        "visualStudio": "Visual Studio 2022 17.14 이상과 GitHub Copilot이 필요해요.",
+        "continueAgent": "Agent 모드에서만 작동해요."
       }
     },
     "consent": {
@@ -11123,6 +11323,8 @@
         "creatingChannel": "채널을 만들었어요",
         "offeringConnectAi": "AI 연결을 제안했어요",
         "offeringConnectApp": "앱 연결을 제안했어요",
+        "offeringSkill": "스킬 설치를 제안했어요",
+        "updatingSkills": "스킬을 업데이트했어요",
         "offeringInvites": "사람 초대를 제안했어요",
         "proposingAgent": "에이전트를 제안했어요",
         "askingAgent": "다른 에이전트에게 물었어요",
@@ -11207,6 +11409,8 @@
       "creatingChannel": "채널을 만드는 중",
       "offeringConnectAi": "AI 연결을 준비하는 중",
       "offeringConnectApp": "앱 연결을 준비하는 중",
+      "offeringSkill": "스킬 설치를 준비하는 중",
+      "updatingSkills": "스킬을 업데이트하는 중",
       "offeringInvites": "초대를 준비하는 중",
       "proposingAgent": "에이전트를 제안하는 중",
       "askingAgent": "다른 에이전트에게 묻는 중",
@@ -11316,6 +11520,8 @@
       "action_connect_app": "{{name}} 연결",
       "action_add_mcp": "MCP 서버 추가",
       "action_invite_people": "사람 초대",
+      "action_install_skill": "스킬 설치",
+      "action_update_skills": "스킬 업데이트",
       "agent_proposal": "새 에이전트를 제안했어요: {{name}}",
       "approval_request": "승인 요청: {{title}}",
       "secret_request": "{{agent}}이(가) 키를 요청했어요: {{name}}",
@@ -11520,6 +11726,14 @@
     "offer_invites": {
       "label": "사람 초대 제안",
       "description": "주소가 미리 입력된 초대 대화상자를 여는 버튼이 있는 카드를 게시해요."
+    },
+    "offer_install_skill": {
+      "label": "스킬 설치 제안",
+      "description": "스킬 링크가 채워진 설치 화면을 여는 버튼이 있는 카드를 올려요."
+    },
+    "update_skill_from_source": {
+      "label": "링크에서 스킬 업데이트",
+      "description": "스킬을 설치한 곳에서 업데이트해요. 스크립트 변경은 사람을 기다려요."
     },
     "propose_agent": {
       "label": "에이전트 제안",

@@ -21,7 +21,7 @@ const SUGGESTION_PROMPT_MAX = 300;
 /** Names of connections listed for "reads …" (and given to the model). */
 const SOURCES_MAX = 12;
 
-/** Suggestions per agent and language, kept a day in this process (ADR 0134 §3): asked once a day, not per dialog. */
+/** Suggestions per agent and language, kept a day in this process (ADR 0135 §3): asked once a day, not per dialog. */
 const suggestionCache = new TtlCache<WidgetSuggestion[]>(24 * 3600_000, 2000);
 
 /** Forgets the suggestions kept for an agent (tests, or after its role or connections change). */
@@ -108,7 +108,7 @@ export function parseWidgetSuggestions(text: string): WidgetSuggestion[] {
 }
 
 /**
- * "+ Widget"'s suggestions for one agent (ADR 0134 §3).
+ * "+ Widget"'s suggestions for one agent (ADR 0135 §3).
  *
  * `sources`: the names of the connections the agent may read (its connector grants). `suggestions`: three things it
  * could keep up to date, each with a kind and an alert condition, asked once of the workspace's cheap model through

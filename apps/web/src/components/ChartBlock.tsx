@@ -40,7 +40,7 @@ import { useDarkTheme, useGrowFrom } from "@/lib/grow";
 export const ChartAccent = createContext<AgentColor>("sky");
 
 /**
- * The agent's message a chart is in, where it can be pinned to a board as a widget (ADR 0134): its "Pin" button.
+ * The agent's message a chart is in, where it can be pinned to a board as a widget (ADR 0135): its "Pin" button.
  * Null elsewhere (a live answer, a notice, a consultation): no button.
  */
 export const ChartMessage = createContext<{ messageId: string; agentId: string } | null>(null);

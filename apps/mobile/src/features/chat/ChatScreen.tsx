@@ -156,6 +156,7 @@ import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinnedBar, PinsSheet } from "./PinsSheet";
+import { AgentLocked } from "./ReachLines";
 import { RowSight } from "./row-sight";
 import {
   appendedKeys,
@@ -1037,7 +1038,7 @@ function Chat({
   const [seek, setSeek] = useState<string | null>(focusId);
   const [flashId, setFlashId] = useState<string | null>(null);
   const seekPages = useRef(0);
-  const seekReady = isThread ? threadMessages.isSuccess : top.isSuccess;
+  const seekReady = isThread ? threadMessages.isSuccess && !threadMessages.isPlaceholderData : top.isSuccess;
   useEffect(() => {
     if (!seek || !seekReady) return;
     const index = shownRows.findIndex((r) => r.kind === "message" && r.message.id === seek);
@@ -1491,7 +1492,10 @@ function Chat({
       })
     : null;
   const connectInline = banner === null;
-  const loading = isThread ? threadMessages.isLoading : top.isLoading;
+  // A thread opens on its root the channel holds (`isPlaceholderData`) when it has no replies to wait for.
+  const loading = isThread
+    ? threadMessages.isLoading || (threadMessages.isPlaceholderData && (thread.data?.replyCount ?? 1) > 0)
+    : top.isLoading;
 
   const renderItem = useCallback(
     ({ item }: { item: Row }) => {
@@ -1947,7 +1951,14 @@ function Chat({
                   onSee={seeRun}
                 />
               ) : null}
-              {member ? (
+              {member && dmAgent && !canTalk(dmAgent) ? (
+                <AgentLocked agent={dmAgent} />
+              ) : member && channel?.can?.post === false ? (
+                // The channel's exceptions keep me from sending here (ADR 0134): reading stays open.
+                <Text variant="footnote" tone="muted" style={styles.readOnly}>
+                  {t("channel.perms.readOnlyComposer")}
+                </Text>
+              ) : member ? (
                 <Composer
                   placeholder={placeholder}
                   onSend={onSend}
@@ -2140,6 +2151,7 @@ const styles = StyleSheet.create({
   day: { alignSelf: "center", textAlign: "center", marginTop: 16, marginBottom: 6, fontWeight: "600" },
   listPad: { paddingTop: 8, paddingBottom: 8 },
   composer: { paddingHorizontal: 10, paddingTop: 6 },
+  readOnly: { textAlign: "center", paddingHorizontal: 16, paddingVertical: 12 },
   composerDock: { position: "absolute", left: 0, right: 0, bottom: 0 },
   jumpDock: { position: "absolute", left: 14, right: 14 },
   jumpEnd: { alignSelf: "flex-end" },

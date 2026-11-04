@@ -28,7 +28,7 @@ import {
 import { AudienceFields } from "./parts";
 
 /**
- * Share a dashboard, pushed (ADR 0134): who sees it (the whole workspace, some roles, only you), who edits it (whoever
+ * Share a dashboard, pushed (ADR 0135): who sees it (the whole workspace, some roles, only you), who edits it (whoever
  * sees it, only you and admins, or some roles), what showing it exposes, and who has access with these choices,
  * person by person. "Save" in the bar.
  */

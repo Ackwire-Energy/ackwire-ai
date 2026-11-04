@@ -20,7 +20,7 @@ const TABS: { name: string; glyph: TabGlyph; label: string; role?: "search" }[] 
 const SHOWN = barTabs(TABS, Platform.OS, Platform.Version);
 
 /**
- * Chats (the home), Dashboards (ADR 0134), Threads (threads and missions), Agents, Activity and Search in the
+ * Chats (the home), Dashboards (ADR 0135), Threads (threads and missions), Agents, Activity and Search in the
  * system tab bar (UITabBarController on iOS, Liquid Glass on iOS 26; Material bottom navigation on Android). Our own
  * glyphs on both platforms (outline, filled when selected), drawn as template images the bar tints. Badges for unread
  * conversations (Chats: channels and DMs; Threads: its rows, never both) and what waits on you. Every tab holds a

@@ -700,16 +700,11 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
       if (current && event.seq <= current.lastSeq) return state;
-      // A new model call: what the previous one wrote (and no tool call moved) was narration.
-      const prev = current?.text.trim() ?? "";
-      if (current && event.turn !== undefined && current.turn !== undefined && event.turn > current.turn && prev) {
-        return upsert(state, event, {
-          status: "running",
-          work: say(current.work ?? [], prev, current.turn),
-          text: event.text,
-          lastSeq: event.seq,
-          turn: event.turn,
-        });
+      // A new model call. Narration (text before tool calls) already left the body with `agent.narration` or the
+      // call; what is still here is a whole reply the server held and sent back for another try (a give-up, a
+      // question it shouldn't ask), never posted: the next turn's text replaces it.
+      if (current && event.turn !== undefined && current.turn !== undefined && event.turn > current.turn) {
+        return upsert(state, event, { status: "running", text: event.text, lastSeq: event.seq, turn: event.turn });
       }
       return upsert(state, event, {
         status: "running",

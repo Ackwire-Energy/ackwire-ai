@@ -28,7 +28,7 @@ import {
 import { addMember, type Fixture, setup } from "./fixtures";
 import { notificationsOf, routineRow } from "./routine-fixtures";
 
-/** ADR 0134 §16 (test a widget before creating it) and §17 (who names a widget, notes never cut). */
+/** ADR 0135 §16 (test a widget before creating it) and §17 (who names a widget, notes never cut). */
 
 let f: Fixture;
 afterEach(async () => {
@@ -85,7 +85,7 @@ async function widgetOf(id: string) {
 const routineRunsOf = (routineId: string) =>
   f.db.select().from(schema.routineRuns).where(eq(schema.routineRuns.routineId, routineId));
 
-describe("test before creating (ADR 0134 §16)", () => {
+describe("test before creating (ADR 0135 §16)", () => {
   test("Test makes a draft only its creator sees, on no board, built at once by a normal refresh run", async () => {
     await setupWidgets(builds({ data: KPI, summary: "1.284 visitas", title: "Visitas no site" }));
     const nina = await addMember(f.db, f.org.id, "member", "nina");
@@ -311,7 +311,7 @@ describe("test before creating (ADR 0134 §16)", () => {
   });
 });
 
-describe("who names a widget (ADR 0134 §17)", () => {
+describe("who names a widget (ADR 0135 §17)", () => {
   test("a first build must name it: no title is a tool error; too long is refused, never cut", async () => {
     const results: string[] = [];
     await setupWidgets((req, call) => {

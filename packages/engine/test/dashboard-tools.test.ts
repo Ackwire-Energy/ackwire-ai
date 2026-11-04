@@ -17,7 +17,7 @@ import {
 import { addMember, type Fixture, setup } from "./fixtures";
 import { channelRoutine, notificationsOf, routineDeps } from "./routine-fixtures";
 
-/** ADR 0134 §10, §11: agents make boards and widgets for the person behind the run, and never widen them alone. */
+/** ADR 0135 §10, §11: agents make boards and widgets for the person behind the run, and never widen them alone. */
 
 let f: Fixture;
 afterEach(async () => {

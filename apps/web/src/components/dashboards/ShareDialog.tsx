@@ -16,7 +16,7 @@ export const dashboardUrl = (orgId: string, dashboardId: string) =>
   `${window.location.origin}/org/${orgId}/dashboards/${dashboardId}`;
 
 /**
- * Share (ADR 0134 §8, §12): who sees the board and who edits it (anyone who sees it, only you and admins, or some
+ * Share (ADR 0135 §8, §12): who sees the board and who edits it (anyone who sees it, only you and admins, or some
  * roles), as in New dashboard, then who has access with the choice on screen (each member: edits, sees, or doesn't
  * see, by the server's own rule), Copy link and Save. Only the board's owner and admins open it (`canManage`).
  */

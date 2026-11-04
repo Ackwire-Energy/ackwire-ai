@@ -1,11 +1,11 @@
 /**
  * The presence badge in pixels (ADR 0084): a 9×9 shape in the agents' body (the cut corner bottom left), two tones
- * of dither like their bodies, a white mark (busy: a bar; away: a clock), an empty outline for offline and a dotted
- * one for hidden, and a one-cell ring in the surface's color around it. Pure data: the web draws it as SVG
- * (`PresenceBadge`), the phone with react-native-svg.
+ * of dither like their bodies, a white mark (busy: a bar; away: a clock; out of office: an arrow out the door, §12),
+ * an empty outline for offline and a dotted one for hidden, and a one-cell ring in the surface's color around it.
+ * Pure data: the web draws it as SVG (`PresenceBadge`), the phone with react-native-svg.
  */
 
-export type BadgePresence = "online" | "away" | "busy" | "offline" | "hidden";
+export type BadgePresence = "online" | "away" | "busy" | "out" | "offline" | "hidden";
 
 /** What each cell is: the badge's tones, the white mark, or the surface behind (`ring`). */
 export type BadgeTone = "base" | "light" | "deep" | "mark" | "ring";
@@ -42,6 +42,15 @@ const MARKS: Partial<Record<BadgePresence, readonly (readonly [number, number])[
     [4, 4],
     [4, 5],
     [4, 6],
+  ],
+  out: [
+    [3, 5],
+    [4, 2],
+    [4, 3],
+    [4, 4],
+    [4, 5],
+    [4, 6],
+    [5, 5],
   ],
 };
 

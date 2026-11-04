@@ -77,7 +77,7 @@ export function useNotificationOpener() {
       }
       const found = openTarget(n);
       if (!found) return null;
-      // A widget of My Home opens on Home (ADR 0134), when this tab knows which board that is.
+      // A widget of My Home opens on Home (ADR 0135), when this tab knows which board that is.
       const target = homeTarget(found, qc.getQueryData<Dashboard>(keys.dashboardHome(orgId))?.id);
       // A routine's trouble: its details over the page the person is on, its state and fix in view.
       const routineId = routineOf(target);

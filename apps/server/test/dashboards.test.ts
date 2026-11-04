@@ -4,7 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import { insertMessage, notify, proposeDashboardAudience } from "@agenteschat/engine";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
-/** The boards and widgets routes (ADR 0134): who sees and changes what, and what each route answers. */
+/** The boards and widgets routes (ADR 0135): who sees and changes what, and what each route answers. */
 
 let t: TestServer;
 beforeEach(async () => {
@@ -352,7 +352,7 @@ test("+ Widget: checked input, an agent the person may talk to, room on the boar
   expect(made).toMatchObject({
     dashboardId: sales.id,
     agentId: s.agentId,
-    // Untitled until its agent names it on its first build (ADR 0134 §17).
+    // Untitled until its agent names it on its first build (ADR 0135 §17).
     title: "",
     prompt: "Today's sales vs. yesterday",
     format: "auto",
@@ -983,7 +983,7 @@ test("cancelling a test deletes the draft; a person keeps five", async () => {
   expect(drafts).toHaveLength(4);
 });
 
-test("Rename keeps a person's title (ADR 0134 §17)", async () => {
+test("Rename keeps a person's title (ADR 0135 §17)", async () => {
   const s = await start();
   const sales = await s.newBoard(s.owner, { title: "Sales" });
   const w = await s.newWidget(s.owner, sales.id, { prompt: "Open orders by channel" });

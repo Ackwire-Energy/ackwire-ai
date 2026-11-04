@@ -106,12 +106,12 @@ const TargetEdit = z.union([
     forUserId: z.string().optional(),
   }),
 ]);
-/** What routines show: also a widget's own routine (ADR 0134 §4), whose target never changes from here. */
+/** What routines show: also a widget's own routine (ADR 0135 §4), whose target never changes from here. */
 const TargetView = z.union([
   ...TargetEdit.options,
   z
     .object({ type: z.literal("widget"), widgetId: z.uuid(), dashboardId: z.uuid() })
-    .openapi({ description: "Redoes a widget in place (ADR 0134 §4): its schedule and instructions change there." }),
+    .openapi({ description: "Redoes a widget in place (ADR 0135 §4): its schedule and instructions change there." }),
 ]);
 /** A structured schedule (the period picker): RRULE-like, in a time zone. */
 const ScheduleRuleSchema = z
@@ -354,7 +354,7 @@ const Routine = z
       .object({ id: z.uuid(), dashboardId: z.uuid(), title: z.string() })
       .nullable()
       .optional()
-      .openapi({ description: "A widget's own routine (ADR 0134 §4): the widget it redoes, which opens it." }),
+      .openapi({ description: "A widget's own routine (ADR 0135 §4): the widget it redoes, which opens it." }),
     lastRun: RoutineRun.nullable(),
     recentRuns: z.array(RoutineRun).openapi({ description: "The last runs, newest first (at most 14)." }),
     usage: z

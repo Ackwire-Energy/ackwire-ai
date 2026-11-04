@@ -254,16 +254,16 @@
     "chatSearch": "Zoek een persoon of een agent",
     "people": "Mensen",
     "nobody": "Nog niemand hier.",
-    "ask": {
-      "question": "Wat heb je nodig?",
-      "placeholder": "Bijv. de tekst van de prijspagina nakijken voor vrijdag",
-      "to": "Voor",
-      "sendF": "Vraag het {{name}}",
-      "sendM": "Vraag het {{name}}",
-      "more": "Of begin iets nieuws",
-      "person": "Gesprek met een persoon",
-      "noAgents": "Maak eerst je eigen agent aan om een agent iets te vragen."
-    },
+    "search": "Persoon of agent",
+    "create": "Maken",
+    "agentHint": "Een naam en wat hij doet",
+    "chatShort": "Gesprek",
+    "chatHint": "Een persoon of een agent",
+    "taskHint": "Met een verantwoordelijke en een deadline",
+    "routineHint": "Een agent doet het zelf, volgens schema",
+    "wikiPage": "Wikipagina",
+    "wikiHint": "Om te lezen voor het team en de agents",
+    "inviteHint": "Via e-mail of link",
     "agent": {
       "question": "Wat gaat hij doen?"
     }
@@ -1201,7 +1201,8 @@
       "forum": "Jouw beurt",
       "browser": "Browser",
       "secret": "Geheim",
-      "join": "Leden"
+      "join": "Leden",
+      "tools": "Tools"
     },
     "review": "Nakijken",
     "answer": "Antwoorden",

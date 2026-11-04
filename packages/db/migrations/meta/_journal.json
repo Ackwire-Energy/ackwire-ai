@@ -1342,22 +1342,50 @@
     {
       "idx": 192,
       "version": "7",
-      "when": 1793718507561,
-      "tag": "0193_dashboards",
+      "when": 1793725976871,
+      "tag": "0193_question_dismissed",
       "breakpoints": true
     },
     {
       "idx": 193,
       "version": "7",
-      "when": 1793728507561,
-      "tag": "0194_widget_drafts",
+      "when": 1793727546494,
+      "tag": "0194_channel_permissions",
       "breakpoints": true
     },
     {
       "idx": 194,
       "version": "7",
-      "when": 1793738507561,
-      "tag": "0195_dashboard_edit_roles",
+      "when": 1793728196643,
+      "tag": "0195_skill_auto_update",
+      "breakpoints": true
+    },
+    {
+      "idx": 195,
+      "version": "7",
+      "when": 1793730234354,
+      "tag": "0196_agents_improve_skills",
+      "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "7",
+      "when": 1793731584844,
+      "tag": "0197_skill_edited_since_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 197,
+      "version": "7",
+      "when": 1793733666011,
+      "tag": "0198_command_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 198,
+      "version": "7",
+      "when": 1793743666011,
+      "tag": "0199_dashboards",
       "breakpoints": true
     }
   ]

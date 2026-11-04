@@ -32,8 +32,11 @@ export interface DetailsDialogProps {
   /** "Abrir em página própria": the item's own page. */
   page?: DetailsDialogPageLink;
   closeLabel: string;
-  /** 720 (reading width, the default) or 960 (previews: files, diffs; an item laid out as its own page). */
-  size?: "md" | "lg";
+  /**
+   * 720 (reading width, the default), 960 (diffs; an item laid out as its own page) or `xl`, most of the window with a
+   * margin all round (a file, a page or a picture to look at).
+   */
+  size?: "md" | "lg" | "xl";
   /** Always the full height: tabs or sections that change inside never make it grow or shrink. */
   fill?: boolean;
   /**
@@ -85,6 +88,18 @@ export function DetailsDialog({
     returnTo.current = document.activeElement as HTMLElement | null;
   }
   wasOpen.current = open;
+  const inline = !eyebrow && !titleHidden;
+  const heading = titleHidden ? (
+    <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
+  ) : (
+    <div className="ac-details__heading">
+      {icon && <span className="ac-details__icon">{icon}</span>}
+      <div className="ac-details__titles">
+        <RDialog.Title className="ac-details__title">{title}</RDialog.Title>
+        {subtitle && <div className="ac-details__subtitle">{subtitle}</div>}
+      </div>
+    </div>
+  );
   const pageIcon = <Icon name="external" size={16} />;
   const pageClass = "ac-btn ac-btn--ghost ac-btn--sm ac-btn--icon";
   return (
@@ -92,7 +107,7 @@ export function DetailsDialog({
       <RDialog.Portal>
         <RDialog.Overlay className="ac-dialog__scrim" />
         <RDialog.Content
-          className={cx("ac-details", size === "lg" && "ac-details--lg", fill && "ac-details--fill", className)}
+          className={cx("ac-details", size !== "md" && `ac-details--${size}`, fill && "ac-details--fill", className)}
           aria-describedby={undefined}
           onEscapeKeyDown={onEscapeKeyDown}
           onCloseAutoFocus={(e) => {
@@ -104,8 +119,9 @@ export function DetailsDialog({
           }}
         >
           <div className="ac-details__head">
-            <div className="ac-details__bar">
-              <span className="ac-details__eyebrow">{eyebrow}</span>
+            {/* With no eyebrow, the heading takes the bar's empty start, beside the buttons, instead of a row of its own. */}
+            <div className={cx("ac-details__bar", inline && "ac-details__bar--titled")}>
+              {inline ? heading : <span className="ac-details__eyebrow">{eyebrow}</span>}
               <div className="ac-details__actions ac-acts">
                 {actions}
                 {page &&
@@ -132,17 +148,7 @@ export function DetailsDialog({
                 </RDialog.Close>
               </div>
             </div>
-            {titleHidden ? (
-              <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
-            ) : (
-              <div className="ac-details__heading">
-                {icon && <span className="ac-details__icon">{icon}</span>}
-                <div className="ac-details__titles">
-                  <RDialog.Title className="ac-details__title">{title}</RDialog.Title>
-                  {subtitle && <div className="ac-details__subtitle">{subtitle}</div>}
-                </div>
-              </div>
-            )}
+            {!inline && heading}
           </div>
           <div className="ac-details__body">{children}</div>
           {footer && <div className="ac-details__foot">{footer}</div>}

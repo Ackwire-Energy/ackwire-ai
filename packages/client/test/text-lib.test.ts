@@ -1,6 +1,16 @@
 import { expect, test } from "bun:test";
 import { plainLines } from "../src/lib/markdown";
-import { around, emailTypoFix, excerpt, holdsText, jwtEmail, matchesName, webmailOf } from "../src/lib/text";
+import {
+  around,
+  emailTypoFix,
+  excerpt,
+  holdsText,
+  jwtEmail,
+  looksLikePassword,
+  matchesName,
+  nameIsPassword,
+  webmailOf,
+} from "../src/lib/text";
 
 test("a name typed to confirm: case, extra spaces, width forms and invisible characters aside, never a part", () => {
   expect(matchesName(" new  AGENT ", "New agent")).toBe(true);
@@ -128,4 +138,38 @@ test("holdsText: the same words, spacing aside, never a word cut in the middle",
   expect(holdsText("Vou verificar o painel.", "Vou ver")).toBe(false);
   expect(holdsText("Okay, feito.", "Ok")).toBe(false);
   expect(holdsText("Outra coisa.", "Vou ver.")).toBe(false);
+});
+
+test("a name that looks like a password: no space, a digit and a symbol; real names never", () => {
+  for (const name of ["Fake#Pass1", "S3nh@forte", " hunter2!xyz ", "P4ss#word", "كلمة١٢٣$سر"])
+    expect(looksLikePassword(name)).toBe(true);
+  for (const name of [
+    "Ana 2",
+    "Ana",
+    "José da Silva",
+    "Jean-Luc",
+    "O'Neil",
+    "D’Ávila",
+    "Dr. Müller",
+    "Ana-Clara2",
+    "Nguyễn Văn An",
+    "李小龙",
+    "محمد بن سلمان",
+    "Владимир",
+    "ジョン・スミス2世",
+    "Gal·la2024x",
+    "J.R.R.Tolkien3",
+    "R2-D2",
+    "Fake#Pass1 Souza",
+    "abc$1",
+    "",
+  ])
+    expect(looksLikePassword(name)).toBe(false);
+});
+
+test("the password chosen is the name typed: trimmed, exact, never an empty name", () => {
+  expect(nameIsPassword("Fake#Pass1 ", "Fake#Pass1")).toBe(true);
+  expect(nameIsPassword("Fake#Pass1", "admin$10")).toBe(false);
+  expect(nameIsPassword("Ana Souza", "outra-senha-1")).toBe(false);
+  expect(nameIsPassword("  ", "  ")).toBe(false);
 });

@@ -14,11 +14,11 @@ import { TextArea } from "../shared/TextArea";
 import { type AudienceDraft, audienceDraftOf, audienceReady, shareInputOf } from "./logic";
 import { AudienceFields } from "./parts";
 
-/** The longest name the server takes (ADR 0134). */
+/** The longest name the server takes (ADR 0135). */
 const TITLE_MAX = 80;
 
 /**
- * "New dashboard", pushed (ADR 0134): its name (with a line saying an agent builds one when asked in a chat), who sees
+ * "New dashboard", pushed (ADR 0135): its name (with a line saying an agent builds one when asked in a chat), who sees
  * it and who edits it. "Create" in the bar opens the new, empty board.
  */
 export function NewBoardScreen() {

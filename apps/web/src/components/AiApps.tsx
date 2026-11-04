@@ -1,17 +1,6 @@
 import type { AppAccess, AppsList, ConnectedApp, Me, PersonalToken, PersonalTokenInput } from "@agenteschat/client";
 import { ApiError, keys, useAppActions, useApps, useMe } from "@agenteschat/client";
-import {
-  APP_CLIENTS,
-  type AppClientId,
-  claudeCodeCommand,
-  codexCommands,
-  cursorConfig,
-  cursorInstallLink,
-  OTHER_CLIENT_TABS,
-  type OtherClientTab,
-  vscodeConfig,
-  vscodeInstallLink,
-} from "@agenteschat/client/lib/app-clients";
+import { APP_CLIENT_GROUPS, APP_CLIENTS, type AppClient, type GuideStep } from "@agenteschat/client/lib/app-clients";
 import { appFacts, appMark, isAppsEmpty, newlyConnected, tokenFacts } from "@agenteschat/client/lib/apps";
 import { errorCode, errorText, REAUTH_SIGN_IN } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -39,13 +28,14 @@ import {
   Tabs,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { useSignInAgain } from "@/hooks/useSignInAgain";
+import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import "./ai-apps.css";
 
@@ -338,8 +328,9 @@ function ConfirmDialog({ confirm, whole, onClose }: { confirm: Confirm | null; w
 // ── "Conectar um app" ─────────────────────────────────────────────────────────
 
 /**
- * One card per app, then that app's steps in the same dialog with the address to paste. While the steps are open
- * the list is asked again every few seconds: the new app shows here once its sign-in is done.
+ * One card per app, the chat apps first, then editors and terminals, then "Outro app"; then that app's steps in the
+ * same dialog with the address to paste. While the steps are open the list is asked again every few seconds: the new
+ * app shows here once its sign-in is done.
  */
 export function ConnectAppDialog({
   serverUrl,
@@ -354,7 +345,7 @@ export function ConnectAppDialog({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const [client, setClient] = useState<AppClientId | null>(null);
+  const [client, setClient] = useState<string | null>(null);
   const [known] = useState(() => new Set(seen));
   const [since, setSince] = useState(0);
   const [watching, setWatching] = useState(false);
@@ -371,11 +362,12 @@ export function ConnectAppDialog({
     return () => clearTimeout(timer);
   }, [client, connected, timedOut]);
   const picked = APP_CLIENTS.find((c) => c.id === client);
+  const nameOf = (c: AppClient) => c.name ?? t("apps.dialog.client.other");
   return (
     <Dialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title={picked ? t(`apps.dialog.client.${picked.id}`) : t("apps.connect")}
+      title={picked ? nameOf(picked) : t("apps.connect")}
       description={picked ? undefined : t("apps.dialog.pick")}
       leading={picked ? <ClientMark mark={picked.mark} /> : undefined}
       closeLabel={t("common.close")}
@@ -384,26 +376,41 @@ export function ConnectAppDialog({
     >
       <DialogBody className="apps-connect__body">
         {!picked ? (
-          <div className="apps-clients">
-            {APP_CLIENTS.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="apps-client"
-                onClick={() => {
-                  setClient(c.id);
-                  setSince(Date.now());
-                }}
-              >
-                <ClientMark mark={c.mark} />
-                <span className="list-col">
-                  <span className="apps-client__name">{t(`apps.dialog.client.${c.id}`)}</span>
-                  <span className="small muted">{t(`apps.dialog.clientText.${c.id}`)}</span>
-                </span>
-                <Icon name="chevronRight" size={16} className="apps-client__go" />
-              </button>
-            ))}
-          </div>
+          APP_CLIENT_GROUPS.map((group) => {
+            const clients = APP_CLIENTS.filter((c) => c.group === group);
+            const heading = group && `apps-group-${group}`;
+            return (
+              <section key={group ?? "other"} className="apps-group" aria-labelledby={heading || undefined}>
+                {group && (
+                  <h3 id={heading || undefined} className="cflow-group__title">
+                    {t(`apps.dialog.group.${group}`)}
+                  </h3>
+                )}
+                <div className="apps-clients">
+                  {clients.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="apps-client"
+                      onClick={() => {
+                        setClient(c.id);
+                        setSince(Date.now());
+                      }}
+                    >
+                      <ClientMark mark={c.mark} />
+                      <span className="list-col">
+                        <span className="apps-client__name">{nameOf(c)}</span>
+                        <span className="small muted">
+                          {c.site ?? t(`apps.dialog.clientText.${c.kind ?? "other"}`)}
+                        </span>
+                      </span>
+                      <Icon name="chevronRight" size={16} className="apps-client__go" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          })
         ) : connected ? (
           // The app's mark is already in the head: the body says it connected.
           <div className="apps-connected" role="status">
@@ -417,7 +424,7 @@ export function ConnectAppDialog({
           </div>
         ) : (
           <>
-            <ClientSteps client={picked.id} app={picked.app} url={serverUrl} onToken={onToken} />
+            <ClientSteps client={picked} url={serverUrl} onToken={onToken} />
             {timedOut ? (
               <div className="apps-watch apps-watch--late">
                 <span className="small muted">{t("apps.dialog.timeout")}</span>
@@ -474,10 +481,6 @@ function ClientMark({ mark }: { mark: string | null }) {
   );
 }
 
-function Steps({ children }: { children: ReactNode }) {
-  return <ol className="machine-pair__steps apps-steps small">{children}</ol>;
-}
-
 function OpenLink({ href, app }: { href: string; app: string }) {
   const { t } = useTranslation();
   return (
@@ -490,147 +493,53 @@ function OpenLink({ href, app }: { href: string; app: string }) {
   );
 }
 
-/** One app's steps, each fact from `app-clients.ts`. */
-function ClientSteps({
-  client,
-  app,
-  url,
-  onToken,
-}: {
-  client: AppClientId;
-  app: string | undefined;
-  url: string;
-  onToken: () => void;
-}) {
+/** One app's guide from `app-clients.ts`: each step's words, then its button, address or command to copy. */
+function ClientSteps({ client, url, onToken }: { client: AppClient; url: string; onToken: () => void }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<OtherClientTab>("vscode");
-  const address = <CommandBlock command={url} copied={t("apps.serverCopied")} />;
-  if (client === "claude") {
-    return (
-      <>
-        <p className="small muted apps-lead">{t("apps.dialog.claude.lead")}</p>
-        <Steps>
-          <li>
-            <span className="apps-step">
-              {t("apps.dialog.claude.step1")}
-              {app && <OpenLink href={app} app="Claude" />}
-            </span>
-          </li>
-          <li>
-            <span className="apps-step">
-              {t("apps.dialog.claude.step2")}
-              {address}
-            </span>
-          </li>
-          <li>{t("apps.dialog.claude.step3")}</li>
-        </Steps>
-        <SettingNote icon="phone">{t("apps.dialog.claude.phone")}</SettingNote>
-        <SettingNote icon="members">{t("apps.dialog.claude.team")}</SettingNote>
-        <SettingNote icon="info">{t("apps.dialog.claude.free")}</SettingNote>
-      </>
-    );
-  }
-  if (client === "claude_code") {
-    return (
-      <>
-        <Steps>
-          <li>
-            <span className="apps-step">
-              {t("apps.dialog.claudeCode.step1")}
-              <CommandBlock command={claudeCodeCommand(url)} />
-            </span>
-          </li>
-          <li>
-            <span>
-              <Trans i18nKey="apps.dialog.claudeCode.step2" components={CODE} />
-            </span>
-          </li>
-        </Steps>
-        <SettingNote icon="info">
-          <Trans i18nKey="apps.dialog.claudeCode.scope" components={CODE} />
-        </SettingNote>
-      </>
-    );
-  }
-  if (client === "chatgpt") {
-    return (
-      <>
-        <Steps>
-          <li>
-            <span className="apps-step">
-              {t("apps.dialog.chatgpt.step1")}
-              {app && <OpenLink href={app} app="ChatGPT" />}
-            </span>
-          </li>
-          <li>{t("apps.dialog.chatgpt.step2")}</li>
-          <li>
-            <span className="apps-step">
-              {t("apps.dialog.chatgpt.step3")}
-              {address}
-            </span>
-          </li>
-        </Steps>
-        <SettingNote icon="info">{t("apps.dialog.chatgpt.plans")}</SettingNote>
-      </>
-    );
-  }
-  if (client === "cursor") {
-    return (
-      <>
-        <div className="row">
-          <Button asChild variant="primary">
-            <a href={cursorInstallLink(url)}>{t("apps.dialog.cursor.add")}</a>
-          </Button>
-        </div>
-        <span className="apps-step small muted">
-          <span>
-            <Trans i18nKey="apps.dialog.cursor.manual" components={CODE} />
-          </span>
-          <CommandBlock command={cursorConfig(url)} />
-        </span>
-        <SettingNote icon="info">{t("apps.dialog.cursor.signIn")}</SettingNote>
-      </>
-    );
-  }
+  const guide = client.guide(url);
+  const words = (s: GuideStep) => (
+    <Trans i18nKey={`apps.dialog.${s.text}`} values={s.vars} components={CODE} {...TYPED_VALUES} />
+  );
+  const installs = guide.steps.filter((s) => s.install);
+  const steps = guide.steps.filter((s) => !s.install);
   return (
-    <Tabs
-      value={tab}
-      onValueChange={setTab}
-      label={t("apps.dialog.other.tabs")}
-      items={OTHER_CLIENT_TABS.map((value) => ({ value, label: t(`apps.dialog.other.${value}`) }))}
-    >
-      <TabPanel value="vscode">
-        <div className="row">
+    <>
+      {guide.lead && <p className="small muted apps-lead">{t(`apps.dialog.${guide.lead}`)}</p>}
+      {installs.map((s) => (
+        <div key={s.text} className="row">
           <Button asChild variant="primary">
-            <a href={vscodeInstallLink(url)}>{t("apps.dialog.other.vscodeAdd")}</a>
+            <a href={s.install}>{words(s)}</a>
           </Button>
         </div>
-        <span className="apps-step small muted">
-          <span>
-            <Trans i18nKey="apps.dialog.other.vscodeManual" components={CODE} />
-          </span>
-          <CommandBlock command={vscodeConfig(url)} />
-        </span>
-      </TabPanel>
-      <TabPanel value="codex">
-        <span className="apps-step small muted">
-          {t("apps.dialog.other.codexStep")}
-          <CommandBlock command={codexCommands(url)} />
-        </span>
-      </TabPanel>
-      <TabPanel value="any">
-        <span className="apps-step small muted">
-          {t("apps.dialog.other.anyStep")}
-          {address}
-        </span>
-        <SettingNote icon="key">{t("apps.dialog.other.anyToken")}</SettingNote>
-        <div className="row">
-          <Button size="sm" icon="key" onClick={onToken}>
-            {t("apps.dialog.other.toTokens")}
-          </Button>
-        </div>
-      </TabPanel>
-    </Tabs>
+      ))}
+      {steps.length > 0 && (
+        <ol className="machine-pair__steps apps-steps small">
+          {steps.map((s) => (
+            <li key={`${s.text}${s.code ?? ""}`}>
+              <span className="apps-step">
+                <span>{words(s)}</span>
+                {s.open && <OpenLink href={s.open} app={client.name ?? ""} />}
+                {s.address && <CommandBlock command={url} copied={t("apps.serverCopied")} />}
+                {s.code && <CommandBlock command={s.code} />}
+                {s.token && (
+                  <span className="row">
+                    <Button size="sm" icon="key" onClick={onToken}>
+                      {t("apps.dialog.other.toTokens")}
+                    </Button>
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {client.untested && <SettingNote icon="info">{t("apps.dialog.note.untested")}</SettingNote>}
+      {guide.notes.map((n) => (
+        <SettingNote key={n.text} icon={n.icon}>
+          <Trans i18nKey={`apps.dialog.${n.text}`} components={CODE} />
+        </SettingNote>
+      ))}
+    </>
   );
 }
 

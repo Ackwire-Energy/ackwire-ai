@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { DirectMessage } from "@agenteschat/client";
 import { buildConversations } from "../../src/features/chats/logic";
-import { AGENT_NAMES, askTargets, pickedTarget, requestBody, suggestAgentName } from "../../src/features/new/logic";
+import { AGENT_NAMES, askTargets, chatMatches, createItems, suggestAgentName } from "../../src/features/new/logic";
 import { agent, at } from "./fixtures";
 
 const dm = (channelId: string, who: { type: "agent" | "person"; id: string }, minutesAgo: number | null) =>
@@ -17,7 +17,7 @@ const dm = (channelId: string, who: { type: "agent" | "person"; id: string }, mi
 
 const rows = (dms: DirectMessage[]) => buildConversations({ channels: [], dms, threads: [] });
 
-describe("Novo: who a request goes to", () => {
+describe("New: the agents in its row", () => {
   const theo = agent({ id: "theo", name: "Theo" });
   const nina = agent({ id: "nina", name: "Nina" });
   const ada = agent({ id: "ada", name: "Ada" });
@@ -40,22 +40,58 @@ describe("Novo: who a request goes to", () => {
     const list = askTargets([theo, { ...nina, canTalk: false }, ada], []);
     expect(list.map((a) => a.id)).toEqual(["ada", "theo"]);
   });
+});
 
-  test("the tapped agent wins while it is still there, else the first", () => {
-    const list = [theo, nina];
-    expect(pickedTarget(list, null)?.id).toBe("theo");
-    expect(pickedTarget(list, "nina")?.id).toBe("nina");
-    expect(pickedTarget(list, "gone")?.id).toBe("theo");
-    expect(pickedTarget([], "nina")).toBeNull();
+describe("New: the search for a person or an agent", () => {
+  const theo = agent({ id: "theo", name: "Theo", role: "Vendas" });
+  const ada = agent({ id: "ada", name: "Ada", role: "Dev", handle: "ada-dev" });
+  const quiet = agent({ id: "quiet", name: "Bia", canTalk: false });
+  const people = [
+    { userId: "me", name: "Ana Lima" },
+    { userId: "u2", name: "Carla Souza" },
+    { userId: "u3", name: "Bruno Reis" },
+  ];
+
+  test("no words: every agent that talks to you and every other person, each by name", () => {
+    const found = chatMatches("", [theo, quiet, ada], people, "me");
+    expect(found.agents.map((a) => a.id)).toEqual(["ada", "theo"]);
+    expect(found.people.map((p) => p.userId)).toEqual(["u3", "u2"]);
   });
 
-  test("the request is the text, trimmed; nothing to send when empty", () => {
-    expect(requestBody("  Revisar a página de preços\n")).toBe("Revisar a página de preços");
-    expect(requestBody(" \n ")).toBeNull();
+  test("agents match by name, role or handle; people by name, ignoring case and accents", () => {
+    expect(chatMatches("vendas", [theo, ada], people, "me").agents.map((a) => a.id)).toEqual(["theo"]);
+    expect(chatMatches("ADA-D", [theo, ada], people, "me").agents.map((a) => a.id)).toEqual(["ada"]);
+    expect(chatMatches("sóuza", [theo, ada], people, "me").people.map((p) => p.userId)).toEqual(["u2"]);
+    expect(chatMatches("lima", [theo, ada], people, "me").people).toEqual([]);
   });
 });
 
-describe("Novo agente: the suggested name", () => {
+describe("New: what the grid offers", () => {
+  const all = ["create_agents", "create_channels", "post", "manage_routines", "edit_wiki", "invite_people"] as const;
+
+  test("everything, in order, for who may do it all", () => {
+    expect(createItems({ permissions: all }, { ownsAgent: false })).toEqual([
+      "agent",
+      "channel",
+      "chat",
+      "task",
+      "routine",
+      "wiki",
+      "invite",
+    ]);
+  });
+
+  test("a conversation for anyone; nothing else without its permission", () => {
+    expect(createItems({ permissions: [] }, { ownsAgent: false })).toEqual(["chat"]);
+    expect(createItems(null, { ownsAgent: false })).toEqual(["chat"]);
+  });
+
+  test("a routine also for the owner of an agent", () => {
+    expect(createItems({ permissions: ["post"] }, { ownsAgent: true })).toEqual(["chat", "task", "routine"]);
+  });
+});
+
+describe("New agent: the suggested name", () => {
   test("the first name nobody uses, ignoring case and accents", () => {
     expect(suggestAgentName([])).toBe(AGENT_NAMES[0]);
     expect(suggestAgentName(["lu", "NÍNA"])).toBe("Theo");

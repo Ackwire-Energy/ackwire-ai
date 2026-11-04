@@ -89,3 +89,93 @@ describe("loading states", () => {
     expect(within(nav).getByRole("link", { name: /eng/ })).toBeTruthy();
   });
 });
+
+describe("a thread opening in the panel", () => {
+  const click = (el: Element) => act(async () => fireEvent.click(el));
+  /** The thread's own reads (its info and its messages) held until `release`. */
+  const holdThread = (api: ReturnType<typeof createFakeApi>) => {
+    const info = deferred<void>();
+    const realGet = api.threads.get;
+    const realMessages = api.chat.messages;
+    api.threads.get = async (...args) => {
+      await info.promise;
+      return realGet(...args);
+    };
+    api.chat.messages = async (orgId, channelId, options) => {
+      if (options?.threadId) await info.promise;
+      return realMessages(orgId, channelId, options);
+    };
+    return () => act(async () => info.resolve());
+  };
+
+  test("Responder: the header, the message and the composer are real at once, with no skeleton", async () => {
+    const api = createFakeApi(seedState());
+    const release = holdThread(api);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const bar = screen().getByRole("toolbar", { name: "Ações da mensagem de João" });
+    await click(within(bar).getByRole("button", { name: "Responder" }));
+    await settle(2);
+    const panel = screen().getByRole("complementary", { name: "Thread" });
+    expect(within(panel).getByRole("button", { name: "Fechar a thread" })).toBeTruthy();
+    expect(panel.querySelector('article[data-message-id="m-1"]')?.textContent).toContain("o login está devolvendo 401");
+    const composer = within(panel).getByRole("combobox", { name: "Responder na thread" });
+    expect(within(panel).queryByRole("status", { name: "Carregando mensagens" })).toBeNull();
+    await release();
+    await settle(6);
+    // The read lands in place: the same composer, the same root, still no skeleton.
+    expect(within(panel).getByRole("combobox", { name: "Responder na thread" })).toBe(composer);
+    expect(panel.querySelectorAll('article[data-message-id="m-1"]')).toHaveLength(1);
+    expect(within(panel).queryByRole("status", { name: "Carregando mensagens" })).toBeNull();
+  });
+
+  test("a thread with replies: only its replies wait, under its real root", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-3",
+      channelId: ENG_ID,
+      threadId: "m-1",
+      author: { type: "person", id: "u-walter" },
+      body: "vou olhar o refresh",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: new Date(Date.now() - 30 * 60_000).toISOString(),
+    });
+    const api = createFakeApi(state);
+    await state.openThread?.(ORG_ID, "m-1", state.messages.at(-1)?.createdAt ?? "");
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const release = holdThread(api);
+    await click(screen().getByRole("button", { name: /1 resposta/ }));
+    await settle(2);
+    const panel = screen().getByRole("complementary", { name: "Thread" });
+    expect(panel.querySelector(".thread-title")?.textContent).toContain("o login está devolvendo 401");
+    expect(panel.querySelector('article[data-message-id="m-1"]')).toBeTruthy();
+    const waiting = within(panel).getByRole("status", { name: "Carregando mensagens" });
+    expect(waiting.querySelectorAll(".ac-skeleton-msg")).toHaveLength(1);
+    // Nothing of the whole-conversation skeleton: the header and the composer are the real ones.
+    expect(panel.querySelector(".channel__skeleton")).toBeNull();
+    expect(within(panel).getByRole("combobox", { name: "Responder na thread" })).toBeTruthy();
+    await release();
+    await settle(6);
+    expect(panel.textContent).toContain("vou olhar o refresh");
+    expect(within(panel).queryByRole("status", { name: "Carregando mensagens" })).toBeNull();
+  });
+
+  test("a thread no list holds yet: one skeleton shaped like it, the composer's box with no bar in it", async () => {
+    const api = createFakeApi(seedState());
+    const release = holdThread(api);
+    await renderApp(`/org/${ORG_ID}/threads/m-1`, { api });
+    await settle(6);
+    const skeleton = document.querySelector(".channel__skeleton") as HTMLElement;
+    expect(skeleton.querySelector(".thread-head")).toBeTruthy();
+    expect(skeleton.querySelectorAll(".ac-skeleton-msg")).toHaveLength(6);
+    const box = skeleton.querySelector(".channel__composer-skeleton") as HTMLElement;
+    expect(box.querySelectorAll(".ac-skeleton")).toHaveLength(1);
+    expect(box.querySelector(".ac-composer__tools .channel__composer-skeleton-send")).toBeTruthy();
+    await release();
+    await settle(8);
+    expect(document.querySelector(".channel__skeleton")).toBeNull();
+    expect(screen().getByRole("combobox", { name: "Responder na thread" })).toBeTruthy();
+  });
+});

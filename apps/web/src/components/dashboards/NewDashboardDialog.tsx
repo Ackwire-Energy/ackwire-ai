@@ -10,7 +10,7 @@ import { AudienceFields, audienceReady, type BoardAudience } from "./parts";
 import "@/pages/dashboards.css";
 
 /**
- * New dashboard (ADR 0134 §8, §10): its name (with a line saying an agent builds one when asked in a chat), who sees
+ * New dashboard (ADR 0135 §8, §10): its name (with a line saying an agent builds one when asked in a chat), who sees
  * it and who edits it, with the note on what whoever sees it sees. Creating opens the new, empty board.
  */
 export function NewDashboardDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -40,7 +40,7 @@ function NewDashboardBody({ nameRef, onClose }: { nameRef: RefObject<HTMLInputEl
   const id = useId();
   const create = useCreateDashboard(org.id);
   const [title, setTitle] = useState("");
-  // Private until the person picks otherwise: nothing reaches others without a choice (ADR 0134 §12).
+  // Private until the person picks otherwise: nothing reaches others without a choice (ADR 0135 §12).
   const [audience, setAudience] = useState<BoardAudience>({
     audience: "private",
     roleIds: [],

@@ -11,7 +11,7 @@ import { useToast } from "@/lib/toast";
 import { roleNames, useCustomRoles } from "./parts";
 
 /**
- * An agent's request to show the board to more people (ADR 0134 §11), on the board itself: "Theo built this
+ * An agent's request to show the board to more people (ADR 0135 §11), on the board itself: "Theo built this
  * dashboard for you", what it suggests, and — for the person it asks — Keep only for me and Publish. Everyone else
  * who sees the board reads the request without the buttons.
  */

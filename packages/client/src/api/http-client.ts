@@ -54,6 +54,7 @@ import type {
   ChannelCard,
   ChannelCategory,
   ChannelMember,
+  ChannelOverride,
   Choices,
   CodeSent,
   CommandApproval,
@@ -77,6 +78,7 @@ import type {
   DeviceRequest,
   DirectMessage,
   DmRead,
+  ForeignMailbox,
   FormerAgent,
   ForumPost,
   ForumSuggestion,
@@ -176,6 +178,8 @@ import type {
   Skill,
   SkillDetail,
   SkillPick,
+  SkillSettings,
+  SkillSourceUpdate,
   SpeechKey,
   StartChoice,
   StorageConfig,
@@ -623,6 +627,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/routine`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
+      mailLoss: async (orgId, agentId, audience) =>
+        (
+          await request<{ mailboxes: ForeignMailbox[] }>(`${org(orgId)}/agents/${enc(agentId)}/audience/mail-loss`, {
+            json: { audience },
+          })
+        ).mailboxes,
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
       purge: (orgId, agentId) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE", query: { purge: "true" } }),
@@ -814,6 +824,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           method: "PATCH",
           json: { autoReply },
         }),
+      permissions: async (orgId, channelId) =>
+        (await request<{ overrides: ChannelOverride[] }>(`${org(orgId)}/channels/${enc(channelId)}/permissions`))
+          .overrides,
+      setPermission: async (orgId, channelId, override) =>
+        (await request<ChannelOverride | undefined>(`${org(orgId)}/channels/${enc(channelId)}/permissions`, {
+          method: "PUT",
+          json: override,
+        })) ?? null,
       messages: async (orgId, channelId, options = {}) => {
         const path = `${org(orgId)}/channels/${enc(channelId)}/messages`;
         const query = { threadId: options.threadId, before: options.before, limit: options.limit };
@@ -1013,6 +1031,16 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ skills: LearnedSkill[] }>(`${org(orgId)}/agents/${enc(agentId)}/learned-skills`)).skills,
       revert: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/revert`, { json: {} }),
       restore: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/restore`, { json: {} }),
+      updateFromSource: (orgId, id) =>
+        request<SkillSourceUpdate>(`${org(orgId)}/skills/${enc(id)}/update`, { json: {} }),
+      approveUpdate: (orgId, id) =>
+        request<SkillSourceUpdate>(`${org(orgId)}/skills/${enc(id)}/update/approve`, { json: {} }),
+      dismissUpdate: (orgId, id) =>
+        request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/dismiss`, { json: {} }),
+      undoUpdate: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/undo`, { json: {} }),
+      settings: (orgId) => request<SkillSettings>(`${org(orgId)}/skill-settings`),
+      saveSettings: (orgId, input) =>
+        request<SkillSettings>(`${org(orgId)}/skill-settings`, { method: "PUT", json: input }),
     },
     access: {
       get: (orgId, agentId) => request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`),
@@ -1471,6 +1499,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     questions: {
       answer: (orgId, questionId, input) =>
         request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/answer`, { json: input }),
+      dismiss: (orgId, questionId) =>
+        request<AgentQuestion>(`${org(orgId)}/questions/${enc(questionId)}/dismiss`, { json: {} }),
     },
     secrets: {
       deliver: (orgId, requestId, box) =>

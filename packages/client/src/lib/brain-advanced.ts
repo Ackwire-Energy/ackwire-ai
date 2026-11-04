@@ -5,7 +5,8 @@ import { type ContextLimit, contextSize } from "./context-limits";
 /*
  * "Configuração avançada" of an agent's AI (ADR 0086), the same on the web (a dialog over "Quem pensa") and the
  * phone (a screen from "Pensa com"): how it thinks (effort, context window) and who it answers ("Atende outras
- * pessoas", answering through the API while its computer is away). Its row says only what differs from the defaults.
+ * pessoas", answering through the API while its computer is away). Its row names what is inside, a save says what
+ * differs from the defaults.
  */
 
 /** The effort levels the apps offer (a stored `xhigh` shows as high). */
@@ -31,8 +32,14 @@ export const isAdvancedDefault = (kind: BrainKind, now: Advanced) =>
 
 type AdvancedOf = { kind: BrainKind; autoModel: boolean; apiKey: boolean; now: Advanced };
 
+/** The row's line: what the dialog holds ("Esforço, janela de contexto e quem atende"), the effort only with a fixed model. */
+export function advancedContents(t: TFunction, o: Pick<AdvancedOf, "kind" | "autoModel">): string {
+  const which = o.kind === "model" ? "model" : o.autoModel ? "auto" : "fixed";
+  return t(`agentPage.work.brain.advanced.contents.${which}`);
+}
+
 /**
- * The row's line: "Tudo no padrão", or only what differs ("Esforço alto · Contexto de 400K"). The effort counts only
+ * After a save: "Tudo no padrão", or only what differs ("Esforço alto · Contexto de 400K"). The effort counts only
  * with a fixed model (an automatic one picks it), and the fallback only where answering through the API is possible.
  */
 export function advancedSummary(t: TFunction, language: string, o: AdvancedOf): string {

@@ -101,7 +101,7 @@ async function usage(runId: string | null, cost: number, agentId = f.agent.id, b
   });
 }
 
-describe("what a widget costs (ADR 0134 §7)", () => {
+describe("what a widget costs (ADR 0135 §7)", () => {
   test("without a history: its model's price for a typical refresh, times the runs of its schedule", async () => {
     const hourly = await estimateWidgetCost(deps, f.owner.id, f.org.id, f.agent.id, "hour");
     expect(hourly).toMatchObject({
@@ -168,7 +168,7 @@ describe("what a widget costs (ADR 0134 §7)", () => {
   });
 });
 
-describe("suggestions per agent (ADR 0134 §3)", () => {
+describe("suggestions per agent (ADR 0135 §3)", () => {
   async function connection(label: string, prefix: string) {
     const [row] = await f.db
       .insert(schema.connectorConnections)

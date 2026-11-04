@@ -938,6 +938,12 @@
   "auth.flow.namePlaceholder": {
     "value": "Your name"
   },
+  "auth.flow.nameIsPassword": {
+    "value": "Is this your name? It's the same as the password you typed."
+  },
+  "auth.flow.nameLooksLikePassword": {
+    "value": "That looks like a password. Your name goes here."
+  },
   "auth.flow.newPassword": {
     "value": "Now a password."
   },
@@ -3086,6 +3092,9 @@
   "shell.handle": {
     "value": "Your @"
   },
+  "shell.nameEmpty": {
+    "value": "Write your name."
+  },
   "shell.timezoneHelp": {
     "value": "Shows your local time on your profile card."
   },
@@ -3537,6 +3546,96 @@
       "one": "{{count}} agent working",
       "other": "{{count}} agents working"
     }
+  },
+  "channel.settingsNav.label": {
+    "value": "Channel settings"
+  },
+  "channel.settingsNav.overview": {
+    "value": "Overview"
+  },
+  "channel.settingsNav.permissions": {
+    "value": "Permissions"
+  },
+  "channel.settingsNav.members": {
+    "value": "Members"
+  },
+  "channel.perms.advanced": {
+    "value": "Advanced permissions"
+  },
+  "channel.perms.intro": {
+    "value": "Exceptions apply to this channel only. Default follows the workspace's roles."
+  },
+  "channel.perms.targets": {
+    "value": "Roles and people with an exception"
+  },
+  "channel.perms.add": {
+    "value": "Add a role or person"
+  },
+  "channel.perms.addSearch": {
+    "value": "Search roles or people"
+  },
+  "channel.perms.addNone": {
+    "value": "No role or person found"
+  },
+  "channel.perms.groupRoles": {
+    "value": "Roles"
+  },
+  "channel.perms.groupPeople": {
+    "value": "People"
+  },
+  "channel.perms.clear": {
+    "value": "Remove exception"
+  },
+  "channel.perms.stateLabel": {
+    "value": "{{key}} for {{target}}"
+  },
+  "channel.perms.state.deny": {
+    "value": "Deny"
+  },
+  "channel.perms.state.inherit": {
+    "value": "Default"
+  },
+  "channel.perms.state.allow": {
+    "value": "Allow"
+  },
+  "channel.perms.keys.post.title": {
+    "value": "Send messages"
+  },
+  "channel.perms.keys.post.line": {
+    "value": "Write, reply in threads and pin messages here"
+  },
+  "channel.perms.keys.callAgents.title": {
+    "value": "Call agents"
+  },
+  "channel.perms.keys.callAgents.line": {
+    "value": "Get replies from this channel's agents"
+  },
+  "channel.perms.keys.manage.title": {
+    "value": "Manage the channel"
+  },
+  "channel.perms.keys.manage.line": {
+    "value": "Change its name, who sees it, members and these permissions"
+  },
+  "channel.perms.default.allowedBy": {
+    "value": "Default: allowed by the {{role}} role"
+  },
+  "channel.perms.default.notHeld": {
+    "value": "Default: not allowed by the {{role}} role"
+  },
+  "channel.perms.default.followsEveryone": {
+    "value": "Default: follows {{role}} in this channel"
+  },
+  "channel.perms.default.person": {
+    "value": "Default: follows this person's roles"
+  },
+  "channel.perms.readOnlyComposer": {
+    "value": "You can't send messages in this channel"
+  },
+  "channel.perms.agentsDenied": {
+    "value": "You can't call agents in this channel"
+  },
+  "channel.perms.forbidden": {
+    "value": "You can only change permissions you have, for roles and people below you"
   },
   "channel.pins.title": {
     "value": "Pinned"
@@ -4606,6 +4705,39 @@
   "actionCard.invite.adminOnly": {
     "value": "Someone who may invite sends it"
   },
+  "actionCard.install_skill.title": {
+    "value": "Install a skill"
+  },
+  "actionCard.install_skill.open": {
+    "value": "Install"
+  },
+  "actionCard.install_skill.done": {
+    "value": "Installed"
+  },
+  "actionCard.install_skill.adminOnly": {
+    "value": "Someone who manages agents installs it"
+  },
+  "actionCard.update_skills.title": {
+    "value": {
+      "one": "Update a skill",
+      "other": "Update {{count}} skills"
+    }
+  },
+  "actionCard.update_skills.update": {
+    "value": "Update"
+  },
+  "actionCard.update_skills.review": {
+    "value": "Review"
+  },
+  "actionCard.update_skills.done": {
+    "value": "Up to date"
+  },
+  "actionCard.update_skills.waiting": {
+    "value": "Waits for review"
+  },
+  "actionCard.update_skills.adminOnly": {
+    "value": "Someone who manages agents updates it"
+  },
   "actionCard.agentProposal.title": {
     "value": "{{agent}} proposes a new agent"
   },
@@ -4747,6 +4879,29 @@
   },
   "reach.allowed": {
     "value": "Done: {{person}} can now talk to {{name}}."
+  },
+  "reach.allowMe": {
+    "value": "Let me talk to him",
+    "female": "Let me talk to her"
+  },
+  "reach.allowedMe": {
+    "value": "Done: you can now talk to {{name}}."
+  },
+  "reach.mailLossTitle": {
+    "value": "Remove mailbox access?"
+  },
+  "reach.mailLoss": {
+    "value": "{{name}} has access to the mailbox of {{owners}}. With more people talking to him, they could reach those emails through him, so that access is removed. Whoever connected the mailbox can give it again.",
+    "female": "{{name}} has access to the mailbox of {{owners}}. With more people talking to her, they could reach those emails through her, so that access is removed. Whoever connected the mailbox can give it again."
+  },
+  "reach.planTitle": {
+    "value": "Use {{owner}}'s plan?"
+  },
+  "reach.planOpen": {
+    "value": "Conversations with {{name}} will use {{owner}}'s {{plan}} plan and its limits. {{owner}} will get an email about it."
+  },
+  "reach.plansTitle": {
+    "value": "Use the plans of {{owners}}?"
   },
   "teamChecks.group": {
     "value": "What the agent didn't repeat"
@@ -5219,6 +5374,12 @@
   "channelCategories.editChannel": {
     "value": "Edit channel"
   },
+  "channelMembers.caption": {
+    "value": "Who can see this channel"
+  },
+  "channelMembers.captionOpen": {
+    "value": "Open to the whole workspace"
+  },
   "channelMembers.addRow": {
     "value": "Add people or agents"
   },
@@ -5235,7 +5396,10 @@
     "value": "Search people or agents"
   },
   "channelMembers.addEmpty": {
-    "value": "Everyone is already here, or nobody found for “{{q}}”."
+    "value": "Nobody outside the channel matches “{{q}}”."
+  },
+  "channelMembers.addEveryone": {
+    "value": "Everyone in {{org}} is already in #{{channel}}."
   },
   "channelMembers.addConfirm": {
     "value": {
@@ -5788,6 +5952,18 @@
   "question.withdrawn": {
     "value": "{{name}} no longer needs an answer."
   },
+  "question.skip": {
+    "value": "Skip"
+  },
+  "question.skipFailed": {
+    "value": "Couldn't skip the question. Try again."
+  },
+  "question.dismissed": {
+    "value": "{{name}} skipped this question."
+  },
+  "question.dismissedByYou": {
+    "value": "You skipped this question."
+  },
   "ask.kind.approval": {
     "value": "Asks for your approval"
   },
@@ -5940,6 +6116,12 @@
   },
   "approval.always.noteTarget": {
     "value": "Covers {{actions}} from now on. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.noteCommand": {
+    "value": "Covers {{actions}} on the computer from now on, with any arguments. To undo: Tools and access, on {{name}}'s page."
+  },
+  "approval.always.computer": {
+    "value": "Commands on the computer"
   },
   "approval.always.noteReads": {
     "value": "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page."
@@ -7285,6 +7467,30 @@
   "agent.roleHelp": {
     "value": "What it does for the team, e.g. Email and calendar assistant."
   },
+  "agent.editName": {
+    "value": "Edit name: {{name}}"
+  },
+  "agent.editHandle": {
+    "value": "Edit mentions: @{{handle}}"
+  },
+  "agent.editRole": {
+    "value": "Edit role: {{role}}"
+  },
+  "agent.noRole": {
+    "value": "No role"
+  },
+  "agent.rolePlaceholder": {
+    "value": "E.g. Support"
+  },
+  "agent.roleList": {
+    "value": "Roles"
+  },
+  "agent.roleUse": {
+    "value": "Use “{{role}}”"
+  },
+  "agent.roleCurrent": {
+    "value": "current"
+  },
   "agent.edit": {
     "value": "Edit"
   },
@@ -7440,6 +7646,9 @@
   "agentPage.work.cell.brain": {
     "value": "Thinks with"
   },
+  "agentPage.work.cell.brainWith": {
+    "value": "Thinks with {{plan}}"
+  },
   "agentPage.work.cell.browser": {
     "value": "Browser"
   },
@@ -7540,8 +7749,8 @@
   "agentPage.work.brain.account": {
     "value": "Account"
   },
-  "agentPage.work.brain.accountLocked": {
-    "value": "Only {{name}} changes it"
+  "agentPage.work.brain.accountWho": {
+    "value": "Only accounts of {{owner}}, who is responsible for {{name}}: a plan thinks only for its owner's agents."
   },
   "agentPage.work.brain.accountSignedOut": {
     "value": "Signed out, sign in again"
@@ -7610,7 +7819,7 @@
     "value": "maximum"
   },
   "agentPage.work.brain.effortText.auto": {
-    "value": "Picks the effort for each task."
+    "value": "The Automatic model picks each task's effort. Pick a model to set the effort yourself."
   },
   "agentPage.work.brain.effortText.low": {
     "value": "Answers fast. Good for simple questions."
@@ -7665,6 +7874,15 @@
   },
   "agentPage.work.brain.advanced.done": {
     "value": "Done"
+  },
+  "agentPage.work.brain.advanced.contents.model": {
+    "value": "Context window"
+  },
+  "agentPage.work.brain.advanced.contents.auto": {
+    "value": "Context window and who it answers"
+  },
+  "agentPage.work.brain.advanced.contents.fixed": {
+    "value": "Effort, context window and who it answers"
   },
   "agentPage.work.brain.advanced.allDefault": {
     "value": "All defaults"
@@ -10086,6 +10304,21 @@
   "members.dialog.title": {
     "value": "Invite to {{org}}"
   },
+  "members.dialog.stepOf": {
+    "value": "Step {{n}} of {{total}} · {{step}}"
+  },
+  "members.dialog.steps.who": {
+    "value": "Who"
+  },
+  "members.dialog.steps.role": {
+    "value": "Role"
+  },
+  "members.dialog.steps.where": {
+    "value": "Where they start"
+  },
+  "members.dialog.steps.note": {
+    "value": "Note"
+  },
   "members.dialog.emails": {
     "value": "Emails"
   },
@@ -10094,6 +10327,12 @@
   },
   "members.dialog.checkMarked": {
     "value": "Check the marked emails: they won't get an invitation."
+  },
+  "members.dialog.pasteHelp": {
+    "value": "Paste a list if you like: commas, spaces or one per line."
+  },
+  "members.dialog.leftOut": {
+    "value": "Whoever is already in or already invited stays out."
   },
   "members.dialog.withNote": {
     "value": "with a note"
@@ -10116,6 +10355,9 @@
   "members.dialog.or": {
     "value": "or send the link"
   },
+  "members.dialog.continueWith": {
+    "value": "Continue with {{count}}"
+  },
   "members.dialog.send": {
     "value": {
       "one": "Invite {{count}} person",
@@ -10130,6 +10372,159 @@
   },
   "members.dialog.alsoIn": {
     "value": "They also join {{channels}}."
+  },
+  "members.dialog.who.title": {
+    "value": "Who do you want to bring in?"
+  },
+  "members.dialog.who.lead": {
+    "value": "Give me their emails. Each person gets an invitation and joins directly."
+  },
+  "members.dialog.orLink.title": {
+    "value": "Rather send a link?"
+  },
+  "members.dialog.orLink.text": {
+    "value": "Whoever opens it asks to join, and you approve."
+  },
+  "members.dialog.orLink.open": {
+    "value": "See the link"
+  },
+  "members.dialog.role.titleOne": {
+    "value": "What role does {{name}} join with?"
+  },
+  "members.dialog.role.titleMany": {
+    "value": "What role do these people join with?"
+  },
+  "members.dialog.role.lead": {
+    "value": "The role says what each person can do. You can change it later."
+  },
+  "members.dialog.role.each": {
+    "value": "A role for each person"
+  },
+  "members.dialog.role.same": {
+    "value": "The same role for everyone"
+  },
+  "members.dialog.where.titleOne": {
+    "value": "Which channels does {{name}} join right away?"
+  },
+  "members.dialog.where.titleMany": {
+    "value": "Which channels do these people join right away?"
+  },
+  "members.dialog.where.lead": {
+    "value": "Everyone starts in #{{channel}}. You pick the others."
+  },
+  "members.dialog.where.label": {
+    "value": "Channels"
+  },
+  "members.dialog.where.everyone": {
+    "value": "Everyone joins"
+  },
+  "members.dialog.where.private": {
+    "value": "Private · you're in it"
+  },
+  "members.dialog.where.people": {
+    "value": {
+      "one": "{{count}} person",
+      "other": "{{count}} people"
+    }
+  },
+  "members.dialog.where.fromChannel": {
+    "value": "#{{channel}} comes checked: you invited from there."
+  },
+  "members.dialog.noteStep.title": {
+    "value": "Want me to say something in the invitation?"
+  },
+  "members.dialog.noteStep.lead": {
+    "value": "It goes in the email. If not, I'll send it as it is."
+  },
+  "members.dialog.mailFor": {
+    "value": "This is how it reaches {{names}}"
+  },
+  "members.dialog.mail.from": {
+    "value": "agentes.chat · to {{to}}"
+  },
+  "members.dialog.mail.toMany": {
+    "value": "{{email}} and {{count}} more"
+  },
+  "members.dialog.mail.subject": {
+    "value": "You're invited to a workspace on agentes.chat"
+  },
+  "members.dialog.mail.headline": {
+    "value": "You're invited to a workspace"
+  },
+  "members.dialog.mail.body": {
+    "value": "<b>{{name}}</b> ({{email}}) invited you to join <b>{{org}}</b> as a member."
+  },
+  "members.dialog.mail.noteFrom": {
+    "value": "<b>{{name}}:</b> “{{note}}”"
+  },
+  "members.dialog.mail.what": {
+    "value": "agentes.chat is where people and AI agents work together."
+  },
+  "members.dialog.mail.button": {
+    "value": "Accept invitation"
+  },
+  "members.dialog.mail.small": {
+    "value": "The invitation works for 7 days. Accept it with this email address."
+  },
+  "members.dialog.done.title": {
+    "value": "Done, I sent the invitation to {{names}}."
+  },
+  "members.dialog.done.leadOne": {
+    "value": "When {{name}} joins, I'll greet them in {{channels}} and let you know."
+  },
+  "members.dialog.done.leadMany": {
+    "value": "When each person joins, I'll greet them in {{channels}} and let you know."
+  },
+  "members.dialog.done.none": {
+    "value": "No invitation went out this time."
+  },
+  "members.dialog.done.noneLead": {
+    "value": "Each address's reason is below."
+  },
+  "members.dialog.result.invited": {
+    "value": "Sent"
+  },
+  "members.dialog.result.already_member": {
+    "value": "already in {{org}}"
+  },
+  "members.dialog.result.already_invited": {
+    "value": "already had an invitation"
+  },
+  "members.dialog.result.invalid_email": {
+    "value": "invalid email"
+  },
+  "members.dialog.again": {
+    "value": "Invite more people"
+  },
+  "members.dialog.finish": {
+    "value": "Done"
+  },
+  "members.dialog.linkStep.title": {
+    "value": "This is {{org}}'s link."
+  },
+  "members.dialog.linkStep.lead": {
+    "value": "Whoever opens it asks to join. I'll show you each request, and you approve."
+  },
+  "members.dialog.linkStep.how1": {
+    "value": "The person opens the link and says who they are."
+  },
+  "members.dialog.linkStep.how2": {
+    "value": "The request reaches whoever invites, here and on the phone."
+  },
+  "members.dialog.linkStep.how3": {
+    "value": "You approve and pick the role they join with."
+  },
+  "members.dialog.linkStep.waiting": {
+    "value": {
+      "one": "One request waiting for you",
+      "other": "{{count}} requests waiting for you"
+    }
+  },
+  "members.dialog.linkStep.seeRequests": {
+    "value": "See requests"
+  },
+  "members.dialog.linkStep.byEmail": {
+    "value": "Invite by email"
   },
   "members.invitations.title": {
     "value": "Sent invitations"
@@ -10600,6 +10995,24 @@
   "scopes.github_issues_write.description": {
     "value": "Create issues and comment."
   },
+  "scopes.github_actions_read.label": {
+    "value": "Read Actions"
+  },
+  "scopes.github_actions_read.description": {
+    "value": "List workflows and runs and read their jobs and logs."
+  },
+  "scopes.github_projects_read.label": {
+    "value": "Read Projects"
+  },
+  "scopes.github_projects_read.description": {
+    "value": "List and read GitHub Projects, their fields and items."
+  },
+  "scopes.github_projects_write.label": {
+    "value": "Write Projects"
+  },
+  "scopes.github_projects_write.description": {
+    "value": "Add items to GitHub Projects and move or edit them."
+  },
   "scopes.github_actions_run.label": {
     "value": "Run workflows"
   },
@@ -10800,6 +11213,114 @@
   },
   "issues.showCanceled": {
     "value": "Show canceled"
+  },
+  "issues.filterButton": {
+    "value": "Filter"
+  },
+  "issues.filterValue": {
+    "value": "{{filter}}: {{value}}"
+  },
+  "issues.me": {
+    "value": "Me"
+  },
+  "issues.display.title": {
+    "value": "Display"
+  },
+  "issues.display.label": {
+    "value": "Display: {{layout}} · {{group}}"
+  },
+  "issues.display.layout": {
+    "value": "Layout"
+  },
+  "issues.display.group": {
+    "value": "Group by"
+  },
+  "issues.display.sort": {
+    "value": "Sort by"
+  },
+  "issues.display.fields": {
+    "value": "On the cards"
+  },
+  "issues.display.saved": {
+    "value": "Saved for you in this workspace"
+  },
+  "issues.display.reset": {
+    "value": "Back to default"
+  },
+  "issues.display.by.stage": {
+    "value": "Stage"
+  },
+  "issues.display.by.assignee": {
+    "value": "Assignee"
+  },
+  "issues.display.by.priority": {
+    "value": "Priority"
+  },
+  "issues.display.order.manual": {
+    "value": "Manual"
+  },
+  "issues.display.order.priority": {
+    "value": "Priority"
+  },
+  "issues.display.order.due": {
+    "value": "Due date"
+  },
+  "issues.display.field.assignee": {
+    "value": "Assignee"
+  },
+  "issues.display.field.priority": {
+    "value": "Priority"
+  },
+  "issues.display.field.due": {
+    "value": "Due date"
+  },
+  "issues.display.field.criteria": {
+    "value": "Criteria"
+  },
+  "issues.display.field.pullRequest": {
+    "value": "Pull request"
+  },
+  "issues.display.field.label": {
+    "value": "Label"
+  },
+  "issues.drop.stage": {
+    "value": "Drop in {{name}}"
+  },
+  "issues.drop.assignee": {
+    "value": "Drop to give it to {{name}}"
+  },
+  "issues.drop.unassign": {
+    "value": "Drop to unassign"
+  },
+  "issues.drop.priority": {
+    "value": "Drop for {{priority}} priority"
+  },
+  "issues.drag.role": {
+    "value": "draggable task"
+  },
+  "issues.drag.help": {
+    "value": "Space picks the task up, the arrows move it, Space drops it and Esc cancels."
+  },
+  "issues.drag.picked": {
+    "value": "You picked up #{{number}}. The arrows move it, Space drops it, Esc cancels."
+  },
+  "issues.drag.moved": {
+    "value": "#{{number}}: {{group}}, position {{position}} of {{total}}."
+  },
+  "issues.drag.dropped": {
+    "value": "You dropped #{{number}} in {{group}}."
+  },
+  "issues.drag.canceled": {
+    "value": "#{{number}} went back to its place."
+  },
+  "issues.drag.assigned": {
+    "value": "#{{number}} is now with {{name}}."
+  },
+  "issues.drag.unassigned": {
+    "value": "#{{number}} has no assignee now."
+  },
+  "issues.drag.prioritized": {
+    "value": "#{{number}} now has {{priority}} priority."
   },
   "issues.canceledColumn": {
     "value": "Canceled"
@@ -11912,6 +12433,45 @@
   },
   "routines.panel.ahead": {
     "value": "Prepared for later"
+  },
+  "routines.panel.createdBy": {
+    "value": "Created by {{name}} · {{date}}"
+  },
+  "routines.panel.nameLabel": {
+    "value": "Routine name"
+  },
+  "routines.panel.editName": {
+    "value": "Edit the name"
+  },
+  "routines.panel.editWhat": {
+    "value": "Edit what it does"
+  },
+  "routines.panel.tabs.label": {
+    "value": "Parts of the routine"
+  },
+  "routines.panel.tabs.details": {
+    "value": "Details"
+  },
+  "routines.panel.tabs.runs": {
+    "value": "Runs"
+  },
+  "routines.panel.nexts": {
+    "value": "Next runs"
+  },
+  "routines.panel.who": {
+    "value": "Who does it"
+  },
+  "routines.panel.onAirLine": {
+    "value": "Runs by itself when it's time"
+  },
+  "routines.panel.offAirLine": {
+    "value": "Doesn't run until you turn it on"
+  },
+  "routines.panel.reportHint.always": {
+    "value": "Even with nothing new"
+  },
+  "routines.panel.reportHint.when_new": {
+    "value": "Quiet when there's nothing new"
   },
   "routines.panel.ownActions": {
     "value": "Does on its own"
@@ -13198,6 +13758,15 @@
   },
   "missions.command.alwaysBy": {
     "value": "Allowed in this mission by {{name}} · {{time}}: {{rules}}"
+  },
+  "missions.command.alwaysAgent": {
+    "value": "Always approve for this agent"
+  },
+  "missions.command.alwaysAgentHint": {
+    "value": "Always approve for this agent allows {{kind}} with any arguments, in every mission and conversation. To undo: Tools and access, on the agent's page."
+  },
+  "missions.command.alwaysAgentBy": {
+    "value": "Allowed for this agent by {{name}} · {{time}}: {{kind}}"
   },
   "missions.command.state.allowed": {
     "value": "Approved"
@@ -15614,6 +16183,108 @@
   "skills.refreshed": {
     "value": "{{name}} updated from its link."
   },
+  "skills.upToDate": {
+    "value": "{{name}} already has what its link has."
+  },
+  "skills.waitingToast": {
+    "value": "The update of {{name}} changes files that run, so it waits for a review."
+  },
+  "skills.autoUpdate": {
+    "value": "Update by itself"
+  },
+  "skills.autoUpdateHelp": {
+    "value": "Reads its link every day. New text goes in with Undo. Changes to scripts wait for someone who manages skills."
+  },
+  "skills.autoChip": {
+    "value": "Updates by itself"
+  },
+  "skills.waitingChip": {
+    "value": "Update waiting"
+  },
+  "skills.lastUpdate": {
+    "value": "Updated from its link {{when}}"
+  },
+  "skills.undoUpdate": {
+    "value": "Undo update"
+  },
+  "skills.undone": {
+    "value": "{{name}} is back to version {{version}}."
+  },
+  "skills.agentsImprove": {
+    "value": "Agents improve skills by themselves"
+  },
+  "skills.agentsImproveHelp": {
+    "value": "When an agent finds a skill wrong or missing a step, it fixes it right away: a new version you can undo, and whoever made the skill is told. Changes to scripts wait for someone who manages skills."
+  },
+  "skills.agentsImproveThis": {
+    "value": "Agents improve this skill by themselves"
+  },
+  "skills.agentChange": {
+    "value": "{{agent}} changed it {{when}}"
+  },
+  "skills.undoAgentChange": {
+    "value": "Undo change"
+  },
+  "skills.pending.title": {
+    "value": "The update from its link changes files that run: {{files}}"
+  },
+  "skills.pending.lead": {
+    "value": "Apply it only if you trust these files. Agents run them on their computers."
+  },
+  "skills.pending.edited": {
+    "value": "The update from its link would replace what agents changed in it"
+  },
+  "skills.pending.editedLead": {
+    "value": "Apply it to take its link's version. You can undo it after."
+  },
+  "skills.pending.apply": {
+    "value": "Apply update"
+  },
+  "skills.pending.dismiss": {
+    "value": "Don't apply"
+  },
+  "skills.pending.applied": {
+    "value": "{{name}} updated from its link."
+  },
+  "skills.pending.changedAgain": {
+    "value": "Its link changed again. Review the new files."
+  },
+  "skills.pending.dismissed": {
+    "value": "Update not applied. A new change to its link asks again."
+  },
+  "skills.updateFailed.no_skill_md": {
+    "value": "Couldn't update it: its link no longer has a SKILL.md."
+  },
+  "skills.updateFailed.connection_gone": {
+    "value": "Couldn't update it: the GitHub connection that read it is gone."
+  },
+  "skills.updateFailed.link_holds_several": {
+    "value": "Couldn't update it: its link holds several skills now."
+  },
+  "skills.updateFailed.link_renamed": {
+    "value": "Couldn't update it: its link holds another skill now."
+  },
+  "skills.updateFailed.owner_gone": {
+    "value": "Couldn't update it: whoever turned on updating by itself can no longer manage skills. Turn it on again."
+  },
+  "skills.updateFailed.other": {
+    "value": "Couldn't update it from its link."
+  },
+  "skills.notice.updated": {
+    "value": "{{name}} was updated from its link"
+  },
+  "skills.notice.waiting": {
+    "value": "An update of {{name}} changes its scripts"
+  },
+  "skills.notice.waitingEdited": {
+    "value": "An update of {{name}} would replace what agents changed"
+  },
+  "skills.notice.failed": {
+    "value": "{{name}} couldn't update from its link"
+  },
+  "skills.notice.edited": {
+    "value": "Agents improved {{name}}"
+  },
   "skills.remove": {
     "value": "Remove"
   },
@@ -15770,13 +16441,6 @@
   "aiAccounts.share.switchAll": {
     "value": "Answer other people"
   },
-  "aiAccounts.share.switchOther": {
-    "value": "Answers only {{owner}}"
-  },
-  "aiAccounts.share.onOther": {
-    "value": "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to him.",
-    "female": "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to her."
-  },
   "aiAccounts.share.line.off": {
     "value": "{{name}} answers only you, on your {{plan}}."
   },
@@ -15789,6 +16453,13 @@
   },
   "aiAccounts.share.line.onAll": {
     "value": "They answer anyone who can talk to them, on your {{plan}}."
+  },
+  "aiAccounts.share.lineOf.off": {
+    "value": "{{name}} answers only {{owner}}, on {{owner}}'s {{plan}}."
+  },
+  "aiAccounts.share.lineOf.on": {
+    "value": "{{name}} answers anyone who can talk to him, on {{owner}}'s {{plan}}.",
+    "female": "{{name}} answers anyone who can talk to her, on {{owner}}'s {{plan}}."
   },
   "aiAccounts.share.plan.own": {
     "value": "{{provider}} plan"
@@ -15817,6 +16488,9 @@
   "aiAccounts.share.savedOwner": {
     "value": "{{name}} now answers only you."
   },
+  "aiAccounts.share.savedOwnerOf": {
+    "value": "{{name}} now answers only {{owner}}."
+  },
   "aiAccounts.share.backOnApi": {
     "value": "{{name}} is back on the API and still answers only you."
   },
@@ -15828,9 +16502,6 @@
   },
   "aiAccounts.share.pickPeople": {
     "value": "{{name}} answers only the people picked, and nobody is picked yet. Pick them under Who can talk."
-  },
-  "aiAccounts.errors.planOwnerOnly": {
-    "value": "Only the person responsible for {{agentName}} can let more people in: {{agentName}} answers on their plan."
   },
   "aiAccounts.add.paste": {
     "value": "Paste"
@@ -20122,6 +20793,9 @@
   "artifacts.subtitle": {
     "value": "{{kind}} · {{name}} · {{where}} · {{when}}"
   },
+  "artifacts.subtitleSize": {
+    "value": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}"
+  },
   "artifacts.noChannel": {
     "value": "no channel"
   },
@@ -21697,6 +22371,12 @@
   },
   "connectors.connectedAs": {
     "value": "Connected as {{account}}"
+  },
+  "connectors.reconnectAdds": {
+    "value": "Reconnect {{name}} so agents can also {{what}}."
+  },
+  "connectors.adds.github_project": {
+    "value": "use GitHub Projects (read boards and move cards)"
   },
   "connectors.toolsCount": {
     "value": {
@@ -24500,6 +25180,9 @@
   "errors.artifact.fileTooLarge": {
     "value": "The file is over {{max}} MB, the limit per file."
   },
+  "errors.artifact.notVersioned": {
+    "value": "An image, a video or a recording has no versions. Send it as a new file."
+  },
   "errors.artifact.fileRequired": {
     "value": "Choose a file to upload."
   },
@@ -24571,6 +25254,18 @@
   },
   "errors.skill.connectionGone": {
     "value": "The GitHub connection that read {{repo}} is gone. Connect GitHub again to update this skill."
+  },
+  "errors.skill.linkHoldsSeveral": {
+    "value": "Its link holds several skills now. Install this one again from its own folder."
+  },
+  "errors.skill.linkRenamed": {
+    "value": "Its link holds the skill {{name}} now."
+  },
+  "errors.skill.noLink": {
+    "value": "Only a skill installed from a link updates from it."
+  },
+  "errors.skill.noPendingUpdate": {
+    "value": "No update of this skill is waiting."
   },
   "errors.agentGroup.notFound": {
     "value": "This group no longer exists."
@@ -25531,35 +26226,32 @@
   "apps.dialog.open": {
     "value": "Open {{app}}"
   },
-  "apps.dialog.client.claude": {
-    "value": "Claude"
-  },
-  "apps.dialog.client.claude_code": {
-    "value": "Claude Code"
-  },
-  "apps.dialog.client.chatgpt": {
-    "value": "ChatGPT"
-  },
-  "apps.dialog.client.cursor": {
-    "value": "Cursor"
-  },
   "apps.dialog.client.other": {
     "value": "Other app"
   },
   "apps.dialog.clientText.claude": {
     "value": "claude.ai, app and phone"
   },
-  "apps.dialog.clientText.claude_code": {
+  "apps.dialog.clientText.terminal": {
     "value": "In the terminal"
   },
-  "apps.dialog.clientText.chatgpt": {
-    "value": "chatgpt.com"
+  "apps.dialog.clientText.editor": {
+    "value": "Code editor"
   },
-  "apps.dialog.clientText.cursor": {
-    "value": "The editor"
+  "apps.dialog.clientText.extension": {
+    "value": "Editor extension"
+  },
+  "apps.dialog.clientText.desktop": {
+    "value": "Desktop app"
   },
   "apps.dialog.clientText.other": {
-    "value": "VS Code and more"
+    "value": "Any MCP app"
+  },
+  "apps.dialog.group.chat": {
+    "value": "Chat apps"
+  },
+  "apps.dialog.group.code": {
+    "value": "Editors and terminals"
   },
   "apps.dialog.waiting": {
     "value": "Waiting for the app to connect"
@@ -25609,18 +26301,6 @@
   "apps.dialog.claudeCode.scope": {
     "value": "It works in every folder. For the current folder only, drop <code>--scope user</code>."
   },
-  "apps.dialog.chatgpt.step1": {
-    "value": "Open chatgpt.com/plugins."
-  },
-  "apps.dialog.chatgpt.step2": {
-    "value": "Click + then Add custom MCP server."
-  },
-  "apps.dialog.chatgpt.step3": {
-    "value": "Paste the address and connect."
-  },
-  "apps.dialog.chatgpt.plans": {
-    "value": "Available on paid ChatGPT plans."
-  },
   "apps.dialog.cursor.add": {
     "value": "Add to Cursor"
   },
@@ -25630,26 +26310,17 @@
   "apps.dialog.cursor.signIn": {
     "value": "Cursor asks you to sign in the first time you use it."
   },
-  "apps.dialog.other.tabs": {
-    "value": "Which app"
-  },
-  "apps.dialog.other.vscode": {
-    "value": "VS Code"
-  },
-  "apps.dialog.other.codex": {
-    "value": "Codex"
-  },
-  "apps.dialog.other.any": {
-    "value": "Any MCP app"
-  },
-  "apps.dialog.other.vscodeAdd": {
+  "apps.dialog.vscode.add": {
     "value": "Add to VS Code"
   },
-  "apps.dialog.other.vscodeManual": {
+  "apps.dialog.vscode.manual": {
     "value": "Or paste into <code>.vscode/mcp.json</code>:"
   },
-  "apps.dialog.other.codexStep": {
+  "apps.dialog.codex.step": {
     "value": "Run in the terminal. Codex opens the page for you to sign in:"
+  },
+  "apps.dialog.copilotIdes.config": {
+    "value": "In the IDE's GitHub Copilot settings, open <code>mcp.json</code> and paste:"
   },
   "apps.dialog.other.anyStep": {
     "value": "Paste the address into the app. It opens this page for you to sign in."
@@ -25659,6 +26330,126 @@
   },
   "apps.dialog.other.toTokens": {
     "value": "Create a personal token"
+  },
+  "apps.dialog.step.open": {
+    "value": "Open {{place}}."
+  },
+  "apps.dialog.step.click": {
+    "value": "Click {{button}}."
+  },
+  "apps.dialog.step.clickThen": {
+    "value": "Click {{button}}, then {{next}}."
+  },
+  "apps.dialog.step.name": {
+    "value": "Name it agentes.chat and paste the address."
+  },
+  "apps.dialog.step.nameDescribe": {
+    "value": "Name it agentes.chat and add a description."
+  },
+  "apps.dialog.step.nameConnect": {
+    "value": "Name it agentes.chat and click {{button}}."
+  },
+  "apps.dialog.step.paste": {
+    "value": "Paste the address."
+  },
+  "apps.dialog.step.pasteIn": {
+    "value": "Paste the address into {{field}}."
+  },
+  "apps.dialog.step.choosePaste": {
+    "value": "Choose {{option}} and paste the address."
+  },
+  "apps.dialog.step.emptySecret": {
+    "value": "Leave the client ID and secret empty and click {{button}}."
+  },
+  "apps.dialog.step.choose": {
+    "value": "Choose {{option}}."
+  },
+  "apps.dialog.step.chooseThen": {
+    "value": "Choose {{option}}, click {{button}}, then {{next}}."
+  },
+  "apps.dialog.step.chooseConfig": {
+    "value": "Choose {{option}} and paste:"
+  },
+  "apps.dialog.step.auth": {
+    "value": "For authentication, choose {{option}}."
+  },
+  "apps.dialog.step.tick": {
+    "value": "Tick “{{box}}” and click {{button}}."
+  },
+  "apps.dialog.step.run": {
+    "value": "Run in the terminal:"
+  },
+  "apps.dialog.step.orRun": {
+    "value": "Or run in the terminal:"
+  },
+  "apps.dialog.step.runCommand": {
+    "value": "Run the {{command}} command."
+  },
+  "apps.dialog.step.file": {
+    "value": "Paste into <code>{{file}}</code>:"
+  },
+  "apps.dialog.step.orFile": {
+    "value": "Or paste into <code>{{file}}</code>:"
+  },
+  "apps.dialog.step.pasteConfig": {
+    "value": "Paste:"
+  },
+  "apps.dialog.step.mode": {
+    "value": "In the chat, switch to {{mode}} mode."
+  },
+  "apps.dialog.step.loginRun": {
+    "value": "To sign in, run <code>{{command}}</code>."
+  },
+  "apps.dialog.step.loginType": {
+    "value": "To sign in, type <code>{{command}}</code> in the app."
+  },
+  "apps.dialog.step.signIn": {
+    "value": "Sign in with your agentes.chat account on the page that opens."
+  },
+  "apps.dialog.step.signInFirst": {
+    "value": "The app asks you to sign in the first time you use it."
+  },
+  "apps.dialog.step.token": {
+    "value": "Create a personal token and put it in place of {{placeholder}}."
+  },
+  "apps.dialog.step.install": {
+    "value": "Add to {{app}}"
+  },
+  "apps.dialog.note.untested": {
+    "value": "We haven't tested signing in from this app yet. If it fails, let us know."
+  },
+  "apps.dialog.note.chatgptPlans": {
+    "value": "On paid ChatGPT plans, not Free or Go. On Business, only admins can add it."
+  },
+  "apps.dialog.note.chatgptPhone": {
+    "value": "It can't be added from the phone app. Once added on the web, it shows on desktop and phone too."
+  },
+  "apps.dialog.note.geminiPlans": {
+    "value": "On the web only, with a personal Google account. It may need Google AI Pro or Ultra."
+  },
+  "apps.dialog.note.codex": {
+    "value": "Needs a ChatGPT plan with Codex. The ChatGPT desktop app, the Codex CLI and its IDE extension share this setup."
+  },
+  "apps.dialog.note.copilotPolicy": {
+    "value": "On Copilot Business and Enterprise, an admin has to turn on the MCP servers in Copilot policy, which is off by default."
+  },
+  "apps.dialog.note.grokAdmin": {
+    "value": "On Grok Business and Enterprise, an admin adds the connector."
+  },
+  "apps.dialog.note.perplexityPlans": {
+    "value": "On Perplexity Pro, Max and Enterprise."
+  },
+  "apps.dialog.note.leChatAdmin": {
+    "value": "On the Team plan, an admin adds the connector."
+  },
+  "apps.dialog.note.raycastPro": {
+    "value": "Only on Raycast Pro."
+  },
+  "apps.dialog.note.visualStudio": {
+    "value": "Visual Studio 2022 17.14 or newer, with GitHub Copilot."
+  },
+  "apps.dialog.note.continueAgent": {
+    "value": "Works in Agent mode only."
   },
   "apps.consent.title.verified": {
     "value": "<b>{{name}}</b> wants to access your account"
@@ -27753,6 +28544,12 @@
   "chat.work.step.offeringConnectApp": {
     "value": "Offered to connect an app"
   },
+  "chat.work.step.offeringSkill": {
+    "value": "Offered to install a skill"
+  },
+  "chat.work.step.updatingSkills": {
+    "value": "Updated skills"
+  },
   "chat.work.step.offeringInvites": {
     "value": "Offered to invite people"
   },
@@ -27995,6 +28792,12 @@
   },
   "chat.activity.offeringConnectApp": {
     "value": "getting an app ready to connect"
+  },
+  "chat.activity.offeringSkill": {
+    "value": "getting a skill ready to install"
+  },
+  "chat.activity.updatingSkills": {
+    "value": "updating skills"
   },
   "chat.activity.offeringInvites": {
     "value": "getting invitations ready"
@@ -28301,6 +29104,12 @@
   },
   "chat.body.action_invite_people": {
     "value": "Invite people"
+  },
+  "chat.body.action_install_skill": {
+    "value": "Install a skill"
+  },
+  "chat.body.action_update_skills": {
+    "value": "Update skills"
   },
   "chat.body.agent_proposal": {
     "value": "Proposed a new agent: {{name}}"
@@ -28646,6 +29455,18 @@
   },
   "builtinTools.offer_invites.description": {
     "value": "Posts a card whose button opens the invite dialog with the addresses filled in."
+  },
+  "builtinTools.offer_install_skill.label": {
+    "value": "Offer to install a skill"
+  },
+  "builtinTools.offer_install_skill.description": {
+    "value": "Posts a card whose button opens the install dialog with the skill's link filled in."
+  },
+  "builtinTools.update_skill_from_source.label": {
+    "value": "Update skills from their links"
+  },
+  "builtinTools.update_skill_from_source.description": {
+    "value": "Updates skills from where they were installed. Changes to scripts wait for a person."
   },
   "builtinTools.propose_agent.label": {
     "value": "Propose an agent"
@@ -31958,352 +32779,25 @@
   "dashboards.errors.notTested": {
     "value": "Test it first: the widget is created once its test works."
   },
-  "agent.editName": {
-    "value": "Edit name: {{name}}"
+  "presence.out": {
+    "value": "Out of office"
   },
-  "agent.editHandle": {
-    "value": "Edit mentions: @{{handle}}"
+  "presence.lower.out": {
+    "value": "out of office"
   },
-  "agent.editRole": {
-    "value": "Edit role: {{role}}"
+  "presence.agent.out_of_plan": {
+    "value": "Out of plan limit"
   },
-  "agent.noRole": {
-    "value": "No role"
+  "presence.agent.out_of_budget": {
+    "value": "Monthly budget spent"
   },
-  "agent.rolePlaceholder": {
-    "value": "E.g. Support"
+  "presence.agent.backAt": {
+    "value": "back {{when}}"
   },
-  "agent.roleList": {
-    "value": "Roles"
+  "presence.agentWhy.out": {
+    "value": "Out of limit for now · answers after the reset"
   },
-  "agent.roleUse": {
-    "value": "Use “{{role}}”"
-  },
-  "agent.roleCurrent": {
-    "value": "current"
-  },
-  "members.dialog.stepOf": {
-    "value": "Step {{n}} of {{total}} · {{step}}"
-  },
-  "members.dialog.steps.who": {
-    "value": "Who"
-  },
-  "members.dialog.steps.role": {
-    "value": "Role"
-  },
-  "members.dialog.steps.where": {
-    "value": "Where they start"
-  },
-  "members.dialog.steps.note": {
-    "value": "Note"
-  },
-  "members.dialog.pasteHelp": {
-    "value": "Paste a list if you like: commas, spaces or one per line."
-  },
-  "members.dialog.leftOut": {
-    "value": "Whoever is already in or already invited stays out."
-  },
-  "members.dialog.continueWith": {
-    "value": "Continue with {{count}}"
-  },
-  "members.dialog.who.title": {
-    "value": "Who do you want to bring in?"
-  },
-  "members.dialog.who.lead": {
-    "value": "Give me their emails. Each person gets an invitation and joins directly."
-  },
-  "members.dialog.orLink.title": {
-    "value": "Rather send a link?"
-  },
-  "members.dialog.orLink.text": {
-    "value": "Whoever opens it asks to join, and you approve."
-  },
-  "members.dialog.orLink.open": {
-    "value": "See the link"
-  },
-  "members.dialog.role.titleOne": {
-    "value": "What role does {{name}} join with?"
-  },
-  "members.dialog.role.titleMany": {
-    "value": "What role do these people join with?"
-  },
-  "members.dialog.role.lead": {
-    "value": "The role says what each person can do. You can change it later."
-  },
-  "members.dialog.role.each": {
-    "value": "A role for each person"
-  },
-  "members.dialog.role.same": {
-    "value": "The same role for everyone"
-  },
-  "members.dialog.where.titleOne": {
-    "value": "Which channels does {{name}} join right away?"
-  },
-  "members.dialog.where.titleMany": {
-    "value": "Which channels do these people join right away?"
-  },
-  "members.dialog.where.lead": {
-    "value": "Everyone starts in #{{channel}}. You pick the others."
-  },
-  "members.dialog.where.label": {
-    "value": "Channels"
-  },
-  "members.dialog.where.everyone": {
-    "value": "Everyone joins"
-  },
-  "members.dialog.where.private": {
-    "value": "Private · you're in it"
-  },
-  "members.dialog.where.people": {
-    "value": {
-      "one": "{{count}} person",
-      "other": "{{count}} people"
-    }
-  },
-  "members.dialog.where.fromChannel": {
-    "value": "#{{channel}} comes checked: you invited from there."
-  },
-  "members.dialog.noteStep.title": {
-    "value": "Want me to say something in the invitation?"
-  },
-  "members.dialog.noteStep.lead": {
-    "value": "It goes in the email. If not, I'll send it as it is."
-  },
-  "members.dialog.mailFor": {
-    "value": "This is how it reaches {{names}}"
-  },
-  "members.dialog.mail.from": {
-    "value": "agentes.chat · to {{to}}"
-  },
-  "members.dialog.mail.toMany": {
-    "value": "{{email}} and {{count}} more"
-  },
-  "members.dialog.mail.subject": {
-    "value": "You're invited to a workspace on agentes.chat"
-  },
-  "members.dialog.mail.headline": {
-    "value": "You're invited to a workspace"
-  },
-  "members.dialog.mail.body": {
-    "value": "<b>{{name}}</b> ({{email}}) invited you to join <b>{{org}}</b> as a member."
-  },
-  "members.dialog.mail.noteFrom": {
-    "value": "<b>{{name}}:</b> “{{note}}”"
-  },
-  "members.dialog.mail.what": {
-    "value": "agentes.chat is where people and AI agents work together."
-  },
-  "members.dialog.mail.button": {
-    "value": "Accept invitation"
-  },
-  "members.dialog.mail.small": {
-    "value": "The invitation works for 7 days. Accept it with this email address."
-  },
-  "members.dialog.done.title": {
-    "value": "Done, I sent the invitation to {{names}}."
-  },
-  "members.dialog.done.leadOne": {
-    "value": "When {{name}} joins, I'll greet them in {{channels}} and let you know."
-  },
-  "members.dialog.done.leadMany": {
-    "value": "When each person joins, I'll greet them in {{channels}} and let you know."
-  },
-  "members.dialog.done.none": {
-    "value": "No invitation went out this time."
-  },
-  "members.dialog.done.noneLead": {
-    "value": "Each address's reason is below."
-  },
-  "members.dialog.result.invited": {
-    "value": "Sent"
-  },
-  "members.dialog.result.already_member": {
-    "value": "already in {{org}}"
-  },
-  "members.dialog.result.already_invited": {
-    "value": "already had an invitation"
-  },
-  "members.dialog.result.invalid_email": {
-    "value": "invalid email"
-  },
-  "members.dialog.again": {
-    "value": "Invite more people"
-  },
-  "members.dialog.finish": {
-    "value": "Done"
-  },
-  "members.dialog.linkStep.title": {
-    "value": "This is {{org}}'s link."
-  },
-  "members.dialog.linkStep.lead": {
-    "value": "Whoever opens it asks to join. I'll show you each request, and you approve."
-  },
-  "members.dialog.linkStep.how1": {
-    "value": "The person opens the link and says who they are."
-  },
-  "members.dialog.linkStep.how2": {
-    "value": "The request reaches whoever invites, here and on the phone."
-  },
-  "members.dialog.linkStep.how3": {
-    "value": "You approve and pick the role they join with."
-  },
-  "members.dialog.linkStep.waiting": {
-    "value": {
-      "one": "One request waiting for you",
-      "other": "{{count}} requests waiting for you"
-    }
-  },
-  "members.dialog.linkStep.seeRequests": {
-    "value": "See requests"
-  },
-  "members.dialog.linkStep.byEmail": {
-    "value": "Invite by email"
-  },
-  "issues.filterButton": {
-    "value": "Filter"
-  },
-  "issues.filterValue": {
-    "value": "{{filter}}: {{value}}"
-  },
-  "issues.me": {
-    "value": "Me"
-  },
-  "issues.display.title": {
-    "value": "Display"
-  },
-  "issues.display.label": {
-    "value": "Display: {{layout}} · {{group}}"
-  },
-  "issues.display.layout": {
-    "value": "Layout"
-  },
-  "issues.display.group": {
-    "value": "Group by"
-  },
-  "issues.display.sort": {
-    "value": "Sort by"
-  },
-  "issues.display.fields": {
-    "value": "On the cards"
-  },
-  "issues.display.saved": {
-    "value": "Saved for you in this workspace"
-  },
-  "issues.display.reset": {
-    "value": "Back to default"
-  },
-  "issues.display.by.stage": {
-    "value": "Stage"
-  },
-  "issues.display.by.assignee": {
-    "value": "Assignee"
-  },
-  "issues.display.by.priority": {
-    "value": "Priority"
-  },
-  "issues.display.order.manual": {
-    "value": "Manual"
-  },
-  "issues.display.order.priority": {
-    "value": "Priority"
-  },
-  "issues.display.order.due": {
-    "value": "Due date"
-  },
-  "issues.display.field.assignee": {
-    "value": "Assignee"
-  },
-  "issues.display.field.priority": {
-    "value": "Priority"
-  },
-  "issues.display.field.due": {
-    "value": "Due date"
-  },
-  "issues.display.field.criteria": {
-    "value": "Criteria"
-  },
-  "issues.display.field.pullRequest": {
-    "value": "Pull request"
-  },
-  "issues.display.field.label": {
-    "value": "Label"
-  },
-  "issues.drop.stage": {
-    "value": "Drop in {{name}}"
-  },
-  "issues.drop.assignee": {
-    "value": "Drop to give it to {{name}}"
-  },
-  "issues.drop.unassign": {
-    "value": "Drop to unassign"
-  },
-  "issues.drop.priority": {
-    "value": "Drop for {{priority}} priority"
-  },
-  "issues.drag.role": {
-    "value": "draggable task"
-  },
-  "issues.drag.help": {
-    "value": "Space picks the task up, the arrows move it, Space drops it and Esc cancels."
-  },
-  "issues.drag.picked": {
-    "value": "You picked up #{{number}}. The arrows move it, Space drops it, Esc cancels."
-  },
-  "issues.drag.moved": {
-    "value": "#{{number}}: {{group}}, position {{position}} of {{total}}."
-  },
-  "issues.drag.dropped": {
-    "value": "You dropped #{{number}} in {{group}}."
-  },
-  "issues.drag.canceled": {
-    "value": "#{{number}} went back to its place."
-  },
-  "issues.drag.assigned": {
-    "value": "#{{number}} is now with {{name}}."
-  },
-  "issues.drag.unassigned": {
-    "value": "#{{number}} has no assignee now."
-  },
-  "issues.drag.prioritized": {
-    "value": "#{{number}} now has {{priority}} priority."
-  },
-  "routines.panel.createdBy": {
-    "value": "Created by {{name}} · {{date}}"
-  },
-  "routines.panel.nameLabel": {
-    "value": "Routine name"
-  },
-  "routines.panel.editName": {
-    "value": "Edit the name"
-  },
-  "routines.panel.editWhat": {
-    "value": "Edit what it does"
-  },
-  "routines.panel.tabs.label": {
-    "value": "Parts of the routine"
-  },
-  "routines.panel.tabs.details": {
-    "value": "Details"
-  },
-  "routines.panel.tabs.runs": {
-    "value": "Runs"
-  },
-  "routines.panel.nexts": {
-    "value": "Next runs"
-  },
-  "routines.panel.who": {
-    "value": "Who does it"
-  },
-  "routines.panel.onAirLine": {
-    "value": "Runs by itself when it's time"
-  },
-  "routines.panel.offAirLine": {
-    "value": "Doesn't run until you turn it on"
-  },
-  "routines.panel.reportHint.always": {
-    "value": "Even with nothing new"
-  },
-  "routines.panel.reportHint.when_new": {
-    "value": "Quiet when there's nothing new"
+  "presence.help.out": {
+    "value": "Away from work (vacation, a day off): everyone sees it until your status clears."
   }
 }

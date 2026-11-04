@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
-import type { GitHubRepositories } from "../src/api/types";
+import type { AppNotification, GitHubRepositories } from "../src/api/types";
+import { openTarget, workspaceHeadline } from "../src/lib/notifications";
 import {
   githubRepoLink,
   hiddenRepoOf,
@@ -104,5 +105,26 @@ describe("skills from a private repository (web and phone)", () => {
     expect(searchRepos(listing, "").map((a) => a.repositories.length)).toEqual([2, 1]);
     expect(searchRepos(undefined, "x")).toEqual([]);
     expect(githubRepoLink("contoso/skills")).toBe("https://github.com/contoso/skills");
+  });
+});
+
+describe("skill notices", () => {
+  test("each state of a skill's notice has its headline, and every one opens the skill", () => {
+    const notice = (statusTo: string) =>
+      ({ kind: "skill_update", source: { skillId: "s1", label: "deploy" }, latest: { statusTo } }) as AppNotification;
+    expect(["updated", "waiting", "failed", "edited"].map((s) => workspaceHeadline(notice(s)))).toEqual([
+      "skills.notice.updated",
+      "skills.notice.waiting",
+      "skills.notice.failed",
+      "skills.notice.edited",
+    ]);
+    // Waiting only because it would replace the agents' change (no script in it).
+    const replaces = { ...notice("waiting"), latest: { statusTo: "waiting", reason: "edited" } } as AppNotification;
+    expect(workspaceHeadline(replaces)).toBe("skills.notice.waitingEdited");
+    expect(openTarget(notice("edited"))).toEqual({
+      to: "/org/$orgId/settings/$section",
+      params: { section: "skills" },
+      search: { skill: "s1" },
+    });
   });
 });

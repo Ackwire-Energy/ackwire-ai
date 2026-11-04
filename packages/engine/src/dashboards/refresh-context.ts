@@ -7,7 +7,7 @@ import { WIDGET_AGENT_TITLE_MAX } from "./types";
 const { dashboards, dashboardWidgets, dashboardWidgetUpdates, users } = schema;
 
 /*
- * What a widget's refresh run reads (ADR 0134 §5): what the widget shows and for whom, the person's ask, the kind
+ * What a widget's refresh run reads (ADR 0135 §5): what the widget shows and for whom, the person's ask, the kind
  * rule, its current data, its alert, a change request, and how to answer through `update_widget` only. Kept apart
  * from `refresh.ts` so `context.ts` reads it without an import cycle.
  */
@@ -64,7 +64,7 @@ export async function widgetRunContext(
   const firstBuild = widget.spec === null || widget.kind === null;
   const shown = widget.title.trim() ? `«${neutralizeUntrusted(widget.title)}»` : "(not named yet)";
   const titleRule = `a short \`title\`: at most ${WIDGET_AGENT_TITLE_MAX} characters, sentence case, in the language of the instructions, no period at the end, never the instructions themselves (like "Site visits" or "Open orders")`;
-  // ADR 0134 §17: the agent names it on its first build and on a change, never over a person's title.
+  // ADR 0135 §17: the agent names it on its first build and on a change, never over a person's title.
   const naming = widget.titleSetByUser
     ? `Its title ${shown} is the one a person gave it: never change it.`
     : change

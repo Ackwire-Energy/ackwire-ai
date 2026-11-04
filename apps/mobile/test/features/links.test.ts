@@ -131,6 +131,10 @@ describe("inbox items", () => {
     const joined = notification({ id: "n", kind: "invitation_accepted", source: { label: "Acme" } });
     expect(notificationHref(joined)).toBe("/me/members");
     expect(notificationHref(notification({ id: "n", kind: "connector_tool_changed", source: {} }))).toBe("/connectors");
+    expect(notificationHref(notification({ id: "n", kind: "skill_update", source: { skillId: "s1" } }))).toBe(
+      "/settings/skills/s1",
+    );
+    expect(notificationHref(notification({ id: "n", kind: "skill_update", source: {} }))).toBe("/settings/skills");
     expect(notificationHref(notification({ id: "n", kind: "machine_connected", source: {} }))).toBe(
       "/settings/computers",
     );

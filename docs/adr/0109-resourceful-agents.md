@@ -39,3 +39,7 @@ A second production case: asked to pull its owner's spend on one product from an
 4. **Codex and the web**: computer brains list our tools through the bridge (`bridgeToolsFor`, the gateway's own list), and the core `web` source has no scope, so Codex and Claude Code turns get `web_search` and `web_fetch` with the browser's tools. The production run predates this ADR's web source; no runner change.
 5. **Measured**: autonomy scenarios S59–S62 (fake provider) and three `eval:resilience` cases (`ada-external-api-key`, `ambiguous-one-question`, `secret-never-in-chat`, graded on `request_secret` and on the questions that reached the person).
 6. **A secret through the controller**: the turn-end judge has a `secret` verdict (the reply asks for a key, a token or a password in the chat, or needs one and hasn't used a secure request). Such a reply is neither posted nor made a question card: the run reads `SECRET_NUDGE` once (`request_secret` when it has it, otherwise say which key and where it is set up) and its next reply ends the run as it is. A routine's or an agents' DM run ends as `ask_elsewhere`. Scenarios S63–S64; `eval:resilience` fails a reply that asks for the key in the chat.
+
+## Addendum (2026-11-03): no stop on a person-only step
+
+§4's blocker line ("a real blocker is only something a person must give: a code, a sign-in…") is replaced: a step only a person can do is handed to them with its request, then the agent goes on, and `untried` covers a stop on it while the means can hand it over. See ADR 0097, addendum 2026-11-03.

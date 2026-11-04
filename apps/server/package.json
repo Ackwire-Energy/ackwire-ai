@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@agenteschat/adapters": "workspace:*",
+    "@agenteschat/client": "workspace:*",
     "@agenteschat/config": "workspace:*",
     "@agenteschat/db": "workspace:*",
     "@agenteschat/engine": "workspace:*",

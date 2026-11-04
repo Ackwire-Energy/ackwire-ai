@@ -78,7 +78,7 @@ export function Face({
  * asking to join isn't a member yet: their initials.
  */
 export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; className?: string }) {
-  // A board's notice with nobody named: its agent (ADR 0134).
+  // A board's notice with nobody named: its agent (ADR 0135).
   const widget = widgetNoticeOf(n);
   if (widget?.agentId) return <AgentAvatar agentId={widget.agentId} name="" size="md" className={className} />;
   if (n.kind === "join_request") return <Avatar name={askersOf(n).names[0] ?? ""} size="sm" className={className} />;
@@ -92,6 +92,12 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
     return (
       <span className="nt-sys" aria-hidden="true">
         <Icon name="plug" size={16} />
+      </span>
+    );
+  if (n.kind === "skill_update")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <Icon name="book" size={16} />
       </span>
     );
   if (n.kind === "computer_disk_full")
@@ -191,7 +197,7 @@ export function Headline({
   const own = workspaceHeadline(n);
   if (own) return t(own, { name: n.source.label });
   if (n.kind === "app_created") return appCreatedLine(t, n);
-  // A board's notice (ADR 0134): the agent who looks after the widget or asks to publish the board.
+  // A board's notice (ADR 0135): the agent who looks after the widget or asks to publish the board.
   const widget = widgetNoticeOf(n);
   if (widget) {
     const agent = widget.agentId ? (dir.anyAgent(widget.agentId)?.name ?? t("channel.unknownAgent")) : name;

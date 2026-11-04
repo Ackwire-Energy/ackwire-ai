@@ -295,7 +295,7 @@ describe("pieces", () => {
   });
 });
 
-describe("a board's notices (ADR 0134)", () => {
+describe("a board's notices (ADR 0135)", () => {
   const alert = notification({
     id: "a",
     kind: "widget_alert",

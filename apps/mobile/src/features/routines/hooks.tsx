@@ -180,7 +180,7 @@ export function useTargetLabel() {
           : t("routines.inChannel", { channel: c.name });
       }
       if (target.type === "forum") return t("routines.target.forumShort");
-      // A widget's own routine (ADR 0134): it redoes its widget, with no message.
+      // A widget's own routine (ADR 0135): it redoes its widget, with no message.
       if (target.type === "widget") return t("mobile.dashboards.routineTarget");
       return target.type === "dm" ? t("routines.target.dmShort") : t("routines.target.artifactShort");
     },
@@ -330,7 +330,7 @@ export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: 
     toast(ok ? { title: t("routines.webhookCopied") } : { title: t("mobile.app.failed"), icon: "x" });
   };
   const items: MenuItem[] = [];
-  // A widget's routine is changed from its widget (ADR 0134): "Open widget" stands for Edit, and it isn't duplicated.
+  // A widget's routine is changed from its widget (ADR 0135): "Open widget" stands for Edit, and it isn't duplicated.
   const widget = r.target.type === "widget" ? r.target : null;
   if (widget)
     items.push({

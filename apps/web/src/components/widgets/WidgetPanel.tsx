@@ -27,7 +27,7 @@ import { RemoveWidgetDialog } from "./RemoveWidgetDialog";
 import "./widgets.css";
 
 /**
- * A widget's side panel (ADR 0134): the widget big, how it updates (its schedule and next run, its alert, what its
+ * A widget's side panel (ADR 0135): the widget big, how it updates (its schedule and next run, its alert, what its
  * agent reads), its latest updates, Update now, Remove, and "Ask for a change" to its agent. Whoever edits it renames
  * it in place: a press on the title (or its pencil) opens the field, Enter saves, Esc cancels. Opened from a board
  * (`?widget=<id>`), a notification or a push.

@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { keys } from "../api/keys";
 
-/** A board changed (ADR 0134): its title, who sees it, its layout, a widget added or removed, deleted. */
+/** A board changed (ADR 0135): its title, who sees it, its layout, a widget added or removed, deleted. */
 export const DASHBOARD_CHANGED = "dashboard.changed";
 /** A widget's data or status changed. */
 export const DASHBOARD_WIDGET = "dashboard.widget";

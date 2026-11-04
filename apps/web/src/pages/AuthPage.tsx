@@ -15,7 +15,14 @@ import {
 } from "@agenteschat/client/lib/errors";
 import { signInFor } from "@agenteschat/client/lib/guards";
 import { type HumanAction, isHumanCheckRefusal, withHumanCheck } from "@agenteschat/client/lib/human-check";
-import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
+import {
+  emailTypoFix,
+  isEmail,
+  looksLikePassword,
+  nameIsPassword,
+  passwordState,
+  webmailOf,
+} from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -98,6 +105,17 @@ export function PasswordHelp({ password }: { password: string }) {
         ))}
       </span>
       {help.text}
+    </span>
+  );
+}
+
+/** Under a name step's field: a soft line, never a block, when what's typed there looks like a password. */
+export function NameHint({ name }: { name: string }) {
+  const { t } = useTranslation();
+  if (!looksLikePassword(name)) return null;
+  return (
+    <span className="auth__help" role="status">
+      {t("auth.flow.nameLooksLikePassword")}
     </span>
   );
 }
@@ -309,7 +327,12 @@ export function AuthPage({
     if (step === "email") void lookUp();
     else if (step === "password") void signIn();
     else if (step === "name") go("newPassword");
-    else if (step === "newPassword") void signUp();
+    else if (step === "newPassword" && nameIsPassword(name, password)) {
+      // The name step got the password: no account with a password for a name.
+      setPassword("");
+      go("name");
+      setError(t("auth.flow.nameIsPassword"));
+    } else if (step === "newPassword") void signUp();
     else if (step === "forgot") void sendReset();
   };
 
@@ -524,16 +547,19 @@ export function AuthPage({
             )}
 
             {step === "name" && (
-              <Input
-                className="auth__big"
-                aria-label={t("auth.yourName")}
-                autoComplete="name"
-                spellCheck={false}
-                placeholder={t("auth.flow.namePlaceholder")}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
+              <div className="auth__field">
+                <Input
+                  className="auth__big"
+                  aria-label={t("auth.yourName")}
+                  autoComplete="name"
+                  spellCheck={false}
+                  placeholder={t("auth.flow.namePlaceholder")}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus
+                />
+                {!error && <NameHint name={name} />}
+              </div>
             )}
 
             {step === "newPassword" && (

@@ -392,6 +392,8 @@ export const en = {
       name: "Nice to meet you. This email is new here.",
       nameLead: "What does your team call you?",
       namePlaceholder: "Your name",
+      nameIsPassword: "Is this your name? It's the same as the password you typed.",
+      nameLooksLikePassword: "That looks like a password. Your name goes here.",
       newPassword: "Now a password.",
       newPasswordNamed: "Great, {{name}}. Now a password.",
       closed: "This email has no account yet.",
@@ -1247,6 +1249,7 @@ export const en = {
     timezone: "Time zone",
     profileTitle: "Your profile in this workspace",
     handle: "Your @",
+    nameEmpty: "Write your name.",
     timezoneHelp: "Shows your local time on your profile card.",
     timezoneInvalid: "Use a time zone like America/Sao_Paulo.",
     useOrgZone: "Use the workspace time zone",
@@ -1419,6 +1422,58 @@ export const en = {
     working_other: "{{count}} agents working",
   },
   channel: {
+    /** Channel settings' sections, for who manages it (ADR 0134). */
+    settingsNav: {
+      label: "Channel settings",
+      overview: "Overview",
+      permissions: "Permissions",
+      members: "Members",
+    },
+    /** A channel's exceptions to the workspace's roles (ADR 0134), said for people who never used Discord. */
+    perms: {
+      advanced: "Advanced permissions",
+      intro: "Exceptions apply to this channel only. Default follows the workspace's roles.",
+      targets: "Roles and people with an exception",
+      add: "Add a role or person",
+      addSearch: "Search roles or people",
+      addNone: "No role or person found",
+      groupRoles: "Roles",
+      groupPeople: "People",
+      clear: "Remove exception",
+      /** The three-state control's name for screen readers: "Enviar mensagens para Vendas". */
+      stateLabel: "{{key}} for {{target}}",
+      state: {
+        deny: "Deny",
+        inherit: "Default",
+        allow: "Allow",
+      },
+      keys: {
+        post: {
+          title: "Send messages",
+          line: "Write, reply in threads and pin messages here",
+        },
+        callAgents: {
+          title: "Call agents",
+          line: "Get replies from this channel's agents",
+        },
+        manage: {
+          title: "Manage the channel",
+          line: "Change its name, who sees it, members and these permissions",
+        },
+      },
+      /** What "Padrão" means right now for the role or person picked. */
+      default: {
+        allowedBy: "Default: allowed by the {{role}} role",
+        notHeld: "Default: not allowed by the {{role}} role",
+        followsEveryone: "Default: follows {{role}} in this channel",
+        person: "Default: follows this person's roles",
+      },
+      /** In place of the composer when the channel's exceptions keep me from sending. */
+      readOnlyComposer: "You can't send messages in this channel",
+      /** Only for me, after my message mentioned an agent here. */
+      agentsDenied: "You can't call agents in this channel",
+      forbidden: "You can only change permissions you have, for roles and people below you",
+    },
     pins: {
       title: "Pinned",
       button_one: "Pinned messages ({{count}})",
@@ -1846,6 +1901,21 @@ export const en = {
       done: "Invited",
       adminOnly: "Someone who may invite sends it",
     },
+    install_skill: {
+      title: "Install a skill",
+      open: "Install",
+      done: "Installed",
+      adminOnly: "Someone who manages agents installs it",
+    },
+    update_skills: {
+      title_one: "Update a skill",
+      title_other: "Update {{count}} skills",
+      update: "Update",
+      review: "Review",
+      done: "Up to date",
+      waiting: "Waits for review",
+      adminOnly: "Someone who manages agents updates it",
+    },
     agentProposal: {
       title: "{{agent}} proposes a new agent",
       review: "Review",
@@ -1906,6 +1976,21 @@ export const en = {
     allow: "Let {{person}} talk to him",
     allow_female: "Let {{person}} talk to her",
     allowed: "Done: {{person}} can now talk to {{name}}.",
+    allowMe: "Let me talk to him",
+    allowMe_female: "Let me talk to her",
+    allowedMe: "Done: you can now talk to {{name}}.",
+    /** Before widening an agent's audience takes mailboxes other people gave it (only a mailbox's owner gives access). */
+    mailLossTitle: "Remove mailbox access?",
+    mailLoss:
+      "{{name}} has access to the mailbox of {{owners}}. With more people talking to him, they could reach those emails through him, so that access is removed. Whoever connected the mailbox can give it again.",
+    mailLoss_female:
+      "{{name}} has access to the mailbox of {{owners}}. With more people talking to her, they could reach those emails through her, so that access is removed. Whoever connected the mailbox can give it again.",
+    /** Before widening an agent on someone else's plan (ADR 0059 §5): it spends their plan, and they get an email. */
+    planTitle: "Use {{owner}}'s plan?",
+    planOpen:
+      "Conversations with {{name}} will use {{owner}}'s {{plan}} plan and its limits. {{owner}} will get an email about it.",
+    /** "Usar em outros agentes" opening the plans of several people: then one `planOpen` line per owner. */
+    plansTitle: "Use the plans of {{owners}}?",
   },
   teamChecks: {
     group: "What the agent didn't repeat",
@@ -2097,13 +2182,18 @@ export const en = {
     editChannel: "Edit channel",
   },
   channelMembers: {
+    /** A small line on top of the members column and sheet: what the list is. */
+    caption: "Who can see this channel",
+    /** The same line in the channel settings' members, for a public channel: no list limits who sees it. */
+    captionOpen: "Open to the whole workspace",
     addRow: "Add people or agents",
     /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Invite {{email}} to {{org}} and #{{channel}}",
     inviteOrg: "Invite {{email}} to {{org}}",
     addTitle: "Add to #{{channel}}",
     addSearch: "Search people or agents",
-    addEmpty: "Everyone is already here, or nobody found for “{{q}}”.",
+    addEmpty: "Nobody outside the channel matches “{{q}}”.",
+    addEveryone: "Everyone in {{org}} is already in #{{channel}}.",
     addConfirm_one: "Add {{count}}",
     addConfirm_other: "Add {{count}}",
     actions: "Options for {{name}}",
@@ -2166,7 +2256,15 @@ export const en = {
     busy: "Busy",
     hidden: "Invisible",
     offline: "Offline",
-    lower: { online: "online", away: "away", busy: "busy", hidden: "invisible", offline: "offline" },
+    out: "Out of office",
+    lower: {
+      online: "online",
+      away: "away",
+      busy: "busy",
+      hidden: "invisible",
+      offline: "offline",
+      out: "out of office",
+    },
     setStatus: "Set status",
     seen: "seen {{when}}",
     title: "Set status",
@@ -2188,6 +2286,7 @@ export const en = {
       auto: "Online while agentes.chat is open.",
       away: "Out for a while: people know answers may take time.",
       busy: "Everyone sees it's better not to interrupt right now.",
+      out: "Away from work (vacation, a day off): everyone sees it until your status clears.",
       hidden: "You show as offline to everyone, and can still use everything.",
     },
     suggest: {
@@ -2227,6 +2326,9 @@ export const en = {
       waiting_plan: "Waiting for the plan to reset",
       waiting_budget: "Waiting for the budget to reset",
       provider_down: "The AI provider is down · retries by itself",
+      out_of_plan: "Out of plan limit",
+      out_of_budget: "Monthly budget spent",
+      backAt: "back {{when}}",
       work: "In the background: {{subject}}",
     },
     agentWhy: {
@@ -2235,6 +2337,7 @@ export const en = {
       away: "Idle since {{when}}",
       awayNever: "Hasn't worked yet",
       offline: "Paused",
+      out: "Out of limit for now · answers after the reset",
       noAi: "No AI connected",
     },
     bySelf: "Written by {{name}} · clears when it's done",
@@ -2312,6 +2415,11 @@ export const en = {
     closed: "Closed without an answer.",
     failed: "Couldn't send the answer. Try again.",
     withdrawn: "{{name}} no longer needs an answer.",
+    /** Closes the question without an answer: the agent goes on with its own judgement. */
+    skip: "Skip",
+    skipFailed: "Couldn't skip the question. Try again.",
+    dismissed: "{{name}} skipped this question.",
+    dismissedByYou: "You skipped this question.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
   ask: {
@@ -2387,6 +2495,11 @@ export const en = {
       reads: "Always approve reads",
       note: "Covers {{actions}} from now on, with any values. To undo: Tools and access, on {{name}}'s page.",
       noteTarget: "Covers {{actions}} from now on. To undo: Tools and access, on {{name}}'s page.",
+      /** A command on the agent's computer, by its kind (`gh issue create`). */
+      noteCommand:
+        "Covers {{actions}} on the computer from now on, with any arguments. To undo: Tools and access, on {{name}}'s page.",
+      /** Where a command rule applies, in the agent's list of what it runs without asking. */
+      computer: "Commands on the computer",
       /** `target`: the call's other arguments, as `project_id=abc`. */
       noteReads:
         "Covers only reads by {{actions}} in this project ({{target}}) from now on. Anything that changes data still asks. To undo: Tools and access, on {{name}}'s page.",
@@ -2968,6 +3081,7 @@ export const en = {
         label_female: "How she works",
         computer: "Works on",
         brain: "Thinks with",
+        brainWith: "Thinks with {{plan}}",
         browser: "Browser",
         effort: "{{level}} effort",
       },
@@ -3013,7 +3127,9 @@ export const en = {
         none: "No computer has it",
         planModel: "Model",
         account: "Account",
-        accountLocked: "Only {{name}} changes it",
+        /** To an admin: the accounts are the agent's owner's, since a plan thinks only for its owner's agents. */
+        accountWho:
+          "Only accounts of {{owner}}, who is responsible for {{name}}: a plan thinks only for its owner's agents.",
         accountSignedOut: "Signed out, sign in again",
         thisComputer: "{{computer}}'s account",
         accountMove: "In use by {{agents}} · Move it here",
@@ -3030,7 +3146,7 @@ export const en = {
         efforts: { auto: "Automatic", low: "Low", medium: "Medium", high: "High", max: "Maximum" },
         effortsLower: { auto: "automatic", low: "low", medium: "medium", high: "high", max: "maximum" },
         effortText: {
-          auto: "Picks the effort for each task.",
+          auto: "The Automatic model picks each task's effort. Pick a model to set the effort yourself.",
           low: "Answers fast. Good for simple questions.",
           medium: "The default. Thinks enough most of the time.",
           high: "Thinks more on hard tasks. Slower and costs more.",
@@ -3055,6 +3171,11 @@ export const en = {
           answers: "Who it answers",
           defaults: "Back to defaults",
           done: "Done",
+          contents: {
+            model: "Context window",
+            auto: "Context window and who it answers",
+            fixed: "Effort, context window and who it answers",
+          },
           allDefault: "All defaults",
           effort: "Effort: {{level}}",
           context: "Context: {{size}}",
@@ -4306,6 +4427,18 @@ export const en = {
     github_pr_merge: { label: "Merge pull requests", description: "Merge a pull request. Always asks for approval." },
     github_issues_read: { label: "Read issues", description: "List and read GitHub issues." },
     github_issues_write: { label: "Write issues", description: "Create issues and comment." },
+    github_actions_read: {
+      label: "Read Actions",
+      description: "List workflows and runs and read their jobs and logs.",
+    },
+    github_projects_read: {
+      label: "Read Projects",
+      description: "List and read GitHub Projects, their fields and items.",
+    },
+    github_projects_write: {
+      label: "Write Projects",
+      description: "Add items to GitHub Projects and move or edit them.",
+    },
     github_actions_run: {
       label: "Run workflows",
       description: "Start GitHub Actions workflows (may deploy). Always asks for approval.",
@@ -4763,7 +4896,7 @@ export const en = {
     subtitle: "What the agents do on their own, on a schedule or when something happens.",
     new: "New routine",
     deliversTo: "{{agent}} · delivers to {{target}}",
-    /** A widget's routine (ADR 0134) in the list: it redoes its widget and posts nothing. */
+    /** A widget's routine (ADR 0135) in the list: it redoes its widget and posts nothing. */
     widgetLine: "{{agent}} · updates its widget, with no message",
     widgetChip: "Dashboard widget",
     widgetFixed: "What it shows, when it updates and who looks after it change from its widget.",
@@ -5383,6 +5516,11 @@ export const en = {
       allowedBy: "Approved by {{name}} · {{time}}",
       deniedBy: "Declined by {{name}} · {{time}}",
       alwaysBy: "Allowed in this mission by {{name}} · {{time}}: {{rules}}",
+      /** That kind of command (`kind`: `gh issue create`) for the agent, for good: its owner or an admin. */
+      alwaysAgent: "Always approve for this agent",
+      alwaysAgentHint:
+        "Always approve for this agent allows {{kind}} with any arguments, in every mission and conversation. To undo: Tools and access, on the agent's page.",
+      alwaysAgentBy: "Allowed for this agent by {{name}} · {{time}}: {{kind}}",
       state: { allowed: "Approved", denied: "Declined", expired: "No answer", pending: "Waiting" },
       blockedLabel: "Blocked commands",
       blocked: "Blocked:",
@@ -6266,6 +6404,49 @@ export const en = {
     saved: "{{name}} saved.",
     refresh: "Update from link",
     refreshed: "{{name}} updated from its link.",
+    upToDate: "{{name}} already has what its link has.",
+    waitingToast: "The update of {{name}} changes files that run, so it waits for a review.",
+    autoUpdate: "Update by itself",
+    autoUpdateHelp:
+      "Reads its link every day. New text goes in with Undo. Changes to scripts wait for someone who manages skills.",
+    autoChip: "Updates by itself",
+    waitingChip: "Update waiting",
+    lastUpdate: "Updated from its link {{when}}",
+    undoUpdate: "Undo update",
+    undone: "{{name}} is back to version {{version}}.",
+    agentsImprove: "Agents improve skills by themselves",
+    agentsImproveHelp:
+      "When an agent finds a skill wrong or missing a step, it fixes it right away: a new version you can undo, and whoever made the skill is told. Changes to scripts wait for someone who manages skills.",
+    agentsImproveThis: "Agents improve this skill by themselves",
+    agentChange: "{{agent}} changed it {{when}}",
+    undoAgentChange: "Undo change",
+    pending: {
+      title: "The update from its link changes files that run: {{files}}",
+      lead: "Apply it only if you trust these files. Agents run them on their computers.",
+      edited: "The update from its link would replace what agents changed in it",
+      editedLead: "Apply it to take its link's version. You can undo it after.",
+      apply: "Apply update",
+      dismiss: "Don't apply",
+      applied: "{{name}} updated from its link.",
+      changedAgain: "Its link changed again. Review the new files.",
+      dismissed: "Update not applied. A new change to its link asks again.",
+    },
+    updateFailed: {
+      no_skill_md: "Couldn't update it: its link no longer has a SKILL.md.",
+      connection_gone: "Couldn't update it: the GitHub connection that read it is gone.",
+      link_holds_several: "Couldn't update it: its link holds several skills now.",
+      link_renamed: "Couldn't update it: its link holds another skill now.",
+      owner_gone:
+        "Couldn't update it: whoever turned on updating by itself can no longer manage skills. Turn it on again.",
+      other: "Couldn't update it from its link.",
+    },
+    notice: {
+      updated: "{{name}} was updated from its link",
+      waiting: "An update of {{name}} changes its scripts",
+      waitingEdited: "An update of {{name}} would replace what agents changed",
+      failed: "{{name}} couldn't update from its link",
+      edited: "Agents improved {{name}}",
+    },
     remove: "Remove",
     removeTitle: "Remove {{name}}?",
     removeAgents_one: "{{names}} uses this skill and loses access to it.",
@@ -6337,15 +6518,18 @@ export const en = {
     share: {
       switch: "Answers other people",
       switchAll: "Answer other people",
-      switchOther: "Answers only {{owner}}",
-      onOther: "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to him.",
-      onOther_female: "{{name}} thinks with {{owner}}'s plan. Only {{owner}} can let other people talk to her.",
       line: {
         off: "{{name}} answers only you, on your {{plan}}.",
         on: "{{name}} answers anyone who can talk to him, on your {{plan}}.",
         on_female: "{{name}} answers anyone who can talk to her, on your {{plan}}.",
         offAll: "They answer only you, on your {{plan}}.",
         onAll: "They answer anyone who can talk to them, on your {{plan}}.",
+      },
+      /** The same line to an admin, on the plan of the agent's owner. */
+      lineOf: {
+        off: "{{name}} answers only {{owner}}, on {{owner}}'s {{plan}}.",
+        on: "{{name}} answers anyone who can talk to him, on {{owner}}'s {{plan}}.",
+        on_female: "{{name}} answers anyone who can talk to her, on {{owner}}'s {{plan}}.",
       },
       plan: {
         own: "{{provider}} plan",
@@ -6361,14 +6545,11 @@ export const en = {
       },
       savedEveryone: "Now {{name}} answers other people.",
       savedOwner: "{{name}} now answers only you.",
+      savedOwnerOf: "{{name}} now answers only {{owner}}.",
       backOnApi: "{{name}} is back on the API and still answers only you.",
       letEveryone: "Let {{name}} answer everyone",
       letPeople: "Let {{name}} answer other people",
       pickPeople: "{{name}} answers only the people picked, and nobody is picked yet. Pick them under Who can talk.",
-    },
-    errors: {
-      planOwnerOnly:
-        "Only the person responsible for {{agentName}} can let more people in: {{agentName}} answers on their plan.",
     },
     add: {
       paste: "Paste",
@@ -8038,6 +8219,7 @@ export const en = {
     countsLabel: "{{added}} lines added, {{removed}} removed",
     htmlPreview: "Interactive page. Open to see it.",
     subtitle: "{{kind}} · {{name}} · {{where}} · {{when}}",
+    subtitleSize: "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     noChannel: "no channel",
     download: "Download",
     downloadCsv: "Download CSV",
@@ -8583,6 +8765,9 @@ export const en = {
     connectedList: "Connected",
     connected: "Connected",
     connectedAs: "Connected as {{account}}",
+    /** A sign-in that lacks scopes the connector asks for now; `what` lists what reconnecting adds (`adds.*`). */
+    reconnectAdds: "Reconnect {{name}} so agents can also {{what}}.",
+    adds: { github_project: "use GitHub Projects (read boards and move cards)" },
     toolsCount_one: "{{count}} tool",
     toolsCount_other: "{{count}} tools",
     active: "Active",
@@ -9638,6 +9823,7 @@ export const en = {
     },
     artifact: {
       fileTooLarge: "The file is over {{max}} MB, the limit per file.",
+      notVersioned: "An image, a video or a recording has no versions. Send it as a new file.",
       fileRequired: "Choose a file to upload.",
       fileNameRequired: "The file needs a name.",
       notFound: "This file no longer exists or you don't have access.",
@@ -9668,6 +9854,10 @@ export const en = {
       tooLarge: "The skill is too large (max {{max}} MB).",
       tooManyFiles: "The skill has too many files (max {{max}}).",
       connectionGone: "The GitHub connection that read {{repo}} is gone. Connect GitHub again to update this skill.",
+      linkHoldsSeveral: "Its link holds several skills now. Install this one again from its own folder.",
+      linkRenamed: "Its link holds the skill {{name}} now.",
+      noLink: "Only a skill installed from a link updates from it.",
+      noPendingUpdate: "No update of this skill is waiting.",
     },
     agentGroup: {
       notFound: "This group no longer exists.",
@@ -10053,18 +10243,19 @@ export const en = {
       address: "Server address",
       open: "Open {{app}}",
       client: {
-        claude: "Claude",
-        claude_code: "Claude Code",
-        chatgpt: "ChatGPT",
-        cursor: "Cursor",
         other: "Other app",
       },
       clientText: {
         claude: "claude.ai, app and phone",
-        claude_code: "In the terminal",
-        chatgpt: "chatgpt.com",
-        cursor: "The editor",
-        other: "VS Code and more",
+        terminal: "In the terminal",
+        editor: "Code editor",
+        extension: "Editor extension",
+        desktop: "Desktop app",
+        other: "Any MCP app",
+      },
+      group: {
+        chat: "Chat apps",
+        code: "Editors and terminals",
       },
       waiting: "Waiting for the app to connect",
       connected: "Connected: {{name}}",
@@ -10086,28 +10277,81 @@ export const en = {
         step2: "In Claude Code, type <code>/mcp</code>, pick agentes and Authenticate.",
         scope: "It works in every folder. For the current folder only, drop <code>--scope user</code>.",
       },
-      chatgpt: {
-        step1: "Open chatgpt.com/plugins.",
-        step2: "Click + then Add custom MCP server.",
-        step3: "Paste the address and connect.",
-        plans: "Available on paid ChatGPT plans.",
-      },
       cursor: {
         add: "Add to Cursor",
         manual: "Or paste into <code>~/.cursor/mcp.json</code>:",
         signIn: "Cursor asks you to sign in the first time you use it.",
       },
+      vscode: {
+        add: "Add to VS Code",
+        manual: "Or paste into <code>.vscode/mcp.json</code>:",
+      },
+      codex: {
+        step: "Run in the terminal. Codex opens the page for you to sign in:",
+      },
+      /** The IDE's own settings for its Copilot extension, where its mcp.json opens. */
+      copilotIdes: {
+        config: "In the IDE's GitHub Copilot settings, open <code>mcp.json</code> and paste:",
+      },
       other: {
-        tabs: "Which app",
-        vscode: "VS Code",
-        codex: "Codex",
-        any: "Any MCP app",
-        vscodeAdd: "Add to VS Code",
-        vscodeManual: "Or paste into <code>.vscode/mcp.json</code>:",
-        codexStep: "Run in the terminal. Codex opens the page for you to sign in:",
         anyStep: "Paste the address into the app. It opens this page for you to sign in.",
         anyToken: "Apps without OAuth sign-in use a personal token in the Authorization: Bearer header.",
         toTokens: "Create a personal token",
+      },
+      /**
+       * One step of an app's guide. The values are the app's own menu paths, buttons and fields, in its English, as
+       * its docs write them; keep them as they are.
+       */
+      step: {
+        open: "Open {{place}}.",
+        click: "Click {{button}}.",
+        clickThen: "Click {{button}}, then {{next}}.",
+        name: "Name it agentes.chat and paste the address.",
+        nameDescribe: "Name it agentes.chat and add a description.",
+        nameConnect: "Name it agentes.chat and click {{button}}.",
+        paste: "Paste the address.",
+        pasteIn: "Paste the address into {{field}}.",
+        choosePaste: "Choose {{option}} and paste the address.",
+        emptySecret: "Leave the client ID and secret empty and click {{button}}.",
+        choose: "Choose {{option}}.",
+        chooseThen: "Choose {{option}}, click {{button}}, then {{next}}.",
+        chooseConfig: "Choose {{option}} and paste:",
+        auth: "For authentication, choose {{option}}.",
+        /** {{box}} is the checkbox's own label. */
+        tick: "Tick “{{box}}” and click {{button}}.",
+        run: "Run in the terminal:",
+        orRun: "Or run in the terminal:",
+        /** A command the app runs from its own search box (Raycast's Install MCP Server). */
+        runCommand: "Run the {{command}} command.",
+        file: "Paste into <code>{{file}}</code>:",
+        orFile: "Or paste into <code>{{file}}</code>:",
+        pasteConfig: "Paste:",
+        mode: "In the chat, switch to {{mode}} mode.",
+        loginRun: "To sign in, run <code>{{command}}</code>.",
+        loginType: "To sign in, type <code>{{command}}</code> in the app.",
+        signIn: "Sign in with your agentes.chat account on the page that opens.",
+        signInFirst: "The app asks you to sign in the first time you use it.",
+        /** {{placeholder}} is the spot in the config above where the token goes. */
+        token: "Create a personal token and put it in place of {{placeholder}}.",
+        /** A button. */
+        install: "Add to {{app}}",
+      },
+      note: {
+        untested: "We haven't tested signing in from this app yet. If it fails, let us know.",
+        chatgptPlans: "On paid ChatGPT plans, not Free or Go. On Business, only admins can add it.",
+        chatgptPhone: "It can't be added from the phone app. Once added on the web, it shows on desktop and phone too.",
+        geminiPlans: "On the web only, with a personal Google account. It may need Google AI Pro or Ultra.",
+        codex:
+          "Needs a ChatGPT plan with Codex. The ChatGPT desktop app, the Codex CLI and its IDE extension share this setup.",
+        /** "MCP servers in Copilot" is the policy's name in GitHub's settings: keep it as is. */
+        copilotPolicy:
+          "On Copilot Business and Enterprise, an admin has to turn on the MCP servers in Copilot policy, which is off by default.",
+        grokAdmin: "On Grok Business and Enterprise, an admin adds the connector.",
+        perplexityPlans: "On Perplexity Pro, Max and Enterprise.",
+        leChatAdmin: "On the Team plan, an admin adds the connector.",
+        raycastPro: "Only on Raycast Pro.",
+        visualStudio: "Visual Studio 2022 17.14 or newer, with GitHub Copilot.",
+        continueAgent: "Works in Agent mode only.",
       },
     },
     consent: {
@@ -10956,6 +11200,8 @@ export const en = {
         creatingChannel: "Created a channel",
         offeringConnectAi: "Offered to connect an AI",
         offeringConnectApp: "Offered to connect an app",
+        offeringSkill: "Offered to install a skill",
+        updatingSkills: "Updated skills",
         offeringInvites: "Offered to invite people",
         proposingAgent: "Proposed an agent",
         askingAgent: "Asked another agent",
@@ -11040,6 +11286,8 @@ export const en = {
       creatingChannel: "creating a channel",
       offeringConnectAi: "getting an AI ready to connect",
       offeringConnectApp: "getting an app ready to connect",
+      offeringSkill: "getting a skill ready to install",
+      updatingSkills: "updating skills",
       offeringInvites: "getting invitations ready",
       proposingAgent: "proposing an agent",
       askingAgent: "asking another agent",
@@ -11159,6 +11407,8 @@ export const en = {
       action_connect_app: "Connect {{name}}",
       action_add_mcp: "Add an MCP server",
       action_invite_people: "Invite people",
+      action_install_skill: "Install a skill",
+      action_update_skills: "Update skills",
       agent_proposal: "Proposed a new agent: {{name}}",
       approval_request: "Approval request: {{title}}",
       secret_request: "{{agent}} asked for a key: {{name}}",
@@ -11371,6 +11621,14 @@ export const en = {
     offer_invites: {
       label: "Offer to invite people",
       description: "Posts a card whose button opens the invite dialog with the addresses filled in.",
+    },
+    offer_install_skill: {
+      label: "Offer to install a skill",
+      description: "Posts a card whose button opens the install dialog with the skill's link filled in.",
+    },
+    update_skill_from_source: {
+      label: "Update skills from their links",
+      description: "Updates skills from where they were installed. Changes to scripts wait for a person.",
     },
     propose_agent: {
       label: "Propose an agent",
@@ -12412,7 +12670,7 @@ export const en = {
       none: "{{name}} is free now.",
     },
   },
-  // Widgets (ADR 0134): what every surface shows of one. The web and the phone add their own keys here, above the end.
+  // Widgets (ADR 0135): what every surface shows of one. The web and the phone add their own keys here, above the end.
   widgets: {
     kinds: {
       auto: "Auto",
@@ -12596,7 +12854,7 @@ export const en = {
     noConnectors: "No connectors",
     more: "+{{count}}",
   },
-  // Dashboards (ADR 0134): the boards' page, a board, its dialogs. The web and the phone add their own keys here.
+  // Dashboards (ADR 0135): the boards' page, a board, its dialogs. The web and the phone add their own keys here.
   dashboards: {
     title: "Dashboards",
     subtitle: "Numbers and charts the agents keep up to date, for the workspace or only some roles.",
@@ -12740,7 +12998,7 @@ export const en = {
         noRedoHint: "You can ask for an update in the menu",
       },
       created: "Widget added to {{where}}",
-      /** Asking is tested first (ADR 0134): the agent builds a draft with real data before the widget is created. */
+      /** Asking is tested first (ADR 0135): the agent builds a draft with real data before the widget is created. */
       test: "Test",
       testAgain: "Test again",
       testing: "{{name}} is building it with real data…",

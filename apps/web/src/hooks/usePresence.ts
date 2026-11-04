@@ -31,7 +31,7 @@ const live = <T extends { until: string | null }>(line: T | null | undefined, no
 
 /** What you picked, from how you appear to yourself, when the server didn't say (`Person.availability`). */
 export const availabilityOf = (presence: MemberPresence | undefined): Availability =>
-  presence === "away" || presence === "busy" || presence === "hidden" ? presence : "auto";
+  presence === "away" || presence === "busy" || presence === "out" || presence === "hidden" ? presence : "auto";
 
 /** A person's line as its emoji and words. */
 export const personLine = (status: MemberStatus) => ({ emoji: status.emoji || STATUS_EMOJI, text: status.text });
@@ -118,5 +118,6 @@ export function useAgentPresence(agentId: string | null | undefined): AgentShown
   };
 }
 
-/** An agent's line in words with its emoji, or null. */
-export const agentLine = (t: TFunction, line: AgentStatusLine | null) => (line ? agentStatusText(t, line) : null);
+/** An agent's line in words with its emoji, or null; `locale` words when an agent out of office is back. */
+export const agentLine = (t: TFunction, line: AgentStatusLine | null, locale?: string) =>
+  line ? agentStatusText(t, line, locale) : null;

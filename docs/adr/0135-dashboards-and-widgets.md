@@ -1,9 +1,9 @@
-# 0134. Dashboards and widgets: numbers agents keep up to date, on boards people share
+# 0135. Dashboards and widgets: numbers agents keep up to date, on boards people share
 
 - Status: Accepted
 - Date: 2026-11-03
 - Extends: ADR 0053 (routines and unattended work: a widget is redone by a routine of its own), 0085 (roles and permissions: who sees a board), 0108 (Home: "My Home" is its board), 0113 (live blocks: what is pinned is a chart, not a live block), 0125 (an audience by role, the same model), 0071 (notifications: alerts and requests wait on the person)
-- Code: `packages/db/src/schema/dashboards.ts` (`dashboards`, `dashboard_widgets`, `dashboard_widget_updates`), migrations `0193_dashboards.sql`, `0194_widget_drafts.sql`, `0195_dashboard_edit_roles.sql`; `packages/ui/src/widgets/spec.ts` (`@agenteschat/ui/widgets/spec`: `WidgetSpec`, `validateWidgetSpec`, `chartBlockToWidgetSpec`, schedules, sizes, caps); `packages/engine/src/dashboards/*` (`access.ts`, `service.ts`, `pin.ts`, `cost.ts`, `suggestions.ts`, `refresh.ts`, `proposals.ts`, `tools.ts`, `events.ts`, `types.ts`), `routines.ts` and `routine-ledger.ts` (the `widget` target), `tools/run-policy.ts` (a widget's refresh run), `notifications.ts` (`widget_alert`, `widget_failed`, `dashboard_proposal`); server `routes/app/dashboards.ts`, `dashboard-schemas.ts`; client `packages/client/src/dashboards/*`; web `packages/ui/src/widgets/*`, `pages/HomePage.tsx` (the mural), `pages/DashboardsPage.tsx`, `pages/DashboardPage.tsx`, `components/dashboards/*`; phone `app/(app)/(tabs)/dashboards/*`, `src/features/dashboards/*`
+- Code: `packages/db/src/schema/dashboards.ts` (`dashboards`, `dashboard_widgets`, `dashboard_widget_updates`), migration `0199_dashboards.sql`; `packages/ui/src/widgets/spec.ts` (`@agenteschat/ui/widgets/spec`: `WidgetSpec`, `validateWidgetSpec`, `chartBlockToWidgetSpec`, schedules, sizes, caps); `packages/engine/src/dashboards/*` (`access.ts`, `service.ts`, `pin.ts`, `cost.ts`, `suggestions.ts`, `refresh.ts`, `proposals.ts`, `tools.ts`, `events.ts`, `types.ts`), `routines.ts` and `routine-ledger.ts` (the `widget` target), `tools/run-policy.ts` (a widget's refresh run), `notifications.ts` (`widget_alert`, `widget_failed`, `dashboard_proposal`); server `routes/app/dashboards.ts`, `dashboard-schemas.ts`; client `packages/client/src/dashboards/*`; web `packages/ui/src/widgets/*`, `pages/HomePage.tsx` (the mural), `pages/DashboardsPage.tsx`, `pages/DashboardPage.tsx`, `components/dashboards/*`; phone `app/(app)/(tabs)/dashboards/*`, `src/features/dashboards/*`
 
 ## Context
 
@@ -176,8 +176,8 @@ people than asked.
 - Someone leaving the workspace loses their home board and private boards (their widgets' routines are deleted);
   boards others see stay, and admins manage them. Widget routines whose creator left pause (`creator_left`) until an
   editor presses Resolve.
-- Migration 0193 adds the three tables; notifications gain three kinds. Migration 0194 adds `draft` and
-  `title_set_by_user` to widgets (§16, §17). Migration 0195 adds `edit_role_ids` to dashboards (§8).
+- Migration 0199 adds the three tables, with `draft` and `title_set_by_user` on widgets (§16, §17) and
+  `edit_role_ids` on dashboards (§8); notifications gain three kinds.
 - Live blocks (ADR 0113) are not pinnable: they are for using now, and run code a board shouldn't keep running.
 
 ## Alternatives considered

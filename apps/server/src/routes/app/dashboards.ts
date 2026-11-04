@@ -62,7 +62,7 @@ import {
 const tags = ["Dashboards"];
 
 /**
- * Dashboards and widgets (ADR 0134): boards of widgets agents keep up to date, who sees and edits them, "My Home",
+ * Dashboards and widgets (ADR 0135): boards of widgets agents keep up to date, who sees and edits them, "My Home",
  * an agent's request to show a board to more people, and what "+ Widget" needs (cost, suggestions, charts to pin).
  * Every check is the engine's (`packages/engine/src/dashboards/*`): a board the caller can't see is 404, one they see
  * but may not change is 403. Anything that queues a widget's run wakes the workers so it starts without waiting for
@@ -97,7 +97,7 @@ export function dashboardRoutes(deps: AppDeps) {
       security,
       summary: "New dashboard, empty (an agent builds one when asked in a chat)",
       description:
-        "Showing it to others (`workspace`, `roles`) needs `post`. Whoever sees a board sees what its agents fetched with their own connections (ADR 0134 §12).",
+        "Showing it to others (`workspace`, `roles`) needs `post`. Whoever sees a board sees what its agents fetched with their own connections (ADR 0135 §12).",
       request: { params: OrgParams, body: body(CreateDashboardBody) },
       responses: { 201: json(Dashboard, "Created"), ...errors },
     }),
@@ -209,7 +209,7 @@ export function dashboardRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "An agent's request to show the board to more people: Publish or Keep only for me",
-      description: "Only the person it asks decides (ADR 0134 §11); publishing needs `post`.",
+      description: "Only the person it asks decides (ADR 0135 §11); publishing needs `post`.",
       request: { params: DashboardParams, body: body(DashboardProposalBody) },
       responses: { 200: json(Dashboard), ...errors },
     }),
@@ -250,7 +250,7 @@ export function dashboardRoutes(deps: AppDeps) {
       security,
       summary: "Test: a draft of the widget, built at once with real data by its agent, seen only by me",
       description:
-        "The same checks as + Widget (I edit the board, I may talk to the agent). The draft (`draft: true`) is on no board and under no cap; it starts `building` and its events go to me alone. I keep at most 5 drafts (the oldest go); unconfirmed ones go after a day. Confirm it with `POST …/widgets/{widgetId}/confirm` once it is `ok`; `DELETE …/widgets/{widgetId}` drops it and stops its run (ADR 0134 §16).",
+        "The same checks as + Widget (I edit the board, I may talk to the agent). The draft (`draft: true`) is on no board and under no cap; it starts `building` and its events go to me alone. I keep at most 5 drafts (the oldest go); unconfirmed ones go after a day. Confirm it with `POST …/widgets/{widgetId}/confirm` once it is `ok`; `DELETE …/widgets/{widgetId}` drops it and stops its run (ADR 0135 §16).",
       request: { params: DashboardParams, body: body(CreateWidgetBody) },
       responses: { 202: json(Widget, "Accepted: its test build started"), ...errors },
     }),

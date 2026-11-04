@@ -349,3 +349,45 @@ describe("what waits on a plan's limit: Não rodar", () => {
     expect(cards.some((a) => a.textContent?.includes("Cancelado. Não vai rodar quando o limite voltar."))).toBe(true);
   });
 });
+
+describe("an agent's card to install or update a skill", () => {
+  const offer = (id: string, kind: string, params: Record<string, unknown>): Message => ({
+    ...card(id, {}),
+    body: "server text",
+    meta: { bodyCode: "action_install_skill", actionCard: { kind, forUserId: "u-walter", params } },
+  });
+
+  test("Instalar opens Instalar skill on the link, its skills read to pick; nothing installs from the card", async () => {
+    const state = seedState();
+    const link = "https://github.com/acme/skills/tree/main/deploy";
+    state.messages.push(offer("c-skill", "install_skill", { url: link, why: "Faz deploys." }));
+    await open(state);
+    const row = cardRow("Instalar uma skill");
+    expect(row.textContent).toContain("Faz deploys.");
+    expect(row.textContent).toContain(link);
+    await click(within(row).getByRole("button", { name: "Instalar" }), 8);
+    const install = dialog("Instalar skill") as HTMLElement;
+    expect((within(install).getByRole("textbox", { name: "Link do GitHub" }) as HTMLInputElement).value).toBe(link);
+    expect(state.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
+      { url: link, list: true },
+    ]);
+  });
+
+  test("an update waiting on its scripts: Revisar opens the skill, where it is applied", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const [review] = await api.skills.list(ORG_ID);
+    if (!review) throw new Error("no skill");
+    const pendingUpdate = { scripts: ["scripts/lint.sh"], at: NOW.toISOString(), dismissed: false };
+    await api.skills.update(ORG_ID, review.id, { pendingUpdate } as never);
+    state.messages.push(offer("c-up", "update_skills", { skillIds: [review.id], why: "Script novo." }));
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const row = cardRow("Atualizar uma skill");
+    await click(within(row).getByRole("button", { name: "Revisar" }), 8);
+    const sheet = dialog(review.name) as HTMLElement;
+    expect(sheet.textContent).toContain("A atualização do link muda arquivos que rodam: scripts/lint.sh");
+    await click(within(sheet).getByRole("button", { name: "Aplicar atualização" }), 8);
+    expect(state.calls.some((c) => c.method === "skills.approveUpdate")).toBe(true);
+  });
+});

@@ -2,7 +2,7 @@ import type { DashboardAudience } from "@agenteschat/client";
 import { useSyncExternalStore } from "react";
 
 /**
- * "Who edits › Some roles…" while its screen is open (ADR 0134 §8): who sees the board in the form that pushed it
+ * "Who edits › Some roles…" while its screen is open (ADR 0135 §8): who sees the board in the form that pushed it
  * (only roles that see it can edit it), the roles checked now, and how each change goes back to that form. The form
  * (Share or New dashboard) starts it and ends it when it closes, as Invite people shares its draft with the screens
  * pushed over it.

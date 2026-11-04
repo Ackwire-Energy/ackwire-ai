@@ -80,7 +80,7 @@ const editorsShown = (dialog: HTMLElement) =>
     .getByRole("button", { name: /^Quem edita/ })
     .querySelector(".ac-select__value")?.textContent;
 
-describe("New dashboard (ADR 0134 §8, §10)", () => {
+describe("New dashboard (ADR 0135 §8, §10)", () => {
   const start = async (prepareState?: (state: FakeState) => void) => {
     const opened = await open(`/org/${ORG_ID}/dashboards`, undefined, prepareState);
     await click(screen().getAllByRole("button", { name: "Novo painel" })[0] as Element);
@@ -102,7 +102,7 @@ describe("New dashboard (ADR 0134 §8, §10)", () => {
     expect(dialog.textContent).not.toContain("Pedir a um agente");
     expect(dialog.textContent).toContain("Você também pode pedir a um agente, numa conversa, que monte um.");
     expect(editorsShown(dialog)).toBe("Só você e a administração");
-    // What whoever sees it sees, said where the audience is chosen (ADR 0134 §12).
+    // What whoever sees it sees, said where the audience is chosen (ADR 0135 §12).
     expect(dialog.textContent).toContain("Quem vê o painel vê o que os agentes trouxeram");
     await type(within(dialog).getByLabelText("Nome"), "Metas do trimestre");
     await click(create);
@@ -180,7 +180,7 @@ describe("New dashboard (ADR 0134 §8, §10)", () => {
   });
 });
 
-describe("Share (ADR 0134 §8, §12)", () => {
+describe("Share (ADR 0135 §8, §12)", () => {
   const share = async () => {
     const opened = await open(`/org/${ORG_ID}/dashboards/dash-m`, myBoard, withSales);
     await click(screen().getByRole("button", { name: "Compartilhar" }));
@@ -235,7 +235,7 @@ describe("Share (ADR 0134 §8, §12)", () => {
   });
 });
 
-describe("New widget (ADR 0134 §3)", () => {
+describe("New widget (ADR 0135 §3)", () => {
   const withSuggestions = (fake: FakeDashboards) => {
     myBoard(fake);
     fake.suggestions.set(ADA_ID, {

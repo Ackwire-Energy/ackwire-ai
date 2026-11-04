@@ -202,7 +202,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
       : r.target.type === "dm"
         ? "dm"
         : r.target.type;
-  // Where it delivers opens when it is a conversation the phone has (a channel, a thread), or its widget (ADR 0134).
+  // Where it delivers opens when it is a conversation the phone has (a channel, a thread), or its widget (ADR 0135).
   const whereChannel = routineChannelOf(r.target);
   const widget = r.target.type === "widget" ? r.target : null;
   const whereHref = widget

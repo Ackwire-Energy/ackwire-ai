@@ -25,7 +25,7 @@ import {
 
 const { messages, channels, channelMembers } = schema;
 
-/** "Pin" a chart an agent sent in chat (ADR 0134 §3). */
+/** "Pin" a chart an agent sent in chat (ADR 0135 §3). */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** How far back "Pin from chat" looks. */
@@ -47,7 +47,7 @@ const textAround = (body: string) =>
     .trim();
 
 /**
- * The standing instructions of a pinned chart's widget (its refresh run reads them, ADR 0134 §5): keep the chart up
+ * The standing instructions of a pinned chart's widget (its refresh run reads them, ADR 0135 §5): keep the chart up
  * to date, with what the chart and its message said.
  */
 export function pinnedWidgetPrompt(chart: { title: string; subtitle?: string | null }, body: string): string {
@@ -108,7 +108,7 @@ export async function pinMessageAsWidget(
   const agent = await getAgent(deps.db, orgId, message.authorAgentId);
   if (!agent) throw blockNotFound();
   if (input.schedule !== "manual") {
-    // Updating it is asking the agent again and again: only who may talk to it (ADR 0134 §3).
+    // Updating it is asking the agent again and again: only who may talk to it (ADR 0135 §3).
     if (agent.archivedAt) {
       throw new ValidationError(`${agent.name} is archived`, DASHBOARD_ERRORS.agentArchived, { agentName: agent.name });
     }
@@ -131,7 +131,7 @@ export async function pinMessageAsWidget(
     spec: chart.spec,
     sourceMessageId: message.id,
     createdByUserId: actorId,
-    // A title the person typed is theirs; the chart's own is its agent's (ADR 0134 §17).
+    // A title the person typed is theirs; the chart's own is its agent's (ADR 0135 §17).
     titleSetByUser: Boolean(input.title?.trim()),
   });
   return widgetView(deps.db, row);

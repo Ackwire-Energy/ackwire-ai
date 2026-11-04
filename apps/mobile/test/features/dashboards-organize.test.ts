@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { dragTarget, footprint, moveIndex, orderWidgets } from "../../src/features/dashboards/organize-logic";
 
-describe("Organize on the phone (ADR 0134)", () => {
+describe("Organize on the phone (ADR 0135)", () => {
   test("a held row lands where the finger took it, one row per step, never off the list", () => {
     // Rows 110 tall with a gap of 10: a step of 120.
     expect(dragTarget(1, 0, 120, 4)).toBe(1);

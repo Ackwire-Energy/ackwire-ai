@@ -23,7 +23,6 @@ import {
   LargeTitleScreen,
   LIST_AVATAR,
   LIST_INSET,
-  LineIcon,
   ListRow,
   PersonAvatar,
   SectionHeader,
@@ -146,7 +145,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const surface = useSurface();
   const act = useNotificationAction(orgId);
   const card = waitingCardOf(n);
-  // A widget's alert, or an agent asking to publish a dashboard (ADR 0134): its own word, line and "Open".
+  // A widget's alert, or an agent asking to publish a dashboard (ADR 0135): its own word, line and "Open".
   const dash = dashboardWaitingCard(n, t as unknown as (key: string, values?: Record<string, unknown>) => string);
   // A request's title in words, from the request itself (the notification keeps the tool's raw title).
   const waitingApprovals = useWaitingApprovals();
@@ -162,7 +161,10 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
           .join(" · ")
       : join
         ? join.text
-        : (dash?.title ?? card.title);
+        : // The server's name in words, as the web says it; the tools themselves are in its review.
+          card.kind === "tools"
+          ? t("connectors.toolChanges.notice", { name: n.source.label ?? "" })
+          : (dash?.title ?? card.title);
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
   const href = notificationHref(n, ai);
@@ -173,7 +175,8 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const name = dir.nameOf(who);
   const kind = dash ? dash.kind : t(`mobile.activityNow.kind.${card.kind}`);
   const left = card.expiresAt ? timeLeft(t, card.expiresAt, new Date(now)) : null;
-  const place = placeOf(n);
+  // The server is already named in the title.
+  const place = card.kind === "tools" ? null : placeOf(n);
   const where = [place ? t("mobile.chats.waitIn", { where: place }) : null, when.short(n.updatedAt)]
     .filter(Boolean)
     .join(" · ");
@@ -210,7 +213,7 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
         ) : null}
         <View style={styles.grow} />
         <View style={styles.kind}>
-          <LineIcon name={dash ? "chart" : KIND_ICON[card.kind]} size={13} color={c.amber} variant="footnote" />
+          <Icon name={dash ? "chart" : KIND_ICON[card.kind]} size={13} color={c.amber} />
           <Text variant="footnote" style={[styles.semibold, { color: c.amber }]}>
             {kind}
           </Text>
@@ -252,6 +255,7 @@ const KIND_ICON = {
   browser: "globe",
   secret: "lock",
   join: "members",
+  tools: "bolt",
 } as const;
 
 /** Faces of the crew drawn over "Nada esperando você". */
@@ -395,7 +399,7 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
         <View style={styles.back}>
           <Face who={faceOf(faces[0])} size={STACKED} live={false} />
         </View>
-        <View style={[styles.front, { backgroundColor: c.bg, borderRadius: STACKED / 2 + 2 }]}>
+        <View style={[styles.front, { backgroundColor: c.bg, borderRadius: STACKED * 0.3 + 2 }]}>
           <Face who={faceOf(faces[1])} size={STACKED} live={false} />
         </View>
       </View>

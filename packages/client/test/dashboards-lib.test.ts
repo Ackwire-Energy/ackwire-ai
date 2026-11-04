@@ -291,7 +291,7 @@ describe("dashboards API", () => {
     expect(calls[7]?.body).toBe('{"text":"split by channel"}');
   });
 
-  test("Test and Create widget (ADR 0134 §16)", async () => {
+  test("Test and Create widget (ADR 0135 §16)", async () => {
     const calls: { url: string; method: string; body: string | null }[] = [];
     const api = createHttpApi({
       fetch: async (url, init) => {

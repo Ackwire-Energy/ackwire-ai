@@ -33,7 +33,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar, PersonAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 
-/** Who sees and who edits a board, as the New dashboard and Share dialogs edit it (ADR 0134 §8). */
+/** Who sees and who edits a board, as the New dashboard and Share dialogs edit it (ADR 0135 §8). */
 export interface BoardAudience {
   audience: DashboardAudience;
   roleIds: string[];
@@ -78,7 +78,7 @@ export function VisibilityChip({ board }: { board: Pick<DashboardSummary, "audie
         {t("dashboards.audience.workspace")}
       </span>
     );
-  // A `roles` board whose roles are all gone is its owner's alone until shared again (ADR 0134 §8).
+  // A `roles` board whose roles are all gone is its owner's alone until shared again (ADR 0135 §8).
   if (board.audience === "private" || roles.length === 0)
     return (
       <span className="db-vis">
@@ -124,7 +124,7 @@ const AUDIENCE_ICON: Record<DashboardAudience, IconName> = {
 
 /**
  * "Who sees" (the whole workspace, roles with their chips and how many hold each, or only you), "Who edits" and the
- * note on what whoever sees a board sees (ADR 0134 §8, §12). Showing a board to others needs `post`: without it the
+ * note on what whoever sees a board sees (ADR 0135 §8, §12). Showing a board to others needs `post`: without it the
  * wider choices are shown but can't be picked, unless the board already has one. Narrowing who sees drops the edit
  * roles that no longer see the board (`fitEditRoles`).
  */
@@ -227,7 +227,7 @@ export function AudienceFields({
 }
 
 /**
- * "Who edits" (ADR 0134 §8): a dropdown with "Whoever sees it", "Only you and admins", then the workspace's roles to
+ * "Who edits" (ADR 0135 §8): a dropdown with "Whoever sees it", "Only you and admins", then the workspace's roles to
  * check (with `roles`, people holding one of them who see the board edit it). A role whose people don't see the board
  * is shown but can't be checked, with why: editing isn't seeing, so it would give them nothing. The trigger says what
  * is picked ("Sales and Board", "3 roles").

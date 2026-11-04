@@ -23,7 +23,7 @@ const board = (over: Partial<{ kind: string; audience: string; ownerUserId: stri
   ...over,
 });
 
-describe("dashboard events (ADR 0134)", () => {
+describe("dashboard events (ADR 0135)", () => {
   test("a shared board's changes go to the whole workspace, as ids only", async () => {
     const { pubsub, org, nina } = listen();
     await publishDashboardChanged(pubsub, board({ audience: "roles" }));

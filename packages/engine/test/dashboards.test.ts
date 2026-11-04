@@ -68,7 +68,7 @@ async function widgetRow(dashboardId: string, over: Partial<typeof schema.dashbo
 const titles = async (userId: string) =>
   (await listDashboards(deps, userId, f.org.id)).dashboards.map((d) => d.title).sort();
 
-describe("who sees a board (ADR 0134 §8)", () => {
+describe("who sees a board (ADR 0135 §8)", () => {
   test("a workspace board: every member sees it; with `owner` only its owner and admins edit", async () => {
     const nina = await addMember(f.db, f.org.id, "member", "nina");
     const theo = await addMember(f.db, f.org.id, "member", "theo");
@@ -414,7 +414,7 @@ describe("boards", () => {
   });
 });
 
-describe("My Home (ADR 0134 §9)", () => {
+describe("My Home (ADR 0135 §9)", () => {
   test("made once on first use, private, with the fixed tiles; nobody else sees it", async () => {
     const nina = await addMember(f.db, f.org.id, "member", "nina");
     const lia = await addMember(f.db, f.org.id, "admin", "lia");
@@ -701,7 +701,7 @@ describe("widgets", () => {
   });
 });
 
-describe("someone leaving (ADR 0134 Consequences)", () => {
+describe("someone leaving (ADR 0135 Consequences)", () => {
   test("their home and private boards go with their widgets' routines; shared ones stay", async () => {
     const nina = await addMember(f.db, f.org.id, "member", "nina");
     const home = await getOrCreateHome(deps, nina.id, f.org.id);

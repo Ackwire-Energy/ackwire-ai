@@ -18,7 +18,7 @@ import { users } from "./auth";
 import { organizations } from "./tenancy";
 import { routines } from "./work";
 
-/** A fixed tile of a person's home board, placed among its widgets (ADR 0134 §9). */
+/** A fixed tile of a person's home board, placed among its widgets (ADR 0135 §9). */
 export interface DashboardHomeTile {
   key: "waiting" | "working";
   position: number;
@@ -27,7 +27,7 @@ export interface DashboardHomeTile {
 }
 
 /**
- * An agent asks to show a board to more people than the person it made it for (ADR 0134 §11): pending until that
+ * An agent asks to show a board to more people than the person it made it for (ADR 0135 §11): pending until that
  * person publishes it or keeps it to themselves.
  */
 export interface DashboardProposalRow {
@@ -43,7 +43,7 @@ export interface DashboardProposalRow {
 }
 
 /**
- * Dashboards (ADR 0134): a board of widgets that agents keep up to date. `kind` `home` is a person's own board on
+ * Dashboards (ADR 0135): a board of widgets that agents keep up to date. `kind` `home` is a person's own board on
  * Home (one per person, always private); `board` is any other. Who sees it: `audience` `workspace` (every
  * member), `roles` (whoever holds one of `audience_role_ids` at the time, ADR 0085, as a channel's audience, ADR
  * 0125) or `private` (its owner only). Who edits: `edit_policy` `viewers` (whoever sees it), `owner` (its owner
@@ -75,7 +75,7 @@ export const dashboards = pgTable(
     audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** `viewers` | `owner` | `roles`. */
     editPolicy: text().notNull().default("owner"),
-    /** With `roles`: the roles whose holders edit it, when they also see it (ADR 0134 §8); else empty. */
+    /** With `roles`: the roles whose holders edit it, when they also see it (ADR 0135 §8); else empty. */
     editRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** Shown first in the list (its owner or an admin sets it). */
     pinned: boolean().notNull().default(false),
@@ -101,7 +101,7 @@ export const dashboards = pgTable(
 );
 
 /**
- * A widget (ADR 0134): what it shows (`spec`, a `WidgetSpec` from `@agenteschat/ui/widgets/spec`), the agent that
+ * A widget (ADR 0135): what it shows (`spec`, a `WidgetSpec` from `@agenteschat/ui/widgets/spec`), the agent that
  * looks after it and how it is redone. A scheduled one has a routine (`routine_id`, its target `{ type: "widget" }`)
  * whose background run redoes it in place through `update_widget`, posting nothing in chat. `status`: `building`
  * (its first run), `ok`, `updating` (a run is redoing it; the last data stays), `failed` (`failure_code`, and the
@@ -152,10 +152,10 @@ export const dashboardWidgets = pgTable(
     /** Its last good update. */
     refreshedAt: timestamp({ withTimezone: true }),
     lastAlertAt: timestamp({ withTimezone: true }),
-    /** A person named it (on create, on confirm or with Rename): its agent never renames it (ADR 0134 §17). */
+    /** A person named it (on create, on confirm or with Rename): its agent never renames it (ADR 0135 §17). */
     titleSetByUser: boolean().notNull().default(false),
     /**
-     * A test of a widget not made yet ("Test" in New widget, ADR 0134 §16): on no board's list, seen only by its
+     * A test of a widget not made yet ("Test" in New widget, ADR 0135 §16): on no board's list, seen only by its
      * creator, its routine never scheduled; confirmed (moved onto a board) or deleted within a day.
      */
     draft: boolean().notNull().default(false),
@@ -174,7 +174,7 @@ export const dashboardWidgets = pgTable(
   ],
 );
 
-/** A widget's history (ADR 0134 §6): each update or failure, with what it showed then; the latest few are kept. */
+/** A widget's history (ADR 0135 §6): each update or failure, with what it showed then; the latest few are kept. */
 export const dashboardWidgetUpdates = pgTable(
   "dashboard_widget_updates",
   {

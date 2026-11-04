@@ -1,4 +1,4 @@
-import { answerQuestion, getQuestion } from "@agenteschat/engine";
+import { answerQuestion, dismissQuestion, getQuestion } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
 
@@ -16,6 +16,7 @@ const AgentQuestion = z
     status: z.enum(["open", "answered"]),
     answer: z.string().nullable(),
     answeredByUserId: z.string().nullable(),
+    dismissed: z.literal(true).optional(),
   })
   .openapi("AgentQuestion");
 
@@ -70,6 +71,22 @@ export function questionRoutes(deps: AppDeps) {
         c.req.valid("json"),
       );
       return c.json(answered, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/questions/{questionId}/dismiss",
+      tags,
+      security,
+      summary: "Skip an agent's question; the agent continues without an answer",
+      request: { params: QuestionParams },
+      responses: { 200: json(AgentQuestion), ...errors },
+    }),
+    async (c) => {
+      const { orgId, questionId } = c.req.valid("param");
+      return c.json(await dismissQuestion({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, questionId), 200);
     },
   );
 

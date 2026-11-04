@@ -14,7 +14,7 @@ const { usageRecords, routineRuns, routines } = schema;
 const HISTORY_DAYS = 30;
 /** Fewer routine runs than this say too little: the model's price is used instead. */
 const HISTORY_MIN_RUNS = 3;
-/** A typical refresh: what a widget's run reads and writes (ADR 0134 §7). */
+/** A typical refresh: what a widget's run reads and writes (ADR 0135 §7). */
 export const TYPICAL_REFRESH = { inputTokens: 8_000, outputTokens: 1_000 } as const;
 
 /**
@@ -67,7 +67,7 @@ export function typicalRefreshCost(model: string | null): number | null {
 }
 
 /**
- * What a widget's refreshes cost (ADR 0134 §7).
+ * What a widget's refreshes cost (ADR 0135 §7).
  *
  * Runs a day (`scheduleRunsPerDay`) × the agent's average cost of a background (routine) run over its last 30 days,
  * from `usage_records` (at least 3 runs: `basis: "history"`); else its model's price (`@agenteschat/providers`

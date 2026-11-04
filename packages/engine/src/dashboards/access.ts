@@ -7,7 +7,7 @@ import { DASHBOARD_ERRORS, type DashboardRow, type WidgetRow } from "./types";
 const { dashboards, dashboardWidgets } = schema;
 
 /**
- * Who sees, edits and manages a board (ADR 0134 §8).
+ * Who sees, edits and manages a board (ADR 0135 §8).
  *
  * - **Sees:** a board that isn't deleted and is the viewer's own (`owner_user_id`), or `workspace` (every member), or
  *   `roles` when the viewer holds one of `audience_role_ids` at the time (`organization_member_roles`, as
@@ -60,7 +60,7 @@ const NO_RIGHTS: DashboardRights = { see: false, edit: false, manage: false };
 export function dashboardRights(board: RightsFields, viewer: DashboardViewer): DashboardRights {
   if (board.deletedAt) return NO_RIGHTS;
   const owner = viewer.userId !== "" && board.ownerUserId === viewer.userId;
-  // A private board and a home board are their owner's alone, admins included (ADR 0134 §8).
+  // A private board and a home board are their owner's alone, admins included (ADR 0135 §8).
   const shared =
     board.kind !== "home" &&
     (board.audience === "workspace" ||
@@ -123,7 +123,7 @@ export async function requireDashboard(
 
 /**
  * A widget and its board, with the same rule on the board (`widget.not_found` when the board is hidden). A draft
- * (ADR 0134 §16) is its creator's alone, whatever the board's audience: anyone else gets `widget.not_found`.
+ * (ADR 0135 §16) is its creator's alone, whatever the board's audience: anyone else gets `widget.not_found`.
  */
 export async function requireWidget(
   db: Database,

@@ -11,7 +11,7 @@ import { toggledEditRoles } from "./logic";
 import { RoleMark } from "./parts";
 
 /**
- * "Who edits › Some roles…", pushed over Share or New dashboard (ADR 0134 §8): the workspace's roles to check; people
+ * "Who edits › Some roles…", pushed over Share or New dashboard (ADR 0135 §8): the workspace's roles to check; people
  * holding a checked one edit the board when they also see it. A role whose people don't see it is shown, faint, with
  * why, and can't be checked. Each change goes back to the form at once; "Done" goes back to it.
  */

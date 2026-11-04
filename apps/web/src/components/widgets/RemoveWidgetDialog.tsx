@@ -8,7 +8,7 @@ import { useToast } from "@/lib/toast";
 import { useWidgetAgent, widgetTitle } from "./parts";
 
 /**
- * "Remove “Sales today”?" (ADR 0134): every way to remove a widget (its card's menu, Organize, its panel) asks here
+ * "Remove “Sales today”?" (ADR 0135): every way to remove a widget (its card's menu, Organize, its panel) asks here
  * first, since its routine stops and its history goes with it. Remove removes it and says so in a toast; Cancel keeps
  * it. Open while `widget` is set.
  */

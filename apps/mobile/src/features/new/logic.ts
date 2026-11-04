@@ -1,15 +1,16 @@
 import type { Agent } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import type { ConversationRow } from "../chats/logic";
+import { matches } from "../search/logic";
 
 /**
- * The pure part of "Novo": who a request from the "+" goes to, the
- * request itself, and the name suggested for a new agent.
+ * The pure part of "New" (the "+" of the tabs): the agents in its row, who its search finds, what its grid offers
+ * to create, and the name suggested for a new agent.
  */
 
 /**
- * The agents a request can go to, the one you talked to last first: agents with a direct conversation,
- * newest first, then the rest by name. Agents that don't talk to you are left out. The first one is the
- * preselected one.
+ * The agents in "New"'s row, the one you talked to last first: agents with a direct conversation, newest first, then
+ * the rest by name. Agents that don't talk to you are left out.
  */
 export function askTargets(agents: readonly Agent[], rows: readonly ConversationRow[]): Agent[] {
   const talkable = agents.filter((a) => a.canTalk !== false);
@@ -29,15 +30,50 @@ export function askTargets(agents: readonly Agent[], rows: readonly Conversation
   });
 }
 
-/** The agent picked: the one tapped while it can still be asked, else the default (first) one. */
-export function pickedTarget(targets: readonly Agent[], tapped: string | null): Agent | null {
-  return (tapped ? targets.find((a) => a.id === tapped) : undefined) ?? targets[0] ?? null;
+/**
+ * Who a conversation can start with, for the words typed ("Person or agent" in "New", and "Chat with…"): the agents
+ * that talk to you (by name, role or handle) and the other people (by name), each by name. No words: everyone.
+ */
+export function chatMatches<P extends { userId: string; name: string }>(
+  q: string,
+  agents: readonly Agent[],
+  people: Iterable<P>,
+  meId: string | null | undefined,
+): { agents: Agent[]; people: P[] } {
+  return {
+    agents: agents
+      .filter((a) => a.canTalk !== false && matches(q, a.name, a.role, a.handle))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    people: [...people]
+      .filter((p) => p.userId !== meId && matches(q, p.name))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
 }
 
-/** The message a request becomes in the agent's conversation (null when there is nothing to send). */
-export function requestBody(text: string): string | null {
-  const body = text.trim();
-  return body ? body : null;
+/** What "New"'s grid offers, in its order; `invite` is the wide row at its end. */
+export type CreateItem = "agent" | "channel" | "chat" | "task" | "routine" | "wiki" | "invite";
+
+const CREATE_ORDER: readonly CreateItem[] = ["agent", "channel", "chat", "task", "routine", "wiki", "invite"];
+
+/**
+ * What this person may start from "New", each as the server checks it (ADR 0085): an agent (`create_agents`), a
+ * channel (`create_channels`), a conversation (anyone), a task (`post`), a routine (`manage_routines`, or the owner of
+ * an agent), a wiki page (`edit_wiki`) and invitations (`invite_people`).
+ */
+export function createItems(
+  org: { permissions?: readonly string[] } | null | undefined,
+  { ownsAgent }: { ownsAgent: boolean },
+): CreateItem[] {
+  const allowed: Record<CreateItem, boolean> = {
+    agent: can(org, "create_agents"),
+    channel: can(org, "create_channels"),
+    chat: true,
+    task: can(org, "post"),
+    routine: can(org, "manage_routines") || ownsAgent,
+    wiki: can(org, "edit_wiki"),
+    invite: can(org, "invite_people"),
+  };
+  return CREATE_ORDER.filter((item) => allowed[item]);
 }
 
 /** Names offered for a new agent (short, friendly, easy to call). */

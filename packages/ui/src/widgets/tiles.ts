@@ -1,5 +1,5 @@
 /**
- * A widget's tones (ADR 0134), the same as the chat's charts: the stroke in the agent's deep tone (its light one on
+ * A widget's tones (ADR 0135), the same as the chat's charts: the stroke in the agent's deep tone (its light one on
  * a dark page), the fill a 2px Bayer dither in its light tone. CSS reads them as variables, so bars, a goal's fill,
  * the building sweep and the dashboards' thumbnails share one tile.
  */

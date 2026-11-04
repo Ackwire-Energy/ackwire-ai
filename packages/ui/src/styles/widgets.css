@@ -1,5 +1,5 @@
 /*
- * Widgets and boards (ADR 0134). A widget is a neutral card (the cut corner, no tint) in its agent's tones: the
+ * Widgets and boards (ADR 0135). A widget is a neutral card (the cut corner, no tint) in its agent's tones: the
  * stroke `--wg-s` and the 2px dither tile `--wg-tile` (`widgetTileVars`). Numbers in the app's font, bold and
  * tabular; charts as the chat draws them. A board is a 4-column grid: S = 1×1, M = 2×1, L = 2×2.
  */
@@ -380,7 +380,7 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
   display: block;
   color: var(--muted);
 }
-/* A note at most two lines long, an ellipsis where it goes on (ADR 0134): whole words, however long the note. */
+/* A note at most two lines long, an ellipsis where it goes on (ADR 0135): whole words, however long the note. */
 .wk-clamp {
   display: -webkit-box;
   -webkit-box-orient: vertical;

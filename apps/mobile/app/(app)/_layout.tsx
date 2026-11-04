@@ -29,9 +29,8 @@ export function ErrorBoundary(props: ErrorBoundaryProps) {
 
 /**
  * The signed-in app: the native tabs, and the screens pushed over them with the platform's push (the tab
- * bar hides there; the native back button and the edge swipe go back), Você and its screens among them.
- * Requests and "Novo" (the "+" of the tabs, with its three forms stacked over it) are native form sheets over
- * whatever is on screen.
+ * bar hides there; the native back button and the edge swipe go back), Você and its screens among them, and "New"
+ * (the "+" of the tabs). Requests and the forms "New" opens are native form sheets over whatever is on screen.
  * Header options are set here so the first frame of a push already has its bar; `PushedHeader` fills in
  * the title and actions.
  */
@@ -68,7 +67,6 @@ function AppStack() {
   const pushed = usePushedOptions();
   const scrollUnder = useScrollUnderPushedOptions();
   const approvalSheet = useFormSheetOptions([0.62, 1], "raised");
-  const newSheet = useFormSheetOptions([0.6, 1]);
   const formSheet = useFormSheetOptions([1]);
   const channelSheet = useFormSheetOptions([0.45, 1]);
   const switchSheet = useFormSheetOptions([0.8, 1]);
@@ -99,6 +97,7 @@ function AppStack() {
       <Stack.Screen name="agent-setup/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-delete" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -116,7 +115,7 @@ function AppStack() {
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/zone" options={{ ...pushed, ...scrollUnder }} />
-      {/* Dashboards (ADR 0134): every screen pushed with back, never a sheet. */}
+      {/* Dashboards (ADR 0135): every screen pushed with back, never a sheet. */}
       <Stack.Screen name="board/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="board-new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="board-share/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -184,7 +183,6 @@ function AppStack() {
       <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="push-ask" options={pushSheet} />
       <Stack.Screen name="wiki-new" options={wikiSheet} />
-      <Stack.Screen name="new" options={newSheet} />
       <Stack.Screen name="new-channel" options={channelSheet} />
       <Stack.Screen name="new-chat" options={formSheet} />
       <Stack.Screen name="code" options={formSheet} />

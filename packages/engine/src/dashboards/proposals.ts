@@ -8,7 +8,7 @@ import { DASHBOARD_ERRORS, type DashboardDeps, type DashboardProposalDecision, t
 
 const { dashboards, orgRoles } = schema;
 
-/** An agent never shows a board to more people by itself (ADR 0134 §11). */
+/** An agent never shows a board to more people by itself (ADR 0135 §11). */
 
 /** How long the agent's reason may be (it shows on the board's banner and in "Waiting on you"). */
 export const DASHBOARD_PROPOSAL_WHY_MAX = 500;

@@ -23,14 +23,14 @@ export function WidgetFace({ agentId, name }: { agentId: string; name: string })
   return <AgentAvatar agentId={agentId} name={name} size="xs" />;
 }
 
-/** What a widget is called until its agent names it: its kind ("Number", "Bars"…), or "New widget" (ADR 0134). */
+/** What a widget is called until its agent names it: its kind ("Number", "Bars"…), or "New widget" (ADR 0135). */
 export function neutralWidgetTitle(t: TFunction, kind: WidgetKind | null): string {
   return kind ? t(`widgets.kinds.${kind}`) : t("widgets.untitled");
 }
 
 /**
  * A widget's title as boards and its panel show it. The agent names it on its first build; until then (or when an
- * older widget still holds the start of what was asked) the neutral name, never the raw ask (ADR 0134).
+ * older widget still holds the start of what was asked) the neutral name, never the raw ask (ADR 0135).
  */
 export function widgetTitle(t: TFunction, w: Pick<Widget, "title" | "prompt" | "spec" | "kind" | "format">): string {
   const title = w.title.trim();
@@ -48,7 +48,7 @@ export function failureText(t: TFunction, failure: WidgetFailure | null, name: s
 }
 
 /**
- * A widget's footer on a board (ADR 0134): who looks after it, when it last updated and how often; while it is built
+ * A widget's footer on a board (ADR 0135): who looks after it, when it last updated and how often; while it is built
  * or updated, the agent at it; failed, why, with Resolve (an update asked now).
  */
 export function WidgetFoot({
@@ -122,7 +122,7 @@ export function WidgetFoot({
 }
 
 /**
- * A board's head controls as one pill (ADR 0134): "Organize" (pressed while organizing, then "Done") and "+ Widget"
+ * A board's head controls as one pill (ADR 0135): "Organize" (pressed while organizing, then "Done") and "+ Widget"
  * side by side, a hairline between them. Home's mural and a board's page use it.
  */
 export function BoardActionsPill({

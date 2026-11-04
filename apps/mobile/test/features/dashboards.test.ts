@@ -96,7 +96,7 @@ const board = (over: Partial<DashboardSummary> & { id: string }): DashboardSumma
 /** Example words that say their own key: what a preview gets is visible in the test. */
 const words = exampleWordsOf((key) => key.replace("widgets.example.", ""));
 
-describe("dashboards on the phone (ADR 0134)", () => {
+describe("dashboards on the phone (ADR 0135)", () => {
   test("the three dashboard notices, and no other", () => {
     expect(isDashboardNotice("widget_alert")).toBe(true);
     expect(isDashboardNotice("widget_failed")).toBe(true);

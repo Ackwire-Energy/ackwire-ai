@@ -4,6 +4,7 @@ import { type IslandItem, islandLead, noticeLine } from "@agenteschat/client/lib
 import { mediaWord } from "@agenteschat/client/lib/media";
 import { replyTarget, waitingCardOf } from "@agenteschat/client/lib/notifications";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -102,9 +103,13 @@ export function NoticeIsland() {
   const camera = Platform.OS === "ios" && insets.top >= CAMERA_INSET;
   const top = camera ? CAMERA.top : insets.top + 6;
   const shape: Shape = !lead ? "none" : open ? "open" : small ? "small" : "pill";
+  // Grown out of the camera, the pill and the open island cover the status bar's line: their content starts under
+  // the camera (never behind it) and the status bar steps aside meanwhile, as with the system's own island.
+  const clear = camera ? CAMERA.height : 0;
+  const coversBar = camera && (shape === "pill" || shape === "open");
   const size = {
     none: camera ? { w: CAMERA.width, h: CAMERA.height } : { w: 44, h: 44 },
-    pill: { w: Math.min(width - 20, 420), h: PILL_HEIGHT },
+    pill: { w: Math.min(width - 20, 420), h: PILL_HEIGHT + clear },
     small: { w: camera ? 250 : 200, h: camera ? CAMERA.height : 40 },
     open: { w: Math.min(width - 16, 440), h: openHeight },
   }[shape];
@@ -173,13 +178,14 @@ export function NoticeIsland() {
           accessibilityRole="button"
         />
       ) : null}
+      {camera ? <StatusBar hidden={coversBar} animated /> : null}
       <View pointerEvents="box-none" style={[styles.place, { top }]}>
         <GestureDetector gesture={pan}>
           <Animated.View pointerEvents={shape === "none" ? "none" : "auto"} style={[styles.island, box]}>
             <Animated.View style={[styles.fill, inner]}>
               {shape === "open" ? (
                 <View
-                  style={{ width: size.w }}
+                  style={{ width: size.w, paddingTop: clear }}
                   onLayout={(e: LayoutChangeEvent) => setOpenHeight(Math.ceil(e.nativeEvent.layout.height))}
                 >
                   {snap.items.slice(0, OPEN_MAX).map((i, k) => (
@@ -206,7 +212,7 @@ export function NoticeIsland() {
               ) : item && shape === "small" ? (
                 <SmallIsland item={item} others={others} camera={camera} onPress={() => setOpen(true)} />
               ) : item ? (
-                <Pill item={item} others={others} onPress={() => setOpen(true)} />
+                <Pill item={item} others={others} clear={clear} onPress={() => setOpen(true)} />
               ) : null}
             </Animated.View>
           </Animated.View>
@@ -238,7 +244,18 @@ const useLine = (n: AppNotification) => {
 };
 
 /** Closed: the face, who did what and the line; how many more. */
-function Pill({ item, others, onPress }: { item: IslandItem; others: number; onPress: () => void }) {
+function Pill({
+  item,
+  others,
+  clear,
+  onPress,
+}: {
+  item: IslandItem;
+  others: number;
+  /** Room on top for the camera it grew out of. */
+  clear: number;
+  onPress: () => void;
+}) {
   const { t } = useTranslation();
   const { title } = useNoticeTitle(item.n);
   const line = useLine(item.n);
@@ -249,12 +266,12 @@ function Pill({ item, others, onPress }: { item: IslandItem; others: number; onP
   return (
     <Pressable
       onPress={onPress}
-      style={styles.pill}
+      style={[styles.pill, { paddingTop: clear }]}
       accessibilityRole="button"
       accessibilityLabel={[title, line].filter(Boolean).join(", ")}
       accessibilityHint={t("island.expand")}
     >
-      <Face who={faceOf(item.n)} size={40} />
+      <IslandFace n={item.n} size={40} />
       <View style={styles.grow}>
         <Title n={item.n} lines={1} />
         {line ? (
@@ -288,7 +305,7 @@ function SmallIsland({
 }) {
   const { t } = useTranslation();
   const { title } = useNoticeTitle(item.n);
-  // A widget's alert or an agent asking to publish a dashboard (ADR 0134) is opened, never answered here.
+  // A widget's alert or an agent asking to publish a dashboard (ADR 0135) is opened, never answered here.
   const ask = item.n.waiting && !isDashboardNotice(item.n.kind) ? waitingCardOf(item.n).action : "open";
   const label = ask === "review" ? t("island.review") : ask === "answer" ? t("island.reply") : t("island.open");
   return (
@@ -299,7 +316,7 @@ function SmallIsland({
       accessibilityLabel={title}
       accessibilityHint={t("island.expand")}
     >
-      <Face who={faceOf(item.n)} size={27} />
+      <IslandFace n={item.n} size={27} />
       <Text variant="footnote" numberOfLines={1} style={styles.smallLabel}>
         {others > 0 ? `${label} +${others}` : label}
       </Text>
@@ -366,7 +383,7 @@ function IslandRow({ n, onOpened }: { n: AppNotification; onOpened: () => void }
 
   return (
     <View style={styles.row}>
-      <Face who={faceOf(n)} size={34} />
+      <IslandFace n={n} size={34} />
       <View style={styles.grow}>
         <Title n={n} lines={2} />
         {line ? (
@@ -497,6 +514,20 @@ const faceOf = (n: AppNotification) => {
   return a ? { type: a.type === "agent" ? "agent" : "person", id: a.id } : null;
 };
 
+/**
+ * Who it is from; with nobody behind it (a connected server changed tools, the workspace itself), what it is about as
+ * an icon on a soft tile, never an unknown face.
+ */
+function IslandFace({ n, size }: { n: AppNotification; size: number }) {
+  const who = faceOf(n);
+  if (who) return <Face who={who} size={size} />;
+  return (
+    <View style={[styles.sysFace, { width: size, height: size, borderRadius: size * 0.3 }]}>
+      <Icon name={n.kind === "connector_tool_changed" ? "bolt" : "bell"} size={Math.round(size * 0.48)} color={WHITE} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // The island's place: centered, whatever its width while it grows.
   place: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 100 },
@@ -507,6 +538,7 @@ const styles = StyleSheet.create({
     boxShadow: "0 18px 40px -16px rgba(0,0,0,0.6)",
   },
   fill: { flex: 1 },
+  sysFace: { alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.14)" },
   pill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12, paddingLeft: 16, paddingRight: 18 },
   grow: { flex: 1, minWidth: 0 },
   names: { color: WHITE, fontWeight: "600" },

@@ -42,7 +42,7 @@ const FOOT_H = 22;
 const FOOT_GAP = 2;
 
 /**
- * Organize a board on the phone, pushed from its "…" (ADR 0134): each widget in the board's order, held and dragged
+ * Organize a board on the phone, pushed from its "…" (ADR 0135): each widget in the board's order, held and dragged
  * to a new place (the others slide out of its way) or moved with Move up and Move down, its size (S, M, L, drawn as
  * the room it takes) and Remove. "Done" saves the order and sizes at once; a home board's tiles keep their places.
  * `id` is `home` for My Home.
@@ -148,7 +148,7 @@ function Arrange({ board }: { board: Dashboard }) {
       },
     );
   };
-  // The same words as the web's confirmation (ADR 0134): its routine stops and its history goes.
+  // The same words as the web's confirmation (ADR 0135): its routine stops and its history goes.
   const confirmRemove = (item: Extract<BoardItem, { type: "widget" }>) =>
     Alert.alert(
       t("widgets.removeConfirm.title", {

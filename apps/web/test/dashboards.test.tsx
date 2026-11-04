@@ -46,7 +46,7 @@ const open = async (path: string, prepare?: (fake: FakeDashboards) => void) => {
 };
 const section = (name: string) => screen().getByRole("region", { name });
 
-describe("Dashboards: in the sidebar's More, and the list (ADR 0134 §14)", () => {
+describe("Dashboards: in the sidebar's More, and the list (ADR 0135 §14)", () => {
   test("More opens the Dashboards page, which then shows under More, on a board's page too", async () => {
     const { router } = await open(`/org/${ORG_ID}/home`, (fake) => {
       fake.addBoard({ id: "dash-m", title: "Metas", audience: "workspace" });

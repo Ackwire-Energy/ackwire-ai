@@ -54,7 +54,7 @@ import "@/pages/dashboards.css";
 
 /** The destination select's value for the person's own home board ("My Home"). */
 const HOME = "home";
-/** A widget's title, as long as the server takes it (ADR 0134). */
+/** A widget's title, as long as the server takes it (ADR 0135). */
 const TITLE_MAX = 80;
 
 type Mode = "ask" | "pin";
@@ -70,7 +70,7 @@ export interface NewWidgetDialogProps {
 }
 
 /**
- * New widget (ADR 0134 §3). The dialog is the widget itself, large on a dotted stage, and the card is the form: what
+ * New widget (ADR 0135 §3). The dialog is the widget itself, large on a dotted stage, and the card is the form: what
  * to follow is written in its body (with the agent's suggestions), the agent's face in its footer opens the list of
  * agents, the schedule beside it how often it updates, the bell in its head the alert, S/M/L its size; its title is
  * edited in place. Test has the agent build it there with real data (a draft), and only a draft that worked for what

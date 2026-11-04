@@ -1,4 +1,4 @@
-import type { AgentDraft, AgentProposalCard, Message } from "@agenteschat/client";
+import type { AgentDraft, AgentProposalCard, Message, SkillSourceUpdate } from "@agenteschat/client";
 import {
   useAiStatus,
   useAllInvitations,
@@ -11,19 +11,26 @@ import {
   useDenyAgentProposal,
   useMailAccounts,
   useMembers,
+  useSkillAction,
+  useSkills,
+  useSkillUsage,
 } from "@agenteschat/client";
 import {
   actionCardOf,
   type ConnectAppCard,
   connectAiDone,
   connectAppDone,
+  type InstallSkillCard,
   type InviteCard,
+  installSkillDone,
   inviteDone,
   type ProposalLine,
   proposalLines,
   proposalStatus,
   routineLeft,
+  skillUpdateState,
   suggestedAiText,
+  type UpdateSkillsCard,
 } from "@agenteschat/client/lib/action-cards";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -32,6 +39,7 @@ import { hostOf } from "@agenteschat/client/lib/import/shared";
 import { choiceOf } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName } from "@agenteschat/client/lib/scopes";
+import { SKILL_UPDATE_TOAST } from "@agenteschat/client/lib/skills";
 import { Button, Dialog, Icon, Spinner } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { lazy, type ReactNode, Suspense, useState } from "react";
@@ -47,6 +55,7 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
+import { InstallSkillDialog, SkillSheet } from "@/components/Skills";
 import { StretchCardView } from "@/components/StretchCard";
 import { UsagePauseCardView } from "@/components/UsagePauseCard";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -82,6 +91,8 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "usage_paused") return <UsagePauseCardView message={message} card={card} />;
   if (card.kind === "connect_app") return <ConnectAppCardView card={card} />;
   if (card.kind === "invite_people") return <InviteCardView card={card} />;
+  if (card.kind === "install_skill") return <InstallSkillCardView card={card} />;
+  if (card.kind === "update_skills") return <UpdateSkillsCardView message={message} card={card} />;
   if (card.kind === "autonomy_proposal") return <CostlyProposalCardView message={message} card={card} />;
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
@@ -171,6 +182,134 @@ function ConnectAppCardView({ card }: { card: ConnectAppCard }) {
         )}
       </span>
       <ConnectFlow flow={flow} onChange={setFlow} onClose={() => setFlow(null)} />
+    </div>
+  );
+}
+
+/**
+ * "Instalar uma skill" (`offer_install_skill`): Instalar opens Instalar skill with the link read, its skills listed to
+ * pick; who manages agents installs there. Done once the library has a skill from that link.
+ */
+function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const may = can(org, "manage_agents");
+  const skills = useSkills(org.id, may);
+  const [open, setOpen] = useState(false);
+  const title = t("actionCard.install_skill.title");
+  if (installSkillDone(card, skills.data ?? [])) {
+    return (
+      <RequestDone done label={title}>
+        {t("actionCard.install_skill.done")}: <b>{card.url}</b>
+      </RequestDone>
+    );
+  }
+  return (
+    <div className="waitcard">
+      <span className="waitcard__top ac-iconline">
+        <Icon name="book" size={16} />
+        <span>{title}</span>
+      </span>
+      {card.why && <p>{card.why}</p>}
+      <p className="small">
+        <code>{card.url}</code>
+      </p>
+      <span className="waitcard__acts">
+        {may ? (
+          <Button size="sm" onClick={() => setOpen(true)}>
+            {t("actionCard.install_skill.open")}
+          </Button>
+        ) : (
+          <span className="small muted">{t("actionCard.install_skill.adminOnly")}</span>
+        )}
+      </span>
+      {may && (
+        <InstallSkillDialog
+          open={open}
+          onOpenChange={setOpen}
+          onInstalled={() => {}}
+          initialUrl={open ? card.url : undefined}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * "Atualizar skills" (`update_skill_from_source`): each skill with where it stands. Atualizar reads its link (new text
+ * applies, files that run wait); Revisar opens the skill, where its waiting update is applied or refused. Done once
+ * every one was read after the card and nothing waits.
+ */
+function UpdateSkillsCardView({ message, card }: { message: Message; card: UpdateSkillsCard }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const may = can(org, "manage_agents");
+  const skills = useSkills(org.id, true);
+  const action = useSkillAction(org.id);
+  const [open, setOpen] = useState<string | null>(null);
+  const usage = useSkillUsage(org.id, open !== null);
+  const rows = card.skillIds.map((id) => {
+    const skill = skills.data?.find((s) => s.id === id);
+    return { id, name: skill?.name ?? "", state: skillUpdateState(skill, message.createdAt) };
+  });
+  const title = t("actionCard.update_skills.title", { count: rows.length });
+  if (skills.data && rows.every((r) => r.state === "done")) {
+    return (
+      <RequestDone done label={title}>
+        {t("actionCard.update_skills.done")}:{" "}
+        <b>
+          {rows
+            .map((r) => r.name)
+            .filter(Boolean)
+            .join(", ")}
+        </b>
+      </RequestDone>
+    );
+  }
+  return (
+    <div className="waitcard">
+      <span className="waitcard__top ac-iconline">
+        <Icon name="book" size={16} />
+        <span>{title}</span>
+      </span>
+      {card.why && <p>{card.why}</p>}
+      <ul className="stack-2">
+        {rows
+          .filter((r) => r.name)
+          .map((r) => (
+            <li key={r.id} className="row" style={{ gap: 8, alignItems: "center" }}>
+              <b>{r.name}</b>
+              {r.state === "done" ? (
+                <span className="small muted">{t("actionCard.update_skills.done")}</span>
+              ) : !may ? (
+                r.state === "waiting" && <span className="small muted">{t("actionCard.update_skills.waiting")}</span>
+              ) : r.state === "waiting" ? (
+                <Button size="sm" onClick={() => setOpen(r.id)}>
+                  {t("actionCard.update_skills.review")}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={action.isPending}
+                  onClick={() =>
+                    action.mutate(
+                      { type: "updateFromSource", id: r.id },
+                      {
+                        onSuccess: (u) =>
+                          toast.show(t(SKILL_UPDATE_TOAST[(u as SkillSourceUpdate).status], { name: r.name })),
+                      },
+                    )
+                  }
+                >
+                  {t("actionCard.update_skills.update")}
+                </Button>
+              )}
+            </li>
+          ))}
+      </ul>
+      {!may && <span className="small muted">{t("actionCard.update_skills.adminOnly")}</span>}
+      {open && <SkillSheet id={open} users={usage.get(open) ?? []} onClose={() => setOpen(null)} />}
     </div>
   );
 }

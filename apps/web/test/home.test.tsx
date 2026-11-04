@@ -308,7 +308,7 @@ describe("Início", () => {
     expect(document.activeElement?.getAttribute("aria-label")).toBe("Mensagem para a Ada");
     for (const empty of ["Desde a sua última visita", "Próximas rotinas"])
       expect(screen().queryByRole("region", { name: empty })).toBeNull();
-    // The mural's fixed tiles stay in their places, empty (ADR 0134).
+    // The mural's fixed tiles stay in their places, empty (ADR 0135).
     for (const tile of ["Esperando você", "Trabalhando agora"])
       expect(within(section(tile)).queryAllByRole("listitem")).toHaveLength(0);
     expect(section("Trabalhando agora").textContent).toContain("Nenhum agente trabalhando agora.");

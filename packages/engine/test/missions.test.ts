@@ -1144,6 +1144,41 @@ describe("missions (ADR 0029)", () => {
       expect((runner.started.at(-1) as TaskStartRequest).mission?.allow).toEqual(["Bash(swift build *)"]);
     });
 
+    test("Aprovar sempre para o agente keeps the command's kind for the agent; read-only gh needs no card", async () => {
+      const { view, main, prompt: ask } = await working();
+      // Where the session runs, as the runner says: plain reads and writes inside it are code's to allow.
+      const prompt = (taskId: string, args: Record<string, unknown>) =>
+        ask(taskId, { ...args, scope: { cwd: "/w/app", folders: ["/w/app"] } });
+      expect(
+        await prompt(main.taskId, { tool_name: "Bash", input: { command: "gh pr view 12 --json title" } }),
+      ).toEqual({ behavior: "allow" });
+      const asked = await prompt(main.taskId, { tool_name: "Bash", input: { command: "gh issue create --title x" } });
+      const id = asked.request_id as string;
+      const [card] = (await listMissionCommands(md(), f.owner.id, f.org.id, view.id)).commands;
+      expect(card).toMatchObject({ id, agentKind: "gh issue create", forAgent: false });
+      const decided = await decideCommand(md(), f.owner.id, f.org.id, view.id, id, "agent");
+      expect(decided).toMatchObject({ state: "allowed", always: false, forAgent: true });
+      expect(await ask(main.taskId, { request_id: id })).toEqual({ behavior: "allow" });
+      expect(
+        (await f.db.select().from(schema.approvalRules)).map((r) => [r.agentId, r.connectionId, r.tool, r.action]),
+      ).toEqual([[f.agent.id, null, "command", "gh issue create"]]);
+      const [audit] = await f.db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "mission.command_agent"));
+      expect(audit?.details).toMatchObject({ agentId: f.agent.id, kind: "gh issue create" });
+      // Its kind with other arguments runs at once; another kind asks; a forbidden one is never offered.
+      expect(
+        await prompt(main.taskId, { tool_name: "Bash", input: { command: "gh issue create --title y --label bug" } }),
+      ).toEqual({ behavior: "allow" });
+      expect(await prompt(main.taskId, { tool_name: "Bash", input: { command: "gh issue close 2" } })).toMatchObject({
+        status: "pending",
+      });
+      const outside = await prompt(main.taskId, { tool_name: "Bash", input: { command: "touch /etc/x" } });
+      const commands = (await listMissionCommands(md(), f.owner.id, f.org.id, view.id)).commands;
+      expect(commands.find((c) => c.id === outside.request_id)?.agentKind).toBeNull();
+    });
+
     describe("Pedir aprovação de comandos (the deny list, plain reads, the judge)", () => {
       /** What the fake judge says about commands (mission_command_risk), and how often it was asked. */
       let risk: number | "error" = 0;

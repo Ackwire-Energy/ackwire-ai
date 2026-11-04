@@ -69,14 +69,16 @@ function InvitePeople() {
   const inviteMany = useInviteMany(orgId);
   const input = useRef<TextInputInstance | null>(null);
   const [typed, setTyped] = useState("");
-  // An agent's invite card opens it with its addresses (`?emails=a@x,b@y`).
-  const { emails } = useLocalSearchParams<{ emails?: string }>();
+  // An agent's invite card opens it with its addresses (`?emails=a@x,b@y`), a channel's add sheet with that channel.
+  const { emails, channel } = useLocalSearchParams<{ emails?: string; channel?: string }>();
   useEffect(() => {
-    setInviteDraft(
-      emails ? { ...EMPTY_INVITE, addresses: withAddresses(EMPTY_INVITE.addresses, emails) } : EMPTY_INVITE,
-    );
+    setInviteDraft({
+      ...EMPTY_INVITE,
+      addresses: emails ? withAddresses(EMPTY_INVITE.addresses, emails) : EMPTY_INVITE.addresses,
+      channelIds: channel ? [channel] : EMPTY_INVITE.channelIds,
+    });
     return () => setInviteDraft(null);
-  }, [emails]);
+  }, [emails, channel]);
   const draft = useInviteDraft() ?? EMPTY_INVITE;
 
   // Who is in already, and who has an invitation waiting: said on their row and left out of the send.

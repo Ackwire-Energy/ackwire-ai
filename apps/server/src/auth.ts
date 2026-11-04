@@ -1,10 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes, sign as signWithKey } from "node:crypto";
-import type { HumanAction, HumanCheck, RateLimiter } from "@agenteschat/adapters";
+import type { HumanAction, HumanCheck, PubSub, RateLimiter } from "@agenteschat/adapters";
+import { nameIsPassword } from "@agenteschat/client/lib/text";
 import type { Config } from "@agenteschat/config";
 import { type Database, eq, schema } from "@agenteschat/db";
 import {
   accountBlock,
+  announceProfile,
   countUsers,
   deriveSecret,
   EARLY_ACCESS_HEADER,
@@ -74,6 +76,8 @@ export function createAuth(deps: {
   rateLimiter: RateLimiter;
   /** The bot check of the email forms (ADR 0075); absent: none. */
   humanCheck?: HumanCheck | null;
+  /** Tells a person's workspaces their name changed. */
+  pubsub?: PubSub;
 }) {
   const { db, config, log, rateLimiter } = deps;
   const emailEnabled = deps.emailDelivers === true;
@@ -304,7 +308,10 @@ export function createAuth(deps: {
           if (refused) throw new APIError("FORBIDDEN", refused);
         }
         if (ctx.path !== "/sign-up/email") return;
-        const email = (ctx.body as { email?: unknown } | undefined)?.email;
+        const { email, name, password } = (ctx.body ?? {}) as { email?: unknown; name?: unknown; password?: unknown };
+        if (typeof name === "string" && typeof password === "string" && nameIsPassword(name, password)) {
+          throw new APIError("BAD_REQUEST", { code: NAME_IS_PASSWORD, message: NAME_IS_PASSWORD_MESSAGE });
+        }
         if (typeof email !== "string") return;
         await assertSignupAllowed(email, await accessOf(ctx));
       }),
@@ -340,6 +347,14 @@ export function createAuth(deps: {
                 log.error("early access not recorded", { userId: user.id, error }),
               );
             }
+          },
+        },
+        update: {
+          // Their name (`/update-user`, from the web or the phone): open apps show the new one at once.
+          after: async (user) => {
+            await announceProfile(db, deps.pubsub, user.id).catch((error) =>
+              log.error("profile change not announced", { userId: user.id, error }),
+            );
           },
         },
       },
@@ -542,6 +557,9 @@ const HUMAN_ACTIONS: Record<string, HumanAction> = {
 /** Reset and confirmation emails to one address in an hour. */
 const EMAILS_PER_ADDRESS = { limit: 3, windowMs: 3600_000 };
 
+/** A sign-up whose name is its password: the name step got the password (mirrored in packages/client errors.ts). */
+export const NAME_IS_PASSWORD = "NAME_IS_PASSWORD";
+export const NAME_IS_PASSWORD_MESSAGE = "Is this your name? It's the same as the password you typed.";
 /** `APIError` code of a sign-up refused because the first account waits for its owner's link or key. */
 export const OWNER_CLAIM_REQUIRED = "OWNER_CLAIM_REQUIRED";
 /**

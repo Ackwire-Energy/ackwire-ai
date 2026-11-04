@@ -235,7 +235,7 @@ describe("examples", () => {
   });
 });
 
-describe("notes and text are never cut mid-word (ADR 0134 §17)", () => {
+describe("notes and text are never cut mid-word (ADR 0135 §17)", () => {
   const long = `${"visitantes únicos no site ".repeat(6)}(1.012 visitantes)`;
 
   test("an agent's note longer than one short sentence is refused, so it writes a shorter one", () => {

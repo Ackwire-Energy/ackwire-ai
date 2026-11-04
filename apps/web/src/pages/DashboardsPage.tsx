@@ -14,7 +14,7 @@ import { useNow } from "@/hooks/useNow";
 import "./dashboards.css";
 
 /**
- * Dashboards (ADR 0134 §14): "My Home" first, then the boards the person sees, grouped as the workspace's, their
+ * Dashboards (ADR 0135 §14): "My Home" first, then the boards the person sees, grouped as the workspace's, their
  * roles' and only theirs, each a card with its widgets' thumbnail, who made it, how many widgets and when it was
  * updated; "New dashboard" makes one. With only "My Home", a line under it says so (no empty state: there is a
  * board, and the header already has "New dashboard").

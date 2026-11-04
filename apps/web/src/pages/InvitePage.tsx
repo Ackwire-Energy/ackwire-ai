@@ -13,7 +13,14 @@ import {
   sendsEmail,
   typedCode,
 } from "@agenteschat/client/lib/join-requests";
-import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
+import {
+  emailTypoFix,
+  isEmail,
+  looksLikePassword,
+  nameIsPassword,
+  passwordState,
+  webmailOf,
+} from "@agenteschat/client/lib/text";
 import { Button, cx, type Expression, Field, Icon, Input, PixelSpinner, Textarea } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -32,7 +39,7 @@ import { inDesktopApp } from "@/lib/desktop";
 import { useHumanCheck } from "@/lib/human-check";
 import { lookOf } from "@/lib/look";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
-import { PasswordHelp, passwordHelp } from "@/pages/AuthPage";
+import { NameHint, PasswordHelp, passwordHelp } from "@/pages/AuthPage";
 import "./invite.css";
 
 /**
@@ -592,7 +599,11 @@ function EmailInvitation({
     e.preventDefault();
     if (!ready || pending) return;
     if (step === "name") go("newPassword");
-    else if (step === "newPassword") void signUp();
+    else if (step === "newPassword" && nameIsPassword(name, password)) {
+      setPassword("");
+      go("name");
+      setError(t("auth.flow.nameIsPassword"));
+    } else if (step === "newPassword") void signUp();
     else if (step === "password") void signIn();
     else if (step === "forgot") void sendReset();
   };
@@ -659,16 +670,19 @@ function EmailInvitation({
       body = (
         <>
           {locked}
-          <Input
-            className="auth__big"
-            aria-label={t("auth.yourName")}
-            autoComplete="name"
-            spellCheck={false}
-            placeholder={t("auth.flow.namePlaceholder")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
+          <div className="auth__field">
+            <Input
+              className="auth__big"
+              aria-label={t("auth.yourName")}
+              autoComplete="name"
+              spellCheck={false}
+              placeholder={t("auth.flow.namePlaceholder")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+            {!error && <NameHint name={name} />}
+          </div>
           <ErrorLine error={error} />
           <Button type="submit" variant="primary" size="lg" block kbd={["↵"]} disabled={!ready}>
             {t("auth.flow.continue")}
@@ -1215,7 +1229,11 @@ function AskSteps({
     if (!ready || pending || codes.pending) return;
     if (step === "email") void toCode();
     else if (step === "name") go("password");
-    else if (step === "password") go("note");
+    else if (step === "password" && nameIsPassword(name, password)) {
+      setPassword("");
+      go("name");
+      setError(t("auth.flow.nameIsPassword"));
+    } else if (step === "password") go("note");
     else if (step === "note") void ask();
   };
 
@@ -1313,17 +1331,21 @@ function AskSteps({
       body = (
         <>
           <Who email={typed} ok />
-          <Input
-            className="auth__big"
-            aria-label={t("invite.ask.name")}
-            autoComplete="name"
-            spellCheck={false}
-            maxLength={JOIN_NAME_MAX}
-            placeholder={t("auth.flow.namePlaceholder")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
+          <div className="auth__field">
+            <Input
+              className="auth__big"
+              aria-label={t("invite.ask.name")}
+              autoComplete="name"
+              spellCheck={false}
+              maxLength={JOIN_NAME_MAX}
+              placeholder={t("auth.flow.namePlaceholder")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+            {!error && <NameHint name={name} />}
+          </div>
+          <ErrorLine error={error} />
           {next}
           {backTo("email")}
         </>
@@ -1826,7 +1848,11 @@ function AskForm({ token, preview }: { token: string; preview: InvitationPreview
       step="form"
       onSubmit={submit}
     >
-      <Field label={t("invite.ask.name")} id="ask-name">
+      <Field
+        label={t("invite.ask.name")}
+        id="ask-name"
+        help={looksLikePassword(name) ? t("auth.flow.nameLooksLikePassword") : undefined}
+      >
         <Input
           className="auth__big"
           autoComplete="name"

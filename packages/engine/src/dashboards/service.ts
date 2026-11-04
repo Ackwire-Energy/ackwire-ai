@@ -78,7 +78,7 @@ import {
 const { dashboards, dashboardWidgets, dashboardWidgetUpdates, agents, users, routines, orgRoles } = schema;
 
 /**
- * Boards and widgets for people (ADR 0134): the HTTP layer's calls, each checking who may (`access.ts`), and the
+ * Boards and widgets for people (ADR 0135): the HTTP layer's calls, each checking who may (`access.ts`), and the
  * internal inserts agents' tools use. Every write publishes through `events.ts`.
  */
 
@@ -156,7 +156,7 @@ async function customRoleIds(db: Executor, orgId: string, roleIds: readonly stri
 }
 
 /**
- * Whether going from one audience to another shows the board to anyone who didn't see it (ADR 0134 §8, §11):
+ * Whether going from one audience to another shows the board to anyone who didn't see it (ADR 0135 §8, §11):
  * private → anything else, roles → workspace, or roles gaining a role. Narrowing (or the same) is not.
  */
 export function widensDashboardAudience(
@@ -227,7 +227,7 @@ async function boardFill(db: Executor, board: Pick<DashboardRow, "id" | "kind" |
       low: sql<number | null>`min(${dashboardWidgets.position})`,
     })
     .from(dashboardWidgets)
-    // Drafts sit on no board: they take no place (ADR 0134 §16).
+    // Drafts sit on no board: they take no place (ADR 0135 §16).
     .where(and(eq(dashboardWidgets.dashboardId, board.id), eq(dashboardWidgets.draft, false)));
   const tiles = board.kind === "home" ? tilesOf(board.homeTiles) : [];
   const top = Math.max(row?.top == null ? -1 : Number(row.top), ...tiles.map((t) => t.position));
@@ -335,7 +335,7 @@ export async function widgetView(db: Executor, row: WidgetRow): Promise<WidgetVi
   return view;
 }
 
-/** Each board's widgets, in board order (never a draft: it is on no board until confirmed, ADR 0134 §16). */
+/** Each board's widgets, in board order (never a draft: it is on no board until confirmed, ADR 0135 §16). */
 async function widgetsOf(db: Executor, boardIds: readonly string[]): Promise<Map<string, WidgetRow[]>> {
   const out = new Map<string, WidgetRow[]>(boardIds.map((id) => [id, []]));
   if (boardIds.length === 0) return out;
@@ -501,7 +501,7 @@ async function loadWidgetRow(db: Executor, widgetId: string): Promise<WidgetRow>
   return row;
 }
 
-/** An open request or alert about a board or its widgets is done once they are gone (ADR 0134 §6, §11). */
+/** An open request or alert about a board or its widgets is done once they are gone (ADR 0135 §6, §11). */
 async function resolveBoardNotices(deps: DashboardDeps, orgId: string, dashboardId: string, widgetIds: string[]) {
   const n = { db: deps.db, pubsub: deps.pubsub, now: deps.now };
   // Proposal and failure keys carry a suffix per request/streak, so they are matched by prefix.
@@ -658,7 +658,7 @@ export async function updateDashboard(
 
 /**
  * Who sees and who edits (managers; never a home board). Who edits never needs `post`: editing isn't seeing (ADR
- * 0134 §8). A pending agent request is dropped (and its notice).
+ * 0135 §8). A pending agent request is dropped (and its notice).
  */
 export async function shareDashboard(
   deps: DashboardDeps,
@@ -688,7 +688,7 @@ export async function shareDashboard(
   if (board.proposal) {
     await resolveDashboardProposal({ db: deps.db, pubsub: deps.pubsub, now: deps.now }, orgId, board.id);
   }
-  // Wide: people who saw it before may not anymore, and new people may now (ADR 0134 §13).
+  // Wide: people who saw it before may not anymore, and new people may now (ADR 0135 §13).
   await publishDashboardChanged(deps.pubsub, next, { wide: true });
   return dashboardView(deps.db, next, viewer);
 }
@@ -790,7 +790,7 @@ export async function saveDashboardLayout(
 
 // ── Widgets ──────────────────────────────────────────────────────────────────
 
-/** A title in one line, clipped at a word's end (never mid-word, ADR 0134 §17). */
+/** A title in one line, clipped at a word's end (never mid-word, ADR 0135 §17). */
 function widgetTitle(raw: string | undefined): string {
   return clipText(oneLine(raw ?? ""), WIDGET_TITLE_MAX);
 }
@@ -838,7 +838,7 @@ export async function createWidget(
     orgId,
     dashboardId: board.id,
     agentId: agent.id,
-    // Empty until its agent names it on its first run, unless the person named it (ADR 0134 §17).
+    // Empty until its agent names it on its first run, unless the person named it (ADR 0135 §17).
     title,
     titleSetByUser: title !== "",
     prompt,
@@ -879,8 +879,8 @@ export async function assertScheduledRoom(db: Executor, orgId: string, excluding
  * A widget made without a person's request in front of it (`create_widget`, a pin): the caps and the board's room are
  * checked, its routine made and, without `spec`, its first build queued. With `spec` it starts `ok` with that data.
  * `routineCreatorUserId`: who its routine runs for (ADR 0053 §1); default its creator, else the board's owner.
- * `draft` (a person's "Test", ADR 0134 §16): on no board and under no cap, never scheduled, its events to its creator
- * alone. `titleSetByUser`: a person named it, so its agent never renames it (ADR 0134 §17).
+ * `draft` (a person's "Test", ADR 0135 §16): on no board and under no cap, never scheduled, its events to its creator
+ * alone. `titleSetByUser`: a person named it, so its agent never renames it (ADR 0135 §17).
  */
 export async function insertWidget(
   deps: DashboardDeps,
@@ -917,7 +917,7 @@ export async function insertWidget(
   const schedule = draft ? "manual" : scheduleOf(input.schedule);
   const layout = sizeToLayout(input.size ?? defaultSize(format === "auto" ? (spec?.kind ?? null) : format));
   const at = nowOf(deps);
-  // Never the ask itself: its agent names it on its first build (ADR 0134 §17).
+  // Never the ask itself: its agent names it on its first build (ADR 0135 §17).
   const title = widgetTitle(input.title);
   const row = await deps.db.transaction(async (tx) => {
     // One insert at a time per board, so two can't both take its last place.
@@ -962,7 +962,7 @@ export async function insertWidget(
   await publishWidgetChanged(deps.pubsub, board, widgetEvent(row, row.status as WidgetStatus));
   if (!draft) await publishDashboardChanged(deps.pubsub, board);
   const creator = input.routineCreatorUserId ?? input.createdByUserId ?? board.ownerUserId;
-  // A scheduled widget gets its routine now; one without data gets one for its first build (ADR 0134 §4).
+  // A scheduled widget gets its routine now; one without data gets one for its first build (ADR 0135 §4).
   const routineId = await syncWidgetRoutine(deps, orgId, row.id, {
     ...(creator ? { creatorUserId: creator } : {}),
     ensure: !spec,
@@ -986,14 +986,14 @@ export async function updateWidget(
   patch: UpdateWidgetInput,
 ): Promise<WidgetView> {
   const { widget, board, membership } = await requireWidget(deps.db, actorId, orgId, widgetId, "edit");
-  // A draft changes only by being tested again or confirmed (ADR 0134 §16).
+  // A draft changes only by being tested again or confirmed (ADR 0135 §16).
   if (widget.draft) throw new NotFoundError("Widget not found", DASHBOARD_ERRORS.widgetNotFound);
   const set: Partial<typeof dashboardWidgets.$inferInsert> = {};
   let routineChanged = false;
   if (patch.title !== undefined) {
     const title = widgetTitle(patch.title);
     if (!title) throw new ValidationError("A widget needs a title", DASHBOARD_ERRORS.titleRequired);
-    // A person's title stays: its agent no longer renames it (ADR 0134 §17).
+    // A person's title stays: its agent no longer renames it (ADR 0135 §17).
     if (!widget.titleSetByUser) set.titleSetByUser = true;
     if (title !== widget.title) {
       set.title = title;
@@ -1020,7 +1020,7 @@ export async function updateWidget(
   if (patch.alert !== undefined) {
     set.alertEnabled = patch.alert.enabled === true;
     set.alertCondition = alertCondition(patch.alert.condition);
-    // Who hears it: whoever turned it on or last changed it (ADR 0134 §6).
+    // Who hears it: whoever turned it on or last changed it (ADR 0135 §6).
     set.alertUserId = patch.alert.enabled ? actorId : null;
   }
   const size = sizeOf(patch.size);
@@ -1102,7 +1102,7 @@ async function discardWidget(deps: DashboardDeps, orgId: string, widget: WidgetR
   if (!widget.draft) await publishDashboardChanged(deps.pubsub, board);
 }
 
-// ── Test before creating (ADR 0134 §16) ──────────────────────────────────────
+// ── Test before creating (ADR 0135 §16) ──────────────────────────────────────
 
 /**
  * "Test" in New widget: a draft of the widget the person asks for, built at once with real data by its agent (the
@@ -1240,7 +1240,7 @@ export async function confirmWidget(
 
 /**
  * Drafts nobody confirmed for `WIDGET_DRAFT_TTL_MS` (a dialog closed without cancelling, an app that quit) go with
- * their routines (ADR 0134 §16). Run by the server's workers; returns how many went.
+ * their routines (ADR 0135 §16). Run by the server's workers; returns how many went.
  */
 export async function sweepWidgetDrafts(deps: DashboardDeps, limit = 200): Promise<number> {
   const before = new Date(nowOf(deps).getTime() - WIDGET_DRAFT_TTL_MS);
@@ -1338,7 +1338,7 @@ export async function insertDashboard(
 /**
  * Who edits a board, set by an agent's `share_dashboard` for the person it works for (no permission check: the tool
  * checked it; `editRoleIds` are the workspace's custom roles, matched by name). Editing isn't seeing, so it never
- * waits on a decision (ADR 0134 §8, §11).
+ * waits on a decision (ADR 0135 §8, §11).
  */
 export async function setDashboardEditors(
   deps: DashboardDeps,
@@ -1399,7 +1399,7 @@ export async function dropMemberDashboards(tx: Executor, orgId: string, userId: 
       ),
     )
     .returning({ id: dashboards.id });
-  // Their drafts go too (ADR 0134 §16): their routines with them, so none runs for someone who left.
+  // Their drafts go too (ADR 0135 §16): their routines with them, so none runs for someone who left.
   const drafts = await tx
     .delete(dashboardWidgets)
     .where(

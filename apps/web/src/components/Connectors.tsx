@@ -23,6 +23,7 @@ import {
   isMcpItem,
   itemName,
   outcomeText,
+  reconnectAddsText,
 } from "@agenteschat/client/lib/connected";
 import { sameServer } from "@agenteschat/client/lib/custom-tools";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -364,6 +365,7 @@ function ConnectedRow({
     relativeTime(t, i18n.language, item.createdAt),
     t("connectors.toolsCount", { count: item.tools }),
   ].filter(Boolean);
+  const adds = reconnectAddsText(t, item);
   return (
     <div className="ac-list__row connected-row">
       <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size="lg" />
@@ -391,6 +393,7 @@ function ConnectedRow({
         <span className="small muted" title={meta.join(" · ")}>
           {meta.join(" · ")}
         </span>
+        {adds && !item.needsReconnect && <span className="small muted">{adds}</span>}
       </span>
       <span className="connected-row__who small muted">
         {using.length > 0 && (
@@ -404,7 +407,7 @@ function ConnectedRow({
       </span>
       {admin && (
         <div className="connected-row__actions">
-          {item.needsReconnect && (
+          {(item.needsReconnect || adds) && (
             <Button
               size="sm"
               variant="primary"
@@ -414,7 +417,7 @@ function ConnectedRow({
               {t("connectors.detail.reconnect")}
             </Button>
           )}
-          {item.needsReview && !item.needsReconnect && (
+          {item.needsReview && !item.needsReconnect && !adds && (
             <Button
               size="sm"
               variant="primary"

@@ -14,8 +14,8 @@ export function fakeGithubMcp() {
 
   const build = () => {
     const server = new McpServer({ name: "fake-github", version: "1" });
-    server.registerTool("get_pull_request", { description: "Get a pull request", inputSchema: pr }, async (args) => {
-      calls.push({ tool: "get_pull_request", args });
+    server.registerTool("pull_request_read", { description: "Get a pull request", inputSchema: pr }, async (args) => {
+      calls.push({ tool: "pull_request_read", args });
       return { content: [{ type: "text", text: `PR #${args.pullNumber}: fix token refresh (checks passing)` }] };
     });
     server.registerTool(
@@ -36,7 +36,7 @@ export function fakeGithubMcp() {
       },
     );
     server.registerTool(
-      "get_issue",
+      "issue_read",
       { description: "Get an issue", inputSchema: { number: z.number() } },
       async () => ({
         content: [{ type: "text", text: "boom" }],

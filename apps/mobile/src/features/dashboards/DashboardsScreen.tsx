@@ -13,7 +13,7 @@ import { BoardRow, useBoardByline } from "./parts";
 export const openNewBoard = () => router.push("/board-new");
 
 /**
- * Dashboards, a tab between Chats and Threads (ADR 0134): My Home on top (the person's own widgets), then the boards
+ * Dashboards, a tab between Chats and Threads (ADR 0135): My Home on top (the person's own widgets), then the boards
  * of the whole workspace, of the person's roles and only theirs, each with a thumbnail of its widgets. A row pushes
  * the board; "+" in the bar makes a new one. With only My Home, a line under it says where the others will be (no
  * empty state: My Home is a board).

@@ -192,7 +192,10 @@ describe("the prompt's rules", () => {
       "Before saying you can't or don't have a tool, check your means (listed under Your means): your tools and find_tools, your computer, browser and terminal, and the teammates whose role covers it.",
     );
     expect(text).toContain(
-      "A real blocker is only something a person must give: a code, a sign-in, a payment, a permission, a decision. Only then stop, and say in one line what you tried and the one thing a person must do.",
+      "is never a blocker or a reason to say you can't: do everything up to it, hand it over with its request",
+    );
+    expect(text).toContain(
+      "A service with no connector but a web version (a messaging app, a social network, a bank): use it in your browser, the person signing in.",
     );
     expect(text).toContain(
       "ask it yourself (ask_agent) when you need its answer, or hand it work or news (tell_agent): what comes of either reaches you here by itself.",

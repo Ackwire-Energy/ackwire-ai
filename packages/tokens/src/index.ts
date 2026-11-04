@@ -194,6 +194,7 @@ export const shadows: Record<ThemeName, Record<ShadowName, ShadowLayer[]>> = {
 
 /** Corner radii (px). */
 export const radius = {
+  xs: 4,
   sm: 6,
   item: 10,
   md: 10,

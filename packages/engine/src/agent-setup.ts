@@ -22,6 +22,7 @@ import {
   normalizeBrainModel,
   setAgentBrain,
 } from "./brain-settings";
+import { planIsOwners } from "./brains/select";
 import type { BrainKind } from "./brains/types";
 import { caches } from "./cache";
 import { ValidationError } from "./errors";
@@ -90,6 +91,11 @@ export interface SetupResult {
   params?: Record<string, string>;
   /** Its Autonomia changes (in a preview, would), whatever its AI does. */
   autonomy?: { from: CommandApproval; to: CommandApproval };
+  /**
+   * It lets more people talk to it on its owner's plan, someone else's (in a preview, would): that owner gets an email
+   * (ADR 0059 §5), so the apps ask first.
+   */
+  opensPlan?: true;
 }
 
 const nullableId = (v: unknown, what: string): string | null => {
@@ -170,7 +176,7 @@ const skip = (reason: SetupReason, params?: Record<string, string>): Plan => ({
 function refusal(error: unknown): Pick<SetupResult, "reason" | "params"> {
   const { code, params } = (error ?? {}) as { code?: unknown; params?: Record<string, unknown> };
   if (code === "agent.not_owner") return { reason: "not_allowed" };
-  if (code === "account.not_owner" || code === "audience.plan_owner_only") return { reason: "account_owner" };
+  if (code === "account.not_owner") return { reason: "account_owner" };
   if (code === "account.in_use") {
     return {
       reason: "account_single",
@@ -282,21 +288,41 @@ export async function applyAgentSetup(
           results.set(t.id, { agentId: t.id, ...ai });
           continue;
         }
+        let opensPlan = false;
         try {
           await tx.transaction(async (sp) => {
             if (p.status === "applied") {
               if (p.patch) await updateAgent(sp, userId, orgId, t.id, p.patch, { remember: false });
+              let opened = false;
               await setAgentBrain({ db: sp }, userId, orgId, t.id, p.brain, {
                 remember: false,
                 audit: { via: "setup" },
+                onPlanOpened: () => {
+                  opened = true;
+                },
               });
+              // The email goes only where its owner's plan thinks (the job checks again): the question says so too.
+              if (opened) {
+                const [after] = await sp
+                  .select({ machineId: schema.agents.machineId, account: schema.agents.brainAccountId })
+                  .from(schema.agents)
+                  .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.id, t.id)));
+                opensPlan =
+                  !!after?.machineId &&
+                  (await planIsOwners(sp, t, after.machineId, after.account ? { id: after.account } : undefined));
+              }
             }
             if (autonomy) {
               await setAgentMissionApproval({ db: sp }, userId, orgId, t.id, autonomy, { audit: { via: "setup" } });
             }
           });
           applied.push(t.id);
-          results.set(t.id, { agentId: t.id, ...ai, ...(autonomy ? { autonomy: { from, to: autonomy } } : {}) });
+          results.set(t.id, {
+            agentId: t.id,
+            ...ai,
+            ...(autonomy ? { autonomy: { from, to: autonomy } } : {}),
+            ...(opensPlan ? { opensPlan: true as const } : {}),
+          });
           // Not one that kept its own account (even one that already thought so), nor one that took only the Autonomia.
           if (p.status === "applied" ? !p.keeps : p.status === "same" && !p.ownAccount) whole ??= t.id;
         } catch (error) {
@@ -405,9 +431,9 @@ function planFor(
 /** Whether the setup's account (or its computer's own sign-in) can think for the agent, else why not. */
 function takesAccount(
   t: Agent,
-  c: Pick<Parameters<typeof planFor>[1], "setup" | "userId" | "machine" | "account" | "computerName" | "pairerName">,
+  c: Pick<Parameters<typeof planFor>[1], "setup" | "machine" | "account" | "computerName" | "pairerName">,
 ): true | Plan {
-  const { setup, userId, machine } = c;
+  const { setup, machine } = c;
   if (!machine || !brainOptions(machine).some((o) => o.kind === setup.brain && o.available)) return skip("failed");
   if (t.machineId !== machine.id) {
     const where = t.machineId ? c.computerName.get(t.machineId) : undefined;
@@ -416,18 +442,17 @@ function takesAccount(
   if (setup.account) {
     const a = c.account;
     if (!a || a.kind !== setup.brain) return skip("failed");
-    // Only the owner of both the account and the agent chooses it (ADR 0059 §3).
-    if (a.ownerId !== userId) return skip("account_owner", a.ownerName ? { owner: a.ownerName } : undefined);
-    if (t.ownerUserId !== userId) return skip("account_owner");
+    // A plan thinks only for its owner's agents (ADR 0059 §3).
+    if (!a.ownerId || a.ownerId !== t.ownerUserId)
+      return skip("account_owner", a.ownerName ? { owner: a.ownerName } : undefined);
     const other = a.shared ? -1 : a.usedByIds.findIndex((id) => id !== t.id);
     if (other >= 0) return skip("account_single", { agent: a.usedBy[other] ?? "" });
     return true;
   }
   // The computer's own sign-in thinks only for the agents of whoever connected it; on one nobody did, for none.
   if (!machine.pairedByUserId) return skip("failed");
-  if (machine.pairedByUserId !== userId)
+  if (machine.pairedByUserId !== t.ownerUserId)
     return skip("account_owner", c.pairerName ? { owner: c.pairerName } : undefined);
-  if (t.ownerUserId !== userId) return skip("account_owner");
   return true;
 }
 

@@ -18,7 +18,7 @@ import { AGENT_SEARCH_FROM, agentsMatching } from "./logic";
 const LOGOS_SHOWN = 4;
 
 /**
- * "Who looks after it", pushed from New widget's card (ADR 0134; screens, never sheets): the agents the person can
+ * "Who looks after it", pushed from New widget's card (ADR 0135; screens, never sheets): the agents the person can
  * talk to, each with its face, name, role and the connected apps it reads, the current one checked. A search field
  * past a handful of agents. Choosing one goes back to the card at once.
  */

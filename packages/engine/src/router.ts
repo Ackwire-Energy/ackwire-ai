@@ -653,6 +653,11 @@ export interface RouterDeps {
   /** Whether the workspace used up its platform AI for the month (`limits.ts`): only with a chain that bills it. */
   platformCapReached?(orgId: string): Promise<boolean>;
   /**
+   * The agents among `agentIds` that are out of office now (`outOfOfficeIds`, ADR 0084 §12): their plan or budget ran
+   * out, so they aren't candidates for a message nobody mentioned them in. Absent: nobody is.
+   */
+  outOfOffice?(orgId: string, agentIds: string[]): Promise<Set<string>>;
+  /**
    * How long a person's message waits for their next one before the router decides (`ROUTER_QUIET_MS` on a
    * server). Absent or 0: no wait, and each message is decided alone.
    */
@@ -807,7 +812,7 @@ export async function routeMessage(
         // Never the agent that wrote it.
         byAgent && message.authorAgentId ? ne(agents.id, message.authorAgentId) : undefined,
         // Never an agent this person can't talk to: not as a pick, not as "the last agent" of a follow-up.
-        audienceSql("agents", sql`${personId}::text`),
+        audienceSql("agents", sql`${personId}::text`, { channelId: sql`${message.channelId}::uuid` }),
       ),
     )
     // Oldest first: the last tie-break of a default pick.
@@ -819,9 +824,22 @@ export async function routeMessage(
     role: r.role,
     about: cutText(r.instructions, 300),
   }));
+  // Out of office (ADR 0084 §12): with nothing to think with until a reset, an agent doesn't answer a message nobody
+  // mentioned it in (the others do); a mention still reaches it.
+  if (deps.outOfOffice && candidates.length > 0) {
+    const out = await deps
+      .outOfOffice(
+        message.orgId,
+        candidates.map((c) => c.agentId),
+      )
+      .catch(() => new Set<string>());
+    candidates = candidates.filter((c) => !out.has(c.agentId));
+  }
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
   // The team's coordinator (ADR 0093), when it is a candidate here: never for an agent's message.
-  const coordinatorId = byAgent ? null : (rows.find((r) => r.coordinator)?.agentId ?? null);
+  const coordinatorId = byAgent
+    ? null
+    : (rows.find((r) => r.coordinator && candidates.some((c) => c.agentId === r.agentId))?.agentId ?? null);
   // Routed to nobody without asking the strategy, and why (the receipts say it).
   const unrouted = async (reason: typeof NO_AI | typeof PLATFORM_CAP): Promise<RouteResult> => {
     const stored = await db

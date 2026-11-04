@@ -302,6 +302,7 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
     answer: str(q.answer) || null,
     answeredByUserId: str(q.answeredByUserId) || null,
     ...(q.withdrawn === true ? { withdrawn: true as const } : {}),
+    ...(q.dismissed === true ? { dismissed: true as const } : {}),
   };
 }
 

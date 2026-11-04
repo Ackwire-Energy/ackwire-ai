@@ -1,10 +1,12 @@
 import {
   archiveChannel,
+  CHANNEL_KEYS,
   channelMembersDetail,
   createChannelCategory,
   deleteChannel,
   deleteChannelCategory,
   listChannelCategories,
+  listChannelOverrides,
   listPins,
   pinMessage,
   placeChannel,
@@ -13,6 +15,7 @@ import {
   renameChannelCategory,
   requireChannelAccess,
   setChannelAgentAutoReply,
+  setChannelOverride,
   unarchiveChannel,
   unpinMessage,
   updateChannel,
@@ -40,6 +43,17 @@ const categoryJson = (r: { id: string; name: string; position: number }) => ({
   name: r.name,
   position: r.position,
 });
+const OverrideTarget = z.object({
+  type: z.enum(["role", "person"]),
+  id: z.string().min(1).openapi({ description: "A role's id (`everyone`, \"Todos\", too) or a person's user id." }),
+});
+const ChannelOverride = z
+  .object({
+    target: OverrideTarget,
+    allow: z.array(z.enum(CHANNEL_KEYS)),
+    deny: z.array(z.enum(CHANNEL_KEYS)),
+  })
+  .openapi("ChannelPermissionOverride");
 const Pin = z
   .object({
     messageId: z.uuid(),
@@ -243,6 +257,53 @@ export function channelRoutes(deps: AppDeps) {
         },
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/permissions",
+      tags,
+      security,
+      summary: "The channel's exceptions to the workspace's keys, per role or person (ADR 0134; who manages it)",
+      request: { params: ChannelParams },
+      responses: {
+        200: json(z.object({ keys: z.array(z.enum(CHANNEL_KEYS)), overrides: z.array(ChannelOverride) })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      const r = await listChannelOverrides(db, c.get("user").id, orgId, channelId);
+      return c.json({ keys: [...r.keys], overrides: r.overrides }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/channels/{channelId}/permissions",
+      tags,
+      security,
+      summary:
+        "Set one exception of the channel (ADR 0134); empty allow and deny remove it (204). 403 `channel.permission_forbidden`: a key you don't hold here, a role or person not below you, or yourself",
+      request: {
+        params: ChannelParams,
+        body: body(
+          z.object({
+            target: OverrideTarget,
+            allow: z.array(z.enum(CHANNEL_KEYS)).max(CHANNEL_KEYS.length),
+            deny: z.array(z.enum(CHANNEL_KEYS)).max(CHANNEL_KEYS.length),
+          }),
+        ),
+      },
+      responses: { 200: json(ChannelOverride), 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      const row = await setChannelOverride(db, c.get("user").id, orgId, channelId, c.req.valid("json"), opts);
+      return row ? c.json(row, 200) : c.body(null, 204);
     },
   );
 

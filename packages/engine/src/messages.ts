@@ -20,8 +20,8 @@ import { type AgentActionView, actionsFor } from "./agent-actions";
 import { currentHandles } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
-import { requireChannelAccess } from "./channels";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { postRefusal, requireChannelAccess } from "./channels";
+import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import {
   type DecidedBy,
   decidedByOf,
@@ -583,6 +583,8 @@ export async function insertMessageWithRuns(
   // Idempotent send: a person's `clientId` is claimed with the message; a resend finds it taken.
   const clientId = person ? normalizeClientId(input.clientId) : null;
   // Where the message may go: no thread, or a top-level message of this channel (`m` checks it too).
+  // Who may wake agents here: the person's `talk_to_agents` in this channel (ADR 0134).
+  const inChannel = { channelId: sql`${input.channelId}::uuid` };
   const threadOk = sql`(${threadId}::uuid is null or exists (
           select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
             and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))`;
@@ -647,14 +649,14 @@ export async function insertMessageWithRuns(
             order by oq.created_at desc limit 1)
           and (not exists (select 1 from mentioned) or q.agent_id in (select id from mentioned))
           and q.agent_id not in (select agent_id from muted)
-          and exists (select 1 from ${agents} qa where qa.id = q.agent_id and ${audienceSql("qa", sql`${userId}::text`)})
+          and exists (select 1 from ${agents} qa where qa.id = q.agent_id and ${audienceSql("qa", sql`${userId}::text`, inChannel)})
           and (${threadId}::uuid is null or exists (
             select 1 from ${messages} r where r.id = ${threadId}::uuid and r.org_id = ${input.orgId}::uuid
               and r.channel_id = ${input.channelId}::uuid and r.thread_id is null))
         returning q.id, q.run_id, q.agent_id
       ), addressed as (
         select a.id as agent_id, case when exists (select 1 from mentioned) then 'mention' else 'dm' end as trig,
-          ${audienceSql("a", sql`${userId}::text`)} as allowed
+          ${audienceSql("a", sql`${userId}::text`, inChannel)} as allowed
         from ${agents} a
         join ${channelMembers} cm on cm.agent_id = a.id and cm.channel_id = ${input.channelId}::uuid
         where ${startRuns}::boolean and a.org_id = ${input.orgId}::uuid and a.archived_at is null
@@ -685,7 +687,7 @@ export async function insertMessageWithRuns(
           and exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
           and exists (select 1 from ${messages} tm where tm.org_id = ${input.orgId}::uuid
             and tm.id = r.trigger_message_id and tm.author_user_id = ${userId})
-          and ${audienceSql("ra", sql`${userId}::text`)}
+          and ${audienceSql("ra", sql`${userId}::text`, inChannel)}
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
         -- Addressed agents (mention, DM) with a run in this conversation, and, for a reply in a
@@ -720,7 +722,7 @@ export async function insertMessageWithRuns(
                 or (r.status = 'waiting_input' and r.waiting_machine_id is not null and ${inChannelRun(sql`r`)})`
                 }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
-              and ${audienceSql("ra", sql`${userId}::text`)})
+              and ${audienceSql("ra", sql`${userId}::text`, inChannel)})
             or (r.id in (select id from floor_runs) and (select count(distinct agent_id) from floor_runs) = 1)
           )
         order by r.agent_id, r.created_at desc
@@ -736,7 +738,7 @@ export async function insertMessageWithRuns(
           and r.agent_id not in (select agent_id from answered)
           and r.agent_id not in (select agent_id from muted)
           and r.agent_id <> all(${referenced}::uuid[])
-          and ${audienceSql("ra", sql`${userId}::text`)}
+          and ${audienceSql("ra", sql`${userId}::text`, inChannel)}
       ), steered as (
         -- Queued on the run only while it is still active: one that ended since (its unread messages
         -- already handed on) is never appended to; the message starts a run of its own below instead.
@@ -991,8 +993,8 @@ export async function postPersonMessage(
   },
 ): Promise<MessageView> {
   // One access check (membership + channel) instead of two round trips.
-  const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
-  if (!can(membership, "post")) throw new ForbiddenError();
+  const { channel, membership, workspace } = await requireChannelAccess(deps.db, userId, orgId, channelId);
+  if (!can(membership, "post")) throw postRefusal(workspace);
   // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
@@ -1085,6 +1087,7 @@ export async function postPersonMessage(
       channelId,
       threadId: message.threadId,
       messageId: message.id,
+      deniedHere: can(workspace, "talk_to_agents") && !can(membership, "talk_to_agents"),
     });
   }
   // Delivered to the agent's task in progress: it reads it at its next step, now, or wakes from a wait.

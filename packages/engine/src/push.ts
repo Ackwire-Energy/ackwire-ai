@@ -296,7 +296,7 @@ export const PUSH_PLACE_KEYS = [
   "machineId",
   "topicId",
   "issueNumber",
-  // A widget or a board (ADR 0134): the apps open the widget, else the board.
+  // A widget or a board (ADR 0135): the apps open the widget, else the board.
   "dashboardId",
   "widgetId",
 ] as const;

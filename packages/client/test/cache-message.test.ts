@@ -1,7 +1,15 @@
 import { expect, test } from "bun:test";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import type { ApiClient, Message } from "../src/index";
-import { cacheMessage, cacheReceipts, catchUpChannel, keys, messagesQuery, outbox } from "../src/index";
+import {
+  cacheMessage,
+  cacheReceipts,
+  catchUpChannel,
+  keys,
+  messagesQuery,
+  outbox,
+  startThreadCache,
+} from "../src/index";
 
 const msg = (over: Partial<Message>): Message => ({
   id: "m",
@@ -25,7 +33,34 @@ test("a reply that starts a thread replaces its 'sending…' copy (which waits i
   cacheMessage(qc, "o1", msg({ id: "real", threadId: "root", clientId: "k1" }));
 
   expect(qc.getQueryData<Message[]>(keys.messages("o1", "c1"))?.map((m) => m.id)).toEqual(["root"]);
-  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "root"))?.map((m) => m.id)).toEqual(["real"]);
+  // The thread's list starts with its root, as the server lists it.
+  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "root"))?.map((m) => m.id)).toEqual(["root", "real"]);
+});
+
+test("a new top-level message starts its thread's list with itself; a list already there stays", () => {
+  const qc = new QueryClient();
+  const sticker = msg({ id: "s1", body: "", meta: { media: { kind: "sticker", agentId: "a1", mood: "love" } } });
+  startThreadCache(qc, "o1", sticker);
+  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "s1"))?.map((m) => m.id)).toEqual(["s1"]);
+  const kept = [sticker, msg({ id: "r1", threadId: "s1" })];
+  qc.setQueryData(keys.thread("o1", "c1", "s1"), kept);
+  startThreadCache(qc, "o1", sticker);
+  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "s1"))?.map((m) => m.id)).toEqual(["s1", "r1"]);
+  // A reply starts no thread of its own.
+  startThreadCache(qc, "o1", msg({ id: "r2", threadId: "s1" }));
+  expect(qc.getQueryData(keys.thread("o1", "c1", "r2"))).toBeUndefined();
+});
+
+test("a live reply to an older thread: its root from the older pages; with no root here, the list stays to be read", () => {
+  const qc = new QueryClient();
+  qc.setQueryData(keys.messages("o1", "c1"), [msg({ id: "new" })]);
+  qc.setQueryData(keys.olderPages("o1", "c1"), { pages: [msg({ id: "old" })], done: false });
+  cacheMessage(qc, "o1", msg({ id: "r1", threadId: "old" }));
+  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "old"))?.map((m) => m.id)).toEqual(["old", "r1"]);
+  expect(qc.getQueryState(keys.thread("o1", "c1", "old"))?.isInvalidated).toBe(false);
+  cacheMessage(qc, "o1", msg({ id: "r2", threadId: "gone" }));
+  expect(qc.getQueryData<Message[]>(keys.thread("o1", "c1", "gone"))?.map((m) => m.id)).toEqual(["r2"]);
+  expect(qc.getQueryState(keys.thread("o1", "c1", "gone"))?.isInvalidated).toBe(true);
 });
 
 test("reading a conversation again (after a reconnect) keeps my messages still sending or waiting to go out, not one the server refused", async () => {

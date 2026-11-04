@@ -271,8 +271,9 @@ export const ownSignInReady = (
 
 /**
  * An agent's account choice lists the computer's own sign-in where it is ready (`ownSignInReady`), and while the
- * agent thinks with it: on a computer its owner connected, whatever that computer reported, and to someone who
- * can't change the account.
+ * agent thinks with it: on a computer its owner connected, whatever that computer reported, and to an admin who
+ * doesn't own the agent wherever it is (what it thinks with). To that admin also wherever its owner connected the
+ * computer: only the person who connected it sees whether that CLI is signed in there.
  */
 export const ownSignInListed = (
   brain: Pick<AgentBrain, "ownSignIn" | "brain" | "account" | "canUsePlans">,
@@ -280,6 +281,7 @@ export const ownSignInListed = (
   kind: MachineAccountKind,
 ) =>
   ownSignInReady(brain, row, kind) ||
+  (brain.ownSignIn && !brain.canUsePlans) ||
   (brain.brain === kind && brain.account === null && (brain.ownSignIn || !brain.canUsePlans));
 
 /**

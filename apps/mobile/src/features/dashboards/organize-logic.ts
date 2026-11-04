@@ -1,5 +1,5 @@
 /**
- * Organize on the phone (ADR 0134), pure: where a held widget lands as the finger carries it, the order that results,
+ * Organize on the phone (ADR 0135), pure: where a held widget lands as the finger carries it, the order that results,
  * and the small drawing of a size. The ones marked `worklet` also run on the UI thread, inside the drag.
  */
 

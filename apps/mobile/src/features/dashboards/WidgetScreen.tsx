@@ -41,11 +41,11 @@ import { WidgetCard } from "./WidgetView";
 
 /** Rows of the history shown (the server keeps the latest 20). */
 const HISTORY_SHOWN = 10;
-/** The longest alert condition the server takes (ADR 0134). */
+/** The longest alert condition the server takes (ADR 0135). */
 const CONDITION_MAX = 200;
 
 /**
- * A widget, pushed from its board (ADR 0134): the widget big, why it didn't update (with Resolve), its title (renamed
+ * A widget, pushed from its board (ADR 0135): the widget big, why it didn't update (with Resolve), its title (renamed
  * in place; a person's title is kept: the agent no longer changes it), how it updates
  * (its schedule, picked in place; the alert and its condition; what the agent reads; its routine), the latest updates,
  * "Update now" and the remove; at the bottom, "Ask <agent> for a change" goes to the agent, who redoes it in place.
@@ -152,7 +152,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
         onError: failed,
       },
     );
-  // The same words as the web's confirmation (ADR 0134): its routine stops and its history goes.
+  // The same words as the web's confirmation (ADR 0135): its routine stops and its history goes.
   const confirmRemove = () =>
     Alert.alert(
       t("widgets.removeConfirm.title", { title: shown }),

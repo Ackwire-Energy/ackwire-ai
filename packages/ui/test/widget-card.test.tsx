@@ -32,7 +32,7 @@ const card = (spec: WidgetSpec | null, over: Partial<Parameters<typeof WidgetCar
     />,
   );
 
-describe("the widget's numbers (ADR 0134)", () => {
+describe("the widget's numbers (ADR 0135)", () => {
   test("in the reader's language: grouped, fractions only for small numbers, the unit where the chat puts it", () => {
     expect(formatWidgetNumber(18420, "pt-BR")).toBe("18.420");
     expect(formatWidgetNumber(18420, "en")).toBe("18,420");

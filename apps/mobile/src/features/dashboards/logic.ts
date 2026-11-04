@@ -29,7 +29,7 @@ import {
 } from "@agenteschat/ui/widgets/spec";
 
 /**
- * Dashboards and widgets on the phone (ADR 0134), without React: the agent's tones and the dither the widgets are
+ * Dashboards and widgets on the phone (ADR 0135), without React: the agent's tones and the dither the widgets are
  * drawn with, the 2-column board, the thumbnails, the New widget preview, Share's draft, and the notices.
  */
 
@@ -261,7 +261,7 @@ export function layoutChanged(
 /** A tall (2-high, L) widget on the phone draws its data big, and stands taller. */
 export const isTall = (h: number) => h >= 2;
 
-/** What a board's "…" offers, by what the viewer may do (ADR 0134): My Home is only organized. */
+/** What a board's "…" offers, by what the viewer may do (ADR 0135): My Home is only organized. */
 export type BoardMenuKey = "organize" | "share" | "edit" | "pin" | "unpin" | "delete";
 
 export function boardMenuKeys(
@@ -358,7 +358,7 @@ export const realBoardId = (id: string, homeId: string | null | undefined): stri
 // ── Test before creating ─────────────────────────────────────────────────────
 
 /**
- * What a test covers (ADR 0134): the ask, the agent and the format. Changing any of them makes the test stale; the
+ * What a test covers (ADR 0135): the ask, the agent and the format. Changing any of them makes the test stale; the
  * schedule, the alert, the size and the destination don't (Create sends them).
  */
 export const testKeyOf = (prompt: string, agentId: string | null, format: WidgetFormat): string =>
@@ -515,7 +515,7 @@ export const pinDraftNow = (): PinDraft | null => pinDraft;
 // ── The widget card ──────────────────────────────────────────────────────────
 
 /**
- * A widget card's soft surface (ADR 0134): no border and no shadow, only a background a step off the board's
+ * A widget card's soft surface (ADR 0135): no border and no shadow, only a background a step off the board's
  * (`board`). On the light grouped gray that is the raised white; on the dark board, 78% of the raised tone over it (a
  * quieter card). Opaque `#rrggbb`, so marks drawn on the card can be ringed in it.
  */

@@ -74,7 +74,7 @@ function roundRect(x: number, y: number, w: number, h: number, r: number): strin
 }
 
 /**
- * Dashboards (ADR 0134): a board of four widgets, a tall and a short one in each column, staggered; each fills when
+ * Dashboards (ADR 0135): a board of four widgets, a tall and a short one in each column, staggered; each fills when
  * selected.
  */
 const DASHBOARD_TILES = [

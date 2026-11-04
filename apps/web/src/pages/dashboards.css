@@ -1,5 +1,5 @@
 /*
- * Dashboards (ADR 0134 §14): the list of boards, a board's page, and the dialogs that make and share them (New
+ * Dashboards (ADR 0135 §14): the list of boards, a board's page, and the dialogs that make and share them (New
  * widget, New dashboard, Share). Widgets themselves are drawn by `packages/ui` (`widgets.css`); the tones here come
  * from `widgetTileVars`: `--wg-s` the agent's stroke, `--wg-tile` its 2px dither tile.
  */
@@ -200,7 +200,7 @@ html:not([data-pointer]) .db-card:focus-visible {
   min-width: 0;
 }
 
-/* An agent's request to publish the board (ADR 0134 §11): a line in its tone above the grid. */
+/* An agent's request to publish the board (ADR 0135 §11): a line in its tone above the grid. */
 .db-proposal {
   display: flex;
   align-items: center;
@@ -448,7 +448,7 @@ html:not([data-pointer]) :is(.db-role, .db-sug, .db-pick):focus-visible {
 
 /*
  * ── New widget ─────────────────────────────────────────────────────────
- * The card is the form (ADR 0134 §3): one large widget on a dotted stage. The ask is written in its body; its parts
+ * The card is the form (ADR 0135 §3): one large widget on a dotted stage. The ask is written in its body; its parts
  * that open something (the agent, the schedule, the format, the bell) read as quiet text until the pointer or the
  * keys reach them. Under the stage, the dialog's footer: where it goes, Cancel and the one next step.
  */

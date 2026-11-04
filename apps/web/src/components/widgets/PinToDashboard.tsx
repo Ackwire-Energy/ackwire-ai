@@ -27,7 +27,7 @@ const KEEP_SCHEDULES = ["half", "hour", "day", "week"] as const satisfies readon
 type KeepSchedule = (typeof KEEP_SCHEDULES)[number];
 
 /**
- * "Pin to a dashboard" on an agent's chart in the chat (ADR 0134): the chart as it will look, where it goes (My Home
+ * "Pin to a dashboard" on an agent's chart in the chat (ADR 0135): the chart as it will look, where it goes (My Home
  * or a board the person edits) and whether its agent keeps it updated; it keeps the chart's data either way.
  */
 export function PinToDashboard({

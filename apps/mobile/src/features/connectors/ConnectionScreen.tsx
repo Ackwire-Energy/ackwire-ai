@@ -1,5 +1,11 @@
 import { useCatalog, useConnections, useCustomServers, useRenameConnection } from "@agenteschat/client";
-import { accountUnchecked, type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import {
+  accountUnchecked,
+  type ConnectedItem,
+  connectedItems,
+  itemName,
+  reconnectAddsText,
+} from "@agenteschat/client/lib/connected";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorBrand } from "@agenteschat/client/lib/scopes";
@@ -112,7 +118,13 @@ function Connection({ id }: { id: string }) {
             <Text variant="small" tone="ink" accessibilityRole="header" style={styles.section}>
               {t("mobile.connectors.whoTitle")}
             </Text>
-            {item.needsReconnect ? <Problem text={t("mobile.connectors.needsReconnect", { name })} /> : null}
+            {item.needsReconnect ? (
+              <Problem text={t("mobile.connectors.needsReconnect", { name })} />
+            ) : item.reconnectAdds.length > 0 ? (
+              <Text variant="small" tone="muted">
+                {reconnectAddsText(t, item)}
+              </Text>
+            ) : null}
             <AgentLevels connectionId={id} />
             <SafeNote />
             {admin ? <ToolsRow count={item.tools} waiting={waiting} onPress={() => openTools(id)} /> : null}

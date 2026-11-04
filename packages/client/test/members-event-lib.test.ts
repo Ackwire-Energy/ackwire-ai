@@ -21,3 +21,12 @@ test("a role given or taken: the channel list is read again, since roles decide 
   applyWorkspaceEvent(qc, "o1", { type: "org.members" });
   expect(qc.getQueryState(keys.channels("o1"))?.isInvalidated).toBe(true);
 });
+
+test("a person's new name: each channel's roster is read again, another workspace's is not", () => {
+  const qc = new QueryClient();
+  qc.setQueryData(keys.roster("o1", "c1"), []);
+  qc.setQueryData(keys.roster("o2", "c2"), []);
+  applyWorkspaceEvent(qc, "o1", { type: "org.members" });
+  expect(qc.getQueryState(keys.roster("o1", "c1"))?.isInvalidated).toBe(true);
+  expect(qc.getQueryState(keys.roster("o2", "c2"))?.isInvalidated).toBe(false);
+});

@@ -149,7 +149,7 @@ export function mcpAddress(raw: string): string | null {
  * Whether the person behind the run may do it themselves, and else whether someone who may can open this
  * conversation (so the card is still of use): what the tool tells the agent to say.
  */
-async function whoActs(ctx: ToolContext, userId: string | null, permission: RolePermission) {
+export async function whoActs(ctx: ToolContext, userId: string | null, permission: RolePermission) {
   const membership = userId ? await getMembership(ctx.db, userId, ctx.orgId) : null;
   if (can(membership, permission)) return "person" as const;
   return (await deciderCanOpen(ctx.db, ctx.orgId, ctx.channelId, permission)) ? ("admin_here" as const) : null;
@@ -163,13 +163,13 @@ const noAgents = async (ctx: ToolContext, missing: string[]): Promise<ToolOutput
   isError: true,
 });
 
-async function hopOf(ctx: ToolContext) {
+export async function hopOf(ctx: ToolContext) {
   const [run] = await ctx.db.select({ hop: agentRuns.hop }).from(agentRuns).where(eq(agentRuns.id, ctx.runId));
   return run?.hop ?? 0;
 }
 
 /** The run's cards so far (Connect cards and proposals alike), or an error once it has made its share. */
-async function cardsLeft(ctx: ToolContext): Promise<ToolOutput | null> {
+export async function cardsLeft(ctx: ToolContext): Promise<ToolOutput | null> {
   const [made] = await ctx.db
     .select({ n: count() })
     .from(messages)

@@ -1005,6 +1005,19 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   gap: 6px;
   vertical-align: top;
 }
+/* Under the header: the conversation's column, and the members column beside it, so the header and its line
+   span both (Discord's). */
+.channel__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.channel__col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .channel__messages {
   flex: 1;
   min-height: 0;
@@ -1237,8 +1250,15 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   gap: 8px;
   margin: 12px 0 2px;
 }
-.member-group:first-child {
+.member-group:first-child,
+.member-caption + .member-group {
   margin-top: 0;
+}
+.member-caption {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--ink-muted);
 }
 .member-group__count {
   font-size: 12px;
@@ -1660,6 +1680,9 @@ html:not([data-pointer]) .artifact-card__open:focus-visible {
   grid-template-columns: minmax(0, 1fr) 220px;
   gap: 24px;
   min-height: 100%;
+}
+.artifact-viewer--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 @media (max-width: 760px) {
   .artifact-viewer {
@@ -2318,7 +2341,7 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
 }
 
 /* ── Drive: pages/drive.css. The previews (the agent's Arquivos tab), the kind tag and the selection bar
- * (Threads) stay here. ── */
+ * (Threads too) stay here. ── */
 .drive {
   max-width: none;
   display: grid;
@@ -2619,16 +2642,20 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   display: none;
 }
 
-/* Selection: a glass bar that floats at the bottom of the page. */
+/* Selection: a glass bar fixed at the bottom of the work area, centered on it (SelectionBar hangs it from
+ * `.shell__work`, beside the sidebar, so it stays put however short or long the list is). */
 .drive-selbar {
-  position: sticky;
+  position: absolute;
+  left: 0;
+  right: 0;
   bottom: 20px;
   z-index: var(--z-floating);
-  align-self: center;
   display: flex;
   align-items: center;
   gap: 4px;
-  max-width: 100%;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin-inline: auto;
   padding: 6px 6px 6px 14px;
   border-radius: 16px;
   background: var(--glass);
@@ -2681,8 +2708,11 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
     display: none;
   }
   .drive-selbar {
-    align-self: stretch;
+    left: 12px;
+    right: 12px;
     bottom: 12px;
+    width: auto;
+    max-width: none;
   }
   .drive-selbar__count {
     margin-right: auto;
@@ -4994,11 +5024,33 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   flex: 1;
   min-height: 0;
 }
-.channel__composer-skeleton {
-  min-height: 52px;
+/* The composer at rest: its one text line (the textarea's padding and line) and its toolbar with the send square. */
+.channel__composer-skeleton-line {
+  display: block;
+  min-height: 32px;
+  padding: 12px 16px 2px;
+  line-height: 22px;
+}
+.channel__composer-skeleton-line::before {
+  content: "\a0";
+}
+.channel__composer-skeleton-send.ac-skeleton {
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  margin-left: auto;
+  border-radius: var(--control-r-sm);
+}
+/* A thread's header in the panel: the title's and the meta's own lines. */
+.channel__skeleton-title,
+.channel__skeleton-meta {
+  display: flex;
   align-items: center;
-  padding: 0 var(--space-4);
-  border-color: var(--line);
+}
+.channel__skeleton-title {
+  height: 24px;
+}
+.channel__skeleton-meta {
+  height: 18px;
 }
 @media (prefers-reduced-motion: no-preference) {
   .channel__messages[data-fresh] .ac-msg,
@@ -5039,8 +5091,8 @@ html:not([data-pointer]) .tr-ok:focus-visible {
  * sidebar's sliding pill stopped halfway and jumped. Nothing moves with prefers-reduced-motion.
  */
 @media (prefers-reduced-motion: no-preference) {
-  /* A thread opening in the side panel has its own entrance. */
-  .shell__main:not(.thread-panel__chat) {
+  /* A thread opening in the side panel has its own entrance; a view taking over from its own skeleton is already in. */
+  .shell__main:not(.thread-panel__chat, [data-continues]) {
     animation: page-in 160ms ease-out both;
   }
 }
@@ -6796,16 +6848,6 @@ html:not([data-pointer]) .file-row__open:focus-visible {
   gap: 12px;
   min-width: 0;
 }
-.file-view__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  box-shadow: var(--e1);
-}
 .file-view__preview {
   display: flex;
   justify-content: center;
@@ -6814,15 +6856,16 @@ html:not([data-pointer]) .file-row__open:focus-visible {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
+/* As tall as the dialog leaves it (its header and padding): a picture fills the window's height. */
 .file-view__image {
   max-width: 100%;
-  max-height: 70vh;
+  max-height: max(320px, calc(100vh - 200px));
   height: auto;
   object-fit: contain;
 }
 .file-view__pdf {
   width: 100%;
-  height: 70vh;
+  height: max(320px, calc(100vh - 200px));
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
@@ -8577,14 +8620,16 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
 .agp-hero__work {
   padding: 18px var(--agp-gutter) 0;
 }
+/* The name on its own line; the handle and role, then its chips ("Sem IA"), share the next one. */
 .agp-ident {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--space-2);
   padding: 12px var(--agp-gutter) 0;
 }
 .agp-name {
+  flex-basis: 100%;
   margin: 0;
   font-family: var(--font-display);
   font-size: 40px;
@@ -8715,11 +8760,10 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   font-weight: 500;
   line-height: 16px;
 }
+/* What a cell says wraps, never cut: the model and its effort, the account and its usage. */
 .agp-cell__value,
 .agp-cell__sub {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .agp-cell__value {
   display: block;
@@ -8860,8 +8904,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   justify-content: space-between;
   gap: 12px;
 }
-/* A setting of the opened brain: its label sits on its picker (6px), and the settings stand apart (28px) so Modelo
-   and Conta never read as one list. */
+/* A setting of the opened brain: its label sits on its picker (6px), the settings a card's gap apart. */
 .agp-brainfield {
   display: flex;
   flex-direction: column;
@@ -8871,9 +8914,6 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   font-size: 13px;
   font-weight: 600;
   color: var(--ink2);
-}
-.agp-wdlg .ac-optrow__more--card {
-  gap: 28px;
 }
 /* The account and its plan's usage in one outline: the meters hang under the account's picker, on a sunken band. */
 .agp-acct {
@@ -11001,6 +11041,217 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 }
 .channel-details__archive {
   color: var(--danger);
+}
+/* Channel settings (ADR 0134): a nav on the left as in Settings, one section in the pane; stacked on a phone. */
+.channel-settings {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+}
+.channel-settings__nav {
+  flex: 0 0 184px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0 var(--dialog-pad) var(--dialog-pad);
+}
+.channel-settings__nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.channel-settings__nav .settings__link {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.channel-settings__danger {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.channel-settings__pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: min(420px, 60vh);
+  display: flex;
+  flex-direction: column;
+  padding-top: 12px;
+}
+.channel-settings__pane > .ac-dialog__body,
+.channel-settings__pane > .ac-dialog__list {
+  padding-bottom: var(--dialog-pad);
+}
+@media (max-width: 640px) {
+  .channel-settings {
+    flex-direction: column;
+  }
+  .channel-settings__nav {
+    flex: none;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px var(--dialog-pad) 0;
+    scrollbar-width: none;
+  }
+  .channel-settings__nav::-webkit-scrollbar {
+    display: none;
+  }
+  .channel-settings__nav ul,
+  .channel-settings__danger {
+    flex-direction: row;
+  }
+  .channel-settings__nav .settings__link {
+    width: auto;
+    white-space: nowrap;
+  }
+  .channel-settings__pane {
+    min-height: 0;
+    padding-top: 4px;
+  }
+}
+/* A channel's exceptions: who on the left, their keys on the right. */
+.channel-perms {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+.channel-perms__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.channel-perms__intro h3 {
+  margin: 0;
+}
+.channel-perms__intro p {
+  margin: 0;
+}
+.channel-perms__grid {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.channel-perms__targets {
+  flex: 0 0 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.channel-perms__targets ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.channel-perms__target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--control-h-md);
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--control-r-md);
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.channel-perms__target:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+.channel-perms__target[aria-current="true"] {
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  color: var(--ink);
+  font-weight: 600;
+}
+html:not([data-pointer]) .channel-perms__target:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.channel-perms__target-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.channel-perms__keys {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.channel-perms__keys-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+.channel-perms__key {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+.channel-perms__key + .channel-perms__key {
+  border-top: 1px solid var(--line);
+}
+.channel-perms__key-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.channel-perms__key-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.channel-perms__default {
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--faint);
+}
+.channel-perms__state {
+  display: inline-flex;
+  align-items: center;
+}
+[aria-checked="true"] > .channel-perms__state--deny {
+  color: var(--danger);
+}
+[aria-checked="true"] > .channel-perms__state--allow {
+  color: var(--ok);
+}
+@media (max-width: 640px) {
+  .channel-perms__grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .channel-perms__targets {
+    flex: none;
+  }
+  .channel-perms__key {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 @media (hover: none) {
   .sidebar__section-add {

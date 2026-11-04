@@ -16,6 +16,8 @@ export const REAUTH_PASSWORD = "reauth.password";
  * own message is English). Anything else falls back to that message.
  */
 const KNOWN = {
+  "channel.post_denied": "channel.perms.readOnlyComposer",
+  "channel.permission_forbidden": "channel.perms.forbidden",
   "agent.handle_taken": "newAgent.errors.handleTaken",
   "agent_proposal.decided": "errors.agentProposal.decided",
   "approval.always_unavailable": "errors.approval.alwaysUnavailable",
@@ -27,6 +29,7 @@ const KNOWN = {
   "mail.owner_only": "errors.mail.ownerOnly",
   send_without_recipients: "mail.agent.saveError.send_without_recipients",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
+  "artifact.not_versioned": "errors.artifact.notVersioned",
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",
   "artifact.not_found": "errors.artifact.notFound",
@@ -96,7 +99,6 @@ const KNOWN = {
   "run.continue_extra_off": "errors.routine.continueExtraOff",
   "routine.continue_extra_used_up": "errors.routine.continueExtraUsedUp",
   "run.continue_extra_used_up": "errors.routine.continueExtraUsedUp",
-  "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
   "wiki.no_access": "errors.wiki.noAccess",
   "wiki.audience_forbidden": "errors.wiki.audienceForbidden",
   "wiki.audience_excludes_you": "errors.wiki.audienceExcludesYou",
@@ -152,6 +154,8 @@ const KNOWN = {
   EARLY_ACCESS_EMAIL_UNVERIFIED: "auth.earlyAccess.unverified",
   // A provider's sign-up on a closed server comes back to /login with this code.
   SIGNUP_CLOSED: "auth.flow.closedLead",
+  // A sign-up whose name is its password (apps/server auth.ts `NAME_IS_PASSWORD`).
+  NAME_IS_PASSWORD: "auth.flow.nameIsPassword",
   account_not_linked: "auth.unconfirmed",
   // A provider that hasn't confirmed its own address, to a confirmed account here (apps/server auth.ts `authHandler`).
   provider_email_unverified: "auth.providerUnverified",
@@ -176,6 +180,10 @@ const KNOWN = {
   "skill.too_large": "errors.skill.tooLarge",
   "skill.too_many_files": "errors.skill.tooManyFiles",
   "skill.connection_gone": "errors.skill.connectionGone",
+  "skill.link_holds_several": "errors.skill.linkHoldsSeveral",
+  "skill.link_renamed": "errors.skill.linkRenamed",
+  "skill.no_link": "errors.skill.noLink",
+  "skill.no_pending_update": "errors.skill.noPendingUpdate",
   "handle.invalid": "errors.handle.invalid",
   "handle.taken": "errors.handle.taken",
   "handle.taken_by_agent": "errors.handle.takenByAgent",
@@ -188,7 +196,7 @@ const KNOWN = {
   "message.media_not_found": "errors.media.notFound",
   "gifs.off": "errors.media.gifsOff",
   "gifs.unavailable": "errors.media.gifsUnavailable",
-  // Boards and widgets (ADR 0134).
+  // Boards and widgets (ADR 0135).
   "dashboard.not_found": "dashboards.errors.notFound",
   "dashboard.forbidden": "dashboards.errors.forbidden",
   "dashboard.home_fixed": "dashboards.errors.homeFixed",

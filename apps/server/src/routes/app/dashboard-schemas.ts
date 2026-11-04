@@ -9,7 +9,7 @@ import {
 import { z } from "@hono/zod-openapi";
 
 /**
- * Request and response bodies of the boards and widgets routes (ADR 0134), mirroring the engine's views
+ * Request and response bodies of the boards and widgets routes (ADR 0135), mirroring the engine's views
  * (`packages/engine/src/dashboards/types.ts`). A widget's data is checked by `validateWidgetSpec` where it is made
  * (the agents' tools, a pin), so here it only describes it.
  */
@@ -93,7 +93,7 @@ const DashboardProposal = z
     at: z.string(),
     canDecide: z.boolean().openapi({ description: "The caller is the person it asks: Publish or Keep only for me." }),
   })
-  .openapi("DashboardProposal", { description: "An agent asks to show the board to more people (ADR 0134 §11)." });
+  .openapi("DashboardProposal", { description: "An agent asks to show the board to more people (ADR 0135 §11)." });
 
 export const DashboardSummary = z
   .object({

@@ -30,7 +30,17 @@ import {
   requireActiveMembership,
   requirePermission,
 } from "./organizations";
-import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
+import {
+  type ChannelKey,
+  channelMaySql,
+  channelOverridesSql,
+  channelPermissions,
+  maySql,
+  memberKeysSql,
+  memberRankSql,
+  parseOverrides,
+  resolvePermissions,
+} from "./permissions";
 import { closedRefusal, STANDING_COLUMNS } from "./standing";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
@@ -243,6 +253,11 @@ export interface ChannelListItem {
   /** I muted it: it never looks unread to me. */
   muted: boolean;
   /**
+   * What I may do here, with its exceptions (ADR 0134): send messages (`post`), wake its agents (`talk_to_agents`)
+   * and manage it (`managesChannel`).
+   */
+  can: { post: boolean; callAgents: boolean; manage: boolean };
+  /**
    * The latest top-level message, skipping a routine's call (hidden in the chat, only the agent's answer
    * shows); null when I'm not a member (I can't read it) or it's empty.
    */
@@ -272,6 +287,9 @@ interface ChannelListRow {
   last_user_id: string | null;
   last_agent_id: string | null;
   last_author_name: string | null;
+  can_post: boolean;
+  can_call: boolean;
+  can_manage: boolean;
 }
 
 const asDate = (v: Date | string) => (v instanceof Date ? v : new Date(v));
@@ -304,7 +322,11 @@ export async function listChannels(db: Database, userId: string, orgId: string):
         coalesce(cr.muted, false) as muted,
         lm.id as last_id, lm.body as last_body, lm.meta as last_meta, lm.created_at as last_at, lm.author_type as last_author_type,
         lm.author_user_id as last_user_id, lm.author_agent_id as last_agent_id,
-        coalesce(lu.name, la.name) as last_author_name
+        coalesce(lu.name, la.name) as last_author_name,
+        ${channelCanSql(orgId, userId, "post")} as can_post,
+        ${channelCanSql(orgId, userId, "talk_to_agents")} as can_call,
+        (${maySql(sql`${orgId}::uuid`, sql`${userId}::text`, "manage_channels")} or (cm.id is not null
+          and (c.created_by_user_id = ${userId} or ${channelCanSql(orgId, userId, "manage_channels")}))) as can_manage
       from ${channels} c
       left join ${channelMembers} cm on cm.org_id = c.org_id and cm.channel_id = c.id and cm.user_id = ${userId}
       left join ${schema.channelReads} cr on cr.channel_id = c.id and cr.user_id = ${userId}
@@ -351,6 +373,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
       unreadCount: Number(r.unread_count ?? 0),
       mentionCount: Number(r.mention_count ?? 0),
       muted: r.muted === true,
+      can: { post: r.can_post === true, callAgents: r.can_call === true, manage: r.can_manage === true },
       lastMessage:
         r.last_id && r.last_at && r.last_author_type
           ? {
@@ -493,6 +516,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
       standing: STANDING_COLUMNS,
       channel: channels,
       memberId: channelMembers.id,
+      overrides: channelOverridesSql(organizationMembers.orgId, sql`${channelId}::uuid`, organizationMembers.userId),
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
@@ -510,7 +534,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
   // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum.
   if (!row.memberId && channel.kind !== "forum") throw new ForbiddenError("Join this channel first");
-  const membership: Membership = {
+  const workspace: Membership = {
     orgId,
     orgName: row.orgName,
     role: row.role,
@@ -519,14 +543,31 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
     roleIds: row.roleIds,
     standing: row.standing,
   };
-  return { channel, membership };
+  // Their keys in this channel (ADR 0134): what every check after this one reads (`can`, `speakerOf`).
+  const membership = {
+    ...workspace,
+    permissions: channelPermissions(workspace.permissions, parseOverrides(row.overrides)),
+  };
+  return { channel, membership, workspace };
 }
+
+/** The refusal to post for someone `requireChannelAccess` found can't: `channel.post_denied` when only this channel's exceptions stop them. */
+export const postRefusal = (workspace: Membership) =>
+  can(workspace, "post")
+    ? new ForbiddenError("You can't send messages in this channel", "channel.post_denied")
+    : new ForbiddenError();
 
 /**
  * Joins a public channel, or a private one limited to a role the person holds (ADR 0125). Other private channels
  * need an invitation from a member.
  */
-export async function joinChannel(db: Database, userId: string, orgId: string, channelId: string) {
+export async function joinChannel(
+  db: Database,
+  userId: string,
+  orgId: string,
+  channelId: string,
+  options: { pubsub?: PubSub } = {},
+) {
   await requirePermission(db, userId, orgId, "read");
   const [channel] = await db
     .select({
@@ -539,13 +580,23 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm" || (channel.visibility !== "public" && channel.byRole !== true))
     throw new ForbiddenError("This channel is private");
+  // The channel's members column shows them at once (a join from a channel's preview or the browser).
+  const joined = async () => {
+    caches.channelMembers.delete(`${orgId}:${channelId}`);
+    await publishChannelEvent(options.pubsub, {
+      type: "channel.member_added",
+      channelId,
+      member: { type: "person", id: userId },
+    });
+  };
   if (channel.visibility === "public") {
     await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
+    await joined();
     return;
   }
   // Checked again in the insert, under the lock that taking a role away holds (setMemberRoles, deleteRole,
   // updateChannel): a removal at the same moment either sees this membership and drops it, or wins and this refuses.
-  const joined = await db.transaction(async (tx) => {
+  const byRole = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     const rows = rowsOf(
       await tx.execute(sql`insert into ${channelMembers} (org_id, channel_id, user_id)
@@ -556,21 +607,37 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
     if (rows.length > 0) return true;
     return isChannelMember(tx, orgId, channelId, userId);
   });
-  if (!joined) throw new ForbiddenError("This channel is private");
+  if (!byRole) throw new ForbiddenError("This channel is private");
+  await joined();
 }
 
 /**
- * Who manages a channel (its name, members, category, archiving): `manage_channels`, or its creator only while still
- * in it, so a creator taken out of it can't put himself back. The apps mirror it (`managesChannel` in packages/client).
+ * Who manages a channel (its name, members, category, archiving, exceptions): `manage_channels`, or, only while still
+ * in it, its creator or someone a channel exception lets manage it (ADR 0134), so nobody taken out of it can put
+ * himself back. The apps read it from `ChannelListItem.can.manage`.
  */
-export const managesChannel = async (
+export async function managesChannel(
   db: Database,
   membership: Membership,
   actorId: string,
   channel: { id: string; orgId: string; createdByUserId: string | null },
-) =>
-  can(membership, "manage_channels") ||
-  (channel.createdByUserId === actorId && (await isChannelMember(db, channel.orgId, channel.id, actorId)));
+) {
+  if (can(membership, "manage_channels")) return true;
+  const [row] = rowsOf<{ member: boolean; overrides: Parameters<typeof parseOverrides>[0] }>(
+    await db.execute(sql`select exists (select 1 from ${channelMembers} cm where cm.org_id = ${channel.orgId}::uuid
+        and cm.channel_id = ${channel.id}::uuid and cm.user_id = ${actorId}) as member,
+      ${channelOverridesSql(sql`${channel.orgId}::uuid`, sql`${channel.id}::uuid`, sql`${actorId}::text`)} as overrides`),
+  );
+  if (row?.member !== true) return false;
+  return (
+    channel.createdByUserId === actorId ||
+    channelPermissions(membership.permissions, parseOverrides(row.overrides)).has("manage_channels")
+  );
+}
+
+/** `channelMaySql` for one channel and person, for the channel list's `can`. */
+const channelCanSql = (orgId: string, userId: string, key: ChannelKey) =>
+  channelMaySql(sql`${orgId}::uuid`, sql`c.id`, sql`${userId}::text`, key);
 
 /**
  * Where `actorId` may put an agent of theirs (or any, with `manage_agents`) or take it out (ADR 0085 §5): a channel

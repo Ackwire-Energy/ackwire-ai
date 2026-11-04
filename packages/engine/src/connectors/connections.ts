@@ -180,6 +180,17 @@ export function connectorDefinition(id: string): ConnectorDefinition {
   return def;
 }
 
+/**
+ * The OAuth scopes a catalog connection's sign-in lacks that the catalog asks for now (GitHub's `project`): Reconectar
+ * adds them. None for a key, a server's own sign-in or a sign-in we don't know the scopes of.
+ */
+export function missingOAuthScopes(c: Pick<ConnectorConnection, "connector" | "authType" | "oauthScopes">): string[] {
+  const wanted = CONNECTOR_CATALOG[c.connector]?.oauth?.scopes;
+  if (!wanted || c.authType !== "oauth" || c.oauthScopes === null) return [];
+  const have = new Set(c.oauthScopes.split(/[\s,]+/));
+  return wanted.filter((scope) => !have.has(scope));
+}
+
 /** Public view: no secrets. */
 export const connectionView = (c: ConnectorConnection) => ({
   id: c.id,
@@ -191,6 +202,7 @@ export const connectionView = (c: ConnectorConnection) => ({
   tokenExpiresAt: c.tokenExpiresAt ? c.tokenExpiresAt.toISOString() : null,
   createdAt: c.createdAt.toISOString(),
   revokedAt: c.revokedAt ? c.revokedAt.toISOString() : null,
+  reconnectAdds: missingOAuthScopes(c),
 });
 
 function checkServerUrl(url: string) {
@@ -220,6 +232,7 @@ async function storeConnection(
     accountLabel?: string | null;
     oauthClientId?: string | null;
     resource?: string | null;
+    oauthScopes?: string | null;
   },
 ): Promise<{ connection: ConnectorConnection; outcome: ConnectOutcome }> {
   const def = connectorDefinition(input.connector);
@@ -259,12 +272,15 @@ async function storeConnection(
         accountLabel: input.accountLabel ?? null,
         oauthClientId: input.oauthClientId ?? null,
         resource: input.resource ?? null,
+        oauthScopes: input.oauthScopes ?? null,
         createdByUserId: input.actorId,
       })
       .returning();
     if (!row) throw new Error("connection insert returned nothing");
     if (previous) {
       await tx.update(agentScopes).set({ connectionId: row.id }).where(eq(agentScopes.connectionId, previous.id));
+      // "Aprovar sempre" (and the git proxy's grants through it) moves with them: Reconectar never asks again.
+      await tx.update(approvalRules).set({ connectionId: row.id }).where(eq(approvalRules.connectionId, previous.id));
     }
     // A custom server writes its own rows (`connector.custom_connected`, custom.ts).
     if (!input.connector.startsWith("custom:")) {
@@ -518,6 +534,8 @@ interface TokenResponse {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  /** What the provider granted (GitHub: comma-separated). */
+  scope?: string;
   error?: string;
   error_description?: string;
 }
@@ -621,6 +639,10 @@ export async function completeOAuth(
     serverUrl: checkServerUrl(row.serverUrl ?? def.serverUrl),
     secret: { accessToken: token.access_token, refreshToken: token.refresh_token },
     tokenExpiresAt: token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null,
+    // An empty `scope` (a GitHub App's client, which has no scopes) is unknown, never "none granted".
+    oauthScopes:
+      (typeof token.scope === "string" ? token.scope.split(/[\s,]+/) : def.oauth.scopes).filter(Boolean).join(" ") ||
+      null,
   });
   return { ...stored, returnTo: row.returnTo };
 }

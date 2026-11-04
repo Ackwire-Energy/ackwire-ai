@@ -8,7 +8,7 @@ import type { WidgetStatus } from "./types";
 const { dashboards, dashboardWidgets } = schema;
 
 /*
- * A widget routine as it fires (ADR 0134 §4, ADR 0053 §6): its widget and board must still be there, and its creator
+ * A widget routine as it fires (ADR 0135 §4, ADR 0053 §6): its widget and board must still be there, and its creator
  * must still see the board; then the widget shows it is being redone. Kept apart from `refresh.ts` so `routines.ts`
  * reads it without an import cycle.
  */
@@ -18,7 +18,7 @@ export const WIDGET_CHANGE_EVENT = "widget.change";
 
 /**
  * Whether a routine run is a person's ask on a widget ("Ask for a change"): like a manual run, it goes ahead while a
- * person keeps the widget's routine paused on purpose (ADR 0134 §6); only the schedule waits.
+ * person keeps the widget's routine paused on purpose (ADR 0135 §6); only the schedule waits.
  */
 export function isWidgetChangeRun(run: { event?: Record<string, unknown> | null }): boolean {
   return run.event?.type === WIDGET_CHANGE_EVENT;

@@ -309,7 +309,7 @@ function routineLine(r: RoutineView, where: string, handle: string | null, promp
 }
 
 /**
- * Reminders are a person's own: never listed as routines. A widget's routine is its widget's (ADR 0134 §4):
+ * Reminders are a person's own: never listed as routines. A widget's routine is its widget's (ADR 0135 §4):
  * list_dashboards shows it there.
  */
 const isRoutine = (r: RoutineView) =>
@@ -413,7 +413,7 @@ async function triggerOf(ctx: ToolContext, raw: Record<string, unknown>): Promis
 async function ownRoutine(ctx: ToolContext, id: string, anyAgent = false) {
   const row = await routineRow(ctx.db, ctx.orgId, id);
   if (!row || row.deletedAt) return { row: null, error: `You have no routine ${id}. Use list_routines.` };
-  // A widget's routine follows its widget (ADR 0134 §4): people change it there; its agent changes nothing of it.
+  // A widget's routine follows its widget (ADR 0135 §4): people change it there; its agent changes nothing of it.
   if ((row.target as { type?: unknown }).type === "widget") {
     return {
       row: null,

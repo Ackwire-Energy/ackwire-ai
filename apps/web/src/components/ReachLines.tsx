@@ -1,9 +1,25 @@
-import { type Agent, type Message, useAddChannelMember, useChannels, useUpdateAgent } from "@agenteschat/client";
-import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
+import {
+  type Agent,
+  type AgentAudience,
+  type ForeignMailbox,
+  type Message,
+  useAddChannelMember,
+  useChannels,
+  useWidenAudience,
+} from "@agenteschat/client";
+import {
+  audienceWith,
+  audienceWithMe,
+  canEditAudience,
+  modeOf,
+  opensOthersPlan,
+  widenQuestion,
+} from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { type ReachEntry, reachKey, reachOf, reachOpens } from "@agenteschat/client/lib/reach";
-import { Icon } from "@agenteschat/ui";
+import { Button, Dialog, DialogFooter, Icon } from "@agenteschat/ui";
+import { type SyntheticEvent, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { ConsultPairRow, useConsultById } from "@/components/ConsultGroup";
 import { useOrg } from "@/components/org-context";
@@ -123,22 +139,109 @@ export function AllowTalkButton({ agent, userId, className }: { agent: Agent; us
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const toast = useToast();
-  const update = useUpdateAgent(org.id, agent.id);
+  const save = useWidenAudience(org.id, agent.id);
+  const asks = useWidenAsk(agent);
   const person = dir.memberById.get(userId)?.name;
   const audience = audienceWith(agent, userId);
   if (!person || !audience || modeOf(agent) === "everyone" || !canEditAudience(org, agent, me.user.id)) return null;
   const g = agentGrammar(agent.name);
   return (
-    <button
-      type="button"
-      className={className}
-      disabled={update.isPending || update.isSuccess}
-      onClick={(ev) => {
-        ev.stopPropagation();
-        update.mutate({ audience }, { onSuccess: () => toast.show(t("reach.allowed", { person, name: g.name })) });
-      }}
-    >
-      {t("reach.allow", { person, context: g.context })}
-    </button>
+    <>
+      <button
+        type="button"
+        className={className}
+        disabled={save.busy || save.done}
+        onClick={(ev) => {
+          ev.stopPropagation();
+          save.widen(audience, asks.ask(audience), () => toast.show(t("reach.allowed", { person, name: g.name })));
+        }}
+      >
+        {t("reach.allow", { person, context: g.context })}
+      </button>
+      {asks.dialog}
+    </>
   );
+}
+
+/**
+ * "Quero falar com ele": who manages agents (or owns it) lets themselves into an agent that keeps them out. Nothing
+ * when it answers them already. On someone else's plan it asks first (`useWidenAsk`).
+ */
+export function LetMeTalkButton({ agent }: { agent: Agent }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const toast = useToast();
+  const save = useWidenAudience(org.id, agent.id);
+  const asks = useWidenAsk(agent);
+  const audience = audienceWithMe(org, agent, me.user.id);
+  if (!audience) return null;
+  const g = agentGrammar(agent.name);
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="primary"
+        icon="message"
+        disabled={save.busy || save.done}
+        onClick={() => save.widen(audience, asks.ask(audience), () => toast.show(t("reach.allowedMe", g)))}
+      >
+        {t("reach.allowMe", g)}
+      </Button>
+      {asks.dialog}
+    </>
+  );
+}
+
+/**
+ * The one question before a wider audience (`widenQuestion`): on someone else's plan, that it uses their plan and
+ * they get an email, and the mailboxes other people gave the agent that it loses. `ask(next)` answers whether to go
+ * on, at once when there is nothing to ask. Every save that widens an agent's audience goes through it.
+ */
+export function useWidenAsk(agent: Agent) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const [asking, setAsking] = useState<{
+    question: { title: string; description: string };
+    answer: (yes: boolean) => void;
+  } | null>(null);
+  /** Asks `question` (none: yes at once). */
+  const confirm = (question: { title: string; description: string } | null): Promise<boolean> =>
+    question ? new Promise((answer) => setAsking({ question, answer })) : Promise.resolve(true);
+  const ask =
+    (next: AgentAudience) =>
+    (mailboxes: ForeignMailbox[]): Promise<boolean> => {
+      const owner = opensOthersPlan(agent, next, me.user.id)
+        ? (dir.memberById.get(agent.ownerUserId ?? "")?.name ?? t("channel.unknownPerson"))
+        : null;
+      return confirm(widenQuestion(t, agent, owner, mailboxes));
+    };
+  const answer = (yes: boolean) => {
+    asking?.answer(yes);
+    setAsking(null);
+  };
+  const stop = (e: SyntheticEvent) => e.stopPropagation();
+  const dialog = asking && (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the dialog's clicks and keys bubble through React to the row around the button (an inbox row opens on click)
+    <span onClick={stop} onKeyDown={stop}>
+      <Dialog
+        open
+        onOpenChange={(open) => !open && answer(false)}
+        title={asking.question.title}
+        description={asking.question.description}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button type="button" onClick={() => answer(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button variant="primary" onClick={() => answer(true)}>
+            {t("common.continue")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </span>
+  );
+  return { ask, confirm, dialog };
 }

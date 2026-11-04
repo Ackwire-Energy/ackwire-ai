@@ -55,7 +55,7 @@ async function message(channelId: string, body: string, by: { agentId: string } 
 const board = (actorId: string) =>
   createDashboard(deps, actorId, f.org.id, { title: "Sales", audience: "workspace", editPolicy: "viewers" });
 
-describe("Pin (ADR 0134 §3)", () => {
+describe("Pin (ADR 0135 §3)", () => {
   test("a chart an agent sent becomes a widget with its data, looked after by that agent", async () => {
     const m = await message(f.general.id, `Here is today so far:\n${fence(KPI)}\nUp from yesterday.\n${fence(BARS)}`, {
       agentId: f.agent.id,

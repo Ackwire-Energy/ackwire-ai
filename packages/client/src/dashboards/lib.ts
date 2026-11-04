@@ -12,7 +12,7 @@ import type {
 } from "./types";
 
 /**
- * What the web and the phone share about boards (ADR 0134), without React: the list's groups, who has access in
+ * What the web and the phone share about boards (ADR 0135), without React: the list's groups, who has access in
  * Share, a board's order of widgets and tiles, Organize's moves, a failure's words and the cost line.
  */
 
@@ -72,7 +72,7 @@ export interface DashboardEditors {
 
 /**
  * Whether the holders of a role see a board with this audience: only they can edit it through that role (editing
- * isn't seeing, ADR 0134 §8), so "Who edits" offers the others disabled.
+ * isn't seeing, ADR 0135 §8), so "Who edits" offers the others disabled.
  */
 export function roleSeesBoard(
   board: { audience: DashboardAudience; roleIds: readonly string[] },

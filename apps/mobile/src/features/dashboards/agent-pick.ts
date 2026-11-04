@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * "Who looks after it" while its screen is open (ADR 0134): the agent picked now and how a choice goes back to the
+ * "Who looks after it" while its screen is open (ADR 0135): the agent picked now and how a choice goes back to the
  * form that pushed the screen (New widget). The form starts it before pushing and ends it when it closes, as "Who edits
  * › Some roles…" shares its draft (`edit-roles.ts`): a route can't carry a callback.
  */

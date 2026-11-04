@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { ditherCells, WIDGET_CELL } from "./logic";
 
 /**
- * A shape filled with the widgets' dither (ADR 0134): square cells on the 4×4 Bayer threshold in the agent's light
+ * A shape filled with the widgets' dither (ADR 0135): square cells on the 4×4 Bayer threshold in the agent's light
  * tone, clipped to the shape, and the shape's clean outline in its deep tone. Drawn inside a Skia `Canvas`, at
  * (`x`, `y`); `shape` and `outline` are SVG path data in the box's own coordinates (`outline` defaults to `shape`).
  */

@@ -13,7 +13,7 @@ import { failureText } from "./parts";
 import "./widgets.css";
 
 /**
- * The line under a board's notice (ADR 0134): what the agent saw (an alert), why the widget stopped (a failure), or
+ * The line under a board's notice (ADR 0135): what the agent saw (an alert), why the widget stopped (a failure), or
  * whom the agent wants to show the board to (a request to publish). Null for any other notice.
  */
 export function widgetNoticeLine(t: TFunction, n: AppNotification, dir: Dir): string | null {

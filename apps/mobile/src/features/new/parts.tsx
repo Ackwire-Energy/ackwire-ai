@@ -5,8 +5,8 @@ import { IconButton, type IconName, Text } from "@/ui";
 import type { AppHref } from "../links/logic";
 
 /**
- * Pieces of "Novo" (the "+" of the tabs) and its forms, each a native form sheet: the title row, and
- * leaving every sheet to open what was just made.
+ * Pieces of the forms "New" opens (the "+" of the tabs), each a native form sheet: the title row, and leaving every
+ * sheet to open what was just made.
  */
 
 /** The sheet's title, centered, with close (or back to "Novo") on the left. */
@@ -37,7 +37,7 @@ export function SheetHeader({
   );
 }
 
-/** Closes "Novo" and its forms, then opens `href` (a new conversation) over the tabs. */
+/** Closes the sheets and screens over the tabs ("New" and its forms), then opens `href` (a new conversation) there. */
 export function closeSheetsAndOpen(href: AppHref) {
   if (router.canDismiss()) router.dismissAll();
   setTimeout(() => router.push(href), 60);

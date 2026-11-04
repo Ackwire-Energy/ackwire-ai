@@ -40,7 +40,7 @@ export interface WidgetBoardProps {
 }
 
 /**
- * A board's grid (ADR 0134): 4 columns, each widget S (1×1), M (2×1) or L (2×2), a home board's fixed tiles among
+ * A board's grid (ADR 0135): 4 columns, each widget S (1×1), M (2×1) or L (2×2), a home board's fixed tiles among
  * them; a widget is added from the header's "+", not from a tile on the board. Each card has Update now and its
  * menu (Open, Update now, Ask for a change, Change when it updates, Remove), a failure's Resolve, and in Organize:
  * drag with a mouse or a finger (`useGridDrag`: the card lifts, the others slide out of its way, a pixel well marks

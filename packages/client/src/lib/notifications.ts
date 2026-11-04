@@ -203,6 +203,18 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "connector_tool_changed") return "connectors.toolChanges.notice" as const;
   if (n.kind === "computer_disk_full") return "machines.shared.diskFullNotice" as const;
   if (n.kind === "computer_no_chrome") return "machines.chromeMissingNotice" as const;
+  if (n.kind === "skill_update") {
+    const to = n.latest.statusTo;
+    return to === "waiting"
+      ? n.latest.reason === "edited" && !n.latest.title
+        ? ("skills.notice.waitingEdited" as const)
+        : ("skills.notice.waiting" as const)
+      : to === "failed"
+        ? ("skills.notice.failed" as const)
+        : to === "edited"
+          ? ("skills.notice.edited" as const)
+          : ("skills.notice.updated" as const);
+  }
   if (n.kind !== "org_standing") return null;
   const to = n.latest.statusTo;
   const billing = billingHoldOf({ state: "hold", reason: n.latest.billingHold ?? null });
@@ -330,7 +342,8 @@ export type OpenTarget =
     }
   | { to: "/org/$orgId/home"; search?: { widget: string } }
   | { to: "/org/$orgId/dashboards" }
-  | { to: "/org/$orgId/dashboards/$dashboardId"; params: { dashboardId: string }; search?: { widget: string } };
+  | { to: "/org/$orgId/dashboards/$dashboardId"; params: { dashboardId: string }; search?: { widget: string } }
+  | { to: "/org/$orgId/settings/$section"; params: { section: "skills" }; search?: { skill: string } };
 
 /** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
 export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
@@ -340,7 +353,7 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
   "routine_waiting_plan",
 ]);
 
-/** A board's notices (ADR 0134): a widget's alert, a widget that stopped updating, an agent's request to publish. */
+/** A board's notices (ADR 0135): a widget's alert, a widget that stopped updating, an agent's request to publish. */
 export const WIDGET_NOTICES: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
   "widget_alert",
   "widget_failed",
@@ -368,7 +381,7 @@ export function openTarget(n: AppNotification): OpenTarget | null {
       ? { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id } }
       : { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   }
-  // A widget's alert or failure, an agent's request to publish a board (ADR 0134): the board, the widget's panel open.
+  // A widget's alert or failure, an agent's request to publish a board (ADR 0135): the board, the widget's panel open.
   // A home board's widget opens on Home: the web knows its home board (`homeTarget`), the address alone doesn't.
   if (WIDGET_NOTICES.has(n.kind))
     return s.dashboardId
@@ -390,6 +403,13 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   // A server changed approved tools: accepted in Conectores.
   if (n.kind === "connector_tool_changed")
     return { to: "/org/$orgId/settings/$section", params: { section: "connectors" } };
+  // An update of a skill from its link: the skill, in Skills.
+  if (n.kind === "skill_update")
+    return {
+      to: "/org/$orgId/settings/$section",
+      params: { section: "skills" },
+      ...(s.skillId ? { search: { skill: s.skillId } } : {}),
+    };
   if (
     n.kind === "machine_connected" ||
     n.kind === "computer_ready" ||
@@ -442,7 +462,7 @@ export function homeTarget(target: OpenTarget, homeId: string | null | undefined
 }
 
 /**
- * What a board's notice is about and what can be done from the inbox and Home (ADR 0134): an alert opens its
+ * What a board's notice is about and what can be done from the inbox and Home (ADR 0135): an alert opens its
  * widget, a failure is resolved by running it again, a request to publish is decided (Publish, Keep only for me).
  * Null for any other notice.
  */
@@ -512,13 +532,16 @@ export function snoozeTimes(now = new Date()) {
 
 /**
  * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, give
- * a secret, or let someone in.
+ * a secret, let someone in, or review tools a connected server changed.
  */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join";
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join" | "tools";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
-  /** The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join. */
+  /**
+   * The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join,
+   * the tools that changed.
+   */
   title: string;
   /** Only requests expire. */
   expiresAt: string | null;
@@ -541,9 +564,12 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
   // No actor (they aren't a member yet): the first who asked is the title; `joinRequestLine` says them all.
   if (n.kind === "join_request")
     return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };
-  // A board's notice (ADR 0134) has nobody to answer: it opens the widget or the board, where it is decided.
+  // A board's notice (ADR 0135) has nobody to answer: it opens the widget or the board, where it is decided.
   if (WIDGET_NOTICES.has(n.kind))
     return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "open" };
+  // A connected server changed approved tools (ADR 0117): reviewed in Connectors, never answered like a question.
+  if (n.kind === "connector_tool_changed")
+    return { kind: "tools", title: l.title ?? "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
 }
 

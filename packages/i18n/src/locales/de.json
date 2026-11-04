@@ -388,6 +388,8 @@
       "name": "Schön, dich kennenzulernen. Diese E-Mail ist neu hier.",
       "nameLead": "Wie nennt dich dein Team?",
       "namePlaceholder": "Dein Name",
+      "nameIsPassword": "Ist das dein Name? Er ist gleich dem Passwort, das du eingegeben hast.",
+      "nameLooksLikePassword": "Das sieht nach einem Passwort aus. Hier kommt dein Name hin.",
       "newPassword": "Jetzt ein Passwort.",
       "newPasswordNamed": "Super, {{name}}. Jetzt ein Passwort.",
       "closed": "Für diese E-Mail gibt es noch kein Konto.",
@@ -1267,6 +1269,7 @@
     "timezone": "Zeitzone",
     "profileTitle": "Dein Profil in diesem Workspace",
     "handle": "Dein @",
+    "nameEmpty": "Schreib deinen Namen.",
     "timezoneHelp": "Zeigt deine Ortszeit auf deiner Profilkarte.",
     "timezoneInvalid": "Nutze eine Zeitzone wie Europe/Berlin.",
     "useOrgZone": "Zeitzone des Workspace verwenden",
@@ -1439,6 +1442,52 @@
     "working_other": "{{count}} Agenten arbeiten"
   },
   "channel": {
+    "settingsNav": {
+      "label": "Kanaleinstellungen",
+      "overview": "Übersicht",
+      "permissions": "Berechtigungen",
+      "members": "Mitglieder"
+    },
+    "perms": {
+      "advanced": "Erweiterte Berechtigungen",
+      "intro": "Ausnahmen gelten nur in diesem Kanal. Standard folgt den Rollen des Workspace.",
+      "targets": "Rollen und Personen mit Ausnahme",
+      "add": "Rolle oder Person hinzufügen",
+      "addSearch": "Rollen oder Personen suchen",
+      "addNone": "Keine Rolle oder Person gefunden",
+      "groupRoles": "Rollen",
+      "groupPeople": "Personen",
+      "clear": "Ausnahme entfernen",
+      "stateLabel": "{{key}} für {{target}}",
+      "state": {
+        "deny": "Verweigern",
+        "inherit": "Standard",
+        "allow": "Erlauben"
+      },
+      "keys": {
+        "post": {
+          "title": "Nachrichten senden",
+          "line": "Hier schreiben, in Threads antworten und Nachrichten anheften"
+        },
+        "callAgents": {
+          "title": "Agenten rufen",
+          "line": "Antworten von den Agenten dieses Kanals bekommen"
+        },
+        "manage": {
+          "title": "Kanal verwalten",
+          "line": "Namen, wer ihn sieht, Mitglieder und diese Berechtigungen ändern"
+        }
+      },
+      "default": {
+        "allowedBy": "Standard: erlaubt durch die Rolle {{role}}",
+        "notHeld": "Standard: nicht erlaubt durch die Rolle {{role}}",
+        "followsEveryone": "Standard: folgt {{role}} in diesem Kanal",
+        "person": "Standard: folgt den Rollen dieser Person"
+      },
+      "readOnlyComposer": "Du kannst in diesem Kanal keine Nachrichten senden",
+      "agentsDenied": "In diesem Kanal rufst du keine Agenten",
+      "forbidden": "Du kannst nur Berechtigungen ändern, die du hast, für Rollen und Personen unter dir"
+    },
     "pins": {
       "title": "Angeheftet",
       "button_one": "Angeheftete Nachrichten ({{count}})",
@@ -1896,6 +1945,21 @@
       "done": "Einladung gesendet",
       "adminOnly": "Wer einladen darf, sendet sie"
     },
+    "install_skill": {
+      "title": "Skill installieren",
+      "open": "Installieren",
+      "done": "Installiert",
+      "adminOnly": "Wer Agenten verwaltet, installiert ihn"
+    },
+    "update_skills": {
+      "title_one": "Einen Skill aktualisieren",
+      "title_other": "{{count}} Skills aktualisieren",
+      "update": "Aktualisieren",
+      "review": "Prüfen",
+      "done": "Aktuell",
+      "waiting": "Wartet auf Prüfung",
+      "adminOnly": "Wer Agenten verwaltet, aktualisiert ihn"
+    },
     "agentProposal": {
       "title": "{{agent}} schlägt einen neuen Agenten vor",
       "review": "Prüfen",
@@ -1958,7 +2022,16 @@
     "added": "{{name}} ist dem Kanal beigetreten.",
     "allow": "{{person}} mit ihm sprechen lassen",
     "allow_female": "{{person}} mit ihr sprechen lassen",
-    "allowed": "Erledigt: {{person}} kann jetzt mit {{name}} sprechen."
+    "allowed": "Erledigt: {{person}} kann jetzt mit {{name}} sprechen.",
+    "allowMe": "Lass mich mit ihm sprechen",
+    "allowMe_female": "Lass mich mit ihr sprechen",
+    "allowedMe": "Erledigt: Du kannst jetzt mit {{name}} sprechen.",
+    "mailLossTitle": "Postfachzugriff entfernen?",
+    "mailLoss": "{{name}} hat Zugriff auf das Postfach von {{owners}}. Wenn mehr Leute mit ihm sprechen, könnten sie über ihn an diese E-Mails kommen, daher wird dieser Zugriff entfernt. Wer das Postfach verbunden hat, kann den Zugriff wieder erteilen.",
+    "mailLoss_female": "{{name}} hat Zugriff auf das Postfach von {{owners}}. Wenn mehr Leute mit ihr sprechen, könnten sie über sie an diese E-Mails kommen, daher wird dieser Zugriff entfernt. Wer das Postfach verbunden hat, kann den Zugriff wieder erteilen.",
+    "planTitle": "Das Abo von {{owner}} nutzen?",
+    "planOpen": "Unterhaltungen mit {{name}} nutzen das {{plan}}-Abo von {{owner}} und seine Limits. {{owner}} bekommt dazu eine E-Mail.",
+    "plansTitle": "Die Abos von {{owners}} nutzen?"
   },
   "teamChecks": {
     "group": "Was der Agent nicht wiederholt hat",
@@ -2148,12 +2221,15 @@
     "editChannel": "Kanal bearbeiten"
   },
   "channelMembers": {
-    "addRow": "Personen oder Agenten hinzufügen",
+    "caption": "Wer diesen Kanal sehen kann",
+    "captionOpen": "Offen für den ganzen Workspace",
+    "addRow": "Person oder Agent hinzufügen",
     "invite": "{{email}} zu {{org}} und #{{channel}} einladen",
     "inviteOrg": "{{email}} zu {{org}} einladen",
     "addTitle": "Zu #{{channel}} hinzufügen",
     "addSearch": "Personen oder Agenten suchen",
-    "addEmpty": "Alle sind schon hier, oder niemand gefunden für „{{q}}“.",
+    "addEmpty": "Niemand außerhalb des Kanals passt zu „{{q}}“.",
+    "addEveryone": "Alle aus {{org}} sind schon in #{{channel}}.",
     "addConfirm_one": "{{count}} hinzufügen",
     "addConfirm_other": "{{count}} hinzufügen",
     "actions": "Optionen für {{name}}",
@@ -2215,12 +2291,14 @@
     "busy": "Beschäftigt",
     "hidden": "Unsichtbar",
     "offline": "Offline",
+    "out": "Nicht im Büro",
     "lower": {
       "online": "online",
       "away": "abwesend",
       "busy": "beschäftigt",
       "hidden": "unsichtbar",
-      "offline": "offline"
+      "offline": "offline",
+      "out": "nicht im Büro"
     },
     "setStatus": "Status festlegen",
     "seen": "zuletzt {{when}} gesehen",
@@ -2243,6 +2321,7 @@
       "auto": "Online, solange agentes.chat offen ist.",
       "away": "Eine Weile weg: Alle wissen, dass Antworten dauern können.",
       "busy": "Alle sehen, dass du gerade lieber nicht gestört wirst.",
+      "out": "Nicht bei der Arbeit (Urlaub, freier Tag): alle sehen es, bis dein Status verschwindet.",
       "hidden": "Für alle bist du offline und kannst trotzdem alles nutzen."
     },
     "suggest": {
@@ -2282,6 +2361,9 @@
       "waiting_plan": "Wartet, bis sich das Abo zurücksetzt",
       "waiting_budget": "Wartet, bis sich das Budget zurücksetzt",
       "provider_down": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
+      "out_of_plan": "Planlimit erreicht",
+      "out_of_budget": "Monatsbudget aufgebraucht",
+      "backAt": "zurück {{when}}",
       "work": "Im Hintergrund: {{subject}}"
     },
     "agentWhy": {
@@ -2290,6 +2372,7 @@
       "away": "Untätig seit {{when}}",
       "awayNever": "Hat noch nicht gearbeitet",
       "offline": "Pausiert",
+      "out": "Gerade ohne Limit · antwortet nach dem Reset",
       "noAi": "Keine KI verbunden"
     },
     "bySelf": "Von {{name}} geschrieben · wird gelöscht, wenn es erledigt ist",
@@ -2367,7 +2450,11 @@
     "closed": "Ohne Antwort geschlossen.",
     "failed": "Die Antwort konnte nicht gesendet werden. Versuch es noch einmal.",
     "withdrawn": "{{name}} braucht keine Antwort mehr.",
-    "withdrawn_female": "{{name}} braucht keine Antwort mehr."
+    "withdrawn_female": "{{name}} braucht keine Antwort mehr.",
+    "skip": "Überspringen",
+    "skipFailed": "Die Frage konnte nicht übersprungen werden. Versuch es noch einmal.",
+    "dismissed": "{{name}} hat diese Frage übersprungen.",
+    "dismissedByYou": "Du hast diese Frage übersprungen."
   },
   "ask": {
     "kind": {
@@ -2436,6 +2523,8 @@
       "reads": "Lesezugriffe immer freigeben",
       "note": "Gilt ab jetzt für {{actions}}, mit beliebigen Werten. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
       "noteTarget": "Gilt ab jetzt für {{actions}}. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
+      "noteCommand": "Gilt ab jetzt für {{actions}} auf dem Computer, mit beliebigen Argumenten. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
+      "computer": "Befehle auf dem Computer",
       "noteReads": "Gilt ab jetzt nur für Lesezugriffe von {{actions}} in diesem Projekt ({{target}}). Was Daten ändert, fragt weiter nach. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
       "noteReadsAll": "Gilt ab jetzt nur für Lesezugriffe von {{actions}} über diese Verbindung. Was Daten ändert, fragt weiter nach. Rückgängig: Tools und Zugriff, auf der Seite von {{name}}.",
       "readsRule": "Lesezugriffe von {{tool}}",
@@ -2975,6 +3064,14 @@
     "nameLabel": "Name",
     "roleLabel": "Rolle",
     "roleHelp": "Was er für das Team tut, z. B. Assistent für E-Mail und Kalender.",
+    "editName": "Namen bearbeiten: {{name}}",
+    "editHandle": "Erwähnungen bearbeiten: @{{handle}}",
+    "editRole": "Rolle bearbeiten: {{role}}",
+    "noRole": "Keine Rolle",
+    "rolePlaceholder": "z. B. Kundenservice",
+    "roleList": "Rollen",
+    "roleUse": "„{{role}}“ verwenden",
+    "roleCurrent": "aktuell",
     "edit": "Bearbeiten",
     "chat": "Chatten",
     "moreActions": "Weitere Aktionen",
@@ -3020,15 +3117,7 @@
     "budgetDefaultHelp": "Leer: der Standard des Workspace.",
     "budgetDefaultHelpAmount": "Leer: der Standard des Workspace ({{amount}}).",
     "budgetInvalid": "Gib einen Wert über null ein.",
-    "notFound": "Diesen Agenten gibt es nicht oder er wurde archiviert.",
-    "editName": "Namen bearbeiten: {{name}}",
-    "editHandle": "Erwähnungen bearbeiten: @{{handle}}",
-    "editRole": "Rolle bearbeiten: {{role}}",
-    "noRole": "Keine Rolle",
-    "rolePlaceholder": "z. B. Kundenservice",
-    "roleList": "Rollen",
-    "roleUse": "„{{role}}“ verwenden",
-    "roleCurrent": "aktuell"
+    "notFound": "Diesen Agenten gibt es nicht oder er wurde archiviert."
   },
   "agentPage": {
     "work": {
@@ -3040,6 +3129,7 @@
         "label_female": "So arbeitet sie",
         "computer": "Arbeitet auf",
         "brain": "Denkt mit",
+        "brainWith": "Denkt mit {{plan}}",
         "browser": "Browser",
         "effort": "Aufwand {{level}}"
       },
@@ -3082,7 +3172,7 @@
         "none": "Kein Computer hat es",
         "planModel": "Modell",
         "account": "Konto",
-        "accountLocked": "Nur {{name}} kann es ändern",
+        "accountWho": "Nur Konten von {{owner}}, verantwortlich für {{name}}: Ein Plan denkt nur für die Agenten seines Inhabers.",
         "accountSignedOut": "Abgemeldet, melde dich erneut an",
         "thisComputer": "Konto von {{computer}}",
         "accountMove": "Genutzt von {{agents}} · Hierher verschieben",
@@ -3110,7 +3200,7 @@
           "max": "maximal"
         },
         "effortText": {
-          "auto": "Wählt den Aufwand für jede Aufgabe.",
+          "auto": "Das automatische Modell wählt den Aufwand jeder Aufgabe. Wähle ein Modell, um den Aufwand festzulegen.",
           "low": "Antwortet schnell. Gut für einfache Fragen.",
           "medium": "Der Standard. Denkt meistens genug nach.",
           "high": "Denkt bei schweren Aufgaben mehr nach. Langsamer und teurer.",
@@ -3135,6 +3225,11 @@
           "answers": "Wem er antwortet",
           "defaults": "Auf Standard zurücksetzen",
           "done": "Fertig",
+          "contents": {
+            "model": "Kontextfenster",
+            "auto": "Kontextfenster und wem er antwortet",
+            "fixed": "Aufwand, Kontextfenster und wem er antwortet"
+          },
           "allDefault": "Alles Standard",
           "effort": "Aufwand: {{level}}",
           "context": "Kontext: {{size}}",
@@ -4136,21 +4231,6 @@
     },
     "dialog": {
       "title": "Zu {{org}} einladen",
-      "emails": "E-Mails",
-      "moreEmails": "Weitere E-Mails…",
-      "checkMarked": "Prüfe die markierten E-Mail-Adressen: Sie bekommen keine Einladung.",
-      "withNote": "mit einer Notiz",
-      "alsoJoin": "Sie treten auch bei",
-      "generalAlways": "Alle treten #{{channel}} bei",
-      "note": "Notiz in der E-Mail",
-      "optional": "(optional)",
-      "notePlaceholder": "Hallo! Komm zu {{org}}: Das Team und die Agenten sind alle hier.",
-      "or": "oder sende den Link",
-      "send_one": "{{count}} Person einladen",
-      "send_other": "{{count}} Personen einladen",
-      "sent": "Einladung an {{email}} gesendet.",
-      "sentMany": "{{count}} Einladungen gesendet.",
-      "alsoIn": "Sie treten auch {{channels}} bei.",
       "stepOf": "Schritt {{n}} von {{total}} · {{step}}",
       "steps": {
         "who": "Wer",
@@ -4158,9 +4238,24 @@
         "where": "Wo es losgeht",
         "note": "Notiz"
       },
+      "emails": "E-Mails",
+      "moreEmails": "Weitere E-Mails…",
+      "checkMarked": "Prüfe die markierten E-Mail-Adressen: Sie bekommen keine Einladung.",
       "pasteHelp": "Füge eine Liste ein, wenn du willst: Kommas, Leerzeichen oder eine pro Zeile.",
       "leftOut": "Wer schon dabei oder schon eingeladen ist, bleibt außen vor.",
+      "withNote": "mit einer Notiz",
+      "alsoJoin": "Sie treten auch bei",
+      "generalAlways": "Alle treten #{{channel}} bei",
+      "note": "Notiz in der E-Mail",
+      "optional": "(optional)",
+      "notePlaceholder": "Hallo! Komm zu {{org}}: Das Team und die Agenten sind alle hier.",
+      "or": "oder sende den Link",
       "continueWith": "Weiter mit {{count}}",
+      "send_one": "{{count}} Person einladen",
+      "send_other": "{{count}} Personen einladen",
+      "sent": "Einladung an {{email}} gesendet.",
+      "sentMany": "{{count}} Einladungen gesendet.",
+      "alsoIn": "Sie treten auch {{channels}} bei.",
       "who": {
         "title": "Wen möchtest du dazuholen?",
         "lead": "Gib mir die E-Mail-Adressen. Jede Person bekommt eine Einladung und tritt direkt bei."
@@ -4440,6 +4535,18 @@
       "label": "Issues schreiben",
       "description": "Issues erstellen und kommentieren."
     },
+    "github_actions_read": {
+      "label": "Actions lesen",
+      "description": "Workflows und Läufe auflisten und ihre Jobs und Logs lesen."
+    },
+    "github_projects_read": {
+      "label": "Projects lesen",
+      "description": "GitHub Projects mit ihren Feldern und Einträgen auflisten und lesen."
+    },
+    "github_projects_write": {
+      "label": "Projects bearbeiten",
+      "description": "Einträge zu GitHub Projects hinzufügen, verschieben oder bearbeiten."
+    },
     "github_actions_run": {
       "label": "Workflows ausführen",
       "description": "GitHub-Actions-Workflows starten (können deployen). Fragt immer nach Freigabe."
@@ -4551,6 +4658,54 @@
     "flowHint": "Die Aufgabe wandert von selbst in die erste Spalte jeder Phase: In Arbeit, wenn ein Agent beginnt, In Prüfung, wenn sie bereit zur Prüfung ist, Erledigt, wenn du freigibst.",
     "moreOptions": "Weitere Optionen",
     "showCanceled": "Abgebrochene anzeigen",
+    "filterButton": "Filtern",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ich",
+    "display": {
+      "title": "Darstellung",
+      "label": "Darstellung: {{layout}} · {{group}}",
+      "layout": "Anordnung",
+      "group": "Gruppieren nach",
+      "sort": "Sortieren nach",
+      "fields": "Auf den Karten",
+      "saved": "Für dich in diesem Workspace gespeichert",
+      "reset": "Zurück zum Standard",
+      "by": {
+        "stage": "Phase",
+        "assignee": "Zuständig",
+        "priority": "Priorität"
+      },
+      "order": {
+        "manual": "Manuell",
+        "priority": "Priorität",
+        "due": "Fälligkeit"
+      },
+      "field": {
+        "assignee": "Zuständig",
+        "priority": "Priorität",
+        "due": "Fälligkeit",
+        "criteria": "Kriterien",
+        "pullRequest": "Pull-Request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "In {{name}} ablegen",
+      "assignee": "Ablegen, um sie {{name}} zu geben",
+      "unassign": "Ablegen, um die Zuständigkeit zu entfernen",
+      "priority": "Ablegen für Priorität {{priority}}"
+    },
+    "drag": {
+      "role": "verschiebbare Aufgabe",
+      "help": "Leertaste nimmt die Aufgabe, die Pfeiltasten verschieben sie, Leertaste legt sie ab und Esc bricht ab.",
+      "picked": "Du hast #{{number}} aufgenommen. Die Pfeiltasten verschieben sie, Leertaste legt sie ab, Esc bricht ab.",
+      "moved": "#{{number}}: {{group}}, Position {{position}} von {{total}}.",
+      "dropped": "Du hast #{{number}} in {{group}} abgelegt.",
+      "canceled": "#{{number}} ist wieder an ihrem Platz.",
+      "assigned": "#{{number}} liegt jetzt bei {{name}}.",
+      "unassigned": "#{{number}} ist jetzt niemandem zugewiesen.",
+      "prioritized": "#{{number}} hat jetzt Priorität {{priority}}."
+    },
     "canceledColumn": "Abgebrochen",
     "columns": {
       "add": "Spalte hinzufügen",
@@ -4789,54 +4944,6 @@
       "agent_asked": "hat {{name}} gebeten, sie zu erledigen",
       "forum_opened": "hat sie ins Forum gebracht: {{title}}",
       "forum_evaluated": "hat das Ergebnis aus dem Forum zurückgebracht: {{title}}"
-    },
-    "filterButton": "Filtern",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Ich",
-    "display": {
-      "title": "Darstellung",
-      "label": "Darstellung: {{layout}} · {{group}}",
-      "layout": "Anordnung",
-      "group": "Gruppieren nach",
-      "sort": "Sortieren nach",
-      "fields": "Auf den Karten",
-      "saved": "Für dich in diesem Workspace gespeichert",
-      "reset": "Zurück zum Standard",
-      "by": {
-        "stage": "Phase",
-        "assignee": "Zuständig",
-        "priority": "Priorität"
-      },
-      "order": {
-        "manual": "Manuell",
-        "priority": "Priorität",
-        "due": "Fälligkeit"
-      },
-      "field": {
-        "assignee": "Zuständig",
-        "priority": "Priorität",
-        "due": "Fälligkeit",
-        "criteria": "Kriterien",
-        "pullRequest": "Pull-Request",
-        "label": "Label"
-      }
-    },
-    "drop": {
-      "stage": "In {{name}} ablegen",
-      "assignee": "Ablegen, um sie {{name}} zu geben",
-      "unassign": "Ablegen, um die Zuständigkeit zu entfernen",
-      "priority": "Ablegen für Priorität {{priority}}"
-    },
-    "drag": {
-      "role": "verschiebbare Aufgabe",
-      "help": "Leertaste nimmt die Aufgabe, die Pfeiltasten verschieben sie, Leertaste legt sie ab und Esc bricht ab.",
-      "picked": "Du hast #{{number}} aufgenommen. Die Pfeiltasten verschieben sie, Leertaste legt sie ab, Esc bricht ab.",
-      "moved": "#{{number}}: {{group}}, Position {{position}} von {{total}}.",
-      "dropped": "Du hast #{{number}} in {{group}} abgelegt.",
-      "canceled": "#{{number}} ist wieder an ihrem Platz.",
-      "assigned": "#{{number}} liegt jetzt bei {{name}}.",
-      "unassigned": "#{{number}} ist jetzt niemandem zugewiesen.",
-      "prioritized": "#{{number}} hat jetzt Priorität {{priority}}."
     }
   },
   "routines": {
@@ -5031,7 +5138,6 @@
         "widget": "Aktualisiert sein Widget, ohne Nachricht"
       },
       "ahead": "Für später vorbereitet",
-      "ownActions": "Macht selbst",
       "createdBy": "Erstellt von {{name}} · {{date}}",
       "nameLabel": "Name der Routine",
       "editName": "Namen bearbeiten",
@@ -5048,7 +5154,8 @@
       "reportHint": {
         "always": "Auch wenn es nichts Neues gibt",
         "when_new": "Still, wenn es nichts Neues gibt"
-      }
+      },
+      "ownActions": "Macht selbst"
     },
     "ownActions": {
       "hint": "Jeder Lauf erledigt das in deinen verbundenen Apps, ohne zu fragen. Jede andere Aktion dort fragt zuerst eine Person, und Merge, Deploy und Rollback fragen immer.",
@@ -5578,6 +5685,9 @@
       "allowedBy": "Freigegeben von {{name}} · {{time}}",
       "deniedBy": "Abgelehnt von {{name}} · {{time}}",
       "alwaysBy": "In dieser Mission erlaubt von {{name}} · {{time}}: {{rules}}",
+      "alwaysAgent": "Immer für diesen Agenten genehmigen",
+      "alwaysAgentHint": "Immer für diesen Agenten genehmigen erlaubt {{kind}} mit beliebigen Argumenten, in jeder Mission und jedem Gespräch. Rückgängig: Tools und Zugriff, auf der Seite des Agenten.",
+      "alwaysAgentBy": "Für diesen Agenten erlaubt von {{name}} · {{time}}: {{kind}}",
       "state": {
         "allowed": "Freigegeben",
         "denied": "Abgelehnt",
@@ -6557,6 +6667,46 @@
     "saved": "{{name}} gespeichert.",
     "refresh": "Über Link aktualisieren",
     "refreshed": "{{name}} über seinen Link aktualisiert.",
+    "upToDate": "{{name}} hat schon, was sein Link enthält.",
+    "waitingToast": "Das Update von {{name}} ändert Dateien, die ausgeführt werden, und wartet deshalb auf eine Prüfung.",
+    "autoUpdate": "Selbst aktualisieren",
+    "autoUpdateHelp": "Liest seinen Link jeden Tag. Neuer Text kommt mit Rückgängig. Änderungen an Skripten warten auf jemanden, der Skills verwaltet.",
+    "autoChip": "Aktualisiert sich selbst",
+    "waitingChip": "Update wartet",
+    "lastUpdate": "Über seinen Link aktualisiert {{when}}",
+    "undoUpdate": "Update rückgängig machen",
+    "undone": "{{name}} ist zurück auf Version {{version}}.",
+    "agentsImprove": "Agenten verbessern Skills selbst",
+    "agentsImproveHelp": "Findet ein Agent einen Skill falsch oder ohne einen Schritt, korrigiert er ihn sofort: eine neue Version, die du rückgängig machen kannst, und wer den Skill erstellt hat, erfährt es. Änderungen an Skripten warten auf jemanden, der Skills verwaltet.",
+    "agentsImproveThis": "Agenten verbessern diesen Skill selbst",
+    "agentChange": "{{agent}} hat ihn geändert {{when}}",
+    "undoAgentChange": "Änderung rückgängig machen",
+    "pending": {
+      "title": "Das Update über seinen Link ändert Dateien, die ausgeführt werden: {{files}}",
+      "lead": "Wende es nur an, wenn du diesen Dateien vertraust. Agenten führen sie auf ihren Computern aus.",
+      "edited": "Das Update über seinen Link würde ersetzen, was Agenten daran geändert haben",
+      "editedLead": "Wende es an, um die Version des Links zu übernehmen. Du kannst es danach rückgängig machen.",
+      "apply": "Update anwenden",
+      "dismiss": "Nicht anwenden",
+      "applied": "{{name}} über seinen Link aktualisiert.",
+      "changedAgain": "Sein Link hat sich wieder geändert. Prüfe die neuen Dateien.",
+      "dismissed": "Update nicht angewendet. Eine neue Änderung am Link fragt erneut."
+    },
+    "updateFailed": {
+      "no_skill_md": "Aktualisieren nicht möglich: Sein Link hat keine SKILL.md mehr.",
+      "connection_gone": "Aktualisieren nicht möglich: Die GitHub-Verbindung, die ihn gelesen hat, ist weg.",
+      "link_holds_several": "Aktualisieren nicht möglich: Sein Link enthält jetzt mehrere Skills.",
+      "link_renamed": "Aktualisieren nicht möglich: Sein Link enthält jetzt einen anderen Skill.",
+      "owner_gone": "Aktualisieren nicht möglich: Wer das Selbst-Aktualisieren eingeschaltet hat, kann keine Skills mehr verwalten. Schalte es erneut ein.",
+      "other": "Aktualisieren über seinen Link nicht möglich."
+    },
+    "notice": {
+      "updated": "{{name}} wurde über seinen Link aktualisiert",
+      "waiting": "Ein Update von {{name}} ändert seine Skripte",
+      "waitingEdited": "Ein Update von {{name}} würde ersetzen, was Agenten geändert haben",
+      "failed": "{{name}} konnte sich nicht über seinen Link aktualisieren",
+      "edited": "Agenten haben {{name}} verbessert"
+    },
     "remove": "Entfernen",
     "removeTitle": "{{name}} entfernen?",
     "removeAgents_one": "{{names}} nutzt diesen Skill und verliert den Zugriff darauf.",
@@ -6626,15 +6776,17 @@
     "share": {
       "switch": "Antwortet anderen Personen",
       "switchAll": "Anderen Personen antworten",
-      "switchOther": "Antwortet nur {{owner}}",
-      "onOther": "{{name}} denkt mit dem Abo von {{owner}}. Nur {{owner}} kann anderen Personen erlauben, mit ihm zu schreiben.",
-      "onOther_female": "{{name}} denkt mit dem Abo von {{owner}}. Nur {{owner}} kann anderen Personen erlauben, mit ihr zu schreiben.",
       "line": {
         "off": "{{name}} antwortet nur dir, über dein {{plan}}.",
         "on": "{{name}} antwortet allen, die mit ihm schreiben dürfen, über dein {{plan}}.",
         "on_female": "{{name}} antwortet allen, die mit ihr schreiben dürfen, über dein {{plan}}.",
         "offAll": "Sie antworten nur dir, über dein {{plan}}.",
         "onAll": "Sie antworten allen, die mit ihnen schreiben dürfen, über dein {{plan}}."
+      },
+      "lineOf": {
+        "off": "{{name}} antwortet nur {{owner}}, über das {{plan}} von {{owner}}.",
+        "on": "{{name}} antwortet allen, die mit ihm schreiben dürfen, über das {{plan}} von {{owner}}.",
+        "on_female": "{{name}} antwortet allen, die mit ihr schreiben dürfen, über das {{plan}} von {{owner}}."
       },
       "plan": {
         "own": "{{provider}}-Abo",
@@ -6649,13 +6801,11 @@
       },
       "savedEveryone": "{{name}} antwortet jetzt anderen Personen.",
       "savedOwner": "{{name}} antwortet jetzt nur dir.",
+      "savedOwnerOf": "{{name}} antwortet jetzt nur {{owner}}.",
       "backOnApi": "{{name}} ist zurück auf der API und antwortet weiterhin nur dir.",
       "letEveryone": "{{name}} allen antworten lassen",
       "letPeople": "{{name}} anderen Personen antworten lassen",
       "pickPeople": "{{name}} antwortet nur den ausgewählten Personen, und noch ist niemand ausgewählt. Wähle sie unter Wer schreiben darf."
-    },
-    "errors": {
-      "planOwnerOnly": "Nur die verantwortliche Person für {{agentName}} kann weitere Personen zulassen: {{agentName}} antwortet über ihr Abo."
     },
     "add": {
       "paste": "Einfügen",
@@ -8380,6 +8530,7 @@
     "countsLabel": "{{added}} Zeilen hinzugefügt, {{removed}} entfernt",
     "htmlPreview": "Interaktive Seite. Öffne sie, um sie zu sehen.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "kein Kanal",
     "download": "Herunterladen",
     "downloadCsv": "CSV herunterladen",
@@ -9108,6 +9259,10 @@
     "connectedList": "Verbunden",
     "connected": "Verbunden",
     "connectedAs": "Verbunden als {{account}}",
+    "reconnectAdds": "Verbinde {{name}} neu, damit Agenten auch {{what}} können.",
+    "adds": {
+      "github_project": "GitHub Projects nutzen (Boards lesen und Karten verschieben)"
+    },
     "toolsCount_one": "{{count}} Tool",
     "toolsCount_other": "{{count}} Tools",
     "active": "Aktiv",
@@ -10241,6 +10396,7 @@
     },
     "artifact": {
       "fileTooLarge": "Die Datei ist größer als {{max}} MB, das Limit pro Datei.",
+      "notVersioned": "Ein Bild, ein Video oder eine Aufnahme hat keine Versionen. Sende es als neue Datei.",
       "fileRequired": "Wähl eine Datei zum Hochladen.",
       "fileNameRequired": "Die Datei braucht einen Namen.",
       "notFound": "Diese Datei gibt es nicht mehr, oder du hast keinen Zugriff."
@@ -10270,7 +10426,11 @@
       "invalidDescription": "Die Beschreibung muss 1 bis {{max}} Zeichen haben.",
       "tooLarge": "Der Skill ist zu groß (max. {{max}} MB).",
       "tooManyFiles": "Der Skill hat zu viele Dateien (max. {{max}}).",
-      "connectionGone": "Die GitHub-Verbindung, die {{repo}} gelesen hat, ist weg. Verbinde GitHub erneut, um diesen Skill zu aktualisieren."
+      "connectionGone": "Die GitHub-Verbindung, die {{repo}} gelesen hat, ist weg. Verbinde GitHub erneut, um diesen Skill zu aktualisieren.",
+      "linkHoldsSeveral": "Sein Link enthält jetzt mehrere Skills. Installiere diesen erneut aus seinem eigenen Ordner.",
+      "linkRenamed": "Sein Link enthält jetzt den Skill {{name}}.",
+      "noLink": "Nur ein Skill, der über einen Link installiert wurde, aktualisiert sich darüber.",
+      "noPendingUpdate": "Für diesen Skill wartet kein Update."
     },
     "agentGroup": {
       "notFound": "Diese Gruppe gibt es nicht mehr.",
@@ -10663,18 +10823,19 @@
       "address": "Serveradresse",
       "open": "{{app}} öffnen",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "Andere App"
       },
       "clientText": {
         "claude": "claude.ai, App und Handy",
-        "claude_code": "Im Terminal",
-        "chatgpt": "chatgpt.com",
-        "cursor": "Der Editor",
-        "other": "VS Code und mehr"
+        "terminal": "Im Terminal",
+        "editor": "Code-Editor",
+        "extension": "Editor-Erweiterung",
+        "desktop": "Desktop-App",
+        "other": "Jede MCP-App"
+      },
+      "group": {
+        "chat": "Chat-Apps",
+        "code": "Editoren und Terminals"
       },
       "waiting": "Warten, bis sich die App verbindet",
       "connected": "Verbunden: {{name}}",
@@ -10696,28 +10857,69 @@
         "step2": "Gib in Claude Code <code>/mcp</code> ein, wähle agentes und Authenticate.",
         "scope": "Es funktioniert in jedem Ordner. Nur für den aktuellen Ordner lass <code>--scope user</code> weg."
       },
-      "chatgpt": {
-        "step1": "Öffne chatgpt.com/plugins.",
-        "step2": "Klicke auf + und dann auf Add custom MCP server.",
-        "step3": "Füge die Adresse ein und verbinde.",
-        "plans": "Verfügbar in den kostenpflichtigen ChatGPT-Abos."
-      },
       "cursor": {
         "add": "Zu Cursor hinzufügen",
         "manual": "Oder füge es in <code>~/.cursor/mcp.json</code> ein:",
         "signIn": "Cursor bittet dich beim ersten Mal, dich anzumelden."
       },
+      "vscode": {
+        "add": "Zu VS Code hinzufügen",
+        "manual": "Oder füge es in <code>.vscode/mcp.json</code> ein:"
+      },
+      "codex": {
+        "step": "Im Terminal ausführen. Codex öffnet die Seite, damit du dich anmeldest:"
+      },
+      "copilotIdes": {
+        "config": "Öffne in den GitHub-Copilot-Einstellungen der IDE die <code>mcp.json</code> und füge ein:"
+      },
       "other": {
-        "tabs": "Welche App",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "Jede MCP-App",
-        "vscodeAdd": "Zu VS Code hinzufügen",
-        "vscodeManual": "Oder füge es in <code>.vscode/mcp.json</code> ein:",
-        "codexStep": "Im Terminal ausführen. Codex öffnet die Seite, damit du dich anmeldest:",
         "anyStep": "Füge die Adresse in die App ein. Sie öffnet diese Seite, damit du dich anmeldest.",
         "anyToken": "Apps ohne OAuth-Anmeldung nutzen einen persönlichen Token im Header Authorization: Bearer.",
         "toTokens": "Persönlichen Token erstellen"
+      },
+      "step": {
+        "open": "Öffne {{place}}.",
+        "click": "Klicke auf {{button}}.",
+        "clickThen": "Klicke auf {{button}} und dann auf {{next}}.",
+        "name": "Nenne ihn agentes.chat und füge die Adresse ein.",
+        "nameDescribe": "Nenne ihn agentes.chat und schreib eine Beschreibung.",
+        "nameConnect": "Nenne ihn agentes.chat und klicke auf {{button}}.",
+        "paste": "Füge die Adresse ein.",
+        "pasteIn": "Füge die Adresse in {{field}} ein.",
+        "choosePaste": "Wähle {{option}} und füge die Adresse ein.",
+        "emptySecret": "Lass Client ID und Secret leer und klicke auf {{button}}.",
+        "choose": "Wähle {{option}}.",
+        "chooseThen": "Wähle {{option}}, klicke auf {{button}} und dann auf {{next}}.",
+        "chooseConfig": "Wähle {{option}} und füge ein:",
+        "auth": "Wähle bei der Authentifizierung {{option}}.",
+        "tick": "Hake „{{box}}“ an und klicke auf {{button}}.",
+        "run": "Im Terminal ausführen:",
+        "orRun": "Oder im Terminal ausführen:",
+        "runCommand": "Führe den Befehl {{command}} aus.",
+        "file": "In <code>{{file}}</code> einfügen:",
+        "orFile": "Oder in <code>{{file}}</code> einfügen:",
+        "pasteConfig": "Einfügen:",
+        "mode": "Wechsle im Chat in den Modus {{mode}}.",
+        "loginRun": "Zum Anmelden führe <code>{{command}}</code> aus.",
+        "loginType": "Zum Anmelden gib in der App <code>{{command}}</code> ein.",
+        "signIn": "Melde dich auf der Seite, die sich öffnet, mit deinem agentes.chat-Konto an.",
+        "signInFirst": "Die App bittet dich beim ersten Mal, dich anzumelden.",
+        "token": "Erstelle einen persönlichen Token und setze ihn anstelle von {{placeholder}} ein.",
+        "install": "Zu {{app}} hinzufügen"
+      },
+      "note": {
+        "untested": "Die Anmeldung aus dieser App haben wir noch nicht getestet. Wenn sie fehlschlägt, sag uns Bescheid.",
+        "chatgptPlans": "In den kostenpflichtigen ChatGPT-Abos, nicht in Free oder Go. Bei Business können nur Admins ihn hinzufügen.",
+        "chatgptPhone": "In der Handy-App lässt er sich nicht hinzufügen. Sobald er im Web hinzugefügt ist, erscheint er auch am Computer und auf dem Handy.",
+        "geminiPlans": "Nur im Web, mit einem privaten Google-Konto. Eventuell braucht es Google AI Pro oder Ultra.",
+        "codex": "Braucht ein ChatGPT-Abo mit Codex. Die ChatGPT-Desktop-App, die Codex CLI und ihre IDE-Erweiterung teilen diese Einrichtung.",
+        "copilotPolicy": "Bei Copilot Business und Enterprise muss ein Admin die Richtlinie MCP servers in Copilot einschalten, die standardmäßig aus ist.",
+        "grokAdmin": "Bei Grok Business und Enterprise fügt ein Admin den Konnektor hinzu.",
+        "perplexityPlans": "In Perplexity Pro, Max und Enterprise.",
+        "leChatAdmin": "Im Team-Abo fügt ein Admin den Konnektor hinzu.",
+        "raycastPro": "Nur mit Raycast Pro.",
+        "visualStudio": "Visual Studio 2022 17.14 oder neuer, mit GitHub Copilot.",
+        "continueAgent": "Funktioniert nur im Modus Agent."
       }
     },
     "consent": {
@@ -11551,6 +11753,8 @@
         "creatingChannel": "Einen Kanal erstellt",
         "offeringConnectAi": "Angeboten, eine KI zu verbinden",
         "offeringConnectApp": "Angeboten, eine App zu verbinden",
+        "offeringSkill": "Angeboten, einen Skill zu installieren",
+        "updatingSkills": "Skills aktualisiert",
         "offeringInvites": "Angeboten, Personen einzuladen",
         "proposingAgent": "Einen Agenten vorgeschlagen",
         "askingAgent": "Einen anderen Agenten gefragt",
@@ -11635,6 +11839,8 @@
       "creatingChannel": "Erstellen eines Kanals",
       "offeringConnectAi": "Vorbereiten einer KI-Verbindung",
       "offeringConnectApp": "Vorbereiten einer App-Verbindung",
+      "offeringSkill": "Vorbereiten einer Skill-Installation",
+      "updatingSkills": "Skills werden aktualisiert",
       "offeringInvites": "Vorbereiten der Einladungen",
       "proposingAgent": "Vorschlagen eines Agenten",
       "askingAgent": "Fragen eines anderen Agenten",
@@ -11745,6 +11951,8 @@
       "action_connect_app": "{{name}} verbinden",
       "action_add_mcp": "Einen MCP-Server hinzufügen",
       "action_invite_people": "Personen einladen",
+      "action_install_skill": "Skill installieren",
+      "action_update_skills": "Skills aktualisieren",
       "agent_proposal": "Hat einen neuen Agenten vorgeschlagen: {{name}}",
       "approval_request": "Freigabeanfrage: {{title}}",
       "secret_request": "{{agent}} hat um einen Schlüssel gebeten: {{name}}",
@@ -11952,6 +12160,14 @@
     "offer_invites": {
       "label": "Anbieten, Personen einzuladen",
       "description": "Postet eine Karte, deren Taste den Einladungsdialog mit den eingetragenen Adressen öffnet."
+    },
+    "offer_install_skill": {
+      "label": "Skill-Installation anbieten",
+      "description": "Postet eine Karte, deren Button die Installation mit dem Link des Skills öffnet."
+    },
+    "update_skill_from_source": {
+      "label": "Skills über ihre Links aktualisieren",
+      "description": "Aktualisiert Skills von dort, wo sie installiert wurden. Änderungen an Skripten warten auf eine Person."
     },
     "propose_agent": {
       "label": "Agenten vorschlagen",

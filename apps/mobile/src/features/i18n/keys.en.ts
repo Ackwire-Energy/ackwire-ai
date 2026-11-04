@@ -257,17 +257,16 @@ export const featureKeysEn = {
     chatSearch: "Search for a person or an agent",
     people: "People",
     nobody: "Nobody here yet.",
-    // intentional: new
-    ask: {
-      question: "What do you need?",
-      placeholder: "E.g. review the pricing page copy before Friday",
-      to: "For",
-      sendF: "Ask {{name}}",
-      sendM: "Ask {{name}}",
-      more: "Or start something new",
-      person: "Chat with a person",
-      noAgents: "To ask an agent for something, start by creating yours.",
-    },
+    search: "Person or agent",
+    create: "Create",
+    agentHint: "A name and what it does",
+    chatShort: "Conversation",
+    chatHint: "A person or an agent",
+    taskHint: "With an assignee and a due date",
+    routineHint: "An agent does it on its own, on schedule",
+    wikiPage: "Wiki page",
+    wikiHint: "For the team and the agents to read",
+    inviteHint: "By email or link",
     agent: {
       question: "What will it do?",
     },
@@ -1203,6 +1202,7 @@ export const featureKeysEn = {
       browser: "Browser",
       secret: "Secret",
       join: "Members",
+      tools: "Tools",
     },
     review: "Review",
     answer: "Reply",
@@ -1713,7 +1713,7 @@ export const featureKeysEn = {
     cleared: "Status cleared",
     bySelfUntil: "Written by {{name}} · {{when}}",
   },
-  // Dashboards on the phone (ADR 0134); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
+  // Dashboards on the phone (ADR 0135); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
   dashboards: {
     homeRow: "Only you · your own widgets",
     loadFailed: "Couldn't load the dashboards.",

@@ -168,7 +168,7 @@ export const RoutineRow = memo(function RoutineRow({
       ? t("routines.deliversIn", { agent, place: targetLabel(r.target) })
       : t("routines.deliversTo", { agent, target: targetLabel(r.target) });
   const next = nextText(r, at);
-  // A widget's routine opens its widget, where it is changed (ADR 0134).
+  // A widget's routine opens its widget, where it is changed (ADR 0135).
   const href = r.target.type === "widget" ? widgetHref(r.target.widgetId, r.target.dashboardId) : routineHref(r.id);
   return (
     <Pressable

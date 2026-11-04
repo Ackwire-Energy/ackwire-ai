@@ -38,7 +38,7 @@ export function MessageBody({
   live?: boolean;
   /** The writing agent's color: its charts take its tones. */
   accent?: AgentColor;
-  /** An agent's saved message: its charts can be pinned to a board (ADR 0134). */
+  /** An agent's saved message: its charts can be pinned to a board (ADR 0135). */
   pinFrom?: { messageId: string; agentId: string } | null;
 }) {
   const mention = useCallback(

@@ -32,6 +32,7 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   join_request: "attention",
   browser_profile_request: "attention",
   connector_tool_changed: "attention",
+  skill_update: "done",
   invitation_accepted: "done",
   app_created: "done",
   mention: "mention",
@@ -44,7 +45,7 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   routine_failed: "error",
   run_failed: "error",
   routine_paused: "error",
-  // Boards (ADR 0134): an alert and a request to publish wait on you; a widget that stopped is a failure.
+  // Boards (ADR 0135): an alert and a request to publish wait on you; a widget that stopped is a failure.
   widget_alert: "attention",
   dashboard_proposal: "attention",
   widget_failed: "error",

@@ -369,7 +369,13 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
 
 /** "busy, on heavy work: Revisando o PR #12": what an agent is doing, its line in its own words. */
 function presenceWords(s: AgentStatusView) {
-  const what = { online: "online", busy: "busy, on heavy work", away: "away", offline: "paused" }[s.presence];
+  const what = {
+    online: "online",
+    busy: "busy, on heavy work",
+    away: "away",
+    out: "out of office",
+    offline: "paused",
+  }[s.presence];
   const line = s.status ? lineInEnglish(s.status) : null;
   return `${what}${line ? `: ${line.replace(/[()\n]/g, " ")}` : ""}`;
 }
@@ -395,23 +401,28 @@ export async function teammatesNowPrompt(
   if (ids.length === 0) return "";
   const [ai, presence] = await Promise.all([
     agentAiStates(deps, orgId, ids),
-    loadAgentStatuses(deps.db, orgId, new Date(), ids),
+    loadAgentStatuses(deps.db, orgId, new Date(), ids, {
+      hasModel: (agent) => deps.gateway.hasModelCredential(agent),
+    }),
   ]);
   const presenceOf = new Map(presence.map((s) => [s.agentId, s]));
   const lines = listed.flatMap((a) => {
     const s = presenceOf.get(a.id);
     if (!s) return [];
     const state = ai.get(a.id)?.state;
+    // Out of office (ADR 0084 §12) says why and until when, so the agent asks someone else meanwhile.
     const now =
       state === "no_ai"
         ? "no AI connected yet"
-        : state === "waiting"
-          ? "its computer is away for now"
-          : s.presence === "offline"
-            ? "paused"
-            : s.presence === "busy"
-              ? `${presenceWords(s)} (answers when called)`
-              : "has an AI, answers when called";
+        : s.presence === "out"
+          ? presenceWords(s)
+          : state === "waiting"
+            ? "its computer is away for now"
+            : s.presence === "offline"
+              ? "paused"
+              : s.presence === "busy"
+                ? `${presenceWords(s)} (answers when called)`
+                : "has an AI, answers when called";
     return [`- @${a.handle}: ${now}`];
   });
   if (lines.length === 0) return "";

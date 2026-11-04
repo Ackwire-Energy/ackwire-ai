@@ -265,17 +265,16 @@ export const featureKeysPtBR = {
     chatSearch: "Buscar pessoa ou agente",
     people: "Pessoas",
     nobody: "Ninguém por aqui ainda.",
-    // intentional: new
-    ask: {
-      question: "O que você precisa?",
-      placeholder: "Ex.: revisar o texto da página de preços antes de sexta",
-      to: "Para",
-      sendF: "Pedir à {{name}}",
-      sendM: "Pedir ao {{name}}",
-      more: "Ou comece algo novo",
-      person: "Conversa com uma pessoa",
-      noAgents: "Para pedir algo a um agente, comece criando o seu.",
-    },
+    search: "Pessoa ou agente",
+    create: "Criar",
+    agentHint: "Nome e o que ele faz",
+    chatShort: "Conversa",
+    chatHint: "Uma pessoa ou um agente",
+    taskHint: "Com responsável e prazo",
+    routineHint: "Um agente faz sozinho, no horário",
+    wikiPage: "Página na wiki",
+    wikiHint: "Para a equipe e os agentes lerem",
+    inviteHint: "Por e-mail ou link",
     agent: {
       question: "O que esse agente vai fazer?",
     },
@@ -1208,6 +1207,7 @@ export const featureKeysPtBR = {
       browser: "Navegador",
       secret: "Segredo",
       join: "Membros",
+      tools: "Ferramentas",
     },
     review: "Revisar",
     answer: "Responder",
@@ -1718,7 +1718,7 @@ export const featureKeysPtBR = {
     cleared: "Status limpo",
     bySelfUntil: "Escrito por {{name}} · {{when}}",
   },
-  // Dashboards on the phone (ADR 0134); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
+  // Dashboards on the phone (ADR 0135); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
   dashboards: {
     homeRow: "Só você · seus próprios widgets",
     loadFailed: "Não deu para carregar os painéis.",

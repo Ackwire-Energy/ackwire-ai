@@ -38,7 +38,7 @@ import { useToast } from "@/lib/toast";
 import "./dashboards.css";
 
 /**
- * One board (ADR 0134 §14): back to Dashboards, its title with Share, Organize and "+", a line with who sees it, who
+ * One board (ADR 0135 §14): back to Dashboards, its title with Share, Organize and "+", a line with who sees it, who
  * made it, how many widgets and when it was updated, an agent's request to publish it, then its widgets (the
  * 4-column grid, Organize to drag and resize) or an empty state. `?widget=<id>` opens a widget's side panel, so a
  * notification or a link opens it. A home board belongs on Home.
@@ -279,7 +279,7 @@ function RenameBody({ board, onClose }: { board: Dashboard; onClose: () => void 
   );
 }
 
-/** Delete: the board, its widgets and their routines (ADR 0134 §8: its owner and admins). */
+/** Delete: the board, its widgets and their routines (ADR 0135 §8: its owner and admins). */
 function DeleteDialog({ board, open, onClose }: { board: Dashboard; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();

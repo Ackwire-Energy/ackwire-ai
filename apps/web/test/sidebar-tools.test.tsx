@@ -85,11 +85,11 @@ describe("the tools on top", () => {
   test("by default Threads, Tarefas and Drive, Aprovações while some wait; the rest in More, then Personalizar", async () => {
     await go();
     expect(rows()[0]).toBe("Início");
-    // Dashboards (ADR 0134) is no row of its own: it is in More.
+    // Dashboards (ADR 0135) is no row of its own: it is in More.
     expect(rows()).not.toContain("Painéis");
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
     const more = await openMore();
-    // Dashboards (ADR 0134) and the task manager (ADR 0128) are always there, after the tools a person places.
+    // Dashboards (ADR 0135) and the task manager (ADR 0128) are always there, after the tools a person places.
     expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum", "Painéis", "Gerenciador de tarefas"]);
     expect(
       within(more)

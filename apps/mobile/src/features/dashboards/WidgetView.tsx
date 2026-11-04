@@ -54,7 +54,7 @@ import {
 } from "./logic";
 
 /**
- * The phone's widget (ADR 0134): a block an agent keeps up to date, drawn from its spec like the web's. Numbers in
+ * The phone's widget (ADR 0135): a block an agent keeps up to date, drawn from its spec like the web's. Numbers in
  * the app's sans at weight 700 with tabular figures; charts as the chat draws them (a clean stroke in the agent's
  * deep tone over a dither in its light one: the line is the chat's own); bars and a goal's fill as outlined shapes
  * filled with the same 2-point Bayer dither. A chart's unit is one small tag above it (each bar reads only its

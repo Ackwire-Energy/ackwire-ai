@@ -39,7 +39,7 @@ import {
   routineRunRow,
 } from "./routine-fixtures";
 
-/** ADR 0134 §4–§7: a widget is redone by a routine of its own, speaking only through `update_widget`. */
+/** ADR 0135 §4–§7: a widget is redone by a routine of its own, speaking only through `update_widget`. */
 
 let f: Fixture;
 afterEach(async () => {
@@ -274,7 +274,7 @@ describe("the refresh run", () => {
       if (last.includes("Updated:")) return { chunks: ["Feito."] };
       if (call > 0) results.push(last);
       const data = call === 0 ? { kind: "kpi", value: "muito" } : KPI;
-      // A first build names the widget (ADR 0134 §17).
+      // A first build names the widget (ADR 0135 §17).
       return { chunks: [], toolUses: [{ name: "update_widget", input: { data, summary: "Vendas", title: "Vendas" } }] };
     });
     const b = await board();

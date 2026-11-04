@@ -40,7 +40,7 @@ export const AUTONOMY_PHRASES: string[] = [
   "- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome.",
   "When you need another agent's answer for the task, ask it with `ask_agent`; to hand one work, use `tell_agent`, giving the whole job to the agent that owns it with everything it needs. Do this instead of saying you can't or sending the person to it.",
   "- When something took figuring out (several tries, a new API, a script), save how you did it with `save_how_to` before you answer",
-  "- If a skill you loaded was wrong or missing a step, fix it with `update_skill` before you answer.",
+  "- A skill you used was wrong, missed a step or hit a pitfall: fix it with `update_skill` before your turn ends, in its language (only skills you used).",
   "Search before saying you can't do something.",
 ];
 

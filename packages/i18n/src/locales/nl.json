@@ -388,6 +388,8 @@
       "name": "Leuk je te ontmoeten. Dit e-mailadres is nieuw hier.",
       "nameLead": "Hoe noemt je team je?",
       "namePlaceholder": "Je naam",
+      "nameIsPassword": "Is dit je naam? Hij is gelijk aan het wachtwoord dat je typte.",
+      "nameLooksLikePassword": "Dat lijkt op een wachtwoord. Hier komt je naam.",
       "newPassword": "Nu een wachtwoord.",
       "newPasswordNamed": "Mooi, {{name}}. Nu een wachtwoord.",
       "closed": "Dit e-mailadres heeft nog geen account.",
@@ -1267,6 +1269,7 @@
     "timezone": "Tijdzone",
     "profileTitle": "Je profiel in deze werkruimte",
     "handle": "Je @",
+    "nameEmpty": "Schrijf je naam.",
     "timezoneHelp": "Toont je lokale tijd op je profielkaart.",
     "timezoneInvalid": "Gebruik een tijdzone zoals Europe/Amsterdam.",
     "useOrgZone": "De tijdzone van de werkruimte gebruiken",
@@ -1439,6 +1442,52 @@
     "working_other": "{{count}} agents aan het werk"
   },
   "channel": {
+    "settingsNav": {
+      "label": "Kanaalinstellingen",
+      "overview": "Overzicht",
+      "permissions": "Rechten",
+      "members": "Leden"
+    },
+    "perms": {
+      "advanced": "Geavanceerde rechten",
+      "intro": "Uitzonderingen gelden alleen in dit kanaal. Standaard volgt de rollen van de werkruimte.",
+      "targets": "Rollen en mensen met een uitzondering",
+      "add": "Rol of persoon toevoegen",
+      "addSearch": "Rollen of mensen zoeken",
+      "addNone": "Geen rol of persoon gevonden",
+      "groupRoles": "Rollen",
+      "groupPeople": "Mensen",
+      "clear": "Uitzondering weghalen",
+      "stateLabel": "{{key}} voor {{target}}",
+      "state": {
+        "deny": "Weigeren",
+        "inherit": "Standaard",
+        "allow": "Toestaan"
+      },
+      "keys": {
+        "post": {
+          "title": "Berichten sturen",
+          "line": "Hier schrijven, in threads antwoorden en berichten vastzetten"
+        },
+        "callAgents": {
+          "title": "Agents oproepen",
+          "line": "Antwoorden krijgen van de agents van dit kanaal"
+        },
+        "manage": {
+          "title": "Kanaal beheren",
+          "line": "Naam, wie het ziet, leden en deze rechten wijzigen"
+        }
+      },
+      "default": {
+        "allowedBy": "Standaard: toegestaan door de rol {{role}}",
+        "notHeld": "Standaard: niet toegestaan door de rol {{role}}",
+        "followsEveryone": "Standaard: volgt {{role}} in dit kanaal",
+        "person": "Standaard: volgt de rollen van deze persoon"
+      },
+      "readOnlyComposer": "Je kunt geen berichten sturen in dit kanaal",
+      "agentsDenied": "In dit kanaal roep je geen agents op",
+      "forbidden": "Je kunt alleen rechten wijzigen die je zelf hebt, voor rollen en mensen onder je"
+    },
     "pins": {
       "title": "Vastgezet",
       "button_one": "Vastgezette berichten ({{count}})",
@@ -1900,6 +1949,21 @@
       "done": "Uitnodiging verstuurd",
       "adminOnly": "Wie mag uitnodigen, verstuurt het"
     },
+    "install_skill": {
+      "title": "Een skill installeren",
+      "open": "Installeren",
+      "done": "Geïnstalleerd",
+      "adminOnly": "Wie agents beheert, installeert het"
+    },
+    "update_skills": {
+      "title_one": "Een skill bijwerken",
+      "title_other": "{{count}} skills bijwerken",
+      "update": "Bijwerken",
+      "review": "Bekijken",
+      "done": "Bijgewerkt",
+      "waiting": "Wacht op controle",
+      "adminOnly": "Wie agents beheert, werkt het bij"
+    },
     "agentProposal": {
       "title": "{{agent}} stelt een nieuwe agent voor",
       "review": "Bekijken",
@@ -1960,7 +2024,16 @@
     "added": "{{name}} is lid geworden van het kanaal.",
     "allow": "Laat {{person}} met hem praten",
     "allow_female": "Laat {{person}} met haar praten",
-    "allowed": "Klaar: {{person}} kan nu met {{name}} praten."
+    "allowed": "Klaar: {{person}} kan nu met {{name}} praten.",
+    "allowMe": "Ik wil met hem praten",
+    "allowMe_female": "Ik wil met haar praten",
+    "allowedMe": "Klaar: je kunt nu met {{name}} praten.",
+    "mailLossTitle": "Toegang tot de mailbox weghalen?",
+    "mailLoss": "{{name}} heeft toegang tot de mailbox van {{owners}}. Als meer mensen met hem praten, kunnen ze via hem bij die e-mails komen, dus deze toegang wordt weggehaald. Wie de mailbox heeft gekoppeld, kan die toegang opnieuw geven.",
+    "mailLoss_female": "{{name}} heeft toegang tot de mailbox van {{owners}}. Als meer mensen met haar praten, kunnen ze via haar bij die e-mails komen, dus deze toegang wordt weggehaald. Wie de mailbox heeft gekoppeld, kan die toegang opnieuw geven.",
+    "planTitle": "Het abonnement van {{owner}} gebruiken?",
+    "planOpen": "Gesprekken met {{name}} gebruiken het {{plan}}-abonnement van {{owner}} en de limieten ervan. {{owner}} krijgt hierover een e-mail.",
+    "plansTitle": "De abonnementen van {{owners}} gebruiken?"
   },
   "teamChecks": {
     "group": "Wat de agent niet herhaalde",
@@ -2150,12 +2223,15 @@
     "editChannel": "Kanaal bewerken"
   },
   "channelMembers": {
+    "caption": "Wie dit kanaal kan zien",
+    "captionOpen": "Open voor de hele werkruimte",
     "addRow": "Mensen of agents toevoegen",
     "invite": "{{email}} uitnodigen voor {{org}} en #{{channel}}",
     "inviteOrg": "{{email}} uitnodigen voor {{org}}",
     "addTitle": "Toevoegen aan #{{channel}}",
     "addSearch": "Mensen of agents zoeken",
-    "addEmpty": "Iedereen is er al, of niemand gevonden voor “{{q}}”.",
+    "addEmpty": "Niemand buiten het kanaal past bij “{{q}}”.",
+    "addEveryone": "Iedereen in {{org}} zit al in #{{channel}}.",
     "addConfirm_one": "{{count}} toevoegen",
     "addConfirm_other": "{{count}} toevoegen",
     "actions": "Opties voor {{name}}",
@@ -2217,12 +2293,14 @@
     "busy": "Bezet",
     "hidden": "Onzichtbaar",
     "offline": "Offline",
+    "out": "Afwezig",
     "lower": {
       "online": "online",
       "away": "afwezig",
       "busy": "bezet",
       "hidden": "onzichtbaar",
-      "offline": "offline"
+      "offline": "offline",
+      "out": "afwezig"
     },
     "setStatus": "Status instellen",
     "seen": "gezien {{when}}",
@@ -2245,6 +2323,7 @@
       "auto": "Online zolang agentes.chat open is.",
       "away": "Even weg: mensen weten dat antwoorden wat langer kunnen duren.",
       "busy": "Iedereen ziet dat je nu liever niet gestoord wordt.",
+      "out": "Niet aan het werk (vakantie, vrije dag): iedereen ziet het tot je status verdwijnt.",
       "hidden": "Je bent voor iedereen offline en kunt toch alles gebruiken."
     },
     "suggest": {
@@ -2284,6 +2363,9 @@
       "waiting_plan": "Wacht tot het abonnement opnieuw begint",
       "waiting_budget": "Wacht tot het budget opnieuw begint",
       "provider_down": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
+      "out_of_plan": "Planlimiet bereikt",
+      "out_of_budget": "Maandbudget op",
+      "backAt": "terug {{when}}",
       "work": "Op de achtergrond: {{subject}}"
     },
     "agentWhy": {
@@ -2292,6 +2374,7 @@
       "away": "Inactief sinds {{when}}",
       "awayNever": "Heeft nog niet gewerkt",
       "offline": "Gepauzeerd",
+      "out": "Even zonder limiet · antwoordt na de reset",
       "noAi": "Geen AI gekoppeld"
     },
     "bySelf": "Geschreven door {{name}} · verdwijnt als het klaar is",
@@ -2368,7 +2451,11 @@
     "alreadyAnswered": "Deze vraag is al beantwoord of gesloten.",
     "closed": "Gesloten zonder antwoord.",
     "failed": "Kon het antwoord niet sturen. Probeer het opnieuw.",
-    "withdrawn": "{{name}} heeft geen antwoord meer nodig."
+    "withdrawn": "{{name}} heeft geen antwoord meer nodig.",
+    "skip": "Overslaan",
+    "skipFailed": "De vraag kon niet worden overgeslagen. Probeer het opnieuw.",
+    "dismissed": "{{name}} heeft deze vraag overgeslagen.",
+    "dismissedByYou": "Je hebt deze vraag overgeslagen."
   },
   "ask": {
     "kind": {
@@ -2437,6 +2524,8 @@
       "reads": "Lezen altijd goedkeuren",
       "note": "Geldt vanaf nu voor {{actions}}, met elke waarde. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
       "noteTarget": "Geldt vanaf nu voor {{actions}}. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
+      "noteCommand": "Geldt vanaf nu voor {{actions}} op de computer, met alle argumenten. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
+      "computer": "Opdrachten op de computer",
       "noteReads": "Geldt vanaf nu alleen voor lezen door {{actions}} in dit project ({{target}}). Wat gegevens wijzigt, blijft om goedkeuring vragen. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
       "noteReadsAll": "Geldt vanaf nu alleen voor lezen door {{actions}} via deze verbinding. Wat gegevens wijzigt, blijft om goedkeuring vragen. Ongedaan maken: Tools en toegang, op de pagina van {{name}}.",
       "readsRule": "Lezen door {{tool}}",
@@ -2983,6 +3072,14 @@
     "nameLabel": "Naam",
     "roleLabel": "Rol",
     "roleHelp": "Wat de agent voor het team doet, bijv. assistent voor e-mail en agenda.",
+    "editName": "Naam bewerken: {{name}}",
+    "editHandle": "Vermeldingen bewerken: @{{handle}}",
+    "editRole": "Rol bewerken: {{role}}",
+    "noRole": "Geen rol",
+    "rolePlaceholder": "Bijv. Support",
+    "roleList": "Rollen",
+    "roleUse": "“{{role}}” gebruiken",
+    "roleCurrent": "huidig",
     "edit": "Bewerken",
     "chat": "Chatten",
     "moreActions": "Meer acties",
@@ -3032,15 +3129,7 @@
     "budgetDefaultHelp": "Leeg: de standaard van de werkruimte.",
     "budgetDefaultHelpAmount": "Leeg: de standaard van de werkruimte ({{amount}}).",
     "budgetInvalid": "Gebruik een waarde groter dan nul.",
-    "notFound": "Deze agent bestaat niet of is gearchiveerd.",
-    "editName": "Naam bewerken: {{name}}",
-    "editHandle": "Vermeldingen bewerken: @{{handle}}",
-    "editRole": "Rol bewerken: {{role}}",
-    "noRole": "Geen rol",
-    "rolePlaceholder": "Bijv. Support",
-    "roleList": "Rollen",
-    "roleUse": "“{{role}}” gebruiken",
-    "roleCurrent": "huidig"
+    "notFound": "Deze agent bestaat niet of is gearchiveerd."
   },
   "agentPage": {
     "work": {
@@ -3052,6 +3141,7 @@
         "label_female": "Hoe zij werkt",
         "computer": "Werkt op",
         "brain": "Denkt met",
+        "brainWith": "Denkt met {{plan}}",
         "browser": "Browser",
         "effort": "Inspanning: {{level}}"
       },
@@ -3106,7 +3196,7 @@
         "none": "Geen computer heeft het",
         "planModel": "Model",
         "account": "Account",
-        "accountLocked": "Alleen {{name}} wijzigt dit",
+        "accountWho": "Alleen accounts van {{owner}}, verantwoordelijk voor {{name}}: een abonnement denkt alleen voor de agents van de eigenaar.",
         "accountSignedOut": "Uitgelogd, log opnieuw in",
         "thisComputer": "Account van {{computer}}",
         "accountMove": "In gebruik door {{agents}} · Hierheen verplaatsen",
@@ -3135,7 +3225,7 @@
           "max": "maximaal"
         },
         "effortText": {
-          "auto": "Kiest de inspanning per taak.",
+          "auto": "Het automatische model kiest de inspanning per taak. Kies een model om de inspanning vast te zetten.",
           "low": "Antwoordt snel. Goed voor simpele vragen.",
           "medium": "De standaard. Denkt meestal genoeg na.",
           "high": "Denkt meer na bij moeilijke taken. Trager en duurder.",
@@ -3160,6 +3250,11 @@
           "answers": "Wie het antwoordt",
           "defaults": "Terug naar standaard",
           "done": "Klaar",
+          "contents": {
+            "model": "Contextvenster",
+            "auto": "Contextvenster en wie het antwoordt",
+            "fixed": "Inspanning, contextvenster en wie het antwoordt"
+          },
           "allDefault": "Alles standaard",
           "effort": "Inspanning: {{level}}",
           "context": "Context: {{size}}",
@@ -4180,21 +4275,6 @@
     },
     "dialog": {
       "title": "Uitnodigen voor {{org}}",
-      "emails": "E-mailadressen",
-      "moreEmails": "Meer e-mailadressen…",
-      "checkMarked": "Controleer de gemarkeerde e-mailadressen: die krijgen geen uitnodiging.",
-      "withNote": "met een notitie",
-      "alsoJoin": "Ze komen ook in",
-      "generalAlways": "Iedereen komt in #{{channel}}",
-      "note": "Notitie in de e-mail",
-      "optional": "(optioneel)",
-      "notePlaceholder": "Hoi. Kom erbij in {{org}}: het team en de agents zijn er allemaal.",
-      "or": "of stuur de link",
-      "send_one": "{{count}} persoon uitnodigen",
-      "send_other": "{{count}} mensen uitnodigen",
-      "sent": "Uitnodiging verstuurd naar {{email}}.",
-      "sentMany": "{{count}} uitnodigingen verstuurd.",
-      "alsoIn": "Ze komen ook in {{channels}}.",
       "stepOf": "Stap {{n}} van {{total}} · {{step}}",
       "steps": {
         "who": "Wie",
@@ -4202,9 +4282,24 @@
         "where": "Waar ze beginnen",
         "note": "Notitie"
       },
+      "emails": "E-mailadressen",
+      "moreEmails": "Meer e-mailadressen…",
+      "checkMarked": "Controleer de gemarkeerde e-mailadressen: die krijgen geen uitnodiging.",
       "pasteHelp": "Plak een lijst als je wilt: komma's, spaties of één per regel.",
       "leftOut": "Wie er al is of al is uitgenodigd, valt erbuiten.",
+      "withNote": "met een notitie",
+      "alsoJoin": "Ze komen ook in",
+      "generalAlways": "Iedereen komt in #{{channel}}",
+      "note": "Notitie in de e-mail",
+      "optional": "(optioneel)",
+      "notePlaceholder": "Hoi. Kom erbij in {{org}}: het team en de agents zijn er allemaal.",
+      "or": "of stuur de link",
       "continueWith": "Doorgaan met {{count}}",
+      "send_one": "{{count}} persoon uitnodigen",
+      "send_other": "{{count}} mensen uitnodigen",
+      "sent": "Uitnodiging verstuurd naar {{email}}.",
+      "sentMany": "{{count}} uitnodigingen verstuurd.",
+      "alsoIn": "Ze komen ook in {{channels}}.",
       "who": {
         "title": "Wie wil je erbij halen?",
         "lead": "Geef me de e-mailadressen. Elke persoon krijgt een uitnodiging en doet direct mee."
@@ -4484,6 +4579,18 @@
       "label": "Issues schrijven",
       "description": "Issues maken en erop reageren."
     },
+    "github_actions_read": {
+      "label": "Actions lezen",
+      "description": "Workflows en runs opsommen en hun jobs en logs lezen."
+    },
+    "github_projects_read": {
+      "label": "Projects lezen",
+      "description": "GitHub Projects met hun velden en items opsommen en lezen."
+    },
+    "github_projects_write": {
+      "label": "Projects bewerken",
+      "description": "Items aan GitHub Projects toevoegen en ze verplaatsen of bewerken."
+    },
     "github_actions_run": {
       "label": "Workflows uitvoeren",
       "description": "GitHub Actions-workflows starten (kan deployen). Vraagt altijd om goedkeuring."
@@ -4595,6 +4702,54 @@
     "flowHint": "De taak verschuift vanzelf naar de eerste kolom van elke fase: Bezig als een agent begint, Ter controle als hij klaar is om te checken, Klaar als jij hem goedkeurt.",
     "moreOptions": "Meer opties",
     "showCanceled": "Geannuleerde tonen",
+    "filterButton": "Filteren",
+    "filterValue": "{{filter}}: {{value}}",
+    "me": "Ik",
+    "display": {
+      "title": "Weergave",
+      "label": "Weergave: {{layout}} · {{group}}",
+      "layout": "Indeling",
+      "group": "Groeperen op",
+      "sort": "Sorteren op",
+      "fields": "Op de kaarten",
+      "saved": "Voor jou bewaard in deze werkruimte",
+      "reset": "Terug naar standaard",
+      "by": {
+        "stage": "Fase",
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit"
+      },
+      "order": {
+        "manual": "Handmatig",
+        "priority": "Prioriteit",
+        "due": "Deadline"
+      },
+      "field": {
+        "assignee": "Toegewezen aan",
+        "priority": "Prioriteit",
+        "due": "Deadline",
+        "criteria": "Voorwaarden",
+        "pullRequest": "Pull request",
+        "label": "Label"
+      }
+    },
+    "drop": {
+      "stage": "Loslaten in {{name}}",
+      "assignee": "Loslaten om aan {{name}} te geven",
+      "unassign": "Loslaten om de toewijzing weg te halen",
+      "priority": "Loslaten voor prioriteit {{priority}}"
+    },
+    "drag": {
+      "role": "versleepbare taak",
+      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
+      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
+      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
+      "canceled": "#{{number}} staat weer op zijn plek.",
+      "assigned": "#{{number}} ligt nu bij {{name}}.",
+      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
+      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
+    },
     "canceledColumn": "Geannuleerd",
     "columns": {
       "add": "Kolom toevoegen",
@@ -4842,54 +4997,6 @@
       "agent_asked": "heeft {{name}} gevraagd het te doen",
       "forum_opened": "heeft het naar het forum gebracht: {{title}}",
       "forum_evaluated": "heeft het resultaat van het forum teruggebracht: {{title}}"
-    },
-    "filterButton": "Filteren",
-    "filterValue": "{{filter}}: {{value}}",
-    "me": "Ik",
-    "display": {
-      "title": "Weergave",
-      "label": "Weergave: {{layout}} · {{group}}",
-      "layout": "Indeling",
-      "group": "Groeperen op",
-      "sort": "Sorteren op",
-      "fields": "Op de kaarten",
-      "saved": "Voor jou bewaard in deze werkruimte",
-      "reset": "Terug naar standaard",
-      "by": {
-        "stage": "Fase",
-        "assignee": "Toegewezen aan",
-        "priority": "Prioriteit"
-      },
-      "order": {
-        "manual": "Handmatig",
-        "priority": "Prioriteit",
-        "due": "Deadline"
-      },
-      "field": {
-        "assignee": "Toegewezen aan",
-        "priority": "Prioriteit",
-        "due": "Deadline",
-        "criteria": "Voorwaarden",
-        "pullRequest": "Pull request",
-        "label": "Label"
-      }
-    },
-    "drop": {
-      "stage": "Loslaten in {{name}}",
-      "assignee": "Loslaten om aan {{name}} te geven",
-      "unassign": "Loslaten om de toewijzing weg te halen",
-      "priority": "Loslaten voor prioriteit {{priority}}"
-    },
-    "drag": {
-      "role": "versleepbare taak",
-      "help": "Spatie pakt de taak op, de pijltjes verplaatsen hem, Spatie zet hem neer en Esc annuleert.",
-      "picked": "Je hebt #{{number}} opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
-      "moved": "#{{number}}: {{group}}, positie {{position}} van {{total}}.",
-      "dropped": "Je hebt #{{number}} in {{group}} neergezet.",
-      "canceled": "#{{number}} staat weer op zijn plek.",
-      "assigned": "#{{number}} ligt nu bij {{name}}.",
-      "unassigned": "#{{number}} is nu aan niemand toegewezen.",
-      "prioritized": "#{{number}} heeft nu prioriteit {{priority}}."
     }
   },
   "routines": {
@@ -5081,7 +5188,6 @@
         "widget": "Werkt zijn widget bij, zonder bericht"
       },
       "ahead": "Klaargezet voor later",
-      "ownActions": "Doet zelf",
       "createdBy": "Gemaakt door {{name}} · {{date}}",
       "nameLabel": "Naam van de routine",
       "editName": "Naam bewerken",
@@ -5098,7 +5204,8 @@
       "reportHint": {
         "always": "Ook als er niets nieuws is",
         "when_new": "Stil als er niets nieuws is"
-      }
+      },
+      "ownActions": "Doet zelf"
     },
     "ownActions": {
       "hint": "Elke run doet dit in je gekoppelde apps zonder te vragen. Elke andere actie daar vraagt eerst een persoon om goedkeuring, en merge, deploy en rollback vragen dat altijd.",
@@ -5628,6 +5735,9 @@
       "allowedBy": "Goedgekeurd door {{name}} · {{time}}",
       "deniedBy": "Geweigerd door {{name}} · {{time}}",
       "alwaysBy": "Toegestaan in deze missie door {{name}} · {{time}}: {{rules}}",
+      "alwaysAgent": "Altijd goedkeuren voor deze agent",
+      "alwaysAgentHint": "Altijd goedkeuren voor deze agent staat {{kind}} toe met alle argumenten, in elke missie en elk gesprek. Ongedaan maken: Tools en toegang, op de pagina van de agent.",
+      "alwaysAgentBy": "Toegestaan voor deze agent door {{name}} · {{time}}: {{kind}}",
       "state": {
         "allowed": "Goedgekeurd",
         "denied": "Geweigerd",
@@ -6607,6 +6717,46 @@
     "saved": "{{name}} opgeslagen.",
     "refresh": "Bijwerken vanaf link",
     "refreshed": "{{name}} bijgewerkt vanaf de link.",
+    "upToDate": "{{name}} heeft al wat de link bevat.",
+    "waitingToast": "De update van {{name}} wijzigt bestanden die worden uitgevoerd, dus die wacht op een controle.",
+    "autoUpdate": "Zelf bijwerken",
+    "autoUpdateHelp": "Leest de link elke dag. Nieuwe tekst komt erin met Ongedaan maken. Wijzigingen in scripts wachten op iemand die skills beheert.",
+    "autoChip": "Werkt zichzelf bij",
+    "waitingChip": "Update wacht",
+    "lastUpdate": "Bijgewerkt vanaf de link {{when}}",
+    "undoUpdate": "Update ongedaan maken",
+    "undone": "{{name}} is terug naar versie {{version}}.",
+    "agentsImprove": "Agents verbeteren skills zelf",
+    "agentsImproveHelp": "Vindt een agent een skill fout of mist er een stap, dan verbetert hij die meteen: een nieuwe versie die je ongedaan kunt maken, en wie de skill maakte hoort het. Wijzigingen in scripts wachten op iemand die skills beheert.",
+    "agentsImproveThis": "Agents verbeteren deze skill zelf",
+    "agentChange": "{{agent}} heeft hem gewijzigd {{when}}",
+    "undoAgentChange": "Wijziging ongedaan maken",
+    "pending": {
+      "title": "De update vanaf de link wijzigt bestanden die worden uitgevoerd: {{files}}",
+      "lead": "Pas het alleen toe als je deze bestanden vertrouwt. Agents voeren ze uit op hun computers.",
+      "edited": "De update via de link zou vervangen wat agents eraan hebben veranderd",
+      "editedLead": "Pas hem toe om de versie van de link te nemen. Je kunt het daarna ongedaan maken.",
+      "apply": "Update toepassen",
+      "dismiss": "Niet toepassen",
+      "applied": "{{name}} bijgewerkt vanaf de link.",
+      "changedAgain": "De link is weer gewijzigd. Bekijk de nieuwe bestanden.",
+      "dismissed": "Update niet toegepast. Een nieuwe wijziging in de link vraagt het opnieuw."
+    },
+    "updateFailed": {
+      "no_skill_md": "Bijwerken lukte niet: de link heeft geen SKILL.md meer.",
+      "connection_gone": "Bijwerken lukte niet: de GitHub-koppeling die het las, bestaat niet meer.",
+      "link_holds_several": "Bijwerken lukte niet: de link bevat nu meerdere skills.",
+      "link_renamed": "Bijwerken lukte niet: de link bevat nu een andere skill.",
+      "owner_gone": "Bijwerken lukte niet: wie zelf bijwerken aanzette, kan geen skills meer beheren. Zet het opnieuw aan.",
+      "other": "Bijwerken vanaf de link lukte niet."
+    },
+    "notice": {
+      "updated": "{{name}} is bijgewerkt vanaf de link",
+      "waiting": "Een update van {{name}} wijzigt de scripts",
+      "waitingEdited": "Een update van {{name}} zou vervangen wat agents hebben veranderd",
+      "failed": "{{name}} kon niet bijwerken vanaf de link",
+      "edited": "Agents hebben {{name}} verbeterd"
+    },
     "remove": "Verwijderen",
     "removeTitle": "{{name}} verwijderen?",
     "removeAgents_one": "{{names}} gebruikt deze skill en verliest de toegang ertoe.",
@@ -6676,9 +6826,6 @@
     "share": {
       "switch": "Antwoordt andere mensen",
       "switchAll": "Andere mensen antwoorden",
-      "switchOther": "Antwoordt alleen {{owner}}",
-      "onOther": "{{name}} denkt met het abonnement van {{owner}}. Alleen {{owner}} kan andere mensen met hem laten praten.",
-      "onOther_female": "{{name}} denkt met het abonnement van {{owner}}. Alleen {{owner}} kan andere mensen met haar laten praten.",
       "line": {
         "off": "{{name}} antwoordt alleen jou, op je {{plan}}.",
         "off_female": "{{name}} antwoordt alleen jou, op je {{plan}}.",
@@ -6686,6 +6833,11 @@
         "on_female": "{{name}} antwoordt iedereen die met haar mag praten, op je {{plan}}.",
         "offAll": "Ze antwoorden alleen jou, op je {{plan}}.",
         "onAll": "Ze antwoorden iedereen die met ze mag praten, op je {{plan}}."
+      },
+      "lineOf": {
+        "off": "{{name}} antwoordt alleen {{owner}}, op het {{plan}} van {{owner}}.",
+        "on": "{{name}} antwoordt iedereen die met hem mag praten, op het {{plan}} van {{owner}}.",
+        "on_female": "{{name}} antwoordt iedereen die met haar mag praten, op het {{plan}} van {{owner}}."
       },
       "plan": {
         "own": "{{provider}}-abonnement",
@@ -6701,6 +6853,7 @@
       "savedEveryone": "{{name}} antwoordt nu ook andere mensen.",
       "savedEveryone_female": "{{name}} antwoordt nu ook andere mensen.",
       "savedOwner": "{{name}} antwoordt nu alleen jou.",
+      "savedOwnerOf": "{{name}} antwoordt nu alleen {{owner}}.",
       "savedOwner_female": "{{name}} antwoordt nu alleen jou.",
       "backOnApi": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
       "backOnApi_female": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
@@ -6710,9 +6863,6 @@
       "letPeople_female": "Laat {{name}} andere mensen antwoorden",
       "pickPeople": "{{name}} antwoordt alleen de gekozen mensen, en er is nog niemand gekozen. Kies ze bij Wie mag praten.",
       "pickPeople_female": "{{name}} antwoordt alleen de gekozen mensen, en er is nog niemand gekozen. Kies ze bij Wie mag praten."
-    },
-    "errors": {
-      "planOwnerOnly": "Alleen wie verantwoordelijk is voor {{agentName}} kan meer mensen toelaten: {{agentName}} antwoordt op diens abonnement."
     },
     "add": {
       "paste": "Plakken",
@@ -8462,6 +8612,7 @@
     "countsLabel": "{{added}} regels toegevoegd, {{removed}} verwijderd",
     "htmlPreview": "Interactieve pagina. Open hem om te bekijken.",
     "subtitle": "{{kind}} · {{name}} · {{where}} · {{when}}",
+    "subtitleSize": "{{kind}} · {{name}} · {{where}} · {{when}} · {{size}}",
     "noChannel": "geen kanaal",
     "download": "Downloaden",
     "downloadCsv": "CSV downloaden",
@@ -9186,6 +9337,10 @@
     "connectedList": "Gekoppeld",
     "connected": "Gekoppeld",
     "connectedAs": "Gekoppeld als {{account}}",
+    "reconnectAdds": "Verbind {{name}} opnieuw zodat agents ook {{what}}.",
+    "adds": {
+      "github_project": "GitHub Projects kunnen gebruiken (borden lezen en kaarten verplaatsen)"
+    },
     "toolsCount_one": "{{count}} tool",
     "toolsCount_other": "{{count}} tools",
     "active": "Actief",
@@ -10319,6 +10474,7 @@
     },
     "artifact": {
       "fileTooLarge": "Het bestand is groter dan {{max}} MB, de limiet per bestand.",
+      "notVersioned": "Een afbeelding, video of opname heeft geen versies. Stuur het als een nieuw bestand.",
       "fileRequired": "Kies een bestand om te uploaden.",
       "fileNameRequired": "Het bestand heeft een naam nodig.",
       "notFound": "Dit bestand bestaat niet meer of je hebt geen toegang."
@@ -10348,7 +10504,11 @@
       "invalidDescription": "De beschrijving moet 1 tot {{max}} tekens hebben.",
       "tooLarge": "De skill is te groot (max. {{max}} MB).",
       "tooManyFiles": "De skill heeft te veel bestanden (max. {{max}}).",
-      "connectionGone": "De GitHub-koppeling die {{repo}} las, bestaat niet meer. Koppel GitHub opnieuw om deze skill bij te werken."
+      "connectionGone": "De GitHub-koppeling die {{repo}} las, bestaat niet meer. Koppel GitHub opnieuw om deze skill bij te werken.",
+      "linkHoldsSeveral": "De link bevat nu meerdere skills. Installeer deze opnieuw vanuit de eigen map.",
+      "linkRenamed": "De link bevat nu de skill {{name}}.",
+      "noLink": "Alleen een skill die vanaf een link is geïnstalleerd, werkt daarvandaan bij.",
+      "noPendingUpdate": "Er wacht geen update van deze skill."
     },
     "agentGroup": {
       "notFound": "Deze groep bestaat niet meer.",
@@ -10741,18 +10901,19 @@
       "address": "Serveradres",
       "open": "{{app}} openen",
       "client": {
-        "claude": "Claude",
-        "claude_code": "Claude Code",
-        "chatgpt": "ChatGPT",
-        "cursor": "Cursor",
         "other": "Andere app"
       },
       "clientText": {
         "claude": "claude.ai, app en telefoon",
-        "claude_code": "In de terminal",
-        "chatgpt": "chatgpt.com",
-        "cursor": "De editor",
-        "other": "VS Code en meer"
+        "terminal": "In de terminal",
+        "editor": "Code-editor",
+        "extension": "Editor-extensie",
+        "desktop": "Desktop-app",
+        "other": "Elke MCP-app"
+      },
+      "group": {
+        "chat": "Chat-apps",
+        "code": "Editors en terminals"
       },
       "waiting": "Wachten tot de app verbinding maakt",
       "connected": "Gekoppeld: {{name}}",
@@ -10774,28 +10935,69 @@
         "step2": "Typ in Claude Code <code>/mcp</code>, kies agentes en Authenticate.",
         "scope": "Het werkt in elke map. Alleen voor de huidige map? Laat <code>--scope user</code> weg."
       },
-      "chatgpt": {
-        "step1": "Open chatgpt.com/plugins.",
-        "step2": "Klik op + en dan op Add custom MCP server.",
-        "step3": "Plak het adres en maak verbinding.",
-        "plans": "Beschikbaar bij betaalde ChatGPT-abonnementen."
-      },
       "cursor": {
         "add": "Toevoegen aan Cursor",
         "manual": "Of plak in <code>~/.cursor/mcp.json</code>:",
         "signIn": "Cursor vraagt je in te loggen als je het voor het eerst gebruikt."
       },
+      "vscode": {
+        "add": "Toevoegen aan VS Code",
+        "manual": "Of plak in <code>.vscode/mcp.json</code>:"
+      },
+      "codex": {
+        "step": "Voer uit in de terminal. Codex opent de pagina waar je inlogt:"
+      },
+      "copilotIdes": {
+        "config": "Open in de GitHub Copilot-instellingen van de IDE <code>mcp.json</code> en plak:"
+      },
       "other": {
-        "tabs": "Welke app",
-        "vscode": "VS Code",
-        "codex": "Codex",
-        "any": "Elke MCP-app",
-        "vscodeAdd": "Toevoegen aan VS Code",
-        "vscodeManual": "Of plak in <code>.vscode/mcp.json</code>:",
-        "codexStep": "Voer uit in de terminal. Codex opent de pagina waar je inlogt:",
         "anyStep": "Plak het adres in de app. Die opent deze pagina waar je inlogt.",
         "anyToken": "Apps zonder OAuth-login gebruiken een persoonlijk token in de header Authorization: Bearer.",
         "toTokens": "Persoonlijk token maken"
+      },
+      "step": {
+        "open": "Open {{place}}.",
+        "click": "Klik op {{button}}.",
+        "clickThen": "Klik op {{button}} en daarna op {{next}}.",
+        "name": "Noem hem agentes.chat en plak het adres.",
+        "nameDescribe": "Noem hem agentes.chat en voeg een beschrijving toe.",
+        "nameConnect": "Noem hem agentes.chat en klik op {{button}}.",
+        "paste": "Plak het adres.",
+        "pasteIn": "Plak het adres in {{field}}.",
+        "choosePaste": "Kies {{option}} en plak het adres.",
+        "emptySecret": "Laat client ID en secret leeg en klik op {{button}}.",
+        "choose": "Kies {{option}}.",
+        "chooseThen": "Kies {{option}}, klik op {{button}} en daarna op {{next}}.",
+        "chooseConfig": "Kies {{option}} en plak:",
+        "auth": "Kies bij authenticatie {{option}}.",
+        "tick": "Vink ‘{{box}}’ aan en klik op {{button}}.",
+        "run": "Voer uit in de terminal:",
+        "orRun": "Of voer uit in de terminal:",
+        "runCommand": "Voer de opdracht {{command}} uit.",
+        "file": "Plak in <code>{{file}}</code>:",
+        "orFile": "Of plak in <code>{{file}}</code>:",
+        "pasteConfig": "Plak:",
+        "mode": "Schakel in de chat over naar de modus {{mode}}.",
+        "loginRun": "Voer <code>{{command}}</code> uit om in te loggen.",
+        "loginType": "Typ <code>{{command}}</code> in de app om in te loggen.",
+        "signIn": "Log in met je agentes.chat-account op de pagina die opent.",
+        "signInFirst": "De app vraagt je in te loggen als je hem voor het eerst gebruikt.",
+        "token": "Maak een persoonlijk token en zet het op de plek van {{placeholder}}.",
+        "install": "Toevoegen aan {{app}}"
+      },
+      "note": {
+        "untested": "We hebben inloggen vanuit deze app nog niet getest. Lukt het niet, laat het ons weten.",
+        "chatgptPlans": "Op betaalde ChatGPT-abonnementen, niet op Free of Go. Bij Business kunnen alleen admins hem toevoegen.",
+        "chatgptPhone": "Toevoegen kan niet vanuit de telefoon-app. Zodra hij op het web is toegevoegd, verschijnt hij ook op desktop en telefoon.",
+        "geminiPlans": "Alleen op het web, met een persoonlijk Google-account. Mogelijk is Google AI Pro of Ultra nodig.",
+        "codex": "Vereist een ChatGPT-abonnement met Codex. De ChatGPT-desktopapp, de Codex CLI en de IDE-extensie delen deze instelling.",
+        "copilotPolicy": "Bij Copilot Business en Enterprise moet een admin het beleid MCP servers in Copilot aanzetten, dat standaard uit staat.",
+        "grokAdmin": "Bij Grok Business en Enterprise voegt een admin de connector toe.",
+        "perplexityPlans": "Op Perplexity Pro, Max en Enterprise.",
+        "leChatAdmin": "Op het Team-abonnement voegt een admin de connector toe.",
+        "raycastPro": "Alleen op Raycast Pro.",
+        "visualStudio": "Visual Studio 2022 17.14 of nieuwer, met GitHub Copilot.",
+        "continueAgent": "Werkt alleen in de modus Agent."
       }
     },
     "consent": {
@@ -11634,6 +11836,8 @@
         "creatingChannel": "Een kanaal gemaakt",
         "offeringConnectAi": "Aangeboden een AI te koppelen",
         "offeringConnectApp": "Aangeboden een app te koppelen",
+        "offeringSkill": "Aangeboden een skill te installeren",
+        "updatingSkills": "Skills bijgewerkt",
         "offeringInvites": "Aangeboden mensen uit te nodigen",
         "proposingAgent": "Een agent voorgesteld",
         "askingAgent": "Een andere agent iets gevraagd",
@@ -11718,6 +11922,8 @@
       "creatingChannel": "een kanaal aan het maken",
       "offeringConnectAi": "een AI klaar aan het zetten om te koppelen",
       "offeringConnectApp": "een app klaar aan het zetten om te koppelen",
+      "offeringSkill": "een skill klaarzetten om te installeren",
+      "updatingSkills": "skills bijwerken",
       "offeringInvites": "uitnodigingen klaar aan het zetten",
       "proposingAgent": "een agent aan het voorstellen",
       "askingAgent": "een andere agent iets aan het vragen",
@@ -11829,6 +12035,8 @@
       "action_connect_app": "{{name}} koppelen",
       "action_add_mcp": "Een MCP-server toevoegen",
       "action_invite_people": "Mensen uitnodigen",
+      "action_install_skill": "Een skill installeren",
+      "action_update_skills": "Skills bijwerken",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
       "secret_request": "{{agent}} vroeg om een sleutel: {{name}}",
@@ -12036,6 +12244,14 @@
     "offer_invites": {
       "label": "Aanbieden mensen uit te nodigen",
       "description": "Plaatst een kaart met een knop die het uitnodigingsvenster opent met de adressen al ingevuld."
+    },
+    "offer_install_skill": {
+      "label": "Aanbieden een skill te installeren",
+      "description": "Plaatst een kaart waarvan de knop de installatie opent met de link van de skill ingevuld."
+    },
+    "update_skill_from_source": {
+      "label": "Skills bijwerken vanaf hun links",
+      "description": "Werkt skills bij vanaf waar ze zijn geïnstalleerd. Wijzigingen in scripts wachten op een persoon."
     },
     "propose_agent": {
       "label": "Agent voorstellen",

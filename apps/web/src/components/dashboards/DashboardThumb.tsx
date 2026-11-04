@@ -6,7 +6,7 @@ import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /**
- * A board's thumbnail on the Dashboards list (ADR 0134 §14): its first widgets as small tiles, each in the tones of
+ * A board's thumbnail on the Dashboards list (ADR 0135 §14): its first widgets as small tiles, each in the tones of
  * the agent that looks after it (the stroke and the 2px dither of its charts), as wide as the widget. An empty board
  * shows one dashed tile. Decorative: the card's title and line say what it is.
  */

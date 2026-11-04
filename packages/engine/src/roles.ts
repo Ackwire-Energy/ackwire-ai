@@ -306,7 +306,7 @@ export async function deleteRole(
       .update(schema.channels)
       .set({ audienceRoleIds: sql`array_remove(${schema.channels.audienceRoleIds}, ${role.id}::uuid)` })
       .where(and(eq(schema.channels.orgId, orgId), sql`${role.id}::uuid = any(${schema.channels.audienceRoleIds})`));
-    // Boards forget it too: a `roles` board with no role left is its owner's (and admins') alone (ADR 0134 §8).
+    // Boards forget it too: a `roles` board with no role left is its owner's (and admins') alone (ADR 0135 §8).
     await tx
       .update(schema.dashboards)
       .set({ audienceRoleIds: sql`array_remove(${schema.dashboards.audienceRoleIds}, ${role.id}::uuid)` })

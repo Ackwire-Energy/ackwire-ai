@@ -172,6 +172,7 @@ function SourceChip({
     [icon, label] = ["members", t("notifications.source.members")];
   else if (n.kind === "composio_limit") [icon, label] = ["wallet", t("notifications.source.usage")];
   else if (n.kind === "connector_tool_changed") [icon, label] = ["plug", t("notifications.source.connectors")];
+  else if (n.kind === "skill_update") [icon, label] = ["book", t("skills.title")];
   else if (
     n.kind === "machine_connected" ||
     n.kind === "computer_ready" ||
@@ -356,7 +357,8 @@ function ThreadReplies({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: s
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const thread = useThreadMessages(org.id, channelOf(n) ?? undefined, n.source.threadId ?? "");
-  if (thread.isPending) return <LoadingCards count={1} className="nt-reps" />;
+  // The root the channel holds stands in until the replies are read: they are what this shows.
+  if (thread.isPending || thread.isPlaceholderData) return <LoadingCards count={1} className="nt-reps" />;
   // Replies with words or a GIF or a sticker (cards like an approval or a question have none of their own).
   const replies = (thread.data ?? [])
     .filter((m) => m.id !== n.source.threadId && !m.local && (m.body.trim() || messageMediaOf(m.meta)))
@@ -623,7 +625,7 @@ function Row({
   // run what went wrong (never the server's English).
   const why = routineNotificationWords(n);
   const restriction = restrictionOf(n);
-  // A board's notice says what the agent saw, why the widget stopped, or whom it would show the board to (ADR 0134).
+  // A board's notice says what the agent saw, why the widget stopped, or whom it would show the board to (ADR 0135).
   const widgetLine = widgetNoticeLine(t, n, dir);
   // A GIF or a sticker has no words: its word stands for it (ADR 0091).
   const media = mediaKindOf(l.media);
@@ -1366,7 +1368,7 @@ function WaitRow({
           {sub && <p className="nt-wr__sub">{sub}</p>}
         </div>
         <div className="nt-wr__acts ac-acts">
-          {/* A board's notice is decided or resolved right here (ADR 0134). */}
+          {/* A board's notice is decided or resolved right here (ADR 0135). */}
           <WidgetNoticeActions n={n} onOpen={() => h.onOpen(n)} open={false} />
           <Button size="sm" className="nt-wr__open" title={t("notifications.openTip")} onClick={() => h.onOpen(n)}>
             {t("notifications.open")}
