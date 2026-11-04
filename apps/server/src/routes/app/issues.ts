@@ -10,6 +10,7 @@ import {
   listIssueActivity,
   listIssueColumns,
   listIssues,
+  openTaskConversation,
   setCriterion,
   shareIssueWithEveryone,
   updateIssue,
@@ -27,6 +28,17 @@ const DueDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .nullable();
+
+const ConversationRef = z.object({
+  channelId: z.uuid().openapi({ description: "The conversation's own channel (kind `task`): the chat's routes." }),
+  rootId: z.uuid().openapi({ description: "The thread's root: replies go to it (`threadId`)." }),
+});
+const Conversation = ConversationRef.extend({
+  count: z.number().int().openapi({ description: "Messages in it." }),
+  lastAt: z.string().nullable(),
+  participants: z.array(Actor).openapi({ description: "The first ones to write, oldest first (at most 5)." }),
+  working: z.boolean().openapi({ description: "An agent's turn is live in it." }),
+});
 
 const Issue = z
   .object({
@@ -82,6 +94,9 @@ const Issue = z
     }),
     backgroundWork: WorkView.nullable().openapi({
       description: "The agent's background work this card tracks: its plan, last update and line (ADR 0121).",
+    }),
+    conversation: Conversation.nullable().openapi({
+      description: "Its conversation (ADR 0144), once opened or written: a thread the chat's routes read and post to.",
     }),
     createdAt: z.string(),
     updatedAt: z.string(),
@@ -416,10 +431,26 @@ export function issueRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "post",
+      path: "/organizations/{orgId}/issues/{issueId}/conversation",
+      tags,
+      security,
+      summary: "Open the task's conversation (made on first use): its channel and thread root, for the chat's routes",
+      request: { params: IssueParams },
+      responses: { 200: json(ConversationRef), ...errors },
+    }),
+    async (c) => {
+      const { orgId, issueId } = c.req.valid("param");
+      return c.json(await openTaskConversation(db, person(c.get("user").id), orgId, issueId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/organizations/{orgId}/issues/{issueId}/comments",
       tags,
       security,
-      summary: "Comment on an issue",
+      summary: "Comment on an issue: a reply in its conversation, as the chat's send",
       request: {
         params: IssueParams,
         body: body(
@@ -449,7 +480,7 @@ export function issueRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/issues/{issueId}/ask-agent",
       tags,
       security,
-      summary: '"Ask Ada to implement": assigns the agent and starts its work in a thread of the requester DM',
+      summary: '"Ask Ada to implement": assigns the agent and starts its work in the task\'s conversation',
       request: { params: IssueParams, body: body(z.object({ agentId: z.uuid() })) },
       responses: { 200: json(Issue), ...errors },
     }),

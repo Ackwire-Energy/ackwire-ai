@@ -1,8 +1,9 @@
-import type { Issue, IssueColumn, IssueStatus, IssueWork } from "@agenteschat/client";
+import type { Issue, IssueColumn, IssueConversationRef, IssueStatus, IssueWork } from "@agenteschat/client";
 import { toYmd } from "@agenteschat/client/lib/format";
 import { isOpen, STATUSES } from "@agenteschat/client/lib/issues";
 import { foldSteps, stepPhrase } from "@agenteschat/client/lib/work";
 import type { TFunction } from "i18next";
+import { chatHref } from "../links/logic";
 
 /**
  * Tasks ("Tarefas", internally issues) on the phone: the list by stage
@@ -234,15 +235,12 @@ export function dueDateOf(choice: DueChoice, now = new Date()): string | null {
   return toYmd(d);
 }
 
-/** Where "Conversar" goes: the issue's channel, else a direct conversation with the agent on it. */
-export function conversationOf(
-  i: Pick<Issue, "channelId" | "source" | "assignee">,
-): { channelId: string } | { agentId: string } | null {
-  const channelId = i.channelId ?? (i.source.type === "message" ? i.source.channelId : null);
-  if (channelId) return { channelId };
-  if (i.assignee?.type === "agent") return { agentId: i.assignee.id };
-  return null;
-}
+/**
+ * Where "Conversar" goes: the task's own conversation (ADR 0144), the phone's thread screen, at `messageId` when a
+ * notice or a link named one.
+ */
+export const taskConversationHref = (at: IssueConversationRef, messageId?: string | null) =>
+  chatHref(at.channelId, at.rootId, messageId ?? null);
 
 /** The issue number from a route param ("134"); null when it isn't one. */
 export function issueNumberOf(raw: unknown): number | null {

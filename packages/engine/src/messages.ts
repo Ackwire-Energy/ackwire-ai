@@ -44,6 +44,7 @@ import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
 import { computerWaitSql, NO_AI, outageParkedSql, passedSql, usageWaitSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
+import { admitTaskAgents } from "./task-access";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 import { type WorkView, workViews } from "./works";
@@ -1009,6 +1010,12 @@ export async function postPersonMessage(
   // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
+  // A task's conversation (ADR 0144): an agent mentioned there that sees the task joins it, so the mention wakes it.
+  if (channel.kind === "task") {
+    await admitTaskAgents(deps.db, orgId, channelId, {
+      handles: await currentHandles(deps.db, orgId, parseMentionHandles(input.body)),
+    });
+  }
   const clientId = normalizeClientId(input.clientId);
   // A resend found before the judge call (no cost again); a resend racing the first send is caught by the insert.
   const resent = clientId ? await sentWithClientId(deps.db, orgId, userId, clientId) : null;

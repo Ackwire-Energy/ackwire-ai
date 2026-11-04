@@ -3045,6 +3045,8 @@ export interface Issue {
   blocked?: { reason: string; since: string; text?: string } | null;
   /** The agent's background work this card tracks: its plan, last update and line (ADR 0121). */
   backgroundWork?: WorkView | null;
+  /** Its conversation (ADR 0144), once opened or written: a thread of its own channel. */
+  conversation?: IssueConversation | null;
   /** The issue this one is a sub-issue of (a plan step from the forum). */
   parentIssueId?: string | null;
   /** On the detail: its sub-issues. */
@@ -3053,6 +3055,21 @@ export interface Issue {
   forumTopics?: { id: string; title: string; status: ForumStatus; format: ForumFormat }[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** Where a task's conversation lives (ADR 0144): the chat's routes read and post to this thread. */
+export interface IssueConversationRef {
+  channelId: string;
+  rootId: string;
+}
+
+/** A task's conversation as its card and dialog show it: its messages, who took part, an agent at work now. */
+export interface IssueConversation extends IssueConversationRef {
+  count: number;
+  lastAt: string | null;
+  /** The first ones to write, oldest first (at most 5). */
+  participants: Actor[];
+  working: boolean;
 }
 
 export interface IssueActivity {
@@ -4837,7 +4854,7 @@ export interface ThreadInfo {
   id: string;
   channelId: string;
   channelName: string;
-  channelKind: "channel" | "dm" | "forum";
+  channelKind: "channel" | "dm" | "forum" | "task";
   /** Null: show `rootText`. */
   title: string | null;
   rootText: string;
@@ -6107,7 +6124,7 @@ export interface AuditRow {
   details: Record<string, unknown>;
   runId: string | null;
   channelId: string | null;
-  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" } | null;
+  channel: { id: string; name: string; kind: "channel" | "dm" | "forum" | "task" } | null;
   onBehalfOf: { id: string; name: string | null } | null;
   outcome: AuditOutcome | null;
   /** The approval the call waited for or ran after, as it stands now. */

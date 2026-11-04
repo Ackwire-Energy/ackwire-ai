@@ -7,6 +7,7 @@ import { ErrorState } from "@/components/Loading";
 import { Main } from "@/components/Main";
 import { MissionJoinNote, MissionThreadHeader } from "@/components/missions/MissionHeader";
 import { useOrg } from "@/components/org-context";
+import { TaskConversationHeader } from "@/components/TaskConversationHeader";
 import { ArchivedNote, ContextBlock, ThreadHeader, ThreadOrigin } from "@/components/threads/ThreadView";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
@@ -62,6 +63,8 @@ export function ThreadPage({
     return onClose ? <section className="thread-panel__missing">{body}</section> : <Main>{body}</Main>;
   }
   const archived = thread.state === "archived";
+  // A task's conversation (ADR 0144): its own header and box; the task's screen around it is its title and state.
+  const task = thread.channelKind === "task";
   return (
     <ChannelPage
       channelId={thread.channelId}
@@ -78,12 +81,13 @@ export function ThreadPage({
       }}
       chrome={{
         // A mission's thread: its header is the mission's (no card floating over the messages).
-        header:
-          mission && !onClose ? (
-            <MissionThreadHeader thread={thread} mission={mission} />
-          ) : (
-            <ThreadHeader thread={thread} onClose={onClose} onSeeInChannel={onSeeInChannel} />
-          ),
+        header: task ? (
+          <TaskConversationHeader thread={thread} onClose={onClose} />
+        ) : mission && !onClose ? (
+          <MissionThreadHeader thread={thread} mission={mission} />
+        ) : (
+          <ThreadHeader thread={thread} onClose={onClose} onSeeInChannel={onSeeInChannel} />
+        ),
         top: (
           <>
             <ThreadOrigin thread={thread} />
@@ -94,12 +98,13 @@ export function ThreadPage({
           mission && isOpenMission(mission) && mission.role === "none" ? (
             <MissionJoinNote mission={mission} />
           ) : undefined,
-        composerLabel: t("threads.view.composer"),
+        composerLabel: task ? t("issues.commentPlaceholder") : t("threads.view.composer"),
         composerReplacement: archived ? <ArchivedNote thread={thread} /> : undefined,
         panel: Boolean(onClose),
         // A person's reply here makes it a "Responder" thread (its replies leave the channel's timeline),
         // except a mission's or a range's, which the channel already shows as their own card or marker.
-        openThread: !thread.mission && !thread.context,
+        openThread: !task && !thread.mission && !thread.context,
+        task,
       }}
     />
   );

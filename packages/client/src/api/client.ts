@@ -131,6 +131,7 @@ import type {
   Issue,
   IssueActivity,
   IssueColumn,
+  IssueConversationRef,
   IssueInput,
   IssuePatch,
   IssueStatus,
@@ -1042,8 +1043,10 @@ export interface ApiClient {
     share(orgId: string, id: string): Promise<Issue>;
     activity(orgId: string, id: string): Promise<IssueActivity[]>;
     comment(orgId: string, id: string, text: string, attachmentIds?: string[]): Promise<IssueActivity>;
-    /** "Pedir à Ada para implementar": assigns the agent and starts a run on the issue. */
+    /** "Pedir à Ada para implementar": assigns the agent and starts its work in the task's conversation. */
     askAgent(orgId: string, id: string, agentId: string): Promise<Issue>;
+    /** The task's conversation (made on first use): the thread the chat's routes read and post to (ADR 0144). */
+    conversation(orgId: string, id: string): Promise<IssueConversationRef>;
     /** The board's columns, board order: by stage, then position. */
     columns(orgId: string): Promise<IssueColumn[]>;
     /** Adds a column to a stage (after `afterId` when it is in the same stage, else at the stage's end). */

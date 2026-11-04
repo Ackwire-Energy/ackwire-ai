@@ -67,3 +67,19 @@ function workRef(v: unknown): IssueWorkRef | null {
 export const issueWorkOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.issueWork);
 /** `meta.issueTaken`: the one line where the issue came from ("Ada took issue #24"). */
 export const issueTakenOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.issueTaken);
+
+/**
+ * `meta.taskConversation`: the root of a task's conversation (ADR 0144). It stands for the task and is never drawn:
+ * the task's own screen is right there.
+ */
+export const taskConversationOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.taskConversation);
+
+/**
+ * The conversation line of a task's card and of its dialog's summary: who took part (the first three), how many
+ * messages, and an agent at work or when it last moved. Null for a task nobody wrote in yet.
+ */
+export function conversationLine(i: Pick<Issue, "conversation">) {
+  const c = i.conversation;
+  if (!c || c.count === 0) return null;
+  return { count: c.count, people: c.participants.slice(0, 3), working: c.working, lastAt: c.lastAt };
+}

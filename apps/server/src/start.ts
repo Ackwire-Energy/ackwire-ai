@@ -59,6 +59,7 @@ import {
   isAgentesCloud,
   isBlockedAddress,
   meterComposio,
+  moveIssueComments,
   resolveHostDns,
   retireHostTokens,
   retireMillionSendMailboxes,
@@ -327,6 +328,12 @@ async function boot(
       if (made > 0) log.info("right hands created", { made });
     })
     .catch((error: unknown) => log.warn("right hands backfill failed", { error: String(error) }));
+  // Off the boot path: tasks' comments from before their conversations move into them once (ADR 0144).
+  void moveIssueComments(database.db)
+    .then((moved) => {
+      if (moved > 0) log.info("task comments moved to conversations", { moved });
+    })
+    .catch((error: unknown) => log.warn("task comments move failed", { error: String(error) }));
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
