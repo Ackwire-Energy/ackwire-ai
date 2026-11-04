@@ -80,6 +80,12 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
     const app = auditStr(row.details.app) ?? auditStr(row.details.client);
     if (what && app) return t(`audit.change.apps.${what}`, { app });
   }
+  // The Vault (ADR 0135): its own sentences, since a value shown or copied and a password manager connected don't
+  // read as "<verb> <area>".
+  if (area === "vault") {
+    const what = VAULT_ACTIONS.find((s) => s === rest);
+    if (what) return t(`audit.change.vault.${what}`);
+  }
   const last = (rest.split("_").at(-1) ?? "").replace("cancelled", "canceled");
   const verb = VERBS.find((v) => v === last) ?? "other";
   const where = AREAS.find((a) => a === area) ?? "other";
@@ -95,6 +101,20 @@ export function auditSentence(t: TFunction, row: AuditRow, locale: string): { na
   const text = auditPhrase(t, row);
   return { name, text: name ? lowerFirst(text, locale) : text };
 }
+
+/** The Vault's actions (ADR 0135), each with a sentence of its own. */
+const VAULT_ACTIONS = [
+  "item_created",
+  "item_changed",
+  "item_deleted",
+  "item_shown",
+  "item_copied",
+  "item_used",
+  "imported",
+  "connection_added",
+  "connection_changed",
+  "connection_removed",
+] as const;
 
 /** A change's action is `area.what_happened`: its last word is the verb ("page_created" → created). */
 const VERBS = [
@@ -129,6 +149,9 @@ const VERBS = [
   "resent",
   "revoked",
   "archived",
+  "shown",
+  "copied",
+  "used",
 ] as const;
 const AREAS = [
   "routine",
@@ -160,6 +183,7 @@ const AREAS = [
   "member",
   "invitation",
   "credential",
+  "vault",
 ] as const;
 
 /** What the row is about in its own words (the call's title, a change's name). */

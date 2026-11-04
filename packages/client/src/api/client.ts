@@ -2,6 +2,19 @@ import type { AppLocale } from "@agenteschat/i18n/locale";
 import type { OnboardingStepId } from "../lib/onboarding";
 import type { WikiAccess } from "../lib/wiki";
 import type {
+  SecretToVaultInput,
+  VaultConnectInput,
+  VaultConnection,
+  VaultConnectionPatch,
+  VaultImportResult,
+  VaultItem,
+  VaultItemDetail,
+  VaultItemInput,
+  VaultItemPatch,
+  VaultOverview,
+  VaultScope,
+} from "../vault/types";
+import type {
   AccessInput,
   AccountDeletionPlan,
   AccountLoginStart,
@@ -968,6 +981,12 @@ export interface ApiClient {
     /** Names on the agent's computers (its owner or an admin). */
     list(orgId: string, agentId: string): Promise<AgentSecret[]>;
     remove(orgId: string, agentId: string, name: string, machineId: string | null): Promise<void>;
+    /**
+     * "Save to the Vault" on the card (ADR 0135), after `deliver`: a site's password as a login, a variable as a
+     * key. Only the person asked; 409 `vault.request_not_delivered`, 400 `vault.request_not_savable` (a file or a
+     * code), 403 `vault.team_needs_permission`. Optional so older fakes type-check.
+     */
+    saveToVault?(orgId: string, requestId: string, input: SecretToVaultInput): Promise<VaultItem>;
   };
   issues: {
     list(orgId: string, filters?: { q?: string }): Promise<Issue[]>;
@@ -1561,6 +1580,29 @@ export interface ApiClient {
     setDefault(orgId: string, agentId: string, profileId: string | null): Promise<void>;
     /** "Pedir mais um perfil": the people who grant profiles hear of it. */
     request(orgId: string, agentId: string): Promise<void>;
+  };
+  /**
+   * The Vault (ADR 0135): logins, keys and contacts agents use without seeing a password or a key. No answer carries
+   * a value but `reveal`'s, to who may edit the item, and that is recorded. Personal items are their owner's alone;
+   * team items take `manage_credentials` to create, edit and reveal. Optional so older fakes type-check
+   * (`createHttpApi` has it).
+   */
+  vault?: {
+    overview(orgId: string): Promise<VaultOverview>;
+    /** 404 for an item this person can't see. */
+    item(orgId: string, itemId: string): Promise<VaultItemDetail>;
+    create(orgId: string, input: VaultItemInput): Promise<VaultItem>;
+    update(orgId: string, itemId: string, patch: VaultItemPatch): Promise<VaultItem>;
+    remove(orgId: string, itemId: string): Promise<void>;
+    /** "Show" or "Copy": the password or the key's value, recorded as a use. 429 past 30 a minute. */
+    reveal(orgId: string, itemId: string, purpose: "show" | "copy"): Promise<{ value: string }>;
+    /** A passwords file's text; `dryRun` only counts. 413 `vault.csv_too_large` past 2 MB. */
+    importCsv(orgId: string, input: { csv: string; scope: VaultScope; dryRun: boolean }): Promise<VaultImportResult>;
+    /** Checked with the password manager first: 400 `vault.source.<code>` when it refuses. */
+    connect(orgId: string, input: VaultConnectInput): Promise<VaultConnection>;
+    updateConnection(orgId: string, connectionId: string, patch: VaultConnectionPatch): Promise<VaultConnection>;
+    syncConnection(orgId: string, connectionId: string): Promise<VaultConnection>;
+    removeConnection(orgId: string, connectionId: string): Promise<void>;
   };
   /**
    * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which

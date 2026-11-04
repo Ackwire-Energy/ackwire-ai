@@ -57,6 +57,7 @@ import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
 import { telemetryRoutes } from "./routes/app/telemetry";
 import { threadRoutes } from "./routes/app/threads";
+import { vaultRoutes } from "./routes/app/vault";
 import { speechKeyRoutes, voiceRoutes } from "./routes/app/voice";
 import { wikiRoutes } from "./routes/app/wiki";
 import {
@@ -183,6 +184,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", notificationRoutes(deps));
     api.route("/app", pushRoutes(deps));
     api.route("/app", secretRoutes(deps));
+    api.route("/app", vaultRoutes(deps));
     api.route("/app", inviteRoutes(deps));
     api.route("/app", roleRoutes(deps));
     api.route("/app", storageRoutes(deps));
