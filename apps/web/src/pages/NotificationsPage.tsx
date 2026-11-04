@@ -9,11 +9,11 @@ import {
   useChannels,
   useForumAction,
   useForumTopic,
-  useIssueActivity,
   useNotificationAction,
   useNotificationCount,
   useNotificationReply,
   useNotifications,
+  useTaskConversation,
   useThreadMessages,
 } from "@agenteschat/client";
 import { approvalCardItems, approveAllScope } from "@agenteschat/client/lib/approval-card";
@@ -362,16 +362,27 @@ function SnoozeMenu({ trigger, onPick }: { trigger: ReactNode; onPick: (choice: 
   );
 }
 
-/** The replies of a grouped thread item (from the thread itself). */
-function ThreadReplies({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: string | null }) {
+/** The replies of a grouped thread item (from the thread itself, or `at`: another thread). */
+function ThreadReplies({
+  n,
+  dir,
+  mine,
+  at,
+}: {
+  n: AppNotification;
+  dir: Dir;
+  mine: string | null;
+  at?: { channelId: string; rootId: string };
+}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const thread = useThreadMessages(org.id, channelOf(n) ?? undefined, n.source.threadId ?? "");
+  const rootId = at ? at.rootId : (n.source.threadId ?? "");
+  const thread = useThreadMessages(org.id, at ? at.channelId : (channelOf(n) ?? undefined), rootId);
   // The root the channel holds stands in until the replies are read: they are what this shows.
   if (thread.isPending || thread.isPlaceholderData) return <LoadingCards count={1} className="nt-reps" />;
   // Replies with words or a GIF or a sticker (cards like an approval or a question have none of their own).
   const replies = (thread.data ?? [])
-    .filter((m) => m.id !== n.source.threadId && !m.local && (m.body.trim() || messageMediaOf(m.meta)))
+    .filter((m) => m.id !== rootId && !m.local && (m.body.trim() || messageMediaOf(m.meta)))
     .slice(-n.count);
   return (
     <div className="nt-reps">
@@ -428,34 +439,13 @@ function RunFailures({ n, dir, channelName }: { n: AppNotification; dir: Dir; ch
   );
 }
 
-/** The comments of a grouped issue item (from the issue's activity). */
+/** The comments of a grouped issue item: the replies in the task's conversation (ADR 0144). */
 function IssueComments({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: string | null }) {
-  const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const activity = useIssueActivity(org.id, n.source.issueId);
-  if (activity.isPending) return <LoadingCards count={1} className="nt-reps" />;
-  const comments = (activity.data ?? []).filter((a) => a.kind === "comment").slice(-n.count);
-  return (
-    <div className="nt-reps">
-      {comments.map((c) => {
-        const actor: NotificationActor = { type: c.author.type === "agent" ? "agent" : "user", id: c.author.id };
-        return (
-          <div key={c.id} className="nt-rep">
-            <Face actor={actor} dir={dir} size="sm" className="nt-av22" />
-            <div>
-              <div className="nt-rep__head">
-                <b>{nameOf(t, dir, actor)}</b>
-                <small>{whenText(t, i18n.language, c.createdAt)}</small>
-              </div>
-              <p>
-                <Snippet text={c.text} mine={mine} />
-              </p>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  const issueId = n.source.issueId ?? "";
+  const at = useTaskConversation(org.id, { id: issueId, conversation: null }, Boolean(issueId));
+  if (!at) return <LoadingCards count={1} className="nt-reps" />;
+  return <ThreadReplies n={n} dir={dir} mine={mine} at={at} />;
 }
 
 interface RowHandlers {

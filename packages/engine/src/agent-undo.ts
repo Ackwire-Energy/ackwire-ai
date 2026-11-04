@@ -19,8 +19,18 @@ import { closeThread, getThread, reopenThread, updateThread } from "./threads";
 import { canonicalJson } from "./tools/json-schema";
 import { deleteWikiPage, getWikiPage, getWikiVersion, restoreWikiPage, updateWikiPage } from "./wiki";
 
-const { agentActions, contextItems, routines, routineHooks, channels, channelMembers, issueActivity, messages, users } =
-  schema;
+const {
+  agentActions,
+  contextItems,
+  routines,
+  routineHooks,
+  channels,
+  channelMembers,
+  issueActivity,
+  issues,
+  messages,
+  users,
+} = schema;
 
 type Row = typeof agentActions.$inferSelect;
 
@@ -96,7 +106,7 @@ async function applyIssueFields(
   }
 }
 
-/** Another person or agent touched the issue (activity) since `since`. */
+/** Another person or agent touched the issue since `since`: its activity, or a reply in its conversation (ADR 0144). */
 async function issueTouchedByOthers(db: Database, issueId: string, agentId: string, since: Date) {
   const [row] = await db
     .select({ id: issueActivity.id })
@@ -109,7 +119,25 @@ async function issueTouchedByOthers(db: Database, issueId: string, agentId: stri
       ),
     )
     .limit(1);
-  return Boolean(row);
+  if (row) return true;
+  const [issue] = await db
+    .select({ channelId: issues.conversationChannelId, rootId: issues.conversationRootId })
+    .from(issues)
+    .where(eq(issues.id, issueId));
+  if (!issue?.channelId || !issue.rootId) return false;
+  const [reply] = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.channelId, issue.channelId),
+        eq(messages.threadId, issue.rootId),
+        gt(messages.createdAt, since),
+        or(ne(messages.authorType, "agent"), isNull(messages.authorAgentId), ne(messages.authorAgentId, agentId)),
+      ),
+    )
+    .limit(1);
+  return Boolean(reply);
 }
 
 // ── Memory ───────────────────────────────────────────────────────────────────

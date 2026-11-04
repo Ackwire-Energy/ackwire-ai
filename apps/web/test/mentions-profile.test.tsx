@@ -98,9 +98,13 @@ describe("@mention autocomplete", () => {
     expect(screen().getByText("Atlas entrou no canal.")).toBeTruthy();
   });
 
-  test("works in the issue comment box too", async () => {
+  test("works in the task conversation's box too", async () => {
     await go("issues/131");
-    const box = screen().getByRole("combobox", { name: "Comentar na tarefa" }) as HTMLTextAreaElement;
+    // The task's composer lives in its conversation panel (ADR 0144).
+    await click(screen().getByRole("button", { name: /^Conversa( \d+)?$/ }));
+    await settle(6);
+    expect(screen().getByRole("heading", { name: "Conversa da tarefa" })).toBeTruthy();
+    const box = screen().getByRole("combobox", { name: /^Comentar na tarefa/ }) as HTMLTextAreaElement;
     await typeIn(box, "@ad");
     const list = screen().getByRole("listbox", { name: "Pessoas e agentes" });
     expect(within(list).getAllByRole("option")[0]?.textContent).toContain("Ada");

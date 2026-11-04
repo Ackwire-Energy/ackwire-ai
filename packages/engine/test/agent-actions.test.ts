@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   actionsFor,
+  commentIssue,
   createChannel,
   createContextToolSource,
   createIssue,
@@ -191,6 +192,20 @@ describe("act with undo: issues", () => {
     const back = await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id });
     expect(back).toMatchObject({ priority: "normal", labels: [], dueDate: null });
     expect(back.assignee).toEqual({ type: "agent", id: f.agent.id });
+  });
+
+  test("create_issue: a person's reply in the task's conversation since blocks undo", async () => {
+    f = await setup();
+    const ctx = await runContext(f);
+    const call = await toolsOf([createIssueToolSource(deps(f))], ctx);
+    await call("create_issue", { title: "Uma" });
+    const m = await reply(f, ctx);
+    const [created] = (await actionsFor(f.db, f.org.id, [m.id])).get(m.id) ?? [];
+    if (!created) throw new Error("no action");
+    await commentIssue(deps(f), person(f.owner.id), f.org.id, created.target.id, "vou olhar isso amanhã");
+    await expect(undoAgentAction(deps(f), f.owner.id, f.org.id, created.id)).rejects.toMatchObject({
+      code: "action.changed_since",
+    });
   });
 
   test("who may undo; the window expires; Desfazer tudo goes newest first", async () => {
