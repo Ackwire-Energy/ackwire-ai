@@ -1,5 +1,6 @@
 import type { AccountLoginStart, MachineAccount, MachineAccountKind } from "@agenteschat/client";
-import { keys, useAccountLogin, useApi } from "@agenteschat/client";
+import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
+import { accountTitle, reusableAccount } from "@agenteschat/client/lib/ai-accounts";
 import {
   beginLogin,
   freeDuplicate,
@@ -45,6 +46,11 @@ export interface AddAccountProps {
   /** Sign in again to this account (signed out): same account, same agents. */
   again?: string;
   /**
+   * The person already chose another account: no offer to sign in again to one they have there (`reusableAccount`),
+   * which every other new sign-in makes first.
+   */
+  fresh?: boolean;
+  /**
    * Claude's login hint, never asked: the email of the account signing in again, or of the one other agents use. A
    * sign-in that comes back as another account says so instead of thinking with it.
    */
@@ -69,9 +75,62 @@ export interface AddAccountProps {
 }
 
 export function AddAccount(props: AddAccountProps) {
+  const { t } = useTranslation();
+  const { orgId } = useAiOrg();
+  const { colors: c } = useTheme();
   // "Tentar de novo" starts over with a new sign-in.
   const [attempt, setAttempt] = useState(0);
-  return <AddAccountFlow key={attempt} {...props} onRetry={() => setAttempt((n) => n + 1)} />;
+  // A new sign-in where the person already has that plan's account on that computer, as on the web: Entrar de novo
+  // on it first (already chosen when it's signed out), Outra conta beside it. Decided once, so the account signing in
+  // doesn't change it.
+  const offers = !props.again && !props.email && !props.fresh;
+  const ai = useAiAccounts(orgId, offers);
+  const [reuse, setReuse] = useState<MachineAccount | null>();
+  const [pick, setPick] = useState<"again" | "new">();
+  useEffect(() => {
+    if (reuse !== undefined || (offers && ai.isPending)) return;
+    const found = offers
+      ? reusableAccount(ai.data?.accounts, { machineId: props.machineId, kind: props.kind, provider: props.provider })
+      : undefined;
+    setReuse(found ?? null);
+  }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
+  if (reuse === undefined) return <ActivityIndicator color={c.muted} />;
+  const chosen = reuse ? (pick ?? (reuse.status === "signed_out" ? "again" : undefined)) : "new";
+  const label = reuse ? accountTitle(reuse) : "";
+  const another = (
+    <Button size="sm" variant="secondary" label={t("connectAi.another")} onPress={() => setPick("new")} />
+  );
+  if (reuse && chosen === undefined)
+    return (
+      <View style={styles.reuse}>
+        <Note icon="swap">{t("connectAi.reuse.active", { label })}</Note>
+        <View style={styles.reuseActs}>
+          <Button
+            size="sm"
+            variant="primary"
+            label={t("aiAccounts.page.signInAgain")}
+            onPress={() => setPick("again")}
+          />
+          {another}
+        </View>
+      </View>
+    );
+  return (
+    <>
+      {reuse && chosen === "again" && pick === undefined ? (
+        <View style={styles.reuse}>
+          <Note icon="swap">{t("connectAi.reuse.signedOut", { label })}</Note>
+          <View style={styles.reuseActs}>{another}</View>
+        </View>
+      ) : null}
+      <AddAccountFlow
+        key={`${attempt}:${chosen}`}
+        {...props}
+        {...(reuse && chosen === "again" ? { again: reuse.id, email: reuse.email } : {})}
+        onRetry={() => setAttempt((n) => n + 1)}
+      />
+    </>
+  );
 }
 
 function AddAccountFlow({
@@ -500,6 +559,8 @@ function AddAccountFlow({
 }
 
 const styles = StyleSheet.create({
+  reuse: { gap: 10 },
+  reuseActs: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   flow: { gap: 10 },
   ended: { gap: 10, alignItems: "flex-start" },
   send: { marginTop: 10 },

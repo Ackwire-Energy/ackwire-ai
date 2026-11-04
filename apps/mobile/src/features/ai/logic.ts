@@ -4,6 +4,7 @@ import type {
   AiAccounts,
   BrainKind,
   Credential,
+  Edition,
   MachineAccount,
   MachineAccountKind,
   PlanUsage,
@@ -20,7 +21,14 @@ import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts } from "@agenteschat/client/lib/brain-advanced";
 import { type BrainPick, brainModelLine, brainPickInput, needsOwnSignIn } from "@agenteschat/client/lib/brain-picker";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiChoiceOf, type PlanChoice, type PlanGate, planOfAccount, planOfKind } from "@agenteschat/client/lib/no-ai";
+import {
+  aiChoiceOf,
+  gateRechecks,
+  type PlanChoice,
+  type PlanGate,
+  planOfAccount,
+  planOfKind,
+} from "@agenteschat/client/lib/no-ai";
 import {
   brainModelChoice,
   brainModelChoices,
@@ -50,11 +58,12 @@ export const PLAN_POLL_MS = 5000;
 
 /**
  * Whether the plan shown waits on something no event may bring (the first run opens no socket): the workspace's
- * computer on its way, the agent's computer offline, or the views not in yet. Ready, missing, unsupported or
- * locked stay put until the person does something.
+ * computer on its way, the views not in yet, or what passes by itself (`gateRechecks`: a computer offline, the Cloud's
+ * installing or updating a program). Ready, missing, locked and the rest of unsupported stay put until the person does
+ * something.
  */
-export const pollsPlan = (state: PlanGate["state"]) =>
-  state === "preparing" || state === "offline" || state === "loading";
+export const pollsPlan = (gate: PlanGate, edition: Edition | null) =>
+  gate.state === "preparing" || gate.state === "loading" || gateRechecks(gate, edition);
 
 /* The agent's AI on the phone (the web's "Quem pensa", ADR 0059): what its page lists and reads. */
 

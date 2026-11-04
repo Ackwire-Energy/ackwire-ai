@@ -71,13 +71,13 @@ import {
   commandInReason,
   computerKind,
   computerState,
-  toolOffReason,
   toolOnCommand,
 } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   aiChoiceOf,
   aiStateOf,
+  gateLine,
   kindOf,
   planLabel,
   planMark,
@@ -1115,16 +1115,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // The Cloud's agent without a computer yet gets the workspace's own: the plan signs in there once it's ready.
     if (o.reason === "no_computer" && edition === "cloud")
       return t("brain.reasons.no_computerCloud", { computer: t("computerSetup.title", { org: org.name }) });
-    // The card names the plan: the line names the program on the computer that can't run it.
-    const program = t(`brain.card.${k}`);
-    if (o.reason === "tool_off") {
-      const off = toolOffReason(
-        work.machines.data?.find((m) => m.id === view.computer?.machineId),
-        k,
-      );
-      return t(off.key, { computer: view.computer?.name ?? "", command: off.command, program });
-    }
-    return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "", program });
+    // The card names the plan: the line names the program on the computer that can't run it, as the plan's panel.
+    return (
+      gateLine(t, {
+        gate: { state: "unsupported", reason: o.reason },
+        edition,
+        kind: k,
+        computer: view.computer?.name ?? "",
+        machine: work.machines.data?.find((m) => m.id === view.computer?.machineId),
+      })?.text ?? null
+    );
   };
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(
@@ -1442,6 +1442,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     kind={accountKind}
                     computer={computerName}
                     again={again?.id}
+                    // "Adicionar conta" beside the accounts the agent's choice already lists: another one.
+                    fresh
                     {...(isPlanId(card) ? { provider: card } : {})}
                     email={signingIn?.email}
                     local={view.ownSignIn}

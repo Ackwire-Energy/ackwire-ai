@@ -9,6 +9,7 @@ import {
   ownSignIns,
   ownSignInTitle,
   type PlanAccount,
+  unusedCopies,
 } from "@agenteschat/client/lib/ai-accounts";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -123,6 +124,21 @@ export function AiAccountsSection() {
     }
   };
 
+  // The logins of an account that think for no agent, each a sign-in made again: they go, its agents stay as they are.
+  const removeCopies = async (copies: Row[]) => {
+    setBusy(true);
+    try {
+      for (const a of copies) await api.machines.removeAccount(org.id, a.machineId, a.id);
+      toast.show(t("aiAccounts.page.copiesRemoved", { count: copies.length }));
+      refetch();
+    } catch {
+      toast.show(t("agentPage.work.failed"), "error");
+      refetch();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Card aria-labelledby="sec-plans">
       <div className="row" style={{ gap: 12 }}>
@@ -162,6 +178,7 @@ export function AiAccountsSection() {
             const a = logins.find((l) => l.shared === true) ?? logins[0];
             if (!a) return null;
             const give = toGive(a);
+            const copies = unusedCopies(account);
             const plan = planOf(a.provider);
             const allOut = signedOut.length === logins.length;
             // Of an account with a login per agent, the agents whose login is out.
@@ -187,6 +204,20 @@ export function AiAccountsSection() {
                           ? t("aiAccounts.page.keyRefused")
                           : t("aiAccounts.page.signedOut")}
                     </SettingNote>
+                  )}
+                  {copies.length > 0 && (
+                    <span className="ai-panel__row">
+                      <SettingNote icon="repeat">{t("aiAccounts.page.copies", { count: copies.length })}</SettingNote>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        loading={busy}
+                        disabled={busy}
+                        onClick={() => void removeCopies(copies)}
+                      >
+                        {t("aiAccounts.page.removeCopies")}
+                      </Button>
+                    </span>
                   )}
                   {usage ? (
                     <PlanMeter usage={usage} text={meterText} compact />

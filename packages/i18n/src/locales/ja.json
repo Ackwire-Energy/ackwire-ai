@@ -2036,6 +2036,10 @@
     "onceHint": "プランの上限はみんなで共有します。",
     "use": "{{label}}を使う",
     "another": "別のアカウント",
+    "reuse": {
+      "active": "{{label}}はすでにここにあります。もう一度ログインするか、別のアカウントを使ってください。",
+      "signedOut": "{{label}}はここでログアウトしています。もう一度ログインすると、エージェントはそのまま使えます。"
+    },
     "signInFor": "{{name}}用にログイン",
     "doneAll": "{{names}}は{{label}}で動くようになりました。",
     "otherAccount": {
@@ -6947,11 +6951,13 @@
       "noComputer": "アカウントは接続済みのコンピューターに保存されます。まずあなたのコンピューターを接続してください。",
       "addComputer": "コンピューターを接続",
       "needsCloud": {
-        "claude_code": "{{computer}}ではまだ準備ができていません",
-        "codex": "{{computer}}ではまだ準備ができていません",
-        "cursor": "{{computer}}ではまだ準備ができていません",
-        "opencode": "{{computer}}ではまだ準備できていません",
-        "online": "{{computer}}は現在応答していません。対応中です。"
+        "online": "{{computer}}は再起動または再接続中です。戻りしだい自動で切り替わります。",
+        "installing": "{{computer}}に{{program}}をインストール中です。終わりしだい自動で切り替わります。",
+        "updating": "{{computer}}の{{program}}をアップデート中です。終わりしだい自動で切り替わります。",
+        "runnerOld": "{{computer}}のagentes.chatプログラムが古く、アップデートを準備中です。終わりしだい自動で切り替わります。",
+        "execOff": "{{computer}}はまだ{{program}}を実行できません。対応中で、自動で切り替わります。",
+        "toolOff": "{{computer}}で{{program}}が許可されていません。サポートに許可を依頼してください。",
+        "preparing": "{{computer}}を準備中です。終わりしだい自動で切り替わります。"
       }
     },
     "done": {
@@ -6975,6 +6981,9 @@
       "rename": "名前を変更",
       "signInAgain": "もう一度ログイン",
       "newKey": "キーを置き換える",
+      "copies_other": "エージェントのいない、このアカウントのログインがあと{{count}}件あります。",
+      "removeCopies": "削除",
+      "copiesRemoved_other": "使われていないログインを{{count}}件削除しました。",
       "disconnect": "接続を解除",
       "renameTitle": "{{label}}の名前を変更",
       "nameLabel": "名前",

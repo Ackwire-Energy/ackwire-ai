@@ -2088,6 +2088,11 @@ export const en = {
     /** An account of this plan the person already has on that computer, for all of their agents there. */
     use: "Use {{label}}",
     another: "Another account",
+    /** Before a new sign-in, where the person already has an account of that plan on that computer (`reusableAccount`). */
+    reuse: {
+      active: "You already have {{label}} here. Sign in to it again, or use another account.",
+      signedOut: "{{label}} is signed out here. Sign in to it again and its agents keep it.",
+    },
     signInFor: "Sign in for {{name}}",
     doneAll: "{{names}} now think with {{label}}.",
     otherAccount: {
@@ -7027,12 +7032,19 @@ export const en = {
       },
       noComputer: "Accounts stay on a connected computer. Connect one of yours first.",
       addComputer: "Connect a computer",
+      /**
+       * The Cloud's: why a plan can't sign in on the workspace's computer yet (`gateLine`), with what happens next.
+       * `program`: "Claude Code", "Codex", "Cursor" or "OpenCode" (`brain.card`).
+       */
       needsCloud: {
-        claude_code: "Not ready on {{computer}} yet",
-        codex: "Not ready on {{computer}} yet",
-        cursor: "Not ready on {{computer}} yet",
-        opencode: "Not ready on {{computer}} yet",
-        online: "{{computer}} isn't answering right now. We're on it.",
+        online: "{{computer}} is restarting or reconnecting. This changes by itself once it's back.",
+        installing: "{{program}} is being installed on {{computer}}. This changes by itself when it's done.",
+        updating: "{{program}} is being updated on {{computer}}. This changes by itself when it's done.",
+        runnerOld:
+          "The agentes.chat program on {{computer}} is out of date and an update is on its way. This changes by itself when it's done.",
+        execOff: "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself.",
+        toolOff: "{{program}} isn't allowed on {{computer}}. Ask support to allow it.",
+        preparing: "{{computer}} is getting ready. This changes by itself when it's done.",
       },
     },
     done: {
@@ -7058,6 +7070,12 @@ export const en = {
       rename: "Rename",
       signInAgain: "Sign in again",
       newKey: "Replace the key",
+      /** Logins of one account that think for no agent (`unusedCopies`), each a sign-in made again. */
+      copies_one: "{{count}} more login of this account, with no agent.",
+      copies_other: "{{count}} more logins of this account, with no agent.",
+      removeCopies: "Remove",
+      copiesRemoved_one: "{{count}} unused login removed.",
+      copiesRemoved_other: "{{count}} unused logins removed.",
       disconnect: "Disconnect",
       renameTitle: "Rename {{label}}",
       nameLabel: "Name",

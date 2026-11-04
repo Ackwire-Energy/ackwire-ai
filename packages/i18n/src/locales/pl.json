@@ -2260,6 +2260,10 @@
     "onceHint": "Wszyscy dzielą limity twojego planu.",
     "use": "Użyj {{label}}",
     "another": "Inne konto",
+    "reuse": {
+      "active": "Masz już tu {{label}}. Zaloguj się na nie ponownie albo użyj innego konta.",
+      "signedOut": "{{label}} jest tu wylogowane. Zaloguj się ponownie, a jego agenci dalej z niego korzystają."
+    },
     "signInFor": "Zaloguj się dla: {{name}}",
     "doneAll": "{{names}} myślą teraz z {{label}}.",
     "otherAccount": {
@@ -7791,11 +7795,13 @@
       "noComputer": "Konta zostają na połączonym komputerze. Najpierw połącz jeden ze swoich.",
       "addComputer": "Połącz komputer",
       "needsCloud": {
-        "claude_code": "Jeszcze niegotowe na komputerze {{computer}}",
-        "codex": "Jeszcze niegotowe na komputerze {{computer}}",
-        "cursor": "Jeszcze niegotowe na komputerze {{computer}}",
-        "opencode": "Jeszcze niegotowe na {{computer}}",
-        "online": "{{computer}} teraz nie odpowiada. Zajmujemy się tym."
+        "online": "{{computer}} uruchamia się ponownie albo łączy się od nowa. To zmieni się samo, gdy wróci.",
+        "installing": "{{program}} jest instalowany na komputerze {{computer}}. To zmieni się samo, gdy skończy.",
+        "updating": "{{program}} jest aktualizowany na komputerze {{computer}}. To zmieni się samo, gdy skończy.",
+        "runnerOld": "Program agentes.chat na komputerze {{computer}} jest nieaktualny, a aktualizacja jest w drodze. To zmieni się samo, gdy się skończy.",
+        "execOff": "{{computer}} nie może jeszcze uruchomić programu {{program}}. Zajmujemy się tym, a to zmieni się samo.",
+        "toolOff": "{{program}} nie jest dozwolony na komputerze {{computer}}. Poproś pomoc techniczną o zezwolenie.",
+        "preparing": "{{computer}} się przygotowuje. To zmieni się samo, gdy skończy."
       }
     },
     "done": {
@@ -7825,6 +7831,15 @@
       "rename": "Zmień nazwę",
       "signInAgain": "Zaloguj się ponownie",
       "newKey": "Zastąp klucz",
+      "copies_one": "Jeszcze {{count}} logowanie tego konta, bez agentów.",
+      "copies_few": "Jeszcze {{count}} logowania tego konta, bez agentów.",
+      "copies_many": "Jeszcze {{count}} logowań tego konta, bez agentów.",
+      "copies_other": "Jeszcze {{count}} logowania tego konta, bez agentów.",
+      "removeCopies": "Usuń",
+      "copiesRemoved_one": "Usunięto {{count}} nieużywane logowanie.",
+      "copiesRemoved_few": "Usunięto {{count}} nieużywane logowania.",
+      "copiesRemoved_many": "Usunięto {{count}} nieużywanych logowań.",
+      "copiesRemoved_other": "Usunięto {{count}} nieużywanego logowania.",
       "disconnect": "Rozłącz",
       "renameTitle": "Zmień nazwę: {{label}}",
       "nameLabel": "Nazwa",

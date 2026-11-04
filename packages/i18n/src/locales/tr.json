@@ -2107,6 +2107,10 @@
     "onceHint": "Hepsi planınızın limitlerini paylaşır.",
     "use": "{{label}} kullan",
     "another": "Başka bir hesap",
+    "reuse": {
+      "active": "{{label}} burada zaten var. Ona yeniden giriş yapın ya da başka bir hesap kullanın.",
+      "signedOut": "{{label}} burada oturumu kapattı. Yeniden giriş yapın, ajanları onu kullanmaya devam eder."
+    },
     "signInFor": "{{name}} için giriş yap",
     "doneAll": "{{names}} artık {{label}} ile düşünüyor.",
     "otherAccount": {
@@ -7197,11 +7201,13 @@
       "noComputer": "Hesaplar bağlı bir bilgisayarda kalır. Önce kendi bilgisayarlarınızdan birini bağlayın.",
       "addComputer": "Bilgisayar bağla",
       "needsCloud": {
-        "claude_code": "{{computer}} üzerinde henüz hazır değil",
-        "codex": "{{computer}} üzerinde henüz hazır değil",
-        "cursor": "{{computer}} üzerinde henüz hazır değil",
-        "opencode": "{{computer}} üzerinde henüz hazır değil",
-        "online": "{{computer}} şu anda yanıt vermiyor. İlgileniyoruz."
+        "online": "{{computer}} yeniden başlıyor ya da yeniden bağlanıyor. Geri döndüğünde bu kendiliğinden değişir.",
+        "installing": "{{program}}, {{computer}} üzerine kuruluyor. Bittiğinde bu kendiliğinden değişir.",
+        "updating": "{{program}}, {{computer}} üzerinde güncelleniyor. Bittiğinde bu kendiliğinden değişir.",
+        "runnerOld": "{{computer}} üzerindeki agentes.chat programı eski ve güncelleme yolda. Bittiğinde bu kendiliğinden değişir.",
+        "execOff": "{{computer}} henüz {{program}} çalıştıramıyor. İlgileniyoruz, bu kendiliğinden değişir.",
+        "toolOff": "{{program}}, {{computer}} üzerinde izinli değil. İzin vermesi için destek ekibine yazın.",
+        "preparing": "{{computer}} hazırlanıyor. Bittiğinde bu kendiliğinden değişir."
       }
     },
     "done": {
@@ -7227,6 +7233,11 @@
       "rename": "Yeniden adlandır",
       "signInAgain": "Yeniden giriş yap",
       "newKey": "Anahtarı değiştir",
+      "copies_one": "Bu hesabın ajansız {{count}} girişi daha var.",
+      "copies_other": "Bu hesabın ajansız {{count}} girişi daha var.",
+      "removeCopies": "Kaldır",
+      "copiesRemoved_one": "Kullanılmayan {{count}} giriş kaldırıldı.",
+      "copiesRemoved_other": "Kullanılmayan {{count}} giriş kaldırıldı.",
       "disconnect": "Bağlantıyı kes",
       "renameTitle": "{{label}} adını değiştir",
       "nameLabel": "Ad",

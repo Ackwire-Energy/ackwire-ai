@@ -2043,6 +2043,10 @@
     "onceHint": "Semuanya berbagi batas paketmu.",
     "use": "Pakai {{label}}",
     "another": "Akun lain",
+    "reuse": {
+      "active": "Kamu sudah punya {{label}} di sini. Masuk lagi ke akun itu, atau pakai akun lain.",
+      "signedOut": "{{label}} sudah keluar di sini. Masuk lagi dan agennya tetap memakainya."
+    },
     "signInFor": "Masuk untuk {{name}}",
     "signInFor_female": "Masuk untuk {{name}}",
     "doneAll": "{{names}} sekarang berpikir dengan {{label}}.",
@@ -6994,11 +6998,13 @@
       "noComputer": "Akun disimpan di komputer yang terhubung. Hubungkan salah satu komputermu dulu.",
       "addComputer": "Hubungkan komputer",
       "needsCloud": {
-        "claude_code": "Belum siap di {{computer}}",
-        "codex": "Belum siap di {{computer}}",
-        "cursor": "Belum siap di {{computer}}",
-        "opencode": "Belum siap di {{computer}}",
-        "online": "{{computer}} sedang tidak merespons. Kami sedang menanganinya."
+        "online": "{{computer}} sedang memulai ulang atau menyambung lagi. Ini berubah sendiri begitu ia kembali.",
+        "installing": "{{program}} sedang dipasang di {{computer}}. Ini berubah sendiri setelah selesai.",
+        "updating": "{{program}} sedang diperbarui di {{computer}}. Ini berubah sendiri setelah selesai.",
+        "runnerOld": "Program agentes.chat di {{computer}} sudah usang dan pembaruannya sedang dalam perjalanan. Ini berubah sendiri setelah selesai.",
+        "execOff": "{{computer}} belum bisa menjalankan {{program}}. Kami sedang menanganinya, dan ini berubah sendiri.",
+        "toolOff": "{{program}} tidak diizinkan di {{computer}}. Minta tim dukungan untuk mengizinkannya.",
+        "preparing": "{{computer}} sedang disiapkan. Ini berubah sendiri setelah selesai."
       }
     },
     "done": {
@@ -7022,6 +7028,9 @@
       "rename": "Ganti nama",
       "signInAgain": "Masuk lagi",
       "newKey": "Ganti kunci",
+      "copies_other": "{{count}} login lain dari akun ini, tanpa agen.",
+      "removeCopies": "Hapus",
+      "copiesRemoved_other": "{{count}} login yang tidak dipakai dihapus.",
       "disconnect": "Putuskan",
       "renameTitle": "Ganti nama {{label}}",
       "nameLabel": "Nama",

@@ -2034,6 +2034,10 @@
     "onceHint": "모두 요금제 한도를 함께 써요.",
     "use": "{{label}} 사용",
     "another": "다른 계정",
+    "reuse": {
+      "active": "여기에 이미 {{label}}이(가) 있어요. 그 계정에 다시 로그인하거나 다른 계정을 쓰세요.",
+      "signedOut": "여기서 {{label}}이(가) 로그아웃됐어요. 다시 로그인하면 에이전트가 계속 써요."
+    },
     "signInFor": "{{name}}용으로 로그인",
     "doneAll": "이제 {{names}}은(는) {{label}}(으)로 생각해요.",
     "otherAccount": {
@@ -6940,11 +6944,13 @@
       "noComputer": "계정은 연결된 컴퓨터에 남아요. 먼저 내 컴퓨터를 하나 연결하세요.",
       "addComputer": "컴퓨터 연결",
       "needsCloud": {
-        "claude_code": "{{computer}}에서 아직 준비되지 않았어요",
-        "codex": "{{computer}}에서 아직 준비되지 않았어요",
-        "cursor": "{{computer}}에서 아직 준비되지 않았어요",
-        "opencode": "{{computer}}에서 아직 준비되지 않았어요",
-        "online": "지금 {{computer}}이(가) 응답하지 않아요. 해결 중이에요."
+        "online": "{{computer}}이(가) 다시 시작하거나 다시 연결하는 중이에요. 돌아오면 저절로 바뀌어요.",
+        "installing": "{{computer}}에 {{program}}을(를) 설치하는 중이에요. 끝나면 저절로 바뀌어요.",
+        "updating": "{{computer}}의 {{program}}을(를) 업데이트하는 중이에요. 끝나면 저절로 바뀌어요.",
+        "runnerOld": "{{computer}}의 agentes.chat 프로그램이 오래되어 업데이트가 오고 있어요. 끝나면 저절로 바뀌어요.",
+        "execOff": "{{computer}}이(가) 아직 {{program}}을(를) 실행할 수 없어요. 해결 중이고, 저절로 바뀌어요.",
+        "toolOff": "{{computer}}에서 {{program}}이(가) 허용되지 않았어요. 지원팀에 허용을 요청하세요.",
+        "preparing": "{{computer}}을(를) 준비하는 중이에요. 끝나면 저절로 바뀌어요."
       }
     },
     "done": {
@@ -6968,6 +6974,9 @@
       "rename": "이름 바꾸기",
       "signInAgain": "다시 로그인",
       "newKey": "키 바꾸기",
+      "copies_other": "에이전트가 없는 이 계정의 로그인이 {{count}}개 더 있어요.",
+      "removeCopies": "삭제",
+      "copiesRemoved_other": "쓰지 않는 로그인 {{count}}개를 삭제했어요.",
       "disconnect": "연결 해제",
       "renameTitle": "{{label}} 이름 바꾸기",
       "nameLabel": "이름",

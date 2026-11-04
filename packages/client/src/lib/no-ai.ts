@@ -14,6 +14,7 @@ import type {
 import { ownSignInReady } from "./ai-accounts";
 import { answersOthers, audienceOf } from "./audience";
 import { type SetupView, setupPending } from "./computer";
+import { toolOffReason } from "./machines";
 import { CODING_PLANS, isPlanId, loginPerAgent, PLAN_IDS, type PlanId } from "./plans";
 
 /**
@@ -286,6 +287,69 @@ export const ownSignInFor = (choice: PlanChoice, brain: AgentBrain | undefined, 
 
 /** A plan tile reads dimmed when its plan can't sign in there at all (it still opens its panel, which says why). */
 export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.state === "unsupported";
+
+/**
+ * The gate passes by itself, with nothing for the person to do: the computer reconnecting, or (the Cloud's, which is
+ * ours) its programs being installed or updated there. The panel asks again while it shows, as events may not say it.
+ * A program not allowed there waits for someone, as do all of self-host's (their computers are people's own).
+ */
+export const gateRechecks = (gate: PlanGate, edition: Edition | null) =>
+  gate.state === "offline" || (edition === "cloud" && gate.state === "unsupported" && gate.reason !== "tool_off");
+
+/** The Cloud's line per reason a plan can't sign in on the workspace's computer (`aiAccounts.connect.needsCloud.*`). */
+const CLOUD_REASON = {
+  no_computer: "preparing",
+  exec_off: "execOff",
+  runner_old: "runnerOld",
+  keys: "runnerOld",
+  tool_off: "toolOff",
+  not_installed: "installing",
+  outdated: "updating",
+} as const satisfies Record<BrainUnavailable | "keys", string>;
+
+/**
+ * Why a plan's panel can't sign in yet, in plain words, with what happens next: an offline computer, or a reason the
+ * plan can't sign in there (`unsupported`). On the Cloud the computer is ours, so the line says what it's doing (a
+ * program being installed or updated, a restart) and that it comes back by itself (`rechecks`), or who to ask. Null
+ * for any other gate. `computer`: its name as the panel says it; `machine`: its row, for the way to allow a program
+ * on a self-hosted one.
+ */
+export function gateLine(
+  t: TFunction,
+  {
+    gate,
+    edition,
+    kind,
+    computer,
+    machine,
+  }: {
+    gate: PlanGate;
+    edition: Edition | null;
+    kind: MachineAccountKind;
+    computer: string;
+    machine?: Pick<Machine, "os" | "mode"> | null;
+  },
+): { text: string; rechecks: boolean } | null {
+  const rechecks = gateRechecks(gate, edition);
+  const program = t(`brain.card.${kind}`);
+  if (gate.state === "offline")
+    return {
+      text:
+        edition === "cloud"
+          ? t("aiAccounts.connect.needsCloud.online", { computer })
+          : t("brain.offline", { computer }),
+      rechecks,
+    };
+  if (gate.state !== "unsupported") return null;
+  if (edition === "cloud")
+    return { text: t(`aiAccounts.connect.needsCloud.${CLOUD_REASON[gate.reason]}`, { computer, program }), rechecks };
+  if (gate.reason === "keys") return { text: t("aiAccounts.connect.needs.keys"), rechecks };
+  if (gate.reason === "tool_off") {
+    const off = toolOffReason(machine, kind);
+    return { text: t(off.key, { computer, command: off.command, program }), rechecks };
+  }
+  return { text: t(`brain.reasons.${gate.reason}`, { computer, program }), rechecks };
+}
 
 /** The longest a plan's panel shows its sign-in loading while the agent's view is asked again (`catchUp`). */
 export const CATCH_UP_MS = 8000;

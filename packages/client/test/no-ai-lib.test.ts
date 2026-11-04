@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { TFunction } from "i18next";
+import { resources } from "@agenteschat/i18n";
+import i18next, { type TFunction } from "i18next";
 import type { Agent, AgentAudience, AgentBrain, AiComputer, ComputerSetup, MachineAccount } from "../src/api/types";
 import { setupView } from "../src/lib/computer";
 import { serverBody } from "../src/lib/message-body";
@@ -18,6 +19,8 @@ import {
   firstAgent,
   freePlanAccount,
   gateDims,
+  gateLine,
+  gateRechecks,
   kindOf,
   noAiCardOf,
   onlyOwnerReplies,
@@ -624,5 +627,77 @@ describe("OpenCode (ADR 0132): its free tier or its key, through its own CLI", (
     expect(serverBody(t, "…", { bodyCode: "no_ai", noAi: { reason: "not_signed_in", own: "opencode" } })).toBe(
       "chat.body.no_ai_not_signed_in:OpenCode",
     );
+  });
+});
+
+describe("why a plan can't sign in yet, in plain words (`gateLine`)", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+  const pt = instance.t.bind(instance) as TFunction;
+  const computer = "Computador da Acme";
+  const line = (gate: PlanGate, edition: "cloud" | "selfhost", kind: "claude_code" | "codex" = "codex") =>
+    gateLine(pt, { gate, edition, kind, computer, machine: { os: "linux", mode: "single" } });
+  const off = (reason: Extract<PlanGate, { state: "unsupported" }>["reason"]) =>
+    ({ state: "unsupported", reason }) as const;
+
+  test("on the Cloud each reason says what the computer is doing, and that it comes back by itself", () => {
+    expect(line(off("not_installed"), "cloud")).toEqual({
+      text: "O Codex está sendo instalado no Computador da Acme. Isto muda sozinho quando terminar.",
+      rechecks: true,
+    });
+    expect(line(off("outdated"), "cloud")).toEqual({
+      text: "O Codex está sendo atualizado no Computador da Acme. Isto muda sozinho quando terminar.",
+      rechecks: true,
+    });
+    const runner =
+      "O programa do agentes.chat no Computador da Acme está desatualizado e a atualização já está a caminho. Isto muda sozinho quando ela terminar.";
+    expect(line(off("runner_old"), "cloud")).toEqual({ text: runner, rechecks: true });
+    expect(line(off("keys"), "cloud")).toEqual({ text: runner, rechecks: true });
+    expect(line(off("exec_off"), "cloud", "claude_code")).toEqual({
+      text: "O Computador da Acme ainda não consegue rodar o Claude Code. Já estamos cuidando, e isto muda sozinho.",
+      rechecks: true,
+    });
+    expect(line(off("no_computer"), "cloud")?.text).toBe(
+      "O Computador da Acme está ficando pronto. Isto muda sozinho quando terminar.",
+    );
+    expect(line({ state: "offline" }, "cloud")).toEqual({
+      text: "O Computador da Acme está reiniciando ou se reconectando. Isto muda sozinho quando ele voltar.",
+      rechecks: true,
+    });
+  });
+
+  test("a program not allowed there says who to ask, and waits for them", () => {
+    expect(line(off("tool_off"), "cloud")).toEqual({
+      text: "O Codex não está liberado no Computador da Acme. Peça ao suporte para liberar.",
+      rechecks: false,
+    });
+  });
+
+  test("no Cloud line is the old generic one, and every reason has its own key", () => {
+    const reasons = ["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated", "keys"] as const;
+    for (const r of reasons) {
+      const text = line(off(r), "cloud")?.text ?? "";
+      expect(text).not.toContain("Ainda não está pronto");
+      expect(text).not.toContain("aiAccounts.");
+    }
+  });
+
+  test("self-host keeps its reasons, with the way to allow a program on the person's own computer", () => {
+    expect(line(off("not_installed"), "selfhost")).toEqual({
+      text: "O Codex não está instalado no Computador da Acme.",
+      rechecks: false,
+    });
+    expect(line(off("tool_off"), "selfhost")?.text).toContain("agentes-runner tools enable codex");
+    expect(line(off("keys"), "selfhost")?.text).toBe(pt("aiAccounts.connect.needs.keys"));
+    expect(line({ state: "offline" }, "selfhost")).toEqual({
+      text: pt("brain.offline", { computer }),
+      rechecks: true,
+    });
+  });
+
+  test("any other gate has no line", () => {
+    for (const gate of [{ state: "ready" }, { state: "missing" }, { state: "loading" }] as const)
+      expect(line(gate, "cloud")).toBeNull();
+    expect(gateRechecks({ state: "locked", who: "computer" }, "cloud")).toBe(false);
   });
 });

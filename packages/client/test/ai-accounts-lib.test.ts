@@ -14,7 +14,9 @@ import {
   ownSignInReady,
   ownSignIns,
   planWordOf,
+  reusableAccount,
   signInPlan,
+  unusedCopies,
 } from "../src/lib/ai-accounts";
 import { accountName, usageSourcePart } from "../src/lib/plan-usage";
 
@@ -360,5 +362,53 @@ describe("an account's line in an agent's account choice", () => {
       "agentPage.work.brain.accountSignedOut",
     );
     expect(about({})).toBe("aiAccounts.page.keyEnds");
+  });
+});
+
+describe("a sign-in made again reuses the account (`reusableAccount`), and the copies it left go (`unusedCopies`)", () => {
+  const chatgpt = (id: string, over: Partial<MachineAccount & { machineId: string }> = {}) =>
+    login(id, { kind: "codex", label: "ChatGPT", provider: null, keyHint: null, email: "ana@acme.com", ...over });
+  const where = { machineId: "m1", kind: "codex" } as const;
+
+  test("their account of that plan on that computer, a signed-out one first", () => {
+    const active = chatgpt("on");
+    const out = chatgpt("out", { status: "signed_out" });
+    expect(reusableAccount([active, out], where)?.id).toBe("out");
+    expect(reusableAccount([active], where)?.id).toBe("on");
+    expect(reusableAccount([chatgpt("all", { usedBy: ["Ada"], shared: true })], where)?.id).toBe("all");
+  });
+
+  test("never someone else's, another computer's, another program's or another plan's", () => {
+    expect(
+      reusableAccount(
+        [
+          chatgpt("theirs", { mine: false }),
+          // Another agent's own login: signing in to it again would sign that agent out.
+          chatgpt("ada", { usedBy: ["Ada"], shared: false }),
+          chatgpt("mac2", { machineId: "m2" }),
+          login("claude", { kind: "claude_code", provider: null }),
+          login("glm"),
+        ],
+        where,
+      ),
+    ).toBeUndefined();
+    // A coding plan's key account is reused for that plan only.
+    expect(reusableAccount([login("glm")], { machineId: "m1", kind: "claude_code", provider: "zai" })?.id).toBe("glm");
+    expect(reusableAccount([login("glm")], { machineId: "m1", kind: "claude_code" })).toBeUndefined();
+    expect(reusableAccount(undefined, where)).toBeUndefined();
+  });
+
+  test("an account's logins with no agent are copies, one kept when none has an agent", () => {
+    const [nine] = groupPlans([
+      chatgpt("a", { usedBy: ["Ada"] }),
+      ...["b", "c", "d"].map((id) => chatgpt(id, { status: "signed_out" })),
+      chatgpt("e"),
+    ]);
+    expect(nine && unusedCopies(nine).map((l) => l.id)).toEqual(["b", "c", "d", "e"]);
+    const [idle] = groupPlans([chatgpt("x", { status: "signed_out" }), chatgpt("y"), chatgpt("z")]);
+    // The signed-in one stays.
+    expect(idle && unusedCopies(idle).map((l) => l.id)).toEqual(["x", "z"]);
+    const [one] = groupPlans([chatgpt("only")]);
+    expect(one && unusedCopies(one)).toEqual([]);
   });
 });
