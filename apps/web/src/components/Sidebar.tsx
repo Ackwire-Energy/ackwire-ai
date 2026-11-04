@@ -40,7 +40,7 @@ import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat
 import { recentDms } from "@agenteschat/client/lib/recent";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
-import { looksUnread } from "@agenteschat/client/lib/unread";
+import { badgeCount, looksUnread } from "@agenteschat/client/lib/unread";
 import {
   type AgentColor,
   Avatar,
@@ -1452,7 +1452,7 @@ function UnreadCount({ count, mentions = false }: { count: number; mentions?: bo
       role="img"
       aria-label={t(mentions ? "shell.unreadMentions" : "shell.unread", { count })}
     >
-      {count > 99 ? "99+" : count}
+      {badgeCount(count)}
     </CountBadge>
   );
 }

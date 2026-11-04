@@ -319,7 +319,7 @@ describe("typing bar above the composer", () => {
 });
 
 describe("bottom anchoring", () => {
-  test("short channels sit above the composer; new rows follow while at the bottom; scrolled up shows 'Novas mensagens'", async () => {
+  test("short channels sit above the composer; new rows follow while at the bottom; scrolled up shows the round button", async () => {
     const { socket } = await open();
     const log = screen().getByRole("region", { name: "Mensagens" });
     expect(log.firstElementChild?.className).toBe("channel__spacer");
@@ -351,10 +351,63 @@ describe("bottom anchoring", () => {
     });
     await settle();
     expect(log.scrollTop).toBe(100);
-    const pill = screen().getByRole("button", { name: /Novas mensagens/ });
+    const pill = screen().getByRole("button", { name: /Ir para as mensagens mais recentes/ });
     await act(async () => fireEvent.click(pill));
     expect(log.scrollTop).toBe(2000);
-    expect(screen().queryByRole("button", { name: /Novas mensagens/ })).toBeNull();
+    expect(screen().queryByRole("button", { name: /Ir para as mensagens mais recentes/ })).toBeNull();
+  });
+
+  test("the round button: more than a screen up with nothing new, then a count, red for a mention of me", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    Object.defineProperty(log, "scrollHeight", { configurable: true, value: 3000 });
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    const latest = () => screen().queryByRole("button", { name: /Ir para as mensagens mais recentes/ });
+    expect(latest()).toBeNull();
+    // Less than a screen up: nothing new, no button.
+    log.scrollTop = 2200;
+    await act(async () => {
+      fireEvent.wheel(log, { deltaY: -40 });
+      fireEvent.scroll(log);
+    });
+    expect(latest()).toBeNull();
+    // More than a screen up: the button, keyboard reachable, with no count yet.
+    log.scrollTop = 600;
+    await act(async () => {
+      fireEvent.wheel(log, { deltaY: -40 });
+      fireEvent.scroll(log);
+    });
+    const button = latest() as HTMLElement;
+    expect(button.getAttribute("aria-label")).toBe("Ir para as mensagens mais recentes");
+    expect(button.tabIndex).toBe(0);
+    const at = button.parentElement as HTMLElement;
+    expect(at.querySelector(".channel__latest-count")).toBeNull();
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-call",
+      message: {
+        id: "m-call",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: "@walter dá uma olhada",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await settle();
+    expect(at.querySelector(".channel__latest-count")?.textContent).toBe("1");
+    expect(at.querySelector(".channel__latest-count")?.hasAttribute("data-mention")).toBe(true);
+    expect(latest()?.getAttribute("aria-label")).toBe(
+      "Ir para as mensagens mais recentes: 1 nova · João · mencionaram você",
+    );
+    await act(async () => fireEvent.click(latest() as HTMLElement));
+    expect(log.scrollTop).toBe(3000);
+    expect(latest()).toBeNull();
+    expect(at.querySelector(".channel__latest-count")).toBeNull();
   });
 
   test("a small scroll up lets go at once: new messages don't pull it back down", async () => {
@@ -389,7 +442,7 @@ describe("bottom anchoring", () => {
     });
     await settle();
     expect(log.scrollTop).toBe(1960);
-    expect(screen().getByRole("button", { name: /Novas mensagens/ })).not.toBeNull();
+    expect(screen().getByRole("button", { name: /Ir para as mensagens mais recentes/ })).not.toBeNull();
   });
 
   test("the end shrinking right after a wheel down or a click on a row keeps the list at the bottom", async () => {
@@ -435,7 +488,7 @@ describe("bottom anchoring", () => {
     await said("m-after-click");
     await settle();
     expect(log.scrollTop).toBe(2600);
-    expect(screen().queryByRole("button", { name: /Novas mensagens/ })).toBeNull();
+    expect(screen().queryByRole("button", { name: /Ir para as mensagens mais recentes/ })).toBeNull();
   });
 
   test("a window without focus still scrolled by the wheel is being read: a new message doesn't pull the list", async () => {

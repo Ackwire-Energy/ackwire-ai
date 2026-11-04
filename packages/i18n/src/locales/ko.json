@@ -1541,12 +1541,13 @@
     "typing_other": "{{names}}이(가) 입력 중…",
     "callAgent": "에이전트 부르기",
     "callAgentMenu": "이 채널의 에이전트",
-    "newMessages": "새 메시지",
+    "toLatest": "최신 메시지로 이동",
     "newPill": {
-      "label": "새 메시지: {{text}}",
+      "label": "최신 메시지로 이동: {{text}}",
       "count_other": "새 메시지 {{count}}개",
       "more": "{{names}} 외 {{count}}명",
-      "writing": "{{name}} 작성 중"
+      "writing": "{{name}} 작성 중",
+      "mentionsYou": "나를 멘션했어요"
     },
     "unreadDivider": "새 메시지",
     "offline": "연결이 끊겼어요. 보낸 내용은 연결되면 자동으로 전송돼요.",

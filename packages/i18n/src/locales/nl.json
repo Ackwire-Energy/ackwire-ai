@@ -1596,13 +1596,14 @@
     "typing_other": "{{names}} typen…",
     "callAgent": "Agent roepen",
     "callAgentMenu": "Agents in dit kanaal",
-    "newMessages": "Nieuwe berichten",
+    "toLatest": "Naar de nieuwste berichten",
     "newPill": {
-      "label": "Nieuwe berichten: {{text}}",
+      "label": "Naar de nieuwste berichten: {{text}}",
       "count_one": "{{count}} nieuw",
       "count_other": "{{count}} nieuw",
       "more": "{{names}} en nog {{count}}",
-      "writing": "{{name}} schrijft"
+      "writing": "{{name}} schrijft",
+      "mentionsYou": "je bent vermeld"
     },
     "unreadDivider": "Nieuw",
     "offline": "Geen verbinding. Wat je verstuurt, gaat vanzelf weg zodra de verbinding terug is.",

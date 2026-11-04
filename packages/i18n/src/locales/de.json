@@ -1593,13 +1593,14 @@
     "typing_other": "{{names}} schreiben…",
     "callAgent": "Agenten rufen",
     "callAgentMenu": "Agenten in diesem Kanal",
-    "newMessages": "Neue Nachrichten",
+    "toLatest": "Zu den neuesten Nachrichten",
     "newPill": {
-      "label": "Neue Nachrichten: {{text}}",
+      "label": "Zu den neuesten Nachrichten: {{text}}",
       "count_one": "{{count}} neue",
       "count_other": "{{count}} neue",
       "more": "{{names}} und {{count}} weitere",
-      "writing": "{{name}} schreibt"
+      "writing": "{{name}} schreibt",
+      "mentionsYou": "du wurdest erwähnt"
     },
     "unreadDivider": "Neu",
     "offline": "Keine Verbindung. Was du sendest, geht von selbst raus, sobald sie wieder da ist.",

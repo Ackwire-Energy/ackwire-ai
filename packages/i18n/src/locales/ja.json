@@ -1541,12 +1541,13 @@
     "typing_other": "{{names}}が入力中…",
     "callAgent": "エージェントを呼ぶ",
     "callAgentMenu": "このチャンネルのエージェント",
-    "newMessages": "新しいメッセージ",
+    "toLatest": "最新のメッセージへ",
     "newPill": {
-      "label": "新しいメッセージ: {{text}}",
+      "label": "最新のメッセージへ: {{text}}",
       "count_other": "{{count}}件の新着",
       "more": "{{names}}ほか{{count}}人",
-      "writing": "{{name}}が入力中"
+      "writing": "{{name}}が入力中",
+      "mentionsYou": "メンションされました"
     },
     "unreadDivider": "新着",
     "offline": "接続されていません。送信したものは、接続が戻ると自動で送られます。",

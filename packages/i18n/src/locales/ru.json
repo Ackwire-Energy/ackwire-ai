@@ -1697,15 +1697,16 @@
     "typing_other": "{{names}} печатают…",
     "callAgent": "Позвать агента",
     "callAgentMenu": "Агенты в этом канале",
-    "newMessages": "Новые сообщения",
+    "toLatest": "К последним сообщениям",
     "newPill": {
-      "label": "Новые сообщения: {{text}}",
+      "label": "К последним сообщениям: {{text}}",
       "count_one": "{{count}} новое",
       "count_few": "{{count}} новых",
       "count_many": "{{count}} новых",
       "count_other": "{{count}} новых",
       "more": "{{names}} и ещё {{count}}",
-      "writing": "{{name}} пишет"
+      "writing": "{{name}} пишет",
+      "mentionsYou": "вас упомянули"
     },
     "unreadDivider": "Новые",
     "offline": "Нет соединения. Всё, что вы отправите, уйдёт само, когда оно вернётся.",

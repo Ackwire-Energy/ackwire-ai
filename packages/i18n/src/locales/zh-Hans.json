@@ -1544,12 +1544,13 @@
     "typing_other": "{{names}} 正在输入…",
     "callAgent": "呼叫智能体",
     "callAgentMenu": "这个频道中的智能体",
-    "newMessages": "新消息",
+    "toLatest": "前往最新消息",
     "newPill": {
-      "label": "新消息：{{text}}",
+      "label": "前往最新消息：{{text}}",
       "count_other": "{{count}} 条新消息",
       "more": "{{names}} 等另外 {{count}} 位",
-      "writing": "{{name}} 正在撰写"
+      "writing": "{{name}} 正在撰写",
+      "mentionsYou": "有人提及了你"
     },
     "unreadDivider": "新",
     "offline": "没有网络连接。你发送的内容会在恢复连接后自动发出。",

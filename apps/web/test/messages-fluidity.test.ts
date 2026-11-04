@@ -12,7 +12,7 @@ import { createStreamsStore } from "@/realtime/context";
 const i18n = createI18n("pt-BR");
 const t = i18n.t.bind(i18n) as TFunction;
 
-const msg = (id: string, author: Message["author"]): TimelineItem => ({
+const msg = (id: string, author: Message["author"], body = ""): TimelineItem => ({
   kind: "message",
   key: id,
   grouped: false,
@@ -21,7 +21,7 @@ const msg = (id: string, author: Message["author"]): TimelineItem => ({
     channelId: "c",
     threadId: null,
     author,
-    body: "",
+    body,
     mentionedAgentIds: [],
     agentRunId: null,
     createdAt: new Date(0).toISOString(),
@@ -31,7 +31,7 @@ const me = { type: "person" as const, id: "u-me" };
 const marina = { type: "person" as const, id: "u-marina" };
 const ada = { type: "agent" as const, id: "ada" };
 
-describe("the '↓ novas' pill and the 'Novas' divider", () => {
+describe("the round button's count and the 'Novas' divider", () => {
   const items = [msg("a", me), msg("b", marina), msg("c", ada), msg("d", me), msg("e", marina)];
 
   test("the divider goes before the first row after the one that was last", () => {
@@ -41,8 +41,15 @@ describe("the '↓ novas' pill and the 'Novas' divider", () => {
   });
 
   test("from the divider on: how many others wrote, and who, in order (my own don't count)", () => {
-    expect(unseenOf(items, "b", "u-me")).toEqual({ count: 3, authors: [marina, ada] });
-    expect(unseenOf(items, null, "u-me")).toEqual({ count: 0, authors: [] });
+    expect(unseenOf(items, "b", "u-me")).toEqual({ count: 3, authors: [marina, ada], mentionsMe: false });
+    expect(unseenOf(items, null, "u-me")).toEqual({ count: 0, authors: [], mentionsMe: false });
+  });
+
+  test("a new message by someone else that @mentions me turns the count red; my own never does", () => {
+    const said = [msg("a", marina), msg("b", me, "@Helena olha"), msg("c", ada, "pronto @helena")];
+    expect(unseenOf(said, "b", "u-me", "helena").mentionsMe).toBe(true);
+    expect(unseenOf(said.slice(0, 2), "b", "u-me", "helena").mentionsMe).toBe(false);
+    expect(unseenOf(said, "b", "u-me").mentionsMe).toBe(false);
   });
 
   test("'2 novas · Marina e Ada · Theo escrevendo'; more than two names", () => {
@@ -50,6 +57,7 @@ describe("the '↓ novas' pill and the 'Novas' divider", () => {
     expect(pillParts(t, 1, ["Marina"], [])).toEqual(["1 nova", "Marina"]);
     expect(pillParts(t, 4, ["Marina", "Ada", "João", "Ana"], [])).toEqual(["4 novas", "Marina, Ada e mais 2"]);
     expect(pillParts(t, 0, [], ["Theo"])).toEqual(["Theo escrevendo"]);
+    expect(pillParts(t, 1, ["Ada"], [], true)).toEqual(["1 nova", "Ada", "mencionaram você"]);
   });
 
   test("the pill lands on the divider only when it is more than 1.2 screens from the end", () => {

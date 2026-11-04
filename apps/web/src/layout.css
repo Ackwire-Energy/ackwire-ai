@@ -11871,64 +11871,61 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   opacity: 0;
 }
 
-/* "↓ 2 novas · Marina e Ada · Theo escrevendo": who spoke, with their faces; it lands on "Novas". */
-.channel__newpill {
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100% - 32px);
-  height: 36px;
-  padding: 0 12px 0 8px;
-  border: 0;
-  border-radius: 13px 13px 13px 4px;
-  background: var(--raised);
-  box-shadow: var(--card-shadow);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: normal;
-  color: var(--ink);
-  white-space: nowrap;
-  cursor: pointer;
-  transform: translate(-50%, 16px) scale(0.96);
+/* Back to the latest messages: a round button at the top right of the list (below the header and the pinned bar,
+   clear of the scrollbar), with what arrived below as a count, red when it mentions me. */
+.channel__latest {
+  position: relative;
+  height: 0;
+  z-index: var(--z-sticky);
   opacity: 0;
   pointer-events: none;
 }
-.channel__newpill[data-on] {
-  transform: translate(-50%, 0);
+.channel__latest[data-shown] {
   opacity: 1;
+}
+.channel__latest-at {
+  position: absolute;
+  top: 12px;
+  right: 24px;
+}
+.channel__latest[data-shown] .channel__latest-at {
   pointer-events: auto;
 }
-html:not([data-pointer]) .channel__newpill:focus-visible {
-  outline: none;
-  box-shadow: var(--card-shadow), var(--focus-ring);
+.channel__latest-btn.ac-btn {
+  border-radius: 50%;
+  border-color: var(--line);
+  box-shadow: var(--overlay);
+}
+html:not([data-pointer]) .channel__latest-btn.ac-btn:focus-visible {
+  box-shadow: var(--overlay), var(--focus-ring);
+}
+.channel__latest-count {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: 0 0 0 2px var(--bg);
+  pointer-events: none;
+}
+.channel__latest-count[data-mention] {
+  background: var(--danger);
+  color: var(--raised);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .channel__newpill {
-    transition:
-      transform 0.32s cubic-bezier(0.34, 1.5, 0.5, 1),
-      opacity 0.2s;
+  .channel__latest {
+    transition: opacity 0.16s;
   }
-}
-.channel__newpill-stack {
-  display: inline-flex;
-  align-items: center;
-}
-.channel__newpill-stack > * + * {
-  margin-left: -4px;
-}
-.channel__newpill-stack > * {
-  box-shadow: 0 0 0 2px var(--raised);
-}
-.channel__newpill-more {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--muted);
-  font-weight: 550;
+  .channel__latest-at {
+    transition: transform 0.22s cubic-bezier(0.34, 1.5, 0.5, 1);
+    transform: translateY(-6px) scale(0.92);
+  }
+  .channel__latest[data-shown] .channel__latest-at {
+    transform: none;
+  }
 }
 
 /* Above the box when the connection drops, then "Conectado de novo". */

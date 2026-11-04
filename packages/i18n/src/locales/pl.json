@@ -1700,15 +1700,16 @@
     "typing_other": "{{names}} piszą…",
     "callAgent": "Zawołaj agenta",
     "callAgentMenu": "Agenci w tym kanale",
-    "newMessages": "Nowe wiadomości",
+    "toLatest": "Przejdź do najnowszych wiadomości",
     "newPill": {
-      "label": "Nowe wiadomości: {{text}}",
+      "label": "Przejdź do najnowszych wiadomości: {{text}}",
       "count_one": "{{count}} nowa",
       "count_few": "{{count}} nowe",
       "count_many": "{{count}} nowych",
       "count_other": "{{count}} nowej",
       "more": "{{names}} i jeszcze {{count}}",
-      "writing": "{{name}} pisze"
+      "writing": "{{name}} pisze",
+      "mentionsYou": "ktoś cię wspomniał"
     },
     "unreadDivider": "Nowe",
     "offline": "Brak połączenia. To, co wyślesz, wyjdzie samo, gdy połączenie wróci.",
