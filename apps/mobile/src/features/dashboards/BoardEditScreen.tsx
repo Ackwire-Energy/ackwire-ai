@@ -21,7 +21,7 @@ export function BoardEditScreen({ id }: { id: string }) {
   if (!q.data) {
     return (
       <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-        <PushedHeader title={t("dashboards.rename")} grouped />
+        <PushedHeader title={t("dashboards.rename")} solid={false} grouped />
         <View style={styles.center}>
           {q.isLoading ? (
             <ActivityIndicator color={c.muted} />
@@ -70,6 +70,7 @@ function Form({ board }: { board: Dashboard }) {
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader
         title={t("dashboards.rename")}
+        solid={false}
         grouped
         action={{ label: t("common.save"), disabled: !ready, onPress: save }}
       />

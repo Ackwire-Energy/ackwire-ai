@@ -529,6 +529,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader
         title={t("dashboards.newWidget.title")}
+        solid={false}
         grouped
         action={
           barLabel === "create"

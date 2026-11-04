@@ -29,6 +29,7 @@ export function EditRolesScreen() {
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader
         title={t("dashboards.edit.label")}
+        solid={false}
         grouped
         action={{ label: t("mobile.common.done"), onPress: goBack }}
       />

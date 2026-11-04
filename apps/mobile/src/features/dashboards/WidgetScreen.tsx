@@ -59,7 +59,7 @@ export function WidgetScreen({ id }: { id: string }) {
   if (!w) {
     return (
       <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-        <PushedHeader title="" grouped />
+        <PushedHeader title="" solid={false} grouped />
         <View style={styles.center}>
           {q.isLoading ? (
             <ActivityIndicator color={c.muted} />
@@ -199,6 +199,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
       <PushedHeader
         title={shown}
         subtitle={t("mobile.dashboards.widget.caresFor", { name: look.name })}
+        solid={false}
         grouped
         right={
           w.canEdit ? (

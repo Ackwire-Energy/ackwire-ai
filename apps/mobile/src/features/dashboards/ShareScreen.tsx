@@ -39,7 +39,7 @@ export function ShareScreen({ id }: { id: string }) {
   if (!q.data) {
     return (
       <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-        <PushedHeader title={t("dashboards.share.action")} grouped />
+        <PushedHeader title={t("dashboards.share.action")} solid={false} grouped />
         <View style={styles.center}>
           {q.isLoading ? (
             <ActivityIndicator color={c.muted} />
@@ -126,6 +126,7 @@ function Form({ board }: { board: Dashboard }) {
       <PushedHeader
         title={t("dashboards.share.action")}
         subtitle={board.title}
+        solid={false}
         grouped
         action={{ label: t("dashboards.share.save"), disabled: !ready, onPress: save }}
       />

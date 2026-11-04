@@ -41,7 +41,7 @@ export function AgentPickScreen() {
   };
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader title={t("dashboards.newWidget.who")} grouped />
+      <PushedHeader title={t("dashboards.newWidget.who")} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"

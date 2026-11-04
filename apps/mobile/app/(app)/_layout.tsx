@@ -1,6 +1,5 @@
 import { usePrefetchRecent, useSendWaiting } from "@agenteschat/client";
 import { type ErrorBoundaryProps, Stack } from "expo-router";
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { NoticeIsland } from "@/features/island/NoticeIsland";
@@ -67,16 +66,6 @@ function AppStack() {
   useSendWaiting(orgId, useConnection(), () => toast({ title: t("mobile.chat.notSent"), icon: "x" }));
   const pushed = usePushedOptions();
   const scrollUnder = useScrollUnderPushedOptions();
-  // Dashboards and widgets: an opaque bar in the screens' grouped gray. Under iOS 26's glass bar their big numbers and
-  // charts read through the title and the buttons as they scroll.
-  const groupedBar = useMemo(
-    () => ({
-      ...pushed,
-      headerStyle: { backgroundColor: colors.grouped },
-      contentStyle: { backgroundColor: colors.grouped },
-    }),
-    [pushed, colors.grouped],
-  );
   const approvalSheet = useFormSheetOptions([0.62, 1], "raised");
   const formSheet = useFormSheetOptions([1]);
   const channelSheet = useFormSheetOptions([0.45, 1]);
@@ -128,16 +117,16 @@ function AppStack() {
       <Stack.Screen name="routines/zone" options={{ ...pushed, ...scrollUnder }} />
       {/* Dashboards (ADR 0135): every screen pushed with back, never a sheet; the list opens from the home. */}
       <Stack.Screen name="dashboards" options={{ ...pushed, ...scrollUnder }} />
-      <Stack.Screen name="board/[id]" options={groupedBar} />
-      <Stack.Screen name="board-new" options={groupedBar} />
-      <Stack.Screen name="board-share/[id]" options={groupedBar} />
-      <Stack.Screen name="board-organize/[id]" options={groupedBar} />
-      <Stack.Screen name="board-edit/[id]" options={groupedBar} />
-      <Stack.Screen name="board-edit-roles" options={groupedBar} />
-      <Stack.Screen name="widget/[id]" options={groupedBar} />
-      <Stack.Screen name="widget-new" options={groupedBar} />
-      <Stack.Screen name="agent-pick" options={groupedBar} />
-      <Stack.Screen name="widget-pin" options={groupedBar} />
+      <Stack.Screen name="board/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-share/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-organize/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-edit/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="board-edit-roles" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="widget/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="widget-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-pick" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="widget-pin" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="task-manager/[runId]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-tasks/[agentId]" options={{ ...pushed, ...scrollUnder }} />

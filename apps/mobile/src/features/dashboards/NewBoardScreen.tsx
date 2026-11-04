@@ -60,6 +60,7 @@ function NewBoard() {
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader
         title={t("dashboards.create.title")}
+        solid={false}
         grouped
         action={{ label: t("mobile.dashboards.create"), disabled: !ready, onPress: submit }}
       />

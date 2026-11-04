@@ -2,12 +2,12 @@ import { busyWidgets, type Widget } from "@agenteschat/client";
 import { router } from "expo-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
 import { Button, IconButton, Text, useTheme } from "@/ui";
 import { widgetHref } from "../links/logic";
 import { usePullRefresh } from "../shared/hooks";
-import { FocusLive, PushedHeader } from "../shared/parts";
+import { PushedLargeTitle } from "../shared/PushedLargeTitle";
+import { PushedHeader } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useBoard } from "./hooks";
 import { HOME, phoneRows, widgetsInOrder } from "./logic";
@@ -22,9 +22,11 @@ const BUSY_POLL_MS = 15_000;
 export const newWidgetHref = (dashboardId: string) => `/widget-new?dashboardId=${dashboardId}` as const;
 
 /**
- * A dashboard, pushed (ADR 0135): its widgets on two columns (a 2-wide one takes the whole row, a 2-high one draws
- * its data big), who sees it and how many widgets, an agent's request to publish it (empty: "Add widget").
- * Share (the globe or the lock), "+" and "…" (Organize, Rename, Pin, Delete) in the bar. `id` is `home` for My Home,
+ * A dashboard, pushed (ADR 0135), with a large title as Routines: its name in the content, scrolling away under the
+ * glass bar, whose own title fades in. Under the name, who made it, who sees it and how many widgets; an agent's
+ * request to publish it; then its widgets on two columns (a 2-wide one takes the whole row, a 2-high one draws its
+ * data big), or "Add widget" when empty. Share (the globe or the lock), "+" and "…" (Organize, Rename, Pin, Delete)
+ * in the bar. `id` is `home` for My Home,
  * made the first time it is opened.
  */
 export function BoardScreen({ id }: { id: string }) {
@@ -38,7 +40,6 @@ export function BoardScreen({ id }: { id: string }) {
 function Board({ id }: { id: string }) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
-  const insets = useSafeAreaInsets();
   const { board, loading, failed, refetch } = useBoard(id);
   const menu = useBoardMenu(board);
   const pull = usePullRefresh(refetch);
@@ -52,7 +53,7 @@ function Board({ id }: { id: string }) {
   if (!board) {
     return (
       <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-        <PushedHeader title={id === HOME ? t("dashboards.home") : ""} grouped />
+        <PushedHeader title={id === HOME ? t("dashboards.home") : ""} solid={false} grouped />
         <View style={styles.center}>
           {loading ? (
             <ActivityIndicator color={c.muted} />
@@ -76,91 +77,84 @@ function Board({ id }: { id: string }) {
   const rows = phoneRows(widgets.map((w) => ({ w: w.layout.w, widget: w })));
   const open = (w: Widget) => router.push(widgetHref(w.id));
   return (
-    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
-      <PushedHeader
-        title={title}
-        subtitle={home ? t("dashboards.audience.private") : byline(board, false) || undefined}
-        grouped
-        right={
-          <View style={styles.barRight}>
-            {board.canManage && !home ? (
-              <IconButton
-                icon={board.audience === "workspace" ? "globe" : "lock"}
-                label={t("dashboards.share.action")}
-                onPress={share}
-              />
-            ) : null}
-            {board.canEdit ? <IconButton icon="plus" label={t("widgets.add.label")} onPress={add} /> : null}
-            {menu.any ? <IconButton icon="more" label={menu.label} onPress={menu.open} /> : null}
+    <PushedLargeTitle
+      title={title}
+      grouped
+      refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
+      right={
+        <View style={styles.barRight}>
+          {board.canManage && !home ? (
+            <IconButton
+              icon={board.audience === "workspace" ? "globe" : "lock"}
+              label={t("dashboards.share.action")}
+              onPress={share}
+            />
+          ) : null}
+          {board.canEdit ? <IconButton icon="plus" label={t("widgets.add.label")} onPress={add} /> : null}
+          {menu.any ? <IconButton icon="more" label={menu.label} onPress={menu.open} /> : null}
+        </View>
+      }
+    >
+      <View style={styles.in}>
+        {home ? null : (
+          <View style={styles.meta}>
+            <AudienceLine board={board} after={byline(board) || undefined} />
           </View>
-        }
-      />
-      <FocusLive>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
-          contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 28 }]}
-        >
-          {home ? null : (
-            <View style={styles.meta}>
-              <AudienceLine board={board} after={t("dashboards.meta.widgets", { count: board.widgetCount })} />
-            </View>
-          )}
-          <ProposalBanner board={board} />
-          {widgets.length === 0 ? (
-            <View style={[styles.empty, { borderColor: c.line2 }]}>
-              <Text variant="title" tone="ink" style={styles.centerText}>
-                {t("dashboards.empty.title")}
-              </Text>
-              <Text variant="subhead" tone="muted" style={styles.centerText}>
-                {t("dashboards.empty.text")}
-              </Text>
-              {board.canEdit ? (
-                // The button sizes to its label and sits at the start on its own: centered under the text.
-                <View style={styles.emptyAction}>
-                  <Button variant="primary" size="sm" icon="plus" label={t("widgets.add.label")} onPress={add} />
-                </View>
-              ) : null}
-            </View>
-          ) : (
-            <View style={styles.grid}>
-              {rows.map((items) => (
-                <View key={items.map((x) => x.widget.id).join("+")} style={styles.row}>
-                  {items.map(({ widget: w }) => (
-                    <View key={w.id} style={items.length === 1 && w.layout.w < 2 ? styles.half : styles.cell}>
-                      <WidgetCard
-                        widget={{
-                          title: w.title,
-                          kind: w.kind,
-                          spec: w.spec,
-                          status: w.status,
-                          agentId: w.agentId,
-                          refreshedAt: w.refreshedAt,
-                          schedule: w.schedule,
-                          w: w.layout.w,
-                          h: w.layout.h,
-                        }}
-                        onPress={() => open(w)}
-                      />
-                    </View>
-                  ))}
-                </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </FocusLive>
-    </View>
+        )}
+        <ProposalBanner board={board} />
+        {widgets.length === 0 ? (
+          <View style={[styles.empty, { borderColor: c.line2 }]}>
+            <Text variant="title" tone="ink" style={styles.centerText}>
+              {t("dashboards.empty.title")}
+            </Text>
+            <Text variant="subhead" tone="muted" style={styles.centerText}>
+              {t("dashboards.empty.text")}
+            </Text>
+            {board.canEdit ? (
+              // The button sizes to its label and sits at the start on its own: centered under the text.
+              <View style={styles.emptyAction}>
+                <Button variant="primary" size="sm" icon="plus" label={t("widgets.add.label")} onPress={add} />
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {rows.map((items) => (
+              <View key={items.map((x) => x.widget.id).join("+")} style={styles.row}>
+                {items.map(({ widget: w }) => (
+                  <View key={w.id} style={items.length === 1 && w.layout.w < 2 ? styles.half : styles.cell}>
+                    <WidgetCard
+                      widget={{
+                        title: w.title,
+                        kind: w.kind,
+                        spec: w.spec,
+                        status: w.status,
+                        agentId: w.agentId,
+                        refreshedAt: w.refreshedAt,
+                        schedule: w.schedule,
+                        w: w.layout.w,
+                        h: w.layout.h,
+                      }}
+                      onPress={() => open(w)}
+                    />
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </PushedLargeTitle>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  in: { paddingHorizontal: 16, paddingTop: 4, gap: 10 },
+  in: { paddingHorizontal: 16, gap: 10 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 32 },
   centerText: { textAlign: "center" },
   barRight: { flexDirection: "row", alignItems: "center" },
-  meta: { paddingHorizontal: 4, paddingTop: 4 },
+  meta: { paddingHorizontal: 4 },
   grid: { gap: 10 },
   row: { flexDirection: "row", gap: 10 },
   cell: { flex: 1, minWidth: 0 },

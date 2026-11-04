@@ -72,6 +72,7 @@ export function PinScreen() {
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader
         title={t("widgets.pin.label")}
+        solid={false}
         grouped
         action={{ label: t("dashboards.newWidget.pin"), disabled: !ready, onPress: submit }}
       />
