@@ -59,7 +59,13 @@ const Match = z.enum(["exact", "site"]).openapi({
     "`exact`: only this address (`https://host[:port]`). `site`: every HTTPS page of its registrable domain.",
 });
 
-const Title = z.string().trim().min(1).max(120);
+/**
+ * May be empty: the engine names the item after its website's host, its variable or its contact's name, and refuses
+ * with `vault.title_required` only when there is none (ADR 0135). The apps send an empty title on purpose.
+ */
+const Title = z.string().trim().max(120).openapi({
+  description: "Empty: named after the login's host, the key's variable name or the contact's name.",
+});
 const Description = z.string().trim().max(300);
 const Website = z.string().trim().min(1).max(2048);
 const Username = z.string().trim().max(200);

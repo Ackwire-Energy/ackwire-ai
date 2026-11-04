@@ -39,7 +39,7 @@ import {
   vaultNow,
 } from "./service";
 import { listUses, recordPersonUse } from "./uses";
-import { connectionOf, connectionView, itemView, loadVault, sourceInfos, sourceNameOf } from "./views";
+import { connectionOf, connectionView, contactOf, itemView, loadVault, sourceInfos, sourceNameOf } from "./views";
 
 const { vaultConnections, vaultItems } = schema;
 
@@ -421,9 +421,17 @@ export async function updateVaultItem(
     changed.push("keyName");
   }
   if (patch.title !== undefined) {
+    // An emptied name falls back as on creation: a contact's goes by its (new or saved) fields (ADR 0135).
+    const contact =
+      kind !== "contact" || patch.title.trim()
+        ? null
+        : patch.contact !== undefined
+          ? cleanContact(patch.contact)
+          : await contactOf(deps, item);
     set.title = titleFor(patch.title, {
       website: set.website ?? item.website,
       keyName: set.keyName ?? item.keyName,
+      contact,
     });
     changed.push("title");
   }
