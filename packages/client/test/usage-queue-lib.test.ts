@@ -4,13 +4,14 @@ import i18next, { type TFunction } from "i18next";
 import type { UsageQueue, UsageQueueRow } from "../src/api/types";
 import { agentStatusText } from "../src/lib/presence";
 import {
-  usageQueueFacts,
-  usageQueueLine,
   usageQueueMeta,
+  usageQueueResuming,
   usageQueueShared,
-  usageQueueState,
+  usageQueueSkipReason,
+  usageQueueStoppable,
   usageQueueTitle,
   usageQueueWhere,
+  usageQueueWho,
 } from "../src/lib/usage-queue";
 import { receiptView } from "../src/realtime/receipts";
 
@@ -52,17 +53,27 @@ const queue = (over: Partial<UsageQueue> = {}): UsageQueue => ({
 });
 const person = (id: string) => ({ ana: "Ana", bruno: "Bruno", me: "você" })[id] ?? id;
 
-test("the queue's words: how many, when, where, who asked and what happened since", () => {
-  expect(usageQueueTitle(pt, "Theo", queue({ hidden: 3 }))).toBe("Theo tem 4 conversas para retomar");
-  expect(usageQueueTitle(pt, "Theo", queue())).toBe("Theo tem 1 conversa para retomar");
-  expect(usageQueueLine(pt, "pt-BR", queue(), now)).toMatch(
-    /^Retoma às \d\d:00, quando o plano do Claude renovar\. Uma de cada vez, nesta ordem\.$/,
+test("the queue's words: one title per phase, short rows, why one was skipped", () => {
+  // Before the reset: when it is back. Once it answers the first one: picking up.
+  expect(usageQueueTitle(pt, "pt-BR", "Theo", queue(), now)).toMatch(/^Theo volta às \d\d:00$/);
+  expect(usageQueueTitle(pt, "pt-BR", "Theo", queue({ resetsAt: null }), now)).toBe(
+    "Theo volta quando o plano renovar",
   );
-  expect(usageQueueLine(pt, "pt-BR", queue({ resetsAt: null }), now)).toBe(
-    "Retoma assim que o plano do Claude renovar. Uma de cada vez, nesta ordem.",
+  expect(usageQueueTitle(pt, "pt-BR", "Theo", queue({ reason: "budget", resetsAt: null }), now)).toBe(
+    "Theo volta quando o orçamento renovar",
   );
-  expect(usageQueueShared(pt, "Theo", ["Ada"])).toBe("A fila é do plano: Ada e Theo dividem a mesma conta.");
-  expect(usageQueueShared(pt, "Theo", [])).toBeNull();
+  const draining = queue({ rows: [row({ state: "answering" }), row({ runId: "r2" })] });
+  expect(usageQueueResuming(draining)).toBe(true);
+  expect(usageQueueTitle(pt, "pt-BR", "Theo", draining, now)).toBe("Theo está retomando");
+  expect(usageQueueTitle(pt, "pt-BR", "Theo", queue({ reason: null, rows: [] }), now)).toBe("Theo");
+  // Behind the ⓘ: the other agents on the plan.
+  expect(usageQueueShared(pt, "Claude", ["Ada"])).toBe(
+    "Ada usa o mesmo plano do Claude. As conversas dos dois entram na mesma fila.",
+  );
+  expect(usageQueueShared(pt, "Claude", ["Ada", "Nina"])).toBe(
+    "Ada e Nina usam o mesmo plano do Claude. As conversas de todos entram na mesma fila.",
+  );
+  expect(usageQueueShared(pt, "Claude", [])).toBeNull();
   expect(usageQueueWhere(pt, row(), "me", person)).toBe("#suporte");
   expect(usageQueueWhere(pt, row({ threadId: "t1" }), "me", person)).toBe("Conversa em #suporte");
   expect(usageQueueWhere(pt, row({ channelKind: "dm", channelName: null, askers: ["bruno"] }), "me", person)).toBe(
@@ -72,18 +83,30 @@ test("the queue's words: how many, when, where, who asked and what happened sinc
   expect(usageQueueWhere(pt, row({ kind: "routine", title: "Resumo diário", askers: [] }), "me", person)).toBe(
     "Rotina Resumo diário",
   );
+  // Who and when, on the row's one line: a DM already names its person, so only when.
+  const recent = { since: new Date(now.getTime() - 40 * 60_000).toISOString() };
+  // The time never breaks across lines.
+  expect(usageQueueWho(pt, "pt-BR", row(recent), person, now)).toBe("Ana e Bruno · há\u00a040\u00a0min");
+  expect(usageQueueWho(pt, "pt-BR", row({ ...recent, askers: ["me", "ana"] }), person, now)).toBe(
+    "você e Ana · há\u00a040\u00a0min",
+  );
+  expect(usageQueueWho(pt, "pt-BR", row({ ...recent, channelKind: "dm", askers: ["me"] }), person, now)).toBe(
+    "há\u00a040\u00a0min",
+  );
   expect(usageQueueMeta(pt, "pt-BR", row(), person, now)).toMatch(/^Pedido por Ana e Bruno · /);
-  expect(usageQueueFacts(pt, row())).toBe("12 mensagens depois · Nina e Ada escreveram depois");
-  expect(usageQueueFacts(pt, row({ after: { count: 1, names: ["Nina"] } }))).toBe(
-    "1 mensagem depois · Nina escreveu depois",
+  // The dialog's voice, not the agent's ("Não respondi:" stays in its note).
+  const at = now.toISOString();
+  expect(usageQueueSkipReason(pt, { reason: "solved", who: { name: "Nina" }, askers: [], at })).toBe(
+    "Nina já cuidou disso",
   );
-  expect(usageQueueFacts(pt, row({ after: { count: 0, names: [] } }))).toBe("Nada depois");
-  // The viewer's own messages are theirs: "você", not their own name.
-  expect(usageQueueFacts(pt, row({ after: { count: 3, names: ["Heitor Lima"] } }), "Heitor Lima")).toBe(
-    "3 mensagens depois · você escreveu depois",
+  expect(usageQueueSkipReason(pt, { reason: "withdrawn", who: { name: "Ana" }, askers: [], at })).toBe(
+    "Ana disse que não precisa mais",
   );
-  expect(usageQueueState(pt, row())).toBe("Na fila");
-  expect(usageQueueState(pt, row({ state: "answering" }))).toBe("Respondendo agora");
+  expect(usageQueueSkipReason(pt, { reason: "mixed", askers: [], at })).toBe("Já estava resolvido");
+  // "Não rodar nenhuma" counts what is still in line, the hidden ones too, never the one answering.
+  expect(usageQueueStoppable({ ...draining, hidden: 1 })).toBe(2);
+  expect(pt("usageQueue.confirmAll", { count: 2 })).toBe("Não rodar as 2?");
+  expect(pt("usageQueue.hidden", { count: 1 })).toBe("+1 que você não vê");
 });
 
 test("an agent out of office with conversations waiting says how many", () => {

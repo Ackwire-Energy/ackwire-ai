@@ -992,7 +992,50 @@ describe("catch-ups an agent skipped as already handled (ADR 0136)", () => {
       latest: { title: "Ada", reason: "solved" },
       updatedAt: ago(4),
     });
-    const { router } = await go(seedState({ notifications: [skipped, asker] }));
+    const state = seedState({ notifications: [skipped, asker] });
+    const at = new Date().toISOString();
+    state.usageQueues = {
+      [ATLAS_ID]: {
+        agentId: ATLAS_ID,
+        reason: "plan",
+        plan: "Claude",
+        resetsAt: null,
+        sharedWith: [],
+        rows: [
+          {
+            runId: "r-q",
+            kind: "conversation",
+            channelId: ENG_ID,
+            threadId: null,
+            channelKind: "channel",
+            channelName: "eng",
+            messageId: "m-q",
+            askers: ["u-joao"],
+            since: at,
+            after: { count: 0, names: [] },
+            state: "queued",
+            title: null,
+            mayStop: true,
+          },
+        ],
+        hidden: 0,
+        mayStopAll: true,
+        closed: [
+          {
+            runId: "r-s",
+            channelId: ENG_ID,
+            threadId: null,
+            channelKind: "channel",
+            channelName: "eng",
+            messageId: "m-note",
+            closed: { reason: "solved", who: { name: "Nina" }, askers: ["u-joao"], at },
+            continuedRunId: null,
+            mayAnswer: true,
+          },
+        ],
+      },
+    };
+    const { router } = await go(state);
     const owners = document.querySelector('[data-n="n-skip"]') as HTMLElement;
     expect(owners.textContent).toContain("Atlas retomou e pulou 2 conversas que não precisavam de resposta");
     // Two places: the queue lists each, so no single channel beside it.
@@ -1003,6 +1046,15 @@ describe("catch-ups an agent skipped as already handled (ADR 0136)", () => {
     await click(within(owners).getByRole("button", { name: "Abrir" }));
     await settle(4);
     expect(router.state.location.pathname).toBe(before);
-    expect(screen().getByRole("dialog").textContent).toContain("Atlas");
+    // Opened from a skip: on what it skipped, the line in line one tap away.
+    const dialog = screen().getByRole("dialog");
+    expect(dialog.textContent).toContain("Atlas");
+    expect(
+      within(dialog)
+        .getByRole("radio", { name: /Puladas/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(dialog.textContent).toContain("Nina já cuidou disso");
+    expect(within(dialog).getByRole("button", { name: "Responder mesmo assim" })).toBeTruthy();
   });
 });

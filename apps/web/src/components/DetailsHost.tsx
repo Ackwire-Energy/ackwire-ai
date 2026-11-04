@@ -22,7 +22,13 @@ export function DetailsHost({ children }: { children: ReactNode }) {
       {item?.kind === "routine" && <RoutineDetailsDialog key={item.id} routineId={item.id} onClose={close} />}
       {item?.kind === "approval" && <ApprovalDetailsDialog key={item.id} approvalId={item.id} onClose={close} />}
       {item?.kind === "usage_queue" && (
-        <UsageQueueDialog key={item.id} agentId={item.id} open onOpenChange={(open) => !open && close()} />
+        <UsageQueueDialog
+          key={item.id}
+          agentId={item.id}
+          tab={item.tab}
+          open
+          onOpenChange={(open) => !open && close()}
+        />
       )}
     </OpenDetailsContext.Provider>
   );
