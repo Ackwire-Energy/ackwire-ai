@@ -408,6 +408,10 @@ describe("bottom anchoring", () => {
     expect(log.scrollTop).toBe(3000);
     expect(latest()).toBeNull();
     expect(at.querySelector(".channel__latest-count")).toBeNull();
+    // A frame of the glide down, still far up: the button does not come back.
+    log.scrollTop = 1200;
+    await act(async () => fireEvent.scroll(log));
+    expect(latest()).toBeNull();
   });
 
   test("a small scroll up lets go at once: new messages don't pull it back down", async () => {

@@ -1138,10 +1138,11 @@ function ChannelView({
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, the round button at the top right leads back instead of jumping.
   const scroller = useRef<HTMLElement>(null);
-  // More than a screen above the end: the round button shows even with nothing new below.
+  // More than a screen above the end: the round button shows even with nothing new below. Never while pinned to
+  // the end, so it stays gone while its own click glides down.
   const [far, setFar] = useState(false);
   const measureFar = (el: HTMLElement) =>
-    setFar(screenAboveEnd(el.scrollHeight - el.scrollTop - el.clientHeight, el.clientHeight));
+    setFar(!stick.current && screenAboveEnd(el.scrollHeight - el.scrollTop - el.clientHeight, el.clientHeight));
   const datePill = useRef<DatePillHandle>(null);
   // Every conversation opens at its last message (coming back to one included).
   // Opened at a message: not pinned to the bottom until the person scrolls down.
@@ -1381,7 +1382,7 @@ function ChannelView({
     const blocks = previousSlots.current.split(" ");
     const newBlock = slotsKey.split(" ").some((k) => k && !blocks.includes(k));
     previousSlots.current = slotsKey;
-    if (!stick.current && scroller.current) measureFar(scroller.current);
+    if (scroller.current) measureFar(scroller.current);
     if (stick.current) follow((newRow || newBlock) && settled);
     // Holding a long answer at its start: "Fim da resposta" already leads to what comes after it.
     else if (!holdingRef.current) {
