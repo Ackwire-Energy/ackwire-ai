@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -201,6 +201,44 @@ describe("live row and Parar", () => {
     expect(answers).toHaveLength(1);
     expect(answers[0]?.textContent).toContain("Mais detalhes.");
     expect(document.querySelector(".ac-msg--streaming")).toBeNull();
+  });
+
+  test("back to the tab after a while, the conversation is read again: an answer whose end never came lands", async () => {
+    const { state, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Começando a resposta" });
+    await settle(2);
+    // While the tab was away, the run ended and its events never reached this page (the socket still looks open).
+    state.activeRuns = { [ENG_ID]: [] };
+    state.messages.push({
+      id: "m-done",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "Começando a resposta, e aqui está o fim dela.",
+      mentionedAgentIds: [],
+      mentionedUserIds: [],
+      agentRunId: "r-live",
+      meta: {},
+      clientId: null,
+      createdAt: new Date().toISOString(),
+    } as Message);
+    const visibility = (value: "hidden" | "visible") =>
+      act(async () => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => value });
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+    try {
+      await visibility("hidden");
+      setSystemTime(new Date(Date.now() + 60_000));
+      await visibility("visible");
+      await settle(5);
+      expect(document.querySelector(".ac-msg--streaming")).toBeNull();
+      expect(document.body.textContent).toContain("e aqui está o fim dela.");
+    } finally {
+      setSystemTime();
+      Reflect.deleteProperty(document, "visibilityState");
+    }
   });
 
   test("Esc with an empty composer stops the latest run I may stop, right away", async () => {

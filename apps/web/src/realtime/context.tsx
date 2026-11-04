@@ -765,6 +765,9 @@ export function applyTaskEvent(qc: ReturnType<typeof useQueryClient>, orgId: str
   }
 }
 
+/** A tab away at least this long reads its open conversation again when it comes back (a quick switch doesn't). */
+export const RESYNC_AFTER_HIDDEN_MS = 10_000;
+
 /** Subscribes to a channel while mounted: live runs + message cache updates. */
 export function useChannelRealtime(orgId: string, channelId: string, enabled: boolean) {
   const { connection, streams } = useRealtime();
@@ -779,11 +782,30 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     void reconcileChannelRuns(api, streams, orgId, channelId).then((dropped) => {
       if (dropped) void qc.invalidateQueries({ queryKey: keys.messages(orgId, channelId) });
     });
-    return connection.onSubscribed((id) => {
-      if (id !== channelId) return;
+    const resync = () => {
       void reconcileChannelRuns(api, streams, orgId, channelId);
       catchUpLists(api, qc, streams, orgId, channelId);
+    };
+    const offSubscribed = connection.onSubscribed((id) => {
+      if (id === channelId) resync();
     });
+    // Back to the tab after a while: read it again at once. The socket may have died in the meantime (its check takes
+    // seconds), or stayed up while events never reached it (a sleeping tab, the server's pub/sub reconnecting).
+    let hiddenAt: number | null = null;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt ??= Date.now();
+        return;
+      }
+      const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
+      hiddenAt = null;
+      if (away >= RESYNC_AFTER_HIDDEN_MS) resync();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      offSubscribed();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
     if (!connection || !enabled) return;
