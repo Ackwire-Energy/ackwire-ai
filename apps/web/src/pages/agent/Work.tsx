@@ -47,6 +47,7 @@ import {
 } from "@agenteschat/client/lib/agent-setup";
 import {
   accountChoices,
+  lendable,
   ownSignInListed,
   ownSignInName,
   ownSignInReady,
@@ -760,8 +761,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ...added.filter((a) => !view.accounts.some((v) => v.id === a.id)),
   ];
   // A plan thinks only for its owner's agents (ADR 0059 §3): the agent's owner's accounts of the card's plan, which its
-  // owner or an admin picks; anyone else's shows only while it is this agent's.
-  const ofOwner = (a: MachineAccount) => (view.canUsePlans ? a.mine : a.ownerId === agent.ownerUserId);
+  // owner or an admin picks; anyone else's shows only while it is this agent's, or to whoever may use other people's
+  // plans (every one there, each with its owner's name).
+  const ofOwner = (a: MachineAccount) =>
+    view.canUseOthersPlans === true || (view.canUsePlans ? a.mine : a.ownerId === agent.ownerUserId);
+  // Someone else's account, for whoever may use other people's plans: the agent's owner's as an admin picks them,
+  // anyone else's where it thinks for no other agent (`lendable`).
+  const usable = (a: MachineAccount) =>
+    a.mine || view.canUseOthersPlans !== true ? undefined : a.ownerId === agent.ownerUserId || lendable(a, agent.name);
   const accounts = allAccounts.filter((a) => planOfAccount(a) === card && (ofOwner(a) || a.id === view.account));
   const current = accounts.find((a) => a.id === account) ?? null;
   // Moved onto a plan it starts on its owner alone (ADR 0059 §5): "Atende outras pessoas" on then opens that plan.
@@ -1164,7 +1171,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // agent's, moved here.
     ...accountChoices(accounts, [account, view.account]).map((c) => ({
       value: c.also ? `${ALSO}${c.login.id}` : c.login.id,
-      ...accountOption(t, i18n.language, c, agent.name),
+      ...accountOption(t, i18n.language, c, agent.name, usable(c.login)),
       leading: c.login.shared === true ? sharedIcon : loginIcon,
     })),
     {
@@ -1188,13 +1195,17 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const pairer = work.machines.data?.find((m) => m.id === view.computer?.machineId)?.pairedBy?.name.split(" ")[0];
   // The account says why only when it must: signed out, whose accounts these are to an admin, or only whoever
   // connected the computer adds one there.
+  // Someone else's plans listed for whoever may use them: whose they are, and that their owner hears it.
+  const lends = view.canUseOthersPlans === true && accounts.some((a) => !a.mine && a.ownerId !== agent.ownerUserId);
   const accountNote = signedOut
     ? t(isPlanId(card) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
-    : !view.canUsePlans && ownerFirst
-      ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
-      : lockedHere
-        ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
-        : null;
+    : lends
+      ? t("agentPage.work.brain.accountOthers")
+      : !view.canUsePlans && ownerFirst
+        ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
+        : lockedHere
+          ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
+          : null;
   const accountField = accountsOn && accountKind && (
     <BrainField label={t("agentPage.work.brain.account")}>
       {/* The account and its plan's usage in one outline: the meters hang under its picker, they are that account's. */}
@@ -1222,7 +1233,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         </div>
       )}
       {accountNote && (
-        <SettingNote icon={signedOut ? "alert" : view.canUsePlans ? "lock" : "info"}>{accountNote}</SettingNote>
+        <SettingNote icon={signedOut ? "alert" : view.canUsePlans && !lends ? "lock" : "info"}>
+          {accountNote}
+        </SettingNote>
       )}
       {usage && extraUsageOn(usage) && (
         <div className="agp-advswitch">
@@ -1231,7 +1244,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             id={extraId}
             aria-describedby={`${extraId}-hint`}
             checked={extraUsage}
-            disabled={!view.canUsePlans}
+            // Paid extra usage bills the plan's owner: someone else's plan given to this agent is theirs to turn on.
+            disabled={!(current ? current.mine : view.canUsePlans)}
             onCheckedChange={setExtraUsage}
           />
         </div>

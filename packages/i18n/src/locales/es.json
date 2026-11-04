@@ -362,6 +362,12 @@
       "desc": "El plan, la tarjeta y las facturas.",
       "short": "facturación",
       "say": "gestiona la facturación"
+    },
+    "use_others_plans": {
+      "title": "Usar planes de otras personas",
+      "desc": "Dar a los agentes que puede editar un plan que otra persona conectó. Su dueño recibe un correo y puede recuperarlo.",
+      "short": "usar planes de otras personas",
+      "say": "usa planes de otras personas"
     }
   },
   "auth": {
@@ -3301,7 +3307,8 @@
       "usageLimitReached": "<b>{{name}}</b> llegó al límite de {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> llegó al límite de {{amount}} y pide más",
       "usageLimitRaised": "<b>{{name}}</b> subió tu límite de este mes",
-      "usageLimitRefused": "<b>{{name}}</b> rechazó tu pedido de más uso"
+      "usageLimitRefused": "<b>{{name}}</b> rechazó tu pedido de más uso",
+      "planLent": "<b>{{name}}</b> conectó tu plan de {{plan}} a <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_one": "{{count}} pedido este mes",
@@ -3420,7 +3427,12 @@
     "noneUnread": "Todo leído.",
     "noneHere": "Nada por aquí por ahora.",
     "noneDone": "Nada marcado como completado en los últimos 30 días.",
-    "more": "Mostrar más"
+    "more": "Mostrar más",
+    "planLent": {
+      "takeBack": "Recuperar",
+      "takeBackAll": "Recuperar de todos los agentes",
+      "done": "Tu plan volvió"
+    }
   },
   "approvals": {
     "title": "Aprobaciones",
@@ -3825,7 +3837,8 @@
           "sendFailed": "No se pudo enviar el código. Revísalo e inténtalo de nuevo.",
           "done": "La cuenta {{account}} está en {{computer}}. Haz clic en Usar para guardar."
         },
-        "offCloud": "{{computer}} no responde"
+        "offCloud": "{{computer}} no responde",
+        "accountOthers": "Los planes de otras personas muestran de quién son. Su dueño recibe un correo y puede recuperarlo."
       },
       "computer": {
         "title": "¿Dónde trabaja {{name}}?",

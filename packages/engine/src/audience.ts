@@ -356,6 +356,23 @@ export async function notifyBlocked(
   return out;
 }
 
+type PlanAgent = Pick<Agent, "id" | "brain" | "ownerUserId"> &
+  Partial<Pick<Agent, "brainAccountId" | "brainAccountLentBy">>;
+
+/**
+ * Whose plan an agent on a computer brain thinks with: its owner's, or the owner of the plan someone else gave it
+ * (`brainAccountLentBy`, ADR 0059 §3). Null on the API.
+ */
+async function planOwnerOf(db: Executor, orgId: string, agent: PlanAgent): Promise<string | null> {
+  if (!isComputerBrain(agent.brain)) return null;
+  if (!agent.brainAccountLentBy || !agent.brainAccountId) return agent.ownerUserId;
+  const [row] = await db
+    .select({ ownerId: schema.machineAccounts.createdBy })
+    .from(schema.machineAccounts)
+    .where(and(eq(schema.machineAccounts.orgId, orgId), eq(schema.machineAccounts.id, agent.brainAccountId)));
+  return row?.ownerId ?? null;
+}
+
 /** The outbox job telling a plan's owner that someone else let more people talk to their agent (`queuePlanOpenedEmail`). */
 export const PLAN_OPENED_JOB = "agent.plan_opened";
 
@@ -367,12 +384,12 @@ export async function audienceChanged(
   db: Executor,
   orgId: string,
   actorId: string,
-  after: Pick<Agent, "id" | "brain" | "ownerUserId">,
+  after: PlanAgent,
   from: AgentAudience,
   to: AgentAudience,
   planFrom = from,
 ): Promise<boolean> {
-  const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
+  const planOwner = await planOwnerOf(db, orgId, after);
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -391,11 +408,11 @@ export async function planOpened(
   db: Executor,
   orgId: string,
   actorId: string,
-  after: Pick<Agent, "id" | "brain" | "ownerUserId">,
+  after: PlanAgent,
   from: AgentAudience,
   to: AgentAudience,
 ): Promise<boolean> {
-  const planOwner = isComputerBrain(after.brain) ? after.ownerUserId : null;
+  const planOwner = await planOwnerOf(db, orgId, after);
   if (!planOwner || planOwner === actorId || !widensAudience(from, to, planOwner)) return false;
   await enqueue(db, {
     orgId,

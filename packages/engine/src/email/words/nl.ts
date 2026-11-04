@@ -361,4 +361,22 @@ export const words: EmailWords = {
     why: (org) =>
       `Je krijgt deze e-mail omdat een agent van jou in ${org} met je abonnement denkt en iemand anders heeft gewijzigd wie met hem mag praten.`,
   },
+  planLent: {
+    subject: (plan) => `Je ${plan}-abonnement denkt nu voor een andere agent`,
+    preheader: (plan) =>
+      `Zijn gesprekken gebruiken je ${plan}-abonnement en de limieten ervan. Je kunt het terugnemen.`,
+    headline: "Iemand heeft je abonnement aan een agent gekoppeld",
+    body: (by, agent, plan) => [
+      { b: by },
+      ` heeft je ${plan}-abonnement aan de agent `,
+      { b: agent },
+      " gekoppeld. Zijn gesprekken gebruiken je abonnement en de limieten ervan.",
+    ],
+    agent: "Agent",
+    by: "Gekoppeld door",
+    plan: "Abonnement",
+    note: "Neem het met één klik terug in je meldingen, dan denkt de agent niet meer met je abonnement.",
+    button: "Meldingen openen",
+    why: (org) => `Je krijgt deze e-mail omdat iemand in ${org} je abonnement aan een agent heeft gekoppeld.`,
+  },
 };

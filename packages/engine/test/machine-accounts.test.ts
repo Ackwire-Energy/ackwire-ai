@@ -1251,17 +1251,18 @@ test("the agent's account: its owner's own only, on its computer, of its brain's
     .set({ archivedAt: new Date(), brainAccountId: CLAUDE_ID })
     .where(eq(schema.agents.id, theo.id));
 
-  // Someone else's account never thinks for the owner's agent: not picked by the owner, nor by that account's owner.
+  // Someone else's account thinks for the owner's agent only when given by who may use other people's plans (owners
+  // and admins, ADR 0059 §3), and its owner's giving it to someone else's agent tells nobody.
   await addAccount(machineId, "0193dddd-0000-4000-8000-000000000003", "claude_code", {
     createdBy: admin.id,
     email: "bia@example.com",
   });
-  for (const by of [f.owner.id, admin.id]) {
-    const theirs = await setAgentBrain(deps, by, f.org.id, f.agent.id, {
-      account: "0193dddd-0000-4000-8000-000000000003",
-    }).catch((e) => e);
-    expect(theirs).toBeInstanceOf(ForbiddenError);
-  }
+  const lent = await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, {
+    account: "0193dddd-0000-4000-8000-000000000003",
+  });
+  expect(lent.account).toBe("0193dddd-0000-4000-8000-000000000003");
+  expect((await agentRow()).brainAccountLentBy).toBe(admin.id);
+  expect(await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent.plan_lent"))).toHaveLength(0);
 
   // Another brain kind: back to the computer's own sign-in, whoever changes it.
   const codex = await setAgentBrain(deps, admin.id, f.org.id, f.agent.id, { brain: "codex" });

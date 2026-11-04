@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { EmailError, type EmailSender } from "@agenteschat/adapters";
+import { EmailError, type EmailSender, type PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { formatMoneyUsd } from "@agenteschat/i18n/format";
 import { appLocale, localeInfo } from "@agenteschat/i18n/locale";
@@ -205,6 +205,19 @@ export type EmailTemplate =
       plan: string;
       was: PlanAudience;
       now: PlanAudience;
+      url: string;
+    }
+  /**
+   * Someone gave an agent the reader's plan though it isn't theirs (`use_others_plans`, ADR 0059 §3), to the plan's
+   * owner. `plan`: its maker's name ("Claude"). `url`: their notifications, where they take it back in one click.
+   */
+  | {
+      kind: "plan_lent";
+      locale: EmailLocale;
+      orgName: string;
+      byName: string;
+      agentName: string;
+      plan: string;
       url: string;
     }
   /** An AI app or a personal token got access to the person's account in a workspace (ADR 0119), to that person. */
@@ -751,6 +764,28 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.why(inertText(t.orgName)),
       );
     }
+    case "plan_lent": {
+      const c = w.planLent;
+      const by = inertText(t.byName) || w.someone;
+      return doc(
+        c.subject(t.plan),
+        c.preheader(t.plan),
+        c.headline,
+        [
+          { p: c.body(by, inertText(t.agentName), t.plan) },
+          {
+            facts: [
+              [c.agent, inertText(t.agentName)],
+              [c.by, by],
+              [c.plan, t.plan],
+            ],
+          },
+          { small: c.note },
+          { button: c.button, url: t.url },
+        ],
+        c.why(inertText(t.orgName)),
+      );
+    }
     case "account_deleted": {
       const c = w.accountDeleted;
       const names = new Intl.ListFormat(lang, { type: "conjunction" })
@@ -913,6 +948,7 @@ export async function queuePlanOpenedEmail(
       ownerUserId: agents.ownerUserId,
       brain: agents.brain,
       brainAccountId: agents.brainAccountId,
+      brainAccountLentBy: agents.brainAccountLentBy,
       machineId: agents.machineId,
       planForOthers: agents.planForOthers,
     })
@@ -923,7 +959,17 @@ export async function queuePlanOpenedEmail(
   if (row && isRightHand(row) && !row.planForOthers) return;
   const agent = row ? { ...(await thinkingAgent(db, row)), accountId: row.brainAccountId } : undefined;
   if (!agent?.ownerUserId || !isComputerBrain(agent.brain) || !agent.machineId) return;
-  const ownerId = agent.ownerUserId;
+  // A plan someone else gave it (ADR 0059 §3): that plan's owner hears it, not the agent's.
+  const lentFrom =
+    row?.brainAccountLentBy && agent.accountId
+      ? (
+          await db
+            .select({ ownerId: schema.machineAccounts.createdBy })
+            .from(schema.machineAccounts)
+            .where(and(eq(schema.machineAccounts.orgId, orgId), eq(schema.machineAccounts.id, agent.accountId)))
+        )[0]?.ownerId
+      : undefined;
+  const ownerId = lentFrom ?? agent.ownerUserId;
   // Its owner's plan thinks there, and they are still in the workspace: not OpenCode's free tier on a computer nobody
   // connected (ADR 0132), nor a plan that no longer thinks for it.
   const { planIsOwners } = await import("./brains/select");
@@ -972,6 +1018,78 @@ export async function queuePlanOpenedEmail(
       was: audience(from),
       now: audience(to),
       url: `${publicUrl.replace(/\/$/, "")}/org/${orgId}/agents/${agentId}?tab=settings&sec=audience`,
+    },
+  });
+}
+
+/**
+ * Job `agent.plan_lent` (`PLAN_LENT_JOB`): the plan's owner hears that someone else gave an agent their plan, by
+ * email in their language and in their inbox (`notifyPlanLent`). Nothing once the agent no longer has it lent, or the
+ * owner or the person who gave it is gone.
+ */
+export async function queuePlanLent(
+  deps: { db: Database; pubsub?: PubSub },
+  publicUrl: string | null,
+  orgId: string,
+  jobId: string,
+  payload: Record<string, unknown>,
+) {
+  const { db } = deps;
+  const { agentId, accountId, actorId } = payload as { agentId: string; accountId: string; actorId: string };
+  const [row] = await db
+    .select({
+      name: agents.name,
+      brain: agents.brain,
+      account: agents.brainAccountId,
+      lentBy: agents.brainAccountLentBy,
+      ownerId: schema.machineAccounts.createdBy,
+      provider: schema.machineAccounts.provider,
+    })
+    .from(agents)
+    .innerJoin(
+      schema.machineAccounts,
+      and(eq(schema.machineAccounts.orgId, agents.orgId), eq(schema.machineAccounts.id, agents.brainAccountId)),
+    )
+    .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId)));
+  if (!row?.ownerId || row.account !== accountId || row.lentBy !== actorId || !isComputerBrain(row.brain)) return;
+  const [people, [org]] = await Promise.all([
+    db
+      .select({ id: users.id, name: users.name, email: users.email, locale: users.locale })
+      .from(users)
+      .innerJoin(
+        schema.organizationMembers,
+        and(eq(schema.organizationMembers.userId, users.id), eq(schema.organizationMembers.orgId, orgId)),
+      )
+      .where(inArray(users.id, [row.ownerId, actorId])),
+    db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId)),
+  ]);
+  const owner = people.find((p) => p.id === row.ownerId);
+  const actor = people.find((p) => p.id === actorId);
+  if (!owner || !actor || !org) return;
+  const plan = planName(row.brain, row.provider ?? undefined);
+  const { notifyPlanLent } = await import("./notification-producers");
+  await notifyPlanLent(deps, {
+    orgId,
+    agentId,
+    agentName: row.name,
+    accountId,
+    ownerUserId: owner.id,
+    actorId,
+    plan,
+  });
+  if (!publicUrl) return;
+  await queueEmail(db, {
+    orgId,
+    key: `plan-lent:${jobId}`,
+    to: [owner.email],
+    template: {
+      kind: "plan_lent",
+      locale: emailLocale(owner.locale),
+      orgName: org.name,
+      byName: actor.name,
+      agentName: row.name,
+      plan,
+      url: `${publicUrl.replace(/\/$/, "")}/org/${orgId}/notifications`,
     },
   });
 }

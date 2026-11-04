@@ -340,4 +340,21 @@ export const ptBR: Words = {
     why: (org) =>
       `Você recebeu este e-mail porque um agente seu na ${org} pensa com o seu plano e outra pessoa mudou quem pode falar com ele.`,
   },
+  planLent: {
+    subject: (plan) => `Seu plano do ${plan} agora pensa por outro agente`,
+    preheader: (plan) => `As conversas dele usam o seu plano do ${plan} e os limites dele. Você pode tirar de volta.`,
+    headline: "Alguém conectou o seu plano a um agente",
+    body: (by, agent, plan) => [
+      { b: by },
+      ` conectou o seu plano do ${plan} ao agente `,
+      { b: agent },
+      ". As conversas dele usam o seu plano e os limites dele.",
+    ],
+    agent: "Agente",
+    by: "Conectado por",
+    plan: "Plano",
+    note: "Tire de volta com um clique nas suas notificações, e o agente para de pensar com o seu plano.",
+    button: "Abrir notificações",
+    why: (org) => `Você recebeu este e-mail porque alguém na ${org} conectou o seu plano a um agente.`,
+  },
 };

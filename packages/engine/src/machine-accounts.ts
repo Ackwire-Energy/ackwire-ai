@@ -275,17 +275,31 @@ async function accountViewOf(db: Database, orgId: string, row: MachineAccountRow
  * sign-in when that is their owner's, else to the API (a plan thinks only for
  * its owner's agents, ADR 0059 §3). Their cache goes with `forgetAgents`.
  */
-export async function releaseAgents(db: Executor, orgId: string, accountIds: string[], now = new Date()) {
-  if (accountIds.length === 0) return [];
+export async function releaseAgents(
+  db: Executor,
+  orgId: string,
+  accountIds: string[],
+  now = new Date(),
+  /** Only these agents (a plan taken back from them); omitted = every agent on the accounts. */
+  only?: readonly string[],
+) {
+  if (accountIds.length === 0 || only?.length === 0) return [];
   const rows = await db
     .update(agents)
     .set({
       brainAccountId: null,
+      brainAccountLentBy: null,
       brain: sql`case when exists (select 1 from ${machines} m where m.id = "agents"."machine_id"
         and m.paired_by_user_id = "agents"."owner_user_id") then "agents"."brain" else 'model' end`,
       updatedAt: now,
     })
-    .where(and(eq(agents.orgId, orgId), inArray(agents.brainAccountId, accountIds)))
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        inArray(agents.brainAccountId, accountIds),
+        only ? inArray(agents.id, [...only]) : undefined,
+      ),
+    )
     .returning({ id: agents.id });
   return rows.map((r) => r.id);
 }

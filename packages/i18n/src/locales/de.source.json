@@ -34499,5 +34499,32 @@
   },
   "chat.body.action_open_page": {
     "value": "Open a screen"
+  },
+  "permissions.use_others_plans.title": {
+    "value": "Use other people's plans"
+  },
+  "permissions.use_others_plans.desc": {
+    "value": "Give the agents they can edit a plan someone else connected. Its owner gets an email and can take it back."
+  },
+  "permissions.use_others_plans.short": {
+    "value": "use other people's plans"
+  },
+  "permissions.use_others_plans.say": {
+    "value": "uses other people's plans"
+  },
+  "notifications.planLent.takeBack": {
+    "value": "Take it back"
+  },
+  "notifications.planLent.takeBackAll": {
+    "value": "Take it back from every agent"
+  },
+  "notifications.planLent.done": {
+    "value": "Your plan is back"
+  },
+  "notifications.what.planLent": {
+    "value": "<b>{{name}}</b> connected your {{plan}} plan to <b>{{agent}}</b>"
+  },
+  "agentPage.work.brain.accountOthers": {
+    "value": "Other people's plans show whose they are. Their owner gets an email and can take it back."
   }
 }

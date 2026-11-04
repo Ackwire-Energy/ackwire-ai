@@ -299,6 +299,12 @@ export const ptBR = {
       short: "chaves de IA",
       say: "cuida das chaves de IA",
     },
+    use_others_plans: {
+      title: "Usar planos de outras pessoas",
+      desc: "Dar aos agentes que pode editar um plano que outra pessoa conectou. O dono recebe um e-mail e pode tirar de volta.",
+      short: "usar planos de outras pessoas",
+      say: "usa planos de outras pessoas",
+    },
     edit_wiki: { title: "Editar a wiki", desc: "Criar e mudar páginas.", short: "editar a wiki", say: "edita a wiki" },
     upload_files: {
       title: "Subir arquivos no Drive",
@@ -3067,6 +3073,12 @@ export const ptBR = {
   },
   notifications: {
     title: "Notificações",
+    /** "Tirar de volta" on `plan_lent`: the person's plan leaves the agent someone else gave it to, or all of them. */
+    planLent: {
+      takeBack: "Tirar de volta",
+      takeBackAll: "Tirar de todos os agentes",
+      done: "Seu plano voltou",
+    },
     docTitleUnread: "({{count}}) Notificações",
     summaryWaiting_one: "{{count}} coisa esperando você",
     summaryWaiting_other: "{{count}} coisas esperando você",
@@ -3178,6 +3190,9 @@ export const ptBR = {
       /** Someone other than its owner took control of the person's agent's desktop (`desktop_taken`). */
       desktopTaken: "<b>{{name}}</b> assumiu a tela do computador do\u00a0<b>{{agent}}</b>",
       desktopTaken_female: "<b>{{name}}</b> assumiu a tela do computador da\u00a0<b>{{agent}}</b>",
+      /** Someone gave an agent the person's plan (`plan_lent`): `plan` its maker ("Claude"). */
+      planLent: "<b>{{name}}</b> conectou o seu plano do {{plan}} ao\u00a0<b>{{agent}}</b>",
+      planLent_female: "<b>{{name}}</b> conectou o seu plano do {{plan}} à\u00a0<b>{{agent}}</b>",
       routineWaitingPlan: "<b>{{name}}</b> espera o plano renovar para rodar uma rotina",
       planResetUnknown: "O {{plan}} não disse quando o limite renova. O trabalho de <b>{{name}}</b> segue esperando.",
       catchUpClosed_one: "<b>{{name}}</b> retomou e pulou {{count}} conversa que não precisava de resposta",
@@ -3597,6 +3612,9 @@ export const ptBR = {
         accountMove: "Em uso por {{agents}} · Mover para cá",
         accountAlso: "Também usada por {{agents}}",
         accountOf: "De {{name}}",
+        /** Under the account for someone who may use other people's plans (`use_others_plans`). */
+        accountOthers:
+          "Os planos de outras pessoas mostram de quem são. O dono recebe um e-mail e pode tirar de volta.",
         addAccount: "Adicionar conta",
         signInAgain: "Entrar de novo",
         connectPlan: "Conectar outro plano",

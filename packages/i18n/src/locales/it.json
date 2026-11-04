@@ -362,6 +362,12 @@
       "desc": "Il piano, la carta e le fatture.",
       "short": "fatturazione",
       "say": "gestisce la fatturazione"
+    },
+    "use_others_plans": {
+      "title": "Usare i piani di altre persone",
+      "desc": "Dare agli agenti che può modificare un piano collegato da un’altra persona. Il proprietario riceve un’email e può riprenderlo.",
+      "short": "usare i piani di altre persone",
+      "say": "usa i piani di altre persone"
     }
   },
   "auth": {
@@ -3304,7 +3310,8 @@
       "usageLimitReached": "<b>{{name}}</b> ha raggiunto il limite di {{amount}}",
       "usageLimitRequest": "<b>{{name}}</b> ha raggiunto il limite di {{amount}} e chiede di più",
       "usageLimitRaised": "<b>{{name}}</b> ha alzato il tuo limite di questo mese",
-      "usageLimitRefused": "<b>{{name}}</b> ha rifiutato la tua richiesta di più utilizzo"
+      "usageLimitRefused": "<b>{{name}}</b> ha rifiutato la tua richiesta di più utilizzo",
+      "planLent": "<b>{{name}}</b> ha collegato il tuo piano {{plan}} a <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_one": "{{count}} richiesta questo mese",
@@ -3424,7 +3431,12 @@
     "noneUnread": "Tutto letto.",
     "noneHere": "Per ora niente qui.",
     "noneDone": "Niente segnato come completato negli ultimi 30 giorni.",
-    "more": "Mostra altro"
+    "more": "Mostra altro",
+    "planLent": {
+      "takeBack": "Riprendi",
+      "takeBackAll": "Riprendi da tutti gli agenti",
+      "done": "Il tuo piano è tornato"
+    }
   },
   "approvals": {
     "title": "Approvazioni",
@@ -3850,7 +3862,8 @@
           "sendFailed": "Impossibile inviare il codice. Controllalo e riprova.",
           "done": "L'account {{account}} è su {{computer}}. Fai clic su Usa per salvare."
         },
-        "offCloud": "{{computer}} non risponde"
+        "offCloud": "{{computer}} non risponde",
+        "accountOthers": "I piani di altre persone mostrano di chi sono. Il proprietario riceve un’email e può riprenderlo."
       },
       "computer": {
         "title": "Dove lavora {{name}}?",

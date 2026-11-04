@@ -976,7 +976,15 @@
       "app_created_one": "Приложение ИИ кое-что создало для вас",
       "app_created_few": "Приложение ИИ кое-что создало для вас",
       "app_created_many": "Приложение ИИ кое-что создало для вас",
-      "app_created_other": "Приложение ИИ кое-что создало для вас"
+      "app_created_other": "Приложение ИИ кое-что создало для вас",
+      "plan_lent_one": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_few": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_many": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_other": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_female_one": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_female_few": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_female_many": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}",
+      "plan_lent_female_other": "Ваш план {{plan}} подключён к агенту {{agent}}: {{names}}"
     },
     "markRead": "Отметить как прочитанное",
     "markUnread": "Отметить как непрочитанное",

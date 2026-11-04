@@ -353,4 +353,21 @@ export const words: EmailWords = {
     why: (org) =>
       `Recibiste este correo porque un agente tuyo en ${org} piensa con tu plan y otra persona cambió quién puede hablar con él.`,
   },
+  planLent: {
+    subject: (plan) => `Tu plan de ${plan} ahora piensa por otro agente`,
+    preheader: (plan) => `Sus conversaciones usan tu plan de ${plan} y sus límites. Puedes recuperarlo.`,
+    headline: "Alguien conectó tu plan a un agente",
+    body: (by, agent, plan) => [
+      { b: by },
+      ` conectó tu plan de ${plan} al agente `,
+      { b: agent },
+      ". Sus conversaciones usan tu plan y sus límites.",
+    ],
+    agent: "Agente",
+    by: "Conectado por",
+    plan: "Plan",
+    note: "Recupéralo con un clic desde tus notificaciones, y el agente deja de pensar con tu plan.",
+    button: "Abrir notificaciones",
+    why: (org) => `Recibiste este correo porque alguien en ${org} conectó tu plan a un agente.`,
+  },
 };

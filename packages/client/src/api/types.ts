@@ -5217,6 +5217,11 @@ export interface AgentBrain {
   onlyOwner: boolean;
   /** The viewer owns the agent: only they connect its plan and turn its paid extra usage on or off. */
   canUsePlans: boolean;
+  /**
+   * The viewer may use other people's plans (`use_others_plans`, ADR 0059 §3): `accounts` has every plan on its
+   * computer, and they may give it any of them. Absent on older servers.
+   */
+  canUseOthersPlans?: boolean;
   /** "Conta deste computador" can think for it: whoever connected the computer owns the agent. */
   ownSignIn: boolean;
   /** "Conta deste computador"'s plan usage, by brain (absent: not known). */
@@ -5807,6 +5812,11 @@ export type NotificationKind =
   /** ADR 0059 §8: someone else took control of the person's agent's desktop. Once a day per agent; `source.agentId`. */
   | "desktop_taken"
   /**
+   * ADR 0059 §3: someone gave an agent the person's plan (`use_others_plans`). One per agent and account;
+   * `source.agentId`, `source.accountId`, `latest.plan`. "Tirar de volta" (`takeBackPlan`) makes it done.
+   */
+  | "plan_lent"
+  /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
@@ -5945,6 +5955,8 @@ export interface NotificationSource {
   routineId?: string;
   /** `skill_update`: the skill. */
   skillId?: string;
+  /** `plan_lent`: the plan's account. */
+  accountId?: string;
   /** `machine_connected`: the computer. */
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */

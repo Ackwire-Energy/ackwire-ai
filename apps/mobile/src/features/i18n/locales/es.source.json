@@ -4369,5 +4369,15 @@
   },
   "dashboards.notice.card.proposal": {
     "value": "Dashboard"
+  },
+  "activity.kind.plan_lent": {
+    "value": {
+      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
+      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    },
+    "female": {
+      "one": "{{names}} connected your {{plan}} plan to {{agent}}",
+      "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    }
   }
 }

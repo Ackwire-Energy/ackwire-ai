@@ -357,6 +357,12 @@
       "desc": "Het abonnement, de kaart en de facturen.",
       "short": "facturatie",
       "say": "beheert de facturatie"
+    },
+    "use_others_plans": {
+      "title": "Abonnementen van anderen gebruiken",
+      "desc": "De agents die je mag bewerken een abonnement geven dat iemand anders heeft gekoppeld. De eigenaar krijgt een e-mail en kan het terugnemen.",
+      "short": "abonnementen van anderen gebruiken",
+      "say": "gebruikt abonnementen van anderen"
     }
   },
   "auth": {
@@ -3199,7 +3205,8 @@
       "usageLimitReached": "<b>{{name}}</b> heeft de limiet van {{amount}} bereikt",
       "usageLimitRequest": "<b>{{name}}</b> heeft de limiet van {{amount}} bereikt en vraagt om meer",
       "usageLimitRaised": "<b>{{name}}</b> heeft je limiet voor deze maand verhoogd",
-      "usageLimitRefused": "<b>{{name}}</b> heeft je verzoek om meer gebruik afgewezen"
+      "usageLimitRefused": "<b>{{name}}</b> heeft je verzoek om meer gebruik afgewezen",
+      "planLent": "<b>{{name}}</b> heeft je {{plan}}-abonnement aan <b>{{agent}}</b> gekoppeld"
     },
     "usageLimit": {
       "runs_one": "{{count}} verzoek deze maand",
@@ -3313,7 +3320,12 @@
     "noneUnread": "Alles gelezen.",
     "noneHere": "Hier is voorlopig niets.",
     "noneDone": "Niets als afgerond gemarkeerd in de afgelopen 30 dagen.",
-    "more": "Meer tonen"
+    "more": "Meer tonen",
+    "planLent": {
+      "takeBack": "Terugnemen",
+      "takeBackAll": "Van alle agents terugnemen",
+      "done": "Je abonnement is terug"
+    }
   },
   "approvals": {
     "title": "Goedkeuringen",
@@ -3730,7 +3742,8 @@
           "sendFailed": "Kon de code niet versturen. Controleer hem en probeer het opnieuw.",
           "done": "Het account {{account}} staat op {{computer}}. Klik op Gebruiken om op te slaan."
         },
-        "offCloud": "{{computer}} reageert niet"
+        "offCloud": "{{computer}} reageert niet",
+        "accountOthers": "Abonnementen van anderen laten zien van wie ze zijn. De eigenaar krijgt een e-mail en kan het terugnemen."
       },
       "computer": {
         "title": "Waar werkt {{name}}?",

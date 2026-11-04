@@ -76,7 +76,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
     (r) => r.machineId === view?.computer?.machineId,
   );
   const current =
-    view && kind ? agentAccounts(view, kind, agent?.ownerUserId).find((a) => a.id === view.account) : undefined;
+    view && kind ? agentAccounts(view, kind, agent?.ownerUserId, name).find((a) => a.id === view.account) : undefined;
   const autoModel = view?.brain === "model" ? isAuto(agent?.model) : isAuto(view?.effectiveModel);
   // The sizes under the window of the model it thinks with ("Automático": any of its line).
   const options = !view

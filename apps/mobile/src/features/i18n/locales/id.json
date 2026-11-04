@@ -769,7 +769,9 @@
       "connector_tool_changed_other": "Server yang terhubung mengubah alat yang kamu setujui",
       "computer_disk_full_other": "Disk komputer hampir penuh",
       "computer_no_chrome_other": "Komputer memerlukan Google Chrome. Unduh di google.com/chrome",
-      "app_created_other": "Aplikasi AI membuat sesuatu untukmu"
+      "app_created_other": "Aplikasi AI membuat sesuatu untukmu",
+      "plan_lent_other": "{{names}} menghubungkan paket {{plan}} kamu ke {{agent}}",
+      "plan_lent_female_other": "{{names}} menghubungkan paket {{plan}} kamu ke {{agent}}"
     },
     "markRead": "Tandai sudah dibaca",
     "markUnread": "Tandai belum dibaca",

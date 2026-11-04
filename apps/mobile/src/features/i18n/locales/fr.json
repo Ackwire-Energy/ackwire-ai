@@ -907,7 +907,13 @@
       "computer_no_chrome_other": "Des ordinateurs ont besoin de Google Chrome. Téléchargez-le sur google.com/chrome",
       "app_created_one": "Une app d'IA a créé des choses pour vous",
       "app_created_many": "Une app d'IA a créé des choses pour vous",
-      "app_created_other": "Une app d'IA a créé des choses pour vous"
+      "app_created_other": "Une app d'IA a créé des choses pour vous",
+      "plan_lent_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_one": "{{names}} a connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_many": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}",
+      "plan_lent_female_other": "{{names}} ont connecté votre forfait {{plan}} à {{agent}}"
     },
     "markRead": "Marquer comme lu",
     "markUnread": "Marquer comme non lu",

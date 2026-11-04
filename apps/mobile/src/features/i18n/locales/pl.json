@@ -976,7 +976,15 @@
       "app_created_one": "Aplikacja AI coś dla ciebie utworzyła",
       "app_created_few": "Aplikacje AI coś dla ciebie utworzyły",
       "app_created_many": "Aplikacje AI coś dla ciebie utworzyły",
-      "app_created_other": "Aplikacje AI coś dla ciebie utworzyły"
+      "app_created_other": "Aplikacje AI coś dla ciebie utworzyły",
+      "plan_lent_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_one": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_few": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_many": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}",
+      "plan_lent_female_other": "Twój plan {{plan}} połączony z agentem {{agent}} przez {{names}}"
     },
     "markRead": "Oznacz jako przeczytane",
     "markUnread": "Oznacz jako nieprzeczytane",

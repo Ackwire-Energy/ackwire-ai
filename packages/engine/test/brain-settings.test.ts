@@ -12,6 +12,7 @@ import {
   releaseAgents,
   setAgentAudience,
   setAgentBrain,
+  takeBackPlan,
   updateAgent,
   ValidationError,
 } from "../src";
@@ -25,7 +26,9 @@ import {
   executorBrain,
   normalizeBrainModel,
 } from "../src/brain-settings";
-import { contextFields } from "../src/brains/claude-code";
+import { contextFields, recordPlanUsage } from "../src/brains/claude-code";
+import { brainAccountFor, planIsOwners } from "../src/brains/select";
+import { queuePlanLent } from "../src/email";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -176,7 +179,18 @@ async function world() {
     return r;
   };
   const audits = (action: string) => fx.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, action));
-  return { fx, deps: { db: fx.db }, machineId, bia, caio, account, row, audits };
+  /** Dan edits every agent ("Editar qualquer agente") but may not use other people's plans. */
+  const editor = async () => {
+    const dan = await addMember(fx.db, fx.org.id, "member", "dan");
+    const [role] = await fx.db
+      .insert(schema.orgRoles)
+      .values({ orgId: fx.org.id, name: "Editores", permissions: ["manage_agents"] })
+      .returning();
+    if (!role) throw new Error("no role");
+    await fx.db.insert(schema.organizationMemberRoles).values({ orgId: fx.org.id, userId: dan.id, roleId: role.id });
+    return dan;
+  };
+  return { fx, deps: { db: fx.db }, machineId, bia, caio, account, row, audits, editor };
 }
 
 describe("Criar agente: what a new agent could think with", () => {
@@ -346,7 +360,7 @@ describe("a plan answers its owner until it answers other people (Atende outras 
 
 describe("a plan thinks only for its owner's agents, one account each", () => {
   test("the agent's owner's accounts only, picked by its owner or an admin; another agent's with moveAccount, unless for all", async () => {
-    const { fx, deps, machineId, bia, caio, account, row, audits } = await world();
+    const { fx, deps, machineId, bia, caio, account, row, audits, editor } = await world();
     await account(ANAS, fx.owner.id);
     await account(BIAS, bia.id);
     const [theo] = await fx.db
@@ -363,22 +377,18 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
       })
       .returning();
     if (!theo) throw new Error("no agent");
-    // Dev's page lists Ana's account, never Bia's.
-    const seen = await getAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id);
+    // Without "Usar planos de outras pessoas": Dev's page lists Ana's account, never Bia's.
+    const dan = await editor();
+    const seen = await getAgentBrain(deps, dan.id, fx.org.id, fx.agent.id);
     expect(seen.accounts.map((a) => a.id)).toEqual([ANAS]);
-
-    const theirs = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, {
+    expect(seen.canUseOthersPlans).toBe(false);
+    // Bia's plan thinks only for Bia's agents: whoever edits agents without the permission can't give it to Dev.
+    const theirs = await setAgentBrain(deps, dan.id, fx.org.id, fx.agent.id, {
       brain: "claude_code",
       account: BIAS,
     }).catch((e) => e);
     expect(theirs).toBeInstanceOf(ForbiddenError);
     expect(theirs.code).toBe("account.not_owner");
-    // Nor an admin: Bia's plan thinks only for Bia's agents.
-    const admin = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, {
-      brain: "claude_code",
-      account: BIAS,
-    }).catch((e) => e);
-    expect(admin.code).toBe("account.not_owner");
     // The plan's paid extra usage bills its owner: an admin never turns it off or on.
     const extra = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { extraUsage: false }).catch((e) => e);
     expect(extra.code).toBe("brain.extra_owner_only");
@@ -460,5 +470,138 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
       .where(eq(schema.agents.id, fx.agent.id));
     await updateAgent(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { ownerUserId: fx.owner.id });
     expect(await row()).toMatchObject({ brain: "claude_code", audienceMode: "people", audienceUserIds: [] });
+  });
+});
+
+describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () => {
+  test("an admin gives Dev Bia's plan: billed to Bia, told to her, and she takes it back in one click", async () => {
+    const { fx, deps, machineId, bia, caio, account, row, audits } = await world();
+    await account(ANAS, fx.owner.id);
+    await account(BIAS, bia.id);
+    // Admins hold it by default (and owners always): every plan on Dev's computer, each with its owner.
+    const seen = await getAgentBrain(deps, caio.id, fx.org.id, fx.agent.id);
+    expect(seen.canUseOthersPlans).toBe(true);
+    expect(seen.accounts.map((a) => [a.id, a.ownerId, a.email])).toEqual([
+      [ANAS, fx.owner.id, null],
+      [BIAS, bia.id, null],
+    ]);
+
+    const lent = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { brain: "claude_code", account: BIAS });
+    expect(lent).toMatchObject({ brain: "claude_code", account: BIAS, onlyOwner: true, extraUsage: false });
+    expect(await row()).toMatchObject({ brainAccountId: BIAS, brainAccountLentBy: caio.id });
+    expect((await audits("account.lent"))[0]).toMatchObject({
+      targetId: BIAS,
+      details: { agentId: fx.agent.id, owner: bia.id },
+    });
+    // The plan stays Bia's: her usage, her limits. Its turns think with her account, and only she pays extra usage.
+    const agent = await row();
+    expect(await planIsOwners(fx.db, agent, machineId, { id: BIAS })).toBe(true);
+    expect(await planIsOwners(fx.db, { ...agent, brainAccountLentBy: null }, machineId, { id: BIAS })).toBe(false);
+    expect((await brainAccountFor(fx.db, agent, "claude_code", machineId))?.id).toBe(BIAS);
+    const usage = await recordPlanUsage(fx.db, {
+      orgId: fx.org.id,
+      agentId: fx.agent.id,
+      provider: "claude_code",
+      machineId,
+      accountId: BIAS,
+      inputTokens: 10,
+      outputTokens: 5,
+    });
+    const [record] = await fx.db
+      .select()
+      .from(schema.usageRecords)
+      .where(eq(schema.usageRecords.id, usage ?? ""));
+    expect(record).toMatchObject({ brainAccountId: BIAS, billedTo: "plan", costNanoUsd: 0 });
+    const extra = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { extraUsage: true }).catch((e) => e);
+    expect(extra.code).toBe("brain.extra_owner_only");
+
+    // Bia hears it: one inbox note and one email, from the job queued with the save.
+    const [job] = await fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent.plan_lent"));
+    expect(job?.payload).toEqual({ agentId: fx.agent.id, accountId: BIAS, actorId: caio.id });
+    await queuePlanLent({ db: fx.db }, "https://agentes.test", fx.org.id, job?.id ?? "", job?.payload ?? {});
+    const notes = await fx.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "plan_lent"));
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatchObject({
+      userId: bia.id,
+      source: { agentId: fx.agent.id, accountId: BIAS, label: "Dev" },
+      latest: { plan: "Claude" },
+    });
+    const [mail] = await fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "email.send"));
+    expect(mail?.payload).toMatchObject({
+      to: [bia.email],
+      template: { kind: "plan_lent", byName: "caio", agentName: "Dev", plan: "Claude" },
+    });
+
+    // Only Bia takes it back; Dev goes back to the computer's own sign-in, which is its owner's.
+    expect((await takeBackPlan(deps, caio.id, fx.org.id, BIAS).catch((e) => e)).code).toBe("account.not_owner");
+    expect(await takeBackPlan(deps, bia.id, fx.org.id, BIAS, fx.agent.id)).toEqual({ agentIds: [fx.agent.id] });
+    expect(await row()).toMatchObject({ brainAccountId: null, brainAccountLentBy: null, brain: "claude_code" });
+    expect((await audits("account.taken_back"))[0]).toMatchObject({
+      actorId: bia.id,
+      details: { agentId: fx.agent.id, lentBy: caio.id },
+    });
+    const [done] = await fx.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "plan_lent"));
+    expect(done?.doneAt).not.toBeNull();
+  });
+
+  test("a login another agent has stays there; taking back from all leaves Bia's own agents alone", async () => {
+    const { fx, deps, machineId, bia, caio, account, row } = await world();
+    await account(BIAS, bia.id);
+    const agentOf = async (name: string, ownerUserId: string) => {
+      const [a] = await fx.db
+        .insert(schema.agents)
+        .values({
+          orgId: fx.org.id,
+          name,
+          handle: name.toLowerCase(),
+          model: "claude-sonnet-5-5",
+          ownerUserId,
+          machineId,
+        })
+        .returning();
+      if (!a) throw new Error("no agent");
+      return a;
+    };
+    const bea = await agentOf("Bea", bia.id);
+    const theo = await agentOf("Theo", fx.owner.id);
+    await setAgentBrain(deps, bia.id, fx.org.id, bea.id, { brain: "claude_code", account: BIAS });
+    // Bia's own agent has her login: nobody else takes it, moving or not.
+    for (const move of [false, true]) {
+      const taken = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, {
+        brain: "claude_code",
+        account: BIAS,
+        moveAccount: move,
+      }).catch((e) => e);
+      expect(taken.code).toBe("account.in_use");
+    }
+    // Made for all of her agents there, it thinks for the ones others give it too.
+    await fx.db.update(schema.machineAccounts).set({ shared: true }).where(eq(schema.machineAccounts.id, BIAS));
+    await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { brain: "claude_code", account: BIAS });
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, theo.id, { brain: "claude_code", account: BIAS });
+    expect((await row(theo.id)).brainAccountLentBy).toBe(fx.owner.id);
+    const back = await takeBackPlan(deps, bia.id, fx.org.id, BIAS);
+    expect(back.agentIds.sort()).toEqual([fx.agent.id, theo.id].sort());
+    expect(await row(bea.id)).toMatchObject({ brainAccountId: BIAS, brainAccountLentBy: null });
+  });
+
+  test("Lodi on a teammate's plan: given by an admin who may use other people's plans, not by one who may not", async () => {
+    const { fx, deps, bia, caio, account, editor } = await world();
+    await account(BIAS, bia.id);
+    const [lodi] = await fx.db
+      .insert(schema.agents)
+      .values({ orgId: fx.org.id, name: "Lodi", handle: "lodi", model: "claude-sonnet-5-5", builtin: "right_hand" })
+      .returning();
+    if (!lodi) throw new Error("no agent");
+    const dan = await editor();
+    const refused = await setAgentBrain(deps, dan.id, fx.org.id, lodi.id, {
+      brain: "claude_code",
+      account: BIAS,
+    }).catch((e) => e);
+    expect(refused.code).toBe("account.not_owner");
+    const view = await setAgentBrain(deps, caio.id, fx.org.id, lodi.id, { brain: "claude_code", account: BIAS });
+    expect(view).toMatchObject({ account: BIAS, onlyOwner: true });
+    const [saved] = await fx.db.select().from(schema.agents).where(eq(schema.agents.id, lodi.id));
+    expect(saved).toMatchObject({ brainAccountId: BIAS, brainAccountLentBy: caio.id, planForOthers: false });
+    expect(await takeBackPlan(deps, bia.id, fx.org.id, BIAS)).toEqual({ agentIds: [lodi.id] });
   });
 });

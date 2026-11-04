@@ -907,7 +907,13 @@
       "computer_no_chrome_other": "Alcuni computer hanno bisogno di Google Chrome. Scaricalo da google.com/chrome",
       "app_created_one": "Un'app di IA ha creato qualcosa per te",
       "app_created_many": "Un'app di IA ha creato qualcosa per te",
-      "app_created_other": "Un'app di IA ha creato qualcosa per te"
+      "app_created_other": "Un'app di IA ha creato qualcosa per te",
+      "plan_lent_one": "{{names}} ha collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_many": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_other": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_female_one": "{{names}} ha collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_female_many": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}",
+      "plan_lent_female_other": "{{names}} hanno collegato il tuo piano {{plan}} a {{agent}}"
     },
     "markRead": "Segna come letto",
     "markUnread": "Segna come non letto",

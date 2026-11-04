@@ -214,16 +214,23 @@ export function AiPicker({
 
 /**
  * An account as an agent's account choice shows it (Quem pensa's list, Connect an AI's first rows): its name and plan,
- * the line under it with its plan's state, its maker's mark. Only its owner picks it.
+ * the line under it with its plan's state, its maker's mark. Only its owner picks it, unless `usable` says otherwise
+ * (someone else's plan for a person who may use other people's plans).
  */
-export function accountOption(t: TFunction, locale: string, choice: AccountChoice<MachineAccount>, agentName: string) {
+export function accountOption(
+  t: TFunction,
+  locale: string,
+  choice: AccountChoice<MachineAccount>,
+  agentName: string,
+  usable?: boolean,
+) {
   const a = choice.login;
   return {
     label: accountTitle(a),
     description:
       [accountAbout(t, choice, agentName), planWord(t, locale, a.usage)].filter(Boolean).join(" · ") || undefined,
     leading: <ProviderLogo id={a.provider ?? a.kind} size="sm" />,
-    disabled: !a.mine,
+    disabled: !(usable ?? a.mine),
   };
 }
 
@@ -352,7 +359,7 @@ export function ExistingRows({
       <OptionCard
         key={a.id}
         pressed={signIn?.from === a.id}
-        disabled={option.disabled || busy || gateDims(gates.gateOf(choice))}
+        disabled={r.act === "locked" || busy || gateDims(gates.gateOf(choice))}
         onClick={pick}
         className="ai-picker__key ac-iconline"
       >
@@ -370,10 +377,16 @@ export function ExistingRows({
     const at = rows.findIndex((r) => r.kind === "account" && r.choice.login.id === signIn?.from);
     items.splice(at < 0 ? items.length : at + 1, 0, <Fragment key="panel">{panel}</Fragment>);
   }
+  // Someone else's plan, for whoever may use other people's plans: its owner hears it and may take it back.
+  const ownerId = dir.agentById.get(agent.id)?.ownerUserId;
+  const lends = rows.some(
+    (r) => r.kind === "account" && !r.choice.login.mine && r.choice.login.ownerId !== ownerId && r.act === "use",
+  );
   return (
     <>
       <p className="ai-picker__or">{named ? t("connectAi.have.titleFor", g) : t("connectAi.have.title")}</p>
       {items}
+      {lends && <p className="ai-picker__or">{t("agentPage.work.brain.accountOthers")}</p>}
       <p className="ai-picker__or">{t("connectAi.have.other")}</p>
     </>
   );

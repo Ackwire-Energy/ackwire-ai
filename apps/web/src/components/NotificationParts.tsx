@@ -177,6 +177,7 @@ type WhatKey =
   | "joinRequestMany"
   | "browserProfileRequest"
   | "desktopTaken"
+  | "planLent"
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
@@ -288,6 +289,10 @@ export function Headline({
     case "desktop_taken": {
       const agent = n.source.label ?? "";
       return k("desktopTaken", { name, agent, context: agentGrammar(agent).context });
+    }
+    case "plan_lent": {
+      const agent = n.source.label ?? "";
+      return k("planLent", { name, agent, plan: n.latest.plan ?? "", context: agentGrammar(agent).context });
     }
     case "routine_waiting_plan":
       return k("routineWaitingPlan", { name });

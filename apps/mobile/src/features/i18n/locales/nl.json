@@ -838,7 +838,11 @@
       "computer_no_chrome_one": "Een computer heeft Google Chrome nodig. Download het op google.com/chrome",
       "computer_no_chrome_other": "Computers hebben Google Chrome nodig. Download het op google.com/chrome",
       "app_created_one": "Een AI-app heeft dingen voor je aangemaakt",
-      "app_created_other": "AI-apps hebben dingen voor je aangemaakt"
+      "app_created_other": "AI-apps hebben dingen voor je aangemaakt",
+      "plan_lent_one": "{{names}} heeft je {{plan}}-abonnement aan {{agent}} gekoppeld",
+      "plan_lent_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
+      "plan_lent_female_one": "{{names}} heeft je {{plan}}-abonnement aan {{agent}} gekoppeld",
+      "plan_lent_female_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld"
     },
     "markRead": "Markeren als gelezen",
     "markUnread": "Markeren als ongelezen",

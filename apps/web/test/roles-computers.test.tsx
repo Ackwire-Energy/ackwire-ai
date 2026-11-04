@@ -92,3 +92,20 @@ describe("the agents' computers on a role's page: one choice of three", () => {
     expect(choice().getAttribute("aria-disabled")).toBe("true");
   });
 });
+
+describe("Usar planos de outras pessoas (ADR 0059 §3): one key in Apps e computadores", () => {
+  test("its line under its name, and another role turns it on by itself", async () => {
+    const { saved } = await openRole("Suporte");
+    await click(screen().getByRole("button", { name: /Ajustar Apps e computadores/ }));
+    await settle(2);
+    expect(screen().getByText("Usar planos de outras pessoas")).toBeTruthy();
+    expect(
+      screen().getByText(
+        "Dar aos agentes que pode editar um plano que outra pessoa conectou. O dono recebe um e-mail e pode tirar de volta.",
+      ),
+    ).toBeTruthy();
+    await click(screen().getByRole("switch", { name: /Usar planos de outras pessoas/ }));
+    await settle(4);
+    expect(saved().at(-1)).toEqual(["use_others_plans"]);
+  });
+});
