@@ -858,9 +858,7 @@ describe("several accounts of one service", () => {
 
   test("each account is a row with its own name; only an MCP server's ⋯ adds another account", async () => {
     await twoAccounts();
-    const names = [...section().querySelectorAll(".connected-row__name > span:first-child")].map(
-      (el) => el.textContent,
-    );
+    const names = [...section().querySelectorAll(".list-title > span:first-child")].map((el) => el.textContent);
     expect(names).toEqual(["GitHub", "Zapier", "Zapier 2"]);
     const zapier = await rowMenu("Zapier 2");
     expect(

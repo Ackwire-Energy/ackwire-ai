@@ -370,7 +370,7 @@ function MachineRow({
         <ComputerPortrait kind={computerKind(m.os)} state={computerState(m)} />
       </span>
       <span className="list-col machine-row__main">
-        <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span className="list-title">
           <Link
             to="/org/$orgId/settings/computers/$machineId"
             params={{ orgId: org.id, machineId: m.id }}
@@ -425,7 +425,7 @@ function HostOffRow() {
         <ComputerPortrait kind="linux" state="offline" />
       </span>
       <span className="list-col machine-row__main">
-        <span className="machine-row__name">{t("machines.host.label")}</span>
+        <span className="list-title machine-row__name">{t("machines.host.label")}</span>
         <span className="small muted">{t("machines.host.offText")}</span>
       </span>
       {can(org, "configure") && (
