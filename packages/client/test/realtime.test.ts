@@ -335,7 +335,7 @@ describe("live agent runs (streaming)", () => {
   const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "atlas" };
   const delta = (seq: number, text: string): ChannelEvent => ({ type: "agent.delta", ...base, seq, text });
 
-  test("a piece of the text that never arrived: no glued text, it shows again from the next turn", () => {
+  test("a piece of the text that never arrived: no glued text, what came before stays, it goes on from the next turn", () => {
     const piece = (seq: number, turn: number, at: number, text: string): ChannelEvent => ({
       type: "agent.delta",
       ...base,
@@ -348,10 +348,11 @@ describe("live agent runs (streaming)", () => {
     let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
     s = applyChannelEvent(s, piece(0, 1, 0, "O bot já existe "));
     // Pieces 1 and 2 were lost (the socket went down a moment, or this conversation was closed meanwhile).
+    // What was being read stays, nothing glued after it.
     s = applyChannelEvent(s, piece(3, 1, 40, "no Entra ID."));
-    expect(text(s)).toBe("");
+    expect(text(s)).toBe("O bot já existe ");
     s = applyChannelEvent(s, piece(4, 1, 52, " Qual dos dois?"));
-    expect(text(s)).toBe("");
+    expect(text(s)).toBe("O bot já existe ");
     s = applyChannelEvent(s, piece(5, 2, 0, "Pronto: "));
     s = applyChannelEvent(s, piece(6, 2, 8, "conferi."));
     expect(text(s)).toBe("Pronto: conferi.");

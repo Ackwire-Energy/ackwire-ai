@@ -716,7 +716,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       if (current && event.seq <= current.lastSeq) return state;
       const sameTurn = current?.turn !== undefined && event.turn === current.turn;
       // A piece of this turn never reached us (`at` past what we heard): its text would read glued over the hole,
-      // so the turn shows no words until the next one or the message.
+      // so the turn keeps what came before it (none, opened mid-turn) until the next turn or the message. Erased, the
+      // words being read vanished.
       const heard = sameTurn ? current?.turnChars : 0;
       const gap =
         (sameTurn && current?.gap === true) || (event.at !== undefined && heard !== undefined && event.at > heard);
@@ -738,7 +739,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       }
       return upsert(state, event, {
         status: "running",
-        text: gap ? "" : (current?.text ?? "") + event.text,
+        text: gap ? (sameTurn ? (current?.text ?? "") : "") : (current?.text ?? "") + event.text,
         lastSeq: event.seq,
         ...turnPatch,
       });
