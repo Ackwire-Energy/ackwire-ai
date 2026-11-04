@@ -236,6 +236,7 @@ html:not([data-pointer]) .rq__more:focus-visible {
   padding-block: 6px;
   white-space: normal;
   text-align: left;
+  overflow-wrap: anywhere;
 }
 .rq__foot > .ap-refuse {
   flex: 1 1 100%;
