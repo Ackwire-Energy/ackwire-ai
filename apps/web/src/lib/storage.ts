@@ -46,6 +46,8 @@ export const STORAGE_KEYS = {
   firstStepsHidden: "agentes.home.stepsHidden",
   /** How this browser signed in last ("google", "github", "apple" or "email"): marked on the sign-in screen. */
   lastSignIn: "agentes.lastSignIn",
+  /** "0" when the person switched off the picture viewer's hover lens (on by default). */
+  imageLens: "agentes.image.lens",
   /** The Drive's view: "grid" (default) or "list". */
   driveView: "agentes.drive.view",
   /** "1" when the person shrank the sidebar to its icon rail (desktop). */

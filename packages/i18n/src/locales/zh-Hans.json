@@ -6562,8 +6562,8 @@
       "savedEveryone": "{{name}} 现在会回复其他成员。",
       "savedEveryone_female": "{{name}} 现在会回复其他成员。",
       "savedOwner": "{{name}} 现在只回复你。",
-      "savedOwnerOf": "{{name}} 现在只回复 {{owner}}。",
       "savedOwner_female": "{{name}} 现在只回复你。",
+      "savedOwnerOf": "{{name}} 现在只回复 {{owner}}。",
       "backOnApi": "{{name}} 已改回使用 API，仍然只回复你。",
       "backOnApi_female": "{{name}} 已改回使用 API，仍然只回复你。",
       "letEveryone": "让 {{name}} 回复所有人",
@@ -9922,7 +9922,19 @@
     "imageAlt": "图片：{{title}}",
     "pdfFrame": "PDF：{{title}}",
     "tooBigToPreview": "文件太大，无法预览，请下载后打开。",
-    "downloadOnly": "这类文件无法预览，请下载后打开。"
+    "downloadOnly": "这类文件无法预览，请下载后打开。",
+    "zoom": {
+      "toolbar": "缩放",
+      "in": "放大",
+      "out": "缩小",
+      "fit": "适合窗口",
+      "actual": "实际大小",
+      "lens": "放大镜",
+      "hint": "点击、双指缩放或滚动鼠标滚轮以放大",
+      "hintZoomed": "拖动以移动。按 Esc 恢复适合窗口",
+      "hintTouch": "轻点或双指缩放以放大",
+      "hintZoomedTouch": "拖动以移动。轻点恢复适合窗口"
+    }
   },
   "errors": {
     "connector": {

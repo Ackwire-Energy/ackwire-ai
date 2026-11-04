@@ -6845,8 +6845,8 @@
       "savedEveryone": "{{name}} antwoordt nu ook andere mensen.",
       "savedEveryone_female": "{{name}} antwoordt nu ook andere mensen.",
       "savedOwner": "{{name}} antwoordt nu alleen jou.",
-      "savedOwnerOf": "{{name}} antwoordt nu alleen {{owner}}.",
       "savedOwner_female": "{{name}} antwoordt nu alleen jou.",
+      "savedOwnerOf": "{{name}} antwoordt nu alleen {{owner}}.",
       "backOnApi": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
       "backOnApi_female": "{{name}} werkt weer via de API en antwoordt nog steeds alleen jou.",
       "letEveryone": "Laat {{name}} iedereen antwoorden",
@@ -10309,7 +10309,19 @@
     "imageAlt": "Afbeelding: {{title}}",
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Te groot voor een voorbeeld. Download het om het te openen.",
-    "downloadOnly": "Geen voorbeeld voor dit soort bestand. Download het om het te openen."
+    "downloadOnly": "Geen voorbeeld voor dit soort bestand. Download het om het te openen.",
+    "zoom": {
+      "toolbar": "Zoom",
+      "in": "Inzoomen",
+      "out": "Uitzoomen",
+      "fit": "Passend",
+      "actual": "Ware grootte",
+      "lens": "Vergrootglas",
+      "hint": "Klik, knijp of gebruik het scrollwiel om in te zoomen",
+      "hintZoomed": "Sleep om te verschuiven. Esc maakt het weer passend",
+      "hintTouch": "Tik of knijp om in te zoomen",
+      "hintZoomedTouch": "Sleep om te verschuiven. Tik om het weer passend te maken"
+    }
   },
   "errors": {
     "connector": {

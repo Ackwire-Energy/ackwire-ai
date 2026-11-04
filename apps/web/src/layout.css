@@ -6856,12 +6856,161 @@ html:not([data-pointer]) .file-row__open:focus-visible {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
-/* As tall as the dialog leaves it (its header and padding): a picture fills the window's height. */
-.file-view__image {
-  max-width: 100%;
-  max-height: max(320px, calc(100vh - 200px));
-  height: auto;
-  object-fit: contain;
+/* A picture: the dialog closer to the window's edges with a tighter head, the viewer at its full height and the
+   picture's stage taking all of it (the zoom bar floats over the stage). Phones keep the full-screen sheet. */
+@media (min-width: 641px) {
+  .ac-details.artifact-sheet--image {
+    --details-pad: 16px;
+    width: calc(100% - 32px);
+    height: calc(100vh - 32px);
+    /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+    height: calc(100dvh - 32px);
+    max-height: none;
+  }
+  .artifact-sheet--image .ac-details__body {
+    padding-top: 12px;
+  }
+}
+.ac-details__body > .artifact-viewer--image {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.artifact-viewer--image .artifact-viewer__main,
+.file-view--image {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.artifact-viewer--image .artifact-viewer__versions {
+  min-height: 0;
+  overflow-y: auto;
+}
+.file-view--image .file-view__preview {
+  flex: 1 1 auto;
+  align-items: center;
+}
+.izoom {
+  position: relative;
+  container-type: inline-size;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.izoom__stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 240px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  touch-action: none;
+  user-select: none;
+  cursor: zoom-in;
+}
+.izoom[data-zoomed] .izoom__stage {
+  cursor: grab;
+}
+.izoom__stage[data-dragging] {
+  cursor: grabbing;
+}
+.izoom__stage:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.izoom__img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  -webkit-user-drag: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .izoom__img[data-animate] {
+    transition: transform 0.2s var(--out);
+  }
+}
+.izoom__status {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  gap: 8px;
+}
+.izoom__lens {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 30%, transparent);
+}
+.izoom__pane {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: var(--e3);
+}
+.izoom__pane img {
+  display: block;
+  max-width: none;
+  transform-origin: 0 0;
+}
+/* The zoom bar: a raised pill over the stage's bottom edge, its own surface and ring so it reads on any picture.
+   Shown on hover, on focus (Tab reaches it while hidden) and while zoomed; always on a screen with no hover. */
+.izoom__bar {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 12px;
+  translate: -50% 0;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 40px;
+  padding: 4px 16px;
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: var(--e2);
+  opacity: 0;
+  transition: opacity 0.15s var(--out);
+}
+.izoom:hover .izoom__bar,
+.izoom:focus-within .izoom__bar,
+.izoom[data-zoomed] .izoom__bar {
+  opacity: 1;
+}
+@media (hover: none) {
+  .izoom__bar {
+    opacity: 1;
+  }
+}
+.izoom__hint {
+  margin: 0;
+  white-space: nowrap;
+}
+.izoom__tools {
+  flex: none;
+  align-items: center;
+}
+/* The ghost's own off state is only a lighter ink: here it fades, so − and Ajustar read as off at a glance. */
+.izoom__tools .ac-btn[disabled] {
+  opacity: 0.35;
+}
+.izoom__level {
+  min-width: 48px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+/* The hint only where the bar holds it whole: a narrower stage keeps the bare tools. */
+@container (max-width: 900px) {
+  .izoom__hint {
+    display: none;
+  }
 }
 .file-view__pdf {
   width: 100%;

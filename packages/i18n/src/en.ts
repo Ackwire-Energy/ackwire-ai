@@ -9653,6 +9653,22 @@ export const en = {
     pdfFrame: "PDF: {{title}}",
     tooBigToPreview: "Too large to preview. Download it to open.",
     downloadOnly: "No preview for this type of file. Download it to open.",
+    /** The picture viewer's zoom bar. */
+    zoom: {
+      toolbar: "Zoom",
+      in: "Zoom in",
+      out: "Zoom out",
+      fit: "Fit",
+      /** The "100%" button's label: the picture at its real pixels. */
+      actual: "Actual size",
+      /** Switches the magnifier that follows the mouse over the picture. */
+      lens: "Magnifier",
+      hint: "Click, pinch or use the wheel to zoom in",
+      hintZoomed: "Drag to move around. Esc fits it back",
+      /** The same hints on a touch screen. */
+      hintTouch: "Tap or pinch to zoom in",
+      hintZoomedTouch: "Drag to move around. Tap to fit it back",
+    },
   },
   errors: {
     connector: {

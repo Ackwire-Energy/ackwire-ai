@@ -9844,7 +9844,19 @@
     "imageAlt": "画像: {{title}}",
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "大きすぎてプレビューできません。ダウンロードして開いてください。",
-    "downloadOnly": "この種類のファイルはプレビューできません。ダウンロードして開いてください。"
+    "downloadOnly": "この種類のファイルはプレビューできません。ダウンロードして開いてください。",
+    "zoom": {
+      "toolbar": "ズーム",
+      "in": "拡大",
+      "out": "縮小",
+      "fit": "全体表示",
+      "actual": "実際のサイズ",
+      "lens": "ルーペ",
+      "hint": "クリック、ピンチ、またはホイールで拡大",
+      "hintZoomed": "ドラッグで移動。Esc で全体表示に戻る",
+      "hintTouch": "タップまたはピンチで拡大",
+      "hintZoomedTouch": "ドラッグで移動。タップで全体表示に戻る"
+    }
   },
   "errors": {
     "connector": {

@@ -10231,7 +10231,19 @@
     "imageAlt": "Bild: {{title}}",
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Zu groß für eine Vorschau. Lad sie herunter, um sie zu öffnen.",
-    "downloadOnly": "Keine Vorschau für diesen Dateityp. Lad sie herunter, um sie zu öffnen."
+    "downloadOnly": "Keine Vorschau für diesen Dateityp. Lad sie herunter, um sie zu öffnen.",
+    "zoom": {
+      "toolbar": "Zoom",
+      "in": "Vergrößern",
+      "out": "Verkleinern",
+      "fit": "Einpassen",
+      "actual": "Originalgröße",
+      "lens": "Lupe",
+      "hint": "Zum Vergrößern klicken, zwei Finger spreizen oder das Mausrad drehen",
+      "hintZoomed": "Ziehen zum Verschieben. Esc passt es wieder ein",
+      "hintTouch": "Zum Vergrößern tippen oder zwei Finger spreizen",
+      "hintZoomedTouch": "Ziehen zum Verschieben. Tippen passt es wieder ein"
+    }
   },
   "errors": {
     "connector": {
