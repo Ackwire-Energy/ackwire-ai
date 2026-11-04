@@ -109,7 +109,8 @@ export function NoticeIsland() {
   const coversBar = camera && (shape === "pill" || shape === "open");
   // Open, it stops above the bottom edge and scrolls inside: long choices never run off the screen.
   const openMax = screenHeight - top - insets.bottom - 16;
-  const scrolls = openHeight > openMax;
+  // Only while open: the last open height outlives it, and a closed pill must keep its swipe away.
+  const scrolls = shape === "open" && openHeight > openMax;
   const size = {
     none: camera ? { w: CAMERA.width, h: CAMERA.height } : { w: 44, h: 44 },
     pill: { w: Math.min(width - 20, 420), h: PILL_HEIGHT + clear },

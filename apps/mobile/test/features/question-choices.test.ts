@@ -18,6 +18,8 @@ describe("an agent's answer choices grow with their text and wrap", () => {
     const src = await read("island/NoticeIsland.tsx");
     expect(src).toContain("h: Math.min(openHeight, openMax)");
     expect(src).toMatch(/<ScrollView scrollEnabled=\{scrolls\}/);
+    // The swipe away is off only while the open island scrolls, never on the closed pill.
+    expect(src).toContain('const scrolls = shape === "open" && openHeight > openMax;');
   });
 
   test("the conversation's question card: each choice a row that grows, its words shrink to wrap", async () => {
