@@ -2,16 +2,16 @@ import { bodyPath, EYE_STYLES, EYE_X } from "@agenteschat/ui/agent/engine";
 import { ICONS } from "./icons.data";
 
 /**
- * The tab bar's own glyphs (Conversas, Threads, Agentes, Atividade, Buscar) as SVG documents, in two states:
- * outline (unselected) and filled (selected). They are template images: one opaque color, and the
+ * The tab bar's own glyphs (Chats, Dashboards, Threads, Agents, Activity, Search) as SVG documents, in two
+ * states: outline (unselected) and filled (selected). They are template images: one opaque color, and the
  * native tab bar tints them by state. 24×24 viewBox, stroke 1.7 with round caps, the line icons'
- * geometry; Threads is a message with a reply branching off it; Agentes is our agent (the engine's body with
- * the cut bottom-left corner and two pill eyes); Buscar is the line icons' magnifier, bolder when selected
+ * geometry; Threads is a message with a reply branching off it; Agents is our agent (the engine's body with
+ * the cut bottom-left corner and two pill eyes); Search is the line icons' magnifier, bolder when selected
  * (a filled lens reads as a dot, so it never fills, like the system's search tab).
  * Pure: `tabIcons.ts` rasterizes them with Skia.
  */
 
-export const TAB_GLYPHS = ["chats", "threads", "agents", "activity", "search"] as const;
+export const TAB_GLYPHS = ["chats", "dashboards", "threads", "agents", "activity", "search"] as const;
 export type TabGlyph = (typeof TAB_GLYPHS)[number];
 
 /** A glyph and its state, as one name (the icon "family" of the tab bar takes a single name). */
@@ -55,6 +55,37 @@ const THREAD_REPLY =
 function threadsGlyph(selected: boolean, color: string): string {
   const bubble = selected ? solid : line;
   return `${bubble(THREAD_MESSAGE, color)}${line(THREAD_BRANCH, color)}${bubble(THREAD_REPLY, color)}`;
+}
+
+/** A rounded rectangle as a closed path. */
+function roundRect(x: number, y: number, w: number, h: number, r: number): string {
+  return [
+    `M${f(x + r)} ${f(y)}`,
+    `H${f(x + w - r)}`,
+    `A${f(r)} ${f(r)} 0 0 1 ${f(x + w)} ${f(y + r)}`,
+    `V${f(y + h - r)}`,
+    `A${f(r)} ${f(r)} 0 0 1 ${f(x + w - r)} ${f(y + h)}`,
+    `H${f(x + r)}`,
+    `A${f(r)} ${f(r)} 0 0 1 ${f(x)} ${f(y + h - r)}`,
+    `V${f(y + r)}`,
+    `A${f(r)} ${f(r)} 0 0 1 ${f(x + r)} ${f(y)}`,
+    "Z",
+  ].join("");
+}
+
+/**
+ * Dashboards (ADR 0135): a board of four widgets, a tall and a short one in each column, staggered; each fills when
+ * selected.
+ */
+const DASHBOARD_TILES = [
+  roundRect(3.5, 3.5, 7.5, 9.5, 2),
+  roundRect(13, 3.5, 7.5, 5.5, 2),
+  roundRect(3.5, 15, 7.5, 5.5, 2),
+  roundRect(13, 11, 7.5, 9.5, 2),
+];
+
+function dashboardsGlyph(selected: boolean, color: string): string {
+  return DASHBOARD_TILES.map((d) => (selected ? solid(d, color) : line(d, color))).join("");
 }
 
 /** A vertical pill (an eye) as a closed path. */
@@ -114,6 +145,9 @@ export function tabGlyphSvg(glyph: TabGlyph, selected: boolean, color = "#000000
       break;
     case "activity":
       body = `${selected ? solid(pathD("bell"), color) : line(pathD("bell"), color)}${line(pathD("bell", 1), color)}`;
+      break;
+    case "dashboards":
+      body = dashboardsGlyph(selected, color);
       break;
     case "threads":
       body = threadsGlyph(selected, color);

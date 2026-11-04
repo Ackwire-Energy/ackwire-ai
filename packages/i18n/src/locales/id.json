@@ -2571,6 +2571,7 @@
     },
     "working": {
       "title": "Sedang bekerja",
+      "none": "Tidak ada agen yang sedang bekerja.",
       "dm": "Di percakapanmu",
       "in": "#{{channel}}",
       "mission": "Misi · {{done}} dari {{total}}"
@@ -2757,7 +2758,8 @@
       "browser": "Browser",
       "members": "Anggota",
       "usage": "Penggunaan",
-      "connectors": "Konektor"
+      "connectors": "Konektor",
+      "dashboard": "Dasbor"
     },
     "reactions_other": "{{count}} reaksi",
     "quote": "“{{text}}”",
@@ -4888,13 +4890,18 @@
     "subtitle": "Yang dikerjakan agen sendiri, sesuai jadwal atau saat sesuatu terjadi.",
     "new": "Rutinitas baru",
     "deliversTo": "{{agent}} · dikirim ke {{target}}",
+    "widgetLine": "{{agent}} · memperbarui widget-nya, tanpa pesan",
+    "widgetChip": "Widget dasbor",
+    "widgetFixed": "Apa yang ditampilkan, kapan diperbarui, dan siapa yang mengurusnya diubah dari widget-nya.",
     "target": {
       "forum": "Topik forum",
       "forumShort": "Forum",
       "dm": "DM-ku dengan agen",
       "artifact": "Dokumen di Drive",
       "dmShort": "DM",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "Widget dasbor",
+      "widgetNamed": "Widget “{{title}}”"
     },
     "active": "Aktif",
     "activeLabel": "Aktif: {{name}}",
@@ -4989,7 +4996,8 @@
         "channel": "Semua orang di kanal melihatnya",
         "dm": "Hanya kamu yang melihatnya",
         "forum": "Agen berdiskusi di topik forum",
-        "artifact": "Menjadi dokumen di Drive"
+        "artifact": "Menjadi dokumen di Drive",
+        "widget": "Memperbarui widget-nya, tanpa pesan"
       },
       "ahead": "Disiapkan untuk nanti",
       "createdBy": "Dibuat oleh {{name}} · {{date}}",
@@ -12853,6 +12861,414 @@
         "done": "Selesai hari ini"
       },
       "none": "{{name}} sedang luang."
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "Otomatis",
+      "kpi": "Angka",
+      "goal": "Target",
+      "bars": "Batang",
+      "line": "Garis",
+      "list": "Daftar",
+      "text": "Ringkasan"
+    },
+    "schedules": {
+      "half": "Setiap 30 menit",
+      "hour": "Setiap jam",
+      "day": "Setiap hari pukul 8.00",
+      "week": "Setiap Senin pukul 8.00",
+      "manual": "Hanya saat kamu minta"
+    },
+    "schedulesShort": {
+      "half": "30 menit",
+      "hour": "Setiap jam",
+      "day": "Setiap hari · 8.00",
+      "week": "Setiap Senin",
+      "manual": "Saat saya minta"
+    },
+    "schedulesInline": {
+      "half": "setiap 30 menit",
+      "hour": "setiap jam",
+      "day": "setiap hari pukul 8.00",
+      "week": "setiap Senin pukul 8.00",
+      "manual": "saat diminta"
+    },
+    "sizes": {
+      "label": "Ukuran",
+      "s": "S",
+      "m": "M",
+      "l": "L"
+    },
+    "status": {
+      "building": "{{name}} sedang membuat widget dan rutinitas yang akan memperbaruinya…",
+      "updating": "{{name}} sedang memperbarui…",
+      "failed": "Tidak diperbarui"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "Selesaikan",
+      "agent_reported": "{{detail}}",
+      "no_update": "Pembaruan terakhir selesai tanpa data.",
+      "error": "Pembaruan terakhir gagal.",
+      "budget_exceeded": "{{name}} sudah mencapai anggaran bulan ini.",
+      "waiting_computer": "Komputer {{name}} sedang tidak tersedia.",
+      "waiting_plan": "Paket {{name}} sudah mencapai batas.",
+      "waiting_budget": "Anggaran {{name}} sudah mencapai batas.",
+      "creator_left": "Orang yang menyiapkannya sudah keluar dari ruang kerja.",
+      "creator_no_access": "Orang yang menyiapkannya tidak bisa lagi memakainya.",
+      "agent_archived": "{{name}} sudah diarsipkan.",
+      "audience": "Orang yang menyiapkannya tidak bisa lagi bicara dengan {{name}}.",
+      "failing": "Gagal beberapa kali berturut-turut lalu berhenti.",
+      "stopped": "Pembaruan dihentikan.",
+      "missing_credential": "{{name}} tidak punya kunci AI atau paket untuk bekerja.",
+      "timeout": "Pembaruan terlalu lama.",
+      "invalid_data": "{{name}} tidak bisa menyusun data dalam format ini."
+    },
+    "menu": {
+      "label": "Lainnya",
+      "open": "Buka",
+      "refresh": "Perbarui sekarang",
+      "change": "Minta {{name}} mengubahnya",
+      "schedule": "Ubah kapan diperbarui",
+      "removeHome": "Hapus dari Beranda",
+      "removeBoard": "Hapus dari dasbor"
+    },
+    "organize": {
+      "start": "Atur",
+      "done": "Selesai",
+      "size": "Ukuran",
+      "remove": "Hapus",
+      "drag": "Seret untuk memindahkan",
+      "fixed": "Tetap",
+      "role": "widget yang bisa dipindah",
+      "help": "Spasi atau Enter mengambil kartu, tombol panah memindahkannya, Spasi atau Enter menjatuhkannya, dan Esc membatalkan. Tombol panah saja memindahkannya satu tempat.",
+      "picked": "Kamu mengambil “{{title}}”. Tombol panah memindahkannya, Spasi menjatuhkannya, Esc membatalkan.",
+      "moved": "“{{title}}”: posisi {{position}} dari {{total}}.",
+      "dropped": "Kamu menjatuhkan “{{title}}” di posisi {{position}} dari {{total}}.",
+      "canceled": "“{{title}}” kembali ke tempatnya."
+    },
+    "add": {
+      "label": "Tambah widget",
+      "short": "Widget"
+    },
+    "alert": {
+      "label": "Beri tahu saya kalau ada yang tidak beres",
+      "hint": "Peringatan masuk ke “Menunggumu”, beserta apa yang berubah.",
+      "condition": "Peringatkan jika",
+      "placeholder": "ada yang tidak beres",
+      "line": "Peringatkan jika {{condition}}",
+      "lineAny": "Peringatkan kalau ada yang tidak beres",
+      "where": "Di “Menunggumu”",
+      "none": "Tanpa peringatan"
+    },
+    "cost": {
+      "day": "≈ {{amount}} per hari dari anggaran {{name}}",
+      "week": "≈ {{amount}} per minggu dari anggaran {{name}}",
+      "manual": "Hanya memakai biaya saat kamu meminta pembaruan",
+      "plan": "Memakai paket {{name}}",
+      "unknown": "Setiap pembaruan memakai anggaran {{name}}"
+    },
+    "exposure": "Siapa pun yang melihat dasbor bisa melihat apa yang dibawa para agen, meski tanpa akses ke akun asalnya. Agen juga membuat dasbor. Untuk menampilkannya ke lebih banyak orang daripada yang meminta, mereka bertanya dulu di “Menunggumu”.",
+    "panel": {
+      "caresFor": "{{name}} mengurus widget ini",
+      "caresForOn": "{{name}} mengurus widget ini · {{board}}",
+      "how": "Cara diperbarui",
+      "next": "Rutinitas {{name}} · berikutnya {{when}}",
+      "noRoutine": "Tidak diperbarui sendiri",
+      "askAnytime": "Kamu bisa meminta pembaruan di menu",
+      "editRoutine": "Ubah rutinitas",
+      "changeAlert": "Ubah",
+      "reads": "Yang dibaca {{name}} untuk membuatnya",
+      "history": "Pembaruan terbaru",
+      "noHistory": "Belum ada pembaruan.",
+      "alerted": "memperingatkan: {{text}}",
+      "changed": "Diubah: {{text}}",
+      "ask": "Minta perubahan",
+      "askPlaceholder": "Mis.: pisahkan per kanal, atau bandingkan dengan minggu yang sama tahun lalu",
+      "askTo": "ke {{name}}",
+      "send": "Kirim",
+      "sent": "{{name}} sedang membuat ulang widget-nya.",
+      "updated": "Diperbarui",
+      "rename": "Ganti nama",
+      "titleLabel": "Judul widget"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b> menandai “{{title}}”",
+      "failed": "“{{title}}” berhenti diperbarui",
+      "proposal": "<b>{{name}}</b> ingin memublikasikan dasbor",
+      "proposalWorkspace": "“{{title}}” untuk seluruh ruang kerja · saat ini hanya kamu yang melihatnya",
+      "proposalRoles": "“{{title}}” untuk {{roles}} · saat ini hanya kamu yang melihatnya",
+      "openBoard": "Lihat dasbor",
+      "openWidget": "Buka widget",
+      "resolving": "Memperbarui “{{title}}” lagi"
+    },
+    "example": {
+      "days": {
+        "d1": "Rab",
+        "d2": "Kam",
+        "d3": "Jum",
+        "d4": "Sab",
+        "d5": "Min",
+        "d6": "Sen",
+        "d7": "Sel"
+      },
+      "vsYesterday": "dibanding kemarin",
+      "goalLine": "48 dari 100",
+      "goalNote": "Dengan laju ini, tercapai pada tanggal 29.",
+      "lineNote": "40 kemarin · +48% minggu ini",
+      "row1": "Item pertama",
+      "row2": "Item kedua",
+      "row3": "Item ketiga",
+      "meta1": "sekarang",
+      "meta2": "1 jam lalu",
+      "meta3": "kemarin",
+      "item1": "Ringkasan singkat tentang apa yang berubah.",
+      "item2": "Agen menulisnya ulang di setiap pembaruan."
+    },
+    "preview": {
+      "label": "Pratinjau",
+      "example": "data contoh"
+    },
+    "pin": {
+      "action": "Sematkan",
+      "label": "Sematkan ke dasbor",
+      "done": "Disematkan ke {{where}}",
+      "doneUpdating": "Disematkan ke {{where}} · {{name}} membuatnya ulang {{schedule}}",
+      "subtitle": "Data grafiknya tetap tersimpan. Agennya juga bisa menjaganya tetap terbaru.",
+      "open": "Buka"
+    },
+    "home": "Berandaku",
+    "untitled": "Widget baru",
+    "updatedAgo": "diperbarui {{when}}",
+    "removed": {
+      "home": "“{{title}}” keluar dari Beranda dan rutinitas {{name}} berhenti",
+      "board": "“{{title}}” keluar dari dasbor dan rutinitas {{name}} berhenti"
+    },
+    "removeConfirm": {
+      "title": "Hapus “{{title}}”?",
+      "textRoutine": "Rutinitas {{name}} yang memperbaruinya berhenti, dan riwayat pembaruannya ikut hilang.",
+      "textManual": "Riwayat pembaruannya ikut hilang.",
+      "confirm": "Hapus"
+    }
+  },
+  "agentPicker": {
+    "search": "Cari agen",
+    "list": "Agen",
+    "empty": "Tidak ada agen yang cocok dengan “{{q}}”",
+    "noConnectors": "Tanpa konektor",
+    "more": "+{{count}}"
+  },
+  "dashboards": {
+    "title": "Dasbor",
+    "subtitle": "Angka dan grafik yang dijaga tetap terbaru oleh agen, untuk ruang kerja atau hanya beberapa peran.",
+    "sidebar": "Dasbor",
+    "navWhat": "Angka dan grafik yang dijaga tetap terbaru oleh agen",
+    "new": "Dasbor baru",
+    "back": "Dasbor",
+    "home": "Berandaku",
+    "groups": {
+      "workspace": "Ruang kerja",
+      "workspaceHint": "semua orang melihat",
+      "roles": "Peranmu",
+      "rolesHint": "kamu ada di {{roles}}",
+      "mine": "Hanya milikmu",
+      "mineHint": "tidak ada orang lain yang melihat"
+    },
+    "audience": {
+      "label": "Siapa yang melihat",
+      "workspace": "Seluruh ruang kerja",
+      "workspaceHint_other": "Semua {{count}} anggota melihatnya dan menemukannya di Dasbor",
+      "roles": "Peran",
+      "rolesHint": "Hanya orang dengan salah satu peran yang dipilih",
+      "private": "Hanya kamu",
+      "privateHint": "Tidak ada orang lain yang melihatnya sampai kamu membagikannya",
+      "noRoles": "Ruang kerja belum punya peran.",
+      "people_other": "{{count}} orang"
+    },
+    "edit": {
+      "label": "Siapa yang mengedit",
+      "viewers": "Siapa pun yang melihatnya",
+      "owner": "Hanya kamu dan admin",
+      "roles": "Atau orang dengan peran ini",
+      "twoRoles": "{{first}} dan {{second}}",
+      "manyRoles_other": "{{count}} peran",
+      "cantSee": "Tidak melihat dasbor ini",
+      "someRoles": "Beberapa peran…",
+      "rolesNote": "Orang dengan peran ini bisa mengeditnya jika mereka juga melihatnya. Kamu dan admin selalu bisa."
+    },
+    "meta": {
+      "by": "Dibuat oleh {{name}}",
+      "byYou": "Dibuat olehmu",
+      "widgets_other": "{{count}} widget",
+      "updated": "diperbarui {{when}}"
+    },
+    "share": {
+      "action": "Bagikan",
+      "title": "Bagikan “{{title}}”",
+      "access": "Siapa yang punya akses",
+      "you": "{{name}} (kamu)",
+      "owner": "Pemilik ruang kerja",
+      "edits": "Mengedit",
+      "sees": "Melihat",
+      "none": "Tidak melihat",
+      "copyLink": "Salin tautan",
+      "copied": "Tautan disalin",
+      "save": "Simpan",
+      "nowWorkspace": "“{{title}}” sekarang milik ruang kerja",
+      "nowPrivate": "Hanya kamu yang melihat “{{title}}”",
+      "nowRoles": "{{roles}} melihat “{{title}}”"
+    },
+    "proposal": {
+      "title": "{{name}} membuat dasbor ini untukmu",
+      "workspace": "Dan menyarankan untuk memublikasikannya ke seluruh ruang kerja. Saat ini hanya kamu yang melihatnya.",
+      "roles": "Dan menyarankan untuk menampilkannya ke {{roles}}. Saat ini hanya kamu yang melihatnya.",
+      "keep": "Simpan hanya untukku",
+      "publishWorkspace": "Publikasikan ke ruang kerja",
+      "publishRoles": "Tampilkan ke {{roles}}",
+      "published": "“{{title}}” sudah dipublikasikan",
+      "kept": "Hanya kamu yang melihat “{{title}}”"
+    },
+    "empty": {
+      "title": "Dasbor kosong",
+      "text": "Tambahkan widget: minta ke agen atau sematkan blok dari chat."
+    },
+    "onlyHome": "Buat dasbor untuk ruang kerja atau beberapa peran dengan “Dasbor baru”.",
+    "create": {
+      "title": "Dasbor baru",
+      "subtitle": "Widget berkumpul di satu halaman, untukmu atau untuk tim.",
+      "name": "Nama",
+      "namePlaceholder": "Mis.: Penjualan, Black Friday, Target kuartal",
+      "askHint": "Kamu juga bisa meminta agen di obrolan untuk membuatnya.",
+      "submit": "Buat dasbor",
+      "created": "“{{title}}” dibuat"
+    },
+    "newWidget": {
+      "title": "Widget baru",
+      "subtitle": "Angka, grafik, atau daftar yang dijaga tetap terbaru oleh agen.",
+      "tabAsk": "Minta ke agen",
+      "tabPin": "Sematkan dari chat",
+      "what": "Apa yang ingin kamu pantau?",
+      "whatPlaceholder": "Mis.: penjualan hari ini dibanding kemarin",
+      "who": "Siapa yang mengurus",
+      "format": "Bentuk",
+      "updates": "Pembaruan",
+      "destination": "Tambahkan ke",
+      "create": "Buat widget",
+      "pin": "Sematkan",
+      "fromChat": "Blok yang dikirim agen di chat",
+      "pinHint": "Kamu juga bisa menyematkan langsung dari pesan: “Sematkan” pada bloknya.",
+      "keepUpdated": "Jaga tetap terbaru",
+      "onlyPin": "Tidak, sematkan saja",
+      "emptyPreview": "Sebutkan apa yang ingin kamu pantau dan {{name}} menunjukkan di sini seperti apa tampilannya.",
+      "pickBlock": "Pilih blok dari chat.",
+      "noBlocks": "Belum ada grafik di percakapanmu.",
+      "suggestions": "Saran",
+      "theAgent": "Agennya",
+      "noAgents": "Belum ada agen yang bisa kamu ajak bicara.",
+      "place": {
+        "channel": "{{name}} di #{{channel}} · {{when}}",
+        "thread": "{{name}} di utas #{{channel}} · {{when}}",
+        "dm": "{{name}} di percakapanmu · {{when}}",
+        "unnamed": "{{name}} di sebuah percakapan · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}} membuatnya sekarang, dengan data nyata",
+        "reads": "Membaca {{sources}}",
+        "routine": "Membuat rutinitas “{{title}}”",
+        "routineHint": "{{schedule}} · muncul di Rutinitas",
+        "noRoutine": "Tanpa rutinitas: diperbarui saat kamu minta",
+        "alert": "Peringatan di “Menunggumu” jika {{condition}}",
+        "alertHint": "Selain itu hanya memperbarui widget, tanpa pesan",
+        "noAlert": "Tanpa peringatan",
+        "noAlertHint": "Hanya memperbarui widget, tanpa pesan",
+        "pinAsIs": "Menyematkan blok persis seperti di chat",
+        "redoes": "{{name}} membuatnya ulang {{schedule}}",
+        "redoesHint": "Dengan rutinitas, tanpa pesan di chat",
+        "noRedo": "Tidak diperbarui sendiri",
+        "noRedoHint": "Kamu bisa meminta pembaruan di menu"
+      },
+      "created": "Widget ditambahkan ke {{where}}",
+      "test": "Uji",
+      "testAgain": "Uji lagi",
+      "testing": "{{name}} sedang membuatnya dengan data sungguhan…",
+      "tested": "Data sungguhan · {{when}}",
+      "stale": "Berubah sejak diuji",
+      "testFailed": "Tidak berhasil: {{reason}}",
+      "tryAgain": "Coba lagi",
+      "testCost": "Uji ini memakan biaya {{cost}}",
+      "testFirst": "Uji dulu untuk melihat hasil sungguhannya",
+      "titleField": "Judul",
+      "titlePlaceholder": "Judul · {{name}} menyarankan satu saat diuji",
+      "cardSubtitle": "Tulis di kartu apa yang ingin kamu lihat. Ketuk bagian-bagiannya untuk mengubah siapa yang mengurus, kapan diperbarui, peringatan, dan ukurannya.",
+      "pinTitle": "Sematkan blok dari chat",
+      "pinSubtitle": "Kartunya berasal dari chat. Kamu memilih judulnya dan apakah dibuat ulang.",
+      "pickFromChat": "Pilih blok yang sudah dikirim agen:",
+      "orPin": "Atau sematkan blok yang sudah ada di chat",
+      "repick": "Pilih blok lain",
+      "formatAuto": "Bentuk otomatis",
+      "enterTests": "Enter menguji lagi",
+      "quoted": "“{{ask}}”",
+      "editAsk": "Ubah permintaan",
+      "editAskOf": "Ubah permintaan: {{ask}}",
+      "testingShort": "Menguji…",
+      "buildingFoot": "{{name}} sedang membuat…",
+      "failedTitle": "{{name}} tidak bisa membuatnya",
+      "staleHint": "Uji lagi untuk melihat hasilnya.",
+      "whoButton": "Siapa yang mengurus: {{name}}",
+      "whoHint": "Yang mengurus membuat widget dari apa yang dibacanya lewat konektornya.",
+      "alert": "Peringatan",
+      "alertOn": "Peringatan aktif",
+      "alertDone": "Selesai",
+      "manual": "Hanya saat saya minta",
+      "manualInline": "hanya saat saya minta",
+      "noUpdate": "Jangan perbarui",
+      "noUpdateInline": "tidak diperbarui",
+      "inRoutines": "rutinitas muncul di Rutinitas",
+      "pinAsIs": "Tetap seperti adanya, tanpa rutinitas",
+      "pinRedoes": "{{name}} membuatnya ulang {{schedule}} dengan rutinitas",
+      "formatHints": {
+        "auto": "{{name}} memilih yang paling jelas menampilkannya",
+        "kpi": "Satu angka besar dan perubahannya",
+        "goal": "Kemajuan menuju target",
+        "bars": "Beberapa nilai berdampingan",
+        "line": "Perubahannya dari waktu ke waktu",
+        "list": "Daftar singkat berisi beberapa item",
+        "text": "Beberapa kalimat yang merangkumnya"
+      }
+    },
+    "pinTop": "Sematkan di atas",
+    "unpin": "Lepas sematan",
+    "rename": "Ganti nama",
+    "about": "Deskripsi",
+    "aboutPlaceholder": "Untuk apa dasbor ini",
+    "delete": {
+      "action": "Hapus dasbor",
+      "title": "Hapus “{{title}}”?",
+      "text": "Widget dan rutinitasnya juga ikut terhapus.",
+      "confirm": "Hapus",
+      "done": "“{{title}}” dihapus"
+    },
+    "errors": {
+      "notFound": "Dasbor ini tidak ada, atau kamu tidak bisa melihatnya.",
+      "forbidden": "Hanya yang mengedit dasbor ini yang bisa melakukannya.",
+      "homeFixed": "Berandamu tidak bisa dibagikan atau dihapus.",
+      "rolesRequired": "Pilih setidaknya satu peran.",
+      "roleUnknown": "Salah satu peran ini sudah tidak ada di ruang kerja.",
+      "titleRequired": "Beri nama dasbornya.",
+      "tooMany": "Ruang kerja sudah punya dasbor sebanyak yang diizinkan. Hapus satu dulu.",
+      "publishForbidden": "Peranmu tidak mengizinkanmu menampilkan dasbor ke orang lain.",
+      "proposalNone": "Permintaan itu sudah diputuskan.",
+      "proposalNotYours": "Hanya orang yang ditanya agen yang memutuskan.",
+      "widgetNotFound": "Widget ini sudah tidak ada.",
+      "widgetTooMany": "Dasbor ini sudah penuh. Hapus satu widget atau pakai dasbor lain.",
+      "scheduledCap": "Ruang kerja sudah menjaga {{max}} widget diperbarui sesuai jadwal. Atur satu agar diperbarui hanya saat diminta, atau hapus satu.",
+      "agentUnreachable": "Kamu tidak bisa bicara dengan agen ini.",
+      "agentArchived": "Agen ini sudah diarsipkan.",
+      "blockNotFound": "Grafik itu sudah tidak ada di pesan.",
+      "notAgentMessage": "Hanya grafik dari agen yang bisa disematkan.",
+      "promptRequired": "Sebutkan apa yang harus ditampilkan widget.",
+      "notTested": "Uji dulu: widget dibuat setelah ujinya berhasil."
     }
   }
 }

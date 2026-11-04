@@ -306,8 +306,12 @@ describe("Início", () => {
     // "Pedir" puts me in the composer, which asks the agent I may talk to.
     await click(within(items[2] as HTMLElement).getByRole("button", { name: "Pedir" }));
     expect(document.activeElement?.getAttribute("aria-label")).toBe("Mensagem para a Ada");
-    for (const empty of ["Esperando você", "Trabalhando agora", "Desde a sua última visita", "Próximas rotinas"])
+    for (const empty of ["Desde a sua última visita", "Próximas rotinas"])
       expect(screen().queryByRole("region", { name: empty })).toBeNull();
+    // The mural's fixed tiles stay in their places, empty (ADR 0135).
+    for (const tile of ["Esperando você", "Trabalhando agora"])
+      expect(within(section(tile)).queryAllByRole("listitem")).toHaveLength(0);
+    expect(section("Trabalhando agora").textContent).toContain("Nenhum agente trabalhando agora.");
     expect(screen().queryByText("Tudo em dia")).toBeNull();
 
     // Hidden, the card stays hidden in this browser; nothing waits, so Início says all is calm.

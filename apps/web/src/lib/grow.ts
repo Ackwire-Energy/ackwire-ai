@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef, useSyncExternalStore } from "react";
+import { type RefObject, useEffect, useRef } from "react";
 
 /**
  * A dialog that grows out of the card it was opened from (the code and chart cards' full screen): call
@@ -44,17 +44,5 @@ export function useGrowFrom(open: boolean, card: RefObject<HTMLElement | null>, 
   };
 }
 
-const subscribeTheme = (onChange: () => void) => {
-  const observer = new MutationObserver(onChange);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  return () => observer.disconnect();
-};
-
-/** The page's theme as drawn (`data-theme` on <html>), for drawings that pick colors in script. */
-export function useDarkTheme(): boolean {
-  return useSyncExternalStore(
-    subscribeTheme,
-    () => document.documentElement.dataset.theme === "dark",
-    () => false,
-  );
-}
+/** The page's theme as drawn: it lives with the drawings in `@agenteschat/ui`. */
+export { useDarkTheme } from "@agenteschat/ui";

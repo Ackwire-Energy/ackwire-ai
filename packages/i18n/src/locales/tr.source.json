@@ -6402,6 +6402,9 @@
   "home.working.title": {
     "value": "Working now"
   },
+  "home.working.none": {
+    "value": "No agent is working right now."
+  },
   "home.working.dm": {
     "value": "In your conversation"
   },
@@ -6881,6 +6884,9 @@
   },
   "notifications.source.connectors": {
     "value": "Connectors"
+  },
+  "notifications.source.dashboard": {
+    "value": "Dashboard"
   },
   "notifications.reactions": {
     "value": {
@@ -12149,6 +12155,15 @@
   "routines.deliversTo": {
     "value": "{{agent}} · delivers to {{target}}"
   },
+  "routines.widgetLine": {
+    "value": "{{agent}} · updates its widget, with no message"
+  },
+  "routines.widgetChip": {
+    "value": "Dashboard widget"
+  },
+  "routines.widgetFixed": {
+    "value": "What it shows, when it updates and who looks after it change from its widget."
+  },
   "routines.target.forum": {
     "value": "A forum topic"
   },
@@ -12166,6 +12181,12 @@
   },
   "routines.target.artifactShort": {
     "value": "Drive"
+  },
+  "routines.target.widget": {
+    "value": "A dashboard widget"
+  },
+  "routines.target.widgetNamed": {
+    "value": "The widget “{{title}}”"
   },
   "routines.active": {
     "value": "Active"
@@ -12406,6 +12427,9 @@
   },
   "routines.panel.whereHint.artifact": {
     "value": "Becomes a document in the Drive"
+  },
+  "routines.panel.whereHint.widget": {
+    "value": "Updates its widget, with no message"
   },
   "routines.panel.ahead": {
     "value": "Prepared for later"
@@ -31740,6 +31764,1020 @@
   },
   "taskManager.agentPanel.none": {
     "value": "{{name}} is free now."
+  },
+  "widgets.kinds.auto": {
+    "value": "Auto"
+  },
+  "widgets.kinds.kpi": {
+    "value": "Number"
+  },
+  "widgets.kinds.goal": {
+    "value": "Goal"
+  },
+  "widgets.kinds.bars": {
+    "value": "Bars"
+  },
+  "widgets.kinds.line": {
+    "value": "Line"
+  },
+  "widgets.kinds.list": {
+    "value": "List"
+  },
+  "widgets.kinds.text": {
+    "value": "Summary"
+  },
+  "widgets.schedules.half": {
+    "value": "Every 30 min"
+  },
+  "widgets.schedules.hour": {
+    "value": "Every hour"
+  },
+  "widgets.schedules.day": {
+    "value": "Every day at 8:00"
+  },
+  "widgets.schedules.week": {
+    "value": "Every Monday at 8:00"
+  },
+  "widgets.schedules.manual": {
+    "value": "Only when you ask"
+  },
+  "widgets.schedulesShort.half": {
+    "value": "30 min"
+  },
+  "widgets.schedulesShort.hour": {
+    "value": "Every hour"
+  },
+  "widgets.schedulesShort.day": {
+    "value": "Every day · 8:00"
+  },
+  "widgets.schedulesShort.week": {
+    "value": "Every Monday"
+  },
+  "widgets.schedulesShort.manual": {
+    "value": "When I ask"
+  },
+  "widgets.schedulesInline.half": {
+    "value": "every 30 min"
+  },
+  "widgets.schedulesInline.hour": {
+    "value": "every hour"
+  },
+  "widgets.schedulesInline.day": {
+    "value": "every day at 8:00"
+  },
+  "widgets.schedulesInline.week": {
+    "value": "every Monday at 8:00"
+  },
+  "widgets.schedulesInline.manual": {
+    "value": "when asked"
+  },
+  "widgets.sizes.label": {
+    "value": "Size"
+  },
+  "widgets.sizes.s": {
+    "value": "S"
+  },
+  "widgets.sizes.m": {
+    "value": "M"
+  },
+  "widgets.sizes.l": {
+    "value": "L"
+  },
+  "widgets.status.building": {
+    "value": "{{name}} is building the widget and the routine that will update it…"
+  },
+  "widgets.status.updating": {
+    "value": "{{name}} updating…"
+  },
+  "widgets.status.failed": {
+    "value": "Didn't update"
+  },
+  "widgets.foot": {
+    "value": "{{name}} · {{when}} · {{schedule}}"
+  },
+  "widgets.failure.resolve": {
+    "value": "Resolve"
+  },
+  "widgets.failure.agent_reported": {
+    "value": "{{detail}}"
+  },
+  "widgets.failure.no_update": {
+    "value": "The last update ended without data."
+  },
+  "widgets.failure.error": {
+    "value": "The last update failed."
+  },
+  "widgets.failure.budget_exceeded": {
+    "value": "{{name}} reached its budget for the month."
+  },
+  "widgets.failure.waiting_computer": {
+    "value": "{{name}}'s computer is away."
+  },
+  "widgets.failure.waiting_plan": {
+    "value": "{{name}}'s plan is at its limit."
+  },
+  "widgets.failure.waiting_budget": {
+    "value": "{{name}}'s budget is at its limit."
+  },
+  "widgets.failure.creator_left": {
+    "value": "Whoever set it up left the workspace."
+  },
+  "widgets.failure.creator_no_access": {
+    "value": "Whoever set it up can no longer use it."
+  },
+  "widgets.failure.agent_archived": {
+    "value": "{{name}} was archived."
+  },
+  "widgets.failure.audience": {
+    "value": "Whoever set it up can no longer talk to {{name}}."
+  },
+  "widgets.failure.failing": {
+    "value": "It failed several times in a row and stopped."
+  },
+  "widgets.failure.stopped": {
+    "value": "The update was stopped."
+  },
+  "widgets.failure.missing_credential": {
+    "value": "{{name}} has no AI key or plan to work with."
+  },
+  "widgets.failure.timeout": {
+    "value": "The update took too long."
+  },
+  "widgets.failure.invalid_data": {
+    "value": "{{name}} couldn't put the data in this format."
+  },
+  "widgets.menu.label": {
+    "value": "More"
+  },
+  "widgets.menu.open": {
+    "value": "Open"
+  },
+  "widgets.menu.refresh": {
+    "value": "Update now"
+  },
+  "widgets.menu.change": {
+    "value": "Ask {{name}} for a change"
+  },
+  "widgets.menu.schedule": {
+    "value": "Change when it updates"
+  },
+  "widgets.menu.removeHome": {
+    "value": "Remove from Home"
+  },
+  "widgets.menu.removeBoard": {
+    "value": "Remove from dashboard"
+  },
+  "widgets.organize.start": {
+    "value": "Organize"
+  },
+  "widgets.organize.done": {
+    "value": "Done"
+  },
+  "widgets.organize.size": {
+    "value": "Size"
+  },
+  "widgets.organize.remove": {
+    "value": "Remove"
+  },
+  "widgets.organize.drag": {
+    "value": "Drag to move"
+  },
+  "widgets.organize.fixed": {
+    "value": "Fixed"
+  },
+  "widgets.organize.role": {
+    "value": "movable widget"
+  },
+  "widgets.organize.help": {
+    "value": "Space or Enter picks the card up, the arrows move it, Space or Enter drops it and Esc cancels. The arrows alone move it one place."
+  },
+  "widgets.organize.picked": {
+    "value": "You picked up “{{title}}”. The arrows move it, Space drops it, Esc cancels."
+  },
+  "widgets.organize.moved": {
+    "value": "“{{title}}”: position {{position}} of {{total}}."
+  },
+  "widgets.organize.dropped": {
+    "value": "You dropped “{{title}}” at position {{position}} of {{total}}."
+  },
+  "widgets.organize.canceled": {
+    "value": "“{{title}}” went back to its place."
+  },
+  "widgets.add.label": {
+    "value": "Add widget"
+  },
+  "widgets.add.short": {
+    "value": "Widget"
+  },
+  "widgets.alert.label": {
+    "value": "Tell me when something is off"
+  },
+  "widgets.alert.hint": {
+    "value": "The alert goes to Waiting on you, with what changed."
+  },
+  "widgets.alert.condition": {
+    "value": "Alert if"
+  },
+  "widgets.alert.placeholder": {
+    "value": "something is off"
+  },
+  "widgets.alert.line": {
+    "value": "Alert if {{condition}}"
+  },
+  "widgets.alert.lineAny": {
+    "value": "Alert when something is off"
+  },
+  "widgets.alert.where": {
+    "value": "In Waiting on you"
+  },
+  "widgets.alert.none": {
+    "value": "No alerts"
+  },
+  "widgets.cost.day": {
+    "value": "≈ {{amount}} a day of {{name}}'s budget"
+  },
+  "widgets.cost.week": {
+    "value": "≈ {{amount}} a week of {{name}}'s budget"
+  },
+  "widgets.cost.manual": {
+    "value": "Only spends when you ask for an update"
+  },
+  "widgets.cost.plan": {
+    "value": "Uses {{name}}'s plan"
+  },
+  "widgets.cost.unknown": {
+    "value": "Each update uses {{name}}'s budget"
+  },
+  "widgets.exposure": {
+    "value": "Whoever sees the dashboard sees what the agents brought, even without access to the accounts it came from. Agents create dashboards too. To show one to more people than whoever asked, they ask first, in Waiting on you."
+  },
+  "widgets.panel.caresFor": {
+    "value": "{{name}} looks after this widget"
+  },
+  "widgets.panel.caresForOn": {
+    "value": "{{name}} looks after this widget · {{board}}"
+  },
+  "widgets.panel.how": {
+    "value": "How it updates"
+  },
+  "widgets.panel.next": {
+    "value": "{{name}}'s routine · next {{when}}"
+  },
+  "widgets.panel.noRoutine": {
+    "value": "Doesn't update by itself"
+  },
+  "widgets.panel.askAnytime": {
+    "value": "You can ask for an update in the menu"
+  },
+  "widgets.panel.editRoutine": {
+    "value": "Edit routine"
+  },
+  "widgets.panel.changeAlert": {
+    "value": "Change"
+  },
+  "widgets.panel.reads": {
+    "value": "What {{name}} reads to build it"
+  },
+  "widgets.panel.history": {
+    "value": "Latest updates"
+  },
+  "widgets.panel.noHistory": {
+    "value": "No updates yet."
+  },
+  "widgets.panel.alerted": {
+    "value": "alerted: {{text}}"
+  },
+  "widgets.panel.changed": {
+    "value": "Changed: {{text}}"
+  },
+  "widgets.panel.ask": {
+    "value": "Ask for a change"
+  },
+  "widgets.panel.askPlaceholder": {
+    "value": "E.g.: split it by channel, or compare with the same week last year"
+  },
+  "widgets.panel.askTo": {
+    "value": "to {{name}}"
+  },
+  "widgets.panel.send": {
+    "value": "Send"
+  },
+  "widgets.panel.sent": {
+    "value": "{{name}} is redoing the widget."
+  },
+  "widgets.panel.updated": {
+    "value": "Updated"
+  },
+  "widgets.panel.rename": {
+    "value": "Rename"
+  },
+  "widgets.panel.titleLabel": {
+    "value": "Widget title"
+  },
+  "widgets.notice.alert": {
+    "value": "<b>{{name}}</b> flagged “{{title}}”"
+  },
+  "widgets.notice.failed": {
+    "value": "“{{title}}” stopped updating"
+  },
+  "widgets.notice.proposal": {
+    "value": "<b>{{name}}</b> wants to publish a dashboard"
+  },
+  "widgets.notice.proposalWorkspace": {
+    "value": "“{{title}}” for the whole workspace · only you see it today"
+  },
+  "widgets.notice.proposalRoles": {
+    "value": "“{{title}}” for {{roles}} · only you see it today"
+  },
+  "widgets.notice.openBoard": {
+    "value": "View dashboard"
+  },
+  "widgets.notice.openWidget": {
+    "value": "Open widget"
+  },
+  "widgets.notice.resolving": {
+    "value": "Updating “{{title}}” again"
+  },
+  "widgets.example.days.d1": {
+    "value": "Wed"
+  },
+  "widgets.example.days.d2": {
+    "value": "Thu"
+  },
+  "widgets.example.days.d3": {
+    "value": "Fri"
+  },
+  "widgets.example.days.d4": {
+    "value": "Sat"
+  },
+  "widgets.example.days.d5": {
+    "value": "Sun"
+  },
+  "widgets.example.days.d6": {
+    "value": "Mon"
+  },
+  "widgets.example.days.d7": {
+    "value": "Tue"
+  },
+  "widgets.example.vsYesterday": {
+    "value": "vs. yesterday"
+  },
+  "widgets.example.goalLine": {
+    "value": "48 of 100"
+  },
+  "widgets.example.goalNote": {
+    "value": "At this pace, it's reached on the 29th."
+  },
+  "widgets.example.lineNote": {
+    "value": "40 yesterday · +48% this week"
+  },
+  "widgets.example.row1": {
+    "value": "First item"
+  },
+  "widgets.example.row2": {
+    "value": "Second item"
+  },
+  "widgets.example.row3": {
+    "value": "Third item"
+  },
+  "widgets.example.meta1": {
+    "value": "now"
+  },
+  "widgets.example.meta2": {
+    "value": "1 h ago"
+  },
+  "widgets.example.meta3": {
+    "value": "yesterday"
+  },
+  "widgets.example.item1": {
+    "value": "A short summary of what changed."
+  },
+  "widgets.example.item2": {
+    "value": "The agent writes it again on every update."
+  },
+  "widgets.preview.label": {
+    "value": "Preview"
+  },
+  "widgets.preview.example": {
+    "value": "example data"
+  },
+  "widgets.pin.action": {
+    "value": "Pin"
+  },
+  "widgets.pin.label": {
+    "value": "Pin to a dashboard"
+  },
+  "widgets.pin.done": {
+    "value": "Pinned to {{where}}"
+  },
+  "widgets.pin.doneUpdating": {
+    "value": "Pinned to {{where}} · {{name}} redoes it {{schedule}}"
+  },
+  "widgets.pin.subtitle": {
+    "value": "It keeps the chart's data. Its agent can also keep it up to date."
+  },
+  "widgets.pin.open": {
+    "value": "Open"
+  },
+  "widgets.home": {
+    "value": "My Home"
+  },
+  "widgets.untitled": {
+    "value": "New widget"
+  },
+  "widgets.updatedAgo": {
+    "value": "updated {{when}}"
+  },
+  "widgets.removed.home": {
+    "value": "“{{title}}” left Home and {{name}}'s routine stopped"
+  },
+  "widgets.removed.board": {
+    "value": "“{{title}}” left the dashboard and {{name}}'s routine stopped"
+  },
+  "widgets.removeConfirm.title": {
+    "value": "Remove “{{title}}”?"
+  },
+  "widgets.removeConfirm.textRoutine": {
+    "value": "{{name}}'s routine that updates it stops, and its update history goes with it."
+  },
+  "widgets.removeConfirm.textManual": {
+    "value": "Its update history goes with it."
+  },
+  "widgets.removeConfirm.confirm": {
+    "value": "Remove"
+  },
+  "agentPicker.search": {
+    "value": "Search agents"
+  },
+  "agentPicker.list": {
+    "value": "Agents"
+  },
+  "agentPicker.empty": {
+    "value": "No agent matches “{{q}}”"
+  },
+  "agentPicker.noConnectors": {
+    "value": "No connectors"
+  },
+  "agentPicker.more": {
+    "value": "+{{count}}"
+  },
+  "dashboards.title": {
+    "value": "Dashboards"
+  },
+  "dashboards.subtitle": {
+    "value": "Numbers and charts the agents keep up to date, for the workspace or only some roles."
+  },
+  "dashboards.sidebar": {
+    "value": "Dashboards"
+  },
+  "dashboards.navWhat": {
+    "value": "Numbers and charts the agents keep up to date"
+  },
+  "dashboards.new": {
+    "value": "New dashboard"
+  },
+  "dashboards.back": {
+    "value": "Dashboards"
+  },
+  "dashboards.home": {
+    "value": "My Home"
+  },
+  "dashboards.groups.workspace": {
+    "value": "Workspace"
+  },
+  "dashboards.groups.workspaceHint": {
+    "value": "everyone sees"
+  },
+  "dashboards.groups.roles": {
+    "value": "Your roles"
+  },
+  "dashboards.groups.rolesHint": {
+    "value": "you're in {{roles}}"
+  },
+  "dashboards.groups.mine": {
+    "value": "Only yours"
+  },
+  "dashboards.groups.mineHint": {
+    "value": "nobody else sees"
+  },
+  "dashboards.audience.label": {
+    "value": "Who sees"
+  },
+  "dashboards.audience.workspace": {
+    "value": "Whole workspace"
+  },
+  "dashboards.audience.workspaceHint": {
+    "value": {
+      "one": "{{count}} member sees it and finds it in Dashboards",
+      "other": "All {{count}} members see it and find it in Dashboards"
+    }
+  },
+  "dashboards.audience.roles": {
+    "value": "Roles"
+  },
+  "dashboards.audience.rolesHint": {
+    "value": "Only people with one of the chosen roles"
+  },
+  "dashboards.audience.private": {
+    "value": "Only you"
+  },
+  "dashboards.audience.privateHint": {
+    "value": "Nobody else sees it until you share it"
+  },
+  "dashboards.audience.noRoles": {
+    "value": "The workspace has no roles yet."
+  },
+  "dashboards.audience.people": {
+    "value": {
+      "one": "{{count}} person",
+      "other": "{{count}} people"
+    }
+  },
+  "dashboards.edit.label": {
+    "value": "Who edits"
+  },
+  "dashboards.edit.viewers": {
+    "value": "Whoever sees it"
+  },
+  "dashboards.edit.owner": {
+    "value": "Only you and admins"
+  },
+  "dashboards.edit.roles": {
+    "value": "Or people with these roles"
+  },
+  "dashboards.edit.twoRoles": {
+    "value": "{{first}} and {{second}}"
+  },
+  "dashboards.edit.manyRoles": {
+    "value": {
+      "one": "{{count}} role",
+      "other": "{{count}} roles"
+    }
+  },
+  "dashboards.edit.cantSee": {
+    "value": "Doesn't see this dashboard"
+  },
+  "dashboards.edit.someRoles": {
+    "value": "Some roles…"
+  },
+  "dashboards.edit.rolesNote": {
+    "value": "People with these roles edit it when they also see it. You and admins always do."
+  },
+  "dashboards.meta.by": {
+    "value": "Created by {{name}}"
+  },
+  "dashboards.meta.byYou": {
+    "value": "Created by you"
+  },
+  "dashboards.meta.widgets": {
+    "value": {
+      "one": "{{count}} widget",
+      "other": "{{count}} widgets"
+    }
+  },
+  "dashboards.meta.updated": {
+    "value": "updated {{when}}"
+  },
+  "dashboards.share.action": {
+    "value": "Share"
+  },
+  "dashboards.share.title": {
+    "value": "Share “{{title}}”"
+  },
+  "dashboards.share.access": {
+    "value": "Who has access"
+  },
+  "dashboards.share.you": {
+    "value": "{{name}} (you)"
+  },
+  "dashboards.share.owner": {
+    "value": "Workspace owner"
+  },
+  "dashboards.share.edits": {
+    "value": "Edits"
+  },
+  "dashboards.share.sees": {
+    "value": "Sees"
+  },
+  "dashboards.share.none": {
+    "value": "Doesn't see"
+  },
+  "dashboards.share.copyLink": {
+    "value": "Copy link"
+  },
+  "dashboards.share.copied": {
+    "value": "Link copied"
+  },
+  "dashboards.share.save": {
+    "value": "Save"
+  },
+  "dashboards.share.nowWorkspace": {
+    "value": "“{{title}}” is the workspace's now"
+  },
+  "dashboards.share.nowPrivate": {
+    "value": "Only you see “{{title}}”"
+  },
+  "dashboards.share.nowRoles": {
+    "value": "{{roles}} see “{{title}}”"
+  },
+  "dashboards.proposal.title": {
+    "value": "{{name}} built this dashboard for you"
+  },
+  "dashboards.proposal.workspace": {
+    "value": "And suggests publishing it to the whole workspace. Only you see it today."
+  },
+  "dashboards.proposal.roles": {
+    "value": "And suggests showing it to {{roles}}. Only you see it today."
+  },
+  "dashboards.proposal.keep": {
+    "value": "Keep only for me"
+  },
+  "dashboards.proposal.publishWorkspace": {
+    "value": "Publish to the workspace"
+  },
+  "dashboards.proposal.publishRoles": {
+    "value": "Show to {{roles}}"
+  },
+  "dashboards.proposal.published": {
+    "value": "“{{title}}” is published"
+  },
+  "dashboards.proposal.kept": {
+    "value": "Only you see “{{title}}”"
+  },
+  "dashboards.empty.title": {
+    "value": "Empty dashboard"
+  },
+  "dashboards.empty.text": {
+    "value": "Add widgets: ask an agent or pin a block from the chat."
+  },
+  "dashboards.onlyHome": {
+    "value": "Make a dashboard for the workspace or some roles with “New dashboard”."
+  },
+  "dashboards.create.title": {
+    "value": "New dashboard"
+  },
+  "dashboards.create.subtitle": {
+    "value": "Widgets together on one page, for you or for the team."
+  },
+  "dashboards.create.name": {
+    "value": "Name"
+  },
+  "dashboards.create.namePlaceholder": {
+    "value": "E.g.: Sales, Black Friday, Quarter goals"
+  },
+  "dashboards.create.askHint": {
+    "value": "You can also ask an agent in a chat to build one."
+  },
+  "dashboards.create.submit": {
+    "value": "Create dashboard"
+  },
+  "dashboards.create.created": {
+    "value": "“{{title}}” created"
+  },
+  "dashboards.newWidget.title": {
+    "value": "New widget"
+  },
+  "dashboards.newWidget.subtitle": {
+    "value": "A number, chart or list an agent keeps up to date."
+  },
+  "dashboards.newWidget.tabAsk": {
+    "value": "Ask an agent"
+  },
+  "dashboards.newWidget.tabPin": {
+    "value": "Pin from chat"
+  },
+  "dashboards.newWidget.what": {
+    "value": "What do you want to follow?"
+  },
+  "dashboards.newWidget.whatPlaceholder": {
+    "value": "E.g.: today's sales compared with yesterday"
+  },
+  "dashboards.newWidget.who": {
+    "value": "Who looks after it"
+  },
+  "dashboards.newWidget.format": {
+    "value": "Format"
+  },
+  "dashboards.newWidget.updates": {
+    "value": "Updates"
+  },
+  "dashboards.newWidget.destination": {
+    "value": "Add to"
+  },
+  "dashboards.newWidget.create": {
+    "value": "Create widget"
+  },
+  "dashboards.newWidget.pin": {
+    "value": "Pin"
+  },
+  "dashboards.newWidget.fromChat": {
+    "value": "Blocks the agents sent in chat"
+  },
+  "dashboards.newWidget.pinHint": {
+    "value": "You can also pin straight from the message: “Pin” on the block."
+  },
+  "dashboards.newWidget.keepUpdated": {
+    "value": "Keep it updated"
+  },
+  "dashboards.newWidget.onlyPin": {
+    "value": "No, just pin"
+  },
+  "dashboards.newWidget.emptyPreview": {
+    "value": "Say what you want to follow and {{name}} shows here how it will look."
+  },
+  "dashboards.newWidget.pickBlock": {
+    "value": "Pick a block from the chat."
+  },
+  "dashboards.newWidget.noBlocks": {
+    "value": "No charts in your conversations yet."
+  },
+  "dashboards.newWidget.suggestions": {
+    "value": "Suggestions"
+  },
+  "dashboards.newWidget.theAgent": {
+    "value": "The agent"
+  },
+  "dashboards.newWidget.noAgents": {
+    "value": "No agent you can talk to yet."
+  },
+  "dashboards.newWidget.place.channel": {
+    "value": "{{name}} in #{{channel}} · {{when}}"
+  },
+  "dashboards.newWidget.place.thread": {
+    "value": "{{name}} in a thread in #{{channel}} · {{when}}"
+  },
+  "dashboards.newWidget.place.dm": {
+    "value": "{{name}} in your conversation · {{when}}"
+  },
+  "dashboards.newWidget.place.unnamed": {
+    "value": "{{name}} in a conversation · {{when}}"
+  },
+  "dashboards.newWidget.steps.builds": {
+    "value": "{{name}} builds it now, with real data"
+  },
+  "dashboards.newWidget.steps.reads": {
+    "value": "Reads {{sources}}"
+  },
+  "dashboards.newWidget.steps.routine": {
+    "value": "Creates the routine “{{title}}”"
+  },
+  "dashboards.newWidget.steps.routineHint": {
+    "value": "{{schedule}} · shows in Routines"
+  },
+  "dashboards.newWidget.steps.noRoutine": {
+    "value": "No routine: updates when you ask"
+  },
+  "dashboards.newWidget.steps.alert": {
+    "value": "Alerts in Waiting on you if {{condition}}"
+  },
+  "dashboards.newWidget.steps.alertHint": {
+    "value": "Otherwise it only updates the widget, no message"
+  },
+  "dashboards.newWidget.steps.noAlert": {
+    "value": "No alerts"
+  },
+  "dashboards.newWidget.steps.noAlertHint": {
+    "value": "Only updates the widget, no message"
+  },
+  "dashboards.newWidget.steps.pinAsIs": {
+    "value": "Pins the block as it is in chat"
+  },
+  "dashboards.newWidget.steps.redoes": {
+    "value": "{{name}} redoes it {{schedule}}"
+  },
+  "dashboards.newWidget.steps.redoesHint": {
+    "value": "With a routine, no chat message"
+  },
+  "dashboards.newWidget.steps.noRedo": {
+    "value": "Doesn't update by itself"
+  },
+  "dashboards.newWidget.steps.noRedoHint": {
+    "value": "You can ask for an update in the menu"
+  },
+  "dashboards.newWidget.created": {
+    "value": "Widget added to {{where}}"
+  },
+  "dashboards.newWidget.test": {
+    "value": "Test"
+  },
+  "dashboards.newWidget.testAgain": {
+    "value": "Test again"
+  },
+  "dashboards.newWidget.testing": {
+    "value": "{{name}} is building it with real data…"
+  },
+  "dashboards.newWidget.tested": {
+    "value": "Real data · {{when}}"
+  },
+  "dashboards.newWidget.stale": {
+    "value": "Changed since the test"
+  },
+  "dashboards.newWidget.testFailed": {
+    "value": "It didn't work: {{reason}}"
+  },
+  "dashboards.newWidget.tryAgain": {
+    "value": "Try again"
+  },
+  "dashboards.newWidget.testCost": {
+    "value": "This test cost {{cost}}"
+  },
+  "dashboards.newWidget.testFirst": {
+    "value": "Test it first to see the real result"
+  },
+  "dashboards.newWidget.titleField": {
+    "value": "Title"
+  },
+  "dashboards.newWidget.titlePlaceholder": {
+    "value": "Title · {{name}} suggests one on the test"
+  },
+  "dashboards.newWidget.cardSubtitle": {
+    "value": "Write on the card what you want to see. Its parts change who looks after it, when it updates, the alert and its size."
+  },
+  "dashboards.newWidget.pinTitle": {
+    "value": "Pin a block from the chat"
+  },
+  "dashboards.newWidget.pinSubtitle": {
+    "value": "The card comes from the chat. You choose its title and whether it is redone."
+  },
+  "dashboards.newWidget.pickFromChat": {
+    "value": "Choose a block an agent already sent:"
+  },
+  "dashboards.newWidget.orPin": {
+    "value": "Or pin a block that already came in the chat"
+  },
+  "dashboards.newWidget.repick": {
+    "value": "Choose another block"
+  },
+  "dashboards.newWidget.formatAuto": {
+    "value": "Automatic format"
+  },
+  "dashboards.newWidget.enterTests": {
+    "value": "Enter tests again"
+  },
+  "dashboards.newWidget.quoted": {
+    "value": "“{{ask}}”"
+  },
+  "dashboards.newWidget.editAsk": {
+    "value": "Change the ask"
+  },
+  "dashboards.newWidget.editAskOf": {
+    "value": "Change the ask: {{ask}}"
+  },
+  "dashboards.newWidget.testingShort": {
+    "value": "Testing…"
+  },
+  "dashboards.newWidget.buildingFoot": {
+    "value": "{{name}} building…"
+  },
+  "dashboards.newWidget.failedTitle": {
+    "value": "{{name}} couldn't build it"
+  },
+  "dashboards.newWidget.staleHint": {
+    "value": "Test again to see how it looks."
+  },
+  "dashboards.newWidget.whoButton": {
+    "value": "Who looks after it: {{name}}"
+  },
+  "dashboards.newWidget.whoHint": {
+    "value": "Whoever looks after it builds the widget from what it reads through its connectors."
+  },
+  "dashboards.newWidget.alert": {
+    "value": "Alert"
+  },
+  "dashboards.newWidget.alertOn": {
+    "value": "Alerts"
+  },
+  "dashboards.newWidget.alertDone": {
+    "value": "Done"
+  },
+  "dashboards.newWidget.manual": {
+    "value": "Only when I ask"
+  },
+  "dashboards.newWidget.manualInline": {
+    "value": "only when I ask"
+  },
+  "dashboards.newWidget.noUpdate": {
+    "value": "Don't update"
+  },
+  "dashboards.newWidget.noUpdateInline": {
+    "value": "doesn't update"
+  },
+  "dashboards.newWidget.inRoutines": {
+    "value": "the routine shows in Routines"
+  },
+  "dashboards.newWidget.pinAsIs": {
+    "value": "Stays as it is, no routine"
+  },
+  "dashboards.newWidget.pinRedoes": {
+    "value": "{{name}} redoes it {{schedule}} with a routine"
+  },
+  "dashboards.newWidget.formatHints.auto": {
+    "value": "{{name}} picks the one that shows it best"
+  },
+  "dashboards.newWidget.formatHints.kpi": {
+    "value": "One big number and how it moved"
+  },
+  "dashboards.newWidget.formatHints.goal": {
+    "value": "Progress toward a target"
+  },
+  "dashboards.newWidget.formatHints.bars": {
+    "value": "A few values side by side"
+  },
+  "dashboards.newWidget.formatHints.line": {
+    "value": "How it changed over time"
+  },
+  "dashboards.newWidget.formatHints.list": {
+    "value": "A short list of items"
+  },
+  "dashboards.newWidget.formatHints.text": {
+    "value": "A few sentences that sum it up"
+  },
+  "dashboards.pinTop": {
+    "value": "Pin to the top"
+  },
+  "dashboards.unpin": {
+    "value": "Unpin"
+  },
+  "dashboards.rename": {
+    "value": "Rename"
+  },
+  "dashboards.about": {
+    "value": "Description"
+  },
+  "dashboards.aboutPlaceholder": {
+    "value": "What this dashboard is for"
+  },
+  "dashboards.delete.action": {
+    "value": "Delete dashboard"
+  },
+  "dashboards.delete.title": {
+    "value": "Delete “{{title}}”?"
+  },
+  "dashboards.delete.text": {
+    "value": "Its widgets and their routines go too."
+  },
+  "dashboards.delete.confirm": {
+    "value": "Delete"
+  },
+  "dashboards.delete.done": {
+    "value": "“{{title}}” deleted"
+  },
+  "dashboards.errors.notFound": {
+    "value": "This dashboard isn't there, or you don't see it."
+  },
+  "dashboards.errors.forbidden": {
+    "value": "Only who edits this dashboard can do that."
+  },
+  "dashboards.errors.homeFixed": {
+    "value": "Your Home isn't shared or deleted."
+  },
+  "dashboards.errors.rolesRequired": {
+    "value": "Pick at least one role."
+  },
+  "dashboards.errors.roleUnknown": {
+    "value": "One of these roles isn't in the workspace anymore."
+  },
+  "dashboards.errors.titleRequired": {
+    "value": "Give the dashboard a name."
+  },
+  "dashboards.errors.tooMany": {
+    "value": "The workspace has as many dashboards as it can. Delete one first."
+  },
+  "dashboards.errors.publishForbidden": {
+    "value": "Your roles don't let you show dashboards to others."
+  },
+  "dashboards.errors.proposalNone": {
+    "value": "That request was already decided."
+  },
+  "dashboards.errors.proposalNotYours": {
+    "value": "Only the person the agent asked decides."
+  },
+  "dashboards.errors.widgetNotFound": {
+    "value": "This widget isn't there anymore."
+  },
+  "dashboards.errors.widgetTooMany": {
+    "value": "This dashboard is full. Remove a widget or use another dashboard."
+  },
+  "dashboards.errors.scheduledCap": {
+    "value": "The workspace already keeps {{max}} widgets updating on a schedule. Set one to update only when asked, or remove one."
+  },
+  "dashboards.errors.agentUnreachable": {
+    "value": "You can't talk to this agent."
+  },
+  "dashboards.errors.agentArchived": {
+    "value": "This agent was archived."
+  },
+  "dashboards.errors.blockNotFound": {
+    "value": "That chart isn't in the message anymore."
+  },
+  "dashboards.errors.notAgentMessage": {
+    "value": "Only an agent's chart can be pinned."
+  },
+  "dashboards.errors.promptRequired": {
+    "value": "Say what the widget should show."
+  },
+  "dashboards.errors.notTested": {
+    "value": "Test it first: the widget is created once its test works."
   },
   "presence.out": {
     "value": "Out of office"

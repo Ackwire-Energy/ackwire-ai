@@ -821,6 +821,12 @@ export async function notifyRoutinePaused(
     key: string;
   },
 ) {
+  // A widget's routine says it through its widget (`widget_failed`, ADR 0135 §6), not as a routine.
+  const [r] = await deps.db
+    .select({ type: sql<string | null>`${routines.target}->>'type'` })
+    .from(routines)
+    .where(and(eq(routines.id, input.routineId), eq(routines.orgId, input.orgId)));
+  if (r?.type === "widget") return;
   await notify(deps, {
     orgId: input.orgId,
     userIds: [input.creatorUserId, await agentOwner(deps, input.agentId)],
@@ -1007,6 +1013,136 @@ export async function resolveRoutineTrouble(deps: NotificationDeps, orgId: strin
 /** A person resumed or took over a routine: its pause notifications are done. */
 export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string, routineId: string) {
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
+}
+
+// ── Dashboards and widgets (ADR 0135) ──────────────────────────────────────────
+
+/** Open alerts of a widget: one row merging while open. */
+export const widgetAlertGroup = (widgetId: string) => `widget-alert:${widgetId}`;
+/**
+ * A widget's failure streaks: one row per streak (`<streakKey>` its first failed run), resolved by a good update.
+ * Without a key, the prefix every streak's row starts with.
+ */
+export const widgetFailedGroup = (widgetId: string, streakKey?: string) =>
+  streakKey ? `widget-failed:${widgetId}:${streakKey}` : `widget-failed:${widgetId}`;
+/**
+ * An agent's requests to show a board to more people: one row per request (`<at>` when it asked). Without `at`, the
+ * prefix every request's row starts with.
+ */
+export const dashboardProposalGroup = (dashboardId: string, at?: string) =>
+  at ? `dashboard-proposal:${dashboardId}:${at}` : `dashboard-proposal:${dashboardId}`;
+
+/**
+ * A widget's alert condition was met (ADR 0135 §6): `userIds` (whoever set the alert, while they see the board) hear
+ * the agent's words in "Waiting on you", one row per widget merging while open. Never in the chat.
+ */
+export async function notifyWidgetAlert(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    userIds: (string | null)[];
+    widgetId: string;
+    dashboardId: string;
+    agentId: string;
+    title: string;
+    text: string;
+  },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: input.userIds,
+    kind: "widget_alert",
+    groupKey: widgetAlertGroup(input.widgetId),
+    waiting: true,
+    actor: agent(input.agentId),
+    source: { dashboardId: input.dashboardId, widgetId: input.widgetId, agentId: input.agentId, label: input.title },
+    latest: { title: input.title, text: notificationSnippet(input.text) },
+  });
+}
+
+/**
+ * A widget stopped updating (ADR 0135 §6): `userId` (its creator, else who looks after its routine) hears it once per
+ * failure streak (`streakKey`), with the coded reason (`agent_reported`: the agent's words in `latest.text`). Inbox
+ * only; resolved by its next good update.
+ */
+export async function notifyWidgetFailed(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    userId: string | null;
+    widgetId: string;
+    dashboardId: string;
+    agentId: string;
+    title: string;
+    streakKey: string;
+    reason: string;
+    text?: string | null;
+  },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [input.userId],
+    kind: "widget_failed",
+    groupKey: widgetFailedGroup(input.widgetId, input.streakKey),
+    actor: agent(input.agentId),
+    source: { dashboardId: input.dashboardId, widgetId: input.widgetId, agentId: input.agentId, label: input.title },
+    latest: {
+      title: input.title,
+      reason: input.reason,
+      ...(input.text ? { text: notificationSnippet(input.text) } : {}),
+    },
+  });
+}
+
+/** A widget updated well again: its failure notification is done. */
+export async function resolveWidgetFailed(deps: NotificationDeps, orgId: string, widgetId: string) {
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: widgetFailedGroup(widgetId) });
+}
+
+/** A widget or its board is gone: its open alert and failure rows are done. */
+export async function resolveWidgetNotices(deps: NotificationDeps, orgId: string, widgetId: string) {
+  await resolveNotifications(deps, orgId, { groupKey: widgetAlertGroup(widgetId) });
+  await resolveWidgetFailed(deps, orgId, widgetId);
+}
+
+/**
+ * An agent asks to show a board to more people (ADR 0135 §11): the person it was made for decides, from "Waiting on
+ * you", with the audience (`statusTo`, the roles' names in `names`) and the agent's reason.
+ */
+export async function notifyDashboardProposal(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    userId: string | null;
+    dashboardId: string;
+    agentId: string;
+    title: string;
+    audience: "workspace" | "roles";
+    roleNames: string[];
+    why: string;
+    at: string;
+  },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [input.userId],
+    kind: "dashboard_proposal",
+    groupKey: dashboardProposalGroup(input.dashboardId, input.at),
+    waiting: true,
+    actor: agent(input.agentId),
+    source: { dashboardId: input.dashboardId, agentId: input.agentId, label: input.title },
+    latest: {
+      title: input.title,
+      statusTo: input.audience,
+      ...(input.roleNames.length > 0 ? { names: input.roleNames.slice(0, 10) } : {}),
+      ...(input.why ? { text: notificationSnippet(input.why) } : {}),
+    },
+  });
+}
+
+/** The board's request was decided, replaced or dropped (shared by a person, deleted): its notification is done. */
+export async function resolveDashboardProposal(deps: NotificationDeps, orgId: string, dashboardId: string) {
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: dashboardProposalGroup(dashboardId) });
 }
 
 /** Who in the organization may `permission` (ADR 0085), or only its owners. */

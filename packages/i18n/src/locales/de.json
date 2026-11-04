@@ -2642,6 +2642,7 @@
     },
     "working": {
       "title": "Arbeitet gerade",
+      "none": "Gerade arbeitet kein Agent.",
       "dm": "In deiner Unterhaltung",
       "in": "#{{channel}}",
       "mission": "Mission · {{done}} von {{total}}"
@@ -2838,7 +2839,8 @@
       "browser": "Browser",
       "members": "Mitglieder",
       "usage": "Nutzung",
-      "connectors": "Konnektoren"
+      "connectors": "Konnektoren",
+      "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} Reaktion",
     "reactions_other": "{{count}} Reaktionen",
@@ -5024,13 +5026,18 @@
     "subtitle": "Was die Agenten selbst erledigen, nach Zeitplan oder wenn etwas passiert.",
     "new": "Neue Routine",
     "deliversTo": "{{agent}} · liefert an {{target}}",
+    "widgetLine": "{{agent}} · aktualisiert sein Widget, ohne Nachricht",
+    "widgetChip": "Dashboard-Widget",
+    "widgetFixed": "Was es zeigt, wann es sich aktualisiert und wer sich darum kümmert, änderst du in seinem Widget.",
     "target": {
       "forum": "Ein Forumsthema",
       "forumShort": "Forum",
       "dm": "Meine Direktnachricht mit dem Agenten",
       "artifact": "Ein Dokument im Drive",
       "dmShort": "DM",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "Ein Dashboard-Widget",
+      "widgetNamed": "Das Widget „{{title}}“"
     },
     "active": "Aktiv",
     "activeLabel": "Aktiv: {{name}}",
@@ -5127,7 +5134,8 @@
         "channel": "Alle im Kanal sehen es",
         "dm": "Nur du siehst es",
         "forum": "Die Agenten diskutieren in einem Forumsthema",
-        "artifact": "Wird zu einem Dokument im Drive"
+        "artifact": "Wird zu einem Dokument im Drive",
+        "widget": "Aktualisiert sein Widget, ohne Nachricht"
       },
       "ahead": "Für später vorbereitet",
       "createdBy": "Erstellt von {{name}} · {{date}}",
@@ -13177,6 +13185,418 @@
         "done": "Heute erledigt"
       },
       "none": "{{name}} ist gerade frei."
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "Automatisch",
+      "kpi": "Zahl",
+      "goal": "Ziel",
+      "bars": "Balken",
+      "line": "Linie",
+      "list": "Liste",
+      "text": "Zusammenfassung"
+    },
+    "schedules": {
+      "half": "Alle 30 Minuten",
+      "hour": "Jede Stunde",
+      "day": "Jeden Tag um 8:00",
+      "week": "Jeden Montag um 8:00",
+      "manual": "Nur wenn du fragst"
+    },
+    "schedulesShort": {
+      "half": "30 Minuten",
+      "hour": "Stündlich",
+      "day": "Täglich · 8:00",
+      "week": "Montags",
+      "manual": "Auf Anfrage"
+    },
+    "schedulesInline": {
+      "half": "alle 30 Minuten",
+      "hour": "jede Stunde",
+      "day": "jeden Tag um 8:00",
+      "week": "jeden Montag um 8:00",
+      "manual": "auf Anfrage"
+    },
+    "sizes": {
+      "label": "Größe",
+      "s": "S",
+      "m": "M",
+      "l": "L"
+    },
+    "status": {
+      "building": "{{name}} baut das Widget und die Routine, die es aktualisieren wird…",
+      "updating": "{{name}} aktualisiert…",
+      "failed": "Nicht aktualisiert"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "Beheben",
+      "agent_reported": "{{detail}}",
+      "no_update": "Die letzte Aktualisierung endete ohne Daten.",
+      "error": "Die letzte Aktualisierung ist fehlgeschlagen.",
+      "budget_exceeded": "{{name}} hat das Budget für den Monat erreicht.",
+      "waiting_computer": "Der Computer von {{name}} ist nicht erreichbar.",
+      "waiting_plan": "Das Abo von {{name}} ist am Limit.",
+      "waiting_budget": "Das Budget von {{name}} ist am Limit.",
+      "creator_left": "Wer es eingerichtet hat, hat den Workspace verlassen.",
+      "creator_no_access": "Wer es eingerichtet hat, kann es nicht mehr nutzen.",
+      "agent_archived": "{{name}} wurde archiviert.",
+      "audience": "Wer es eingerichtet hat, kann nicht mehr mit {{name}} sprechen.",
+      "failing": "Es ist mehrmals hintereinander fehlgeschlagen und wurde gestoppt.",
+      "stopped": "Die Aktualisierung wurde gestoppt.",
+      "missing_credential": "{{name}} hat keinen KI-Schlüssel und kein Abo zum Arbeiten.",
+      "timeout": "Die Aktualisierung hat zu lange gedauert.",
+      "invalid_data": "{{name}} konnte die Daten nicht in dieses Format bringen."
+    },
+    "menu": {
+      "label": "Mehr",
+      "open": "Öffnen",
+      "refresh": "Jetzt aktualisieren",
+      "change": "{{name}} um eine Änderung bitten",
+      "schedule": "Ändern, wann es sich aktualisiert",
+      "removeHome": "Von Start entfernen",
+      "removeBoard": "Vom Dashboard entfernen"
+    },
+    "organize": {
+      "start": "Anordnen",
+      "done": "Fertig",
+      "size": "Größe",
+      "remove": "Entfernen",
+      "drag": "Zum Verschieben ziehen",
+      "fixed": "Fest",
+      "role": "verschiebbares Widget",
+      "help": "Leertaste oder Enter nimmt die Karte auf, die Pfeiltasten verschieben sie, Leertaste oder Enter legt sie ab und Esc bricht ab. Die Pfeiltasten allein verschieben sie um einen Platz.",
+      "picked": "Du hast „{{title}}“ aufgenommen. Die Pfeiltasten verschieben es, Leertaste legt es ab, Esc bricht ab.",
+      "moved": "„{{title}}“: Position {{position}} von {{total}}.",
+      "dropped": "Du hast „{{title}}“ auf Position {{position}} von {{total}} abgelegt.",
+      "canceled": "„{{title}}“ ist wieder an seinem Platz."
+    },
+    "add": {
+      "label": "Widget hinzufügen",
+      "short": "Widget"
+    },
+    "alert": {
+      "label": "Sag mir Bescheid, wenn etwas nicht stimmt",
+      "hint": "Der Alarm landet in „Wartet auf dich“, mit dem, was sich geändert hat.",
+      "condition": "Alarm, wenn",
+      "placeholder": "etwas nicht stimmt",
+      "line": "Alarm, wenn {{condition}}",
+      "lineAny": "Alarm, wenn etwas nicht stimmt",
+      "where": "In „Wartet auf dich“",
+      "none": "Keine Alarme"
+    },
+    "cost": {
+      "day": "≈ {{amount}} pro Tag aus dem Budget von {{name}}",
+      "week": "≈ {{amount}} pro Woche aus dem Budget von {{name}}",
+      "manual": "Kostet nur, wenn du eine Aktualisierung anforderst",
+      "plan": "Nutzt das Abo von {{name}}",
+      "unknown": "Jede Aktualisierung nutzt das Budget von {{name}}"
+    },
+    "exposure": "Wer das Dashboard sieht, sieht, was die Agenten geholt haben, auch ohne Zugriff auf die Konten, aus denen es stammt. Agenten erstellen auch Dashboards. Um eines mehr Personen zu zeigen als der Person, die es angefragt hat, fragen sie zuerst, in „Wartet auf dich“.",
+    "panel": {
+      "caresFor": "{{name}} kümmert sich um dieses Widget",
+      "caresForOn": "{{name}} kümmert sich um dieses Widget · {{board}}",
+      "how": "Wie es sich aktualisiert",
+      "next": "Routine von {{name}} · nächste {{when}}",
+      "noRoutine": "Aktualisiert sich nicht von selbst",
+      "askAnytime": "Du kannst im Menü eine Aktualisierung anfordern",
+      "editRoutine": "Routine bearbeiten",
+      "changeAlert": "Ändern",
+      "reads": "Was {{name}} dafür liest",
+      "history": "Letzte Aktualisierungen",
+      "noHistory": "Noch keine Aktualisierungen.",
+      "alerted": "Alarm: {{text}}",
+      "changed": "Geändert: {{text}}",
+      "ask": "Um eine Änderung bitten",
+      "askPlaceholder": "Z. B.: nach Kanal aufteilen oder mit derselben Woche im Vorjahr vergleichen",
+      "askTo": "an {{name}}",
+      "send": "Senden",
+      "sent": "{{name}} baut das Widget neu.",
+      "updated": "Aktualisiert",
+      "rename": "Umbenennen",
+      "titleLabel": "Titel des Widgets"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b> hat „{{title}}“ markiert",
+      "failed": "„{{title}}“ wird nicht mehr aktualisiert",
+      "proposal": "<b>{{name}}</b> möchte ein Dashboard veröffentlichen",
+      "proposalWorkspace": "„{{title}}“ für den ganzen Workspace · heute siehst nur du es",
+      "proposalRoles": "„{{title}}“ für {{roles}} · heute siehst nur du es",
+      "openBoard": "Dashboard ansehen",
+      "openWidget": "Widget öffnen",
+      "resolving": "„{{title}}“ wird erneut aktualisiert"
+    },
+    "example": {
+      "days": {
+        "d1": "Mi",
+        "d2": "Do",
+        "d3": "Fr",
+        "d4": "Sa",
+        "d5": "So",
+        "d6": "Mo",
+        "d7": "Di"
+      },
+      "vsYesterday": "ggü. gestern",
+      "goalLine": "48 von 100",
+      "goalNote": "In diesem Tempo ist es am 29. erreicht.",
+      "lineNote": "40 gestern · +48 % diese Woche",
+      "row1": "Erster Eintrag",
+      "row2": "Zweiter Eintrag",
+      "row3": "Dritter Eintrag",
+      "meta1": "jetzt",
+      "meta2": "vor 1 Std.",
+      "meta3": "gestern",
+      "item1": "Eine kurze Zusammenfassung dessen, was sich geändert hat.",
+      "item2": "Der Agent schreibt sie bei jeder Aktualisierung neu."
+    },
+    "preview": {
+      "label": "Vorschau",
+      "example": "Beispieldaten"
+    },
+    "pin": {
+      "action": "Anheften",
+      "label": "An ein Dashboard anheften",
+      "done": "An {{where}} angeheftet",
+      "doneUpdating": "An {{where}} angeheftet · {{name}} erstellt es {{schedule}} neu",
+      "subtitle": "Es behält die Daten des Diagramms. Sein Agent kann es auch aktuell halten.",
+      "open": "Öffnen"
+    },
+    "home": "Mein Start",
+    "untitled": "Neues Widget",
+    "updatedAgo": "aktualisiert {{when}}",
+    "removed": {
+      "home": "„{{title}}“ ist nicht mehr auf Start und die Routine von {{name}} wurde gestoppt",
+      "board": "„{{title}}“ ist nicht mehr auf dem Dashboard und die Routine von {{name}} wurde gestoppt"
+    },
+    "removeConfirm": {
+      "title": "„{{title}}“ entfernen?",
+      "textRoutine": "Die Routine von {{name}}, die es aktualisiert, stoppt, und sein Aktualisierungsverlauf verschwindet mit ihm.",
+      "textManual": "Sein Aktualisierungsverlauf verschwindet mit ihm.",
+      "confirm": "Entfernen"
+    }
+  },
+  "agentPicker": {
+    "search": "Agenten suchen",
+    "list": "Agenten",
+    "empty": "Kein Agent passt zu „{{q}}“",
+    "noConnectors": "Keine Konnektoren",
+    "more": "+{{count}}"
+  },
+  "dashboards": {
+    "title": "Dashboards",
+    "subtitle": "Zahlen und Diagramme, die die Agenten aktuell halten, für den Workspace oder nur für einige Rollen.",
+    "sidebar": "Dashboards",
+    "navWhat": "Zahlen und Diagramme, die die Agenten aktuell halten",
+    "new": "Neues Dashboard",
+    "back": "Dashboards",
+    "home": "Mein Start",
+    "groups": {
+      "workspace": "Workspace",
+      "workspaceHint": "alle sehen es",
+      "roles": "Deine Rollen",
+      "rolesHint": "du bist in {{roles}}",
+      "mine": "Nur deine",
+      "mineHint": "niemand sonst sieht sie"
+    },
+    "audience": {
+      "label": "Wer es sieht",
+      "workspace": "Ganzer Workspace",
+      "workspaceHint_one": "{{count}} Mitglied sieht es und findet es unter Dashboards",
+      "workspaceHint_other": "Alle {{count}} Mitglieder sehen es und finden es unter Dashboards",
+      "roles": "Rollen",
+      "rolesHint": "Nur Personen mit einer der gewählten Rollen",
+      "private": "Nur du",
+      "privateHint": "Niemand sonst sieht es, bis du es teilst",
+      "noRoles": "Der Workspace hat noch keine Rollen.",
+      "people_one": "{{count}} Person",
+      "people_other": "{{count}} Personen"
+    },
+    "edit": {
+      "label": "Wer bearbeitet",
+      "viewers": "Wer es sieht",
+      "owner": "Nur du und Admins",
+      "roles": "Oder Personen mit diesen Rollen",
+      "twoRoles": "{{first}} und {{second}}",
+      "manyRoles_one": "{{count}} Rolle",
+      "manyRoles_other": "{{count}} Rollen",
+      "cantSee": "Sieht dieses Dashboard nicht",
+      "someRoles": "Einige Rollen…",
+      "rolesNote": "Personen mit diesen Rollen bearbeiten es, wenn sie es auch sehen. Du und Admins immer."
+    },
+    "meta": {
+      "by": "Erstellt von {{name}}",
+      "byYou": "Von dir erstellt",
+      "widgets_one": "{{count}} Widget",
+      "widgets_other": "{{count}} Widgets",
+      "updated": "aktualisiert {{when}}"
+    },
+    "share": {
+      "action": "Teilen",
+      "title": "„{{title}}“ teilen",
+      "access": "Wer Zugriff hat",
+      "you": "{{name}} (du)",
+      "owner": "Inhaber des Workspace",
+      "edits": "Bearbeitet",
+      "sees": "Sieht",
+      "none": "Sieht nicht",
+      "copyLink": "Link kopieren",
+      "copied": "Link kopiert",
+      "save": "Speichern",
+      "nowWorkspace": "„{{title}}“ gehört jetzt dem Workspace",
+      "nowPrivate": "Nur du siehst „{{title}}“",
+      "nowRoles": "{{roles}} sehen „{{title}}“"
+    },
+    "proposal": {
+      "title": "{{name}} hat dieses Dashboard für dich gebaut",
+      "workspace": "Und schlägt vor, es im ganzen Workspace zu veröffentlichen. Heute siehst nur du es.",
+      "roles": "Und schlägt vor, es {{roles}} zu zeigen. Heute siehst nur du es.",
+      "keep": "Nur für mich behalten",
+      "publishWorkspace": "Im Workspace veröffentlichen",
+      "publishRoles": "{{roles}} zeigen",
+      "published": "„{{title}}“ ist veröffentlicht",
+      "kept": "Nur du siehst „{{title}}“"
+    },
+    "empty": {
+      "title": "Leeres Dashboard",
+      "text": "Füge Widgets hinzu: Bitte einen Agenten darum oder hefte einen Block aus dem Chat an."
+    },
+    "onlyHome": "Erstelle mit „Neues Dashboard“ ein Dashboard für den Workspace oder einige Rollen.",
+    "create": {
+      "title": "Neues Dashboard",
+      "subtitle": "Widgets zusammen auf einer Seite, für dich oder fürs Team.",
+      "name": "Name",
+      "namePlaceholder": "Z. B.: Vertrieb, Black Friday, Quartalsziele",
+      "askHint": "Du kannst auch einen Agenten in einem Chat bitten, eins zu bauen.",
+      "submit": "Dashboard erstellen",
+      "created": "„{{title}}“ erstellt"
+    },
+    "newWidget": {
+      "title": "Neues Widget",
+      "subtitle": "Eine Zahl, ein Diagramm oder eine Liste, die ein Agent aktuell hält.",
+      "tabAsk": "Einen Agenten fragen",
+      "tabPin": "Aus dem Chat anheften",
+      "what": "Was möchtest du verfolgen?",
+      "whatPlaceholder": "Z. B.: die Verkäufe von heute im Vergleich zu gestern",
+      "who": "Wer sich darum kümmert",
+      "format": "Darstellung",
+      "updates": "Aktualisierung",
+      "destination": "Hinzufügen zu",
+      "create": "Widget erstellen",
+      "pin": "Anheften",
+      "fromChat": "Blöcke, die die Agenten im Chat geschickt haben",
+      "pinHint": "Du kannst auch direkt aus der Nachricht anheften: „Anheften“ am Block.",
+      "keepUpdated": "Aktuell halten",
+      "onlyPin": "Nein, nur anheften",
+      "emptyPreview": "Sag, was du verfolgen möchtest, und {{name}} zeigt hier, wie es aussehen wird.",
+      "pickBlock": "Wähle einen Block aus dem Chat.",
+      "noBlocks": "Noch keine Diagramme in deinen Unterhaltungen.",
+      "suggestions": "Vorschläge",
+      "theAgent": "Der Agent",
+      "noAgents": "Noch kein Agent, mit dem du sprechen kannst.",
+      "place": {
+        "channel": "{{name}} in #{{channel}} · {{when}}",
+        "thread": "{{name}} in einem Thread in #{{channel}} · {{when}}",
+        "dm": "{{name}} in eurer Unterhaltung · {{when}}",
+        "unnamed": "{{name}} in einer Unterhaltung · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}} baut es jetzt, mit echten Daten",
+        "reads": "Liest {{sources}}",
+        "routine": "Erstellt die Routine „{{title}}“",
+        "routineHint": "{{schedule}} · erscheint unter Routinen",
+        "noRoutine": "Keine Routine: aktualisiert sich, wenn du fragst",
+        "alert": "Alarm in „Wartet auf dich“, wenn {{condition}}",
+        "alertHint": "Sonst aktualisiert es nur das Widget, ohne Nachricht",
+        "noAlert": "Keine Alarme",
+        "noAlertHint": "Aktualisiert nur das Widget, ohne Nachricht",
+        "pinAsIs": "Heftet den Block so an, wie er im Chat ist",
+        "redoes": "{{name}} erstellt es {{schedule}} neu",
+        "redoesHint": "Mit einer Routine, ohne Nachricht im Chat",
+        "noRedo": "Aktualisiert sich nicht von selbst",
+        "noRedoHint": "Du kannst im Menü eine Aktualisierung anfordern"
+      },
+      "created": "Widget zu {{where}} hinzugefügt",
+      "test": "Testen",
+      "testAgain": "Erneut testen",
+      "testing": "{{name}} baut es mit echten Daten…",
+      "tested": "Echte Daten · {{when}}",
+      "stale": "Seit dem Test geändert",
+      "testFailed": "Hat nicht geklappt: {{reason}}",
+      "tryAgain": "Erneut versuchen",
+      "testCost": "Dieser Test hat {{cost}} gekostet",
+      "testFirst": "Teste es zuerst, um das echte Ergebnis zu sehen",
+      "titleField": "Titel",
+      "titlePlaceholder": "Titel · {{name}} schlägt beim Testen einen vor",
+      "cardSubtitle": "Schreib auf die Karte, was du sehen willst. Tippe auf ihre Teile, um zu ändern, wer sich darum kümmert, wann es aktualisiert wird, den Alarm und die Größe.",
+      "pinTitle": "Einen Block aus dem Chat anheften",
+      "pinSubtitle": "Die Karte kommt aus dem Chat. Du wählst den Titel und ob sie neu erstellt wird.",
+      "pickFromChat": "Wähle einen Block, den ein Agent schon geschickt hat:",
+      "orPin": "Oder hefte einen Block an, der schon im Chat kam",
+      "repick": "Anderen Block wählen",
+      "formatAuto": "Automatische Darstellung",
+      "enterTests": "Enter testet erneut",
+      "quoted": "„{{ask}}“",
+      "editAsk": "Anfrage ändern",
+      "editAskOf": "Anfrage ändern: {{ask}}",
+      "testingShort": "Wird getestet…",
+      "buildingFoot": "{{name}} baut es…",
+      "failedTitle": "{{name}} konnte es nicht bauen",
+      "staleHint": "Teste noch einmal, um zu sehen, wie es aussieht.",
+      "whoButton": "Wer sich darum kümmert: {{name}}",
+      "whoHint": "Wer sich darum kümmert, baut das Widget aus dem, was er über seine Konnektoren liest.",
+      "alert": "Alarm",
+      "alertOn": "Alarm an",
+      "alertDone": "Fertig",
+      "manual": "Nur wenn ich frage",
+      "manualInline": "nur wenn ich frage",
+      "noUpdate": "Nicht aktualisieren",
+      "noUpdateInline": "wird nicht aktualisiert",
+      "inRoutines": "die Routine erscheint unter Routinen",
+      "pinAsIs": "Bleibt, wie es ist, ohne Routine",
+      "pinRedoes": "{{name}} erstellt es {{schedule}} mit einer Routine neu",
+      "formatHints": {
+        "auto": "{{name}} wählt die Darstellung, die es am besten zeigt",
+        "kpi": "Eine große Zahl und wie sie sich verändert hat",
+        "goal": "Der Fortschritt zu einem Ziel",
+        "bars": "Ein paar Werte nebeneinander",
+        "line": "Wie es sich im Lauf der Zeit verändert hat",
+        "list": "Eine kurze Liste von Einträgen",
+        "text": "Ein paar Sätze, die es zusammenfassen"
+      }
+    },
+    "pinTop": "Oben anheften",
+    "unpin": "Lösen",
+    "rename": "Umbenennen",
+    "about": "Beschreibung",
+    "aboutPlaceholder": "Wofür dieses Dashboard da ist",
+    "delete": {
+      "action": "Dashboard löschen",
+      "title": "„{{title}}“ löschen?",
+      "text": "Seine Widgets und ihre Routinen werden auch gelöscht.",
+      "confirm": "Löschen",
+      "done": "„{{title}}“ gelöscht"
+    },
+    "errors": {
+      "notFound": "Dieses Dashboard gibt es nicht, oder du siehst es nicht.",
+      "forbidden": "Das kann nur, wer dieses Dashboard bearbeitet.",
+      "homeFixed": "Dein Start wird weder geteilt noch gelöscht.",
+      "rolesRequired": "Wähle mindestens eine Rolle.",
+      "roleUnknown": "Eine dieser Rollen gibt es im Workspace nicht mehr.",
+      "titleRequired": "Gib dem Dashboard einen Namen.",
+      "tooMany": "Der Workspace hat so viele Dashboards, wie er haben kann. Lösche zuerst eines.",
+      "publishForbidden": "Deine Rollen erlauben dir nicht, anderen Dashboards zu zeigen.",
+      "proposalNone": "Über diese Anfrage wurde schon entschieden.",
+      "proposalNotYours": "Nur die Person, die der Agent gefragt hat, entscheidet.",
+      "widgetNotFound": "Dieses Widget gibt es nicht mehr.",
+      "widgetTooMany": "Dieses Dashboard ist voll. Entferne ein Widget oder nutze ein anderes Dashboard.",
+      "scheduledCap": "Der Workspace hält schon {{max}} Widgets nach Zeitplan aktuell. Stell eines auf „nur auf Anfrage“ um oder entferne eines.",
+      "agentUnreachable": "Du kannst nicht mit diesem Agenten sprechen.",
+      "agentArchived": "Dieser Agent wurde archiviert.",
+      "blockNotFound": "Dieses Diagramm ist nicht mehr in der Nachricht.",
+      "notAgentMessage": "Nur das Diagramm eines Agenten kann angeheftet werden.",
+      "promptRequired": "Sag, was das Widget zeigen soll.",
+      "notTested": "Teste es zuerst: Das Widget wird erstellt, sobald sein Test klappt."
     }
   }
 }

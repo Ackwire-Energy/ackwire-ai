@@ -32,6 +32,8 @@ export const APP_LINK_PATTERNS = [
   "/reset-password",
   "/signup",
   "/org/*/home",
+  "/org/*/dashboards",
+  "/org/*/dashboards/*",
   "/org/*/c/*",
   "/org/*/dm/*",
   "/org/*/threads",

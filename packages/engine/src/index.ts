@@ -83,6 +83,7 @@ export * from "./continue-run";
 export * from "./credentials";
 export * from "./cron";
 export * from "./crypto";
+export * from "./dashboards";
 export * from "./databases/connections";
 export * from "./databases/guard";
 export * from "./databases/identifiers";

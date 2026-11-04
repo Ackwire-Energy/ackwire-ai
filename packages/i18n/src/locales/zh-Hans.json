@@ -2562,6 +2562,7 @@
     },
     "working": {
       "title": "正在工作",
+      "none": "目前没有智能体在工作。",
       "dm": "在你的对话中",
       "in": "#{{channel}}",
       "mission": "专项任务 · {{done}} / {{total}}"
@@ -2747,7 +2748,8 @@
       "browser": "浏览器",
       "members": "成员",
       "usage": "用量",
-      "connectors": "连接器"
+      "connectors": "连接器",
+      "dashboard": "仪表盘"
     },
     "reactions_other": "{{count}} 个表情回应",
     "quote": "“{{text}}”",
@@ -4902,13 +4904,18 @@
     "subtitle": "智能体按计划或在某事发生时自己完成的工作。",
     "new": "新建例行工作",
     "deliversTo": "{{agent}} · 发送到{{target}}",
+    "widgetLine": "{{agent}} · 更新它的小组件，不发消息",
+    "widgetChip": "仪表盘小组件",
+    "widgetFixed": "显示什么、何时更新、由谁负责，都在它的小组件里修改。",
     "target": {
       "forum": "论坛主题",
       "forumShort": "论坛",
       "dm": "我与智能体的私信",
       "artifact": "Drive 中的文档",
       "dmShort": "私信",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "仪表盘小组件",
+      "widgetNamed": "小组件“{{title}}”"
     },
     "active": "运行中",
     "activeLabel": "运行中：{{name}}",
@@ -5001,7 +5008,8 @@
         "channel": "频道里的所有人都能看到",
         "dm": "只有你能看到",
         "forum": "智能体在论坛主题中讨论",
-        "artifact": "生成 Drive 中的文档"
+        "artifact": "生成 Drive 中的文档",
+        "widget": "更新它的小组件，不发消息"
       },
       "ahead": "为之后准备好的",
       "createdBy": "由 {{name}} 创建 · {{date}}",
@@ -12930,6 +12938,414 @@
         "done": "今天完成"
       },
       "none": "{{name}} 现在空闲。"
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "自动",
+      "kpi": "数字",
+      "goal": "目标",
+      "bars": "柱状图",
+      "line": "折线图",
+      "list": "列表",
+      "text": "摘要"
+    },
+    "schedules": {
+      "half": "每 30 分钟",
+      "hour": "每小时",
+      "day": "每天 8:00",
+      "week": "每周一 8:00",
+      "manual": "仅在你要求时"
+    },
+    "schedulesShort": {
+      "half": "30 分钟",
+      "hour": "每小时",
+      "day": "每天 · 8:00",
+      "week": "每周一",
+      "manual": "按需"
+    },
+    "schedulesInline": {
+      "half": "每 30 分钟",
+      "hour": "每小时",
+      "day": "每天 8:00",
+      "week": "每周一 8:00",
+      "manual": "按需"
+    },
+    "sizes": {
+      "label": "大小",
+      "s": "小",
+      "m": "中",
+      "l": "大"
+    },
+    "status": {
+      "building": "{{name}} 正在创建小组件和负责更新它的例行工作…",
+      "updating": "{{name}} 正在更新…",
+      "failed": "未更新"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "解决",
+      "agent_reported": "{{detail}}",
+      "no_update": "上次更新结束时没有数据。",
+      "error": "上次更新失败了。",
+      "budget_exceeded": "{{name}} 已用完本月预算。",
+      "waiting_computer": "{{name}} 的电脑无法连接。",
+      "waiting_plan": "{{name}} 的套餐已达上限。",
+      "waiting_budget": "{{name}} 的预算已达上限。",
+      "creator_left": "设置它的人已离开工作区。",
+      "creator_no_access": "设置它的人已无法再使用它。",
+      "agent_archived": "{{name}} 已归档。",
+      "audience": "设置它的人已无法再与 {{name}} 对话。",
+      "failing": "连续失败多次，已停止。",
+      "stopped": "更新已停止。",
+      "missing_credential": "{{name}} 没有可用的 AI 密钥或套餐。",
+      "timeout": "更新耗时太长。",
+      "invalid_data": "{{name}} 无法把数据做成这种形式。"
+    },
+    "menu": {
+      "label": "更多",
+      "open": "打开",
+      "refresh": "立即更新",
+      "change": "请 {{name}} 修改",
+      "schedule": "更改更新时间",
+      "removeHome": "从首页移除",
+      "removeBoard": "从仪表盘移除"
+    },
+    "organize": {
+      "start": "整理",
+      "done": "完成",
+      "size": "大小",
+      "remove": "移除",
+      "drag": "拖动以移动",
+      "fixed": "固定",
+      "role": "可移动的小组件",
+      "help": "按空格或 Enter 拿起卡片，用方向键移动，再按空格或 Enter 放下，按 Esc 取消。只按方向键会一次移动一格。",
+      "picked": "你拿起了“{{title}}”。方向键移动，空格放下，Esc 取消。",
+      "moved": "“{{title}}”：第 {{position}} 个，共 {{total}} 个。",
+      "dropped": "你把“{{title}}”放到了第 {{position}} 个，共 {{total}} 个。",
+      "canceled": "“{{title}}”回到了原位。"
+    },
+    "add": {
+      "label": "添加小组件",
+      "short": "小组件"
+    },
+    "alert": {
+      "label": "有异常时通知我",
+      "hint": "提醒会连同变化内容一起进入“等你处理”。",
+      "condition": "提醒条件",
+      "placeholder": "出现异常",
+      "line": "提醒条件：{{condition}}",
+      "lineAny": "出现异常时提醒",
+      "where": "在“等你处理”中",
+      "none": "无提醒"
+    },
+    "cost": {
+      "day": "每天约 {{amount}}，来自 {{name}} 的预算",
+      "week": "每周约 {{amount}}，来自 {{name}} 的预算",
+      "manual": "只在你要求更新时产生费用",
+      "plan": "使用 {{name}} 的套餐",
+      "unknown": "每次更新都使用 {{name}} 的预算"
+    },
+    "exposure": "能看到仪表盘的人，就能看到智能体带来的内容，即使没有数据来源账号的权限。智能体也会创建仪表盘。要给比提出请求的人更多的人看时，它们会先在“等你处理”中征求同意。",
+    "panel": {
+      "caresFor": "{{name}} 负责这个小组件",
+      "caresForOn": "{{name}} 负责这个小组件 · {{board}}",
+      "how": "更新方式",
+      "next": "{{name}} 的例行工作 · 下次 {{when}}",
+      "noRoutine": "不会自动更新",
+      "askAnytime": "你可以在菜单中要求更新",
+      "editRoutine": "编辑例行工作",
+      "changeAlert": "更改",
+      "reads": "{{name}} 创建时读取的内容",
+      "history": "最近更新",
+      "noHistory": "还没有更新。",
+      "alerted": "提醒：{{text}}",
+      "changed": "已更改：{{text}}",
+      "ask": "要求修改",
+      "askPlaceholder": "例如：按频道拆分，或与去年同一周对比",
+      "askTo": "发给 {{name}}",
+      "send": "发送",
+      "sent": "{{name}} 正在重做小组件。",
+      "updated": "已更新",
+      "rename": "重命名",
+      "titleLabel": "小组件标题"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b> 对“{{title}}”发出了提醒",
+      "failed": "“{{title}}”已停止更新",
+      "proposal": "<b>{{name}}</b> 想发布一个仪表盘",
+      "proposalWorkspace": "“{{title}}”面向整个工作区 · 目前只有你能看到",
+      "proposalRoles": "“{{title}}”面向{{roles}} · 目前只有你能看到",
+      "openBoard": "查看仪表盘",
+      "openWidget": "打开小组件",
+      "resolving": "正在重新更新“{{title}}”"
+    },
+    "example": {
+      "days": {
+        "d1": "周三",
+        "d2": "周四",
+        "d3": "周五",
+        "d4": "周六",
+        "d5": "周日",
+        "d6": "周一",
+        "d7": "周二"
+      },
+      "vsYesterday": "较昨天",
+      "goalLine": "48 / 100",
+      "goalNote": "按这个速度，将在 29 日达成。",
+      "lineNote": "昨天 40 · 本周 +48%",
+      "row1": "第一项",
+      "row2": "第二项",
+      "row3": "第三项",
+      "meta1": "刚刚",
+      "meta2": "1 小时前",
+      "meta3": "昨天",
+      "item1": "对变化内容的简短摘要。",
+      "item2": "智能体每次更新都会重写。"
+    },
+    "preview": {
+      "label": "预览",
+      "example": "示例数据"
+    },
+    "pin": {
+      "action": "固定",
+      "label": "固定到仪表盘",
+      "done": "已固定到 {{where}}",
+      "doneUpdating": "已固定到 {{where}} · {{name}} {{schedule}}重做",
+      "subtitle": "它会保留图表的数据。它的智能体也可以让它保持最新。",
+      "open": "打开"
+    },
+    "home": "我的首页",
+    "untitled": "新小组件",
+    "updatedAgo": "{{when}}更新",
+    "removed": {
+      "home": "“{{title}}”已移出首页，{{name}} 的例行工作已停止",
+      "board": "“{{title}}”已移出仪表盘，{{name}} 的例行工作已停止"
+    },
+    "removeConfirm": {
+      "title": "移除“{{title}}”？",
+      "textRoutine": "负责更新它的 {{name}} 的例行工作会停止，更新历史也会一起移除。",
+      "textManual": "更新历史也会一起移除。",
+      "confirm": "移除"
+    }
+  },
+  "agentPicker": {
+    "search": "搜索智能体",
+    "list": "智能体",
+    "empty": "没有与“{{q}}”匹配的智能体",
+    "noConnectors": "无连接器",
+    "more": "+{{count}}"
+  },
+  "dashboards": {
+    "title": "仪表盘",
+    "subtitle": "智能体保持更新的数字和图表，面向整个工作区或仅部分角色。",
+    "sidebar": "仪表盘",
+    "navWhat": "智能体保持更新的数字和图表",
+    "new": "新建仪表盘",
+    "back": "仪表盘",
+    "home": "我的首页",
+    "groups": {
+      "workspace": "工作区",
+      "workspaceHint": "所有人可见",
+      "roles": "你的角色",
+      "rolesHint": "你属于{{roles}}",
+      "mine": "仅你自己",
+      "mineHint": "其他人看不到"
+    },
+    "audience": {
+      "label": "谁能看到",
+      "workspace": "整个工作区",
+      "workspaceHint_other": "全部 {{count}} 位成员都能看到，并可在“仪表盘”中找到",
+      "roles": "角色",
+      "rolesHint": "仅限拥有所选角色之一的人",
+      "private": "仅你自己",
+      "privateHint": "在你分享之前，其他人都看不到",
+      "noRoles": "工作区还没有角色。",
+      "people_other": "{{count}} 人"
+    },
+    "edit": {
+      "label": "谁能编辑",
+      "viewers": "能看到的人",
+      "owner": "仅你和管理员",
+      "roles": "或拥有这些角色的人",
+      "twoRoles": "{{first}}和{{second}}",
+      "manyRoles_other": "{{count}} 个角色",
+      "cantSee": "看不到这个仪表盘",
+      "someRoles": "部分角色…",
+      "rolesNote": "拥有这些角色的人在也能看到仪表盘时可以编辑。你和管理员始终可以编辑。"
+    },
+    "meta": {
+      "by": "由 {{name}} 创建",
+      "byYou": "由你创建",
+      "widgets_other": "{{count}} 个小组件",
+      "updated": "{{when}}更新"
+    },
+    "share": {
+      "action": "分享",
+      "title": "分享“{{title}}”",
+      "access": "谁有访问权限",
+      "you": "{{name}}（你）",
+      "owner": "工作区所有者",
+      "edits": "可编辑",
+      "sees": "可查看",
+      "none": "不可查看",
+      "copyLink": "复制链接",
+      "copied": "链接已复制",
+      "save": "保存",
+      "nowWorkspace": "“{{title}}”现在属于工作区",
+      "nowPrivate": "现在只有你能看到“{{title}}”",
+      "nowRoles": "{{roles}}现在能看到“{{title}}”"
+    },
+    "proposal": {
+      "title": "{{name}} 为你创建了这个仪表盘",
+      "workspace": "并建议发布给整个工作区。目前只有你能看到。",
+      "roles": "并建议展示给{{roles}}。目前只有你能看到。",
+      "keep": "仅自己可见",
+      "publishWorkspace": "发布到工作区",
+      "publishRoles": "展示给{{roles}}",
+      "published": "“{{title}}”已发布",
+      "kept": "现在只有你能看到“{{title}}”"
+    },
+    "empty": {
+      "title": "空仪表盘",
+      "text": "添加小组件：请智能体创建，或从聊天中固定一个区块。"
+    },
+    "onlyHome": "用“新建仪表盘”为工作区或部分角色创建仪表盘。",
+    "create": {
+      "title": "新建仪表盘",
+      "subtitle": "把小组件放在同一页上，给你自己或给团队。",
+      "name": "名称",
+      "namePlaceholder": "例如：销售、黑色星期五、季度目标",
+      "askHint": "你也可以在聊天中请智能体帮你搭建一个。",
+      "submit": "创建仪表盘",
+      "created": "已创建“{{title}}”"
+    },
+    "newWidget": {
+      "title": "新建小组件",
+      "subtitle": "由智能体保持更新的数字、图表或列表。",
+      "tabAsk": "请智能体创建",
+      "tabPin": "从聊天中固定",
+      "what": "你想跟踪什么？",
+      "whatPlaceholder": "例如：今天的销售额与昨天对比",
+      "who": "由谁负责",
+      "format": "形式",
+      "updates": "更新",
+      "destination": "添加到",
+      "create": "创建小组件",
+      "pin": "固定",
+      "fromChat": "智能体在聊天中发送的区块",
+      "pinHint": "你也可以直接在消息中固定：点击区块上的“固定”。",
+      "keepUpdated": "保持更新",
+      "onlyPin": "不用，只固定",
+      "emptyPreview": "说说你想跟踪什么，{{name}} 会在这里展示它的样子。",
+      "pickBlock": "从聊天中选择一个区块。",
+      "noBlocks": "你的对话中还没有图表。",
+      "suggestions": "建议",
+      "theAgent": "智能体",
+      "noAgents": "还没有你可以对话的智能体。",
+      "place": {
+        "channel": "{{name}} 在 #{{channel}} · {{when}}",
+        "thread": "{{name}} 在 #{{channel}} 的话题中 · {{when}}",
+        "dm": "{{name}} 在你们的对话中 · {{when}}",
+        "unnamed": "{{name}} 在一个对话中 · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}} 现在用真实数据创建",
+        "reads": "读取 {{sources}}",
+        "routine": "创建例行工作“{{title}}”",
+        "routineHint": "{{schedule}} · 显示在“例行工作”中",
+        "noRoutine": "没有例行工作：在你要求时更新",
+        "alert": "如果{{condition}}，在“等你处理”中提醒",
+        "alertHint": "否则只更新小组件，不发消息",
+        "noAlert": "无提醒",
+        "noAlertHint": "只更新小组件，不发消息",
+        "pinAsIs": "按聊天中的原样固定区块",
+        "redoes": "{{name}} {{schedule}}重做",
+        "redoesHint": "通过例行工作，不在聊天中发消息",
+        "noRedo": "不会自动更新",
+        "noRedoHint": "你可以在菜单中要求更新"
+      },
+      "created": "小组件已添加到 {{where}}",
+      "test": "测试",
+      "testAgain": "再测试一次",
+      "testing": "{{name}} 正在用真实数据制作…",
+      "tested": "真实数据 · {{when}}",
+      "stale": "测试后有改动",
+      "testFailed": "没有成功：{{reason}}",
+      "tryAgain": "重试",
+      "testCost": "这次测试花费 {{cost}}",
+      "testFirst": "先测试一下，看看真实结果",
+      "titleField": "标题",
+      "titlePlaceholder": "标题 · {{name}} 会在测试时建议一个",
+      "cardSubtitle": "在卡片上写下你想看的内容。点按卡片的各个部分，可以更改由谁负责、何时更新、提醒和大小。",
+      "pinTitle": "固定聊天中的区块",
+      "pinSubtitle": "卡片来自聊天。由你选择标题，以及是否重新制作。",
+      "pickFromChat": "选择一个智能体已发送的区块：",
+      "orPin": "或固定一个已在聊天中出现的区块",
+      "repick": "选择其他区块",
+      "formatAuto": "自动形式",
+      "enterTests": "按 Enter 重新测试",
+      "quoted": "“{{ask}}”",
+      "editAsk": "修改需求",
+      "editAskOf": "修改需求：{{ask}}",
+      "testingShort": "测试中…",
+      "buildingFoot": "{{name}} 正在制作…",
+      "failedTitle": "{{name}} 未能制作成功",
+      "staleHint": "再测试一次，看看效果。",
+      "whoButton": "由谁负责：{{name}}",
+      "whoHint": "负责的智能体会根据它通过连接器读取的内容制作小组件。",
+      "alert": "提醒",
+      "alertOn": "提醒已开",
+      "alertDone": "完成",
+      "manual": "仅在我要求时",
+      "manualInline": "仅在我要求时",
+      "noUpdate": "不更新",
+      "noUpdateInline": "不更新",
+      "inRoutines": "例行工作显示在“例行工作”中",
+      "pinAsIs": "保持原样，不建例行工作",
+      "pinRedoes": "{{name}} 通过例行工作{{schedule}}重新制作",
+      "formatHints": {
+        "auto": "{{name}} 选择最能展示它的形式",
+        "kpi": "一个醒目的数字及其变化",
+        "goal": "距离目标的进度",
+        "bars": "几个数值并排对比",
+        "line": "随时间的变化",
+        "list": "一份简短的条目列表",
+        "text": "几句话概括"
+      }
+    },
+    "pinTop": "置顶",
+    "unpin": "取消置顶",
+    "rename": "重命名",
+    "about": "描述",
+    "aboutPlaceholder": "这个仪表盘的用途",
+    "delete": {
+      "action": "删除仪表盘",
+      "title": "删除“{{title}}”？",
+      "text": "它的小组件和对应的例行工作也会一起删除。",
+      "confirm": "删除",
+      "done": "已删除“{{title}}”"
+    },
+    "errors": {
+      "notFound": "这个仪表盘不存在，或者你无法查看。",
+      "forbidden": "只有能编辑这个仪表盘的人才能这样做。",
+      "homeFixed": "你的首页不能分享或删除。",
+      "rolesRequired": "请至少选择一个角色。",
+      "roleUnknown": "其中一个角色已不在工作区中。",
+      "titleRequired": "给仪表盘起个名字。",
+      "tooMany": "工作区的仪表盘数量已达上限。请先删除一个。",
+      "publishForbidden": "你的角色不允许你向他人展示仪表盘。",
+      "proposalNone": "这个请求已经有了决定。",
+      "proposalNotYours": "只有智能体询问的那个人才能决定。",
+      "widgetNotFound": "这个小组件已不存在。",
+      "widgetTooMany": "这个仪表盘已满。请移除一个小组件，或使用其他仪表盘。",
+      "scheduledCap": "工作区已有 {{max}} 个小组件在按计划更新。请把其中一个改为按需更新，或移除一个。",
+      "agentUnreachable": "你无法与这个智能体对话。",
+      "agentArchived": "这个智能体已归档。",
+      "blockNotFound": "那个图表已不在消息中。",
+      "notAgentMessage": "只能固定智能体的图表。",
+      "promptRequired": "说说小组件应该显示什么。",
+      "notTested": "请先测试：测试成功后才会创建小组件。"
     }
   }
 }

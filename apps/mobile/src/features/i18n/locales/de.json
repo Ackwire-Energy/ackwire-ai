@@ -86,6 +86,7 @@
   },
   "tabs": {
     "chats": "Chats",
+    "dashboards": "Dashboards",
     "threads": "Threads",
     "agents": "Agenten",
     "activity": "Aktivität",
@@ -1713,5 +1714,74 @@
     "noEmoji": "Kein Emoji",
     "cleared": "Status gelöscht",
     "bySelfUntil": "Geschrieben von {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Nur du · deine eigenen Widgets",
+    "loadFailed": "Die Dashboards konnten nicht geladen werden.",
+    "onlyHome": "Dashboards für den Workspace oder deine Rollen erscheinen hier.",
+    "create": "Erstellen",
+    "routineTarget": "sein Widget",
+    "pin": {
+      "which": "Welches Diagramm"
+    },
+    "organize": {
+      "hint": "Halte ein Widget gedrückt und zieh es an seinen neuen Platz, oder nutze die Pfeile, und wähle die Größe von jedem. Fertig speichert die Reihenfolge.",
+      "holdHint": "Gedrückt halten und ziehen, um es zu verschieben.",
+      "up": "Nach oben",
+      "down": "Nach unten",
+      "position": "{{at}} von {{count}}",
+      "saved": "Dashboard angeordnet"
+    },
+    "edit": {
+      "saved": "Dashboard gespeichert"
+    },
+    "pinned": "Oben angeheftet",
+    "unpinned": "Gelöst",
+    "sizeHint": {
+      "s": "Eine halbe Zeile auf dem Handy, ein Viertel des Dashboards im Web.",
+      "m": "Die ganze Zeile auf dem Handy, das halbe Dashboard im Web.",
+      "l": "Die ganze Zeile, groß dargestellt. Das halbe Dashboard und doppelt so hoch im Web."
+    },
+    "widget": {
+      "caresFor": "{{name}} kümmert sich darum",
+      "refreshing": "{{name}} aktualisiert es.",
+      "scheduleSaved": "Es aktualisiert sich jetzt {{schedule}}",
+      "alertSaved": "Alarm gespeichert",
+      "removed": "Widget entfernt. Seine Routine wurde gestoppt.",
+      "routine": "Seine Routine",
+      "onBoard": "Wo es ist",
+      "title": "Titel",
+      "titlePlaceholder": "Ein kurzer Name für das Widget",
+      "titleSaved": "Titel gespeichert"
+    },
+    "formatAuto": "{{name}} wählt die beste aus",
+    "newWidget": {
+      "titleHint": "Titel · {{name}} schlägt beim Testen einen vor",
+      "alerts": "Alarm an",
+      "realData": "Echte Daten",
+      "editAsk": "Anfrage ändern",
+      "asked": "„{{ask}}“",
+      "autoFormat": "Automatische Darstellung"
+    },
+    "agentPick": {
+      "search": "Agenten suchen",
+      "noMatch": "Kein Agent mit diesem Namen oder dieser Rolle.",
+      "note": "Jeder Agent liest nur die Apps, auf die er Zugriff hat.",
+      "reads": "Liest {{apps}}",
+      "noApps": "Keine verbundenen Apps"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} hat ein Widget markiert",
+      "widget_alert_other": "{{names}} haben ein Widget markiert",
+      "widget_failed_one": "{{names}} konnte ein Widget nicht aktualisieren",
+      "widget_failed_other": "{{names}} konnten ein Widget nicht aktualisieren",
+      "dashboard_proposal_one": "{{names}} möchte ein Dashboard veröffentlichen",
+      "dashboard_proposal_other": "{{names}} möchten ein Dashboard veröffentlichen",
+      "card": {
+        "alert": "Alarm",
+        "failed": "Nicht aktualisiert",
+        "proposal": "Dashboard"
+      }
+    }
   }
 }

@@ -399,6 +399,7 @@ export {
   type TextEdit,
   wrapSelection,
 } from "./format";
+export { useDarkTheme } from "./hooks/useDarkTheme";
 export {
   HOVER_CLOSE_MS,
   HOVER_SWITCH_MS,
@@ -463,3 +464,9 @@ export {
   zoneOption,
   zoneOptions,
 } from "./timezones";
+export { DitherLine, fillEnds, paintCells, paintLineArea, useElementWidth } from "./widgets/ChartPieces";
+export { formatWidgetNumber, formatWithUnit, useCountUp, widgetDigits } from "./widgets/format";
+export { ditherTile, WIDGET_CELL, widgetTileVars, widgetTones } from "./widgets/tiles";
+export { BuildingDither, WidgetBody, type WidgetBodyProps } from "./widgets/WidgetBody";
+export { WidgetBleed, WidgetCard, type WidgetCardProps, type WidgetOrganize } from "./widgets/WidgetCard";
+export { WidgetGlyph } from "./widgets/WidgetGlyph";

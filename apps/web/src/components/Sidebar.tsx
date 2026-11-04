@@ -1177,7 +1177,19 @@ function MoreTools({
             {countOf(id)}
           </Link>
         ))}
-        {/* The task manager (ADR 0128): always here, not one of the tools a person places (`SIDEBAR_ITEMS`). */}
+        {/* Dashboards (ADR 0135 §14) and the task manager (ADR 0128): always here, not tools a person places. */}
+        <Link
+          to="/org/$orgId/dashboards"
+          params={{ orgId: org.id }}
+          className="ac-menu__item sidebar__more-item"
+          onClick={() => setOpen(false)}
+        >
+          <Icon name="chart" />
+          <span className="ac-menu__label">
+            {t("dashboards.sidebar")}
+            <span className="ac-menu__desc">{t("dashboards.navWhat")}</span>
+          </span>
+        </Link>
         <Link
           to="/org/$orgId/task-manager"
           params={{ orgId: org.id }}
@@ -1207,6 +1219,16 @@ function MoreTools({
       </Popover>
       <div className="sidebar__more-active">
         {items.map(row)}
+        {/* A board's own page too (`/dashboards/<id>`): the link is active on the pages under it. */}
+        <Link
+          to="/org/$orgId/dashboards"
+          params={{ orgId: org.id }}
+          className="sidebar__item"
+          title={t("dashboards.sidebar")}
+        >
+          <Icon name="chart" />
+          <span className="sidebar__item-label">{t("dashboards.sidebar")}</span>
+        </Link>
         <Link
           to="/org/$orgId/task-manager"
           params={{ orgId: org.id }}
