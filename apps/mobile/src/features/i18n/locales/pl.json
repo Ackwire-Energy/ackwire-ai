@@ -1963,6 +1963,7 @@
     "item": {
       "gone": "Ten element już nie istnieje albo nie możesz go zobaczyć.",
       "missingText": "Od ostatniej synchronizacji nie ma go w {{name}}. Agenci nie mogą go używać.",
+      "unreadable": "Nie można tu odczytać danych tego kontaktu. Osoba, która nim zarządza, może wpisać je ponownie i zapisać.",
       "externalText": "Pochodzi z {{name}}. Zmień tam nazwę, adres, nazwę użytkownika lub hasło.",
       "noValue": "Nie zapisano jeszcze żadnej wartości.",
       "changePassword": "Zmień hasło",

@@ -1787,6 +1787,7 @@
     "item": {
       "gone": "Dit item bestaat niet meer of je kunt het niet zien.",
       "missingText": "Het is sinds de laatste synchronisatie verdwenen uit {{name}}. Agenten kunnen het niet gebruiken.",
+      "unreadable": "De gegevens van dit contact kunnen hier niet worden gelezen. Wie het beheert, kan ze opnieuw invullen en opslaan.",
       "externalText": "Het komt uit {{name}}. Wijzig daar de naam, het adres, de gebruikersnaam of het wachtwoord.",
       "noValue": "Er is nog geen waarde opgeslagen.",
       "changePassword": "Wachtwoord wijzigen",

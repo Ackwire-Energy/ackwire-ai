@@ -154,7 +154,7 @@ export type ScreenActOutcome =
   | {
       ok: true;
       observation: ScreenObservation | null;
-      /** What was typed, as the report names it (a Vault login's title, ADR 0139): never a value. */
+      /** What was typed, as the report names it (the site a Vault login was typed for, ADR 0139): never a value. */
       typed?: string;
     }
   | { ok: false; error: string };
@@ -222,7 +222,7 @@ export interface StepReport {
   expected?: { met: boolean | null; p: number };
   /** Its action went through (a failed step with this only failed its `expect`: it must not be done again). */
   ran?: boolean;
-  /** What a `type_secret` typed, by name (a Vault login's title, ADR 0139): never a value. */
+  /** What a `type_secret` typed, by name (the site a Vault login was typed for, ADR 0139): never a value. */
   typed?: string;
   /** `read` with `find`: the lines that answer it (page text, untrusted), or why there are none. */
   found?: {

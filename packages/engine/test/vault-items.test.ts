@@ -146,7 +146,7 @@ describe("saving", () => {
     ).rejects.toMatchObject({ code: "vault.too_long" });
   });
 
-  test("a contact: its fields sealed at rest, shown to who sees it", async () => {
+  test("a contact: its fields sealed at rest, shown to who sees it on its page, never in the list", async () => {
     v = await vaultSetup();
     const contact = await createVaultItem(v.deps, v.carla.id, v.f.org.id, {
       kind: "contact",
@@ -169,8 +169,11 @@ describe("saving", () => {
     });
     const row = await rowOf(contact.id);
     expect(row.secretCiphertext).not.toContain("12.345.678");
-    const seenByDora = (await listVault(v.deps, v.dora.id, v.f.org.id)).items.find((i) => i.id === contact.id);
-    expect(seenByDora?.contact?.document).toBe("12.345.678/0001-90");
+    // The list opens no contact's seal: its row goes by its title and description (ADR 0139 §7).
+    const listed = (await listVault(v.deps, v.dora.id, v.f.org.id)).items.find((i) => i.id === contact.id);
+    expect(listed).toMatchObject({ title: "Acme Ltda", contact: null });
+    const seenByDora = await getVaultItem(v.deps, v.dora.id, v.f.org.id, contact.id);
+    expect(seenByDora).toMatchObject({ unreadable: false, contact: { document: "12.345.678/0001-90" } });
     expect(await everythingStored(v)).not.toContain("12.345.678");
   });
 });
@@ -280,8 +283,13 @@ describe("changing, showing, deleting", () => {
     await expect(revealVaultItem(v.deps, v.dora.id, v.f.org.id, item.id, "show")).rejects.toMatchObject({
       name: "ForbiddenError",
     });
+    const changes = () =>
+      v.events.filter((e) => (e as { event?: { type?: string } }).event?.type === "vault.changed").length;
+    const before = changes();
     expect(await revealVaultItem(v.deps, v.carla.id, v.f.org.id, item.id, "show")).toEqual({ value: PASSWORD });
     expect(await revealVaultItem(v.deps, v.ana.id, v.f.org.id, item.id, "copy")).toEqual({ value: PASSWORD });
+    // A use alone isn't a change: no app reloads the Vault for it (ADR 0139 §7).
+    expect(changes()).toBe(before);
     const detail = await getVaultItem(v.deps, v.carla.id, v.f.org.id, item.id);
     expect(detail.uses.map((u) => [u.action, u.userId])).toEqual([
       ["copy", v.ana.id],

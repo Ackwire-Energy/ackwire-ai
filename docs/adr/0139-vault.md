@@ -113,7 +113,9 @@ A saved login is typed without a person's yes each time. The guards are elsewher
    attribute, fills the element carrying the mark (a page that moved on has none) and takes the mark off. The value
    is dropped when the batch ends. The page's own scripts can patch the DOM the check reads; they can't fake
    `location`, `ancestorOrigins` or `top`, so what the check guarantees is the origins the value goes to, and the
-   field checks catch honest mistakes (a script of the rule's own site could read the field anyway).
+   field checks catch honest mistakes (a script of the rule's own site could read the field anyway). A field inside
+   an embedded frame (the ref is the frame itself) gets nothing (`in_frame`): the agent asks the person to sign in
+   there through the browser hand-off (`browser_ask_person`).
 4. **A typed value doesn't leave in an address.** Before a password is typed, its Chrome pauses every request and
    the fill waits until Chrome acknowledged that on every page and frame, those opened since an earlier fill too
    (unconfirmed, or refused by one still open: nothing is typed); for 2 minutes then, a request whose URL carries
@@ -132,7 +134,10 @@ answer in time). Not when the command never reached the computer or the runner r
 
 What agents read of an item (its title, username, description, a contact's fields) was written by people, agents,
 password managers or CSV files: `vault_list` gives each item's text in its own `untrustedBlock` and counts as
-reading outside text (ADR 0117).
+reading outside text (ADR 0117). No other tool text carries it: refusals, `vault_save`'s answers and a browser plan's
+report name an item by its id and what the server checked when it was saved, a login's site and a key's variable
+name (`vaultItemName`: "Typed the Vault login for github.com"). `vault_list` records a read only for the contacts it
+shows.
 
 ### 5. What it doesn't protect against
 
@@ -145,6 +150,8 @@ reading outside text (ADR 0117).
   that key in a KMS (ADR 0007).
 - **An agent already signed in** can do wrong things with the session, as a person could. Sensitive actions keep
   asking for approval (ADR 0015).
+- **A session stays in the agent's browser.** A session an agent opens stays in its own browser for its later work,
+  so on an agent several people use, people give it logins meant to be shared, not personal ones.
 
 ### 6. The request card
 
@@ -157,15 +164,22 @@ reading outside text (ADR 0117).
 - A **code** mode (`digits`), with one box per digit, typed by the runner into one field or one field per digit.
 
 A site's password from a request is no longer written to `store.json`: the runner keeps it in memory for 15
-minutes, and drops any site entry left in the file when it loads. Keys and files asked with `request_secret`
-(`env`, `file`) are unchanged.
+minutes (`SITE_SECRET_TTL_MS`, the protocol's), and drops any site entry left in the file when it loads. The server
+counts it gone after the same 15 minutes: the agent isn't told it still holds it, the agent's page doesn't list it,
+a new request doesn't "replace" it, and an agent that tries to type it hears plainly that it was kept in memory only
+and is gone (ask again, or save it to the Vault). Keys and files asked with `request_secret` (`env`, `file`) are
+unchanged.
 
 ### 7. Screens
 
 Settings › Vault, on the web and the phone: Team, Personal and Connections, each item with who may use it and its
-last use; an item's page with its fields (shown or copied only by who manages it, and recorded), who has access in
-one sentence and its recent uses; a new item by kind; a CSV import from a browser or password manager export (web),
+last use (a contact by its title and description: the list carries no contact's details, so it opens no contact's
+seal); an item's page with its fields (shown or copied only by who manages it, and recorded; a contact whose saved
+details don't open on this server says so, and is never changed on top of nothing, for a person to save them again),
+who has access in one sentence and its recent uses; a new item by kind; a CSV import from a browser or password manager export (web),
 which keeps nothing of the file; and one card per source to connect, generated from what the source describes.
+The apps reload the Vault on `vault.changed`, sent when an item, a connection or an access changes, never for a use
+alone (a fill, a key, a read, a show or a copy): agents at work don't make every open app reload it.
 
 ## Consequences
 

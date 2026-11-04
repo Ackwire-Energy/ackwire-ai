@@ -1787,6 +1787,8 @@ export const featureKeysEn = {
     item: {
       gone: "This item is gone or you can't see it.",
       missingText: "It's gone from {{name}} since the last sync. Agents can't use it.",
+      /** A contact whose saved details don't open here (its key is gone): someone who manages it types them again. */
+      unreadable: "This contact's details can't be read here. Whoever manages it can type them again and save.",
       externalText: "It comes from {{name}}. Change its name, address, username or password there.",
       noValue: "No value is saved yet.",
       changePassword: "Change password",

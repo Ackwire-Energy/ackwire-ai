@@ -2,7 +2,14 @@ import { isReservedSecretName } from "@agenteschat/adapters";
 import { and, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { type ComputerHandle, requireComputerManager } from "./sandbox";
-import { MAX_PENDING_SECRETS, REQUEST_SECRET_TOOL, requesterOfRun, SECRET_TTL_MS, secretOnComputer } from "./secrets";
+import {
+  MAX_PENDING_SECRETS,
+  REQUEST_SECRET_TOOL,
+  requesterOfRun,
+  SECRET_TTL_MS,
+  secretOnComputer,
+  secretStillHeld,
+} from "./secrets";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -179,6 +186,8 @@ export function requestSecretTool(opts: {
                 eq(schema.secretRequests.machineId, computer.machineId),
                 eq(schema.secretRequests.status, "delivered"),
                 isNull(schema.secretRequests.removedAt),
+                // A site's password past the minutes its runner keeps it is gone: nothing to replace (ADR 0139 §6).
+                secretStillHeld(),
               ),
             )
             .limit(1);

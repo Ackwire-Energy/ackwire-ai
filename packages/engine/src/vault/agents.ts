@@ -1,7 +1,8 @@
 /**
  * The Vault for agents (ADR 0139): what a run may list, type, give to a command and change. Every call reads who is
  * behind the run (`vaultPersonOfRun`) and checks each item (`runAccess`); a refusal is a `VaultRefusal` with English
- * words for the model, never a hint that an item hidden from the run exists.
+ * words for the model, never a hint that an item hidden from the run exists, and never an item's title or anything
+ * else written on it (`named`: its kind, id, a login's site, a key's variable name; ADR 0117).
  *
  * Values leave here only through `releaseVaultLogin` and `releaseVaultKeys`, to the tool that seals them for the
  * agent's own computer at once. A contact's fields are not secret: agents read them and type them.
@@ -15,7 +16,7 @@ import {
   vaultRuleLabel,
   vaultRuleMatches,
 } from "@agenteschat/adapters";
-import { and, type Executor, eq, schema } from "@agenteschat/db";
+import { and, type Executor, eq, inArray, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { UUID } from "../authority";
 import { SealedValueError } from "../crypto";
@@ -30,7 +31,7 @@ import {
   vaultPersonOfRun,
 } from "./access";
 import { assertRoom, cleanContact, cleanText, connectionRow } from "./items";
-import { refuse } from "./refusals";
+import { named, refuse, vaultItemName } from "./refusals";
 import { readItemValue, sealItemValue } from "./seal";
 import {
   VAULT_LIMITS,
@@ -45,9 +46,19 @@ import {
   vaultNow,
 } from "./service";
 import { recordAgentChange, recordReads } from "./uses";
-import { agentView, connectionOf, contactOf, hasValue, hostOf, loadVault, sourceNameOf } from "./views";
+import {
+  agentView,
+  connectionOf,
+  contactOf,
+  hasValue,
+  hostOf,
+  loadVault,
+  readContact,
+  sourceNameOf,
+  type VaultState,
+} from "./views";
 
-const { vaultItems } = schema;
+const { vaultConnections, vaultItems } = schema;
 
 /** Most keys one command gets at once. */
 export const VAULT_MAX_KEYS = 10;
@@ -88,14 +99,17 @@ function haystack(item: ItemRow, contact: VaultContactFields | null) {
 
 /**
  * The items this run may use, metadata only (contacts with their fields), optionally narrowed by kind, site or a
- * query. Each contact listed is recorded as read, once per run. `given`: who is behind the run, when the caller
- * already read it (`vaultPersonOfRun`).
+ * query, in the order a list shows them. `shown`: how many of the first ones the caller shows (`vault_list`'s
+ * `VAULT_LIST_MAX`): only those contacts' fields are read, past what a query needs to match, and only those are
+ * recorded as read, once per run; the rest come without their fields, to be counted. `given`: who is behind the run,
+ * when the caller already read it (`vaultPersonOfRun`).
  */
 export async function listUsableVault(
   deps: VaultDeps,
   run: VaultRun,
   filter: { kind?: VaultItemKind; site?: string; query?: string } = {},
   given?: VaultRunPerson,
+  shown = Number.POSITIVE_INFINITY,
 ): Promise<VaultItemForAgent[]> {
   const person = given ?? (await vaultPersonOfRun(deps.db, run));
   const state = await loadVault(deps.db, run.orgId);
@@ -104,16 +118,27 @@ export async function listUsableVault(
   const site = filter.site?.trim();
   if (site) items = items.filter((item) => forSite(item, site));
   const contacts = new Map<string, VaultContactFields | null>();
-  for (const item of items) if (item.kind === "contact") contacts.set(item.id, await contactOf(deps, item));
+  const read = async (list: ItemRow[]) => {
+    for (const item of list) {
+      if (item.kind === "contact" && !contacts.has(item.id)) contacts.set(item.id, await contactOf(deps, item));
+    }
+  };
   const query = filter.query?.trim().toLowerCase();
-  if (query) items = items.filter((item) => haystack(item, contacts.get(item.id) ?? null).includes(query));
+  if (query) {
+    // Words in a contact's fields find it: every contact left is read to match.
+    await read(items);
+    items = items.filter((item) => haystack(item, contacts.get(item.id) ?? null).includes(query));
+  }
+  const listed = items.slice(0, shown);
+  await read(listed);
   await recordReads(
     deps,
     run,
     person,
-    items.filter((item) => item.kind === "contact").map((item) => item.id),
+    listed.filter((item) => item.kind === "contact").map((item) => item.id),
   );
-  return items.map((item) => agentView(item, contacts.get(item.id) ?? null));
+  const inList = new Set(listed.map((item) => item.id));
+  return items.map((item) => agentView(item, inList.has(item.id) ? (contacts.get(item.id) ?? null) : null));
 }
 
 /** An item by id as the run sees it: hidden ones (and ids that aren't ids) are not found. */
@@ -128,9 +153,9 @@ async function itemForRun(deps: VaultDeps, run: VaultRun, person: VaultRunPerson
   const connection = await connectionRow(deps.db, run.orgId, item.connectionId);
   const access = runAccess(item.ownerUserId, effectiveColumns(item, connection), person, run.agentId);
   if (access === "hidden") throw missingItem();
-  if (access === "not_shared") throw refuse.notShared(item.title);
+  if (access === "not_shared") throw refuse.notShared(item);
   const source = connection ? sourceNameOf(deps.sources, connection.kind) : "the Vault";
-  if (item.missing) throw refuse.missing(item.title, source);
+  if (item.missing) throw refuse.missing(item, source);
   return { item, connection, source };
 }
 
@@ -141,10 +166,10 @@ async function valueForRun(deps: VaultDeps, item: ItemRow, connection: Connectio
     value = await readItemValue(deps, item, connection);
   } catch (error) {
     if (error instanceof VaultSourceError) throw refuse.sourceError(source, error.message);
-    if (error instanceof SealedValueError) throw refuse.noValue(item.title);
+    if (error instanceof SealedValueError) throw refuse.noValue(item);
     throw error;
   }
-  if (!value) throw refuse.noValue(item.title);
+  if (!value) throw refuse.noValue(item);
   return value;
 }
 
@@ -166,20 +191,24 @@ export interface VaultBrowserProfile {
 function assertProfileMay(item: ItemRow, connection: ConnectionRow | undefined, profile: VaultBrowserProfile) {
   if (item.ownerUserId) {
     throw refuse.notAllowed(
-      `"${item.title}" is a personal login, and your browser now is the shared profile "${profile.name}": every agent granted that profile would be signed in as its owner. Switch to your own browser (browser_profile with "own") to sign in with it.`,
+      `${named(item)} is a personal login, and your browser now is the shared profile "${profile.name}": every agent granted that profile would be signed in as its owner. Switch to your own browser (browser_profile with "own") to sign in with it.`,
     );
   }
   const columns = effectiveColumns(item, connection);
   if (!columns.audienceEveryone) {
     throw refuse.notAllowed(
-      `"${item.title}" is open only to some people in the workspace, and your browser now is the shared profile "${profile.name}": every agent granted that profile would be signed in with it, whoever they work for. Switch to your own browser (browser_profile with "own") to sign in with it.`,
+      `${named(item)} is open only to some people in the workspace, and your browser now is the shared profile "${profile.name}": every agent granted that profile would be signed in with it, whoever they work for. Switch to your own browser (browser_profile with "own") to sign in with it.`,
     );
   }
   if (columns.allAgents || profile.agentIds.every((id) => columns.agentIds.includes(id))) return;
   throw refuse.notAllowed(
-    `"${item.title}" isn't shared with every agent that uses the browser profile "${profile.name}", so it isn't typed there: they would all be signed in with it. Switch to your own browser (browser_profile with "own"), or ask a person who manages the login to share it with all of them in Settings, Vault.`,
+    `${named(item)} isn't shared with every agent that uses the browser profile "${profile.name}", so it isn't typed there: they would all be signed in with it. Switch to your own browser (browser_profile with "own"), or ask a person who manages the login to share it with all of them in Settings, Vault.`,
   );
 }
+
+/** An id that names a key or a contact where a login was asked for. */
+const notALogin = (item: ItemRow) =>
+  refuse.notAllowed(`The Vault item ${item.id} is a ${item.kind}, not a login. Use a login's id from vault_list.`);
 
 /**
  * A login the run may type, checked before anything runs: shared with it for the person behind the run, still in its
@@ -194,9 +223,8 @@ export async function checkVaultLogin(
 ): Promise<void> {
   const person = await vaultPersonOfRun(deps.db, run);
   const { item, connection } = await itemForRun(deps, run, person, itemId, "login");
-  if (item.kind !== "login")
-    throw refuse.notAllowed(`"${item.title}" is a ${item.kind}, not a login. Use a login's id from vault_list.`);
-  if (!hasValue(item)) throw refuse.noValue(item.title);
+  if (item.kind !== "login") throw notALogin(item);
+  if (!hasValue(item)) throw refuse.noValue(item);
   if (profile) assertProfileMay(item, connection, profile);
 }
 
@@ -216,8 +244,7 @@ export async function releaseVaultLogin(
 ): Promise<VaultReleasedLogin> {
   const person = await vaultPersonOfRun(deps.db, run);
   const { item, connection, source } = await itemForRun(deps, run, person, itemId, "login");
-  if (item.kind !== "login")
-    throw refuse.notAllowed(`"${item.title}" is a ${item.kind}, not a login. Use a login's id from vault_list.`);
+  if (item.kind !== "login") throw notALogin(item);
   if (profile) assertProfileMay(item, connection, profile);
   const rule = item.website ? vaultRule(item.website, item.match === "site" ? "site" : "exact") : null;
   if (!rule) throw refuse.noWebsite();
@@ -233,6 +260,26 @@ const keyOrder = (personId: string | null) => (a: ItemRow, b: ItemRow) => {
     (item.ownerUserId && item.ownerUserId === personId ? 0 : 2) + (item.connectionId ? 1 : 0);
   return rank(a) - rank(b) || b.updatedAt.getTime() - a.updatedAt.getTime();
 };
+
+/**
+ * The workspace's keys with these variable names and their connections: only those rows, never the whole Vault (a
+ * command asks for a few names).
+ */
+async function keysNamed(db: Executor, orgId: string, names: string[]): Promise<VaultState> {
+  const items = await db
+    .select()
+    .from(vaultItems)
+    .where(and(eq(vaultItems.orgId, orgId), eq(vaultItems.kind, "key"), inArray(vaultItems.keyName, names)));
+  const ids = [...new Set(items.flatMap((item) => (item.connectionId ? [item.connectionId] : [])))];
+  const connections =
+    ids.length === 0
+      ? []
+      : await db
+          .select()
+          .from(vaultConnections)
+          .where(and(eq(vaultConnections.orgId, orgId), inArray(vaultConnections.id, ids)));
+  return { items, connections: new Map(connections.map((c) => [c.id, c])) };
+}
 
 /**
  * The values of the keys a command asked for by variable name, each from a key this run may use. The use of each
@@ -253,10 +300,10 @@ export async function releaseVaultKeys(
       throw refuse.notAllowed(`${name} is reserved for how agents think. No key uses it.`);
   }
   const person = await vaultPersonOfRun(deps.db, run);
-  const state = await loadVault(deps.db, run.orgId);
+  const state = await keysNamed(deps.db, run.orgId, wanted);
   const out: { name: string; value: string; itemId: string }[] = [];
   for (const name of wanted) {
-    const keys = state.items.filter((item) => item.kind === "key" && item.keyName === name);
+    const keys = state.items.filter((item) => item.keyName === name);
     const access = (item: ItemRow) =>
       runAccess(item.ownerUserId, effectiveColumns(item, connectionOf(state, item)), person, run.agentId);
     const ready = keys.filter((item) => usable(item, connectionOf(state, item), person, run.agentId));
@@ -264,13 +311,13 @@ export async function releaseVaultKeys(
     if (!item) {
       const known = keys.filter((key) => access(key) !== "hidden");
       const notShared = known.find((key) => access(key) === "not_shared");
-      if (notShared) throw refuse.notShared(notShared.title);
+      if (notShared) throw refuse.notShared(notShared);
       const gone = known.find((key) => key.missing);
       if (gone) {
         const kind = connectionOf(state, gone)?.kind;
-        throw refuse.missing(gone.title, kind ? sourceNameOf(deps.sources, kind) : "its password manager");
+        throw refuse.missing(gone, kind ? sourceNameOf(deps.sources, kind) : "its password manager");
       }
-      if (known[0]) throw refuse.noValue(known[0].title);
+      if (known[0]) throw refuse.noValue(known[0]);
       throw refuse.notFound(
         `No key named ${name} is shared with you in the Vault. Ask the person to save it in Settings, Vault, or use request_secret.`,
       );
@@ -306,7 +353,8 @@ function auditByAgent(
  * An agent's change (`vault_save`): a new contact, personal to the person behind the run (none behind it: refused),
  * or, on an item it may use, a contact's title and fields, a login's username or any item's description. A personal
  * item changes for its owner (only their runs see it); a team item only for someone who manages credentials, as in
- * the app (ADR 0139 §2). Only built-in items: an external one changes in its source.
+ * the app (ADR 0139 §2). Only built-in items: an external one changes in its source. A contact whose saved fields
+ * don't open here is refused: its fields are only ever changed on top of what was saved.
  */
 export async function saveVaultItemByAgent(
   deps: VaultDeps,
@@ -318,23 +366,33 @@ export async function saveVaultItemByAgent(
   if (!change.itemId) return createContact(deps, run, person, change);
 
   const { item, source } = await itemForRun(deps, run, person, change.itemId, "item");
-  if (item.connectionId) throw refuse.notAllowed(`"${item.title}" comes from ${source}. It changes there, not here.`);
+  if (item.connectionId) throw refuse.notAllowed(`${named(item)} comes from ${source}. It changes there, not here.`);
   if (!item.ownerUserId && !(person.personId && person.manages)) {
     throw refuse.notAllowed(
-      `"${item.title}" is the team's: only someone who manages credentials changes it, and nobody behind this request does. Ask one of them, or a person can change it in Settings, Vault.`,
+      `${named(item)} is the team's: only someone who manages credentials changes it, and nobody behind this request does. Ask one of them, or a person can change it in Settings, Vault.`,
     );
   }
   const kind = item.kind as VaultItemKind;
   const set: Partial<typeof vaultItems.$inferInsert> = {};
   const fields: string[] = [];
-  let contact: VaultContactFields | null = kind === "contact" ? await contactOf(deps, item) : null;
+  let contact: VaultContactFields | null = null;
+  if (kind === "contact") {
+    const saved = await readContact(deps, item);
+    // Its fields don't open here: a change would be merged onto nothing and replace them all.
+    if (saved.unreadable) {
+      throw refuse.notAllowed(
+        `${named(item)} can't be read here (its saved fields don't open on this server), so it isn't changed. Ask a person to save it again in Settings, Vault.`,
+      );
+    }
+    contact = saved.contact;
+  }
   await asRefusal(async () => {
     if (change.description !== undefined) {
       set.description = cleanText(change.description, VAULT_LIMITS.description, "description");
       fields.push("description");
     }
     if (change.username !== undefined) {
-      if (kind !== "login") throw new ValidationError(`"${item.title}" is a ${kind}. Only a login has a username.`);
+      if (kind !== "login") throw new ValidationError(`${named(item)} is a ${kind}. Only a login has a username.`);
       set.username = cleanText(change.username, VAULT_LIMITS.username, "username") || null;
       fields.push("username");
     }
@@ -346,7 +404,7 @@ export async function saveVaultItemByAgent(
       fields.push("title");
     }
     if (change.contact !== undefined) {
-      if (kind !== "contact") throw new ValidationError(`"${item.title}" is a ${kind}, not a contact.`);
+      if (kind !== "contact") throw new ValidationError(`${named(item)} is a ${kind}, not a contact.`);
       contact = cleanContact({ ...(contact ?? {}), ...change.contact });
       fields.push("contact");
     }
@@ -429,10 +487,10 @@ export async function deleteVaultItemByAgent(
 ): Promise<VaultAgentResult> {
   const person = await vaultPersonOfRun(deps.db, run);
   const { item, source } = await itemForRun(deps, run, person, itemId, "item");
-  if (item.connectionId) throw refuse.notAllowed(`"${item.title}" comes from ${source}. It goes from there, not here.`);
+  if (item.connectionId) throw refuse.notAllowed(`${named(item)} comes from ${source}. It goes from there, not here.`);
   if (item.createdByAgentId !== run.agentId) {
     throw refuse.notAllowed(
-      `You didn't save "${item.title}", so you can't delete it. Someone who manages it can, in Settings, Vault.`,
+      `You didn't save ${vaultItemName(item)}, so you can't delete it. Someone who manages it can, in Settings, Vault.`,
     );
   }
   const contact = item.kind === "contact" ? await contactOf(deps, item) : null;

@@ -47,6 +47,7 @@ import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, r
 import { WEBHOOK_EVENT, webhookEventText } from "./routine-hooks";
 import { heldHere } from "./run-inbox";
 import { type AgentRun, replyThreadOf } from "./runs";
+import { SITE_SECRET_TTL_TEXT, secretStillHeld } from "./secrets";
 import { stretchCardOf } from "./stretch";
 import { loadTeam, rosterScopeNames, TEAM_IN_PROMPT, teammatesFor, teammatesNowPrompt, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
@@ -1746,8 +1747,17 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
   };
 }
 
-/** The secrets delivered to the agent's current computer and still there (names and where, never values). */
-async function heldSecretsOf(db: Database, orgId: string, agentId: string, machineId: string | null) {
+/**
+ * The secrets delivered to the agent's current computer and still there (names and where, never values): a site's
+ * password only within the minutes its runner keeps it in memory (`secretStillHeld`, ADR 0139 §6).
+ */
+export async function heldSecretsOf(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  machineId: string | null,
+  now = new Date(),
+) {
   const { secretRequests } = schema;
   return db
     .selectDistinct({
@@ -1764,6 +1774,7 @@ async function heldSecretsOf(db: Database, orgId: string, agentId: string, machi
         eq(secretRequests.status, "delivered"),
         isNull(secretRequests.removedAt),
         machineId ? eq(secretRequests.machineId, machineId) : isNull(secretRequests.machineId),
+        secretStillHeld(now),
       ),
     )
     .orderBy(secretRequests.name)
@@ -1775,11 +1786,11 @@ export function heldSecretsText(rows: { name: string; kind: string; path: string
     r.kind === "file" && r.path
       ? `the file ${r.path}`
       : r.kind === "site" && r.site
-        ? `a password your browser types on ${new URL(r.site).host}`
+        ? `a password your browser types on ${new URL(r.site).host}, kept in your computer's memory only, for ${SITE_SECRET_TTL_TEXT} after it was given`
         : "an environment variable in your commands";
   return [
     "# Secrets on your computer",
-    "People already gave you these; they stay on your computer between conversations. Use them by name, never print them, and don't ask for them again (ask again only when one is refused or stopped working):",
+    "People already gave you these; they stay on your computer between conversations (a site's password only for the minutes its line says). Use them by name, never print them, and don't ask for them again (ask again only when one is refused, stopped working or is gone):",
     ...rows.map((r) => `- ${r.name}: ${where(r)}`),
   ].join("\n");
 }

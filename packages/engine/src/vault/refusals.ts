@@ -1,3 +1,4 @@
+import { SECRET_NAME, vaultRule, vaultRuleLabel } from "@agenteschat/adapters";
 import type { ToolOutput } from "../tools/types";
 
 /**
@@ -25,27 +26,65 @@ export class VaultRefusal extends Error {
   }
 }
 
+/** What `vaultItemName` reads of an item: only what the engine checked when it was saved. */
+export interface VaultItemNaming {
+  id: string;
+  kind: string;
+  website: string | null;
+  match: string;
+  keyName: string | null;
+}
+
+/**
+ * How the agent's tool text names an item outside `vault_list`'s blocks (ADR 0139 §4, ADR 0117): its kind and id, a
+ * login's site (the host of its rule, parsed from the saved HTTPS origin) and a key's variable name (checked against
+ * `SECRET_NAME`). Never its title, description or username, which people, agents, password managers and CSV files
+ * write: those reach the model only in an `untrustedBlock`. Lowercase, for the middle of a sentence (`named`
+ * capitalizes it).
+ */
+export function vaultItemName(item: VaultItemNaming): string {
+  if (item.kind === "login") {
+    const rule = item.website ? vaultRule(item.website, item.match === "site" ? "site" : "exact") : null;
+    return rule ? `the login ${item.id} for ${vaultRuleLabel(rule)}` : `the login ${item.id}`;
+  }
+  if (item.kind === "key") {
+    return item.keyName && SECRET_NAME.test(item.keyName)
+      ? `the key ${item.keyName} (${item.id})`
+      : `the key ${item.id}`;
+  }
+  return `the contact ${item.id}`;
+}
+
+/** `vaultItemName` at the start of a sentence. */
+export const named = (item: VaultItemNaming) => {
+  const name = vaultItemName(item);
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+};
+
 const NOT_FOUND =
   "No Vault item like that is shared with you. Look with vault_list, or ask the person to save it in Settings, Vault.";
 
 export const refuse = {
   notFound: (message = NOT_FOUND) => new VaultRefusal("not_found", message),
-  notShared: (title: string) =>
+  notShared: (item: VaultItemNaming) =>
     new VaultRefusal(
       "not_shared",
-      `"${title}" is in the Vault but not shared with you. Someone who manages it can add you in Settings, Vault.`,
+      `${named(item)} is in the Vault but not shared with you. Someone who manages it can add you in Settings, Vault.`,
     ),
   wrongSite: (label: string, host: string) =>
     new VaultRefusal("wrong_site", `This login is for ${label}. The page is on ${host}, so it isn't typed there.`),
   noWebsite: () =>
     new VaultRefusal("wrong_site", "This login has no HTTPS website saved, so it can't be typed anywhere."),
-  missing: (title: string, source: string) =>
+  missing: (item: VaultItemNaming, source: string) =>
     new VaultRefusal(
       "missing",
-      `"${title}" is gone from ${source} since the last sync. Ask the person to put it back, or use another one.`,
+      `${named(item)} is gone from ${source} since the last sync. Ask the person to put it back, or use another one.`,
     ),
-  noValue: (title: string) =>
-    new VaultRefusal("no_value", `"${title}" has nothing saved to use. Ask the person to add it in Settings, Vault.`),
+  noValue: (item: VaultItemNaming) =>
+    new VaultRefusal(
+      "no_value",
+      `${named(item)} has nothing saved to use. Ask the person to add it in Settings, Vault.`,
+    ),
   sourceError: (source: string, reason: string) =>
     new VaultRefusal("source_error", `Couldn't read it from ${source}: ${reason}`),
   noPerson: () =>

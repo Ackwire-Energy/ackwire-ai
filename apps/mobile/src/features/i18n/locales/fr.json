@@ -1873,6 +1873,7 @@
     "item": {
       "gone": "Cet élément n'existe plus ou vous ne pouvez pas le voir.",
       "missingText": "Il a disparu de {{name}} depuis la dernière synchronisation. Les agents ne peuvent pas l'utiliser.",
+      "unreadable": "Les coordonnées de ce contact ne peuvent pas être lues ici. La personne qui le gère peut les saisir à nouveau et enregistrer.",
       "externalText": "Il vient de {{name}}. Modifiez son nom, son adresse, son nom d'utilisateur ou son mot de passe là-bas.",
       "noValue": "Aucune valeur n'est encore enregistrée.",
       "changePassword": "Changer le mot de passe",

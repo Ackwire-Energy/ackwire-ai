@@ -16,6 +16,7 @@ import {
   type VaultItemForAgent,
   type VaultItemKind,
   type VaultRun,
+  vaultItemName,
   vaultPersonOfRun,
   vaultRefusalOutput,
 } from "./index";
@@ -196,11 +197,13 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
         const run = runOf(ctx);
         // Who is behind the run, read once: the list is theirs, and the answer names them.
         const person = await vaultPersonOfRun(ctx.db, run);
+        // Only what the answer shows is read (and recorded as read): past `VAULT_LIST_MAX`, items are only counted.
         const items = await listUsableVault(
           deps,
           run,
           { ...(kind ? { kind } : {}), ...(site ? { site } : {}), ...(query ? { query } : {}) },
           person,
+          VAULT_LIST_MAX,
         );
         const name = person.personId ? await nameOf(ctx, person.personId) : null;
         return {
@@ -275,16 +278,17 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
         const run = runOf(ctx);
         const result = await saveVaultItemByAgent(deps, run, change);
         const item = result.item;
+        // The item by its id, never by what was written on it (ADR 0139 §4): vault_list shows that as data.
         if (result.outcome === "created") {
           const person = await vaultPersonOfRun(ctx.db, run);
           const owner = person.personId ? await nameOf(ctx, person.personId) : "the person who asked";
           return {
-            content: `Saved the contact ${quoted(item.title)} to the Vault (id ${item.id}), personal to ${owner}: only they see it, and their agents use it when they ask.`,
+            content: `Saved the contact to the Vault (id ${item.id}), personal to ${owner}: only they see it, and their agents use it when they ask.`,
             data: { vaultItem: { id: item.id, outcome: result.outcome } },
           };
         }
         return {
-          content: `Updated ${quoted(item.title)} in the Vault.`,
+          content: `Updated ${vaultItemName(item)} in the Vault.`,
           data: { vaultItem: { id: item.id, outcome: result.outcome } },
         };
       } catch (error) {
@@ -309,7 +313,7 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
       try {
         const result = await deleteVaultItemByAgent(deps, runOf(ctx), str(input.id).trim());
         return {
-          content: `Deleted ${quoted(result.item.title)} from the Vault.`,
+          content: `Deleted ${vaultItemName(result.item)} from the Vault.`,
           data: { vaultItem: { id: result.item.id, outcome: result.outcome } },
         };
       } catch (error) {

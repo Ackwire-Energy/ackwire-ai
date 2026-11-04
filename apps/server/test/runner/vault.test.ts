@@ -5,8 +5,10 @@ import {
   MACHINE_OPS,
   MACHINE_PROTOCOL_VERSION,
   type MachineRequest,
+  SITE_SECRET_TTL_MS as PROTOCOL_SITE_SECRET_TTL_MS,
   parseServerFrame,
   VAULT_PROTOCOL,
+  VAULT_TYPE_REFUSALS,
 } from "@agenteschat/adapters/machine-protocol";
 import { type SecretTarget, sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
 import { describeRequest, handleRequest, NEW_WORK_OPS, OP_ROUTES, type RequestScope } from "../../runner/handlers";
@@ -136,8 +138,13 @@ test("armed values and site secrets live their time in memory, then go", () => {
   expect(vault.site("/store/a", "SHOP_PASSWORD")).toBeNull();
   expect(vault.siteByRequest("/store/a", "r-00000001")).toMatchObject({ value: null, size: 7 });
   vault.putSite("/store/a", { ...shop, value: "pw-5678", requestId: "r-00000002", order: "o2" });
-  now += SITE_SECRET_TTL_MS;
+  now += SITE_SECRET_TTL_MS - 1;
+  expect(vault.site("/store/a", "SHOP_PASSWORD")?.value).toBe("pw-5678");
+  now += 1;
   expect(vault.sitesOf("/store/a")).toEqual([]);
+  // The protocol's own minutes: the server counts a site's password gone when this drops it (ADR 0139 §6).
+  expect(SITE_SECRET_TTL_MS).toBe(PROTOCOL_SITE_SECRET_TTL_MS);
+  expect(SITE_SECRET_TTL_MS).toBe(15 * 60_000);
 });
 
 // ── Input ─────────────────────────────────────────────────────────────────────
@@ -218,6 +225,8 @@ test("the field's verdict: its frame and every frame around it on the rule's sit
   expect(vaultFieldVerdict(facts({ ...framed, ancestors: [] }), site)).toBe("wrong_site");
   // The field.
   expect(vaultFieldVerdict(facts({ tag: "IFRAME" }), exact)).toBe("in_frame");
+  // Its own code on the wire, so the server tells the agent to hand the sign-in to a person.
+  expect(VAULT_TYPE_REFUSALS).toContain("in_frame");
   expect(vaultFieldVerdict(facts({ tag: "TEXTAREA" }), exact)).toBe("not_password_field");
   expect(vaultFieldVerdict(facts({ tag: null }), exact)).toBe("not_password_field");
   expect(vaultFieldVerdict(facts({ type: "text" }), exact)).toBe("not_password_field");

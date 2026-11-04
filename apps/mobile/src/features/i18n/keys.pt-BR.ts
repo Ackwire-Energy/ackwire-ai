@@ -1791,6 +1791,8 @@ export const featureKeysPtBR = {
     item: {
       gone: "Este item não existe mais ou você não pode vê-lo.",
       missingText: "Sumiu do {{name}} desde a última sincronização. Os agentes não podem usar.",
+      unreadable:
+        "Os dados deste contato não podem ser lidos aqui. Quem gerencia o contato pode digitá-los de novo e salvar.",
       externalText: "Vem do {{name}}. Mude nome, endereço, usuário ou senha lá.",
       noValue: "Ainda não há valor salvo.",
       changePassword: "Trocar senha",

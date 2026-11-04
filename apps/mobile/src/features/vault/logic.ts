@@ -81,24 +81,19 @@ const CONTACT_ORDER: readonly (keyof VaultContactFields)[] = [
 /** A contact's fields in the order the form shows them. */
 export const CONTACT_FIELDS = CONTACT_ORDER;
 
-/** "Ana Souza · São Paulo": a contact's name (or company) and city. */
-export function contactLine(c: VaultContactFields | null | undefined): string {
-  if (!c) return "";
-  return [c.fullName?.trim() || c.company?.trim(), c.city?.trim()].filter(Boolean).join(" · ");
-}
-
-/** The line under an item's name: a login's site and username, a key's description, a contact's name and city. */
-export function itemLine(item: Pick<VaultItem, "kind" | "website" | "username" | "description" | "contact">): string {
+/**
+ * The line under an item's name: a login's site and username, a key's description, a contact's description (the
+ * list carries no contact's fields, only its page does, ADR 0139 §7).
+ */
+export function itemLine(item: Pick<VaultItem, "kind" | "website" | "username" | "description">): string {
   if (item.kind === "login") return [hostOf(item.website), item.username].filter(Boolean).join(" · ");
-  if (item.kind === "key") return item.description;
-  return contactLine(item.contact);
+  return item.description;
 }
 
-/** Everything a search may find an item by (never a value: the app has none). */
+/** Everything a search may find an item by (never a value: the app has none; a contact by its title and description). */
 export function itemSearchText(item: VaultItem): string {
-  const contact = item.contact ? CONTACT_ORDER.map((k) => item.contact?.[k] ?? "").join(" ") : "";
   return fold(
-    [item.title, hostOf(item.website), item.username, item.keyName, item.description, item.sourceName, contact]
+    [item.title, hostOf(item.website), item.username, item.keyName, item.description, item.sourceName]
       .filter(Boolean)
       .join(" "),
   );

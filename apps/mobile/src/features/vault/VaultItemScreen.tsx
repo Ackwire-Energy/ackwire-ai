@@ -146,6 +146,12 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
           <Note icon="wait">{t("mobile.vault.item.missingText", { name: item.sourceName ?? "" })}</Note>
         </View>
       ) : null}
+      {/* A contact whose saved fields don't open on the server (ADR 0139): who manages it types them again. */}
+      {item.unreadable ? (
+        <View style={styles.note}>
+          <Note icon="x">{t("mobile.vault.item.unreadable")}</Note>
+        </View>
+      ) : null}
       <Gap />
       <GroupedList>
         <InputField

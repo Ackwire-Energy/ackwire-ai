@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { contactName, hostOf, matchesQuery, sortItems } from "./lib";
+import { hostOf, matchesQuery, sortItems } from "./lib";
 import { AgentFaces } from "./VaultAccess";
 import { VaultConnections } from "./VaultConnections";
 import { VaultImportDialog } from "./VaultImportDialog";
@@ -24,7 +24,10 @@ import "./vault.css";
 type Tab = "team" | "personal" | "connections";
 type KindFilter = "all" | VaultItemKind;
 
-/** The line under an item's name: where and as whom (login), the variable (key), who and where (contact). */
+/**
+ * The line under an item's name: where and as whom (login), the variable (key), the description (contact: the list
+ * carries no contact's fields, only its page does, ADR 0139 §7).
+ */
 function Subtitle({ item }: { item: VaultItem }) {
   const parts: ReactNode[] =
     item.kind === "login"
@@ -38,7 +41,7 @@ function Subtitle({ item }: { item: VaultItem }) {
             ) : null,
             item.description,
           ]
-        : [contactName(item.contact), item.contact?.city];
+        : [item.description];
   const shown = parts.filter(Boolean);
   return (
     <span className="vlt-row__sub">

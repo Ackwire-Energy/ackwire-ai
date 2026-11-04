@@ -2726,6 +2726,8 @@ export const ptBR = {
       missing: "Sumiu",
       missingText: "Não está mais no {{source}}. Os agentes não podem usar até voltar.",
       editIn: "Edite no {{source}}. As mudanças chegam aqui na próxima sincronização.",
+      unreadable:
+        "Os dados deste contato não podem ser lidos aqui. Quem gerencia o contato pode digitá-los de novo e salvar.",
       hidden: "Oculto",
       endsIn: "termina em {{hint}}",
       noValue: "Nada salvo",

@@ -126,7 +126,9 @@ export const VaultItem = z
     keyName: z.string().nullable().openapi({ description: "Key: the variable name." }),
     keyHint: z.string().nullable().openapi({ description: "Key: its last 4 characters, to tell keys apart." }),
     hasSecret: z.boolean().openapi({ description: "Login or key: a value is saved. The value itself never is here." }),
-    contact: VaultContactFields.nullable(),
+    contact: VaultContactFields.nullable().openapi({
+      description: "A contact's fields, only in one item's details: null in the list, and for logins and keys.",
+    }),
     connectionId: z.uuid().nullable().openapi({ description: "Null: kept here (built-in)." }),
     sourceName: z.string().nullable().openapi({ description: "The source's brand name when external (`1Password`)." }),
     accessFromConnection: z.boolean().openapi({
@@ -160,6 +162,10 @@ const VaultUse = z
 
 const VaultItemDetail = VaultItem.extend({
   uses: z.array(VaultUse).openapi({ description: "The newest 30, newest first." }),
+  unreadable: z.boolean().openapi({
+    description:
+      "A contact whose saved fields can't be read on this server: `contact` is null, and a person saves them again.",
+  }),
 }).openapi("VaultItemDetail");
 
 const VaultConnection = z

@@ -448,7 +448,10 @@ function UseRow({ use }: { use: VaultUse }) {
   );
 }
 
-/** Opens an item from the list: its details as the server has them now, the list's copy while they load. */
+/**
+ * Opens an item from the list: its details as the server has them now, the list's copy while they load. A contact's
+ * fields come only with its details (the list has none, ADR 0139 §7): its form waits for them, and starts from them.
+ */
 export function VaultItemDialog({
   itemId,
   overview,
@@ -463,12 +466,17 @@ export function VaultItemDialog({
   const item = detail.data ?? overview.items.find((i) => i.id === itemId);
   if (!item) return null;
   const connection = item.connectionId ? overview.connections.find((c) => c.id === item.connectionId) : undefined;
+  const fieldsPending = item.kind === "contact" && !detail.data;
   return (
     <ItemDialog
+      // A contact's form starts again from its details once they arrive.
+      key={fieldsPending ? "listed" : "detail"}
       item={item}
       uses={detail.data?.uses}
       usesLoading={detail.isPending}
       usesFailed={detail.isError}
+      fieldsPending={fieldsPending}
+      unreadable={detail.data?.unreadable === true}
       connection={connection}
       onClose={onClose}
     />
@@ -480,6 +488,8 @@ function ItemDialog({
   uses,
   usesLoading,
   usesFailed,
+  fieldsPending,
+  unreadable,
   connection,
   onClose,
 }: {
@@ -488,6 +498,10 @@ function ItemDialog({
   usesLoading: boolean;
   /** The item's details didn't load: its uses are unknown, not none. */
   usesFailed: boolean;
+  /** A contact whose fields haven't come yet (or didn't load): no form until they do. */
+  fieldsPending: boolean;
+  /** A contact whose saved fields can't be read on the server: who manages it types them again. */
+  unreadable: boolean;
   connection: VaultConnection | undefined;
   onClose: () => void;
 }) {
@@ -563,7 +577,7 @@ function ItemDialog({
             <Button onClick={onClose}>{t("common.cancel")}</Button>
             <Button
               variant="primary"
-              disabled={!dirty || actions.updating}
+              disabled={!dirty || actions.updating || fieldsPending}
               loading={actions.updating}
               onClick={() => void save()}
             >
@@ -579,25 +593,34 @@ function ItemDialog({
         <div className="issue-layout__main vlt-details__main">
           {external && editable && <SettingNote icon="plug">{t("vault.item.editIn", { source })}</SettingNote>}
           {item.missing && <SettingNote icon="alert">{t("vault.item.missingText", { source })}</SettingNote>}
-          <ItemFields
-            kind={item.kind}
-            draft={draft}
-            onDraft={(p) => setDraft((d) => ({ ...d, ...p }))}
-            readOnly={!editable}
-            locked={external}
-            errors={errors}
-            secret={
-              item.kind === "contact" ? null : (
-                <SecretValue
-                  item={item}
-                  canChange={editable && !external}
-                  value={secret}
-                  onValue={setSecret}
-                  error={errors.secret}
-                />
-              )
-            }
-          />
+          {unreadable && <SettingNote icon="alert">{t("vault.item.unreadable")}</SettingNote>}
+          {fieldsPending ? (
+            usesFailed ? (
+              <p className="vlt-uses__none">{t("common.loadFailed")}</p>
+            ) : (
+              <LoadingList count={3} />
+            )
+          ) : (
+            <ItemFields
+              kind={item.kind}
+              draft={draft}
+              onDraft={(p) => setDraft((d) => ({ ...d, ...p }))}
+              readOnly={!editable}
+              locked={external}
+              errors={errors}
+              secret={
+                item.kind === "contact" ? null : (
+                  <SecretValue
+                    item={item}
+                    canChange={editable && !external}
+                    value={secret}
+                    onValue={setSecret}
+                    error={errors.secret}
+                  />
+                )
+              }
+            />
+          )}
         </div>
         {/* The fields on the left; who has access and its recent uses beside them (ADR 0139 §7). */}
         <aside className="issue-aside vlt-aside">

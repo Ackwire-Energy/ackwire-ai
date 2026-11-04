@@ -71,18 +71,17 @@ export function hostOf(website: string | null | undefined): string | null {
   }
 }
 
-/** The name a contact goes by in a list: the person's, else the company's. */
-export const contactName = (c: VaultContactFields | null | undefined) => c?.fullName || c?.company || "";
-
 /** Folded for search: no accents, no case. */
 export const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
-/** Whether an item has `query` in what a person would look it up by (never a value). */
+/**
+ * Whether an item has `query` in what a person would look it up by (never a value). A contact by its title and
+ * description: the list carries no contact's fields (ADR 0139 §7).
+ */
 export function matchesQuery(item: VaultItem, query: string): boolean {
   const q = fold(query.trim());
   if (!q) return true;
-  const contact = item.contact ? Object.values(item.contact).filter(Boolean) : [];
-  return [item.title, item.description, hostOf(item.website), item.username, item.keyName, item.sourceName, ...contact]
+  return [item.title, item.description, hostOf(item.website), item.username, item.keyName, item.sourceName]
     .filter((v): v is string => typeof v === "string" && v.length > 0)
     .some((v) => fold(v).includes(q));
 }

@@ -45,7 +45,7 @@ import {
   type TargetCache,
 } from "../screen";
 import { requestSecretTool } from "../secret-request-tool";
-import { REQUEST_SECRET_TOOL } from "../secrets";
+import { REQUEST_SECRET_TOOL, SITE_SECRET_TTL_TEXT, siteSecretGone } from "../secrets";
 import { toolDetail } from "../tool-detail";
 import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess, VAULT_LIST_TOOL, VAULT_READ_SCOPE } from "../tools/scopes";
@@ -61,6 +61,7 @@ import {
 } from "../vault";
 import type { BrowserPageReader } from "../web-tools";
 import {
+  ASK_PERSON_TOOL,
   agentUsesScreen,
   browserOnDesktop,
   endHandoffForRestart,
@@ -187,12 +188,18 @@ export async function warmAgentBrowser(
 }
 
 /**
- * A secret delivered to the computer the browser runs on, with the one site it
- * may be typed on (`request_secret` with `site`). Null when there is none.
+ * A secret delivered to the computer the browser runs on, with the one site it may be typed on (`request_secret`
+ * with `site`). Null when there is none. `gone`: a site's password past the minutes its runner keeps it in memory
+ * (ADR 0139 §6), which the computer no longer has.
  */
 async function browserSecret(ctx: ToolContext, name: string, machineId: string) {
   const [held] = await ctx.db
-    .select({ id: secretRequests.id, site: secretRequests.site })
+    .select({
+      id: secretRequests.id,
+      site: secretRequests.site,
+      targetKind: secretRequests.targetKind,
+      deliveredAt: secretRequests.deliveredAt,
+    })
     .from(secretRequests)
     .where(
       and(
@@ -206,7 +213,7 @@ async function browserSecret(ctx: ToolContext, name: string, machineId: string) 
     )
     .orderBy(desc(secretRequests.deliveredAt))
     .limit(1);
-  return held ?? null;
+  return held ? { id: held.id, site: held.site, gone: siteSecretGone(held) } : null;
 }
 
 /** "14:02" in UTC, for "in use since". */
@@ -376,8 +383,9 @@ export function browserErrorText(error: string) {
 
 /**
  * A runner's failed command as the agent reads it (protocol 41 adds a `code` to Vault and code refusals, ADR 0139):
- * a typed password the page tried to send in an address, a field that takes no code, or the refusal's code ahead of
- * the runner's words, which `vaultTypingRefusal` reads for a login.
+ * a typed password the page tried to send in an address, a field that takes no code, a field inside an embedded
+ * frame (a person types there, through the hand-off), or the refusal's code ahead of the runner's words, which
+ * `vaultTypingRefusal` reads for a login.
  */
 export function runnerFailureText(error: string | undefined, code?: string): string {
   const said = error || "the command failed";
@@ -390,14 +398,21 @@ export function runnerFailureText(error: string | undefined, code?: string): str
   if (code === "unguarded") {
     return "The browser couldn't get ready to keep the password out of the page's addresses, so nothing was typed. Run that step again; if it keeps failing, tell the person.";
   }
+  // Its code stays ahead of the words: `vaultTypingRefusal` reads it for a login and words it its own way.
+  if (code === "in_frame") {
+    return `in_frame: That field is inside an embedded frame, where your browser can't type a secret, so nothing was typed. Ask the person to do that step themselves with ${ASK_PERSON_TOOL}.`;
+  }
   if (code && (VAULT_TYPE_REFUSALS as readonly string[]).includes(code)) return browserErrorText(`${code}: ${said}`);
   return browserErrorText(said);
 }
 
 /** Why a secret can't be typed in the browser. */
-function secretMissingText(name: string, held: { site: string | null } | null) {
+function secretMissingText(name: string, held: { site: string | null; gone?: boolean } | null) {
   if (!held) {
     return `No secret named ${name} was delivered to the computer your browser runs on. Ask for it first with request_secret, giving \`site\` (the person types it; you never see it).`;
+  }
+  if (held.gone && held.site) {
+    return `${name}, the password for ${new URL(held.site).host}, was kept in your computer's memory only, for ${SITE_SECRET_TTL_TEXT} after it was given, and it is gone now. Ask for it again with request_secret (with \`site\`), or ask the person to save it to the Vault, so you can sign in with it from vault_list next time.`;
   }
   return `${name} wasn't asked for a site, so the browser won't type it. Ask for it again with request_secret and \`site\` set to the address of the page it goes into (https://…).`;
 }
@@ -426,10 +441,12 @@ const vaultErrorText = (error: unknown) =>
  * number, a covered field) as the browser said it, so the plan finds the field again as for any step.
  */
 export function vaultTypingRefusal(text: string, site: string): string {
-  const code = /\b(wrong_site|not_password_field|get_form|key_expired)\b/.exec(text)?.[1];
+  const code = /\b(wrong_site|in_frame|not_password_field|get_form|key_expired)\b/.exec(text)?.[1];
   switch (code) {
     case "wrong_site":
       return `The field isn't on ${site} (the page, or the frame that holds the field, is on another site), so the login wasn't typed. Open the sign-in page of ${site} and try again.`;
+    case "in_frame":
+      return `That field is inside an embedded frame, where a Vault login can't be typed, so it wasn't typed. Ask the person to sign in to ${site} themselves with ${ASK_PERSON_TOOL}.`;
     case "not_password_field":
       return "That field isn't a password field, so the login wasn't typed. Give the password field as `target` (its number from the page); type the username yourself with a `fill` step.";
     case "get_form":
@@ -516,7 +533,7 @@ function trailOf(report: PlanReport) {
     .filter((s) => s.status !== "skipped")
     .map((s) => {
       const tool = TRAIL_TOOL[s.step.do];
-      // A Vault login's step says which login (its title, ADR 0139); an open says where. Never a value.
+      // A Vault login's step says the site it was typed for (ADR 0139); an open says where. Never a value.
       const detail =
         tool === "browser_open"
           ? toolDetail(tool, { url: s.step.url ?? s.step.target })
@@ -987,7 +1004,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     if (!vault || !hub) return "The Vault isn't available on this server.";
     const run = ids(ctx);
     const origin = pageOrigin(url);
-    let sealed: { box: unknown; keyId: string; rule: string; site: string; title: string };
+    let sealed: { box: unknown; keyId: string; rule: string; site: string };
     try {
       // The profile's grants are read again here: one given meanwhile counts before the value is read.
       const released = await releaseVaultLogin(vault, run, id, origin, await vaultProfile(ctx, profile));
@@ -999,10 +1016,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         released.password,
         vaultAad({ keyId: key.keyId, agentId: ctx.agentId, use: { kind: "fill", rule } }),
       ).catch(() => {
-        // Never the sealing's own words: they could name the value's size.
-        throw new Error(`"${released.item.title}" couldn't be prepared for your computer.`);
+        // Never the sealing's own words (they could name the value's size), nor the login's title (ADR 0139 §4).
+        throw new Error(`The Vault login ${id} couldn't be prepared for your computer.`);
       });
-      sealed = { box, keyId: key.keyId, rule, site: vaultRuleLabel(released.rule), title: released.item.title };
+      sealed = { box, keyId: key.keyId, rule, site: vaultRuleLabel(released.rule) };
     } catch (error) {
       return vaultErrorText(error);
     }
@@ -1012,7 +1029,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         args: [field, sealed.rule, JSON.stringify({ keyId: sealed.keyId, box: sealed.box })],
         timeoutSeconds: COMMAND_SECONDS,
       },
-      label: sealed.title,
+      // The site of its rule, which the engine read from the saved address: never its title (ADR 0139 §4).
+      label: sealed.site,
       typed: () => recordVaultUse(vault, run, id, { action: "fill", ...(origin ? { origin } : {}) }),
       refused: (text) => vaultTypingRefusal(text, sealed.site),
     };
@@ -1055,7 +1073,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       const name = s.secret?.trim();
       if (!name || sites.has(name)) continue;
       const held = await browserSecret(ctx, name, linked.status.machineId);
-      if (!held?.site) return { content: secretMissingText(name, held), isError: true };
+      if (!held?.site || held.gone) return { content: secretMissingText(name, held), isError: true };
       sites.set(name, held.site);
     }
     const key = seenKey(ctx);
@@ -1550,7 +1568,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
           const status = await machineOf(ctx);
           if (!status.available) return { ok: false, message: browserUnavailableText(status) };
           const held = await browserSecret(ctx, name, status.machineId);
-          return held?.site ? { ok: true } : { ok: false, message: secretMissingText(name, held) };
+          return held?.site && !held.gone ? { ok: true } : { ok: false, message: secretMissingText(name, held) };
         },
       },
     ),

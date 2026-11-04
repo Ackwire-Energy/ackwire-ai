@@ -7,7 +7,6 @@ import { vaultOrigin } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { UUID } from "../authority";
-import { publishVaultChanged } from "../events";
 import { type VaultRunPerson, vaultPersonOfRun } from "./access";
 import { type VaultDeps, type VaultRun, type VaultUse, type VaultUseAction, vaultNow } from "./service";
 
@@ -57,10 +56,11 @@ export async function recordAgentChange(
 /**
  * An agent typed a login (`fill`, after its computer said it did) or gave a key to a command (`key`, once the
  * command started): the use, the item's last use and the audit line (`vault.item_used`, with the origin, the run
- * and the person it worked for).
+ * and the person it worked for). A use isn't a change to the Vault: no `vault.changed` goes to every open app for it
+ * (ADR 0139 §7), so agents at work don't make every app reload the list.
  */
 export async function recordVaultUse(
-  deps: Pick<VaultDeps, "db" | "pubsub" | "now">,
+  deps: Pick<VaultDeps, "db" | "now">,
   run: VaultRun,
   itemId: string,
   use: { action: "fill" | "key"; origin?: string },
@@ -98,7 +98,6 @@ export async function recordVaultUse(
       onBehalfOfUserId: person.personId,
     });
   });
-  await publishVaultChanged(deps.pubsub, run.orgId);
 }
 
 /** An agent read contacts' fields: one `read` per item and run, however often it lists them. */

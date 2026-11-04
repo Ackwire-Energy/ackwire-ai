@@ -167,7 +167,7 @@ export function observationOf(data: unknown): ScreenObservation | null {
 export interface VaultTyping {
   /** `agentes:type_vault [ref, rule, box]`: the password sealed to a one-use key of the agent's computer. */
   command: BrowserBatchCommand;
-  /** What the report names it by (the login's title): never a value. */
+  /** What the report names it by: the site of its rule (`github.com`), never its title (ADR 0139 §4) nor a value. */
   label: string;
   /** The runner typed it: the use is recorded. */
   typed(): Promise<void>;

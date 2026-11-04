@@ -26,6 +26,7 @@ import {
   parseBrowserInputEvent,
   type RunnerBrowserInfo,
   type RunnerFrame,
+  SITE_SECRET_TTL_MS,
   type VaultTypeRefusal,
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
@@ -2610,10 +2611,12 @@ export class BrowserManager {
     }
     const held = await this.opts.secret(agent, name);
     if (held === null) {
+      // ADR 0139 §6: a site's password lives in this process's memory only, for `SITE_SECRET_TTL_MS`, and not past a
+      // restart of the runner: one given earlier is gone, and the agent is told so plainly.
       return {
         success: false,
         data: null,
-        error: `No secret named ${name} was delivered to this agent; ask for it with request_secret first`,
+        error: `There is no ${name} on this computer now. A site's password from request_secret is kept in its memory only, for ${SITE_SECRET_TTL_MS / 60_000} minutes after it was given (and not past a restart of the runner), so it is gone. Ask for it again with request_secret, or ask the person to save it to the Vault so you can sign in with it next time.`,
       };
     }
     // The site the person sealed it to, on this computer, wins over the one the request names.
@@ -2719,8 +2722,8 @@ export class BrowserManager {
           );
         case "in_frame":
           return refused(
-            "not_code_field",
-            `${at} is inside a frame. Switch to that frame first, then type the code; it wasn't typed there`,
+            "in_frame",
+            `${at} is inside an embedded frame, where a code isn't typed; it wasn't typed there`,
           );
         case "not_code_field":
         case "not_password_field":
@@ -2793,8 +2796,8 @@ export class BrowserManager {
           );
         case "in_frame":
           return refused(
-            "not_password_field",
-            `${ref} is inside a frame. Switch to that frame first, then type the login. It wasn't typed.`,
+            "in_frame",
+            `${ref} is inside an embedded frame, where a Vault login isn't typed. It wasn't typed.`,
           );
         case "not_password_field":
         case "not_code_field":

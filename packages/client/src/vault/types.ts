@@ -51,6 +51,10 @@ export interface VaultItem {
   keyHint: string | null;
   /** Login or key: a value is saved. */
   hasSecret: boolean;
+  /**
+   * A contact's fields, only on its own page (`item`): the list (`overview`) never has them, so a contact's row shows
+   * its title and description. Null for logins and keys.
+   */
   contact: VaultContactFields | null;
   /** null = built-in. */
   connectionId: string | null;
@@ -90,6 +94,11 @@ export interface VaultUse {
 
 export interface VaultItemDetail extends VaultItem {
   uses: VaultUse[];
+  /**
+   * A contact whose saved fields can't be read on this server (sealed with a key it no longer has): `contact` is null,
+   * and a person who manages it saves its fields again.
+   */
+  unreadable: boolean;
 }
 
 export type VaultConnectionStatus = "ready" | "error" | "syncing";

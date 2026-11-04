@@ -476,11 +476,22 @@ export const CONVERSATION_PROTOCOL = 40;
  * that tries to send a typed password in an address is stopped. The server sends none of these to an older runner.
  */
 export const VAULT_PROTOCOL = 41;
+/**
+ * Protocol 41 (ADR 0139 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
+ * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
+ * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
+ */
+export const SITE_SECRET_TTL_MS = 15 * 60_000;
 /** What `agentes:type_vault` (and a code typed into several fields) answers in `code` when it types nothing. */
 export const VAULT_TYPE_REFUSALS = [
   /** The frame that owns the field (or one around it, or the page) is on no site the login's rule allows. */
   "wrong_site",
-  /** The focused element isn't a password field (or it sits inside a frame the agent didn't switch to). */
+  /**
+   * The field is inside an embedded frame (the ref is the frame's element): nothing of the Vault, nor a code, is
+   * typed there; a person signs in through the browser hand-off.
+   */
+  "in_frame",
+  /** The focused element isn't a password field. */
   "not_password_field",
   /** A code's field isn't a text, number or one-time-code input. */
   "not_code_field",

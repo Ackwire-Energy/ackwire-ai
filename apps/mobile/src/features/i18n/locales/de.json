@@ -1787,6 +1787,7 @@
     "item": {
       "gone": "Diesen Eintrag gibt es nicht mehr, oder du kannst ihn nicht sehen.",
       "missingText": "Er ist seit der letzten Synchronisierung aus {{name}} verschwunden. Agenten können ihn nicht verwenden.",
+      "unreadable": "Die Angaben dieses Kontakts können hier nicht gelesen werden. Wer ihn verwaltet, kann sie neu eingeben und speichern.",
       "externalText": "Er kommt aus {{name}}. Ändere Namen, Adresse, Benutzernamen oder Passwort dort.",
       "noValue": "Noch kein Wert gespeichert.",
       "changePassword": "Passwort ändern",

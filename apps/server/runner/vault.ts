@@ -1,5 +1,10 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { type ExecVault, VAULT_EXEC_KEYS, type VaultTypeRefusal } from "@agenteschat/adapters/machine-protocol";
+import {
+  type ExecVault,
+  SITE_SECRET_TTL_MS,
+  VAULT_EXEC_KEYS,
+  type VaultTypeRefusal,
+} from "@agenteschat/adapters/machine-protocol";
 import {
   generateSecretKeyPair,
   isReservedSecretName,
@@ -22,7 +27,8 @@ import { RunnerError } from "./errors";
  *   use (`vaultAad`). A key opens for two minutes and goes at its first use, whether the box opens or not; an agent
  *   holds 16 at most (the oldest goes first).
  * - Site secrets: a password or code a person gave through `request_secret` for one site, kept for its browser for
- *   15 minutes after it was activated (before, they stayed in `store.json`; `secrets.ts` removes those).
+ *   15 minutes after it was activated (`SITE_SECRET_TTL_MS`, which the server counts too; before, they stayed in
+ *   `store.json`; `secrets.ts` removes those).
  * - Armed values: every value opened here, redacted from what leaves the computer (command output, browser
  *   answers, errors) for 10 minutes after its last use.
  *
@@ -31,7 +37,8 @@ import { RunnerError } from "./errors";
 
 export const VAULT_KEY_TTL_MS = 2 * 60_000;
 export const VAULT_KEYS_PER_AGENT = 16;
-export const SITE_SECRET_TTL_MS = 15 * 60_000;
+/** The protocol's, so the server counts a site's password gone when this process drops it (ADR 0139 §6). */
+export { SITE_SECRET_TTL_MS };
 export const ARMED_TTL_MS = 10 * 60_000;
 /** After a password is typed, how long its browser stops any request that carries it in its address. */
 export const GET_GUARD_MS = 2 * 60_000;

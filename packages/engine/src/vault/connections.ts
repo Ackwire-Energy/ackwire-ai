@@ -84,7 +84,8 @@ function auditConnection(
 
 /**
  * Connects a source: checked with the provider, its credentials sealed, then its items read before this returns. A
- * refusal at either step leaves nothing behind and throws the source's `VaultSourceError`.
+ * refusal at either step leaves nothing behind and throws the source's `VaultSourceError`; so does any other failure
+ * of that first read (the database's, say), thrown as it was.
  */
 export async function connectVaultSource(
   deps: VaultDeps,
@@ -121,10 +122,18 @@ export async function connectVaultSource(
     })
     .returning();
   if (!inserted) throw new Error("vault connection insert returned nothing");
-  const { row, error } = await syncConnectionRow(deps, inserted);
-  if (error) {
-    // Nothing half made: the person fixes what the source said and connects again.
-    await db.delete(vaultConnections).where(eq(vaultConnections.id, id));
+  let row: ConnectionRow;
+  try {
+    const synced = await syncConnectionRow(deps, inserted);
+    if (synced.error) throw synced.error;
+    row = synced.row;
+  } catch (error) {
+    // Nothing half made, whatever stopped the first read (a source's refusal, the database): no row left `syncing`
+    // with sealed credentials, nor the items it read (they go with it). The person connects again.
+    await db
+      .delete(vaultConnections)
+      .where(and(eq(vaultConnections.orgId, orgId), eq(vaultConnections.id, id)))
+      .catch(() => undefined);
     await publishVaultChanged(deps.pubsub, orgId);
     throw error;
   }

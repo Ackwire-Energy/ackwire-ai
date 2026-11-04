@@ -7,6 +7,7 @@ import type {
   ApiClient,
   SecretTarget,
   SecretToVaultInput,
+  VaultContactFields,
   VaultItem,
   VaultItemDetail,
   VaultOverview,
@@ -81,15 +82,18 @@ const KEY = vaultItem({
   keyHint: "a1b2",
   description: "Test mode",
 });
+/** A contact as the list has it: no fields (ADR 0139 §7), only its title and description. */
 const CONTACT = vaultItem({
   id: "vi-contact",
   kind: "contact",
   scope: "personal",
   ownerUserId: "u-walter",
   title: "Billing details",
-  contact: { fullName: "Ana Souza", city: "Recife" },
+  description: "Invoices for the Recife office",
   access: access({ everyone: false, allAgents: true }),
 });
+/** Its fields: only an item's details carry them. */
+const CONTACT_FIELDS = { fullName: "Ana Souza", city: "Recife" };
 
 function overviewOf(patch: Partial<VaultOverview> = {}): VaultOverview {
   return {
@@ -125,8 +129,17 @@ function overviewOf(patch: Partial<VaultOverview> = {}): VaultOverview {
   };
 }
 
-/** A fake Vault over `overview`, every call logged in `state.calls` as `vault.<method>`. */
-function fakeVault(state: FakeState, overview: VaultOverview): NonNullable<ApiClient["vault"]> {
+/**
+ * A fake Vault over `overview`, every call logged in `state.calls` as `vault.<method>`. An item's details add a
+ * contact's fields (`fields`, by id), or say they can't be read (`unreadable`).
+ */
+function fakeVault(
+  state: FakeState,
+  overview: VaultOverview,
+  details: { fields?: Record<string, VaultContactFields>; unreadable?: string[] } = {
+    fields: { [CONTACT.id]: CONTACT_FIELDS },
+  },
+): NonNullable<ApiClient["vault"]> {
   const log = (method: string, ...args: unknown[]) => state.calls.push({ method: `vault.${method}`, args });
   const find = (id: string) => {
     const item = overview.items.find((i) => i.id === id);
@@ -140,7 +153,10 @@ function fakeVault(state: FakeState, overview: VaultOverview): NonNullable<ApiCl
     },
     item: async (orgId, itemId) => {
       log("item", orgId, itemId);
-      const detail: VaultItemDetail = { ...structuredClone(find(itemId)), uses: [] };
+      const listed = structuredClone(find(itemId));
+      const unreadable = details.unreadable?.includes(itemId) === true;
+      const contact = unreadable ? null : (details.fields?.[itemId] ?? listed.contact);
+      const detail: VaultItemDetail = { ...listed, contact, uses: [], unreadable };
       return detail;
     },
     create: async (orgId, input) => {
@@ -183,9 +199,9 @@ function fakeVault(state: FakeState, overview: VaultOverview): NonNullable<ApiCl
   };
 }
 
-async function openVault(state = seedState(), overview = overviewOf()) {
+async function openVault(state = seedState(), overview = overviewOf(), details?: Parameters<typeof fakeVault>[2]) {
   const api = createFakeApi(state);
-  api.vault = fakeVault(state, overview);
+  api.vault = fakeVault(state, overview, details);
   const r = await renderApp(`/org/${ORG_ID}/settings/vault`, { api });
   await settle(6);
   // The app's own words, whatever the keys say in this build.
@@ -222,7 +238,9 @@ describe("Settings › Vault (ADR 0139)", () => {
 
     await click(tab("vault.tab.personal"));
     expect(rows().map((r) => r.querySelector(".vlt-row__title")?.textContent)).toEqual(["Billing details"]);
-    expect(rows()[0]?.textContent).toContain("Ana Souza · Recife");
+    // A contact's row: its title and description, never its fields (the list has none).
+    expect(rows()[0]?.textContent).toContain("Invoices for the Recife office");
+    expect(rows()[0]?.textContent).not.toContain("Ana Souza");
     expect(document.body.textContent).toContain(t("vault.list.personalNote"));
 
     await click(tab("vault.tab.connections"));
@@ -230,6 +248,34 @@ describe("Settings › Vault (ADR 0139)", () => {
     const card = screen().getByRole("region", { name: "1Password" });
     expect(card.textContent).toContain(t("vault.connections.items", { count: 3 }));
     expect(within(card).getByRole("button", { name: t("vault.connections.syncNow") })).toBeTruthy();
+  });
+
+  test("a contact's fields come with its details, and its form starts from them", async () => {
+    const { state, t } = await openVault();
+    const views = screen().getByRole("radiogroup", { name: t("vault.tab.label") });
+    await click(within(views).getByRole("radio", { name: new RegExp(`^${t("vault.tab.personal")}`) }));
+    await click(rows()[0] as HTMLElement);
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "vault.item" && c.args[1] === CONTACT.id)).toBe(true);
+    const dialog = screen().getByRole("dialog", { name: "Billing details" });
+    expect((within(dialog).getByLabelText(t("vault.contact.fullName")) as HTMLInputElement).value).toBe("Ana Souza");
+    expect((within(dialog).getByLabelText(t("vault.contact.city")) as HTMLInputElement).value).toBe("Recife");
+    expect(dialog.textContent).not.toContain(t("vault.item.unreadable"));
+    // Nothing changed yet: nothing to save.
+    const save = within(dialog).getByRole("button", { name: t("common.save") }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+  });
+
+  test("a contact whose saved fields can't be read says so, for its owner to type them again", async () => {
+    const { t } = await openVault(seedState(), overviewOf(), { unreadable: [CONTACT.id] });
+    const views = screen().getByRole("radiogroup", { name: t("vault.tab.label") });
+    await click(within(views).getByRole("radio", { name: new RegExp(`^${t("vault.tab.personal")}`) }));
+    await click(rows()[0] as HTMLElement);
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Billing details" });
+    expect(dialog.textContent).toContain(t("vault.item.unreadable"));
+    expect((within(dialog).getByLabelText(t("vault.contact.fullName")) as HTMLInputElement).value).toBe("");
+    expect(dialog.textContent).not.toContain("Ana Souza");
   });
 
   test("a full Vault: the connection says so and offers Sync now, not Reconnect", async () => {

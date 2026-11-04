@@ -1,6 +1,20 @@
 import type { PubSub, SecretRequest } from "@agenteschat/adapters";
-import { parseSecretBox, SECRET_NAME, type SecretTarget, secretAad } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, isNotNull, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { parseSecretBox, SECRET_NAME, type SecretTarget, SITE_SECRET_TTL_MS, secretAad } from "@agenteschat/adapters";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gt,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { consultedFor } from "./consultations";
@@ -68,6 +82,24 @@ const targetOf = (row: Pick<SecretRequestRow, "targetKind" | "targetPath" | "sit
       ? { kind: "site", site: row.site }
       : { kind: "env" };
 
+/**
+ * A delivered secret still on its computer, for a select over `secret_requests` (ADR 0139 §6): a site's password
+ * lives in the runner's memory only, for `SITE_SECRET_TTL_MS` from its delivery, so an older `site` delivery counts
+ * as gone (never told to the agent as held, never listed on its page, never "replaced" by a new request).
+ */
+export const secretStillHeld = (now = new Date()) =>
+  or(
+    ne(secretRequests.targetKind, "site"),
+    gt(secretRequests.deliveredAt, new Date(now.getTime() - SITE_SECRET_TTL_MS)),
+  );
+
+/** A `site` delivery past the time its runner keeps it in memory (`secretStillHeld`, row by row). */
+export const siteSecretGone = (row: Pick<SecretRequestRow, "targetKind" | "deliveredAt">, now = new Date()) =>
+  row.targetKind === "site" && (!row.deliveredAt || now.getTime() - row.deliveredAt.getTime() >= SITE_SECRET_TTL_MS);
+
+/** How long a site's password stays on the computer, in words ("15 minutes"). */
+export const SITE_SECRET_TTL_TEXT = `${SITE_SECRET_TTL_MS / 60_000} minutes`;
+
 /** Pending but past its deadline counts as expired (the worker closes it within a minute). */
 function statusOf(row: SecretRequestRow, now = new Date()): SecretRequestView["status"] {
   if (row.status === "pending" && row.expiresAt <= now) return "expired";
@@ -120,7 +152,7 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
           ? ` The account is ${JSON.stringify(row.username)}: type that yourself (a \`fill\` step) where the site asks for it.`
           : "";
         return {
-          content: `${row.name} was delivered to your computer for ${host}${row.replaces ? ", replacing the one you had" : ""}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.${code}${user}`,
+          content: `${row.name} was delivered to your computer for ${host}${row.replaces ? ", replacing the one you had" : ""}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site, within ${SITE_SECRET_TTL_TEXT} (it is kept in your computer's memory only). It isn't in your commands' environment; for a command, ask for it again without \`site\`.${code}${user}`,
         };
       }
       return {
@@ -686,7 +718,10 @@ export interface AgentSecretView {
   deliveredByUserId: string;
 }
 
-/** The secrets on the agent's computers (names only), for its owner and admins. */
+/**
+ * The secrets on the agent's computers (names only), for its owner and admins. A site's password past the minutes
+ * its runner keeps it in memory is gone from there, so it isn't listed (ADR 0139 §6).
+ */
 export async function listAgentSecrets(db: Database, actorId: string, orgId: string, agentId: string) {
   await requireComputerManager(db, actorId, orgId, agentId);
   const rows = await db
@@ -698,6 +733,7 @@ export async function listAgentSecrets(db: Database, actorId: string, orgId: str
         eq(secretRequests.agentId, agentId),
         eq(secretRequests.status, "delivered"),
         isNull(secretRequests.removedAt),
+        secretStillHeld(),
       ),
     );
   return rows

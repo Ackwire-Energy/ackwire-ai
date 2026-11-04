@@ -46,6 +46,7 @@ import {
   hostOf,
   itemView,
   loadVault,
+  readContact,
   sourceInfos,
   sourceNameOf,
 } from "./views";
@@ -271,14 +272,20 @@ function auditItem(
   });
 }
 
-/** Everything the person sees in the Vault: their items, the connections they manage, the sources to connect. */
+/**
+ * Everything the person sees in the Vault: their items, the connections they manage, the sources to connect. No
+ * contact's fields (`contact: null`): opening every contact's seal for a list is work no row shows (ADR 0139 §7); an
+ * item's page has them (`getVaultItem`).
+ */
 export async function listVault(deps: VaultDeps, userId: string, orgId: string): Promise<VaultOverview> {
   const viewer = await vaultViewer(deps.db, userId, orgId);
   const state = await loadVault(deps.db, orgId);
   const visible = state.items.filter((item) =>
     viewerSees(item.ownerUserId, effectiveColumns(item, connectionOf(state, item)), viewer),
   );
-  const items = await Promise.all(visible.map((item) => itemView(deps, item, connectionOf(state, item), viewer)));
+  const items = await Promise.all(
+    visible.map((item) => itemView(deps, item, connectionOf(state, item), viewer, { contact: false })),
+  );
   const counts = new Map<string, number>();
   for (const item of state.items)
     if (item.connectionId && !item.missing) counts.set(item.connectionId, (counts.get(item.connectionId) ?? 0) + 1);
@@ -289,7 +296,10 @@ export async function listVault(deps: VaultDeps, userId: string, orgId: string):
   return { items, connections, sources: sourceInfos(deps.sources), canManageTeam: viewer.manages };
 }
 
-/** One item with its newest uses (only who manages it sees who used it, and for whom). */
+/**
+ * One item with its newest uses (only who manages it sees who used it, and for whom) and, for a contact, its fields,
+ * or `unreadable` when they don't open here.
+ */
 export async function getVaultItem(
   deps: VaultDeps,
   userId: string,
@@ -298,9 +308,10 @@ export async function getVaultItem(
 ): Promise<VaultItemDetail> {
   const viewer = await vaultViewer(deps.db, userId, orgId);
   const { item, connection } = await visibleItem(deps.db, orgId, itemId, viewer);
-  const view = await itemView(deps, item, connection, viewer);
+  const view = await itemView(deps, item, connection, viewer, { contact: false });
+  const { contact, unreadable } = await readContact(deps, item);
   const uses = viewerManages(item.ownerUserId, viewer) ? await listUses(deps.db, orgId, item.id) : [];
-  return { ...view, uses };
+  return { ...view, contact, uses, unreadable };
 }
 
 /** Saves a new built-in item: personal for anyone, team for who manages credentials. */
@@ -514,7 +525,8 @@ export async function deleteVaultItem(deps: VaultDeps, userId: string, orgId: st
 /**
  * A login's password or a key's value, for the person who manages it to see or copy: recorded as a use and in the
  * audit log (`vault.item_shown`, `vault.item_copied`), never with the value. A source's refusal throws its
- * `VaultSourceError`.
+ * `VaultSourceError`. A use alone isn't a change to the Vault: no `vault.changed` goes to every open app for it
+ * (ADR 0139 §7), and the person's own app refetches the item it shows.
  */
 export async function revealVaultItem(
   deps: VaultDeps,
@@ -535,6 +547,5 @@ export async function revealVaultItem(
     await recordPersonUse(tx, { orgId, itemId: item.id, userId, action: purpose });
     await auditItem(tx, orgId, userId, purpose === "show" ? "vault.item_shown" : "vault.item_copied", item);
   });
-  await publishVaultChanged(deps.pubsub, orgId);
   return { value };
 }

@@ -4342,6 +4342,9 @@
   "vault.item.missingText": {
     "value": "It's gone from {{name}} since the last sync. Agents can't use it."
   },
+  "vault.item.unreadable": {
+    "value": "This contact's details can't be read here. Whoever manages it can type them again and save."
+  },
   "vault.item.externalText": {
     "value": "It comes from {{name}}. Change its name, address, username or password there."
   },

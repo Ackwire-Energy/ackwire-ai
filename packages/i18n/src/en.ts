@@ -2704,6 +2704,8 @@ export const en = {
       missing: "Missing",
       missingText: "It's gone from {{source}}. Agents can't use it until it's back.",
       editIn: "Edit it in {{source}}. Changes arrive here at the next sync.",
+      /** A contact whose saved details don't open here (its key is gone): someone who manages it types them again. */
+      unreadable: "This contact's details can't be read here. Whoever manages it can type them again and save.",
       hidden: "Hidden",
       /** Next to a hidden key: the last characters it ends with. */
       endsIn: "ends in {{hint}}",

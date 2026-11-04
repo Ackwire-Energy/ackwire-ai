@@ -1699,6 +1699,7 @@
     "item": {
       "gone": "Item ini sudah tidak ada atau kamu tidak bisa melihatnya.",
       "missingText": "Item ini hilang dari {{name}} sejak sinkronisasi terakhir. Agen tidak bisa menggunakannya.",
+      "unreadable": "Detail kontak ini tidak bisa dibaca di sini. Orang yang mengelolanya bisa mengetiknya lagi lalu menyimpan.",
       "externalText": "Item ini berasal dari {{name}}. Ubah nama, alamat, nama pengguna, atau kata sandinya di sana.",
       "noValue": "Belum ada nilai yang tersimpan.",
       "changePassword": "Ganti kata sandi",

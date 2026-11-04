@@ -135,9 +135,12 @@ const ITEMS: VaultItem[] = [
     id: "i3",
     title: "Acme billing",
     kind: "contact",
+    // The list carries no contact's fields (ADR 0139 §7): a contact goes by its title and description there.
+    description: "Invoices for the São Paulo office",
     website: null,
     username: null,
-    contact: { fullName: "Ana Souza", city: "São Paulo", email: "ana@acme.example" },
+    hasSecret: false,
+    contact: null,
   }),
   item({ id: "i4", title: "Ana's mail", scope: "personal", ownerUserId: "u1", website: "https://mail.acme.example" }),
 ];
@@ -169,13 +172,18 @@ describe("the Vault's tabs and rows", () => {
     expect(kindsIn(ITEMS, "personal")).toEqual(["login"]);
   });
 
-  test("a row's line: a login's site and username, a key's description, a contact's name and city", () => {
+  test("a row's line: a login's site and username, a key's or a contact's description (never its fields)", () => {
     expect(itemLine(item({ id: "x" }))).toBe("github.com · dev@acme.example");
     expect(itemLine(item({ id: "x", username: null }))).toBe("github.com");
     expect(itemLine(item({ id: "x", kind: "key", description: "Payments, test mode" }))).toBe("Payments, test mode");
-    expect(itemLine(item({ id: "x", kind: "contact", contact: { company: "Acme", city: "Lisboa" } }))).toBe(
-      "Acme · Lisboa",
+    expect(itemLine(item({ id: "x", kind: "contact", description: "Lisbon office", contact: null }))).toBe(
+      "Lisbon office",
     );
+    // Fields an item's page brought along never make the row's line.
+    expect(
+      itemLine(item({ id: "x", kind: "contact", description: "", contact: { company: "Acme", city: "Lisboa" } })),
+    ).toBe("");
+    expect(vaultList(ITEMS, "team", "all", "ana souza")).toEqual([]);
     expect(hostOf("https://app.acme.example:8443")).toBe("app.acme.example:8443");
     expect(hostOf(null)).toBe("");
   });

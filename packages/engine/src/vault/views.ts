@@ -95,22 +95,39 @@ export function sourceInfos(sources: VaultSources): VaultSourceInfo[] {
 
 /** A contact's fields, or null (not a contact, nothing saved, or a seal that doesn't open here). */
 export async function contactOf(deps: Pick<VaultDeps, "keyWrappers">, item: ItemRow) {
-  if (item.kind !== "contact") return null;
+  return (await readContact(deps, item)).contact;
+}
+
+/**
+ * A contact's fields, and whether its saved fields can't be read here (ADR 0139): sealed with a key this server no
+ * longer has, or a row moved onto another owner, or not JSON. Such a contact is never merged onto or shown as empty:
+ * a person saves it again. Not a contact, or nothing saved: no fields, and nothing unreadable.
+ */
+export async function readContact(
+  deps: Pick<VaultDeps, "keyWrappers">,
+  item: ItemRow,
+): Promise<{ contact: VaultContactFields | null; unreadable: boolean }> {
+  if (item.kind !== "contact" || !item.secretCiphertext) return { contact: null, unreadable: false };
   try {
-    return await openContact(deps, item);
+    const contact = await openContact(deps, item);
+    return contact ? { contact, unreadable: false } : { contact: null, unreadable: true };
   } catch {
-    return null;
+    return { contact: null, unreadable: true };
   }
 }
 
 const iso = (date: Date | null) => (date ? date.toISOString() : null);
 
-/** An item for a person; `viewer` null: nobody's rights (a system call). */
+/**
+ * An item for a person; `viewer` null: nobody's rights (a system call). `contact: false` leaves a contact's fields
+ * out (`contact: null`) without opening its seal: the list of the whole Vault (ADR 0139 §7); an item's page has them.
+ */
 export async function itemView(
   deps: Pick<VaultDeps, "keyWrappers" | "sources">,
   item: ItemRow,
   connection: ConnectionRow | undefined,
   viewer: VaultViewer | null,
+  options: { contact?: boolean } = {},
 ): Promise<VaultItem> {
   const manages = viewer !== null && viewerManages(item.ownerUserId, viewer);
   const value = hasValue(item);
@@ -127,7 +144,7 @@ export async function itemView(
     keyName: item.keyName,
     keyHint: item.keyHint,
     hasSecret: value,
-    contact: await contactOf(deps, item),
+    contact: options.contact === false ? null : await contactOf(deps, item),
     connectionId: item.connectionId,
     sourceName: connection ? sourceNameOf(deps.sources, connection.kind) : null,
     accessFromConnection: item.accessFromConnection,

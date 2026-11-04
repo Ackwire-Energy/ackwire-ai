@@ -17,8 +17,11 @@ import {
   createVaultItem,
   createVaultToolSource,
   grantScopes,
+  heldSecretsOf,
+  heldSecretsText,
   insertMessage,
   keysMayHaveRun,
+  listAgentSecrets,
   type MachineCaller,
   MachineDroppedError,
   MachineOfflineError,
@@ -407,16 +410,19 @@ test("a saved login is typed by the browser, sealed to a one-use key of the agen
   // The value went only inside the box: never in a request, a result or a step.
   expect(JSON.stringify(v.computer.calls)).not.toContain(PASSWORD);
   expect(out.content).not.toContain(PASSWORD);
+  // The report names the site its rule allows, never the login's title (ADR 0139 §4).
+  expect(out.content).toContain("Typed the Vault login for acme.example into");
+  expect(out.content).not.toContain("Acme admin");
   const fills = (await usesOf(v.items.login.id)).filter((u) => u.action === "fill");
   expect(fills).toHaveLength(1);
   expect(fills[0]).toMatchObject({ origin: "https://acme.example", runId: ana.runId, onBehalfOfUserId: f.owner.id });
 
-  // In a plan, the trail names the login by its title.
+  // In a plan, the trail names the login by its site.
   const planned = await v.call(ana, "browser_do", {
     steps: [{ do: "type_secret", target: "e2", login: v.items.login.id }],
   });
   expect(planned.isError).toBeFalsy();
-  expect(planned.data?.browserTrail).toEqual([{ tool: "browser_type_secret", detail: "Acme admin" }]);
+  expect(planned.data?.browserTrail).toEqual([{ tool: "browser_type_secret", detail: "acme.example" }]);
 });
 
 test("a login is refused before its value goes out: not shared, another site, an old computer", async () => {
@@ -441,7 +447,8 @@ test("a login is refused before its value goes out: not shared, another site, an
   });
   const nothing = await v.call(ana, "browser_type_secret", { target: "e2", login: empty.id });
   expect(nothing.isError).toBe(true);
-  expect(nothing.content).toContain('"Acme empty" has nothing saved');
+  expect(nothing.content).toContain(`The login ${empty.id} for acme.example has nothing saved`);
+  expect(nothing.content).not.toContain("Acme empty");
 
   // The page is on another site: the Vault refuses, no key is made.
   v.computer.s.url = "https://acme-login.example/";
@@ -483,6 +490,15 @@ test("the runner's refusals become clear errors, and nothing is recorded", async
     "isn't a password field",
   );
   expect(vaultTypingRefusal("The browser said: get_form", "acme.example")).toContain("address");
+  // A field inside an embedded frame: the person signs in there through the hand-off, not "switch frames".
+  const framed = runnerFailureText("@e2 is inside an embedded frame", "in_frame");
+  expect(framed).toStartWith("in_frame: ");
+  expect(framed).toContain("browser_ask_person");
+  const login = vaultTypingRefusal(framed, "acme.example");
+  expect(login).toBe(
+    "That field is inside an embedded frame, where a Vault login can't be typed, so it wasn't typed. Ask the person to sign in to acme.example themselves with browser_ask_person.",
+  );
+  expect(login).not.toContain("password field as `target`");
   expect(vaultTypingRefusal("The browser said: key_expired", "acme.example")).toContain("run that step again");
   // Anything else stays as the browser said it: a stale number is found again like any step's.
   expect(vaultTypingRefusal("stale_ref: unknown ref e2", "acme.example")).toBe("stale_ref: unknown ref e2");
@@ -507,6 +523,7 @@ test("a code split in boxes is typed one character per box, only by a runner of 
     machineId: machine?.id ?? null,
     publicKey: "pk",
     status: "delivered",
+    deliveredAt: new Date(),
     expiresAt: new Date(Date.now() + 60_000),
   });
   const boxes = ["e4", "e5", "e6", "e7", "e8", "e9"];
@@ -530,6 +547,63 @@ test("a code split in boxes is typed one character per box, only by a runner of 
     steps: [{ do: "type_secret", targets: boxes, login: v.items.login.id }],
   });
   expect(many.content).toContain("one password field");
+});
+
+test("a site's password is gone 15 minutes after it was given: not held, not listed, not replaced, said plainly", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const site = (name: string, minutesAgo: number) => ({
+    orgId: f.org.id,
+    runId: ana.runId,
+    agentId: f.agent.id,
+    channelId: f.general.id,
+    toolUseId: `tu_${name}`,
+    requestedForUserId: f.owner.id,
+    name,
+    purpose: "Acme sign-in",
+    site: "https://acme.example",
+    targetKind: "site" as const,
+    machineId: v.machineId,
+    publicKey: "pk",
+    status: "delivered" as const,
+    deliveredAt: new Date(Date.now() - minutesAgo * 60_000),
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+  await f.db.insert(schema.secretRequests).values([site("OLD_PASSWORD", 16), site("FRESH_PASSWORD", 2)]);
+  await v.call(ana, "browser_read", {});
+
+  // The runner dropped it from its memory: the agent hears so before anything runs, and what to do.
+  const gone = await v.call(ana, "browser_type_secret", { target: "e2", secret: "OLD_PASSWORD" });
+  expect(gone.isError).toBe(true);
+  expect(gone.content).toContain("kept in your computer's memory only, for 15 minutes after it was given");
+  expect(gone.content).toContain("request_secret");
+  expect(gone.content).toContain("Vault");
+  expect((await v.call(ana, "browser_type_secret", { target: "e2", secret: "FRESH_PASSWORD" })).isError).toBeFalsy();
+
+  // Neither the agent's context nor its page lists it.
+  const held = await heldSecretsOf(f.db, f.org.id, f.agent.id, v.machineId);
+  expect(held.map((r) => r.name)).toEqual(["FRESH_PASSWORD"]);
+  expect(heldSecretsText(held)).toContain("for 15 minutes after it was given");
+  const listed = await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id);
+  expect(listed.map((s) => s.name)).toEqual(["FRESH_PASSWORD"]);
+
+  // Asked again: a new one, not a replacement of one the computer no longer has.
+  const ask = (name: string) =>
+    f.tools?.invoke(ana, {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: "request_secret",
+      input: { name, purpose: "Sign in again", target: "env", site: "https://acme.example/login" },
+    });
+  expect((await ask("OLD_PASSWORD"))?.type).toBe("secret");
+  expect((await ask("FRESH_PASSWORD"))?.type).toBe("secret");
+  const pending = await f.db
+    .select({ name: schema.secretRequests.name, replaces: schema.secretRequests.replaces })
+    .from(schema.secretRequests)
+    .where(and(eq(schema.secretRequests.runId, ana.runId), eq(schema.secretRequests.status, "pending")));
+  expect(pending.sort((a, b) => a.name.localeCompare(b.name))).toEqual([
+    { name: "FRESH_PASSWORD", replaces: true },
+    { name: "OLD_PASSWORD", replaces: false },
+  ]);
 });
 
 test("run_code gives saved keys to one command, sealed for the computer, and records their use", async () => {
@@ -595,7 +669,9 @@ test("vault_save keeps contacts for the person behind the run; vault_delete only
 
   const changed = await v.call(ana, "vault_save", { id, contact: { phone: "+55 19 0000-0000" } });
   expect(changed.isError).toBeFalsy();
-  expect(changed.content).toContain("Updated");
+  // By its id: what was written on it reaches the model only inside vault_list's blocks (ADR 0139 §4).
+  expect(changed.content).toBe(`Updated the contact ${id} in the Vault.`);
+  expect(saved.content).not.toContain("Acme shipping");
   const listed = await v.call(ana, "vault_list", { kind: "contact" });
   expect(listed.content).toContain("+55 19 0000-0000");
   expect(listed.content).toContain("Rua das Flores, 10");

@@ -192,6 +192,10 @@ test("personal items are their owner's alone, the workspace's owner included", a
   const anaView = await overviewOf(w.ana, w.vault);
   expect(anaView.text).not.toContain(TOKEN_VALUE);
   expect(anaView.overview.items.map((i) => i.id).sort()).toEqual([id, contact.item?.id ?? ""].sort());
+  // The list carries no contact's fields; its page does (ADR 0139 §7).
+  expect(anaView.text).not.toContain("Ana Souza");
+  const page = await (await w.ana(`${w.vault}/items/${contact.item?.id ?? ""}`)).json();
+  expect(page).toMatchObject({ contact: { fullName: "Ana Souza", city: "Recife" }, unreadable: false });
   const ownerView = await overviewOf(w.owner, w.vault);
   expect(ownerView.overview.items.some((i) => i.ownerUserId === w.anaId)).toBe(false);
   expect(ownerView.text).not.toContain("Ana Souza");

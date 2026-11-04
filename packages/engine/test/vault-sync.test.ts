@@ -154,6 +154,34 @@ describe("connecting", () => {
     expect(String((error as Error).message)).not.toContain(SOURCE_TOKEN);
   });
 
+  test("any other failure of the first read leaves nothing either, and is thrown as it was", async () => {
+    v = await vaultSetup();
+    v.source.items = [github, deploy];
+    // The first read lists and keeps the items, then fails (the database's error, say) before it marks it ready.
+    let clock = 0;
+    const failing = {
+      ...v.deps,
+      now: () => {
+        clock += 1;
+        if (clock > 1) throw new Error("the database went away");
+        return new Date();
+      },
+    };
+    await expect(
+      connectVaultSource(failing, v.carla.id, v.f.org.id, {
+        kind: "fakepass",
+        scope: "team",
+        input: { token: SOURCE_TOKEN },
+      }),
+    ).rejects.toThrow("the database went away");
+    // No connection left `syncing` with its sealed credentials, nor the items it read.
+    expect(await v.f.db.select().from(schema.vaultConnections)).toEqual([]);
+    expect(await v.f.db.select().from(schema.vaultItems)).toEqual([]);
+    expect(
+      await v.f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "vault.connection_added")),
+    ).toEqual([]);
+  });
+
   test("a personal connection is its owner's alone; its items are personal", async () => {
     v = await vaultSetup();
     v.source.items = [github];

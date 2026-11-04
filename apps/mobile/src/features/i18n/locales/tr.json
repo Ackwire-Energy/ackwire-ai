@@ -1787,6 +1787,7 @@
     "item": {
       "gone": "Bu öğe artık yok ya da onu göremiyorsunuz.",
       "missingText": "Son eşitlemeden beri {{name}} içinde yok. Ajanlar onu kullanamaz.",
+      "unreadable": "Bu kişinin bilgileri burada okunamıyor. Onu yöneten kişi bilgileri yeniden girip kaydedebilir.",
       "externalText": "{{name}} kaynağından geliyor. Adını, adresini, kullanıcı adını ya da şifresini orada değiştirin.",
       "noValue": "Henüz kayıtlı bir değer yok.",
       "changePassword": "Şifreyi değiştir",

@@ -2752,10 +2752,11 @@ test.if(posix)("a Vault login isn't typed off its sites, outside a password fiel
       "@e6": { type: "password" },
     },
   });
+  // The ref is a frame's element: its own code, for the server to send the person through the hand-off.
   expect(await type("e5")).toMatchObject({
     success: false,
-    code: "not_password_field",
-    error: expect.stringContaining("inside a frame"),
+    code: "in_frame",
+    error: expect.stringContaining("inside an embedded frame"),
   });
   // The field in a frame from another site, inside the right page.
   t.page({ frame: { origin: "https://ads.test", ancestors: ["https://shop.example.com"] } });
@@ -2867,6 +2868,20 @@ test.if(posix)("a code goes one character per field, each field checked where it
     code: "not_code_field",
     error: expect.stringContaining("@e3"),
   });
+  // A box that is a frame's element: its own code, never "switch to that frame".
+  t.page({ attrs: boxes({ "@e2": { tag: "IFRAME" } }) });
+  expect(await typeCode(refs)).toMatchObject({
+    success: false,
+    code: "in_frame",
+    error: expect.stringContaining("@e2 is inside an embedded frame"),
+  });
+  // A site's password from request_secret lives in memory only: once gone, the answer says so plainly.
+  const missing = await t.act("agentes:type_secret", ["e1", "SHOP_PASSWORD", "https://shop.example.com"], {
+    agent: keeper,
+  });
+  expect(missing).toMatchObject({ success: false });
+  expect(missing.error).toContain("kept in its memory only, for 15 minutes");
+  expect(missing.error).toContain("save it to the Vault");
 });
 
 /**
