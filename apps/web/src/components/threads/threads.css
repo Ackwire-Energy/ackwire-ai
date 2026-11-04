@@ -935,11 +935,12 @@ html:not([data-pointer]) .thread-line:focus-visible {
     flex: none;
     width: clamp(360px, calc(100% - 400px), 640px);
     border-radius: 0;
-    box-shadow: inset 1px 0 0 var(--line);
+    border-left: 1px solid var(--line);
+    box-shadow: none;
     animation: ac-fade-in 160ms ease-out;
   }
   [data-theme="dark"] .thread-panel--docked {
-    box-shadow: inset 1px 0 0 var(--line2);
+    border-left-color: var(--line2);
   }
 }
 @media (min-width: 861px) and (prefers-reduced-motion: reduce) {
