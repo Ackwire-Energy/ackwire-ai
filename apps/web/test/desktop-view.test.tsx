@@ -893,6 +893,10 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.querySelector(".ac-dialog__sub > .cmp-said")?.textContent).toBe("Não deu certo. Tente de novo.");
     expect(document.querySelector(".ac-toast")).toBeNull();
     expect(note().value).toBe("Deixei aberto");
+    // Voltar and Devolver again: the note opens with its words, nothing sent out of sight.
+    await click(view().getByRole("button", { name: "Voltar" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    expect(note().value).toBe("Deixei aberto");
   });
 
   test("control ended on the server first (4410): it opens again as a watcher over the same picture; a drop then says so", async () => {
@@ -2039,19 +2043,18 @@ test("a touch scroll does not offer control; a later tap does", async () => {
   expect(rfb().log).toEqual([]);
 });
 
-test("with the focus off the screen no key offers control, nor typing into a field", async () => {
+test("shortcuts and typing into a field never offer control; a letter anywhere else in the dialog does", async () => {
   await dialog();
   await connected();
+  const ask = () => document.querySelector(".dsk-ask");
   await act(async () => {
-    fireEvent.keyDown(document.body, { key: "a" });
     fireEvent.keyDown(document.body, { key: "a", ctrlKey: true });
     fireEvent.keyDown(document.body, { key: "a", metaKey: true });
-    fireEvent.keyDown(document.body, { key: " " });
     fireEvent.keyDown(document.body, { key: "Tab" });
     fireEvent.keyDown(document.body, { key: "a", isComposing: true });
   });
   await settle(2);
-  expect(document.querySelector(".dsk-ask")).toBeNull();
+  expect(ask()).toBeNull();
   const input = document.createElement("input");
   document.body.appendChild(input);
   try {
@@ -2060,10 +2063,30 @@ test("with the focus off the screen no key offers control, nor typing into a fie
       fireEvent.keyDown(input, { key: "a" });
     });
     await settle(2);
-    expect(document.querySelector(".dsk-ask")).toBeNull();
+    expect(ask()).toBeNull();
   } finally {
     input.remove();
   }
+  // A button of the dialog keeps its Enter and Space; a letter typed on it asks, and so does one on the page.
+  const button = [...document.querySelectorAll<HTMLElement>('[role="dialog"] button')].find(
+    (b) => !b.closest(".dsk-stage"),
+  ) as HTMLElement;
+  await act(async () => {
+    fireEvent.keyDown(button, { key: "Enter" });
+    fireEvent.keyDown(button, { key: " " });
+  });
+  await settle(2);
+  expect(ask()).toBeNull();
+  await act(async () => void fireEvent.keyDown(button, { key: "a" }));
+  await settle(2);
+  expect(ask()).not.toBeNull();
+  // Cancelar goes, its focus back on the screen: the next key asks again.
+  await click(within(ask() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+  expect(document.activeElement === document.querySelector(".dsk-stage")).toBe(true);
+  await act(async () => void fireEvent.keyDown(document.body, { key: "b" }));
+  await settle(2);
+  expect(ask()).not.toBeNull();
+  expect(rfb().log).toEqual([]);
 });
 
 test("a connection quality change adjusts the active screen without reopening its socket", async () => {

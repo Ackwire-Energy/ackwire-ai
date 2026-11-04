@@ -872,7 +872,7 @@ export function BrowserCard({
       ? t("desktop.taking")
       : actions.done.isPending
         ? t("desktop.returning", g)
-        : keptSrc && starting
+        : keptSrc && starting && !stuck
           ? inControl
             ? t("desktop.taking")
             : t("desktop.returning", g)

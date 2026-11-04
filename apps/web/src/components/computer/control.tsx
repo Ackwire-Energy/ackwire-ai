@@ -1,46 +1,49 @@
 import { Button, isApple, onScreenKeyboard, Textarea } from "@agenteschat/ui";
-import {
-  type ClipboardEvent,
-  type KeyboardEvent,
-  type PointerEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { aimsAtScreen } from "@/lib/keys";
 import { useDialogHead } from "./head";
 
-/** What the stage takes while watching (`useAskControl`): none of it otherwise. */
+/** What the stage takes while watching (`useAskControl`): none of it otherwise, but its ref. */
 export interface AskStage {
+  ref: (el: HTMLElement | null) => void;
   tabIndex?: number;
   onPointerDownCapture?: (e: PointerEvent<HTMLElement>) => void;
   onPointerUp?: (e: PointerEvent<HTMLElement>) => void;
   onPointerCancel?: () => void;
-  onKeyDown?: (e: KeyboardEvent<HTMLElement>) => void;
-  onPaste?: (e: ClipboardEvent<HTMLElement>) => void;
 }
 
 /** A finger that moves farther than this between down and up scrolled, it didn't tap. */
 const TAP_SLOP_PX = 12;
 
-/** What on the stage keeps its own keys and clicks: the question's buttons, a field. */
+/** What on the stage keeps its own clicks: the question's buttons, a field. */
 const OWN_INPUT = 'button,a,input,textarea,select,[contenteditable="true"],[role="button"],[role="textbox"]';
+/** Where keys and pastes are the person's own words. */
+const TEXT_FIELD = 'input,textarea,select,[contenteditable="true"],[role="textbox"],[role="combobox"]';
+/** A control that keeps Enter, Space and arrows; a letter typed on it still asks. */
+const CONTROL =
+  'button,a,[role="button"],[role="tab"],[role="menuitem"],[role="option"],[role="radio"],[role="checkbox"],[role="switch"],[role="slider"]';
 
 /**
- * Watching the agent's screen or page in the computer dialog: a click, a tap, a key or a paste on it asks "Quer
- * assumir o controle?" and sends nothing there. The question stays through more clicks and keys, so the person
- * knows they aren't in control; only Cancelar, Esc or taking control close it, and the next try asks again. Keys
- * count only with the focus on the stage (a click on it puts it there), and shortcuts stay the browser's
- * (`aimsAtScreen`). `offer`: watching, live, and nothing else in the way.
+ * Watching the agent's screen or page in the computer dialog: a click, a tap, a key or a paste asks "Quer assumir o
+ * controle?" and sends nothing there. The question stays through more clicks and keys, so the person knows they aren't
+ * in control; only Cancelar, Esc or taking control close it, and the next try asks again. Keys and pastes count with
+ * the focus anywhere in the stage's dialog but a field (a control keeps its Enter, Space and arrows), and shortcuts
+ * stay the browser's (`aimsAtScreen`). `offer`: watching, live, and nothing else in the way.
  */
 export function useAskControl(offer: boolean) {
   const head = useDialogHead();
   const [asking, setAsking] = useState(false);
   const tapAt = useRef<{ x: number; y: number } | null>(null);
-  const cancel = useCallback(() => setAsking(false), []);
+  const stageEl = useRef<HTMLElement | null>(null);
+  const ref = useCallback((el: HTMLElement | null) => {
+    stageEl.current = el;
+  }, []);
+  // Cancelar goes with the question: the keys stay where they were, on the stage.
+  const cancel = useCallback(() => {
+    setAsking(false);
+    stageEl.current?.focus({ preventScroll: true });
+  }, []);
   useEffect(() => {
     if (!offer) setAsking(false);
   }, [offer]);
@@ -51,9 +54,38 @@ export function useAskControl(offer: boolean) {
     setAsk?.(cancel);
     return () => setAsk?.(null);
   }, [open, setAsk, cancel]);
+  useEffect(() => {
+    if (!offer) return;
+    // The stage's dialog, or the page with nothing over it; a menu or a dialog over it keeps its keys.
+    const near = (target: EventTarget | null) => {
+      const room = stageEl.current?.closest('[role="dialog"]') ?? document.body;
+      if (!(target instanceof Element) || !stageEl.current) return false;
+      return target === document.body || room.contains(target);
+    };
+    const key = (e: globalThis.KeyboardEvent) => {
+      if (e.defaultPrevented || !near(e.target) || !aimsAtScreen(e, isApple())) return;
+      const target = e.target as Element;
+      if (target.closest(TEXT_FIELD)) return;
+      if (target !== stageEl.current && target.closest(CONTROL) && (e.key.length !== 1 || e.key === " ")) return;
+      e.preventDefault();
+      setAsking(true);
+    };
+    const paste = (e: globalThis.ClipboardEvent) => {
+      if (e.defaultPrevented || !near(e.target) || (e.target as Element).closest(TEXT_FIELD)) return;
+      e.preventDefault();
+      setAsking(true);
+    };
+    document.addEventListener("keydown", key);
+    document.addEventListener("paste", paste);
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.removeEventListener("paste", paste);
+    };
+  }, [offer]);
   const own = (target: EventTarget) => target instanceof Element && target.closest(OWN_INPUT) !== null;
   const stage: AskStage = offer
     ? {
+        ref,
         tabIndex: 0,
         onPointerDownCapture: (e: PointerEvent<HTMLElement>) => {
           if (own(e.target)) return;
@@ -74,18 +106,8 @@ export function useAskControl(offer: boolean) {
         onPointerCancel: () => {
           tapAt.current = null;
         },
-        onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
-          if (own(e.target) || !aimsAtScreen(e.nativeEvent, isApple())) return;
-          e.preventDefault();
-          setAsking(true);
-        },
-        onPaste: (e: ClipboardEvent<HTMLElement>) => {
-          if (own(e.target)) return;
-          e.preventDefault();
-          setAsking(true);
-        },
       }
-    : {};
+    : { ref };
   return { asking: open, cancel, stage };
 }
 
@@ -132,8 +154,12 @@ export function HandBackFoot({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
-  const [writing, setWriting] = useState(noteFirst && note !== undefined);
+  // A note written before Voltar opens again with it: nothing goes to the agent out of sight.
+  const [writing, setWriting] = useState(noteFirst || Boolean(note?.trim()));
   const noted = writing && note !== undefined;
+  const back = () => {
+    if (!pending) onBack();
+  };
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: Esc anywhere in the row goes back to control
     <div
@@ -158,7 +184,7 @@ export function HandBackFoot({
             onKeyDown={(e) => {
               if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
               e.preventDefault();
-              onBack();
+              back();
             }}
           />
         </>
@@ -174,7 +200,7 @@ export function HandBackFoot({
         <Button size="sm" variant="ghost" onClick={onCancel}>
           {t("browser.live.back")}
         </Button>
-        <Button size="sm" variant="primary" icon="check" autoFocus={!noted} loading={pending} onClick={onBack}>
+        <Button size="sm" variant="primary" icon="check" autoFocus={!noted} loading={pending} onClick={back}>
           {label}
         </Button>
       </div>
