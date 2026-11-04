@@ -216,16 +216,23 @@ html:not([data-pointer]) .ni__pill:focus-visible {
   gap: 6px;
   margin-top: 10px;
 }
+/* Choices can be whole sentences: each grows with its text and wraps inside the card, a pill while it is one line
+   and a rounded box once it takes more. */
 .ni__choice {
   all: unset;
+  box-sizing: border-box;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  height: 32px;
-  padding: 0 14px;
-  border-radius: 999px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 6px 14px;
+  border-radius: 16px;
   font-size: 13.5px;
   font-weight: 650;
+  line-height: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 0 0 1.5px var(--line2);
