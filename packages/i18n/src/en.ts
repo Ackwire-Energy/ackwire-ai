@@ -12329,6 +12329,8 @@ export const en = {
       doneTitle: "Done. A note for {{name}}?",
       backLabel: "Note for {{name}}",
       backPlaceholder: "Optional: anything {{name}} should know?",
+      /** Handing back: opens the optional note. */
+      addNote: "Leave a note",
     },
     now: {
       ready: "Ready on {{computer}}",
@@ -12730,6 +12732,8 @@ export const en = {
     takeBrowser: "Take over the browser",
     /** Over the last picture while control opens. */
     taking: "Taking control…",
+    /** Over the last picture while control goes back to the agent. */
+    returning: "Handing back to {{name}}…",
     clipboard: {
       got: "Copied on {{name}}'s computer:",
       copy: "Copy",

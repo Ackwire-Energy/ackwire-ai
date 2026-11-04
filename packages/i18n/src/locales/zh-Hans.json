@@ -12510,6 +12510,7 @@
       "backLabel": "给 {{name}} 的备注",
       "backLabel_female": "给 {{name}} 的备注",
       "backPlaceholder": "可选：有什么需要 {{name}} 知道的吗？",
+      "addNote": "留个言",
       "backPlaceholder_female": "可选：有什么需要 {{name}} 知道的吗？"
     },
     "now": {
@@ -12896,6 +12897,7 @@
     "takeover": "接管控制",
     "takeBrowser": "接管浏览器",
     "taking": "正在接管控制…",
+    "returning": "正在交还给 {{name}}…",
     "clipboard": {
       "got": "在 {{name}} 的电脑上复制了：",
       "got_female": "在 {{name}} 的电脑上复制了：",

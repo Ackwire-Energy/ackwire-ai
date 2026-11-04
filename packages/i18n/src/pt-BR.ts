@@ -12590,6 +12590,8 @@ export const ptBR = {
       backLabel_female: "Recado para a {{name}}",
       backPlaceholder: "Opcional: o que o {{name}} precisa saber?",
       backPlaceholder_female: "Opcional: o que a {{name}} precisa saber?",
+      /** Handing back: opens the optional note. */
+      addNote: "Deixar um recado",
     },
     now: {
       ready: "Pronto no {{computer}}",
@@ -13028,6 +13030,9 @@ export const ptBR = {
     takeBrowser: "Assumir o navegador",
     /** Over the last picture while control opens. */
     taking: "Assumindo o controle…",
+    /** Over the last picture while control goes back to the agent. */
+    returning: "Devolvendo ao {{name}}…",
+    returning_female: "Devolvendo à {{name}}…",
     clipboard: {
       got: "Copiado no computador do {{name}}:",
       got_female: "Copiado no computador da {{name}}:",

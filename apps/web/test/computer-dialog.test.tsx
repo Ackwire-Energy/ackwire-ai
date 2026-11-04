@@ -498,6 +498,64 @@ describe("the computer dialog, live", () => {
   });
 });
 
+/** A JPEG's first bytes (SOI + a start-of-frame for 1280×800): enough for the page's size. */
+const FRAME_DATA = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 3, 32, 5, 0, 3, 0, 0, 0));
+const pageFrame = {
+  type: "browser.frame",
+  agentId: ADA_ID,
+  seq: 1,
+  data: FRAME_DATA,
+  metadata: { deviceWidth: 1280, deviceHeight: 800 },
+};
+
+describe("switching between the page and the screen, and watching the page", () => {
+  test("handing the page back: the screen opens over the page's last picture, dimmed under Devolvendo à Ada…, never Abrindo", async () => {
+    const mine = screenAsk({
+      id: "h-page",
+      screen: "browser",
+      kind: "takeover",
+      status: "active",
+      controllerUserId: "u-walter",
+      expiresAt: null,
+    });
+    const t = await dialog({ handoff: mine, browser: true, desktop: { ...RUNNING, canControl: false } });
+    await act(async () => t.sockets.realtime.last().open());
+    await act(async () => t.sockets.realtime.last().push(pageFrame));
+    await settle(2);
+    expect(box().querySelector(".brw-ac.is-surface.is-control")).not.toBeNull();
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(6);
+    expect(calls(t, "browser.done")).toEqual([[ORG_ID, "h-page"]]);
+    expect(box().querySelector(".brw-ac")).toBeNull();
+    const still = box().querySelector(".dsk-screen > img.dsk-still") as HTMLImageElement | null;
+    expect(still?.getAttribute("src")).toBe(`data:image/jpeg;base64,${FRAME_DATA}`);
+    expect(screen().getByText("Devolvendo à Ada…").closest(".brw-dim")?.classList.contains("is-clear")).toBe(true);
+    expect(box().textContent).not.toContain("Abrindo o computador da Ada…");
+  });
+
+  test("watching the page: a click or a key on it asks, the question stays until Cancelar, and nothing reaches the page", async () => {
+    const t = await dialog({ desktop: { available: false, reason: "no_desktop" }, browser: true });
+    await act(async () => t.sockets.realtime.last().open());
+    await act(async () => t.sockets.realtime.last().push(pageFrame));
+    await settle(2);
+    const stage = box().querySelector(".brw-ac__stage") as HTMLElement;
+    const img = stage.querySelector(".brw-ac__page img") as HTMLElement;
+    const prompt = () => box().querySelector(".dsk-ask") as HTMLElement | null;
+    await act(async () => fireEvent.pointerDown(img, { pointerType: "mouse", button: 0 }));
+    expect(prompt()?.textContent).toContain("Quer assumir o controle?");
+    await act(async () => fireEvent.pointerDown(img, { pointerType: "mouse", button: 0 }));
+    expect(prompt()).not.toBeNull();
+    await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+    expect(prompt()).toBeNull();
+    stage.focus();
+    await act(async () => void fireEvent.keyDown(stage, { key: "a" }));
+    expect(prompt()).not.toBeNull();
+    const sent = t.sockets.realtime.last().sent.filter((f) => (f as { type: string }).type === "browser.input");
+    expect(sent).toEqual([]);
+  });
+});
+
 describe("the computer dialog, self-host", () => {
   test("paused on the computer itself: until when and by whom, live, no take control", async () => {
     const until = new Date(Date.now() + 2 * 3_600_000);

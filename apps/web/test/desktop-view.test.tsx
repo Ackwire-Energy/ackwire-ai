@@ -607,9 +607,14 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().log).toContain("keydown Escape Escape");
 
     await click(view().getByRole("button", { name: "Devolver" }));
+    // One quiet row: Ada asked nothing, so the note waits behind "Deixar um recado", and Devolver has the focus.
+    expect(view().queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    expect(document.activeElement === view().getByRole("button", { name: "Devolver" })).toBe(true);
+    await click(view().getByRole("button", { name: "Deixar um recado" }));
     // One line in the middle of its field that grows as it wraps (its height set to its text): all of a note stays
     // in sight, and there is no grip to drag.
     const note = view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
+    expect(document.activeElement === note).toBe(true);
     expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
       "TEXTAREA",
       "1",
@@ -881,6 +886,7 @@ describe("the agent's screen in the computer dialog", () => {
       throw new ApiError(500, "internal", "Something broke");
     });
     await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Deixar um recado" }));
     const note = () => view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     await act(async () => fireEvent.change(note(), { target: { value: "Deixei aberto" } }));
     await click(view().getByRole("button", { name: "Devolver" }));
@@ -907,7 +913,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(screen().getByText("Tentando de novo…")).toBeTruthy();
   });
 
-  test("a switch whose new connection hasn't drawn in 3 s lets go of the old picture and says it is opening", async () => {
+  test("a hand back keeps the last picture dimmed under Devolvendo à Ada… until the watcher draws, never the cold cover", async () => {
     const t = await controlled();
     await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Devolver" }));
@@ -915,13 +921,21 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
     expect(still()).not.toBeNull();
     expect(sub()).toBe("Ao vivo · você está assistindo");
+    const returning = () => screen().queryByText("Devolvendo à Ada…")?.closest(".brw-dim");
+    expect(returning()?.classList.contains("is-clear")).toBe(true);
+    // However long the watcher takes: the picture, dimmed, and what is happening, never "Abrindo…".
     await act(() => new Promise((r) => setTimeout(r, 3_100)));
-    expect(still()).toBeNull();
-    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
-    expect(sub()).toBe("");
+    expect(still()).not.toBeNull();
+    expect(returning()).toBeTruthy();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    // Nothing asks to take control meanwhile.
+    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    expect(document.querySelector(".dsk-ask")).toBeNull();
     await connected();
+    expect(still()).toBeNull();
+    expect(returning()).toBeFalsy();
     expect(sub()).toBe("Ao vivo · você está assistindo");
-  });
+  }, 15_000);
 
   test("control taken over by someone else: their screen hidden at once, nothing of it kept under the cover", async () => {
     const t = await controlled();
@@ -1163,6 +1177,7 @@ describe("the agent's screen in the computer dialog", () => {
     // Handed back with its keyboard up, then taken again: the button starts unpressed. Its return key adds a line to
     // the note, as in the chat; the button hands back.
     await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Deixar um recado" }));
     const note = view().getByRole("textbox", { name: "Recado para a Ada" });
     expect(fireEvent.keyDown(note, { key: "Enter" })).toBe(true);
     await settle(2);
@@ -1224,7 +1239,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.fullscreenElement).toBeNull();
     expect(t.closed()).toBe(0);
     await click(view().getByRole("button", { name: "Devolver" }));
-    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    expect(view().getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
   });
 
   test("Devolver from full screen leaves it first: the note is the dialog's, never over the screen", async () => {
@@ -1235,8 +1250,8 @@ describe("the agent's screen in the computer dialog", () => {
     await click(view().getByRole("button", { name: "Devolver" }));
     expect(classes()).not.toContain("is-full");
     expect(document.fullscreenElement).toBeNull();
-    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
-    // No full screen while the note is open.
+    expect(view().getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
+    // No full screen while the hand back is open.
     expect(view().queryByRole("button", { name: "Tela cheia" })).toBeNull();
   });
 
@@ -1913,30 +1928,79 @@ describe("the person's clipboard", () => {
 });
 
 describe("watching offers control after deliberate interaction", () => {
+  const prompt = () => document.querySelector(".dsk-ask") as HTMLElement | null;
+  const press = () => act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
   test("a first screen click offers control without passing input; Escape dismisses before closing", async () => {
     const t = await dialog();
     await connected();
-    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    await press();
     await settle(3);
-    expect(document.querySelector(".dsk-ask")).not.toBeNull();
+    expect(prompt()).not.toBeNull();
+    // Dimmed, not frosted: the screen stays in sight under the question.
+    expect(prompt()?.classList.contains("is-clear")).toBe(true);
     expect(rfb().viewOnly).toBe(true);
     expect(rfb().log).toEqual([]);
     await act(async () => fireEvent.keyDown(document, { key: "Escape" }));
     await settle(3);
-    expect(document.querySelector(".dsk-ask")).toBeNull();
+    expect(prompt()).toBeNull();
     expect(t.closed()).toBe(0);
-    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    // The next try asks again.
+    await press();
     await settle(2);
-    expect(document.querySelector(".dsk-ask")).toBeNull();
+    expect(prompt()).not.toBeNull();
   });
-  test("typing offers control without moving focus or sending the triggering key", async () => {
+  test("the question stays through more clicks, on the screen and on its dim; Cancelar closes it", async () => {
     await dialog();
     await connected();
-    const before = document.activeElement;
-    await act(async () => fireEvent.keyDown(document.body, { key: "a", code: "KeyA" }));
-    await settle(3);
-    expect(document.querySelector(".dsk-ask")).not.toBeNull();
-    expect(document.activeElement === before).toBe(true);
+    await press();
+    await settle(2);
+    await press();
+    await act(async () => fireEvent.pointerDown(prompt() as HTMLElement, { pointerType: "mouse", button: 0 }));
+    await settle(2);
+    expect(prompt()).not.toBeNull();
+    await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+    expect(prompt()).toBeNull();
+    expect(rfb().log).toEqual([]);
+    await press();
+    await settle(2);
+    expect(prompt()).not.toBeNull();
+  });
+  test("a key or a paste on the focused screen asks, sends nothing, and leaves shortcuts to the browser", async () => {
+    await dialog();
+    await connected();
+    const stage = document.querySelector(".dsk-stage") as HTMLElement;
+    // A click on the screen puts the keys there.
+    await press();
+    expect(document.activeElement === stage).toBe(true);
+    await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+    stage.focus();
+    /** Whether the key is left to the browser (not taken to ask). */
+    const key = async (init: KeyboardEventInit) => {
+      let left = true;
+      await act(async () => {
+        left = fireEvent.keyDown(stage, init);
+      });
+      await settle(1);
+      return left;
+    };
+    for (const init of [{ key: "a", ctrlKey: true }, { key: "l", metaKey: true }, { key: "F5" }, { key: "Shift" }])
+      expect([init.key, await key(init), prompt()]).toEqual([init.key, true, null]);
+    // Tab moves the focus (the dialog keeps it inside): it never asks.
+    await key({ key: "Tab" });
+    expect(prompt()).toBeNull();
+    for (const init of [{ key: "a" }, { key: " " }, { key: "Enter" }, { key: "ArrowDown" }]) {
+      expect([init.key, await key(init), prompt() !== null]).toEqual([init.key, false, true]);
+      await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+      stage.focus();
+    }
+    // A paste (its keys, or the browser's own paste event) asks too.
+    expect(await key({ key: "Insert", shiftKey: true })).toBe(false);
+    expect(prompt()).not.toBeNull();
+    await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+    stage.focus();
+    await act(async () => void fireEvent.paste(stage, { clipboardData: { getData: () => "segredo" } }));
+    await settle(1);
+    expect(prompt()).not.toBeNull();
     expect(rfb().log).toEqual([]);
   });
 });
@@ -1975,10 +2039,11 @@ test("a touch scroll does not offer control; a later tap does", async () => {
   expect(rfb().log).toEqual([]);
 });
 
-test("modifier shortcuts, Space, and typing into a field never offer control", async () => {
+test("with the focus off the screen no key offers control, nor typing into a field", async () => {
   await dialog();
   await connected();
   await act(async () => {
+    fireEvent.keyDown(document.body, { key: "a" });
     fireEvent.keyDown(document.body, { key: "a", ctrlKey: true });
     fireEvent.keyDown(document.body, { key: "a", metaKey: true });
     fireEvent.keyDown(document.body, { key: " " });

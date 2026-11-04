@@ -30704,6 +30704,9 @@
   "browser.inCard.backPlaceholder": {
     "value": "Optional: anything {{name}} should know?"
   },
+  "browser.inCard.addNote": {
+    "value": "Leave a note"
+  },
   "browser.now.ready": {
     "value": "Ready on {{computer}}"
   },
@@ -31465,6 +31468,9 @@
   },
   "desktop.taking": {
     "value": "Taking control…"
+  },
+  "desktop.returning": {
+    "value": "Handing back to {{name}}…"
   },
   "desktop.clipboard.got": {
     "value": "Copied on {{name}}'s computer:"

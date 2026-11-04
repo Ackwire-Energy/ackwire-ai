@@ -780,6 +780,40 @@ html:not([data-pointer]) .brw-ac__page.is-control:focus-visible {
   color: var(--muted);
   font-size: 12.5px;
 }
+/*
+ * Over a picture the person should still see, dimmed and not frosted: a switch between watching and control, or the
+ * question a click or a key while watching asks (`useAskControl`).
+ */
+.brw-ac__stage > .brw-dim.is-clear {
+  background: color-mix(in srgb, var(--bg) 30%, transparent);
+  backdrop-filter: none;
+  animation: brw-dim-in 150ms ease-out;
+}
+@keyframes brw-dim-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brw-ac__stage > .brw-dim.is-clear {
+    animation: none;
+  }
+}
+/* The question's buttons: take control, and Cancelar beside it. */
+.brw-dim__acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+/* Watching, the stage takes the keys a click gives it: the keyboard's own ring only. */
+.brw-ac__stage[tabindex] {
+  outline: none;
+}
+html:not([data-pointer]) .brw-ac__stage[tabindex]:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
 .brw-ac .brw-log {
   max-height: none;
 }
@@ -809,6 +843,10 @@ html:not([data-pointer]) .brw-ac__page.is-control:focus-visible {
 .brw-ac__fail b {
   font-size: 14px;
   font-weight: 650;
+}
+/* Handing back: "Deixar um recado" beside the row's title, quieter than its buttons. */
+.brw-ac__add {
+  font-size: 13px;
 }
 /*
  * A note to the agent (handing back, or why it couldn't be done): one line in the middle of its field that grows as it

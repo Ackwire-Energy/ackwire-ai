@@ -12829,7 +12829,8 @@
       "backTitle": "An {{name}} zurückgeben",
       "doneTitle": "Fertig. Eine Notiz für {{name}}?",
       "backLabel": "Notiz für {{name}}",
-      "backPlaceholder": "Optional: Gibt es etwas, das {{name}} wissen sollte?"
+      "backPlaceholder": "Optional: Gibt es etwas, das {{name}} wissen sollte?",
+      "addNote": "Notiz hinterlassen"
     },
     "now": {
       "ready": "Bereit auf {{computer}}",
@@ -13181,6 +13182,7 @@
     "takeover": "Steuerung übernehmen",
     "takeBrowser": "Browser übernehmen",
     "taking": "Steuerung wird übernommen…",
+    "returning": "Wird an {{name}} zurückgegeben…",
     "clipboard": {
       "got": "Auf dem Computer von {{name}} kopiert:",
       "copy": "Kopieren",

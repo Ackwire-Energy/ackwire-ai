@@ -12382,7 +12382,8 @@
       "backTitle": "{{name}}に返す",
       "doneTitle": "完了しました。{{name}}へのメモはありますか？",
       "backLabel": "{{name}}へのメモ",
-      "backPlaceholder": "任意: {{name}}に伝えておくことはありますか？"
+      "backPlaceholder": "任意: {{name}}に伝えておくことはありますか？",
+      "addNote": "メモを残す"
     },
     "now": {
       "ready": "{{computer}}で準備完了",
@@ -12730,6 +12731,7 @@
     "takeover": "操作を代わる",
     "takeBrowser": "ブラウザを操作する",
     "taking": "操作を切り替え中…",
+    "returning": "{{name}}に返しています…",
     "clipboard": {
       "got": "{{name}}のコンピューターでコピーされた内容:",
       "copy": "コピー",

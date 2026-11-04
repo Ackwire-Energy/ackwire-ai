@@ -19,6 +19,7 @@ import {
   framePoint,
   handoffFuse,
   handoffTimeLeft,
+  handoffWantsWords,
   jpegSize,
   keyboardEvents,
   keyEvents,
@@ -834,5 +835,20 @@ describe("the frame's real size", () => {
       x: 640,
       y: 288,
     });
+  });
+});
+
+describe("handoffWantsWords", () => {
+  test("a request that asks the person something, or to tell it something, opens the hand back with its note", () => {
+    const ask = (instructions: string) => handoffWantsWords({ kind: "ask", instructions });
+    expect(ask("Entrar no painel com a conta de teste")).toBe(false);
+    expect(ask("Faça login no Stripe. Qual plano aparece?")).toBe(true);
+    expect(ask("Entre no banco e me diga o saldo")).toBe(true);
+    expect(ask("Sign in and let me know which plan shows")).toBe(true);
+    expect(ask("Inicia sesión y dime el código")).toBe(true);
+    expect(ask("ログインしてください。どのプランですか？")).toBe(true);
+    // The person's own take over asked nothing.
+    expect(handoffWantsWords({ kind: "takeover", instructions: "Qual?" })).toBe(false);
+    expect(handoffWantsWords(null)).toBe(false);
   });
 });

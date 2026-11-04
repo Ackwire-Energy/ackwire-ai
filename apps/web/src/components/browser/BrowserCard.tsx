@@ -16,6 +16,7 @@ import {
   dragEvent,
   frameMetadata,
   HELD_STALE_MS,
+  handoffWantsWords,
   isHeldTakeover,
   isOpenHandoff,
   keyboardEvents,
@@ -52,7 +53,6 @@ import {
   Icon,
   type IconName,
   isApple,
-  onScreenKeyboard,
   onScreenNow,
   PixelSpinner,
   SkyStrip,
@@ -67,6 +67,7 @@ import {
   type PointerEvent,
   type ReactNode,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -79,6 +80,7 @@ import { pastes } from "@/lib/keys";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
 import { AgentWho } from "../AgentAvatar";
+import { AskActions, HandBackFoot, useAskControl } from "../computer/control";
 import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { PASTE_MAX_BYTES, pasteBytes } from "../desktop/paste";
@@ -283,10 +285,11 @@ export function Cover({
   help,
   action,
   className,
-  onDismiss,
+  clear,
 }: {
   className?: string;
-  onDismiss?: () => void;
+  /** Dimmed, not frosted: the picture under it stays in sight (a switch between watching and control, a question). */
+  clear?: boolean;
   icon?: IconName;
   /** A picture over the words instead of the icon (the computer's portrait). */
   art?: ReactNode;
@@ -300,12 +303,7 @@ export function Cover({
 }) {
   const box = useRef<HTMLSpanElement>(null);
   return (
-    <div
-      className={cx("brw-dim", sky && "brw-dim--sky", className)}
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onDismiss?.();
-      }}
-    >
+    <div className={cx("brw-dim", sky && "brw-dim--sky", clear && "is-clear", className)}>
       {sky && <ComputerSky color={color} clear={() => [box.current]} />}
       <span className="brw-dim__box" role="status" ref={box}>
         {art}
@@ -454,7 +452,6 @@ export function BrowserCard({
   const [note, setNote] = useState("");
   const [handingBack, setHandingBack] = useState(false);
   const [backNote, setBackNote] = useState("");
-  const backRef = useRef<HTMLTextAreaElement>(null);
   const [confirmStop, setConfirmStop] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   // On touch the text bar types into the page; a mouse and keyboard type into it directly (`onPageKey`).
@@ -696,9 +693,25 @@ export function BrowserCard({
     fingers.cancel();
     setSliding(false);
   }, [pointing, fingers]);
+  // The screen's last picture, when the dialog switches from it to this page (or back), shows dimmed until the page's
+  // first frame: the layout effects of the view going and of the one coming run before anything paints
+  // (`DialogHeadSlots.picture`).
+  const kept = head?.picture;
+  const [keptSrc, setKeptSrc] = useState<string | null>(null);
+  const leaving = useRef({ still, inControl });
+  leaving.current = { still, inControl };
+  useLayoutEffect(() => {
+    if (!kept) return;
+    if (kept.current && kept.current.control !== leaving.current.inControl) setKeptSrc(kept.current.src);
+    kept.current = null;
+    return () => {
+      const { still: last, inControl: control } = leaving.current;
+      kept.current = last ? { src: `data:image/jpeg;base64,${last.data}`, control } : null;
+    };
+  }, [kept]);
   useEffect(() => {
-    if (handingBack) backRef.current?.focus();
-  }, [handingBack]);
+    if (live.frame) setKeptSrc(null);
+  }, [live.frame]);
 
   const onPageKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!inControl) return;
@@ -852,6 +865,22 @@ export function BrowserCard({
     if (mayDrive && !profile) actions.restart.mutate(agentId, { onError: didntWork, onSettled: () => live.retry() });
     else live.retry();
   };
+
+  // Handing back or taking, the last picture stays in sight, dimmed under what is happening: never a cold cover.
+  const switchingTo =
+    actions.takeover.isPending || profileActions.takeover.isPending
+      ? t("desktop.taking")
+      : actions.done.isPending
+        ? t("desktop.returning", g)
+        : keptSrc && starting
+          ? inControl
+            ? t("desktop.taking")
+            : t("desktop.returning", g)
+          : null;
+  // Watching in the dialog, a click, a key or a paste on the page asks before control (`useAskControl`).
+  const asking = useAskControl(
+    surface && canTakeOver && !inControl && !otherInControl && Boolean(frame) && !blocker && !switchingTo,
+  );
 
   // The agent's own request is open and mine: its card (under the request) is the control, not this one.
   if (!given && handoff?.kind === "ask" && inControl) return null;
@@ -1097,40 +1126,69 @@ export function BrowserCard({
       <span>{withAgentFace(sub, name, agentId)}</span>
     </small>
   );
-  const cover = profileWait ? (
-    <ProfileWaitCover wait={profileWait} waiter={{ agentId, name }} />
-  ) : blocker ? (
-    <Cover color={color} text={blocker} />
-  ) : hidden ? (
-    // Its head says who is in control.
-    <Cover color={color} icon="eyeOff" text={t("browser.inCard.hiddenHelp", g)} />
-  ) : closed ? (
-    <Cover
-      color={color}
-      sky
-      icon="globe"
-      text={t("browser.inCard.closed", g)}
-      help={inControl ? t("browser.inCard.closedControl") : t("browser.inCard.closedHelp", g)}
-    />
-  ) : stuck ? (
-    <Cover
-      color={color}
-      icon="alert"
-      text={t("browser.inCard.stuck", g)}
-      help={mayDrive ? t("browser.inCard.stuckHelp") : undefined}
-      action={
-        <Button size="sm" icon="refresh" loading={actions.restart.isPending} onClick={retry}>
-          {t("common.retry")}
-        </Button>
-      }
-    />
-  ) : opening ? (
-    <Cover color={color} spinner text={t("browser.inCard.goOpening", { site: waitingFor?.site ?? "" })} />
-  ) : reconnecting ? (
-    <Cover color={color} spinner text={t("browser.live.reconnecting")} help={t("browser.inCard.reconnectHelp", g)} />
-  ) : starting ? (
-    <Cover color={color} spinner text={t("browser.inCard.openingLong", g)} help={t("browser.inCard.openingHelp")} />
-  ) : null;
+  const cover =
+    switchingTo && (src || keptSrc) ? (
+      <Cover clear color={color} spinner text={switchingTo} />
+    ) : asking.asking ? (
+      <Cover
+        className="dsk-ask"
+        clear
+        color={color}
+        icon={mayDrive ? "person" : "eye"}
+        text={t(mayDrive ? "desktop.ask.title" : "desktop.ask.watching")}
+        action={
+          <AskActions
+            onCancel={asking.cancel}
+            take={
+              mayDrive && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon="person"
+                  loading={actions.takeover.isPending}
+                  onClick={takeover}
+                >
+                  {t("desktop.takeover")}
+                </Button>
+              )
+            }
+          />
+        }
+      />
+    ) : profileWait ? (
+      <ProfileWaitCover wait={profileWait} waiter={{ agentId, name }} />
+    ) : blocker ? (
+      <Cover color={color} text={blocker} />
+    ) : hidden ? (
+      // Its head says who is in control.
+      <Cover color={color} icon="eyeOff" text={t("browser.inCard.hiddenHelp", g)} />
+    ) : closed ? (
+      <Cover
+        color={color}
+        sky
+        icon="globe"
+        text={t("browser.inCard.closed", g)}
+        help={inControl ? t("browser.inCard.closedControl") : t("browser.inCard.closedHelp", g)}
+      />
+    ) : stuck ? (
+      <Cover
+        color={color}
+        icon="alert"
+        text={t("browser.inCard.stuck", g)}
+        help={mayDrive ? t("browser.inCard.stuckHelp") : undefined}
+        action={
+          <Button size="sm" icon="refresh" loading={actions.restart.isPending} onClick={retry}>
+            {t("common.retry")}
+          </Button>
+        }
+      />
+    ) : opening ? (
+      <Cover color={color} spinner text={t("browser.inCard.goOpening", { site: waitingFor?.site ?? "" })} />
+    ) : reconnecting ? (
+      <Cover color={color} spinner text={t("browser.live.reconnecting")} help={t("browser.inCard.reconnectHelp", g)} />
+    ) : starting ? (
+      <Cover color={color} spinner text={t("browser.inCard.openingLong", g)} help={t("browser.inCard.openingHelp")} />
+    ) : null;
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
@@ -1262,7 +1320,7 @@ export function BrowserCard({
         />
       )}
       <div className={showLog ? "brw-ac__body brw-ac__body--split" : "brw-ac__body"}>
-        <div className="brw-ac__stage">
+        <div className="brw-ac__stage" {...asking.stage}>
           {src ? (
             // biome-ignore lint/a11y/noStaticElementInteractions: the page takes the person's keys while in control
             <div
@@ -1293,6 +1351,10 @@ export function BrowserCard({
                   {sliding ? t("browser.inCard.touchHint") : t("browser.inCard.scrollHint")}
                 </span>
               )}
+            </div>
+          ) : keptSrc ? (
+            <div className="brw-ac__page" aria-hidden="true">
+              <img src={keptSrc} alt="" draggable={false} />
             </div>
           ) : (
             <div className="brw-ac__page brw-ac__page--blank" aria-hidden="true">
@@ -1363,52 +1425,22 @@ export function BrowserCard({
             </div>
           </div>
         ) : handingBack ? (
-          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own, on one line that
-          // grows as it wraps (`.brw-ac__note`), so all of it stays in sight. Enter hands back as in the chat:
-          // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
-          <div className="brw-ac__foot brw-ac__fail">
-            <b>
-              {profile
+          <HandBackFoot
+            title={
+              profile
                 ? t("browser.profiles.backTitle", { name: profile.name })
                 : handoff?.kind === "ask"
                   ? t("browser.inCard.doneTitle", g)
-                  : t("browser.inCard.backTitle", g)}
-            </b>
-            {!profile && (
-              <Textarea
-                rows={1}
-                autoGrow
-                className="brw-ac__note"
-                ref={backRef}
-                value={backNote}
-                onChange={(e) => setBackNote(e.target.value)}
-                placeholder={t("browser.inCard.backPlaceholder", g)}
-                aria-label={t("browser.inCard.backLabel", g)}
-                maxLength={1000}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setHandingBack(false);
-                  if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
-                  e.preventDefault();
-                  finish();
-                }}
-              />
-            )}
-            <div className="brw-ac__row">
-              <span className="brw-grow" />
-              <Button size="sm" variant="ghost" onClick={() => setHandingBack(false)}>
-                {t("browser.live.back")}
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                icon="check"
-                loading={profile ? profileActions.handback.isPending : actions.done.isPending}
-                onClick={finish}
-              >
-                {handBackLabel}
-              </Button>
-            </div>
-          </div>
+                  : t("browser.inCard.backTitle", g)
+            }
+            label={handBackLabel}
+            grammar={g}
+            {...(profile ? {} : { note: backNote, onNote: setBackNote })}
+            noteFirst={handoffWantsWords(handoff)}
+            pending={profile ? profileActions.handback.isPending : actions.done.isPending}
+            onBack={finish}
+            onCancel={() => setHandingBack(false)}
+          />
         ) : touch ? (
           // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, a site, send.
           <div className="brw-ac__foot brw-type">
