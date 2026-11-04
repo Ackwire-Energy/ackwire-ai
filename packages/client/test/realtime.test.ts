@@ -415,6 +415,12 @@ describe("live agent runs (streaming)", () => {
     expect(text(whole)).toBe("Vou olhar o log e já volto.");
     whole = reconcileRuns(whole, "c1", active({ turn: 2, at: 0, text: "Antes" }));
     expect(text(whole)).toBe("Vou olhar o log e já volto.");
+    // Failed after the list was read: the late list never brings it back to life.
+    let stopped = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
+    stopped = applyChannelEvent(stopped, { type: "run.finished", ...base, status: "failed", error: "gave_up" });
+    expect(stopped.runs.r1?.status).toBe("failed");
+    stopped = reconcileRuns(stopped, "c1", active({ turn: 2, at: 0, text: "O bot" }));
+    expect(stopped.runs.r1).toMatchObject({ status: "failed", text: "" });
     // No text on the server (another replica, or between calls): the waiting row, as before.
     expect(reconcileRuns(emptyStreams, "c1", active()).runs.r1).toMatchObject({ status: "thinking", text: "" });
   });

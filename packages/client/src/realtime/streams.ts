@@ -864,6 +864,8 @@ export function reconcileRuns(
  * keeps its own.
  */
 function caughtUp(r: LiveRun, live: NonNullable<ActiveRun["live"]>): LiveRun {
+  // A failed or canceled row heard after the list was read stays as it is: the list is older than its end.
+  if (r.status === "failed" || r.status === "canceled") return r;
   if (r.turn !== undefined && (r.turn > live.turn || (r.turn === live.turn && !r.gap))) return r;
   let text = live.text;
   let end = live.at + text.length;
