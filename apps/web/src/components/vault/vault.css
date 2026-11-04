@@ -181,17 +181,24 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   margin-right: auto;
 }
 /* Its icon in the access lines' column (`.vlt-access__lead`), so the scope's words start where theirs do. */
+/* The icon on the name's line, at the top, not halfway down the two lines. */
 .vlt-scope {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   font-size: 14px;
+}
+.vlt-scope > .vlt-access__lead {
+  height: 20px;
 }
 .vlt-scope__text {
   display: flex;
   flex-direction: column;
   gap: 1px;
   font-size: 14px;
+}
+.vlt-scope__text b {
+  line-height: 20px;
 }
 .vlt-scope__text small {
   font-size: 12.5px;
@@ -329,12 +336,12 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   flex-direction: column;
   gap: 12px;
 }
-/* The icon in a column of its own across both rows; what it is, with Edit at its end; then who, the whole width
-   under it, so a summary like "Everyone in the workspace" stays on one line in the narrow aside. */
+/* The icon in a column of its own, on the top row with what it is (Edit at its end); then who, under it, so a
+   summary like "Everyone in the workspace" stays on one line in the narrow aside. */
 .vlt-access__line {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) auto;
-  grid-template-areas: "lead label edit" "lead value value";
+  grid-template-areas: "lead label edit" ". value value";
   align-items: center;
   column-gap: 10px;
   row-gap: 4px;
@@ -344,6 +351,7 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   grid-area: lead;
   flex: none;
   display: flex;
+  align-items: center;
   justify-content: center;
   width: 24px;
   color: var(--ink2);
