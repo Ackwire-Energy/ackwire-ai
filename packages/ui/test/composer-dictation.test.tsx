@@ -7,7 +7,13 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react";
 import { Composer } from "../src/components/Composer";
 
-afterEach(() => cleanup());
+// The DOM is one window for every test file: put the browser's clipboard back for the files after this one.
+const browserClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+afterEach(() => {
+  cleanup();
+  if (browserClipboard) Object.defineProperty(navigator, "clipboard", browserClipboard);
+  else Reflect.deleteProperty(navigator, "clipboard");
+});
 
 // Dictation apps (Wispr Flow and the like) put the words on the clipboard, press ⌘V for the person and put the old
 // clipboard back a moment later; others insert through the accessibility API, an input with no key pressed.

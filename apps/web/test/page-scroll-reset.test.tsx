@@ -20,7 +20,11 @@ afterEach(() => cleanup());
 // Two settings sections in one route and a page of its own, each in the app's page column, routed like main.tsx.
 async function app() {
   const root = createRootRoute({ component: Outlet });
-  const page = () => <main className="shell__main" />;
+  const page = () => (
+    <main className="shell__main">
+      <h2 id="jev">Jev</h2>
+    </main>
+  );
   const section = createRoute({ getParentRoute: () => root, path: "settings/$section", component: page });
   const drive = createRoute({
     getParentRoute: () => root,
@@ -75,5 +79,21 @@ describe("page column scroll", () => {
     scroll(300);
     await go(() => router.history.replace("/drive?open=x"));
     expect(column().scrollTop).toBe(300);
+  });
+
+  test("a link to an anchor in another section still lands on it", async () => {
+    const { router, scroll, go } = await app();
+    scroll(500);
+    const landed: string[] = [];
+    const into = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
+      landed.push(this.id);
+    };
+    try {
+      await go(() => router.history.push("/settings/ai#jev"));
+    } finally {
+      HTMLElement.prototype.scrollIntoView = into;
+    }
+    expect(landed).toEqual(["jev"]);
   });
 });
