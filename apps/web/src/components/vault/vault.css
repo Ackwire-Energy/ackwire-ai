@@ -361,9 +361,12 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   gap: 6px;
   min-width: 0;
 }
-.vlt-access__value > span {
+/* One line: in the dialog's narrow aside a long summary ends in "…" (the whole of it on hover) instead of breaking. */
+.vlt-access__value > span:last-child {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .vlt-access__sentence {
   margin: 0;

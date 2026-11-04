@@ -286,7 +286,7 @@ function AccessLine({
         <b>{label}</b>
         <span className="vlt-access__value">
           {faces}
-          <span>{value}</span>
+          <span title={value}>{value}</span>
         </span>
       </span>
       {onEdit && (
@@ -342,7 +342,8 @@ export function AccessBlock({
       )}
       <AccessLine
         icon="agent"
-        faces={<AgentFaces access={access} />}
+        // The line's own icon says agents: faces only for the agents chosen, no second icon for all of them.
+        faces={access.allAgents ? undefined : <AgentFaces access={access} />}
         label={agentsLabel}
         value={agentsSummary(t, i18n.language, dir, access)}
         editLabel={t("vault.access.editOf", { what: agentsLabel })}
