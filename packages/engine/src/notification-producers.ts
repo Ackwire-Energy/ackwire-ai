@@ -45,6 +45,7 @@ const {
   messageReactions,
   machines,
   approvals,
+  notifications,
 } = schema;
 
 type ApprovalRow = typeof schema.approvals.$inferSelect;
@@ -527,6 +528,39 @@ export async function resolveApprovalNotifications(
     const next = waiting.find((_, i) => deciders[i]?.has(userId));
     return next ? { source: { approvalId: next.id }, latest: approvalLatest(next) } : null;
   });
+}
+
+/**
+ * `userId`'s cover started, changed or ended, or they went out of office or came back (ADR 0139): the approvals
+ * waiting that they are asked personally reach whoever is asked now, and leave whoever isn't any more.
+ */
+export async function rerouteApprovals(deps: NotificationDeps, orgId: string, userId: string) {
+  const rows = await deps.db
+    .select()
+    .from(approvals)
+    .where(
+      and(
+        eq(approvals.orgId, orgId),
+        eq(approvals.status, "pending"),
+        sql`(${approvals.ownerUserId} = ${userId} or ${approvals.approvers} -> 'userIds' @> to_jsonb(${userId}::text))`,
+      ),
+    );
+  for (const row of rows) {
+    await resolveApprovalNotifications(deps, row);
+    const holding = await deps.db
+      .select({ userId: notifications.userId })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.orgId, orgId),
+          eq(notifications.groupKey, approvalGroupKey(row)),
+          isNull(notifications.doneAt),
+        ),
+      );
+    const held = new Set(holding.map((h) => h.userId));
+    const newcomers = (await approverIds(deps.db, row)).filter((id) => !held.has(id));
+    if (newcomers.length > 0) await notifyApproval(deps, row, newcomers);
+  }
 }
 
 // ── Issues ────────────────────────────────────────────────────────────────────
@@ -1308,6 +1342,25 @@ export async function notifyComputerNoChrome(
 }
 
 /**
+ * Someone other than its owner took control of an agent's desktop (ADR 0059 §8): the owner hears it in the inbox
+ * only, once a day per agent (`desktop_taken:{agentId}:{UTC day}`), since an admin may do so even while the agent
+ * thinks with the owner's plan.
+ */
+export async function notifyDesktopTaken(
+  deps: NotificationDeps,
+  input: { orgId: string; agentId: string; agentName: string; ownerUserId: string; actorId: string; at: Date },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [input.ownerUserId],
+    kind: "desktop_taken",
+    groupKey: `desktop_taken:${input.agentId}:${input.at.toISOString().slice(0, 10)}`,
+    actor: { type: "user", id: input.actorId },
+    source: { agentId: input.agentId, screen: "desktop", label: input.agentName },
+  });
+}
+
+/**
  * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
  * from seconds to an approval hours later. One row each time it gets ready.
  */
@@ -1472,14 +1525,41 @@ export const resolveAgentHold = (deps: NotificationDeps, orgId: string, agentId:
 
 // ── Agent browser (ADR 0040) ──────────────────────────────────────────────────
 
-/** Who an agent's browser handoff is asked of: the person behind the run, else the agent's owner. */
+/**
+ * Who an agent's browser handoff is asked of: the person behind the run, else the agent's owner, the first whose
+ * roles give them the agents' browsers (`own_browsers`); null: nobody in particular.
+ */
 export async function browserHandoffRecipient(
   deps: Pick<NotificationDeps, "db">,
   orgId: string,
   runId: string | null,
   agentId: string,
 ) {
-  return (await requesterOfRun(deps, orgId, runId)) ?? (await agentOwner(deps, agentId));
+  const asked = [await requesterOfRun(deps, orgId, runId), await agentOwner(deps, agentId)];
+  const may = await mayOf(deps, orgId, asked, "own_browsers");
+  return asked.find((id) => id && may.includes(id)) ?? null;
+}
+
+/** Those of `userIds` who may `permission` in the organization (ADR 0085). */
+async function mayOf(
+  deps: Pick<NotificationDeps, "db">,
+  orgId: string,
+  userIds: (string | null)[],
+  permission: RolePermission,
+) {
+  const ids = userIds.filter((id): id is string => !!id);
+  if (ids.length === 0) return [];
+  const rows = await deps.db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(
+      and(
+        eq(organizationMembers.orgId, orgId),
+        inArray(organizationMembers.userId, ids),
+        maySql(orgId, organizationMembers.userId, permission),
+      ),
+    );
+  return rows.map((r) => r.userId);
 }
 
 /**
@@ -1495,10 +1575,13 @@ export async function notifyBrowserHandoff(
   where: { channelId: string; threadId: string | null },
   to?: string[],
 ) {
-  // Who asked for the work and the agent's responsible person (once when it's the same person).
-  const userIds = [...new Set(to ?? [h.requestedForUserId, await agentOwner(deps, h.agentId)])].filter(
-    (id): id is string => !!id,
-  );
+  // Who asked for the work and the agent's responsible person (once when it's the same person), if their roles
+  // give them the agents' browsers.
+  const userIds = [
+    ...new Set(
+      to ?? (await mayOf(deps, h.orgId, [h.requestedForUserId, await agentOwner(deps, h.agentId)], "own_browsers")),
+    ),
+  ];
   if (userIds.length === 0) return;
   const [channel] = await deps.db
     .select({ kind: channels.kind, name: channels.name })

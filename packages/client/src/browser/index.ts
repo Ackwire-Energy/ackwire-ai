@@ -3,8 +3,9 @@ import type { TFunction } from "i18next";
 import { useEffect, useState } from "react";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, ScreenKind } from "../api/types";
+import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, PageTarget, ScreenKind } from "../api/types";
 import { timeLeft } from "../lib/format";
+import { can } from "../lib/permissions";
 import { isBlankPage } from "../lib/sites";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
@@ -45,6 +46,16 @@ export const isOpenHandoff = (h: Pick<BrowserHandoff, "status">) => h.status ===
 /** Which screen a handoff is on (servers older than screens name none: the browser). */
 export const handoffScreen = (h: Pick<BrowserHandoff, "screen">): ScreenKind => h.screen ?? "browser";
 
+/**
+ * The agent's request asks the person something, or to tell it something: handing back opens with the note. A question
+ * mark in any script, or "tell me", "let me know" and their like.
+ * ponytail: a few cue phrases in the most used languages, a server-side flag on the request if this misses too often.
+ */
+const ASKS_WORDS =
+  /[?？؟]|\b(tell|let) me\b|\bme (diga|diz|fala|conta|avise|informe|passe|mande)\b|\b(dime|cu[eé]ntame|av[ií]same|dis-moi|sag mir)\b/i;
+export const handoffWantsWords = (h: Pick<BrowserHandoff, "kind" | "instructions"> | null | undefined): boolean =>
+  h?.kind === "ask" && ASKS_WORDS.test(h.instructions);
+
 /** Waiting for someone to open it, not yet expired. */
 export function isWaitingHandoff(h: Pick<BrowserHandoff, "status" | "expiresAt">, now = Date.now()): boolean {
   if (h.status !== "pending") return false;
@@ -55,17 +66,22 @@ export function isWaitingHandoff(h: Pick<BrowserHandoff, "status" | "expiresAt">
  * Whether a waiting request is this person's to answer (its card says it waits for you, the bar above the
  * composer brings it back, its buttons show): the person it was asked of and the agent's responsible person,
  * who are both notified. Asked of no one in particular (no one behind the run and no responsible person, or a
- * desktop several people may drive), it is for whoever may control computers. The server checks again when
- * they open it (ADR 0040 §6, ADR 0058 §4).
+ * desktop several people may drive), it is for whoever may control every agent's screen (`control_browsers`; a
+ * desktop `control_computers`). Whose roles don't give them that screen at all (`own_browsers`, `own_computers`)
+ * answers none. The server checks again when they open it (ADR 0040 §6, ADR 0058 §4).
  */
 export function handoffIsMine(
-  h: Pick<BrowserHandoff, "requestedForUserId">,
+  h: Pick<BrowserHandoff, "requestedForUserId" | "screen">,
   meId: string,
   ownerUserId: string | null | undefined,
-  mayControlComputers: boolean,
+  org: Parameters<typeof can>[0],
 ): boolean {
+  const full = handoffScreen(h) === "desktop";
+  if (!can(org, full ? "own_computers" : "own_browsers")) return false;
   if (ownerUserId && ownerUserId === meId) return true;
-  return h.requestedForUserId ? h.requestedForUserId === meId : mayControlComputers;
+  return h.requestedForUserId
+    ? h.requestedForUserId === meId
+    : can(org, full ? "control_computers" : "control_browsers");
 }
 
 /** The time a waiting request has left ("24 h", "45 min"); null without a deadline or once it passed. */
@@ -300,10 +316,10 @@ export interface DoneInput {
   note?: string;
 }
 
-/** A site the person in control opens in the agent's browser (a bare host gets https://). */
+/** A site the person in control opens in the agent's browser (a bare host gets https://), or an arrow. */
 export interface OpenPageInput {
   agentId: string;
-  url: string;
+  url: PageTarget;
 }
 
 /**

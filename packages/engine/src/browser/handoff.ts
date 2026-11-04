@@ -21,6 +21,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { recordAudit } from "../audit";
 import { isChannelMember } from "../channels";
 import { answersAgentsOnly } from "../consultations";
 import { openPersonAgentDm } from "../dms";
@@ -28,13 +29,22 @@ import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, Valida
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { formatDuration } from "../machine-tasks";
-import { computerDrivers, drivesComputer, getMachine, requireComputerDriver, servesDesktops } from "../machines";
+import {
+  computerDrivers,
+  drivesComputer,
+  getMachine,
+  mayDriveComputer,
+  requireComputerDriver,
+  servesDesktops,
+} from "../machines";
+import { appPageLink, namesOwnApp } from "../message-links";
 import { insertMessage, messageView } from "../messages";
 import { missionOfRun } from "../mission-context";
 import {
   browserHandoffRecipient,
   humanBehindRun,
   notifyBrowserHandoff,
+  notifyDesktopTaken,
   remindBrowserHandoffNotifications,
   resolveBrowserHandoffNotifications,
 } from "../notification-producers";
@@ -306,6 +316,65 @@ function noteControl(deps: HandoffDeps, row: BrowserHandoffRow) {
   );
 }
 
+/**
+ * Someone other than the agent's owner took control of its desktop (ADR 0059 §8: an admin may, even while the agent
+ * thinks with the owner's plan, so could read that sign-in there): audited (who, which agent, when), and the owner
+ * hears it quietly.
+ */
+async function noteDesktopTaken(deps: HandoffDeps, row: BrowserHandoffRow) {
+  if (!row.controllerUserId) return;
+  // The browser's handoff puts who may drive the computer on the whole screen its window is on (`streamAccess`).
+  if (
+    row.screen !== "desktop" &&
+    !(
+      (await browserOnDesktop(deps.db, row.orgId, row.agentId, row.machineId)) &&
+      (await mayDriveComputer(deps.db, row.controllerUserId, row.orgId, row.agentId))
+    )
+  ) {
+    return;
+  }
+  await noteComputerTaken(deps, {
+    orgId: row.orgId,
+    agentId: row.agentId,
+    actorId: row.controllerUserId,
+    audit: { machineId: row.machineId, handoffId: row.id },
+  });
+}
+
+/**
+ * Someone other than the agent's owner got its screen or a shell as its OS user: the owner's quiet notice and, with
+ * `audit`, the `desktop.control_taken` row. A terminal passes none: its stream is audited when it closes
+ * (`terminal.session`).
+ */
+export async function noteComputerTaken(
+  deps: HandoffDeps,
+  input: { orgId: string; agentId: string; actorId: string; audit?: Record<string, unknown> },
+) {
+  const [agent] = await deps.db
+    .select({ owner: agents.ownerUserId, name: agents.name, handle: agents.handle })
+    .from(agents)
+    .where(and(eq(agents.id, input.agentId), eq(agents.orgId, input.orgId)));
+  if (!agent || agent.owner === input.actorId) return;
+  if (input.audit) {
+    await recordAudit(deps.db, {
+      orgId: input.orgId,
+      actor: { type: "person", id: input.actorId },
+      action: "desktop.control_taken",
+      target: { type: "agent", id: input.agentId },
+      details: input.audit,
+    });
+  }
+  if (!agent.owner) return;
+  await notifyDesktopTaken(deps, {
+    orgId: input.orgId,
+    agentId: input.agentId,
+    agentName: agent.name || agent.handle,
+    ownerUserId: agent.owner,
+    actorId: input.actorId,
+    at: new Date(),
+  }).catch(() => {});
+}
+
 /** Control ended: the page it ended on (best effort). */
 async function noteControlEnded(deps: HandoffDeps, row: BrowserHandoffRow) {
   if (!row.controllerUserId || !deps.live?.page) return;
@@ -343,14 +412,38 @@ async function handoffFacts(
 // ── Access ────────────────────────────────────────────────────────────────────
 
 /**
- * Who may watch an agent's screen, and see its handoffs (driving it: `requireBrowserControl`): org admins,
- * the agent's responsible person, the person a handoff was asked of, and the
- * person behind the work (who asked for the run waiting on it, or for one of
- * the agent's runs going on now). Not everyone who can read a channel: the
- * screen shows all of the agent's work, DMs included. A desktop also to whoever
- * may drive its computer (`drivesComputer`): they can see all of it anyway.
+ * Who may watch an agent's screen, and see its handoffs (driving it: `requireBrowserControl`): org admins of that
+ * screen (`control_browsers`; the desktop `control_computers`), and, with the same screen's `own_*` key, the agent's
+ * responsible person, the person a handoff was asked of, and the person behind the work (who asked for the run
+ * waiting on it, or for one of the agent's runs going on now). Not everyone who can read a channel: the screen shows
+ * all of the agent's work, DMs included. A desktop also to whoever may drive its computer (`drivesComputer`): they
+ * can see all of it anyway. `level`: refused only for the key (`screenAccess`).
  */
 export async function requireBrowserAccess(
+  db: Database,
+  userId: string,
+  orgId: string,
+  agentId: string,
+  handoff?: BrowserHandoffRow | null,
+  screen: ScreenKind = "browser",
+) {
+  const { access, refusal } = await screenAccess(db, userId, orgId, agentId, handoff, screen);
+  if (refusal === "level") {
+    throw new ForbiddenError(
+      screen === "desktop"
+        ? "Your roles give you the agents' browsers, not their whole computer"
+        : "Your roles don't give you the agents' computers",
+    );
+  }
+  if (refusal) throw new ForbiddenError(`You can't use this agent's ${SCREENS[screen].what}`);
+  return access;
+}
+
+/**
+ * `requireBrowserAccess` without throwing on a refusal: `level` when the person would see this screen but their
+ * roles don't give them it (no `own_*` key; an admin of browsers on a desktop), `none` otherwise.
+ */
+export async function screenAccess(
   db: Database,
   userId: string,
   orgId: string,
@@ -367,11 +460,28 @@ export async function requireBrowserAccess(
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   if (!agent) throw new NotFoundError("Agent not found");
-  const admin = can(membership, "control_computers");
+  const full = screen === "desktop";
+  const admin = can(membership, full ? "control_computers" : "control_browsers");
   const access = { ...agent, admin };
-  if (admin || agent.owner === userId) return access;
+  if (admin) return { access, refusal: null };
+  const theirs = await seesScreenAsTheirs(db, userId, orgId, agentId, agent, handoff, screen);
+  if (theirs && can(membership, full ? "own_computers" : "own_browsers")) return { access, refusal: null };
+  return { access, refusal: theirs || (full && can(membership, "control_browsers")) ? "level" : "none" } as const;
+}
+
+/** Whether the agent's screen is this person's to see, keys aside (`requireBrowserAccess`). */
+async function seesScreenAsTheirs(
+  db: Database,
+  userId: string,
+  orgId: string,
+  agentId: string,
+  agent: { owner: string | null; machineId: string | null },
+  handoff: BrowserHandoffRow | null | undefined,
+  screen: ScreenKind,
+) {
+  if (agent.owner === userId) return true;
   const open = handoff === undefined ? await openHandoffOf(db, orgId, agentId, screen) : handoff;
-  if (open?.requestedForUserId === userId) return access;
+  if (open?.requestedForUserId === userId) return true;
   const runs = open?.runId
     ? [open.runId]
     : (
@@ -391,14 +501,14 @@ export async function requireBrowserAccess(
   for (const runId of runs) {
     // A run consulted for someone outside the agent's audience has nobody behind it for its screen.
     if ((await humanBehindRun({ db }, orgId, runId)) === userId && !(await answersAgentsOnly(db, orgId, runId))) {
-      return access;
+      return true;
     }
   }
   if (screen === "desktop" && agent.machineId) {
     const machine = await getMachine(db, orgId, agent.machineId);
-    if (machine && drivesComputer(machine, { userId, admin, owner: false })) return access;
+    if (machine && drivesComputer(machine, { userId, admin: false, own: true, owner: false })) return true;
   }
-  throw new ForbiddenError(`You can't use this agent's ${SCREENS[screen].what}`);
+  return false;
 }
 
 /**
@@ -422,7 +532,8 @@ export async function requireBrowserControl(
   if (open && OPEN.includes(open.status) && open.requestedForUserId === userId) return access;
   if (screen === "desktop" && access.machineId) {
     const machine = await getMachine(db, orgId, access.machineId);
-    if (machine && drivesComputer(machine, { userId, admin: false, owner: false })) return access;
+    // `requireBrowserAccess` checked the desktop's key.
+    if (machine && drivesComputer(machine, { userId, admin: false, own: true, owner: false })) return access;
   }
   throw new ForbiddenError(
     `Only an admin, the agent's owner or the person it asked can control its ${SCREENS[screen].what}`,
@@ -674,6 +785,28 @@ async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow, movedFrom?
  * (`data.pause`) until they press Done or Couldn't, or it expires. The
  * agent then reads the page again and checks.
  */
+/**
+ * Why a hand-off to our own app is refused (ADR 0137 amendment): the agent already works inside it, so a person
+ * never signs it in on its computer. What it changes goes through its tools and cards, else a link to the page.
+ */
+export const ownAppRefusal = (orgId: string) =>
+  `Nothing was asked: that is agentes.chat itself, the app you work in. Never sign in to it on your computer, nor ask a person to. Change the workspace with your own tools, which post cards a person applies as themselves (propose_remove_agents archives or deletes agents, propose_agent creates them, propose_settings_change, offer_invites, offer_connect_app; find_tools finds them). When no tool does it, send the person the link to the page instead: the team ${appPageLink(orgId, "/team")}, settings ${appPageLink(orgId, "/settings/members")} (or /settings/roles, /settings/connectors, /settings/computers, /settings/usage, /settings/keys).`;
+
+/** The address the agent's browser shows, as its computer says (short: it runs before a person is asked). */
+async function browserUrl(hub: MachineCaller, machineId: string, agent: { id: string; handle: string }) {
+  try {
+    const reply = await hub.call<"browser.act">(
+      machineId,
+      { op: "browser.act", agent, command: "get", args: ["url"], timeoutSeconds: 3 },
+      { timeoutMs: 4000 },
+    );
+    const data = reply.success ? (reply.data as { url?: unknown } | null) : null;
+    return typeof data?.url === "string" ? data.url : null;
+  } catch {
+    return null;
+  }
+}
+
 export function createBrowserHandoffToolSource(
   deps: { pubsub?: PubSub; machines?: { hub: MachineCaller } } = {},
 ): ToolSource {
@@ -708,6 +841,7 @@ export function createBrowserHandoffToolSource(
     const s = SCREENS[screen];
     const instructions = String(input.instructions ?? "").trim();
     if (!instructions) return { content: "Say what the person should do.", isError: true };
+    if (namesOwnApp(instructions)) return { content: ownAppRefusal(ctx.orgId), isError: true };
     const minutes =
       typeof input.timeout_minutes === "number"
         ? Math.min(HANDOFF_TIMEOUT_MAX_MINUTES, Math.max(1, Math.floor(input.timeout_minutes)))
@@ -728,6 +862,11 @@ export function createBrowserHandoffToolSource(
         content: `Your computer ${place.name} is offline, so no one can use your ${s.what} now. Say so in your reply.`,
         isError: true,
       };
+    }
+    if (screen === "browser" && hub) {
+      const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+      const url = agent && (await browserUrl(hub, place.machineId, { id: agent.id, handle: agent.handle }));
+      if (url && namesOwnApp(url)) return { content: ownAppRefusal(ctx.orgId), isError: true };
     }
     const [run] = await ctx.db
       .select()
@@ -990,6 +1129,7 @@ export async function claimHandoff(deps: HandoffDeps, actorId: string, orgId: st
   await syncCard(deps.db, row);
   noteControl(deps, row);
   await afterChange(deps, row);
+  await noteDesktopTaken(deps, row);
   return handoffView(row);
 }
 
@@ -1162,6 +1302,7 @@ export async function startTakeover(
   if (!row) throw new Error("takeover not created");
   noteControl(deps, row);
   await afterChange(deps, row);
+  await noteDesktopTaken(deps, row);
   return handoffView(row);
 }
 
@@ -1535,6 +1676,18 @@ export function webAddress(typed: string): string | null {
   }
 }
 
+/** The address bar's arrows and reload, as the browser's own commands. */
+export const PAGE_MOVES = ["back", "forward", "reload"] as const;
+export type PageMove = (typeof PAGE_MOVES)[number];
+
+/** The browser's command for what the person typed in the address bar (400 when it's no web address), or an arrow. */
+export function pageCommand(to: string | { go: PageMove }): { command: string; args: string[] } {
+  if (typeof to !== "string") return { command: to.go, args: [] };
+  const url = webAddress(to);
+  if (!url) throw new ValidationError("Type a web address (https://…)", "browser.bad_address");
+  return { command: "open", args: [url] };
+}
+
 /** How long a person's open may take on the computer (a slow page, or Chrome starting). */
 const OPEN_PAGE_SECONDS = 60;
 
@@ -1564,15 +1717,14 @@ export async function openPageInControl(
   actorId: string,
   orgId: string,
   agentId: string,
-  typed: string,
+  to: string | { go: PageMove },
 ) {
   const open = await openHandoffOf(deps.db, orgId, agentId);
   await requireBrowserControl(deps.db, actorId, orgId, agentId, open);
   if (open?.status !== "active" || open.controllerUserId !== actorId) {
     throw new ConflictError("Take control of the browser first", "browser.not_in_control");
   }
-  const url = webAddress(typed);
-  if (!url) throw new ValidationError("Type a web address (https://…)", "browser.bad_address");
+  const { command, args } = pageCommand(to);
   if (!hub) throw new ValidationError("Connected computers are not available on this server");
   // Its computer's switch too, as for its browser tools: the runner checks only the computer's.
   await requireAgentBrowserSwitch(deps.db, orgId, agentId);
@@ -1589,8 +1741,8 @@ export async function openPageInControl(
       {
         op: "browser.act",
         agent: { id: agentId, handle: agent.handle, ...(agent.name ? { name: agent.name } : {}) },
-        command: "open",
-        args: [url],
+        command,
+        args,
         timeoutSeconds: OPEN_PAGE_SECONDS,
         ...(agent.browserAllowedDomains ? { allowedDomains: agent.browserAllowedDomains } : {}),
         link: agentBrowserLink(orgId, agentId),

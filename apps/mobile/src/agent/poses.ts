@@ -1,13 +1,14 @@
-import { type Expression, idlePose, type Pose } from "@agenteschat/ui/agent/engine";
+import { type Expression, idlePose, type Pose, sleepPose } from "@agenteschat/ui/agent/engine";
 
 /**
  * How an agent looks in each state: pure, so tests can check it.
  * - idle: looks around, blinks, now and then a happy face or a wink;
  * - run: working, the eyes are short dashes (words arriving);
  * - think: looks up and aside;
- * - rest: eyes closed, breathing slowly.
+ * - rest: eyes closed, breathing slowly;
+ * - sleep: rest with a pixel zz over its head (paused until its plan or budget is back).
  */
-export type AgentMode = "idle" | "run" | "think" | "rest";
+export type AgentMode = "idle" | "run" | "think" | "rest" | "sleep";
 
 const IDLE_EXPRESSIONS: Expression[] = ["happy", "wink"];
 
@@ -18,8 +19,7 @@ export function poseFor(mode: AgentMode, t: number, seed: number, reduced = fals
     const g = Math.sin(t * 0.6 + seed);
     return { ...p, turn: [g * 0.45, -0.3], look: [g * 0.12, -0.14] };
   }
-  if (mode === "rest")
-    return { expression: "closed", turn: [0, 0.15], squash: reduced ? 0 : Math.sin(t * 1.1 + seed) * 0.3 };
+  if (mode === "rest" || mode === "sleep") return sleepPose(reduced ? undefined : t, seed);
   return idlePose(t, seed, { every: 12, expressions: IDLE_EXPRESSIONS });
 }
 

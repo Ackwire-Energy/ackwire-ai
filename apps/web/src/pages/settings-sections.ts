@@ -8,6 +8,7 @@ import type { IconName } from "@agenteschat/ui";
 export type SettingsSection =
   | "account"
   | "notifications"
+  | "approvals"
   | "apps"
   | "general"
   | "right_hand"
@@ -39,6 +40,8 @@ export const SETTINGS_SECTIONS: {
   { id: "account", icon: "person", group: "you", allowed: () => true },
   // What reaches my devices as a notification here (ADR 0071 §8).
   { id: "notifications", icon: "bell", group: "you", allowed: () => true },
+  // Who approves for me, and whom I approve for (ADR 0139).
+  { id: "approvals", icon: "approve", group: "you", allowed: () => true },
   // AI apps (ADR 0119): each person connects their own, in this workspace.
   { id: "apps", icon: "link", group: "you", allowed: () => true },
   // The workspace's sections are for who runs it: a member keeps only their own (above) and what they use themselves
@@ -100,6 +103,8 @@ export const settingsSearch = (
   install?: string;
   skill?: string;
   agent?: string;
+  /** Uso › Pessoas: the person whose month opens (ADR 0141). */
+  person?: string;
 } => ({
   connected: typeof search.connected === "string" ? search.connected : undefined,
   outcome: typeof search.outcome === "string" ? search.outcome : undefined,
@@ -112,4 +117,5 @@ export const settingsSearch = (
   install: typeof search.install === "string" ? search.install : undefined,
   skill: typeof search.skill === "string" ? search.skill : undefined,
   agent: typeof search.agent === "string" ? search.agent : undefined,
+  person: typeof search.person === "string" ? search.person : undefined,
 });

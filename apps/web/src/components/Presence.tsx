@@ -1,4 +1,5 @@
-import { cx } from "@agenteschat/ui";
+import type { LIMIT_ICON } from "@agenteschat/client/lib/presence";
+import { cx, Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import "./presence.css";
@@ -9,10 +10,20 @@ import "./presence.css";
  */
 
 /** A line's emoji beside a name: its words on hover and for screen readers. */
-export function StatusEmoji({ emoji, text, className }: { emoji: string; text: string; className?: string }) {
+export function StatusEmoji({
+  emoji,
+  icon,
+  text,
+  className,
+}: {
+  emoji: string | null;
+  icon?: typeof LIMIT_ICON | undefined;
+  text: string;
+  className?: string;
+}) {
   return (
     <span className={cx("status-emoji", className)} role="img" aria-label={text} title={text}>
-      {emoji}
+      {icon ? <Icon name={icon} size={14} /> : emoji}
     </span>
   );
 }
@@ -20,21 +31,28 @@ export function StatusEmoji({ emoji, text, className }: { emoji: string; text: s
 /** Emoji and words, muted, on one line ("📅 Em reunião"); `empty` draws a placeholder fainter. */
 export function StatusLine({
   emoji,
+  icon,
   text,
   empty,
   className,
 }: {
   emoji?: string | null;
+  /** In place of the emoji: a limit the app draws (`agentStatusText`). */
+  icon?: typeof LIMIT_ICON | undefined;
   text: string;
   empty?: boolean;
   className?: string;
 }) {
   return (
-    <span className={cx("status-line", empty && "status-line--empty", className)}>
-      {emoji && (
-        <span className="status-line__emoji" aria-hidden="true">
-          {emoji}
-        </span>
+    <span className={cx("status-line", empty && "status-line--empty", icon && "ac-iconline", className)}>
+      {icon ? (
+        <Icon name={icon} size={14} className="status-line__icon" />
+      ) : (
+        emoji && (
+          <span className="status-line__emoji" aria-hidden="true">
+            {emoji}
+          </span>
+        )
       )}
       <span className="status-line__text">{text}</span>
     </span>
@@ -55,5 +73,5 @@ function PersonAuthorStatus({ userId }: { userId: string }) {
 function AgentAuthorStatus({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
   const line = agentLine(t, useAgentPresence(agentId)?.line ?? null, i18n.language);
-  return line ? <StatusEmoji emoji={line.emoji} text={line.text} className="msg-status" /> : null;
+  return line ? <StatusEmoji emoji={line.emoji} icon={line.icon} text={line.text} className="msg-status" /> : null;
 }

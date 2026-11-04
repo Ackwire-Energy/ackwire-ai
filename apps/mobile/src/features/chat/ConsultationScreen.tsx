@@ -2,7 +2,6 @@ import { useChannels, useConsultationConversation } from "@agenteschat/client";
 import { consultLineState, consultOriginKey } from "@agenteschat/client/lib/consult-group";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { groupsWith } from "@agenteschat/client/lib/timeline";
-import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,7 +9,7 @@ import { Button, Icon, PixelOrbit, Text } from "@/ui";
 import { chatHref } from "../links/logic";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { FocusLive, PushedHeader } from "../shared/parts";
+import { FocusLive, goBack, PushedHeader } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { consultLineLabel } from "./ConsultGroup";
 import { requestComposerText } from "./composer-request";
@@ -59,8 +58,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
   const said = list.some((m) => m.author.id === q?.consultedAgentId && m.channelId !== channelId);
   const talk = () => {
     if (asker) requestComposerText(channelId, `@${asker.handle} `);
-    if (router.canGoBack()) router.back();
-    else router.replace(chatHref(channelId));
+    goBack(chatHref(channelId));
   };
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>

@@ -90,6 +90,7 @@ import {
   brainModelChoices,
   isPlanId,
   PLAN_IDS,
+  planFreeHint,
   planModel as planModelOf,
   planOf,
 } from "@agenteschat/client/lib/plans";
@@ -1308,6 +1309,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       </span>
     </SettingNote>
   );
+  const freeHint = planFreeHint(t, plan);
   // "Configuração avançada" names what it holds.
   const advancedNow: Advanced = { effort, contextTokens: shownContext, onlyOwner, fallback };
   const advancedLine = advancedContents(t, { kind, autoModel: isAuto(planModel) });
@@ -1341,6 +1343,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           options={planModelOptionsShown}
         />
         {modelHow}
+        {freeHint && <SettingNote icon="info">{freeHint}</SettingNote>}
       </BrainField>
       {accountField}
       {advancedRow}

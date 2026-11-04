@@ -9,7 +9,8 @@ import { renderUnicodeCompact } from "uqr";
 
 /** Every instance serves its own compose file there; agentes.chat's is the latest release's. */
 export const COMPOSE_URL = "https://agentes.chat/install/docker-compose.yml";
-export const GUIDE_URL = "https://github.com/agentes-chat/agentes-chat/blob/main/SELF_HOSTING.md";
+/** `INSTALL_DOCS_URL` in @agenteschat/i18n, as text: this MIT package bundles none of the AGPL workspace. */
+export const GUIDE_URL = "https://agentes.chat/docs/install-on-a-server";
 export const ISSUES_URL = "https://github.com/agentes-chat/agentes-chat/issues";
 export const IMAGE = "ghcr.io/agentes-chat/agentes:latest";
 /** The compose file's Tailscale serve config is inline (`configs.content`), which Compose reads from 2.23.1 on. */
@@ -293,9 +294,9 @@ function parseUrl(url: string): URL | null {
 // ── .env ────────────────────────────────────────────────────────────────────
 
 /** The top of a .env the setup creates. */
-export const ENV_HEADER = `# agentes.chat settings, written by npx @agenteschat/setup (running it again is safe). Every
-# value is explained in SELF_HOSTING.md. AGENTES_SECRET encrypts the keys stored in the database:
-# back it up apart from the database, and never change it.
+export const ENV_HEADER = `# agentes.chat settings, written by npx @agenteschat/setup (running it again is safe). The guide:
+# ${GUIDE_URL}. AGENTES_SECRET encrypts the keys stored in the
+# database: back it up apart from the database, and never change it.
 `;
 
 const ENV_LINE = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/;
@@ -817,7 +818,7 @@ export function computerOffer(machine: ThisMachine, content: string | null, imag
   if (image) {
     return no(
       "Inside the image, the setup can't make this machine the agents' computer.",
-      `Follow "This server as the agents' computer" in ${GUIDE_URL}.`,
+      `Run the installer on the server for this folder instead, with --dir <folder> --computer yes: ${GUIDE_URL}#computers`,
     );
   }
   const conflict = hostTokenConflict(content);

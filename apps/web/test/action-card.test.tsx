@@ -302,7 +302,7 @@ describe("what waits on a plan's limit: Não rodar", () => {
     expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-w-three")).toBe(true);
   });
 
-  test("Ver fila: what the agent picks up when the plan is back, in order, with Não rodar per row and for all", async () => {
+  test("Ver fila: one short row each in order, Não rodar only where the viewer may, Não rodar nenhuma for all", async () => {
     const state = seedState();
     state.messages.push(note("w-line", {}));
     const row = (runId: string, over: Record<string, unknown> = {}) => ({
@@ -328,7 +328,11 @@ describe("what waits on a plan's limit: Não rodar", () => {
         plan: "Claude",
         resetsAt: null,
         sharedWith: [ADA_ID],
-        rows: [row("r-a", { state: "answering" }), row("r-b", { after: { count: 0, names: [] } })],
+        rows: [
+          row("r-a", { state: "answering" }),
+          row("r-b"),
+          row("r-c", { channelName: "vendas", askers: ["u-ana"], mayStop: false }),
+        ],
         hidden: 1,
         mayStopAll: true,
         closed: [],
@@ -340,26 +344,75 @@ describe("what waits on a plan's limit: Não rodar", () => {
       .find((a) => a.textContent?.includes("Respondo assim que ele renovar")) as HTMLElement;
     await click(within(note_).getByRole("button", { name: "Ver fila" }));
     const dialog = await screen().findByRole("dialog");
-    expect(dialog.textContent).toContain("Atlas tem 3 conversas para retomar");
-    expect(dialog.textContent).toContain("Retoma assim que o plano do Claude renovar. Uma de cada vez, nesta ordem.");
-    expect(dialog.textContent).toContain("A fila é do plano: Ada e Atlas dividem a mesma conta.");
-    expect(dialog.textContent).toContain("Respondendo agora");
-    expect(dialog.textContent).toContain("12 mensagens depois · Nina e Ada escreveram depois");
-    expect(dialog.textContent).toContain("Nada depois");
-    expect(dialog.textContent).toContain("+1 em conversas que você não vê");
-    // The row answering now has nothing to cancel; the one in line does.
+    // One title for the phase: it answers the first one, so it is picking up. The shared plan only behind the ⓘ.
+    expect(dialog.querySelector(".ac-dialog__title")?.textContent).toContain("Atlas está retomando");
+    expect(within(dialog).getByRole("button", { name: "Sobre a fila" })).toBeTruthy();
+    expect(dialog.textContent).not.toContain("mensagens depois");
+    expect(dialog.textContent).not.toContain("Ver conversa");
+    // Nothing skipped: no switch, the list alone.
+    expect(within(dialog).queryByRole("radiogroup")).toBeNull();
+    const rows = Array.from(dialog.querySelectorAll(".uq__row")) as HTMLElement[];
+    expect(rows.map((r) => r.querySelector(".uq__n")?.textContent)).toEqual(["1", "2", "3"]);
+    expect(rows[0]?.textContent).toContain("Respondendo");
+    expect(rows[2]?.textContent).toContain("#vendas");
+    // "Não rodar" only where the viewer may use it: not on the one answering, not on someone else's.
     expect(within(dialog).getAllByRole("button", { name: "Não rodar" })).toHaveLength(1);
-    // Every row opens its conversation; the owner and admins may change the agent's AI from here.
-    expect(within(dialog).getAllByRole("button", { name: "Ver conversa" })).toHaveLength(2);
+    expect(within(rows[2] as HTMLElement).queryByRole("button", { name: "Não rodar" })).toBeNull();
+    expect(dialog.textContent).toContain("+1 que você não vê");
     expect(within(dialog).getByRole("link", { name: "Trocar a IA do Atlas" }).getAttribute("href")).toContain(
       "sec=brain",
     );
     await click(within(dialog).getByRole("button", { name: "Não rodar" }));
     expect(state.calls.some((c) => c.method === "agents.cancelRun" && c.args[1] === "r-b")).toBe(true);
+    // Counts only what is still in line: two rows and the hidden one, never the one answering.
     await click(within(dialog).getByRole("button", { name: "Não rodar nenhuma" }));
-    expect(dialog.textContent).toContain("Não rodar as 2 conversas?");
+    expect(dialog.textContent).toContain("Não rodar as 3?");
     await click(within(dialog).getByRole("button", { name: "Sim, não rodar" }));
     expect(state.calls.some((c) => c.method === "agents.cancelUsageQueue" && c.args[1] === ATLAS_ID)).toBe(true);
+  });
+
+  test("the whole row opens its conversation, with the dialog closed", async () => {
+    const state = seedState();
+    state.messages.push(note("w-open", {}));
+    state.usageQueues = {
+      [ATLAS_ID]: {
+        agentId: ATLAS_ID,
+        reason: "plan",
+        plan: "Claude",
+        resetsAt: null,
+        sharedWith: [],
+        rows: [
+          {
+            runId: "r-o",
+            kind: "conversation",
+            channelId: ENG_ID,
+            threadId: null,
+            channelKind: "channel",
+            channelName: "eng",
+            messageId: "w-open",
+            askers: ["u-joao"],
+            since: NOW.toISOString(),
+            after: { count: 0, names: [] },
+            state: "queued",
+            title: null,
+            mayStop: false,
+          },
+        ],
+        hidden: 0,
+        mayStopAll: false,
+        closed: [],
+      },
+    };
+    await open(state);
+    const note_ = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Respondo assim que ele renovar")) as HTMLElement;
+    await click(within(note_).getByRole("button", { name: "Ver fila" }));
+    const dialog = await screen().findByRole("dialog");
+    // Not the owner: no bulk action, no footer.
+    expect(within(dialog).queryByRole("button", { name: "Não rodar nenhuma" })).toBeNull();
+    await click(dialog.querySelector(".uq__open") as HTMLElement);
+    expect(screen().queryByRole("dialog")).toBeNull();
   });
 
   test("a catch-up skipped as already handled says why, with Responder mesmo assim; pressed, it says who asked", async () => {
@@ -387,7 +440,7 @@ describe("what waits on a plan's limit: Não rodar", () => {
     expect(within(asked).queryByRole("button", { name: "Responder mesmo assim" })).toBeNull();
   });
 
-  test("the queue lists what it skipped in the last day, why, and Responder mesmo assim for who may", async () => {
+  test("Puladas: what it skipped in the last day, why in the dialog's voice, Responder mesmo assim for who may", async () => {
     const state = seedState();
     state.messages.push(note("w-q", {}));
     const at = new Date().toISOString();
@@ -409,7 +462,23 @@ describe("what waits on a plan's limit: Não rodar", () => {
         plan: "Claude",
         resetsAt: null,
         sharedWith: [],
-        rows: [],
+        rows: [
+          {
+            runId: "r-w",
+            kind: "conversation",
+            channelId: ENG_ID,
+            threadId: null,
+            channelKind: "channel",
+            channelName: "eng",
+            messageId: "w-q",
+            askers: ["u-joao"],
+            since: at,
+            after: { count: 0, names: [] },
+            state: "queued",
+            title: null,
+            mayStop: true,
+          },
+        ],
         hidden: 0,
         mayStopAll: true,
         closed: [
@@ -424,14 +493,81 @@ describe("what waits on a plan's limit: Não rodar", () => {
       .find((a) => a.textContent?.includes("Respondo assim que ele renovar")) as HTMLElement;
     await click(within(note_).getByRole("button", { name: "Ver fila" }));
     const dialog = await screen().findByRole("dialog");
-    expect(dialog.textContent).toContain("2 não precisaram de resposta");
-    expect(dialog.textContent).toContain("Pareciam resolvidas, então Atlas não respondeu.");
-    expect(dialog.textContent).toContain("Não respondi: Nina já cuidou disso.");
-    expect(dialog.textContent).toContain("Não respondi: João disse que não precisa mais.");
-    expect(dialog.textContent).not.toContain("Nada esperando");
-    expect(within(dialog).getAllByRole("button", { name: "Ver conversa" })).toHaveLength(2);
+    expect(dialog.querySelector(".ac-dialog__title")?.textContent).toBe("Atlas volta quando o plano renovar");
+    // Both lists have something: the switch, on Na fila, with one count each.
+    const queued = within(dialog).getByRole("radio", { name: /Na fila/ });
+    expect(queued.getAttribute("aria-checked")).toBe("true");
+    expect(queued.textContent).toContain("1");
+    expect(dialog.textContent).not.toContain("Nina já cuidou disso");
+    await click(within(dialog).getByRole("radio", { name: /Puladas/ }));
+    expect(dialog.textContent).toContain("Nina já cuidou disso");
+    expect(dialog.textContent).toContain("João disse que não precisa mais");
+    expect(dialog.textContent).not.toContain("Não respondi");
+    // The footer is the line's: not on Puladas.
+    expect(within(dialog).queryByRole("button", { name: "Não rodar nenhuma" })).toBeNull();
+    expect(within(dialog).getAllByRole("button", { name: "Responder mesmo assim" })).toHaveLength(1);
     await click(within(dialog).getByRole("button", { name: "Responder mesmo assim" }));
     expect(state.calls.some((c) => c.method === "agents.continueRun" && c.args[1] === "r-s1")).toBe(true);
+  });
+
+  test("Ver fila under a skipped catch-up's note opens on Puladas", async () => {
+    const state = seedState();
+    const at = new Date().toISOString();
+    const closed = { reason: "solved", who: { name: "Nina", userId: "u-nina" }, askers: ["u-joao"], at };
+    state.messages.push(note("w-skipped", { ended: true, closed }));
+    state.usageQueues = {
+      [ATLAS_ID]: {
+        agentId: ATLAS_ID,
+        reason: "plan",
+        plan: "Claude",
+        resetsAt: null,
+        sharedWith: [],
+        rows: [
+          {
+            runId: "r-w",
+            kind: "conversation",
+            channelId: ENG_ID,
+            threadId: null,
+            channelKind: "channel",
+            channelName: "eng",
+            messageId: "w-skipped",
+            askers: ["u-joao"],
+            since: at,
+            after: { count: 0, names: [] },
+            state: "queued",
+            title: null,
+            mayStop: true,
+          },
+        ],
+        hidden: 0,
+        mayStopAll: true,
+        closed: [
+          {
+            runId: "r-w-skipped",
+            channelId: ENG_ID,
+            threadId: null,
+            channelKind: "channel",
+            channelName: "eng",
+            messageId: "w-skipped",
+            closed: closed as never,
+            continuedRunId: null,
+            mayAnswer: true,
+          },
+        ],
+      },
+    };
+    await open(state);
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Não respondi: Nina já cuidou disso.")) as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Ver fila" }));
+    const dialog = await screen().findByRole("dialog");
+    expect(
+      within(dialog)
+        .getByRole("radio", { name: /Puladas/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(dialog.textContent).toContain("Nina já cuidou disso");
   });
 
   test("back at work, the note offers nothing to cancel", async () => {

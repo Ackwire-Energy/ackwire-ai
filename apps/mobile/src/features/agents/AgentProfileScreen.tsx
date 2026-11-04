@@ -315,7 +315,12 @@ function Profile({ id }: { id: string }) {
           ) : null}
           {status?.card ? (
             <View style={styles.status}>
-              <StatusCard emoji={status.card.emoji} text={status.card.text} note={status.card.note} />
+              <StatusCard
+                emoji={status.card.emoji}
+                icon={status.card.icon}
+                text={status.card.text}
+                note={status.card.note}
+              />
             </View>
           ) : null}
           {status?.waiting ? (

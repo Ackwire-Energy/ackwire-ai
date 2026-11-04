@@ -8,7 +8,7 @@ import { ApiError, keys } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
-import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, meWithRole, ORG_ID, seedState } from "./fake-api";
 import { fakeSockets } from "./fake-socket";
 import { renderPage, screen, settle } from "./render";
 
@@ -350,6 +350,58 @@ function screenPixels() {
 const waitLooks = () => act(async () => new Promise((r) => setTimeout(r, 260)));
 
 describe("the agent's screen in the computer dialog", () => {
+  test("someone who may drive the browser but not the whole computer: the button and the page say browser, and why", async () => {
+    // The Cloud's computer in system mode, Ada on her owner's plan, and a role that controls computers but doesn't
+    // manage agents: only her owner and admins who manage agents drive the screen (ADR 0059 §8).
+    const b = await backend({ ...RUNNING, canControl: false, controlRefusal: "owner_plan" }, true);
+    b.state.scopes[ADA_ID] = [...(b.state.scopes[ADA_ID] ?? []), { connectionId: null, scope: "browser:use" }];
+    b.fake.settings.set(ADA_ID, { allowedDomains: null, available: true, reason: null, detail: null, machine: null });
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    await renderPage(<ComputerDialog agent={ada} open onClose={() => {}} />, {
+      api: b.api,
+      org: true,
+      createSocket: b.sockets.factory,
+    });
+    await settle(8);
+    await connected();
+    const why =
+      "A\u00a0Ada pensa com o plano de quem é dona dela, então só essa pessoa e os admins que gerenciam agentes controlam o computador inteiro";
+    expect(view().queryByRole("button", { name: "Assumir o controle" })).toBeNull();
+    const take = view().getByRole("button", { name: "Assumir o navegador" });
+    expect(take.getAttribute("title")).toBe(why);
+    await click(take);
+    // The browser's take over, never the screen's: the screen's would be refused.
+    expect(calls(b, "browser.takeover")).toEqual([[ORG_ID, ADA_ID]]);
+    await settle(8);
+    const banner = document.querySelector(".cmp-banner[data-tone=info]") as HTMLElement;
+    expect(banner.textContent).toBe(`Você está no navegador, não no computador inteiro${why}`);
+  });
+
+  test("whose role gives none of the agents' computers: no Assumir o navegador, and a click on the screen only says so, with Fechar", async () => {
+    const b = await backend({ ...RUNNING, canControl: false, controlRefusal: "role" }, true);
+    b.state.scopes[ADA_ID] = [...(b.state.scopes[ADA_ID] ?? []), { connectionId: null, scope: "browser:use" }];
+    b.fake.settings.set(ADA_ID, { allowedDomains: null, available: true, reason: null, detail: null, machine: null });
+    meWithRole(b.state, ["manage_agents"]);
+    b.state.roles = (b.state.roles ?? []).map((r) =>
+      r.kind === "everyone" ? { ...r, permissions: r.permissions.filter((p) => p !== "own_computers") } : r,
+    );
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    await renderPage(<ComputerDialog agent={ada} open onClose={() => {}} />, {
+      api: b.api,
+      org: true,
+      createSocket: b.sockets.factory,
+    });
+    await settle(8);
+    await connected();
+    expect(view().queryByRole("button", { name: "Assumir o navegador" })).toBeNull();
+    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    await settle(3);
+    const prompt = document.querySelector(".dsk-ask") as HTMLElement;
+    expect(prompt.textContent).toContain("Você está só assistindo.");
+    expect(within(prompt).queryByRole("button", { name: /Assumir/ })).toBeNull();
+    expect(within(prompt).getByRole("button", { name: "Fechar" })).toBeTruthy();
+  });
+
   test("watching: a socket of its own in binary, view-only at quality 3, scaled; live once noVNC connects", async () => {
     const t = await dialog();
     expect(t.sockets.desktops).toHaveLength(1);
@@ -580,9 +632,14 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().log).toContain("keydown Escape Escape");
 
     await click(view().getByRole("button", { name: "Devolver" }));
+    // One quiet row: Ada asked nothing, so the note waits behind "Deixar um recado", and Devolver has the focus.
+    expect(view().queryByRole("textbox", { name: "Recado para a Ada" })).toBeNull();
+    expect(document.activeElement === view().getByRole("button", { name: "Devolver" })).toBe(true);
+    await click(view().getByRole("button", { name: "Deixar um recado" }));
     // One line in the middle of its field that grows as it wraps (its height set to its text): all of a note stays
     // in sight, and there is no grip to drag.
     const note = view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
+    expect(document.activeElement === note).toBe(true);
     expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
       "TEXTAREA",
       "1",
@@ -854,11 +911,16 @@ describe("the agent's screen in the computer dialog", () => {
       throw new ApiError(500, "internal", "Something broke");
     });
     await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Deixar um recado" }));
     const note = () => view().getByRole("textbox", { name: "Recado para a Ada" }) as HTMLTextAreaElement;
     await act(async () => fireEvent.change(note(), { target: { value: "Deixei aberto" } }));
     await click(view().getByRole("button", { name: "Devolver" }));
     expect(document.querySelector(".ac-dialog__sub > .cmp-said")?.textContent).toBe("Não deu certo. Tente de novo.");
     expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(note().value).toBe("Deixei aberto");
+    // Voltar and Devolver again: the note opens with its words, nothing sent out of sight.
+    await click(view().getByRole("button", { name: "Voltar" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
     expect(note().value).toBe("Deixei aberto");
   });
 
@@ -880,7 +942,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(screen().getByText("Tentando de novo…")).toBeTruthy();
   });
 
-  test("a switch whose new connection hasn't drawn in 3 s lets go of the old picture and says it is opening", async () => {
+  test("a hand back keeps the last picture dimmed under Devolvendo à Ada… until the watcher draws, never the cold cover", async () => {
     const t = await controlled();
     await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Devolver" }));
@@ -888,13 +950,21 @@ describe("the agent's screen in the computer dialog", () => {
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=watch");
     expect(still()).not.toBeNull();
     expect(sub()).toBe("Ao vivo · você está assistindo");
+    const returning = () => screen().queryByText("Devolvendo à Ada…")?.closest(".brw-dim");
+    expect(returning()?.classList.contains("is-clear")).toBe(true);
+    // However long the watcher takes: the picture, dimmed, and what is happening, never "Abrindo…".
     await act(() => new Promise((r) => setTimeout(r, 3_100)));
-    expect(still()).toBeNull();
-    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
-    expect(sub()).toBe("");
+    expect(still()).not.toBeNull();
+    expect(returning()).toBeTruthy();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    // Nothing asks to take control meanwhile.
+    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    expect(document.querySelector(".dsk-ask")).toBeNull();
     await connected();
+    expect(still()).toBeNull();
+    expect(returning()).toBeFalsy();
     expect(sub()).toBe("Ao vivo · você está assistindo");
-  });
+  }, 15_000);
 
   test("control taken over by someone else: their screen hidden at once, nothing of it kept under the cover", async () => {
     const t = await controlled();
@@ -1136,6 +1206,7 @@ describe("the agent's screen in the computer dialog", () => {
     // Handed back with its keyboard up, then taken again: the button starts unpressed. Its return key adds a line to
     // the note, as in the chat; the button hands back.
     await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Deixar um recado" }));
     const note = view().getByRole("textbox", { name: "Recado para a Ada" });
     expect(fireEvent.keyDown(note, { key: "Enter" })).toBe(true);
     await settle(2);
@@ -1197,7 +1268,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.fullscreenElement).toBeNull();
     expect(t.closed()).toBe(0);
     await click(view().getByRole("button", { name: "Devolver" }));
-    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    expect(view().getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
   });
 
   test("Devolver from full screen leaves it first: the note is the dialog's, never over the screen", async () => {
@@ -1208,8 +1279,8 @@ describe("the agent's screen in the computer dialog", () => {
     await click(view().getByRole("button", { name: "Devolver" }));
     expect(classes()).not.toContain("is-full");
     expect(document.fullscreenElement).toBeNull();
-    expect(view().getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
-    // No full screen while the note is open.
+    expect(view().getByRole("button", { name: "Deixar um recado" })).toBeTruthy();
+    // No full screen while the hand back is open.
     expect(view().queryByRole("button", { name: "Tela cheia" })).toBeNull();
   });
 
@@ -1886,30 +1957,79 @@ describe("the person's clipboard", () => {
 });
 
 describe("watching offers control after deliberate interaction", () => {
+  const prompt = () => document.querySelector(".dsk-ask") as HTMLElement | null;
+  const press = () => act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
   test("a first screen click offers control without passing input; Escape dismisses before closing", async () => {
     const t = await dialog();
     await connected();
-    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    await press();
     await settle(3);
-    expect(document.querySelector(".dsk-ask")).not.toBeNull();
+    expect(prompt()).not.toBeNull();
+    // Dimmed, not frosted: the screen stays in sight under the question.
+    expect(prompt()?.classList.contains("is-clear")).toBe(true);
     expect(rfb().viewOnly).toBe(true);
     expect(rfb().log).toEqual([]);
     await act(async () => fireEvent.keyDown(document, { key: "Escape" }));
     await settle(3);
-    expect(document.querySelector(".dsk-ask")).toBeNull();
+    expect(prompt()).toBeNull();
     expect(t.closed()).toBe(0);
-    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    // The next try asks again.
+    await press();
     await settle(2);
-    expect(document.querySelector(".dsk-ask")).toBeNull();
+    expect(prompt()).not.toBeNull();
   });
-  test("typing offers control without moving focus or sending the triggering key", async () => {
+  test("the question stays through more clicks, on the screen and on its dim; Cancelar closes it", async () => {
     await dialog();
     await connected();
-    const before = document.activeElement;
-    await act(async () => fireEvent.keyDown(document.body, { key: "a", code: "KeyA" }));
-    await settle(3);
-    expect(document.querySelector(".dsk-ask")).not.toBeNull();
-    expect(document.activeElement === before).toBe(true);
+    await press();
+    await settle(2);
+    await press();
+    await act(async () => fireEvent.pointerDown(prompt() as HTMLElement, { pointerType: "mouse", button: 0 }));
+    await settle(2);
+    expect(prompt()).not.toBeNull();
+    await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+    expect(prompt()).toBeNull();
+    expect(rfb().log).toEqual([]);
+    await press();
+    await settle(2);
+    expect(prompt()).not.toBeNull();
+  });
+  test("a key or a paste on the focused screen asks, sends nothing, and leaves shortcuts to the browser", async () => {
+    await dialog();
+    await connected();
+    const stage = document.querySelector(".dsk-stage") as HTMLElement;
+    // A click on the screen puts the keys there.
+    await press();
+    expect(document.activeElement === stage).toBe(true);
+    await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+    stage.focus();
+    /** Whether the key is left to the browser (not taken to ask). */
+    const key = async (init: KeyboardEventInit) => {
+      let left = true;
+      await act(async () => {
+        left = fireEvent.keyDown(stage, init);
+      });
+      await settle(1);
+      return left;
+    };
+    for (const init of [{ key: "a", ctrlKey: true }, { key: "l", metaKey: true }, { key: "F5" }, { key: "Shift" }])
+      expect([init.key, await key(init), prompt()]).toEqual([init.key, true, null]);
+    // Tab moves the focus (the dialog keeps it inside): it never asks.
+    await key({ key: "Tab" });
+    expect(prompt()).toBeNull();
+    for (const init of [{ key: "a" }, { key: " " }, { key: "Enter" }, { key: "ArrowDown" }]) {
+      expect([init.key, await key(init), prompt() !== null]).toEqual([init.key, false, true]);
+      await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+      stage.focus();
+    }
+    // A paste (its keys, or the browser's own paste event) asks too.
+    expect(await key({ key: "Insert", shiftKey: true })).toBe(false);
+    expect(prompt()).not.toBeNull();
+    await click(within(prompt() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+    stage.focus();
+    await act(async () => void fireEvent.paste(stage, { clipboardData: { getData: () => "segredo" } }));
+    await settle(1);
+    expect(prompt()).not.toBeNull();
     expect(rfb().log).toEqual([]);
   });
 });
@@ -1948,18 +2068,18 @@ test("a touch scroll does not offer control; a later tap does", async () => {
   expect(rfb().log).toEqual([]);
 });
 
-test("modifier shortcuts, Space, and typing into a field never offer control", async () => {
+test("shortcuts and typing into a field never offer control; a letter anywhere else in the dialog does", async () => {
   await dialog();
   await connected();
+  const ask = () => document.querySelector(".dsk-ask");
   await act(async () => {
     fireEvent.keyDown(document.body, { key: "a", ctrlKey: true });
     fireEvent.keyDown(document.body, { key: "a", metaKey: true });
-    fireEvent.keyDown(document.body, { key: " " });
     fireEvent.keyDown(document.body, { key: "Tab" });
     fireEvent.keyDown(document.body, { key: "a", isComposing: true });
   });
   await settle(2);
-  expect(document.querySelector(".dsk-ask")).toBeNull();
+  expect(ask()).toBeNull();
   const input = document.createElement("input");
   document.body.appendChild(input);
   try {
@@ -1968,10 +2088,30 @@ test("modifier shortcuts, Space, and typing into a field never offer control", a
       fireEvent.keyDown(input, { key: "a" });
     });
     await settle(2);
-    expect(document.querySelector(".dsk-ask")).toBeNull();
+    expect(ask()).toBeNull();
   } finally {
     input.remove();
   }
+  // A button of the dialog keeps its Enter and Space; a letter typed on it asks, and so does one on the page.
+  const button = [...document.querySelectorAll<HTMLElement>('[role="dialog"] button')].find(
+    (b) => !b.closest(".dsk-stage"),
+  ) as HTMLElement;
+  await act(async () => {
+    fireEvent.keyDown(button, { key: "Enter" });
+    fireEvent.keyDown(button, { key: " " });
+  });
+  await settle(2);
+  expect(ask()).toBeNull();
+  await act(async () => void fireEvent.keyDown(button, { key: "a" }));
+  await settle(2);
+  expect(ask()).not.toBeNull();
+  // Cancelar goes, its focus back on the screen: the next key asks again.
+  await click(within(ask() as HTMLElement).getByRole("button", { name: "Cancelar" }));
+  expect(document.activeElement === document.querySelector(".dsk-stage")).toBe(true);
+  await act(async () => void fireEvent.keyDown(document.body, { key: "b" }));
+  await settle(2);
+  expect(ask()).not.toBeNull();
+  expect(rfb().log).toEqual([]);
 });
 
 test("a connection quality change adjusts the active screen without reopening its socket", async () => {

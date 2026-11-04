@@ -1,5 +1,5 @@
 import * as Clipboard from "expo-clipboard";
-import { type NativeStackNavigationOptions, router, Stack, useIsFocused } from "expo-router";
+import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { needsHeaderBlur } from "@/lib/nav";
@@ -229,11 +229,7 @@ function HeaderTitle({ text, node, subtitle }: { text: string; node: HeaderSlotS
   );
 }
 
-/** Back, or home when the screen was opened by a link. */
-export function goBack() {
-  if (router.canGoBack()) router.back();
-  else router.replace("/");
-}
+export { goBack } from "@/ui/navigation";
 
 /** A light tap under the thumb (long press, reactions, picks). */
 export const tapHaptic = () => haptics.light();

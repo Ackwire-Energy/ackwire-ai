@@ -528,7 +528,7 @@ function WorkRow({ w, dir, now }: { w: WorkItem; dir: Dir; now: number }) {
     <RowBody
       face={<AgentAvatar agentId={w.agentId} name={name} channelId={w.channelId} />}
       title={<b>{name}</b>}
-      sub={line ? `${line.emoji} ${line.text}` : w.what}
+      sub={line ? [line.emoji, line.text].filter(Boolean).join(" ") : w.what}
       meta={meta}
     />
   );

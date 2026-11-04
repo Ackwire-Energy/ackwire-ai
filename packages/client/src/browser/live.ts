@@ -101,6 +101,8 @@ export type BrowserLiveMessage =
     }
   | { type: "error"; agentId: string; code: string };
 
+/** The most text one `text` event carries (mirror of `BROWSER_LIMITS.inputText` in `@agenteschat/adapters`). */
+export const TEXT_EVENT_MAX = 10_000;
 /** Most events in one `browser.input` frame (the server's limit). */
 export const BROWSER_INPUT_BATCH = 100;
 /**
@@ -262,9 +264,22 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
     if (closed || queue.length === 0) return;
     const out = queue;
     queue = [];
-    for (let i = 0; i < out.length; i += BROWSER_INPUT_BATCH) {
-      options.send({ type: "browser.input", agentId, events: out.slice(i, i + BROWSER_INPUT_BATCH) });
+    // At most one event's worth of text a frame (a paste comes in such pieces): the server takes frames up to two.
+    let batch: BrowserInputEvent[] = [];
+    let chars = 0;
+    const ship = () => {
+      if (batch.length) options.send({ type: "browser.input", agentId, events: batch });
+      batch = [];
+      chars = 0;
+    };
+    for (const e of out) {
+      const n = e.kind === "text" ? e.text.length : 0;
+      if (chars + n > TEXT_EVENT_MAX) ship();
+      batch.push(e);
+      chars += n;
+      if (batch.length === BROWSER_INPUT_BATCH) ship();
     }
+    ship();
   };
   const flushSoon = () => {
     if (flushTimer === null) flushTimer = timers.setTimeout(flush, BROWSER_DRAG_FLUSH_MS);

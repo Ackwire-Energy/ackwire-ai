@@ -603,6 +603,7 @@ test("the desktop's REST: its state for who may watch it, nothing to turn on or 
     handoff: null,
     viewers: 0,
     canControl: true,
+    controlRefusal: null,
     held: false,
   });
   // It stays on: no route turns it on or off (the browser still closes).

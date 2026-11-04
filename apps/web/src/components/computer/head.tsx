@@ -20,6 +20,18 @@ export interface DialogHeadSlots {
   setAsk?: (dismiss: (() => void) | null) => void;
   /** An action that failed, said in place of the sub-line for a moment (`useSayFailed`). */
   say: (text: string) => void;
+  /**
+   * The last picture of the view that just left the stage (the screen for the page, or back), and whether the person
+   * was in control there: where control changed, the next view shows it dimmed while it opens, never a cold
+   * "Abrindo…". Written as a view goes, taken as the next one comes.
+   */
+  picture: { current: KeptPicture | null };
+}
+
+export interface KeptPicture {
+  /** A data URL. */
+  src: string;
+  control: boolean;
 }
 
 export const DialogHeadContext = createContext<DialogHeadSlots | null>(null);

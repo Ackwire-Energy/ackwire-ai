@@ -749,6 +749,9 @@
   "chat.toLatest": {
     "value": "Go to the latest messages"
   },
+  "chat.toLatestNew": {
+    "value": "Go to the latest messages: {{text}}"
+  },
   "chat.stopAgent": {
     "value": "Stop {{name}}"
   },
@@ -820,6 +823,9 @@
   },
   "chat.unseen.working": {
     "value": "{{names}} writing"
+  },
+  "chat.unseen.mentionsYou": {
+    "value": "you were mentioned"
   },
   "chat.unseen.divider": {
     "value": "New"
@@ -1967,10 +1973,68 @@
       "other": "{{names}} ask for a change to the team"
     }
   },
+  "activity.kind.usage_limit_warning": {
+    "value": "You've used {{percent}}% of your limit this month"
+  },
+  "activity.kind.usage_limit_reached_notify": {
+    "value": "You've reached your usage limit for this month"
+  },
+  "activity.kind.usage_limit_reached": {
+    "value": "{{names}} reached their {{amount}} limit"
+  },
+  "activity.kind.usage_limit_request": {
+    "value": "{{names}} reached their {{amount}} limit and asks for more"
+  },
+  "activity.kind.usage_limit_raised": {
+    "value": "{{names}} raised your limit for this month"
+  },
+  "activity.kind.usage_limit_refused": {
+    "value": "{{names}} turned down your request for more"
+  },
+  "activity.kind.approval_cover": {
+    "value": {
+      "one": "{{names}} picked you in Who approves for me",
+      "other": "{{names}} picked you in Who approves for me"
+    }
+  },
+  "activity.kind.approval_cover_declined": {
+    "value": {
+      "one": "{{names}} won't approve for you any more",
+      "other": "{{names}} won't approve for you any more"
+    }
+  },
+  "activity.kind.approval_cover_ended": {
+    "value": {
+      "one": "{{names}} ended who approves for you",
+      "other": "{{names}} ended who approves for you"
+    }
+  },
+  "activity.kind.right_hand_decided": {
+    "value": {
+      "one": "{{names}} approved requests for you today",
+      "other": "{{names}} approved requests for you today"
+    }
+  },
+  "activity.kind.right_hand_paused": {
+    "value": {
+      "one": "{{names}} stopped approving for you",
+      "other": "{{names}} stopped approving for you"
+    }
+  },
   "activity.kind.browser_profile_request": {
     "value": {
       "one": "{{names}} asks for one more browser profile",
       "other": "{{names}} ask for one more browser profile"
+    }
+  },
+  "activity.kind.desktop_taken": {
+    "value": {
+      "one": "{{names}} took control of the screen of {{agent}}'s computer",
+      "other": "{{names}} took control of the screen of {{agent}}'s computer"
+    },
+    "female": {
+      "one": "{{names}} took control of the screen of {{agent}}'s computer",
+      "other": "{{names}} took control of the screen of {{agent}}'s computer"
     }
   },
   "activity.kind.connector_tool_changed": {
@@ -2972,6 +3036,9 @@
   "activityNow.kind.tools": {
     "value": "Tools"
   },
+  "activityNow.kind.limit": {
+    "value": "Limit"
+  },
   "activityNow.review": {
     "value": "Review"
   },
@@ -3538,6 +3605,12 @@
   },
   "browser.live.keys": {
     "value": "Keys"
+  },
+  "browser.live.paste": {
+    "value": "Paste"
+  },
+  "browser.live.pasteHint": {
+    "value": "Paste what you copied into the page"
   },
   "browser.live.secureOn": {
     "value": "Show the text"

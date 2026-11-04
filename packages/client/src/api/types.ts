@@ -772,6 +772,8 @@ export interface ProposalApplied {
 /** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081). A person creates it or says no. */
 export interface AgentProposalCard {
   kind: "agent_proposal";
+  /** The right hand looked at it for the person it is for (ADR 0139 §2). */
+  delegate?: CardDelegate | null;
   /** The person behind the run that proposed it. */
   forUserId: string | null;
   /** `firstTask`: what "Criar e testar" puts in the composer of the clicker's DM with the new agent (ADR 0137). */
@@ -1152,11 +1154,24 @@ export interface ActiveRun {
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
   background?: boolean;
+  /**
+   * What its current model call streamed so far past its last tool: `text` starts at `at` of the call's text, so an
+   * app opened mid-answer goes on from `at` plus its length.
+   */
+  live?: { turn: number; at: number; text: string };
 }
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
 export type ChannelEvent =
-  | { type: "message.created"; channelId: string; messageId: string; message?: Message }
+  /** `message` is left out when too big for the server's pub/sub (read it over HTTP); its thread and run still come. */
+  | {
+      type: "message.created";
+      channelId: string;
+      messageId: string;
+      message?: Message;
+      threadId?: string | null;
+      agentRunId?: string | null;
+    }
   /** Someone joined or left, or an agent's way of replying changed (agents carry `autoReply`). */
   | {
       type: "channel.member_added" | "channel.member_removed" | "channel.member_updated";
@@ -1221,6 +1236,8 @@ export type ChannelEvent =
       text: string;
       /** Which model call of the run this text belongs to (narration is keyed by it). */
       turn?: number;
+      /** Where `text` starts in its turn's text: past what arrived here, a piece was missed. */
+      at?: number;
     }
   | {
       type: "agent.run";
@@ -1258,6 +1275,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
     } & AgentProposalDecision)
+  /** The right hand looked at a card for someone (ADR 0139): its `meta.actionCard.delegate` now. */
+  | {
+      type: "card.delegate";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      delegate: CardDelegate | null;
+    }
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
   | {
@@ -1525,6 +1550,8 @@ export interface Approval {
   expiresAt: string;
   createdAt: string;
   decidedByUserId: string | null;
+  /** Decided by someone covering this person (ADR 0139): "Aprovado por Bruno, cobrindo Ana". */
+  decidedForUserId?: string | null;
   decidedAt: string | null;
   reason: string | null;
   /** You are the agent's owner or an admin, and it is pending. */
@@ -1773,7 +1800,8 @@ export type ProposalSettingField =
   | "channel_add"
   | "channel_remove"
   | "reply_mode"
-  | "archive";
+  | "archive"
+  | "delete";
 
 /**
  * One line of a settings card: `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or
@@ -5765,6 +5793,8 @@ export type NotificationKind =
   | "computer_disk_full"
   /** ADR 0133: a computer has no Google Chrome for its agents' browsers (who connected it). `source.machineId`. */
   | "computer_no_chrome"
+  /** ADR 0059 §8: someone else took control of the person's agent's desktop. Once a day per agent; `source.agentId`. */
+  | "desktop_taken"
   /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
@@ -5798,7 +5828,90 @@ export type NotificationKind =
    * `source.proposalId` (or `source.messageId` for a new agent's card), `source.agentId` and `label` the agent,
    * `latest.text` why. Done once someone decides.
    */
-  | "change_request";
+  | "change_request"
+  /**
+   * ADR 0141: a person's monthly AI limit, `source.userId` the person, `latest.statusTo`: `warning` (80%, the
+   * person), `reached` (who decides; `reached_notify` to the person when the limit only notifies), `request` (who
+   * decides, waiting, with `raiseToUsd`), `raised` or `refused` (the person). The person's own carry a percent only.
+   */
+  | "usage_limit"
+  /**
+   * ADR 0139: someone chose this person to approve for them (`latest.statusTo` `always` or `while_out`,
+   * `latest.expiresAt` its end), or the covered person hears the cover said no (`declined`) or an admin ended it
+   * (`ended`). The other person is the actor. Inbox only. Opens Configurações › Aprovações.
+   */
+  | "approval_cover"
+  /**
+   * ADR 0139 §2: the right hand approved cards for this person today (`count` how many, `latest.title` the newest
+   * one's agent, `source.agentId` the right hand, its name in `label`). Inbox only.
+   */
+  | "right_hand_decided"
+  /** ADR 0139 §2: three of its decisions undone in a week stopped it. Waiting until it is turned back on. */
+  | "right_hand_paused";
+
+/** "O Gerente aprova por você" (ADR 0139 §2): what the person let the workspace's right hand approve. */
+export interface RightHandApprovals {
+  enabled: boolean;
+  /** Creating agents other agents propose (no apps, open channels). */
+  newAgents: boolean;
+  /** Model on the same AI account, budget and open channels of an existing agent. */
+  agentChanges: boolean;
+  /** What it may add to one agent's budget in a month. */
+  budgetCapNanoUsd: number;
+  guidance: string;
+  /** Three decisions undone in a week stopped it. */
+  pausedAt: string | null;
+  rightHand: { id: string; name: string } | null;
+  /** What the person may decide themselves now: a kind they can't is greyed. */
+  mayDecide: { newAgents: boolean; agentChanges: boolean };
+  caps: { decisionsPerDay: number; newAgentsPerDay: number; monthNanoUsd: number };
+  used: { decisionsToday: number; newAgentsToday: number; monthNanoUsd: number };
+}
+
+export type RightHandApprovalsInput = Partial<
+  Pick<RightHandApprovals, "enabled" | "newAgents" | "agentChanges" | "budgetCapNanoUsd" | "guidance">
+>;
+
+/**
+ * `meta.actionCard.delegate` (ADR 0139 §2): the right hand looked at the card for `forUserId`. Deciding, approved
+ * (Desfazer until `undoUntil`, "Por quê?" reads `reason`), passed with its reason, out of reach, its own chain, a cap
+ * reached, or undone.
+ */
+export interface CardDelegate {
+  agentId: string;
+  forUserId: string;
+  state: "deciding" | "approved" | "passed" | "outside" | "own" | "limit" | "undone";
+  reason?: string;
+  decisionId?: string;
+  at: string;
+  undoUntil?: string;
+  undoneByUserId?: string;
+}
+
+/** "Quem aprova por mim" (ADR 0139): how one cover reads, from either side. */
+export interface ApprovalCoverView {
+  /** Who covers me (`cover`), or whom I cover (`covering`). */
+  userId: string;
+  /** `while_out`: only while the covered person's status says out of office. */
+  mode: "always" | "while_out";
+  /** Merge, deploy and other high-risk actions are in. */
+  risky: boolean;
+  endsAt: string | null;
+  /** Deciding now. */
+  active: boolean;
+}
+
+export interface ApprovalCovers {
+  cover: ApprovalCoverView | null;
+  covering: ApprovalCoverView[];
+}
+
+export interface ApprovalCoverInput {
+  userId: string;
+  mode: "always" | "while_out";
+  risky: boolean;
+  endsAt: string | null;
+}
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5889,6 +6002,15 @@ export interface NotificationLatest {
   failures?: RunFailure[];
   /** `run_failed` on a computer brain: the plan's name its cause names ("Claude"). */
   plan?: string;
+  /** `usage_limit`: the share of the person's limit used. */
+  percent?: number;
+  /** `usage_limit` to who decides: the limit, the raise offered, where the limit comes from, this month's requests. */
+  limitUsd?: number;
+  raiseToUsd?: number;
+  limitFrom?: string;
+  runs?: number;
+  /** `usage_limit`: the share of the requests made with the agent named in `title`. */
+  share?: number;
 }
 
 /** A run a `run_failed` row lists: its agent and where it failed (`key` names both). */
@@ -6001,13 +6123,38 @@ export interface NoticePrefs {
 }
 
 /** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
-export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "forum";
+export type SidebarItem =
+  | "approvals"
+  | "threads"
+  | "issues"
+  | "wiki"
+  | "drive"
+  | "routines"
+  | "calendar"
+  | "forum"
+  | "team";
 /** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
 export type SidebarPlace = "always" | "more" | "auto";
 /** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */
 export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
 /** A section of the sidebar, in the order I put them (`SIDEBAR_SECTIONS` in packages/engine/src/sidebar-items.ts). */
 export type SidebarSection = "tools" | "channels" | "agents" | "people";
+/** How AGENTES orders each group (`AGENT_SORTS` in packages/engine/src/sidebar-items.ts). */
+export type AgentSort = "workspace" | "mine" | "working";
+/** "Fixar no topo": agent, channel and user ids on top of their own section, in order. */
+export interface SidebarPins {
+  agents: string[];
+  channels: string[];
+  people: string[];
+}
+/** How my sidebar shows the agents, and what I pinned, in one workspace (`GET …/me/sidebar/view`). */
+export interface SidebarView {
+  agentSort: AgentSort;
+  /** Who manages agents also lists the ones that don't talk to them. */
+  showAllAgents: boolean;
+  /** Never saved: the apps pin my own agents (`dayOnePins`). */
+  pins: SidebarPins | null;
+}
 
 /**
  * How I look at Tarefas in one workspace (`GET …/me/issues-view`), on every device: `ISSUES_VIEW_DEFAULT` in
@@ -6459,6 +6606,9 @@ export type ScreenKind = "browser" | "desktop";
  * watching took over (`takeover`: no card of its own; its browser card stays
  * with the run it is bound to, `runId`).
  */
+/** Where the person in control sends the agent's page: an address they typed, or the address bar's arrows and reload. */
+export type PageTarget = string | { go: "back" | "forward" | "reload" };
+
 export interface BrowserHandoff {
   id: string;
   agentId: string;
@@ -6518,6 +6668,12 @@ export interface DesktopStatus {
   viewers: number;
   /** This person may take control. */
   canControl: boolean;
+  /**
+   * Why not: `pairer` (only who connected the computer), `owner_plan` (only the agent's owner and admins who manage
+   * agents while it thinks with the owner's plan), `role` (their roles give them the agents' browsers, not the whole
+   * computer), `not_allowed` (neither an admin nor its owner). Absent from older servers.
+   */
+  controlRefusal?: "pairer" | "owner_plan" | "role" | "not_allowed" | null;
   /** The agent is held, or the workspace is on hold: people watch, nobody takes control. */
   held: boolean;
 }
@@ -6725,4 +6881,112 @@ export interface BrowserProfileWait {
   profileId: string;
   name: string;
   holder: BrowserProfileHolder;
+}
+
+/** Where a person's work happened, as the viewer may see it (ADR 0141): never a DM's content. */
+export interface UsagePlace {
+  kind: "channel" | "private" | "hidden" | "routine";
+  channelId?: string;
+  channelName?: string;
+  routineName?: string;
+}
+
+export interface PersonLimitView {
+  percent: number | null;
+  state: "none" | "ok" | "near" | "at";
+  requested: boolean;
+  reachedAt: string | null;
+  /** With money (`view_usage`) only. */
+  monthUsd?: number;
+  limitUsd?: number | null;
+  limitFrom?: "raised" | "person" | "role" | "default" | "owner" | "none";
+  limitRoleId?: string | null;
+  raiseToUsd?: number | null;
+}
+
+export interface PersonLiveWork {
+  personId: string | null;
+  agentId: string;
+  routine: boolean;
+  place: UsagePlace;
+  title: string | null;
+  startedAt: string;
+}
+
+/** `GET …/usage/people`: Uso › Pessoas (ADR 0141), for who sees money. */
+export interface PeopleUsage {
+  month: string;
+  since: string;
+  until: string;
+  totalUsd: number;
+  plansOnly: boolean;
+  limitsOn: boolean;
+  people: (Required<Omit<PersonLimitView, "limitRoleId">> & {
+    limitRoleId: string | null;
+    userId: string;
+    name: string;
+    image: string | null;
+    owner: boolean;
+    roleIds: string[];
+    runs: number;
+    costUsd: number;
+    estimated: boolean;
+    agents: { agentId: string; share: number }[];
+    caresFor: string[];
+    created: number;
+    lastActiveAt: string | null;
+    now: { agentId: string; place: UsagePlace; title: string | null; startedAt: string } | null;
+  })[];
+  live: PersonLiveWork[];
+}
+
+export type PersonUsageRecent =
+  | {
+      kind: "work";
+      agentId: string;
+      place: UsagePlace;
+      title: string | null;
+      startedAt: string;
+      minutes: number;
+      amount: number;
+    }
+  | { kind: "private" | "hidden"; agentId: string; runs: number; amount: number; lastAt: string };
+
+/** `GET …/usage/people/{userId}`: a person's month; `money` false: amounts are percentages of their limit. */
+export interface PersonUsage {
+  userId: string;
+  name: string;
+  image: string | null;
+  roleIds: string[];
+  owner: boolean;
+  money: boolean;
+  renewsAt: string;
+  since: string;
+  until: string;
+  limit: PersonLimitView;
+  total: number;
+  days: { date: string; agents: Record<string, number> }[];
+  agents: { agentId: string; runs: number; amount: number }[];
+  recent: PersonUsageRecent[];
+  created: { agentId: string; createdAt: string }[];
+}
+
+/** The monthly AI limits per person, in US$ (null: no limit); a role not in `roles` uses the default. */
+export interface PersonLimits {
+  defaultUsd: number | null;
+  roles: Record<string, number | null>;
+  people: Record<string, number | null>;
+  onLimit: "block" | "notify";
+  warn: boolean;
+}
+
+/** `meta.actionCard` of the card an agent posts when the person behind its run is at their limit (ADR 0141). */
+export interface PersonLimitCard {
+  kind: "person_limit";
+  state: "limited" | "raised" | "refused";
+  userId: string | null;
+  agentId: string;
+  runId: string;
+  renewsAt: string;
+  byUserId?: string;
 }

@@ -4,8 +4,10 @@ import type {
   AgentDraft,
   AgentProposalCard,
   AiStatus,
+  CardDelegate,
   CostKind,
   CostlyDecision,
+  PersonLimitCard,
   ProposedRoutine,
   Skill,
   SuggestedAi,
@@ -151,6 +153,8 @@ export interface SettingsProposalCard {
   kind: "settings_proposal";
   forUserId: string | null;
   proposalIds: string[];
+  /** The right hand looked at it for the person it is for (ADR 0139 §2). */
+  delegate?: CardDelegate | null;
 }
 
 export type ActionCard =
@@ -163,7 +167,16 @@ export type ActionCard =
   | AgentProposalCard
   | StretchCard
   | UsagePauseCard
-  | CostlyProposalCard;
+  | CostlyProposalCard
+  | PersonLimitCard;
+
+/** The card an agent posts when the person behind its run is at their monthly limit (ADR 0141). */
+export const personLimitCardOf = (meta: Record<string, unknown> | null | undefined): PersonLimitCard | null => {
+  const c = meta?.actionCard as Partial<PersonLimitCard> | undefined;
+  return c?.kind === "person_limit" && typeof c.agentId === "string" && typeof c.state === "string"
+    ? (c as PersonLimitCard)
+    : null;
+};
 
 /**
  * An agent asks before costly work nobody asked for directly (ADR 0131 §3): opening a PR, installing packages, a long
@@ -328,17 +341,27 @@ function routineLine(
 }
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
-  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta) ?? usagePauseCardOf(meta) ?? costlyProposalOf(meta);
+  const proposal =
+    agentProposalOf(meta) ??
+    stretchCardOf(meta) ??
+    usagePauseCardOf(meta) ??
+    costlyProposalOf(meta) ??
+    personLimitCardOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;
   if ((raw as { kind?: unknown }).kind === "settings_proposal") {
-    const r = raw as { forUserId?: unknown; proposalIds?: unknown };
+    const r = raw as { forUserId?: unknown; proposalIds?: unknown; delegate?: CardDelegate | null };
     const proposalIds = Array.isArray(r.proposalIds)
       ? r.proposalIds.filter((id): id is string => typeof id === "string")
       : [];
     return proposalIds.length > 0
-      ? { kind: "settings_proposal", forUserId: typeof r.forUserId === "string" ? r.forUserId : null, proposalIds }
+      ? {
+          kind: "settings_proposal",
+          forUserId: typeof r.forUserId === "string" ? r.forUserId : null,
+          proposalIds,
+          delegate: r.delegate ?? null,
+        }
       : null;
   }
   const card = raw as { kind?: unknown; forUserId?: unknown; params?: unknown };

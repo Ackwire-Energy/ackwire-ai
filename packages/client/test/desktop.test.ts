@@ -10,6 +10,7 @@ import {
   desktopSocketUrl,
   desktopStatusState,
   desktopWithHandoff,
+  drivesOnDesktop,
 } from "../src/index";
 
 const handoff = (over: Partial<BrowserHandoff> = {}): BrowserHandoff => ({
@@ -95,9 +96,23 @@ describe("the agent's screen", () => {
     expect(desktopMode(status({ handoff: handoff({ status: "pending", controllerUserId: null }) }), "me")).toBe(
       "watch",
     );
-    // The browser's handoff, its Chrome showing on the desktop: the same window, watched from here.
-    expect(desktopMode(status({ handoff: handoff({ screen: "browser" }) }), "me")).toBe("watch");
+    // The browser's handoff, its Chrome showing on the desktop: who may drive the screen helps on it, the others
+    // watch it from here (they help in the page).
+    expect(desktopMode(status({ handoff: handoff({ screen: "browser" }), canControl: true }), "me")).toBe("control");
+    expect(desktopMode(status({ handoff: handoff({ screen: "browser" }), canControl: false }), "me")).toBe("watch");
     expect(desktopMode(status(), "me")).toBe("watch");
+  });
+
+  test("a browser request is helped with on the whole screen only by who may drive it, on the screen its window is on", () => {
+    const ask = handoff({ id: "h-ask", screen: "browser", status: "pending", controllerUserId: null });
+    const on = { available: true, canControl: true, handoff: ask };
+    expect(drivesOnDesktop(ask, on)).toBe(true);
+    expect(drivesOnDesktop(ask, { ...on, canControl: false })).toBe(false);
+    // Its browser on another computer than the screen (the screen holds no handoff of it), or no screen at all.
+    expect(drivesOnDesktop(ask, { ...on, handoff: null })).toBe(false);
+    expect(drivesOnDesktop(ask, { ...on, available: false })).toBe(false);
+    expect(drivesOnDesktop(ask, null)).toBe(false);
+    expect(drivesOnDesktop(handoff({ screen: "desktop" }), null)).toBe(true);
   });
 
   test("a handoff that changed: the desktop's own updates its state; another screen's only when it named it", () => {

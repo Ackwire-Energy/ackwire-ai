@@ -19,12 +19,13 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, fieldText, Icon, Text, useTheme, useToast } from "@/ui";
+import { Button, fieldText, Icon, Segmented, Text, useTheme, useToast } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { AccountHead, PlanMeter, UsageCard } from "./parts";
+import { MyUsageCard, PeopleList } from "./people";
 
 /*
  * Uso, as the web's Configurações › Uso (ADR 0063): the plan accounts by computer, each window with every agent's
@@ -49,6 +50,8 @@ export function UsageScreen() {
   useEffect(() => {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
   }, [api, orgId]);
+  // Uso › Pessoas (ADR 0141): each person's month for who sees money, else one's own.
+  const [view, setView] = useState<"summary" | "people">("summary");
   const data = usage.data;
   const machines = new Map<string, PlanAccountUsage[]>();
   for (const a of data?.accounts ?? []) machines.set(a.machineId, [...(machines.get(a.machineId) ?? []), a]);
@@ -59,13 +62,22 @@ export function UsageScreen() {
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
-        {usage.isLoading ? <ActivityIndicator color={c.muted} /> : null}
-        {!usage.isLoading && !data ? (
+        <Segmented
+          value={view}
+          onChange={(v) => setView(v === "people" ? "people" : "summary")}
+          items={[
+            { key: "summary", label: t("peopleUsage.tabs.summary") },
+            { key: "people", label: allowed ? t("peopleUsage.tabs.people") : t("peopleUsage.tabs.mine") },
+          ]}
+        />
+        {view === "people" ? allowed ? <PeopleList /> : <MyUsageCard /> : null}
+        {view === "people" ? null : usage.isLoading ? <ActivityIndicator color={c.muted} /> : null}
+        {view === "people" ? null : !usage.isLoading && !data ? (
           <Text variant="small" tone="muted">
             {t("common.loadFailed")}
           </Text>
         ) : null}
-        {data ? (
+        {data && view === "summary" ? (
           <>
             <UsageCard
               icon="laptop"
@@ -100,12 +112,12 @@ export function UsageScreen() {
             <ApiCard data={data} />
           </>
         ) : null}
-        {composio.data && showsComposioUsage(composio.data) ? (
+        {view === "summary" && composio.data && showsComposioUsage(composio.data) ? (
           <UsageCard icon="chart" title={composioUsageText(t, i18n.language, composio.data)}>
             {null}
           </UsageCard>
         ) : null}
-        {allowed && report.data ? (
+        {view === "summary" && allowed && report.data ? (
           <UsageCard icon="chart" title={t("settings.usageTitle")}>
             <Text variant="small" tone="muted">
               {t("settings.usageTotal", {
@@ -133,7 +145,7 @@ export function UsageScreen() {
             </View>
           </UsageCard>
         ) : null}
-        {allowed ? <DefaultBudgetCard /> : null}
+        {view === "summary" && allowed ? <DefaultBudgetCard /> : null}
       </ScrollView>
     </View>
   );

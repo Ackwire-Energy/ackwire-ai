@@ -1,5 +1,6 @@
 import type { Agent } from "@agenteschat/client";
 import {
+  browserOnlyWhy,
   controlledBy,
   handoffTimeLeft,
   isWaitingHandoff,
@@ -21,7 +22,7 @@ import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, ComputerPortrait, cx, Dialog, gradientOf, Icon, SkyStrip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { type EntrySignal, QueueButton, useAgentMachineId } from "@/components/ComputerQueue";
@@ -38,7 +39,7 @@ import { colorOf } from "../Sky";
 import { SetupWait, useWaitReader } from "../WorkspaceComputer";
 import { CantShowCover, ScreenNotice, Stage } from "./covers";
 import { type AgentComputerView, useAgentComputer } from "./facts";
-import { DialogHead, DialogHeadContext, type DialogHeadSlots } from "./head";
+import { DialogHead, DialogHeadContext, type DialogHeadSlots, type KeptPicture } from "./head";
 import { OpenComputerContext, useOpenComputer } from "./open";
 import "./computer.css";
 
@@ -186,6 +187,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const [full, setFull] = useState(false);
   const [dismissAsk, setDismissAsk] = useState<(() => void) | null>(null);
   const setAsk = useCallback((dismiss: (() => void) | null) => setDismissAsk(() => dismiss), []);
+  const picture = useRef<KeptPicture | null>(null);
   useFullScreen(full, setFull);
   const g = agentGrammar(agent.name);
   const who = { name: agent.name, appearance: lookOf(agent) };
@@ -253,7 +255,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
         agent={agent}
         view={view}
         surface={surface}
-        slots={{ sub, actions: acts, full, setFull, setAsk, say: (text) => say(text, true) }}
+        slots={{ sub, actions: acts, full, setFull, setAsk, say: (text) => say(text, true), picture }}
         onLeave={close}
       />
     </Dialog>
@@ -297,11 +299,18 @@ function ComputerStage({
   const machine = view.machine;
   const computer = computerName(t, org.name, machine);
   const manages = can(org, "manage_agents") || agent.ownerUserId === me.user.id;
+  // Whose role gives no browser here gets Fechar, never "Assumir o navegador" (ADR 0085 §12).
+  const mayBrowser = can(org, agent.ownerUserId === me.user.id ? "own_browsers" : "control_browsers");
   const person = (id: string | null) => (id ? dir.memberById.get(id)?.name : undefined) ?? t("channel.unknownPerson");
   const paused = f?.edition === "selfhost" && machine && isPaused(machine, now) ? machine.paused : null;
   const waiting = waitingFor && isWaitingHandoff(waitingFor, now) ? waitingFor : null;
   const mine = controlledBy(f?.handoff, me.user.id);
   const watching = f ? liveSubLine(t, f, { name: agent.name, person, nowMs: now }) : t("agentComputer.sub.watching");
+  // A picture kept for a view that doesn't come (a cover took the stage) is for none that comes later.
+  const kept = slots.picture;
+  useLayoutEffect(() => {
+    if (surface !== "screen" && surface !== "page") kept.current = null;
+  }, [surface, kept]);
   const head: DialogHeadSlots = { ...slots, watching };
   const refused = (err: unknown) =>
     slots.say((err as { status?: number }).status === 409 ? t("browser.card.busy") : t("browser.card.openFailed"));
@@ -336,7 +345,11 @@ function ComputerStage({
       <>
         <DialogHead sub="" />
         <Stage>
-          <Cover color={color} icon="lock" text={t("agentComputer.state.forbidden")} />
+          <Cover
+            color={color}
+            icon="lock"
+            text={t(can(org, "own_browsers") ? "agentComputer.state.forbidden" : "agentComputer.state.noRole")}
+          />
         </Stage>
       </>
     );
@@ -431,10 +444,17 @@ function ComputerStage({
             canTakeOver={canTakeOver}
             working={Boolean(f.working) && !mine}
             onHeld={setScreenHeld}
-            {...(manages && f.browser && !view.desktop?.canControl ? { onTakeBrowser: takeBrowser } : {})}
+            {...(manages && mayBrowser && f.browser && !view.desktop?.canControl ? { onTakeBrowser: takeBrowser } : {})}
           />
         ) : (
-          <BrowserCard agentId={agent.id} name={agent.name} handoff={f.handoff} surface canTakeOver={canTakeOver} />
+          <>
+            {((mine && view.desktop?.available && !view.desktop.canControl) ||
+              view.desktop?.reason === "browser_only") && (
+              // A computer with a screen whose browser alone this person drives: the page, labeled, not the screen.
+              <Banner tone="info" text={t("desktop.browserOnly.title")} help={t(browserOnlyWhy(view.desktop), g)} />
+            )}
+            <BrowserCard agentId={agent.id} name={agent.name} handoff={f.handoff} surface canTakeOver={canTakeOver} />
+          </>
         )}
       </>
     );
@@ -592,7 +612,7 @@ function Banner({
   help,
   action,
 }: {
-  tone: "pause" | "warn";
+  tone: "pause" | "warn" | "info";
   text: string;
   help?: string;
   action?: ReactNode;

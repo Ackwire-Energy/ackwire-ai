@@ -86,6 +86,24 @@
     "fromAdmin": "「管理者」から",
     "viaAdmin": "管理者としてすべて",
     "nothing": "なし",
+    "computer": {
+      "title": "エージェントのコンピューター",
+      "levels": {
+        "none": "なし",
+        "browser": "ブラウザのみ",
+        "full": "コンピューター全体"
+      },
+      "every": {
+        "none": "全員がすでにできることのみ",
+        "browser": "どのエージェントのブラウザとログインのリクエストも。画面全体やターミナルは不可",
+        "full": "どのエージェントの画面全体、操作、ターミナルも"
+      },
+      "own": {
+        "none": "エージェントのコンピューターやブラウザ、ログインのリクエストを誰も見たり使ったりできません",
+        "browser": "自分のエージェントのブラウザと自分宛てのログインのリクエスト。画面全体は不可",
+        "full": "自分のエージェントと自分が接続したコンピューターの画面全体とターミナル"
+      }
+    },
     "everyoneNote": "ワークスペースのすべての人に適用されます。ほかのロールはこれに権限を追加するだけです。",
     "summary": {
       "owner": "常にすべてのことができます。どのワークスペースにも少なくとも1人のオーナーがいます。",
@@ -244,6 +262,24 @@
       "desc": "デスクトップとブラウザを操作できます。",
       "short": "画面を操作",
       "say": "エージェントの画面を操作"
+    },
+    "control_browsers": {
+      "title": "エージェントのブラウザを使う",
+      "desc": "どのエージェントのブラウザも見て操作し、ログインのリクエストに対応できます。",
+      "short": "エージェントのブラウザを使う",
+      "say": "エージェントのブラウザを使えます"
+    },
+    "own_computers": {
+      "title": "自分のエージェントのコンピューターを使う",
+      "desc": "担当するエージェントと自分が接続したコンピューターの画面全体とターミナル。",
+      "short": "自分のエージェントのコンピューターを使う",
+      "say": "自分のエージェントのコンピューターを使えます"
+    },
+    "own_browsers": {
+      "title": "自分のエージェントのブラウザを使う",
+      "desc": "担当するエージェントのブラウザと、自分宛てのログインのリクエスト。",
+      "short": "自分のエージェントのブラウザを使う",
+      "say": "自分のエージェントのブラウザを使えます"
     },
     "manage_connectors": {
       "title": "アプリを接続",
@@ -1055,6 +1091,7 @@
     "copyText": "テキストをコピー",
     "textCopied": "テキストをコピーしました。",
     "copyLink": "リンクをコピー",
+    "openComputer": "コンピューターを開く",
     "linkCopied": "リンクをコピーしました。",
     "saveToWiki": "Wikiに保存",
     "pin": "メッセージをピン留め",
@@ -1094,6 +1131,63 @@
     "none": {
       "terms": "このサーバーには利用規約のページがありません",
       "privacy": "このサーバーにはプライバシーのページがありません"
+    }
+  },
+  "approvalCover": {
+    "title": "代わりに承認する人",
+    "subtitle": "あなたへの依頼をあなたの名前で決めます。その人自身の依頼は決めません。",
+    "person": "人",
+    "nobody": "なし",
+    "when": "いつ",
+    "whenHelp": "不在：ステータスが不在のときです。",
+    "whileOut": "不在のときだけ",
+    "always": "常に",
+    "until": "期限",
+    "noDate": "期限なし",
+    "clearDate": "期限を外す",
+    "risky": "マージ、デプロイなどのリスクのある操作",
+    "riskyOff": "オフ：これらはあなただけが決めます。",
+    "riskyOn": "オン：これらもこの人が決めます。",
+    "lock": "常にあなたが決めるもの：お金、人とロール、AIキー、あなたのメールボックス、削除。",
+    "coveringTitle": "あなたが代わりに承認する人",
+    "coveringSubtitle": "この人たちへの依頼はあなたにも届き、その人の名前で決めます。あなた自身の依頼は決めません。",
+    "coveringWhileOut": "不在のとき",
+    "coveringUntil": "{{date}}まで",
+    "coveringNow": "代理中",
+    "decline": "代理をやめる",
+    "failed": "保存できませんでした。もう一度お試しください。"
+  },
+  "rightHandApprovals": {
+    "title": "{{name}}があなたの代わりに承認",
+    "subtitle": "あなた自身の依頼から来たものだけ。承認しないものはあなたに回します。",
+    "newAgents": "他のエージェントが提案したエージェントを作成",
+    "newAgentsHelp": "アプリなし、公開チャンネルのみ。24時間は取り消せます。",
+    "agentChanges": "エージェントのモデル、予算、チャンネルを変更",
+    "agentChangesHelp": "モデルは同じ AI アカウント内のみ。",
+    "cantDecide": "現在あなたはこれを決められません",
+    "budget": "エージェントごとの追加予算",
+    "budgetHelp": "それを超えると依頼はあなたに届きます。",
+    "perMonth": "/月",
+    "guidanceLabel": "{{name}}があなたの代わりにどう決めるか",
+    "guidanceHelp": "{{name}}は決める前にこれを読みます。任意です。",
+    "guidancePlaceholder": "例: 重複するエージェントは作らない\n新しいエージェントには安いモデルだけ\n顧客のチャンネルには入れない",
+    "paused": "一時停止中: 今週その決定を3回取り消しました。いつでもオンに戻せます。",
+    "card": {
+      "deciding": "{{name}}が{{for}}の代わりに確認しています…",
+      "approved": "{{name}}が{{for}}の代わりに承認",
+      "passed": "{{name}}があなたに回しました",
+      "passedWhy": "{{name}}があなたに回しました: {{reason}}",
+      "outside": "{{name}}に任せた範囲の外です",
+      "own": "{{name}}は自分の依頼は決めません",
+      "limit": "{{name}}は今日の上限に達しました。これはあなたが決めます",
+      "undoneByYou": "あなたが取り消しました",
+      "undoneBy": "{{name}}が取り消しました",
+      "why": "理由",
+      "undo": "取り消す",
+      "undoArchives": "取り消すと{{name}}をアーカイブします。{{until}}まで有効です。",
+      "undoSettings": "取り消すと設定が元に戻ります。{{until}}まで有効です。",
+      "approvedForYou": "{{name}}があなたの代わりに承認",
+      "decidingForYou": "{{name}}があなたの代わりに確認しています…"
     }
   },
   "noticePrefs": {
@@ -1183,14 +1277,14 @@
       "drive": "ファイル、レポート、表",
       "routines": "エージェントが時間どおりに自動で行うこと",
       "calendar": "会議と締め切り",
-      "forum": "決定に複数の意見が必要なとき"
+      "forum": "決定に複数の意見が必要なとき",
+      "team": "誰が誰か：メンバー、エージェント、そのグループ"
     },
     "customizeSidebar": "サイドバーをカスタマイズ",
     "sidebarMenu": {
       "title": "サイドバー",
       "newChannel": "新しいチャンネル",
       "addToChannels": "新しいチャンネルまたはカテゴリ",
-      "addToDms": "新しいメッセージまたはエージェント",
       "newMessage": "新しいメッセージ",
       "addMembers": "人またはエージェントを追加",
       "channelSettings": "チャンネルの設定",
@@ -1306,7 +1400,45 @@
     "delete": "グループを削除",
     "deleteTitle": "グループ「{{name}}」を削除しますか？",
     "deleteText": "グループ内のエージェントは「エージェント」に戻ります。",
-    "dropHere": "ここにエージェントをドラッグ"
+    "dropHere": "ここにエージェントをドラッグ",
+    "moved": "{{name}} をグループ「{{group}}」に移動しました",
+    "movedOut": "{{name}} をグループ「{{group}}」から外しました",
+    "undo": "元に戻す"
+  },
+  "sidebarAgents": {
+    "options": "エージェントのオプション",
+    "add": "新しいエージェントまたはグループ",
+    "order": "並び順",
+    "sort": {
+      "workspace": "ワークスペースの順",
+      "mine": "自分のエージェントを先に",
+      "working": "作業中を先に"
+    },
+    "showAll": "自分と話さないエージェントも表示",
+    "collapseAll": "すべて折りたたむ",
+    "expandAll": "すべて展開",
+    "organize": "チームでグループを整理",
+    "seeAll_other": "{{count}} 件のエージェントをすべて見る",
+    "createFirst": "最初のエージェントを作成",
+    "working_other": "{{count}} 件が作業中",
+    "count_other": "エージェント {{count}} 件",
+    "workingIn": "#{{channel}} で作業中",
+    "talksOnly": "{{name}} とだけ話します",
+    "talksOnlyMore_other": "{{name}} とほか {{count}} 件とだけ話します",
+    "changeGroup": "グループを変更",
+    "newGroupWith": "{{name}} で新しいグループ",
+    "dmsEmpty": "メンバーとの会話はここに表示されます。"
+  },
+  "sidebarPins": {
+    "pin": "上部に固定",
+    "unpin": "固定を解除",
+    "pinned": "上部に固定済み",
+    "hint": "自分のエージェントは上部に固定されます。会話を右クリックすると固定できます。",
+    "full": {
+      "agents": "すでにエージェントを 5 件固定しています。固定するには 1 件解除してください。",
+      "channels": "すでにチャンネルを 5 件固定しています。固定するには 1 件解除してください。",
+      "people": "すでにメンバーを 5 人固定しています。固定するには 1 人解除してください。"
+    }
   },
   "openOnPhone": {
     "qr": "agentesアプリにログインするためのQRコード",
@@ -1460,7 +1592,6 @@
       "thinking": "考え中",
       "writing": "書いています"
     },
-    "autoReplyChip": "メンションなしで返信",
     "more": "メッセージのその他の操作",
     "copyLink": "リンクをコピー",
     "linkCopied": "リンクをコピーしました。",
@@ -1541,12 +1672,13 @@
     "typing_other": "{{names}}が入力中…",
     "callAgent": "エージェントを呼ぶ",
     "callAgentMenu": "このチャンネルのエージェント",
-    "newMessages": "新しいメッセージ",
+    "toLatest": "最新のメッセージへ",
     "newPill": {
-      "label": "新しいメッセージ: {{text}}",
+      "label": "最新のメッセージへ: {{text}}",
       "count_other": "{{count}}件の新着",
       "more": "{{names}}ほか{{count}}人",
-      "writing": "{{name}}が入力中"
+      "writing": "{{name}}が入力中",
+      "mentionsYou": "メンションされました"
     },
     "unreadDivider": "新着",
     "offline": "接続されていません。送信したものは、接続が戻ると自動で送られます。",
@@ -1696,6 +1828,7 @@
         "budget": "エージェントの予算を変えられるのは管理者だけです",
         "owner": "エージェントの責任者を変えられるのは管理者だけです",
         "archive": "エージェントをアーカイブできるのは管理者だけです",
+        "delete": "エージェントを削除できるのは管理者だけです",
         "audience": "話せる人を変えられるのは管理者と責任者だけです",
         "channels": "チャンネルを変えられるのは管理者と責任者だけです",
         "ai_account": "割り当てられるのはアカウントの持ち主だけです",
@@ -1720,9 +1853,19 @@
       "somePeople": "一部の人",
       "active": "有効",
       "archived": "アーカイブ済み",
+      "deleted": "削除済み",
       "notIn": "チャンネル外",
       "withoutMention": "自分の判断で",
       "mentionOnly": "メンションされたときだけ"
+    },
+    "remove": {
+      "archiveTitle_other": "{{count}}体のエージェントをアーカイブしますか？",
+      "deleteTitle_other": "{{count}}体のエージェントを完全に削除しますか？",
+      "archiveAll": "すべてアーカイブ",
+      "deleteAll": "すべて削除",
+      "archiveSome_other": "{{count}}体をアーカイブ",
+      "deleteSome_other": "{{count}}体を削除",
+      "deleteHelp": "指示、メモリー、ルーティンは完全に消えます。メッセージは残ります。"
     }
   },
   "routing": {
@@ -1967,11 +2110,15 @@
     "extraHint": "プランで追加使用量がオンの場合、長い作業は95%を超えても続きます。オフの場合は95%で一時停止し、プランのリセット後に再開します。"
   },
   "usageQueue": {
-    "title_other": "{{agent}}には再開する会話が{{count}}件あります",
-    "line": "{{plan}}のプランがリセットされる{{when}}に再開します。1件ずつ、この順番で進めます。",
-    "lineUnknown": "{{plan}}のプランがリセットされたらすぐに再開します。1件ずつ、この順番で進めます。",
-    "lineBudget": "予算が更新される{{when}}に再開します。管理者が増やせばもっと早く再開します。1件ずつ、この順番で進めます。",
-    "shared": "この順番待ちはプランのものです。{{agents}}は同じアカウントを共有しています。",
+    "back": "{{agent}}は{{when}}に戻ります",
+    "backPlan": "{{agent}}はプランがリセットされたら戻ります",
+    "backBudget": "{{agent}}は予算が更新されたら戻ります",
+    "resuming": "{{agent}}が再開しています",
+    "shared_other": "{{agents}}も同じ{{plan}}のプランを使っています。会話はすべて同じ順番待ちに入ります。",
+    "about": "順番待ちについて",
+    "lists": "会話",
+    "queuedTab": "順番待ち",
+    "skippedTab": "スキップ済み",
     "dm": "{{name}}とのDM",
     "yourDm": "あなたのDM",
     "thread": "#{{channel}}のスレッド",
@@ -1979,25 +2126,20 @@
     "work": "作業: {{name}}",
     "askedBy": "{{names}}の依頼 · {{ago}}",
     "paused": "一時停止 · {{ago}}",
-    "after_other": "その後のメッセージ{{count}}件",
-    "nothingAfter": "その後は何もありません",
-    "wrote_other": "その後{{names}}が書き込みました",
-    "queued": "順番待ち",
-    "answering": "いま返信中",
-    "hidden_other": "+{{count}}件 (あなたが見られない会話)",
+    "answering": "返信中",
+    "hidden_other": "+{{count}}件 (あなたには見えません)",
     "dontRunAll": "どれも実行しない",
-    "confirmAll_other": "{{count}}件の会話を実行しませんか？",
+    "confirmAll_other": "{{count}}件すべてを実行しませんか？",
     "yesDontRun": "はい、実行しない",
     "keep": "そのままにする",
-    "canceledAll_other": "{{count}}件の会話をキャンセルしました。上限が戻っても{{agent}}は返信しません。",
-    "empty": "再開を待っているものはありません。",
+    "canceledAll_other": "{{count}}件の会話をキャンセルしました。{{agent}}は返信しません。",
+    "empty": "プランを待っているものはありません。",
     "waiting_other": "{{count}}件の会話が待機中",
-    "closedTitle_other": "返信が不要だった会話{{count}}件",
-    "closedWhy": "解決済みに見えたため、{{agent}}は返信しませんでした。",
-    "closedLine": "解決済みに見えたため、{{agent}}は返信しませんでした。まだ返信が必要なものがあれば、「それでも返信する」を選んでください。",
-    "seeConversation": "会話を見る",
-    "answeredAnyway": "それでも返信してほしいと頼まれました",
-    "toResume": "再開する会話",
+    "skip_solved": "{{name}}がすでに対応済み",
+    "skip_withdrawn": "{{name}}がもう必要ないと言いました",
+    "skip_task_canceled": "{{name}}がタスクをキャンセルしました",
+    "skip_mixed": "すでに解決済み",
+    "answeredAnyway": "それでも返信中",
     "switchAi": "{{name}}のAIを変更"
   },
   "actionCard": {
@@ -2333,6 +2475,7 @@
     "messageTo": "{{name}}へのメッセージ",
     "audienceEdit": "編集",
     "nowIn": "現在 #{{channel}} で作業中",
+    "answersHere": "ここでは@なしで返信します",
     "more": "その他",
     "of": "{{name}}のプロフィール",
     "presence": "ステータス",
@@ -2431,6 +2574,8 @@
       "provider_down": "AIプロバイダーが停止中 · 自動で再試行します",
       "out_of_plan": "プランの上限に達しました",
       "out_of_budget": "今月の予算を使い切りました",
+      "out_of_planShort": "上限に到達",
+      "out_of_budgetShort": "予算切れ",
       "backAt": "復帰: {{when}}",
       "work": "バックグラウンドで作業中: {{subject}}"
     },
@@ -2660,6 +2805,12 @@
     "outcomeApprovedByYou": "あなたが承認",
     "outcomeRefusedBy": "{{name}}が却下",
     "outcomeRefusedByYou": "あなたが却下",
+    "outcomeApprovedCovering": "{{name}}が{{for}}の代わりに承認",
+    "outcomeRefusedCovering": "{{name}}が{{for}}の代わりに却下",
+    "outcomeApprovedByYouCovering": "あなたが{{for}}の代わりに承認",
+    "outcomeRefusedByYouCovering": "あなたが{{for}}の代わりに却下",
+    "outcomeApprovedCoveringYou": "{{name}}があなたの代わりに承認",
+    "outcomeRefusedCoveringYou": "{{name}}があなたの代わりに却下",
     "refusedByYou": "あなたが却下 · {{when}}",
     "expiresIn": "あと{{time}}で期限切れ",
     "expired": "期限切れ",
@@ -2870,6 +3021,7 @@
       "routineStalled": "<b>{{name}}</b>はルーティンを実行するため、コンピューターを待っています",
       "agentUnreached": "ルーティンが<b>{{name}}</b>を呼び出せませんでした",
       "browserProfileRequest": "<b>{{name}}</b>が<b>{{agent}}</b>用のブラウザプロファイルの追加を求めています",
+      "desktopTaken": "<b>{{name}}</b>が<b>{{agent}}</b>のコンピューターの画面の操作を引き継ぎました",
       "routineWaitingPlan": "<b>{{name}}</b>はルーティンを実行するため、プランのリセットを待っています",
       "planResetUnknown": "{{plan}}は上限がいつリセットされるかを伝えませんでした。<b>{{name}}</b>の作業はまだ待機中です。",
       "catchUpClosed_other": "<b>{{name}}</b>が再開し、返信が不要だった会話{{count}}件をスキップしました",
@@ -2887,9 +3039,29 @@
       "joinSuggestion": "<b>{{by}}</b>が<b>{{name}}</b>を提案しました",
       "changeRequest": "<b>{{name}}</b>が<b>{{agent}}</b>の変更を依頼しています",
       "changeRequestAgent": "<b>{{name}}</b>が新しいエージェントを依頼しています：<b>{{agent}}</b>",
+      "approvalCover": "<b>{{name}}</b>が「代わりに承認する人」にあなたを選びました",
+      "approvalCoverDeclined": "<b>{{name}}</b>はあなたの代わりに承認しなくなりました",
+      "approvalCoverEnded": "<b>{{name}}</b>があなたの代わりに承認する人を解除しました",
+      "rightHandDecided": "<b>{{name}}</b>が今日あなたの代わりに承認した依頼: {{count}}",
+      "rightHandPaused": "<b>{{name}}</b>はあなたの代わりの承認を止めました。今週その決定を3回取り消しました",
       "invitationAccepted": "<b>{{name}}</b>があなたの招待を受けて{{org}}に参加しました",
       "invitationAcceptedAny": "<b>{{name}}</b>があなたの招待を受けました",
-      "reaction_other": "<b>{{names}}</b>があなたのメッセージにリアクションしました"
+      "reaction_other": "<b>{{names}}</b>があなたのメッセージにリアクションしました",
+      "usageLimitWarning": "今月の上限の{{percent}}%を使いました",
+      "usageLimitReachedSelf": "今月の利用上限に達しました",
+      "usageLimitReached": "<b>{{name}}</b>さんが上限{{amount}}に達しました",
+      "usageLimitRequest": "<b>{{name}}</b>さんが上限{{amount}}に達し、追加を求めています",
+      "usageLimitRaised": "<b>{{name}}</b>さんが今月のあなたの上限を引き上げました",
+      "usageLimitRefused": "<b>{{name}}</b>さんが追加利用のリクエストを断りました"
+    },
+    "usageLimit": {
+      "runs_other": "今月{{count}}件のリクエスト",
+      "top": "{{agent}}で{{share}}%",
+      "fromRole": "ロール{{role}}の上限です。",
+      "fromRaised": "今月、上限が引き上げられました。",
+      "fromPerson": "この人に個別に設定された上限です。",
+      "fromDefault": "ワークスペースの既定の上限です。",
+      "line": "{{runs}}。{{from}}"
     },
     "source": {
       "channel": "#{{name}}",
@@ -3668,6 +3840,7 @@
         "credential_wrong_provider": "モデルは{{modelProvider}}のものですが、キーは{{keyProvider}}のものです。",
         "model_unlisted": "OpenRouterでは{{model}}が提供されなくなりました。エージェントの設定で別のモデルを選んでください。",
         "no_ai": "エージェントにAIが接続されていません。",
+        "person_limit": "依頼した人が今月の利用上限に達しました。",
         "org_paused": "ワークスペースのエージェントは一時停止中です。",
         "org_suspended": "ワークスペースは利用できません。",
         "org_deleting": "ワークスペースは削除中です。",
@@ -5353,6 +5526,7 @@
       "agent_archived": "エージェントがアーカイブされました",
       "interrupted": "サーバーの再起動で中断されました",
       "no_ai": "エージェントにAIが接続されていません",
+      "person_limit": "実行されませんでした: 作成者が今月の利用上限に達しました",
       "org_paused": "実行されませんでした: ワークスペースのエージェントが一時停止されていました",
       "org_suspended": "実行されませんでした: ワークスペースが利用できませんでした",
       "org_deleting": "実行されませんでした: ワークスペースが削除中でした",
@@ -8147,6 +8321,7 @@
     },
     "recommended": "おすすめ",
     "free": "無料",
+    "opencodeFreeHint": "ほかの無料モデルは、エージェントのコンピューターの OpenCode で動きます。",
     "modelHelp": "大きいモデルほど深く考え、プランの消費が早くなります。",
     "hidden": "考えるAIを選ぶのは{{owner}}または管理者です。",
     "hiddenAdmins": "考えるAIを選べるのは管理者だけです。",
@@ -9575,6 +9750,13 @@
     "urlHelp": "postgres:// で始まります。末尾のデータベース名は省略できます。サーバーに暗号化して保存され、エージェントを含め誰も再び見られません。",
     "urlPlaceholder": "postgres://ユーザー:パスワード@ホスト/DB",
     "urlInvalid": "postgres://で始まるアドレスを貼り付けるか、「詳細」の項目を入力してください。",
+    "scope": "対象のデータベース",
+    "scopeOne": "このデータベースだけ",
+    "scopeAll": "このサーバーのすべてのデータベース",
+    "scopeAllHelp": "顧客ごとにデータベースがある場合に。エージェントは一覧を見て、クエリごとにデータベースを選びます。",
+    "prefix": "名前の先頭がこれのものだけ",
+    "prefixPlaceholder": "例: customer_",
+    "prefixHelp": "空欄ならすべて。この名前で始まる新しいデータベースは自動で表示されます。",
     "howTitle": "読み取り専用ユーザーの作り方は？",
     "howText": "エージェントはクエリを実行するだけですが、読み取り専用ユーザーにすれば、データベース側でもそれが保証されます。",
     "how": {
@@ -9609,11 +9791,13 @@
         "3": "postgres://agentes_leitura:password@server:5432/database の形でアドレスを作り、ここに貼り付けます。"
       }
     },
+    "howAll": "すべてのデータベースを読むには (Postgres 14 以降)。",
     "openPage": "{{name}}を開く",
     "dedicated": "ヒント: データベースの読み取り専用コピー（レプリカ）があれば、そちらを接続してください。",
     "advancedText": "アドレスの代わりに、またはアドレスの一部を変えたいときに。",
     "host": "サーバー",
     "database": "データベース",
+    "databaseOptional": "すべてのデータベースの場合は省略できます。",
     "password": "パスワード",
     "passwordInvalid": "データベースのパスワードを入力してください。",
     "ssl": "安全な接続",
@@ -9630,10 +9814,22 @@
     },
     "connect": "接続",
     "connectedToast": "{{name}}を接続しました。",
+    "connectedToastAll_other": "{{name}} を {{count}} 個のデータベースと接続しました。",
+    "count_other": "{{count}} 個のデータベース",
+    "prefixRow": "{{prefix}} で始まるデータベース",
+    "refresh": "一覧を更新",
+    "refreshName": "{{name}} のデータベース一覧を更新",
+    "scopeEdit": "データベース",
+    "scopeEditName": "{{name}} のデータベース",
+    "scopeSaved": "{{name}} を保存しました。",
+    "widenTitle": "サーバー全体を開きますか？",
+    "widenTitlePrefix": "対象のデータベースを広げますか？",
+    "widenText_other": "アクセスできる {{count}} 体のエージェントが、このサーバーのすべてのデータベースを読めるようになります。エージェントごとの制限はルールで設定できます。",
+    "widenTextPrefix_other": "アクセスできる {{count}} 体のエージェントが、{{prefix}} で始まるすべてのデータベースを読めるようになります。エージェントごとの制限はルールで設定できます。",
     "testing": {
       "reach": "データベースに接続中…",
-      "tables": "テーブルを確認中…",
-      "databases": "データベースを確認中…"
+      "databases": "データベースを確認中…",
+      "tables": "テーブルを確認中…"
     },
     "canWrite": "このユーザーはデータを変更できます。エージェントは読むだけですが、最も安全なのは読み取り専用ユーザーです（作り方はステップ1を参照）。",
     "toolsLead": "{{name}}でエージェントができること。今は読むだけで、データベースは何も変更されません。",
@@ -9672,22 +9868,22 @@
       "tablesLoading": "テーブルを読み込み中…",
       "tablesError": "今はテーブルを読めませんでした。",
       "tablesHelp": "何もチェックしない＝すべてのテーブル。",
+      "tablesIn": "テーブル ({{database}} で確認)",
+      "databases": "データベース",
+      "databasesAll": "すべて",
+      "databasesSome": "これらだけ",
+      "databasePlaceholder": "データベース名",
+      "databasesHelp": "以下のルールは、このエージェントが読むすべてのデータベースに適用されます。",
       "hidden": "見せない列",
       "hiddenHelp": "テーブル.列の形式で。大文字、スペース、記号を含む名前はダブルクォートで囲みます（customers.\"Tax ID\"）。個人データやパスワードらしき列は、すでに非表示にしてあります。",
       "hiddenPlaceholder": "customers.tax_id",
       "hiddenInvalid": "テーブル.列（またはスキーマ.テーブル.列）の形式で入力してください。大文字、スペース、記号を含む名前は\"ダブルクォート\"で囲みます。",
       "cap": "1日あたりのクエリ数",
       "capHelp": "空欄＝上限なし。",
+      "capHelpAll": "空欄 = 上限なし。すべてのデータベースの合計です。",
       "timeout": "クエリごとの制限時間",
       "timeoutHelp": "これより時間がかかるクエリは、データベースに負荷をかけないようキャンセルされます。",
-      "seconds_other": "{{count}}秒",
-      "databases": "データベース",
-      "databasesAll": "すべて",
-      "databasesSome": "これらだけ",
-      "databasePlaceholder": "データベース名",
-      "databasesHelp": "以下のルールは、このエージェントが読むすべてのデータベースに適用されます。",
-      "tablesIn": "テーブル ({{database}} で確認)",
-      "capHelpAll": "空欄 = 上限なし。すべてのデータベースの合計です。"
+      "seconds_other": "{{count}}秒"
     },
     "agent": {
       "title": "データベース",
@@ -9697,28 +9893,7 @@
       "saved": "{{name}}のデータベースアクセスを保存しました。",
       "allDatabases": "{{name}} のすべてのデータベース",
       "someDatabases_other": "{{name}} の {{count}} 個のデータベース"
-    },
-    "scope": "対象のデータベース",
-    "scopeOne": "このデータベースだけ",
-    "scopeAll": "このサーバーのすべてのデータベース",
-    "scopeAllHelp": "顧客ごとにデータベースがある場合に。エージェントは一覧を見て、クエリごとにデータベースを選びます。",
-    "prefix": "名前の先頭がこれのものだけ",
-    "prefixPlaceholder": "例: customer_",
-    "prefixHelp": "空欄ならすべて。この名前で始まる新しいデータベースは自動で表示されます。",
-    "databaseOptional": "すべてのデータベースの場合は省略できます。",
-    "connectedToastAll_other": "{{name}} を {{count}} 個のデータベースと接続しました。",
-    "howAll": "すべてのデータベースを読むには (Postgres 14 以降)。",
-    "count_other": "{{count}} 個のデータベース",
-    "prefixRow": "{{prefix}} で始まるデータベース",
-    "refresh": "一覧を更新",
-    "refreshName": "{{name}} のデータベース一覧を更新",
-    "scopeEdit": "データベース",
-    "scopeEditName": "{{name}} のデータベース",
-    "scopeSaved": "{{name}} を保存しました。",
-    "widenTitle": "サーバー全体を開きますか？",
-    "widenTitlePrefix": "対象のデータベースを広げますか？",
-    "widenText_other": "アクセスできる {{count}} 体のエージェントが、このサーバーのすべてのデータベースを読めるようになります。エージェントごとの制限はルールで設定できます。",
-    "widenTextPrefix_other": "アクセスできる {{count}} 体のエージェントが、{{prefix}} で始まるすべてのデータベースを読めるようになります。エージェントごとの制限はルールで設定できます。"
+    }
   },
   "mail": {
     "choice": {
@@ -10481,7 +10656,7 @@
     "leadCloud": "エージェントの作業場所: このワークスペース専用の、常に起動しているコンピューター。",
     "about": "このコンピューターについて",
     "how": "コンピューターのしくみ",
-    "hostMissing": "このサーバーもエージェントのコンピューターにできます。手順は<code>SELF_HOSTING.md</code>の「This server as the agents' computer」にあります。",
+    "hostMissing": "このサーバーもエージェントのコンピューターにできます。<guide>やり方を見る</guide>",
     "other": {
       "title": "ほかのコンピューター",
       "text": "自宅のMac miniや別のサーバーなど、コードで接続したもの。何を許可するかは、それぞれのコンピューター側で設定します。",
@@ -11029,7 +11204,8 @@
       "billing": "プランと請求",
       "media": "GIFとステッカー",
       "voice": "音声",
-      "apps": "AIアプリ"
+      "apps": "AIアプリ",
+      "approvals": "承認"
     },
     "sectionText": {
       "account": "あなたのプロフィールと、アプリの表示設定。",
@@ -11043,13 +11219,14 @@
       "skills": "エージェントが必要なときに開くMarkdownの指示。",
       "keys": "あなたのプランと、ワークスペースのAPIキー。",
       "storage": "ワークスペースのファイルの保存先。",
-      "usage": "予算と、今月各エージェントが使った金額。",
+      "usage": "各メンバーと各エージェントのAI利用量と、今月の上限。",
       "audit": "エージェントが会話の外で行ったことと、人が変更したこと。管理者だけが閲覧できます。",
       "import": "ほかのアプリやワークスペースからエージェントを取り込んだり、このワークスペースを好きな場所へ持ち出したりできます。",
       "billing": "このワークスペースのagentes.chatのプラン、カード、請求書は、アプリ外の専用ページにあります。",
       "media": "会話で送れるものと、エージェントがGIFやステッカーを送るタイミング。",
       "voice": "会話でのボイスメッセージと、音声をテキストにするサービス。",
-      "apps": "ClaudeやCursorなどのアプリから、このワークスペースのエージェントにタスクを依頼できます。"
+      "apps": "ClaudeやCursorなどのアプリから、このワークスペースのエージェントにタスクを依頼できます。",
+      "approvals": "エージェントがあなたの承認を待つ依頼をしたとき、あなたの代わりに決める人です。"
     },
     "title": "設定",
     "account": {
@@ -11224,6 +11401,147 @@
         "jev": "エージェントが自分からステッカーを送るのは、Jevを使っている場合だけです。",
         "jevLink": "Jevを設定"
       }
+    }
+  },
+  "peopleUsage": {
+    "tabs": {
+      "summary": "概要",
+      "people": "メンバー",
+      "mine": "あなたの利用"
+    },
+    "view": {
+      "usage": "利用",
+      "limits": "上限"
+    },
+    "title": "メンバー別の利用",
+    "about": "各メンバーがどれだけ、どのエージェントで使っているかを確認できます。プライベートな会話の内容はここに表示されません。",
+    "plansAbout": "プランは支払い済みです。この金額はメンバー間の利用を比べるためだけのものです。",
+    "sub_other": "{{month}} · {{count}}人 · AIに{{amount}}",
+    "periodLabel": "期間",
+    "period": {
+      "month": "今月",
+      "last7": "過去7日間",
+      "last30": "過去30日間",
+      "lastMonth": "先月"
+    },
+    "role": "ロール",
+    "roleAll": "ロール: すべて",
+    "agent": "エージェント",
+    "agentAll": "エージェント: すべて",
+    "chips": {
+      "near": "上限に近い",
+      "at": "上限に到達",
+      "idle": "利用なし"
+    },
+    "summary": {
+      "near": "上限に近い: {{n}}",
+      "at": "上限に到達: {{n}}",
+      "idle": "期間中の利用なし: {{n}}"
+    },
+    "export": "CSVを書き出す",
+    "limitsHint": "上限でメンバーごとの上限を設定",
+    "empty": "今月はまだ誰もエージェントを使っていません。",
+    "owner": "オーナー",
+    "member": "メンバー",
+    "columns": {
+      "person": "メンバー",
+      "now": "いま",
+      "runs": "リクエスト",
+      "agents": "よく使う",
+      "usage": "今月",
+      "caresFor": "担当",
+      "created": "作成"
+    },
+    "now": {
+      "channel": "#{{channel}}で{{agent}}と",
+      "private": "{{agent}}とプライベートな会話中",
+      "hidden": "プライベートチャンネルで{{agent}}と",
+      "routine": "ルーティン {{name}}",
+      "last": "最終利用 {{when}}",
+      "never": "利用なし"
+    },
+    "meter": {
+      "of": "/ {{limit}}",
+      "noLimit": "· 上限なし",
+      "estimate": "API換算で≈ {{amount}}"
+    },
+    "live": {
+      "title": "いま",
+      "routineOf": "{{name}}さんのルーティン"
+    },
+    "from": {
+      "raised": "今月引き上げ",
+      "person": "この人に個別設定",
+      "role": "ロール{{role}}から",
+      "default": "ワークスペースの既定"
+    },
+    "drawer": {
+      "limit": "今月の上限: {{amount}}",
+      "noLimit": "今月は利用上限がありません。",
+      "reached": "{{date}}に上限に到達 · {{used}}使用",
+      "used": "{{used}}使用 · {{percent}}%",
+      "raise": "上限を引き上げる",
+      "raiseTo": "今月の新しい上限 (US$)",
+      "raiseSave": "引き上げる",
+      "raised": "今月の上限を引き上げました",
+      "asked": "追加を依頼済み",
+      "days": "日ごとの利用",
+      "agents": "使ったエージェント",
+      "runs_other": "{{count}}件のリクエスト",
+      "recent": "最近の作業",
+      "untitled": "無題",
+      "with": "{{agent}}と",
+      "minutes": "{{n}}分",
+      "private": "{{agent}}とのプライベートな会話",
+      "hidden": "プライベートチャンネルで{{agent}}と",
+      "routine": "ルーティン {{name}}",
+      "created": "作成したエージェント",
+      "createdAt": "{{date}}に作成",
+      "audit": "監査でエージェントの操作を見る",
+      "noUse": "この期間の利用はありません。"
+    },
+    "limits": {
+      "title": "メンバーごとの利用上限",
+      "lead": "各メンバーが1か月に使えるAIの量で、すべてのエージェントの合計です。本人の依頼と、本人が作成したルーティンが含まれます。",
+      "default": "ワークスペースの既定",
+      "defaultHint": "ロールや例外による上限がない人に適用されます。",
+      "byRole": "ロール別",
+      "people": "例外",
+      "addPerson": "メンバーを追加",
+      "useDefault": "既定を使う",
+      "none": "上限なし",
+      "amount": "月の上限",
+      "rule": "本人の上限が優先されます。ない場合はロールのうち最も高いもの。どちらもない場合は既定です。オーナーには上限がありません。",
+      "whenTitle": "上限に達したとき",
+      "block": "その人のための新しい作業をエージェントが始めなくなる",
+      "notify": "管理者に知らせるだけ",
+      "warn": "80%で知らせる",
+      "warnHint": "本人に通知が届き、100%で管理者にも通知が届きます。",
+      "saved": "上限を保存しました"
+    },
+    "mine": {
+      "title": "今月の上限の{{percent}}%を使いました",
+      "noLimit": "今月は利用上限がありません",
+      "renews": "{{date}}に更新されます。",
+      "near": "上限が近いので、管理者に追加を依頼してください。",
+      "recent": "最近の作業",
+      "ofLimit": "上限の{{percent}}%"
+    },
+    "card": {
+      "title": "今月の利用上限に達しました",
+      "text": "{{date}}に更新されます。今すぐ続けるには管理者に依頼してください。",
+      "ask": "追加を依頼",
+      "asked": "依頼しました",
+      "see": "自分の利用を見る",
+      "other": "{{name}}さんが今月の利用上限に達しました",
+      "raised": "{{name}}さんが今月の上限を引き上げました。続けられます。",
+      "raisedOther": "{{name}}さんが今月の上限を引き上げました",
+      "refused": "{{name}}さんが依頼を断りました。上限は{{date}}に更新されます。"
+    },
+    "actions": {
+      "raise": "今月{{amount}}に引き上げる",
+      "refuse": "断る",
+      "see": "利用を見る"
     }
   },
   "usageViews": {
@@ -11767,6 +12085,7 @@
       "work_end_canceled": "{{minutes}}分後に停止しました。",
       "work_end_canceledBy": "{{minutes}}分後に{{name}}が停止しました。",
       "no_ai": "まだ返信できません。AIが接続されていません。",
+      "person_limit": "依頼した人が今月の利用上限に達しました。今すぐ続けるには管理者に依頼してください。",
       "no_ai_signed_out": "まだ返信できません。AIがログアウトされています。",
       "no_ai_not_signed_in": "まだ返信できません。私のコンピューターで{{brain}}にログインしていません。",
       "action_connect_ai": "AIを接続",
@@ -12361,6 +12680,7 @@
       "noComputer": "{{name}}には接続済みのコンピューターがありません。",
       "noComputerCloud": "{{name}}のコンピューターを準備しています。",
       "forbidden": "このブラウザを見る権限がありません。",
+      "noRole": "あなたのロールではエージェントのブラウザにアクセスできません。",
       "tooMany": "同時に開いているブラウザが多すぎます。ほかのブラウザが閉じると表示されます。",
       "unavailable": "現在ブラウザを表示できません。再試行しています…",
       "closed": "{{name}}のブラウザは閉じています。",
@@ -12373,7 +12693,12 @@
       "subHidden": "{{person}}が操作中 · 画面は非表示",
       "full": "全画面表示",
       "fullExit": "全画面表示を終了",
-      "goToggle": "サイトを開く",
+      "navBack": "戻る",
+      "navForward": "進む",
+      "navReload": "ページを再読み込み",
+      "paste": "貼り付け",
+      "pasteHint": "コピーした内容をページに貼り付け",
+      "pasteBlocked": "ブラウザーがコピーした内容の読み取りを許可しませんでした。ページで {{keys}} を使ってください。",
       "goLabel": "サイトのアドレス",
       "goPlaceholder": "example.comのようにアドレスを入力",
       "go": "開く",
@@ -12384,7 +12709,8 @@
       "backTitle": "{{name}}に返す",
       "doneTitle": "完了しました。{{name}}へのメモはありますか？",
       "backLabel": "{{name}}へのメモ",
-      "backPlaceholder": "任意: {{name}}に伝えておくことはありますか？"
+      "backPlaceholder": "任意: {{name}}に伝えておくことはありますか？",
+      "addNote": "メモを残す"
     },
     "now": {
       "ready": "{{computer}}で準備完了",
@@ -12715,7 +13041,8 @@
     "ask": {
       "watching": "見ているだけです。",
       "title": "操作を代わりますか？",
-      "working": "あなたが操作している間、{{name}}は一時停止します。"
+      "working": "あなたが操作している間、{{name}}は一時停止します。",
+      "titleBrowser": "ブラウザを操作しますか？"
     },
     "sub": {
       "control": "あなたが操作中 · {{name}}は待機中",
@@ -12729,7 +13056,9 @@
     },
     "retry": "もう一度試す",
     "takeover": "操作を代わる",
+    "takeBrowser": "ブラウザを操作する",
     "taking": "操作を切り替え中…",
+    "returning": "{{name}}に返しています…",
     "clipboard": {
       "got": "{{name}}のコンピューターでコピーされた内容:",
       "copy": "コピー",
@@ -12796,11 +13125,18 @@
       "linuxOnly": "エージェントが自分の画面でアプリを使えるのは、Linuxのコンピューターだけです。",
       "agent": "{{name}}はまだ{{computer}}の自分の画面でアプリを使えません。",
       "agent_female": "{{name}}はまだ{{computer}}の自分の画面でアプリを使えません。"
+    },
+    "browserOnly": {
+      "title": "操作できるのはブラウザだけで、コンピューター全体ではありません",
+      "plan": "{{name}}はオーナーのプランで思考しているため、コンピューター全体を操作できるのはオーナーとエージェントを管理する管理者だけです",
+      "other": "{{name}}のブラウザは操作できますが、コンピューター全体は操作できません",
+      "role": "あなたのロールで使えるのは{{name}}のブラウザで、コンピューター全体ではありません"
     }
   },
   "agentComputer": {
     "title": "{{name}}のコンピューター",
     "open": "開く",
+    "openOf": "{{name}}のコンピューターを開く",
     "help": "ヘルプ",
     "button": "コンピューター",
     "choose": "コンピューターを選択",
@@ -12856,7 +13192,8 @@
       "noScreenHelp": "「ツールとアクセス」で画面またはブラウザを許可してください。",
       "noComputer": "{{name}}のコンピューターを選択してください。",
       "browserOff": "{{computer}}で{{name}}のブラウザがオフになっています",
-      "forbidden": "このコンピューターを見る権限がありません。"
+      "forbidden": "このコンピューターを見る権限がありません。",
+      "noRole": "あなたのロールではエージェントのコンピューターにアクセスできません。"
     },
     "closeAsk": "{{name}}はあなたが戻るのを2分間待ちます。",
     "openAccess": "「ツールとアクセス」を開く",

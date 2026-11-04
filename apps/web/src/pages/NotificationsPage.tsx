@@ -41,6 +41,7 @@ import {
   widgetNoticeOf,
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
+import { usageLimitLine } from "@agenteschat/client/lib/person-usage";
 import { routineNotificationWords } from "@agenteschat/client/lib/routine-view";
 import { secretNoticeLine } from "@agenteschat/client/lib/secret-requests";
 import {
@@ -82,6 +83,7 @@ import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationHref, useNotificationOpener } from "@/components/NotificationOpen";
 import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
+import { UsageLimitActions } from "@/components/PeopleUsage";
 import { AllowTalkButton } from "@/components/ReachLines";
 import { ChangeRequestCard } from "@/components/RightHandCards";
 import { colorOf, prepareBurst } from "@/components/Sky";
@@ -170,6 +172,8 @@ function SourceChip({
   let label = "";
   if (WIDGET_NOTICES.has(n.kind)) [icon, label] = ["grid", t("notifications.source.dashboard")];
   else if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
+  else if (n.kind === "approval_cover" || n.kind === "right_hand_paused")
+    [icon, label] = ["approve", t("settings.section.approvals")];
   else if (n.kind === "join_request" || n.kind === "invitation_accepted")
     [icon, label] = ["members", t("notifications.source.members")];
   else if (n.kind === "composio_limit") [icon, label] = ["wallet", t("notifications.source.usage")];
@@ -180,6 +184,7 @@ function SourceChip({
     n.kind === "computer_ready" ||
     n.kind === "computer_disk_full" ||
     n.kind === "computer_no_chrome" ||
+    n.kind === "desktop_taken" ||
     (n.kind === "browser_handoff" && s.screen === "desktop")
   )
     [icon, label] = ["computer", t("notifications.source.machine")];
@@ -633,13 +638,15 @@ function Row({
   const media = mediaKindOf(l.media);
   const text = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
-    : widgetLine
-      ? widgetLine
-      : why
-        ? sayWords(t, why, l.text ?? "")
-        : media === "voice"
-          ? mediaWord(t, media)
-          : l.text || (media ? mediaWord(t, media) : l.text);
+    : n.kind === "usage_limit"
+      ? usageLimitLine(t, n)
+      : widgetLine
+        ? widgetLine
+        : why
+          ? sayWords(t, why, l.text ?? "")
+          : media === "voice"
+            ? mediaWord(t, media)
+            : l.text || (media ? mediaWord(t, media) : l.text);
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed
@@ -737,6 +744,7 @@ function Row({
                 <ChangeRequestCard n={n} />
               </div>
             )}
+            {n.kind === "usage_limit" && <UsageLimitActions n={n} />}
             {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
               <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
@@ -1107,6 +1115,7 @@ function WaitCard({
             <ChangeRequestCard n={n} />
           </div>
         )}
+        {n.kind === "usage_limit" && <UsageLimitActions n={n} />}
       </WaitRow>
     );
   let meta: ReactNode;
@@ -1344,7 +1353,9 @@ function WaitRow({
       ? null
       : n.kind === "secret_request"
         ? secretNoticeLine(n)
-        : (widgetNoticeLine(t, n, dir) ?? n.latest.title ?? n.latest.text);
+        : n.kind === "usage_limit"
+          ? usageLimitLine(t, n)
+          : (widgetNoticeLine(t, n, dir) ?? n.latest.title ?? n.latest.text);
   const l1 = useRef<HTMLDivElement>(null);
   const wraps = useWraps(l1);
   return (

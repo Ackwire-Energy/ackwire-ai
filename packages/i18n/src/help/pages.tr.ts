@@ -20,7 +20,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Kimin için",
         blocks: [
-          "Bu bilgisayar açıkken sizin ya da küçük bir ekibin kullanması için yapıldı. Daha büyük bir ekip ya da hep açık bir sunucu için agentes.chat'i bir sunucuya kurun ve uygulamada **Sunucuma bağlan** seçeneğini seçin. Verilerinizi sonra oraya taşıyabilirsiniz.",
+          "Bu bilgisayar açıkken sizin ya da küçük bir ekibin kullanması için yapıldı. Daha büyük bir ekip ya da hep açık bir sunucu için [agentes.chat'i bir sunucuya kurun](/help/install-on-a-server) ve uygulamada **Sunucuma bağlan** seçeneğini seçin. Verilerinizi sonra oraya taşıyabilirsiniz.",
         ],
       },
       {
@@ -515,6 +515,143 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Cursor eski bir girişte takılı kaldı:** Cursor'dan çıkın, `~/.mcp-auth` klasörünü silin ve yeniden bağlanın.",
             ],
           },
+        ],
+      },
+    ],
+  },
+  "install-on-a-server": {
+    title: "agentes.chat'i bir sunucuya kurun",
+    summary:
+      "agentes.chat'i kendi sunucunuzda, ücretsiz, tüm ekibiniz için çalıştırın. Tek bir komut her şeyi hazırlar.",
+    sections: [
+      {
+        id: "need",
+        heading: "Gerekenler",
+        blocks: [
+          {
+            list: [
+              "64 bit Linux'lu bir sunucu ya da VPS, x64 veya arm64. Küçük bir ekip için 2 CPU, 4 GB bellek ve 20 GB disk iyi bir başlangıçtır. Denemek için Docker Desktop, OrbStack ya da Colima yüklü bir Mac de olur.",
+              "Compose ile Docker. Linux'ta eksikse kurulum programı önce sorar, sonra kurar.",
+              "Bir erişim yolu: ücretsiz bir Tailscale hesabı (varsayılan, özel, alan adı ve açık port gerekmez) ya da sunucuyu gösteren bir alan adı ve açık 80 ile 443 portları.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "install",
+        heading: "Kurun",
+        blocks: [
+          "Sunucuda şunu çalıştırın:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh",
+          },
+          "Eksikleri kurar, sonra birkaç soru sorar: insanların nasıl erişeceği, e-posta, bu sunucunun ajanlarınızın bilgisayarı da olup olmayacağı ve anonim kullanım istatistikleri gönderip göndermeyeceği. Önerilen cevap için Enter'a basın. `/opt/agentes` içine kurulur (Docker'ı zaten kullanabilen bir kullanıcı için `~/agentes`) ve ilk seferde yaklaşık 2 GB indirir.",
+          "Sonunda sunucunuzun adresini ve telefonunuz için bir QR kodu gösterir. Tekrar çalıştırmak güvenlidir: ayarlarınızı korur ve yalnızca eksik olanı tamamlar.",
+          "Node.js 18 veya daha yenisi varsa, boş bir klasörde `npx @agenteschat/setup` aynı kurulumdur. Node yoksa uygulamanın imajından, geçerli klasörde çalışır ve gerisini başlatan komutlarla biter:",
+          {
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+          },
+        ],
+      },
+      {
+        id: "reach",
+        heading: "İnsanlar nasıl erişir",
+        blocks: [
+          {
+            list: [
+              "**Tailscale**, varsayılan: `https://agentes.<tailnetiniz>.ts.net` adresinde özel HTTPS, yalnızca Tailscale ağınızdaki cihazlar için. Kurmadan önce https://console.tailscale.com/admin/dns sayfasında MagicDNS ve HTTPS'i açın, kurulumun soracağı erişim anahtarını (auth key) https://console.tailscale.com/admin/settings/keys sayfasında oluşturun.",
+              "**Herkese açık bir alan adı**: internetteki herkes açabilir, örneğin `https://chat.example.com` adresinde. Alan adını sunucuya yönlendirin ve 80 ile 443 portlarını açın. Kurulum sertifikayı alır ve yeniler, alan adı yayına girmeden önce de hesabınızı oluşturmanızı ister.",
+              "**Yalnızca bu makine**: `http://localhost:3000`, kendi bilgisayarınızda denemek için.",
+            ],
+          },
+          "Tailscale'de sunucu, anahtarının süresi 180 gün sonra dolunca ağınızdan çıkar. Kalması için https://console.tailscale.com/admin/machines sayfasında sunucunun **⋯** menüsünü açıp **Disable Key Expiry** seçin.",
+          "Rutin başlatan webhook'lar ve kendi sunucularından çağrı yapan yapay zekâ uygulamaları herkese açık bir adrese ihtiyaç duyar. Tailscale'de Funnel aynı adresi internete açar: https://console.tailscale.com/admin/acls sayfasında Funnel'ı tailnet politikanıza ekleyin ve `.env` içinde `TAILSCALE_FUNNEL=true` ayarlayın, sonra `docker compose up -d` çalıştırın.",
+        ],
+      },
+      {
+        id: "owner",
+        heading: "Hesabınız",
+        blocks: [
+          "Sunucunuzun adresini açın ve kaydolun: ilk hesap sahip olur. Ardından kayıt kapanır ve insanlar **Ayarlar\u00a0›\u00a0Üyeler ve davetler** üzerinden gönderilen davetle katılır.",
+          "Tailscale'de davet ettiğiniz kişilerin de tailnet'inizde olması gerekir. Onları önce https://console.tailscale.com/admin/users sayfasında, sonra agentes.chat'te davet edin.",
+        ],
+      },
+      {
+        id: "email",
+        heading: "E-posta",
+        blocks: [
+          "E-posta yoksa agentes.chat her e-postayı göndermek yerine günlüğüne yazar, böylece bir davet bağlantısını oradan kopyalayabilirsiniz. Parola sıfırlama kapalı kalır.",
+          {
+            code: "docker compose logs agentes | grep 'email (not sent'",
+          },
+          "Kurulum kendi posta sunucunuzu (SMTP) ya da MillionSend veya Resend gibi Resend uyumlu bir API anahtarını kabul eder. Başka bir gönderen seçmezseniz e-postalar sunucunuzun alan adındaki `ping@` adresinden gider ve bu alan adının e-posta sağlayıcınızda doğrulanmış olması gerekir. Sonra ayarlamak için kurulumu yeniden çalıştırın.",
+        ],
+      },
+      {
+        id: "phone",
+        heading: "Telefonunuz",
+        blocks: [
+          {
+            list: [
+              "Tailscale'de telefonunuza Tailscale uygulamasını kurun ve aynı tailnet'e giriş yapın.",
+              "agentes.chat uygulamasını kurun.",
+              "Kurulumun gösterdiği QR kodunu ya da **Ayarlar\u00a0›\u00a0Hesabınız\u00a0›\u00a0Telefonunuzda açın** içindekini tarayın. İkincisi oturumunuzu da açar.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "computers",
+        heading: "Ajanlarınızın bilgisayarları",
+        blocks: [
+          "Kurulum bu sunucuyu ajanlarınızın bilgisayarı da yapabilir: komutları orada çalıştırır, bir tarayıcı kullanır ve dosyalarını orada tutarlar. Kurulum sorar ve sunucu bunu iyi kaldırabiliyorsa evet önerir. Linux'ta her ajanın ekranı olan kendi kullanıcısı olur. Hayır dediyseniz kurulumu `--computer yes` ile yeniden çalıştırın:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+          },
+          "agentes.chat uygulamalı bir Mac ya da başka bir sunucu gibi diğer bilgisayarlar **Ayarlar\u00a0›\u00a0Bilgisayarlar** üzerinden bağlanır, [Ajanlarınız için bilgisayarlar](/help/computers) sayfasındaki gibi. Tailscale'de önce tailnet'inize katılırlar.",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "Yedekler ve geri yükleme",
+        blocks: [
+          "Sunucunuz üç şeyden oluşur: veritabanı, yüklenen dosyalar ve `.env` içindeki `AGENTES_SECRET`. `.env` dosyasının bir kopyasını yedeklerden ayrı, güvenli bir yerde tutun: bu sır olmadan, geri yüklenen bir veritabanındaki anahtarlar okunamaz.",
+          "Her gün yedek için Cloudflare R2'de ya da S3 uyumlu başka bir depolamada özel bir bucket ve orada okuyup yazabilen ve silebilen bir anahtar oluşturun. Bunları `.env` içine ekleyin, `COMPOSE_PROFILES` içine de `backup` ekleyin (herkese açık bir alan adıyla `https,backup`):",
+          {
+            code: "S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=…\nS3_SECRET_ACCESS_KEY=…\nS3_BACKUP_BUCKET=agentes-backups\nCOMPOSE_PROFILES=tailscale,backup",
+          },
+          "Ardından kurulum klasöründe `docker compose up -d` çalıştırın. Veritabanının dökümü 03:00 UTC'de alınır ve her döküm 14 gün tutulur. `docker compose run --rm backup now` hemen bir tane alır, `docker compose run --rm backup list` hepsini listeler. Dökümlerde yalnızca veritabanı vardır: `files` biriminde duran yüklenen dosyaların ayrı bir kopyası gerekir, komutları aşağıdaki tam kılavuzda.",
+          "Geri yüklemek için bir dökümü `docker compose run --rm -T backup fetch <ad> > agentes.dump` ile indirin, sonra uygulama durmuşken boş bir veritabanına yükleyin:",
+          {
+            code: "docker compose stop agentes\ndocker compose exec -T postgres dropdb -U agentes --force agentes\ndocker compose exec -T postgres createdb -U agentes agentes\ndocker compose exec -T postgres pg_restore -U agentes -d agentes --exit-on-error < agentes.dump\ndocker compose start agentes",
+          },
+          "Dökümü alan sürüme ya da daha yeni bir sürüme geri yükleyin.",
+        ],
+      },
+      {
+        id: "upgrades",
+        heading: "Güncellemeler",
+        blocks: [
+          "Kurulum klasöründe şunu çalıştırın:",
+          {
+            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+          },
+          "Yeni sürüm başlarken veritabanı kendini günceller. Ayarlarınızı `.env` içinde tutun ve `docker-compose.yml` dosyasını asla düzenlemeyin, çünkü her güncelleme onu değiştirir. Büyük bir sıçramadan önce yedek alın: daha yeni bir sürümün güncellediği bir veritabanı eski bir sürümde açılmaz.",
+        ],
+      },
+      {
+        id: "data",
+        heading: "Ne gönderir",
+        blocks: [
+          "Sunucu günde bir kez agentes.chat'e anonim kullanım istatistikleri gönderir: kişi, ajan sayısı, makine boyutları, kullanılan yapay zekâ token'ları ve ajanların tarayıcılarının ne kadar veri gönderip aldığı gibi sayılar. Asla mesajlar, dosyalar, adlar ya da siteler. `docker compose run --rm agentes telemetry` tam olarak ne gönderileceğini gösterir. Sahip bunu **Ayarlar\u00a0›\u00a0Genel** içinden ya da `.env` içinde `TELEMETRY=off` ile kapatır.",
+          "Hata raporları, `SENTRY_DSN` ile kendi seçtiğiniz Sentry uyumlu bir sunucu ayarlamadıkça hiçbir yere gitmez. Bir rapor hatayı ve nerede olduğunu içerir, asla mesajları, e-postaları, IP adreslerini, çerezleri ya da token'ları içermez.",
+        ],
+      },
+      {
+        id: "reference",
+        heading: "Tam kılavuz",
+        blocks: [
+          "Tüm ayarlar, nginx gibi kendi proxy'niz, Docker olmadan çalıştırma, kendi kendine kuran yapay zekâ ajanları için bir adım listesi ve bir şey ters gittiğinde ne yapılacağı, agentes.chat deposundaki `SELF_HOSTING.md` dosyasında.",
         ],
       },
     ],

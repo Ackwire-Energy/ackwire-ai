@@ -1,28 +1,31 @@
 import type { DesktopMode, DesktopViewState, Edition, Machine } from "@agenteschat/client";
 import {
   ApiError,
+  browserOnlyWhy,
   DESKTOP_CLOSE,
   desktopCloseState,
   desktopMode,
   desktopRetryMs,
   desktopSocketUrl,
   desktopStatusState,
+  handoffWantsWords,
   useBrowserHandoffMutations,
   useDesktopStatus,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, cx, Icon, InfoHint, onScreenKeyboard, Textarea } from "@agenteschat/ui";
+import { Button, cx, Icon, InfoHint } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
-import { type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { type ReactNode, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow, TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
-import { heldPicture, holdPicture, liveCanvas, showsPicture } from "@/lib/canvas";
+import { heldPicture, holdImage, holdPicture, liveCanvas, pictureOf, showsPicture } from "@/lib/canvas";
 import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { withAgentFace } from "../AgentAvatar";
 import { Cover } from "../browser/BrowserCard";
+import { AskActions, HandBackFoot, useAskControl } from "../computer/control";
 import { CantShowCover, ScreenNotice } from "../computer/covers";
 import { Egress } from "../computer/Egress";
 import { DialogHead, FullButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
@@ -45,14 +48,14 @@ const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdat
 const PICTURE_POLL_MS = 50;
 const PICTURE_WAIT_MS = 10_000;
 /**
- * Handing back opens the screen again as a watcher, on a new socket. Its last picture stays over the new connection
- * until that one draws (`holdPicture`), so the hand back shows no "Abrindo…" and the head says watching as soon as
- * the server does. A connection that hasn't drawn by this long is said to be opening. Taking control holds the picture
- * too, frosted under "Assumindo o controle…" for as long as control takes to open: noVNC drops keys, clicks and pastes
- * until its connection opens, so the picture must never look ready meanwhile. Once it opens, the picture stays clear
- * until control draws, and the pointer goes through it: a first click waits for nothing more than a first key.
+ * Handing back opens the screen again as a watcher, on a new socket or the same one switched. Its last picture stays
+ * over the new connection, dimmed under "Devolvendo ao…", until that one draws (`holdPicture`), so the hand back never
+ * shows the cold "Abrindo…" and the head says watching as soon as the server does. Taking control holds the picture
+ * too, under "Assumindo o controle…" for as long as control takes to open: noVNC drops keys, clicks and pastes until
+ * its connection opens, so the picture must never look ready meanwhile. Once it opens, the picture stays clear until
+ * control draws, and the pointer goes through it: a first click waits for nothing more than a first key. The page's
+ * last picture comes over the same way when the dialog switches from it to the screen (`DialogHeadSlots.picture`).
  */
-const HOLD_MS = 3_000;
 /** A stream that changes mode in place and hasn't this long after the mode changed opens again in the new one. */
 const SWITCH_WAIT_MS = 3_000;
 
@@ -105,16 +108,9 @@ export function DesktopView({
   const [round, setRound] = useState(0);
   const [gaveUp, setGaveUp] = useState(false);
   const [handingBack, setHandingBack] = useState(false);
-  // Control opening over the last picture it watched (`HOLD_MS`).
+  // Control opening over the last picture it watched, or watching again over the last one in control.
   const [taking, setTaking] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const [askPointer, setAskPointer] = useState(false);
-  const quietUntil = useRef(0);
-  const touchAskStart = useRef<{ x: number; y: number } | null>(null);
-  const dismissAsk = useCallback(() => {
-    setAsking(false);
-    quietUntil.current = Date.now() + 20_000;
-  }, []);
+  const [returning, setReturning] = useState(false);
   const [backNote, setBackNote] = useState("");
   const screenRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
@@ -205,23 +201,19 @@ export function DesktopView({
     if (!connect) {
       heldPicture(el)?.remove();
       setTaking(false);
+      setReturning(false);
       return;
     }
-    // While it retries, the cover keeps saying why; a picture held over a hand back stays live, and over control
-    // opening it stays under "Assumindo o controle…"; anything else is a fresh start.
+    // While it retries, the cover keeps saying why; a picture held over a hand back stays under "Devolvendo ao…", and
+    // over control opening under "Assumindo o controle…"; anything else is a fresh start.
     const holding = heldPicture(el) !== null;
     setTaking(holding && modeNow.current === "control");
+    setReturning(holding && modeNow.current !== "control");
     setView((v) => (holding || v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
     let cancelled = false;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let looking: ReturnType<typeof setInterval> | undefined;
-    const goneStale = () =>
-      setTimeout(() => {
-        heldPicture(el)?.remove();
-        setView("connecting");
-      }, HOLD_MS);
-    let stale = holding && modeNow.current !== "control" ? goneStale() : undefined;
     let link: DesktopLink | null = null;
     let rfb: RFB | null = null;
     let session: DesktopMode = modeNow.current;
@@ -249,7 +241,6 @@ export function DesktopView({
         socket.addEventListener("close", (e: CloseEvent) => {
           closed = true;
           clearInterval(looking);
-          clearTimeout(stale);
           // A close that arrives after the next connection took over (watching turned control) leaves that one be.
           if (rfbRef.current === rfb) rfbRef.current = null;
           if (cancelled) return;
@@ -258,6 +249,7 @@ export function DesktopView({
           // Control ended (handed back): it opens again as a watcher over the picture it had; any other close says why.
           if (e.code !== DESKTOP_CLOSE.controlEnded || !holdPicture(el)) {
             heldPicture(el)?.remove();
+            setReturning(false);
             setView(next.state);
           }
           // What changed shows at once (someone took control); a state that blocks it stops the retry.
@@ -289,16 +281,16 @@ export function DesktopView({
             attempts.current = 0;
             // Taking control puts the person's keys on the screen at once (a phone's keyboard waits for its button).
             if (control && !matchesNow(TOUCH)) keysRef.current?.focus({ preventScroll: true });
-            // noVNC takes input now: a picture held over it loses its frost and lets clicks through (`HOLD_MS`).
+            // noVNC takes input now: a picture held over it loses its cover and lets clicks through.
             if (!cancelled) setTaking(false);
             const since = Date.now();
             const look = () => {
               const canvas = liveCanvas(el);
               if (canvas && !showsPicture(canvas) && Date.now() - since < PICTURE_WAIT_MS) return;
               clearInterval(looking);
-              clearTimeout(stale);
               heldPicture(el)?.remove();
               if (cancelled) return;
+              setReturning(false);
               setView("live");
             };
             clearInterval(looking);
@@ -313,12 +305,11 @@ export function DesktopView({
         // showed, as a new socket would in the new mode.
         opened.onSwitch = (m) => {
           clearInterval(looking);
-          clearTimeout(stale);
           const held = holdPicture(el);
           if (rfbRef.current === rfb) rfbRef.current = null;
           rfb?.disconnect();
           setTaking(held && m === "control");
-          stale = held && m !== "control" ? goneStale() : undefined;
+          setReturning(held && m !== "control");
           if (!held) setView("connecting");
           start(m);
           void refetch();
@@ -337,7 +328,6 @@ export function DesktopView({
       network?.removeEventListener("change", adjustEncoding);
       clearTimeout(timer);
       clearInterval(looking);
-      clearTimeout(stale);
       if (rfbRef.current === rfb) rfbRef.current = null;
       if (linkRef.current === link) linkRef.current = null;
       if (closed) return;
@@ -358,6 +348,23 @@ export function DesktopView({
       end();
     };
   }, [connect, round, org.id, agentId, createSocket, refetch, copiedThere]);
+  // The page's last picture, when the dialog switches from it to the screen, waits here dimmed for the screen's
+  // first one; going, the screen leaves its own for the page. Layout effects: the one leaving writes it before the one
+  // coming reads it, and nothing paints in between.
+  const kept = head?.picture;
+  useLayoutEffect(() => {
+    const el = screenRef.current;
+    if (!el || !kept) return;
+    if (kept.current && kept.current.control !== (modeNow.current === "control")) {
+      holdImage(el, kept.current.src);
+      setView("live");
+    }
+    kept.current = null;
+    return () => {
+      const src = pictureOf(el);
+      kept.current = src ? { src, control: modeNow.current === "control" } : null;
+    };
+  }, [kept]);
   useEffect(() => {
     const back = (e: PageTransitionEvent) => {
       if (e.persisted) setRound((r) => r + 1);
@@ -382,51 +389,15 @@ export function DesktopView({
 
   const shown: DesktopViewState = blocked ?? view;
   const live = shown === "live";
-  const offer = live && !inControl && !taking && !head?.full && !s?.controllerUserId && canTakeOver;
+  // Handing back or taking, the last picture stays in sight under what is happening: never a cold cover.
+  const switching = actions.done.isPending || actions.takeover.isPending || taking || returning;
+  const offer = live && !inControl && !switching && !head?.full && !s?.controllerUserId && canTakeOver;
   const mayTake = Boolean(s?.canControl || onTakeBrowser);
-  useEffect(() => {
-    if (!offer) setAsking(false);
-  }, [offer]);
-  const setAsk = head?.setAsk;
-  useEffect(() => {
-    if (!asking || !offer) return;
-    setAsk?.(dismissAsk);
-    return () => setAsk?.(null);
-  }, [asking, offer, setAsk, dismissAsk]);
-  useEffect(() => {
-    if (!offer) return;
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && asking && !setAsk) {
-        e.preventDefault();
-        dismissAsk();
-        return;
-      }
-      if (
-        asking ||
-        Date.now() < quietUntil.current ||
-        e.key.length !== 1 ||
-        e.key === " " ||
-        e.ctrlKey ||
-        e.metaKey ||
-        e.altKey ||
-        e.isComposing
-      )
-        return;
-      const target = e.target as Element | null;
-      if (target?.closest?.('button,a,input,textarea,select,[contenteditable="true"],[role="button"],[role="textbox"]'))
-        return;
-      e.preventDefault();
-      setAskPointer(false);
-      setAsking(true);
-    };
-    document.addEventListener("keydown", key);
-    return () => document.removeEventListener("keydown", key);
-  }, [offer, asking, setAsk, dismissAsk]);
-  const askFromPointer = () => {
-    if (!offer || asking || Date.now() < quietUntil.current) return;
-    setAskPointer(true);
-    setAsking(true);
-  };
+  // Only the browser is theirs to drive here: the button and the question say so, and why.
+  const browserOnly = !s?.canControl && Boolean(onTakeBrowser);
+  const takeLabel = t(browserOnly ? "desktop.takeBrowser" : "desktop.takeover");
+  const whyBrowser = browserOnly ? t(browserOnlyWhy(s), g) : undefined;
+  const ask = useAskControl(offer);
   const settled = SETTLED.includes(shown);
   // A cover only a person's own step changes (`SETTLED`): the window's foot keeps no line under it.
   const final = settled && !live;
@@ -434,7 +405,7 @@ export function DesktopView({
   const held = shown === "held";
   useEffect(() => onHeld?.(held), [held, onHeld]);
   const handoff = s?.handoff ?? null;
-  const ask = inControl && handoff?.kind === "ask" ? handoff.instructions : null;
+  const asked = inControl && handoff?.kind === "ask" ? handoff.instructions : null;
   // Until the screen's state says who (right after a 4409), someone.
   const controllerName =
     (s?.controllerUserId ? dir.memberById.get(s.controllerUserId)?.name : undefined) ?? t("channel.unknownPerson");
@@ -478,7 +449,7 @@ export function DesktopView({
   const back = useHandBack(handoff?.kind !== "ask");
   // Over a cover the head says nothing the cover says (opening, the pause, why not): only who holds the screen.
   const sub = inControl
-    ? ask
+    ? asked
       ? t("desktop.sub.controlAsked", g)
       : t("desktop.sub.control", g)
     : shown === "hidden"
@@ -558,15 +529,16 @@ export function DesktopView({
           className="cmp-take"
           loading={actions.takeover.isPending}
           onClick={s?.canControl ? takeover : onTakeBrowser}
+          title={whyBrowser}
         >
-          <span className="cmp-act-label">{t("desktop.takeover")}</span>
+          <span className="cmp-act-label">{takeLabel}</span>
         </Button>
       )}
     </>
   );
   const controlActs = (
     <>
-      {ask && (
+      {asked && (
         <Button
           size="sm"
           variant="ghost"
@@ -607,23 +579,14 @@ export function DesktopView({
           </>
         }
       />
-      {ask && <p className="cmp-asked">“{ask}”</p>}
+      {asked && <p className="cmp-asked">“{asked}”</p>}
       <div
         className="brw-ac__stage dsk-stage"
+        {...ask.stage}
         onPointerDownCapture={(e) => {
           // noVNC cancels its own mousedown, so the field keeps the focus a click on the screen gives it.
           if (inControl && e.pointerType !== "touch") keysRef.current?.focus({ preventScroll: true });
-          else if (e.pointerType !== "touch" && e.button === 0) askFromPointer();
-          else if (e.pointerType === "touch") touchAskStart.current = { x: e.clientX, y: e.clientY };
-        }}
-        onPointerUp={(e) => {
-          const start = touchAskStart.current;
-          touchAskStart.current = null;
-          if (e.pointerType === "touch" && start && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 12)
-            askFromPointer();
-        }}
-        onPointerCancel={() => {
-          touchAskStart.current = null;
+          else ask.stage.onPointerDownCapture?.(e);
         }}
       >
         <div
@@ -646,73 +609,61 @@ export function DesktopView({
             onBlur={() => setTyping(false)}
           />
         )}
-        {shown !== "live"
-          ? cover[shown]
-          : (taking || (inControl && screenMode === "watch")) && (
-              <Cover color={color} spinner text={t("desktop.taking")} />
-            )}
-        {asking && offer && (
-          <Cover
-            className="dsk-ask"
-            color={color}
-            icon={mayTake ? "person" : "eye"}
-            text={t(mayTake ? "desktop.ask.title" : "desktop.ask.watching")}
-            help={mayTake && working ? t("desktop.ask.working", g) : undefined}
-            onDismiss={dismissAsk}
-            action={
-              mayTake ? (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  icon="person"
-                  autoFocus={askPointer}
-                  loading={actions.takeover.isPending}
-                  onClick={() => {
-                    if (s?.canControl) takeover();
-                    else onTakeBrowser?.();
-                  }}
-                >
-                  {t("desktop.takeover")}
-                </Button>
-              ) : undefined
-            }
-          />
+        {shown !== "live" ? (
+          cover[shown]
+        ) : taking || actions.takeover.isPending || (inControl && screenMode === "watch") ? (
+          <Cover clear color={color} spinner text={t("desktop.taking")} />
+        ) : returning || actions.done.isPending || (!inControl && screenMode === "control") ? (
+          <Cover clear color={color} spinner text={t("desktop.returning", g)} />
+        ) : (
+          ask.asking && (
+            <Cover
+              className="dsk-ask"
+              clear
+              color={color}
+              icon={mayTake ? "person" : "eye"}
+              text={t(
+                !mayTake ? "desktop.ask.watching" : browserOnly ? "desktop.ask.titleBrowser" : "desktop.ask.title",
+              )}
+              help={whyBrowser ?? (mayTake && working ? t("desktop.ask.working", g) : undefined)}
+              action={
+                <AskActions
+                  onCancel={ask.cancel}
+                  take={
+                    mayTake && (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        icon="person"
+                        loading={actions.takeover.isPending}
+                        onClick={() => {
+                          if (s?.canControl) takeover();
+                          else onTakeBrowser?.();
+                        }}
+                      >
+                        {takeLabel}
+                      </Button>
+                    )
+                  }
+                />
+              }
+            />
+          )
         )}
       </div>
       {inControl &&
         (handingBack ? (
-          // Pronto or Devolver: an optional word to the agent, which it reads as the person's own. One line that grows
-          // as it wraps (`.brw-ac__note`), so all of a note stays in sight. Enter hands back as in the chat:
-          // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
-          <div className="brw-ac__foot brw-ac__fail">
-            <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
-            <Textarea
-              rows={1}
-              autoGrow
-              className="brw-ac__note"
-              autoFocus
-              value={backNote}
-              onChange={(e) => setBackNote(e.target.value)}
-              placeholder={t("browser.inCard.backPlaceholder", g)}
-              aria-label={t("browser.inCard.backLabel", g)}
-              maxLength={1000}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setHandingBack(false);
-                if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
-                e.preventDefault();
-                finish();
-              }}
-            />
-            <div className="brw-ac__row">
-              <span className="brw-grow" />
-              <Button size="sm" variant="ghost" onClick={() => setHandingBack(false)}>
-                {t("browser.live.back")}
-              </Button>
-              <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
-                {handBackLabel}
-              </Button>
-            </div>
-          </div>
+          <HandBackFoot
+            title={handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}
+            label={handBackLabel}
+            grammar={g}
+            note={backNote}
+            onNote={setBackNote}
+            noteFirst={handoffWantsWords(handoff)}
+            pending={actions.done.isPending}
+            onBack={finish}
+            onCancel={() => setHandingBack(false)}
+          />
         ) : (
           <div className="dsk-line">
             {touch && (

@@ -165,6 +165,49 @@ export async function routinePostRun(
   return row?.agentRunId ?? null;
 }
 
+/**
+ * The agents a run's chain passed through, from `runId` back to its root (the run's agent, then each agent whose
+ * message or run woke the one after it), the runs themselves, and the person's message it started from, if one did. The
+ * right hand never decides a card its own run is part of (ADR 0139 §2). Null when the chain is broken or too long.
+ */
+export async function runChain(
+  db: Executor,
+  orgId: string,
+  runId: string,
+): Promise<{ agentIds: string[]; runIds: string[]; rootMessageId: string | null } | null> {
+  const seen = new Set<string>();
+  const runIds: string[] = [];
+  let id: string | null = runId;
+  for (let depth = 0; id && depth <= MAX_AUTHORITY_CHAIN; depth++) {
+    const [run] = await db
+      .select({
+        agentId: agentRuns.agentId,
+        triggerMessageId: agentRuns.triggerMessageId,
+        background: agentRuns.background,
+      })
+      .from(agentRuns)
+      .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, id)));
+    if (!run) return null;
+    seen.add(run.agentId);
+    runIds.push(id);
+    if (run.background) return { agentIds: [...seen], runIds, rootMessageId: null };
+    const [m] = await db
+      .select({
+        authorType: messages.authorType,
+        authorAgentId: messages.authorAgentId,
+        agentRunId: messages.agentRunId,
+        meta: messages.meta,
+      })
+      .from(messages)
+      .where(and(eq(messages.orgId, orgId), eq(messages.id, run.triggerMessageId)));
+    if (!m) return null;
+    if (m.authorType === "person") return { agentIds: [...seen], runIds, rootMessageId: run.triggerMessageId };
+    if (m.authorAgentId) seen.add(m.authorAgentId);
+    id = returnsTo(m.meta) ?? m.agentRunId ?? (await routinePostRun(db, { orgId, ...m }));
+  }
+  return id ? null : { agentIds: [...seen], runIds, rootMessageId: null };
+}
+
 /** The person behind a message (see `messageRoot`), or null. */
 export async function personOfMessage(db: Executor, orgId: string, messageId: string): Promise<string | null> {
   const root = await messageRoot(db, orgId, messageId);

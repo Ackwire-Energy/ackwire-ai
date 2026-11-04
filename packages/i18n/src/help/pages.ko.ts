@@ -20,7 +20,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "누구에게 맞나요",
         blocks: [
-          "이 컴퓨터가 켜져 있는 동안 혼자 또는 작은 팀이 쓰기 좋아요. 더 큰 팀이거나 항상 켜져 있는 서버가 필요하다면 서버에 agentes.chat을 설치하고 앱에서 **내 서버에 연결**을 고르세요. 데이터는 나중에 옮길 수 있어요.",
+          "이 컴퓨터가 켜져 있는 동안 혼자 또는 작은 팀이 쓰기 좋아요. 더 큰 팀이거나 항상 켜져 있는 서버가 필요하다면 [서버에 agentes.chat을 설치](/help/install-on-a-server)하고 앱에서 **내 서버에 연결**을 고르세요. 데이터는 나중에 옮길 수 있어요.",
         ],
       },
       {
@@ -510,6 +510,142 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Cursor가 예전 로그인에 멈춤:** Cursor를 종료하고 `~/.mcp-auth` 폴더를 삭제한 다음 다시 연결하세요.",
             ],
           },
+        ],
+      },
+    ],
+  },
+  "install-on-a-server": {
+    title: "서버에 agentes.chat 설치하기",
+    summary: "내 서버에서 agentes.chat을 무료로 실행하고 팀 전체가 함께 쓰세요. 명령 하나로 준비됩니다.",
+    sections: [
+      {
+        id: "need",
+        heading: "필요한 것",
+        blocks: [
+          {
+            list: [
+              "64비트 Linux(x64 또는 arm64) 서버나 VPS. 작은 팀이라면 CPU 2개, 메모리 4 GB, 디스크 20 GB로 시작하면 좋습니다. 시험해 보려면 Docker Desktop, OrbStack 또는 Colima가 있는 Mac도 됩니다.",
+              "Compose가 포함된 Docker. Linux에서는 없으면 설치 프로그램이 먼저 물어본 뒤 설치합니다.",
+              "접속 방법. 무료 Tailscale 계정(기본값, 비공개, 도메인과 열린 포트 불필요)이나, 서버를 가리키는 도메인과 열린 80, 443 포트 중 하나가 필요합니다.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "install",
+        heading: "설치하기",
+        blocks: [
+          "서버에서 다음을 실행하세요.",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh",
+          },
+          "없는 것을 설치한 뒤 몇 가지를 묻습니다. 사람들이 접속하는 방법, 이메일, 이 서버를 에이전트의 컴퓨터로도 쓸지, 익명 사용 통계를 보낼지입니다. Enter를 누르면 제안된 답을 고릅니다. 설치 위치는 `/opt/agentes`(이미 Docker를 쓸 수 있는 사용자라면 `~/agentes`)이고, 처음에는 약 2 GB를 내려받습니다.",
+          "마지막에 서버 주소와 휴대폰용 QR 코드를 보여 줍니다. 다시 실행해도 괜찮습니다. 설정은 그대로 두고 빠진 것만 채웁니다.",
+          "Node.js 18 이상이 있다면 빈 폴더에서 `npx @agenteschat/setup`을 실행해도 같은 설정입니다. Node가 없으면 앱 이미지에서 현재 폴더를 대상으로 실행할 수 있고, 마지막에 나머지를 시작하는 명령을 보여 줍니다.",
+          {
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+          },
+        ],
+      },
+      {
+        id: "reach",
+        heading: "접속 방법",
+        blocks: [
+          {
+            list: [
+              "**Tailscale**(기본값): `https://agentes.<내-tailnet>.ts.net`의 비공개 HTTPS로, Tailscale 네트워크에 있는 기기만 열 수 있습니다. 설치 전에 https://console.tailscale.com/admin/dns 에서 MagicDNS와 HTTPS를 켜고, 설정에서 물어볼 인증 키(auth key)를 https://console.tailscale.com/admin/settings/keys 에서 만들어 두세요.",
+              "**공개 도메인**: 인터넷의 누구나 열 수 있습니다(예: `https://chat.example.com`). 도메인이 서버를 가리키게 하고 80, 443 포트를 여세요. 설정이 인증서를 받고 갱신하며, 도메인을 공개하기 전에 계정을 만들도록 안내합니다.",
+              "**이 기기만**: `http://localhost:3000`. 내 컴퓨터에서 시험해 보는 용도입니다.",
+            ],
+          },
+          "Tailscale에서는 키가 만료되면(180일 후) 서버가 네트워크에서 빠집니다. 계속 두려면 https://console.tailscale.com/admin/machines 에서 서버의 **⋯** 메뉴를 열고 **Disable Key Expiry**를 고르세요.",
+          "루틴을 시작하는 웹훅과 자기 서버에서 호출하는 AI 앱에는 공개 주소가 필요합니다. Tailscale에서는 Funnel이 같은 주소를 인터넷에 엽니다. https://console.tailscale.com/admin/acls 에서 tailnet 정책에 Funnel을 추가하고 `.env`에 `TAILSCALE_FUNNEL=true`를 넣은 뒤 `docker compose up -d`를 실행하세요.",
+        ],
+      },
+      {
+        id: "owner",
+        heading: "내 계정",
+        blocks: [
+          "서버 주소를 열고 가입하세요. 첫 계정이 소유자가 됩니다. 그 뒤로는 가입이 닫히고, 다른 사람은 **설정\u00a0›\u00a0멤버와 초대**에서 보낸 초대로 들어옵니다.",
+          "Tailscale에서는 초대하는 사람도 내 tailnet에 있어야 합니다. 먼저 https://console.tailscale.com/admin/users 에서 초대한 다음 agentes.chat에서 초대하세요.",
+        ],
+      },
+      {
+        id: "email",
+        heading: "이메일",
+        blocks: [
+          "이메일이 없으면 agentes.chat은 이메일을 보내는 대신 로그에 기록하므로, 초대 링크는 거기서 복사할 수 있습니다. 비밀번호 재설정은 꺼져 있습니다.",
+          {
+            code: "docker compose logs agentes | grep 'email (not sent'",
+          },
+          "설정에서는 내 메일 서버(SMTP)나 MillionSend, Resend 같은 Resend 호환 API의 키를 쓸 수 있습니다. 다른 보낸 사람을 고르지 않으면 이메일은 서버 도메인의 `ping@`에서 나가며, 그 도메인은 이메일 서비스에서 인증되어 있어야 합니다. 나중에 설정하려면 설치를 다시 실행하세요.",
+        ],
+      },
+      {
+        id: "phone",
+        heading: "휴대폰",
+        blocks: [
+          {
+            list: [
+              "Tailscale을 쓴다면 휴대폰에 Tailscale 앱을 설치하고 같은 tailnet에 로그인하세요.",
+              "agentes.chat 앱을 설치하세요.",
+              "설정이 보여 준 QR 코드나 **설정\u00a0›\u00a0내 계정\u00a0›\u00a0휴대폰에서 열기**의 QR 코드를 스캔하세요. 뒤의 것은 로그인까지 해 줍니다.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "computers",
+        heading: "에이전트의 컴퓨터",
+        blocks: [
+          "설정에서 이 서버를 에이전트의 컴퓨터로도 만들 수 있습니다. 에이전트는 거기서 명령을 실행하고 브라우저를 쓰고 파일을 둡니다. 설정이 물어보며, 서버가 잘 감당할 수 있을 때 예를 제안합니다. Linux에서는 에이전트마다 화면이 있는 자기 사용자가 생깁니다. 아니요라고 답했다면 `--computer yes`를 붙여 설치를 다시 실행하세요.",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+          },
+          "agentes.chat 앱이 있는 Mac이나 다른 서버 같은 컴퓨터는 **설정\u00a0›\u00a0컴퓨터**에서 연결합니다([에이전트를 위한 컴퓨터](/help/computers) 참고). Tailscale을 쓴다면 먼저 내 tailnet에 들어가야 합니다.",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "백업과 복원",
+        blocks: [
+          "서버는 세 가지로 이루어집니다. 데이터베이스, 올린 파일, 그리고 `.env`의 `AGENTES_SECRET`입니다. `.env`의 사본은 백업과 떨어진 안전한 곳에 두세요. 이 비밀이 없으면 복원한 데이터베이스에 저장된 키를 읽을 수 없습니다.",
+          "매일 백업하려면 Cloudflare R2나 다른 S3 호환 저장소에 비공개 버킷을 만들고, 그 안에서 읽기, 쓰기, 삭제를 할 수 있는 키를 만드세요. 이를 `.env`에 넣고 `COMPOSE_PROFILES`에 `backup`을 더하세요(공개 도메인이라면 `https,backup`).",
+          {
+            code: "S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=…\nS3_SECRET_ACCESS_KEY=…\nS3_BACKUP_BUCKET=agentes-backups\nCOMPOSE_PROFILES=tailscale,backup",
+          },
+          "그런 다음 설치 폴더에서 `docker compose up -d`를 실행하세요. 데이터베이스는 03:00 UTC에 덤프되고 각 덤프는 14일 동안 보관됩니다. `docker compose run --rm backup now`는 바로 하나를 만들고, `docker compose run --rm backup list`는 목록을 보여 줍니다. 덤프에는 데이터베이스만 들어갑니다. `files` 볼륨에 있는 올린 파일은 따로 복사해야 하며, 그 명령은 아래의 전체 안내에 있습니다.",
+          "복원하려면 `docker compose run --rm -T backup fetch <이름> > agentes.dump`로 덤프를 받은 뒤, 앱을 멈춘 상태에서 빈 데이터베이스에 불러오세요.",
+          {
+            code: "docker compose stop agentes\ndocker compose exec -T postgres dropdb -U agentes --force agentes\ndocker compose exec -T postgres createdb -U agentes agentes\ndocker compose exec -T postgres pg_restore -U agentes -d agentes --exit-on-error < agentes.dump\ndocker compose start agentes",
+          },
+          "덤프를 만든 버전이나 그보다 새 버전에 복원하세요.",
+        ],
+      },
+      {
+        id: "upgrades",
+        heading: "업데이트",
+        blocks: [
+          "설치 폴더에서 다음을 실행하세요.",
+          {
+            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+          },
+          "새 버전이 시작되면 데이터베이스는 알아서 업데이트됩니다. 설정은 `.env`에 두고 `docker-compose.yml`은 고치지 마세요. 업데이트할 때마다 바뀝니다. 크게 올리기 전에는 백업하세요. 새 버전이 업데이트한 데이터베이스는 이전 버전에서 열리지 않습니다.",
+        ],
+      },
+      {
+        id: "data",
+        heading: "보내는 정보",
+        blocks: [
+          "서버는 하루에 한 번 agentes.chat에 익명 사용 통계를 보냅니다. 사람 수, 에이전트 수, 기기 크기, 사용한 AI 토큰, 에이전트의 브라우저가 주고받은 데이터 양 같은 숫자입니다. 메시지, 파일, 이름, 사이트는 보내지 않습니다. `docker compose run --rm agentes telemetry`는 보낼 내용을 그대로 보여 줍니다. 소유자는 **설정\u00a0›\u00a0일반**이나 `.env`의 `TELEMETRY=off`로 끌 수 있습니다.",
+          "오류 보고는 직접 고른 Sentry 호환 서버를 `SENTRY_DSN`에 설정하지 않는 한 어디에도 가지 않습니다. 보고에는 오류와 발생 위치가 들어가며, 메시지, 이메일, IP 주소, 쿠키, 토큰은 들어가지 않습니다.",
+        ],
+      },
+      {
+        id: "reference",
+        heading: "전체 안내",
+        blocks: [
+          "모든 설정, nginx 같은 자체 프록시, Docker 없이 실행하기, 직접 설치하는 AI 에이전트를 위한 절차, 문제가 생겼을 때 할 일은 agentes.chat 저장소의 `SELF_HOSTING.md`에 있습니다.",
         ],
       },
     ],

@@ -44,3 +44,13 @@ export const keyInit = (e: KeyboardEvent): KeyboardEventInit => ({
   ...locksOf(e),
   modifierAltGraph: e.getModifierState("AltGraph"),
 });
+
+/** Keys that stay the person's own on a screen they watch: moving the focus, Esc, lone modifiers and locks, F keys. */
+const NOT_AIMED = /^(Tab|Escape|Shift|Control|Alt|AltGraph|Meta|Fn|CapsLock|NumLock|ScrollLock|F\d{1,2})$/;
+
+/**
+ * A key pressed on a watched screen that was meant for it: a paste, or any key but a shortcut (Ctrl, ⌘ or Alt held) and
+ * `NOT_AIMED`. What the browser or the app does with the others stays theirs.
+ */
+export const aimsAtScreen = (e: KeyboardEvent, apple: boolean) =>
+  pastes(e, apple) || (!e.ctrlKey && !e.metaKey && !e.altKey && !composes(e) && !NOT_AIMED.test(e.key));

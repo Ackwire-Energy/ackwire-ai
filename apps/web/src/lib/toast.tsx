@@ -10,7 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentWho } from "@/components/AgentAvatar";
 
 /**
  * Minimal toasts in the design language (glass, overlay shadow, icon + words, the tone's soft glow from the right).
@@ -177,14 +177,7 @@ function ToastWords({ toast }: { toast: Toast }) {
   return (
     <>
       {splitAtNames(toast.text, [who.name]).map((part) =>
-        typeof part === "string" ? (
-          part
-        ) : (
-          <span key="who" className="ac-who">
-            <AgentAvatar size="xs" name={who.name} appearance={who.appearance} />
-            <b>{who.name}</b>
-          </span>
-        ),
+        typeof part === "string" ? part : <AgentWho key="who" name={who.name} appearance={who.appearance} />,
       )}
     </>
   );

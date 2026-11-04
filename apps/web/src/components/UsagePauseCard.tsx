@@ -146,14 +146,14 @@ export function AnswerAnywayButton({
   );
 }
 
-/** Under a skipped catch-up's note: "Responder mesmo assim" until someone presses it, and "Ver fila". */
+/** Under a skipped catch-up's note: "Responder mesmo assim" until someone presses it, and "Ver fila" (on the skips). */
 export function UsageWaitClosed({ message, wait }: { message: Message; wait: UsageWait & { closed: CatchUpClosed } }) {
   return (
     <span className="cq__acts">
       {!wait.continuedByUserId && (
         <AnswerAnywayButton runId={wait.runId} agentId={message.author.id ?? null} closed={wait.closed} />
       )}
-      {message.author.id && <SeeUsageQueue agentId={message.author.id} />}
+      {message.author.id && <SeeUsageQueue agentId={message.author.id} tab="skipped" />}
     </span>
   );
 }

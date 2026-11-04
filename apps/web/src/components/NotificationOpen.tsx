@@ -75,10 +75,10 @@ export function useNotificationOpener() {
         openComputer(computerOf);
         return "dialog";
       }
-      // An agent skipped several catch-ups as handled: its queue, where each skip and "Responder mesmo assim" are.
+      // An agent skipped several catch-ups as handled: its queue on what it skipped, each with "Responder mesmo assim".
       const agent = n.actors[0];
       if (openDetails && n.kind === "catch_up_closed" && n.count > 1 && agent?.type === "agent") {
-        openDetails({ kind: "usage_queue", id: agent.id });
+        openDetails({ kind: "usage_queue", id: agent.id, tab: "skipped" });
         return "dialog";
       }
       const found = openTarget(n);

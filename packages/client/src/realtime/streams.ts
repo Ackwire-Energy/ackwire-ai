@@ -2,6 +2,9 @@ import type { ActiveRun, BrowserProfileWait, ChannelEvent, Message, RunStatus } 
 import { isMediaAfterReply } from "../lib/media";
 import { NO_AI } from "../lib/no-ai";
 
+/** Failures whose card in the conversation is all there is to say: no AI, or the person at their limit (ADR 0141). */
+const carded = (error: string | undefined) => error === NO_AI || error === "person_limit";
+
 /**
  * Live agent runs per channel, from `agent.run`, `agent.delta` and (expected
  * from the backend) `agent.thinking` / `agent.typing` / `agent.idle` /
@@ -167,6 +170,12 @@ export interface LiveRun {
   output?: LiveOutput[];
   /** Messages sent with "Parar e mandar" it hasn't read yet. */
   steerNow?: string[];
+  /** How much of the current turn's text arrived (`agent.delta.at`), moved to the narration or not. */
+  turnChars?: number;
+  /** A piece of the current turn's text never arrived (a lost socket, a conversation opened mid-answer). */
+  gap?: boolean;
+  /** The current turn's pieces heard past that hole, kept for the server's copy of the text before them. */
+  ahead?: { at: number; text: string }[];
 }
 
 export type LiveWork =
@@ -302,6 +311,8 @@ export interface StreamsState {
   finished: Record<string, true>;
   /** A routine's runs working in the background: never a row, never "trabalhando" (`isBackgroundEvent`). */
   background?: Record<string, true>;
+  /** Runs whose message came without its body (too big for its event): it is on its way over HTTP. */
+  landing?: Record<string, true>;
 }
 
 export const emptyStreams: StreamsState = { runs: {}, finished: {} };
@@ -612,17 +623,23 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
     }
     case "message.created": {
       const m = event.message;
+      // Too big for its event, it comes as its run and thread only (read over HTTP), and ends the run all the same: its
+      // block waits for that read (`landing`) instead of going blank.
+      const runId = m ? m.agentRunId : event.agentRunId;
       // The sticker or GIF an agent adds after its reply (ADR 0091) ends nothing: its reply already did, and a new
       // "pensando…" stays.
-      if (!m?.agentRunId || postedOnTheWay(state, m) || isMediaAfterReply(m.meta)) return state;
-      const next = finish(state, m.agentRunId);
-      if (m.author?.type !== "agent" || !m.author.id) return next;
-      if (m.threadId) return settleProvisional(next, m.author.id, m.threadId);
+      if (!runId || postedOnTheWay(state, { agentRunId: runId, meta: m?.meta }) || isMediaAfterReply(m?.meta))
+        return state;
+      const ended = finish(state, runId);
+      const next = m ? ended : { ...ended, landing: { ...state.landing, [runId]: true as const } };
+      const agentId = m ? (m.author?.type === "agent" ? m.author.id : null) : state.runs[runId]?.agentId;
+      const threadId = m ? m.threadId : event.threadId;
+      if (!agentId) return next;
+      if (threadId) return settleProvisional(next, agentId, threadId);
       // Flat reply (DMs): it answers the latest message, whatever thread we guessed.
-      const agentId = m.author.id;
       const runs = Object.fromEntries(
         Object.entries(next.runs).filter(
-          ([, r]) => !(r.provisional && r.agentId === agentId && r.channelId === m.channelId),
+          ([, r]) => !(r.provisional && r.agentId === agentId && r.channelId === event.channelId),
         ),
       );
       return { ...next, runs };
@@ -641,8 +658,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         const settled = settleProvisional(s, event.agentId, event.threadId);
         return settled.runs[event.runId] ? finish(settled, event.runId) : settled;
       }
-      // No AI to think with: nothing ran, and its card (or the receipt under the message) says why.
-      if (event.status === "failed" && event.error === NO_AI) return finish(settleAfterRun(s, event), event.runId);
+      // No AI to think with, or its person at their limit: nothing ran, and its card says why.
+      if (event.status === "failed" && carded(event.error)) return finish(settleAfterRun(s, event), event.runId);
       // Started but nothing written yet: thinking.
       const current = s.runs[event.runId];
       const status: LiveStatus =
@@ -680,7 +697,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       return finish(settleAfterRun(state, event), event.runId);
     case "run.finished": {
       const settled = settleAfterRun(state, event);
-      if (event.status === "failed" && event.error === NO_AI) return finish(settled, event.runId);
+      if (event.status === "failed" && carded(event.error)) return finish(settled, event.runId);
       if (event.status === "failed") {
         const { error, errorCode, errorParams } = event;
         return upsert(settled, event, { status: "failed", error, errorCode, errorParams });
@@ -702,17 +719,43 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       if (state.finished[event.runId]) return state;
       const current = state.runs[event.runId];
       if (current && event.seq <= current.lastSeq) return state;
+      const sameTurn = current?.turn !== undefined && event.turn === current.turn;
+      // A piece of this turn never reached us (`at` past what we heard): its text would read glued over the hole,
+      // so the turn keeps what came before it (none, opened mid-turn) until the next turn or the message. Erased, the
+      // words being read vanished.
+      const heard = sameTurn ? current?.turnChars : 0;
+      const gap =
+        (sameTurn && current?.gap === true) || (event.at !== undefined && heard !== undefined && event.at > heard);
+      const turnPatch = {
+        gap,
+        ahead:
+          gap && event.at !== undefined
+            ? [...((sameTurn && current?.ahead) || []), { at: event.at, text: event.text }]
+            : undefined,
+        ...(event.at !== undefined ? { turnChars: Math.max(heard ?? 0, event.at + event.text.length) } : {}),
+        ...(event.turn !== undefined ? { turn: event.turn } : {}),
+      };
+      // Sent before the server's copy of the turn was read, it arrived after it (`caughtUp`): only its tail is new.
+      const fresh =
+        event.at !== undefined && heard !== undefined && event.at < heard
+          ? event.text.slice(heard - event.at)
+          : event.text;
       // A new model call. Narration (text before tool calls) already left the body with `agent.narration` or the
       // call; what is still here is a whole reply the server held and sent back for another try (a give-up, a
       // question it shouldn't ask), never posted: the next turn's text replaces it.
       if (current && event.turn !== undefined && current.turn !== undefined && event.turn > current.turn) {
-        return upsert(state, event, { status: "running", text: event.text, lastSeq: event.seq, turn: event.turn });
+        return upsert(state, event, {
+          status: "running",
+          text: gap ? "" : event.text,
+          lastSeq: event.seq,
+          ...turnPatch,
+        });
       }
       return upsert(state, event, {
         status: "running",
-        text: (current?.text ?? "") + event.text,
+        text: gap ? (sameTurn ? (current?.text ?? "") : "") : (current?.text ?? "") + fresh,
         lastSeq: event.seq,
-        ...(event.turn !== undefined ? { turn: event.turn } : {}),
+        ...turnPatch,
       });
     }
     default:
@@ -732,7 +775,7 @@ function finish(state: StreamsState, runId: string): StreamsState {
  * channel. Taken for the run's end, it froze the row with that call still running, and dropped every later event of the
  * run. A pause (an approval, a question) ends the row with its own event.
  */
-const postedOnTheWay = (state: StreamsState, m: Message) =>
+const postedOnTheWay = (state: StreamsState, m: Pick<Message, "agentRunId" | "meta">) =>
   Boolean(m.meta?.talker) ||
   Boolean(m.agentRunId && state.runs[m.agentRunId]?.work?.some((w) => w.kind === "call" && w.running));
 
@@ -811,7 +854,41 @@ export function reconcileRuns(
       ...(a.triggerMessageId ? { triggerMessageId: a.triggerMessageId } : {}),
     });
   }
+  for (const a of active) {
+    const r = a.live && known.has(a.runId) ? s.runs[a.runId] : undefined;
+    if (r && a.live) s = { ...s, runs: { ...s.runs, [a.runId]: caughtUp(r, a.live) } };
+  }
   return s;
+}
+
+/**
+ * Opened or back mid-answer: the server's body of the turn so far (from `live.at`), then the pieces heard past the
+ * hole (`ahead`) that continue it, so the next delta's `at` lines up. A row that heard the whole turn, or a later one,
+ * keeps its own.
+ */
+function caughtUp(r: LiveRun, live: NonNullable<ActiveRun["live"]>): LiveRun {
+  // A failed or canceled row heard after the list was read stays as it is: the list is older than its end.
+  if (r.status === "failed" || r.status === "canceled") return r;
+  if (r.turn !== undefined && (r.turn > live.turn || (r.turn === live.turn && !r.gap))) return r;
+  let text = live.text;
+  let end = live.at + text.length;
+  const ahead = r.turn === live.turn ? [...(r.ahead ?? [])].sort((x, y) => x.at - y.at) : [];
+  for (const p of ahead) {
+    if (p.at > end || p.at + p.text.length <= end) continue;
+    text += p.text.slice(end - p.at);
+    end = p.at + p.text.length;
+  }
+  const heard = r.turn === live.turn ? (r.turnChars ?? 0) : 0;
+  const gap = heard > end;
+  return {
+    ...r,
+    status: "running",
+    text,
+    turn: live.turn,
+    turnChars: Math.max(heard, end),
+    gap,
+    ahead: gap ? ahead : undefined,
+  };
 }
 
 /** Forget a failed run after the person has seen it. */

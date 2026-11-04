@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { BrowserProfile, Machine } from "../api/types";
+import type { BrowserProfile, Machine, PageTarget } from "../api/types";
 
 /** The live view's key of a browser profile (ADR 0110): watched where an agent's id would be. */
 export const profileLiveKey = (profileId: string) => `profile:${profileId}`;
@@ -81,7 +81,8 @@ export function useBrowserProfileMutations(orgId: string) {
       onSuccess: put,
     }),
     open: useMutation({
-      mutationFn: ({ profileId, url }: { profileId: string; url: string }) => profiles().open(orgId, profileId, url),
+      mutationFn: ({ profileId, url }: { profileId: string; url: PageTarget }) =>
+        profiles().open(orgId, profileId, url),
       meta: { silent: true },
     }),
     setDefault: useMutation({

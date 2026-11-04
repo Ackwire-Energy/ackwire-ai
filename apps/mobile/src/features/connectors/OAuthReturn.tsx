@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useToast } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
-import { errorHaptic, successHaptic } from "../shared/parts";
+import { errorHaptic, goBack, successHaptic } from "../shared/parts";
 import { isFinishing } from "./logic";
 import { returnHref } from "./review";
 
@@ -31,7 +31,7 @@ export function ConnectorOAuthReturn() {
   useEffect(() => {
     if (ran.current) return;
     ran.current = true;
-    const leave = () => (router.canGoBack() ? router.back() : router.replace("/connectors"));
+    const leave = () => goBack("/connectors");
     if (state && isFinishing(state)) return leave();
     if (error || !state || !code) {
       errorHaptic();

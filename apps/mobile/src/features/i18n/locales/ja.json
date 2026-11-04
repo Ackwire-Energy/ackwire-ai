@@ -296,6 +296,7 @@
     "failed": "未送信 · もう一度試す",
     "notSent": "メッセージは送信されませんでした。",
     "toLatest": "最新のメッセージへ",
+    "toLatestNew": "最新のメッセージへ: {{text}}",
     "stopAgent": "{{name}}を止める",
     "offlineWait": "接続が戻ると送信されます",
     "turn": {
@@ -326,6 +327,7 @@
     "unseen": {
       "count_other": "{{count}}件の新着",
       "working": "{{names}}が入力中",
+      "mentionsYou": "メンションされました",
       "divider": "新着"
     },
     "connection": {
@@ -750,7 +752,20 @@
       "invitation_accepted_other": "{{names}}が招待を承諾しました",
       "composio_limit_other": "このワークスペースは今月のComposio呼び出し回数を使い切りました",
       "change_request_other": "{{names}}がチームの変更を求めています",
+      "usage_limit_warning": "今月の上限の{{percent}}%を使いました",
+      "usage_limit_reached_notify": "今月の利用上限に達しました",
+      "usage_limit_reached": "{{names}}さんが上限{{amount}}に達しました",
+      "usage_limit_request": "{{names}}さんが上限{{amount}}に達し、追加を求めています",
+      "usage_limit_raised": "{{names}}さんが今月のあなたの上限を引き上げました",
+      "usage_limit_refused": "{{names}}さんが追加利用のリクエストを断りました",
+      "approval_cover_other": "{{names}}が「代わりに承認する人」にあなたを選びました",
+      "approval_cover_declined_other": "{{names}}はあなたの代わりに承認しなくなりました",
+      "approval_cover_ended_other": "{{names}}があなたの代わりに承認する人を解除しました",
+      "right_hand_decided_other": "{{names}}が今日あなたの代わりに依頼を承認しました",
+      "right_hand_paused_other": "{{names}}はあなたの代わりの承認を止めました",
       "browser_profile_request_other": "{{names}}がブラウザプロフィールの追加を求めています",
+      "desktop_taken_other": "{{names}}が{{agent}}のコンピューターの画面の操作を引き継ぎました",
+      "desktop_taken_female_other": "{{names}}が{{agent}}のコンピューターの画面の操作を引き継ぎました",
       "connector_tool_changed_other": "接続中のサーバーが、承認済みのツールを変更しました",
       "computer_disk_full_other": "コンピューターのディスクがほぼいっぱいです",
       "computer_no_chrome_other": "コンピューターにGoogle Chromeが必要です。google.com/chromeからダウンロードしてください",
@@ -1138,7 +1153,8 @@
       "browser": "ブラウザ",
       "secret": "シークレット",
       "join": "メンバー",
-      "tools": "ツール"
+      "tools": "ツール",
+      "limit": "上限"
     },
     "review": "レビュー",
     "answer": "返信",
@@ -1363,6 +1379,8 @@
       "typeMarked": "マークされた欄に入力",
       "typeMarkedSecret": "マークされた欄のパスワード",
       "keys": "キー",
+      "paste": "貼り付け",
+      "pasteHint": "コピーした内容をページに貼り付け",
       "secureOn": "テキストを表示",
       "secureOff": "テキストを隠す（パスワード）",
       "send": "送信",

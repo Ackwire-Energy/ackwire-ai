@@ -17,6 +17,10 @@ export const isBlankPage = (url: string | null | undefined) =>
         url === "chrome-extension://mbgkclemiokgppkieijlfaoehgdjlhbl/start.html"),
   );
 
+/** The address as a browser's bar shows it at rest: no scheme, no lone slash after the host; none for a blank page. */
+export const shownAddress = (url: string | null | undefined) =>
+  !url || isBlankPage(url) ? "" : url.replace(/^https?:\/\//i, "").replace(/^([^/?#]+)\/$/, "$1");
+
 /**
  * Why opening a site in the agent's browser was refused (`POST …/browser/open`), as the i18n key that says it.
  * `cloud`: the workspace's own computer, which is never off.

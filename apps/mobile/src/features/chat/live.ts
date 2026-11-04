@@ -12,6 +12,7 @@ import {
   type ConsultsState,
   cacheAgentProposal,
   cacheApproval,
+  cacheCardDelegate,
   cacheDmRead,
   cacheMessage,
   cacheMessageActions,
@@ -294,6 +295,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "secret.requested":
     case "secret.updated":
       cacheSecret(qc, orgId, channelId, event.secretRequest);
+      break;
+    case "card.delegate":
+      cacheCardDelegate(qc, orgId, event, event.delegate);
       break;
     case "agent.proposal.updated":
       // An agent's proposal of a new agent was created or denied (by anyone): its card.

@@ -214,8 +214,10 @@ html:not([data-pointer]) .team-sky__agent:focus-visible {
   border-radius: 50%;
   background: var(--ok);
 }
-.team-card__title > .noai-chip {
+/* A chip clears the line above it by the gap of a section's rows (8px), not the title's 4px. */
+.team-card__title > :is(.noai-chip, .ac-chip) {
   align-self: flex-start;
+  margin-top: 4px;
 }
 .team-card__sec {
   display: flex;

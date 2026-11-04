@@ -8,6 +8,7 @@ import {
   handoffView,
   openHandoffOf,
   openPageInControl,
+  PAGE_MOVES,
   requireBrowserAccess,
   requireBrowserControl,
   startTakeover,
@@ -40,6 +41,13 @@ export const BrowserHandoff = z
 
 const HandoffParams = OrgParams.extend({ handoffId: z.uuid() });
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
+
+/** Where the person in control sends the page: an address they typed, or the address bar's arrows and reload. */
+export const PageTarget = z.union([
+  z.object({ url: z.string().min(1).max(2048) }),
+  z.object({ go: z.enum(PAGE_MOVES) }),
+]);
+export const pageTarget = (b: z.infer<typeof PageTarget>) => ("go" in b ? { go: b.go } : b.url);
 
 /**
  * A person's turn on one of an agent's screens (ADR 0040 §6). The agent asks
@@ -251,16 +259,17 @@ export function browserRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agents/{agentId}/browser/open",
       tags,
       security,
-      summary: "Open a site in the agent's browser (the person in control); a closed browser opens",
+      summary:
+        "Open a site in the agent's browser (the person in control), or go back, forward or reload; a closed browser opens",
       description:
-        "Only the person in control (409 `browser.not_in_control` otherwise), and only while the agent may use its browser (`browser:use`) and its computer serves it (403 otherwise). `url`: http(s), a bare host gets https (anything else is 400 `browser.bad_address`). A site outside the agent's list is 403 `browser.not_allowed`; a page that fails to load is 400 `browser.open_failed`.",
-      request: { params: AgentParams, body: body(z.object({ url: z.string().min(1).max(2048) })) },
+        "Only the person in control (409 `browser.not_in_control` otherwise), and only while the agent may use its browser (`browser:use`) and its computer serves it (403 otherwise). `url`: http(s), a bare host gets https (anything else is 400 `browser.bad_address`); or `go`: the address bar's arrows and reload. A site outside the agent's list is 403 `browser.not_allowed`; a page that fails to load is 400 `browser.open_failed`.",
+      request: { params: AgentParams, body: body(PageTarget) },
       responses: { 204: { description: "Opened" }, ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { url } = c.req.valid("json");
-      await openPageInControl(handoffDeps, deps.extras?.sandbox?.machines?.hub, c.get("user").id, orgId, agentId, url);
+      const to = pageTarget(c.req.valid("json"));
+      await openPageInControl(handoffDeps, deps.extras?.sandbox?.machines?.hub, c.get("user").id, orgId, agentId, to);
       return c.body(null, 204);
     },
   );

@@ -20,7 +20,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Untuk siapa",
         blocks: [
-          "Dibuat untukmu atau tim kecil, selama komputer ini menyala. Untuk tim yang lebih besar, atau server yang selalu menyala, pasang agentes.chat di server lalu pilih **Hubungkan ke serverku** di aplikasi. Datamu bisa dipindahkan ke sana nanti.",
+          "Dibuat untukmu atau tim kecil, selama komputer ini menyala. Untuk tim yang lebih besar, atau server yang selalu menyala, [pasang agentes.chat di server](/help/install-on-a-server) lalu pilih **Hubungkan ke serverku** di aplikasi. Datamu bisa dipindahkan ke sana nanti.",
         ],
       },
       {
@@ -513,6 +513,143 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
               "**Cursor tertahan di info masuk lama:** tutup Cursor, hapus folder `~/.mcp-auth`, lalu hubungkan lagi.",
             ],
           },
+        ],
+      },
+    ],
+  },
+  "install-on-a-server": {
+    title: "Pasang agentes.chat di server",
+    summary:
+      "Jalankan agentes.chat di servermu sendiri, gratis, untuk seluruh timmu. Satu perintah menyiapkan semuanya.",
+    sections: [
+      {
+        id: "need",
+        heading: "Yang kamu perlukan",
+        blocks: [
+          {
+            list: [
+              "Server atau VPS dengan Linux 64-bit, di x64 atau arm64. Untuk tim kecil, 2 CPU, memori 4 GB, dan disk 20 GB sudah cukup untuk mulai. Untuk mencoba, Mac dengan Docker Desktop, OrbStack, atau Colima juga bisa.",
+              "Docker dengan Compose. Di Linux, pemasang menambahkannya kalau belum ada, setelah bertanya dulu.",
+              "Cara masuk: akun Tailscale gratis (bawaan, privat, tanpa domain dan tanpa port terbuka), atau domain yang mengarah ke server, dengan port 80 dan 443 terbuka.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "install",
+        heading: "Pasang",
+        blocks: [
+          "Di server, jalankan:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh",
+          },
+          "Pemasang memasang yang belum ada, lalu menanyakan beberapa hal: cara orang masuk, email, apakah server ini juga jadi komputer agenmu, dan apakah mengirim statistik pemakaian anonim. Tekan Enter untuk jawaban yang disarankan. Semuanya dipasang di `/opt/agentes` (`~/agentes` untuk pengguna yang sudah bisa memakai Docker), dan pertama kali ia mengunduh sekitar 2 GB.",
+          "Di akhir, ia menampilkan alamat servermu dan kode QR untuk ponselmu. Menjalankannya lagi aman: pengaturanmu tetap, dan hanya yang kurang yang dilengkapi.",
+          "Dengan Node.js 18 atau lebih baru, `npx @agenteschat/setup` di folder kosong adalah penyiapan yang sama. Tanpa Node, ia berjalan dari image aplikasi, di folder saat ini, dan diakhiri dengan perintah yang menyalakan sisanya:",
+          {
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+          },
+        ],
+      },
+      {
+        id: "reach",
+        heading: "Cara orang masuk",
+        blocks: [
+          {
+            list: [
+              "**Tailscale**, bawaan: HTTPS privat di `https://agentes.<tailnet-mu>.ts.net`, hanya untuk perangkat di jaringan Tailscale-mu. Sebelum memasang, nyalakan MagicDNS dan HTTPS di https://console.tailscale.com/admin/dns dan buat kunci akses (auth key) di https://console.tailscale.com/admin/settings/keys untuk diminta saat penyiapan.",
+              "**Domain publik**: siapa pun di internet bisa membukanya, misalnya di `https://chat.example.com`. Arahkan domain ke server dan buka port 80 dan 443. Penyiapan mengambil sertifikat dan memperbaruinya, dan memintamu membuat akun sebelum domain aktif.",
+              "**Hanya mesin ini**: `http://localhost:3000`, untuk mencoba di komputermu sendiri.",
+            ],
+          },
+          "Di Tailscale, server keluar dari jaringanmu saat kuncinya kedaluwarsa, setelah 180 hari. Agar tetap ada, buka menu **⋯** server di https://console.tailscale.com/admin/machines dan pilih **Disable Key Expiry**.",
+          "Webhook yang memulai rutinitas, dan aplikasi AI yang memanggil dari server mereka sendiri, butuh alamat publik. Di Tailscale, Funnel membuka alamat yang sama ke internet: tambahkan Funnel ke kebijakan tailnet-mu di https://console.tailscale.com/admin/acls dan atur `TAILSCALE_FUNNEL=true` di `.env`, lalu jalankan `docker compose up -d`.",
+        ],
+      },
+      {
+        id: "owner",
+        heading: "Akunmu",
+        blocks: [
+          "Buka alamat servermu dan daftar: akun pertama menjadi pemilik. Setelah itu pendaftaran ditutup, dan orang masuk lewat undangan, dari **Pengaturan\u00a0›\u00a0Anggota dan undangan**.",
+          "Di Tailscale, orang yang kamu undang juga perlu masuk ke tailnet-mu. Undang mereka dulu di https://console.tailscale.com/admin/users lalu di agentes.chat.",
+        ],
+      },
+      {
+        id: "email",
+        heading: "Email",
+        blocks: [
+          "Tanpa email, agentes.chat menulis setiap email ke log-nya alih-alih mengirimnya, jadi tautan undangan tetap bisa disalin dari sana. Atur ulang kata sandi tetap mati.",
+          {
+            code: "docker compose logs agentes | grep 'email (not sent'",
+          },
+          "Penyiapan menerima server email milikmu sendiri (SMTP) atau kunci API yang kompatibel dengan Resend, seperti MillionSend atau Resend. Email dikirim dari `ping@` domain servermu kecuali kamu memilih pengirim lain, dan domain itu harus terverifikasi di penyedia emailmu. Untuk menyiapkannya nanti, jalankan pemasangan lagi.",
+        ],
+      },
+      {
+        id: "phone",
+        heading: "Ponselmu",
+        blocks: [
+          {
+            list: [
+              "Di Tailscale, pasang aplikasi Tailscale di ponselmu dan masuk ke tailnet yang sama.",
+              "Pasang aplikasi agentes.chat.",
+              "Pindai kode QR yang ditampilkan penyiapan, atau yang ada di **Pengaturan\u00a0›\u00a0Akunmu\u00a0›\u00a0Buka di ponselmu**, yang juga langsung memasukkanmu.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "computers",
+        heading: "Komputer agen-agenmu",
+        blocks: [
+          "Penyiapan bisa menjadikan server ini juga komputer agenmu, tempat mereka menjalankan perintah, memakai browser, dan menyimpan file. Ia bertanya, dan menyarankan ya kalau server sanggup. Di Linux, setiap agen mendapat pengguna sendiri, dengan layar. Kalau kamu menjawab tidak, jalankan pemasangan lagi dengan `--computer yes`:",
+          {
+            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+          },
+          "Komputer lain, seperti Mac dengan aplikasi agentes.chat atau server lain, terhubung dari **Pengaturan\u00a0›\u00a0Komputer**, seperti di [Komputer untuk agen-agenmu](/help/computers). Di Tailscale, komputer itu masuk ke tailnet-mu lebih dulu.",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "Cadangan dan pemulihan",
+        blocks: [
+          "Servermu terdiri dari tiga hal: database, file yang diunggah, dan `AGENTES_SECRET` di `.env`. Simpan salinan `.env` di tempat aman, terpisah dari cadangan: tanpa rahasia itu, kunci yang tersimpan di database yang dipulihkan tidak bisa dibaca.",
+          "Untuk cadangan setiap hari, buat bucket privat di Cloudflare R2 atau penyimpanan lain yang kompatibel dengan S3, dan kunci yang bisa membaca, menulis, dan menghapus di sana. Tambahkan ke `.env`, dengan `backup` di `COMPOSE_PROFILES` (`https,backup` dengan domain publik):",
+          {
+            code: "S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=…\nS3_SECRET_ACCESS_KEY=…\nS3_BACKUP_BUCKET=agentes-backups\nCOMPOSE_PROFILES=tailscale,backup",
+          },
+          "Lalu jalankan `docker compose up -d` di folder pemasangan. Database dicadangkan pukul 03:00 UTC dan setiap cadangan disimpan 14 hari. `docker compose run --rm backup now` membuat satu saat itu juga, dan `docker compose run --rm backup list` menampilkan daftarnya. Cadangan hanya berisi database: file yang diunggah, di volume `files`, perlu salinan sendiri, dan panduan lengkap di bawah punya perintahnya.",
+          "Untuk memulihkan, ambil cadangan dengan `docker compose run --rm -T backup fetch <nama> > agentes.dump`, lalu muat ke database kosong saat aplikasi berhenti:",
+          {
+            code: "docker compose stop agentes\ndocker compose exec -T postgres dropdb -U agentes --force agentes\ndocker compose exec -T postgres createdb -U agentes agentes\ndocker compose exec -T postgres pg_restore -U agentes -d agentes --exit-on-error < agentes.dump\ndocker compose start agentes",
+          },
+          "Pulihkan ke versi yang membuat cadangan itu, atau versi yang lebih baru.",
+        ],
+      },
+      {
+        id: "upgrades",
+        heading: "Pembaruan",
+        blocks: [
+          "Di folder pemasangan, jalankan:",
+          {
+            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+          },
+          "Database memperbarui dirinya sendiri saat versi baru menyala. Simpan pengaturanmu di `.env` dan jangan pernah mengubah `docker-compose.yml`, karena setiap pembaruan menggantinya. Buat cadangan sebelum lompatan besar: database yang diperbarui versi lebih baru tidak bisa dibuka di versi lebih lama.",
+        ],
+      },
+      {
+        id: "data",
+        heading: "Yang dikirim",
+        blocks: [
+          "Sekali sehari server mengirim statistik pemakaian anonim ke agentes.chat: hitungan seperti jumlah orang, agen, ukuran mesin, token AI yang dipakai, dan berapa banyak data yang dikirim dan diterima browser para agen. Tidak pernah pesan, file, nama, atau situs. `docker compose run --rm agentes telemetry` menampilkan persis apa yang akan dikirim. Pemilik mematikannya di **Pengaturan\u00a0›\u00a0Umum**, atau dengan `TELEMETRY=off` di `.env`.",
+          "Laporan galat tidak dikirim ke mana pun kecuali kamu mengatur `SENTRY_DSN` ke server yang kompatibel dengan Sentry pilihanmu. Laporan berisi galat dan tempat terjadinya, tidak pernah pesan, email, alamat IP, cookie, atau token.",
+        ],
+      },
+      {
+        id: "reference",
+        heading: "Panduan lengkap",
+        blocks: [
+          "Semua pengaturan, proxy milikmu sendiri seperti nginx, menjalankan tanpa Docker, langkah-langkah untuk agen AI yang memasangnya sendiri, dan apa yang dilakukan saat ada yang gagal ada di `SELF_HOSTING.md`, di repositori agentes.chat.",
         ],
       },
     ],

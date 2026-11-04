@@ -161,12 +161,11 @@ describe("Configurações → Computadores on self-host", () => {
   test("with no computer of the server's own, admins read how to make it one, only while sign-up is closed", async () => {
     await computers(`/org/${ORG_ID}/settings/computers`);
     const missing = region("Computador deste servidor") as HTMLElement;
-    // The guide's steps: the installer takes no option for it yet (its setup refuses unknown ones).
-    expect(missing.textContent).toContain(
-      "Este servidor também pode ser o computador dos agentes: os passos estão em “This server as the agents' computer”, no SELF_HOSTING.md.",
-    );
-    expect(missing.querySelector("code")?.textContent).toBe("SELF_HOSTING.md");
-    expect(missing.textContent).not.toContain("--computer");
+    // The install page's steps, on the public docs: the repository's own guide isn't public.
+    expect(missing.textContent).toContain("Este servidor também pode ser o computador dos agentes: veja como.");
+    const link = [...missing.querySelectorAll("a")].find((a) => a.textContent === "veja como");
+    expect(link?.getAttribute("href")).toBe("https://agentes.chat/pt/docs/install-on-a-server#computers");
+    expect(link?.getAttribute("target")).toBe("_blank");
     cleanup();
     // Open sign-up: the server refuses a computer of its own, so nothing to suggest.
     await computers(`/org/${ORG_ID}/settings/computers`, { signupOpen: true });

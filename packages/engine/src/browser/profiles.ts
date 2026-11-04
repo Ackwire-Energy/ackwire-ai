@@ -5,7 +5,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from ".
 import type { MachineCaller } from "../machine-hub";
 import { type NotificationDeps, notify } from "../notifications";
 import { can, requireActiveMembership, requirePermission } from "../organizations";
-import { BROWSER_HANDOFF_TOPIC, webAddress } from "./handoff";
+import { BROWSER_HANDOFF_TOPIC, type PageMove, pageCommand } from "./handoff";
 
 const { agents, agentRuns, browserProfiles, browserProfileGrants, machines, organizationMembers } = schema;
 
@@ -676,21 +676,22 @@ export async function runBrowserProfile(
   return agent?.id ?? null;
 }
 
-/** Who may drive a profile (log in, open a site, take control): `manage_connectors` with `control_computers`. */
+/** Who may drive a profile (log in, open a site, take control): `manage_connectors` with `control_browsers`. */
 export async function requireProfileDriver(db: Database, userId: string, orgId: string, profileId: string) {
   const membership = await requirePermission(db, userId, orgId, "manage_connectors");
-  if (!can(membership, "control_computers")) throw new ForbiddenError();
+  if (!can(membership, "control_browsers")) throw new ForbiddenError();
   return requireProfile(db, orgId, profileId);
 }
 
 /**
- * Who may watch a profile live: its drivers and the owners of the agents granted it. Never the person behind a
- * run: a profile shows a whole account, so the asker gets the agent's answer, not the screen.
+ * Who may watch a profile live: its drivers and the owners of the agents granted it (with `own_browsers`). Never the
+ * person behind a run: a profile shows a whole account, so the asker gets the agent's answer, not the screen.
  */
 export async function requireProfileWatcher(db: Database, userId: string, orgId: string, profileId: string) {
   const membership = await requireActiveMembership(db, userId, orgId);
   const row = await requireProfile(db, orgId, profileId);
-  if (can(membership, "manage_connectors") && can(membership, "control_computers")) return row;
+  if (can(membership, "manage_connectors") && can(membership, "control_browsers")) return row;
+  if (!can(membership, "own_browsers")) throw new ForbiddenError();
   const [owned] = await db
     .select({ id: agents.id })
     .from(browserProfileGrants)
@@ -796,14 +797,13 @@ export async function openProfilePage(
   userId: string,
   orgId: string,
   profileId: string,
-  typed: string,
+  to: string | { go: PageMove },
 ) {
   const row = await requireProfileDriver(deps.db, userId, orgId, profileId);
   if (holderOf(row)?.type !== "person" || row.heldByUserId !== userId) {
     throw new ConflictError("Take control of the profile first", "browser.not_in_control");
   }
-  const url = webAddress(typed);
-  if (!url) throw new ValidationError("Type a web address (https://…)", "browser.bad_address");
+  const { command, args } = pageCommand(to);
   if (!deps.hub) throw new ValidationError("Connected computers are not available on this server");
   const reply = await deps.hub.call<"browser.act">(
     row.machineId,
@@ -811,8 +811,8 @@ export async function openProfilePage(
       op: "browser.act",
       agent: profileScope(profileId),
       profile: { id: profileId },
-      command: "open",
-      args: [url],
+      command,
+      args,
       timeoutSeconds: OPEN_PAGE_SECONDS,
     },
     { timeoutMs: (OPEN_PAGE_SECONDS + 30) * 1000 },

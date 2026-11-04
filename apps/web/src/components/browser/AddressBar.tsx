@@ -1,46 +1,66 @@
-import { ApiError } from "@agenteschat/client";
+import { ApiError, type PageTarget } from "@agenteschat/client";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { openRefusalKey } from "@agenteschat/client/lib/sites";
+import { isBlankPage, openRefusalKey, shownAddress } from "@agenteschat/client/lib/sites";
 import { Button, Icon } from "@agenteschat/ui";
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { SiteIcon } from "./SiteIcon";
+
+const NAV = [
+  { go: "back", icon: "chevronLeft", label: "browser.inCard.navBack" },
+  { go: "forward", icon: "chevronRight", label: "browser.inCard.navForward" },
+  { go: "reload", icon: "refresh", label: "browser.inCard.navReload" },
+] as const;
 
 /**
- * The address bar of the agent's browser while a person is in control (ADR 0040 §7): the site
- * opens there (a closed browser starts), and a refusal (outside the agent's sites, not an
- * address, a page that didn't load) is said under the field.
+ * The address bar of the agent's browser (ADR 0040 §7), always at the page's top like a browser's own: the page's
+ * address, which the person in control edits (Enter opens it, Esc puts it back), with back, forward and reload.
+ * Watching, the address alone, read only. A refusal (outside the agent's sites, not an address, a page that didn't
+ * load) is said under it.
  */
 export function AddressBar({
   grammar,
+  url,
+  host,
   onOpen,
+  readOnly = false,
   focus = false,
   cloud = false,
+  end,
 }: {
   grammar: ReturnType<typeof agentGrammar>;
-  /** Opens the typed address; rejects with the server's refusal. */
-  onOpen: (url: string) => Promise<unknown>;
+  /** The page's address now; null before any page. */
+  url: string | null;
+  /** Its host, for the site's icon ("" for none). */
+  host: string;
+  /** Opens the typed address or moves back, forward or reloads; rejects with the server's refusal. */
+  onOpen: (to: PageTarget) => Promise<unknown>;
+  readOnly?: boolean;
   /** Takes the focus when it appears: with the browser closed, an address is the next thing to type. */
   focus?: boolean;
   /** The workspace's own computer: its refusals never say it is off. */
   cloud?: boolean;
+  /** At the bar's end (the page's Colar). */
+  end?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const [url, setUrl] = useState("");
+  // What the person is typing; null: the page's address.
+  const [draft, setDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const errorId = useId();
   useEffect(() => {
-    if (focus) input.current?.focus();
-  }, [focus]);
-  const go = async () => {
-    const typed = url.trim();
-    if (!typed || busy) return;
+    if (focus && !readOnly) input.current?.focus();
+  }, [focus, readOnly]);
+  const run = async (to: PageTarget) => {
+    if (busy || readOnly) return;
     setBusy(true);
     setError(null);
     try {
-      await onOpen(typed);
-      setUrl("");
+      await onOpen(to);
+      setDraft(null);
+      input.current?.blur();
     } catch (e) {
       setError(t(openRefusalKey(e instanceof ApiError ? e.code : undefined, cloud), grammar));
     } finally {
@@ -49,36 +69,72 @@ export function AddressBar({
   };
   return (
     <form
-      className="brw-go"
+      className={readOnly ? "brw-go is-read" : "brw-go"}
       onSubmit={(e) => {
         e.preventDefault();
-        void go();
+        const typed = (draft ?? "").trim();
+        if (typed) void run(typed);
       }}
     >
+      {!readOnly && (
+        <span className="brw-go__nav">
+          {NAV.map((n) => (
+            <Button
+              key={n.go}
+              type="button"
+              size="sm"
+              variant="ghost"
+              iconOnly
+              icon={n.icon}
+              aria-label={t(n.label)}
+              title={t(n.label)}
+              disabled={busy}
+              onClick={() => void run({ go: n.go })}
+            />
+          ))}
+        </span>
+      )}
       <label className="brw-go__field">
-        <Icon name="globe" size={14} />
+        {host ? <SiteIcon host={host} /> : <Icon name="globe" size={14} />}
         <input
           ref={input}
           type="text"
           inputMode="url"
+          enterKeyHint="go"
           autoComplete="url"
           autoCapitalize="none"
           spellCheck={false}
           maxLength={2048}
-          value={url}
+          readOnly={readOnly}
+          value={draft ?? shownAddress(url)}
+          onFocus={(e) => {
+            // The whole address, selected, as a browser's bar does: typing replaces it.
+            if (!readOnly) setDraft(isBlankPage(url) ? "" : (url ?? ""));
+            const el = e.currentTarget;
+            requestAnimationFrame(() => el.select());
+          }}
+          onBlur={() => {
+            if (!busy) setDraft(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape" || draft === null) return;
+            e.preventDefault();
+            e.stopPropagation();
+            setDraft(null);
+            setError(null);
+            e.currentTarget.blur();
+          }}
           onChange={(e) => {
-            setUrl(e.target.value);
+            setDraft(e.target.value);
             setError(null);
           }}
-          placeholder={t("browser.inCard.goPlaceholder")}
+          placeholder={readOnly ? "" : t("browser.inCard.goPlaceholder")}
           aria-label={t("browser.inCard.goLabel")}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
         />
       </label>
-      <Button type="submit" size="sm" loading={busy} disabled={!url.trim()}>
-        {t("browser.inCard.go")}
-      </Button>
+      {end}
       {error && (
         <p id={errorId} className="brw-go__error" role="alert">
           {error}

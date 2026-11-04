@@ -131,11 +131,14 @@ describe("Quem pode falar com a Ada", () => {
   test("an agent that doesn't answer me: chip, no @ suggestion, DM composer off with the notice", async () => {
     const withDm = onlyOwner();
     seedDm(withDm, { type: "agent", id: ADA_ID });
+    // An owner lists the agents that don't talk to them only when they ask to (Agentes' ⋯).
+    withDm.sidebarView = { agentSort: "workspace", showAllAgents: true, pins: null };
     await go(`c/${ENG_ID}`, withDm);
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     const sidebarAda = within(nav).getByRole("link", { name: /^Ada/ });
-    // In the sidebar: her role, then a lock that says who she answers. The chip is in the DM's header.
-    expect(sidebarAda.textContent).toContain("Dev");
+    // In the sidebar: who she talks to in place of her role, and a lock that says it whole. The chip is in the DM's
+    // header.
+    expect(sidebarAda.textContent).toContain("só fala com João");
     expect(within(sidebarAda).getByRole("img", { name: "Pessoal" }).getAttribute("title")).toBe(
       "A Ada só responde a João.",
     );

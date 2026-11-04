@@ -665,6 +665,8 @@ async function settle(
   userId: string,
   agent: Agent | null,
   got?: string,
+  /** The right hand's name when it decided for `userId` (ADR 0139). */
+  by?: string,
 ) {
   const { message, card } = found;
   await resolveNotifications(deps, message.orgId, { groupKey: askGroup(message.id) }).catch(() => 0);
@@ -688,7 +690,7 @@ async function settle(
     : [];
   if (!run) return;
   const [person] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, userId));
-  const who = person?.name ?? "A person";
+  const who = by ? `${by}, on behalf of ${person?.name ?? "a person"},` : (person?.name ?? "A person");
   const notice: Notice = {
     kind: "proposal_result",
     from: `Your proposal of the agent «${card.params.draft.name}»`,
@@ -745,17 +747,31 @@ export async function createProposedAgent(
   userId: string,
   orgId: string,
   messageId: string,
-  options: { test?: boolean } = {},
+  options: {
+    test?: boolean;
+    /**
+     * The right hand approving for `userId` (ADR 0139): its name for the agent that proposed it, and the budget the
+     * new agent gets (within their cap). It thinks with the workspace's key.
+     */
+    delegated?: { by: string; budgetNanoUsd: number };
+  } = {},
 ) {
   const found = await claim(deps, userId, orgId, messageId, "creating");
   const { draft } = found.card.params;
+  const { delegated } = options;
   let agent: Agent;
   try {
     agent = await createAgent(
       deps.db,
       userId,
       orgId,
-      { name: draft.name, handle: draft.handle, role: draft.role, instructions: draft.instructions },
+      {
+        name: draft.name,
+        handle: draft.handle,
+        role: draft.role,
+        instructions: draft.instructions,
+        ...(delegated ? { monthlyBudgetNanoUsd: delegated.budgetNanoUsd } : {}),
+      },
       NEW_AGENT_DEFAULTS,
       { via: found.proposedBy },
     );
@@ -764,7 +780,7 @@ export async function createProposedAgent(
     await setCard(deps.db, found.message, found.before, "creating");
     throw error;
   }
-  const given = await giveLines(deps, userId, found.message, agent, draft);
+  const given = await giveLines(deps, userId, found.message, agent, draft, !!delegated);
   const card: AgentProposalCard = {
     ...found.card,
     state: "created",
@@ -773,7 +789,7 @@ export async function createProposedAgent(
     routineId: given.routineId,
   };
   await setCard(deps.db, found.message, card, "creating");
-  await settle(deps, { ...found, card }, userId, agent, given.said);
+  await settle(deps, { ...found, card }, userId, agent, given.said, delegated?.by);
   // "Criar e testar": their DM with it, where the app puts the first task in the composer. Never sent for them: the
   // right hand wrote it, and it would run with the clicker's permissions unread.
   const dm =
@@ -905,9 +921,17 @@ async function giveApps(db: Database, userId: string, orgId: string, agentId: st
 
 /**
  * Gives the new agent each line of its draft that `userId` may give, one by one (one refused leaves the others), and
- * says to the agent that proposed it what it got and what waits for whom.
+ * says to the agent that proposed it what it got and what waits for whom. `apiOnly`: it thinks with the workspace's
+ * key, never a plan of theirs (the right hand creating it for them, ADR 0139).
  */
-async function giveLines(deps: ProposedAgentDeps, userId: string, message: Message, agent: Agent, draft: AgentDraft) {
+async function giveLines(
+  deps: ProposedAgentDeps,
+  userId: string,
+  message: Message,
+  agent: Agent,
+  draft: AgentDraft,
+  apiOnly = false,
+) {
   const { db } = deps;
   const orgId = message.orgId;
   const attempt = async <T>(step: () => Promise<T>) => {
@@ -918,7 +942,7 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
     }
   };
   // Its AI: an account of this person's that thinks for no agent (a plan thinks only for its owner's agents).
-  const ai = await suggestAgentAi(deps, orgId, userId);
+  const ai: SuggestedAi = apiOnly ? { kind: "model" } : await suggestAgentAi(deps, orgId, userId);
   const thinks =
     ai.kind !== "account" ||
     (

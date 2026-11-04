@@ -1,4 +1,4 @@
-import type { BrowserFrameMetadata, BrowserInputEvent, BrowserModifiers } from "./live";
+import { type BrowserFrameMetadata, type BrowserInputEvent, type BrowserModifiers, TEXT_EVENT_MAX } from "./live";
 
 /**
  * A person's input on the live view (ADR 0040 §7, §14): where a click, a drag
@@ -237,6 +237,20 @@ export function wheelEvent(at: { x: number; y: number }, deltaX: number, deltaY:
 /** Whole text into the page's focused field (accents and autofilled passwords included). */
 export function textEvent(text: string): BrowserInputEvent | null {
   return text ? { kind: "text", text } : null;
+}
+
+/** A paste into the page's focused field: line breaks as LF, in pieces one event carries, never inside a character. */
+export function pasteEvents(text: string): BrowserInputEvent[] {
+  const all = text.replaceAll("\r\n", "\n");
+  const out: BrowserInputEvent[] = [];
+  for (let i = 0; i < all.length; ) {
+    let end = Math.min(i + TEXT_EVENT_MAX, all.length);
+    const last = all.charCodeAt(end - 1);
+    if (end < all.length && last >= 0xd800 && last <= 0xdbff) end -= 1;
+    out.push({ kind: "text", text: all.slice(i, end) });
+    i = end;
+  }
+  return out;
 }
 
 /** The special keys the live view sends as keys (everything else goes as text). */

@@ -18,6 +18,8 @@ import { getAgentCached } from "../agents";
 import type { CodeSetup } from "../git/machine";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
+import { addPersonSpend } from "../person-usage";
+import { apiNano } from "../plan-usage";
 import { computerPrompt, systemWithConversation } from "./prompt";
 import {
   BRAIN_NAMES,
@@ -473,6 +475,8 @@ export async function recordPlanUsage(
     agentId: string;
     runId?: string;
     kind?: "agent" | "router";
+    /** The person behind the run (ADR 0141): the row names them and their month counts the API-equivalent. */
+    personId?: string | null;
     /** `claude_code` or `codex`. */
     provider: string;
     /** The computer the turn ran on and the account it spent; `accountId` null: that computer's own sign-in. */
@@ -509,7 +513,19 @@ export async function recordPlanUsage(
       billedTo: "plan",
       machineId: input.machineId ?? null,
       brainAccountId: input.machineId ? (input.accountId ?? null) : null,
+      personId: input.personId ?? null,
     })
-    .returning({ id: schema.usageRecords.id });
+    .returning({ id: schema.usageRecords.id, inputTokens: schema.usageRecords.inputTokens });
+  if (row && input.personId) {
+    // One unit for everything: a plan's tokens count at what they would cost through the API.
+    const equivalent = apiNano(input.model ?? null, {
+      input: row.inputTokens,
+      output: Math.max(0, Math.round(input.outputTokens)),
+      cacheRead,
+      cacheWrite,
+    });
+    if (equivalent)
+      await addPersonSpend(db, { orgId: input.orgId, personId: input.personId, amountNanoUsd: equivalent });
+  }
   return row?.id ?? null;
 }

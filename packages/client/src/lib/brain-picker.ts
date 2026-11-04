@@ -5,7 +5,14 @@ import { thinksWith } from "./brain";
 import { isClaudeAlias } from "./brain-advanced";
 import { namesComputers } from "./machines";
 import { kindOf, PLAN_CHOICES, type PlanChoice, planLabel, planMark, planOfAccount } from "./no-ai";
-import { type BrainModelChoice, brainModelChoices, type CodingPlan, type PlanModelNeed, planOf } from "./plans";
+import {
+  type BrainModelChoice,
+  brainModelChoices,
+  type CodingPlan,
+  type PlanModelNeed,
+  planFreeHint,
+  planOf,
+} from "./plans";
 import { AUTO, isAuto, type ModelChoice, providerLabel } from "./providers";
 
 /*
@@ -158,6 +165,7 @@ export function brainPickOptions(
     const kind = kindOf(choice);
     const coding = planOf(choice);
     const name = thinksWith(t, choice, null);
+    const freeHint = planFreeHint(t, coding);
     const on = machines.filter((m) => m.options.some((o) => o.kind === kind && o.available));
     const rows = (
       base: Omit<Extract<BrainPick, { machineId: string }>, "model">,
@@ -177,6 +185,7 @@ export function brainPickOptions(
           mark: planMark(choice),
           // Claude's, ChatGPT's and Cursor's say whose plan it is; a coding plan is the person's own key.
           description: coding ? t("brain.auto.hint") : t(`brain.${kind}Text`),
+          ...(freeHint ? { hint: freeHint } : {}),
           disabled: false,
           free: false,
           keywords: name,
@@ -213,6 +222,7 @@ export function brainPickOptions(
             group: name,
             mark: choice,
             description: t("newAgent.brainPick.connectText", { plan: coding.label }),
+            ...(freeHint ? { hint: freeHint } : {}),
             disabled: false,
             free: false,
             keywords: "",

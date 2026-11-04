@@ -34,8 +34,8 @@ import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } f
 import { type Agent, getAgentCached } from "./agents";
 import { agentsDmReads, readerOfRun } from "./agents-dm-reads";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
-import { publishApproval } from "./approvals";
-import { fedByRoutine, personOfMessage, runAuthority } from "./authority";
+import { deciderName, publishApproval } from "./approvals";
+import { accountablePerson, fedByRoutine, personOfMessage, runAuthority } from "./authority";
 import {
   type AutoChoice,
   type AutoModelRecord,
@@ -154,9 +154,10 @@ import {
   dataExceptionMessage,
   MissingCredentialError,
   NotFoundError,
+  PersonLimitError,
   ValidationError,
 } from "./errors";
-import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import { type ChannelEvent, liveTurns, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
@@ -184,6 +185,7 @@ import {
 import { openRequestNudge, openRequestsOf, WITHDRAW_REQUEST_TOOL } from "./open-requests";
 import { enqueue, PermanentJobError } from "./outbox";
 import { type OutsideMemo, personWords, runReadOutside } from "./outside";
+import { assertPersonUnderLimit } from "./person-usage";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
 import { reachWillHand } from "./reach";
@@ -229,6 +231,7 @@ import {
   addRunStep,
   isTerminal,
   NO_AI,
+  PERSON_LIMIT,
   type RunStatus,
   replyThreadOf,
   runErrorDetail,
@@ -771,6 +774,10 @@ const userFacing = (error: unknown): string | null => {
 const retryableOutage = (error: unknown) =>
   (error instanceof ProviderError || error instanceof BrainFailure) && error.retryable;
 
+/** The card's words when the person behind a run is at their monthly limit (`bodyCode` `person_limit`). */
+const PERSON_LIMIT_TEXT =
+  "The person who asked reached their usage limit for this month. To keep going now, ask an admin.";
+
 /** The note a run parked on a provider outage posts once (`bodyCode` `provider_unavailable`). */
 const PROVIDER_UNAVAILABLE_TEXT = "My AI provider isn't answering right now. I'll answer as soon as it's back.";
 
@@ -1272,6 +1279,41 @@ async function executeRunInner(
         .catch(() => {});
     }
     await fail(NO_AI);
+  };
+
+  /**
+   * The person behind the run is at their monthly AI limit (ADR 0141): the conversation gets the agent's card ("Você
+   * chegou ao seu limite", Pedir mais, Ver meu uso, for that person only) and the run ends with `person_limit`, which
+   * nobody is notified of: the card is the news. A raise turns the card into "pode continuar"; the person asks again.
+   * ponytail: the run ends instead of waiting for the raise like a budget's wait does; parking it would need a usage
+   * wait of its own (`USAGE_WAIT_CODES`).
+   */
+  const failPersonLimit = async (forUserId: string) => {
+    if (!run.background) {
+      const card = await db.transaction((tx) =>
+        post(
+          tx,
+          replyThreadId,
+          PERSON_LIMIT_TEXT,
+          {
+            ...bodyCode("person_limit"),
+            actionCard: {
+              kind: "person_limit",
+              state: "limited",
+              userId: forUserId,
+              agentId: run.agentId,
+              runId: run.id,
+              renewsAt: new Date(nextMonthStart(Date.now())).toISOString(),
+            },
+          },
+          undefined,
+          true,
+        ),
+      );
+      const [view] = await withWikiLinks(db, run.orgId, [messageView(card)]);
+      if (view) await publishMessageCreated(deps.pubsub, view);
+    }
+    await fail(PERSON_LIMIT);
   };
 
   // A workspace on hold or suspended, or this agent held (`standing.ts`): the run ends here and says why,
@@ -2060,8 +2102,10 @@ async function executeRunInner(
           if (ran) await publishApproval({ db, pubsub: deps.pubsub }, ran, "approval.decided").catch(() => {});
         } else {
           const by = approval?.status === "refused" ? approval.decidedByUserId : null;
-          const [person] = by ? await db.select({ name: users.name }).from(users).where(eq(users.id, by)) : [];
-          result = toolResultFor(approval, person?.name);
+          result = toolResultFor(
+            approval,
+            by ? await deciderName(db, by, approval?.decidedForUserId ?? null) : undefined,
+          );
         }
       }
       const line = `${call.name}${result?.isError ? " (not done)" : ""}: ${result?.content ?? ""}`;
@@ -3608,12 +3652,23 @@ async function executeRunInner(
       let result: BrainStep;
       /** The computer turned the turn away for want of room: nothing ended there that frees room. */
       let refused = false;
+      // Whose month this turn counts for (ADR 0141): the person behind the run, else a routine's creator. The
+      // team's right hand helping someone set up counts for nobody.
+      const personId =
+        agent.builtin === "right_hand"
+          ? null
+          : accountablePerson(
+              await runAuthority(db, { ...run, transcript: transcript as unknown as Record<string, unknown> }),
+            );
       try {
+        // A plan brain's turn costs nothing through the gateway: its person's limit is checked here.
+        if (personId && turnPlan.kind !== "model") await assertPersonUnderLimit(db, run.orgId, personId);
         result = await thinkOnce(
           brain,
           // Memory and wiki once per run: its first turn, or a session started afresh.
           brainTurnOf(run, thinker, transcript, turnTools, prompt, turnPlan, {
             found: computerTurns === 0 || !turnPlan.session?.resume,
+            personId,
             // Synced during the quiet window for this very turn; where it starts is picked again from its words now
             // (what came in meanwhile may name another repository).
             ...(earlyCode?.plan === turnPlan && computerTurns === 0
@@ -3636,6 +3691,7 @@ async function executeRunInner(
                   orgId: run.orgId,
                   agentId: run.agentId,
                   runId: run.id,
+                  personId,
                   provider: brain.kind,
                   ...(turnPlan.session?.machineId
                     ? { machineId: turnPlan.session.machineId, accountId: turnPlan.account?.id ?? null }
@@ -3814,6 +3870,8 @@ async function executeRunInner(
           if (handled === "fallback") continue;
           if (handled === "waited" || handled === "failed") return;
         }
+        // The person behind it is at their monthly limit (ADR 0141): the agent says so with "Pedir mais" and stops.
+        if (error instanceof PersonLimitError) return failPersonLimit(error.personId);
         // The agent's monthly budget: the run waits for the next month or a raise. A forum's turn fails instead:
         // the topic's order moves on without it.
         if (error instanceof BudgetExceededError && !forum) {
@@ -4521,7 +4579,7 @@ function brainTurnOf(
   tools: ToolDefinition[],
   trigger: string,
   plan: BrainPlan,
-  options: { found?: boolean; code?: Promise<CodeSetup | null> } = {},
+  options: { found?: boolean; code?: Promise<CodeSetup | null>; personId?: string | null } = {},
 ): ComputerTurn {
   const model = plan.kind === "model" ? agent.model : plan.model;
   const turnParts = () => {
@@ -4577,6 +4635,7 @@ function brainTurnOf(
     ...(agent.contextTokens ? { contextTokens: agent.contextTokens } : {}),
     trigger,
     ...(options.code ? { code: options.code } : {}),
+    ...(options.personId ? { personId: options.personId } : {}),
   };
 }
 
@@ -4958,6 +5017,7 @@ function createDeltaPublisher(
   let all = "";
   /** What was published so far (always a prefix of what may be shown). */
   let shown = "";
+  const live = { turn: first.turn, text: "", from: 0 };
   /** Length of `all` at the last send. */
   let sentUpTo = 0;
   /** When each piece arrived: [ms, length of `all` once it was added]. */
@@ -4974,8 +5034,13 @@ function createDeltaPublisher(
     const visible = visibleText(all, final);
     // A held piece turned out to be the word (now cut): nothing new to show.
     if (!visible.startsWith(shown)) return;
-    let rest = visible.slice(shown.length);
+    let at = shown.length;
+    let rest = visible.slice(at);
     shown = visible;
+    if (shown) {
+      live.text = shown;
+      liveTurns.set(run.id, live);
+    }
     while (rest.length > 0) {
       const text = rest.slice(0, MAX_CHUNK);
       rest = rest.slice(MAX_CHUNK);
@@ -4988,7 +5053,9 @@ function createDeltaPublisher(
         seq: seq++,
         text,
         turn: first.turn,
+        at,
       };
+      at += text.length;
       pending = pending.then(() => publishChannelEvent(pubsub, evt));
     }
   };
@@ -5009,6 +5076,7 @@ function createDeltaPublisher(
     async flush() {
       // The turn's text is complete: what was held is shown now, unless it was the word.
       send(true);
+      liveTurns.delete(run.id);
       await pending;
     },
     seq: () => seq,

@@ -224,7 +224,7 @@ function AppRow({ app, onDisconnect }: { app: ConnectedApp; onDisconnect: () => 
     <div className="ac-list__row app-row">
       <AppMark app={app} />
       <span className="list-col app-row__main">
-        <span className="app-row__title">
+        <span className="list-title">
           <span className="app-row__name">{app.name}</span>
           <AccessChip access={app.access} />
         </span>
@@ -244,7 +244,7 @@ function TokenRow({ token, onRevoke }: { token: PersonalToken; onRevoke: () => v
         <Icon name="key" />
       </span>
       <span className="list-col app-row__main">
-        <span className="app-row__title">
+        <span className="list-title">
           <span className="app-row__name">{token.name}</span>
           <AccessChip access={token.access} />
         </span>

@@ -69,8 +69,8 @@ AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' npx -y @agenteschat/setup --netwo
 
 Exit code 0: done; 1: a check failed; 2: a wrong option.
 
-The full guide, with the phone app, a runbook for agents and troubleshooting:
-[SELF_HOSTING.md](https://github.com/agentes-chat/agentes-chat/blob/main/SELF_HOSTING.md).
+The guide, with the phone app, backups and upgrades: https://agentes.chat/docs/install-on-a-server. The full reference, with a
+runbook for agents and troubleshooting, is `SELF_HOSTING.md` in the agentes.chat repository.
 
 ## License
 

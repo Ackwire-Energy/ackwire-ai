@@ -1,6 +1,6 @@
 # 0132. The OpenCode brain: agents think with OpenCode's CLI, its free tier or an OpenCode key
 
-- Status: Accepted (2026-11-02)
+- Status: Accepted (2026-11-02). Amended 2026-11-03: §7 (free variants beside their paid models, and where they run)
 - Date: 2026-11-02
 - Extends: ADR 0032 (computer brains), ADR 0041 (accounts per agent), ADR 0053 §3 (permission profiles), ADR 0059 (AI accounts belong to people), ADR 0114 (the Cursor brain, which this mirrors), ADR 0118 (long work pauses near a limit)
 
@@ -59,6 +59,8 @@ A turn's usage is recorded like every computer brain's: tokens on the run with `
 ### 7. Models
 
 "Quem pensa" offers what `opencode models` listed on the agent's computer (`provider/model`), the free tier first with a "Free" mark, else, when it listed nothing, OpenCode's free tier from a static list (`OPENCODE_FREE_MODELS`, `isOpencodeFreeModel`: `opencode/…-free`, or listed). With none chosen the CLI's own default runs (`defaultBrainModel` is null); any `provider/model` is taken as typed (a key's paid Zen models, which the computer's own CLI may not list).
+
+*Amended 2026-11-03:* a listing with a key holds OpenCode's paid models and their free variants (`opencode/glm-5.3-flash` and `opencode/glm-5.3-flash-free`, `opencode/deepseek-v4.1-flash` and `opencode/deepseek-v4.1-flash-free`, as OpenCode's console shows them). Each free variant now sits right after its paid model (the `-free` id of a listed model), the other free ones still first; ids and labels stay OpenCode's, each free one marked "Free" and, like every computer brain's turn, recorded at zero cost (§3). They answer only OpenCode's CLI, so OpenCode Go's key, which thinks through Claude Code, never lists them: its models' picker (the agent's page on the web and the phone, Quem pensa's Automático row of the plan) says in one line that other free models run through OpenCode on the agent's computer (`brain.opencodeFreeHint`). Go's own free models (`beam-free`, `iceman-contributor-free`, in Go's live list) stay on Go's list.
 
 ### 8. In the apps
 

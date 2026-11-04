@@ -25,6 +25,7 @@ import {
 import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
 import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { catchEarlyErrors, reportError, setErrorScope, startErrorReports } from "./lib/error-reports";
+import { pageScrollReset } from "./lib/page-scroll";
 import { showReturnNotices } from "./lib/return-notices";
 import { snapshotStore } from "./lib/snapshot-store";
 import { installSounds } from "./lib/sounds";
@@ -94,15 +95,19 @@ document.addEventListener("visibilitychange", () => {
 /** Opening never waits longer than this for the snapshot (a slow disk loads from the server instead). */
 const SNAPSHOT_WAIT_MS = 300;
 
+const pageScroll = pageScrollReset();
 const router = createRouter({
   routeTree,
   context: { queryClient, api },
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
   scrollRestoration: true,
+  scrollToTopSelectors: pageScroll.selectors,
   // No View Transitions: they freeze the whole page while the next one renders (the sidebar's pill
   // stalled mid-slide). Each page's main fades in on mount instead (layout.css).
 });
+
+router.subscribe("onBeforeLoad", pageScroll.track);
 
 declare module "@tanstack/react-router" {
   interface Register {

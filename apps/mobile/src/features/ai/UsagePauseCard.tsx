@@ -138,7 +138,9 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
             variant="ghost"
             size="sm"
             label={t("queue.see")}
-            onPress={() => sheet.open(<UsageQueueSheet agentId={m.author.id ?? ""} />)}
+            onPress={() =>
+              sheet.open(<UsageQueueSheet agentId={m.author.id ?? ""} tab={skipped ? "skipped" : undefined} />)
+            }
           />
         ) : null}
       </View>

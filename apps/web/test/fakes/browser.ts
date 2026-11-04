@@ -18,6 +18,8 @@ export interface FakeBrowser {
   forbidden: Set<string>;
   /** Agents whose screen this person may watch but not drive (`GET …/control` answers false). */
   watchOnly: Set<string>;
+  /** Agents whose Chrome shows on their desktop: the desktop's state names the browser's open handoff too. */
+  sameWindow: Set<string>;
 }
 
 const NO_DESKTOP: DesktopStatus = {
@@ -52,6 +54,7 @@ export function createFakeBrowser(
   const desktops = new Map<string, Partial<DesktopStatus>>();
   const forbidden = new Set<string>();
   const watchOnly = new Set<string>();
+  const sameWindow = new Set<string>();
   const openOn = (agentId: string, screen: BrowserHandoff["screen"] = "browser") =>
     [...handoffs.values()].find(
       (h) => h.agentId === agentId && handoffScreen(h) === screen && (h.status === "pending" || h.status === "active"),
@@ -132,6 +135,7 @@ export function createFakeBrowser(
       if (held?.controllerUserId !== me) {
         throw new ApiError(409, "browser.not_in_control", "Take control of the browser first");
       }
+      if (typeof url !== "string") return;
       let host: string;
       try {
         const u = new URL(url.includes("://") ? url : `https://${url}`);
@@ -160,7 +164,7 @@ export function createFakeBrowser(
     status: async (orgId, agentId) => {
       log("desktop.status", orgId, agentId);
       if (forbidden.has(agentId)) throw new ApiError(403, "forbidden", "You can't use this agent's desktop");
-      const open = openOn(agentId, "desktop");
+      const open = openOn(agentId, "desktop") ?? (sameWindow.has(agentId) ? openOn(agentId, "browser") : null);
       return {
         ...NO_DESKTOP,
         ...desktops.get(agentId),
@@ -168,5 +172,5 @@ export function createFakeBrowser(
       };
     },
   };
-  return { client, desktop, settings, handoffs, desktops, forbidden, watchOnly };
+  return { client, desktop, settings, handoffs, desktops, forbidden, watchOnly, sameWindow };
 }

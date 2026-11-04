@@ -13,7 +13,7 @@ import {
   useMachines,
   usesScreen,
 } from "@agenteschat/client";
-import type { AgentComputerFacts } from "@agenteschat/client/lib/agent-computer";
+import { type AgentComputerFacts, entryState } from "@agenteschat/client/lib/agent-computer";
 import { computerEdition, setupView } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQuery } from "@tanstack/react-query";
@@ -115,3 +115,13 @@ export function useAgentComputer(
 }
 
 export type AgentComputerView = ReturnType<typeof useAgentComputer>;
+
+/**
+ * Whether this person may open the agent's computer from a shortcut (its card): they may watch it and it has one. A
+ * self-hosted agent with no computer yet has nothing to open there (its page offers to pick one).
+ */
+export function useOpensComputer(agent: Pick<Agent, "id" | "ownerUserId">): boolean {
+  const view = useAgentComputer(agent);
+  const f = view.facts;
+  return Boolean(view.ready && !view.forbidden && f && entryState(f).kind !== "noComputer");
+}

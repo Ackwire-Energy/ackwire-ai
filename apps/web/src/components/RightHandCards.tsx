@@ -1,4 +1,4 @@
-import type { AppNotification, Message, Proposal } from "@agenteschat/client";
+import type { AppNotification, CardDelegate, Message, Proposal } from "@agenteschat/client";
 import {
   keys,
   useAgentActions,
@@ -7,6 +7,7 @@ import {
   useCardProposals,
   useChannels,
   useDecideProposal,
+  useDecideProposals,
   useMembers,
   useModelLabel,
   useRoles,
@@ -16,16 +17,30 @@ import type { SettingsProposalCard } from "@agenteschat/client/lib/action-cards"
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { decidersOf, onlyKey, sentToText, settingLineText } from "@agenteschat/client/lib/proposals";
-import { Button, Icon } from "@agenteschat/ui";
+import {
+  cardOutcome,
+  chosenRows,
+  decidersOf,
+  isOpen,
+  onlyKey,
+  removalOf,
+  rowStatus,
+  sentToText,
+  settingLineText,
+} from "@agenteschat/client/lib/proposals";
+import { Button, Icon, Switch } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentProposalCardView } from "@/components/ActionCard";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { DeleteAgentsDialog } from "@/components/DeleteAgentDialog";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone } from "@/components/RequestCard";
+import { DelegateNote, DelegateUndo, useDelegateLine } from "@/components/RightHandDelegate";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
+import "./proposals.css";
 
 /**
  * The right hand's card of a teammate's settings (ADR 0137): a request per row (one agent, one decider), each applied
@@ -34,11 +49,216 @@ import { useToast } from "@/lib/toast";
 export function SettingsProposalCardView({ message, card }: { message: Message; card: SettingsProposalCard }) {
   const { org } = useOrg();
   const rows = useCardProposals(org.id, card.proposalIds);
+  const removal = removalOf(rows);
+  if (removal) return <RemovalCard rows={rows} message={message} removal={removal} />;
   return (
     <>
-      {rows.map((p) => (
-        <SettingsRow key={p.id} p={p} message={message} />
+      {rows.map((p, i) => (
+        <SettingsRow key={p.id} p={p} message={message} delegate={card.delegate} first={i === 0} />
       ))}
+    </>
+  );
+}
+
+/**
+ * "Arquivar 5 agentes?" (`propose_remove_agents`): the agents listed, each with its switch, and "Arquivar todos" or
+ * "Arquivar 3" for whoever may archive (or delete) them, applied as them row by row; the person who asked and can't,
+ * Pedir a um admin. Decided, how it ended and Desfazer for what was archived (a deleted agent doesn't come back).
+ */
+function RemovalCard({
+  rows,
+  message,
+  removal,
+}: {
+  rows: Proposal[];
+  message?: Message;
+  removal: "archive" | "delete";
+}) {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const members = useMembers(org.id).data ?? [];
+  const roles = useRoles(org.id).data?.roles ?? [];
+  const decide = useDecideProposals(org.id);
+  const ask = useAskProposal(org.id);
+  const actions = useAgentActions(org.id, message?.channelId ?? "");
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [off, setOff] = useState<ReadonlySet<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const [first] = rows;
+  if (!first) return null;
+  const del = removal === "delete";
+  const failed = (e: unknown) => toast.show(errorText(t, e), "error");
+  const nameOf = (p: Proposal) => dir.anyAgent(p.agentId)?.name ?? t("channel.unknownAgent");
+  const label = t(del ? "rightHand.remove.deleteTitle" : "rightHand.remove.archiveTitle", { count: rows.length });
+  const open = rows.filter(isOpen);
+  const { chosen, all } = chosenRows(rows, off);
+  const decides = open.some((p) => p.canDecide);
+  const mine = first.requestedBy?.userId === me.user.id;
+  const toggle = (id: string, on: boolean) =>
+    setOff((prev) => {
+      const next = new Set(prev);
+      if (on) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const run = (decision: "accept" | "refuse") =>
+    decide.mutate(
+      { ids: chosen.map((p) => p.id), decision },
+      {
+        onSuccess: ({ failed: f }) => f[0] && failed(f[0].error),
+        onSettled: () => setConfirming(false),
+      },
+    );
+
+  if (open.length === 0) {
+    const outcome = cardOutcome(t, rows);
+    const receipts = (message?.actions ?? []).filter((a) => rows.some((p) => p.undoActionId === a.id));
+    const undoable = receipts.some((a) => !a.undoneAt && a.undoableUntil && Date.parse(a.undoableUntil) > Date.now());
+    const undone = receipts.length > 0 && receipts.every((a) => a.undoneAt);
+    const done = rows.filter((p) => p.status === "accepted");
+    // One person decided every row the same way: "Aplicado por você", as on a settings row.
+    const by = first.decidedBy;
+    const alike = rows.every((p) => p.status === first.status && p.decidedBy?.userId === by?.userId);
+    const byMe = by?.userId === me.user.id;
+    const who =
+      !alike || !by
+        ? outcome.label
+        : first.status === "accepted"
+          ? byMe
+            ? t("rightHand.card.appliedByYou")
+            : t("rightHand.card.appliedBy", { name: by.name })
+          : byMe
+            ? t("rightHand.card.declinedByYou")
+            : t("rightHand.card.declinedBy", { name: by.name });
+    return (
+      <RequestDone
+        done={outcome.accepted && !undone}
+        label={label}
+        action={
+          undoable && (
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={actions.undoAll.isPending}
+              onClick={() =>
+                message &&
+                actions.undoAll.mutate(message.id, {
+                  onSuccess: () => void qc.invalidateQueries({ queryKey: keys.agents(org.id) }),
+                  onError: failed,
+                })
+              }
+            >
+              {t("rightHand.card.undo")}
+            </Button>
+          )
+        }
+      >
+        {who}: <b>{(done.length ? done : rows).map(nameOf).join(", ")}</b>
+        {first.decidedAt && ` · ${formatTime(i18n.language, first.decidedAt)}`}
+        {undone && ` · ${t("rightHand.card.undone")}`}
+      </RequestDone>
+    );
+  }
+
+  const unsent = open.filter((p) => !p.canDecide && !p.askedAt);
+  const sent = open.find((p) => p.askedAt);
+  const state = decides ? undefined : mine && unsent.length > 0 ? t(onlyKey(first)) : t("proposals.waitingAdmin");
+  const decision = decides ? (
+    <>
+      <Button
+        size="sm"
+        variant={del ? "danger" : "primary"}
+        disabled={decide.isPending || chosen.length === 0}
+        loading={decide.isPending && decide.variables?.decision === "accept"}
+        onClick={() => (del ? setConfirming(true) : run("accept"))}
+      >
+        {all
+          ? t(del ? "rightHand.remove.deleteAll" : "rightHand.remove.archiveAll")
+          : t(del ? "rightHand.remove.deleteSome" : "rightHand.remove.archiveSome", { count: chosen.length })}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={decide.isPending || chosen.length === 0}
+        loading={decide.isPending && decide.variables?.decision === "refuse"}
+        onClick={() => run("refuse")}
+      >
+        {t(mine ? "rightHand.card.dismiss" : "rightHand.card.decline")}
+      </Button>
+    </>
+  ) : mine && unsent.length > 0 ? (
+    <Button
+      size="sm"
+      variant="primary"
+      icon="arrowUp"
+      loading={ask.isPending}
+      onClick={async () => {
+        try {
+          for (const p of unsent) await ask.mutateAsync(p.id);
+        } catch (e) {
+          failed(e);
+        }
+      }}
+    >
+      {t("rightHand.card.askAdmin")}
+    </Button>
+  ) : (
+    sent?.askedAt && (
+      <span className="rq__sent ac-iconline">
+        <Icon name="arrowUp" size={14} />
+        <span>{sentToText(t, i18n.language, decidersOf(sent, members, roles, null), sent.askedAt)}</span>
+      </span>
+    )
+  );
+  return (
+    <>
+      <DeleteAgentsDialog
+        key={String(confirming)}
+        names={confirming ? chosen.map(nameOf) : null}
+        pending={decide.isPending}
+        onConfirm={() => run("accept")}
+        onClose={() => setConfirming(false)}
+      />
+      <RequestCard
+        id={first.id}
+        kind="proposal"
+        agent={dir.anyAgent(first.proposedByAgentId ?? first.agentId)}
+        label={label}
+        mine={decides}
+        waitingFor={state}
+        lead={del ? `${first.why} ${t("rightHand.remove.deleteHelp")}` : first.why}
+        body={
+          <ul className="proposal-rows">
+            {rows.map((p) => {
+              const agent = dir.anyAgent(p.agentId);
+              const name = nameOf(p);
+              const status = rowStatus(t, p);
+              return (
+                <li key={p.id} className="proposal-row">
+                  <AgentAvatar agentId={p.agentId} size="sm" name={name} />
+                  <span className="proposal-row__what">
+                    <span className="proposal-row__name">{name}</span>
+                    {agent && <span>{[`@${agent.handle}`, agent.role].filter(Boolean).join(" · ")}</span>}
+                  </span>
+                  {status && <span className="proposal-row__status">{status}</span>}
+                  {isOpen(p) && p.canDecide && (
+                    <Switch
+                      checked={!off.has(p.id)}
+                      disabled={decide.isPending}
+                      onCheckedChange={(on) => toggle(p.id, on)}
+                      aria-label={t("proposals.include", { name })}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        }
+        actions={decision || undefined}
+        what={label}
+      />
     </>
   );
 }
@@ -48,7 +268,18 @@ export function SettingsProposalCardView({ message, card }: { message: Message; 
  * Who may decide it gets Aplicar and Descartar (Recusar in the inbox); the person who asked and can't, Pedir a um
  * admin, then whom it went to. Decided, one line with who did it, and Desfazer on its receipt while it lasts.
  */
-function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
+function SettingsRow({
+  p,
+  message,
+  delegate,
+  first = true,
+}: {
+  p: Proposal;
+  message?: Message;
+  /** The right hand looked at the card for the person it is for (ADR 0139): one decision, Desfazer on the first row. */
+  delegate?: CardDelegate | null;
+  first?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -77,12 +308,15 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
   const failed = (e: unknown) => toast.show(errorText(t, e), "error");
   const mine = p.requestedBy?.userId === me.user.id;
   const label = t("proposals.titleSettings", g);
+  const delegated = useDelegateLine(delegate);
+  const byRightHand = delegated && (delegate?.state === "approved" || delegate?.state === "undone");
 
   if (p.status !== "pending") {
     const receipt = message?.actions?.find((a) => a.id === p.undoActionId);
     const byMe = p.decidedBy?.userId === me.user.id;
-    const who =
-      p.status === "accepted"
+    const who = byRightHand
+      ? delegated
+      : p.status === "accepted"
         ? byMe
           ? t("rightHand.card.appliedByYou")
           : t("rightHand.card.appliedBy", { name: p.decidedBy?.name ?? "" })
@@ -93,24 +327,31 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
       receipt && !receipt.undoneAt && receipt.undoableUntil && Date.parse(receipt.undoableUntil) > Date.now();
     return (
       <RequestDone
-        done={p.status === "accepted" && !receipt?.undoneAt}
+        done={p.status === "accepted" && !receipt?.undoneAt && delegate?.state !== "undone"}
         label={label}
+        more={
+          byRightHand && delegate?.reason
+            ? { label: t("rightHandApprovals.card.why"), content: <p>{delegate.reason}</p> }
+            : undefined
+        }
         action={
-          undoable && (
-            <Button
-              size="sm"
-              variant="ghost"
-              loading={actions.undo.isPending}
-              onClick={() =>
-                actions.undo.mutate(receipt.id, {
-                  onSuccess: () => void qc.invalidateQueries({ queryKey: keys.agents(org.id) }),
-                  onError: failed,
-                })
-              }
-            >
-              {t("rightHand.card.undo")}
-            </Button>
-          )
+          byRightHand
+            ? first && <DelegateUndo d={delegate} />
+            : undoable && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={actions.undo.isPending}
+                  onClick={() =>
+                    actions.undo.mutate(receipt.id, {
+                      onSuccess: () => void qc.invalidateQueries({ queryKey: keys.agents(org.id) }),
+                      onError: failed,
+                    })
+                  }
+                >
+                  {t("rightHand.card.undo")}
+                </Button>
+              )
         }
       >
         {who}: <b>{[name, ...lines.map((l) => `${lowerFirst(l.field, i18n.language)} ${l.to}`)].join(" · ")}</b>
@@ -201,19 +442,24 @@ function SettingsRow({ p, message }: { p: Proposal; message?: Message }) {
         detail: [agent?.handle ? `@${agent.handle}` : null, agent?.role].filter(Boolean).join(" · "),
       }}
       body={
-        lines.length > 0 && (
-          <dl className="rq__settings">
-            {lines.map((l) => (
-              <div key={`${l.field}:${l.to}`} className="rq__setting">
-                <dt>{l.field}</dt>
-                <dd>
-                  <s>{l.from}</s>
-                  <Icon name="arrowRight" size={14} label={t("rightHand.card.to")} />
-                  <b>{l.to}</b>
-                </dd>
-              </div>
-            ))}
-          </dl>
+        (delegated || lines.length > 0) && (
+          <>
+            {first && <DelegateNote d={delegate} />}
+            {lines.length > 0 && (
+              <dl className="rq__settings">
+                {lines.map((l) => (
+                  <div key={`${l.field}:${l.to}`} className="rq__setting">
+                    <dt>{l.field}</dt>
+                    <dd>
+                      <s>{l.from}</s>
+                      <Icon name="arrowRight" size={14} label={t("rightHand.card.to")} />
+                      <b>{l.to}</b>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </>
         )
       }
       actions={decision || undefined}
@@ -232,6 +478,8 @@ export function ChangeRequestCard({ n }: { n: AppNotification }) {
   const rows = useCardProposals(org.id, proposalId ? [proposalId] : []);
   const agentCard = useAgentProposal(org.id, proposalId ? null : (n.source.messageId ?? null)).data;
   const [p] = rows;
+  const removal = removalOf(rows);
+  if (p && removal) return <RemovalCard rows={rows} removal={removal} />;
   if (p) return <SettingsRow p={p} />;
   if (!agentCard) return null;
   return (

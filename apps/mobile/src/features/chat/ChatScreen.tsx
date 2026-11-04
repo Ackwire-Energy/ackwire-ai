@@ -40,12 +40,13 @@ import {
 } from "@agenteschat/client";
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { runPosition } from "@agenteschat/client/lib/chat";
+import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { capitalize } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
+import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import {
   isMediaAfterReply,
   isMediaAlone,
@@ -91,6 +92,7 @@ import {
   Button,
   Composer,
   type ComposerWorking,
+  Count,
   Icon,
   IconButton,
   PressScale,
@@ -111,7 +113,7 @@ import { DmQueueButton, QueueButton, useAgentsQueue, useOpenQueue } from "../que
 import { RemindSheet } from "../reminders/RemindSheet";
 import { RightHandIntro } from "../right-hand/Intro";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useMyHandle, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, previewOf } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
@@ -165,7 +167,6 @@ import {
   appendedKeys,
   type HeldRun,
   HOLD_FINISHED_RUN_MS,
-  landsOnDivider,
   lastSeenKey,
   type Place,
   placeCorrection,
@@ -293,6 +294,7 @@ function Chat({
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const meId = useMeId();
+  const myHandle = useMyHandle();
   const api = useApi();
   const dir = useDirectory();
   const c = useColors();
@@ -614,8 +616,8 @@ function Chat({
 
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther
-  // up nothing moves (the scroll is never taken): a pill says what arrived below and who, a "Novas" line
-  // marks the first of it, and the pill lands there when it is far.
+  // up nothing moves (the scroll is never taken): the round button at the top right counts what arrived below (in
+  // red when it mentions me) and goes back to the end, and a "Novas" line marks the first of it.
   const listRef = useRef<LegendListRef>(null);
   // The person dragging the list, a new hold on their place (see "Keeping the place") and the app moving it on
   // purpose (sending, the pill, a pin): each lets go of a held place.
@@ -634,13 +636,18 @@ function Chat({
         mine: r.kind === "message" && r.message.author.type === "person" && r.message.author.id === meId,
         // An agent's sticker or GIF after its reply (ADR 0091) is never news of its own.
         silent: r.kind === "message" && isMediaAfterReply(r.message.meta),
+        mentionsMe:
+          r.kind === "message" &&
+          !!myHandle &&
+          r.message.author.id !== meId &&
+          mentionsHandle(r.message.body, myHandle),
         ...(r.kind === "message" && r.message.author.id
           ? { who: `${r.message.author.type}:${r.message.author.id}` }
           : r.kind === "run"
             ? { who: `agent:${r.run.agentId}` }
             : {}),
       })),
-    [rows, meId],
+    [rows, meId, myHandle],
   );
   const [atEnd, setAtEnd] = useState(true);
   const atEndRef = useRef(atEnd);
@@ -654,7 +661,10 @@ function Chat({
     if (atEnd) setSeenKey(latestSeen);
   }, [atEnd, latestSeen]);
   const unseen: Unseen = useMemo(
-    () => (atEnd ? { messages: 0, firstKey: null, authors: [], working: [] } : unseenBelow(scrollRows, seenKey)),
+    () =>
+      atEnd
+        ? { messages: 0, firstKey: null, authors: [], working: [], mentionsMe: false }
+        : unseenBelow(scrollRows, seenKey),
     [atEnd, scrollRows, seenKey],
   );
   // "Novas": before the first new row while the person reads above; it fades a while after they reach it.
@@ -691,21 +701,6 @@ function Chat({
     setAtEnd(true);
     requestAnimationFrame(() => void listRef.current?.scrollToEnd({ animated: true }));
   }, [letGo]);
-  // The pill: to the "Novas" line when it is far, else to the end.
-  const toUnseen = useCallback(() => {
-    const state = listRef.current?.getState();
-    const index = shownRows.findIndex((r) => r.key === DIVIDER_KEY);
-    const far = state && landsOnDivider(state.contentLength, state.positionByKey(DIVIDER_KEY), state.scrollLength);
-    if (far && index >= 0) {
-      letGo();
-      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0, viewOffset: 12 });
-      // What is new is in view now: the pill goes, the line fades after a while.
-      setSeenKey(latestSeen);
-      setReached(true);
-      return;
-    }
-    toEnd();
-  }, [shownRows, latestSeen, toEnd, letGo]);
 
   // "Ver" on the requests' line: the list goes to the request and stays there. It stops following the end, as
   // when reading a long message from its top, so a reply streaming in doesn't pull it back down; reaching the end,
@@ -1694,6 +1689,13 @@ function Chat({
     watchAsks();
     watchRows();
   }, [watchAsks, watchRows]);
+  // More than a screen above the end: the round button shows even with nothing new below.
+  const [far, setFar] = useState(false);
+  const onListScroll = useCallback(() => {
+    watchList();
+    const state = listRef.current?.getState();
+    if (state) setFar(screenAboveEnd(state.distanceFromEnd, state.scrollLength));
+  }, [watchList]);
 
   // The list shows once it sits at the end (no frame of it placing itself), as Bluesky's and Expensify's do; from
   // a little opacity, not none, so the glass inside rows keeps drawing.
@@ -1847,7 +1849,7 @@ function Chat({
                           onStartReached={loadOlder}
                           // A look at the waiting requests' cards and the live rows, once a frame and only while
                           // there is one.
-                          onScroll={watchList}
+                          onScroll={onListScroll}
                           onViewableItemsChanged={onViewable}
                           viewabilityConfig={STICKER_VIEW}
                           onScrollBeginDrag={() => {
@@ -1880,6 +1882,9 @@ function Chat({
                     </JumpToMessageContext.Provider>
                   </StickerStageContext.Provider>
                   <DatePill day={topDay} shown={dayShown} top={hasPin ? 8 : headerHeight + 8} />
+                  {showList && (readHold || (!atEnd && (far || unseen.messages > 0 || unseen.working.length > 0))) ? (
+                    <ToLatest top={hasPin ? 8 : headerHeight + 8} unseen={unseen} onPress={toEnd} />
+                  ) : null}
                 </View>
               </Animated.View>
               {showList ? null : (
@@ -1910,19 +1915,6 @@ function Chat({
               )}
             </>
           )}
-          <KeyboardStickyView
-            offset={{ opened: lift }}
-            style={[styles.jumpDock, { bottom: composerHeight + 10 }]}
-            pointerEvents="box-none"
-          >
-            {showList && (!atEnd || readHold) ? (
-              unseen.messages > 0 || unseen.working.length > 0 ? (
-                <NewPill unseen={unseen} onPress={toUnseen} />
-              ) : (
-                <ToLatest onPress={toEnd} />
-              )
-            ) : null}
-          </KeyboardStickyView>
           {!hasPin ? (
             // The conversation fades under the floating header, as it does under the box. Not under a pinned bar
             // or card: the list already starts below them, and a header-tall fade there was a dark band over the
@@ -2025,83 +2017,57 @@ function Chat({
   );
 }
 
-/** Back to the latest messages: a round button over the list (nothing new below). */
-function ToLatest({ onPress }: { onPress: () => void }) {
+/**
+ * Back to the latest messages: a round button at the top right, under the bar (and the pinned card), as on the web.
+ * It counts what arrived below, in red when one mentions me; its label says who spoke and who is writing.
+ */
+function ToLatest({ top, unseen, onPress }: { top: number; unseen: Unseen; onPress: () => void }) {
   const { t } = useTranslation();
+  const dir = useDirectory();
   const { colors, shadows } = useTheme();
+  const nameOf = (who: string) => {
+    const at = who.indexOf(":");
+    return dir.nameOf({ type: who.slice(0, at), id: who.slice(at + 1) });
+  };
+  const said = [
+    unseen.messages > 0 ? t("mobile.chat.unseen.count", { count: unseen.messages }) : "",
+    unseen.authors.length > 0 ? listNames(t, unseen.authors.map(nameOf)) : "",
+    unseen.working.length > 0
+      ? t("mobile.chat.unseen.working", { names: listNames(t, unseen.working.map(nameOf)) })
+      : "",
+    unseen.mentionsMe ? t("mobile.chat.unseen.mentionsYou") : "",
+  ].filter(Boolean);
   return (
-    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} style={styles.jumpEnd}>
+    <Animated.View
+      entering={FadeIn.duration(160)}
+      exiting={FadeOut.duration(120)}
+      style={[styles.jumpAt, { top }]}
+      pointerEvents="box-none"
+    >
       <PressScale
         to={0.92}
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={t("mobile.chat.toLatest")}
+        accessibilityLabel={
+          said.length > 0 ? t("mobile.chat.toLatestNew", { text: said.join(" · ") }) : t("mobile.chat.toLatest")
+        }
         style={[styles.jump, { backgroundColor: colors.raised, boxShadow: `${shadows.e2}, ${shadows.top}` }]}
       >
         <View style={styles.jumpIcon}>
-          <Icon name="chev" size={20} color={colors.ink2} />
+          <Icon name="down" size={20} color={colors.ink2} />
         </View>
       </PressScale>
-    </Animated.View>
-  );
-}
-
-/**
- * "↓ 2 novas · Marina e Ada · Theo escrevendo": who spoke below, not just a count, with
- * their stacked faces; it lands on the "Novas" line (or at the end when that is close).
- */
-function NewPill({ unseen, onPress }: { unseen: Unseen; onPress: () => void }) {
-  const { t } = useTranslation();
-  const dir = useDirectory();
-  const reduced = useReducedMotion();
-  const { colors, shadows } = useTheme();
-  const parse = (who: string) => {
-    const at = who.indexOf(":");
-    return { type: who.slice(0, at), id: who.slice(at + 1) };
-  };
-  const nameOf = (who: string) => dir.nameOf(parse(who));
-  const count = unseen.messages > 0 ? t("mobile.chat.unseen.count", { count: unseen.messages }) : "";
-  const working = unseen.working;
-  const rest = [
-    unseen.authors.length > 0 ? listNames(t, unseen.authors.map(nameOf)) : "",
-    working.length > 0 ? t("mobile.chat.unseen.working", { names: listNames(t, working.map(nameOf)) }) : "",
-  ].filter(Boolean);
-  const faces = [...new Set([...unseen.authors, ...working])].slice(0, 3);
-  const label = [count, ...rest].filter(Boolean).join(" · ");
-  return (
-    <Animated.View
-      entering={reduced ? FadeIn.duration(120) : FadeInDown.springify().damping(14).stiffness(260)}
-      exiting={FadeOut.duration(120)}
-      style={styles.pillWrap}
-    >
-      <PressScale
-        to={0.96}
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        style={[styles.pill, { backgroundColor: colors.raised, boxShadow: `${shadows.e2}, ${shadows.top}` }]}
-      >
-        <View style={styles.pillIn}>
-          <Icon name="down" size={16} color={colors.ink2} />
-          <View style={styles.faces}>
-            {faces.map((w, i) => (
-              <View key={w} style={[styles.pillFace, i > 0 && styles.pillOverlap, { borderColor: colors.raised }]}>
-                <Face who={parse(w)} size={20} live={false} />
-              </View>
-            ))}
-          </View>
-          <Text variant="footnote" tone="ink" numberOfLines={1} style={styles.pillText}>
-            {count ? (
-              <Text variant="footnote" tone="ink" style={styles.pillCount}>
-                {count}
-              </Text>
-            ) : null}
-            <Text variant="footnote" tone="muted">
-              {(count ? rest.map((x) => ` · ${x}`) : [rest.join(" · ")]).join("")}
-            </Text>
-          </Text>
+      {unseen.messages > 0 ? (
+        <View style={[styles.jumpCount, { borderColor: colors.bg }]} pointerEvents="none">
+          <Count
+            value={unseen.messages}
+            size={11}
+            inverted
+            max={99}
+            {...(unseen.mentionsMe ? { fill: colors.danger, color: colors.raised } : {})}
+          />
         </View>
-      </PressScale>
+      ) : null}
     </Animated.View>
   );
 }
@@ -2180,24 +2146,12 @@ const styles = StyleSheet.create({
   composer: { paddingHorizontal: 10, paddingTop: 6 },
   readOnly: { textAlign: "center", paddingHorizontal: 16, paddingVertical: 12 },
   composerDock: { position: "absolute", left: 0, right: 0, bottom: 0 },
-  jumpDock: { position: "absolute", left: 14, right: 14 },
-  jumpEnd: { alignSelf: "flex-end" },
+  jumpAt: { position: "absolute", right: 14 },
   jump: { width: 40, height: 40, borderRadius: 20 },
   jumpIcon: { flex: 1, alignItems: "center", justifyContent: "center" },
-  // The "↓ novas" pill: centered, the "tato com canto" corner.
-  pillWrap: { alignSelf: "center", maxWidth: "100%" },
-  pill: {
-    minHeight: 36,
-    borderTopLeftRadius: 13,
-    borderTopRightRadius: 13,
-    borderBottomRightRadius: 13,
-    borderBottomLeftRadius: 4,
-  },
-  pillIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 8, paddingRight: 12 },
+  jumpCount: { position: "absolute", top: -6, right: -6, borderWidth: 2, borderRadius: 999 },
   pillFace: { borderWidth: 2, borderRadius: 8 },
   pillOverlap: { marginLeft: -6 },
-  pillText: { flexShrink: 1 },
-  pillCount: { fontWeight: "600" },
   unseen: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginVertical: 6 },
   unseenText: { fontWeight: "700" },
   unseenRule: { flex: 1, height: StyleSheet.hairlineWidth * 2, opacity: 0.45 },

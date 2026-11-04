@@ -13,6 +13,9 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { can, type RolePermission } from "@agenteschat/client/lib/permissions";
 import {
   type AreaLevel,
+  COMPUTER_KEYS,
+  type ComputerLevel,
+  computerLevelOf,
   everyoneOf,
   grants,
   holdsAll,
@@ -24,6 +27,7 @@ import {
   peopleWith,
   roleSummary,
   sortRoles,
+  withComputerLevel,
   withKey,
   withLevel,
 } from "@agenteschat/client/lib/roles";
@@ -286,9 +290,10 @@ function RolePage({
   const area = (a: PermissionArea) => {
     const level = levelOf(role, a, everyone);
     const options = levelOptions(role, a, everyone);
+    const keys = a.keys.filter((k) => !COMPUTER_KEYS.includes(k));
     const reach = admin
       ? []
-      : a.keys.filter((k) => grants(role.permissions).has(k) || (!base && grants(everyone?.permissions ?? []).has(k)));
+      : keys.filter((k) => grants(role.permissions).has(k) || (!base && grants(everyone?.permissions ?? []).has(k)));
     const expanded = open.has(a.id);
     const line = admin
       ? t("rolesPage.viaAdmin")
@@ -343,9 +348,10 @@ function RolePage({
             }
           />
         </div>
+        {a.id === "tools" && <ComputerChoice role={role} everyone={everyone} lock={!!lock || admin} onSave={save} />}
         {expanded && (
           <div className="roles-area__items">
-            {a.keys.map((k) => (
+            {keys.map((k) => (
               <KeyRow key={k} role={role} everyone={everyone} k={k as RolePermission} lock={!!lock} onSave={save} />
             ))}
           </div>
@@ -462,6 +468,46 @@ function RolePage({
           </Button>
         </DialogFooter>
       </Dialog>
+    </div>
+  );
+}
+
+const COMPUTER_LEVELS: readonly ComputerLevel[] = ["none", "browser", "full"];
+
+/**
+ * The agents' computers as one choice (`computerLevelOf`): nothing, the browser, the whole computer, on every agent
+ * (`everyone`: on what is the person's own). Below what `everyone` already gives isn't offered.
+ */
+function ComputerChoice({
+  role,
+  everyone,
+  lock,
+  onSave,
+}: {
+  role: OrgRole;
+  everyone: OrgRole | undefined;
+  lock: boolean;
+  onSave: (permissions: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  const { level, base } = computerLevelOf(role, everyone);
+  const options = COMPUTER_LEVELS.slice(COMPUTER_LEVELS.indexOf(base));
+  const shown = options.includes(level) ? level : base;
+  const reach = isEveryone(role) ? "own" : "every";
+  return (
+    <div className="roles-computer">
+      <span className="roles-key__text">
+        <b>{t("rolesPage.computer.title")}</b>
+        <span>{t(`rolesPage.computer.${reach}.${shown}`)}</span>
+      </span>
+      <Segmented<ComputerLevel>
+        size="sm"
+        label={t("rolesPage.computer.title")}
+        value={shown}
+        disabled={lock}
+        onValueChange={(v) => v !== shown && onSave(withComputerLevel(role, v))}
+        options={options.map((v) => ({ value: v, label: t(`rolesPage.computer.levels.${v}`) }))}
+      />
     </div>
   );
 }

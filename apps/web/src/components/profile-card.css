@@ -28,12 +28,12 @@
   display: flex;
   gap: 6px;
 }
-.mcard__more.ac-btn {
+.mcard__act.ac-btn {
   background: color-mix(in srgb, var(--sunken) 70%, transparent);
   color: var(--ink);
   border-radius: var(--radius-full);
 }
-.mcard__more.ac-btn[data-state="open"] {
+.mcard__act.ac-btn[data-state="open"] {
   background: var(--raised);
 }
 .mcard__face {
@@ -68,6 +68,10 @@
   font-size: 19px;
   line-height: 24px;
   overflow-wrap: anywhere;
+}
+/* A chip under the names is a row of its own, the body's gap above it, never stretched to the card's width. */
+.mcard .profile-card__body > :is(.noai-chip, .ac-chip) {
+  align-self: flex-start;
 }
 .mcard .profile-card__status {
   border-radius: var(--radius-md);

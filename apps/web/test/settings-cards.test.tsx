@@ -7,6 +7,7 @@ import type { AgentAction, AgentProposalCard, Message, Proposal } from "@agentes
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
   ADA_ID,
+  ATLAS_ID,
   createFakeApi,
   type FakeState,
   LODI_ID,
@@ -238,6 +239,106 @@ describe("a teammate's settings, on the right hand's card", () => {
     expect(within(c).getByRole("button", { name: "Aplicar" })).toBeTruthy();
     await click(within(c).getByRole("button", { name: "Recusar" }));
     expect(state.calls.some((x) => x.method === "proposals.refuse" && x.args[1] === "set-1")).toBe(true);
+  });
+});
+
+/** A removal card (`propose_remove_agents`): one row per agent, each archiving it. */
+const withRemoval = (state: FakeState, over: Partial<Proposal> = {}, extra: Partial<Message> = {}) => {
+  withRightHand(state);
+  seedDm(state, { type: "agent", id: LODI_ID });
+  const rows = [ADA_ID, ATLAS_ID].map((agentId, i) =>
+    settingsRow({
+      id: `rm-${i}`,
+      agentId,
+      target: { type: "agent_settings", agentId },
+      settings: [{ field: "archive", from: false, to: true }],
+      why: "Vamos recomeçar o time do zero.",
+      ...over,
+    }),
+  );
+  state.proposals.push(...rows);
+  state.messages.push(
+    lodiMessage(
+      "m-rm",
+      { actionCard: { kind: "settings_proposal", forUserId: "u-walter", proposalIds: rows.map((r) => r.id) } },
+      extra,
+    ),
+  );
+  return state;
+};
+
+describe("archiving several agents, on one card", () => {
+  test("lists them all, Arquivar todos, and a switch leaves one out", async () => {
+    const { state } = await go(withRemoval(seedState()));
+    const c = card("Arquivar 2 agentes?");
+    for (const shown of ["Vamos recomeçar o time do zero.", "Ada", "Atlas", "@ada"])
+      expect(c.textContent).toContain(shown);
+    expect(within(c).getByRole("button", { name: "Arquivar todos" })).toBeTruthy();
+    await click(within(c).getByRole("switch", { name: "Incluir Atlas" }));
+    await click(within(card("Arquivar 2 agentes?")).getByRole("button", { name: "Arquivar 1" }));
+    const accepted = state.calls.filter((x) => x.method === "proposals.accept").map((x) => x.args[1]);
+    expect(accepted).toEqual(["rm-0"]);
+  });
+
+  test("deleting for good asks for how many, typed, before any row is decided", async () => {
+    const { state } = await go(withRemoval(seedState(), { settings: [{ field: "delete", from: false, to: true }] }));
+    await click(within(card("Apagar 2 agentes para sempre?")).getByRole("button", { name: "Apagar todos" }));
+    expect(state.calls.some((x) => x.method === "proposals.accept")).toBe(false);
+    const dialog = screen().getByRole("dialog");
+    expect(dialog.textContent).toContain("Ada, Atlas");
+    const confirm = within(dialog).getByRole("button", { name: "Apagar" }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    await act(async () => {
+      fireEvent.change(within(dialog).getByLabelText("Digite 2 para confirmar"), { target: { value: "2" } });
+    });
+    await click(confirm);
+    const accepted = state.calls.filter((x) => x.method === "proposals.accept").map((x) => x.args[1]);
+    expect(accepted).toEqual(["rm-0", "rm-1"]);
+  });
+
+  test("a member who can't archive sends every row to an admin", async () => {
+    const state = asMember(withRemoval(seedState(), { canDecide: false }));
+    await go(state);
+    const c = card("Arquivar 2 agentes?");
+    expect(c.textContent).toContain("Só admins arquivam um agente");
+    expect(within(c).queryByRole("button", { name: "Arquivar todos" })).toBeNull();
+    await click(within(c).getByRole("button", { name: "Pedir a um admin" }));
+    const asked = state.calls.filter((x) => x.method === "proposals.ask").map((x) => x.args[1]);
+    expect(asked).toEqual(["rm-0", "rm-1"]);
+    expect(card("Arquivar 2 agentes?").textContent).toContain("Enviado para");
+  });
+
+  test("archived: who did it, and Desfazer brings them all back", async () => {
+    const receipt = (id: string, agentId: string, name: string): AgentAction => ({
+      id,
+      kind: "agent.settings_changed",
+      agentId: LODI_ID,
+      messageId: "m-rm",
+      requestedByUserId: "u-walter",
+      target: { type: "agent", id: agentId, title: name },
+      params: { proposalId: id, agentName: name, fields: ["archive"] },
+      createdAt: NOW.toISOString(),
+      undoableUntil: new Date(Date.now() + HOUR).toISOString(),
+      undoneAt: null,
+      undoneByUserId: null,
+      redoneAt: null,
+    });
+    const state = withRemoval(
+      seedState(),
+      {
+        status: "accepted",
+        canDecide: false,
+        decidedBy: { userId: "u-walter", name: "Walter" },
+        decidedAt: NOW.toISOString(),
+      },
+      { actions: [receipt("act-a", ADA_ID, "Ada"), receipt("act-b", ATLAS_ID, "Atlas")] },
+    );
+    for (const p of state.proposals) if (p.id.startsWith("rm-")) p.undoActionId = p.id === "rm-0" ? "act-a" : "act-b";
+    await go(state);
+    const c = card("Arquivar 2 agentes?");
+    expect(c.textContent).toContain("Aplicado por você: Ada, Atlas");
+    await click(within(c).getByRole("button", { name: "Desfazer" }));
+    expect(state.calls.some((x) => x.method === "actions.undoMessage" && x.args[1] === "m-rm")).toBe(true);
   });
 });
 

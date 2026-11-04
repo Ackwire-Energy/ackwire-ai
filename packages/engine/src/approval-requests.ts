@@ -1,5 +1,5 @@
 import { and, eq, gt, schema, sql } from "@agenteschat/db";
-import { approverIds, namesLabel, namesOf } from "./approvals";
+import { approverIds, deciderName, namesLabel, namesOf } from "./approvals";
 import { findMember, plainName } from "./chat-tools";
 import { cutText } from "./format";
 import { MISSION_TOOL_RATES } from "./missions";
@@ -188,10 +188,15 @@ export function createApprovalRequestToolSource(): ToolSource {
     // Runs only once someone approved it (the gateway asked first): says who, and their note.
     async execute(input, ctx) {
       const [row] = await ctx.db
-        .select({ decidedBy: approvals.decidedByUserId, reason: approvals.reason, approvers: approvals.approvers })
+        .select({
+          decidedBy: approvals.decidedByUserId,
+          decidedFor: approvals.decidedForUserId,
+          reason: approvals.reason,
+          approvers: approvals.approvers,
+        })
         .from(approvals)
         .where(and(eq(approvals.runId, ctx.runId), eq(approvals.toolUseId, ctx.toolUseId ?? "")));
-      const [name] = row?.decidedBy ? await namesOf(ctx.db, [row.decidedBy]) : [];
+      const name = row?.decidedBy ? await deciderName(ctx.db, row.decidedBy, row.decidedFor) : null;
       const self = !!row?.decidedBy && row.decidedBy === row.approvers?.requestedBy;
       return {
         content: `Approved by ${name ?? "a person"}${self ? " (who asked for it, as an approver by role)" : ""}${

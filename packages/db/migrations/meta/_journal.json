@@ -1443,6 +1443,34 @@
       "when": 1793813667011,
       "tag": "0207_home_dashboard",
       "breakpoints": true
+    },
+    {
+      "idx": 208,
+      "version": "7",
+      "when": 1793823667011,
+      "tag": "0208_usage_per_person",
+      "breakpoints": true
+    },
+    {
+      "idx": 209,
+      "version": "7",
+      "when": 1793833667011,
+      "tag": "0209_approval_covers",
+      "breakpoints": true
+    },
+    {
+      "idx": 210,
+      "version": "7",
+      "when": 1793843667011,
+      "tag": "0210_right_hand_approvals",
+      "breakpoints": true
+    },
+    {
+      "idx": 211,
+      "version": "7",
+      "when": 1793853667011,
+      "tag": "0211_own_computers",
+      "breakpoints": true
     }
   ]
 }
