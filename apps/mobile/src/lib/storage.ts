@@ -70,6 +70,8 @@ export const STORED = {
   lastPlace: "last-place",
   /** Recent searches, newest first, per workspace (JSON by workspace id; ADR 0123). */
   searchRecent: "search-recent",
+  /** Recent searches inside one conversation, newest first (JSON by `<workspace id>:<channel id>`). */
+  conversationSearchRecent: "conversation-search-recent",
   /** The person has touched the trackpad: its lesson is over ("1"). */
   trackpadTaught: "trackpad-taught",
   /** `<user id>.<org id>` entries (JSON list): the right hand's DM was opened there, so its "Novo" is gone. */
