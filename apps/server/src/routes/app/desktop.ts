@@ -28,7 +28,7 @@ const DesktopStatus = z
     canControl: z.boolean().openapi({ description: "This person may take control of the desktop." }),
     controlRefusal: z.enum(["pairer", "owner_plan", "not_allowed"]).nullable().openapi({
       description:
-        "Why not: `pairer` (only the person who connected the computer), `owner_plan` (only the agent's owner while it thinks with their plan), `not_allowed` (neither an admin nor its owner).",
+        "Why not: `pairer` (only the person who connected the computer), `owner_plan` (only the agent's owner and admins who manage agents while it thinks with the owner's plan), `not_allowed` (neither an admin nor its owner).",
     }),
     held: z.boolean().openapi({
       description: "The agent is held, or its workspace is on hold: people may watch, nobody takes control.",

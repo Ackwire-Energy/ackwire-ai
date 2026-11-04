@@ -2867,6 +2867,7 @@
       "routineStalled": "<b>{{name}}</b>이(가) 루틴을 실행하려고 컴퓨터를 기다리고 있어요",
       "agentUnreached": "루틴이 <b>{{name}}</b>을(를) 부르지 못했어요",
       "browserProfileRequest": "<b>{{name}}</b> 님이 <b>{{agent}}</b>의 브라우저 프로필을 하나 더 요청해요",
+      "desktopTaken": "<b>{{name}}</b> 님이 <b>{{agent}}</b>의 컴퓨터 화면 제어를 넘겨받았어요",
       "routineWaitingPlan": "<b>{{name}}</b>이(가) 루틴을 실행하려고 요금제 한도가 초기화되기를 기다리고 있어요",
       "planResetUnknown": "{{plan}}이(가) 한도 초기화 시점을 알려 주지 않았어요. <b>{{name}}</b>의 작업은 계속 대기 중이에요.",
       "catchUpClosed_other": "<b>{{name}}</b>이(가) 돌아와서 답할 필요가 없었던 대화 {{count}}개를 건너뛰었어요",
@@ -12784,7 +12785,7 @@
     },
     "browserOnly": {
       "title": "컴퓨터 전체가 아니라 브라우저만 제어하고 있어요",
-      "plan": "{{name}}은(는) 소유자의 요금제로 생각하므로 컴퓨터 전체는 소유자만 제어할 수 있어요",
+      "plan": "{{name}}은(는) 소유자의 요금제로 생각하므로 컴퓨터 전체는 소유자와 에이전트를 관리하는 관리자만 제어할 수 있어요",
       "other": "{{name}}의 브라우저는 제어할 수 있지만 컴퓨터 전체는 제어할 수 없어요"
     }
   },

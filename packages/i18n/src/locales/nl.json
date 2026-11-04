@@ -2978,6 +2978,7 @@
       "routineStalled": "<b>{{name}}</b> wacht op de computer om een routine uit te voeren",
       "agentUnreached": "Een routine kon <b>{{name}}</b> niet bereiken",
       "browserProfileRequest": "<b>{{name}}</b> vraagt om nog een browserprofiel voor <b>{{agent}}</b>",
+      "desktopTaken": "<b>{{name}}</b> heeft het scherm van de computer van <b>{{agent}}</b> overgenomen",
       "routineWaitingPlan": "<b>{{name}}</b> wacht tot zijn abonnement wordt gereset om een routine uit te voeren",
       "planResetUnknown": "{{plan}} heeft niet gezegd wanneer de limiet wordt gereset. Het werk van <b>{{name}}</b> wacht nog.",
       "catchUpClosed_one": "<b>{{name}}</b> is terug en heeft {{count}} gesprek overgeslagen dat geen antwoord nodig had",
@@ -13422,7 +13423,7 @@
     },
     "browserOnly": {
       "title": "Je zit in de browser, niet op de hele computer",
-      "plan": "{{name}} denkt met het abonnement van de eigenaar, dus alleen die bedient de hele computer",
+      "plan": "{{name}} denkt met het abonnement van de eigenaar, dus alleen die en beheerders die agents beheren bedienen de hele computer",
       "other": "Je kunt de browser van {{name}} bedienen, niet de hele computer"
     }
   },

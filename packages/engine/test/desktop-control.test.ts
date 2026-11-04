@@ -28,6 +28,7 @@ import {
   type MachineCaller,
   type MachineHub,
   type MachineStatus,
+  noticeCategoryOf,
   postPersonMessage,
   type RunnerLink,
   reauthorizeStream,
@@ -267,10 +268,13 @@ describe("one person in control of the desktop", () => {
     await expect(requireComputerDriver(f.db, caio.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
-  test("system mode, the agent on its owner's plan: its user holds that sign-in, so only the owner drives it", async () => {
+  test("system mode, the agent on its owner's plan: the owner and admins who manage agents drive it, nobody else", async () => {
     const { machine, open, systemMode } = await start();
     await systemMode();
     const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    // Caio controls computers (every member here) but doesn't manage agents; Dani is a plain member.
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    const dani = await addMember(f.db, f.org.id, "member", "dani");
     const accountId = crypto.randomUUID();
     await f.db.insert(schema.machineAccounts).values({
       id: accountId,
@@ -286,23 +290,93 @@ describe("one person in control of the desktop", () => {
         .update(schema.agents)
         .set(plan ? { brain: "claude_code", brainAccountId: accountId } : { brain: "model", brainAccountId: null })
         .where(eq(schema.agents.id, f.agent.id));
+    const everyone = (keys: string[]) =>
+      f.db
+        .update(schema.orgRoles)
+        .set({ permissions: keys })
+        .where(and(eq(schema.orgRoles.orgId, f.org.id), eq(schema.orgRoles.kind, "everyone")));
     await onPlan(true);
-    await expect(requireComputerDriver(f.db, bia.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
-    // The apps say why, and offer the admin the agent's browser instead.
+    // The admin drives the whole screen even on the owner's plan (ADR 0059 §8, amended 2026-11-03).
+    expect((await requireComputerDriver(f.db, bia.id, f.org.id, f.agent.id)).id).toBe(machine.machineId);
     expect(await desktopStatus({ db: f.db }, bia.id, f.org.id, f.agent.id)).toMatchObject({
+      canControl: true,
+      controlRefusal: null,
+    });
+    expect((await open(bia.id, TERMINAL)).closed).toBeNull();
+    // A member still doesn't.
+    await expect(requireComputerDriver(f.db, dani.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(startTakeover(deps(), dani.id, f.org.id, f.agent.id, null, "desktop")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    // Controlling computers without managing agents: the owner's plan is still not theirs, only its browser.
+    const [base] = await f.db
+      .select({ permissions: schema.orgRoles.permissions })
+      .from(schema.orgRoles)
+      .where(and(eq(schema.orgRoles.orgId, f.org.id), eq(schema.orgRoles.kind, "everyone")));
+    await everyone([...(base?.permissions ?? []), "control_computers"]);
+    await expect(requireComputerDriver(f.db, caio.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(await desktopStatus({ db: f.db }, caio.id, f.org.id, f.agent.id)).toMatchObject({
       canControl: false,
       controlRefusal: "owner_plan",
     });
-    await expect(startTakeover(deps(), bia.id, f.org.id, f.agent.id, null, "desktop")).rejects.toBeInstanceOf(
+    await expect(startTakeover(deps(), caio.id, f.org.id, f.agent.id, null, "desktop")).rejects.toBeInstanceOf(
       ForbiddenError,
     );
-    expect((await open(bia.id, TERMINAL)).closed?.code).toBe(STREAM_CLOSE.forbidden);
+    expect((await open(caio.id, TERMINAL)).closed?.code).toBe(STREAM_CLOSE.forbidden);
     expect((await open(f.owner.id, TERMINAL)).closed).toBeNull();
-    // Watching shows no shell: the admin still watches.
-    expect((await open(bia.id, WATCH)).closed).toBeNull();
-    // Back on the API, no sign-in is lent to its user: admins drive it again.
+    // Watching shows no shell: they still watch.
+    expect((await open(caio.id, WATCH)).closed).toBeNull();
+    // Back on the API, no sign-in is lent to its user: they drive it again.
     await onPlan(false);
-    expect((await requireComputerDriver(f.db, bia.id, f.org.id, f.agent.id)).id).toBe(machine.machineId);
+    expect((await requireComputerDriver(f.db, caio.id, f.org.id, f.agent.id)).id).toBe(machine.machineId);
+  });
+
+  test("someone other than the owner takes control of the screen: audited each time, the owner told quietly once a day", async () => {
+    const { systemMode } = await start();
+    await systemMode();
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    const takenRows = () =>
+      f.db
+        .select()
+        .from(schema.auditLog)
+        .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, "desktop.control_taken")));
+    const notices = () =>
+      f.db
+        .select()
+        .from(schema.notifications)
+        .where(and(eq(schema.notifications.orgId, f.org.id), eq(schema.notifications.kind, "desktop_taken")));
+    const takeAndHandBack = async (userId: string) => {
+      const taken = await startTakeover(deps(), userId, f.org.id, f.agent.id, null, "desktop");
+      await finishHandoff(deps(), userId, f.org.id, taken.id, { result: "done" });
+      return taken;
+    };
+
+    // The owner's own take over: nothing to tell or record.
+    await takeAndHandBack(f.owner.id);
+    expect(await takenRows()).toEqual([]);
+    expect(await notices()).toEqual([]);
+
+    const first = await takeAndHandBack(bia.id);
+    await takeAndHandBack(bia.id);
+    const rows = await takenRows();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      actorType: "person",
+      actorId: bia.id,
+      targetType: "agent",
+      targetId: f.agent.id,
+      details: { handoffId: first.id },
+    });
+    const [notice, ...more] = await notices();
+    expect(more).toEqual([]);
+    expect(notice).toMatchObject({
+      userId: f.owner.id,
+      groupKey: `desktop_taken:${f.agent.id}:${new Date().toISOString().slice(0, 10)}`,
+      actors: [{ type: "user", id: bia.id }],
+      source: { agentId: f.agent.id, screen: "desktop", label: f.agent.name },
+    });
+    // Inbox only: it never reaches a device.
+    expect(noticeCategoryOf("desktop_taken", false)).toBeNull();
   });
 
   test("a suspended workspace: its views and terminals close at the next check and none opens; on hold they don't", async () => {

@@ -2986,6 +2986,9 @@ export const ptBR = {
       routineStalled: "<b>{{name}}</b> espera o computador para rodar uma rotina",
       agentUnreached: "Uma rotina não conseguiu chamar <b>{{name}}</b>",
       browserProfileRequest: "<b>{{name}}</b> pede mais um perfil do navegador para <b>{{agent}}</b>",
+      /** Someone other than its owner took control of the person's agent's desktop (`desktop_taken`). */
+      desktopTaken: "<b>{{name}}</b> assumiu a tela do computador do\u00a0<b>{{agent}}</b>",
+      desktopTaken_female: "<b>{{name}}</b> assumiu a tela do computador da\u00a0<b>{{agent}}</b>",
       routineWaitingPlan: "<b>{{name}}</b> espera o plano renovar para rodar uma rotina",
       planResetUnknown: "O {{plan}} não disse quando o limite renova. O trabalho de <b>{{name}}</b> segue esperando.",
       catchUpClosed_one: "<b>{{name}}</b> retomou e pulou {{count}} conversa que não precisava de resposta",
@@ -13108,9 +13111,9 @@ export const ptBR = {
     /** In control of the browser alone on a computer with a screen, and why the whole computer isn't theirs. */
     browserOnly: {
       title: "Você está no navegador, não no computador inteiro",
-      plan: "O\u00a0{{name}} pensa com o plano de quem é dono dele, então só essa pessoa controla o computador inteiro",
+      plan: "O\u00a0{{name}} pensa com o plano de quem é dono dele, então só essa pessoa e os admins que gerenciam agentes controlam o computador inteiro",
       plan_female:
-        "A\u00a0{{name}} pensa com o plano de quem é dona dela, então só essa pessoa controla o computador inteiro",
+        "A\u00a0{{name}} pensa com o plano de quem é dona dela, então só essa pessoa e os admins que gerenciam agentes controlam o computador inteiro",
       other: "Você controla o navegador do\u00a0{{name}}, não o computador inteiro",
       other_female: "Você controla o navegador da\u00a0{{name}}, não o computador inteiro",
     },

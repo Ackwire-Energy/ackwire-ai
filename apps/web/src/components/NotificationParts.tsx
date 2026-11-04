@@ -2,6 +2,7 @@ import type { AppNotification, NotificationActor } from "@agenteschat/client";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { namesText } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { askersOf, channelOf, runFailedGroupOf, workspaceHeadline } from "@agenteschat/client/lib/notifications";
 import type { Words } from "@agenteschat/client/lib/routine-view";
 import { Avatar, ComputerIcon, Icon } from "@agenteschat/ui";
@@ -160,6 +161,7 @@ type WhatKey =
   | "joinRequest"
   | "joinRequestMany"
   | "browserProfileRequest"
+  | "desktopTaken"
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
@@ -243,6 +245,10 @@ export function Headline({
       return k("agentUnreached", { name });
     case "browser_profile_request":
       return k("browserProfileRequest", { name, agent: n.source.label ?? "" });
+    case "desktop_taken": {
+      const agent = n.source.label ?? "";
+      return k("desktopTaken", { name, agent, context: agentGrammar(agent).context });
+    }
     case "routine_waiting_plan":
       return k("routineWaitingPlan", { name });
     case "plan_reset_unknown":

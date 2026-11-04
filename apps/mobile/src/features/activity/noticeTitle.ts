@@ -1,5 +1,6 @@
 import type { AppNotification } from "@agenteschat/client";
 import { appCreatedLine } from "@agenteschat/client/lib/apps";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { restrictionOf, workspaceHeadline } from "@agenteschat/client/lib/notifications";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "../shared/hooks";
@@ -47,6 +48,10 @@ export function useNoticeTitle(n: AppNotification) {
             plan: n.latest.title ?? "",
             // `catch_up_closed_asker`: who was credited.
             who: n.latest.title ?? "",
+            // `desktop_taken`: whose computer, said with its name's gender.
+            ...(n.kind === "desktop_taken"
+              ? { agent: n.source.label ?? "", context: agentGrammar(n.source.label ?? "").context }
+              : {}),
             defaultValue: NAMES,
           });
   // Agents that failed for one cause close together: one line for all, who they are under it.

@@ -809,6 +809,8 @@
       "change_request_other": "{{names}} vragen om een wijziging in het team",
       "browser_profile_request_one": "{{names}} vraagt om nog een browserprofiel",
       "browser_profile_request_other": "{{names}} vragen om nog een browserprofiel",
+      "desktop_taken_one": "{{names}} heeft het scherm van de computer van {{agent}} overgenomen",
+      "desktop_taken_other": "{{names}} hebben het scherm van de computer van {{agent}} overgenomen",
       "connector_tool_changed_one": "Een gekoppelde server heeft tools gewijzigd die je hebt goedgekeurd",
       "connector_tool_changed_other": "Gekoppelde servers hebben tools gewijzigd die je hebt goedgekeurd",
       "computer_disk_full_one": "De schijf van een computer is bijna vol",

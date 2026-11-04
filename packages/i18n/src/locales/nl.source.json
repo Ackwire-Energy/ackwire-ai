@@ -6962,6 +6962,9 @@
   "notifications.what.browserProfileRequest": {
     "value": "<b>{{name}}</b> asks for one more browser profile for <b>{{agent}}</b>"
   },
+  "notifications.what.desktopTaken": {
+    "value": "<b>{{name}}</b> took control of the screen of <b>{{agent}}</b>'s computer"
+  },
   "notifications.what.routineWaitingPlan": {
     "value": "<b>{{name}}</b> is waiting for its plan to reset to run a routine"
   },
@@ -31591,7 +31594,7 @@
     "value": "You're in the browser, not the whole computer"
   },
   "desktop.browserOnly.plan": {
-    "value": "{{name}} thinks with the owner's plan, so only the owner controls the whole computer"
+    "value": "{{name}} thinks with the owner's plan, so only the owner and admins who manage agents control the whole computer"
   },
   "desktop.browserOnly.other": {
     "value": "You can control {{name}}'s browser, not the whole computer"

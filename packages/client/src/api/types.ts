@@ -5738,6 +5738,8 @@ export type NotificationKind =
   | "computer_disk_full"
   /** ADR 0133: a computer has no Google Chrome for its agents' browsers (who connected it). `source.machineId`. */
   | "computer_no_chrome"
+  /** ADR 0059 §8: someone else took control of the person's agent's desktop. Once a day per agent; `source.agentId`. */
+  | "desktop_taken"
   /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
@@ -6471,8 +6473,9 @@ export interface DesktopStatus {
   /** This person may take control. */
   canControl: boolean;
   /**
-   * Why not: `pairer` (only who connected the computer), `owner_plan` (only the agent's owner while it thinks with
-   * their plan), `not_allowed` (neither an admin nor its owner). Absent from older servers.
+   * Why not: `pairer` (only who connected the computer), `owner_plan` (only the agent's owner and admins who manage
+   * agents while it thinks with the owner's plan), `not_allowed` (neither an admin nor its owner). Absent from older
+   * servers.
    */
   controlRefusal?: "pairer" | "owner_plan" | "not_allowed" | null;
   /** The agent is held, or the workspace is on hold: people watch, nobody takes control. */

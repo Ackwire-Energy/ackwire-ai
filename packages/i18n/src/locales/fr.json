@@ -3077,6 +3077,7 @@
       "routineStalled": "<b>{{name}}</b> attend l'ordinateur pour exécuter une routine",
       "agentUnreached": "Une routine n'a pas pu appeler <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> demande un profil de navigateur de plus pour <b>{{agent}}</b>",
+      "desktopTaken": "<b>{{name}}</b> a pris le contrôle de l'écran de l'ordinateur de <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> attend la réinitialisation de son abonnement pour exécuter une routine",
       "planResetUnknown": "{{plan}} n'a pas indiqué quand sa limite se réinitialise. Le travail de <b>{{name}}</b> attend toujours.",
       "catchUpClosed_one": "<b>{{name}}</b> est de retour et a sauté {{count}} conversation qui n'avait pas besoin de réponse",
@@ -13825,7 +13826,7 @@
     },
     "browserOnly": {
       "title": "Vous êtes dans le navigateur, pas sur tout l'ordinateur",
-      "plan": "{{name}} réfléchit avec l'abonnement de son propriétaire, donc seule cette personne contrôle tout l'ordinateur",
+      "plan": "{{name}} réfléchit avec l'abonnement de son propriétaire, donc seuls cette personne et les admins qui gèrent les agents contrôlent tout l'ordinateur",
       "other": "Vous pouvez contrôler le navigateur de {{name}}, pas tout l'ordinateur"
     }
   },

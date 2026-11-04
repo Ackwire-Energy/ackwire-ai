@@ -2872,6 +2872,7 @@
       "routineStalled": "<b>{{name}}</b> 正在等待电脑来运行例行工作",
       "agentUnreached": "一个例行工作无法叫到 <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> 申请为 <b>{{agent}}</b> 再添加一个浏览器配置文件",
+      "desktopTaken": "<b>{{name}}</b> 接管了 <b>{{agent}}</b> 的电脑屏幕",
       "routineWaitingPlan": "<b>{{name}}</b> 正在等待套餐额度重置后运行例行工作",
       "planResetUnknown": "{{plan}} 没有说明额度何时重置。<b>{{name}}</b> 的工作仍在等待。",
       "catchUpClosed_other": "<b>{{name}}</b> 已恢复，并跳过了 {{count}} 个无需回复的对话",
@@ -12971,7 +12972,7 @@
     },
     "browserOnly": {
       "title": "你控制的是浏览器，不是整台电脑",
-      "plan": "{{name}} 使用其所有者的套餐思考，因此只有所有者能控制整台电脑",
+      "plan": "{{name}} 使用其所有者的套餐思考，因此只有所有者和管理智能体的管理员能控制整台电脑",
       "other": "你可以控制 {{name}} 的浏览器，但不能控制整台电脑"
     }
   },

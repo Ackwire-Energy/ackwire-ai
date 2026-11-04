@@ -2962,6 +2962,7 @@
       "routineStalled": "<b>{{name}}</b> bir rutini çalıştırmak için bilgisayarı bekliyor",
       "agentUnreached": "Bir rutin <b>{{name}}</b> ajanını çağıramadı",
       "browserProfileRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir tarayıcı profili daha istiyor",
+      "desktopTaken": "<b>{{name}}</b>, <b>{{agent}}</b> ajanının bilgisayar ekranını devraldı",
       "routineWaitingPlan": "<b>{{name}}</b> bir rutini çalıştırmak için planının sıfırlanmasını bekliyor",
       "planResetUnknown": "{{plan}} sınırının ne zaman sıfırlanacağını söylemedi. <b>{{name}}</b> ajanının işi hâlâ bekliyor.",
       "catchUpClosed_one": "<b>{{name}}</b> döndü ve yanıt gerektirmeyen {{count}} konuşmayı atladı",
@@ -13176,7 +13177,7 @@
     },
     "browserOnly": {
       "title": "Tüm bilgisayarda değil, tarayıcıdasınız",
-      "plan": "{{name}} sahibinin planıyla düşünüyor, bu yüzden tüm bilgisayarı yalnızca sahibi kontrol eder",
+      "plan": "{{name}} sahibinin planıyla düşünüyor, bu yüzden tüm bilgisayarı yalnızca sahibi ve ajanları yöneten yöneticiler kontrol eder",
       "other": "{{name}} adlı ajanın tarayıcısını kontrol edebilirsiniz, tüm bilgisayarı değil"
     }
   },

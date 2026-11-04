@@ -176,6 +176,7 @@ function SourceChip({
     n.kind === "computer_ready" ||
     n.kind === "computer_disk_full" ||
     n.kind === "computer_no_chrome" ||
+    n.kind === "desktop_taken" ||
     (n.kind === "browser_handoff" && s.screen === "desktop")
   )
     [icon, label] = ["computer", t("notifications.source.machine")];

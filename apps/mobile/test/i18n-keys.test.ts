@@ -134,6 +134,7 @@ test("the plan's notifications have their own Activity line in both languages, n
       "browser_profile_request",
       "computer_disk_full",
       "computer_no_chrome",
+      "desktop_taken",
       "catch_up_closed",
       "catch_up_closed_asker",
       "catch_up_closed_asker_task",

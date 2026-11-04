@@ -3073,6 +3073,7 @@
       "routineStalled": "<b>{{name}}</b> espera la computadora para ejecutar una rutina",
       "agentUnreached": "Una rutina no pudo llamar a <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> pide un perfil de navegador más para <b>{{agent}}</b>",
+      "desktopTaken": "<b>{{name}}</b> tomó el control de la pantalla del computador de <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> espera que su plan se renueve para ejecutar una rutina",
       "planResetUnknown": "{{plan}} no dijo cuándo se renueva su límite. El trabajo de <b>{{name}}</b> sigue esperando.",
       "catchUpClosed_one": "<b>{{name}}</b> volvió y omitió {{count}} conversación que no necesitaba respuesta",
@@ -13696,7 +13697,7 @@
     },
     "browserOnly": {
       "title": "Estás en el navegador, no en todo el computador",
-      "plan": "{{name}} piensa con el plan de quien es su dueño, así que solo esa persona controla todo el computador",
+      "plan": "{{name}} piensa con el plan de quien es su dueño, así que solo esa persona y los admins que gestionan agentes controlan todo el computador",
       "other": "Puedes controlar el navegador de {{name}}, no todo el computador"
     }
   },

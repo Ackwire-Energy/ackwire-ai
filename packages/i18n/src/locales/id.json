@@ -2881,6 +2881,7 @@
       "routineStalled": "<b>{{name}}</b> menunggu komputer untuk menjalankan rutinitas",
       "agentUnreached": "Rutinitas tidak bisa memanggil <b>{{name}}</b>",
       "browserProfileRequest": "<b>{{name}}</b> meminta satu profil browser lagi untuk <b>{{agent}}</b>",
+      "desktopTaken": "<b>{{name}}</b> mengambil alih layar komputer <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> menunggu paketnya direset untuk menjalankan rutinitas",
       "planResetUnknown": "{{plan}} tidak memberi tahu kapan batasnya direset. Pekerjaan <b>{{name}}</b> masih menunggu.",
       "catchUpClosed_other": "<b>{{name}}</b> kembali dan melewati {{count}} percakapan yang tidak perlu dijawab",
@@ -12907,7 +12908,7 @@
     },
     "browserOnly": {
       "title": "Kamu di browser, bukan di seluruh komputer",
-      "plan": "{{name}} berpikir dengan paket pemiliknya, jadi hanya pemiliknya yang mengendalikan seluruh komputer",
+      "plan": "{{name}} berpikir dengan paket pemiliknya, jadi hanya pemiliknya dan admin yang mengelola agen yang mengendalikan seluruh komputer",
       "other": "Kamu bisa mengendalikan browser {{name}}, bukan seluruh komputer"
     }
   },

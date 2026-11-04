@@ -751,6 +751,7 @@
       "composio_limit_other": "이 워크스페이스는 이번 달 Composio 호출을 모두 썼어요",
       "change_request_other": "{{names}}이(가) 팀 변경을 요청해요",
       "browser_profile_request_other": "{{names}}이(가) 브라우저 프로필을 하나 더 요청해요",
+      "desktop_taken_other": "{{names}} 님이 {{agent}}의 컴퓨터 화면 제어를 넘겨받았어요",
       "connector_tool_changed_other": "연결된 서버가 내가 승인한 도구를 바꿨어요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
       "computer_no_chrome_other": "컴퓨터에 Google Chrome이 필요해요. google.com/chrome에서 받으세요",
