@@ -666,6 +666,9 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
   gap: 8px;
   min-width: 0;
 }
+.nwc-row--format {
+  margin-top: auto;
+}
 /* After the test: the ask as one line that opens it again. */
 .nwc-asked {
   display: flex;

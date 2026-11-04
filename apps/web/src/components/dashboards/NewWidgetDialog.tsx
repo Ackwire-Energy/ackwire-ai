@@ -554,7 +554,8 @@ function NewWidgetBody({
           ))}
         </div>
       )}
-      <div className="nwc-row">
+      {/* The format sits at the card's foot end, under the ask (and the suggestions), at any size. */}
+      <div className="nwc-row nwc-row--format">
         {formatSelect(true)}
         {editing && built && <span className="nw-hint">{t("dashboards.newWidget.enterTests")}</span>}
       </div>
@@ -824,11 +825,16 @@ function NewWidgetBody({
         </div>
       </div>
       <DialogFooter className="nw-foot">
-        <span className="nw-dest">
-          <Icon name="grid" size={16} />
-          <label htmlFor={`${id}-dest`}>{t("dashboards.newWidget.destination")}</label>
-          <Select id={`${id}-dest`} size="sm" value={dest} onValueChange={setDest} options={destOptions} />
-        </span>
+        {/* Only when there is a choice: with My Home alone, nothing to pick. */}
+        {destOptions.length > 1 ? (
+          <span className="nw-dest">
+            <Icon name="grid" size={16} />
+            <label htmlFor={`${id}-dest`}>{t("dashboards.newWidget.destination")}</label>
+            <Select id={`${id}-dest`} size="sm" value={dest} onValueChange={setDest} options={destOptions} />
+          </span>
+        ) : (
+          <span className="nw-dest" aria-hidden="true" />
+        )}
         <Button variant="ghost" onClick={onClose}>
           {t("common.cancel")}
         </Button>
