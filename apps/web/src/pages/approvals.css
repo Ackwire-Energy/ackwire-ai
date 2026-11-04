@@ -520,49 +520,6 @@ html:not([data-pointer]) .ap-link:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.ap-outcome {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 12px;
-  align-items: flex-start;
-  padding: 12px;
-  border-radius: 16px;
-  background: var(--sunken);
-  overflow: hidden;
-}
-.ap-outcome__text {
-  flex: 1 1 200px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 13.5px;
-}
-.ap-outcome__text b {
-  font-weight: 600;
-}
-.ap-outcome__text small {
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.ap-outcome__text > span {
-  margin-top: 8px;
-}
-.ap-result {
-  flex-basis: 100%;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.ap-result summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-.ap-result .ap-code {
-  margin-top: 8px;
-  background: var(--raised);
-}
-
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .ap-card {
@@ -987,4 +944,38 @@ html:not([data-pointer]) .ap-li:focus-visible {
     flex-basis: 100%;
     white-space: normal;
   }
+}
+
+/* A decided request's state at the end of its row: the icon only, in its color. */
+.ap-li__state {
+  display: inline-flex;
+  flex: none;
+  margin-right: 2px;
+  color: var(--muted);
+}
+.ap-li__state.is-done,
+.ap-li__state.is-scheduled {
+  color: var(--success);
+}
+.ap-li__state.is-failed {
+  color: var(--attention);
+}
+.ap-li__when {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* What became of it: one card among the review's, its state's color on the head's key. */
+.ap-outcome--done .ac-card__key,
+.ap-outcome--scheduled .ac-card__key {
+  color: var(--success);
+}
+.ap-outcome--failed .ac-card__key {
+  color: var(--attention);
+}
+.ap-outcome__lesson {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
 }

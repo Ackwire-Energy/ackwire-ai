@@ -867,7 +867,7 @@ function ReqRow({
             : t("approval.waitingAdmin")}
       </span>
     ) : (
-      <PhaseChip approval={a} />
+      <PhaseMark approval={a} />
     );
   return (
     <button
@@ -900,9 +900,9 @@ function ReqRow({
       </span>
       <span className="ap-li__meta">
         <ViaGlyph via={via} />
-        <span className="ap-li__where">{where}</span>
-        <span>
-          ·{" "}
+        {where && <span className="ap-li__where">{where}</span>}
+        <span className="ap-li__when">
+          {where ? "· " : ""}
           {p === "waiting" || p === "running"
             ? relativeTime(t, i18n.language, a.createdAt)
             : decisionLabel(t, i18n.language, a, me.user.id, dir.memberById)}
@@ -1144,7 +1144,7 @@ function ReviewBody({ approval: a, channel }: { approval: Approval; channel: str
     <div className="ap-review__body">
       <FactStrip facts={facts} className="ap-review__facts" />
       <AheadLine approval={a} className="ap-card__ahead" />
-      {p !== "waiting" && <Outcome approval={a} agent={agent} />}
+      <Outcome approval={a} agent={agent} />
 
       {why && (
         <Card className="ap-review__card">
@@ -1346,7 +1346,8 @@ function DecisionBar({
   );
 }
 
-function PhaseChip({ approval }: { approval: Approval }) {
+/** A decided request's state at the end of its list row: only its icon (the row's line already says who decided). */
+function PhaseMark({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const p = approvalPhase(approval);
   const [icon, key]: [IconName, "approved" | "failed" | "refused" | "expired" | "running" | "canceled" | "scheduled"] =
@@ -1363,10 +1364,11 @@ function PhaseChip({ approval }: { approval: Approval }) {
               : p === "running"
                 ? ["play", "running"]
                 : ["block", "canceled"];
+  const label = t(`approvals.status.${key}`);
   return (
-    <Chip icon={icon} className={`ap-phase ap-phase--${p}`}>
-      {t(`approvals.status.${key}`)}
-    </Chip>
+    <span className={cx("ap-li__state", `is-${p}`)} role="img" aria-label={label} title={label}>
+      <Icon name={icon} size={16} />
+    </span>
   );
 }
 
@@ -1487,69 +1489,68 @@ function ApprovalDetails({
   );
 }
 
+/** What became of a decided request, as one card among the review's: its state, who decided and when, the action it
+ * still offers (cancel a scheduled one, ask again), and what the action returned behind a link. */
 function Outcome({ approval: a, agent }: { approval: Approval; agent: Agent | undefined }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
+  const [returned, setReturned] = useState(false);
   const name = agent?.name ?? t("channel.unknownAgent");
   const g = agentGrammar(name);
   const p = approvalPhase(a);
+  if (p === "waiting") return null;
   const who =
     a.decidedByUserId === me.user.id
       ? t("approvals.panel.youLower")
       : (dir.memberById.get(a.decidedByUserId ?? "")?.name ?? "");
   const when = a.decidedAt ? relativeTime(t, i18n.language, a.decidedAt) : "";
+  const approvedBy = t("approvals.panel.approvedBy", { name: who, when });
+  const [icon, title, subtitle]: [IconName, string, string | undefined] =
+    p === "running"
+      ? ["play", t("approvals.panel.runningLine", { context: g.context, name }), approvedBy]
+      : p === "done"
+        ? ["check", t("approvals.panel.done"), approvedBy]
+        : p === "failed"
+          ? ["alert", t("approvals.panel.failed"), approvedBy]
+          : p === "refused"
+            ? [
+                "close",
+                t("approvals.panel.refusedBy", { name: who, when }),
+                a.reason ? `“${a.reason}”` : t("approvals.panel.noReason"),
+              ]
+            : p === "scheduled"
+              ? [
+                  "calendar",
+                  a.runAt ? t("approval.ahead.scheduled", { when: nextLabel(i18n.language, a.runAt) }) : "",
+                  approvedBy,
+                ]
+              : p === "expired"
+                ? ["clock", t("approvals.status.expired"), aheadEndLine(t, a) ?? t("approvals.expiredLine")]
+                : ["block", t("approvals.status.canceled"), aheadEndLine(t, a) ?? t("approvals.canceledLine")];
+  const action =
+    p === "scheduled" && a.canCancel ? (
+      <CancelAhead id={a.id} />
+    ) : p === "expired" && aheadPhase(a) !== "lapsed" ? (
+      <AskAgain approval={a} agent={agent} />
+    ) : undefined;
   return (
-    <div className={cx("ap-outcome", `ap-outcome--${p}`)}>
-      <PhaseChip approval={a} />
-      <div className="ap-outcome__text">
-        {p === "running" && <b>{t("approvals.panel.runningLine", { context: g.context, name })}</b>}
-        {(p === "done" || p === "failed") && (
-          <>
-            <b>{p === "done" ? t("approvals.panel.done") : t("approvals.panel.failed")}</b>
-            <small>{t("approvals.panel.approvedBy", { name: who, when })}</small>
-          </>
-        )}
-        {p === "refused" && (
-          <>
-            <b>{t("approvals.panel.refusedBy", { name: who, when })}</b>
-            <small>{a.reason ? `“${a.reason}”` : t("approvals.panel.noReason")}</small>
-            {a.reason && <small className="ap-row__lesson">{t("approvals.lesson", { name, reason: a.reason })}</small>}
-          </>
-        )}
-        {p === "scheduled" && a.runAt && (
-          <>
-            <b>{t("approval.ahead.scheduled", { when: nextLabel(i18n.language, a.runAt) })}</b>
-            <small>{t("approvals.panel.approvedBy", { name: who, when })}</small>
-            {a.canCancel && (
-              <span className="ac-acts">
-                <CancelAhead id={a.id} />
-              </span>
-            )}
-          </>
-        )}
-        {p === "expired" && (
-          <>
-            <b>{t("approvals.status.expired")}</b>
-            <small>{aheadEndLine(t, a) ?? t("approvals.expiredLine")}</small>
-            {aheadPhase(a) !== "lapsed" && (
-              <span>
-                <AskAgain approval={a} agent={agent} />
-              </span>
-            )}
-          </>
-        )}
-        {p === "canceled" && <small>{aheadEndLine(t, a) ?? t("approvals.canceledLine")}</small>}
-      </div>
+    <Card className={cx("ap-review__card ap-outcome", `ap-outcome--${p}`)}>
+      <CardHeader icon={icon} title={title} subtitle={subtitle} action={action} />
+      {p === "refused" && a.reason && <p className="ap-outcome__lesson">{t("approvals.lesson", { name, reason: a.reason })}</p>}
+      {returned && a.result?.text && (
+        <pre className="ap-code ap-review__tech">
+          <code>{a.result.text}</code>
+        </pre>
+      )}
       {a.result?.text && (
-        <details className="ap-result">
-          <summary>{t("approvals.panel.returned")}</summary>
-          <pre className="ap-code">
-            <code>{a.result.text}</code>
-          </pre>
-        </details>
+        <p className="ac-card__foot ap-review__foot">
+          <button type="button" className="ap-link" aria-expanded={returned} onClick={() => setReturned((o) => !o)}>
+            {t("approvals.panel.returned")}
+          </button>
+        </p>
       )}
       {p === "running" && <WorkSweep color={colorOf(agent)} />}
-    </div>
+    </Card>
   );
 }
