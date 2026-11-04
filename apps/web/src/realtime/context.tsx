@@ -782,13 +782,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
     return connection.onSubscribed((id) => {
       if (id !== channelId) return;
       void reconcileChannelRuns(api, streams, orgId, channelId);
-      // A receipt nothing changed while the read was on its way takes it as it is. The lists' copies get the same
-      // receipts, so the page seeding them again (on every change) changes nothing.
-      const before = streams.get().receipts;
-      void catchUpChannel(api, qc, orgId, channelId).then((read) => {
-        streams.seed(read, before);
-        cacheReceipts(qc, orgId, channelId, read);
-      });
+      catchUpLists(api, qc, streams, orgId, channelId);
     });
   }, [connection, enabled, orgId, channelId, qc, streams, api]);
   useEffect(() => {
@@ -852,17 +846,41 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       }
       if (event.type === "message.created") {
         if (event.message) cacheMessage(qc, orgId, event.message);
-        else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
+        else {
+          // Too big for its event: the open lists read it (its live block holds until it lands); a closed one, when
+          // it opens again.
+          void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId], refetchType: "none" });
+          catchUpLists(api, qc, streams, orgId, channelId);
+        }
         // A new top-level message may get agent replies in its thread: start watching it.
         if (event.message) startThreadCache(qc, orgId, event.message);
         // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines. An agent's
         // sticker after its reply (ADR 0091) changes none of them.
-        if (event.message?.threadId && !isMediaAfterReply(event.message.meta)) {
+        if ((event.message ? event.message.threadId : event.threadId) && !isMediaAfterReply(event.message?.meta)) {
           void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
         }
       }
     });
-  }, [connection, enabled, orgId, channelId, qc, streams]);
+  }, [connection, enabled, orgId, channelId, qc, streams, api]);
+}
+
+/**
+ * Reads a conversation's open lists and adds what they lack (`catchUpChannel`). A receipt nothing changed while the
+ * read was on its way takes it as it is. The lists' copies get the same receipts, so the page seeding them again (on
+ * every change) changes nothing.
+ */
+function catchUpLists(
+  api: ApiClient,
+  qc: ReturnType<typeof useQueryClient>,
+  streams: StreamsStore,
+  orgId: string,
+  channelId: string,
+) {
+  const before = streams.get().receipts;
+  void catchUpChannel(api, qc, orgId, channelId).then((read) => {
+    streams.seed(read, before);
+    cacheReceipts(qc, orgId, channelId, read);
+  });
 }
 
 /** An open task's activity, live: comments and events from others land in its feed (`useIssueLive`). */

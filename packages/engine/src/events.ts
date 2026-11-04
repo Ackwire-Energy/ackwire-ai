@@ -79,8 +79,18 @@ export function decidedByOf(strategy: string, authorUserId: string | null): Deci
  */
 /** `threadId` null on agent events = the main timeline (DMs are flat). */
 export type ChannelEvent =
-  /** A message was committed. `message` is omitted when too large for pub/sub: fetch it by id. */
-  | { type: "message.created"; channelId: string; messageId: string; message?: MessageView }
+  /**
+   * A message was committed. `message` is omitted when too large for pub/sub: read it over HTTP. Its thread and run
+   * come either way, so the app knows which live answer it ends while that read is on its way.
+   */
+  | {
+      type: "message.created";
+      channelId: string;
+      messageId: string;
+      message?: MessageView;
+      threadId?: string | null;
+      agentRunId?: string | null;
+    }
   /** A fragment of an agent's reply while it is generated (not persisted; the final message follows). */
   | {
       type: "agent.delta";
@@ -612,7 +622,7 @@ export async function publishMessageCreated(pubsub: PubSub, message: MessageView
     type: "message.created",
     channelId: message.channelId,
     messageId: message.id,
-    ...(inline ? { message } : {}),
+    ...(inline ? { message } : { threadId: message.threadId, agentRunId: message.agentRunId }),
   });
   try {
     await pubsub.publish(chatActivityTopic, {

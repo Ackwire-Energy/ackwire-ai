@@ -1156,7 +1156,15 @@ export interface ActiveRun {
 
 /** Real-time channel events (packages/engine/src/events.ts, docs/adr/0010-realtime.md). */
 export type ChannelEvent =
-  | { type: "message.created"; channelId: string; messageId: string; message?: Message }
+  /** `message` is left out when too big for the server's pub/sub (read it over HTTP); its thread and run still come. */
+  | {
+      type: "message.created";
+      channelId: string;
+      messageId: string;
+      message?: Message;
+      threadId?: string | null;
+      agentRunId?: string | null;
+    }
   /** Someone joined or left, or an agent's way of replying changed (agents carry `autoReply`). */
   | {
       type: "channel.member_added" | "channel.member_removed" | "channel.member_updated";

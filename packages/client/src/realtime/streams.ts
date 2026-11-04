@@ -302,6 +302,8 @@ export interface StreamsState {
   finished: Record<string, true>;
   /** A routine's runs working in the background: never a row, never "trabalhando" (`isBackgroundEvent`). */
   background?: Record<string, true>;
+  /** Runs whose message came without its body (too big for its event): it is on its way over HTTP. */
+  landing?: Record<string, true>;
 }
 
 export const emptyStreams: StreamsState = { runs: {}, finished: {} };
@@ -612,17 +614,23 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
     }
     case "message.created": {
       const m = event.message;
+      // Too big for its event, it comes as its run and thread only (read over HTTP), and ends the run all the same: its
+      // block waits for that read (`landing`) instead of going blank.
+      const runId = m ? m.agentRunId : event.agentRunId;
       // The sticker or GIF an agent adds after its reply (ADR 0091) ends nothing: its reply already did, and a new
       // "pensando…" stays.
-      if (!m?.agentRunId || postedOnTheWay(state, m) || isMediaAfterReply(m.meta)) return state;
-      const next = finish(state, m.agentRunId);
-      if (m.author?.type !== "agent" || !m.author.id) return next;
-      if (m.threadId) return settleProvisional(next, m.author.id, m.threadId);
+      if (!runId || postedOnTheWay(state, { agentRunId: runId, meta: m?.meta }) || isMediaAfterReply(m?.meta))
+        return state;
+      const ended = finish(state, runId);
+      const next = m ? ended : { ...ended, landing: { ...state.landing, [runId]: true as const } };
+      const agentId = m ? (m.author?.type === "agent" ? m.author.id : null) : state.runs[runId]?.agentId;
+      const threadId = m ? m.threadId : event.threadId;
+      if (!agentId) return next;
+      if (threadId) return settleProvisional(next, agentId, threadId);
       // Flat reply (DMs): it answers the latest message, whatever thread we guessed.
-      const agentId = m.author.id;
       const runs = Object.fromEntries(
         Object.entries(next.runs).filter(
-          ([, r]) => !(r.provisional && r.agentId === agentId && r.channelId === m.channelId),
+          ([, r]) => !(r.provisional && r.agentId === agentId && r.channelId === event.channelId),
         ),
       );
       return { ...next, runs };
@@ -732,7 +740,7 @@ function finish(state: StreamsState, runId: string): StreamsState {
  * channel. Taken for the run's end, it froze the row with that call still running, and dropped every later event of the
  * run. A pause (an approval, a question) ends the row with its own event.
  */
-const postedOnTheWay = (state: StreamsState, m: Message) =>
+const postedOnTheWay = (state: StreamsState, m: Pick<Message, "agentRunId" | "meta">) =>
   Boolean(m.meta?.talker) ||
   Boolean(m.agentRunId && state.runs[m.agentRunId]?.work?.some((w) => w.kind === "call" && w.running));
 
