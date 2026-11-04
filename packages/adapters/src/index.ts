@@ -10,6 +10,7 @@ import type { PubSub } from "./pubsub";
 import type { PushSender } from "./push";
 import type { RateLimiter } from "./rate-limiter";
 import type { SearchIndexResolver } from "./search";
+import type { VaultSources } from "./vault/source";
 import type { WebPushSender } from "./web-push";
 
 export * from "./blob";
@@ -45,6 +46,10 @@ export * from "./search";
 export * from "./secret-box";
 export * from "./speech";
 export * from "./standard-webhooks";
+export { createBitwardenSource } from "./vault/bitwarden";
+export { createOnePasswordSource } from "./vault/onepassword";
+export * from "./vault/site";
+export * from "./vault/source";
 export * from "./web-push";
 
 /**
@@ -84,4 +89,9 @@ export interface Adapters {
    * null/absent = no GIFs.
    */
   gifs?: GifProvider | null;
+  /**
+   * The Vault's external sources by kind (ADR 0135): 1Password and Bitwarden by default, a module's merged by kind.
+   * The built-in source is the engine's own. null/absent = only built-in items.
+   */
+  vaultSources?: VaultSources | null;
 }

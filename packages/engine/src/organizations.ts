@@ -1125,6 +1125,27 @@ export async function removeMember(
     if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
     // Their AI apps and personal tokens here stop now (ADR 0119).
     await revokeMemberApps(tx, orgId, targetUserId);
+    // Their personal Vault goes with them, and they leave the team items' audiences (ADR 0135 §2). A personal
+    // connection's items cascade with it.
+    await tx
+      .delete(schema.vaultConnections)
+      .where(and(eq(schema.vaultConnections.orgId, orgId), eq(schema.vaultConnections.ownerUserId, targetUserId)));
+    await tx
+      .delete(schema.vaultItems)
+      .where(and(eq(schema.vaultItems.orgId, orgId), eq(schema.vaultItems.ownerUserId, targetUserId)));
+    await tx
+      .update(schema.vaultItems)
+      .set({ audienceUserIds: sql`array_remove(${schema.vaultItems.audienceUserIds}, ${targetUserId})` })
+      .where(and(eq(schema.vaultItems.orgId, orgId), sql`${targetUserId} = any(${schema.vaultItems.audienceUserIds})`));
+    await tx
+      .update(schema.vaultConnections)
+      .set({ audienceUserIds: sql`array_remove(${schema.vaultConnections.audienceUserIds}, ${targetUserId})` })
+      .where(
+        and(
+          eq(schema.vaultConnections.orgId, orgId),
+          sql`${targetUserId} = any(${schema.vaultConnections.audienceUserIds})`,
+        ),
+      );
     // The secrets agents are waiting on from them won't come.
     const secrets = await cancelSecretRequestsFor(tx, orgId, targetUserId);
     // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an

@@ -12,6 +12,7 @@ import {
   enqueueIdleReflections,
   enqueueOverdueDeletions,
   enqueueSkillUpdates,
+  enqueueVaultSyncs,
   enqueueWaitlistContacts,
   expireApprovals,
   expireBrowserHandoffs,
@@ -131,6 +132,8 @@ export const WORKER_INTERVALS_MS = {
   autonomyDigest: 10 * 60_000,
   /** Skills that update by themselves: each workspace queued once a day (the date in the job's dedupe key). */
   skillUpdates: 3600_000,
+  /** Vault connections last read over 10 minutes ago, queued once per 10-minute window (ADR 0135). */
+  vaultSyncs: 5 * 60_000,
 };
 
 /**
@@ -189,6 +192,9 @@ export function startWorkers(deps: WorkerDeps) {
   every("apps", WORKER_INTERVALS_MS.apps, () => purgeApps(db));
   every("skillUpdates", WORKER_INTERVALS_MS.skillUpdates, async () => {
     if ((await enqueueSkillUpdates(db)) > 0) void ticks.get("outbox")?.();
+  });
+  every("vaultSyncs", WORKER_INTERVALS_MS.vaultSyncs, async () => {
+    if ((await enqueueVaultSyncs(db)) > 0) void ticks.get("outbox")?.();
   });
   every("partitions", WORKER_INTERVALS_MS.partitions, async () => {
     const created = await ensureMessagePartitions(db);

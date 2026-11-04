@@ -12,6 +12,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  smallint,
   text,
   timestamp,
   unique,
@@ -832,6 +833,10 @@ export const secretRequests = pgTable(
      * (`https://host[:port]`) it may be typed on. Shown to the person.
      */
     site: text(),
+    /** A site password's username, when the agent knows it: the card prefills "Save to the Vault" with it (ADR 0135). */
+    username: text(),
+    /** A one-time code typed into this many boxes (ADR 0135); null unless the request is for a code. Never saved. */
+    codeDigits: smallint(),
     /** The computer's public key for this request (raw P-256, base64). */
     publicKey: text().notNull(),
     status: secretRequestStatusEnum().notNull().default("pending"),

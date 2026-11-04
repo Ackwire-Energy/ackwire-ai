@@ -100,6 +100,7 @@ import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from ".
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
+import { runVaultSync, VAULT_SYNC_JOB, type VaultDeps } from "./vault";
 import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 import { saveWaitlistContact } from "./waitlist";
 import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
@@ -144,6 +145,8 @@ export interface JobDeps extends RunExecutorDeps {
   skills?: SkillDeps;
   /** Voice messages (job `voice.transcribe`, ADR 0100). */
   voice?: VoiceDeps;
+  /** The Vault's sources (job `vault.sync`, ADR 0135); absent: connections aren't read again. */
+  vault?: VaultDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
   connectors?: ConnectorDeps;
   /** People's mailboxes: job `org.delete` has Composio forget a workspace's mailboxes before its rows go. */
@@ -997,6 +1000,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     [SKILL_UPDATES_JOB]: async (job) => {
       if (!deps.skills) return;
       await runSkillUpdates(deps.skills, orgOf(job));
+    },
+    // A Vault connection read again (ADR 0135); a source's refusal stays on the connection, never retried here.
+    [VAULT_SYNC_JOB]: async (job) => {
+      if (!deps.vault) return;
+      await runVaultSync(deps.vault, orgOf(job), String(job.payload.connectionId));
     },
     "context.consolidate": async (job) => {
       if (!deps.context) return;

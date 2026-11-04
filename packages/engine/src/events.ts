@@ -697,6 +697,19 @@ export async function publishOrgEvent(pubsub: PubSub | undefined, event: OrgEven
 export const publishRoutineRuns = (pubsub: PubSub | undefined, orgId: string, routineId: string) =>
   publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "routine.runs", orgId, routineId } });
 
+/**
+ * Something in the workspace's Vault changed (ADR 0135): an item, a connection, a sync. Nothing else goes out, not
+ * even which item: each app fetches again what its person may see.
+ */
+export type VaultChangedEvent = { type: "vault.changed"; orgId: string };
+
+export const publishVaultChanged = (pubsub: PubSub | undefined, orgId: string) =>
+  publishOrgEvent(pubsub, {
+    type: "org.broadcast",
+    orgId,
+    event: { type: "vault.changed", orgId } satisfies VaultChangedEvent,
+  });
+
 /** An event for one person (forwarded to every connection they have open in that organization). */
 export type UserEvent = { type: string; [key: string]: unknown };
 

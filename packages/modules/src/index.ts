@@ -25,6 +25,11 @@ export interface ModuleContext {
 export interface AdapterOverrides extends Partial<Adapters> {
   /** Model providers by id (e.g. `anthropic`), merged over the core ones. */
   modelProviders?: Record<string, ModelProvider>;
+  /**
+   * Vault sources by kind (ADR 0135), merged over the core ones: a module adds a source or replaces one of the same
+   * kind. null turns every external source off.
+   */
+  vaultSources?: Adapters["vaultSources"];
 }
 
 /**
@@ -68,12 +73,23 @@ export async function resolveAdapters(
   const overridden: string[] = [];
   for (const module of modules) {
     if (!module.adapters) continue;
-    const { modelProviders: providers, ...rest } = await module.adapters({ ...ctx, defaults: adapters });
+    const {
+      modelProviders: providers,
+      vaultSources: sources,
+      ...rest
+    } = await module.adapters({ ...ctx, defaults: adapters });
     for (const key of Object.keys(rest)) overridden.push(`${module.name}:${key}`);
     adapters = { ...adapters, ...rest };
     if (providers) {
       for (const key of Object.keys(providers)) overridden.push(`${module.name}:modelProviders.${key}`);
       modelProviders = { ...modelProviders, ...providers };
+    }
+    if (sources === null) {
+      overridden.push(`${module.name}:vaultSources`);
+      adapters = { ...adapters, vaultSources: null };
+    } else if (sources) {
+      for (const kind of Object.keys(sources)) overridden.push(`${module.name}:vaultSources.${kind}`);
+      adapters = { ...adapters, vaultSources: { ...adapters.vaultSources, ...sources } };
     }
   }
   return { adapters, modelProviders, overridden };

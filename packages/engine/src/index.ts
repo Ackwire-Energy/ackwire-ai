@@ -249,6 +249,8 @@ export * from "./uploads";
 export * from "./usage";
 export * from "./usage-pause";
 export * from "./usage-tools";
+export * from "./vault";
+export * from "./vault/tools";
 export * from "./voice";
 export * from "./waitlist";
 export * from "./web-push";

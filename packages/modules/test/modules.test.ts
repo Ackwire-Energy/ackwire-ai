@@ -68,3 +68,18 @@ test("no modules: defaults unchanged", async () => {
   expect(result.adapters).toEqual(defaults);
   expect(result.overridden).toEqual([]);
 });
+
+test("vault sources merge by kind; null turns them off (ADR 0135)", async () => {
+  const s = (kind: string) => ({ kind }) as unknown as import("@agenteschat/adapters").VaultSource;
+  const base = { ...defaults, vaultSources: { a: s("a"), b: s("b") } };
+  const r = await resolveAdapters(
+    [{ name: "m", adapters: () => ({ vaultSources: { b: s("b2"), c: s("c") } }) }],
+    ctx,
+    base,
+    {},
+  );
+  expect(Object.keys(r.adapters.vaultSources ?? {}).sort()).toEqual(["a", "b", "c"]);
+  expect(r.overridden).toEqual(["m:vaultSources.b", "m:vaultSources.c"]);
+  const off = await resolveAdapters([{ name: "n", adapters: () => ({ vaultSources: null }) }], ctx, base, {});
+  expect(off.adapters.vaultSources).toBeNull();
+});
