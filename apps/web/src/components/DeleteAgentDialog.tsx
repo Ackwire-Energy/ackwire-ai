@@ -11,8 +11,8 @@ import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 
 /**
- * Deleting an agent for good (ADR 0082), from its page or, archived, from Equipe: what goes and what stays (and that
- * the team has no coordinator after it, ADR 0093), then its name typed to confirm. `onDeleted` runs after the toast,
+ * Deleting an agent for good (ADR 0082), from its page or, archived, from Equipe: what goes and what stays, then its
+ * name typed to confirm. `onDeleted` runs after the toast,
  * before the dialog closes.
  */
 export function DeleteAgentDialog({
@@ -20,7 +20,7 @@ export function DeleteAgentDialog({
   onClose,
   onDeleted,
 }: {
-  agent: { id: string; name: string; coordinator?: boolean } | null;
+  agent: { id: string; name: string } | null;
   onClose: () => void;
   onDeleted?: () => void;
 }) {
@@ -73,12 +73,6 @@ export function DeleteAgentDialog({
               <Icon name="message" size={16} />
               <span>{t("agentPage.delete.stays")}</span>
             </li>
-            {agent?.coordinator && (
-              <li className="ac-iconline">
-                <Icon name="flag" size={16} />
-                <span>{t("coordinator.archive", g)}</span>
-              </li>
-            )}
           </ul>
           <Field
             label={t("agentPage.delete.typeName", g)}

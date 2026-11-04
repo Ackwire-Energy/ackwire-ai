@@ -65,7 +65,7 @@ describe("the sidebar on a phone (drawer)", () => {
     await click(button);
     expect(nav().getAttribute("data-open")).toBe("true");
     expect(button.getAttribute("aria-expanded")).toBe("true");
-    expect(document.activeElement).toBe(nav());
+    expect(document.activeElement === nav()).toBe(true);
     // The page behind can't be reached while it's open.
     // The work area (an offline-computer notice and the page) is inert as a whole.
     const main = document.querySelector(".shell__work") as HTMLElement;
@@ -76,7 +76,7 @@ describe("the sidebar on a phone (drawer)", () => {
     });
     expect(nav().getAttribute("data-open")).toBe("false");
     expect(main.inert).toBe(false);
-    expect(document.activeElement).toBe(button);
+    expect(document.activeElement === button).toBe(true);
   });
 
   test("a tap on the dimmed page closes it", async () => {

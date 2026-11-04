@@ -1,6 +1,6 @@
 import { Text as RNText, View } from "react-native";
 import { useTheme } from "./theme";
-import { CHROME_MAX_SCALE, countStyle, type Weight } from "./type-scale";
+import { CHROME_MAX_SCALE, countBadge, countStyle, type Weight } from "./type-scale";
 
 export interface CountProps {
   value: number;
@@ -29,23 +29,10 @@ export function Count({ value, size = 14, inverted = false, color, max, hero = f
     ? { fontFamily: fonts.dot, fontSize: size, lineHeight: Math.round(size * 1.2) }
     : countStyle(size, weight);
   if (inverted) {
-    const h = Math.round(size * 1.55);
+    const badge = countBadge(size);
     return (
-      <View
-        style={{
-          minWidth: h,
-          minHeight: h,
-          paddingHorizontal: Math.round(size * 0.45),
-          borderRadius: 999,
-          backgroundColor: colors.ink,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <RNText
-          style={[face, { lineHeight: h - 2, color: color ?? colors.bg }]}
-          maxFontSizeMultiplier={CHROME_MAX_SCALE}
-        >
+      <View style={[badge.box, { backgroundColor: colors.ink }]}>
+        <RNText style={[face, badge.text, { color: color ?? colors.bg }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
           {label}
         </RNText>
       </View>

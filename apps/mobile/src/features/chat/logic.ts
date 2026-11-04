@@ -3,6 +3,7 @@ import type {
   LiveConsult,
   LiveRun,
   Message,
+  MessageCard,
   MessageConsultation,
   MessagePin,
   ReactionCount,
@@ -29,6 +30,7 @@ import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines"
 import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { usagePauseCardOf } from "@agenteschat/client/lib/usage-pause";
 import { voiceOf } from "@agenteschat/client/lib/voice";
+import type { TFunction } from "i18next";
 import { previewOf } from "../shared/logic";
 import { continuesReply } from "./media";
 
@@ -819,3 +821,10 @@ export function dayInView(
  */
 export const readMark = (channelId: string, threadId: string | null | undefined) =>
   threadId ? ({ kind: "thread", id: threadId } as const) : ({ kind: "channel", id: channelId } as const);
+
+/**
+ * A message link's pill before its message icon (the web's `MessageRef`): "#general ›", "@Ana ›" in a DM,
+ * "#general › Thread ›" for a thread's reply.
+ */
+export const messageRefWords = (t: TFunction, card: MessageCard) =>
+  `${card.kind === "dm" ? `@${card.name}` : `#${card.name}`}${card.threadId ? ` › ${t("messageRefs.thread")}` : ""} › `;

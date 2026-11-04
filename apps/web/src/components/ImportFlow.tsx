@@ -1,7 +1,6 @@
 import type {
   ApiClient,
   BundleTodo,
-  ImportedSource,
   ImportItemKind,
   ImportItemResult,
   ImportSkipReason,
@@ -1485,37 +1484,6 @@ export function ImportReport({
 /** Downloads the workspace as a file: its agents, skills, routines and shared memory, never conversations or files. */
 export const saveExport = (api: ApiClient, orgId: string) =>
   fileSaver.save(api.imports.exportUrl(orgId), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
-
-/**
- * What the workspace brought from other apps, once it's in and no file is in hand here (the onboarding opened again):
- * each source by its mark with how much of each kind came, and the way to bring another file.
- */
-export function ImportedSummary({ sources, onAnother }: { sources: ImportedSource[]; onAnother: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <section className="imp-report">
-      {sources.map((source) => {
-        const origin = bundleOrigin({ source });
-        return (
-          <header key={`${source.app}:${source.ref}`} className="imp-head">
-            <SourceMark card={origin.card} />
-            <div className="imp-head__text">
-              <h2 className="imp-head__title">
-                {origin.app ? t("onboarding.import.from", { app: origin.app }) : t("onboarding.import.fromOther")}
-              </h2>
-              <p className="imp-head__sub">{kindsLine(t, (kind) => source.counts[kind])}</p>
-            </div>
-          </header>
-        );
-      })}
-      <div>
-        <Button variant="ghost" icon="upload" onClick={onAnother}>
-          {t("onboarding.import.report.another")}
-        </Button>
-      </div>
-    </section>
-  );
-}
 
 /**
  * Configurações → Importar e exportar (admins): the import flow, and this workspace as a file, with what it never

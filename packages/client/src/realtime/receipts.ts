@@ -15,8 +15,9 @@ import type { RunSteeredEvent } from "./streams";
  */
 /**
  * `outage`: its run is parked because its AI provider is down, and retries by itself. `queued`: in line for room on
- * its computer; `away`: waiting for its computer to come back. `passed`: its run ended without answering (it passed
- * and posted nothing, or was canceled before it started).
+ * its computer; `away`: waiting for its computer to come back. `plan` / `budget`: waiting for its plan's limit or its
+ * budget to renew. `asking`: it asked the person something. `passed`: its run ended without answering (it passed and
+ * posted nothing, or was canceled before it started); `canceled`: a person stopped it once it had started.
  */
 export type ReceiptPhase =
   | "seen"
@@ -27,8 +28,13 @@ export type ReceiptPhase =
   | "outage"
   | "queued"
   | "away"
+  | "plan"
+  | "budget"
+  /** Long work waiting in the agent's line of work (ADR 0121): nobody is asked anything. */
+  | "line"
   | "handled"
   | "passed"
+  | "canceled"
   | "failed"
   | "no_ai";
 
@@ -75,8 +81,9 @@ export type ReceiptsState = Record<string, MessageReceipt>;
 const phaseOf = (
   status: RunStatus | "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
   outage?: boolean,
-  computer?: "queued" | "away",
+  computer?: "queued" | "away" | "line",
   passed?: boolean,
+  usage?: "plan" | "budget",
 ): ReceiptPhase =>
   passed
     ? "passed"
@@ -84,17 +91,21 @@ const phaseOf = (
       ? "outage"
       : computer && status === "waiting_input"
         ? computer
-        : status === "queued"
-          ? "picked"
-          : status === "running"
-            ? "claimed"
-            : status === "waiting_approval"
-              ? "waiting"
-              : status === "waiting_input"
-                ? "asking"
-                : status === "failed"
-                  ? "failed"
-                  : "handled";
+        : usage && status === "waiting_input"
+          ? usage
+          : status === "canceled"
+            ? "canceled"
+            : status === "queued"
+              ? "picked"
+              : status === "running"
+                ? "claimed"
+                : status === "waiting_approval"
+                  ? "waiting"
+                  : status === "waiting_input"
+                    ? "asking"
+                    : status === "failed"
+                      ? "failed"
+                      : "handled";
 
 const RANK: Record<ReceiptPhase, number> = {
   seen: 0,
@@ -105,8 +116,12 @@ const RANK: Record<ReceiptPhase, number> = {
   outage: 2,
   queued: 2,
   away: 2,
+  plan: 2,
+  budget: 2,
+  line: 2,
   handled: 3,
   passed: 3,
+  canceled: 3,
   failed: 3,
   no_ai: 3,
 };
@@ -207,7 +222,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
   if (r && existing?.confirmed && !fresh) {
     let next = state;
     for (const h of r.handled) {
-      const phase = h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer, h.passed);
+      const phase = h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer, h.passed, h.usage);
       const follows = existing.runOf?.[h.agentId];
       if (RANK[phase] < RANK.handled || (follows && h.runId && h.runId !== follows)) continue;
       next = linkRun(set(next, message.id, h.agentId, phase), message.id, h.runId, h.agentId);
@@ -225,7 +240,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
         next,
         message.id,
         h.agentId,
-        h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer, h.passed),
+        h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage, h.computer, h.passed, h.usage),
       );
       next = linkRun(next, message.id, h.runId, h.agentId);
     }
@@ -334,13 +349,13 @@ export function applyReceiptEvent(
         event.reason === NO_AI
           ? "no_ai"
           : event.status
-            ? phaseOf(event.status, event.outage, event.computer, event.passed)
+            ? phaseOf(event.status, event.outage, event.computer, event.passed, event.usage)
             : "handled",
       );
     case "agent.run.steered": {
       // Went into the agent's task in progress: that agent is on it (a "stop" ends it).
       const linked = linkRun(state, event.messageId, event.runId, event.agentId);
-      const phase = event.stop ? "handled" : (event.computer ?? "claimed");
+      const phase = event.stop ? "handled" : (event.computer ?? event.usage ?? "claimed");
       return event.agentId ? set(linked, event.messageId, event.agentId, phase) : linked;
     }
     case "agent.run":
@@ -349,7 +364,7 @@ export function applyReceiptEvent(
         event.runId,
         event.triggerMessageId ?? event.threadId,
         event.agentId,
-        phaseOf(event.status, event.outage, event.computer),
+        phaseOf(event.status, event.outage, event.computer, false, event.usage),
         event.status === "running",
       );
     case "agent.thinking":
@@ -365,7 +380,7 @@ export function applyReceiptEvent(
         event.runId,
         event.threadId,
         event.agentId,
-        phaseOf(event.status, event.outage, event.computer, event.passed),
+        phaseOf(event.status, event.outage, event.computer, event.passed, event.usage),
         event.status === "waiting_approval",
       );
     case "question.asked":
@@ -398,7 +413,20 @@ export interface ReceiptView {
   /** Main status, or null when there is nothing to say yet. */
   status:
     | {
-        kind: "picked" | "claimed" | "waiting" | "asking" | "outage" | "away" | "queued" | "handled" | "failed";
+        kind:
+          | "picked"
+          | "claimed"
+          | "waiting"
+          | "asking"
+          | "outage"
+          | "away"
+          | "queued"
+          | "plan"
+          | "budget"
+          | "line"
+          | "handled"
+          | "canceled"
+          | "failed";
         agents: string[];
       }
     /** Every agent it was for ended without answering: "No one replied", and a person can call one. */
@@ -433,13 +461,28 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
   const noAi = with_("no_ai");
   if ((noAi.length > 0 || receipt.noAi) && receipt.agents.every(([, p]) => p === "seen" || p === "no_ai"))
     return { seen, status: { kind: "no_ai", agents: noAi }, done: false, referenced };
-  for (const kind of ["failed", "outage", "away", "queued", "asking", "waiting", "claimed", "picked"] as const) {
+  for (const kind of [
+    "failed",
+    "outage",
+    "away",
+    "queued",
+    "plan",
+    "budget",
+    "line",
+    "asking",
+    "waiting",
+    "claimed",
+    "picked",
+  ] as const) {
     const agents = with_(kind);
     if (agents.length) return { seen, status: { kind, agents }, done: false, referenced, ...decided };
   }
   // One answer is an answer, whoever else passed.
   const handled = with_("handled");
   if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced, ...decided };
+  const canceled = with_("canceled");
+  if (canceled.length)
+    return { seen, status: { kind: "canceled", agents: canceled }, done: true, referenced, ...decided };
   const passed = with_("passed");
   if (passed.length) return { seen, status: { kind: "passed", agents: passed }, done: true, referenced, ...decided };
   if (receipt.platformCap) return { seen, status: { kind: "platform_cap" }, done: false, referenced };
@@ -466,7 +509,7 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
  */
 export type ReceiptTicks = "clock" | "check" | "checks";
 
-const ACTED: ReadonlySet<ReceiptPhase> = new Set(["handled", "passed", "failed", "no_ai"]);
+const ACTED: ReadonlySet<ReceiptPhase> = new Set(["handled", "passed", "canceled", "failed", "no_ai"]);
 
 export function receiptTicks(receipt: MessageReceipt | undefined): ReceiptTicks {
   if (!receipt || (receipt.picking && !receipt.routed)) return "clock";

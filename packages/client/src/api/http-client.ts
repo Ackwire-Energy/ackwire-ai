@@ -121,6 +121,7 @@ import type {
   Member,
   Memory,
   Message,
+  MessageCard,
   MessagePin,
   Mission,
   MissionBrain,
@@ -198,6 +199,7 @@ import type {
   ToolChange,
   TrashedArtifact,
   UndoAllResult,
+  UsageQueue,
   UsageReport,
   WikiGraph,
   WikiImportResult,
@@ -341,8 +343,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ).connection,
       disconnect: (orgId, connectionId) =>
         request<void>(`${org(orgId)}/databases/${enc(connectionId)}`, { method: "DELETE" }),
-      tables: async (orgId, connectionId) =>
-        (await request<{ tables: DatabaseTable[] }>(`${org(orgId)}/databases/${enc(connectionId)}/tables`)).tables,
+      tables: async (orgId, connectionId, database) =>
+        (
+          await request<{ tables: DatabaseTable[] }>(
+            `${org(orgId)}/databases/${enc(connectionId)}/tables${database ? `?database=${enc(database)}` : ""}`,
+          )
+        ).tables,
+      serverDatabases: async (orgId, connectionId, refresh) =>
+        (
+          await request<{ databases: string[] }>(
+            `${org(orgId)}/databases/${enc(connectionId)}/databases${refresh ? "?refresh=1" : ""}`,
+          )
+        ).databases,
       agent: async (orgId, agentId) =>
         (await request<{ databases: AgentDatabase[] }>(`${org(orgId)}/agents/${enc(agentId)}/databases`)).databases,
       setAgent: (orgId, agentId, connectionId, input) =>
@@ -562,6 +574,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           query: {
             actorType: query.actorType,
             actorId: query.actorId,
+            via: query.via,
             outcome: query.outcome?.length ? query.outcome.join(",") : undefined,
             waiting: query.waiting ? "true" : undefined,
             kind: query.kind,
@@ -613,13 +626,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
       denyProposal: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
-      createProposed: (orgId, messageId) =>
-        request<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"] }>(
+      createProposed: (orgId, messageId, options) =>
+        request<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"]; testChannelId?: string | null }>(
           `${org(orgId)}/agent-proposals/${enc(messageId)}/create`,
-          {
-            json: {},
-          },
+          { json: options?.test ? { test: true } : {} },
         ),
+      askProposal: (orgId, messageId) =>
+        request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/ask`, { json: {} }),
       decideCostly: (orgId, signalId, decision) =>
         request<{ state: CostlyDecision }>(`${org(orgId)}/autonomy-proposals/${enc(signalId)}`, {
           json: { decision },
@@ -653,6 +666,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
       aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),
       statuses: async (orgId) => (await request<{ agents: AgentStatus[] }>(`${org(orgId)}/agent-status`)).agents,
+      usageQueue: (orgId, agentId) => request<UsageQueue>(`${org(orgId)}/agents/${enc(agentId)}/usage-queue`),
+      cancelUsageQueue: (orgId, agentId) =>
+        request<{ canceled: number; skipped: number }>(`${org(orgId)}/agents/${enc(agentId)}/usage-queue/cancel`, {
+          method: "POST",
+        }),
       importFromGithub: (orgId, url) =>
         request<{ files: { path: string; text: string }[]; skipped?: string[] }>(`${org(orgId)}/agent-imports/github`, {
           json: { url },
@@ -776,6 +794,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/place`, { method: "PUT", json: input }),
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
       card: (orgId, channelId) => request<ChannelCard>(`${org(orgId)}/channels/${enc(channelId)}/card`),
+      messageCard: (orgId, messageId) => request<MessageCard>(`${org(orgId)}/messages/${enc(messageId)}/card`),
       update: (orgId, channelId, input) =>
         request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
       reactions: async (orgId, messageId) =>
@@ -1038,6 +1057,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<SkillSourceUpdate>(`${org(orgId)}/skills/${enc(id)}/update/approve`, { json: {} }),
       dismissUpdate: (orgId, id) =>
         request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/dismiss`, { json: {} }),
+      reopenUpdate: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/reopen`, { json: {} }),
       undoUpdate: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/update/undo`, { json: {} }),
       settings: (orgId) => request<SkillSettings>(`${org(orgId)}/skill-settings`),
       saveSettings: (orgId, input) =>
@@ -1532,6 +1552,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       accept: (orgId, id, text) =>
         request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/accept`, { json: text === undefined ? {} : { text } }),
       refuse: (orgId, id) => request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/refuse`, { json: {} }),
+      ask: (orgId, id) => request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/ask`, { json: {} }),
     },
     repositories: {
       get: async (orgId, agentId) =>

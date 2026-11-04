@@ -19,6 +19,8 @@ export interface DatabasePolicy {
   dailyQueryCap: number | null;
   /** Each query is cancelled past this. */
   timeoutSeconds: number;
+  /** Whole-server connections: the only databases it may read (exact names); absent or empty = every one. */
+  databases?: string[];
 }
 
 export type DatabaseLevel = "none" | "read";
@@ -75,6 +77,7 @@ export async function agentDatabasePolicies(
               hiddenColumns: r.hiddenColumns,
               dailyQueryCap: r.dailyQueryCap,
               timeoutSeconds: r.timeoutSeconds,
+              ...(r.databases.length > 0 ? { databases: r.databases } : {}),
             }
           : defaultDatabasePolicy(c),
       ];
@@ -110,7 +113,16 @@ export function normalizeDatabasePolicy(input: DatabasePolicy): DatabasePolicy {
   const timeout = input.timeoutSeconds;
   if (!Number.isInteger(timeout) || timeout < 1 || timeout > 60)
     throw new ValidationError("timeoutSeconds must be 1 to 60", "database.timeout");
-  return { tables, hiddenColumns, dailyQueryCap: cap, timeoutSeconds: timeout };
+  const databases = [...new Set((input.databases ?? []).map((d) => d.trim()).filter(Boolean))];
+  if (databases.length > 2000 || databases.some((d) => d.length > 63))
+    throw new ValidationError("At most 2000 databases, each at most 63 characters", "database.too_many");
+  return {
+    tables,
+    hiddenColumns,
+    dailyQueryCap: cap,
+    timeoutSeconds: timeout,
+    ...(databases.length > 0 ? { databases } : {}),
+  };
 }
 
 /** `GET …/agents/{agentId}/databases`: one entry per connected database. */
@@ -164,7 +176,7 @@ export async function setAgentDatabase(
         .insert(agentScopes)
         .values({ orgId, agentId, connectionId, scope: DATABASE_SCOPE, grantedByUserId: actorId });
     }
-    const values = { ...policy, updatedByUserId: actorId, updatedAt: new Date() };
+    const values = { ...policy, databases: policy.databases ?? [], updatedByUserId: actorId, updatedAt: new Date() };
     await tx
       .insert(dbAgentPolicies)
       .values({ orgId, agentId, connectionId, ...values })

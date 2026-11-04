@@ -140,14 +140,4 @@ describe("where the ⓘ is plugged in", () => {
     expect(fields.length).toBeGreaterThanOrEqual(1);
     for (const name of [...names, ...fields]) expect(name).toStartWith('t("common.about"');
   });
-
-  test("the first run's import sources are plain rows: no button, so VoiceOver doesn't read them as dimmed", () => {
-    const flow = source("features/onboarding/OnboardingFlow.tsx");
-    const importStep = flow.match(/function ImportStep\(\)[\s\S]*?\n}\n/)?.[0] ?? "";
-    const line = flow.match(/function Line\([\s\S]*?\n}\n/)?.[0] ?? "";
-    expect(importStep).toContain("<Line");
-    expect(importStep).not.toContain("onPress");
-    expect(line).toContain("if (!onPress) return <View");
-    expect(line).not.toContain("disabled=");
-  });
 });

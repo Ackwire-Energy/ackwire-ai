@@ -681,7 +681,7 @@ describe("a newcomer's first #general", () => {
       "Atlas",
     ]);
     await click(within(card).getByRole("button", { name: "Dizer oi no #general" }));
-    expect(document.activeElement).toBe(screen().getByRole("combobox", { name: "Mensagem para #general" }));
+    expect(document.activeElement === screen().getByRole("combobox", { name: "Mensagem para #general" })).toBe(true);
     await click(within(card).getByRole("button", { name: "Fechar" }));
     expect(welcome()).toBeNull();
     expect(localStorage.getItem(`agentes.arrival.closed.u-walter.${ORG_ID}`)).toBe("1");

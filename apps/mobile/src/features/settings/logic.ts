@@ -18,6 +18,7 @@ import { clockAt, formatPercent, relativeTime } from "@agenteschat/client/lib/fo
 import { folderName, hostDescKey, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import { zoneDisplayName } from "@agenteschat/client/lib/routines";
+import { skillWaitingChip } from "@agenteschat/client/lib/skills";
 import type { TFunction } from "i18next";
 import type { IconName } from "@/ui";
 
@@ -32,6 +33,7 @@ import type { IconName } from "@/ui";
 export type SettingsSection =
   | "apps"
   | "general"
+  | "right_hand"
   | "members"
   | "audit"
   | "media"
@@ -67,6 +69,14 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
     icon: "home",
     href: "/settings/general",
     allowed: (o) => can(o, "configure"),
+  },
+  // The team's right hand (ADR 0137): its name, AI, budget and audience, for who manages agents.
+  {
+    id: "right_hand",
+    group: "org",
+    icon: "agent",
+    href: "/settings/right-hand",
+    allowed: (o) => can(o, "manage_agents"),
   },
   // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).
   { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
@@ -229,7 +239,7 @@ export function skillLine(
     t(`skills.source.${skillSourceKey(s)}`),
     s.defaultForNewAgents ? t("skills.defaultChip") : null,
     s.pendingUpdate && !s.pendingUpdate.dismissed
-      ? t("skills.waitingChip")
+      ? t(skillWaitingChip(s.pendingUpdate))
       : s.autoUpdate
         ? t("skills.autoChip")
         : null,

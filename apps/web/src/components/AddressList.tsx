@@ -22,6 +22,7 @@ export function AddressList({
   invalidText,
   inputMode = "email",
   clearable,
+  suggestions,
 }: {
   id: string;
   label: string;
@@ -35,6 +36,8 @@ export function AddressList({
   invalidText?: string;
   inputMode?: "email" | "text";
   clearable?: boolean;
+  /** Offered as the person types (the browser's own list). */
+  suggestions?: string[];
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
@@ -65,6 +68,7 @@ export function AddressList({
             inputMode={inputMode}
             autoComplete="off"
             placeholder={placeholder ?? t("mail.list.placeholder")}
+            list={suggestions ? `${id}-suggestions` : undefined}
             onChange={(e) => {
               setText(e.target.value);
               setInvalid(false);
@@ -84,6 +88,13 @@ export function AddressList({
           >
             {t("mail.list.add")}
           </Button>
+          {suggestions && (
+            <datalist id={`${id}-suggestions`}>
+              {suggestions.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          )}
         </div>
       </Field>
       {values.length > 0 && (

@@ -1,7 +1,16 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
-import type { GitHubRepositories, Skill, SkillChoice, SkillSkipped, SkillVia } from "../api/types";
+import type {
+  GitHubRepositories,
+  Skill,
+  SkillAgentChange,
+  SkillChoice,
+  SkillDetail,
+  SkillSkipped,
+  SkillVia,
+} from "../api/types";
 import { errorText } from "./errors";
+import { joinNames, relativeTime } from "./format";
 
 /**
  * What a GitHub link holds when `skills.import` answers with skills to pick from, else null. `via`: which of the
@@ -121,4 +130,107 @@ export function skillUpdateErrorText(t: TFunction, code: string) {
     return t(`skills.updateFailed.${key}`);
   if (key === "auto_update_owner_gone" || code === "forbidden") return t("skills.updateFailed.owner_gone");
   return t("skills.updateFailed.other");
+}
+
+/** The update from its link that waits for a person (not kept out), or null. */
+export const waitingUpdate = (s: Pick<Skill, "pendingUpdate">) =>
+  s.pendingUpdate && !s.pendingUpdate.dismissed ? s.pendingUpdate : null;
+
+/** The list's word for a waiting update: the link and the agents both changed it, or files that run to review. */
+export const skillWaitingChip = (pending: NonNullable<Skill["pendingUpdate"]>) =>
+  pending.edited ? "skills.waitingChipEdited" : "skills.waitingChip";
+
+/** A skill's text: what it is for and its SKILL.md. */
+export interface SkillText {
+  body: string;
+  description: string;
+}
+
+/**
+ * One way to read a waiting update on the skill's page (`skills.diff.{id}`): what the agents changed since its link
+ * last wrote it, what its link changed since, and the skill now against its link's version. Without what its link
+ * last wrote (`pending.base`), only the last. An update the agents didn't change has one: what it changes.
+ */
+export interface SkillPendingView {
+  id: "agents" | "link" | "compare";
+  before: SkillText;
+  after: SkillText;
+}
+
+export function skillPendingViews(s: SkillDetail): SkillPendingView[] {
+  const p = s.pending;
+  if (!p) return [];
+  const now = { body: s.body, description: s.description };
+  const link = { body: p.body, description: p.description };
+  if (!s.pendingUpdate?.edited) return [{ id: "link", before: now, after: link }];
+  if (!p.base) return [{ id: "compare", before: now, after: link }];
+  return [
+    { id: "agents", before: p.base, after: now },
+    { id: "link", before: p.base, after: link },
+    { id: "compare", before: now, after: link },
+  ];
+}
+
+/** The agents' changes since its link last wrote it, newest first: none when that isn't known. */
+export const changesSinceLink = (s: SkillDetail): SkillAgentChange[] => {
+  const since = s.pending?.base?.at;
+  return since ? (s.changes ?? []).filter((c) => !c.undone && c.at > since) : [];
+};
+
+/** "Ada e Bia mudaram esta skill, a última vez há 2 dias": who changed it since its link (`changesSinceLink`). */
+export function changedByText(
+  t: TFunction,
+  lang: string,
+  changes: SkillAgentChange[],
+  nameOf: (agentId: string) => string,
+): string | null {
+  const [latest] = changes;
+  if (!latest) return null;
+  const names = [...new Set(changes.map((c) => nameOf(c.agentId)))];
+  return t("skills.pending.byAgents", {
+    count: names.length,
+    names: joinNames(names, t),
+    when: relativeTime(t, lang, latest.at),
+  });
+}
+
+/**
+ * What a skill's page says about its update from its link (web and phone): the waiting one with its choice, the line
+ * left after keeping the skill as it is (Desfazer makes it wait again), and the last update applied with its Desfazer.
+ */
+export function skillUpdateWords(t: TFunction, lang: string, s: SkillDetail) {
+  const pending = waitingUpdate(s);
+  const when = (at: string) => relativeTime(t, lang, at);
+  const kept = s.pendingUpdate?.dismissed && s.pendingUpdate.dismissedAt ? s.pendingUpdate : null;
+  const last = s.lastUpdate && !s.lastUpdate.agentId ? s.lastUpdate : null;
+  return {
+    waiting: pending
+      ? {
+          title: pending.edited
+            ? t("skills.pending.edited")
+            : t("skills.pending.title", { files: pending.scripts.join(", ") }),
+          since: t("skills.pending.linkSince", { when: when(pending.at) }),
+          lead: [
+            ...(pending.edited ? [t("skills.pending.editedLead")] : []),
+            ...(pending.scripts.length > 0 ? [t("skills.pending.lead")] : []),
+          ].join(" "),
+          apply: t(pending.edited ? "skills.pending.useLink" : "skills.pending.apply"),
+          keep: t(pending.edited ? "skills.pending.keepAgents" : "skills.pending.dismiss"),
+          /** The toasts' words (with `{{name}}`) after either choice. */
+          applied: pending.edited ? ("skills.pending.usedLink" as const) : ("skills.pending.applied" as const),
+          kept: pending.edited ? ("skills.pending.keptAgents" as const) : ("skills.pending.dismissed" as const),
+        }
+      : null,
+    kept: kept
+      ? t(kept.edited ? "skills.pending.keptLine" : "skills.pending.notAppliedLine", {
+          when: when(kept.dismissedAt ?? kept.at),
+        })
+      : null,
+    last: last
+      ? {
+          line: t(last.waited ? "skills.chosenLink" : "skills.lastUpdate", { when: when(last.at) }),
+          undo: t(last.waited ? "skills.undo" : "skills.undoUpdate"),
+        }
+      : null,
+  };
 }

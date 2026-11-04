@@ -650,7 +650,8 @@ export function useCreateProposedAgent(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (messageId: string) => api.agents.createProposed(orgId, messageId),
+    mutationFn: ({ messageId, test }: { messageId: string; test?: boolean }) =>
+      api.agents.createProposed(orgId, messageId, test ? { test } : undefined),
     onSuccess: ({ proposal }) => {
       cacheAgentProposal(qc, orgId, proposal, proposal);
       for (const key of [keys.agents(orgId), keys.channels(orgId), keys.routines(orgId)])
@@ -669,6 +670,16 @@ export function useCreateProposedRoutine(orgId: string) {
       cacheAgentProposal(qc, orgId, proposal, proposal);
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
     },
+  });
+}
+
+/** "Pedir a um admin" on an agent's proposal the viewer can't create (ADR 0137): the card says it was sent. */
+export function useAskAgentProposal(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.askProposal(orgId, messageId),
+    onSuccess: (proposal) => cacheAgentProposal(qc, orgId, proposal, proposal),
   });
 }
 
@@ -982,6 +993,17 @@ export const useChannelCard = (orgId: string, channelId: string, enabled = true)
   });
 };
 
+/** A pasted message link's pill: where the message is and who wrote it (an error: one I can't see). */
+export const useMessageCard = (orgId: string, messageId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.messageCard(orgId, messageId),
+    queryFn: () => api.chat.messageCard(orgId, messageId),
+    staleTime: 60_000,
+    retry: false,
+  });
+};
+
 export function useJoinChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -1149,7 +1171,7 @@ export function cacheAgentProposal(
   qc: ReturnType<typeof useQueryClient>,
   orgId: string,
   where: { channelId: string; messageId: string },
-  { state, agentId, decidedByUserId, decidedAt, applied, routineId }: AgentProposalDecision,
+  { state, agentId, decidedByUserId, decidedAt, applied, routineId, askedAt }: AgentProposalDecision,
 ) {
   cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
     actionCard: {
@@ -1160,6 +1182,7 @@ export function cacheAgentProposal(
       decidedAt,
       ...(applied ? { applied } : {}),
       ...(routineId ? { routineId } : {}),
+      ...(askedAt ? { askedAt } : {}),
     },
   }));
   void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, where.messageId) });
@@ -2031,6 +2054,32 @@ function withStatus(p: Person, input: StatusInput): Person {
 const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", out: "out", hidden: "hidden" } as const;
 
 /**
+ * What an agent picks up when its plan or budget is back (ADR 0118). `agent.status` events refetch it (a row joined,
+ * started or ended); while anything waits it also refetches every 30 s, so "Respondendo agora" moves down the line.
+ */
+export const useUsageQueue = (orgId: string, agentId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.usageQueue(orgId, agentId),
+    queryFn: () => api.agents.usageQueue(orgId, agentId),
+    enabled: enabled && orgId.length > 0 && agentId.length > 0,
+    retry: false,
+    refetchInterval: (q) => ((q.state.data?.rows.length ?? 0) + (q.state.data?.hidden ?? 0) > 0 ? 30_000 : false),
+    meta: { quiet: true },
+  });
+};
+
+/** "Don't run any" on an agent's usage queue: the queue and the statuses follow. */
+export function useCancelUsageQueue(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.agents.cancelUsageQueue(orgId, agentId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) }),
+  });
+}
+
+/**
  * Each agent's presence and line (ADR 0084). Refetched on `agent.status`, and every 30 s: presence also follows
  * time (busy after 2 minutes on one run, away after 30 idle) and runs elsewhere in the workspace.
  */
@@ -2830,6 +2879,9 @@ function refreshAccepted(qc: QueryClient, orgId: string, decided: Proposal[]) {
   }
   if (accepted.some((p) => p.target.type === "agent_access"))
     void qc.invalidateQueries({ queryKey: keys.access(orgId) });
+  // A settings card may seat an agent in a channel or take it out.
+  if (accepted.some((p) => p.target.type === "agent_settings"))
+    void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
 }
 
 export function useDecideProposal(orgId: string) {
@@ -2843,6 +2895,16 @@ export function useDecideProposal(orgId: string) {
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
     onSuccess: (row) => refreshAccepted(qc, orgId, [row]),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+  });
+}
+
+/** "Pedir a um admin" on a settings row the viewer can't decide (ADR 0137): the card says whom it went to. */
+export function useAskProposal(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.proposals.ask(orgId, id),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
   });
 }
@@ -3578,7 +3640,7 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         | { type: "remove"; id: string }
         | { type: "revert"; id: string }
         | { type: "restore"; id: string }
-        | { type: "updateFromSource" | "approveUpdate" | "dismissUpdate" | "undoUpdate"; id: string }
+        | { type: "updateFromSource" | "approveUpdate" | "dismissUpdate" | "reopenUpdate" | "undoUpdate"; id: string }
         | { type: "settings"; settings: SkillSettings }
         | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
     ): Promise<unknown> => {
@@ -3604,6 +3666,7 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         case "updateFromSource":
         case "approveUpdate":
         case "dismissUpdate":
+        case "reopenUpdate":
         case "undoUpdate":
           return api.skills[action.type]?.(orgId, action.id) ?? Promise.resolve();
         case "settings":
@@ -5153,16 +5216,34 @@ export const useDatabases = (orgId: string, enabled = true) => {
   });
 };
 
-/** A database's tables (the rules' table picker). */
-export const useDatabaseTables = (orgId: string, connectionId: string | null) => {
+/** A database's tables (the rules' table picker); on a whole server, of `database` (default: the sample). */
+export const useDatabaseTables = (orgId: string, connectionId: string | null, database?: string) => {
   const api = useApi();
   return useQuery({
-    queryKey: keys.databaseTables(orgId, connectionId ?? ""),
-    queryFn: () => api.databases.tables(orgId, connectionId ?? ""),
+    queryKey: keys.databaseTables(orgId, connectionId ?? "", database),
+    queryFn: () => api.databases.tables(orgId, connectionId ?? "", database),
     enabled: Boolean(connectionId),
     staleTime: 5 * 60_000,
     retry: false,
   });
+};
+
+/** A whole-server connection's databases; `refresh()` reads the list again on the server. */
+export const useServerDatabases = (orgId: string, connectionId: string, enabled = true) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: keys.serverDatabases(orgId, connectionId),
+    queryFn: () => api.databases.serverDatabases(orgId, connectionId),
+    enabled,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const refresh = useMutation({
+    mutationFn: () => api.databases.serverDatabases(orgId, connectionId, true),
+    onSuccess: (names) => qc.setQueryData(keys.serverDatabases(orgId, connectionId), names),
+  });
+  return { ...query, refresh };
 };
 
 /** An agent's access and rules per database. */

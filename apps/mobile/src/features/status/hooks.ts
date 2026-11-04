@@ -100,6 +100,8 @@ export interface AgentProfileStatus {
   line: string;
   /** Its line in full, with who wrote it; null: none. */
   card: { emoji: string; text: string; note: string } | null;
+  /** Out of office with conversations waiting for it (ADR 0118): how many, its queue's way in. */
+  waiting: number;
 }
 
 /**
@@ -132,6 +134,7 @@ export function useAgentProfileStatus(agentId: string, name: string): AgentProfi
     presence: shown.presence,
     line: `${t(`presence.${shown.presence}`)} · ${why}`,
     card: shown.line ? { ...shown.line, note } : null,
+    waiting: own && (own.kind === "out_of_plan" || own.kind === "out_of_budget") ? (own.count ?? 0) : 0,
   };
 }
 

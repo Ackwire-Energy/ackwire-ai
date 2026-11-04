@@ -68,6 +68,12 @@ export function auditRoutes(deps: AppDeps) {
         query: z.object({
           actorType: ActorType.optional(),
           actorId: z.string().min(1).max(200).optional(),
+          via: z
+            .string()
+            .min(1)
+            .max(200)
+            .optional()
+            .openapi({ description: "An agent's id: what it did, and what people applied from its cards." }),
           outcome: z
             .string()
             .regex(/^(done|failed|refused|pending)(,(done|failed|refused|pending))*$/)

@@ -68,7 +68,7 @@ const MARK_ICON: Record<AuditMark, IconName> = {
   waiting: "wait",
 };
 
-export function AuditScreen() {
+export function AuditScreen({ agentId: first = null }: { agentId?: string | null } = {}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const when = useWhen();
@@ -76,7 +76,7 @@ export function AuditScreen() {
   const { orgId, org } = useOrg();
   const admin = can(org, "view_audit");
   const [show, setShow] = useState<AuditShow>("all");
-  const [agentId, setAgentId] = useState<string | null>(null);
+  const [agentId, setAgentId] = useState<string | null>(first);
   const audit = useAudit(orgId, auditQueryOf(show, agentId), admin);
   const rows = useMemo(() => audit.data?.pages.flatMap((p) => p.rows) ?? [], [audit.data]);
   const days = useMemo(() => byDay(rows, when.day), [rows, when.day]);

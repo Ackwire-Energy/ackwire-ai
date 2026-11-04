@@ -3,12 +3,17 @@ import { DatabaseError } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   createDatabaseConnection,
+  DATABASES_SQL,
   databaseSlugs,
+  dropClient,
   getAgentDatabases,
   grantScopes,
   isSensitive,
   listDatabaseConnections,
   listDatabaseTables,
+  listServerDatabases,
+  MAX_POOLS_PER_CONNECTION,
+  openPools,
   revokeDatabaseConnection,
   setAgentScopes,
   updateDatabaseConnection,
@@ -208,4 +213,229 @@ test("slugs per connection are short, plain and distinct", () => {
       ]).values(),
     ].map((s) => s.length <= 20 && /^[a-z0-9]+$/.test(s)),
   ).toEqual([true, true, true]);
+});
+
+// ── A whole server (one connection, every database) ─────────────────────────
+
+const wholeServer = (d: DatabaseFixture, input: Record<string, unknown> = {}) =>
+  createDatabaseConnection(d.deps, d.f.owner.id, d.f.org.id, {
+    url: "postgres://reader:s3cret@db.example.com:5432",
+    wholeServer: true,
+    ...input,
+  });
+
+test("a whole server: no database name needed, the first database is the sample, the prefix filters the list", async () => {
+  d = await databaseSetup();
+  d.state.server = ["cliente_a", "cliente_b", "metabase"];
+  const r = await wholeServer(d, { databasePrefix: "cliente_" });
+  if (!r.ok) throw new Error(r.error);
+  expect(r.connection).toMatchObject({
+    label: "db.example.com",
+    database: "cliente_a",
+    wholeServer: true,
+    databasePrefix: "cliente_",
+    databaseCount: 2,
+  });
+  // The list is read from `postgres`, then the sample is tested like a single database.
+  expect(d.opened.map((t) => t.database)).toEqual(["postgres", "cliente_a"]);
+  expect(r.connection.suggestedHidden).toContain("public.customers.cpf");
+  expect(await listServerDatabases(d.deps, d.f.owner.id, d.f.org.id, r.connection.id)).toEqual([
+    "cliente_a",
+    "cliente_b",
+  ]);
+  const [audit] = await d.f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "database.connected"));
+  expect(audit?.details).toMatchObject({ wholeServer: true, prefix: "cliente_", databases: 2 });
+
+  // Nothing the user can open: a plain error, nothing saved (a database in the address doesn't count).
+  expect(await wholeServer(d, { databasePrefix: "x_" })).toEqual({ ok: false, error: "no_databases" });
+  expect(
+    await wholeServer(d, { url: "postgres://reader:s3cret@db.example.com:5432/cliente_a", databasePrefix: "x_" }),
+  ).toEqual({ ok: false, error: "no_databases" });
+  // A database in the address outside the prefix is only where the list is read: the sample is one agents read.
+  const entry = await wholeServer(d, {
+    url: "postgres://reader:s3cret@db.example.com:5432/postgres",
+    databasePrefix: "cliente_",
+  });
+  expect(entry.ok && entry.connection.database).toBe("cliente_a");
+  expect(d.opened.slice(-2).map((t) => t.database)).toEqual(["postgres", "cliente_a"]);
+  // No `postgres` on the server: the list comes from `template1`.
+  d.state.refuseDatabase = (db) => (db === "postgres" ? new DatabaseError("no such database", "query", "3D000") : null);
+  const fallback = await wholeServer(d);
+  expect(fallback.ok && fallback.connection.databaseCount).toBe(3);
+  expect(d.opened.at(-2)?.database).toBe("template1");
+  d.state.refuseDatabase = undefined;
+
+  // A single database without a name is still `postgres`, as before.
+  const single = await createDatabaseConnection(d.deps, d.f.owner.id, d.f.org.id, {
+    url: "postgres://reader:s3cret@db.example.com",
+  });
+  expect(single.ok && single.connection).toMatchObject({
+    database: "postgres",
+    wholeServer: false,
+    databaseCount: null,
+  });
+  // Switching to the whole server is a reconnect: tested first.
+  if (!single.ok) throw new Error(single.error);
+  const before = d.opened.length;
+  const switched = await updateDatabaseConnection(d.deps, d.f.owner.id, d.f.org.id, single.connection.id, {
+    wholeServer: true,
+  });
+  // `postgres` isn't one of the databases listed, so the sample is the first that is.
+  expect(switched.ok && switched.connection).toMatchObject({ wholeServer: true, database: "cliente_a" });
+  expect(d.opened.length).toBeGreaterThan(before);
+});
+
+test("the server's real list: no templates, by prefix", async () => {
+  d = await databaseSetup();
+  const names = async (prefix: string) =>
+    (await d.pg.query<[string]>(DATABASES_SQL, [prefix], { rowMode: "array" })).rows.map((r) => r[0]);
+  expect(await names("")).toEqual(["postgres"]);
+  expect(await names("post")).toEqual(["postgres"]);
+  expect(await names("cliente_")).toEqual([]);
+});
+
+test("whole-server tools: one database per call, the agent's list, the cap over every database, receipts", async () => {
+  d = await databaseSetup();
+  d.state.server = ["cliente_a", "cliente_b", "cliente_c"];
+  const r = await wholeServer(d, { label: "Produção" });
+  if (!r.ok) throw new Error(r.error);
+  const c = r.connection;
+  const single = await connectDatabase(d, "Analytics");
+  await giveDatabase(d, single.id);
+  await giveDatabase(d, c.id, "read", { databases: ["cliente_a", "cliente_b"], dailyQueryCap: 5 });
+  const ctx = await runContext(d.f);
+  const tools = (await d.tools.list(ctx)).filter((t) => t.name.startsWith("pg_"));
+  expect(tools.map((t) => t.name)).toEqual([
+    "pg_analytics_describe_table",
+    "pg_analytics_list_tables",
+    "pg_analytics_query",
+    "pg_producao_describe_table",
+    "pg_producao_list_databases",
+    "pg_producao_list_tables",
+    "pg_producao_query",
+  ]);
+  const schemaOf = (name: string) =>
+    tools.find((t) => t.name === name)?.inputSchema as { properties: Record<string, unknown>; required?: string[] };
+  expect(schemaOf("pg_producao_query").required).toEqual(["database", "sql"]);
+  expect(tools.find((t) => t.name === "pg_producao_query")?.description).toContain("different customer");
+  expect(Object.keys(schemaOf("pg_analytics_query").properties)).toEqual(["sql", "params"]);
+  expect(tools.find((t) => t.name === "pg_analytics_query")?.description).not.toContain("customer");
+
+  const call = (name: string, input: Record<string, unknown>) =>
+    d.tools.invoke(ctx, { toolUseId: `tu_${Math.random()}`, name: `pg_producao_${name}`, input });
+  const content = (x: Awaited<ReturnType<typeof call>>) => (x.type === "result" ? x.output.content : "");
+
+  const listed = await call("list_databases", {});
+  expect(content(listed)).toContain("2 databases");
+  expect(content(listed)).toContain("cliente_b");
+  expect(content(listed)).not.toContain("cliente_c");
+
+  const q = await call("query", { database: "cliente_b", sql: "select count(*) from orders" });
+  expect(content(q)).toContain("[Database Produção · cliente_b] 1 rows");
+  expect(q.type === "result" && q.output.data).toMatchObject({ database: "cliente_b" });
+  expect(d.opened.at(-1)?.database).toBe("cliente_b");
+  await call("list_tables", { database: "cliente_a" });
+  expect(d.opened.at(-1)?.database).toBe("cliente_a");
+
+  // Outside the agent's list, or not on the server: refused the same way.
+  expect(await call("query", { database: "cliente_c", sql: "select 1" })).toMatchObject({
+    output: {
+      isError: true,
+      content: "Not allowed: cliente_c is not a database of Produção. Call pg_producao_list_databases.",
+    },
+  });
+  // A name from another database in the SQL itself.
+  expect(
+    content(await call("query", { database: "cliente_a", sql: "select * from cliente_c.public.orders" })),
+  ).toContain("pass the database in `database`");
+  expect(content(await call("query", { database: "cliente_a", sql: "select query from pg_stat_activity" }))).toContain(
+    "not allowed here",
+  );
+
+  const log = await d.f.db.select().from(schema.dbQueries).where(eq(schema.dbQueries.connectionId, c.id));
+  expect(log.map((x) => [x.kind, x.database])).toEqual([
+    ["list_databases", null],
+    ["query", "cliente_b"],
+    ["list_tables", "cliente_a"],
+  ]);
+  // The cap sums every database: 3 ran, 2 more today.
+  await call("query", { database: "cliente_a", sql: "select 1" });
+  await call("describe_table", { database: "cliente_b", table: "orders" });
+  expect(content(await call("query", { database: "cliente_a", sql: "select 1" }))).toContain(
+    "already ran its 5 queries",
+  );
+});
+
+test("whole server: a database whose access rules refuse the user is closed, the connection still works", async () => {
+  d = await databaseSetup();
+  d.state.server = ["cliente_a", "cliente_b"];
+  const r = await wholeServer(d, { label: "Produção" });
+  if (!r.ok) throw new Error(r.error);
+  await giveDatabase(d, r.connection.id);
+  const ctx = await runContext(d.f);
+  const call = (database: string) =>
+    d.tools.invoke(ctx, {
+      toolUseId: `tu_${Math.random()}`,
+      name: "pg_producao_query",
+      input: { database, sql: "select 1" },
+    });
+  d.state.refuseDatabase = (db) =>
+    db === "cliente_b" ? new DatabaseError('no pg_hba.conf entry for database "cliente_b"', "auth", "28000") : null;
+  expect(await call("cliente_b")).toMatchObject({
+    output: { isError: true, content: expect.stringContaining("refused this user on the database cliente_b") },
+  });
+  const status = async () =>
+    (await d.f.db.select().from(schema.dbConnections).where(eq(schema.dbConnections.id, r.connection.id)))[0]?.status;
+  expect(await status()).toBe("active");
+  expect(await call("cliente_a")).toMatchObject({ output: { content: expect.stringContaining("1 rows") } });
+  // A refused password is the whole connection's.
+  d.state.refuseDatabase = (db) =>
+    db === "cliente_b" ? new DatabaseError("password authentication failed", "auth", "28P01") : null;
+  await call("cliente_b");
+  expect(await status()).toBe("needs_reconnect");
+});
+
+test("whole server: an unknown database reloads the list once, then is refused", async () => {
+  d = await databaseSetup();
+  d.state.server = ["cliente_a"];
+  const r = await wholeServer(d, { label: "Produção" });
+  if (!r.ok) throw new Error(r.error);
+  await giveDatabase(d, r.connection.id);
+  const ctx = await runContext(d.f);
+  const call = (database: string) =>
+    d.tools.invoke(ctx, {
+      toolUseId: `tu_${Math.random()}`,
+      name: "pg_producao_query",
+      input: { database, sql: "select 1" },
+    });
+  const read = d.state.listed;
+  d.state.server.push("cliente_novo");
+  // A customer added since the list was read: found on the one reload.
+  const ok = await call("cliente_novo");
+  expect(ok.type === "result" && ok.output.isError).toBeUndefined();
+  expect(d.state.listed).toBe(read + 1);
+  // Another unknown name within the minute: no new read, refused.
+  expect(await call("nope")).toMatchObject({ output: { isError: true } });
+  expect(d.state.listed).toBe(read + 1);
+});
+
+test("whole server: at most 8 pools per connection, the least recently used closed; dropClient closes them all", async () => {
+  d = await databaseSetup();
+  d.state.server = Array.from({ length: 9 }, (_, i) => `cliente_${i + 1}`);
+  const r = await wholeServer(d, { label: "Produção" });
+  if (!r.ok) throw new Error(r.error);
+  await giveDatabase(d, r.connection.id);
+  const ctx = await runContext(d.f);
+  for (const database of d.state.server) {
+    const x = await d.tools.invoke(ctx, {
+      toolUseId: `tu_${database}`,
+      name: "pg_producao_query",
+      input: { database, sql: "select 1" },
+    });
+    expect(x.type === "result" && x.output.isError).toBeUndefined();
+  }
+  expect(openPools(r.connection.id)).toHaveLength(MAX_POOLS_PER_CONNECTION);
+  expect(openPools(r.connection.id)).not.toContain("cliente_1");
+  dropClient(r.connection.id);
+  expect(openPools(r.connection.id)).toEqual([]);
 });

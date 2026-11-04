@@ -21,7 +21,7 @@ const ORG_ID = sql.raw(`"organizations"."id"`);
 const memberCount = sql<number>`(select count(*) from ${organizationMembers}
   where ${organizationMembers.orgId} = ${ORG_ID})`.mapWith(Number);
 const agentCount = sql<number>`(select count(*) from ${agents}
-  where ${agents.orgId} = ${ORG_ID} and ${agents.archivedAt} is null)`.mapWith(Number);
+  where ${agents.orgId} = ${ORG_ID} and ${agents.archivedAt} is null and ${agents.builtin} is null)`.mapWith(Number);
 
 // Cut to milliseconds (what a JS Date and the cursor carry), so paging compares exactly what it returned.
 export const orgCreatedAtMs = sql<Date>`date_trunc('milliseconds', ${organizations.createdAt})`.mapWith(

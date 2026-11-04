@@ -148,7 +148,7 @@ describe("Fixar mensagem", () => {
     await act(async () => fireEvent.contextMenu(row("m-1"), { clientX: 40, clientY: 60 }));
     await settle(2);
     const names = menuNames();
-    expect(names).toContain("Copiar link");
+    expect(names).toContain("Copiar link da mensagem");
     expect(names).not.toContain("Fixar mensagem");
   });
 });

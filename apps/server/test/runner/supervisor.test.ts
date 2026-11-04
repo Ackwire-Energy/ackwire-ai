@@ -3119,7 +3119,7 @@ test("a late hello cannot reopen a retiring worker to a new request", async () =
 });
 
 test.if(posix)(
-  "a managed finite drain rejects new stale work and retries owned desktop retirement without a roster",
+  "a managed finite drain holds new work until the switch and retries owned desktop retirement without a roster",
   async () => {
     const home = newHome();
     const ws = tempDir("network-deadline-");
@@ -3189,8 +3189,8 @@ test.if(posix)(
       );
       expect(old.stdin.writableEnded).toBe(false);
       socket.frame({ type: "request", id: "new-work", ...exec(ANA) });
-      await waitFor(() => socket.of("result").some((r) => r.id === "new-work"));
-      expect(socket.of("result").find((r) => r.id === "new-work")?.ok).toBe(false);
+      await new Promise((r) => setTimeout(r, 700));
+      expect(socket.of("result").some((r) => r.id === "new-work")).toBe(false);
       // Keep the old UID alive until the failed desktop stop has been retried.
       old.stdin.removeAllListeners("end");
       now += 61_000;
@@ -3203,10 +3203,16 @@ test.if(posix)(
       expect(socket.of("result").find((r) => r.id === "active")?.ok).toBe(false);
       await waitFor(() => desktopStops === 2, 5000);
       old.crash(0);
-      await new Promise((r) => setTimeout(r, 10));
-      socket.frame({ type: "request", id: "fresh", ...exec(ANA) });
-      await waitFor(() => workers.length === 2);
-      expect(workers[1]?.user).toMatchObject(target);
+      await waitFor(() => workers.length === 2, 5000);
+      const next = workers[1] as FakeWorker;
+      expect(next.user).toMatchObject(target);
+      next.hello();
+      const held = await requestOn(next);
+      // The wait came out of the command's own timeout, inside the server's deadline for it.
+      expect(held.timeoutSeconds).toBeLessThan(10);
+      next.send({ type: "result", ok: true, id: held.id, data: execDone });
+      await waitFor(() => socket.of("result").some((r) => r.id === "new-work"));
+      expect(socket.of("result").find((r) => r.id === "new-work")?.ok).toBe(true);
     } finally {
       stopDesktop.mockRestore();
       await daemon.stop();

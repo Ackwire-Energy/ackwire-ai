@@ -149,6 +149,107 @@ describe("Configurações → Skills", () => {
     expect(state.calls.find((c) => c.method === "skills.update")?.args.at(-1)).toEqual({ agentsImprove: true });
   });
 
+  test("a waiting update: what each side changed, who and when, the choice and its Desfazer either way", async () => {
+    const { state, section } = await settings();
+    await click(within(section()).getByRole("button", { name: "Revisão de PR" }));
+    await settle(4);
+    const sheet = () => screen().getByRole("dialog", { name: "Revisão de PR" });
+    await click(within(sheet()).getByRole("button", { name: "Atualizar do link" }));
+    await settle(6);
+    const card = () => within(sheet()).getByRole("region", { name: "Atualização esperando" });
+    expect(card().textContent).toContain("O link tem uma versão nova, e os agentes também mudaram esta skill");
+    expect(card().textContent).toContain("Versão nova no link");
+    expect(card().textContent).toContain("Ada mudou esta skill, a última vez");
+    expect(card().textContent).toContain("Escolha qual versão fica. Dá para desfazer depois.");
+    // Three ways to read it: what the agents changed, what the link changed, the skill now against the link.
+    const tabs = within(card())
+      .getAllByRole("tab")
+      .map((tab) => tab.textContent);
+    expect(tabs).toEqual(["O que os agentes mudaram", "O que mudou no link", "Atual × link"]);
+    const added = () => [...card().querySelectorAll(".ac-diff__line--add")].map((l) => l.textContent);
+    expect(added()).toContain("+Adicionado: 2. Rode os testes.");
+    await pickTab(within(card()).getByRole("tab", { name: "O que mudou no link" }));
+    expect(added()).toContain("+Adicionado: 2. Rode o lint.");
+    // The file that runs, changed, with its own diff.
+    expect(card().querySelector(".skill-diff__file")?.textContent).toContain("scripts/lint.sh");
+    expect(card().querySelector(".skill-diff__file")?.textContent).toContain("mudou");
+    expect(added()).toContain("+Adicionado: biome check .");
+
+    // Manter a dos agentes: said with Desfazer, and the sheet keeps a line with its own.
+    await click(within(card()).getByRole("button", { name: "Manter a dos agentes" }));
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "skills.dismissUpdate")).toBe(true);
+    expect(screen().getByText("Revisão de PR continua com a versão dos agentes.")).toBeTruthy();
+    expect(within(sheet()).queryByRole("region", { name: "Atualização esperando" })).toBeNull();
+    expect(sheet().textContent).toContain("Ficou a versão dos agentes");
+    await click(within(sheet()).getByRole("button", { name: "Desfazer" }));
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "skills.reopenUpdate")).toBe(true);
+    expect(screen().getByText("A atualização de Revisão de PR voltou a esperar.")).toBeTruthy();
+
+    // Usar a versão do link: the link's text, a line with Desfazer that makes it wait again.
+    await click(within(card()).getByRole("button", { name: "Usar a versão do link" }));
+    await settle(4);
+    expect(screen().getByText("Revisão de PR agora usa a versão do link.")).toBeTruthy();
+    expect(sheet().textContent).toContain("Ficou a versão do link");
+    expect(sheet().textContent).toContain("Rode o lint.");
+    await click(within(sheet()).getByRole("button", { name: "Desfazer" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "skills.undoUpdate")).toHaveLength(1);
+    expect(card().textContent).toContain("O link tem uma versão nova");
+
+    // The library says it waits on both sides.
+    await click(within(sheet()).getByRole("button", { name: "Fechar" }));
+    await settle(4);
+    const row = within(section()).getByRole("button", { name: "Revisão de PR" }).closest(".skill-row");
+    expect(row?.textContent).toContain("Link e agentes mudaram");
+  });
+
+  test("the agents' changes: each with its diff opened in place, Desfazer on the newest; none, or the page failing", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const { section } = await settings(state, api);
+    await click(within(section()).getByRole("button", { name: "Atendimento" }));
+    await settle(4);
+    const sheet = () => screen().getByRole("dialog", { name: "Atendimento" });
+    const history = () => within(sheet()).getByRole("region", { name: "Mudanças dos agentes" });
+    expect(history().textContent).toContain("Ada mudou");
+    const show = within(history()).getByRole("button", { name: "Ver mudança" });
+    expect(show.getAttribute("aria-expanded")).toBe("false");
+    await click(show);
+    expect(within(history()).getByRole("button", { name: "Esconder mudança" }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    expect([...history().querySelectorAll(".ac-diff__line--add")].map((l) => l.textContent)).toEqual([
+      "+Adicionado: Seja breve e cordial.",
+    ]);
+    await click(within(history()).getByRole("button", { name: "Desfazer mudança" }));
+    await settle(4);
+    expect(history().textContent).toContain("desfeita");
+    expect(within(history()).queryByRole("button", { name: "Desfazer mudança" })).toBeNull();
+    await click(within(sheet()).getByRole("button", { name: "Fechar" }));
+    await settle(4);
+
+    await click(within(section()).getByRole("button", { name: "Relatório semanal" }));
+    await settle(4);
+    const empty = screen().getByRole("dialog", { name: "Relatório semanal" });
+    expect(within(empty).getByRole("region", { name: "Mudanças dos agentes" }).textContent).toContain(
+      "Nenhum agente mudou esta skill ainda.",
+    );
+    await click(within(empty).getByRole("button", { name: "Fechar" }));
+    await settle(4);
+
+    api.skills.get = async () => {
+      throw new Error("offline");
+    };
+    // One not opened before: nothing to show but why, and a way to try again.
+    await click(within(section()).getByRole("button", { name: "Revisão de PR" }));
+    await settle(6);
+    const failed = screen().getByRole("dialog", { name: "Skills" });
+    expect(failed.textContent).toContain("Não foi possível carregar");
+    expect(within(failed).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+  });
+
   test("Instalar skill: GitHub link, .zip and Escrever", async () => {
     const { state, section } = await settings();
     await click(within(section()).getByRole("button", { name: "Instalar skill" }));

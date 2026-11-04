@@ -78,6 +78,8 @@ export interface JudgeRequest {
    * (or an instruction) where the image belongs, and every one must be used. Jev only.
    */
   images?: Record<string, JudgeImage>;
+  /** Its own wait for Jev (ms), when the caller can wait longer or must wait less than the judge's default. */
+  timeoutMs?: number;
 }
 
 export interface Judge {
@@ -157,7 +159,7 @@ export function createJevJudge(options: {
         },
         timeoutMs: vision
           ? (options.visionTimeoutMs ?? Math.max(6000, options.timeoutMs ?? 0))
-          : (options.timeoutMs ?? 2000),
+          : (request.timeoutMs ?? options.timeoutMs ?? 2000),
       }).catch((error: unknown) => {
         throw withJudgeCall(error, model, "typesafe");
       });

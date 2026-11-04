@@ -723,7 +723,8 @@ describe("external provisioning", () => {
     await hub?.stop();
     hub = null;
 
-    // Made over a minute ago, on a server that sends email, with no agent (and so no AI) yet.
+    // Made over a minute ago, on a server that sends email, with no agent of its own yet: its right hand (ADR 0137)
+    // is no crew, but thinks on the workspace's key, so the AI is connected.
     const other = await createOrganization(f.db, (await addUser(f.db, "caio")).id, { name: "Beta" });
     await f.db
       .update(schema.organizations)
@@ -733,7 +734,7 @@ describe("external provisioning", () => {
     await hello(token, { publicUrl: "https://chat.example.com", gateway: { hasModelCredential: async () => true } });
     const [email] = await queued();
     expect(email?.payload).toMatchObject({
-      template: { kind: "computer_ready", orgName: "Beta", needsAi: true, hasAgents: false, crew: [] },
+      template: { kind: "computer_ready", orgName: "Beta", needsAi: false, hasAgents: false, crew: [] },
     });
   });
 

@@ -30,11 +30,8 @@ const standing = (details: Record<string, unknown>) =>
 describe("Auditoria in words (web and phone)", () => {
   test("the shortcuts and the agent ask the server for the same thing on both", () => {
     expect(auditQueryOf("all", null)).toEqual({});
-    expect(auditQueryOf("problems", "ag")).toEqual({
-      actorType: "agent",
-      actorId: "ag",
-      outcome: ["refused", "failed"],
-    });
+    // An agent: what it did and what people applied from its cards.
+    expect(auditQueryOf("problems", "ag")).toEqual({ via: "ag", outcome: ["refused", "failed"] });
     expect(auditQueryOf("waiting", null)).toEqual({ waiting: true });
     // People's changes are people's, whichever agent was picked.
     expect(auditQueryOf("people", "ag")).toEqual({ actorType: "person", kind: "change" });

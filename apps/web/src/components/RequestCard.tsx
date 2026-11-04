@@ -110,6 +110,7 @@ export function RequestCard({
   end,
   what,
   onSubmit,
+  muted = false,
 }: {
   id: string;
   kind: RequestKind;
@@ -139,6 +140,8 @@ export function RequestCard({
   what: string;
   /** Its field and footer are a form (a secret): Enter sends it. */
   onSubmit?: () => void;
+  /** Overtaken (a newer card took its place): drawn quiet, nothing to do. */
+  muted?: boolean;
 }) {
   const { t } = useTranslation();
   const registry = useContext(AskRegistryContext);
@@ -222,7 +225,7 @@ export function RequestCard({
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div
       ref={root}
-      className="rq"
+      className={muted ? "rq rq--muted" : "rq"}
       role="group"
       aria-label={label}
       data-ask-id={id}
@@ -254,6 +257,7 @@ export function RequestDone({
   done,
   label,
   more,
+  action,
   children,
 }: {
   /** It went through. */
@@ -262,6 +266,8 @@ export function RequestDone({
   label: string;
   /** What the line leaves out, and the button that opens it. */
   more?: { label: string; content: ReactNode };
+  /** A button at the line's end (Desfazer). */
+  action?: ReactNode;
   /** The words: what it was, how it ended and, when the request has one, the time. */
   children: ReactNode;
 }) {
@@ -274,6 +280,7 @@ export function RequestDone({
           <span />
         </span>
         <span className="rq-done__text">{children}</span>
+        {action}
         {more && (
           <RequestMore open={open} onClick={() => setOpen((v) => !v)}>
             {more.label}

@@ -294,7 +294,7 @@ describe("the tools on top", () => {
       }
       expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
       // Moved down, its node is re-inserted: the focus comes back to it.
-      expect(document.activeElement).toBe(tool("Drive"));
+      expect(document.activeElement === tool("Drive")).toBe(true);
       // Wiki stays where the steps left it, in More: the order is Drive's own spot now, not the default's.
       expect(toolOrder(state).at(-1)).toEqual([
         "approvals",
@@ -322,7 +322,9 @@ describe("the tools on top", () => {
       expect(names().slice(0, 4)).toEqual(["Aprovações", "Threads", "Drive", "Tarefas"]);
       // At the top its up arrow turns off: the focus goes to the row's down arrow, not out of the dialog.
       await click(within(dialog).getByRole("button", { name: "Mover para cima: Threads" }));
-      expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Mover para baixo: Threads" }));
+      expect(document.activeElement === within(dialog).getByRole("button", { name: "Mover para baixo: Threads" })).toBe(
+        true,
+      );
       await click(within(dialog).getByRole("button", { name: "Mover para baixo: Threads" }));
       expect(listed()).toEqual(["Threads", "Drive", "Tarefas"]);
       const reset = within(dialog).getByRole("button", { name: "Restaurar o padrão" }) as HTMLButtonElement;

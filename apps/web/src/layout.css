@@ -991,6 +991,10 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* The right hand's label starts the line (ADR 0137): its first letter up, as each language writes a sentence. */
+.channel__topic[data-right-hand]::first-letter {
+  text-transform: uppercase;
+}
 /* A face beside a name that rises to it (`.ac-captop`, a DM's name with a line under it): both start at one top,
    whatever else the header holds. A name that doesn't rise stays centred on the face. */
 .channel__header > .ac-avatar:has(+ div > .ac-captop),
@@ -1102,6 +1106,31 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   padding: 4px 12px;
   font-size: 13px;
   color: var(--ink-muted);
+}
+/* The right hand's row (ADR 0137) above the tools: its label never pushes the name out; the label gives way first. */
+.sidebar__pin-row .sidebar__item-label {
+  flex: 0 0 auto;
+  max-width: 60%;
+}
+.sidebar__pin-row .sidebar__item-meta {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+  text-align: right;
+}
+/* Its one-time "Novo": a small dot in the info tone before the word. */
+.sidebar__new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--ink2);
+}
+.sidebar__new-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--info);
 }
 /* A lock when not everyone can talk to the agent (the tooltip says who). */
 .sidebar__item-meta--audience {
@@ -1442,21 +1471,16 @@ html:not([data-pointer]) .member-row--add:focus-visible {
 .sidebar__item[data-unread="true"] .sidebar__item-label {
   font-weight: 600;
 }
+/* A count pill (`.ac-count`, which centres the number) in red; proportional digits, so a lone "1" isn't set in a
+   "0"'s width off to one side. */
 .sidebar__unread {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  box-sizing: border-box;
-  display: inline-grid;
-  place-items: center;
-  border-radius: var(--radius-full);
   background: var(--danger);
   color: var(--raised);
   font-size: 11.5px;
   font-weight: 700;
-  /* Its own line, the pill's height, so the number sits in the middle; proportional digits, so a lone "1" isn't set
-     in a "0"'s width off to one side. */
-  line-height: 18px;
   font-variant-numeric: normal;
 }
 .sidebar__label-row {
@@ -2963,6 +2987,27 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   color: var(--ink-muted);
   text-decoration: line-through;
 }
+/* A message's link (MessageRef): the #channel pill with its parts in a row, "# general › 💬". */
+.message-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+.message-ref .ac-icon {
+  flex: none;
+}
+.message-ref__sep {
+  color: var(--ink-muted);
+}
+.message-ref--none {
+  border-radius: var(--radius-cut);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+  font-weight: 600;
+}
 .channel-card__head {
   display: flex;
   align-items: center;
@@ -3272,6 +3317,62 @@ html:not([data-pointer]) .skill-file--open:focus-visible {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+/* A fact and its action on one line, the button on the words' centre ("Ficou a versão do link há 2 h · Desfazer"). */
+.skill-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+/* The waiting update takes the sheet's column, not a chat card's width. */
+.skill-wait {
+  max-width: none;
+}
+.skill-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.skill-diff h4 {
+  margin: 4px 0 0;
+}
+/* Long texts scroll inside their diff: every line stays, none cut. */
+.skill-diff .ac-diff,
+.skill-history .ac-diff {
+  max-height: 320px;
+  overflow: auto;
+}
+.skill-diff__file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.skill-diff__file > .skill-file {
+  padding: 0;
+}
+.skill-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skill-history h3 {
+  margin: 0;
+}
+.skill-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skill-history__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .skill-sheet__files h3 {
   margin: 0 0 8px;
@@ -6242,7 +6343,6 @@ html:not([data-pointer]) .run-continue:focus-visible {
   height: 16px;
   padding: 0 4px;
   font-size: 10px;
-  line-height: 16px;
 }
 .sidebar[data-rail="true"] .sidebar__top,
 .sidebar[data-rail="true"] .sidebar__scroll,
@@ -6856,12 +6956,161 @@ html:not([data-pointer]) .file-row__open:focus-visible {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
-/* As tall as the dialog leaves it (its header and padding): a picture fills the window's height. */
-.file-view__image {
-  max-width: 100%;
-  max-height: max(320px, calc(100vh - 200px));
-  height: auto;
-  object-fit: contain;
+/* A picture: the dialog closer to the window's edges with a tighter head, the viewer at its full height and the
+   picture's stage taking all of it (the zoom bar floats over the stage). Phones keep the full-screen sheet. */
+@media (min-width: 641px) {
+  .ac-details.artifact-sheet--image {
+    --details-pad: 16px;
+    width: calc(100% - 32px);
+    height: calc(100vh - 32px);
+    /* biome-ignore lint/suspicious/noDuplicateProperties: dvh with a vh fallback for older browsers */
+    height: calc(100dvh - 32px);
+    max-height: none;
+  }
+  .artifact-sheet--image .ac-details__body {
+    padding-top: 12px;
+  }
+}
+.ac-details__body > .artifact-viewer--image {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.artifact-viewer--image .artifact-viewer__main,
+.file-view--image {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.artifact-viewer--image .artifact-viewer__versions {
+  min-height: 0;
+  overflow-y: auto;
+}
+.file-view--image .file-view__preview {
+  flex: 1 1 auto;
+  align-items: center;
+}
+.izoom {
+  position: relative;
+  container-type: inline-size;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.izoom__stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 240px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  touch-action: none;
+  user-select: none;
+  cursor: zoom-in;
+}
+.izoom[data-zoomed] .izoom__stage {
+  cursor: grab;
+}
+.izoom__stage[data-dragging] {
+  cursor: grabbing;
+}
+html:not([data-pointer]) .izoom__stage:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.izoom__img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  -webkit-user-drag: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .izoom__img[data-animate] {
+    transition: transform 0.2s var(--out);
+  }
+}
+.izoom__status {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  gap: 8px;
+}
+.izoom__lens {
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ink) 35%, transparent);
+  background: color-mix(in srgb, var(--surface-raised) 30%, transparent);
+}
+.izoom__pane {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: var(--e3);
+}
+.izoom__pane img {
+  display: block;
+  max-width: none;
+  transform-origin: 0 0;
+}
+/* The zoom bar: a raised pill over the stage's bottom edge, its own surface and ring so it reads on any picture.
+   Shown on hover, on focus (Tab reaches it while hidden) and while zoomed; always on a screen with no hover. */
+.izoom__bar {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 12px;
+  translate: -50% 0;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 40px;
+  padding: 4px 16px;
+  border-radius: var(--radius-full);
+  background: var(--surface-raised);
+  box-shadow: var(--e2);
+  opacity: 0;
+  transition: opacity 0.15s var(--out);
+}
+.izoom:hover .izoom__bar,
+.izoom:focus-within .izoom__bar,
+.izoom[data-zoomed] .izoom__bar {
+  opacity: 1;
+}
+@media (hover: none) {
+  .izoom__bar {
+    opacity: 1;
+  }
+}
+.izoom__hint {
+  margin: 0;
+  white-space: nowrap;
+}
+.izoom__tools {
+  flex: none;
+  align-items: center;
+}
+/* The ghost's own off state is only a lighter ink: here it fades, so − and Ajustar read as off at a glance. */
+.izoom__tools .ac-btn[disabled] {
+  opacity: 0.35;
+}
+.izoom__level {
+  min-width: 48px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+/* The hint only where the bar holds it whole: a narrower stage keeps the bare tools. */
+@container (max-width: 900px) {
+  .izoom__hint {
+    display: none;
+  }
 }
 .file-view__pdf {
   width: 100%;
@@ -10668,15 +10917,6 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
-/* "Coordena o time", after the look and its same hairline. */
-.agp-coord {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 4px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
 /* Each part's name above its choices, all starting on the same left edge. */
 .agp-look__row {
   display: flex;
@@ -12646,5 +12886,54 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
 @media (max-width: 560px) {
   .tool-change__row {
     flex-wrap: wrap;
+  }
+}
+
+/* Configurações › Lodi (ADR 0137): the face, the name and "Mudar visual" on one line; the other controls as wide as a
+   picker; the audience under its head on the card's own padding. */
+.rh-set__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.rh-set__name .ac-input {
+  width: 200px;
+}
+.rh-set__model {
+  width: 280px;
+  max-width: 100%;
+}
+.rh-set__budget {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+/* Wide enough for its placeholder ("Padrão do workspace", longer in es, de, ru) after "US$". */
+.rh-set__budget .ac-input-affix {
+  width: 260px;
+  min-width: 0;
+}
+.rh-set__audience {
+  margin-top: 16px;
+}
+.rh-set__face {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.rh-set__acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+@media (max-width: 640px) {
+  .rh-set__name {
+    flex-wrap: wrap;
+  }
+  .rh-set__name .ac-input,
+  .rh-set__model {
+    width: 100%;
   }
 }

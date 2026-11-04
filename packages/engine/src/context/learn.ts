@@ -8,6 +8,7 @@ import { agentBudgetState } from "../gateway";
 import { enqueue } from "../outbox";
 import { runReadOutsideById } from "../outside";
 import { personBehindCall } from "../requester";
+import { isRightHand } from "../right-hand";
 import { addRunStep } from "../runs";
 import type { ToolContext } from "../tools/types";
 import {
@@ -293,7 +294,7 @@ function parseLearnOutput(text: string): { items: LearnedItem[]; skillFixes: { s
 
 export interface LearnResult {
   /** `running`: the run took more messages after the turn that queued this; the job retries (`jobs.ts`). */
-  skipped?: "missing" | "cap_reached" | "busy" | "running" | "budget" | "no_model" | "model_failed";
+  skipped?: "missing" | "cap_reached" | "busy" | "running" | "budget" | "no_model" | "model_failed" | "right_hand";
   saved: { id: string; action: string; trust: string; scopeType: string }[];
   rejected: { content: string; reason: "no_sources" | "secret" | "refused" }[];
   skills: { slug: string; action: string }[];
@@ -343,6 +344,8 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
   if (busy) return { ...out, skipped: "busy" };
   const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId));
   if (!agent || agent.archivedAt) return { ...out, skipped: "missing" };
+  // Its runs keep no memory (ADR 0137).
+  if (isRightHand(agent)) return { ...out, skipped: "right_hand" };
   if (agent.monthlyBudgetNanoUsd !== null) {
     const spent = await agentBudgetState(db, run.orgId, agent.id);
     if (spent.spentNanoUsd + spent.reservedNanoUsd >= agent.monthlyBudgetNanoUsd) return { ...out, skipped: "budget" };

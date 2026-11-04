@@ -2,6 +2,7 @@ import type { BrainEffort } from "@agenteschat/adapters";
 import { type ModelMessage, modelProvider, type SystemBlock, type ToolSpec } from "@agenteschat/providers";
 import type { Agent } from "../agents";
 import { turnNotes } from "../context";
+import { cutOldToolSteps } from "../context-budget";
 import type { GatewayResult, ModelGateway } from "../gateway";
 import type { Brain, BrainEvent, BrainIO, BrainTurn } from "./types";
 
@@ -62,7 +63,9 @@ export class ModelBrain implements Brain {
   /** The gateway call a turn makes, as sent (a pre-warm sends the same with no output). */
   private request(turn: BrainTurn) {
     const { agent } = this.options;
-    const { system, messages, notesAt } = this.options.conversation();
+    const conversation = this.options.conversation();
+    const { system, notesAt } = conversation;
+    const messages = cutOldToolSteps(conversation.messages, turn.tools);
     const laid = turnNotes(system, notesAt, messages);
     const specs: ToolSpec[] = turn.tools.map((t) => ({
       name: t.name,

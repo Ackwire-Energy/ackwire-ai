@@ -289,7 +289,7 @@ describe("the pair row before the reply that asked (ConsultPairRow)", () => {
     await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Responder" })));
     await settle(1);
     const field = within(side).getByRole("textbox", { name: "Sua resposta" });
-    expect(document.activeElement).toBe(field);
+    expect(document.activeElement === field).toBe(true);
     await act(async () => fireEvent.change(field, { target: { value: "Pode usar" } }));
     await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
     await settle(4);

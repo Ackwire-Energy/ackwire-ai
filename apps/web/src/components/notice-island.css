@@ -122,8 +122,6 @@ html:not([data-pointer]) .ni__pill:focus-visible {
 }
 .ni__count {
   flex: none;
-  display: inline-grid;
-  place-items: center;
   min-width: 22px;
   height: 22px;
   padding: 0 7px;

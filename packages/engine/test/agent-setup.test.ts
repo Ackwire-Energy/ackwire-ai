@@ -574,7 +574,14 @@ describe("the Autonomia goes with the setup", () => {
 });
 
 test("a proposed agent's role may say what it does in full, not a word or two", async () => {
-  const tools = await createSetupToolSource({}).tools({} as ToolContext);
+  // The tools depend on whose run it is (the right hand gets one more, ADR 0137): an ordinary agent's.
+  const fx = await setup();
+  f = fx;
+  const tools = await createSetupToolSource({}).tools({
+    db: fx.db,
+    orgId: fx.org.id,
+    agentId: fx.agent.id,
+  } as ToolContext);
   const props = tools.find((t) => t.name === PROPOSE_AGENT_TOOL)?.inputSchema.properties as
     | Record<string, { maxLength?: number; description?: string }>
     | undefined;

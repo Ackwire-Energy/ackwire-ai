@@ -13,6 +13,7 @@ import {
   agentsImproveSkill,
   classifyFile,
   cleanSkillPath,
+  editedByAgents,
   pinBlobs,
   requireAgentSkillChange,
   runsCode,
@@ -241,8 +242,14 @@ export async function changeSkillAsAgent(
       const [marked] = await db
         .update(skills)
         .set({
-          lastUpdate: { from: before, version: row.version, at: new Date().toISOString(), agentId: ctx.agentId },
-          editedSinceSource: true,
+          lastUpdate: {
+            from: before,
+            version: row.version,
+            at: new Date().toISOString(),
+            agentId: ctx.agentId,
+            prior: { edited: skill.editedSinceSource, linkBase: skill.linkBase },
+          },
+          ...editedByAgents(skill),
         })
         .where(eq(skills.id, skill.id))
         .returning();

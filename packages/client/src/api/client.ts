@@ -154,6 +154,7 @@ import type {
   Member,
   Memory,
   Message,
+  MessageCard,
   MessagePin,
   Mission,
   MissionBrain,
@@ -265,6 +266,7 @@ import type {
   ToolDecision,
   TrashedArtifact,
   UndoAllResult,
+  UsageQueue,
   UsageReport,
   WikiFolderAudience,
   WikiGraph,
@@ -516,11 +518,17 @@ export interface ApiClient {
     create(orgId: string, input: AgentInput): Promise<Agent>;
     /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
     proposal(orgId: string, messageId: string): Promise<AgentProposal>;
-    /** "Criar" on the card: the agent as proposed, with each line the person may give it. */
+    /**
+     * "Criar" on the card: the agent as proposed, with each line the person may give it. With `test` ("Criar e
+     * testar", ADR 0137) the clicker's DM with it opens (`testChannelId`), its `firstTask` in the composer, unsent.
+     */
     createProposed(
       orgId: string,
       messageId: string,
-    ): Promise<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"] }>;
+      options?: { test?: boolean },
+    ): Promise<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"]; testChannelId?: string | null }>;
+    /** "Pedir a um admin" on a card the person it is for can't create (ADR 0137): to whoever may, once. */
+    askProposal(orgId: string, messageId: string): Promise<AgentProposal>;
     /** The routine it came with, for the agent created from the review (once it is where it reports). */
     proposalRoutine(orgId: string, messageId: string): Promise<AgentProposal>;
     /** Says no to it (who may create agents): the card stays, marked denied. */
@@ -564,6 +572,10 @@ export interface ApiClient {
     aiStatus(orgId: string): Promise<AiStatus>;
     /** Each agent's presence and what it says it is doing (ADR 0084). */
     statuses(orgId: string): Promise<AgentStatus[]>;
+    /** What the agent picks up when its plan or budget is back, in order (ADR 0118). */
+    usageQueue(orgId: string, agentId: string): Promise<UsageQueue>;
+    /** "Don't run any": nothing waiting on its plan or budget runs (the agent's owner and admins). */
+    cancelUsageQueue(orgId: string, agentId: string): Promise<{ canceled: number; skipped: number }>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
       orgId: string,
@@ -657,6 +669,8 @@ export interface ApiClient {
     join(orgId: string, channelId: string): Promise<void>;
     /** A `#channel` link's card; 404 for a channel I can't see (private and not mine). Archived ones too. */
     card(orgId: string, channelId: string): Promise<ChannelCard>;
+    /** A pasted message link's pill; 404 for a message I can't see (a private channel's, a DM I'm not in). */
+    messageCard(orgId: string, messageId: string): Promise<MessageCard>;
     update(orgId: string, channelId: string, input: ChannelInput & { name?: string }): Promise<Channel>;
     /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
     archive(orgId: string, channelId: string): Promise<void>;
@@ -880,6 +894,8 @@ export interface ApiClient {
     approveUpdate?(orgId: string, id: string): Promise<SkillSourceUpdate>;
     /** Refuse the waiting update. */
     dismissUpdate?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Undo `dismissUpdate`: the update it kept out waits again. */
+    reopenUpdate?(orgId: string, id: string): Promise<SkillDetail>;
     /** Back to the version before its last update from its link. */
     undoUpdate?(orgId: string, id: string): Promise<SkillDetail>;
     /** Bring back a skill archived for disuse. */
@@ -918,6 +934,8 @@ export interface ApiClient {
     list(orgId: string, filter?: { ids?: string[] }): Promise<Proposal[]>;
     accept(orgId: string, proposalId: string, finalText?: string): Promise<Proposal>;
     refuse(orgId: string, proposalId: string): Promise<Proposal>;
+    /** "Pedir a um admin" (ADR 0137): the person who asked sends a row they can't decide to whoever may, once. */
+    ask(orgId: string, proposalId: string): Promise<Proposal>;
   };
   customConnectors: {
     list(orgId: string): Promise<CustomServer[]>;
@@ -1505,7 +1523,10 @@ export interface ApiClient {
       input: DatabaseConnectionInput & { offActions?: DatabaseActionName[] },
     ): Promise<DatabaseConnection>;
     disconnect(orgId: string, connectionId: string): Promise<void>;
-    tables(orgId: string, connectionId: string): Promise<DatabaseTable[]>;
+    /** On a whole server, of `database` (default: the sample). */
+    tables(orgId: string, connectionId: string, database?: string): Promise<DatabaseTable[]>;
+    /** A whole-server connection's databases; `refresh` reads the list again. */
+    serverDatabases(orgId: string, connectionId: string, refresh?: boolean): Promise<string[]>;
     /** An agent's access and rules per database. */
     agent(orgId: string, agentId: string): Promise<AgentDatabase[]>;
     setAgent(orgId: string, agentId: string, connectionId: string, input: AgentDatabaseInput): Promise<AgentDatabase>;

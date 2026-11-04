@@ -257,25 +257,58 @@ export interface SkillView {
   autoUpdate: boolean;
   /** When its link was last read to update it. */
   checkedAt: string | null;
-  /** An update from its link that changes what runs, waiting for a person who manages skills (`dismissed`: refused). */
-  /** `edited`: it would replace what agents changed since its link last wrote it. */
-  pendingUpdate: { scripts: string[]; at: string; dismissed: boolean; edited: boolean } | null;
+  /**
+   * An update from its link that changes what runs, or would replace what agents changed since its link last wrote it
+   * (`edited`), waiting for a person who manages skills. `dismissed`: kept as it is (`dismissedAt`), until
+   * `reopenSkillUpdate`.
+   */
+  pendingUpdate: {
+    scripts: string[];
+    at: string;
+    dismissed: boolean;
+    dismissedAt: string | null;
+    edited: boolean;
+  } | null;
   /** Why its last update from its link failed (a code the app translates), until one works. */
   updateError: string | null;
   /**
    * Its last update from its link, or an agent's last change to it (`agentId`), while it can be undone (the skill is
    * still at the version it made).
    */
-  lastUpdate: { fromVersion: number; at: string; agentId: string | null } | null;
+  lastUpdate: { fromVersion: number; at: string; agentId: string | null; waited: boolean } | null;
   /** "Agentes melhoram as skills sozinhos" set for this skill; null: the workspace's setting. */
   agentsImprove: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
 
+/** An agent's change to a skill's text (`skill.updated`), newest first: the skill's page shows each with its diff. */
+export interface SkillAgentChange {
+  id: string;
+  agentId: string;
+  at: string;
+  before: string;
+  after: string;
+  undone: boolean;
+}
+
+/** How many of a skill's changes by agents its page lists. */
+export const SKILL_CHANGES_SHOWN = 20;
+
 export interface SkillDetail extends SkillView {
   body: string;
   files: { path: string; size: number; mime: string; status: SkillFileStatus }[];
+  /**
+   * The waiting update's content, to show what it changes: its text, its files that run, and the text its link last
+   * wrote before agents changed it (`base`, null when that isn't known).
+   */
+  pending: {
+    body: string;
+    description: string;
+    base: { body: string; description: string; at: string } | null;
+    files: { path: string; before: string | null; after: string | null; large: boolean }[];
+  } | null;
+  changes: SkillAgentChange[];
 }
 
 const view = (s: SkillRow): SkillView => ({
@@ -300,13 +333,19 @@ const view = (s: SkillRow): SkillView => ({
         scripts: s.pendingUpdate.scripts,
         at: s.pendingUpdate.at,
         dismissed: s.pendingUpdate.dismissed === true,
+        dismissedAt: s.pendingUpdate.dismissedAt ?? null,
         edited: s.pendingUpdate.edited === true,
       }
     : null,
   updateError: s.updateError,
   lastUpdate:
     s.lastUpdate && s.lastUpdate.version === s.version
-      ? { fromVersion: s.lastUpdate.from.version, at: s.lastUpdate.at, agentId: s.lastUpdate.agentId ?? null }
+      ? {
+          fromVersion: s.lastUpdate.from.version,
+          at: s.lastUpdate.at,
+          agentId: s.lastUpdate.agentId ?? null,
+          waited: !!s.lastUpdate.waited,
+        }
       : null,
   agentsImprove: s.agentsImprove,
   createdAt: s.createdAt.toISOString(),
@@ -323,10 +362,61 @@ export async function skillFilesOf(db: Database, s: SkillRow) {
   return rows.map((f) => ({ path: f.path, size: f.size, mime: f.mime, status: f.status as SkillFileStatus }));
 }
 
+/** The agents' changes to its text, newest first (`SKILL_CHANGES_SHOWN`). */
+async function skillChanges(db: Database, s: SkillRow): Promise<SkillAgentChange[]> {
+  const rows = await db
+    .select()
+    .from(schema.agentActions)
+    .where(
+      and(
+        eq(schema.agentActions.orgId, s.orgId),
+        eq(schema.agentActions.kind, "skill.updated"),
+        eq(schema.agentActions.targetId, s.id),
+      ),
+    )
+    .orderBy(sql`${schema.agentActions.createdAt} desc`)
+    .limit(SKILL_CHANGES_SHOWN);
+  return rows.flatMap((r) => {
+    const before = (r.before as { body?: unknown } | null)?.body;
+    const after = (r.after as { body?: unknown } | null)?.body;
+    // An update from its link an agent asked for (`update_skill_from_source`) isn't a change of its own.
+    if (typeof before !== "string" || typeof after !== "string" || (r.params as { fromLink?: unknown }).fromLink)
+      return [];
+    return [
+      { id: r.id, agentId: r.agentId, at: r.createdAt.toISOString(), before, after, undone: r.undoneAt !== null },
+    ];
+  });
+}
+
+const pendingOf = (s: SkillRow): SkillDetail["pending"] => {
+  const p = s.pendingUpdate;
+  if (!p || p.body === undefined) return null;
+  return {
+    body: p.body,
+    description: p.description ?? s.description,
+    base: s.linkBase,
+    files: (p.files ?? []).map((f) => ({ path: f.path, before: f.before, after: f.after, large: !!f.large })),
+  };
+};
+
 export const skillDetail = async (db: Database, s: SkillRow): Promise<SkillDetail> => ({
   ...view(s),
   body: s.body,
   files: await skillFilesOf(db, s),
+  pending: pendingOf(s),
+  changes: await skillChanges(db, s),
+});
+
+/**
+ * The fields an agent's change (or an accepted proposal) writes on the skill as it was (`before`): it is edited since
+ * its link last wrote it, and the first such change keeps that text and when it was written (`linkBase`).
+ */
+export const editedByAgents = (before: SkillRow) => ({
+  editedSinceSource: true,
+  linkBase:
+    before.editedSinceSource || before.source !== "url"
+      ? before.linkBase
+      : { body: before.body, description: before.description, at: before.updatedAt.toISOString() },
 });
 
 export async function loadSkill(db: Database, orgId: string, id: string) {
@@ -460,6 +550,7 @@ export async function saveSkill(
         ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
         deletedAt: null,
         editedSinceSource: false,
+        linkBase: null,
         updatedAt: new Date(),
       })
       .where(eq(skills.id, existing.id))
@@ -1103,8 +1194,7 @@ export async function listSkills(db: Database, actorId: string, orgId: string) {
 
 export async function getSkill(db: Database, actorId: string, orgId: string, id: string): Promise<SkillDetail> {
   await requirePermission(db, actorId, orgId, "read");
-  const s = await loadSkill(db, orgId, id);
-  return { ...view(s), body: s.body, files: await skillFilesOf(db, s) };
+  return skillDetail(db, await loadSkill(db, orgId, id));
 }
 
 /** Edits by hand (a new version); renaming isn't allowed (the name is the skill's identity). */

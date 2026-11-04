@@ -265,13 +265,13 @@ describe("imports and the export", () => {
       (
         (await (await b(`/api/app/organizations/${orgId}/agents`)).json()) as { agents: { handle: string }[] }
       ).agents.map((a) => a.handle);
-    expect(await agents()).toEqual(["dev"]);
+    expect(await agents()).toEqual(["lodi", "dev"]);
     // Planned only: nothing came yet.
     expect(await sources()).toEqual([]);
 
     const applied = (await (await b(imports, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
     expect(applied.items.every((i) => i.action === "create" && i.targetId)).toBe(true);
-    expect(await agents()).toEqual(["dev", "scout"]);
+    expect(await agents()).toEqual(["lodi", "dev", "scout"]);
     const routines = (await (await b(`/api/app/organizations/${orgId}/routines`)).json()) as {
       routines: { name: string; active: boolean; nextRunAt: string | null }[];
     };
@@ -457,6 +457,8 @@ describe("an imported agent's own files into the Drive", () => {
     // The Drive's limits: the workspace's storage.
     await setOrgLimits((t as TestServer).db, orgId, {
       members: null,
+      membersMax: null,
+      payerUserId: null,
       storageBytes: 10,
       uploadBytesPerDay: null,
       platformUsdPerMonth: null,
@@ -466,6 +468,8 @@ describe("an imported agent's own files into the Drive", () => {
     expect(((await full.json()) as { error: { code: string } }).error.code).toBe("storage.full");
     await setOrgLimits((t as TestServer).db, orgId, {
       members: null,
+      membersMax: null,
+      payerUserId: null,
       storageBytes: null,
       uploadBytesPerDay: null,
       platformUsdPerMonth: null,

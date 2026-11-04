@@ -175,3 +175,15 @@ export const rolesOf = (person: Pick<Person, "roleIds">, roles: readonly OrgRole
 /** Who holds a role (`everyone`: everybody). */
 export const peopleWith = <P extends Pick<Person, "roleIds">>(role: OrgRole, people: readonly P[]) =>
   isEveryone(role) ? [...people] : people.filter((p) => (p.roleIds ?? []).includes(role.id));
+
+/** Who holds a permission: the owners, and whoever has a role (or the `everyone` base) that grants it. */
+export function holdersOf<P extends Pick<Person, "role" | "roleIds">>(
+  people: readonly P[],
+  roles: readonly OrgRole[],
+  permission: RolePermission,
+): P[] {
+  const granting = roles.filter((r) => grants(r.permissions).has(permission));
+  return people.filter(
+    (p) => p.role === "owner" || granting.some((r) => isEveryone(r) || (p.roleIds ?? []).includes(r.id)),
+  );
+}

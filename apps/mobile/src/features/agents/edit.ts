@@ -46,14 +46,14 @@ export function shuffleLook(current: FullLook, rand: () => number = Math.random)
   return { ...current, color: AGENT_COLORS.find((c) => c !== current.color) ?? current.color };
 }
 
-export type AgentEditField = "name" | "role" | "instructions" | "look" | "coordinator" | "consultable";
+export type AgentEditField = "name" | "role" | "instructions" | "look" | "consultable";
 
 /**
  * Who manages agents changes everything here; the agent's own person, its look and whether other agents may consult
  * it (who talks to it is theirs too, as on the web).
  */
 export function editableFields(viewer: { admin: boolean; owner: boolean }): Set<AgentEditField> {
-  if (viewer.admin) return new Set(["name", "role", "instructions", "look", "coordinator", "consultable"]);
+  if (viewer.admin) return new Set(["name", "role", "instructions", "look", "consultable"]);
   if (viewer.owner) return new Set(["look", "consultable"]);
   return new Set();
 }
@@ -65,8 +65,6 @@ export interface AgentDraft {
   role: string;
   instructions: string;
   look: FullLook;
-  /** It coordinates the team (ADR 0093). */
-  coordinator: boolean;
   /** Who talks to it; here only its `consultable` switch changes (ADR 0085 addendum). */
   audience: AgentAudience;
 }
@@ -85,7 +83,6 @@ export function agentChanges(
   if (fields.has("role") && draft.role.trim() !== saved.role.trim()) out.role = draft.role.trim();
   if (fields.has("instructions") && draft.instructions !== saved.instructions) out.instructions = draft.instructions;
   if (fields.has("look") && !sameLook(draft.look, saved.look)) out.appearance = { ...draft.look };
-  if (fields.has("coordinator") && draft.coordinator !== saved.coordinator) out.coordinator = draft.coordinator;
   if (fields.has("consultable") && draft.audience.consultable !== saved.audience.consultable)
     out.audience = draft.audience;
   return Object.keys(out).length > 0 ? out : null;

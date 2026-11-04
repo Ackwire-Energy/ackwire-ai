@@ -41,6 +41,10 @@ const Notification = z
       routineId: z.string().optional(),
       machineId: z.string().optional(),
       handoffId: z.string().optional(),
+      proposalId: z
+        .string()
+        .optional()
+        .openapi({ description: "`change_request`: the proposal to decide (`POST …/proposals/{id}/accept`)." }),
       screen: z.enum(SCREEN_KINDS).optional(),
       agentId: z
         .string()

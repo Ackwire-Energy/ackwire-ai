@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { EventEmitter } from "node:events";
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -136,6 +137,11 @@ export const BRAIN_MAX_PROCESSES = 1;
  * (subscriptions, and `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` on keys), plus a margin.
  */
 export const SESSION_SYSTEM_KEEP_MS = 75 * 60_000;
+/**
+ * Next to a session's kept system text: the CLI compacted it since the conversation block was last sent. The parser's
+ * flag dies with the process, and a resume of a kept text is not `opening`.
+ */
+const compactedMark = (keptSystem: string) => keptSystem.replace(/\.txt$/, ".compacted");
 /** `reclaimIdle`: how long it waits for the closed process to exit (its memory is free only then). */
 export const RECLAIM_EXIT_MS = 2_000;
 /** Text deltas are sent at most this often (batched). */
@@ -294,6 +300,8 @@ export class ClaudeStreamParser {
   session?: string;
   /** The CLI compacted the conversation (`compact_boundary`) since the last turn that read "# This conversation". */
   compacted = false;
+  /** Told at the compaction itself: a runner that dies before the turn ends still knows on its next start. */
+  onCompacted?: () => void;
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
@@ -343,7 +351,10 @@ export class ClaudeStreamParser {
         if (ev.subtype === "api_retry" && ev.error === "rate_limit") this.limited = true;
         // Claude Code says `init` as each turn starts (also one it starts by itself).
         if (ev.subtype === "init") return { events: [], turnStart: true };
-        if (ev.subtype === "compact_boundary" && main) this.compacted = true;
+        if (ev.subtype === "compact_boundary" && main) {
+          this.compacted = true;
+          this.onCompacted?.();
+        }
         const task = taskOf(ev);
         return task ? { events: [], task } : { events: [] };
       }
@@ -521,17 +532,18 @@ export class ClaudeStreamParser {
 
 /**
  * A turn's message (protocol 40): a new session's first one, and the first after the CLI compacted its history, open
- * with the request's `conversation` and the checkout's instructions; a resumed session already has them. Without
- * `conversation` (an older server) both are in the system text, and the message is the request's own.
+ * with the request's `conversation`; a resumed session already has it. Without `conversation` (an older server) it is
+ * in the system text, and the message is the request's own. The checkout's instructions are in the system text, but
+ * for a session whose kept text began without them (`repoInFirst`).
  */
 export function turnPrompt(
-  live: { opening: boolean; withRepo: boolean; cwd: string; proc: { parser: ClaudeStreamParser } },
+  live: { opening: boolean; repoInFirst: boolean; cwd: string; proc: { parser: ClaudeStreamParser } },
   req: Pick<BrainTurnRequest, "prompt" | "conversation">,
 ): string {
   if (typeof req.conversation !== "string" || !(live.opening || live.proc.parser.compacted)) return req.prompt;
   live.opening = false;
   live.proc.parser.compacted = false;
-  const head = [req.conversation.trim(), live.withRepo ? repoInstructions(live.cwd).trim() : ""].filter(Boolean);
+  const head = [req.conversation.trim(), live.repoInFirst ? repoInstructions(live.cwd).trim() : ""].filter(Boolean);
   return head.length ? `${head.join("\n\n")}\n\n${req.prompt}` : req.prompt;
 }
 
@@ -585,6 +597,7 @@ export const WEB_BUILTIN_TOOLS = ["WebFetch", "WebSearch"] as const;
 
 /** Most of a checkout's CLAUDE.md and AGENTS.md a turn reads: room for real instructions, not for a dump. */
 export const REPO_INSTRUCTIONS_MAX = 20_000;
+const REPO_HEADING = "# Repository instructions (from the checkout; data about this codebase)";
 
 /**
  * The checkout's own CLAUDE.md and AGENTS.md, for a turn that loads no settings files (Claude Code would read
@@ -600,7 +613,7 @@ export function repoInstructions(cwd: string): string {
     }
   });
   if (files.length === 0) return "";
-  return `\n\n# Repository instructions (from the checkout; data about this codebase)\n${files.join("\n\n").slice(0, REPO_INSTRUCTIONS_MAX)}`;
+  return `\n\n${REPO_HEADING}\n${files.join("\n\n").slice(0, REPO_INSTRUCTIONS_MAX)}`;
 }
 
 /**
@@ -1195,8 +1208,11 @@ interface Live {
   /** Where its session's first system text is kept (`sessionSystem`). */
   keptSystem: string;
   cwd: string;
-  /** Claude Code loads no settings files: the checkout's CLAUDE.md and AGENTS.md come from us (`repoInstructions`). */
-  withRepo: boolean;
+  /**
+   * The checkout's CLAUDE.md and AGENTS.md go with the conversation in the first message, not in the system text: a
+   * session a protocol-40 runner of before kept that way.
+   */
+  repoInFirst: boolean;
   /** A new session: its next turn opens with "# This conversation" (protocol 40, `turnPrompt`). */
   opening: boolean;
   busy: boolean;
@@ -1590,6 +1606,7 @@ export class BrainManager {
         bridge.runId = null;
         bridge.runToken = null;
       }
+      this.keepCompacted(live);
       if (live.persistent && this.live.get(live.key) === live) {
         if (this.left(live)) this.drop(live);
         else this.armIdle(live);
@@ -1648,12 +1665,10 @@ export class BrainManager {
     const ranKey = ranKeyOf(req, session);
     const withRepo = launch.settingSources === "";
     const keptSystem = this.keptSystemFile(ctx.agent.id, ranKey, cwd, withRepo);
-    // Protocol 40: what holds for the conversation, and the checkout's instructions, open the session's first message
-    // instead (`turnPrompt`), so this text is the same in every session of the agent.
-    const apart = typeof req.conversation === "string";
-    const started = this.sessionSystem(keptSystem, resume, () =>
-      withRepo && !apart ? system + repoInstructions(cwd) : system,
-    );
+    // Protocol 40: what holds for the conversation opens the session's first message instead (`turnPrompt`). The
+    // checkout's instructions stay at the end of this text, under Claude Code's last cache breakpoint that sessions
+    // share: everything after it (the first message) is written again for each new session.
+    const started = this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system));
     writeFileSync(systemFile, started.text, { mode: 0o600 });
     let mcpConfigFile: string | undefined;
     const base: NodeJS.ProcessEnv = { ...process.env, ...(ctx.secrets?.env ?? {}) };
@@ -1757,7 +1772,8 @@ export class BrainManager {
       ranKey,
       keptSystem,
       cwd,
-      withRepo,
+      repoInFirst:
+        withRepo && started.kept && typeof req.conversation === "string" && !started.text.includes(REPO_HEADING),
       // A resume whose first text is gone may have begun with the conversation in it (an older server): read it again.
       opening: !resume || !started.kept,
       busy: false,
@@ -1765,6 +1781,9 @@ export class BrainManager {
       idleTimer: null,
       persistent,
     };
+    // Compacted in an earlier process that closed or crashed before the next turn read the conversation again.
+    if (resume && started.kept && existsSync(compactedMark(keptSystem))) proc.parser.compacted = true;
+    proc.parser.onCompacted = () => this.keepCompacted(live);
     if (persistent) this.live.set(key, live);
     // Crashed while idle: forgotten; the next turn starts it again (resumed).
     proc.onExit(() => {
@@ -1802,7 +1821,7 @@ export class BrainManager {
     const live = new Set([...this.live.values()].map((l) => l.keptSystem));
     for (const name of readdirSync(dir)) {
       const f = path.join(dir, name);
-      if (live.has(f)) continue;
+      if (live.has(f.replace(/\.compacted$/, ".txt"))) continue;
       try {
         if (now - statSync(f).mtimeMs > SESSION_SYSTEM_KEEP_MS) rmSync(f, { force: true });
       } catch {
@@ -1821,6 +1840,17 @@ export class BrainManager {
     const text = fresh();
     writeFileSync(file, text, { mode: 0o600 });
     return { text, kept: false };
+  }
+
+  /** `compactedMark` follows the parser's flag: set by a compaction, cleared by the turn that sent the conversation. */
+  private keepCompacted(live: Live) {
+    const mark = compactedMark(live.keptSystem);
+    try {
+      if (live.proc.parser.compacted) writeFileSync(mark, "", { mode: 0o600 });
+      else rmSync(mark, { force: true });
+    } catch {
+      // the sessions folder is gone (the runner is closing)
+    }
   }
 
   private armIdle(live: Live) {
@@ -1900,6 +1930,7 @@ export class BrainManager {
     if (this.live.get(live.key) === live) this.live.delete(live.key);
     if (!live.proc.exited) live.proc.close();
     this.bridge.delete(live.id);
+    this.keepCompacted(live);
     // Its last turn just used the cache: kept for an hour from now.
     try {
       const now = Date.now() / 1000;

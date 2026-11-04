@@ -24,10 +24,10 @@ import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
-import { publishOrgEvent } from "./events";
 import type { CommandApproval } from "./missions";
 import { recordOperatorEvent } from "./operator-events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
+import { isRightHand, RIGHT_HAND_EDITABLE, refuseRightHand, rightHandPermanent } from "./right-hand";
 import { DEFAULT_AGENT_SCOPES, dropForeignMailGrants, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 import { resumeBudgetWaits } from "./usage-pause";
@@ -176,7 +176,8 @@ export async function createAgent(
   orgId: string,
   input: AgentInput & { autonomy?: CommandApproval; audienceMode?: Agent["audienceMode"] },
   defaults: { model: string },
-  options: { remember?: boolean } = {},
+  /** `via`: the agent whose card it was created from (the audit's "via"). */
+  options: { remember?: boolean; via?: string } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
   const { autonomy, audienceMode, ...fields } = input;
@@ -226,26 +227,6 @@ export async function createAgent(
       })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
-    // The first agent of a team coordinates it (ADR 0093): no active agent is older, so of two first agents made at
-    // once only the older claims it. In a savepoint: with the same time both try, and the unique index turns the
-    // second claim down without failing its creation.
-    const [first] = await db
-      .transaction((tx) =>
-        tx
-          .update(agents)
-          .set({ coordinator: true })
-          .where(
-            and(
-              eq(agents.id, agent.id),
-              sql`not exists (select 1 from agents a where a.org_id = agents.org_id and a.id <> agents.id and a.archived_at is null and a.created_at < agents.created_at)`,
-            ),
-          )
-          .returning(),
-      )
-      .catch((error: unknown) => {
-        if (isUniqueViolation(error)) return [];
-        throw error;
-      });
     // Every agent may read context, keep its own notes and use its computer; everything else is granted explicitly.
     await grantScopes(
       db,
@@ -284,15 +265,15 @@ export async function createAgent(
         name: agent.name,
         handle: agent.handle,
         model: agent.model,
-        ...(first ? { coordinator: true } : {}),
         ...(autonomy ? { autonomy } : {}),
+        ...(options.via ? { via: options.via } : {}),
       },
     });
     // A model or key the creator picked is their latest choice; "Automático" with the default key is no choice.
     if (options.remember && (!isAutoModel(agent.model) || agent.credentialId)) {
       await rememberAgentSetup(db, membership, setupOfAgent(agent));
     }
-    return first ?? agent;
+    return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw handleTaken(values.handle, await takenHandles(db, orgId));
     throw error;
@@ -332,6 +313,15 @@ export async function handOver(
   await repointApprovals(deps, before.orgId, [before.id], ownerUserId);
 }
 
+/** The right hand's instructions, role, owner and the rest are the product's (ADR 0137): only `RIGHT_HAND_EDITABLE` changes. */
+async function refuseRightHandFields(db: Database, orgId: string, agentId: string, patch: Partial<AgentInput>) {
+  const fixed = Object.keys(patch).filter(
+    (k) => patch[k as keyof AgentInput] !== undefined && !RIGHT_HAND_EDITABLE.has(k),
+  );
+  if (fixed.length > 0 && isRightHand(await getAgent(db, orgId, agentId)))
+    throw rightHandPermanent(`changed this way (${fixed.join(", ")})`);
+}
+
 export async function updateAgent(
   db: Database,
   actorId: string,
@@ -341,6 +331,7 @@ export async function updateAgent(
   options: { remember?: boolean; pubsub?: PubSub } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "manage_agents");
+  await refuseRightHandFields(db, orgId, agentId, patch);
   const cleaned =
     patch.handle === undefined ? patch : { ...patch, handle: patch.handle.trim().replace(/^@/, "").toLowerCase() };
   // Stored whole and normalized: what the brakes read is what the settings show.
@@ -444,12 +435,12 @@ export async function updateAgent(
   return agent;
 }
 
-export async function archiveAgent(db: Database, actorId: string, orgId: string, agentId: string) {
+export async function archiveAgent(db: Database, actorId: string, orgId: string, agentId: string, pubsub?: PubSub) {
   await requirePermission(db, actorId, orgId, "manage_agents");
+  await refuseRightHand(db, orgId, agentId, "archived");
   const [gone] = await db
     .update(agents)
-    // An archived agent coordinates nothing: the team has no coordinator until someone picks one (ADR 0093).
-    .set({ archivedAt: new Date(), coordinator: false })
+    .set({ archivedAt: new Date() })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)))
     .returning({ name: agents.name, handle: agents.handle });
   if (gone) {
@@ -460,6 +451,9 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
       target: { type: "agent", id: agentId },
       details: { name: gone.name, handle: gone.handle },
     });
+    // What waits on its plan or budget won't run: its notes say so now. Loaded here: the usage pause loads agents.
+    const { stopAgentUsageWaits } = await import("./usage-pause");
+    await stopAgentUsageWaits({ db, pubsub }, orgId, agentId).catch(() => null);
   }
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
@@ -470,52 +464,29 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
 }
 
 /**
- * Picks the agent that coordinates the team, or (`on` false) leaves the team with none (ADR 0093). Owners and admins.
- * Turning it on takes it from whoever had it in the same transaction, under a lock per workspace, so of two saves at
- * once the last one wins. Audited, and every open app of the workspace reads its agents again (`agent.coordinator`).
+ * Brings an archived agent back (an archive's Undo, ADR 0137): its handle was kept for it all along (`takenHandles`
+ * holds archived agents'), so nothing else took it meanwhile. Not a deleted one.
  */
-export async function setCoordinator(
-  deps: { db: Database; pubsub?: PubSub },
-  actorId: string,
-  orgId: string,
-  agentId: string,
-  on: boolean,
-): Promise<Agent> {
-  const { db } = deps;
+export async function unarchiveAgent(db: Database, actorId: string, orgId: string, agentId: string) {
   await requirePermission(db, actorId, orgId, "manage_agents");
-  const done = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`coordinator:${orgId}`}))`);
-    const [agent] = await tx
-      .select()
-      .from(agents)
-      .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
-    if (!agent) throw new NotFoundError("Agent not found");
-    if (agent.coordinator === on) return { agent, changed: false, from: null };
-    const cleared = on
-      ? await tx
-          .update(agents)
-          .set({ coordinator: false })
-          .where(and(eq(agents.orgId, orgId), eq(agents.coordinator, true)))
-          .returning({ id: agents.id })
-      : [];
-    const [next] = await tx
-      .update(agents)
-      .set({ coordinator: on, updatedAt: new Date() })
-      .where(eq(agents.id, agent.id))
-      .returning();
-    return { agent: next ?? agent, changed: true, from: cleared[0]?.id ?? null };
-  });
-  if (!done.changed) return done.agent;
-  caches.agents.deletePrefix(`${orgId}:`);
+  const [back] = await db
+    .update(agents)
+    .set({ archivedAt: null, updatedAt: new Date() })
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)))
+    .returning({ name: agents.name, handle: agents.handle });
+  if (!back) throw new NotFoundError("Agent not found");
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
-    action: "agent.coordinator",
+    action: "agent.unarchived",
     target: { type: "agent", id: agentId },
-    details: { name: done.agent.name, on, ...(done.from ? { from: done.from } : {}) },
+    details: { name: back.name, handle: back.handle },
   });
-  await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: { type: "agent.coordinator" } });
-  return done.agent;
+  caches.agents.delete(`${orgId}:${agentId}`);
+  caches.agents.delete(`${orgId}:team`);
+  caches.agents.delete(`${orgId}:archived`);
+  caches.agents.delete(`${orgId}:old-handles`);
+  caches.channelMembers.deletePrefix(`${orgId}:`);
 }
 
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {
@@ -578,7 +549,8 @@ export const agentView = (a: Agent) => ({
   appearance: (a.appearance ?? null) as AgentAppearance | null,
   /** It may follow a light reply with a sticker or a GIF (ADR 0091). */
   mediaReplies: a.mediaReplies,
-  coordinator: a.coordinator,
+  /** A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand. Null for the others. */
+  builtin: a.builtin ?? null,
   /** Its autonomy brakes (ADR 0131), with the defaults filled in. */
   brakes: autonomySettings(a.autonomyBrakes),
   createdAt: a.createdAt,
