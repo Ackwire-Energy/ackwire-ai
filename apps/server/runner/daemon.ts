@@ -95,7 +95,7 @@ import { type ConnectionOutcome, type Dial, RunnerConnection } from "./connectio
 import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopUser, runnerUser, systemDesktopUser } from "./desktop-session";
 import { EgressObservation, probeEgress } from "./egress";
-import { RUNNER_VERSION, RunnerError } from "./errors";
+import { NetworkChangingError, RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
 import { systemGitCache } from "./git";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
@@ -1023,7 +1023,7 @@ export class RunnerDaemon implements RequestObserver {
         this.uidNetworks.pending((uid) => uid === user.uid || this.networkUidBusy(uid));
         this.persistNetworkPins(network);
         if (this.config?.networkDrainSeconds && networkKey(effective) !== networkKey(network)) {
-          throw new Error("This agent’s network is changing. New work waits for its computer sessions to restart.");
+          throw new NetworkChangingError(this.config.networkDrainSeconds);
         }
         return effective;
       };
