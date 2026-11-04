@@ -164,7 +164,7 @@ describe("the agent's AI", () => {
     expect(screen).toContain("newPlanAccountOption(brainOptions, optionsBefore)");
     expect(screen).toContain("connectedHere ?? picked");
     // For the agents I create: none of mine is offered, so a plan signs in for the new one.
-    expect(sheet).toContain('params.forNew === "1" ? []');
+    expect(sheet).toMatch(/params\.forNew === "1"\s*\? \[\]/);
     expect(sheet).toContain("queryKey: keys.brainMachines(orgId)");
   });
 
