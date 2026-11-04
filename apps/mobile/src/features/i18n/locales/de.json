@@ -1755,7 +1755,7 @@
       "text": "Verbinde einen Passwort-Manager, und deine Agenten verwenden die Logins, die dort liegen. Nichts wird kopiert: Ein Passwort wird erst gelesen, wenn es gebraucht wird.",
       "connected": "Verbunden",
       "add": "Verbinden",
-      "none": "Auf diesem Server lässt sich kein Passwort-Manager verbinden.",
+      "none": "Hier lässt sich kein Passwort-Manager verbinden.",
       "help": "Verwende einen Tresor oder Ordner nur für deine Agenten, mit genau dem, was sie brauchen."
     },
     "connect": {

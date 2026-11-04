@@ -2658,7 +2658,7 @@ export const en = {
       close: "Done",
     },
     connections: {
-      none: "No password manager can connect on this server.",
+      none: "No password manager can be connected here.",
       lead: "Your agents use the {{kinds}} you keep in {{name}}.",
       connect: "Connect",
       reconnect: "Reconnect",
@@ -2714,7 +2714,7 @@ export const en = {
         not_found: "What it read is gone. Reconnect to choose again.",
         rate_limited: "The password manager asked us to wait. It tries again by itself.",
         unreachable: "Its server didn't answer. It tries again by itself.",
-        unsupported: "This server can't read it. Ask who runs it.",
+        unsupported: "Its settings can't be read here. Try again later or use another account.",
         invalid_input: "Something in the fields was refused. Reconnect and check them.",
         /** The Vault reached its item limit: what was read stays, new items wait. */
         too_many_items: "Remove items before syncing more.",
@@ -10271,7 +10271,7 @@ export const en = {
       csvUnrecognized: "This doesn't look like a passwords file. Export it again as CSV.",
       requestNotDelivered: "Send it first, then save it to the Vault.",
       requestNotSavable: "This one can't be saved to the Vault.",
-      sourceUnknown: "This password manager isn't available on this server.",
+      sourceUnknown: "This password manager isn't available here.",
       sourceError: "Couldn't read it from its password manager. Try again.",
       source: {
         authFailed: "The password manager refused these details. Check them and try again.",
@@ -10282,7 +10282,7 @@ export const en = {
         notFound: "It's no longer in its password manager.",
         rateLimited: "The password manager asked us to wait. Try again in a few minutes.",
         unreachable: "Couldn't reach the password manager. Check the address and try again.",
-        unsupported: "This server can't connect to this password manager.",
+        unsupported: "This password manager can't be connected here.",
         invalidInput: "Check the fields and try again.",
         /** The Vault reached its item limit: what was read stays, new items wait. */
         tooManyItems: "The Vault is full. Remove items before syncing more.",

@@ -2762,7 +2762,7 @@
       "close": "Terminé"
     },
     "connections": {
-      "none": "Aucun gestionnaire de mots de passe ne peut se connecter sur ce serveur.",
+      "none": "Aucun gestionnaire de mots de passe ne peut être connecté ici.",
       "lead": "Vos agents utilisent les {{kinds}} que vous gardez dans {{name}}.",
       "connect": "Connecter",
       "reconnect": "Reconnecter",
@@ -2817,7 +2817,7 @@
         "not_found": "Ce qu'il lisait a disparu. Reconnectez pour choisir à nouveau.",
         "rate_limited": "Le gestionnaire de mots de passe nous a demandé d'attendre. Il réessaie tout seul.",
         "unreachable": "Son serveur n'a pas répondu. Il réessaie tout seul.",
-        "unsupported": "Ce serveur ne peut pas le lire. Demandez à qui le gère.",
+        "unsupported": "Ses réglages ne peuvent pas être lus ici. Réessayez plus tard ou utilisez un autre compte.",
         "invalid_input": "Une information des champs a été refusée. Reconnectez et vérifiez-les.",
         "too_many_items": "Supprimez des éléments avant d'en synchroniser plus.",
         "other": "Essayez Synchroniser, ou reconnectez."
@@ -11245,7 +11245,7 @@
       "csvUnrecognized": "Ceci ne ressemble pas à un fichier de mots de passe. Exportez-le à nouveau en CSV.",
       "requestNotDelivered": "Envoyez-le d'abord, puis enregistrez-le dans le Vault.",
       "requestNotSavable": "Celui-ci ne peut pas être enregistré dans le Vault.",
-      "sourceUnknown": "Ce gestionnaire de mots de passe n'est pas disponible sur ce serveur.",
+      "sourceUnknown": "Ce gestionnaire de mots de passe n'est pas disponible ici.",
       "sourceError": "Impossible de le lire depuis son gestionnaire de mots de passe. Réessayez.",
       "source": {
         "authFailed": "Le gestionnaire de mots de passe a refusé ces informations. Vérifiez-les et réessayez.",
@@ -11256,7 +11256,7 @@
         "notFound": "Il n'est plus dans son gestionnaire de mots de passe.",
         "rateLimited": "Le gestionnaire de mots de passe nous a demandé d'attendre. Réessayez dans quelques minutes.",
         "unreachable": "Impossible de joindre le gestionnaire de mots de passe. Vérifiez l'adresse et réessayez.",
-        "unsupported": "Ce serveur ne peut pas se connecter à ce gestionnaire de mots de passe.",
+        "unsupported": "Ce gestionnaire de mots de passe ne peut pas être connecté ici.",
         "invalidInput": "Vérifiez les champs et réessayez.",
         "tooManyItems": "Le Vault est plein. Supprimez des éléments avant d'en synchroniser plus."
       }

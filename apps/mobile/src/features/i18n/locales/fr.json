@@ -1837,7 +1837,7 @@
       "text": "Connectez un gestionnaire de mots de passe et vos agents utilisent les identifiants qui y sont gardés. Rien n'est copié : un mot de passe n'est lu qu'au moment où il sert.",
       "connected": "Connectés",
       "add": "Connecter",
-      "none": "Aucun gestionnaire de mots de passe ne peut être connecté sur ce serveur.",
+      "none": "Aucun gestionnaire de mots de passe ne peut être connecté ici.",
       "help": "Utilisez un coffre ou un dossier réservé à vos agents, avec juste ce dont ils ont besoin."
     },
     "connect": {

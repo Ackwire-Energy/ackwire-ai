@@ -2688,7 +2688,7 @@
       "close": "Klaar"
     },
     "connections": {
-      "none": "Op deze server kan geen wachtwoordmanager koppelen.",
+      "none": "Hier kan geen wachtwoordmanager koppelen.",
       "lead": "Je agenten gebruiken de {{kinds}} die je in {{name}} bewaart.",
       "connect": "Koppelen",
       "reconnect": "Opnieuw koppelen",
@@ -2743,7 +2743,7 @@
         "not_found": "Wat het las, is weg. Koppel opnieuw om weer te kiezen.",
         "rate_limited": "De wachtwoordmanager vroeg ons te wachten. Het probeert het zelf opnieuw.",
         "unreachable": "De server antwoordde niet. Het probeert het zelf opnieuw.",
-        "unsupported": "Deze server kan het niet lezen. Vraag het aan wie hem beheert.",
+        "unsupported": "De instellingen kunnen hier niet worden gelezen. Probeer het later opnieuw of gebruik een ander account.",
         "invalid_input": "Iets in de velden is geweigerd. Koppel opnieuw en controleer ze.",
         "too_many_items": "Verwijder items voordat je meer synchroniseert.",
         "other": "Probeer Nu synchroniseren of koppel opnieuw."
@@ -10909,7 +10909,7 @@
       "csvUnrecognized": "Dit lijkt geen wachtwoordbestand. Exporteer het opnieuw als CSV.",
       "requestNotDelivered": "Stuur het eerst en sla het daarna op in de Vault.",
       "requestNotSavable": "Dit kan niet in de Vault worden opgeslagen.",
-      "sourceUnknown": "Deze wachtwoordmanager is niet beschikbaar op deze server.",
+      "sourceUnknown": "Deze wachtwoordmanager is hier niet beschikbaar.",
       "sourceError": "Kon het niet lezen uit de wachtwoordmanager. Probeer het opnieuw.",
       "source": {
         "authFailed": "De wachtwoordmanager heeft deze gegevens geweigerd. Controleer ze en probeer het opnieuw.",
@@ -10920,7 +10920,7 @@
         "notFound": "Het staat niet meer in de wachtwoordmanager.",
         "rateLimited": "De wachtwoordmanager vroeg ons te wachten. Probeer het over een paar minuten opnieuw.",
         "unreachable": "Kon de wachtwoordmanager niet bereiken. Controleer het adres en probeer het opnieuw.",
-        "unsupported": "Deze server kan niet met deze wachtwoordmanager koppelen.",
+        "unsupported": "Deze wachtwoordmanager kan hier niet koppelen.",
         "invalidInput": "Controleer de velden en probeer het opnieuw.",
         "tooManyItems": "De Vault is vol. Verwijder items voordat je meer synchroniseert."
       }

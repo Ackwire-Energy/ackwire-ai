@@ -2759,7 +2759,7 @@
       "close": "Listo"
     },
     "connections": {
-      "none": "No se puede conectar ningún gestor de contraseñas en este servidor.",
+      "none": "Aquí no se puede conectar ningún gestor de contraseñas.",
       "lead": "Tus agentes usan {{kinds}} que guardas en {{name}}.",
       "connect": "Conectar",
       "reconnect": "Reconectar",
@@ -2814,7 +2814,7 @@
         "not_found": "Lo que leía ya no está. Reconecta para elegir de nuevo.",
         "rate_limited": "El gestor de contraseñas pidió esperar. Lo vuelve a intentar solo.",
         "unreachable": "Su servidor no respondió. Lo vuelve a intentar solo.",
-        "unsupported": "Este servidor no puede leerlo. Pregunta a quien lo administra.",
+        "unsupported": "Aquí no se puede leer su configuración. Inténtalo más tarde o usa otra cuenta.",
         "invalid_input": "Se rechazó algo en los campos. Reconecta y revísalos.",
         "too_many_items": "Elimina elementos antes de sincronizar más.",
         "other": "Prueba Sincronizar ahora o reconecta."
@@ -11175,7 +11175,7 @@
       "csvUnrecognized": "Esto no parece un archivo de contraseñas. Expórtalo de nuevo como CSV.",
       "requestNotDelivered": "Envíalo primero y luego guárdalo en el Vault.",
       "requestNotSavable": "Este no se puede guardar en el Vault.",
-      "sourceUnknown": "Este gestor de contraseñas no está disponible en este servidor.",
+      "sourceUnknown": "Este gestor de contraseñas no está disponible aquí.",
       "sourceError": "No se pudo leer de su gestor de contraseñas. Inténtalo de nuevo.",
       "source": {
         "authFailed": "El gestor de contraseñas rechazó estos datos. Revísalos e inténtalo de nuevo.",
@@ -11186,7 +11186,7 @@
         "notFound": "Ya no está en su gestor de contraseñas.",
         "rateLimited": "El gestor de contraseñas pidió esperar. Inténtalo de nuevo en unos minutos.",
         "unreachable": "No se pudo conectar con el gestor de contraseñas. Revisa la dirección e inténtalo de nuevo.",
-        "unsupported": "Este servidor no puede conectarse a este gestor de contraseñas.",
+        "unsupported": "Este gestor de contraseñas no se puede conectar aquí.",
         "invalidInput": "Revisa los campos e inténtalo de nuevo.",
         "tooManyItems": "El Vault está lleno. Elimina elementos antes de sincronizar más."
       }

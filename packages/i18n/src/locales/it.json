@@ -2760,7 +2760,7 @@
       "close": "Fatto"
     },
     "connections": {
-      "none": "Su questo server non si può collegare nessun gestore di password.",
+      "none": "Qui non si può collegare nessun gestore di password.",
       "lead": "I tuoi agenti usano i {{kinds}} che conservi in {{name}}.",
       "connect": "Collega",
       "reconnect": "Ricollega",
@@ -2815,7 +2815,7 @@
         "not_found": "Ciò che leggeva non c'è più. Ricollega per scegliere di nuovo.",
         "rate_limited": "Il gestore di password ci ha chiesto di aspettare. Riprova da solo.",
         "unreachable": "Il suo server non ha risposto. Riprova da solo.",
-        "unsupported": "Questo server non può leggerlo. Chiedi a chi lo gestisce.",
+        "unsupported": "Qui non si possono leggere le sue impostazioni. Riprova più tardi o usa un altro account.",
         "invalid_input": "Qualcosa nei campi è stato rifiutato. Ricollega e controllali.",
         "too_many_items": "Elimina degli elementi prima di sincronizzarne altri.",
         "other": "Prova Sincronizza ora, oppure ricollega."
@@ -11252,7 +11252,7 @@
       "csvUnrecognized": "Non sembra un file di password. Esportalo di nuovo come CSV.",
       "requestNotDelivered": "Prima invialo, poi salvalo nel Vault.",
       "requestNotSavable": "Questo non si può salvare nel Vault.",
-      "sourceUnknown": "Questo gestore di password non è disponibile su questo server.",
+      "sourceUnknown": "Questo gestore di password non è disponibile qui.",
       "sourceError": "Non è stato possibile leggerlo dal suo gestore di password. Riprova.",
       "source": {
         "authFailed": "Il gestore di password ha rifiutato questi dati. Controllali e riprova.",
@@ -11263,7 +11263,7 @@
         "notFound": "Non è più nel suo gestore di password.",
         "rateLimited": "Il gestore di password ci ha chiesto di aspettare. Riprova tra qualche minuto.",
         "unreachable": "Impossibile raggiungere il gestore di password. Controlla l'indirizzo e riprova.",
-        "unsupported": "Questo server non può collegarsi a questo gestore di password.",
+        "unsupported": "Questo gestore di password non si può collegare qui.",
         "invalidInput": "Controlla i campi e riprova.",
         "tooManyItems": "Il Vault è pieno. Elimina degli elementi prima di sincronizzarne altri."
       }

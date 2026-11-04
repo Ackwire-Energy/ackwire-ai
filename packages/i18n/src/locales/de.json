@@ -2686,7 +2686,7 @@
       "close": "Fertig"
     },
     "connections": {
-      "none": "Auf diesem Server kann sich kein Passwort-Manager verbinden.",
+      "none": "Hier lässt sich kein Passwort-Manager verbinden.",
       "lead": "Deine Agenten verwenden die {{kinds}}, die du in {{name}} aufbewahrst.",
       "connect": "Verbinden",
       "reconnect": "Neu verbinden",
@@ -2741,7 +2741,7 @@
         "not_found": "Was er gelesen hat, ist weg. Verbinde neu, um erneut zu wählen.",
         "rate_limited": "Der Passwort-Manager hat uns gebeten zu warten. Er versucht es von selbst noch einmal.",
         "unreachable": "Sein Server hat nicht geantwortet. Er versucht es von selbst noch einmal.",
-        "unsupported": "Dieser Server kann ihn nicht lesen. Frag, wer ihn betreibt.",
+        "unsupported": "Seine Einstellungen lassen sich hier nicht lesen. Versuch es später noch einmal oder nutze ein anderes Konto.",
         "invalid_input": "Etwas in den Feldern wurde abgelehnt. Verbinde neu und prüf sie.",
         "too_many_items": "Lösch Einträge, bevor du mehr synchronisierst.",
         "other": "Versuch Jetzt synchronisieren oder verbinde neu."
@@ -10831,7 +10831,7 @@
       "csvUnrecognized": "Das sieht nicht nach einer Passwortdatei aus. Exportiere sie noch einmal als CSV.",
       "requestNotDelivered": "Schick es zuerst und speichere es dann im Vault.",
       "requestNotSavable": "Das lässt sich nicht im Vault speichern.",
-      "sourceUnknown": "Dieser Passwort-Manager ist auf diesem Server nicht verfügbar.",
+      "sourceUnknown": "Dieser Passwort-Manager ist hier nicht verfügbar.",
       "sourceError": "Es ließ sich nicht aus seinem Passwort-Manager lesen. Versuch es noch einmal.",
       "source": {
         "authFailed": "Der Passwort-Manager hat diese Angaben abgelehnt. Prüf sie und versuch es noch einmal.",
@@ -10842,7 +10842,7 @@
         "notFound": "Es ist nicht mehr in seinem Passwort-Manager.",
         "rateLimited": "Der Passwort-Manager hat uns gebeten zu warten. Versuch es in ein paar Minuten noch einmal.",
         "unreachable": "Der Passwort-Manager ist nicht erreichbar. Prüf die Adresse und versuch es noch einmal.",
-        "unsupported": "Dieser Server kann sich nicht mit diesem Passwort-Manager verbinden.",
+        "unsupported": "Dieser Passwort-Manager lässt sich hier nicht verbinden.",
         "invalidInput": "Prüf die Felder und versuch es noch einmal.",
         "tooManyItems": "Der Vault ist voll. Lösch Einträge, bevor du mehr synchronisierst."
       }

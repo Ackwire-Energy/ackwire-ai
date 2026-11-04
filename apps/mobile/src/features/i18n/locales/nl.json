@@ -1755,7 +1755,7 @@
       "text": "Koppel een wachtwoordmanager en je agenten gebruiken de logins die daar staan. Er wordt niets gekopieerd: een wachtwoord wordt pas gelezen als het nodig is.",
       "connected": "Gekoppeld",
       "add": "Koppelen",
-      "none": "Op deze server kan geen wachtwoordmanager worden gekoppeld.",
+      "none": "Hier kan geen wachtwoordmanager koppelen.",
       "help": "Gebruik een kluis of map alleen voor je agenten, met precies wat ze nodig hebben."
     },
     "connect": {

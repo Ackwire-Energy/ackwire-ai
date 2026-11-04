@@ -1919,7 +1919,7 @@
       "text": "Połącz menedżer haseł, a twoi agenci będą używać przechowywanych w nim loginów. Nic nie jest kopiowane: hasło jest odczytywane dopiero wtedy, gdy jest potrzebne.",
       "connected": "Połączone",
       "add": "Połącz",
-      "none": "Na tym serwerze nie można połączyć żadnego menedżera haseł.",
+      "none": "Tutaj nie można połączyć żadnego menedżera haseł.",
       "help": "Użyj sejfu lub folderu tylko dla swoich agentów, z tym, czego naprawdę potrzebują."
     },
     "connect": {

@@ -1837,7 +1837,7 @@
       "text": "Collega un gestore di password e i tuoi agenti usano i login conservati lì. Non viene copiato niente: una password viene letta solo quando serve.",
       "connected": "Collegati",
       "add": "Collega",
-      "none": "Su questo server non si può collegare nessun gestore di password.",
+      "none": "Qui non si può collegare nessun gestore di password.",
       "help": "Usa una cassaforte o una cartella solo per i tuoi agenti, con solo ciò che serve loro."
     },
     "connect": {

@@ -79,7 +79,7 @@ export function ItemChips({ item }: { item: VaultItem }) {
 export function ScopeLine({ scope }: { scope: VaultScope }) {
   const { t } = useTranslation();
   return (
-    <span className="vlt-scope">
+    <span className="vlt-scope ac-iconline">
       <Icon name={scope === "team" ? "members" : "person"} size={18} />
       <span className="vlt-scope__text">
         <b>{t(`vault.scope.${scope}`)}</b>

@@ -2595,7 +2595,7 @@
       "close": "完成"
     },
     "connections": {
-      "none": "此服务器上无法连接任何密码管理器。",
+      "none": "这里无法连接任何密码管理器。",
       "lead": "你的智能体会使用你保存在 {{name}} 中的{{kinds}}。",
       "connect": "连接",
       "reconnect": "重新连接",
@@ -2647,7 +2647,7 @@
         "not_found": "它读取的内容已不存在。请重新连接以重新选择。",
         "rate_limited": "密码管理器要求稍等。它会自动重试。",
         "unreachable": "它的服务器没有响应。它会自动重试。",
-        "unsupported": "此服务器无法读取它。请询问服务器的管理员。",
+        "unsupported": "这里无法读取它的设置。请稍后再试，或使用其他账户。",
         "invalid_input": "字段中有内容被拒绝。请重新连接并检查。",
         "too_many_items": "请先删除项目，再同步更多。",
         "other": "请尝试“立即同步”，或重新连接。"
@@ -10503,7 +10503,7 @@
       "csvUnrecognized": "这看起来不是密码文件。请重新导出为 CSV。",
       "requestNotDelivered": "请先发送，再保存到 Vault。",
       "requestNotSavable": "此项无法保存到 Vault。",
-      "sourceUnknown": "此服务器上无法使用这个密码管理器。",
+      "sourceUnknown": "这里无法使用这个密码管理器。",
       "sourceError": "无法从密码管理器读取。请重试。",
       "source": {
         "authFailed": "密码管理器拒绝了这些信息。请检查后重试。",
@@ -10514,7 +10514,7 @@
         "notFound": "它已不在密码管理器中。",
         "rateLimited": "密码管理器要求稍等。请几分钟后重试。",
         "unreachable": "无法连接到密码管理器。请检查地址后重试。",
-        "unsupported": "此服务器无法连接到这个密码管理器。",
+        "unsupported": "这里无法连接这个密码管理器。",
         "invalidInput": "请检查各字段后重试。",
         "tooManyItems": "Vault 已满。请先删除项目，再同步更多。"
       }

@@ -220,7 +220,7 @@ describe("releasing a login", () => {
     );
 
     v.source.values.delete("item-1");
-    const failed = await releaseVaultLogin(v.deps, run, row.id, null).catch((e: unknown) => e as VaultRefusal);
+    const failed = (await releaseVaultLogin(v.deps, run, row.id, null).catch((e: unknown) => e)) as VaultRefusal;
     expect(failed).toMatchObject({ code: "source_error" });
     expect(failed.message).toContain("FakePass");
 

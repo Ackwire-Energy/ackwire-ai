@@ -933,15 +933,17 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         {vaultSave === "saved" && ` · ${t("vault.card.saved")}`}
       </RequestDone>
       {(vaultSave === "failed" || vaultSave === "dropped") && (
-        <p className="rq__note ac-iconline vlt-save__failed">
-          <Icon name="alert" size={14} />
-          <span>{t("vault.card.notSaved")}</span>
+        <div className="vlt-save__failed">
+          <p className="rq__note ac-iconline">
+            <Icon name="alert" size={14} />
+            <span>{t("vault.card.notSaved")}</span>
+          </p>
           {vaultSave === "failed" && (
             <Button size="sm" variant="ghost" loading={store.isPending} onClick={retrySave}>
               {t("common.retry")}
             </Button>
           )}
-        </p>
+        </div>
       )}
       {error && (
         <p className="rq__error" role="alert">

@@ -1755,7 +1755,7 @@
       "text": "Bir şifre yöneticisi bağlayın, ajanlarınız orada saklanan giriş bilgilerini kullansın. Hiçbir şey kopyalanmaz: şifre yalnızca kullanıldığı anda okunur.",
       "connected": "Bağlı olanlar",
       "add": "Bağla",
-      "none": "Bu sunucuda hiçbir şifre yöneticisi bağlanamıyor.",
+      "none": "Burada hiçbir şifre yöneticisi bağlanamıyor.",
       "help": "Yalnızca ajanlarınız için, sadece ihtiyaç duydukları şeyleri içeren bir kasa ya da klasör kullanın."
     },
     "connect": {

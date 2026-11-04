@@ -1673,7 +1673,7 @@
       "text": "Hubungkan pengelola kata sandi, dan agenmu menggunakan login yang disimpan di sana. Tidak ada yang disalin: kata sandi hanya dibaca saat digunakan.",
       "connected": "Terhubung",
       "add": "Hubungkan",
-      "none": "Tidak ada pengelola kata sandi yang bisa dihubungkan di server ini.",
+      "none": "Tidak ada pengelola kata sandi yang bisa dihubungkan di sini.",
       "help": "Gunakan brankas atau folder khusus untuk agenmu, berisi hanya yang mereka perlukan."
     },
     "connect": {

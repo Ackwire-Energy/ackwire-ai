@@ -6553,7 +6553,7 @@
     "value": "Done"
   },
   "vault.connections.none": {
-    "value": "No password manager can connect on this server."
+    "value": "No password manager can be connected here."
   },
   "vault.connections.lead": {
     "value": "Your agents use the {{kinds}} you keep in {{name}}."
@@ -6709,7 +6709,7 @@
     "value": "Its server didn't answer. It tries again by itself."
   },
   "vault.connections.fix.unsupported": {
-    "value": "This server can't read it. Ask who runs it."
+    "value": "Its settings can't be read here. Try again later or use another account."
   },
   "vault.connections.fix.invalid_input": {
     "value": "Something in the fields was refused. Reconnect and check them."
@@ -26243,7 +26243,7 @@
     "value": "This one can't be saved to the Vault."
   },
   "errors.vault.sourceUnknown": {
-    "value": "This password manager isn't available on this server."
+    "value": "This password manager isn't available here."
   },
   "errors.vault.sourceError": {
     "value": "Couldn't read it from its password manager. Try again."
@@ -26273,7 +26273,7 @@
     "value": "Couldn't reach the password manager. Check the address and try again."
   },
   "errors.vault.source.unsupported": {
-    "value": "This server can't connect to this password manager."
+    "value": "This password manager can't be connected here."
   },
   "errors.vault.source.invalidInput": {
     "value": "Check the fields and try again."

@@ -180,14 +180,12 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
 .vlt-foot__start {
   margin-right: auto;
 }
+/* On .ac-iconline: the icon sits on the first line's capitals. */
 .vlt-scope {
-  display: flex;
-  align-items: flex-start;
   gap: 10px;
+  font-size: 14px;
 }
 .vlt-scope > .ac-icon {
-  flex: none;
-  margin-top: 1px;
   color: var(--ink2);
 }
 .vlt-scope__text {
@@ -605,9 +603,13 @@ html:not([data-pointer]) .vlt-drop__area:focus-visible {
   color: var(--muted);
 }
 /* Under a closed request card: "Sent, but not saved to the Vault", with Retry while the value is kept (ADR 0135). */
-.rq__note.vlt-save__failed {
+.vlt-save__failed {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
 }
-.vlt-save__failed > .ac-btn {
-  margin-block: -6px;
+.vlt-save__failed > .rq__note {
+  margin: 0;
 }

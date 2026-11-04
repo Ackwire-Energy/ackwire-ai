@@ -1753,7 +1753,7 @@ export const featureKeysEn = {
       text: "Connect a password manager and your agents use the logins kept there. Nothing is copied: a password is read only when it's used.",
       connected: "Connected",
       add: "Connect",
-      none: "No password manager can be connected on this server.",
+      none: "No password manager can be connected here.",
       help: "Use a vault or a folder only for your agents, with just what they need.",
     },
     connect: {

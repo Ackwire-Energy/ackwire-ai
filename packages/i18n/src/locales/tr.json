@@ -2674,7 +2674,7 @@
       "close": "Bitti"
     },
     "connections": {
-      "none": "Bu sunucuda hiçbir şifre yöneticisi bağlanamıyor.",
+      "none": "Burada hiçbir şifre yöneticisi bağlanamıyor.",
       "lead": "Ajanlarınız, {{name}} içinde sakladığınız şu öğeleri kullanır: {{kinds}}.",
       "connect": "Bağla",
       "reconnect": "Yeniden bağla",
@@ -2729,7 +2729,7 @@
         "not_found": "Okuduğu şey artık yok. Yeniden seçmek için yeniden bağlayın.",
         "rate_limited": "Şifre yöneticisi beklememizi istedi. Kendisi tekrar deneyecek.",
         "unreachable": "Sunucusu yanıt vermedi. Kendisi tekrar deneyecek.",
-        "unsupported": "Bu sunucu onu okuyamıyor. Sunucuyu yöneten kişiye sorun.",
+        "unsupported": "Ayarları burada okunamıyor. Daha sonra tekrar deneyin ya da başka bir hesap kullanın.",
         "invalid_input": "Alanlardaki bir şey reddedildi. Yeniden bağlayıp kontrol edin.",
         "too_many_items": "Daha fazlasını eşitlemeden önce öğe silin.",
         "other": "Şimdi eşitle'yi deneyin ya da yeniden bağlayın."
@@ -10768,7 +10768,7 @@
       "csvUnrecognized": "Bu bir şifre dosyasına benzemiyor. CSV olarak yeniden dışa aktarın.",
       "requestNotDelivered": "Önce gönderin, sonra Vault'a kaydedin.",
       "requestNotSavable": "Bu, Vault'a kaydedilemez.",
-      "sourceUnknown": "Bu şifre yöneticisi bu sunucuda kullanılamıyor.",
+      "sourceUnknown": "Bu şifre yöneticisi burada kullanılamıyor.",
       "sourceError": "Şifre yöneticisinden okunamadı. Tekrar deneyin.",
       "source": {
         "authFailed": "Şifre yöneticisi bu bilgileri reddetti. Kontrol edip tekrar deneyin.",
@@ -10779,7 +10779,7 @@
         "notFound": "Artık şifre yöneticisinde yok.",
         "rateLimited": "Şifre yöneticisi beklememizi istedi. Birkaç dakika sonra tekrar deneyin.",
         "unreachable": "Şifre yöneticisine ulaşılamadı. Adresi kontrol edip tekrar deneyin.",
-        "unsupported": "Bu sunucu bu şifre yöneticisine bağlanamıyor.",
+        "unsupported": "Bu şifre yöneticisi burada bağlanamıyor.",
         "invalidInput": "Alanları kontrol edip tekrar deneyin.",
         "tooManyItems": "Vault dolu. Daha fazlasını eşitlemeden önce öğe silin."
       }

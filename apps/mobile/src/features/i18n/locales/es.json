@@ -1837,7 +1837,7 @@
       "text": "Conecta un gestor de contraseñas y tus agentes usan los inicios de sesión guardados allí. No se copia nada: una contraseña solo se lee cuando se usa.",
       "connected": "Conectados",
       "add": "Conectar",
-      "none": "No se puede conectar ningún gestor de contraseñas en este servidor.",
+      "none": "Aquí no se puede conectar ningún gestor de contraseñas.",
       "help": "Usa una bóveda o una carpeta solo para tus agentes, con lo justo que necesitan."
     },
     "connect": {

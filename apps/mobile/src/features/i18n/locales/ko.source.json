@@ -4265,7 +4265,7 @@
     "value": "Connect"
   },
   "vault.connections.none": {
-    "value": "No password manager can be connected on this server."
+    "value": "No password manager can be connected here."
   },
   "vault.connections.help": {
     "value": "Use a vault or a folder only for your agents, with just what they need."

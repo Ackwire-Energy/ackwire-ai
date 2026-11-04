@@ -1758,7 +1758,7 @@ export const featureKeysPtBR = {
       text: "Conecte um gerenciador de senhas e seus agentes usam os logins guardados lá. Nada é copiado: a senha só é lida na hora do uso.",
       connected: "Conectados",
       add: "Conectar",
-      none: "Nenhum gerenciador de senhas pode ser conectado neste servidor.",
+      none: "Nenhum gerenciador de senhas pode ser conectado aqui.",
       help: "Use um cofre ou uma pasta só para os agentes, com apenas o que eles precisam.",
     },
     connect: {

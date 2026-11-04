@@ -147,7 +147,7 @@ export function VaultImportDialog({
                 }}
               >
                 <span className="vlt-drop__icon">
-                  <Icon name="upload" size={22} />
+                  <Icon name="upload" size={20} />
                 </span>
                 <b>{importer.busy ? t("vault.import.reading") : t("vault.import.dropTitle")}</b>
                 <span>{t("vault.import.dropText")}</span>

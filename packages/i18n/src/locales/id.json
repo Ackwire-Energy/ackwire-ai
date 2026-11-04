@@ -2604,7 +2604,7 @@
       "close": "Selesai"
     },
     "connections": {
-      "none": "Tidak ada pengelola kata sandi yang bisa terhubung di server ini.",
+      "none": "Tidak ada pengelola kata sandi yang bisa dihubungkan di sini.",
       "lead": "Agenmu menggunakan {{kinds}} yang kamu simpan di {{name}}.",
       "connect": "Hubungkan",
       "reconnect": "Hubungkan ulang",
@@ -2656,7 +2656,7 @@
         "not_found": "Yang dibacanya sudah tidak ada. Hubungkan ulang untuk memilih lagi.",
         "rate_limited": "Pengelola kata sandi meminta kami menunggu. Ia mencoba lagi sendiri.",
         "unreachable": "Servernya tidak menjawab. Ia mencoba lagi sendiri.",
-        "unsupported": "Server ini tidak bisa membacanya. Tanyakan kepada pengelolanya.",
+        "unsupported": "Pengaturannya tidak bisa dibaca di sini. Coba lagi nanti atau pakai akun lain.",
         "invalid_input": "Ada isi kolom yang ditolak. Hubungkan ulang dan periksa.",
         "too_many_items": "Hapus item sebelum menyinkronkan lebih banyak.",
         "other": "Coba Sinkronkan sekarang, atau hubungkan ulang."
@@ -10493,7 +10493,7 @@
       "csvUnrecognized": "Ini tidak tampak seperti file kata sandi. Ekspor lagi sebagai CSV.",
       "requestNotDelivered": "Kirim dulu, lalu simpan ke Vault.",
       "requestNotSavable": "Ini tidak bisa disimpan ke Vault.",
-      "sourceUnknown": "Pengelola kata sandi ini tidak tersedia di server ini.",
+      "sourceUnknown": "Pengelola kata sandi ini tidak tersedia di sini.",
       "sourceError": "Tidak bisa membacanya dari pengelola kata sandinya. Coba lagi.",
       "source": {
         "authFailed": "Pengelola kata sandi menolak data ini. Periksa lalu coba lagi.",
@@ -10504,7 +10504,7 @@
         "notFound": "Item ini sudah tidak ada di pengelola kata sandinya.",
         "rateLimited": "Pengelola kata sandi meminta kami menunggu. Coba lagi dalam beberapa menit.",
         "unreachable": "Tidak bisa menghubungi pengelola kata sandi. Periksa alamatnya lalu coba lagi.",
-        "unsupported": "Server ini tidak bisa terhubung ke pengelola kata sandi ini.",
+        "unsupported": "Pengelola kata sandi ini tidak bisa dihubungkan di sini.",
         "invalidInput": "Periksa kolom-kolomnya lalu coba lagi.",
         "tooManyItems": "Vault penuh. Hapus item sebelum menyinkronkan lebih banyak."
       }

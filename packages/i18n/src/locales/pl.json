@@ -2853,7 +2853,7 @@
       "close": "Gotowe"
     },
     "connections": {
-      "none": "Na tym serwerze nie może połączyć się żaden menedżer haseł.",
+      "none": "Tutaj nie można połączyć żadnego menedżera haseł.",
       "lead": "Twoi agenci używają tego, co trzymasz w {{name}}: {{kinds}}.",
       "connect": "Połącz",
       "reconnect": "Połącz ponownie",
@@ -2914,7 +2914,7 @@
         "not_found": "To, co odczytywał, zniknęło. Połącz ponownie, aby wybrać jeszcze raz.",
         "rate_limited": "Menedżer haseł poprosił, żeby poczekać. Spróbuje ponownie sam.",
         "unreachable": "Jego serwer nie odpowiedział. Spróbuje ponownie sam.",
-        "unsupported": "Ten serwer nie może tego odczytać. Zapytaj osobę, która nim zarządza.",
+        "unsupported": "Tutaj nie da się odczytać jego ustawień. Spróbuj później albo użyj innego konta.",
         "invalid_input": "Coś w polach zostało odrzucone. Połącz ponownie i je sprawdź.",
         "too_many_items": "Usuń elementy, zanim zsynchronizujesz więcej.",
         "other": "Spróbuj Synchronizuj teraz albo połącz ponownie."
@@ -11578,7 +11578,7 @@
       "csvUnrecognized": "To nie wygląda na plik z hasłami. Wyeksportuj go ponownie jako CSV.",
       "requestNotDelivered": "Najpierw wyślij, potem zapisz w Vault.",
       "requestNotSavable": "Tego nie można zapisać w Vault.",
-      "sourceUnknown": "Ten menedżer haseł nie jest dostępny na tym serwerze.",
+      "sourceUnknown": "Ten menedżer haseł nie jest tu dostępny.",
       "sourceError": "Nie udało się odczytać z menedżera haseł. Spróbuj ponownie.",
       "source": {
         "authFailed": "Menedżer haseł odrzucił te dane. Sprawdź je i spróbuj ponownie.",
@@ -11589,7 +11589,7 @@
         "notFound": "Nie ma go już w menedżerze haseł.",
         "rateLimited": "Menedżer haseł poprosił, żeby poczekać. Spróbuj ponownie za kilka minut.",
         "unreachable": "Nie udało się połączyć z menedżerem haseł. Sprawdź adres i spróbuj ponownie.",
-        "unsupported": "Ten serwer nie może połączyć się z tym menedżerem haseł.",
+        "unsupported": "Tego menedżera haseł nie można tu połączyć.",
         "invalidInput": "Sprawdź pola i spróbuj ponownie.",
         "tooManyItems": "Vault jest pełny. Usuń elementy, zanim zsynchronizujesz więcej."
       }
