@@ -70,12 +70,12 @@ describe("the composer's picker: Emojis, GIFs and Figurinhas (ADR 0091)", () => 
     expect(gif.closest(".ac-gif")?.querySelector(".ac-gif__mark")?.textContent).toBe("GIF");
   });
 
-  test("a sticker: each agent's six moods; one click sends it, drawn from the agent's look", async () => {
+  test("a sticker: each agent's seven moods; one click sends it, drawn from the agent's look", async () => {
     const { state } = await open();
     const dialog = await openPicker();
     await pickTab(dialog, "Figurinhas");
     const ada = within(dialog).getByRole("region", { name: "Ada" });
-    expect(within(ada).getAllByRole("button")).toHaveLength(6);
+    expect(within(ada).getAllByRole("button")).toHaveLength(7);
     expect(within(dialog).getByRole("region", { name: "Atlas" })).toBeTruthy();
     await click(within(ada).getByRole("button", { name: "Figurinha da Ada: comemorando" }));
     await settle(4);
