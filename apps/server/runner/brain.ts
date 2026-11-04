@@ -581,7 +581,10 @@ export interface ClaudeLaunch {
   disallowedTools?: readonly string[];
   /** No `--fallback-model` (a plan's aliases may all be one model). */
   noFallback?: boolean;
-  /** `--disable-slash-commands`: no skills or commands, the computer owner's or the CLI's own. */
+  /**
+   * `--disable-slash-commands` and `--no-chrome`: no skills or commands, the computer owner's or the CLI's own, and
+   * no Claude in Chrome (its setup adds its tools to the allowed ones).
+   */
   noSlashCommands?: boolean;
 }
 
@@ -707,7 +710,7 @@ export function claudeBrainArgs(l: ClaudeLaunch): string[] {
     ...(l.settingSources !== undefined ? ["--setting-sources", l.settingSources] : []),
     ...(l.builtinTools ? ["--tools", l.builtinTools.join(",")] : []),
     ...(l.disallowedTools?.length ? ["--disallowedTools", l.disallowedTools.join(",")] : []),
-    ...(l.noSlashCommands ? ["--disable-slash-commands"] : []),
+    ...(l.noSlashCommands ? ["--disable-slash-commands", "--no-chrome"] : []),
     l.resume ? "--resume" : "--session-id",
     l.session,
   ];
@@ -1697,8 +1700,14 @@ export class BrainManager {
     const started = this.sessionSystem(keptSystem, resume, () => (withRepo ? system + repoInstructions(cwd) : system));
     writeFileSync(systemFile, started.text, { mode: 0o600 });
     let mcpConfigFile: string | undefined;
-    // A `chat` turn never holds the agent's secrets.
-    const base: NodeJS.ProcessEnv = { ...process.env, ...(mode === "chat" ? {} : (ctx.secrets?.env ?? {})) };
+    // A `chat` turn never holds the agent's secrets, nor reads the auto memory Claude Code keeps in the account's
+    // folder (whoever else that folder is lent to can write there), nor loads the plan's claude.ai connectors.
+    const base: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...(mode === "chat"
+        ? { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1", ENABLE_CLAUDEAI_MCP_SERVERS: "false" }
+        : (ctx.secrets?.env ?? {})),
+    };
     // ADR 0041: the account's folder is this process's Claude Code home, and nothing else signs it in.
     const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
     const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;

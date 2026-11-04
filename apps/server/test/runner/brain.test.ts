@@ -456,10 +456,25 @@ test("protocol 41: a chat turn (the team's right hand on a plan) gets our MCP to
   expect(at(chat, "--permission-mode")).toBe("dontAsk");
   expect(at(chat, "--allowedTools")).toBe("mcp__agentes");
   expect(chat).toContain("--disable-slash-commands");
+  expect(chat).toContain("--no-chrome");
   expect(chat).not.toContain("--permission-prompt-tool");
   expect(chat).not.toContain("--add-dir");
   const denied = at(chat, "--disallowedTools")?.split(",") ?? [];
-  for (const tool of ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch", "Task", "Skill"]) {
+  for (const tool of [
+    "Bash",
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "WebFetch",
+    "WebSearch",
+    "Task",
+    "Skill",
+    "RemoteTrigger",
+    "CronCreate",
+    "Artifact",
+  ]) {
     expect(denied).toContain(tool);
   }
 });
@@ -1216,8 +1231,14 @@ test.if(posix)(
       { grants: ["/somewhere/else"] },
     );
     expect(r.final).toMatchObject({ type: "done" });
-    const spawn = spawns()[0] as unknown as { args: string[]; cwd: string; system: string | null };
+    const spawn = spawns()[0] as unknown as {
+      args: string[];
+      cwd: string;
+      system: string | null;
+      autoMemoryOff: string | null;
+    };
     expect(spawn.cwd).toBe(folder);
+    expect(spawn.autoMemoryOff).toBe("1");
     expect(spawn.args).not.toContain("--add-dir");
     expect(spawn.args[spawn.args.indexOf("--tools") + 1]).toBe("");
     expect(spawn.system ?? "").not.toContain("SECRET NOTES");

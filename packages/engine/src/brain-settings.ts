@@ -634,7 +634,10 @@ export async function setAgentBrain(
         ? carried
         : agent.brainModel;
   const fallback = (input.fallback as boolean | undefined) ?? agent.brainFallback;
-  const extraUsage = (input.extraUsage as boolean | undefined) ?? agent.brainExtraUsage;
+  // The right hand put on a plan starts with that plan's switches off: neither paid extra usage nor "Atende outras
+  // pessoas" is carried over from whoever set them before (an admin while it was on a key, or another plan's owner).
+  const newPlan = rightHand && typeof input.account === "string" && input.account !== access.agent.brainAccountId;
+  const extraUsage = (input.extraUsage as boolean | undefined) ?? (newPlan ? false : agent.brainExtraUsage);
   // Paid extra usage bills the plan's owner, who is the agent's owner: an admin picks the account, not this.
   if (extraUsage !== agent.brainExtraUsage && agent.ownerUserId !== userId) {
     throw new ForbiddenError(
@@ -660,7 +663,7 @@ export async function setAgentBrain(
     ? agent.planForOthers
     : input.onlyOwner !== undefined
       ? !input.onlyOwner
-      : changed && isComputerBrain(brain)
+      : (changed && isComputerBrain(brain)) || newPlan
         ? false
         : agent.planForOthers;
   const next = await nextBrainAccount(deps.db, userId, orgId, agent, brain, changed, machine, input.account, {

@@ -1124,8 +1124,9 @@ export function missionFolderRules(missionFolder: string | undefined, tools: rea
 }
 
 /**
- * A `chat` turn's deny list (protocol 41): every tool of Claude Code's own that reaches the computer, the web or other
- * agents, on top of `--tools ""` that lists none of them. Names a version doesn't know are ignored by it.
+ * A `chat` turn's deny list (protocol 41): every tool of Claude Code's own that reaches the computer, the web, other
+ * agents or the plan's claude.ai account (cloud routines, artifacts), on top of `--tools ""` that lists none of them.
+ * Names a version doesn't know are ignored by it.
  */
 export const CHAT_DENIED_TOOLS = [
   "Bash",
@@ -1147,6 +1148,27 @@ export const CHAT_DENIED_TOOLS = [
   "Agent",
   "Skill",
   "SlashCommand",
+  "LSP",
+  "REPL",
+  "WebBrowser",
+  "SendMessage",
+  "TeamCreate",
+  "TeamDelete",
+  "TaskOutput",
+  "TaskStop",
+  "EnterWorktree",
+  "ExitWorktree",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
+  "ScheduleWakeup",
+  "RemoteTrigger",
+  "PushNotification",
+  "Artifact",
+  "ArtifactComments",
+  "ArtifactData",
+  "DesignSync",
+  "Config",
 ] as const;
 
 /**

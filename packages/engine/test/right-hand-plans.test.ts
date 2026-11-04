@@ -122,6 +122,19 @@ test("Lodi takes a Claude plan signed in as an account, never Codex nor a comput
   expect(await lodi()).toMatchObject({ brainAccountId: CAIOS, planForOthers: false });
 });
 
+test("a plan given to Lodi starts with its switches off, whatever was set before it", async () => {
+  const { fx, deps, caio, lodi } = await world();
+  const id = (await lodi()).id;
+  // An admin arms paid extra usage while it is on a key: it doesn't carry over to Ana's plan.
+  await setAgentBrain(deps, caio.id, fx.org.id, id, { extraUsage: true });
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain: "claude_code", account: ANAS });
+  expect(await lodi()).toMatchObject({ brainAccountId: ANAS, brainExtraUsage: false, planForOthers: false });
+  // Ana opens hers to others; moved straight onto Caio's plan, his starts closed.
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { onlyOwner: false, extraUsage: true });
+  await setAgentBrain(deps, caio.id, fx.org.id, id, { account: CAIOS });
+  expect(await lodi()).toMatchObject({ brainAccountId: CAIOS, brainExtraUsage: false, planForOthers: false });
+});
+
 test("its turns think on the plan's computer and owner; another person's DM only once the plan answers others", async () => {
   const { fx, deps, machineId, bia, lodi } = await world();
   await setAgentBrain(deps, fx.owner.id, fx.org.id, (await lodi()).id, { brain: "claude_code", account: ANAS });
