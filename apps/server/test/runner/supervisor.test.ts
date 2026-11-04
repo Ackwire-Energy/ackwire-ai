@@ -3208,6 +3208,8 @@ test.if(posix)(
       expect(next.user).toMatchObject(target);
       next.hello();
       const held = await requestOn(next);
+      // The wait came out of the command's own timeout, inside the server's deadline for it.
+      expect(held.timeoutSeconds).toBeLessThan(10);
       next.send({ type: "result", ok: true, id: held.id, data: execDone });
       await waitFor(() => socket.of("result").some((r) => r.id === "new-work"));
       expect(socket.of("result").find((r) => r.id === "new-work")?.ok).toBe(true);
