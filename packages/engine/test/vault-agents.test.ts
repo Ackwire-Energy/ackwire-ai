@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { VaultSourceError } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  checkVaultLogin,
   connectVaultSource,
   createVaultItem,
   deleteVaultItemByAgent,
@@ -229,6 +230,75 @@ describe("releasing a login", () => {
     expect(missing).toMatchObject({ code: "missing" });
     expect((await listUsableVault(v.deps, run)).some((i) => i.id === row.id)).toBe(false);
     expect(failed).not.toBeInstanceOf(VaultSourceError);
+  });
+});
+
+describe("a shared browser profile", () => {
+  test("takes a team login open to everyone and shared with each agent granted it; never a personal one, nor one open to some people", async () => {
+    v = await vaultSetup();
+    const both = [v.dev.id, v.infra.id];
+    const login = (title: string, host: string, over: Partial<VaultAccess>, scope: "team" | "personal" = "team") =>
+      createVaultItem(v.deps, scope === "team" ? v.carla.id : v.bruno.id, v.f.org.id, {
+        kind: "login",
+        scope,
+        title,
+        website: `https://${host}`,
+        secret: `${host}-password-1234`,
+        access: access(over),
+      });
+    const open = await login("Status page", "status.example.com", { everyone: true, agentIds: both });
+    const supportOnly = await login("Support desk", "desk.example.com", { roleIds: [v.supportRoleId], agentIds: both });
+    const devOnly = await login("Deploys", "deploys.example.com", { everyone: true, agentIds: [v.dev.id] });
+    const mine = await login("Bruno's mail", "mail.example.com", { allAgents: true }, "personal");
+    const profile = { name: "Shared", agentIds: both };
+    // Bruno (in Support) asks Dev, whose browser now is the profile Infra uses too.
+    const run = await runAskedBy(v, v.dev.id, v.bruno.id);
+    const refusal = (work: Promise<unknown>) => work.then(() => null).catch((e: unknown) => e as VaultRefusal);
+
+    expect(await checkVaultLogin(v.deps, run, open.id, profile)).toBeUndefined();
+    expect(await releaseVaultLogin(v.deps, run, open.id, null, profile)).toMatchObject({
+      password: "status.example.com-password-1234",
+    });
+    // Bruno may use the Support desk, but Infra in the same session may be working for anyone.
+    const some = await refusal(checkVaultLogin(v.deps, run, supportOnly.id, profile));
+    expect(some?.code).toBe("not_allowed");
+    expect(some?.message).toContain("open only to some people");
+    expect(some?.message).toContain('"Shared"');
+    expect((await refusal(releaseVaultLogin(v.deps, run, supportOnly.id, null, profile)))?.code).toBe("not_allowed");
+    // In Dev's own browser it is typed for him.
+    expect(await releaseVaultLogin(v.deps, run, supportOnly.id, null)).toMatchObject({
+      password: "desk.example.com-password-1234",
+    });
+    expect((await refusal(checkVaultLogin(v.deps, run, devOnly.id, profile)))?.message).toContain(
+      "isn't shared with every agent",
+    );
+    expect((await refusal(checkVaultLogin(v.deps, run, mine.id, profile)))?.message).toContain("personal login");
+    expect(await checkVaultLogin(v.deps, run, mine.id, null)).toBeUndefined();
+  });
+
+  test("checking a login before a plan: shared with the run, a login, with a value; its source isn't asked", async () => {
+    v = await vaultSetup();
+    const empty = await createVaultItem(v.deps, v.carla.id, v.f.org.id, {
+      kind: "login",
+      scope: "team",
+      title: "Empty",
+      website: "https://empty.example.com",
+      access: access({ everyone: true, allAgents: true }),
+    });
+    const key = await createVaultItem(v.deps, v.carla.id, v.f.org.id, {
+      kind: "key",
+      scope: "team",
+      title: "npm",
+      keyName: "NPM_TOKEN",
+      secret: "npm_secret_value_123456",
+      access: access({ everyone: true, allAgents: true }),
+    });
+    const run = await runAskedBy(v, v.dev.id, v.bruno.id);
+    const refusal = (work: Promise<unknown>) => work.then(() => null).catch((e: unknown) => e as VaultRefusal);
+    expect((await refusal(checkVaultLogin(v.deps, run, empty.id, null)))?.code).toBe("no_value");
+    expect((await refusal(checkVaultLogin(v.deps, run, key.id, null)))?.code).toBe("not_allowed");
+    expect((await refusal(checkVaultLogin(v.deps, run, crypto.randomUUID(), null)))?.code).toBe("not_found");
+    expect(v.source.calls.filter((c) => c.op === "reveal")).toEqual([]);
   });
 });
 

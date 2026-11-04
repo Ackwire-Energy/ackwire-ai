@@ -16,7 +16,7 @@ export {
 export { connectVaultSource, deleteVaultConnection, syncVaultConnection, updateVaultConnection } from "./connections";
 export { importVaultCsv } from "./csv";
 export { createVaultItem, deleteVaultItem, getVaultItem, listVault, revealVaultItem, updateVaultItem } from "./items";
-export { VaultRefusal, type VaultRefusalCode } from "./refusals";
+export { VaultRefusal, type VaultRefusalCode, vaultRefusalOutput } from "./refusals";
 export { saveSecretRequestToVault } from "./requests";
 export * from "./service";
 export { enqueueVaultSyncs, runVaultSync, VAULT_SYNC_EVERY_MS, VAULT_SYNC_JOB } from "./sync";

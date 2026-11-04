@@ -53,7 +53,6 @@ import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } f
 import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
 import {
   checkVaultLogin,
-  listUsableVault,
   recordVaultUse,
   releaseVaultLogin,
   type VaultBrowserProfile,
@@ -942,8 +941,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   /**
    * Why a Vault login can't be typed in this run, checked before the plan starts (ADR 0135): the Vault on this
    * server, "See the Vault" for the agent, a computer on protocol 41, the login shared with this agent for the
-   * person behind the run, and, in a shared browser profile, a login every agent granted it may hold (never a
-   * personal one). Null when it can be: its value is released only at the step that types it (checked again there).
+   * person behind the run, still in its source and with a value, and, in a shared browser profile, a login every
+   * agent granted it may hold (never a personal one, nor one open only to some people). Null when it can be: its
+   * value is released only at the step that types it (checked again there). An id the run doesn't know, or one not
+   * shared with this agent, reads the same.
    */
   async function loginRefusal(
     ctx: ToolContext,
@@ -959,11 +960,11 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     }
     if (status.protocol < VAULT_PROTOCOL) return vaultUpdateText(status.machineName, "type Vault logins");
     try {
-      const usable = await listUsableVault(vault, ids(ctx), { kind: "login" });
-      if (!usable.some((i) => i.id === id && i.kind === "login")) return NO_SUCH_LOGIN;
-      if (profile) await checkVaultLogin(vault, ids(ctx), id, await vaultProfile(ctx, profile));
+      await checkVaultLogin(vault, ids(ctx), id, await vaultProfile(ctx, profile));
       return null;
     } catch (error) {
+      if (error instanceof VaultRefusal && (error.code === "not_found" || error.code === "not_shared"))
+        return NO_SUCH_LOGIN;
       return vaultErrorText(error);
     }
   }

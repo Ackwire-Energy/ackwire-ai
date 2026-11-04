@@ -45,20 +45,12 @@ import {
   vaultNow,
 } from "./service";
 import { recordAgentChange, recordReads } from "./uses";
-import { agentView, connectionOf, contactOf, hasValue, loadVault, sourceNameOf } from "./views";
+import { agentView, connectionOf, contactOf, hasValue, hostOf, loadVault, sourceNameOf } from "./views";
 
 const { vaultItems } = schema;
 
 /** Most keys one command gets at once. */
 export const VAULT_MAX_KEYS = 10;
-
-const hostOf = (origin: string) => {
-  try {
-    return new URL(origin).host;
-  } catch {
-    return origin;
-  }
-};
 
 /** A check's own words as a refusal the agent can act on. */
 async function asRefusal<T>(work: () => T | Promise<T>): Promise<T> {
@@ -96,14 +88,16 @@ function haystack(item: ItemRow, contact: VaultContactFields | null) {
 
 /**
  * The items this run may use, metadata only (contacts with their fields), optionally narrowed by kind, site or a
- * query. Each contact listed is recorded as read, once per run.
+ * query. Each contact listed is recorded as read, once per run. `given`: who is behind the run, when the caller
+ * already read it (`vaultPersonOfRun`).
  */
 export async function listUsableVault(
   deps: VaultDeps,
   run: VaultRun,
   filter: { kind?: VaultItemKind; site?: string; query?: string } = {},
+  given?: VaultRunPerson,
 ): Promise<VaultItemForAgent[]> {
-  const person = await vaultPersonOfRun(deps.db, run);
+  const person = given ?? (await vaultPersonOfRun(deps.db, run));
   const state = await loadVault(deps.db, run.orgId);
   let items = state.items.filter((item) => usable(item, connectionOf(state, item), person, run.agentId));
   if (filter.kind) items = items.filter((item) => item.kind === filter.kind);
@@ -165,8 +159,9 @@ export interface VaultBrowserProfile {
 
 /**
  * Whether a login may be typed in a shared browser profile (ADR 0135 §2, ADR 0110): the session it opens stays in
- * the profile for every agent granted it, so a personal login never is, and a team login only when it is shared with
- * all agents or with each agent the profile is granted to.
+ * the profile for every agent granted it, whoever each one works for. So a personal login never is, nor a team login
+ * open only to some people (an agent there working for anyone else would act signed in with it); a team login open
+ * to everyone, only when it is shared with all agents or with each agent the profile is granted to.
  */
 function assertProfileMay(item: ItemRow, connection: ConnectionRow | undefined, profile: VaultBrowserProfile) {
   if (item.ownerUserId) {
@@ -175,13 +170,22 @@ function assertProfileMay(item: ItemRow, connection: ConnectionRow | undefined, 
     );
   }
   const columns = effectiveColumns(item, connection);
+  if (!columns.audienceEveryone) {
+    throw refuse.notAllowed(
+      `"${item.title}" is open only to some people in the workspace, and your browser now is the shared profile "${profile.name}": every agent granted that profile would be signed in with it, whoever they work for. Switch to your own browser (browser_profile with "own") to sign in with it.`,
+    );
+  }
   if (columns.allAgents || profile.agentIds.every((id) => columns.agentIds.includes(id))) return;
   throw refuse.notAllowed(
     `"${item.title}" isn't shared with every agent that uses the browser profile "${profile.name}", so it isn't typed there: they would all be signed in with it. Switch to your own browser (browser_profile with "own"), or ask a person who manages the login to share it with all of them in Settings, Vault.`,
   );
 }
 
-/** A login the run may type, checked before anything runs (the shared profile too); its value isn't read. */
+/**
+ * A login the run may type, checked before anything runs: shared with it for the person behind the run, still in its
+ * source, with a value, and fit for the shared profile when there is one. Its value isn't read (the source isn't
+ * asked): `releaseVaultLogin` checks all of it again at the step that types it.
+ */
 export async function checkVaultLogin(
   deps: VaultDeps,
   run: VaultRun,
@@ -192,6 +196,7 @@ export async function checkVaultLogin(
   const { item, connection } = await itemForRun(deps, run, person, itemId, "login");
   if (item.kind !== "login")
     throw refuse.notAllowed(`"${item.title}" is a ${item.kind}, not a login. Use a login's id from vault_list.`);
+  if (!hasValue(item)) throw refuse.noValue(item.title);
   if (profile) assertProfileMay(item, connection, profile);
 }
 

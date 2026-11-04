@@ -2722,6 +2722,7 @@ export const ptBR = {
         unreachable: "Fora do ar",
         unsupported: "Indisponível aqui",
         invalid_input: "Confira os campos",
+        too_many_items: "Vault cheio",
         other: "Não deu para ler",
       },
       fix: {
@@ -2735,6 +2736,7 @@ export const ptBR = {
         unreachable: "O servidor dele não respondeu. Ele tenta de novo sozinho.",
         unsupported: "Este servidor não consegue ler. Fale com quem cuida dele.",
         invalid_input: "Algo nos campos foi recusado. Reconecte e confira.",
+        too_many_items: "Apague itens antes de sincronizar mais.",
         other: "Tente Sincronizar agora ou reconecte.",
       },
     },
@@ -10462,6 +10464,7 @@ export const ptBR = {
         unreachable: "Não deu para falar com o gerenciador de senhas. Confira o endereço e tente de novo.",
         unsupported: "Este servidor não consegue se conectar a este gerenciador de senhas.",
         invalidInput: "Confira os campos e tente de novo.",
+        tooManyItems: "O Vault está cheio. Apague itens antes de sincronizar mais.",
       },
     },
   },
@@ -12102,7 +12105,7 @@ export const ptBR = {
     },
     vault_delete: {
       label: "Apagar do Vault",
-      description: "Apaga um item que ele salvou, ou um que a pessoa que pediu gerencia.",
+      description: "Apaga um item que ele salvou.",
     },
     react: {
       label: "Reagir",

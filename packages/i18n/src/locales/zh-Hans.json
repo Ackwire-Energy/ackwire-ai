@@ -2635,6 +2635,7 @@
         "unreachable": "无法连接",
         "unsupported": "此处不可用",
         "invalid_input": "请检查各字段",
+        "too_many_items": "Vault 已满",
         "other": "无法读取"
       },
       "fix": {
@@ -2648,6 +2649,7 @@
         "unreachable": "它的服务器没有响应。它会自动重试。",
         "unsupported": "此服务器无法读取它。请询问服务器的管理员。",
         "invalid_input": "字段中有内容被拒绝。请重新连接并检查。",
+        "too_many_items": "请先删除项目，再同步更多。",
         "other": "请尝试“立即同步”，或重新连接。"
       }
     },
@@ -10513,7 +10515,8 @@
         "rateLimited": "密码管理器要求稍等。请几分钟后重试。",
         "unreachable": "无法连接到密码管理器。请检查地址后重试。",
         "unsupported": "此服务器无法连接到这个密码管理器。",
-        "invalidInput": "请检查各字段后重试。"
+        "invalidInput": "请检查各字段后重试。",
+        "tooManyItems": "Vault 已满。请先删除项目，再同步更多。"
       }
     }
   },
@@ -12061,7 +12064,7 @@
     },
     "vault_delete": {
       "label": "从 Vault 删除",
-      "description": "删除它自己保存的项目，或由提出请求的人管理的项目。"
+      "description": "删除它自己保存的项目。"
     },
     "react": {
       "label": "回应表情",

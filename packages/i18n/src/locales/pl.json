@@ -2902,6 +2902,7 @@
         "unreachable": "Brak połączenia",
         "unsupported": "Niedostępne tutaj",
         "invalid_input": "Sprawdź pola",
+        "too_many_items": "Vault pełny",
         "other": "Nie udało się odczytać"
       },
       "fix": {
@@ -2915,6 +2916,7 @@
         "unreachable": "Jego serwer nie odpowiedział. Spróbuje ponownie sam.",
         "unsupported": "Ten serwer nie może tego odczytać. Zapytaj osobę, która nim zarządza.",
         "invalid_input": "Coś w polach zostało odrzucone. Połącz ponownie i je sprawdź.",
+        "too_many_items": "Usuń elementy, zanim zsynchronizujesz więcej.",
         "other": "Spróbuj Synchronizuj teraz albo połącz ponownie."
       }
     },
@@ -11588,7 +11590,8 @@
         "rateLimited": "Menedżer haseł poprosił, żeby poczekać. Spróbuj ponownie za kilka minut.",
         "unreachable": "Nie udało się połączyć z menedżerem haseł. Sprawdź adres i spróbuj ponownie.",
         "unsupported": "Ten serwer nie może połączyć się z tym menedżerem haseł.",
-        "invalidInput": "Sprawdź pola i spróbuj ponownie."
+        "invalidInput": "Sprawdź pola i spróbuj ponownie.",
+        "tooManyItems": "Vault jest pełny. Usuń elementy, zanim zsynchronizujesz więcej."
       }
     }
   },
@@ -13248,7 +13251,7 @@
     },
     "vault_delete": {
       "label": "Usuń z Vault",
-      "description": "Usuwa element, który sam zapisał, albo taki, którym zarządza osoba prosząca."
+      "description": "Usuwa element, który sam zapisał."
     },
     "react": {
       "label": "Zareaguj",

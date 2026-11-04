@@ -197,7 +197,10 @@ export interface VaultConnectionPatch {
 /** "Save to the Vault" on a secret request's card, sent after the box was delivered. */
 export interface SecretToVaultInput {
   value: string;
-  /** Logins: the username to keep with it. */
+  /**
+   * Logins: the username the person kept on the card ("" = none, even when the agent suggested one). Absent: the
+   * request's own. The cards always send it for a site's password.
+   */
   username?: string;
   scope: VaultScope;
   allAgents: boolean;

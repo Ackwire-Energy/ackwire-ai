@@ -793,7 +793,8 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       if (choice)
         saveToVault({
           value: text,
-          username: current.target.kind === "site" ? choice.username.trim() || undefined : undefined,
+          // A site's username always goes: empty means none, even when the agent suggested one (ADR 0135 §6).
+          ...(current.target.kind === "site" ? { username: choice.username.trim() } : {}),
           scope: choice.scope,
           allAgents: choice.allAgents,
           agentIds: choice.allAgents ? [] : choice.agentIds,

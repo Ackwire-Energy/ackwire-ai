@@ -2731,6 +2731,7 @@
         "unreachable": "Onbereikbaar",
         "unsupported": "Hier niet beschikbaar",
         "invalid_input": "Controleer de velden",
+        "too_many_items": "Vault vol",
         "other": "Kon niet lezen"
       },
       "fix": {
@@ -2744,6 +2745,7 @@
         "unreachable": "De server antwoordde niet. Het probeert het zelf opnieuw.",
         "unsupported": "Deze server kan het niet lezen. Vraag het aan wie hem beheert.",
         "invalid_input": "Iets in de velden is geweigerd. Koppel opnieuw en controleer ze.",
+        "too_many_items": "Verwijder items voordat je meer synchroniseert.",
         "other": "Probeer Nu synchroniseren of koppel opnieuw."
       }
     },
@@ -10919,7 +10921,8 @@
         "rateLimited": "De wachtwoordmanager vroeg ons te wachten. Probeer het over een paar minuten opnieuw.",
         "unreachable": "Kon de wachtwoordmanager niet bereiken. Controleer het adres en probeer het opnieuw.",
         "unsupported": "Deze server kan niet met deze wachtwoordmanager koppelen.",
-        "invalidInput": "Controleer de velden en probeer het opnieuw."
+        "invalidInput": "Controleer de velden en probeer het opnieuw.",
+        "tooManyItems": "De Vault is vol. Verwijder items voordat je meer synchroniseert."
       }
     }
   },
@@ -12504,7 +12507,7 @@
     },
     "vault_delete": {
       "label": "Verwijderen uit de Vault",
-      "description": "Verwijdert een item dat hij heeft opgeslagen, of een item dat de vragende persoon beheert."
+      "description": "Verwijdert een item dat hij heeft opgeslagen."
     },
     "react": {
       "label": "Reageren",

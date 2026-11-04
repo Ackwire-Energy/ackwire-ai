@@ -305,7 +305,9 @@ const ImportResult = z
 export const SecretToVaultInput = z
   .object({
     value: SecretValue,
-    username: Username.optional().openapi({ description: "Logins: the username to keep with it." }),
+    username: Username.optional().openapi({
+      description: "Logins: the username to keep with it (empty: none). Absent: the request's own.",
+    }),
     scope: Scope,
     allAgents: z.boolean(),
     agentIds: z.array(z.uuid()).max(200),

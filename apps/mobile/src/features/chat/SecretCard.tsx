@@ -21,7 +21,7 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
 import { useSheetIfAny } from "../shared/SheetHost";
-import { codeComplete, codeLength, LIMITS, vaultSaveOffered } from "../vault/logic";
+import { codeComplete, codeLength, LIMITS, secretToVaultInput, vaultSaveOffered } from "../vault/logic";
 import { AgentPickSheet } from "../vault/parts";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore, useExpired } from "./asks";
 import { markName } from "./logic";
@@ -135,14 +135,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       done(res);
       // Delivered first: the Vault keeps it only once the computer has it (the server checks it too).
       if (offered && save) {
-        const name = username.trim();
         void keep({
           requestId: r.id,
-          value: sent,
-          scope: scope === "team" && canTeam ? "team" : "personal",
-          allAgents: pick.allAgents,
-          agentIds: pick.agentIds,
-          ...(site && name ? { username: name } : {}),
+          ...secretToVaultInput(r, sent, { scope: scope === "team" && canTeam ? "team" : "personal", pick, username }),
         });
       }
     } catch (err) {

@@ -4,6 +4,10 @@
  * longer lists are marked missing (nobody uses them until they come back). A refusal (`VaultSourceError`) leaves the
  * items as they were and goes on the connection (`status` `error`, `errorCode`), never the source's own words.
  *
+ * The workspace's cap (`VAULT_MAX_ITEMS`) counts every item. At it, the items already here stay and are updated, and
+ * only new ones wait: the connection says `too_many_items` (`status` `error`) until a later sync finds room. Whether
+ * an item is missing is decided by the source's listing alone, never by the cap.
+ *
  * Every connection is read again every 10 minutes (`enqueueVaultSyncs`, one job per connection and window), except
  * one whose sign-in was refused: trying again with the same credentials could lock its account, so it waits for a
  * person to reconnect it.
@@ -15,7 +19,7 @@ import {
   type VaultSourceItem,
   vaultOrigin,
 } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNull, lt, not, notInArray, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, lt, not, or, schema, sql } from "@agenteschat/db";
 import { UUID } from "../authority";
 import { SealedValueError } from "../crypto";
 import { publishVaultChanged } from "../events";
@@ -31,6 +35,7 @@ import {
   type VaultItemKind,
   vaultNow,
 } from "./service";
+import { hostOf } from "./views";
 
 const { organizations, vaultConnections, vaultItems } = schema;
 
@@ -40,8 +45,11 @@ export const VAULT_SYNC_JOB = "vault.sync";
 export const VAULT_SYNC_EVERY_MS = 10 * 60_000;
 /** Refusals that wait for a person to reconnect instead of being tried again. */
 const WAITS_FOR_PERSON = ["auth_failed", "locked"];
-
-const hostOf = (origin: string) => new URL(origin).host;
+/**
+ * The connection's `errorCode` when the Vault was full: what it already had stays, new items wait for room. Not a
+ * refusal of the source: the next sync tries again by itself (the apps say "Remove items before syncing more").
+ */
+export const VAULT_FULL = "too_many_items";
 
 /** A row's columns from one listed item; null when it can't be kept (an unknown kind, no id). */
 function rowOf(connection: ConnectionRow, item: VaultSourceItem) {
@@ -78,7 +86,7 @@ const failureOf = (error: unknown) =>
 
 /**
  * Reads one connection now. Returns the row as it ends and, when the source refused, why (also on the row). Never
- * throws for a source's refusal.
+ * throws for a source's refusal. A full Vault isn't one: the row says `too_many_items` and `error` stays null.
  */
 export async function syncConnectionRow(
   deps: Pick<VaultDeps, "db" | "keyWrappers" | "sources" | "pubsub" | "now">,
@@ -117,7 +125,13 @@ export async function syncConnectionRow(
     const row = rowOf(connection, item);
     if (row && !byRef.has(row.externalRef)) byRef.set(row.externalRef, row);
   }
-  // The workspace's cap counts every item; this connection may fill what the others leave.
+  const existing = await db
+    .select({ id: vaultItems.id, externalRef: vaultItems.externalRef, missing: vaultItems.missing })
+    .from(vaultItems)
+    .where(and(eq(vaultItems.orgId, connection.orgId), eq(vaultItems.connectionId, connection.id)));
+  const known = new Set(existing.map((r) => r.externalRef));
+  // The workspace's cap counts every item (this connection's missing ones too): the ones already here stay, and new
+  // ones fill only what is left.
   const [{ others } = { others: 0 }] = await db
     .select({ others: sql<number>`count(*)::int` })
     .from(vaultItems)
@@ -127,8 +141,13 @@ export async function syncConnectionRow(
         or(isNull(vaultItems.connectionId), sql`${vaultItems.connectionId} <> ${connection.id}`),
       ),
     );
-  const rows = [...byRef.values()].slice(0, Math.max(0, VAULT_MAX_ITEMS - others));
-  const refs = rows.map((r) => r.externalRef);
+  const all = [...byRef.values()];
+  const fresh = all.filter((r) => !known.has(r.externalRef));
+  const room = Math.max(0, VAULT_MAX_ITEMS - others - existing.length);
+  const rows = [...all.filter((r) => known.has(r.externalRef)), ...fresh.slice(0, room)];
+  const full = fresh.length > room;
+  // Missing: what the source no longer lists, whatever the cap kept out.
+  const gone = existing.filter((r) => !r.missing && !byRef.has(r.externalRef ?? "")).map((r) => r.id);
 
   await db.transaction(async (tx) => {
     for (let i = 0; i < rows.length; i += 200) {
@@ -154,18 +173,14 @@ export async function syncConnectionRow(
             or (${vaultItems.keyName} is null and excluded.key_name is not null)`,
         });
     }
-    await tx
-      .update(vaultItems)
-      .set({ missing: true, updatedAt: now })
-      .where(
-        and(
-          eq(vaultItems.orgId, connection.orgId),
-          eq(vaultItems.connectionId, connection.id),
-          eq(vaultItems.missing, false),
-          refs.length > 0 ? notInArray(vaultItems.externalRef, refs) : undefined,
-        ),
-      );
+    for (let i = 0; i < gone.length; i += 1000) {
+      await tx
+        .update(vaultItems)
+        .set({ missing: true, updatedAt: now })
+        .where(and(eq(vaultItems.orgId, connection.orgId), inArray(vaultItems.id, gone.slice(i, i + 1000))));
+    }
   });
+  if (full) return ended({ status: "error", errorCode: VAULT_FULL, syncedAt: now }, null);
   return ended({ status: "ready", errorCode: null, syncedAt: now }, null);
 }
 

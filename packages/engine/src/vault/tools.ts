@@ -15,9 +15,9 @@ import {
   type VaultDeps,
   type VaultItemForAgent,
   type VaultItemKind,
-  VaultRefusal,
   type VaultRun,
   vaultPersonOfRun,
+  vaultRefusalOutput,
 } from "./index";
 
 /**
@@ -59,12 +59,11 @@ const CONTACT_LABELS: Record<(typeof CONTACT_FIELDS)[number], string> = {
 const runOf = (ctx: ToolContext): VaultRun => ({ orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId });
 
 /** A refusal in the Vault's own words (it never says an item hidden from the run exists); anything else as failed. */
-function failed(error: unknown): ToolOutput {
-  if (error instanceof VaultRefusal) {
-    return { content: error.message, isError: true, data: { code: `vault.${error.code}` } };
-  }
-  return { content: `Failed: ${error instanceof Error ? error.message : String(error)}`, isError: true };
-}
+const failed = (error: unknown): ToolOutput =>
+  vaultRefusalOutput(error) ?? {
+    content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
+    isError: true,
+  };
 
 /** Where a login may be typed, in words (`github.com`, `anywhere on github.com`). */
 function siteText(item: VaultItemForAgent) {
@@ -94,7 +93,8 @@ function itemLine(item: VaultItemForAgent, owner: string): string {
         ...about,
       ])}`;
     case "key":
-      return `- ${item.keyName ?? "(no variable name)"} (${scope}):\n${itemBlock([quoted(item.title), ...about])}`;
+      // The variable name goes in run_code's `keys`; the id in vault_save, to change its description.
+      return `- ${item.keyName ?? "(no variable name)"} (${scope}, id ${item.id}):\n${itemBlock([quoted(item.title), ...about])}`;
     default: {
       const fields = CONTACT_FIELDS.flatMap((k) => {
         const v = item.contact?.[k];
@@ -141,7 +141,7 @@ export function vaultListText(items: VaultItemForAgent[], who: { name: string | 
   const keys = of("key");
   if (keys.length > 0) {
     parts.push(
-      `Keys (give their variable names in run_code's \`keys\`: each is set in that one command's environment, as $NAME):\n${keys.join("\n")}`,
+      `Keys (give their variable names in run_code's \`keys\`: each is set in that one command's environment, as $NAME. To change a description, give vault_save the id):\n${keys.join("\n")}`,
     );
   }
   const contacts = of("contact");
@@ -194,14 +194,14 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
         const site = str(input.site).trim();
         const query = str(input.query).trim();
         const run = runOf(ctx);
-        const [person, items] = await Promise.all([
-          vaultPersonOfRun(ctx.db, run),
-          listUsableVault(deps, run, {
-            ...(kind ? { kind } : {}),
-            ...(site ? { site } : {}),
-            ...(query ? { query } : {}),
-          }),
-        ]);
+        // Who is behind the run, read once: the list is theirs, and the answer names them.
+        const person = await vaultPersonOfRun(ctx.db, run);
+        const items = await listUsableVault(
+          deps,
+          run,
+          { ...(kind ? { kind } : {}), ...(site ? { site } : {}), ...(query ? { query } : {}) },
+          person,
+        );
         const name = person.personId ? await nameOf(ctx, person.personId) : null;
         return {
           content: vaultListText(items, { name }, Boolean(kind || site || query)),

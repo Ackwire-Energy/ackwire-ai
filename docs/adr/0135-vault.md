@@ -59,9 +59,10 @@ Two narrower rules:
   report or work woke) never sends a credential, and a command holding a key could send it anywhere, so `run_code`
   with `keys` is refused there ("A routine can't use Vault keys in commands…"). A saved login it may still type in
   the browser: that value never reaches the model or a command.
-- **A shared browser profile (ADR 0110) takes only what all its agents may use.** A session signed in there is every
-  granted agent's, so a personal login is never typed in one, and a team login only when it is shared with all
-  agents or with each agent the profile is granted to (the grants read at the fill).
+- **A shared browser profile (ADR 0110) takes only what all its agents may use, for anyone.** A session signed in
+  there is every granted agent's, whoever each one works for, so a personal login is never typed in one, nor a team
+  login open only to some people or roles; a team login open to everyone, only when it is shared with all agents or
+  with each agent the profile is granted to (the grants read at the fill).
 
 What agents change: a contact they keep for the person behind the run, a login's username, an item's description,
 on that person's own items, or on the team's only when that person manages credentials, as in the app. An agent
@@ -90,7 +91,10 @@ runner's checks are the same for all.
 - **Modules** add sources through `AgentesModule.adapters()` (`vaultSources`, merged by kind).
 
 A source's items are indexed (`vault_items`, metadata only) and follow the connection's default access until someone
-changes theirs. An item gone from its source is marked missing, not deleted, so its history stays.
+changes theirs. An item gone from its source is marked missing, not deleted, so its history stays. The workspace's
+item limit counts them too: at it, the items already indexed stay and new ones wait, the connection showing
+`too_many_items` ("Remove items before syncing more") until a later sync finds room; what is missing is decided by
+the source's list alone.
 
 ### 4. Filling without asking
 
@@ -111,9 +115,9 @@ A saved login is typed without a person's yes each time. The guards are elsewher
    `location`, `ancestorOrigins` or `top`, so what the check guarantees is the origins the value goes to, and the
    field checks catch honest mistakes (a script of the rule's own site could read the field anyway).
 4. **A typed value doesn't leave in an address.** Before a password is typed, its Chrome pauses every request and
-   the fill waits until Chrome acknowledged that on every page and frame (unconfirmed: nothing is typed); for 2
-   minutes then, a request whose URL carries the value (raw or encoded) is stopped, and the agent is told. A fill
-   that was refused takes the guard back.
+   the fill waits until Chrome acknowledged that on every page and frame, those opened since an earlier fill too
+   (unconfirmed, or refused by one still open: nothing is typed); for 2 minutes then, a request whose URL carries
+   the value (raw or encoded) is stopped, and the agent is told. A fill that was refused takes the guard back.
 5. **Replies are redacted.** For 10 minutes the value is removed from every browser reply and error, browser
    profiles' included.
 6. **Chrome keeps nothing.** Its own password manager, sign-in and form autofill are off in every agent profile.
@@ -122,7 +126,9 @@ A saved login is typed without a person's yes each time. The guards are elsewher
 Keys follow the same path to step 2, then go into the environment of one command only (`run_code` with `keys`,
 `exec.vault`), with its output redacted, and are kept nowhere; never in a run a routine feeds (§2). Computer brains,
 whose own shells can't take a value for one command, reach the same path through a tool. A key's use is recorded
-once the command was sent, whether or not its answer comes back.
+once the computer took the command with it: an answer came back (any exit code), or none did (the link dropped, no
+answer in time). Not when the command never reached the computer or the runner refused it before opening the keys
+(the command policy, a switch, a key it couldn't open).
 
 What agents read of an item (its title, username, description, a contact's fields) was written by people, agents,
 password managers or CSV files: `vault_list` gives each item's text in its own `untrustedBlock` and counts as

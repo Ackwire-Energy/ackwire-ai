@@ -32,39 +32,43 @@ export function notAllowedMessage(name: string, detail: string, path?: string) {
   }`;
 }
 
-/** Runner error codes → what the agent reads (and tells the people). */
+/**
+ * Runner error codes → what the agent reads (and tells the people). The runner's error stays as the `cause` of the
+ * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0135 §4).
+ */
 function explain(error: unknown, name: string, path?: string): Error {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error : new Error(String(error));
+  const said = (message: string) => new Error(message, { cause: error });
   switch (error.code) {
     case "exec_disabled":
-      return new Error(
+      return said(
         `Commands are turned off on the computer ${name} (its runner was started with --no-exec): you can only read, write, list and upload files there. Tell the person; its owner can restart the runner without --no-exec.`,
       );
     case "outside_workspace":
-      return new Error(
+      return said(
         `${path ?? "That path"} is outside the computer's workspace folder (or a link that leaves it); use paths inside the workspace.`,
       );
     case "too_large":
-      return new Error(
+      return said(
         `${path ?? "The file"} is too large to move this way (max ${MB(MAX_INLINE_FILE_BYTES)}); use upload_file to send big files to the Drive.`,
       );
     case "not_found":
-      return new Error(`No file or folder ${path ?? ""} on ${name}.`.replace("  ", " "));
+      return said(`No file or folder ${path ?? ""} on ${name}.`.replace("  ", " "));
     case "not_allowed":
       // The command policy's `never` (a push our git proxy refuses): callers read its code, as below.
-      return policyRefusal(error.message) ? error : new Error(notAllowedMessage(name, error.message, path));
+      return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path));
     case "paused":
-      return new Error(
+      return said(
         `The owner paused the computer ${name}: nothing new can start there until they resume it. Tell the people.`,
       );
     case "timeout":
     case "canceled":
-      return new Error(error.message);
+      return said(error.message);
     // The command policy held it: its message says why and how to ask a person, and callers read its code.
     case "approval_needed":
       return error;
     default:
-      return new Error(`The computer ${name} failed: ${error.message}`);
+      return said(`The computer ${name} failed: ${error.message}`);
   }
 }
 

@@ -39,7 +39,16 @@ import {
   vaultNow,
 } from "./service";
 import { listUses, recordPersonUse } from "./uses";
-import { connectionOf, connectionView, contactOf, itemView, loadVault, sourceInfos, sourceNameOf } from "./views";
+import {
+  connectionOf,
+  connectionView,
+  contactOf,
+  hostOf,
+  itemView,
+  loadVault,
+  sourceInfos,
+  sourceNameOf,
+} from "./views";
 
 const { vaultConnections, vaultItems } = schema;
 
@@ -153,8 +162,6 @@ export function cleanContact(input: VaultContactFields | undefined | null): Vaul
 
 /** A key's last 4 characters, only when that leaves most of it unknown. */
 export const keyHintOf = (value: string) => (value.length >= 12 ? value.slice(-4) : null);
-
-const hostOf = (origin: string) => new URL(origin).host;
 
 /** A title, or the item's own name when none was given (a login's host, a key's name, a contact's name). */
 function titleFor(

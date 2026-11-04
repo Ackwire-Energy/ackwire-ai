@@ -1,5 +1,6 @@
 import type {
   SecretRequest,
+  SecretToVaultInput,
   VaultAccess,
   VaultConnectField,
   VaultConnection,
@@ -483,6 +484,8 @@ const SOURCE_ERRORS = new Set([
   "unreachable",
   "unsupported",
   "invalid_input",
+  // The Vault's own: full, so new items wait (ADR 0135 §3).
+  "too_many_items",
 ]);
 
 /**
@@ -577,6 +580,24 @@ export function fieldKeyboard(f: Pick<VaultConnectField, "kind">) {
 export function vaultSaveOffered(r: Pick<SecretRequest, "target"> & { codeDigits?: number | null }): boolean {
   if (r.codeDigits) return false;
   return r.target.kind === "site" || r.target.kind === "env";
+}
+
+/**
+ * What "Save to the Vault" sends (ADR 0135 §6). A site's password always carries the username the person left on the
+ * card: empty means none, even when the agent suggested one (absent would keep the agent's).
+ */
+export function secretToVaultInput(
+  r: Pick<SecretRequest, "target">,
+  value: string,
+  choice: { scope: VaultScope; pick: Pick<VaultAccess, "allAgents" | "agentIds">; username: string },
+): SecretToVaultInput {
+  return {
+    value,
+    scope: choice.scope,
+    allAgents: choice.pick.allAgents,
+    agentIds: choice.pick.agentIds,
+    ...(r.target.kind === "site" ? { username: choice.username.trim() } : {}),
+  };
 }
 
 /** A code request's boxes: 4 to 12 digits, or null when the request isn't one. */

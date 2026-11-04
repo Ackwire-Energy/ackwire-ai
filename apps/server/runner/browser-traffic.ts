@@ -30,8 +30,11 @@ import { urlCarries } from "./vault";
  * while, every request of that Chrome pauses (`Fetch.enable` on each of its
  * sessions, new ones too) and one whose address carries the password fails
  * (`Fetch.failRequest`) instead of leaving; the rest go on at once. The guard
- * is ready once Chrome acknowledged `Fetch.enable` on every session it had, and
- * the runner types only then. Only while armed: nothing is paused otherwise.
+ * is ready once Chrome acknowledged `Fetch.enable` on every session it has
+ * then (ones that attached since the last guard too), and the runner types only
+ * then. An error in answer leaves that session unpaused, so the guard isn't
+ * ready, unless the session is gone. Only while armed: nothing is paused
+ * otherwise.
  */
 
 const AUTO_ATTACH = {
@@ -66,8 +69,9 @@ interface Guard {
 /** A guard just armed: `ready` once Chrome paused every session's requests (false: it couldn't), `release` to undo. */
 export interface ArmedGuard {
   /**
-   * True once Chrome acknowledged `Fetch.enable` on every session it had when the guard was armed; false when the
-   * socket closed or no answer came within `readyMs`. Type nothing before it is true.
+   * True once Chrome acknowledged `Fetch.enable` on every session it had when the guard was armed (including ones
+   * that attached after an earlier guard's); false when a session still there answered with an error, the socket
+   * closed or no answer came within `readyMs`. Type nothing before it is true.
    */
   ready: Promise<boolean>;
   /** Takes these values back out (a fill that was refused); the guard ends when no value is left. */
@@ -102,6 +106,11 @@ export interface CrashedPage {
 }
 
 type Params = Record<string, unknown>;
+/** One session's `Fetch.enable` while armed: `ok` null until Chrome answers (true: paused there; false: it isn't). */
+interface FetchState {
+  ok: boolean | null;
+  acked: Promise<boolean>;
+}
 /** Chrome's byte counts: a component extension's worker says -1. */
 const bytes = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0);
 
@@ -142,8 +151,8 @@ export function countChromeTraffic(
   const pages = new Map<string, string>();
   /** What waits on an answer, by the id it was asked under. */
   const answers = new Map<number, (result: Params) => void>();
-  /** What waits only for Chrome to answer (a result or an error), by the id it was asked under. */
-  const acks = new Map<number, () => void>();
+  /** What waits only for Chrome to answer, told whether it was an error, by the id it was asked under. */
+  const acks = new Map<number, (failed: boolean) => void>();
   /** Guards waiting on acknowledgements: told when the socket closes (they never come then). */
   const closeWaiters = new Set<() => void>();
   let closed = false;
@@ -155,17 +164,15 @@ export function countChromeTraffic(
   /** The GET guard's value sets while armed (empty: disarmed), and whether `Fetch` is on for every session. */
   let guards: Guard[] = [];
   let fetchOn = false;
-  /** Settles once Chrome acknowledged the `Fetch.enable` round that armed the guard (shared by guards armed during it). */
-  let fetchReady: Promise<boolean> = Promise.resolve(false);
-  /** That round's outcome: null while it waits. A round that failed is tried again by the next guard. */
-  let fetchReadyOk: boolean | null = null;
+  /** Each session's `Fetch.enable` while armed. One that failed (or never answered) is asked again by the next guard. */
+  const fetchStates = new Map<string, FetchState>();
   let guardTimer: ReturnType<typeof setTimeout> | undefined;
   const send = (
     method: string,
     params: Params,
     sessionId?: string,
     then?: (result: Params) => void,
-    ack?: () => void,
+    ack?: (failed: boolean) => void,
   ) => {
     const id = nextId++;
     if (then) answers.set(id, then);
@@ -197,6 +204,7 @@ export function countChromeTraffic(
     clearTimeout(guardTimer);
     if (!fetchOn) return;
     fetchOn = false;
+    fetchStates.clear();
     for (const id of targets()) send("Fetch.disable", {}, id);
   };
   /** Ends the guard when its last value set expires. */
@@ -211,31 +219,49 @@ export function countChromeTraffic(
     guardTimer = setTimeout(schedule, Math.max(0, last - Date.now()));
     (guardTimer as { unref?: () => void }).unref?.();
   };
-  /** `Fetch.enable` on every session; true once Chrome answered each, false on close or after `readyMs`. */
-  const enableFetch = (readyMs: number): Promise<boolean> => {
-    if (closed || !socket) return Promise.resolve(false);
-    const ids = targets();
-    if (ids.length === 0) return Promise.resolve(true);
-    return new Promise<boolean>((resolve) => {
-      let left = ids.length;
-      let settled = false;
-      const done = (ok: boolean) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        closeWaiters.delete(onClose);
-        resolve(ok);
+  /**
+   * `Fetch.enable` on one session, tracked: paused once Chrome answers with a result. An error leaves it unpaused,
+   * unless the session is gone meanwhile (nothing left there to pause); a closed socket, too.
+   */
+  const enableFetchOn = (sessionId: string): FetchState => {
+    const state: FetchState = { ok: null, acked: Promise.resolve(false) };
+    state.acked = new Promise<boolean>((resolve) => {
+      const onClose = () => {
+        state.ok = false;
+        resolve(false);
       };
-      const onClose = () => done(false);
-      const timer = setTimeout(() => done(false), readyMs);
-      (timer as { unref?: () => void }).unref?.();
       closeWaiters.add(onClose);
-      for (const id of ids) {
-        send("Fetch.enable", FETCH, id, undefined, () => {
-          left--;
-          if (left === 0) done(true);
-        });
-      }
+      send("Fetch.enable", FETCH, sessionId, undefined, (failed) => {
+        closeWaiters.delete(onClose);
+        state.ok = !failed || !sessions.has(sessionId);
+        resolve(state.ok);
+      });
+    });
+    fetchStates.set(sessionId, state);
+    return state;
+  };
+  /**
+   * Every session paused: each one's `Fetch.enable` asked (again, for one that failed or never answered) and waited
+   * for. True once Chrome acknowledged each; false on an error, on close or after `readyMs`.
+   */
+  const fetchReady = (readyMs: number): Promise<boolean> => {
+    if (closed || !socket) return Promise.resolve(false);
+    const states = targets().map((id) => {
+      const known = fetchStates.get(id);
+      return known && known.ok !== false ? known : enableFetchOn(id);
+    });
+    if (states.length === 0) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => {
+        // Still unanswered: asked again by the next guard.
+        for (const state of states) if (state.ok === null) state.ok = false;
+        resolve(false);
+      }, readyMs);
+      (timer as { unref?: () => void }).unref?.();
+      void Promise.all(states.map((state) => state.acked)).then((oks) => {
+        clearTimeout(timer);
+        resolve(oks.every(Boolean));
+      });
     });
   };
   const entry = (sessionId: string, requestId: unknown) => {
@@ -268,8 +294,7 @@ export function countChromeTraffic(
       answers.delete(msg.id);
       const ack = acks.get(msg.id);
       acks.delete(msg.id);
-      // An error answers too: a session that went away (or a target that takes no Fetch) has nothing to pause.
-      ack?.();
+      ack?.(msg.error !== undefined);
       if (then && isObject(msg.result)) then(msg.result);
       return;
     }
@@ -284,8 +309,8 @@ export function countChromeTraffic(
           pages.set(p.sessionId, target.targetId);
         }
         send("Network.enable", NETWORK, p.sessionId);
-        // A page or frame that opens while a password is guarded is guarded too.
-        if (fetchOn) send("Fetch.enable", FETCH, p.sessionId);
+        // A page or frame that opens while a password is guarded is guarded too; the next guard waits for it.
+        if (fetchOn) enableFetchOn(p.sessionId);
         send("Target.setAutoAttach", AUTO_ATTACH_RELATED, p.sessionId);
         return;
       }
@@ -312,6 +337,7 @@ export function countChromeTraffic(
         if (typeof p.sessionId === "string") {
           sessions.delete(p.sessionId);
           pages.delete(p.sessionId);
+          fetchStates.delete(p.sessionId);
         }
         return;
       case "Inspector.targetCrashed": {
@@ -366,6 +392,7 @@ export function countChromeTraffic(
       clearTimeout(guardTimer);
       for (const waiter of [...closeWaiters]) waiter();
       closeWaiters.clear();
+      fetchStates.clear();
       sessions.clear();
       pages.clear();
       answers.clear();
@@ -393,18 +420,12 @@ export function countChromeTraffic(
       if (closed) return { ready: Promise.resolve(false), release: () => {} };
       const entry: Guard = { values: kept, until: Date.now() + ms, onBlocked };
       guards = [...live(), entry];
-      if (!fetchOn || fetchReadyOk === false) {
-        fetchOn = true;
-        fetchReadyOk = null;
-        const round = enableFetch(readyMs);
-        fetchReady = round;
-        void round.then((ok) => {
-          if (fetchReady === round) fetchReadyOk = ok;
-        });
-      }
+      fetchOn = true;
+      // Every session now, those already paused included: one that attached since, or failed, is waited for too.
+      const ready = fetchReady(readyMs);
       schedule();
       return {
-        ready: fetchReady,
+        ready,
         release: () => {
           if (!guards.includes(entry)) return;
           guards = guards.filter((g) => g !== entry);

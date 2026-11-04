@@ -872,9 +872,13 @@ async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, sc
         agent,
         await browser.batch(agent, folder, { ...req, desktop: false }, scope.signal, actor),
       );
-    case "browser.capture":
+    case "browser.capture": {
       requireTool(ctx, "browser");
-      return browser.capture(agent, folder, req.allowedDomains, scope.signal);
+      const shot = await browser.capture(agent, folder, req.allowedDomains, scope.signal);
+      // The page's address, redacted like the session's other answers (ADR 0135); never the image's bytes.
+      if (!shot.url) return shot;
+      return { ...shot, url: await profileRedacted(ctx, actor, agent, shot.url) };
+    }
     case "browser.warm":
       requireTool(ctx, "browser");
       return browser.warm(agent, folder, false);

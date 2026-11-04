@@ -2729,6 +2729,7 @@
         "unreachable": "Nicht erreichbar",
         "unsupported": "Hier nicht verfügbar",
         "invalid_input": "Felder prüfen",
+        "too_many_items": "Vault voll",
         "other": "Konnte nicht lesen"
       },
       "fix": {
@@ -2742,6 +2743,7 @@
         "unreachable": "Sein Server hat nicht geantwortet. Er versucht es von selbst noch einmal.",
         "unsupported": "Dieser Server kann ihn nicht lesen. Frag, wer ihn betreibt.",
         "invalid_input": "Etwas in den Feldern wurde abgelehnt. Verbinde neu und prüf sie.",
+        "too_many_items": "Lösch Einträge, bevor du mehr synchronisierst.",
         "other": "Versuch Jetzt synchronisieren oder verbinde neu."
       }
     },
@@ -10841,7 +10843,8 @@
         "rateLimited": "Der Passwort-Manager hat uns gebeten zu warten. Versuch es in ein paar Minuten noch einmal.",
         "unreachable": "Der Passwort-Manager ist nicht erreichbar. Prüf die Adresse und versuch es noch einmal.",
         "unsupported": "Dieser Server kann sich nicht mit diesem Passwort-Manager verbinden.",
-        "invalidInput": "Prüf die Felder und versuch es noch einmal."
+        "invalidInput": "Prüf die Felder und versuch es noch einmal.",
+        "tooManyItems": "Der Vault ist voll. Lösch Einträge, bevor du mehr synchronisierst."
       }
     }
   },
@@ -12420,7 +12423,7 @@
     },
     "vault_delete": {
       "label": "Aus dem Vault löschen",
-      "description": "Löscht einen Eintrag, den er gespeichert hat, oder einen, den die anfragende Person verwaltet."
+      "description": "Löscht einen Eintrag, den er gespeichert hat."
     },
     "react": {
       "label": "Reagieren",

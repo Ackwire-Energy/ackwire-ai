@@ -79,7 +79,9 @@ export async function saveSecretRequestToVault(
     } catch {
       throw notSavable("This request has no HTTPS site to keep it for");
     }
-    const username = cleanText(input.username ?? request.username, VAULT_LIMITS.username, "username") || null;
+    // The person's choice when the card sent one ("" = no username, a suggestion they cleared), else the agent's.
+    const chosen = input.username !== undefined ? input.username : request.username;
+    const username = cleanText(chosen, VAULT_LIMITS.username, "username") || null;
     value = cleanSecret(input.value, "login");
     existing = await sameLogin(db, orgId, ownerUserId, website, username);
     fields = { title: new URL(website).host, description: "", website, username, keyName: null };

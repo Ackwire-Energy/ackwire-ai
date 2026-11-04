@@ -193,7 +193,7 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   },
   vault_delete: {
     label: "Delete from the Vault",
-    description: "Deletes an item it saved, or one the person asking manages.",
+    description: "Deletes an item it saved.",
   },
   offer_connect_ai: {
     label: "Offer to connect an AI",

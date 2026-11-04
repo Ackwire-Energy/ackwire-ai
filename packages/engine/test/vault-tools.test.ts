@@ -18,13 +18,18 @@ import {
   createVaultToolSource,
   grantScopes,
   insertMessage,
+  keysMayHaveRun,
   type MachineCaller,
+  MachineDroppedError,
+  MachineOfflineError,
+  MachineRequestError,
   type MachineStatus,
   ROUTINE_KEYS_REFUSAL,
   runnerFailureText,
   secretRequestView,
   type ToolContext,
   toolKind,
+  VAULT_KEY_EXPIRED,
   type VaultDeps,
   vaultListText,
   vaultTypingRefusal,
@@ -69,6 +74,8 @@ function fakeComputer(at: { machineId: string; orgId: string }) {
     typeVault: (): Reply => ok({ typed: true }),
     /** Set: `exec` opens its keys, then the connection drops before any answer. */
     execDrops: false,
+    /** Set: `exec` fails with this before any key is opened (never reached, or refused by the runner first). */
+    execRefuses: null as (() => Error) | null,
   };
   const open = async (keyId: string, box: SecretBox, agentId: string, use: Parameters<typeof vaultAad>[0]["use"]) => {
     const privateKey = keys.get(keyId);
@@ -135,6 +142,7 @@ function fakeComputer(at: { machineId: string; orgId: string }) {
         case "write":
           return { size: 1 } as never;
         case "exec": {
+          if (s.execRefuses) throw s.execRefuses();
           for (const k of r.vault?.keys ?? []) {
             await open(r.vault?.keyId ?? "", k.box, agentId, { kind: "env", name: k.name });
           }
@@ -297,8 +305,8 @@ test("vault_list shows what is shared with the agent for the person behind the r
   expect(out.content).toContain('"Acme admin"');
   expect(out.content).toContain('username "dev@acme.example"');
   expect(out.content).toContain("on acme.example");
-  // Ana's own key: by its variable name, for run_code's `keys`.
-  expect(out.content).toContain("ACME_API_KEY");
+  // Ana's own key: by its variable name, for run_code's `keys`, and its id, for vault_save.
+  expect(out.content).toContain(`- ACME_API_KEY (personal, ana, id ${v.items.key.id}):`);
   expect(out.content).toContain("Read-only key for the Acme API");
   // A contact's fields are meant for the agent.
   expect(out.content).toContain("billing@acme.example");
@@ -423,6 +431,17 @@ test("a login is refused before its value goes out: not shared, another site, an
   expect(hidden.content).not.toContain("Payroll");
   const unknown = await v.call(ana, "browser_type_secret", { target: "e2", login: crypto.randomUUID() });
   expect(unknown.content).toBe(hidden.content);
+  // Nothing saved to type: said before anything runs, in its own words.
+  const empty = await createVaultItem(v.vault, f.owner.id, f.org.id, {
+    kind: "login",
+    scope: "team",
+    title: "Acme empty",
+    website: "https://acme.example",
+    access: { everyone: true, roleIds: [], userIds: [], allAgents: true, agentIds: [] },
+  });
+  const nothing = await v.call(ana, "browser_type_secret", { target: "e2", login: empty.id });
+  expect(nothing.isError).toBe(true);
+  expect(nothing.content).toContain('"Acme empty" has nothing saved');
 
   // The page is on another site: the Vault refuses, no key is made.
   v.computer.s.url = "https://acme-login.example/";
@@ -684,10 +703,19 @@ test("in a shared browser profile, a login is typed only when every agent grante
   expect(team.content).toContain("isn't shared with every agent");
   expect(keysAsked()).toBe(0);
   expect(v.computer.opened).toEqual([]);
-  // Shared with both of them: typed in the profile.
+  // Shared with both, but open only to Ana: Bia in the same session may be working for anyone else.
   await f.db
     .update(schema.vaultItems)
-    .set({ agentIds: [f.agent.id, bia.id] })
+    .set({ agentIds: [f.agent.id, bia.id], audienceEveryone: false, audienceUserIds: [f.owner.id] })
+    .where(eq(schema.vaultItems.id, v.items.login.id));
+  const some = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
+  expect(some.isError).toBe(true);
+  expect(some.content).toContain("open only to some people");
+  expect(keysAsked()).toBe(0);
+  // Open to everyone and shared with both of them: typed in the profile.
+  await f.db
+    .update(schema.vaultItems)
+    .set({ audienceEveryone: true, audienceUserIds: [] })
     .where(eq(schema.vaultItems.id, v.items.login.id));
   const typed = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
   expect(typed.isError).toBeFalsy();
@@ -735,4 +763,49 @@ test("a key's use is recorded even when the command's answer never comes back", 
   // The computer opened the key for that command: its use is on the item all the same.
   expect(v.computer.opened).toEqual([{ use: "env:ACME_API_KEY", value: KEY_VALUE }]);
   expect((await usesOf(v.items.key.id)).filter((u) => u.action === "key")).toHaveLength(1);
+});
+
+test("a key's use isn't recorded when the command never ran with it: offline, held, refused by the runner first", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const run = () =>
+    v.call(ana, "run_code", { language: "bash", code: "curl -s $ACME_API_KEY", keys: ["ACME_API_KEY"] });
+  const keyUses = async () => (await usesOf(v.items.key.id)).filter((u) => u.action === "key");
+
+  // The command policy holds it for a person's approval: asked again later, with new keys.
+  v.computer.s.execRefuses = () => new MachineRequestError("approval_needed", "This command needs a person's yes.");
+  const held = await run();
+  expect(held.isError).toBe(true);
+  expect(held.data?.code).toBe("command.approval_needed");
+  // Commands turned off there, and a computer that went away before it was sent.
+  v.computer.s.execRefuses = () => new MachineRequestError("exec_disabled", "Commands are turned off");
+  expect((await run()).isError).toBe(true);
+  v.computer.s.execRefuses = () => new MachineOfflineError("MacBook", null);
+  expect((await run()).isError).toBe(true);
+  expect(v.computer.opened).toEqual([]);
+  expect(await keyUses()).toHaveLength(0);
+
+  // It ran: recorded.
+  v.computer.s.execRefuses = null;
+  expect((await run()).isError).toBeFalsy();
+  expect(await keyUses()).toHaveLength(1);
+
+  // How a failure is read: the runner's error stays as the cause of the words the agent gets.
+  const coded = (code: string) => new Error("words", { cause: new MachineRequestError(code as never, code) });
+  expect(keysMayHaveRun(coded("timeout"))).toBe(true);
+  expect(keysMayHaveRun(coded("not_allowed"))).toBe(false);
+  expect(keysMayHaveRun(coded("not_found"))).toBe(false);
+  expect(keysMayHaveRun(new MachineDroppedError("MacBook"))).toBe(true);
+  expect(keysMayHaveRun(new MachineOfflineError("MacBook", null))).toBe(false);
+  expect(keysMayHaveRun(new Error("anything else"))).toBe(true);
+});
+
+test("a one-use key gone before the command ran reads as an expired key, not a missing file", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  v.computer.s.execRefuses = () => new MachineRequestError("not_found", "No such key");
+  const r = await v.call(ana, "run_code", { language: "bash", code: "curl -s $ACME_API_KEY", keys: ["ACME_API_KEY"] });
+  expect(r.isError).toBe(true);
+  expect(r.content).toContain(VAULT_KEY_EXPIRED);
+  expect(r.content).not.toContain("No file or folder");
 });

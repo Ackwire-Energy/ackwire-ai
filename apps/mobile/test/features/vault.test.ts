@@ -42,6 +42,7 @@ import {
   reservedKeyName,
   sameAccess,
   scopeParam,
+  secretToVaultInput,
   shownFields,
   sourceErrorKey,
   textParam,
@@ -448,6 +449,8 @@ describe("password managers", () => {
     // The same words the server's refusal gets while connecting (`errors.vault.source.*`).
     expect(sourceErrorKey("auth_failed")).toBe("errors.vault.source.authFailed");
     expect(sourceErrorKey("many_vaults")).toBe("errors.vault.source.manyVaults");
+    // The Vault's own: full, so new items wait.
+    expect(sourceErrorKey("too_many_items")).toBe("errors.vault.source.tooManyItems");
     expect(sourceErrorKey("whatever")).toBe("errors.vault.sourceError");
     expect(sourceErrorKey(null)).toBe("errors.vault.sourceError");
     expect(connectionState(connection())).toEqual({ key: "mobile.vault.connection.ready", icon: "check" });
@@ -491,6 +494,20 @@ describe("the request card and the screens", () => {
     expect(vaultSaveOffered(request({ target: { kind: "env" } }))).toBe(true);
     expect(vaultSaveOffered(request({ target: { kind: "file", path: "~/.netrc" } }))).toBe(false);
     expect(vaultSaveOffered(request({ codeDigits: 6 }))).toBe(false);
+  });
+
+  test("Save to the Vault sends a site's username always: cleared, the agent's suggestion isn't kept", () => {
+    const choice = { scope: "personal" as const, pick: { allAgents: false, agentIds: ["a1"] }, username: " dev " };
+    expect(secretToVaultInput(request({ username: "dev" }), "pw", choice)).toStrictEqual({
+      value: "pw",
+      scope: "personal",
+      allAgents: false,
+      agentIds: ["a1"],
+      username: "dev",
+    });
+    expect(secretToVaultInput(request({ username: "guessed" }), "pw", { ...choice, username: "  " }).username).toBe("");
+    // A key has no username at all.
+    expect("username" in secretToVaultInput(request({ target: { kind: "env" } }), "pw", choice)).toBe(false);
   });
 
   test("a code has 4 to 12 boxes, each one a digit", () => {

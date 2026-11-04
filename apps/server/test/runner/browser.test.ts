@@ -2815,6 +2815,15 @@ test.if(posix)("in a profile's session a login opens for the agent whose turn it
     success: true,
     data: { value: "[secret:VAULT_PASSWORD]" },
   });
+  // A picture of the page names its address redacted too, as the agent's own browser does.
+  t.page({ url: `https://shop.example.com/after?pw=${password}` });
+  const shot = (await handleRequest(
+    ctx,
+    { agent: dev, profile: { id: PROFILE }, op: "browser.capture" },
+    profileScope,
+  )) as { url?: string };
+  expect(shot.url).not.toContain(password);
+  expect(shot.url).toContain("[secret:VAULT_PASSWORD]");
 });
 
 test.if(posix)("a code goes one character per field, each field checked where it is typed", async () => {

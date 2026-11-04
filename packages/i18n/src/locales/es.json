@@ -2802,6 +2802,7 @@
         "unreachable": "Sin conexión",
         "unsupported": "No disponible aquí",
         "invalid_input": "Revisa los campos",
+        "too_many_items": "Vault lleno",
         "other": "No se pudo leer"
       },
       "fix": {
@@ -2815,6 +2816,7 @@
         "unreachable": "Su servidor no respondió. Lo vuelve a intentar solo.",
         "unsupported": "Este servidor no puede leerlo. Pregunta a quien lo administra.",
         "invalid_input": "Se rechazó algo en los campos. Reconecta y revísalos.",
+        "too_many_items": "Elimina elementos antes de sincronizar más.",
         "other": "Prueba Sincronizar ahora o reconecta."
       }
     },
@@ -11185,7 +11187,8 @@
         "rateLimited": "El gestor de contraseñas pidió esperar. Inténtalo de nuevo en unos minutos.",
         "unreachable": "No se pudo conectar con el gestor de contraseñas. Revisa la dirección e inténtalo de nuevo.",
         "unsupported": "Este servidor no puede conectarse a este gestor de contraseñas.",
-        "invalidInput": "Revisa los campos e inténtalo de nuevo."
+        "invalidInput": "Revisa los campos e inténtalo de nuevo.",
+        "tooManyItems": "El Vault está lleno. Elimina elementos antes de sincronizar más."
       }
     }
   },
@@ -12801,7 +12804,7 @@
     },
     "vault_delete": {
       "label": "Eliminar del Vault",
-      "description": "Elimina un elemento que guardó, o uno que administra la persona que lo pide."
+      "description": "Elimina un elemento que guardó."
     },
     "react": {
       "label": "Reaccionar",

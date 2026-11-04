@@ -1,3 +1,5 @@
+import type { ToolOutput } from "../tools/types";
+
 /**
  * Why the Vault refused an agent (ADR 0135). The message is English, for the model, and says what to do next. It
  * never says that an item the run may not see exists: an item hidden from the person behind the run (or from a run
@@ -53,3 +55,12 @@ export const refuse = {
     ),
   notAllowed: (why: string) => new VaultRefusal("not_allowed", why),
 };
+
+/**
+ * A Vault refusal as a tool's answer, in its own words (which never say an item hidden from the run exists) with its
+ * code (`vault.<code>`); null for any other error, which the tool answers its own way.
+ */
+export function vaultRefusalOutput(error: unknown): ToolOutput | null {
+  if (!(error instanceof VaultRefusal)) return null;
+  return { content: error.message, isError: true, data: { code: `vault.${error.code}` } };
+}

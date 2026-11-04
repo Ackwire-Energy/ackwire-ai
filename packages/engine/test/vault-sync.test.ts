@@ -13,6 +13,7 @@ import {
   syncVaultConnection,
   updateVaultConnection,
   updateVaultItem,
+  VAULT_MAX_ITEMS,
   VAULT_SYNC_JOB,
   type VaultAccess,
 } from "../src";
@@ -214,6 +215,51 @@ describe("syncing", () => {
     await syncVaultConnection(v.deps, v.carla.id, v.f.org.id, connection.id);
     const back = (await items(connection.id)).filter((r) => !r.missing).map((r) => r.externalRef);
     expect(back.sort()).toEqual(["item-1", "item-3"]);
+  });
+
+  test("at the workspace's cap: what is there stays and is updated, new items wait, missing only what the source dropped", async () => {
+    v = await vaultSetup();
+    v.source.items = [github, deploy];
+    const connection = await connectTeam();
+    // Built-in items fill the rest of the Vault.
+    const filler = Array.from({ length: VAULT_MAX_ITEMS - 2 }, (_, i) => ({
+      orgId: v.f.org.id,
+      kind: "contact",
+      title: `Contact ${i}`,
+    }));
+    for (let i = 0; i < filler.length; i += 500) {
+      await v.f.db.insert(schema.vaultItems).values(filler.slice(i, i + 500));
+    }
+
+    v.source.items = [{ ...github, title: "GitHub (bot)" }, deploy, cloud];
+    const full = await syncVaultConnection(v.deps, v.carla.id, v.f.org.id, connection.id);
+    // Not a refusal of the source: the person sees why, and the next sync tries again by itself.
+    expect(full).toMatchObject({ status: "error", errorCode: "too_many_items", itemCount: 2 });
+    const rows = async () =>
+      (await items(connection.id)).map((r) => [r.externalRef, r.title, r.missing]).sort() as unknown[];
+    expect(await rows()).toEqual([
+      ["item-1", "GitHub (bot)", false],
+      ["item-2", "Deploy token", false],
+    ]);
+
+    // The source dropped one: only that one is missing; the new one still waits (a missing item keeps its place).
+    v.source.items = [github, cloud];
+    await syncVaultConnection(v.deps, v.carla.id, v.f.org.id, connection.id);
+    expect(await rows()).toEqual([
+      ["item-1", "GitHub", false],
+      ["item-2", "Deploy token", true],
+    ]);
+    expect(await enqueueVaultSyncs(v.f.db, new Date(Date.now() + 11 * 60_000))).toBe(1);
+
+    // Room again: the new item comes in and the connection is ready.
+    await v.f.db.delete(schema.vaultItems).where(eq(schema.vaultItems.title, "Contact 0"));
+    const ready = await syncVaultConnection(v.deps, v.carla.id, v.f.org.id, connection.id);
+    expect(ready).toMatchObject({ status: "ready", errorCode: null });
+    expect(await rows()).toEqual([
+      ["item-1", "GitHub", false],
+      ["item-2", "Deploy token", true],
+      ["item-3", "Cloud console", false],
+    ]);
   });
 
   test("a refusal: on the connection, items untouched, thrown to a person, quiet for the job", async () => {

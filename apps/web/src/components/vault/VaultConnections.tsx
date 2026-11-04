@@ -49,7 +49,10 @@ import "./vault.css";
 const words = (t: TFunction, key: string, fallback: string) =>
   (t as unknown as (k: string, o: Record<string, unknown>) => string)(key, { defaultValue: fallback });
 
-/** Error codes a source may give (`VaultSourceErrorCode`); anything else reads as the generic one. */
+/**
+ * Error codes a source may give (`VaultSourceErrorCode`), and the Vault's own `too_many_items` (full: new items wait,
+ * ADR 0135 §3); anything else reads as the generic one.
+ */
 const ERRORS = [
   "auth_failed",
   "locked",
@@ -61,6 +64,7 @@ const ERRORS = [
   "unreachable",
   "unsupported",
   "invalid_input",
+  "too_many_items",
 ] as const;
 type ErrorKey = (typeof ERRORS)[number] | "other";
 const errorKey = (code: string | null): ErrorKey =>
@@ -279,7 +283,8 @@ function ConnectionRow({
       </span>
       {c.can.edit && (
         <div className="connected-row__actions">
-          {c.status === "error" ? (
+          {/* A full Vault isn't fixed by reconnecting: it syncs again once items are removed. */}
+          {c.status === "error" && c.errorCode !== "too_many_items" ? (
             <Button
               size="sm"
               variant="primary"

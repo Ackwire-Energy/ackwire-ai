@@ -232,6 +232,23 @@ describe("Settings › Vault (ADR 0135)", () => {
     expect(within(card).getByRole("button", { name: t("vault.connections.syncNow") })).toBeTruthy();
   });
 
+  test("a full Vault: the connection says so and offers Sync now, not Reconnect", async () => {
+    const overview = overviewOf();
+    const connection = overview.connections[0] as VaultOverview["connections"][number];
+    Object.assign(connection, { status: "error", errorCode: "too_many_items" });
+    const { t } = await openVault(seedState(), overview);
+    const views = screen().getByRole("radiogroup", { name: t("vault.tab.label") });
+    await click(within(views).getByRole("radio", { name: new RegExp(`^${t("vault.tab.connections")}`) }));
+    const card = screen().getByRole("region", { name: "1Password" });
+    expect(card.textContent).toContain(t("vault.connections.error.too_many_items"));
+    expect(card.textContent).toContain(t("vault.connections.fix.too_many_items"));
+    expect(t("vault.connections.error.too_many_items")).not.toBe(t("vault.connections.error.other"));
+    expect(within(card).getByRole("button", { name: t("vault.connections.syncNow") })).toBeTruthy();
+    expect(
+      within(card).queryByRole("button", { name: t("vault.connections.reconnectName", { name: "1Password" }) }),
+    ).toBeNull();
+  });
+
   test("a member who doesn't manage the Vault: a team item reads only, and new items stay personal", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
@@ -363,9 +380,9 @@ describe("the secret request card: Save to the Vault (ADR 0135)", () => {
     expect(methods).toEqual(["secrets.deliver", "secrets.saveToVault"]);
     const call = state.calls.find((c) => c.method === "secrets.saveToVault");
     expect(call?.args.slice(0, 2)).toEqual([ORG_ID, "00000000-0000-4000-8000-0000000000e1"]);
-    expect(call?.args[2]).toEqual({
+    // A key: no username in it at all.
+    expect(call?.args[2]).toStrictEqual({
       value: "npm_live_abc123",
-      username: undefined,
       scope: "personal",
       allAgents: false,
       agentIds: [ADA_ID],
@@ -375,6 +392,18 @@ describe("the secret request card: Save to the Vault (ADR 0135)", () => {
       "npm_live_abc123",
     );
     expect(card().textContent).toContain(t("vault.card.saved"));
+  });
+
+  test("a site's password: the username on the card always goes, so one the agent suggested can be cleared", async () => {
+    const site = { kind: "site" as const, site: "https://shop.example.com" };
+    const { state, t, card } = await withRequest(site, { name: "SHOP_PASSWORD", username: "guessed@shop.example.com" });
+    await type(within(card()).getByLabelText(t("vault.field.username")), "  ");
+    await type(within(card()).getByLabelText(t("secret.label", { name: "SHOP_PASSWORD" })), "hunter2-for-the-shop");
+    await click(within(card()).getByRole("button", { name: t("secret.send") }));
+    await settle(6);
+    const call = state.calls.find((c) => c.method === "secrets.saveToVault");
+    // Empty: no username, not the agent's guess (absent would keep it).
+    expect(call?.args[2]).toMatchObject({ value: "hunter2-for-the-shop", username: "" });
   });
 
   test("unchecked: delivered, and nothing goes to the Vault", async () => {

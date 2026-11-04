@@ -6678,6 +6678,9 @@
   "vault.connections.error.invalid_input": {
     "value": "Check the fields"
   },
+  "vault.connections.error.too_many_items": {
+    "value": "Vault full"
+  },
   "vault.connections.error.other": {
     "value": "Couldn't read it"
   },
@@ -6710,6 +6713,9 @@
   },
   "vault.connections.fix.invalid_input": {
     "value": "Something in the fields was refused. Reconnect and check them."
+  },
+  "vault.connections.fix.too_many_items": {
+    "value": "Remove items before syncing more."
   },
   "vault.connections.fix.other": {
     "value": "Try Sync now, or reconnect."
@@ -26272,6 +26278,9 @@
   "errors.vault.source.invalidInput": {
     "value": "Check the fields and try again."
   },
+  "errors.vault.source.tooManyItems": {
+    "value": "The Vault is full. Remove items before syncing more."
+  },
   "machines.egress.draining": {
     "value": "Network settings are changing. Open computer sessions will restart at {{when}}."
   },
@@ -30252,7 +30261,7 @@
     "value": "Delete from the Vault"
   },
   "builtinTools.vault_delete.description": {
-    "value": "Deletes an item it saved, or one the person asking manages."
+    "value": "Deletes an item it saved."
   },
   "builtinTools.react.label": {
     "value": "React"

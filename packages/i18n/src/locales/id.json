@@ -2644,6 +2644,7 @@
         "unreachable": "Tidak terjangkau",
         "unsupported": "Tidak tersedia di sini",
         "invalid_input": "Periksa kolomnya",
+        "too_many_items": "Vault penuh",
         "other": "Tidak bisa dibaca"
       },
       "fix": {
@@ -2657,6 +2658,7 @@
         "unreachable": "Servernya tidak menjawab. Ia mencoba lagi sendiri.",
         "unsupported": "Server ini tidak bisa membacanya. Tanyakan kepada pengelolanya.",
         "invalid_input": "Ada isi kolom yang ditolak. Hubungkan ulang dan periksa.",
+        "too_many_items": "Hapus item sebelum menyinkronkan lebih banyak.",
         "other": "Coba Sinkronkan sekarang, atau hubungkan ulang."
       }
     },
@@ -10503,7 +10505,8 @@
         "rateLimited": "Pengelola kata sandi meminta kami menunggu. Coba lagi dalam beberapa menit.",
         "unreachable": "Tidak bisa menghubungi pengelola kata sandi. Periksa alamatnya lalu coba lagi.",
         "unsupported": "Server ini tidak bisa terhubung ke pengelola kata sandi ini.",
-        "invalidInput": "Periksa kolom-kolomnya lalu coba lagi."
+        "invalidInput": "Periksa kolom-kolomnya lalu coba lagi.",
+        "tooManyItems": "Vault penuh. Hapus item sebelum menyinkronkan lebih banyak."
       }
     }
   },
@@ -12045,7 +12048,7 @@
     },
     "vault_delete": {
       "label": "Hapus dari Vault",
-      "description": "Menghapus item yang ia simpan, atau item yang dikelola orang yang meminta."
+      "description": "Menghapus item yang ia simpan."
     },
     "react": {
       "label": "Beri reaksi",

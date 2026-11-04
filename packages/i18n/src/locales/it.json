@@ -2803,6 +2803,7 @@
         "unreachable": "Non raggiungibile",
         "unsupported": "Non disponibile qui",
         "invalid_input": "Controlla i campi",
+        "too_many_items": "Vault pieno",
         "other": "Lettura non riuscita"
       },
       "fix": {
@@ -2816,6 +2817,7 @@
         "unreachable": "Il suo server non ha risposto. Riprova da solo.",
         "unsupported": "Questo server non può leggerlo. Chiedi a chi lo gestisce.",
         "invalid_input": "Qualcosa nei campi è stato rifiutato. Ricollega e controllali.",
+        "too_many_items": "Elimina degli elementi prima di sincronizzarne altri.",
         "other": "Prova Sincronizza ora, oppure ricollega."
       }
     },
@@ -11262,7 +11264,8 @@
         "rateLimited": "Il gestore di password ci ha chiesto di aspettare. Riprova tra qualche minuto.",
         "unreachable": "Impossibile raggiungere il gestore di password. Controlla l'indirizzo e riprova.",
         "unsupported": "Questo server non può collegarsi a questo gestore di password.",
-        "invalidInput": "Controlla i campi e riprova."
+        "invalidInput": "Controlla i campi e riprova.",
+        "tooManyItems": "Il Vault è pieno. Elimina degli elementi prima di sincronizzarne altri."
       }
     }
   },
@@ -12884,7 +12887,7 @@
     },
     "vault_delete": {
       "label": "Elimina dal Vault",
-      "description": "Elimina un elemento che ha salvato, o uno gestito dalla persona che lo chiede."
+      "description": "Elimina un elemento che ha salvato."
     },
     "react": {
       "label": "Reagisci",

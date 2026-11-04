@@ -49,6 +49,15 @@ export async function loadVault(db: Executor, orgId: string): Promise<VaultState
 export const connectionOf = (state: VaultState, item: ItemRow) =>
   item.connectionId ? state.connections.get(item.connectionId) : undefined;
 
+/** A saved origin's host (`https://github.com` → `github.com`); the text itself when it isn't an address. */
+export function hostOf(origin: string): string {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return origin;
+  }
+}
+
 /** A login or a key has a value to use: a built-in one sealed here, an external one in its source. */
 export const hasValue = (item: ItemRow) =>
   item.kind !== "contact" && (item.connectionId !== null || item.secretCiphertext !== null);

@@ -305,25 +305,28 @@ test("the GET guard is ready only once Chrome answered Fetch.enable on every ses
   await c.attached;
   cdp.attach("page-1");
   cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  cdp.event("Target.attachedToTarget", { sessionId: "worker-1", targetInfo: { type: "worker" } }, "page-1");
   const sent = (method: string) => cdp.sent.filter((m) => m.method === method);
   let ready: boolean | null = null;
   const first = c.guard(["hunter2-first value"], 60_000, () => {});
   void first.ready.then((ok) => {
     ready = ok;
   });
-  const [page, frame] = sent("Fetch.enable");
-  expect([page?.sessionId, frame?.sessionId]).toEqual(["page-1", "frame-1"]);
+  const [page, frame, worker] = sent("Fetch.enable");
+  expect([page?.sessionId, frame?.sessionId, worker?.sessionId]).toEqual(["page-1", "frame-1", "worker-1"]);
   cdp.reply(page?.id ?? 0);
+  // A session that went away answers with an error: nothing is left there to pause.
+  cdp.event("Target.detachedFromTarget", { sessionId: "worker-1" });
+  cdp.onmessage?.({ data: JSON.stringify({ id: worker?.id, error: { code: -32001, message: "Session not found" } }) });
   await Bun.sleep(5);
   // One session still paused nothing: not ready, so nothing may be typed yet.
   expect(ready).toBeNull();
-  // An error answers too (a session that went away has nothing to pause).
-  cdp.onmessage?.({ data: JSON.stringify({ id: frame?.id, error: { code: -32001, message: "Session not found" } }) });
+  cdp.reply(frame?.id ?? 0);
   expect(await first.ready).toBe(true);
   // Armed again meanwhile: ready at once, nothing asked of Chrome again.
   const second = c.guard(["hunter2-second value"], 60_000, () => {});
   expect(await second.ready).toBe(true);
-  expect(sent("Fetch.enable")).toHaveLength(2);
+  expect(sent("Fetch.enable")).toHaveLength(3);
   // A fill that was refused takes its value back out; the other stays guarded.
   second.release();
   const pause = (requestId: string, value: string) =>
@@ -364,4 +367,53 @@ test("a guard Chrome doesn't confirm isn't ready (after a while, or once the soc
   expect(await waiting.ready).toBe(false);
   // Closed: never ready again.
   expect(await other.c.guard(["hunter2-after close"], 60_000, () => {}).ready).toBe(false);
+});
+
+test("a session that answers Fetch.enable with an error isn't paused: the guard isn't ready, and the next one asks it again", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  const enables = () => cdp.sent.filter((m) => m.method === "Fetch.enable");
+  const first = c.guard(["hunter2-refused fetch"], 60_000, () => {});
+  const [page, frame] = enables();
+  cdp.reply(page?.id ?? 0);
+  // Still attached, so its requests would leave unchecked: nothing may be typed (the runner says `unguarded`).
+  cdp.onmessage?.({ data: JSON.stringify({ id: frame?.id, error: { code: -32000, message: "Fetch unavailable" } }) });
+  expect(await first.ready).toBe(false);
+  // The next guard asks that session again (the page stays paused, not asked twice).
+  const again = c.guard(["hunter2-refused fetch"], 60_000, () => {});
+  expect(enables().map((m) => m.sessionId)).toEqual(["page-1", "frame-1", "frame-1"]);
+  cdp.reply(enables()[2]?.id ?? 0);
+  expect(await again.ready).toBe(true);
+  c.close();
+});
+
+test("a session attached after a guard was ready: the next guard waits for its Fetch.enable too", async () => {
+  const { c, cdp } = counter();
+  cdp.onopen?.();
+  cdp.reply(1);
+  await c.attached;
+  cdp.attach("page-1");
+  const enables = () => cdp.sent.filter((m) => m.method === "Fetch.enable");
+  const first = c.guard(["hunter2-first fill"], 60_000, () => {});
+  cdp.reply(enables()[0]?.id ?? 0);
+  expect(await first.ready).toBe(true);
+  // A frame opens while the guard is armed: paused like the rest, but Chrome hasn't said so yet.
+  cdp.event("Target.attachedToTarget", { sessionId: "frame-1", targetInfo: { type: "iframe" } }, "page-1");
+  expect(enables().map((m) => m.sessionId)).toEqual(["page-1", "frame-1"]);
+  let ready: boolean | null = null;
+  const second = c.guard(["hunter2-second fill"], 60_000, () => {});
+  void second.ready.then((ok) => {
+    ready = ok;
+  });
+  await Bun.sleep(5);
+  expect(ready).toBeNull();
+  // Nothing asked twice: the frame's own acknowledgement is what it waits for.
+  expect(enables()).toHaveLength(2);
+  cdp.reply(enables()[1]?.id ?? 0);
+  expect(await second.ready).toBe(true);
+  c.close();
 });

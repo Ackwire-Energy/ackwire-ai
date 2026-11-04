@@ -2717,6 +2717,7 @@
         "unreachable": "Ulaşılamıyor",
         "unsupported": "Burada kullanılamıyor",
         "invalid_input": "Alanları kontrol edin",
+        "too_many_items": "Vault dolu",
         "other": "Okunamadı"
       },
       "fix": {
@@ -2730,6 +2731,7 @@
         "unreachable": "Sunucusu yanıt vermedi. Kendisi tekrar deneyecek.",
         "unsupported": "Bu sunucu onu okuyamıyor. Sunucuyu yöneten kişiye sorun.",
         "invalid_input": "Alanlardaki bir şey reddedildi. Yeniden bağlayıp kontrol edin.",
+        "too_many_items": "Daha fazlasını eşitlemeden önce öğe silin.",
         "other": "Şimdi eşitle'yi deneyin ya da yeniden bağlayın."
       }
     },
@@ -10778,7 +10780,8 @@
         "rateLimited": "Şifre yöneticisi beklememizi istedi. Birkaç dakika sonra tekrar deneyin.",
         "unreachable": "Şifre yöneticisine ulaşılamadı. Adresi kontrol edip tekrar deneyin.",
         "unsupported": "Bu sunucu bu şifre yöneticisine bağlanamıyor.",
-        "invalidInput": "Alanları kontrol edip tekrar deneyin."
+        "invalidInput": "Alanları kontrol edip tekrar deneyin.",
+        "tooManyItems": "Vault dolu. Daha fazlasını eşitlemeden önce öğe silin."
       }
     }
   },
@@ -12351,7 +12354,7 @@
     },
     "vault_delete": {
       "label": "Vault'tan sil",
-      "description": "Kendi kaydettiği bir öğeyi ya da isteyen kişinin yönettiği bir öğeyi siler."
+      "description": "Kendi kaydettiği bir öğeyi siler."
     },
     "react": {
       "label": "Tepki ver",

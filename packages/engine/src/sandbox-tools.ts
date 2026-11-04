@@ -53,7 +53,13 @@ import {
   taskResumesByItself,
   taskSeconds,
 } from "./machine-tasks";
-import { MachineOfflineError, pausedMessage, REMOVED_COMPUTER_MESSAGE } from "./machines";
+import {
+  MachineDroppedError,
+  MachineOfflineError,
+  MachinePausedError,
+  pausedMessage,
+  REMOVED_COMPUTER_MESSAGE,
+} from "./machines";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
 import { recordTaskFinished } from "./operator-events";
 import { replyThreadOf } from "./runs";
@@ -87,7 +93,7 @@ import {
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 import { uploadedFile, uploadFromComputer } from "./uploads";
-import { recordVaultUse, releaseVaultKeys, type VaultDeps, VaultRefusal } from "./vault";
+import { recordVaultUse, releaseVaultKeys, type VaultDeps, VaultRefusal, vaultRefusalOutput } from "./vault";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -209,6 +215,53 @@ const whyAsks = (requireApproval: boolean) =>
             "Only when the computer answered that a person approves this first: your reason, for them (what you found and why it's needed). The call then waits for their decision in the chat.",
         },
       };
+
+/**
+ * The runner's refusals of an `exec` that come before it opens the command's Vault keys (`doExec`: a switch, the
+ * folder, a malformed request, the command policy) or instead of opening them (`not_found`: a key it couldn't open),
+ * and `canceled` before it was sent.
+ */
+const REFUSED_BEFORE_KEYS = new Set([
+  "approval_needed",
+  "not_allowed",
+  "exec_disabled",
+  "paused",
+  "bad_request",
+  "not_found",
+  "outside_workspace",
+  "canceled",
+]);
+
+/**
+ * Whether a failed `exec` may have run its command with the Vault keys it carried (ADR 0135 §4), so their use is
+ * recorded: yes when the link dropped mid-request or no answer came in time (it may be running), or for a failure we
+ * can't place; no when it never reached the computer (offline, paused) or the runner refused it first. The machine
+ * provider keeps the runner's error as the `cause` of the words it gives.
+ */
+export function keysMayHaveRun(error: unknown): boolean {
+  if (error instanceof MachineDroppedError) return true;
+  if (error instanceof MachineOfflineError || error instanceof MachinePausedError) return false;
+  const runner =
+    error instanceof MachineRequestError
+      ? error
+      : error instanceof Error && error.cause instanceof MachineRequestError
+        ? error.cause
+        : null;
+  return !(runner && REFUSED_BEFORE_KEYS.has(runner.code));
+}
+
+/** The runner's code behind a failed request, when it answered one (the provider keeps it as the `cause`). */
+function runnerCode(error: unknown): string | null {
+  if (error instanceof MachineRequestError) return error.code;
+  return error instanceof Error && error.cause instanceof MachineRequestError ? error.cause.code : null;
+}
+
+/**
+ * A command that carried Vault keys and came back `not_found`: the runner no longer had the one-use key (it lives two
+ * minutes and opens once, ADR 0135 §4), not a missing file, so the agent reads what happened and runs it again.
+ */
+export const VAULT_KEY_EXPIRED =
+  "The computer's one-use key for the Vault expired before the command ran. Nothing ran. Run it again.";
 
 /**
  * The computer held the command for a person (its message says why and how to ask them), or never runs it (a
@@ -572,7 +625,7 @@ export function createSandboxToolSource(
     );
     return {
       vault: { keyId: key.keyId, keys },
-      /** Each key's use, recorded once the command ran. */
+      /** Each key's use, recorded once the computer took the command with them. */
       used: () =>
         Promise.all(
           [...new Set(released.map((k) => k.itemId))].map((itemId) =>
@@ -674,20 +727,22 @@ export function createSandboxToolSource(
                 ...(ctx.approved ? { approved: true } : {}),
                 ...(keys ? { vault: keys.vault } : {}),
               });
-            } finally {
-              // Once the request is on its way the command may run with the keys, whether or not an answer comes
-              // back (a dropped connection, a cancel, a timeout): each use is recorded either way (ADR 0135 §4).
-              await keys?.used();
+            } catch (error) {
+              // The command may have run with the keys though no answer came back (the link dropped, no answer in
+              // time): their use is recorded. Not when it never reached the computer or the runner refused it before
+              // opening them (ADR 0135 §4).
+              if (keysMayHaveRun(error)) await keys?.used();
+              if (keys && runnerCode(error) === "not_found") throw new Error(VAULT_KEY_EXPIRED, { cause: error });
+              throw error;
             }
+            // It ran, whatever its exit code, its timeout or a cancel said.
+            await keys?.used();
             await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r, names);
             return r;
           });
           return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout);
         } catch (error) {
-          if (error instanceof VaultRefusal) {
-            return { content: error.message, isError: true, data: { code: `vault.${error.code}` } };
-          }
-          return heldForApproval(error, "Not run") ?? failed(error);
+          return vaultRefusalOutput(error) ?? heldForApproval(error, "Not run") ?? failed(error);
         }
       },
     },

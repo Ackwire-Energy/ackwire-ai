@@ -2805,6 +2805,7 @@
         "unreachable": "Injoignable",
         "unsupported": "Indisponible ici",
         "invalid_input": "Vérifiez les champs",
+        "too_many_items": "Vault plein",
         "other": "Lecture impossible"
       },
       "fix": {
@@ -2818,6 +2819,7 @@
         "unreachable": "Son serveur n'a pas répondu. Il réessaie tout seul.",
         "unsupported": "Ce serveur ne peut pas le lire. Demandez à qui le gère.",
         "invalid_input": "Une information des champs a été refusée. Reconnectez et vérifiez-les.",
+        "too_many_items": "Supprimez des éléments avant d'en synchroniser plus.",
         "other": "Essayez Synchroniser, ou reconnectez."
       }
     },
@@ -11255,7 +11257,8 @@
         "rateLimited": "Le gestionnaire de mots de passe nous a demandé d'attendre. Réessayez dans quelques minutes.",
         "unreachable": "Impossible de joindre le gestionnaire de mots de passe. Vérifiez l'adresse et réessayez.",
         "unsupported": "Ce serveur ne peut pas se connecter à ce gestionnaire de mots de passe.",
-        "invalidInput": "Vérifiez les champs et réessayez."
+        "invalidInput": "Vérifiez les champs et réessayez.",
+        "tooManyItems": "Le Vault est plein. Supprimez des éléments avant d'en synchroniser plus."
       }
     }
   },
@@ -12883,7 +12886,7 @@
     },
     "vault_delete": {
       "label": "Supprimer du Vault",
-      "description": "Supprime un élément qu'il a enregistré, ou un élément que gère la personne qui le demande."
+      "description": "Supprime un élément qu'il a enregistré."
     },
     "react": {
       "label": "Réagir",

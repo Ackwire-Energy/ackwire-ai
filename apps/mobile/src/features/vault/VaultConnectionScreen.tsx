@@ -95,7 +95,10 @@ export function VaultConnectionScreen({ id }: { id: string }) {
           <GroupedRow
             icon="pen"
             label={
-              conn.status === "error" ? t("mobile.vault.connection.reconnect") : t("mobile.vault.connection.change")
+              // A full Vault isn't fixed by reconnecting (ADR 0135 §3).
+              conn.status === "error" && conn.errorCode !== "too_many_items"
+                ? t("mobile.vault.connection.reconnect")
+                : t("mobile.vault.connection.change")
             }
             chevron
             onPress={() => router.push(vaultHref.reconnect(conn.kind, conn.id) as never)}

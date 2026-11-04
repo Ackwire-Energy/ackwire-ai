@@ -105,6 +105,26 @@ describe("saving what was sent", () => {
     expect(other.id).not.toBe(item.id);
     expect(other.username).toBe("bruno-alt");
 
+    // The card always sends the username it shows: cleared, the agent's suggestion isn't kept (ADR 0135 §6).
+    const cleared = await saveSecretRequestToVault(
+      v.deps,
+      v.bruno.id,
+      v.f.org.id,
+      await request({ username: "dev-guessed-this" }),
+      card({ value: "a-third-password-99", username: "" }),
+    );
+    expect(cleared.username).toBeNull();
+    expect(cleared.id).not.toBe(item.id);
+    // Absent: the request's own (an older app).
+    const kept = await saveSecretRequestToVault(
+      v.deps,
+      v.bruno.id,
+      v.f.org.id,
+      await request({ username: "bruno-kept" }),
+      card({ value: "a-fourth-password-11" }),
+    );
+    expect(kept.username).toBe("bruno-kept");
+
     const uses = (await getVaultItem(v.deps, v.bruno.id, v.f.org.id, item.id)).uses.map((u) => u.action);
     expect(uses).toEqual(["edit", "create"]);
     const stored = await everythingStored(v);

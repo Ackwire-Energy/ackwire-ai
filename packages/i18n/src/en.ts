@@ -2702,6 +2702,7 @@ export const en = {
         unreachable: "Can't reach it",
         unsupported: "Not available here",
         invalid_input: "Check the fields",
+        too_many_items: "Vault full",
         other: "Couldn't read it",
       },
       fix: {
@@ -2715,6 +2716,8 @@ export const en = {
         unreachable: "Its server didn't answer. It tries again by itself.",
         unsupported: "This server can't read it. Ask who runs it.",
         invalid_input: "Something in the fields was refused. Reconnect and check them.",
+        /** The Vault reached its item limit: what was read stays, new items wait. */
+        too_many_items: "Remove items before syncing more.",
         other: "Try Sync now, or reconnect.",
       },
     },
@@ -10281,6 +10284,8 @@ export const en = {
         unreachable: "Couldn't reach the password manager. Check the address and try again.",
         unsupported: "This server can't connect to this password manager.",
         invalidInput: "Check the fields and try again.",
+        /** The Vault reached its item limit: what was read stays, new items wait. */
+        tooManyItems: "The Vault is full. Remove items before syncing more.",
       },
     },
   },
@@ -11893,7 +11898,7 @@ export const en = {
     },
     vault_delete: {
       label: "Delete from the Vault",
-      description: "Deletes an item it saved, or one the person asking manages.",
+      description: "Deletes an item it saved.",
     },
     react: {
       label: "React",
