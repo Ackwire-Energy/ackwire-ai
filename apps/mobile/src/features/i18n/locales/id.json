@@ -81,7 +81,6 @@
   },
   "tabs": {
     "chats": "Obrolan",
-    "dashboards": "Dasbor",
     "threads": "Utas",
     "agents": "Agen",
     "activity": "Aktivitas",
@@ -1635,6 +1634,7 @@
   },
   "dashboards": {
     "homeRow": "Hanya kamu · widget milikmu sendiri",
+    "count_other": "{{count}} dasbor",
     "loadFailed": "Dasbor tidak bisa dimuat.",
     "onlyHome": "Dasbor untuk ruang kerja atau peranmu muncul di sini.",
     "create": "Buat",

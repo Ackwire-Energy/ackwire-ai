@@ -21,28 +21,6 @@ export function needsHeaderBlur(os: string, version: string | number): boolean {
   return Number.isFinite(major) && major < 26;
 }
 
-/**
- * Tabs a system bar holds side by side: Android's bottom navigation takes at most five (a sixth throws when the tabs
- * mount), and an iPhone's bar folds the rest into "More".
- */
-export const BAR_TABS_MAX = 5;
-
-/** Search drawn apart from the tabs (iOS 26's round button), so it takes no slot of the bar. */
-export function searchApart(os: string, version: string | number): boolean {
-  if (os !== "ios") return false;
-  const major = Number.parseInt(String(version), 10);
-  return Number.isFinite(major) && major >= 26;
-}
-
-/** Whether search is in the tab bar: while every tab fits, or where it is drawn apart. Else it opens from the bar. */
-export const searchInBar = (tabCount: number, os: string, version: string | number) =>
-  tabCount <= BAR_TABS_MAX || searchApart(os, version);
-
-/** The tabs the bar shows: all of them, or all but search when it would take a slot past the bar's room. */
-export function barTabs<T extends { role?: "search" }>(tabs: readonly T[], os: string, version: string | number): T[] {
-  return searchInBar(tabs.length, os, version) ? [...tabs] : tabs.filter((tab) => tab.role !== "search");
-}
-
 export { contrastRatio } from "@agenteschat/ui/sky/math";
 
 /**

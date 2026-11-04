@@ -89,7 +89,6 @@ export const featureKeysEn = {
   },
   tabs: {
     chats: "Chats",
-    dashboards: "Dashboards",
     threads: "Threads",
     agents: "Agents",
     activity: "Activity",
@@ -1716,6 +1715,9 @@ export const featureKeysEn = {
   // Dashboards on the phone (ADR 0135); the rest of their words are the web's, `dashboards.*` and `widgets.*`.
   dashboards: {
     homeRow: "Only you · your own widgets",
+    /** The home's Dashboards row: "My Home · 3 dashboards" (ADR 0135 §15). */
+    count_one: "{{count}} dashboard",
+    count_other: "{{count}} dashboards",
     loadFailed: "Couldn't load the dashboards.",
     /** Under "My Home" when the person sees no other board; "+" in the bar makes one. */
     onlyHome: "Dashboards for the workspace or your roles show up here.",

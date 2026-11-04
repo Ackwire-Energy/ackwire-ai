@@ -58,11 +58,11 @@ export const consultationHref = (consultationId: string, channelId: string): App
 export const routineHref = (routineId: unknown): AppHref =>
   isSafeId(routineId) ? `/routines/${routineId}` : "/routines";
 
-/** A dashboard (ADR 0135), "home" for My Home, or the Dashboards tab when the id isn't one. */
+/** A dashboard (ADR 0135), "home" for My Home, or the Dashboards list when the id isn't one. */
 export const boardHref = (dashboardId: unknown): AppHref =>
   isSafeId(dashboardId) ? `/board/${dashboardId}` : "/dashboards";
 
-/** A widget's screen, else its dashboard, else the Dashboards tab. */
+/** A widget's screen, else its dashboard, else the Dashboards list. */
 export const widgetHref = (widgetId: unknown, dashboardId?: unknown): AppHref =>
   isSafeId(widgetId) ? `/widget/${widgetId}` : boardHref(dashboardId);
 

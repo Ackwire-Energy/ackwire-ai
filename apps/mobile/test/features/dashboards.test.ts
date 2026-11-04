@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { DashboardList, DashboardSummary } from "@agenteschat/client";
 import { type OpenTarget, targetPath } from "@agenteschat/client/lib/notifications";
 import { chartAreaTones, chartInk } from "@agenteschat/ui/sky/chart";
@@ -17,6 +19,7 @@ import {
   bleedSeries,
   boardMenuKeys,
   confirmTitle,
+  dashboardsEntryLine,
   dashboardWaitingCard,
   destinationsOf,
   ditherCells,
@@ -58,7 +61,7 @@ import {
   withAudience,
   withEditors,
 } from "../../src/features/dashboards/logic";
-import { appLinkFromUrl, searchHref } from "../../src/features/links/app-links";
+import { appLinkFromUrl } from "../../src/features/links/app-links";
 import {
   boardHref,
   hrefForPush,
@@ -68,6 +71,7 @@ import {
   widgetHref,
 } from "../../src/features/links/logic";
 import { routineTitle, targetIcon } from "../../src/features/routines/logic";
+import { TAB_GLYPHS } from "../../src/ui/tabGlyphs";
 import { notification } from "./fixtures";
 
 const board = (over: Partial<DashboardSummary> & { id: string }): DashboardSummary => ({
@@ -450,7 +454,7 @@ describe("dashboards on the phone (ADR 0135)", () => {
 });
 
 describe("dashboards in links, notifications and routines", () => {
-  test("a board, My Home, a widget, else the Dashboards tab", () => {
+  test("a board, My Home, a widget, else the Dashboards list", () => {
     expect(boardHref("d1")).toBe("/board/d1");
     expect(boardHref(HOME)).toBe("/board/home");
     expect(boardHref(undefined)).toBe("/dashboards");
@@ -496,19 +500,21 @@ describe("dashboards in links, notifications and routines", () => {
     ).toBe("/widget/w1");
   });
 
-  test("search opens at /find where it isn't a tab of the bar, its tab where it is", () => {
-    const web = appLinkFromUrl("https://app.agentes.chat/org/org-1/search");
-    const to = new URLSearchParams((web && "href" in web ? web.href : "").slice("/link?".length)).get("to") ?? "";
-    expect(to).toBe("/search");
-    expect(searchHref(to, false)).toBe("/find");
-    expect(searchHref(to, true)).toBe("/search");
-    expect(searchHref("agenteschat://search", false)).toBe("/find");
-    expect(searchHref("/search?q=sales", false)).toBe("/find?q=sales");
-    expect(searchHref("agenteschat://search", true)).toBe("agenteschat://search");
-    // Anything else as it is.
-    expect(searchHref("/searches", false)).toBe("/searches");
-    expect(searchHref("/chat/c1", false)).toBe("/chat/c1");
-    expect(searchHref("https://app.agentes.chat/search", false)).toBe("https://app.agentes.chat/search");
+  test("Dashboards is a screen pushed from the home, never a tab; the tab bar stays as it was", () => {
+    const app = join(import.meta.dir, "..", "..", "app", "(app)");
+    expect(existsSync(join(app, "dashboards.tsx"))).toBe(true);
+    expect(existsSync(join(app, "(tabs)", "dashboards"))).toBe(false);
+    expect(readFileSync(join(app, "_layout.tsx"), "utf8")).toContain('name="dashboards"');
+    expect(readFileSync(join(app, "(tabs)", "_layout.tsx"), "utf8")).not.toContain("dashboards");
+    expect([...TAB_GLYPHS]).toEqual(["chats", "threads", "agents", "activity", "search"]);
+  });
+
+  test("the home's Dashboards row: My Home and how many others, or My Home alone", () => {
+    const words = { home: "My Home", count: (n: number) => `${n} dashboard${n === 1 ? "" : "s"}` };
+    expect(dashboardsEntryLine(3, words)).toBe("My Home · 3 dashboards");
+    expect(dashboardsEntryLine(1, words)).toBe("My Home · 1 dashboard");
+    expect(dashboardsEntryLine(0, words)).toBe("My Home");
+    expect(dashboardsEntryLine(undefined, words)).toBe("My Home");
   });
 
   test("an alert or a failure opens its widget; a request to publish, its board", () => {

@@ -129,17 +129,6 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
 }
 
 /**
- * Where an address of the search tab opens (`/search`, `agenteschat://search`, with its query): the tab while search
- * is in the bar (`inBar`), else the pushed search screen, `/find` (past five tabs search leaves the bar on Android and
- * iOS before 26). Any other address as it is.
- */
-export function searchHref(href: string, inBar: boolean): string {
-  if (inBar) return href;
-  const m = /^(?:agenteschat:\/\/\/?|\/)search\/?([?#].*)?$/i.exec(href.trim());
-  return m ? `/find${m[1] ?? ""}` : href;
-}
-
-/**
  * A URL the app was opened with → where it goes. Only the web's addresses (`https://<host>/…`) change: the app's own
  * scheme (`agenteschat://chat/…`) and paths stay as they are (null).
  */

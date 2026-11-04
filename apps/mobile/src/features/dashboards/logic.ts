@@ -355,6 +355,17 @@ export const HOME = "home";
 export const realBoardId = (id: string, homeId: string | null | undefined): string | null =>
   id === HOME ? (homeId ?? null) : id;
 
+/**
+ * The home's Dashboards row's second line: "My Home · 3 dashboards", or "My Home" alone while the list loads or
+ * when the person sees no other board (ADR 0135 §15).
+ */
+export function dashboardsEntryLine(
+  count: number | null | undefined,
+  words: { home: string; count: (n: number) => string },
+): string {
+  return count ? `${words.home} · ${words.count(count)}` : words.home;
+}
+
 // ── Test before creating ─────────────────────────────────────────────────────
 
 /**

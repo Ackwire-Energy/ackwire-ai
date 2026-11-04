@@ -86,7 +86,6 @@
   },
   "tabs": {
     "chats": "Chats",
-    "dashboards": "Dashboards",
     "threads": "Threads",
     "agents": "Agenten",
     "activity": "Aktivität",
@@ -1717,6 +1716,8 @@
   },
   "dashboards": {
     "homeRow": "Nur du · deine eigenen Widgets",
+    "count_one": "{{count}} Dashboard",
+    "count_other": "{{count}} Dashboards",
     "loadFailed": "Die Dashboards konnten nicht geladen werden.",
     "onlyHome": "Dashboards für den Workspace oder deine Rollen erscheinen hier.",
     "create": "Erstellen",

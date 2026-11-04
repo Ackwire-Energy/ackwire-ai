@@ -96,7 +96,6 @@
   },
   "tabs": {
     "chats": "Czaty",
-    "dashboards": "Dashboardy",
     "threads": "Wątki",
     "agents": "Agenci",
     "activity": "Aktywność",
@@ -1881,6 +1880,10 @@
   },
   "dashboards": {
     "homeRow": "Tylko ty · twoje własne widżety",
+    "count_one": "{{count}} dashboard",
+    "count_few": "{{count}} dashboardy",
+    "count_many": "{{count}} dashboardów",
+    "count_other": "{{count}} dashboardu",
     "loadFailed": "Nie udało się wczytać dashboardów.",
     "onlyHome": "Tu pojawią się dashboardy przestrzeni roboczej albo twoich ról.",
     "create": "Utwórz",

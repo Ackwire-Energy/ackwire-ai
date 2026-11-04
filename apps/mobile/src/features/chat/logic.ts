@@ -622,6 +622,44 @@ export type Block =
   | { kind: "code"; lang: string; text: string; open?: boolean }
   | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] };
 
+/** Widest a table's column gets at the default text size: a longer cell wraps inside it, at its words. */
+export const TABLE_COL_MAX = 280;
+export const TABLE_COL_MIN = 56;
+/** Points per letter of a column's first guess, until its cells have been measured as drawn. */
+const TABLE_GUESS_PER_CHAR = 8.6;
+/** A cell's horizontal padding (both sides), in the guess. */
+const TABLE_CELL_PAD = 24;
+
+const cellChars = (cell: Inline[]) => cell.reduce((n, s) => n + s.text.length, 0);
+
+/**
+ * Each column's width in a chat table: as wide as its widest cell as drawn (`drawn`, measured on a copy that never
+ * wraps), a guess by letters until then, between the min and the max. The max grows with the person's text size
+ * (up to twice), so a larger text still fits a few words per line. A point more than measured: rounding never wraps
+ * a short cell that fits.
+ */
+export function tableColumnWidths(
+  header: Inline[][],
+  rows: Inline[][][],
+  drawn: Readonly<Record<number, number>>,
+  fontScale = 1,
+): number[] {
+  const scale = Math.min(2, Math.max(1, fontScale));
+  const max = TABLE_COL_MAX * scale;
+  return header.map((h, col) => {
+    const guess =
+      Math.max(cellChars(h), ...rows.map((r) => cellChars(r[col] ?? []))) * TABLE_GUESS_PER_CHAR * scale +
+      TABLE_CELL_PAD;
+    const natural = drawn[col] ?? guess;
+    return Math.min(max, Math.max(TABLE_COL_MIN, Math.ceil(natural) + 1));
+  });
+}
+
+/** Which sides of a table scrolled sideways hide columns (`x`: the scroll, `frame`: the box, `total`: the table). */
+export function tableHidden(x: number, frame: number, total: number): { left: boolean; right: boolean } {
+  return { left: x > 1, right: frame > 0 && x + frame < total - 1 };
+}
+
 const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
 
 /** `#channel` references, then @mentions in the words between them. */

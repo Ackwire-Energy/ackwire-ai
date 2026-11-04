@@ -39,6 +39,10 @@ import {
   rowStopOf,
   standsAlone,
   stoppableInLine,
+  TABLE_COL_MAX,
+  TABLE_COL_MIN,
+  tableColumnWidths,
+  tableHidden,
   threadFaces,
   threadTitleFrom,
   toggleReaction,
@@ -763,6 +767,34 @@ describe("markdown", () => {
       rows: [[[{ kind: "code", text: "generic" }], [{ kind: "text", text: "435" }], [{ kind: "text", text: "~6,7%" }]]],
       align: ["left", "right", "right"],
     });
+  });
+});
+
+describe("a wide table in a message scrolls sideways", () => {
+  const cell = (text: string) => [{ kind: "text" as const, text }];
+  const header = [cell("Nome"), cell("Descrição"), cell("Qtd")];
+  const rows = [[cell("Ana"), cell("uma descrição bem longa ".repeat(8)), cell("3")]];
+
+  test("columns as drawn, a point more so a short cell never wraps; between the min and the max", () => {
+    expect(tableColumnWidths(header, rows, { 0: 70.2, 1: 900, 2: 20 })).toEqual([72, TABLE_COL_MAX, TABLE_COL_MIN]);
+  });
+
+  test("before measuring, a guess by letters; the max grows with the text size, up to twice", () => {
+    const [name, words] = tableColumnWidths(header, rows, {});
+    expect(name).toBeGreaterThan(TABLE_COL_MIN);
+    expect(words).toBe(TABLE_COL_MAX);
+    expect(tableColumnWidths(header, rows, { 1: 900 }, 1.5)[1]).toBe(TABLE_COL_MAX * 1.5);
+    expect(tableColumnWidths(header, rows, { 1: 2000 }, 3.1)[1]).toBe(TABLE_COL_MAX * 2);
+    // A smaller text size never makes a column narrower than the default max allows.
+    expect(tableColumnWidths(header, rows, { 1: 900 }, 0.8)[1]).toBe(TABLE_COL_MAX);
+  });
+
+  test("the hidden side: right while there is more, left once scrolled, none when it fits or isn't laid out", () => {
+    expect(tableHidden(0, 300, 600)).toEqual({ left: false, right: true });
+    expect(tableHidden(150, 300, 600)).toEqual({ left: true, right: true });
+    expect(tableHidden(300, 300, 600)).toEqual({ left: true, right: false });
+    expect(tableHidden(0, 300, 280)).toEqual({ left: false, right: false });
+    expect(tableHidden(0, 0, 600)).toEqual({ left: false, right: false });
   });
 });
 

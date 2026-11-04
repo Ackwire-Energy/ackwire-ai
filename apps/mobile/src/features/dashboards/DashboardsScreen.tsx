@@ -2,10 +2,10 @@ import { type DashboardSummary, dashboardGroups, useDashboards } from "@agentesc
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, RefreshControl, StyleSheet, View } from "react-native";
-import { Button, GroupedFooter, GroupedHeader, GroupedList, LargeTitleScreen, Text, useTheme } from "@/ui";
+import { Button, GroupedFooter, GroupedHeader, GroupedList, IconButton, Text, useTheme } from "@/ui";
 import { boardHref } from "../links/logic";
 import { useOrgId, usePullRefresh } from "../shared/hooks";
-import { useSearchAction, useTabHeader } from "../shared/tabHeader";
+import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { HOME } from "./logic";
 import { BoardRow, useBoardByline } from "./parts";
 
@@ -13,17 +13,15 @@ import { BoardRow, useBoardByline } from "./parts";
 export const openNewBoard = () => router.push("/board-new");
 
 /**
- * Dashboards, a tab between Chats and Threads (ADR 0135): My Home on top (the person's own widgets), then the boards
- * of the whole workspace, of the person's roles and only theirs, each with a thumbnail of its widgets. A row pushes
- * the board; "+" in the bar makes a new one. With only My Home, a line under it says where the others will be (no
- * empty state: My Home is a board).
+ * Dashboards, pushed from the home's Dashboards row (ADR 0135; the tab bar stays as it is): My Home on top (the
+ * person's own widgets), then the boards of the whole workspace, of the person's roles and only theirs, each with a
+ * thumbnail of its widgets. A row pushes the board; "+" in the bar makes a new one. With only My Home, a line under
+ * it says where the others will be (no empty state: My Home is a board).
  */
 export function DashboardsScreen() {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const orgId = useOrgId();
-  const header = useTabHeader();
-  const search = useSearchAction();
   const list = useDashboards(orgId);
   const pull = usePullRefresh(list.refetch);
   const byline = useBoardByline();
@@ -47,13 +45,9 @@ export function DashboardsScreen() {
       </View>
     ) : null;
   return (
-    <LargeTitleScreen
+    <PushedLargeTitle
       title={t("dashboards.title")}
-      left={header.left}
-      actions={[
-        ...(search ? [search] : []),
-        { icon: "plus", sf: "plus", label: t("dashboards.new"), onPress: openNewBoard },
-      ]}
+      right={<IconButton icon="plus" label={t("dashboards.new")} onPress={openNewBoard} />}
       grouped
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
@@ -93,7 +87,7 @@ export function DashboardsScreen() {
           <GroupedFooter>{t("mobile.dashboards.onlyHome")}</GroupedFooter>
         ) : null}
       </View>
-    </LargeTitleScreen>
+    </PushedLargeTitle>
   );
 }
 

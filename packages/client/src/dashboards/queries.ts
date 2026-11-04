@@ -69,7 +69,7 @@ export function dropWidget(qc: QueryClient, orgId: string, widgetId: string) {
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
-/** The Dashboards page and the phone's tab. */
+/** The Dashboards page, the phone's Dashboards list and its row on the home. */
 export function useDashboards(orgId: string, enabled = true) {
   const api = useApi();
   return useQuery({

@@ -209,9 +209,6 @@
   "tabs.chats": {
     "value": "Chats"
   },
-  "tabs.dashboards": {
-    "value": "Dashboards"
-  },
   "tabs.threads": {
     "value": "Threads"
   },
@@ -4182,6 +4179,12 @@
   },
   "dashboards.homeRow": {
     "value": "Only you · your own widgets"
+  },
+  "dashboards.count": {
+    "value": {
+      "one": "{{count}} dashboard",
+      "other": "{{count}} dashboards"
+    }
   },
   "dashboards.loadFailed": {
     "value": "Couldn't load the dashboards."

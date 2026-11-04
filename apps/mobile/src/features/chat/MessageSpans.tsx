@@ -1,13 +1,13 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
-import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Text as RNText, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Text } from "@/ui";
 import { withAlpha } from "@/ui/palette";
 import { openPage } from "../ai/parts";
 import { useColors, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
-import type { Block, Inline } from "./logic";
+import { type Block, type Inline, tableColumnWidths, tableHidden } from "./logic";
 
 /**
  * Inline marks of a message (bold, italic, `code`, links, @mentions, #channels), inside a Text. `channelRefs`: the
@@ -72,18 +72,12 @@ export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?:
 
 type TableBlock = Extract<Block, { kind: "table" }>;
 
-/** A cell's text length: a column's first guess, until its cells have been measured. */
-const cellLength = (cell: Inline[]) => cell.reduce((n, s) => n + s.text.length, 0);
-
-/** Widest a column gets: a longer cell wraps inside it, at its words. */
-const COL_MAX = 280;
-const COL_MIN = 56;
-
 /**
  * A table (the web's `md__table`): a quiet box with a hairline, the header on a soft band, rows split by
  * hairlines, numbers on the right in tabular figures. Each column is as wide as its widest cell as drawn (measured
- * on an unseen copy that never wraps, since a guess by letters came out narrow and broke words), up to `COL_MAX`;
- * a table wider than the message scrolls sideways inside its box, its hidden side fading out at the edge.
+ * on an unseen copy that never wraps, since a guess by letters came out narrow and broke words), up to a max that
+ * grows with the text size (`tableColumnWidths`); a table wider than the message scrolls sideways inside its box,
+ * its hidden side fading out at the edge, and the scroll bar flashes once when it first shows there is more.
  * `surface`: the color under the table (the fade's), the chat's background unless said.
  */
 export function Table({
@@ -93,19 +87,23 @@ export function Table({
   surface,
 }: Pick<TableBlock, "header" | "rows" | "align"> & { surface?: string }) {
   const c = useColors();
+  const { fontScale } = useWindowDimensions();
   const [drawn, setDrawn] = useState<Record<number, number>>({});
   const [frame, setFrame] = useState(0);
   const [x, setX] = useState(0);
-  const widths = header.map((h, col) => {
-    const natural = drawn[col] ?? Math.max(cellLength(h), ...rows.map((r) => cellLength(r[col] ?? []))) * 8.6 + 24;
-    // A pixel more than measured: rounding never wraps a cell that fits.
-    return Math.min(COL_MAX, Math.max(COL_MIN, Math.ceil(natural) + 1));
-  });
+  const scroller = useRef<ScrollView>(null);
+  const flashed = useRef(false);
+  const widths = tableColumnWidths(header, rows, drawn, fontScale);
   // The content's width said outright (not left to layout), so the box always knows it has more to scroll.
   const total = widths.reduce((sum, w) => sum + w, 0);
+  const hidden = tableHidden(x, frame, total);
+  // A table wider than the message says so once: the system's scroll bar flashes, then the fade keeps saying it.
+  useEffect(() => {
+    if (flashed.current || !hidden.right) return;
+    flashed.current = true;
+    scroller.current?.flashScrollIndicators();
+  }, [hidden.right]);
   const fadeTo = surface ?? c.bg;
-  const moreLeft = x > 1;
-  const moreRight = frame > 0 && x + frame < total - 1;
   const words = (inline: Inline[], col: number, head: boolean) => (
     <Text
       variant={head ? "label" : "subhead"}
@@ -151,9 +149,12 @@ export function Table({
       </View>
       <View style={[styles.table, { borderColor: c.line2 ?? c.line }]}>
         <ScrollView
+          ref={scroller}
           horizontal
           directionalLockEnabled
-          showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled
+          alwaysBounceHorizontal={false}
+          showsHorizontalScrollIndicator
           scrollEventThrottle={16}
           onLayout={(e) => setFrame(e.nativeEvent.layout.width)}
           onScroll={(e) => setX(e.nativeEvent.contentOffset.x)}
@@ -169,7 +170,7 @@ export function Table({
             ))}
           </View>
         </ScrollView>
-        {moreLeft ? (
+        {hidden.left ? (
           <LinearGradient
             pointerEvents="none"
             colors={[fadeTo, withAlpha(fadeTo, 0)]}
@@ -178,7 +179,7 @@ export function Table({
             style={[styles.fade, styles.fadeLeft]}
           />
         ) : null}
-        {moreRight ? (
+        {hidden.right ? (
           <LinearGradient
             pointerEvents="none"
             colors={[withAlpha(fadeTo, 0), fadeTo]}

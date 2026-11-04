@@ -22,6 +22,7 @@ export function PushedLargeTitle({
   onScrollBeginDrag,
   bottomInset = 24,
   collapsed = false,
+  grouped = false,
   children,
 }: {
   title: string;
@@ -32,6 +33,8 @@ export function PushedLargeTitle({
   bottomInset?: number;
   /** The large title folded away (a search in progress). */
   collapsed?: boolean;
+  /** The grouped gray background with white cards on it (Dashboards), as `LargeTitleScreen`'s. */
+  grouped?: boolean;
   children?: ReactNode;
 }) {
   const c = useColors();
@@ -41,11 +44,12 @@ export function PushedLargeTitle({
   const { y, onScroll } = useCoverScroll(Platform.OS === "ios" ? headerHeight : 0);
   const titleFade = useScrollFade(y, 0, TITLE_GONE);
   return (
-    <View style={[styles.screen, { backgroundColor: c.bg }]}>
+    <View style={[styles.screen, { backgroundColor: grouped ? c.grouped : c.bg }]}>
       <PushedHeader
         title={<FadingHeaderTitle y={y} from={BAR_TITLE_FROM} to={BAR_TITLE_TO} text={title} />}
         right={right}
         solid={false}
+        grouped={grouped}
       />
       <FocusLive>
         <Animated.ScrollView

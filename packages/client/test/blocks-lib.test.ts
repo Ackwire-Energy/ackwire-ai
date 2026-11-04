@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Poll } from "../src/api/types";
 import { BLOCK_KIT_CSS, BLOCK_KIT_JS } from "../src/lib/block-kit";
 import {
+  BLOCK_VIEWPORT,
   blockEvent,
   blockPage,
   newerBlockState,
@@ -32,6 +33,19 @@ describe("a block's page", () => {
     expect(policy).toBeLessThan(page.indexOf("window.__block"));
     expect(page.indexOf("window.__block")).toBeLessThan(page.indexOf("customElements.define"));
     expect(page.indexOf("customElements.define")).toBeLessThan(page.indexOf('<ac-stat label="x">'));
+  });
+
+  test("the page is as wide as the phone's web view shows it, and what it holds stays inside that width", () => {
+    const page = blockPage("<p>a</p>", HOST);
+    expect(BLOCK_VIEWPORT).toContain('name="viewport"');
+    expect(BLOCK_VIEWPORT).toContain("width=device-width");
+    // After the policy (nothing comes before it), before what the agent wrote.
+    expect(page.indexOf(BLOCK_VIEWPORT)).toBeGreaterThan(page.indexOf("Content-Security-Policy"));
+    expect(page.indexOf(BLOCK_VIEWPORT)).toBeLessThan(page.indexOf("<p>a</p>"));
+    expect(BLOCK_KIT_CSS).toContain("overflow-wrap:break-word");
+    expect(BLOCK_KIT_CSS).toContain(":where(body>*){min-width:0;max-width:100%}");
+    // A table wider than the block scrolls inside it instead of being cut at the edge.
+    expect(BLOCK_KIT_CSS).toContain("ac-table{overflow-x:auto");
   });
 
   test("what the person set can't close the script it travels in", () => {

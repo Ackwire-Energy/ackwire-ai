@@ -20,6 +20,7 @@ import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from 
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
+import { DashboardsEntry } from "./DashboardsEntry";
 import { FirstSteps } from "./FirstSteps";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
 import { CollapsibleSection, SeeAllRow, useHomeCollapsed } from "./HomeSection";
@@ -49,7 +50,8 @@ export const openKindList = (kind: ListKind | `category-${string}`) => router.pu
  * (what an agent finished, how many work), the "Esperando você" strip (only while something waits; it opens into
  * the first item's card, and scrolling closes it), then Agentes, Canais and Pessoas by latest activity, each
  * collapsible (remembered), five rows and "Ver todos". Under the greeting, the workspace's own computer while it
- * is being prepared, and a notice per computer that went offline with agents waiting for it. An agent's row says it waits on your ok, waits
+ * is being prepared, and a notice per computer that went offline with agents waiting for it. Above the sections a
+ * Dashboards row pushes the Dashboards list (ADR 0135 §15). An agent's row says it waits on your ok, waits
  * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  * Our notifications sheet opens over it (never inside a conversation), once it has loaded and once more at the
  * first request to approve, while the phone wasn't asked yet (`@agenteschat/client/lib/push-offer`). When the server doesn't answer
@@ -143,7 +145,13 @@ function Home() {
       <OutageNotices />
       {list.stale && !failed ? <HomeServerNotice retry={list.refetch} /> : null}
       {strip}
-      {failed || empty || list.loading ? null : <FirstSteps collapsed={collapsed} onToggle={toggle} />}
+      {failed || empty || list.loading ? null : (
+        <>
+          {/* Dashboards open from here, not from a tab (ADR 0135 §15). */}
+          <DashboardsEntry />
+          <FirstSteps collapsed={collapsed} onToggle={toggle} />
+        </>
+      )}
       {failed ? (
         <HomeServerError retry={list.refetch} />
       ) : empty ? (

@@ -81,7 +81,6 @@
   },
   "tabs": {
     "chats": "チャット",
-    "dashboards": "ダッシュボード",
     "threads": "スレッド",
     "agents": "エージェント",
     "activity": "アクティビティ",
@@ -1635,6 +1634,7 @@
   },
   "dashboards": {
     "homeRow": "あなただけ · 自分のウィジェット",
+    "count_other": "{{count}}個のダッシュボード",
     "loadFailed": "ダッシュボードを読み込めませんでした。",
     "onlyHome": "ワークスペースやあなたのロールのダッシュボードがここに表示されます。",
     "create": "作成",
