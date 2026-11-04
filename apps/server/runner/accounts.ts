@@ -183,9 +183,12 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
   grok: "The Grok account chosen for this agent isn't on this computer anymore. Choose another account in the agent's settings, or add it again.",
 };
 
-/** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
+/**
+ * What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. Every
+ * `GROK_` switch too (folder trust, memory, managed config, sandbox…): Grok Build gets only `GROK_QUIET_ENV`'s.
+ */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT|XAI_API_KEY|GROK_(?:HOME|AUTH_\w+|OIDC_\w+|CLI_CHAT_PROXY_BASE_URL|CONFIG|CONFIG_PATH|SANDBOX))$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT|XAI_API_KEY|GROK_\w+)$/;
 
 /** `base` without any key, token, endpoint or cloud a CLI would think with instead of its own sign-in. */
 export function withoutSignIns(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -238,6 +241,8 @@ export const GROK_QUIET_ENV: Readonly<Record<string, string>> = {
   GROK_TELEMETRY_MIXPANEL_ENABLED: "false",
   GROK_FEEDBACK_ENABLED: "false",
   GROK_DISABLE_AUTOUPDATER: "1",
+  // Memory is shared by every turn on the account (several agents', Lodi's): forced off whatever a config says.
+  GROK_MEMORY: "0",
 };
 
 /** A Cursor account made with an API key keeps it here (600). */

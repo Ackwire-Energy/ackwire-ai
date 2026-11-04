@@ -1,17 +1,19 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MachineRequest } from "@agenteschat/adapters";
 import { AccountManager, accountEnv, parseGrokLogin, parseGrokStatus } from "../../runner/accounts";
 import type { CodexBrainEvent } from "../../runner/brain-codex";
 import {
   GROK_CHAT_DENIED,
+  GROK_PLANTED,
   grokChatBreach,
   grokChatsFile,
   grokConfig,
   grokProblem,
   grokTurnArgs,
+  writeGrokConfig,
 } from "../../runner/brain-grok";
 import { detectExecutors, parseGrokModels } from "../../runner/executors";
 import { handleRequest } from "../../runner/handlers";
@@ -68,6 +70,19 @@ test("our server in GROK_HOME's config.toml: the run and the token only as env r
   const http = grokConfig({ url: "https://bridge.example/mcp" });
   expect(http).toContain('bearer_token_env_var = "AGENTES_MCP_TOKEN"');
   expect(http).not.toContain("command");
+});
+
+test("a turn drops what an earlier turn planted in GROK_HOME (fleet config, folder trust, LSP, plugins), the sign-in stays", () => {
+  const home = tempDir("grok-home-");
+  dirs.push(home);
+  for (const name of ["managed_config.toml", "trusted_folders.toml", "lsp.json", "auth.json"]) {
+    writeFileSync(path.join(home, name), "x");
+  }
+  mkdirSync(path.join(home, "plugins", "evil"), { recursive: true });
+  writeGrokConfig(home, grokConfig({ command: ["/usr/bin/agentes-runner"] }));
+  for (const name of GROK_PLANTED) expect(existsSync(path.join(home, name))).toBe(false);
+  expect(existsSync(path.join(home, "auth.json"))).toBe(true);
+  expect(readFileSync(path.join(home, "config.toml"), "utf8")).toContain(`[mcp_servers.${CODEX_MCP_SERVER}]`);
 });
 
 test("a chat turn's guard: init with only the meta-tools and our server; a tool of Grok's own, another server or an answer first stop it", () => {
@@ -137,15 +152,23 @@ test("the CLI's words: its models, its sign-in status and its device sign-in", (
 });
 
 test("an account folder is GROK_HOME, other vendors' config and telemetry off, and no xAI key leaks in", () => {
-  const env = accountEnv("grok", "/acc/x", { PATH: "/bin", XAI_API_KEY: "xai-machine", GROK_HOME: "/root/.grok" });
+  const env = accountEnv("grok", "/acc/x", {
+    PATH: "/bin",
+    XAI_API_KEY: "xai-machine",
+    GROK_HOME: "/root/.grok",
+    GROK_FOLDER_TRUST: "0",
+    GROK_MEMORY: "1",
+  });
   expect(env).toMatchObject({
     GROK_HOME: "/acc/x",
     GROK_CLAUDE_MCPS_ENABLED: "false",
     GROK_CURSOR_HOOKS_ENABLED: "false",
     GROK_TELEMETRY_ENABLED: "false",
     GROK_DISABLE_AUTOUPDATER: "1",
+    GROK_MEMORY: "0",
   });
   expect(env.XAI_API_KEY).toBeUndefined();
+  expect(env.GROK_FOLDER_TRUST).toBeUndefined();
 });
 
 test.skipIf(!posix)(
