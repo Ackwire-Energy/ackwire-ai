@@ -57,6 +57,23 @@ test("a rounded thing near a rounded box's edge has the box's radius less the ro
   expect(last(top, ".ac-seg__item", "border-radius")).toBe("calc(var(--seg-r) - var(--seg-in))");
   expect(last(top, ".ac-palette__list", "padding")).toBe("var(--palette-pad)");
   expect(last(top, ".ac-palette__item", "border-radius")).toBe("calc(var(--radius-section) - var(--palette-pad))");
+  // Menus whose search row and list hold the room themselves: the corner follows that room, not the default.
+  for (const menu of [".ac-tz__menu.ac-menu", ".ac-filter__menu.ac-menu"]) {
+    expect(last(top, menu, "--menu-pad")).toBe("6px");
+    expect(last(top, menu, "padding")).toBe("0");
+  }
+  for (const inner of [".ac-tz__searchrow", ".ac-tz__list", ".ac-filter__list"])
+    expect(last(top, inner, "padding")).toBe("var(--menu-pad)");
+  // The phone-style menu overlay: 8px of room inside a section's corner.
+  expect(last(top, ".ac-mo__group", "padding")).toBe("var(--space-2)");
+  expect(last(top, ".ac-mo__item", "border-radius")).toBe("calc(var(--radius-section) - var(--space-2))");
+  // Popovers with their own room set it as the menu's, so their corner follows.
+  const layout = topLevel(await read(join(SRC, "layout.css")));
+  expect(last(layout, ".agp-changes.ac-popover", "padding")).toBe("var(--menu-pad)");
+  expect(last(layout, ".agp-changes__item", "border-radius")).toBe("var(--radius-item)");
+  expect(last(layout, ".agp-changes__jump", "border-radius")).toBe("calc(var(--radius-item) - 4px)");
+  const calendar = topLevel(await read(join(SRC, "pages/calendar.css")));
+  expect(last(calendar, ".cal-more.ac-popover", "padding")).toBe("var(--menu-pad)");
 });
 
 test("every hairline between a card's rows, and over its foot, has one step of room on each side", async () => {

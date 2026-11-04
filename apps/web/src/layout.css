@@ -10399,11 +10399,13 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Concentric: the box is its rows' corner plus its room (`.ac-menu`), each row's button its corner less the row's. */
 .agp-changes.ac-popover {
+  --menu-pad: var(--space-2);
   width: min(420px, calc(100vw - 24px));
   max-height: 60vh;
   overflow: auto;
-  padding: 8px;
+  padding: var(--menu-pad);
 }
 .agp-changes__head {
   display: flex;
@@ -10423,7 +10425,7 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   align-items: flex-start;
   gap: 6px;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--radius-item);
 }
 .agp-changes__item:hover {
   background: var(--plate);
@@ -10436,7 +10438,7 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   gap: 2px;
   padding: 5px 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: calc(var(--radius-item) - 4px);
   background: transparent;
   color: var(--ink);
   font: inherit;

@@ -645,9 +645,11 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-month__more:hover {
   background: var(--plate-soft);
 }
+/* Its chips on the menu's concentric rule: the box is their corner plus its room (`.ac-menu`). */
 .cal-more.ac-popover {
+  --menu-pad: var(--space-2);
   width: 260px;
-  padding: 10px;
+  padding: var(--menu-pad);
 }
 .cal-more__title {
   margin: 0 0 6px;
