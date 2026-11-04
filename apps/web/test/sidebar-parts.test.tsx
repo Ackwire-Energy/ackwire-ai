@@ -128,7 +128,7 @@ describe("the parts' headers", () => {
     expect(dms.textContent).toContain("Suas conversas com pessoas aparecem aqui.");
     const group = head("Integrations").closest(".sidebar__section") as HTMLElement;
     expect(within(group).getByRole("link", { name: /^Ada/ })).toBeTruthy();
-    expect(within(nav()).getByRole("link", { name: "Ver todos os 2 agentes" })).toBeTruthy();
+    expect(nav().querySelector(".sidebar__see-all")).toBeNull();
   });
 
   test("closed, Canais hides its categories too, but the open channel", async () => {

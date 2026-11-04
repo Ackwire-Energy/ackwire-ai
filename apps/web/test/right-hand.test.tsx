@@ -115,7 +115,7 @@ describe("the right hand's row in the sidebar", () => {
 });
 
 describe("the right hand elsewhere", () => {
-  test("the members column lists it first among the agents, with how to call it", async () => {
+  test("the members column doesn't list it: it is in no channel, an @mention reaches it", async () => {
     media = spyOn(window, "matchMedia").mockImplementation(
       (q: string) =>
         ({
@@ -129,9 +129,10 @@ describe("the right hand elsewhere", () => {
     await act(async () => r.sockets.last().open());
     const column = screen().getByRole("complementary", { name: "Membros de #eng" });
     const agents = within(column).getByRole("region", { name: "Agentes" });
-    const rows = [...agents.querySelectorAll(".members-side__row")];
-    expect(rows[0]?.querySelector(".members-side__label")?.textContent).toBe("Lodi");
-    expect(rows[0]?.querySelector(".members-side__line")?.textContent).toBe("chame com @lodi");
+    const names = [...agents.querySelectorAll(".members-side__label")].map((n) => n.textContent);
+    expect(names.length).toBeGreaterThan(0);
+    expect(names).not.toContain("Lodi");
+    expect(column.textContent).not.toContain("chame com @lodi");
   });
 
   test("its DM says what it is and that nothing changes without you", async () => {

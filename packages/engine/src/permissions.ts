@@ -5,6 +5,8 @@ import { type SQL, sql } from "@agenteschat/db";
  * its people, agents and the channels open to them); only an owner may `manage_owners` (give and take ownership,
  * delete the workspace). Agents never hold these: what an agent may do comes from its own scopes (Tool Gateway).
  * The apps draw the roles screen from `PERMISSION_AREAS` (sent by `GET …/roles`) and name each key with i18n.
+ * `use_others_plans`: give any agent one may manage a plan someone else connected (ADR 0059 §3); administrators and
+ * owners hold it, `everyone` doesn't, so no migration backfills it.
  */
 export const PERMISSION_AREAS = [
   {
@@ -28,6 +30,7 @@ export const PERMISSION_AREAS = [
       "control_computers",
       "manage_connectors",
       "manage_credentials",
+      "use_others_plans",
     ],
   },
   {

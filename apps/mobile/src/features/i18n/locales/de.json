@@ -838,7 +838,11 @@
       "computer_no_chrome_one": "Ein Computer braucht Google Chrome. Lade es unter google.com/chrome herunter",
       "computer_no_chrome_other": "Computer brauchen Google Chrome. Lade es unter google.com/chrome herunter",
       "app_created_one": "Eine KI-App hat etwas für dich erstellt",
-      "app_created_other": "KI-Apps haben etwas für dich erstellt"
+      "app_created_other": "KI-Apps haben etwas für dich erstellt",
+      "plan_lent_one": "{{names}} hat dein {{plan}}-Abo mit {{agent}} verbunden",
+      "plan_lent_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden",
+      "plan_lent_female_one": "{{names}} hat dein {{plan}}-Abo mit {{agent}} verbunden",
+      "plan_lent_female_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden"
     },
     "markRead": "Als gelesen markieren",
     "markUnread": "Als ungelesen markieren",
@@ -1716,6 +1720,11 @@
     },
     "machine": {
       "toolsHow": "Tippe auf ein eingeschaltetes Tool, um es auszuschalten. Wieder einschalten geht nur am Computer selbst."
+    },
+    "roles": {
+      "onComputer": "Die Reihenfolge der Rollen und das Symbol jeder Rolle änderst du am Computer.",
+      "items": "Einzeln",
+      "create": "Erstellen"
     },
     "import": {
       "preparing": "Datei wird vorbereitet…",

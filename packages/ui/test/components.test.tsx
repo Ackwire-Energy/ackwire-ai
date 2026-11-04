@@ -808,12 +808,12 @@ describe("Message aside and foot", () => {
         .join(";");
     const value = (selector: string, prop: string) =>
       [...decls(selector).matchAll(new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`, "g"))].at(-1)?.[1]?.trim();
-    expect(css).toContain(":root {\n  --menu-item-h: 28px;\n  --menu-item-px: 8px;\n}");
+    expect(css).toContain(":root {\n  --menu-item-h: 28px;\n  --menu-item-px: 8px;\n  --menu-pad: var(--space-1);\n}");
     expect(value(".ac-menu__item", "padding")).toBe("calc((var(--menu-item-h) - 20px) / 2) var(--menu-item-px)");
     expect(value(".ac-menu__item", "min-height")).toBe("var(--menu-item-h)");
     expect(value(".ac-menu__item", "line-height")).toBe("20px");
     expect(value(".ac-menu__reaction", "height")).toBe("var(--menu-item-h)");
-    expect(value(".ac-menu", "padding")).toBe("4px");
+    expect(value(".ac-menu", "padding")).toBe("var(--menu-pad)");
     // No menu's rows taller than the bar's buttons by more than the token: nothing sets its own item height.
     expect(css).not.toMatch(/\.ac-menu__item\s*\{[^}]*min-height:\s*\d+px/);
   });
@@ -844,7 +844,7 @@ describe("Message aside and foot", () => {
       bodies(".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions"),
     ).toBe("");
     // 26px buttons with 16px icons, 2px around them, no gap: a 30px bar.
-    for (const decl of [/gap:\s*0\s*(;|$)/, /padding:\s*2px\s*(;|$)/, /border-radius:\s*10px\s*(;|$)/])
+    for (const decl of [/(^|;)\s*gap:\s*0\s*(;|$)/, /--bar-pad:\s*2px\s*(;|$)/, /--bar-r:\s*10px\s*(;|$)/])
       expect(bodies(bar)).toMatch(decl);
     expect(value(".ac-msg__actions .ac-btn--sm", "width")).toBe("26px");
     expect(value(".ac-msg__actions .ac-btn--sm", "height")).toBe("26px");

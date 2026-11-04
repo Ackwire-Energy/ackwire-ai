@@ -1,4 +1,4 @@
-import { type DrawnMood, STICKER_STILL_T, type StickerLook, stickerSeed } from "@agenteschat/ui/agent/stickers";
+import { STICKER_STILL_T, type StickerLook, type StickerMood, stickerSeed } from "@agenteschat/ui/agent/stickers";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
 import { createContext, memo, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useReducedMotion } from "@/ui/theme";
@@ -32,7 +32,7 @@ function StickerCanvasView({
   from,
 }: {
   look: StickerLook;
-  mood: DrawnMood;
+  mood: StickerMood;
   size: number;
   /** Keeps stickers side by side out of step: the agent's id. */
   seed: string;

@@ -1,17 +1,19 @@
-import { useSearch } from "@agenteschat/client";
+import { type SearchHit, useSearch } from "@agenteschat/client";
 import { hitText } from "@agenteschat/client/lib/media";
 import {
-  groupByChannel,
+  groupHitsByPlace,
   SEARCH_HAS,
   SEARCH_OPS,
   SEARCH_SORTS,
   type SearchChip,
   type SearchDirectory,
+  type SearchOp,
   type SearchSort,
   type SearchWords,
   searchChipKey,
   searchChipLabel,
   searchFilterInput,
+  searchTerms,
   suggestActors,
   suggestPlaces,
   typingOperator,
@@ -21,11 +23,11 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Filters, Icon, Text } from "@/ui";
 import { Note } from "../ai/parts";
-import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
 import { useColors, useOrgId, useWhen } from "../shared/hooks";
 import { previewOf } from "../shared/logic";
 import { ActionList, Tile } from "../shared/parts";
+import { hitHref } from "./logic";
 
 /** The filters on the box (ADR 0123): each a pill with its ×. */
 export function FilterChips({ chips, onRemove }: { chips: SearchChip[]; onRemove: (chip: SearchChip) => void }) {
@@ -57,15 +59,20 @@ export function FilterChips({ chips, onRemove }: { chips: SearchChip[]; onRemove
   );
 }
 
-/** With nothing typed: the operators to start a filter with (`from:`, `in:`…), and the recent searches. */
+/**
+ * With nothing typed: the operators to start a filter with (`from:`, `in:`…; `ops`, all by default), and the recent
+ * searches.
+ */
 export function SearchOptions({
   words,
+  ops = SEARCH_OPS,
   onInsert,
   recent,
   onPickRecent,
   onClearRecent,
 }: {
   words: SearchWords;
+  ops?: readonly SearchOp[];
   onInsert: (word: string) => void;
   recent: string[];
   onPickRecent: (search: string) => void;
@@ -78,7 +85,7 @@ export function SearchOptions({
         {t("searchPage.options")}
       </Text>
       <Filters
-        items={SEARCH_OPS.map((op) => ({ key: op, label: `${words.ops[op]}:` }))}
+        items={ops.map((op) => ({ key: op, label: `${words.ops[op]}:` }))}
         value=""
         onChange={(op) => onInsert(`${words.ops[op as keyof SearchWords["ops"]]}:`)}
       />
@@ -178,7 +185,11 @@ export function OperatorPicker({
   );
 }
 
-/** Messages that pass the filters (ADR 0123), by channel, with the sort; a tap opens the conversation (a reply its thread). */
+/**
+ * Messages that pass the filters (ADR 0123), by where they were said (a thread's replies under the thread), the
+ * search's words lit, with the sort; a tap opens the conversation at the message (a reply in its thread), or
+ * `onPick` takes it.
+ */
 export function FilteredResults({
   chips,
   text,
@@ -187,15 +198,17 @@ export function FilteredResults({
   onSort,
   onClear,
   onOpen,
+  onPick,
 }: {
   chips: SearchChip[];
   text: string;
   directory: SearchDirectory;
   sort: SearchSort;
   onSort: (sort: SearchSort) => void;
-  /** Removes every chip. */
-  onClear: () => void;
+  /** Removes every chip; without it, no way to (a DM's search holds to it). */
+  onClear?: () => void;
   onOpen: () => void;
+  onPick?: (hit: SearchHit) => void;
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
@@ -203,6 +216,16 @@ export function FilteredResults({
   const hits = useSearch(useOrgId(), text, ["message"], searchFilterInput(chips, sort));
   const list = hits.data ?? [];
   const place = (id: string) => directory.places.find((p) => p.id === id);
+  const placeName = (id: string) => {
+    const p = place(id);
+    return p ? (p.dm ? t("searchPage.dm", { name: p.name }) : `#${p.name}`) : "";
+  };
+  // A thread's group: its title, and in a channel "thread in #channel" (a DM's needs no where).
+  const threadName = (title: string, channelId: string) => {
+    const p = place(channelId);
+    return [title, p && !p.dm ? t("searchPage.panel.threadIn", { channel: p.name }) : null].filter(Boolean).join(" · ");
+  };
+  const terms = searchTerms(text);
   return (
     <View>
       <Filters
@@ -219,10 +242,12 @@ export function FilteredResults({
                 ? t("searchPage.count", { count: list.length })
                 : ""}
           </Text>
-          <Pressable onPress={onClear} accessibilityRole="button" hitSlop={8} style={styles.clear}>
-            <Text tone="faint">{t("searchPage.filtersApplied", { count: chips.length })}</Text>
-            <Icon name="x" size={14} color={c.muted} />
-          </Pressable>
+          {onClear && chips.length > 0 ? (
+            <Pressable onPress={onClear} accessibilityRole="button" hitSlop={8} style={styles.clear}>
+              <Text tone="faint">{t("searchPage.filtersApplied", { count: chips.length })}</Text>
+              <Icon name="x" size={14} color={c.muted} />
+            </Pressable>
+          ) : null}
         </View>
         {hits.isLoading ? <ActivityIndicator color={c.muted} style={styles.empty} /> : null}
         {hits.isError && !hits.data ? (
@@ -231,28 +256,27 @@ export function FilteredResults({
             <Button size="sm" variant="secondary" label={t("common.retry")} onPress={() => void hits.refetch()} />
           </View>
         ) : null}
-        {groupByChannel(list).map(([channelId, inChannel]) => {
-          const p = place(channelId);
-          return (
-            <View key={channelId} style={styles.group}>
-              <Text variant="label" accessibilityRole="header" style={styles.groupTitle}>
-                {p ? (p.dm ? t("searchPage.dm", { name: p.name }) : `#${p.name}`) : ""}
-              </Text>
-              <ActionList
-                items={inChannel.map((h) => ({
-                  key: h.sourceId,
-                  leading: h.author ? <Face who={h.author} size={34} live={false} /> : <Tile icon="chat" size={34} />,
-                  label: previewOf(hitText(t, h)),
-                  hint: [h.author?.name, when.short(h.createdAt)].filter(Boolean).join(" · "),
-                  onPress: () => {
-                    onOpen();
-                    router.push(chatHref(channelId, h.threadId, h.messageId));
-                  },
-                }))}
-              />
-            </View>
-          );
-        })}
+        {groupHitsByPlace(list).map((g) => (
+          <View key={g.key} style={styles.group}>
+            <Text variant="label" accessibilityRole="header" style={styles.groupTitle}>
+              {g.thread ? threadName(g.thread.title, g.channelId) : placeName(g.channelId)}
+            </Text>
+            <ActionList
+              items={g.hits.map((h) => ({
+                key: h.sourceId,
+                leading: h.author ? <Face who={h.author} size={34} live={false} /> : <Tile icon="chat" size={34} />,
+                label: previewOf(hitText(t, h)),
+                marks: terms,
+                hint: [h.author?.name, when.short(h.createdAt)].filter(Boolean).join(" · "),
+                onPress: () => {
+                  onOpen();
+                  if (onPick) onPick(h);
+                  else router.push(hitHref(h));
+                },
+              }))}
+            />
+          </View>
+        ))}
         {hits.isSuccess && list.length === 0 ? (
           <Text tone="faint" style={styles.empty}>
             {t("mobile.find.nothing", {

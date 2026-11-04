@@ -6,7 +6,7 @@ import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { brainPlan, isPlanId, planFreeHint, planOf } from "@agenteschat/client/lib/plans";
+import { brainPlan, geminiPersonal, isPlanId, planFreeHint, planOf } from "@agenteschat/client/lib/plans";
 import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { extraUsageOn, limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -131,7 +131,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const models = useModels().data?.models;
   const thinksMark = thinks.mark ?? apiProviderOf(agent?.model, models ?? []);
   const model = view && kind ? modelRows(t, view, brainPlan(view)).find((r) => r.checked) : undefined;
-  const accounts = view && kind ? agentAccounts(view, kind, agent?.ownerUserId) : [];
+  const accounts = view && kind ? agentAccounts(view, kind, agent?.ownerUserId, name) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
   // Another account, or one more login of `a` other agents use (`also`, its email Claude's hint): Connect an AI on that
   // plan's page (a coding plan's key, on its first page).
@@ -162,11 +162,15 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const signedOut = current?.status === "signed_out" && current.mine;
   // A coding plan's key that its endpoint refused: a new key, on that plan's page.
   const refused = signedOut && current && isPlanId(current.provider) ? current.provider : null;
+  // Someone else's plans listed for whoever may use them: whose they are, and that their owner hears it.
+  const lends = view?.canUseOthersPlans === true && accounts.some((a) => !a.mine && a.ownerId !== agent?.ownerUserId);
   const accountNote = signedOut
     ? t(refused ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
-    : view && !view.canUsePlans && ownerFirst
-      ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
-      : null;
+    : lends
+      ? t("agentPage.work.brain.accountOthers")
+      : view && !view.canUsePlans && ownerFirst
+        ? t("agentPage.work.brain.accountWho", { ...g, owner: ownerFirst })
+        : null;
   const ownRow = view !== undefined && kind !== null && ownSignInListed(view, row, kind);
   const choices = view ? accountChoices(accounts, [view.account]) : [];
   const adds = view?.canUsePlans === true && view.canManageAccounts;
@@ -233,6 +237,9 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     />
                   ) : null}
                 </GroupedList>
+                {kind === "antigravity" && geminiPersonal(current) ? (
+                  <Note icon="info">{t("connectAi.plan.gemini.warning")}</Note>
+                ) : null}
                 {lockedHere ? (
                   <Note icon="lock">
                     {t("connectAi.accountsLocked", { name: pairer?.name.split(" ")[0] ?? "", computer })}
@@ -280,7 +287,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       label={t("usageCard.extraTitle")}
                       labelLines={2}
                       toggle={view.extraUsage}
-                      disabled={busy || !view.canUsePlans}
+                      disabled={busy || !(current ? current.mine : view.canUsePlans)}
                       onPress={() => void save({ extraUsage: !view.extraUsage }, t("usageCard.extraTitle"))}
                     />
                   ) : null}

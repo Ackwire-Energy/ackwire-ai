@@ -894,6 +894,45 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
       "Quem conecta a IA de Ada: um admin, com uma chave de API, ou João, com o próprio plano.",
     );
   });
+
+  test("who may use other people's plans picks a teammate's in one click; one another agent has stays locked", async () => {
+    const bia = acct({
+      id: "acct_bia",
+      label: "Claude Max",
+      plan: "max",
+      ownerId: "u-bia",
+      ownerName: "Bia",
+      mine: false,
+    });
+    const busy = acct({
+      id: "acct_caio",
+      label: "Claude Pro",
+      plan: "pro",
+      ownerId: "u-caio",
+      ownerName: "Caio",
+      mine: false,
+      usedBy: ["Atlas"],
+    });
+    const state = withCard();
+    const { box, picker } = await connectAda(state, {
+      accounts: [bia, busy],
+      canUsePlans: false,
+      canManageAccounts: false,
+      canUseOthersPlans: true,
+    });
+    const theirs = within(picker).getByRole("button", { name: /^Claude Max/ }) as HTMLButtonElement;
+    expect(shownText(theirs)).toBe("Claude MaxDe Bia");
+    expect(theirs.disabled).toBe(false);
+    expect((within(picker).getByRole("button", { name: /^Claude Pro/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(picker.textContent).toContain(
+      "Os planos de outras pessoas mostram de quem são. O dono recebe um e-mail e pode tirar de volta.",
+    );
+    await click(theirs, 8);
+    expect(calls(state, "agents.setBrain").map((c) => c.args)).toEqual([
+      [ORG_ID, ADA_ID, { brain: "claude_code", account: "acct_bia" }],
+    ]);
+    expect(box.textContent).toContain("Ada agora pensa com Claude Max.");
+  });
 });
 
 describe("receipts and the live block", () => {

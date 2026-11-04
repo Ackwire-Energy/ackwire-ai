@@ -245,11 +245,11 @@ describe("the stage: which stickers play", () => {
   });
 
   test("the picker plays the first ones in view, never all of them", () => {
-    const six = [...STICKER_MOODS];
-    const live = pickerLiveIds(["a", "b", "c"], () => six);
+    const all = [...STICKER_MOODS];
+    const live = pickerLiveIds(["a", "b", "c"], () => all);
     expect(live).toHaveLength(PICKER_LIVE_STICKERS);
     expect(live[0]).toBe(stickerCellId("a", "celebrate"));
-    expect(live.at(-1)).toBe(stickerCellId("b", "love"));
+    expect(live.at(-1)).toBe(stickerCellId("b", "celebrate"));
     // What a search left of a section is what counts.
     expect(pickerLiveIds(["a"], () => ["love"])).toEqual([stickerCellId("a", "love")]);
   });

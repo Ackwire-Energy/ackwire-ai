@@ -199,6 +199,13 @@ describe("the agent's screen on the phone's page", () => {
     expect(rfbs[1]?.viewOnly).toBe(false);
     expect(rfbs[1]?.qualityLevel).toBe(6);
     expect(events).toContainEqual({ type: "changed" });
+    // The app's switch cover stays until the new session says its mode.
+    expect(events).not.toContainEqual({ type: "session", mode: "control" });
+    rfbs[1]?.connects();
+    expect(events.filter((e) => e.type === "session")).toEqual([
+      { type: "session", mode: "watch" },
+      { type: "session", mode: "control" },
+    ]);
   });
 
   test("a stream that can't switch opens again in the new mode", () => {

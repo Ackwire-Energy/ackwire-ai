@@ -719,7 +719,7 @@ export type CostlyDecision = "go" | "not_now" | "never" | "always";
 export type SuggestedAi =
   | {
       kind: "account";
-      brain: "claude_code" | "codex" | "cursor" | "opencode";
+      brain: "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
       machineId: string;
       accountId: string;
       label: string;
@@ -2419,7 +2419,7 @@ export interface VoiceDroppedEvent {
 }
 
 /** The agents' stickers, one animation per mood (`STICKER_MOODS` in `lib/media.ts`). */
-export type StickerMood = "celebrate" | "love" | "deal" | "thinking" | "wow" | "dizzy";
+export type StickerMood = "celebrate" | "love" | "deal" | "thinking" | "wow" | "dizzy" | "wave";
 
 /** The GIF picker's chips (`GIF_CATEGORY_IDS` in `lib/media.ts`); the server searches each with its own words. */
 export type GifCategory =
@@ -3884,7 +3884,7 @@ export interface MachinePause {
 }
 
 /** A tool the person turns on or off on the machine. */
-export type MachineToolName = "claude" | "codex" | "cursor" | "opencode" | "commands";
+export type MachineToolName = "claude" | "codex" | "cursor" | "opencode" | "grok" | "antigravity" | "commands";
 
 /** A folder allowed on the machine and the agents (ids) that may use it; empty: allowed, no agent yet. */
 export interface MachineFolderGrant {
@@ -3899,11 +3899,15 @@ export interface MachineAccess {
    * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
    * `terminal` (ADR 0058): the agents' desktops and terminals; absent before protocol 18 (off).
    */
-  tools: Record<Exclude<MachineToolName, "cursor" | "opencode">, boolean> & {
+  tools: Record<Exclude<MachineToolName, "cursor" | "opencode" | "grok" | "antigravity">, boolean> & {
     /** Protocol 36 (ADR 0114): Cursor's CLI; absent on older runners, where it follows Codex's. */
     cursor?: boolean;
     /** Protocol 39 (ADR 0132): OpenCode's CLI; absent on older runners, where it follows Codex's. */
     opencode?: boolean;
+    /** Protocol 43 (ADR 0142): Grok Build; absent on older runners, where it follows Codex's. */
+    grok?: boolean;
+    /** Protocol 44 (ADR 0143): the Antigravity CLI; absent on older runners, where it follows Codex's. */
+    antigravity?: boolean;
     browser?: boolean;
     desktop?: boolean;
     terminal?: boolean;
@@ -3948,7 +3952,7 @@ export interface DesktopRelease {
 }
 
 /** A computer brain that runs on a connected machine. */
-export type ComputerBrain = "claude_code" | "codex" | "cursor" | "opencode";
+export type ComputerBrain = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
 /** An agent waiting for an offline computer, and what it has waiting. */
 export interface OutageAgent {
@@ -4128,6 +4132,8 @@ export type MachineEvent =
       access?: MachineAccess | null | true;
       /** `true`: its Claude Code / Codex accounts changed (ADR 0041); refetch the agents' brain settings. */
       accounts?: true;
+      /** `true`: the coding CLIs it found changed (protocol 41); refetch the agents' brain settings. */
+      executors?: true;
     }
   /** ADR 0036: a new pause state or access reported by the machine (also accepted inside `machine.updated`). */
   | { type: "machine.state"; machineId: string; paused?: MachinePause | null }
@@ -5147,7 +5153,7 @@ export interface MissionSettings {
 }
 
 /** "Quem pensa" (ADR 0032): the API, or Claude Code / Codex on the agent's computer with a person's plan. */
-export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode";
+export type BrainKind = "model" | "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
 /** Why a computer brain can't be chosen now. */
 export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
@@ -5217,6 +5223,11 @@ export interface AgentBrain {
   onlyOwner: boolean;
   /** The viewer owns the agent: only they connect its plan and turn its paid extra usage on or off. */
   canUsePlans: boolean;
+  /**
+   * The viewer may use other people's plans (`use_others_plans`, ADR 0059 §3): `accounts` has every plan on its
+   * computer, and they may give it any of them. Absent on older servers.
+   */
+  canUseOthersPlans?: boolean;
   /** "Conta deste computador" can think for it: whoever connected the computer owns the agent. */
   ownSignIn: boolean;
   /** "Conta deste computador"'s plan usage, by brain (absent: not known). */
@@ -5230,7 +5241,7 @@ export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** A level, or "Automático" (each run picks low, medium or high with the model). */
 export type BrainEffortSetting = BrainEffort | "auto";
 
-export type MachineAccountKind = "claude_code" | "codex" | "cursor" | "opencode";
+export type MachineAccountKind = "claude_code" | "codex" | "cursor" | "opencode" | "grok" | "antigravity";
 
 /** ADR 0041 §3, ADR 0059: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {
@@ -5278,9 +5289,24 @@ export interface AiComputer {
   /** Its runner takes coding plans' keys. */
   keys: boolean;
   /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
-  shares?: { claude_code: boolean; codex: boolean; cursor?: boolean; opencode?: boolean; key: boolean };
+  shares?: {
+    claude_code: boolean;
+    codex: boolean;
+    cursor?: boolean;
+    opencode?: boolean;
+    grok?: boolean;
+    antigravity?: boolean;
+    key: boolean;
+  };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
-  brains: { claude_code: boolean; codex: boolean; cursor?: boolean; opencode?: boolean };
+  brains: {
+    claude_code: boolean;
+    codex: boolean;
+    cursor?: boolean;
+    opencode?: boolean;
+    grok?: boolean;
+    antigravity?: boolean;
+  };
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the viewer connected (absent: a server
    * too old to say). Its plan and usage when the computer reported them.
@@ -5807,6 +5833,11 @@ export type NotificationKind =
   /** ADR 0059 §8: someone else took control of the person's agent's desktop. Once a day per agent; `source.agentId`. */
   | "desktop_taken"
   /**
+   * ADR 0059 §3: someone gave an agent the person's plan (`use_others_plans`). One per agent and account;
+   * `source.agentId`, `source.accountId`, `latest.plan`. "Tirar de volta" (`takeBackPlan`) makes it done.
+   */
+  | "plan_lent"
+  /**
    * ADR 0119: an AI app connected as this person created things for them. One per connection while unread;
    * `latest.title` the app's name, `latest.created` how many of each kind; opens `source.agentId` or `source.routineId`.
    */
@@ -5945,6 +5976,8 @@ export interface NotificationSource {
   routineId?: string;
   /** `skill_update`: the skill. */
   skillId?: string;
+  /** `plan_lent`: the plan's account. */
+  accountId?: string;
   /** `machine_connected`: the computer. */
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */

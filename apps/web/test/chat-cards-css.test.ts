@@ -108,5 +108,5 @@ test("two agents talking is one pair row; on a reach line it sits with the rows,
 });
 
 test("a select's list keeps room under its last row once scrolled to the bottom", () => {
-  expect(value(".ac-menu--select [data-radix-select-viewport]", "padding-block")).toBe("var(--space-1)");
+  expect(value(".ac-menu--select [data-radix-select-viewport]", "padding-block")).toBe("var(--menu-pad)");
 });

@@ -28,7 +28,6 @@ import {
 import { holdText } from "@agenteschat/client/lib/errors";
 import { NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
   type AiChoice,
   ALL_AGENTS,
@@ -37,6 +36,7 @@ import {
   type ExistingSignIn,
   freePlanAccount,
   gateDims,
+  gateLine,
   KEY_MARKS,
   kindOf,
   ownSignInFor,
@@ -51,7 +51,7 @@ import {
   planTitle,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
-import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
+import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
   keyLooksValid,
@@ -214,16 +214,23 @@ export function AiPicker({
 
 /**
  * An account as an agent's account choice shows it (Quem pensa's list, Connect an AI's first rows): its name and plan,
- * the line under it with its plan's state, its maker's mark. Only its owner picks it.
+ * the line under it with its plan's state, its maker's mark. Only its owner picks it, unless `usable` says otherwise
+ * (someone else's plan for a person who may use other people's plans).
  */
-export function accountOption(t: TFunction, locale: string, choice: AccountChoice<MachineAccount>, agentName: string) {
+export function accountOption(
+  t: TFunction,
+  locale: string,
+  choice: AccountChoice<MachineAccount>,
+  agentName: string,
+  usable?: boolean,
+) {
   const a = choice.login;
   return {
     label: accountTitle(a),
     description:
       [accountAbout(t, choice, agentName), planWord(t, locale, a.usage)].filter(Boolean).join(" · ") || undefined,
     leading: <ProviderLogo id={a.provider ?? a.kind} size="sm" />,
-    disabled: !a.mine,
+    disabled: !(usable ?? a.mine),
   };
 }
 
@@ -352,7 +359,7 @@ export function ExistingRows({
       <OptionCard
         key={a.id}
         pressed={signIn?.from === a.id}
-        disabled={option.disabled || busy || gateDims(gates.gateOf(choice))}
+        disabled={r.act === "locked" || busy || gateDims(gates.gateOf(choice))}
         onClick={pick}
         className="ai-picker__key ac-iconline"
       >
@@ -370,10 +377,16 @@ export function ExistingRows({
     const at = rows.findIndex((r) => r.kind === "account" && r.choice.login.id === signIn?.from);
     items.splice(at < 0 ? items.length : at + 1, 0, <Fragment key="panel">{panel}</Fragment>);
   }
+  // Someone else's plan, for whoever may use other people's plans: its owner hears it and may take it back.
+  const ownerId = dir.agentById.get(agent.id)?.ownerUserId;
+  const lends = rows.some(
+    (r) => r.kind === "account" && !r.choice.login.mine && r.choice.login.ownerId !== ownerId && r.act === "use",
+  );
   return (
     <>
       <p className="ai-picker__or">{named ? t("connectAi.have.titleFor", g) : t("connectAi.have.title")}</p>
       {items}
+      {lends && <p className="ai-picker__or">{t("agentPage.work.brain.accountOthers")}</p>}
       <p className="ai-picker__or">{t("connectAi.have.other")}</p>
     </>
   );
@@ -411,6 +424,9 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
       <SettingNote icon="check" live>
         {t("aiAccounts.done.savedAgent", { agent: agent.name, label: used.label })}
       </SettingNote>
+      {a?.kind === "antigravity" && geminiPersonal(a) && (
+        <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+      )}
       {a && (
         <div className="ac-card__foot ac-iconline ai-panel__replies">
           <Icon name={on ? "audienceEveryone" : "audienceOwner"} size={14} />
@@ -565,9 +581,14 @@ export function PlanWithoutAgent({
         sub={t(`connectAi.plan.${choice}.tiers`)}
       />
       {has ? (
-        <SettingNote icon="check" live>
-          {t("connectAi.forNewAgents", { label: has.label })}
-        </SettingNote>
+        <>
+          <SettingNote icon="check" live>
+            {t("connectAi.forNewAgents", { label: has.label })}
+          </SettingNote>
+          {choice === "gemini" && geminiPersonal(has) && (
+            <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+          )}
+        </>
       ) : (
         <>
           <GateWait
@@ -842,7 +863,7 @@ function PlanSteps({
   const ready = gate.state === "ready";
   const brand = planLabel(t, choice);
   const current = view?.accounts.find(
-    (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
+    (a) => a.id === view.account && a.kind === kind && providerFitsChoice(a.provider, choice, coding),
   );
   // The sign-in in play: one just made, the computer's own chosen here, or what the agent already thinks with.
   const signIn = own?.chosen || ownSaved ? OWN_SIGN_IN : view?.brain === kind ? view : undefined;
@@ -970,7 +991,7 @@ function PlanSteps({
               a.mine &&
               a.status === "active" &&
               a.kind === kind &&
-              (coding ? a.provider === choice : !a.provider) &&
+              providerFitsChoice(a.provider, choice, coding) &&
               (everyone || a.id !== view?.account),
           ),
         ).flatMap((g) => g.logins.slice(0, 1))
@@ -1034,6 +1055,9 @@ function PlanSteps({
         </p>
       )}
       {retry}
+      {choice === "gemini" && choosing && !otherChosen && existing.some(geminiPersonal) && (
+        <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+      )}
       {choosing && (
         // Who shares the sign-in: the computer's own, which any of its pairer's agents there thinks with, an account
         // of this plan the person already has there for all of their agents, or another sign-in (ADR 0059 §2). Small
@@ -1080,8 +1104,13 @@ function PlanSteps({
           kind={kind}
           // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
           computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
-          {...(coding ? { provider: choice } : {})}
+          {...(coding
+            ? { provider: choice }
+            : signInProviderOf(signedOut?.provider)
+              ? { provider: signInProviderOf(signedOut?.provider) }
+              : {})}
           again={login ? login.again : signedOut?.id}
+          fresh={existing.length > 0 && otherChosen}
           email={turn && sameAs ? sameAs : login ? login.email : signedOut?.email}
           local={view?.ownSignIn}
           ready={ready}
@@ -1155,6 +1184,8 @@ function GateWait({
     </p>
   );
   const hold = holdText(t, org.standing);
+  // Offline or unsupported: what's going on there and what comes next (on the Cloud, by itself as events arrive).
+  const why = gateLine(t, { gate, edition, kind, computer, machine: machines.data?.find((m) => m.id === machineId) });
   let wait: ReactNode = null;
   if (gate.state === "loading") wait = <Spinner />;
   else if (gate.state === "preparing") {
@@ -1198,15 +1229,13 @@ function GateWait({
         )}
       </div>
     );
-  } else if (gate.state === "offline" && !signingIn) {
-    wait = hostConnecting ? (
-      line(<Spinner size={14} />, t("connectAi.wait.connecting"))
-    ) : (
+  } else if (gate.state === "offline" && hostConnecting && !signingIn) {
+    wait = line(<Spinner size={14} />, t("connectAi.wait.connecting"));
+  } else if (why && !(gate.state === "offline" && signingIn)) {
+    wait = (
       <>
-        <SettingNote icon="alert">
-          {edition === "cloud"
-            ? t("aiAccounts.connect.needsCloud.online", { computer })
-            : t("brain.offline", { computer })}
+        <SettingNote icon={why.rechecks ? "clock" : "alert"} live={why.rechecks}>
+          {why.text}
         </SettingNote>
         {useKey}
       </>
@@ -1220,26 +1249,6 @@ function GateWait({
             {t("aiAccounts.connect.addComputer")}
           </Button>
         </span>
-      </>
-    );
-  } else if (gate.state === "unsupported") {
-    const off = toolOffReason(
-      machines.data?.find((m) => m.id === machineId),
-      kind,
-    );
-    const program = t(`brain.card.${kind}`);
-    wait = (
-      <>
-        <SettingNote icon="alert">
-          {edition === "cloud"
-            ? t(`aiAccounts.connect.needsCloud.${kind}`, { computer })
-            : gate.reason === "keys"
-              ? t("aiAccounts.connect.needs.keys")
-              : gate.reason === "tool_off"
-                ? t(off.key, { computer, command: off.command, program })
-                : t(`brain.reasons.${gate.reason}`, { computer, program })}
-        </SettingNote>
-        {useKey}
       </>
     );
   } else if (gate.state === "locked") {

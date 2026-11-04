@@ -368,4 +368,21 @@ export const words: EmailWords = {
     why: (org) =>
       `Vous recevez cet e-mail car un de vos agents dans ${org} pense avec votre forfait et quelqu'un d'autre a changé qui peut lui parler.`,
   },
+  planLent: {
+    subject: (plan) => `Votre forfait ${plan} pense maintenant pour un autre agent`,
+    preheader: (plan) => `Ses conversations utilisent votre forfait ${plan} et ses limites. Vous pouvez le reprendre.`,
+    headline: "Quelqu’un a connecté votre forfait à un agent",
+    body: (by, agent, plan) => [
+      { b: by },
+      ` a connecté votre forfait ${plan} à l’agent `,
+      { b: agent },
+      ". Ses conversations utilisent votre forfait et ses limites.",
+    ],
+    agent: "Agent",
+    by: "Connecté par",
+    plan: "Forfait",
+    note: "Reprenez-le en un clic depuis vos notifications, et l’agent arrête de penser avec votre forfait.",
+    button: "Ouvrir les notifications",
+    why: (org) => `Vous recevez cet e-mail parce que quelqu’un dans ${org} a connecté votre forfait à un agent.`,
+  },
 };

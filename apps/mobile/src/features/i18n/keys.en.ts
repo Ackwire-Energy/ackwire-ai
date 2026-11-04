@@ -842,6 +842,10 @@ export const featureKeysEn = {
       desktop_taken_other: "{{names}} took control of the screen of {{agent}}'s computer",
       desktop_taken_female_one: "{{names}} took control of the screen of {{agent}}'s computer",
       desktop_taken_female_other: "{{names}} took control of the screen of {{agent}}'s computer",
+      plan_lent_one: "{{names}} connected your {{plan}} plan to {{agent}}",
+      plan_lent_other: "{{names}} connected your {{plan}} plan to {{agent}}",
+      plan_lent_female_one: "{{names}} connected your {{plan}} plan to {{agent}}",
+      plan_lent_female_other: "{{names}} connected your {{plan}} plan to {{agent}}",
       connector_tool_changed_one: "A connected server changed tools you approved",
       connector_tool_changed_other: "A connected server changed tools you approved",
       computer_disk_full_one: "A computer's disk is almost full",
@@ -1714,6 +1718,13 @@ export const featureKeysEn = {
     },
     machine: {
       toolsHow: "Tap a tool that's on to turn it off. Turning it back on happens only on the computer itself.",
+    },
+    roles: {
+      /** Under the roles and a role's name and color: what only the web changes. */
+      onComputer: "The roles' order and each role's icon change on the computer.",
+      /** Over an area's permissions, each with its own switch. */
+      items: "Item by item",
+      create: "Create",
     },
     import: {
       preparing: "Preparing the file…",

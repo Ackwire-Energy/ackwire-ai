@@ -3,7 +3,7 @@ import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agentes
 import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
 import { setupPlanQuestion } from "@agenteschat/client/lib/audience";
-import { CURSOR_KEY_PLAN, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
+import { CURSOR_KEY_PLAN, geminiPersonal, planOf, planReplies, signInKey } from "@agenteschat/client/lib/plans";
 import { markOf } from "@agenteschat/ui/brand/marks";
 import type { TFunction } from "i18next";
 import {
@@ -77,6 +77,32 @@ describe("the agent's AI", () => {
     expect(agentAccounts(admin, "claude_code", "u1").map((a) => a.id)).toEqual(["mine"]);
   });
 
+  test("who may use other people's plans sees a teammate's too, never one another agent has (ADR 0059 §3)", async () => {
+    const t = await translator("pt-BR");
+    const view = {
+      account: null,
+      ownSignIn: false,
+      ownUsage: {},
+      canUsePlans: false,
+      canUseOthersPlans: true,
+      accounts: [
+        account("owners"),
+        account("bias", { mine: false, ownerId: "u2", ownerName: "Bia" }),
+        account("busy", { mine: false, ownerId: "u3", usedBy: ["Theo"] }),
+        account("all", { mine: false, ownerId: "u3", usedBy: ["Theo"], shared: true }),
+        account("out", { mine: false, ownerId: "u3", status: "signed_out" }),
+      ],
+    };
+    expect(agentAccounts(view, "claude_code", "u1", "Ada").map((a) => a.id)).toEqual(["owners", "bias", "all"]);
+    expect(agentAccounts({ ...view, canUseOthersPlans: false }, "claude_code", "u1", "Ada").map((a) => a.id)).toEqual([
+      "owners",
+    ]);
+    // Connect an AI's first rows: Bia's in one tap, whose it is under it; one another agent has stays locked.
+    const rows = existingRows(t, view, [], "Ada").map((r) => [r.row.kind === "key" ? "key" : r.row.act, r.sub]);
+    expect(rows).toContainEqual(["use", "De Bia"]);
+    expect(rows.filter(([act]) => act === "locked")).toHaveLength(2);
+  });
+
   test("the usage shown is its account's, or the computer's own sign-in's only where that thinks for it", () => {
     const base: View = { account: "a1", ownSignIn: true, ownUsage: { claude_code: usage(40) }, accounts: [] };
     expect(thinkingUsage({ ...base, accounts: [account("a1", { usage: usage(90) })] }, "claude_code")).toEqual(
@@ -122,6 +148,24 @@ describe("the agent's AI", () => {
       text: "Os planos do Claude são para uso pessoal. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do Claude.",
     });
     expect(says(pt, true).line).toBe("A Ada atende quem pode falar com ela, pelo seu plano do Claude.");
+    // A Grok plan (ADR 0142): the same note, in Grok's name.
+    expect(says(en, false, { brain: "grok", plan: null })).toEqual({
+      line: "Ada answers only you, on your Grok plan.",
+      about: "About the plan's terms",
+      text: "Grok plans are for personal use. Letting other people use yours is a gray area in Grok's terms.",
+    });
+    expect(says(pt, false, { brain: "grok", plan: null }).text).toBe(
+      "Os planos do Grok são para uso pessoal. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do Grok.",
+    );
+    // A Gemini Enterprise seat (ADR 0143): a seat's usual words; a personal plan has Google's warning, said plainly.
+    expect(says(en, false, { brain: "antigravity", plan: "enterprise" }).line).toBe(
+      "Ada answers only you, on your Gemini seat.",
+    );
+    expect(pt("connectAi.plan.gemini.warning")).toBe(
+      "O Google diz que usar um plano pessoal do Gemini dentro de outros apps pode suspender a conta. Para não correr esse risco, use uma chave de API ou o Gemini Enterprise.",
+    );
+    expect(geminiPersonal({ provider: "enterprise" })).toBe(false);
+    expect(geminiPersonal(undefined)).toBe(true);
     expect(says(pt, true, { agent: "Theo" }).line).toBe(
       "O Theo atende quem pode falar com ele, pelo seu plano do Claude.",
     );
@@ -275,8 +319,8 @@ describe("the agent's AI", () => {
     // The flow is a component the tests can't render: what it wires in, as text.
     const flow = await Bun.file(new URL("../../src/features/ai/AddAccount.tsx", import.meta.url).pathname).text();
     expect(flow).toContain("const busy = (sending || sent) && !ended;");
-    // Claude's code and a plan's key: the line in place of the field and its button, never beside them.
-    expect(flow.match(/\{busy\s+\? busyLine\s+: pasteRow\(/g)).toHaveLength(2);
+    // Claude's code, Gemini's and a plan's key: the line in place of the field and its button, never beside them.
+    expect(flow.match(/\{busy\s+\? busyLine\s+: pasteRow\(/g)).toHaveLength(3);
     expect(flow).toMatch(/<Note icon=\{<InkOrbit size=\{15\} \/>\} live>\s*\{busyText\}/);
     // A failed send brings the field back with what was in it: only a code that went clears it.
     expect(flow).toMatch(/setSent\(true\);\s+setCode\(""\);/);
@@ -728,7 +772,7 @@ describe("the agent's AI", () => {
     expect(connect).toContain(
       'const steps = ready || gate.state === "preparing" || (gate.state === "offline" && signingIn);',
     );
-    expect(connect).toContain('} else if (gate.state === "offline" && !signingIn) {');
+    expect(connect).toContain('} else if (why && !(gate.state === "offline" && signingIn)) {');
     expect(connect).toContain("offersKeyNow(gate, hold !== null) && !signingIn");
     expect(connect).toContain("onSigningIn={setSigningIn}");
     expect(flow).toMatch(

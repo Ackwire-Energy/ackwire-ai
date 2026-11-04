@@ -391,6 +391,36 @@ describe("Quem pensa (its dialog)", () => {
     expect(codex.querySelector(".ac-optrow__side")?.textContent).toBe("Nenhum computador tem");
   });
 
+  test("on the Cloud the card says what the workspace's computer is doing, as the plan's panel", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    machines?.pair({ id: "machine_1", name: "MacBook", os: "linux", mode: "system" });
+    machines?.setSetup({ state: "ready", machineId: "machine_1" });
+    const base = fakeAgentBrain(ADA_ID);
+    const options = base.options.map((o) =>
+      o.kind === "codex"
+        ? { ...o, available: false, reason: "not_installed" as const }
+        : o.kind === "claude_code"
+          ? { ...o, available: false, reason: "tool_off" as const }
+          : o,
+    );
+    api.agents.brain = async () => ({
+      ...base,
+      options,
+      machines: [{ machineId: "machine_1", name: "MacBook", online: true, options }],
+    });
+    await open(state, api);
+    const dialog = await brainDialog();
+    expect(card(dialog, /^ChatGPT/).textContent).toContain(
+      "O Codex está sendo instalado no MacBook. Isto muda sozinho quando terminar.",
+    );
+    // Never the command for a computer of the person's own.
+    expect(card(dialog, /^Claude/).textContent).toContain(
+      "O Claude Code não está liberado no MacBook. Peça ao suporte para liberar.",
+    );
+  });
+
   test("a tool turned off says where it turns on: the app on a Mac, the app or the command on Linux", async () => {
     const reason = async (os: string, name: string) => {
       cleanup();
@@ -715,6 +745,44 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     d = await brainDialog();
     expect(within(d).queryByRole("combobox", { name: "Conta" })).toBeNull();
     expect(within(await advanced(d)).getByRole("slider", { name: "Esforço" })).toBeTruthy();
+  });
+
+  test("who may use other people's plans gives Ada a teammate's, named whose it is; one another agent has stays off", async () => {
+    const bia: MachineAccount = {
+      ...work,
+      id: "acct_bia",
+      label: "Max da Bia",
+      email: null,
+      plan: null,
+      ownerId: "u-bia",
+      ownerName: "Bia Lima",
+      mine: false,
+    };
+    const busy: MachineAccount = { ...bia, id: "acct_caio", label: "Pro do Caio", ownerName: "Caio", usedBy: ["Theo"] };
+    const { state } = await onMac({
+      account: null,
+      accounts: [bia, busy],
+      canUsePlans: false,
+      canManageAccounts: false,
+      canUseOthersPlans: true,
+    });
+    const d = await brainDialog();
+    expect(d.textContent).toContain(
+      "Os planos de outras pessoas mostram de quem são. O dono recebe um e-mail e pode tirar de volta.",
+    );
+    const trigger = within(d).getByRole("combobox", { name: "Conta" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    expect(screen().getByRole("option", { name: /^Max da Bia/ }).textContent).toBe("Max da BiaDe Bia");
+    expect(
+      screen()
+        .getByRole("option", { name: /^Pro do Caio/ })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+    await click(screen().getByRole("option", { name: /^Max da Bia/ }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_bia" });
   });
 
   test("a signed-out account says so and offers to sign in again, its own email going to Claude's sign-in unasked", async () => {

@@ -17,6 +17,7 @@ import { PLAN_OPENED_JOB } from "./audience";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import { closePoll, POLL_CLOSE_JOB } from "./blocks";
+import { PLAN_LENT_JOB } from "./brain-settings";
 import { type BrakeReport, brakeWakes, callableAgents, LATER_JOB, notCallableText } from "./brakes";
 import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import { typingLogFor } from "./burst";
@@ -44,7 +45,7 @@ import {
   requesterOf,
 } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
-import { type EmailArt, queuePlanOpenedEmail, sendQueuedEmail } from "./email";
+import { type EmailArt, queuePlanLent, queuePlanOpenedEmail, sendQueuedEmail } from "./email";
 import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
@@ -908,6 +909,16 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       // No address for the email's link: a server without emailArt sends no email anyway.
       if (!deps.emailArt) return;
       await queuePlanOpenedEmail(deps.db, deps.emailArt.home, orgOf(job), job.id, job.payload);
+    },
+    // Someone gave an agent another person's plan: that person's inbox note and email (`setAgentBrain`).
+    [PLAN_LENT_JOB]: async (job) => {
+      await queuePlanLent(
+        { db: deps.db, pubsub: deps.pubsub },
+        deps.emailArt?.home ?? null,
+        orgOf(job),
+        job.id,
+        job.payload,
+      );
     },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");

@@ -167,6 +167,12 @@ function AppStack() {
       <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/telemetry" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/access" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/[roleId]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/area" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/add" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/rename" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/roles/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/skills/new" options={{ ...pushed, ...scrollUnder }} />

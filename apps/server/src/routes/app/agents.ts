@@ -214,7 +214,7 @@ const AgentProposal = z
         ai: z.discriminatedUnion("kind", [
           z.object({
             kind: z.literal("account"),
-            brain: z.enum(["claude_code", "codex", "cursor", "opencode"]),
+            brain: z.enum(["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]),
             machineId: z.uuid(),
             accountId: z.uuid(),
             label: z.string(),
@@ -470,7 +470,7 @@ export function agentRoutes(deps: AppDeps) {
                     "plan_tools",
                   ])
                   .optional(),
-                own: z.enum(["claude_code", "codex", "cursor", "opencode"]).optional(),
+                own: z.enum(["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]).optional(),
               }),
             ),
             routing: z.object({
@@ -1297,7 +1297,7 @@ export function agentRoutes(deps: AppDeps) {
             }),
             account: z.uuid().nullable().optional().openapi({
               description:
-                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). One of the agent's owner's accounts, chosen by its owner or an admin (`account.not_owner`).",
+                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). One of the agent's owner's accounts, chosen by its owner or an admin (`account.not_owner`), or anyone's there for someone with `use_others_plans` (its owner is told, `account.lent`).",
             }),
             moveAccount: z.boolean().optional().openapi({
               description: "The account thinks for another agent (`account.in_use`): take it from that one (audited).",

@@ -9,7 +9,17 @@ import { joinNames } from "./format";
 
 /** The brain's product name (never translated). */
 export const brainName = (brain: string | null | undefined) =>
-  brain === "codex" ? "Codex" : brain === "cursor" ? "Cursor" : brain === "opencode" ? "OpenCode" : "Claude Code";
+  brain === "codex"
+    ? "Codex"
+    : brain === "cursor"
+      ? "Cursor"
+      : brain === "opencode"
+        ? "OpenCode"
+        : brain === "grok"
+          ? "Grok Build"
+          : brain === "antigravity"
+            ? "Antigravity CLI"
+            : "Claude Code";
 
 /** `meta.brainUnavailable` of an agent's notice ("the computer brain can't answer; I'll answer when it's back"). */
 export interface BrainUnavailable {
@@ -38,7 +48,11 @@ export function brainUnavailableOf(meta: Record<string, unknown> | null | undefi
         ? "cursor"
         : o.brain === "opencode" || params.brain === "OpenCode"
           ? "opencode"
-          : "claude_code";
+          : o.brain === "grok" || params.brain === "Grok Build"
+            ? "grok"
+            : o.brain === "antigravity" || params.brain === "Antigravity CLI"
+              ? "antigravity"
+              : "claude_code";
   return {
     brain,
     code: str(o.code),

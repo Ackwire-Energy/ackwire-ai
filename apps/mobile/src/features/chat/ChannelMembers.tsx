@@ -7,10 +7,9 @@ import {
   useChannels,
   useRoster,
 } from "@agenteschat/client";
-import { canTalk, listsAgent } from "@agenteschat/client/lib/audience";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
-import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -87,29 +86,12 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
     autoReply: Boolean(m.autoReply),
     setsReply: m.type === "agent" && setsAutoReply(channel, dir.agentById.get(m.id), meId, org),
   }));
-  // The right hand (ADR 0137) is in no channel, yet an @mention reaches it anywhere: it leads the agents.
-  const rightHand = rightHandOf(dir.agents);
-  const lead: Who[] =
-    rightHand && canTalk(rightHand) && !all.some((w) => w.id === rightHand.id)
-      ? [
-          {
-            kind: "agent",
-            id: rightHand.id,
-            name: rightHand.name,
-            handle: rightHand.handle,
-            email: "",
-            autoReply: false,
-            setsReply: false,
-          },
-        ]
-      : [];
+  // The right hand (ADR 0137) is in no channel and isn't listed as a member: an @mention reaches it anywhere.
   const needle = q.trim().toLowerCase();
-  const shown = [...lead, ...all].filter(
-    (w) => !needle || `${w.name} ${w.handle} ${w.email}`.toLowerCase().includes(needle),
-  );
+  const shown = all.filter((w) => !needle || `${w.name} ${w.handle} ${w.email}`.toLowerCase().includes(needle));
   const agents = shown.filter((w) => w.kind === "agent");
   const people = shown.filter((w) => w.kind === "person");
-  const agentCount = lead.length + all.filter((w) => w.kind === "agent").length;
+  const agentCount = all.filter((w) => w.kind === "agent").length;
 
   const open = (w: Who) => {
     tapHaptic();
@@ -129,16 +111,15 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
         <Card>
           {list.map((w) => {
             const mine = w.kind === "person" && w.id === meId;
-            const builtin = w.kind === "agent" && isRightHand(dir.agentById.get(w.id));
             return (
               <Row
                 key={`${w.kind}:${w.id}`}
                 leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} presence ring={c.raised} />}
                 title={mine ? `${w.name}${t("common.youSuffix")}` : w.name}
-                subtitle={builtin ? t("rightHand.callWith", { handle: w.handle }) : lineOf(t, w, routing)}
+                subtitle={lineOf(t, w, routing)}
                 subtitleLines={w.kind === "agent" ? 2 : 1}
                 // Not on my own row: taking myself out of my own list reads as a mistake (as on the web).
-                {...(!builtin && ((editable && !mine) || w.setsReply)
+                {...((editable && !mine) || w.setsReply
                   ? {
                       onPress: () => open(w),
                       meta: <Icon name="more" size={18} color={c.faint} />,

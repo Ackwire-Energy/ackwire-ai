@@ -13,18 +13,26 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { can, type RolePermission } from "@agenteschat/client/lib/permissions";
 import {
   type AreaLevel,
+  areaLine,
   COMPUTER_KEYS,
   type ComputerLevel,
-  computerLevelOf,
+  computerChoice,
   everyoneOf,
-  grants,
+  giveRole,
   holdsAll,
   isBelow,
   isEveryone,
+  keyState,
+  levelLabel,
   levelOf,
   levelOptions,
+  newRoleInput,
+  PEOPLE_SEARCH_FROM,
   type PermissionAreaId,
   peopleWith,
+  ROLE_TEMPLATES,
+  roleLock,
+  roleName,
   roleSummary,
   sortRoles,
   withComputerLevel,
@@ -52,7 +60,6 @@ import {
   Switch,
   ToolLevelSwatch,
 } from "@agenteschat/ui";
-import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadingList } from "@/components/Loading";
@@ -76,12 +83,6 @@ const AREA_ICONS: Record<string, IconName> = {
 
 /** The owner, drawn as a role on top (it isn't one on the server: `organization_members.role`). */
 const OWNER_ID = "owner";
-
-const listFormat = (locale: string, items: string[]) =>
-  new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items);
-
-const roleName = (t: TFunction, r: Pick<OrgRole, "kind" | "name">) =>
-  isEveryone(r) ? t("rolesPage.everyoneName") : r.name;
 
 export function RolesSection() {
   const { org } = useOrg();
@@ -234,13 +235,6 @@ function RoleList({ roles, people, onOpen }: { roles: OrgRole[]; people: Person[
   );
 }
 
-/** Why a role can't be changed by this person, or null. */
-function lockOf(t: TFunction, org: { role: string; rank?: number | null }, canManage: boolean, role: OrgRole) {
-  if (role.editable) return null;
-  if (!canManage) return t("rolesPage.locked.noPermission");
-  return org.role !== "owner" && org.rank === role.position ? t("rolesPage.locked.own") : t("rolesPage.locked.above");
-}
-
 const SWATCH: Record<AreaLevel, "read" | "write" | "approval" | "off"> = {
   none: "read",
   use: "read",
@@ -277,32 +271,20 @@ function RolePage({
   const [deleting, setDeleting] = useState(false);
   const everyone = everyoneOf(data.roles);
   const base = isEveryone(role);
-  const lock = lockOf(t, org, can(org, "manage_roles"), role);
+  const locked = roleLock(org, role);
+  const lock = locked && t(`rolesPage.locked.${locked}`);
   const admin = !base && role.permissions.includes("administrator");
   const holders = peopleWith(role, people);
   const name = roleName(t, role);
   const fail = (e: unknown) => toast.show(errorText(t, e), "error");
   const save = (permissions: string[]) => update.mutate({ roleId: role.id, patch: { permissions } }, { onError: fail });
 
-  const levelLabel = (level: AreaLevel) =>
-    level === "none" && base ? t("rolesPage.levels.nothing") : t(`rolesPage.levels.${level}`);
-
   const area = (a: PermissionArea) => {
     const level = levelOf(role, a, everyone);
     const options = levelOptions(role, a, everyone);
     const keys = a.keys.filter((k) => !COMPUTER_KEYS.includes(k));
-    const reach = admin
-      ? []
-      : keys.filter((k) => grants(role.permissions).has(k) || (!base && grants(everyone?.permissions ?? []).has(k)));
     const expanded = open.has(a.id);
-    const line = admin
-      ? t("rolesPage.viaAdmin")
-      : reach.length
-        ? listFormat(
-            i18n.language,
-            reach.map((k) => t(`permissions.${k as RolePermission}.short`)),
-          )
-        : t("rolesPage.nothing");
+    const line = areaLine(t, i18n.language, role, a, everyone);
     const label = t(`permissions.areas.${a.id as PermissionAreaId}`);
     return (
       <div key={a.id} className="roles-area" data-off={admin || undefined}>
@@ -316,7 +298,7 @@ function RolePage({
           </span>
           {!admin &&
             (lock ? (
-              <Chip lead={<LevelMark role={role} level={level} />}>{levelLabel(level)}</Chip>
+              <Chip lead={<LevelMark role={role} level={level} />}>{levelLabel(t, role, level)}</Chip>
             ) : (
               <Segmented<AreaLevel>
                 size="sm"
@@ -325,7 +307,7 @@ function RolePage({
                 onValueChange={(v) => v !== "custom" && save(withLevel(role, a, v))}
                 options={[...options, ...(level === "custom" ? (["custom"] as const) : [])].map((v) => ({
                   value: v,
-                  label: levelLabel(v),
+                  label: levelLabel(t, role, v),
                   mark: <LevelMark role={role} level={v} />,
                 }))}
               />
@@ -472,8 +454,6 @@ function RolePage({
   );
 }
 
-const COMPUTER_LEVELS: readonly ComputerLevel[] = ["none", "browser", "full"];
-
 /**
  * The agents' computers as one choice (`computerLevelOf`): nothing, the browser, the whole computer, on every agent
  * (`everyone`: on what is the person's own). Below what `everyone` already gives isn't offered.
@@ -490,10 +470,7 @@ function ComputerChoice({
   onSave: (permissions: string[]) => void;
 }) {
   const { t } = useTranslation();
-  const { level, base } = computerLevelOf(role, everyone);
-  const options = COMPUTER_LEVELS.slice(COMPUTER_LEVELS.indexOf(base));
-  const shown = options.includes(level) ? level : base;
-  const reach = isEveryone(role) ? "own" : "every";
+  const { options, shown, reach } = computerChoice(role, everyone);
   return (
     <div className="roles-computer">
       <span className="roles-key__text">
@@ -526,10 +503,9 @@ function KeyRow({
   onSave: (permissions: string[]) => void;
 }) {
   const { t } = useTranslation();
-  const base = isEveryone(role);
-  const viaAdmin = role.permissions.includes("administrator");
-  const viaAll = !base && !role.permissions.includes(k) && grants(everyone?.permissions ?? []).has(k);
-  const on = role.permissions.includes(k) || viaAdmin || viaAll;
+  const { on, from } = keyState(role, everyone, k);
+  const viaAdmin = from === "admin";
+  const viaAll = from === "everyone";
   const id = `role-key-${k}`;
   return (
     <div className="roles-key">
@@ -628,19 +604,7 @@ function RolePeople({ role, roles, people }: { role: OrgRole; roles: OrgRole[]; 
         roles={roles}
         emptyText={t("rolesPage.noOneLeft", { name })}
         onAdd={async (ids) => {
-          // One by one, on past a refusal: whoever got it counts, the first refusal says why.
-          let added = 0;
-          let failed: unknown = null;
-          for (const id of ids) {
-            const p = people.find((x) => x.userId === id);
-            if (!p) continue;
-            try {
-              await set.mutateAsync({ userId: id, roleIds: [...(p.roleIds ?? []), role.id] });
-              added++;
-            } catch (e) {
-              failed ??= e;
-            }
-          }
+          const { added, failed } = await giveRole(people, ids, role.id, set.mutateAsync);
           if (added > 0) toast.show(t("rolesPage.added", { count: added, name }));
           if (failed) toast.show(errorText(t, failed), "error");
         }}
@@ -904,7 +868,7 @@ function AddPeopleDialog({
       width={440}
     >
       <DialogBody>
-        {candidates.length > 8 && (
+        {candidates.length > PEOPLE_SEARCH_FROM && (
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -980,18 +944,6 @@ function AddPeopleDialog({
   );
 }
 
-const TEMPLATES: { id: "blank" | "mod" | "agents" | "costs"; keys: RolePermission[]; icon: string; color: string }[] = [
-  { id: "blank", keys: [], icon: "bolt", color: "graphite" },
-  { id: "mod", keys: ["create_channels", "manage_channels"], icon: "flag", color: "teal" },
-  {
-    id: "agents",
-    keys: ["create_agents", "manage_agents", "approve_actions", "manage_routines", "review_memory"],
-    icon: "code",
-    color: "indigo",
-  },
-  { id: "costs", keys: ["view_usage", "view_audit"], icon: "chart", color: "amber" },
-];
-
 function NewRoleDialog({
   open,
   onOpenChange,
@@ -1011,7 +963,7 @@ function NewRoleDialog({
   const [from, setFrom] = useState("blank");
   const copies = roles.filter((r) => holdsAll(org, r.permissions));
   const choices = [
-    ...TEMPLATES.map((x) => ({
+    ...ROLE_TEMPLATES.map((x) => ({
       id: x.id,
       title: t(`rolesPage.templates.${x.id}`),
       desc: t(`rolesPage.templates.${x.id}Desc`),
@@ -1021,25 +973,15 @@ function NewRoleDialog({
   const submit = () => {
     const typed = name.trim();
     if (!typed) return;
-    const copy = from.startsWith("copy:") ? copies.find((r) => `copy:${r.id}` === from) : undefined;
-    const tpl = TEMPLATES.find((x) => x.id === from);
-    create.mutate(
-      {
-        name: typed,
-        icon: copy?.icon ?? tpl?.icon,
-        color: copy?.color ?? tpl?.color,
-        permissions: copy ? copy.permissions : (tpl?.keys ?? []),
+    create.mutate(newRoleInput(typed, from, copies), {
+      onSuccess: (r) => {
+        toast.show(t("rolesPage.created", { name: typed }));
+        setName("");
+        setFrom("blank");
+        onCreated(r.id);
       },
-      {
-        onSuccess: (r) => {
-          toast.show(t("rolesPage.created", { name: typed }));
-          setName("");
-          setFrom("blank");
-          onCreated(r.id);
-        },
-        onError: (e) => toast.show(errorText(t, e), "error"),
-      },
-    );
+      onError: (e) => toast.show(errorText(t, e), "error"),
+    });
   };
   return (
     <Dialog

@@ -422,6 +422,31 @@ describe("a new computer connected (ADR 0036, admins)", () => {
   });
 });
 
+describe("someone gave an agent the person's plan (ADR 0059 §3)", () => {
+  test("who connected it to which agent, and Tirar de volta takes it back from that agent or from all", async () => {
+    const lent = notification({
+      id: "n-lent",
+      kind: "plan_lent",
+      actors: [{ type: "user", id: "u-joao" }],
+      source: { agentId: ADA_ID, accountId: "acct_wes", label: "Ada" },
+      latest: { plan: "Claude" },
+      updatedAt: ago(3),
+    });
+    const { state } = await go(seedState({ notifications: [lent] }));
+    const row = document.querySelector('[data-n="n-lent"]') as HTMLElement;
+    expect(row.textContent).toContain("João conectou o seu plano do Claude à\u00a0Ada");
+    await click(within(row).getByRole("button", { name: "Tirar de volta" }));
+    await settle(4);
+    await click(within(row).getByRole("button", { name: "Tirar de todos os agentes" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "machines.takeBackPlan").map((c) => c.args)).toEqual([
+      [ORG_ID, "acct_wes", ADA_ID],
+      [ORG_ID, "acct_wes", undefined],
+    ]);
+    expect(document.body.textContent).toContain("Seu plano voltou");
+  });
+});
+
 describe("agents that failed for one cause (ADR 0097)", () => {
   const failure = (agentId: string, messageId: string) => ({
     key: `run_failed:${agentId}:${ENG_ID}:${messageId}`,

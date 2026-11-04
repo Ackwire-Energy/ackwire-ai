@@ -12,6 +12,7 @@ import {
   type MessagePin,
   type ReceiptsState,
   type RunConsultation,
+  type SearchHit,
   sendHelpers,
   typingIn,
   useAgentsBrowserHandoffs,
@@ -114,6 +115,8 @@ import { FanStrip } from "../queue/parts";
 import { DmQueueButton, QueueButton, useAgentsQueue, useOpenQueue } from "../queue/QueueSheet";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { RightHandIntro } from "../right-hand/Intro";
+import { ConversationSearch } from "../search/ConversationSearch";
+import { hitTarget } from "../search/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useMyHandle, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, previewOf } from "../shared/logic";
@@ -1086,6 +1089,26 @@ function Chat({
     setSeek(target.messageId);
   };
   const openPins = () => sheet.open(<PinsSheet channelId={channelId} threadId={threadId} onPick={goToPin} />);
+  // "Buscar nesta conversa" (as the web's header search): on the timeline, not in a thread.
+  const searchPlace = isThread
+    ? null
+    : dm
+      ? { id: channelId, name: dm.with.name, dm: true }
+      : channel
+        ? { id: channelId, name: channel.name }
+        : null;
+  const goToHit = (hit: SearchHit) => {
+    sheet.close();
+    const target = hitTarget(hit, channelId);
+    if (target.kind === "open") {
+      router.push(target.href);
+      return;
+    }
+    seekPages.current = 0;
+    setSeek(target.messageId);
+  };
+  const openSearch = () =>
+    searchPlace ? sheet.open(<ConversationSearch place={searchPlace} onPick={goToHit} />) : undefined;
   // "Ver resultado" on a work's line: its report, when this conversation shows it.
   const jumpToMessage = useCallback((messageId: string) => {
     const index = rowsRef.current.findIndex((r) => r.kind === "message" && r.message.id === messageId);
@@ -1359,7 +1382,12 @@ function Chat({
         subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
-        extraActions={(dmAgentId ? 1 : 0) + (queueShown ? 1 : 0) + (agentTasks ? tasksBadge(agentTasks).room : 0)}
+        extraActions={
+          (dmAgentId ? 1 : 0) +
+          (queueShown ? 1 : 0) +
+          (agentTasks ? tasksBadge(agentTasks).room : 0) +
+          (searchPlace ? 1 : 0)
+        }
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
         {...hold}
         label={
@@ -1397,7 +1425,7 @@ function Chat({
           ) : undefined
         }
         onPress={openMembers}
-        extraActions={queueShown ? 1 : 0}
+        extraActions={(queueShown ? 1 : 0) + (searchPlace ? 1 : 0)}
         {...hold}
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
@@ -1432,6 +1460,7 @@ function Chat({
         ) : dmComputer ? (
           <DmComputerButton agentId={dmComputer.agentId} onOpen={leavePlace} />
         ) : null}
+        {searchPlace ? <IconButton icon="search" label={t("searchPage.searchHere")} onPress={openSearch} /> : null}
         <IconButton icon="more" label={t("mobile.chat.options")} onPress={openOptions} />
       </>
     ) : null;

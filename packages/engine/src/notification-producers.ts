@@ -1360,6 +1360,33 @@ export async function notifyDesktopTaken(
   });
 }
 
+/** The inbox note of one plan lent to one agent (`plan_lent`), done when it is taken back; no agent: all of them. */
+export const planLentGroup = (accountId: string, agentId = "") => `plan_lent:${accountId}:${agentId}`;
+
+/** Someone gave an agent this person's plan (`plan_lent`): the plan's owner, in the inbox, with "Tirar de volta". */
+export async function notifyPlanLent(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    agentId: string;
+    agentName: string;
+    accountId: string;
+    ownerUserId: string;
+    actorId: string;
+    plan: string;
+  },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [input.ownerUserId],
+    kind: "plan_lent",
+    groupKey: planLentGroup(input.accountId, input.agentId),
+    actor: { type: "user", id: input.actorId },
+    source: { agentId: input.agentId, accountId: input.accountId, label: input.agentName },
+    latest: { plan: input.plan },
+  });
+}
+
 /**
  * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
  * from seconds to an approval hours later. One row each time it gets ready.

@@ -1,0 +1,161 @@
+// A fake Antigravity CLI (`agy`) for runner tests. Each start appends its argv, cwd and the env that matters (its home,
+// the MCP run and token, keys that must stay out) to $FAKE_AGY_LOG (one JSON line). Signed in: `fake-auth.json` in
+// $HOME/.gemini/antigravity-cli. `--version` prints a version line, `models` the models (signed out: an error),
+// `acp --login` prints a Google sign-in link, reads the pasted code from stdin and signs in, `-p /usage` prints the
+// quotas, `-p /logout` signs out. `-p <prompt> --output-format stream-json` prints one turn: init (the conversation:
+// `--conversation`'s, or a new one when it doesn't know that one; its tools: our server's alone with `--agent`, else
+// the CLI's own and ours, or $FAKE_AGY_TOOLS), a text delta, a shell step (none with "BRIDGE_ONLY"), a call to our
+// server (a tool of the CLI's own with "OWN_TOOL"), the last delta with usage and the result. "LIMIT": an AGY_ERROR
+// quota line on stderr and exit 3. "ENV": the shell step's output is the env.
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+const args = process.argv.slice(2);
+const env = process.env;
+const dir = path.join(env.HOME ?? "/nonexistent", ".gemini", "antigravity-cli");
+const auth = path.join(dir, "fake-auth.json");
+const flag = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+if (env.FAKE_AGY_LOG) {
+  appendFileSync(
+    env.FAKE_AGY_LOG,
+    `${JSON.stringify({
+      args,
+      cwd: process.cwd(),
+      home: env.HOME ?? null,
+      run: env.AGENTES_MCP_RUN ?? null,
+      token: env.AGENTES_MCP_TOKEN ?? null,
+      geminiKey: env.GEMINI_API_KEY ?? null,
+      dbus: env.DBUS_SESSION_BUS_ADDRESS ?? null,
+      updates: env.AGY_CLI_DISABLE_AUTO_UPDATE ?? null,
+    })}\n`,
+  );
+}
+const out = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
+
+if (args[0] === "--version") {
+  process.stdout.write("agy 1.4.12\n");
+  process.exit(0);
+}
+if (args[0] === "models") {
+  if (!existsSync(auth)) {
+    process.stderr.write("Error: authentication required. Run agy to sign in.\n");
+    process.exit(1);
+  }
+  process.stdout.write(
+    "gemini-4-argon-high       Gemini 4 Argon (High)\ngemini-3.8-flash-medium   Gemini 3.8 Flash (Medium)\n",
+  );
+  process.exit(0);
+}
+if (args[0] === "acp" && args[1] === "--login") {
+  process.stdout.write(
+    "Open this link to sign in:\nhttps://accounts.google.com/o/oauth2/v2/auth?client_id=agy&state=s1\nPaste the code: ",
+  );
+  let code = "";
+  process.stdin.setEncoding("utf8");
+  for await (const chunk of process.stdin) {
+    code += chunk;
+    if (code.includes("\n")) break;
+  }
+  if (!code.trim()) process.exit(1);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(auth, "{}");
+  process.stdout.write("Signed in.\n");
+  process.exit(0);
+}
+if (args[0] === "-p" && args[1] === "/usage") {
+  process.stdout.write(
+    "Model quotas\n\nGemini Models\nWeekly Limit Remaining\n75%\nFive Hour Limit Remaining\n40% · resets in 2h 30m\n\nClaude and GPT models\nWeekly Limit Remaining\n100%\n",
+  );
+  process.exit(0);
+}
+if (args[0] === "-p" && args[1] === "/logout") {
+  rmSync(auth, { force: true });
+  process.exit(0);
+}
+
+if (args[0] === "-p") {
+  const prompt = args[1] ?? "";
+  if (!existsSync(auth)) {
+    process.stderr.write("Error: authentication required\n");
+    process.exit(1);
+  }
+  const known = path.join(dir, "fake-conversations.json");
+  const conversations = existsSync(known) ? JSON.parse(readFileSync(known, "utf8")) : [];
+  let conversation = flag("--conversation");
+  if (conversation && !conversations.includes(conversation)) {
+    process.stderr.write(`warning: conversation ${conversation} not found, starting a new one\n`);
+    conversation = undefined;
+  }
+  if (!conversation) {
+    conversation = `c3b60000-0000-4000-8000-${String(conversations.length + 1).padStart(12, "0")}`;
+    writeFileSync(known, JSON.stringify([...conversations, conversation]));
+  }
+  const tools = env.FAKE_AGY_TOOLS
+    ? env.FAKE_AGY_TOOLS.split(",")
+    : flag("--agent")
+      ? ["agenteschat_agentes/post_message"]
+      : ["ask_permission", "run_command", "write_to_file", "agenteschat_agentes/post_message"];
+  const step = (o) => out({ event: "step_update", step_update: { conversation_id: conversation, ...o } });
+  out({
+    event: "init",
+    conversation_id: conversation,
+    init: {
+      cwd: process.cwd(),
+      tools,
+      permission_mode: "request-review",
+      ...(flag("--model") ? { model: flag("--model") } : {}),
+    },
+  });
+  step({ step_index: 0, state: "DONE", step_type: "user_input" });
+  if (prompt.includes("LIMIT")) {
+    process.stderr.write(
+      `AGY_ERROR: ${JSON.stringify({ status: "RESOURCE_EXHAUSTED", code: 429, retryable: true, message: "Quota exceeded for Gemini 4 Argon. Resets in 2h 5m." })}\n`,
+    );
+    out({ event: "result", result: { conversation_id: conversation, status: "ERROR", response: "", error: "quota" } });
+    process.exit(3);
+  }
+  step({ step_index: 1, state: "ACTIVE", step_type: "agent_response", text_delta: "Let me check. " });
+  if (!prompt.includes("BRIDGE_ONLY")) {
+    step({
+      step_index: 2,
+      state: "DONE",
+      step_type: "tool",
+      tool_name: "run_command",
+      tool_info: {
+        name: "run_command",
+        parameters: { CommandLine: "bun test" },
+        output: prompt.includes("ENV") ? JSON.stringify(env) : "3 pass\n",
+      },
+    });
+  }
+  const call = prompt.includes("OWN_TOOL") ? "view_file" : "agenteschat_agentes/post_message";
+  step({
+    step_index: 3,
+    state: "DONE",
+    step_type: "tool",
+    tool_name: call,
+    tool_info: { name: call, parameters: {}, output: "ok" },
+  });
+  step({
+    step_index: 4,
+    state: "DONE",
+    step_type: "agent_response",
+    text_delta: "All good.\n",
+    usage: { input_tokens: 1000, output_tokens: 40, thinking_tokens: 30, cache_read_tokens: 400, total_tokens: 1040 },
+  });
+  out({
+    event: "result",
+    result: {
+      conversation_id: conversation,
+      status: "SUCCESS",
+      response: "Let me check. All good.\n",
+      num_turns: 1,
+      usage: { input_tokens: 9000, output_tokens: 400, cache_read_tokens: 0, total_tokens: 9400 },
+    },
+  });
+  process.exit(0);
+}
+process.exit(2);

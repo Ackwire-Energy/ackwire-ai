@@ -352,6 +352,12 @@
       "desc": "套餐、银行卡和发票。",
       "short": "账单",
       "say": "管理账单"
+    },
+    "use_others_plans": {
+      "title": "使用其他人的套餐",
+      "desc": "把其他人连接的套餐给自己能编辑的智能体使用。套餐的主人会收到邮件，并且可以收回。",
+      "short": "使用其他人的套餐",
+      "say": "使用其他人的套餐"
     }
   },
   "auth": {
@@ -1174,6 +1180,8 @@
     "paused": "已暂停: 你本周撤销了它的 3 个决定。随时可以重新打开。",
     "card": {
       "deciding": "{{name}} 正在代 {{for}} 审阅…",
+      "approvedForYou": "由 {{name}} 代你批准",
+      "decidingForYou": "{{name}} 正在代你审阅…",
       "approved": "由 {{name}} 代 {{for}} 批准",
       "passed": "{{name}} 已转交给你",
       "passedWhy": "{{name}} 已转交给你：{{reason}}",
@@ -1185,9 +1193,7 @@
       "why": "为什么？",
       "undo": "撤销",
       "undoArchives": "撤销会归档 {{name}}。有效期至 {{until}}。",
-      "undoSettings": "撤销会恢复设置。有效期至 {{until}}。",
-      "approvedForYou": "由 {{name}} 代你批准",
-      "decidingForYou": "{{name}} 正在代你审阅…"
+      "undoSettings": "撤销会恢复设置。有效期至 {{until}}。"
     }
   },
   "noticePrefs": {
@@ -1418,7 +1424,7 @@
     "collapseAll": "全部收起",
     "expandAll": "全部展开",
     "organize": "在团队中整理分组",
-    "seeAll_other": "查看全部 {{count}} 个智能体",
+    "more_other": "团队中还有 {{count}} 个智能体",
     "createFirst": "创建第一个智能体",
     "working_other": "{{count}} 个工作中",
     "count_other": "{{count}} 个智能体",
@@ -1744,7 +1750,6 @@
   "rightHand": {
     "label": "你的得力助手",
     "newDot": "新",
-    "callWith": "用 @{{handle}} 呼叫",
     "role": "工作区助手",
     "actsAsYou": "以你的权限行事",
     "composerHint": "没有你，什么都不会变",
@@ -1783,7 +1788,8 @@
       "channels": "被呼叫时在频道里回复",
       "model": "模型",
       "message": "发消息",
-      "configure": "设置"
+      "configure": "设置",
+      "nameStory": "名字来自 lodestar，指引水手航向的那颗星。"
     },
     "settings": {
       "name": "名称和外观",
@@ -1916,6 +1922,8 @@
       "claude_code": "这台电脑上的 Claude Code 未登录。请在 {{name}} 的页面上连接 Claude 账号。",
       "codex": "这台电脑上的 Codex 未登录。请在 {{name}} 的页面上连接 ChatGPT 账号。",
       "cursor": "这台电脑上的 Cursor 未登录。请在 {{name}} 的页面上连接 Cursor 账号。",
+      "grok": "这台电脑上的 Grok 未登录。请在 {{name}} 的页面上连接 Grok 账号。",
+      "antigravity": "这台电脑上的 Gemini 未登录。请在 {{name}} 的页面上连接 Gemini 账号。",
       "opencode": "OpenCode 无法在这台电脑上思考。请在 {{name}} 的页面连接一个 OpenCode 密钥。"
     },
     "card": {
@@ -1944,6 +1952,8 @@
       "claude": "连接你的 Claude 套餐",
       "chatgpt": "连接你的 ChatGPT 套餐",
       "cursor": "连接你的 Cursor 套餐",
+      "grok": "连接你的 Grok 套餐",
+      "gemini": "连接你的 Gemini 套餐",
       "zen": "连接 OpenCode",
       "api_key": "添加 API 密钥"
     },
@@ -1968,6 +1978,15 @@
       "cursor": {
         "title": "你的 Cursor 套餐",
         "tiers": "Pro、Pro+、Ultra 或 Teams，或者 Cursor API 密钥"
+      },
+      "grok": {
+        "title": "你的 Grok 套餐",
+        "tiers": "SuperGrok、SuperGrok Heavy 或 X Premium+"
+      },
+      "gemini": {
+        "title": "你的 Gemini 套餐",
+        "tiers": "Google AI Pro、Google AI Ultra 或 Gemini Enterprise",
+        "warning": "Google 表示，在其他应用中使用个人 Gemini 套餐可能导致账号被停用。为避免这个风险，请使用 API 密钥或 Gemini Enterprise。"
       },
       "zen": {
         "title": "OpenCode",
@@ -2039,6 +2058,10 @@
     "onceHint": "它们共享你套餐的用量上限。",
     "use": "使用 {{label}}",
     "another": "其他账号",
+    "reuse": {
+      "active": "你在这里已经有 {{label}}。重新登录它，或使用其他账号。",
+      "signedOut": "{{label}} 在这里已退出登录。重新登录后，它的智能体会继续使用它。"
+    },
     "signInFor": "为 {{name}} 登录",
     "signInFor_female": "为 {{name}} 登录",
     "doneAll": "{{names}} 现在用 {{label}} 思考。",
@@ -2046,6 +2069,8 @@
       "claude_code": "Claude 登录的是 {{email}}，而不是 {{account}}。请在 Claude 页面退出登录后重试。",
       "codex": "ChatGPT 登录的是 {{email}}，而不是 {{account}}。请在 ChatGPT 页面退出登录后重试。",
       "cursor": "Cursor 登录的是 {{email}}，而不是 {{account}}。请在 Cursor 页面退出登录后重试。",
+      "grok": "Grok 登录的是 {{email}}，而不是 {{account}}。请在 Grok 页面退出登录后重试。",
+      "antigravity": "Gemini 登录的是 {{email}}，而不是 {{account}}。请在 Google 页面退出登录后重试。",
       "opencode": "OpenCode 登录的是 {{email}}，不是 {{account}}。请用正确的密钥重试。"
     },
     "useAnyway": "使用 {{email}}",
@@ -2230,7 +2255,6 @@
   "dm": {
     "subtitle": "{{role}} · 负责人：{{owner}}",
     "subtitleNoOwner": "{{role}} · 无负责人",
-    "profile": "查看资料",
     "emptyAgent": "让他记住、忘记某些事，或换种方式工作。",
     "emptyAgent_female": "让她记住、忘记某些事，或换种方式工作。",
     "opening": "正在打开对话…",
@@ -3086,7 +3110,8 @@
       "usageLimitReached": "<b>{{name}}</b> 已达到 {{amount}} 的额度",
       "usageLimitRequest": "<b>{{name}}</b> 已达到 {{amount}} 的额度并申请增加",
       "usageLimitRaised": "<b>{{name}}</b> 提高了你本月的额度",
-      "usageLimitRefused": "<b>{{name}}</b> 拒绝了你增加使用的申请"
+      "usageLimitRefused": "<b>{{name}}</b> 拒绝了你增加使用的申请",
+      "planLent": "<b>{{name}}</b> 把你的 {{plan}} 套餐连接到了 <b>{{agent}}</b>"
     },
     "usageLimit": {
       "runs_other": "本月 {{count}} 次请求",
@@ -3193,7 +3218,12 @@
     "noneUnread": "全部已读。",
     "noneHere": "这里暂时没有内容。",
     "noneDone": "过去 30 天内没有标记为完成的内容。",
-    "more": "显示更多"
+    "more": "显示更多",
+    "planLent": {
+      "takeBack": "收回",
+      "takeBackAll": "从所有智能体收回",
+      "done": "你的套餐已收回"
+    }
   },
   "approvals": {
     "title": "审批",
@@ -3559,21 +3589,31 @@
             "claude_code": "添加 Claude 账号",
             "codex": "添加 ChatGPT 账号",
             "cursor": "添加 Cursor 账号",
+            "grok": "添加 Grok 账号",
+            "antigravity": "添加 Gemini 账号",
             "opencode": "添加 OpenCode 密钥"
           },
           "stepOne": {
             "claude_code": "有你套餐的那个账号",
             "codex": "有你套餐的那个账号",
-            "cursor": "有你套餐的那个账号"
+            "cursor": "有你套餐的那个账号",
+            "grok": "有你套餐的那个账号",
+            "antigravity": "有你套餐的 Google 账号",
+            "antigravityEnterprise": "你的 Gemini Enterprise 账号"
           },
           "stepOneHint": "账号不对？在那边退出登录后重试。账号只保存在 {{computer}} 上。密码是在 {{brand}} 的页面上输入的。",
           "open": {
             "claude_code": "使用 Claude 登录",
             "codex": "使用 ChatGPT 登录",
-            "cursor": "使用 Cursor 登录"
+            "cursor": "使用 Cursor 登录",
+            "grok": "使用 Grok 登录",
+            "antigravity": "使用 Google 登录"
           },
           "opencodeFree": "OpenCode 的免费模型无需密钥。用 OpenCode 控制台的密钥还能使用付费模型。",
           "cursorFinish": "在 Cursor 的页面上登录后，{{computer}} 上的登录会自动完成。",
+          "grokFinish": "在 Grok 的页面上登录后，{{computer}} 上的登录会自动完成。",
+          "geminiEnterprise": "改用 Gemini Enterprise",
+          "geminiPersonal": "改用个人 Google 账号",
           "cursorKey": "改用 Cursor API 密钥",
           "copyLink": "复制链接",
           "openAgain": "再次打开",
@@ -3585,6 +3625,7 @@
           "sent": "代码已发送。正在 {{computer}} 上完成登录。",
           "local": "就在 {{computer}} 本机上？如果它的浏览器自动打开了，直接在那里授权即可。",
           "deviceCode": "ChatGPT 验证码",
+          "grokCode": "Grok 验证码",
           "deviceCodeText": "在打开的页面中输入这个验证码。",
           "starting": "正在请求 {{computer}}…",
           "waiting": "等待中",
@@ -3595,13 +3636,16 @@
             "claude_code": "Claude 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Claude 的页面上退出登录后重试。",
             "codex": "ChatGPT 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 ChatGPT 的页面上退出登录后重试。",
             "cursor": "Cursor 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Cursor 的页面上退出登录后重试。",
+            "grok": "Grok 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Grok 的页面上退出登录后重试。",
+            "antigravity": "Gemini 已登录为 {{account}}，这个账号你已经连接过了。要使用其他账号，请在 Google 的页面上退出登录后重试。",
             "opencode": "这个 OpenCode 密钥已作为 {{account}} 连接。"
           },
           "startFailed": "{{computer}} 没有响应，请稍后重试。",
           "sendFailed": "无法发送代码，请检查后重试。",
           "done": "{{account}} 账号已在 {{computer}} 上。点击“使用”保存。"
         },
-        "offCloud": "{{computer}} 无响应"
+        "offCloud": "{{computer}} 无响应",
+        "accountOthers": "其他人的套餐会显示是谁的。主人会收到邮件，并且可以收回。"
       },
       "computer": {
         "title": "{{name}} 在哪里工作？",
@@ -6997,6 +7041,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "在电脑上更新 agentes，即可使用套餐密钥"
@@ -7004,11 +7050,13 @@
       "noComputer": "账号保存在已连接的电脑上。请先连接一台你的电脑。",
       "addComputer": "连接电脑",
       "needsCloud": {
-        "claude_code": "{{computer}} 上还没准备好",
-        "codex": "{{computer}} 上还没准备好",
-        "cursor": "{{computer}} 上还没准备好",
-        "opencode": "{{computer}} 上还没准备好",
-        "online": "{{computer}} 目前无响应，我们正在处理。"
+        "online": "{{computer}} 正在重启或重新连接。它回来后这里会自动更新。",
+        "installing": "正在 {{computer}} 上安装 {{program}}。完成后这里会自动更新。",
+        "updating": "正在 {{computer}} 上更新 {{program}}。完成后这里会自动更新。",
+        "runnerOld": "{{computer}} 上的 agentes.chat 程序版本较旧，更新正在路上。完成后这里会自动更新。",
+        "execOff": "{{computer}} 暂时还不能运行 {{program}}。我们正在处理，这里会自动更新。",
+        "toolOff": "{{computer}} 上未允许 {{program}}。请联系支持团队开通。",
+        "preparing": "{{computer}} 正在准备中。完成后这里会自动更新。"
       }
     },
     "done": {
@@ -7032,6 +7080,9 @@
       "rename": "重命名",
       "signInAgain": "重新登录",
       "newKey": "更换密钥",
+      "copies_other": "这个账号还有 {{count}} 个登录，没有任何智能体使用。",
+      "removeCopies": "移除",
+      "copiesRemoved_other": "已移除 {{count}} 个未使用的登录。",
       "disconnect": "断开连接",
       "renameTitle": "重命名 {{label}}",
       "nameLabel": "名称",
@@ -7253,7 +7304,8 @@
       "deal": "成交",
       "thinking": "思考中",
       "wow": "哇",
-      "dizzy": "晕了"
+      "dizzy": "晕了",
+      "wave": "嗨"
     },
     "moodWords": {
       "celebrate": "派对 恭喜 庆祝 上线 发布 耶",
@@ -7261,7 +7313,8 @@
       "deal": "好 好的 同意 是 没问题 搞定",
       "thinking": "嗯 好奇 想想 也许",
       "wow": "哇 惊喜 厉害 天哪",
-      "dizzy": "累 周五 救命 哎呀 困惑"
+      "dizzy": "累 周五 救命 哎呀 困惑",
+      "wave": "你好 嗨 再见 挥手 早上好 回头见"
     },
     "picker": {
       "button": "表情、动图和贴纸",
@@ -8359,21 +8412,29 @@
       "claude": "Claude 套餐上的 {{model}}",
       "chatgpt": "ChatGPT 套餐上的 {{model}}",
       "cursor": "Cursor 套餐上的 {{model}}",
+      "grok": "Grok 套餐上的 {{model}}",
+      "gemini": "Gemini 套餐上的 {{model}}",
       "zen": "通过 OpenCode 使用 {{model}}",
       "coding": "{{plan}} 上的 {{model}}",
       "claudeOf": "{{owner}} 的 Claude 套餐上的 {{model}}",
       "chatgptOf": "{{owner}} 的 ChatGPT 套餐上的 {{model}}",
       "cursorOf": "{{owner}} 的 Cursor 套餐上的 {{model}}",
+      "grokOf": "{{owner}} 的 Grok 套餐上的 {{model}}",
+      "geminiOf": "{{owner}} 的 Gemini 套餐上的 {{model}}",
       "zenOf": "通过 {{owner}} 的 OpenCode 使用 {{model}}",
       "codingOf": "{{owner}} 的 {{plan}} 上的 {{model}}",
       "claudeAuto": "Claude 套餐",
       "chatgptAuto": "ChatGPT 套餐",
       "cursorAuto": "Cursor 套餐",
+      "grokAuto": "Grok 套餐",
+      "geminiAuto": "Gemini 套餐",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}} 的 Claude 套餐",
       "chatgptAutoOf": "{{owner}} 的 ChatGPT 套餐",
       "cursorAutoOf": "{{owner}} 的 Cursor 套餐",
+      "grokAutoOf": "{{owner}} 的 Grok 套餐",
+      "geminiAutoOf": "{{owner}} 的 Gemini 套餐",
       "zenAutoOf": "{{owner}} 的 OpenCode",
       "codingAutoOf": "{{owner}} 的 {{plan}}",
       "on": "{{computer}} 上的{{line}}"
@@ -8386,7 +8447,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "通过 API",
@@ -8397,6 +8460,8 @@
     "claude_codeText": "使用连接这台电脑的人的 Claude 套餐。",
     "codexText": "使用连接这台电脑的人的 ChatGPT 套餐。",
     "cursorText": "使用连接这台电脑的人的 Cursor 套餐。",
+    "grokText": "使用连接这台电脑的人的 Grok 套餐。",
+    "antigravityText": "使用连接这台电脑的人的 Gemini 套餐。",
     "opencodeText": "使用 OpenCode 的免费模型，或连接这台电脑的人的 OpenCode 密钥。",
     "cursorModel": {
       "inPlan": "包含在你的 Cursor 套餐中",
@@ -8441,6 +8506,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}，不回退到 API"
     },
@@ -10719,6 +10786,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "命令",
         "browser": "浏览器"
@@ -10727,6 +10796,8 @@
         "claude": "编写和修改文件，仅限允许的文件夹。",
         "codex": "类似 Claude Code，使用 ChatGPT 账号。仅限允许的文件夹。",
         "cursor": "类似 Claude Code，使用 Cursor 账号。仅限允许的文件夹。",
+        "grok": "类似 Claude Code，使用 Grok 账号。仅限允许的文件夹。",
+        "antigravity": "类似 Claude Code，使用 Gemini 账号。仅限允许的文件夹。",
         "opencode": "类似 Claude Code，使用 OpenCode 的免费模型或 OpenCode 密钥。仅限允许的文件夹。",
         "commands": "运行终端命令，比如测试和构建。"
       },
@@ -12214,6 +12285,8 @@
       "action_invite_people": "邀请成员",
       "action_install_skill": "安装技能",
       "action_update_skills": "更新技能",
+      "action_approvals": "等你处理的审批",
+      "action_open_page": "打开页面",
       "agent_proposal": "提议了一个新智能体：{{name}}",
       "settings_proposal": "提议更改 {{names}}",
       "approval_request": "审批请求：{{title}}",
@@ -12240,9 +12313,7 @@
       "stuck": "我卡住了，在完成前停了下来。",
       "forum_suggestion": "值得开个论坛讨论吗？“{{title}}”",
       "forum_concluded": "论坛“{{title}}”已结束。总结在下方的文件中。",
-      "forum_concluded_issues": "论坛“{{title}}”已结束。总结在下方的文件中，另有 {{count}} 个建议任务待批准。",
-      "action_approvals": "等你处理的审批",
-      "action_open_page": "打开页面"
+      "forum_concluded_issues": "论坛“{{title}}”已结束。总结在下方的文件中，另有 {{count}} 个建议任务待批准。"
     }
   },
   "builtinTools": {
@@ -12876,8 +12947,8 @@
       "backLabel": "给 {{name}} 的备注",
       "backLabel_female": "给 {{name}} 的备注",
       "backPlaceholder": "可选：有什么需要 {{name}} 知道的吗？",
-      "addNote": "留个言",
-      "backPlaceholder_female": "可选：有什么需要 {{name}} 知道的吗？"
+      "backPlaceholder_female": "可选：有什么需要 {{name}} 知道的吗？",
+      "addNote": "留个言"
     },
     "now": {
       "ready": "已在 {{computer}} 上就绪",

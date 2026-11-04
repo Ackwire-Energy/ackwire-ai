@@ -90,14 +90,21 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  --menu-pad: var(--space-2);
   width: min(420px, calc(100vw - 32px));
   max-width: none;
-  padding: 14px;
+  padding: var(--menu-pad);
 }
+/* The buttons on the room (`.ac-popover`), in its corner; the face, the words and the reason further in. */
 .tm-confirm__head {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  padding: var(--popover-in) var(--popover-in) 0;
+}
+.tm-confirm > .tm-why.ac-input {
+  width: auto;
+  margin-inline: var(--popover-in);
 }
 .tm-confirm__text {
   min-width: 0;

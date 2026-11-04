@@ -33,6 +33,7 @@ export const STICKER_MOODS = [
   "thinking",
   "wow",
   "dizzy",
+  "wave",
 ] as const satisfies readonly StickerMood[];
 
 /** The GIF picker's chips, after "Em alta" (the server's `GIF_CATEGORY_IDS`). */

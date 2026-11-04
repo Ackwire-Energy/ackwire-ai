@@ -799,12 +799,12 @@ html:not([data-pointer]) .brw-ac__page.is-control:focus-visible {
     animation: none;
   }
 }
-/* The question's buttons: take control, and Cancelar beside it. */
+/* The question's buttons: take control, and Cancelar under it, as stacked prompts space theirs (`.web-push-ask__acts`). */
 .brw-dim__acts {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
 }
 /* Watching, the stage takes the keys a click gives it: the keyboard's own ring only. */
 .brw-ac__stage[tabindex] {
@@ -1098,7 +1098,7 @@ html:not([data-pointer]) .brw-kc:focus-visible {
 }
 .brw-mmenu span {
   padding: 3px 7px;
-  border-radius: 5px;
+  border-radius: 4px;
   white-space: nowrap;
 }
 .brw-mmenu span[data-hl] {

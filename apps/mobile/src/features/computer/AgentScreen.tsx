@@ -1,7 +1,10 @@
 import {
+  askControlWords,
+  type DesktopMode,
   type DesktopViewState,
   desktopMode,
   desktopStatusState,
+  desktopSwitch,
   handoffIsMine,
   handoffTimeLeft,
   isWaitingHandoff,
@@ -199,6 +202,9 @@ export function AgentScreen({
   const [page, setPage] = useState<DesktopViewState>("connecting");
   const [stuck, setStuck] = useState(false);
   const [taking, setTaking] = useState(false);
+  // The mode of the stream's session now, as the page says it (`session`): a switch's cover waits for it.
+  const [session, setSession] = useState<DesktopMode | null>(null);
+  const [asking, setAsking] = useState(false);
   const [typing, setTyping] = useState(false);
   const [boxSize, setBoxSize] = useState<Size>({ width: 0, height: 0 });
   const [deskSize, setDeskSize] = useState<Size>(DEFAULT_DESKTOP);
@@ -221,15 +227,6 @@ export function AgentScreen({
   useEffect(() => {
     if (ready) call(screenCall("set", { connect, mode }));
   }, [ready, connect, mode]);
-
-  useEffect(() => {
-    if (!connect || shown !== "connecting") {
-      setStuck(false);
-      return;
-    }
-    const id = setTimeout(() => setStuck(true), STUCK_MS);
-    return () => clearTimeout(id);
-  }, [connect, shown]);
 
   const s = useSharedValue(0.25);
   const x = useSharedValue(0);
@@ -261,7 +258,33 @@ export function AgentScreen({
   const mine = waiting !== null && handoffIsMine(waiting, userId, agent?.ownerUserId, org);
   const ask = inControl && handoff?.kind === "ask";
   const doneLabel = ask ? t("mobile.browser.live.done") : t("mobile.browser.live.handBack");
-  const { handBack, couldnt } = useFinishHandoff(inControl ? handoff : null, name, doneLabel);
+  const { handBack, couldnt, finishing } = useFinishHandoff(inControl ? handoff : null, name, doneLabel, () =>
+    view.desktopQ.refetch(),
+  );
+  // Taking or handing back, the last picture stays under what is happening, as on the web: never a cold cover.
+  const switching = desktopSwitch({
+    taking,
+    returning: finishing,
+    mode: taking ? "control" : finishing ? "watch" : mode,
+    session,
+  });
+  // Opening, or a switch the stream never takes: past `STUCK_MS` it says so, with Tentar de novo.
+  const waitsOn = connect && (shown === "connecting" || (live && switching !== null));
+  useEffect(() => {
+    if (!waitsOn) {
+      setStuck(false);
+      return;
+    }
+    const id = setTimeout(() => setStuck(true), STUCK_MS);
+    return () => clearTimeout(id);
+  }, [waitsOn]);
+  const lost = stuck && waitsOn;
+  const words = askControlWords(status, Boolean(f?.browser), Boolean(run));
+  // Watching, a tap on the screen asks before control and reaches nothing there; the question stays until Cancelar.
+  const offer = live && !inControl && !switching && !status?.controllerUserId && !waiting && canTakeOver;
+  useEffect(() => {
+    if (!offer) setAsking(false);
+  }, [offer]);
 
   const take = async () => {
     tapHaptic();
@@ -294,11 +317,11 @@ export function AgentScreen({
     <Button variant="secondary" size="sm" icon="check" label={doneLabel} onPress={handBack} />
   ) : waiting && mine ? (
     <Button variant="primary" size="sm" label={t("agentComputer.help")} loading={taking} onPress={() => void take()} />
-  ) : live && !status?.controllerUserId && !waiting && canTakeOver && (status?.canControl || f?.browser) ? (
+  ) : live && !status?.controllerUserId && !waiting && canTakeOver && words.mayTake ? (
     <Button
       variant="secondary"
       size="sm"
-      label={status?.canControl ? t("desktop.takeover") : t("desktop.takeBrowser")}
+      label={words.browserOnly ? t("desktop.takeBrowser") : t("desktop.takeover")}
       loading={taking}
       onPress={() => void take()}
     />
@@ -325,6 +348,36 @@ export function AgentScreen({
     />
   );
   const computer = computerName(t, org?.name ?? "", view.machine);
+  const askCover = (
+    <Cover
+      fill
+      clear
+      color={color}
+      icon={words.mayTake ? "person" : "eye"}
+      text={t(words.title)}
+      help={words.help ? t(words.help, g) : undefined}
+      action={
+        <View style={styles.askActs}>
+          {words.mayTake ? (
+            <Button
+              variant="primary"
+              size="sm"
+              icon="person"
+              label={words.browserOnly ? t("desktop.takeBrowser") : t("desktop.takeover")}
+              loading={taking}
+              onPress={() => void take()}
+            />
+          ) : null}
+          <Button
+            variant="text"
+            size="sm"
+            label={words.mayTake ? t("common.cancel") : t("common.close")}
+            onPress={() => setAsking(false)}
+          />
+        </View>
+      }
+    />
+  );
   const covers: Record<Exclude<DesktopViewState, "live">, ReactNode> = {
     connecting: stuck ? cantShow : opening,
     hidden: <Cover fill icon="eyeoff" text={t("browser.inCard.hiddenHelp", g)} />,
@@ -423,6 +476,13 @@ export function AgentScreen({
     onUpdate: (e) => {
       "worklet";
       moveCamera(e.changeX, e.changeY);
+    },
+  });
+  const askTap = useTapGesture({
+    enabled: offer,
+    onDeactivate: (e) => {
+      "worklet";
+      if (!e.canceled) scheduleOnRN(setAsking, true);
     },
   });
   // A tap on the screen brings the cursor there; the trackpad clicks.
@@ -565,7 +625,16 @@ export function AgentScreen({
       moveCamera(e.changeX, e.changeY);
     },
   });
-  const viewGestures = useSimultaneousGestures(pinch, panView, tapView, touchTap, touchHold, touchPan, touchMove);
+  const viewGestures = useSimultaneousGestures(
+    pinch,
+    panView,
+    askTap,
+    tapView,
+    touchTap,
+    touchHold,
+    touchPan,
+    touchMove,
+  );
   const spot = useAnimatedStyle(() => ({
     opacity: spotOn.value,
     transform: [{ translateX: spotX.value }, { translateY: spotY.value }, { scale: 1 + 0.28 * spotHeld.value }],
@@ -645,16 +714,19 @@ export function AgentScreen({
                   if (!event) return;
                   if (event.type === "ready") setReady(true);
                   else if (event.type === "view") setPage(event.state);
+                  else if (event.type === "session") setSession(event.mode);
                   else if (event.type === "size") setDeskSize({ width: event.width, height: event.height });
                   else if (event.type === "changed") void view.desktopQ.refetch();
                   else toast({ title: t("desktop.clipboard.tooLong", g), icon: "x" });
                 }}
                 onContentProcessDidTerminate={() => {
                   setReady(false);
+                  setSession(null);
                   setLife((n) => n + 1);
                 }}
                 onRenderProcessGone={() => {
                   setReady(false);
+                  setSession(null);
                   setLife((n) => n + 1);
                 }}
               />
@@ -666,14 +738,21 @@ export function AgentScreen({
             ) : null}
           </Animated.View>
         </GestureDetector>
-        {live ? null : covers[shown]}
-        {taking ? (
-          <View style={styles.taking} pointerEvents="none">
-            <Text variant="small" style={styles.takingText}>
-              {t("desktop.taking")}
-            </Text>
-          </View>
-        ) : null}
+        {lost ? (
+          cantShow
+        ) : switching && (live || shown === "connecting") ? (
+          <Cover
+            fill
+            clear
+            spinner
+            color={color}
+            text={switching === "taking" ? t("desktop.taking") : t("desktop.returning", g)}
+          />
+        ) : live ? (
+          asking && offer && askCover
+        ) : (
+          covers[shown]
+        )}
         {wide ? (
           <>
             <Animated.View pointerEvents="none" style={[styles.spot, { borderColor: tones[3] }, spot]}>
@@ -1183,13 +1262,8 @@ const styles = StyleSheet.create({
     shadowRadius: 1.5,
     shadowOffset: { width: 0, height: 1.5 },
   },
-  taking: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(15,15,14,0.45)",
-  },
-  takingText: { color: "#ffffff", fontWeight: "600" },
+  // Take control, and Cancelar under it, as the web's stacked question (`.brw-dim__acts`).
+  askActs: { alignItems: "center", gap: 4 },
   control: { paddingHorizontal: 12, paddingTop: 10, gap: 8 },
   pad: {
     height: PAD_HEIGHT,

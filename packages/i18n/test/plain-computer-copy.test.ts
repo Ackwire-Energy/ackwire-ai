@@ -145,9 +145,9 @@ const CLOUD_EXTRA = [
   "connectAi.useAnyway",
   "outage.titleCloud",
   "outage.cloudSub",
-  "aiAccounts.connect.needsCloud.claude_code",
-  "aiAccounts.connect.needsCloud.codex",
-  "aiAccounts.connect.needsCloud.online",
+  ...["online", "installing", "updating", "runnerOld", "execOff", "toolOff", "preparing"].map(
+    (k) => `aiAccounts.connect.needsCloud.${k}`,
+  ),
   "agentPage.work.browserDialog.noComputerCloud",
   "brain.reasons.no_computerCloud",
   "scopes.browser_use.description",

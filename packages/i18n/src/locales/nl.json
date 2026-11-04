@@ -357,6 +357,12 @@
       "desc": "Het abonnement, de kaart en de facturen.",
       "short": "facturatie",
       "say": "beheert de facturatie"
+    },
+    "use_others_plans": {
+      "title": "Abonnementen van anderen gebruiken",
+      "desc": "De agents die je mag bewerken een abonnement geven dat iemand anders heeft gekoppeld. De eigenaar krijgt een e-mail en kan het terugnemen.",
+      "short": "abonnementen van anderen gebruiken",
+      "say": "gebruikt abonnementen van anderen"
     }
   },
   "auth": {
@@ -1210,6 +1216,8 @@
     "paused": "Gepauzeerd: je hebt deze week 3 beslissingen ongedaan gemaakt. Zet het weer aan wanneer je wilt.",
     "card": {
       "deciding": "{{name}} bekijkt het namens {{for}}…",
+      "approvedForYou": "Goedgekeurd door {{name}} namens jou",
+      "decidingForYou": "{{name}} bekijkt het namens jou…",
       "approved": "Goedgekeurd door {{name}} namens {{for}}",
       "passed": "{{name}} heeft het aan jou doorgegeven",
       "passedWhy": "{{name}} heeft het aan jou doorgegeven: {{reason}}",
@@ -1221,9 +1229,7 @@
       "why": "Waarom?",
       "undo": "Ongedaan maken",
       "undoArchives": "Ongedaan maken archiveert {{name}}. Kan tot {{until}}.",
-      "undoSettings": "Ongedaan maken zet de instellingen terug. Kan tot {{until}}.",
-      "approvedForYou": "Goedgekeurd door {{name}} namens jou",
-      "decidingForYou": "{{name}} bekijkt het namens jou…"
+      "undoSettings": "Ongedaan maken zet de instellingen terug. Kan tot {{until}}."
     }
   },
   "noticePrefs": {
@@ -1461,8 +1467,8 @@
     "collapseAll": "Alles inklappen",
     "expandAll": "Alles uitklappen",
     "organize": "Groepen ordenen in Team",
-    "seeAll_one": "De {{count}} agent bekijken",
-    "seeAll_other": "Alle {{count}} agents bekijken",
+    "more_one": "Nog 1 agent in Team",
+    "more_other": "Nog {{count}} agents in Team",
     "createFirst": "De eerste agent maken",
     "working_one": "{{count}} aan het werk",
     "working_other": "{{count}} aan het werk",
@@ -1815,7 +1821,6 @@
   "rightHand": {
     "label": "je rechterhand",
     "newDot": "Nieuw",
-    "callWith": "roep aan met @{{handle}}",
     "role": "Workspace-assistent",
     "actsAsYou": "handelt met jouw rechten",
     "composerHint": "niets verandert zonder jou",
@@ -1854,7 +1859,8 @@
       "channels": "Antwoordt in kanalen als je hem roept",
       "model": "Model",
       "message": "Bericht",
-      "configure": "Instellen"
+      "configure": "Instellen",
+      "nameStory": "De naam komt van lodestar, de ster waarop zeelieden koers houden."
     },
     "settings": {
       "name": "Naam en uiterlijk",
@@ -1994,6 +2000,10 @@
       "codex_female": "Codex is niet ingelogd op deze computer. Koppel een ChatGPT-account op de pagina van {{name}}.",
       "cursor": "Cursor is niet ingelogd op deze computer. Koppel een Cursor-account op de pagina van {{name}}.",
       "cursor_female": "Cursor is niet ingelogd op deze computer. Koppel een Cursor-account op de pagina van {{name}}.",
+      "grok": "Grok is niet ingelogd op deze computer. Koppel een Grok-account op de pagina van {{name}}.",
+      "grok_female": "Grok is niet ingelogd op deze computer. Koppel een Grok-account op de pagina van {{name}}.",
+      "antigravity": "Gemini is niet ingelogd op deze computer. Koppel een Gemini-account op de pagina van {{name}}.",
+      "antigravity_female": "Gemini is niet ingelogd op deze computer. Koppel een Gemini-account op de pagina van {{name}}.",
       "opencode": "OpenCode kan niet denken op deze computer. Koppel een OpenCode-sleutel op de pagina van {{name}}.",
       "opencode_female": "OpenCode kan niet denken op deze computer. Koppel een OpenCode-sleutel op de pagina van {{name}}."
     },
@@ -2023,6 +2033,8 @@
       "claude": "Koppel je Claude-abonnement",
       "chatgpt": "Koppel je ChatGPT-abonnement",
       "cursor": "Koppel je Cursor-abonnement",
+      "grok": "Koppel je Grok-abonnement",
+      "gemini": "Koppel je Gemini-abonnement",
       "zen": "Koppel OpenCode",
       "api_key": "Een API-sleutel toevoegen"
     },
@@ -2047,6 +2059,15 @@
       "cursor": {
         "title": "Je Cursor-abonnement",
         "tiers": "Pro, Pro+, Ultra of Teams, of een Cursor-API-sleutel"
+      },
+      "grok": {
+        "title": "Je Grok-abonnement",
+        "tiers": "SuperGrok, SuperGrok Heavy of X Premium+"
+      },
+      "gemini": {
+        "title": "Je Gemini-abonnement",
+        "tiers": "Google AI Pro, Google AI Ultra of Gemini Enterprise",
+        "warning": "Volgens Google kan het gebruik van een persoonlijk Gemini-abonnement in andere apps ertoe leiden dat het account wordt geschorst. Wil je dat risico niet lopen? Gebruik een API-sleutel of Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2118,6 +2139,10 @@
     "onceHint": "Ze delen allemaal de limieten van je abonnement.",
     "use": "{{label}} gebruiken",
     "another": "Een ander account",
+    "reuse": {
+      "active": "Je hebt {{label}} hier al. Log er opnieuw op in, of gebruik een ander account.",
+      "signedOut": "{{label}} is hier uitgelogd. Log opnieuw in en de agents ervan houden het."
+    },
     "signInFor": "Inloggen voor {{name}}",
     "signInFor_female": "Inloggen voor {{name}}",
     "doneAll": "{{names}} denken nu met {{label}}.",
@@ -2125,6 +2150,8 @@
       "claude_code": "Claude is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Claude en probeer het opnieuw.",
       "codex": "ChatGPT is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van ChatGPT en probeer het opnieuw.",
       "cursor": "Cursor is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Cursor en probeer het opnieuw.",
+      "grok": "Grok is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Grok en probeer het opnieuw.",
+      "antigravity": "Gemini is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Google en probeer het opnieuw.",
       "opencode": "OpenCode is ingelogd als {{email}}, niet als {{account}}. Probeer het opnieuw met de juiste sleutel."
     },
     "useAnyway": "{{email}} gebruiken",
@@ -2316,7 +2343,6 @@
   "dm": {
     "subtitle": "{{role}} · eigenaar {{owner}}",
     "subtitleNoOwner": "{{role}} · geen eigenaar",
-    "profile": "Profiel bekijken",
     "emptyAgent": "Vraag hem iets te onthouden, te vergeten of anders te werken.",
     "emptyAgent_female": "Vraag haar iets te onthouden, te vergeten of anders te werken.",
     "opening": "Het gesprek openen…",
@@ -3199,7 +3225,8 @@
       "usageLimitReached": "<b>{{name}}</b> heeft de limiet van {{amount}} bereikt",
       "usageLimitRequest": "<b>{{name}}</b> heeft de limiet van {{amount}} bereikt en vraagt om meer",
       "usageLimitRaised": "<b>{{name}}</b> heeft je limiet voor deze maand verhoogd",
-      "usageLimitRefused": "<b>{{name}}</b> heeft je verzoek om meer gebruik afgewezen"
+      "usageLimitRefused": "<b>{{name}}</b> heeft je verzoek om meer gebruik afgewezen",
+      "planLent": "<b>{{name}}</b> heeft je {{plan}}-abonnement aan <b>{{agent}}</b> gekoppeld"
     },
     "usageLimit": {
       "runs_one": "{{count}} verzoek deze maand",
@@ -3313,7 +3340,12 @@
     "noneUnread": "Alles gelezen.",
     "noneHere": "Hier is voorlopig niets.",
     "noneDone": "Niets als afgerond gemarkeerd in de afgelopen 30 dagen.",
-    "more": "Meer tonen"
+    "more": "Meer tonen",
+    "planLent": {
+      "takeBack": "Terugnemen",
+      "takeBackAll": "Van alle agents terugnemen",
+      "done": "Je abonnement is terug"
+    }
   },
   "approvals": {
     "title": "Goedkeuringen",
@@ -3688,21 +3720,31 @@
             "claude_code": "Claude-account toevoegen",
             "codex": "ChatGPT-account toevoegen",
             "cursor": "Cursor-account toevoegen",
+            "grok": "Grok-account toevoegen",
+            "antigravity": "Gemini-account toevoegen",
             "opencode": "Een OpenCode-sleutel toevoegen"
           },
           "stepOne": {
             "claude_code": "Het account met je abonnement",
             "codex": "Het account met je abonnement",
-            "cursor": "Het account met je abonnement"
+            "cursor": "Het account met je abonnement",
+            "grok": "Het account met je abonnement",
+            "antigravity": "Het Google-account met je abonnement",
+            "antigravityEnterprise": "Je Gemini Enterprise-account"
           },
           "stepOneHint": "Verkeerd account? Log daar uit en probeer het opnieuw. Het account blijft alleen op {{computer}}. Je typt je wachtwoord op de pagina van {{brand}}.",
           "open": {
             "claude_code": "Inloggen met Claude",
             "codex": "Inloggen met ChatGPT",
-            "cursor": "Inloggen met Cursor"
+            "cursor": "Inloggen met Cursor",
+            "grok": "Inloggen met Grok",
+            "antigravity": "Inloggen met Google"
           },
           "opencodeFree": "De gratis modellen van OpenCode hebben geen sleutel nodig. Een sleutel uit de OpenCode-console voegt de betaalde toe.",
           "cursorFinish": "Log in op de pagina van Cursor, dan rondt {{computer}} het inloggen vanzelf af.",
+          "grokFinish": "Log in op de pagina van Grok, dan rondt {{computer}} het inloggen vanzelf af.",
+          "geminiEnterprise": "Gebruik liever Gemini Enterprise",
+          "geminiPersonal": "Gebruik liever een persoonlijk Google-account",
           "cursorKey": "Gebruik liever een Cursor-API-sleutel",
           "copyLink": "Link kopiëren",
           "openAgain": "Opnieuw openen",
@@ -3714,6 +3756,7 @@
           "sent": "Code verstuurd. Inloggen wordt afgerond op {{computer}}.",
           "local": "Zit je op {{computer}} zelf? Als de browser vanzelf openging, geef daar gewoon toestemming.",
           "deviceCode": "Code voor ChatGPT",
+          "grokCode": "Code voor Grok",
           "deviceCodeText": "Typ deze code op de pagina die opent.",
           "starting": "{{computer}} vragen…",
           "waiting": "Wachten",
@@ -3724,13 +3767,16 @@
             "claude_code": "Claude is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Claude en probeer het opnieuw.",
             "codex": "ChatGPT is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van ChatGPT en probeer het opnieuw.",
             "cursor": "Cursor is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Cursor en probeer het opnieuw.",
+            "grok": "Grok is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Grok en probeer het opnieuw.",
+            "antigravity": "Gemini is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Google en probeer het opnieuw.",
             "opencode": "Die OpenCode-sleutel is al gekoppeld als {{account}}."
           },
           "startFailed": "Geen antwoord van {{computer}}. Probeer het zo opnieuw.",
           "sendFailed": "Kon de code niet versturen. Controleer hem en probeer het opnieuw.",
           "done": "Het account {{account}} staat op {{computer}}. Klik op Gebruiken om op te slaan."
         },
-        "offCloud": "{{computer}} reageert niet"
+        "offCloud": "{{computer}} reageert niet",
+        "accountOthers": "Abonnementen van anderen laten zien van wie ze zijn. De eigenaar krijgt een e-mail en kan het terugnemen."
       },
       "computer": {
         "title": "Waar werkt {{name}}?",
@@ -7300,6 +7346,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Werk agentes bij op de computer om de sleutel van een abonnement te gebruiken"
@@ -7307,11 +7355,13 @@
       "noComputer": "Accounts blijven op een gekoppelde computer. Koppel eerst een van jouw computers.",
       "addComputer": "Computer koppelen",
       "needsCloud": {
-        "claude_code": "Nog niet klaar op {{computer}}",
-        "codex": "Nog niet klaar op {{computer}}",
-        "cursor": "Nog niet klaar op {{computer}}",
-        "opencode": "Nog niet klaar op {{computer}}",
-        "online": "{{computer}} reageert nu niet. We zijn ermee bezig."
+        "online": "{{computer}} start opnieuw op of maakt opnieuw verbinding. Dit verandert vanzelf zodra hij terug is.",
+        "installing": "{{program}} wordt geïnstalleerd op {{computer}}. Dit verandert vanzelf als het klaar is.",
+        "updating": "{{program}} wordt bijgewerkt op {{computer}}. Dit verandert vanzelf als het klaar is.",
+        "runnerOld": "Het agentes.chat-programma op {{computer}} is verouderd en een update is onderweg. Dit verandert vanzelf als het klaar is.",
+        "execOff": "{{computer}} kan {{program}} nog niet uitvoeren. We zijn ermee bezig, en dit verandert vanzelf.",
+        "toolOff": "{{program}} is niet toegestaan op {{computer}}. Vraag de support om het toe te staan.",
+        "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is."
       }
     },
     "done": {
@@ -7337,6 +7387,11 @@
       "rename": "Hernoemen",
       "signInAgain": "Opnieuw inloggen",
       "newKey": "Sleutel vervangen",
+      "copies_one": "Nog {{count}} login van dit account, zonder agent.",
+      "copies_other": "Nog {{count}} logins van dit account, zonder agent.",
+      "removeCopies": "Verwijderen",
+      "copiesRemoved_one": "{{count}} ongebruikte login verwijderd.",
+      "copiesRemoved_other": "{{count}} ongebruikte logins verwijderd.",
       "disconnect": "Ontkoppelen",
       "renameTitle": "{{label}} hernoemen",
       "nameLabel": "Naam",
@@ -7562,7 +7617,8 @@
       "deal": "afgesproken",
       "thinking": "denkt na",
       "wow": "wauw",
-      "dizzy": "duizelig"
+      "dizzy": "duizelig",
+      "wave": "hoi"
     },
     "moodWords": {
       "celebrate": "feest gefeliciteerd vieren live lancering joepie",
@@ -7570,7 +7626,8 @@
       "deal": "ok oké akkoord ja prima klaar",
       "thinking": "hmm benieuwd denken misschien",
       "wow": "wauw verrassing geweldig omg",
-      "dizzy": "moe vrijdag help oeps verward"
+      "dizzy": "moe vrijdag help oeps verward",
+      "wave": "hallo hoi doei zwaaien goedemorgen tot zo"
     },
     "picker": {
       "button": "Emoji, GIF's en stickers",
@@ -8709,21 +8766,29 @@
       "claude": "{{model}} op het Claude-abonnement",
       "chatgpt": "{{model}} op het ChatGPT-abonnement",
       "cursor": "{{model}} op het Cursor-abonnement",
+      "grok": "{{model}} op het Grok-abonnement",
+      "gemini": "{{model}} op het Gemini-abonnement",
       "zen": "{{model}} via OpenCode",
       "coding": "{{model}} op {{plan}}",
       "claudeOf": "{{model}} op het Claude-abonnement van {{owner}}",
       "chatgptOf": "{{model}} op het ChatGPT-abonnement van {{owner}}",
       "cursorOf": "{{model}} op het Cursor-abonnement van {{owner}}",
+      "grokOf": "{{model}} op het Grok-abonnement van {{owner}}",
+      "geminiOf": "{{model}} op het Gemini-abonnement van {{owner}}",
       "zenOf": "{{model}} via de OpenCode van {{owner}}",
       "codingOf": "{{model}} op {{plan}} van {{owner}}",
       "claudeAuto": "Claude-abonnement",
       "chatgptAuto": "ChatGPT-abonnement",
       "cursorAuto": "Cursor-abonnement",
+      "grokAuto": "Grok-abonnement",
+      "geminiAuto": "Gemini-abonnement",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Claude-abonnement van {{owner}}",
       "chatgptAutoOf": "ChatGPT-abonnement van {{owner}}",
       "cursorAutoOf": "Cursor-abonnement van {{owner}}",
+      "grokAutoOf": "Grok-abonnement van {{owner}}",
+      "geminiAutoOf": "Gemini-abonnement van {{owner}}",
       "zenAutoOf": "OpenCode van {{owner}}",
       "codingAutoOf": "{{plan}} van {{owner}}",
       "on": "{{line}} op {{computer}}"
@@ -8736,7 +8801,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "Via de API",
@@ -8747,6 +8814,8 @@
     "claude_codeText": "Gebruikt het Claude-abonnement van wie de computer koppelde.",
     "codexText": "Gebruikt het ChatGPT-abonnement van wie de computer koppelde.",
     "cursorText": "Gebruikt het Cursor-abonnement van wie de computer koppelde.",
+    "grokText": "Gebruikt het Grok-abonnement van wie de computer koppelde.",
+    "antigravityText": "Gebruikt het Gemini-abonnement van wie de computer koppelde.",
     "opencodeText": "De gratis modellen van OpenCode, of de OpenCode-sleutel van wie de computer koppelde.",
     "cursorModel": {
       "inPlan": "In je Cursor-abonnement",
@@ -8791,6 +8860,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, zonder terugval op de API"
     },
@@ -11132,6 +11203,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Opdrachten",
         "browser": "Browser"
@@ -11140,6 +11213,8 @@
         "claude": "Schrijft en wijzigt bestanden, alleen in de toegestane mappen.",
         "codex": "Zoals Claude Code, met een ChatGPT-account. Alleen in de toegestane mappen.",
         "cursor": "Zoals Claude Code, met een Cursor-account. Alleen in de toegestane mappen.",
+        "grok": "Zoals Claude Code, met een Grok-account. Alleen in de toegestane mappen.",
+        "antigravity": "Zoals Claude Code, met een Gemini-account. Alleen in de toegestane mappen.",
         "opencode": "Zoals Claude Code, met de gratis modellen van OpenCode of een OpenCode-sleutel. Alleen in de toegestane mappen.",
         "commands": "Voert Terminal-opdrachten uit, zoals tests en builds."
       },
@@ -12663,6 +12738,8 @@
       "action_invite_people": "Mensen uitnodigen",
       "action_install_skill": "Een skill installeren",
       "action_update_skills": "Skills bijwerken",
+      "action_approvals": "Goedkeuringen die op jou wachten",
+      "action_open_page": "Een scherm openen",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
       "settings_proposal": "Stelde een wijziging voor {{names}} voor",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
@@ -12692,9 +12769,7 @@
       "stuck": "Ik liep vast en stopte voordat ik klaar was.",
       "forum_suggestion": "Iets voor het forum? “{{title}}”",
       "forum_concluded": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder.",
-      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}}).",
-      "action_approvals": "Goedkeuringen die op jou wachten",
-      "action_open_page": "Een scherm openen"
+      "forum_concluded_issues": "Het forum “{{title}}” is afgelopen. De samenvatting staat in het bestand hieronder, met voorgestelde taken om goed te keuren ({{count}})."
     }
   },
   "builtinTools": {
@@ -13331,8 +13406,8 @@
       "backLabel": "Notitie voor {{name}}",
       "backLabel_female": "Notitie voor {{name}}",
       "backPlaceholder": "Optioneel: iets wat {{name}} moet weten?",
-      "addNote": "Notitie achterlaten",
-      "backPlaceholder_female": "Optioneel: iets wat {{name}} moet weten?"
+      "backPlaceholder_female": "Optioneel: iets wat {{name}} moet weten?",
+      "addNote": "Notitie achterlaten"
     },
     "now": {
       "ready": "Klaar op {{computer}}",

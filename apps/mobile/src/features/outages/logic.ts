@@ -63,6 +63,8 @@ export const BRAIN_NAME: Record<ComputerBrain, string> = {
   codex: "Codex",
   cursor: "Cursor",
   opencode: "OpenCode",
+  grok: "Grok Build",
+  antigravity: "Antigravity CLI",
 };
 
 // ── Words ───────────────────────────────────────────────────────────────────

@@ -68,6 +68,7 @@ describe("provider marks", () => {
     expect(markOf("claude_code")).toBe("claude");
     expect(markOf("claude")).toBe("claude");
     expect(markOf("codex")).toBe("openai");
+    expect(markOf("antigravity")).toBe("gemini");
     // People know the provider as Claude: its API key draws the Claude spark, never Anthropic's own symbol.
     expect(markOf("anthropic")).toBe("claude");
     expect(markOf("moonshot")).toBe("kimi");
