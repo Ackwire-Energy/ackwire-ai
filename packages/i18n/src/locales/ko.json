@@ -1055,6 +1055,7 @@
     "copyText": "텍스트 복사",
     "textCopied": "텍스트를 복사했어요.",
     "copyLink": "링크 복사",
+    "openComputer": "컴퓨터 열기",
     "linkCopied": "링크를 복사했어요.",
     "saveToWiki": "Wiki에 저장",
     "pin": "메시지 고정",
@@ -12787,6 +12788,7 @@
   "agentComputer": {
     "title": "{{name}}의 컴퓨터",
     "open": "열기",
+    "openOf": "{{name}}의 컴퓨터 열기",
     "help": "도움말",
     "button": "컴퓨터",
     "choose": "컴퓨터 선택",

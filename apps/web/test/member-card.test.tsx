@@ -224,12 +224,23 @@ describe("an agent's card", () => {
     expect(items).toEqual([
       "Mensagem direta",
       "Ver perfil",
+      "Abrir o computador",
       "Mencionar",
       "Copiar @ada",
       "Editar agente",
       "Copiar link",
       "Copiar ID",
     ]);
+  });
+
+  test("Sem IA is a row of its own under the names, the card's gap above it", async () => {
+    const state = seedState();
+    state.aiStatus = { any: true, agents: [{ agentId: ADA_ID, state: "no_ai", reason: "no_key" }] } as never;
+    await go(state);
+    const c = await openCard("Ada");
+    const chip = within(c).getByText("Sem IA").closest(".noai-chip");
+    expect(chip?.parentElement?.classList.contains("profile-card__body")).toBe(true);
+    expect(chip?.previousElementSibling?.classList.contains("mcard__names")).toBe(true);
   });
 
   test("the box sends to its DM", async () => {

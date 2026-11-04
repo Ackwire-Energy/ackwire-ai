@@ -582,3 +582,64 @@ describe("the links", () => {
     }
   });
 });
+
+describe("the profile card's computer button", () => {
+  /** Ada's card in #eng, as Walter (an owner) sees it. */
+  async function card(o: Options = {}) {
+    const b = await backend(o);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: b.api, createSocket: b.sockets.factory });
+    await settle(8);
+    const trigger = screen()
+      .getAllByRole("button", { name: "Perfil de Ada" })
+      .find((x) => !x.hasAttribute("aria-hidden"));
+    if (!trigger) throw new Error("no trigger");
+    await click(trigger);
+    await settle(6);
+    return { ...b, card: screen().getByRole("dialog", { name: "Perfil" }) };
+  }
+  const menuOf = async (c: HTMLElement) => {
+    await act(async () => fireEvent.pointerDown(within(c).getByRole("button", { name: "Mais" }), { button: 0 }));
+    await settle(2);
+    return within(screen().getByRole("menu", { name: "Mais" }))
+      .getAllByRole("menuitem")
+      .map((i) => i.textContent);
+  };
+
+  test("beside the ⋯, round like it, it opens her computer in its dialog and closes the card", async () => {
+    const { card: c } = await card();
+    const button = within(c).getByRole("button", { name: "Abrir o computador da Ada" });
+    expect(button.getAttribute("title")).toBe("Abrir o computador da Ada");
+    expect(button.classList.contains("mcard__act")).toBe(true);
+    expect(within(c).getByRole("button", { name: "Mais" }).classList.contains("mcard__act")).toBe(true);
+    // First of the banner's buttons, the ⋯ last.
+    expect(button.nextElementSibling?.getAttribute("aria-label") ?? "").toBe("Mais");
+    await click(button);
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: "Perfil" })).toBeNull();
+  });
+
+  test("the ⋯ lists Abrir o computador under Ver perfil, and it opens the dialog too", async () => {
+    const { card: c } = await card();
+    expect((await menuOf(c)).slice(0, 3)).toEqual(["Mensagem direta", "Ver perfil", "Abrir o computador"]);
+    await click(
+      within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: "Abrir o computador" }),
+    );
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
+  });
+
+  test("nothing for whoever may not watch it, nor for a self-hosted agent with no computer yet", async () => {
+    for (const o of [{ forbidden: true }, { machine: null }] satisfies Options[]) {
+      const { card: c } = await card(o);
+      expect(within(c).queryByRole("button", { name: "Abrir o computador da Ada" })).toBeNull();
+      expect(await menuOf(c)).not.toContain("Abrir o computador");
+      cleanup();
+    }
+  });
+
+  test("the Cloud's agents have the workspace's computer: the button shows with no computer of their own", async () => {
+    const { card: c } = await card({ setup: {}, machine: null });
+    expect(within(c).getByRole("button", { name: "Abrir o computador da Ada" })).toBeTruthy();
+  });
+});
