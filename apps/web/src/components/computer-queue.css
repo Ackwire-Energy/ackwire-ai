@@ -234,8 +234,9 @@ html:not([data-pointer]) .cq-link:focus-visible {
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  /* CountChip's own display: its text-box centring trims a block container, never an inline-flex box. */
   .cq-btn .cq-btn__count {
-    display: inline-flex;
+    display: inline-block;
   }
 }
 
