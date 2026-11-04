@@ -13960,6 +13960,16 @@
       "m": "M",
       "l": "G"
     },
+    "sizeNames": {
+      "s": "Pequeño",
+      "m": "Mediano",
+      "l": "Grande"
+    },
+    "sizeHints": {
+      "s": "Un cuadrado",
+      "m": "Dos columnas",
+      "l": "Dos columnas, dos filas"
+    },
     "status": {
       "building": "{{name}} está creando el widget y la rutina que lo va a actualizar…",
       "updating": "{{name}} actualizando…",

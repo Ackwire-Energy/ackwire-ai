@@ -13025,6 +13025,8 @@ export const en = {
       manual: "when asked",
     },
     sizes: { label: "Size", s: "S", m: "M", l: "L" },
+    sizeNames: { s: "Small", m: "Medium", l: "Large" },
+    sizeHints: { s: "One square", m: "Two columns", l: "Two columns, two rows" },
     status: {
       building: "{{name}} is building the widget and the routine that will update it…",
       updating: "{{name}} updating…",

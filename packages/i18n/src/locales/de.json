@@ -13499,6 +13499,16 @@
       "m": "M",
       "l": "L"
     },
+    "sizeNames": {
+      "s": "Klein",
+      "m": "Mittel",
+      "l": "Groß"
+    },
+    "sizeHints": {
+      "s": "Ein Quadrat",
+      "m": "Zwei Spalten",
+      "l": "Zwei Spalten, zwei Zeilen"
+    },
     "status": {
       "building": "{{name}} baut das Widget und die Routine, die es aktualisieren wird…",
       "updating": "{{name}} aktualisiert…",

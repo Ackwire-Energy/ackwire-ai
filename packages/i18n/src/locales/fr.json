@@ -14103,6 +14103,16 @@
       "m": "M",
       "l": "G"
     },
+    "sizeNames": {
+      "s": "Petit",
+      "m": "Moyen",
+      "l": "Grand"
+    },
+    "sizeHints": {
+      "s": "Un carré",
+      "m": "Deux colonnes",
+      "l": "Deux colonnes, deux lignes"
+    },
     "status": {
       "building": "{{name}} crée le widget et la routine qui le mettra à jour…",
       "updating": "{{name}} met à jour…",

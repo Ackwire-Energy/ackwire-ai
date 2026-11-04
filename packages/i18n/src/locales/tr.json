@@ -13431,6 +13431,16 @@
       "m": "M",
       "l": "L"
     },
+    "sizeNames": {
+      "s": "Küçük",
+      "m": "Orta",
+      "l": "Büyük"
+    },
+    "sizeHints": {
+      "s": "Bir kare",
+      "m": "İki sütun",
+      "l": "İki sütun, iki satır"
+    },
     "status": {
       "building": "{{name}} widget'ı ve onu güncelleyecek rutini oluşturuyor…",
       "updating": "{{name}} güncelliyor…",

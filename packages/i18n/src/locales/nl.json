@@ -13691,6 +13691,16 @@
       "m": "M",
       "l": "L"
     },
+    "sizeNames": {
+      "s": "Klein",
+      "m": "Middel",
+      "l": "Groot"
+    },
+    "sizeHints": {
+      "s": "Eén vak",
+      "m": "Twee kolommen",
+      "l": "Twee kolommen, twee rijen"
+    },
     "status": {
       "building": "{{name}} bouwt de widget en de routine die hem bijwerkt…",
       "updating": "{{name}} werkt bij…",

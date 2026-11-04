@@ -14430,6 +14430,16 @@
       "m": "M",
       "l": "L"
     },
+    "sizeNames": {
+      "s": "Mały",
+      "m": "Średni",
+      "l": "Duży"
+    },
+    "sizeHints": {
+      "s": "Jeden kwadrat",
+      "m": "Dwie kolumny",
+      "l": "Dwie kolumny, dwa wiersze"
+    },
     "status": {
       "building": "{{name}} tworzy widżet i rutynę, która będzie go aktualizować…",
       "updating": "{{name}} aktualizuje…",

@@ -369,7 +369,7 @@ describe("New widget (ADR 0135 §3)", () => {
     await click(within(dialog).getByRole("button", { name: "PRs esperando revisão" }));
     await pick(combo(dialog, "Formato"), /^Número/);
     await pick(combo(dialog, "Atualiza"), "Todo dia às 8h");
-    await click(segment(dialog, "Tamanho", "G"));
+    await pick(combo(dialog, "Tamanho"), /^Grande/);
     await settle(3);
 
     await click(button(dialog, "Testar") as HTMLElement);
@@ -498,7 +498,7 @@ describe("New widget (ADR 0135 §3)", () => {
     expect(button(dialog, "Criar widget")).toBeTruthy();
 
     // The size doesn't touch the test; another agent does (and back, it holds again).
-    await click(segment(dialog, "Tamanho", "P"));
+    await pick(combo(dialog, "Tamanho"), /^Pequeno/);
     await settle(2);
     expect(button(dialog, "Criar widget")).toBeTruthy();
     await click(agentRow(await openAgents(dialog, "Ada"), "Atlas"));

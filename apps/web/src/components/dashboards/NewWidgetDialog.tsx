@@ -23,7 +23,6 @@ import {
   Input,
   PixelSpinner,
   Popover,
-  Segmented,
   Select,
   Switch,
   useDarkTheme,
@@ -381,6 +380,21 @@ function NewWidgetBody({
       )}
     />
   );
+  /** The size, as a dropdown beside the format: its name, and how much of the board it takes. */
+  const sizeSelect = (boxed: boolean) => (
+    <Select<WidgetSize>
+      className={boxed ? "nwc-pk nwc-pk--box" : "nwc-pk"}
+      size="sm"
+      aria-label={t("widgets.sizes.label")}
+      value={size}
+      onValueChange={setSize}
+      options={WIDGET_SIZES.map((s) => ({
+        value: s,
+        label: t(`widgets.sizeNames.${s}`),
+        description: t(`widgets.sizeHints.${s}`),
+      }))}
+    />
+  );
   const scheduleWords = (s: WidgetSchedule, inline: boolean) => {
     if (s === "manual") {
       if (mode === "pin") return inline ? t("dashboards.newWidget.noUpdateInline") : t("dashboards.newWidget.noUpdate");
@@ -556,7 +570,10 @@ function NewWidgetBody({
       )}
       {/* The format sits at the card's foot end, under the ask (and the suggestions), at any size. */}
       <div className="nwc-row nwc-row--format">
-        {formatSelect(true)}
+        <span className="nwc-pks">
+          {formatSelect(true)}
+          {sizeSelect(true)}
+        </span>
         {editing && built && <span className="nw-hint">{t("dashboards.newWidget.enterTests")}</span>}
       </div>
       {editing && built?.spec && (
@@ -635,7 +652,10 @@ function NewWidgetBody({
       <>
         <div className="nwc-row">
           {folded}
-          {mode === "ask" && formatSelect(false)}
+          <span className="nwc-pks">
+            {mode === "ask" && formatSelect(false)}
+            {sizeSelect(false)}
+          </span>
         </div>
         <div className="nwc-content">{content}</div>
       </>
@@ -722,13 +742,6 @@ function NewWidgetBody({
           </span>
         )}
         {mode === "ask" && bell}
-        <Segmented
-          size="sm"
-          label={t("widgets.sizes.label")}
-          value={size}
-          onValueChange={setSize}
-          options={WIDGET_SIZES.map((s) => ({ value: s, label: t(`widgets.sizes.${s}`) }))}
-        />
       </div>
       {stale && !editing && (
         <div className="nwc__stale" role="status">

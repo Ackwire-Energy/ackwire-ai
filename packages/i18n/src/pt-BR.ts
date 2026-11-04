@@ -13347,6 +13347,8 @@ export const ptBR = {
       manual: "quando pedem",
     },
     sizes: { label: "Tamanho", s: "P", m: "M", l: "G" },
+    sizeNames: { s: "Pequeno", m: "Médio", l: "Grande" },
+    sizeHints: { s: "Um quadrado", m: "Duas colunas", l: "Duas colunas, duas linhas" },
     status: {
       building: "{{name}} está montando o widget e a rotina que vai atualizar…",
       updating: "{{name}} atualizando…",

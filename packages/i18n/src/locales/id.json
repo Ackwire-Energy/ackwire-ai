@@ -13153,6 +13153,16 @@
       "m": "M",
       "l": "L"
     },
+    "sizeNames": {
+      "s": "Kecil",
+      "m": "Sedang",
+      "l": "Besar"
+    },
+    "sizeHints": {
+      "s": "Satu kotak",
+      "m": "Dua kolom",
+      "l": "Dua kolom, dua baris"
+    },
     "status": {
       "building": "{{name}} sedang membuat widget dan rutinitas yang akan memperbaruinya…",
       "updating": "{{name}} sedang memperbarui…",
