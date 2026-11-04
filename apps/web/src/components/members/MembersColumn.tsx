@@ -1,10 +1,10 @@
 import type { Agent, Channel, Member } from "@agenteschat/client";
-import { agentStateIn, useAiStatus, useRoles, useRoster } from "@agenteschat/client";
+import { agentStateIn, useRoles } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
+import { agentStatusShort } from "@agenteschat/client/lib/presence";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
-import { picksForMe } from "@agenteschat/client/lib/routing";
 import { Avatar, Button, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
 import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -161,8 +161,6 @@ function MembersList({ channelId, people, agents: members, onAdd, matches }: Lis
       : members;
   const presences = usePresences();
   const roles = useRoles(org.id).data?.roles ?? [];
-  const roster = useRoster(org.id, channelId);
-  const routing = useAiStatus(org.id).data?.routing;
   const busyKey = useStreams((s) =>
     agents
       .filter((a) => agentStateIn(s, a.id) !== "idle")
@@ -171,10 +169,6 @@ function MembersList({ channelId, people, agents: members, onAdd, matches }: Lis
   );
   const [allOffline, setAllOffline] = useState(false);
   const busy = new Set(busyKey.split(" "));
-  // "Answers without a mention" only while something reads this person's messages that mention nobody.
-  const autoReply = new Set(
-    picksForMe(routing) ? (roster.data ?? []).filter((r) => r.type === "agent" && r.autoReply).map((r) => r.id) : [],
-  );
   const groups = memberGroups({
     people,
     agents,
@@ -220,12 +214,7 @@ function MembersList({ channelId, people, agents: members, onAdd, matches }: Lis
                 </ErrorBoundary>
               ) : (
                 <ErrorBoundary key={r.agent.id} resetKey={r.agent} fallback={unshownRow}>
-                  <AgentRow
-                    agent={r.agent}
-                    channelId={channelId}
-                    busy={busy.has(r.agent.id)}
-                    autoReply={autoReply.has(r.agent.id)}
-                  />
+                  <AgentRow agent={r.agent} channelId={channelId} busy={busy.has(r.agent.id)} />
                 </ErrorBoundary>
               ),
             )}
@@ -300,22 +289,14 @@ function PersonRow({ member: m, you }: { member: Member; you: boolean }) {
 }
 
 /** An agent: its face, what it is doing (its line, its state here, else its role), the trail while it works. */
-function AgentRow({
-  agent,
-  channelId,
-  busy,
-  autoReply,
-}: {
-  agent: Agent;
-  channelId: string;
-  busy: boolean;
-  autoReply: boolean;
-}) {
+function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string; busy: boolean }) {
   const { t, i18n } = useTranslation();
   const state = useStreams((s) => agentStateIn(s, agent.id, channelId));
   const shown = useAgentPresence(agent.id);
   const word = shown ? t(`presence.${shown.presence}`) : null;
-  const line = agentLine(t, shown?.line ?? null, i18n.language);
+  // One short line here; the whole one in the row's title and on its profile card.
+  const line = shown?.line ? agentStatusShort(t, shown.line, i18n.language) : null;
+  const full = agentLine(t, shown?.line ?? null, i18n.language)?.text;
   const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
   const text =
     line?.text ??
@@ -336,7 +317,7 @@ function AgentRow({
         className="members-side__inner"
         data-presence={shown?.presence}
         data-busy={busy || undefined}
-        title={[doing ?? word, agent.role].filter(Boolean).join(" · ") || undefined}
+        title={[full ?? doing ?? word, agent.role].filter(Boolean).join(" · ") || undefined}
       >
         {busy && <AgentTrail color={colorOf(agent)} />}
         <AgentAvatar
@@ -350,7 +331,6 @@ function AgentRow({
         <span className="members-side__text">
           <span className="members-side__name">
             <span className="members-side__label">{agent.name}</span>
-            {autoReply && <span className="members-side__chip">{t("channel.autoReplyChip")}</span>}
           </span>
           {text &&
             (line ? (

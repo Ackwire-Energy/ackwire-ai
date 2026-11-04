@@ -11967,11 +11967,12 @@ html:not([data-pointer]) .channel__newpill:focus-visible {
 .ac-typing__text + .ac-typing__elapsed::before {
   content: "· ";
 }
-/* One agent out of view: its row's step after its name, in one width (cut with "…"), so its time, "Ver" and the
-   stop never move under the pointer as the step turns; a narrow bar still fits it. */
+/* One agent out of view: its row's step after its name, at most one width (cut with "…"), its time, "Ver" and the
+   stop right after it; a narrow bar still fits it. */
 .ac-typing__step {
   display: flex;
-  flex: 0 1 260px;
+  flex: 0 1 auto;
+  max-width: 260px;
   min-width: 0;
   margin-left: 0.3em;
 }
@@ -12000,8 +12001,8 @@ html:not([data-pointer]) .channel__newpill:focus-visible {
 .ac-typing__elapsed:has(+ .ac-typing__also) {
   margin-right: 0;
 }
-/* The end of an agent's live row: its time and its stop ("· 12 s ■"), which the bar no longer repeats while the row
-   is on screen. The clock keeps room for its seconds, and the stop never raises the line it ends. */
+/* The end of an agent's live row: its time and its stop ("· 12 s ■") right after its words, which the bar no longer
+   repeats while the row is on screen. The stop never raises the line it ends. */
 .run-tail {
   display: inline-flex;
   flex: none;
@@ -12009,7 +12010,6 @@ html:not([data-pointer]) .channel__newpill:focus-visible {
   gap: 4px;
 }
 .run-tail__clock {
-  min-width: 4em;
   white-space: nowrap;
 }
 .run-tail__clock:not(:empty)::before {

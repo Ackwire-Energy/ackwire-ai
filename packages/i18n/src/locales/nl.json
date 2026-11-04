@@ -1511,7 +1511,6 @@
       "thinking": "denkt na",
       "writing": "schrijft"
     },
-    "autoReplyChip": "antwoordt zonder vermelding",
     "more": "Meer berichtacties",
     "copyLink": "Link kopiëren",
     "linkCopied": "Link gekopieerd.",
@@ -2423,6 +2422,7 @@
     "messageTo": "Bericht aan {{name}}",
     "audienceEdit": "Bewerken",
     "nowIn": "nu, in #{{channel}}",
+    "answersHere": "Antwoordt hier zonder @",
     "more": "Meer",
     "of": "Profiel van {{name}}",
     "presence": "Aanwezigheid",
@@ -2521,6 +2521,8 @@
       "provider_down": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
       "out_of_plan": "Planlimiet bereikt",
       "out_of_budget": "Maandbudget op",
+      "out_of_planShort": "Limiet bereikt",
+      "out_of_budgetShort": "Budget op",
       "backAt": "terug {{when}}",
       "work": "Op de achtergrond: {{subject}}"
     },

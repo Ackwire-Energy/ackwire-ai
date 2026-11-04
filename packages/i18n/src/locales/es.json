@@ -1562,7 +1562,6 @@
       "thinking": "pensando",
       "writing": "escribiendo"
     },
-    "autoReplyChip": "responde sin mención",
     "more": "Más acciones del mensaje",
     "copyLink": "Copiar enlace",
     "linkCopied": "Enlace copiado.",
@@ -2503,6 +2502,7 @@
     "messageTo": "Mensaje para {{name}}",
     "audienceEdit": "Editar",
     "nowIn": "ahora, en #{{channel}}",
+    "answersHere": "Responde aquí sin necesidad de @",
     "more": "Más",
     "of": "Perfil de {{name}}",
     "presence": "Presencia",
@@ -2601,6 +2601,8 @@
       "provider_down": "El proveedor de IA no responde · reintenta solo",
       "out_of_plan": "Sin límite en el plan",
       "out_of_budget": "Presupuesto del mes agotado",
+      "out_of_planShort": "Sin límite",
+      "out_of_budgetShort": "Sin presupuesto",
       "backAt": "vuelve {{when}}",
       "work": "En segundo plano: {{subject}}"
     },

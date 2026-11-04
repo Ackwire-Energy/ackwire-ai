@@ -144,6 +144,23 @@ export function agentStatusText(
   };
 }
 
+/**
+ * The members column's line: one short line. Out of office is "Sem limite · volta às 01:00" with no emoji (the face's
+ * badge already says it), the waiting count left to the profile card and the queue; any other line as
+ * `agentStatusText`.
+ */
+export function agentStatusShort(
+  t: TFunction,
+  line: AgentStatusLine,
+  locale?: string,
+  now = new Date(),
+): { emoji: string | null; text: string } | null {
+  if (line.text || (line.kind !== "out_of_plan" && line.kind !== "out_of_budget"))
+    return agentStatusText(t, line, locale, now);
+  const back = line.until ? t("presence.agent.backAt", { when: usageWhen(t, locale, line.until, now) }) : null;
+  return { emoji: null, text: [t(`presence.agent.${line.kind}Short`), back].filter(Boolean).join(" · ") };
+}
+
 /** An agent's presence as the apps draw it: no AI to think with reads as offline (ADR 0084 §3). */
 export const agentPresenceShown = (status: AgentStatus | undefined, hasAi: boolean): AgentPresence =>
   !hasAi ? "offline" : (status?.presence ?? "away");

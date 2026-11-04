@@ -44,7 +44,10 @@ import {
 } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+});
 
 const open = async (state = seedState(), api = createFakeApi(state)) => {
   await renderApp(`/org/${ORG_ID}/agents/new`, { api });
@@ -97,6 +100,27 @@ describe("Criar agente: steps", () => {
     expect(document.querySelector(".onb__lead")?.textContent).toBe(
       "Escolha um ponto de partida: o resto a gente preenche.",
     );
+  });
+
+  test("opened from a channel, × and Cancelar go back to that channel, as it was", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}?m=m-1`, { api: createFakeApi(seedState()) });
+    await settle(6);
+    await act(() => router.navigate({ to: "/org/$orgId/agents/new", params: { orgId: ORG_ID } }));
+    await settle(8);
+    const back = `/org/${ORG_ID}/c/${ENG_ID}?m=m-1`;
+    expect(screen().getByRole("link", { name: "Sair sem criar" }).getAttribute("href")).toBe(back);
+    expect(screen().getByRole("link", { name: "Cancelar" }).getAttribute("href")).toBe(back);
+    await click(screen().getByRole("link", { name: "Cancelar" }));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(router.state.location.searchStr).toBe("?m=m-1");
+    // Again, through the rail's ×, after a step forward.
+    await act(() => router.navigate({ to: "/org/$orgId/agents/new", params: { orgId: ORG_ID } }));
+    await settle(8);
+    await click(screen().getByRole("button", { name: /^Do zero/ }));
+    await click(screen().getByRole("link", { name: "Sair sem criar" }));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
   });
 
   test("the preview waits for something in it: a template, or the first thing typed; never all empty", async () => {

@@ -29,6 +29,7 @@ import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { HeaderSearchProvider } from "@/hooks/useWorkspaceSearch";
 import { useServerLocale } from "@/i18n";
 import { inDesktopApp } from "@/lib/desktop";
+import { notePlace } from "@/lib/return-to";
 import { rememberPlace, showWorkspace } from "@/lib/start";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { RealtimeProvider } from "@/realtime/context";
@@ -56,6 +57,7 @@ function OrgLayout() {
   const membership = membershipIn(me, orgId);
   const { t } = useTranslation();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const href = useRouterState({ select: (s) => s.location.href });
   // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).
   const focused = /\/agents\/new\/?$/.test(path) && can(membership, "create_agents");
   // Notifications in this browser (ADR 0071), when already on: the server hears of them again, quietly.
@@ -70,6 +72,8 @@ function OrgLayout() {
     showWorkspace(membership.id);
     rememberPlace(membership.id, path);
   }, [membership, path]);
+  // Where "Criar agente" and the other flows go back to when left.
+  useEffect(() => notePlace(href), [href]);
   // A workspace shown as being deleted that leaves `GET /me` was deleted for good: on to the person's start.
   const closing = useRef<string | null>(null);
   if (membership) closing.current = membership.deletion ? orgId : null;

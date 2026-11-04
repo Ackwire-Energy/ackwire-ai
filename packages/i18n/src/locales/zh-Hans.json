@@ -1460,7 +1460,6 @@
       "thinking": "思考中",
       "writing": "撰写中"
     },
-    "autoReplyChip": "无需提及即回复",
     "more": "更多消息操作",
     "copyLink": "复制链接",
     "linkCopied": "链接已复制。",
@@ -2334,6 +2333,7 @@
     "messageTo": "发给 {{name}} 的消息",
     "audienceEdit": "编辑",
     "nowIn": "正在 #{{channel}} 中",
+    "answersHere": "在这里无需 @ 也会回复",
     "more": "更多",
     "of": "{{name}} 的个人资料",
     "presence": "在线状态",
@@ -2432,6 +2432,8 @@
       "provider_down": "AI 服务商出现故障 · 会自动重试",
       "out_of_plan": "套餐额度已用完",
       "out_of_budget": "本月预算已用完",
+      "out_of_planShort": "额度已用完",
+      "out_of_budgetShort": "预算已用完",
       "backAt": "恢复：{{when}}",
       "work": "后台进行中：{{subject}}"
     },
