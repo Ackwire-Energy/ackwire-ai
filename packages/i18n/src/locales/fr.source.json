@@ -4230,6 +4230,12 @@
   "noAi.rightHand.plan_not_shared": {
     "value": "{{name}} thinks with a plan that answers only its owner."
   },
+  "noAi.rightHand.runner_outdated": {
+    "value": "{{name}} can't answer now: the program on the plan's computer needs an update."
+  },
+  "noAi.rightHand.plan_tools": {
+    "value": "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own."
+  },
   "noAi.rightHand.useKey": {
     "value": "Use an API key"
   },
@@ -29422,6 +29428,12 @@
   "chat.body.no_ai_plan_not_shared": {
     "value": "I can't answer you on this plan: it answers only its owner."
   },
+  "chat.body.no_ai_runner_outdated": {
+    "value": "I can't answer now: the program on my plan's computer needs an update."
+  },
+  "chat.body.no_ai_plan_tools": {
+    "value": "I stopped before answering: my plan's AI on that computer offers tools of its own."
+  },
   "chat.body.action_connect_ai": {
     "value": "Connect an AI"
   },
@@ -33394,7 +33406,7 @@
     "value": "A plan"
   },
   "rightHand.settings.planOffer": {
-    "value": "{{name}} can think with your Claude plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace."
+    "value": "{{name}} can think with your plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace."
   },
   "rightHand.settings.usePlan": {
     "value": "Use a plan"

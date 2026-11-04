@@ -1169,7 +1169,31 @@ export const CHAT_DENIED_TOOLS = [
   "ArtifactData",
   "DesignSync",
   "Config",
+  "ListAgents",
+  "ReportFindings",
+  "Workflow",
+  "ToolSearch",
 ] as const;
+
+/**
+ * A `chat` turn's guard, read on Claude Code's `system` `init` (it lists every tool the model gets, and the MCP
+ * servers): anything but our bridge (`mcp__agentes__…`, server `agentes`) is a breach, and so is an `init` without
+ * the lists. A tool a new version adds that `--tools ""` doesn't take away stops the turn before it can run.
+ */
+export function chatToolsBreach(init: Record<string, unknown>): string | null {
+  const version = typeof init.claude_code_version === "string" ? ` ${init.claude_code_version.slice(0, 40)}` : "";
+  if (!Array.isArray(init.tools) || !Array.isArray(init.mcp_servers)) {
+    return `Claude Code${version} didn't list its tools, so the turn stopped before it began.`;
+  }
+  const tools = init.tools.filter((t) => typeof t !== "string" || !t.startsWith("mcp__agentes__"));
+  const servers = init.mcp_servers.filter((s) => (s as { name?: unknown } | null)?.name !== "agentes");
+  if (tools.length === 0 && servers.length === 0) return null;
+  const names = [
+    ...tools.map((t) => String(t)),
+    ...servers.map((s) => `MCP ${String((s as { name?: unknown } | null)?.name)}`),
+  ];
+  return `Claude Code${version} offers tools of its own here (${names.slice(0, 8).join(", ")}), so the turn stopped before it could use them.`;
+}
 
 /**
  * Denied in every profile (Claude Code checks deny rules before allow rules):

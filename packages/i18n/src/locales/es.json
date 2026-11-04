@@ -1803,7 +1803,7 @@
       "change": "Cambiar",
       "planHelp": "Paga quien es dueño del plan. Si su computadora no está disponible, la conversación lo dice y ofrece una clave de API.",
       "plan": "Un plan",
-      "planOffer": "{{name}} puede pensar con tu plan de Claude en lugar de una clave de API, en la computadora donde el plan tiene la sesión iniciada, sin llegar a nada fuera de este workspace.",
+      "planOffer": "{{name}} puede pensar con tu plan en lugar de una clave de API, en la computadora donde el plan tiene la sesión iniciada, sin llegar a nada fuera de este workspace.",
       "usePlan": "Usar un plan"
     },
     "card": {
@@ -1904,6 +1904,8 @@
       "computer_away": "{{name}} no puede responder ahora: la computadora del plan no está disponible.",
       "plan_limit": "{{name}} no puede responder ahora: el plan llegó a su límite.",
       "plan_not_shared": "{{name}} piensa con un plan que solo responde a su dueño.",
+      "runner_outdated": "{{name}} no puede responder ahora: el programa en la computadora del plan necesita una actualización.",
+      "plan_tools": "{{name}} se detuvo antes de responder: la IA del plan en esa computadora ofrece herramientas propias.",
       "useKey": "Usar una clave de API"
     },
     "receipt": "Nadie responderá: no hay una IA conectada",
@@ -12619,6 +12621,8 @@
       "no_ai_computer_away": "Ahora no puedo responder: la computadora de mi plan no está disponible.",
       "no_ai_plan_limit": "Ahora no puedo responder: el plan con el que pienso llegó a su límite.",
       "no_ai_plan_not_shared": "No puedo responderte con este plan: solo responde a su dueño.",
+      "no_ai_runner_outdated": "Ahora no puedo responder: el programa en la computadora de mi plan necesita una actualización.",
+      "no_ai_plan_tools": "Me detuve antes de responder: la IA de mi plan en esa computadora ofrece herramientas propias.",
       "action_connect_ai": "Conectar una IA",
       "action_connect_app": "Conectar {{name}}",
       "action_add_mcp": "Agregar un servidor MCP",

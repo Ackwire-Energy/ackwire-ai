@@ -11,12 +11,17 @@ import {
   type MachineStatus,
   machineAgents,
   mayFallBack,
+  OpencodeBrain,
   openPersonAgentDm,
+  PLAN_OPENED_JOB,
   postPersonMessage,
+  queuePlanOpenedEmail,
   RIGHT_HAND,
   RIGHT_HAND_TURN,
   resolveBrain,
+  rightHandNoAiReason,
   setAgentBrain,
+  UNAVAILABLE_CODES,
 } from "../src";
 import { agentAiState } from "../src/ai-status";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -108,13 +113,12 @@ test("Lodi takes a Claude plan signed in as an account, never Codex nor a comput
   expect((await lodi()).audienceMode).toBe("everyone");
   // Its user there holds the sign-in while it thinks (system mode lends the folder by the `agents` frame).
   expect((await machineAgents(fx.db, fx.org.id, machineId)).find((a) => a.id === id)).toMatchObject({ account: ANAS });
-  // An admin's view: Ana's plan, not theirs to give or open to others.
+  // An admin's view: Ana's plan, not theirs to give; "Atende outras pessoas" as for any agent on its owner's plan.
   expect(await getAgentBrain(deps, caio.id, fx.org.id, id)).toMatchObject({ canUsePlans: false, account: ANAS });
-  expect(await codeOf(setAgentBrain(deps, caio.id, fx.org.id, id, { onlyOwner: false }))).toBe("account.not_owner");
   expect(await codeOf(setAgentBrain(deps, caio.id, fx.org.id, id, { account: ANAS, onlyOwner: true }))).toBeNull();
-  // Only Ana opens her plan to other people's DMs; anyone who sets Lodi's AI takes it back to a key.
   await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { onlyOwner: false });
   expect((await lodi()).planForOthers).toBe(true);
+  // Anyone who sets Lodi's AI takes it back to a key.
   await setAgentBrain(deps, caio.id, fx.org.id, id, { brain: "model" });
   expect(await lodi()).toMatchObject({ brain: "model", brainAccountId: null, machineId: null });
   // Caio gives it his own.
@@ -257,5 +261,111 @@ test("its turn goes to the runner as the locked-down chat profile, with no check
   }))
     refused.push(e);
   expect(refused).toEqual([expect.objectContaining({ type: "error", code: "runner_outdated" })]);
+  expect(sent).toEqual([]);
+});
+
+const planOpenedJobs = (fx: Fixture) =>
+  fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, PLAN_OPENED_JOB));
+
+test("Atende outras pessoas: the plan's owner chooses, an admin may override, and the plan's owner gets the email", async () => {
+  const { fx, deps, caio, lodi } = await world();
+  const id = (await lodi()).id;
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain: "claude_code", account: ANAS });
+  // Ana opens her own plan: nobody to tell.
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { onlyOwner: false });
+  expect(await planOpenedJobs(fx)).toHaveLength(0);
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { onlyOwner: true });
+  // Caio, an admin, overrides: it answers others, and Ana hears it.
+  const view = await setAgentBrain(deps, caio.id, fx.org.id, id, { onlyOwner: false });
+  expect(view.onlyOwner).toBe(false);
+  expect((await lodi()).planForOthers).toBe(true);
+  const [job] = await planOpenedJobs(fx);
+  expect(job?.payload).toMatchObject({ agentId: id, actorId: caio.id, from: { mode: "owner" } });
+  await queuePlanOpenedEmail(fx.db, "https://app.test", fx.org.id, String(job?.id), job?.payload ?? {});
+  const [mail] = await fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "email.send"));
+  expect(JSON.stringify(mail?.payload)).toContain(fx.owner.email);
+  expect(JSON.stringify(mail?.payload)).not.toContain(caio.email);
+});
+
+test("an OpenCode plan qualifies like Claude's; Codex and Cursor are refused", async () => {
+  const { fx, deps, machineId, lodi, account } = await world();
+  const id = (await lodi()).id;
+  const ZEN = "0193dddd-0000-4000-8000-0000000000a3";
+  await account(ZEN, fx.owner.id, "opencode");
+  await account("0193dddd-0000-4000-8000-0000000000a4", fx.owner.id, "cursor");
+  for (const brain of ["codex", "cursor"]) {
+    expect(await codeOf(setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain }))).toBe("brain.right_hand_plan");
+  }
+  // Offered: only the accounts whose CLI the runner checks (Claude Code's and OpenCode's).
+  const kinds = (await getAgentBrain(deps, fx.owner.id, fx.org.id, id)).accounts.map((a) => a.kind).sort();
+  expect(kinds).toEqual(["claude_code", "opencode"]);
+  await fx.db
+    .update(schema.machines)
+    .set({
+      protocol: MACHINE_PROTOCOL_VERSION,
+      executors: { opencode: { version: "1.19.5" }, detectedAt: new Date().toISOString() },
+    })
+    .where(eq(schema.machines.id, machineId));
+  const view = await setAgentBrain(deps, fx.owner.id, fx.org.id, id, { brain: "opencode", account: ZEN });
+  expect(view).toMatchObject({ brain: "opencode", account: ZEN, computer: { machineId } });
+  expect(await lodi()).toMatchObject({ brain: "opencode", brainAccountId: ZEN, machineId: null });
+});
+
+test("its DM's line: a runner to update and a CLI with tools of its own each say so, never that it has no AI", () => {
+  expect(rightHandNoAiReason("runner_outdated")).toBe("runner_outdated");
+  expect(rightHandNoAiReason("tools_not_locked")).toBe("plan_tools");
+  expect(UNAVAILABLE_CODES.has("tools_not_locked")).toBe(true);
+});
+
+test("an OpenCode turn of it goes out as the chat profile with no checkout; an older runner gets nothing", async () => {
+  const sent: Record<string, unknown>[] = [];
+  let protocol = MACHINE_PROTOCOL_VERSION;
+  let prepared = 0;
+  const brain = new OpencodeBrain({
+    link: {
+      status: async (id: string) => ({
+        ...statusOf(id, { protocol }),
+        executors: { opencode: { version: "1.19.5" }, detectedAt: new Date().toISOString() },
+      }),
+      turn: async (_m: string, request: Record<string, unknown>, o: { onEvent: (e: unknown) => void }) => {
+        sent.push(request);
+        o.onEvent({ type: "done", text: "ok" });
+        return { type: "done", text: "ok" };
+      },
+    } as never,
+    mcp: async () => ({ token: "t" }),
+    permissions: async () => RIGHT_HAND_TURN,
+    prepare: async () => {
+      prepared++;
+      return { cwd: "repos/acme/app", prompt: "# Your code", start: "" } as never;
+    },
+  } as never);
+  const turn = {
+    runId: "0193bbbb-0000-7000-8000-000000000002",
+    orgId: "o",
+    agentId: "a",
+    channelId: "c",
+    threadRootId: null,
+    system: "You are Lodi.",
+    messages: [{ role: "user", content: "oi" }],
+    tools: [],
+    trigger: "oi",
+    session: { id: "0193aaaa-0000-7000-8000-000000000002", resume: false, machineId: "m", cwd: "" },
+  } as unknown as BrainTurn;
+  const run = async () => {
+    const out = [];
+    for await (const e of brain.run(turn, {
+      signal: new AbortController().signal,
+      executeTool: async () => ({ content: "" }),
+    }))
+      out.push(e);
+    return out;
+  };
+  expect((await run()).at(-1)).toMatchObject({ type: "done" });
+  expect(prepared).toBe(0);
+  expect(sent[0]).toMatchObject({ kind: "opencode", permissions: { mode: "chat" }, cwd: "" });
+  sent.length = 0;
+  protocol = LOCKED_BRAIN_PROTOCOL - 1;
+  expect(await run()).toEqual([expect.objectContaining({ type: "error", code: "runner_outdated" })]);
   expect(sent).toEqual([]);
 });

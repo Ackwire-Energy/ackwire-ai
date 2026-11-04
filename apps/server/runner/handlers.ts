@@ -880,10 +880,13 @@ async function doBrainTurn(
   requireTool(ctx, cli ?? "claude");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
-  // A locked-down turn (protocol 41) is Claude Code's alone, and gets neither the agent's secrets nor its folders.
+  // A locked-down turn (protocol 41) runs only where the CLI says which tools it has before it can use one (Claude
+  // Code's `init`, OpenCode's `debug agent`), and gets neither the agent's secrets nor its folders.
   const chat = req.permissions?.mode === "chat";
-  if (chat && cli) throw new RunnerError("bad_request", "Only Claude Code takes a chat turn");
-  if (cli) return doCodexTurn(ctx, req, scope, runId);
+  if (chat && (cli === "codex" || cli === "cursor")) {
+    throw new RunnerError("bad_request", "Only Claude Code and OpenCode take a chat turn");
+  }
+  if (cli) return doCodexTurn(ctx, req, scope, runId, chat);
   if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
@@ -976,6 +979,7 @@ async function doCodexTurn(
   req: Extract<MachineRequest, { op: "brain.turn" }>,
   scope: RequestScope,
   runId: string,
+  chat: boolean,
 ): Promise<MachineReplies["brain.turn"]> {
   const codex = ctx.codex;
   const cursor = req.kind === "cursor";
@@ -1018,9 +1022,9 @@ async function doCodexTurn(
           folder,
           exec: toolOn(ctx, "opencode"),
           runnerHome: codex.runnerHome,
-          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(ctx.secretsDir && !chat ? { secretsDir: ctx.secretsDir } : {}),
           ...(codex.mcp ? { mcp: codex.mcp } : {}),
-          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.grants && !chat ? { grants: ctx.grants } : {}),
           ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
           ...(codex.spawn ? { spawn: codex.spawn } : {}),
         },

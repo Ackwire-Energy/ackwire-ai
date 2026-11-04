@@ -51,6 +51,7 @@ import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import {
   CHAT_DENIED_TOOLS,
+  chatToolsBreach,
   claudeMcpConfig,
   claudePermissionSettings,
   type McpTaskInfo,
@@ -753,6 +754,13 @@ export class ClaudeProcess {
   /** What it can do (`system` `init` `capabilities`): live steering is decided by these (`steerSupport`). */
   capabilities: string[] = [];
   /**
+   * A `chat` turn's guard (`chatToolsBreach`): read on every `system` `init`, before the turn's first request comes
+   * back. Anything it names kills the process at once and is the turn's answer (`breach`).
+   */
+  lock: ((init: Record<string, unknown>) => string | null) | null = null;
+  breach: string | null = null;
+  private lockPassed = false;
+  /**
    * Claude Code started a turn by itself while no request listened (a background
    * task that ended after its turn): its output goes nowhere, and until its
    * `result` a request here would read that turn's output as its own, so the
@@ -804,6 +812,12 @@ export class ClaudeProcess {
       (rl as unknown as EventEmitter).on("line", (line: string) => {
         // Read whether a turn listens or not (the CLI may say it before the first turn's prompt).
         if (line.includes('"init"')) this.noteInit(line);
+        // A locked turn answers only after an `init` that passed: one that never listed its tools never runs.
+        if (this.lock && !this.lockPassed && /"type":\s*"(assistant|stream_event)"/.test(line)) {
+          this.breached("Claude Code answered before it listed its tools");
+        }
+        // Nothing after a breach reaches the turn, not even what was already on its way.
+        if (this.breach) return;
         if (line.includes('"task_')) this.noteTask(line);
         if (this.lineHandler) this.lineHandler(line);
         else this.noteIdle(line);
@@ -822,9 +836,21 @@ export class ClaudeProcess {
       this.initSeen = true;
       if (typeof ev.claude_code_version === "string") this.cliVersion = ev.claude_code_version.slice(0, 40);
       this.capabilities = claudeCapabilities(ev);
+      if (!this.lock) return;
+      const breach = this.lock(ev);
+      if (breach) this.breached(breach);
+      else this.lockPassed = true;
     } catch {
       // not a JSON line
     }
+  }
+
+  private breached(reason: string) {
+    if (this.breach) return;
+    this.breach = reason;
+    try {
+      this.child.kill("SIGKILL");
+    } catch {}
   }
 
   private noteTask(line: string) {
@@ -1609,6 +1635,11 @@ export class BrainManager {
         ...(this.opts.steerFollowUpMs !== undefined ? { followUpMs: this.opts.steerFollowUpMs } : {}),
         ...(this.opts.steerBackgroundWaitMs !== undefined ? { backgroundWaitMs: this.opts.steerBackgroundWaitMs } : {}),
       });
+      if (live.proc.breach) {
+        this.log(`[${ctx.agent.handle}] chat turn stopped: ${live.proc.breach}`);
+        this.drop(live);
+        return { final: errorEvent("tools_not_locked", live.proc.breach, false) };
+      }
       if (out.final?.type === "done") this.ran.add(live.ranKey);
       const short = live.key.split(":")[1]?.slice(0, 8) ?? "";
       // A steered message it never read would start a turn nobody listens to: the process goes (the
@@ -1798,6 +1829,7 @@ export class BrainManager {
       this.opts.spawn,
       ctx.oauthToken,
     );
+    if (mode === "chat") proc.lock = chatToolsBreach;
     const live: Live = {
       key,
       agentId: ctx.agent.id,

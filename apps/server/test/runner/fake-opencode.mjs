@@ -24,6 +24,35 @@ if (args[0] === "models") {
   process.stdout.write(`opencode/big-pickle\nopencode/glm-5.3-flash-free\n${paid}`);
   process.exit(0);
 }
+// `debug agent <name>`: the agent's tools as OpenCode 1.19.5 resolves them (its built-in ones, the last matching rule
+// of the config's `permission` deciding each, `*` deny hiding it), plus $FAKE_OPENCODE_EXTRA_TOOL (one a new version
+// adds) and $FAKE_OPENCODE_ALLOW (a tool another config allows after ours). $FAKE_OPENCODE_PROBE_FAIL: exit 1.
+if (args[0] === "debug" && args[1] === "agent") {
+  if (env.FAKE_OPENCODE_LOG) {
+    appendFileSync(
+      env.FAKE_OPENCODE_LOG,
+      `${JSON.stringify({ probe: true, args, cwd: process.cwd(), config: env.OPENCODE_CONFIG_CONTENT ?? null })}\n`,
+    );
+  }
+  if (env.FAKE_OPENCODE_PROBE_FAIL) {
+    process.stderr.write("Error: No providers found\n");
+    process.exit(1);
+  }
+  const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? "{}");
+  const rules = [
+    ["*", "allow"],
+    ...Object.entries(config.permission ?? {}),
+    ...(env.FAKE_OPENCODE_ALLOW ? [[env.FAKE_OPENCODE_ALLOW, "allow"]] : []),
+  ];
+  const match = (id, p) => p === "*" || p === id || (p.endsWith("*") && id.startsWith(p.slice(0, -1)));
+  const ids = ["bash", "read", "edit", "write", "glob", "grep", "webfetch", "task", "todowrite", "skill"];
+  if (env.FAKE_OPENCODE_EXTRA_TOOL) ids.push(env.FAKE_OPENCODE_EXTRA_TOOL);
+  const tools = Object.fromEntries(
+    ids.map((id) => [id, rules.findLast(([p]) => match(id === "write" ? "edit" : id, p))?.[1] !== "deny"]),
+  );
+  process.stdout.write(`${JSON.stringify({ name: args[2], mode: "primary", tools }, null, 2)}\n`);
+  process.exit(0);
+}
 if (args[0] !== "run" || flag("--format") !== "json") {
   process.stderr.write(`fake opencode: unknown command ${args.join(" ")}\n`);
   process.exit(2);

@@ -163,7 +163,7 @@ const CODING_MARKS = ["zai", "kimi", "minimax", "opencode"] as const;
 export interface ConnectAiFlowProps {
   view: FlowView;
   onView: (view: FlowView) => void;
-  /** The team's right hand: only the plans through Claude Code (`RIGHT_HAND_PLAN_CHOICES`). */
+  /** The team's right hand: no ChatGPT (`RIGHT_HAND_PLAN_CHOICES`; the phone offers OpenCode to nobody). */
   claudeCodeOnly?: boolean;
   /** The person's agents a plan may think for, in the order offered. */
   agents: { id: string; name: string }[];

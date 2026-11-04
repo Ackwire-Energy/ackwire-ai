@@ -23,7 +23,8 @@ export type AiState = "ready" | "no_ai" | "waiting";
 
 /**
  * Why an agent has no AI, as its card and the Connect dialog put it. The team's right hand on a plan also says its
- * computer is away, its plan is at its limit, or the plan answers only its owner (`rightHandNoAiReason`).
+ * computer is away, its plan is at its limit, the plan answers only its owner, the computer's runner needs an update,
+ * or the plan's CLI there offers tools of its own (`rightHandNoAiReason`).
  */
 export type NoAiReason =
   | "no_key"
@@ -32,7 +33,9 @@ export type NoAiReason =
   | "cli_missing"
   | "computer_away"
   | "plan_limit"
-  | "plan_not_shared";
+  | "plan_not_shared"
+  | "runner_outdated"
+  | "plan_tools";
 
 export interface AgentAi {
   state: AiState;

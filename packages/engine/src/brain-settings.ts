@@ -678,13 +678,10 @@ export async function setAgentBrain(
       "brain.right_hand_account",
     );
   }
-  // Its plan is whoever signed it in: only they give it to the right hand or let other people's DMs think with it.
-  // Anyone who sets its AI may take it off the plan, or keep the plan to its owner.
-  if (
-    rightHand &&
-    agent.ownerUserId !== userId &&
-    ((account !== null && account !== access.agent.brainAccountId) || (planForOthers && !agent.planForOthers))
-  ) {
+  // Its plan is whoever signed it in: only they give it to the right hand. "Atende outras pessoas" is as for any agent
+  // on its owner's plan (ADR 0059 §5): the plan's owner chooses, an admin may override, and the plan's owner hears it
+  // by email (`planOpened` below).
+  if (rightHand && agent.ownerUserId !== userId && account !== null && account !== access.agent.brainAccountId) {
     throw new ForbiddenError("Only the plan's owner gives it to the team's right hand", "account.not_owner");
   }
   const accounts = await brainAccounts(deps.db, userId, orgId, agent, machine);
@@ -761,8 +758,12 @@ export async function setAgentBrain(
       await dropMailIfWidened(tx, orgId, agentId, agent.ownerUserId, audienceOf(agent), audienceOf(row), userId);
       const to = { ...audience, consultable: agent.consultable };
       opened = await audienceChanged(tx, orgId, userId, row, audienceOf(agent), to, planFrom);
-    } else if (row && changed && !rightHand)
-      opened = await planOpened(tx, orgId, userId, row, planFrom, audienceOf(row));
+    } else if (row && rightHand) {
+      if (planForOthers && !agent.planForOthers) {
+        const plan = { id: row.id, brain: row.brain, ownerUserId: agent.ownerUserId };
+        opened = await planOpened(tx, orgId, userId, plan, OWNER_ONLY, audienceOf(row));
+      }
+    } else if (row && changed) opened = await planOpened(tx, orgId, userId, row, planFrom, audienceOf(row));
     if (opened) options.onPlanOpened?.();
     return { row, released };
   });

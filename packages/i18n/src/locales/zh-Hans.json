@@ -1670,7 +1670,7 @@
       "change": "更改",
       "planHelp": "费用由套餐的所有者支付。套餐所在的电脑不可用时，对话里会说明，并提供使用 API 密钥的选项。",
       "plan": "套餐",
-      "planOffer": "{{name}} 可以用你的 Claude 套餐思考，代替 API 密钥。它在套餐登录的电脑上运行，只能触及这个工作区。",
+      "planOffer": "{{name}} 可以用你的套餐思考，代替 API 密钥。它在套餐登录的电脑上运行，只能触及这个工作区。",
       "usePlan": "使用套餐"
     },
     "card": {
@@ -1771,6 +1771,8 @@
       "computer_away": "{{name}} 现在无法回答：套餐所在的电脑不可用。",
       "plan_limit": "{{name}} 现在无法回答：套餐已达到上限。",
       "plan_not_shared": "{{name}} 用的套餐只回复它的所有者。",
+      "runner_outdated": "{{name}} 现在无法回复：套餐所在电脑上的程序需要更新。",
+      "plan_tools": "{{name}} 在回复前停下了：那台电脑上套餐的 AI 提供了它自己的工具。",
       "useKey": "使用 API 密钥"
     },
     "receipt": "没有人会回复：未连接 AI",
@@ -11867,6 +11869,8 @@
       "no_ai_computer_away": "我现在无法回答：我的套餐所在的电脑不可用。",
       "no_ai_plan_limit": "我现在无法回答：我用来思考的套餐已达到上限。",
       "no_ai_plan_not_shared": "我无法用这个套餐回复你：它只回复自己的所有者。",
+      "no_ai_runner_outdated": "我现在无法回复：我的套餐所在电脑上的程序需要更新。",
+      "no_ai_plan_tools": "我在回复前停下了：那台电脑上我的套餐的 AI 提供了它自己的工具。",
       "action_connect_ai": "连接 AI",
       "action_connect_app": "连接 {{name}}",
       "action_add_mcp": "添加 MCP 服务器",

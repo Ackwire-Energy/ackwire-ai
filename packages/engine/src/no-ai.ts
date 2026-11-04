@@ -35,6 +35,8 @@ const RIGHT_HAND_TEXT: Partial<Record<NoAiReason, string>> = {
   computer_away: "I can't answer now: the computer my plan is signed in on is away.",
   plan_limit: "I can't answer now: the plan I think with reached its limit.",
   plan_not_shared: "I can't answer you on this plan: it answers only its owner.",
+  runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
+  plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
 };
 
 /** A conversation gets the card again only after this long (per agent; once while the organization has no AI). */

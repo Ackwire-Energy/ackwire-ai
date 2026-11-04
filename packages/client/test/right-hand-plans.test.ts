@@ -21,7 +21,15 @@ test("its plan's line: the computer away, the limit, a plan for its owner only; 
   expect(noAiCardOf(meta("not_signed_in"))?.planLine).toBeUndefined();
 });
 
-test("the plans it may think with: those through Claude Code, never ChatGPT, Cursor or OpenCode", () => {
-  expect(RIGHT_HAND_PLAN_CHOICES).toEqual(["claude", ...PLAN_IDS]);
-  expect(PLAN_CHOICES.filter((c) => !RIGHT_HAND_PLAN_CHOICES.includes(c))).toEqual(["chatgpt", "cursor", "zen"]);
+test("the plans it may think with: those through Claude Code and OpenCode, never ChatGPT nor Cursor", () => {
+  expect([...RIGHT_HAND_PLAN_CHOICES].sort()).toEqual(["claude", "zen", ...PLAN_IDS].sort() as never);
+  expect(PLAN_CHOICES.filter((c) => !RIGHT_HAND_PLAN_CHOICES.includes(c))).toEqual(["chatgpt", "cursor"]);
+});
+
+test("a runner to update and a CLI with tools of its own are lines of their own, not 'no AI'", () => {
+  const t = ((key: string) => key) as unknown as TFunction;
+  for (const reason of ["runner_outdated", "plan_tools"]) {
+    expect(noAiCardOf(meta(reason))?.planLine).toBe(reason as never);
+    expect(serverBody(t, "…", meta(reason))).toBe(`chat.body.no_ai_${reason}`);
+  }
 });

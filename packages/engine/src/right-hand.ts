@@ -171,13 +171,14 @@ export const rightHandReaches = (agent: SQL, channelId: SQL) =>
     where rhc.id = ${channelId} and rhc.kind = 'channel' and rhc.archived_at is null and rhc.deleted_at is null))`;
 
 /**
- * The plans it may think with (ADR 0137 §1, amended 2026-11-04): those whose CLI the runner locks down to our tools
- * alone (`permissions.mode: "chat"`, `LOCKED_BRAIN_PROTOCOL`). Claude Code's, which a Claude plan or a coding plan's
- * key thinks through: none of its own tools (`--tools ""`), our bridge only (`--strict-mcp-config`), no settings,
- * skills or folders. Not Codex, Cursor or OpenCode: their own tools are switched off one by one (Codex's features,
- * Cursor's deny rules, OpenCode's config), so a tool a new version adds would be on.
+ * The plans it may think with (ADR 0137 §1 and §4, amended 2026-11-04): those whose CLI the runner locks down to our
+ * tools alone (`permissions.mode: "chat"`, `LOCKED_BRAIN_PROTOCOL`) and that say which tools they have before they
+ * can use one, so the runner stops a turn that has any other (`tools_not_locked`). Claude Code's (a Claude plan or a
+ * coding plan's key; its `init` lists them) and OpenCode's (`opencode debug agent`). Not Codex nor Cursor: neither
+ * lists its tools (Codex's `debug prompt-input` leaves out those it sends apart, Cursor's `init` has no list), and
+ * their own sign-in sits in the folder their own commands could read.
  */
-export const RIGHT_HAND_PLAN_BRAINS: ReadonlySet<BrainKind> = new Set<BrainKind>(["claude_code"]);
+export const RIGHT_HAND_PLAN_BRAINS: ReadonlySet<BrainKind> = new Set<BrainKind>(["claude_code", "opencode"]);
 
 /** Its computer turns' permission profile: the runner's locked-down `chat` (`LOCKED_BRAIN_PROTOCOL`). */
 export const RIGHT_HAND_TURN = { mode: "chat" } as const;
@@ -243,6 +244,8 @@ export function rightHandNoAiReason(code: string): NoAiReason {
   if (code === "machine_offline" || code === "machine_paused") return "computer_away";
   if (code === "plan_limit") return "plan_limit";
   if (code === "plan_not_shared") return "plan_not_shared";
+  if (code === "runner_outdated") return "runner_outdated";
+  if (code === "tools_not_locked") return "plan_tools";
   if (code === "no_computer" || code === "no_session") return "no_computer";
   if (code === "not_logged_in" || code === "plan_not_owner") return "not_signed_in";
   return "cli_missing";

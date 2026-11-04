@@ -1737,9 +1737,9 @@ export const ptBR = {
       planHelp: "Quem paga é o dono do plano. Sem o computador do plano, a conversa avisa e oferece uma chave de API.",
       plan: "Um plano",
       planOffer:
-        "O {{name}} pode pensar com o seu plano do Claude no lugar de uma chave de API. Ele roda no computador onde o plano está conectado e só alcança este workspace.",
+        "O {{name}} pode pensar com o seu plano no lugar de uma chave de API. Ele roda no computador onde o plano está conectado e só alcança este workspace.",
       planOffer_female:
-        "A {{name}} pode pensar com o seu plano do Claude no lugar de uma chave de API. Ela roda no computador onde o plano está conectado e só alcança este workspace.",
+        "A {{name}} pode pensar com o seu plano no lugar de uma chave de API. Ela roda no computador onde o plano está conectado e só alcança este workspace.",
       usePlan: "Usar um plano",
     },
     card: {
@@ -1856,6 +1856,9 @@ export const ptBR = {
       computer_away: "{{name}} não consegue responder agora: o computador do plano está fora do ar.",
       plan_limit: "{{name}} não consegue responder agora: o plano chegou ao limite.",
       plan_not_shared: "{{name}} pensa com um plano que só atende o próprio dono.",
+      runner_outdated:
+        "{{name}} não consegue responder agora: o programa no computador do plano precisa ser atualizado.",
+      plan_tools: "{{name}} parou antes de responder: a IA do plano naquele computador oferece ferramentas próprias.",
       useKey: "Usar uma chave de API",
     },
     receipt: "Ninguém vai responder: falta uma IA",
@@ -11930,6 +11933,9 @@ export const ptBR = {
       no_ai_computer_away: "Agora não consigo responder: o computador do meu plano está fora do ar.",
       no_ai_plan_limit: "Agora não consigo responder: o plano com que eu penso chegou ao limite.",
       no_ai_plan_not_shared: "Não consigo te responder por este plano: ele só atende o próprio dono.",
+      no_ai_runner_outdated:
+        "Agora não consigo responder: o programa no computador do meu plano precisa ser atualizado.",
+      no_ai_plan_tools: "Parei antes de responder: a IA do meu plano naquele computador oferece ferramentas próprias.",
       action_connect_ai: "Conectar uma IA",
       action_connect_app: "Conectar {{name}}",
       action_add_mcp: "Adicionar um servidor MCP",

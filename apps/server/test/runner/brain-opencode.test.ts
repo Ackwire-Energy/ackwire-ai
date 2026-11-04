@@ -9,11 +9,13 @@ import { setTool } from "../../runner/access";
 import { AccountManager, accountEnv, opencodeKeyOf } from "../../runner/accounts";
 import type { CodexBrainEvent } from "../../runner/brain-codex";
 import {
+  OPENCODE_CHAT_PERMISSION,
   OpencodeEventMapper,
   opencodeConfig,
   opencodeConfigDir,
   opencodePrompt,
   opencodeSessionsFile,
+  opencodeToolsBreach,
   opencodeTurnArgs,
 } from "../../runner/brain-opencode";
 import { accessToStore, effectiveAccess } from "../../runner/config";
@@ -29,7 +31,14 @@ const realHome = process.env.HOME;
 afterEach(async () => {
   for (const m of managers.splice(0)) await m.close();
   delete process.env.FAKE_OPENCODE_LOG;
-  for (const name of ["OPENCODE_PERMISSION", "ANTHROPIC_API_KEY"]) delete process.env[name];
+  for (const name of [
+    "OPENCODE_PERMISSION",
+    "ANTHROPIC_API_KEY",
+    "FAKE_OPENCODE_ALLOW",
+    "FAKE_OPENCODE_EXTRA_TOOL",
+    "FAKE_OPENCODE_PROBE_FAIL",
+  ])
+    delete process.env[name];
   process.env.HOME = realHome;
   removeDirs(dirs);
 });
@@ -491,4 +500,88 @@ test.skipIf(!posix)("an OpenCode account is its sealed key: no key, no sign-in",
   expect(await opencodeKeyOf(path.join(home, "accounts", "opencode", id))).toBe(KEY);
   m.invalidate();
   expect((await m.list()).find((a) => a.id === id)).toMatchObject({ loggedIn: true, provider: "zen" });
+});
+
+// ── Protocol 41: the team's right hand on an OpenCode plan (ADR 0137 §4) ─────
+
+test("a chat turn: every tool denied by `*` but our bridge's, its own agent, no plugins, the model as the default", () => {
+  const chat = JSON.parse(opencodeConfig({ profile: "work", chat: { model: "opencode/glm-5.3" } }));
+  expect(chat.permission).toEqual({ "*": "deny", [`${CODEX_MCP_SERVER}_*`]: "allow" });
+  expect(Object.keys(chat.permission)).toEqual(["*", `${CODEX_MCP_SERVER}_*`]);
+  expect(chat.model).toBe("opencode/glm-5.3");
+  expect(Object.keys(chat.mcp)).toEqual([CODEX_MCP_SERVER]);
+  expect(opencodeTurnArgs({ chat: true, model: "opencode/glm-5.3" })).toEqual([
+    "run",
+    "--format",
+    "json",
+    "--agent",
+    "build",
+    "--pure",
+    "--model",
+    "opencode/glm-5.3",
+  ]);
+  expect(OPENCODE_CHAT_PERMISSION["*"]).toBe("deny");
+});
+
+test("the guard reads `opencode debug agent`: any tool on but ours, or no list, stops the turn", () => {
+  const answer = (tools: unknown) => JSON.stringify({ name: "build", tools }, null, 2);
+  expect(opencodeToolsBreach(answer({ bash: false, read: false, [`${CODEX_MCP_SERVER}_post`]: true }))).toBeNull();
+  expect(opencodeToolsBreach(answer({ bash: false, websearch: true }))).toContain("websearch");
+  expect(opencodeToolsBreach(answer(undefined))).toContain("didn't list");
+  expect(opencodeToolsBreach("")).toContain("didn't list");
+  expect(opencodeToolsBreach(answer({ read: "maybe" }))).toContain("read");
+});
+
+test.skipIf(!posix)(
+  "a chat turn asks OpenCode for its tools first, in the agent's folder with the same config, and runs only when none is on",
+  async () => {
+    const root = tempDir("brain-opencode-");
+    dirs.push(root);
+    const { ctx } = turnContext(root);
+    const log = path.join(root, "opencode.log");
+    process.env.FAKE_OPENCODE_LOG = log;
+    const scope = { signal: new AbortController().signal, output: () => {}, emit: () => {} };
+    const chat = (n: number, over: Record<string, unknown> = {}) =>
+      handleRequest(
+        { ...ctx, grants: ["/somewhere/else"], secretsDir: path.join(root, "no-secrets") },
+        turn({ runId: RUN.replace(/1$/, String(n)), cwd: "repos/acme/app", permissions: { mode: "chat" }, ...over }),
+        scope as never,
+      ) as Promise<{ final: CodexBrainEvent }>;
+    // A tool a new version adds is off too: `*` denies it.
+    process.env.FAKE_OPENCODE_EXTRA_TOOL = "computer";
+    expect((await chat(1)).final).toMatchObject({ type: "done" });
+    const [probe, run] = logOf(log) as unknown as [Logged & { probe?: boolean; cwd: string }, Logged & { cwd: string }];
+    expect(probe?.probe).toBe(true);
+    expect(probe?.args).toEqual(["debug", "agent", "build", "--pure"]);
+    expect(probe?.config).toBe(run?.config);
+    expect(probe?.cwd).toBe(run?.cwd);
+    // Whatever folder the request names: the agent's own.
+    expect(path.basename(run?.cwd ?? "")).toBe(`dev-${AGENT.id.slice(0, 8)}`);
+    expect(run?.args).toEqual(["run", "--format", "json", "--agent", "build", "--pure"]);
+    expect(JSON.parse(run?.config ?? "{}").permission).toEqual(OPENCODE_CHAT_PERMISSION);
+
+    // Another config allows a tool after ours: the turn stops before OpenCode runs it.
+    process.env.FAKE_OPENCODE_ALLOW = "bash";
+    const breached = await chat(2);
+    expect(breached.final).toMatchObject({ type: "error", code: "tools_not_locked" });
+    expect((breached.final as { message: string }).message).toContain("bash");
+    delete process.env.FAKE_OPENCODE_ALLOW;
+    // A probe that fails says nothing: the turn stops too.
+    process.env.FAKE_OPENCODE_PROBE_FAIL = "1";
+    expect((await chat(3)).final).toMatchObject({ type: "error", code: "tools_not_locked" });
+    expect(logOf(log).filter((l) => !(l as { probe?: boolean }).probe)).toHaveLength(1);
+  },
+  20_000,
+);
+
+test.skipIf(!posix)("Codex and Cursor never take a chat turn", async () => {
+  const root = tempDir("brain-opencode-");
+  dirs.push(root);
+  const { ctx } = turnContext(root);
+  const scope = { signal: new AbortController().signal, output: () => {}, emit: () => {} };
+  for (const kind of ["codex", "cursor"]) {
+    await expect(handleRequest(ctx, turn({ kind, permissions: { mode: "chat" } }), scope as never)).rejects.toThrow(
+      /Only Claude Code and OpenCode/,
+    );
+  }
 });

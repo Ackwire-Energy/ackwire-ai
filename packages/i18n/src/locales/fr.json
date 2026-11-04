@@ -1806,7 +1806,7 @@
       "change": "Changer",
       "planHelp": "C'est le titulaire de l'abonnement qui paie. Si son ordinateur n'est pas disponible, la conversation le signale et propose une clé API.",
       "plan": "Un abonnement",
-      "planOffer": "{{name}} peut réfléchir avec votre abonnement Claude au lieu d'une clé API, sur l'ordinateur où l'abonnement est connecté, sans rien atteindre hors de ce workspace.",
+      "planOffer": "{{name}} peut réfléchir avec votre abonnement au lieu d'une clé API, sur l'ordinateur où l'abonnement est connecté, sans rien atteindre hors de ce workspace.",
       "usePlan": "Utiliser un abonnement"
     },
     "card": {
@@ -1907,6 +1907,8 @@
       "computer_away": "{{name}} ne peut pas répondre maintenant : l'ordinateur de l'abonnement n'est pas disponible.",
       "plan_limit": "{{name}} ne peut pas répondre maintenant : l'abonnement a atteint sa limite.",
       "plan_not_shared": "{{name}} réfléchit avec un abonnement qui ne répond qu'à son titulaire.",
+      "runner_outdated": "{{name}} ne peut pas répondre pour l'instant : le programme sur l'ordinateur de l'abonnement doit être mis à jour.",
+      "plan_tools": "{{name}} s'est arrêté avant de répondre : l'IA de l'abonnement sur cet ordinateur propose ses propres outils.",
       "useKey": "Utiliser une clé API"
     },
     "receipt": "Personne ne répondra : aucune IA connectée",
@@ -12701,6 +12703,8 @@
       "no_ai_computer_away": "Je ne peux pas répondre maintenant : l'ordinateur de mon abonnement n'est pas disponible.",
       "no_ai_plan_limit": "Je ne peux pas répondre maintenant : l'abonnement avec lequel je réfléchis a atteint sa limite.",
       "no_ai_plan_not_shared": "Je ne peux pas vous répondre avec cet abonnement : il ne répond qu'à son titulaire.",
+      "no_ai_runner_outdated": "Je ne peux pas répondre pour l'instant : le programme sur l'ordinateur de mon abonnement doit être mis à jour.",
+      "no_ai_plan_tools": "Je me suis arrêté avant de répondre : l'IA de mon abonnement sur cet ordinateur propose ses propres outils.",
       "action_connect_ai": "Connecter une IA",
       "action_connect_app": "Connecter {{name}}",
       "action_add_mcp": "Ajouter un serveur MCP",

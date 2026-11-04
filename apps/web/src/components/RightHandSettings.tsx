@@ -13,6 +13,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { handleAfterRename } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
+import { accountPlan } from "@agenteschat/client/lib/plans";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { AffixInput, Button, Card, CardFooter, CardHeader, Dialog, Input } from "@agenteschat/ui";
@@ -61,10 +62,12 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const connect = useConnectAi();
   const dir = useDirectory(org.id);
   // On a plan (ADR 0137 §1): whose, and whether other people's DMs think with it.
-  const onPlan = agent.brain?.kind === "claude_code";
+  const planKind = agent.brain?.kind === "claude_code" || agent.brain?.kind === "opencode" ? agent.brain.kind : null;
+  const onPlan = planKind !== null;
   const view = useAgentBrain(org.id, agent.id, onPlan).data;
-  const planAccount = view?.accounts.find((a) => a.id === view.account)?.label;
-  const ownerId = view?.accounts.find((a) => a.id === view.account)?.ownerId;
+  const signIn = view?.accounts.find((a) => a.id === view.account);
+  const planAccount = signIn?.label;
+  const ownerId = signIn?.ownerId;
   const planOwner = ownerId ? dir.memberById.get(ownerId)?.name.split(" ")[0] : undefined;
   const save = (patch: Parameters<typeof update.mutate>[0], onSuccess?: () => void) =>
     update.mutate(patch, { onSuccess, onError: (e) => toast.show(errorText(t, e), "error") });
@@ -119,7 +122,11 @@ function RightHandForm({ agent }: { agent: Agent }) {
             control={
               onPlan ? (
                 <span className="rh-set__plan">
-                  <span>{t("rightHand.settings.onPlan", { account: planAccount ?? "Claude" })}</span>
+                  <span>
+                    {planKind === "opencode"
+                      ? `OpenCode · ${planAccount ?? ""}`
+                      : t("rightHand.settings.onPlan", { account: planAccount ?? "Claude" })}
+                  </span>
                   <Button size="sm" onClick={() => connect?.open({ agentId: agent.id })}>
                     {t("rightHand.settings.change")}
                   </Button>
@@ -148,13 +155,15 @@ function RightHandForm({ agent }: { agent: Agent }) {
               label={t("rightHand.settings.plan")}
               help={t("rightHand.settings.planOffer", g)}
               control={
-                <Button size="sm" onClick={() => connect.open({ agentId: agent.id, plan: "claude" })}>
+                <Button size="sm" onClick={() => connect.open({ agentId: agent.id })}>
                   {t("rightHand.settings.usePlan")}
                 </Button>
               }
             />
           )}
-          {onPlan && view && (
+          {planKind && view && (
+            // As for any agent on its owner's plan (ADR 0059 §5): the plan's owner chooses, an admin may override,
+            // and the plan's owner hears it by email.
             <PlanReplies
               agent={agent.name}
               owner={view.canUsePlans ? undefined : (planOwner ?? undefined)}
@@ -165,9 +174,9 @@ function RightHandForm({ agent }: { agent: Agent }) {
                   .then(() => qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, agent.id) }))
                   .catch((e) => toast.show(errorText(t, e), "error"))
               }
-              // Only the plan's owner lets other people's DMs think with it.
-              disabled={!view.canUsePlans}
-              brain="claude_code"
+              disabled={!view.canEdit}
+              brain={planKind}
+              coding={accountPlan(signIn)}
             />
           )}
           <PrefRow

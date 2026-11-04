@@ -1802,7 +1802,7 @@
       "change": "Cambia",
       "planHelp": "Paga chi è titolare del piano. Se il suo computer non è disponibile, la conversazione lo dice e propone una chiave API.",
       "plan": "Un piano",
-      "planOffer": "{{name}} può pensare con il tuo piano Claude invece che con una chiave API, sul computer dove il piano ha l'accesso, senza raggiungere nulla fuori da questo workspace.",
+      "planOffer": "{{name}} può pensare con il tuo piano invece che con una chiave API, sul computer dove il piano ha l'accesso, senza raggiungere nulla fuori da questo workspace.",
       "usePlan": "Usa un piano"
     },
     "card": {
@@ -1907,6 +1907,8 @@
       "computer_away": "{{name}} non può rispondere ora: il computer del piano non è disponibile.",
       "plan_limit": "{{name}} non può rispondere ora: il piano ha raggiunto il limite.",
       "plan_not_shared": "{{name}} pensa con un piano che risponde solo al suo titolare.",
+      "runner_outdated": "{{name}} non può rispondere ora: il programma sul computer del piano va aggiornato.",
+      "plan_tools": "{{name}} si è fermato prima di rispondere: l'IA del piano su quel computer offre strumenti propri.",
       "useKey": "Usa una chiave API"
     },
     "receipt": "Nessuno risponderà: nessuna IA collegata",
@@ -12703,6 +12705,8 @@
       "no_ai_computer_away": "Ora non posso rispondere: il computer del mio piano non è disponibile.",
       "no_ai_plan_limit": "Ora non posso rispondere: il piano con cui penso ha raggiunto il limite.",
       "no_ai_plan_not_shared": "Non posso risponderti con questo piano: risponde solo al suo titolare.",
+      "no_ai_runner_outdated": "Ora non posso rispondere: il programma sul computer del mio piano va aggiornato.",
+      "no_ai_plan_tools": "Mi sono fermato prima di rispondere: l'IA del mio piano su quel computer offre strumenti propri.",
       "action_connect_ai": "Collega un'IA",
       "action_connect_app": "Collega {{name}}",
       "action_add_mcp": "Aggiungi un server MCP",

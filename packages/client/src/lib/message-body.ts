@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
 import { autoUpdateText, talkerStatusText, workEndBody } from "./long-work";
 import { mediaKindOf, mediaWord } from "./media";
+import { RIGHT_HAND_PLAN_LINES } from "./no-ai";
 import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
 import { closedNoteText, usageWaitOf, usageWindowText } from "./usage-pause";
@@ -66,11 +67,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   const busy = waitNote?.code === "busy";
   const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
-  // The team's right hand on a plan (ADR 0137 §7): its plan's computer away, its limit, or a plan for its owner only.
+  // The team's right hand on a plan (ADR 0137 §7): why its plan can't think now (`RIGHT_HAND_PLAN_LINES`).
   const planLine =
-    noAi?.reason === "computer_away" || noAi?.reason === "plan_limit" || noAi?.reason === "plan_not_shared"
-      ? `no_ai_${noAi.reason}`
-      : null;
+    typeof noAi?.reason === "string" && RIGHT_HAND_PLAN_LINES.has(noAi.reason) ? `no_ai_${noAi.reason}` : null;
   const own =
     signedOut &&
     (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor" || noAi?.own === "opencode")

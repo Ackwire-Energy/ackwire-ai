@@ -42,14 +42,21 @@ export interface NoAiCard {
   own?: MachineAccountKind;
   /**
    * The team's right hand on a plan (ADR 0137 §7): why that plan can't think now, said as one line with the way to an
-   * API key (its computer away, the plan at its limit, a plan that answers only its owner).
+   * API key (its computer away, the plan at its limit, a plan that answers only its owner, a runner to update there,
+   * the plan's CLI offering tools of its own).
    */
   planLine?: RightHandPlanLine;
 }
 
 /** Why the right hand's plan can't think for this message (`NoAiCard.planLine`). */
-export type RightHandPlanLine = "computer_away" | "plan_limit" | "plan_not_shared";
-const PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanLine>(["computer_away", "plan_limit", "plan_not_shared"]);
+export type RightHandPlanLine = "computer_away" | "plan_limit" | "plan_not_shared" | "runner_outdated" | "plan_tools";
+export const RIGHT_HAND_PLAN_LINES: ReadonlySet<string> = new Set<RightHandPlanLine>([
+  "computer_away",
+  "plan_limit",
+  "plan_not_shared",
+  "runner_outdated",
+  "plan_tools",
+]);
 
 const INTENTS: ReadonlySet<string> = new Set<ConnectIntent>(["claude", "chatgpt", "api_key", "any", "task"]);
 const isIntent = (v: unknown): v is ConnectIntent => typeof v === "string" && INTENTS.has(v);
@@ -71,7 +78,9 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
     ...(typeof o.provider === "string" ? { provider: o.provider } : {}),
     ...(o.autoOpen === true ? { autoOpen: true } : {}),
     ...(own ? { own } : signedOut ? { signedOut: true } : {}),
-    ...(typeof o.reason === "string" && PLAN_LINES.has(o.reason) ? { planLine: o.reason as RightHandPlanLine } : {}),
+    ...(typeof o.reason === "string" && RIGHT_HAND_PLAN_LINES.has(o.reason)
+      ? { planLine: o.reason as RightHandPlanLine }
+      : {}),
   };
 }
 
@@ -115,10 +124,12 @@ export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", "cursor
 export const kindOf = (choice: PlanChoice): MachineAccountKind =>
   choice === "chatgpt" || choice === "cursor" || choice === "zen" ? PLAN_BRAIN[choice] : PLAN_BRAIN.claude;
 /**
- * The plans the team's right hand may think with: those through Claude Code, the one CLI the runner locks down to its
- * tools (the server's `RIGHT_HAND_PLAN_BRAINS`, packages/engine/src/right-hand.ts).
+ * The plans the team's right hand may think with: those through Claude Code and OpenCode, the CLIs the runner locks
+ * down to its tools and checks before each turn (the server's `RIGHT_HAND_PLAN_BRAINS`, packages/engine/src/right-hand.ts).
  */
-export const RIGHT_HAND_PLAN_CHOICES: readonly PlanChoice[] = PLAN_CHOICES.filter((c) => kindOf(c) === "claude_code");
+export const RIGHT_HAND_PLAN_CHOICES: readonly PlanChoice[] = PLAN_CHOICES.filter(
+  (c) => kindOf(c) === "claude_code" || kindOf(c) === "opencode",
+);
 /** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, Cursor's, else Claude's. */
 export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
   isPlanId(a.provider) ? a.provider : planOfKind(a.kind);

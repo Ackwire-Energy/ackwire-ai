@@ -466,11 +466,13 @@ export const OPENCODE_PROTOCOL = 39;
  */
 export const CONVERSATION_PROTOCOL = 40;
 /**
- * From this protocol on (ADR 0137 §4, amended 2026-11-04): a Claude Code `brain.turn` takes `permissions.mode: "chat"`,
- * the team's right hand thinking on a person's plan. The CLI gets none of its own tools (`--tools ""`, and every one of
- * them denied too), only our MCP bridge (`--strict-mcp-config`), no settings files, skills or slash commands, no
- * folder but the agent's own, no checkout's instructions and no permission prompt (`dontAsk`: what isn't allowed is
- * refused). An older runner reads any mode but `plan` as `work`: the server never sends it a `chat` turn.
+ * From this protocol on (ADR 0137 §4, amended 2026-11-04): a Claude Code or OpenCode `brain.turn` takes
+ * `permissions.mode: "chat"`, the team's right hand thinking on a person's plan. The CLI gets none of its own tools,
+ * only our MCP bridge, no settings files, plugins, skills or slash commands, no folder but the agent's own, none of
+ * the agent's secrets and no permission prompt. The runner checks the tools the CLI lists (Claude Code's `init`,
+ * OpenCode's `debug agent`) before the turn can use one, and ends it with `tools_not_locked` when any is not ours.
+ * Codex and Cursor refuse it (`bad_request`). An older runner reads any mode but `plan` as `work`: the server never
+ * sends it a `chat` turn.
  */
 export const LOCKED_BRAIN_PROTOCOL = 41;
 /** `account` `begin`'s `provider` for an OpenCode account: an OpenCode (Zen / Go) API key, its only sign-in. */

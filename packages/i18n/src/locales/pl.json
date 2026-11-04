@@ -1871,7 +1871,7 @@
       "change": "Zmień",
       "planHelp": "Płaci właściciel planu. Gdy jego komputer jest niedostępny, rozmowa o tym mówi i proponuje klucz API.",
       "plan": "Plan",
-      "planOffer": "{{name}} może myśleć z twoim planem Claude zamiast z kluczem API, na komputerze, na którym plan jest zalogowany, bez sięgania poza ten workspace.",
+      "planOffer": "{{name}} może myśleć z twoim planem zamiast z kluczem API, na komputerze, na którym plan jest zalogowany, bez sięgania poza ten workspace.",
       "usePlan": "Użyj planu"
     },
     "card": {
@@ -1972,6 +1972,8 @@
       "computer_away": "{{name}} nie może teraz odpowiedzieć: komputer planu jest niedostępny.",
       "plan_limit": "{{name}} nie może teraz odpowiedzieć: plan osiągnął limit.",
       "plan_not_shared": "{{name}} myśli z planem, który odpowiada tylko swojemu właścicielowi.",
+      "runner_outdated": "{{name}} nie może teraz odpowiedzieć: program na komputerze planu wymaga aktualizacji.",
+      "plan_tools": "{{name}} zatrzymał się przed odpowiedzią: AI planu na tym komputerze oferuje własne narzędzia.",
       "useKey": "Użyj klucza API"
     },
     "receipt": "Nikt nie odpowie: brak podłączonego AI",
@@ -13050,6 +13052,8 @@
       "no_ai_computer_away": "Nie mogę teraz odpowiedzieć: komputer mojego planu jest niedostępny.",
       "no_ai_plan_limit": "Nie mogę teraz odpowiedzieć: plan, z którym myślę, osiągnął limit.",
       "no_ai_plan_not_shared": "Nie mogę ci odpowiedzieć przez ten plan: odpowiada tylko swojemu właścicielowi.",
+      "no_ai_runner_outdated": "Nie mogę teraz odpowiedzieć: program na komputerze mojego planu wymaga aktualizacji.",
+      "no_ai_plan_tools": "Zatrzymałem się przed odpowiedzią: AI mojego planu na tym komputerze oferuje własne narzędzia.",
       "action_connect_ai": "Połącz AI",
       "action_connect_app": "Połącz {{name}}",
       "action_add_mcp": "Dodaj serwer MCP",

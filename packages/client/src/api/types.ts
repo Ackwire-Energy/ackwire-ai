@@ -1078,7 +1078,9 @@ export interface AiStatus {
       | "cli_missing"
       | "computer_away"
       | "plan_limit"
-      | "plan_not_shared";
+      | "plan_not_shared"
+      | "runner_outdated"
+      | "plan_tools";
   }[];
 }
 

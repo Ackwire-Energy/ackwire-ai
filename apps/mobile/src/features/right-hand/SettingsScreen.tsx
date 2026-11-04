@@ -1,8 +1,10 @@
-import { type Agent, useModelLabel, useRoles, useUpdateAgent } from "@agenteschat/client";
+import { type Agent, keys, useAgentBrain, useApi, useModelLabel, useRoles, useUpdateAgent } from "@agenteschat/client";
 import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { accountPlan } from "@agenteschat/client/lib/plans";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,18 +13,21 @@ import { useOrg } from "@/providers/org";
 import { EmptyState, fieldText, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { openAgentEdit } from "../agents/AgentEditScreen";
 import { openAgentAi } from "../ai/AgentAiScreen";
+import { openConnectAi } from "../ai/NoAiCard";
+import { PlanReplies } from "../ai/parts";
 import { useFailed } from "../routines/hooks";
 import { Gap, SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory } from "../shared/hooks";
+import { type Directory, useColors, useDirectory } from "../shared/hooks";
 
 /** Opens Configurações › the right hand (ADR 0137). */
 export const openRightHandSettings = () => router.push("/settings/right-hand" as never);
 
 /**
  * Configurações › Lodi (ADR 0137), as on the web: only what admins set for the team's right hand. Its name and look,
- * its AI and model, its own monthly budget and who may use it (everyone, or the roles picked); one line says it can't
- * be archived or deleted, and its audit log is a tap away. Its instructions are the product's.
+ * its AI and model or the plan it thinks with ("Atende outras pessoas" under it), its own monthly budget and who may use
+ * it (everyone, or the roles picked); one line says it can't be archived or deleted, and its audit log is a tap away.
+ * Its instructions are the product's.
  */
 export function RightHandSettingsScreen() {
   const { t } = useTranslation();
@@ -36,6 +41,55 @@ export function RightHandSettingsScreen() {
   return <Form agent={agent} />;
 }
 
+/**
+ * Its AI on a plan (ADR 0137 §1): the plan's account, a tap from Connect, and "Atende outras pessoas" as for any agent
+ * on its owner's plan (the plan's owner chooses, an admin may override, the plan's owner hears it by email).
+ */
+function PlanRows({ agent, kind, dir }: { agent: Agent; kind: "claude_code" | "opencode"; dir: Directory }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const failed = useFailed();
+  const view = useAgentBrain(orgId, agent.id).data;
+  const signIn = view?.accounts.find((a) => a.id === view.account);
+  const owner = signIn?.ownerId ? dir.memberById.get(signIn.ownerId)?.name.split(" ")[0] : undefined;
+  return (
+    <>
+      <GroupedList>
+        <GroupedRow
+          icon="bolt"
+          label={
+            kind === "opencode"
+              ? `OpenCode · ${signIn?.label ?? ""}`
+              : t("rightHand.settings.onPlan", { account: signIn?.label ?? "Claude" })
+          }
+          value={t("rightHand.settings.change")}
+          chevron
+          onPress={() => openConnectAi({ agentId: agent.id })}
+        />
+      </GroupedList>
+      <GroupedFooter>{t("rightHand.settings.planHelp")}</GroupedFooter>
+      {view ? (
+        <PlanReplies
+          agent={agent.name}
+          owner={view.canUsePlans ? undefined : owner}
+          on={!view.onlyOwner}
+          onChange={(on) =>
+            void api.agents
+              .setBrain(orgId, agent.id, { onlyOwner: !on })
+              .then(() => qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, agent.id) }))
+              .catch(failed)
+          }
+          brain={kind}
+          coding={accountPlan(signIn)}
+          disabled={!view.canEdit}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function Form({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const { orgId } = useOrg();
@@ -43,6 +97,8 @@ function Form({ agent }: { agent: Agent }) {
   const toast = useToast();
   const failed = useFailed();
   const modelLabel = useModelLabel();
+  const dir = useDirectory();
+  const planKind = agent.brain?.kind === "claude_code" || agent.brain?.kind === "opencode" ? agent.brain.kind : null;
   const roles = useRoles(orgId).data?.roles ?? [];
   const update = useUpdateAgent(orgId, agent.id);
   const [budget, setBudget] = useState(agent.monthlyBudgetUsd == null ? "" : String(agent.monthlyBudgetUsd));
@@ -84,15 +140,29 @@ function Form({ agent }: { agent: Agent }) {
       <GroupedFooter>{t("rightHand.settings.nameHelp", { ...g, label: t("rightHand.label") })}</GroupedFooter>
 
       <GroupedHeader>{t("rightHand.settings.ai")}</GroupedHeader>
-      <GroupedList>
-        <GroupedRow
-          icon="brain"
-          label={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
-          chevron
-          onPress={() => openAgentAi(agent.id)}
-        />
-      </GroupedList>
-      <GroupedFooter>{t("rightHand.settings.aiHelp")}</GroupedFooter>
+      {planKind ? (
+        <PlanRows agent={agent} kind={planKind} dir={dir} />
+      ) : (
+        <>
+          <GroupedList>
+            <GroupedRow
+              icon="brain"
+              label={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
+              chevron
+              onPress={() => openAgentAi(agent.id)}
+            />
+            <GroupedRow
+              icon="bolt"
+              label={t("rightHand.settings.usePlan")}
+              chevron
+              onPress={() => openConnectAi({ agentId: agent.id })}
+            />
+          </GroupedList>
+          <GroupedFooter>
+            {t("common.joinSentences", { a: t("rightHand.settings.aiHelp"), b: t("rightHand.settings.planOffer", g) })}
+          </GroupedFooter>
+        </>
+      )}
 
       <GroupedHeader>{t("rightHand.settings.budget")}</GroupedHeader>
       <View style={[styles.budget, { backgroundColor: c.raised }]}>

@@ -1736,7 +1736,7 @@ export const en = {
       planHelp: "The plan's owner pays. When its computer is away, the conversation says so and offers an API key.",
       plan: "A plan",
       planOffer:
-        "{{name}} can think with your Claude plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace.",
+        "{{name}} can think with your plan instead of an API key. It runs on the computer where the plan is signed in and reaches only this workspace.",
       usePlan: "Use a plan",
     },
     card: {
@@ -1840,6 +1840,8 @@ export const en = {
       computer_away: "{{name}} can't answer now: the computer the plan is signed in on is away.",
       plan_limit: "{{name}} can't answer now: the plan reached its limit.",
       plan_not_shared: "{{name}} thinks with a plan that answers only its owner.",
+      runner_outdated: "{{name}} can't answer now: the program on the plan's computer needs an update.",
+      plan_tools: "{{name}} stopped before answering: the plan's AI on that computer offers tools of its own.",
       useKey: "Use an API key",
     },
     receipt: "Nobody will answer: no\u00a0AI connected",
@@ -11722,6 +11724,8 @@ export const en = {
       no_ai_computer_away: "I can't answer now: the computer my plan is signed in on is away.",
       no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
       no_ai_plan_not_shared: "I can't answer you on this plan: it answers only its owner.",
+      no_ai_runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
+      no_ai_plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
       action_connect_ai: "Connect an AI",
       action_connect_app: "Connect {{name}}",
       action_add_mcp: "Add an MCP server",

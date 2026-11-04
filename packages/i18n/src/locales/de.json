@@ -1738,7 +1738,7 @@
       "change": "Ändern",
       "planHelp": "Es zahlt, wem das Abo gehört. Ist sein Computer nicht erreichbar, sagt die Unterhaltung das und bietet einen API-Schlüssel an.",
       "plan": "Ein Abo",
-      "planOffer": "{{name}} kann statt mit einem API-Schlüssel mit deinem Claude-Abo denken, auf dem Computer, auf dem das Abo angemeldet ist, und erreicht dabei nur diesen Workspace.",
+      "planOffer": "{{name}} kann statt mit einem API-Schlüssel mit deinem Abo denken, auf dem Computer, auf dem das Abo angemeldet ist, und erreicht dabei nur diesen Workspace.",
       "usePlan": "Abo verwenden"
     },
     "card": {
@@ -1843,6 +1843,8 @@
       "computer_away": "{{name}} kann gerade nicht antworten: Der Computer, auf dem das Abo angemeldet ist, ist nicht erreichbar.",
       "plan_limit": "{{name}} kann gerade nicht antworten: Das Abo hat sein Limit erreicht.",
       "plan_not_shared": "{{name}} denkt mit einem Abo, das nur der Person antwortet, der es gehört.",
+      "runner_outdated": "{{name}} kann gerade nicht antworten: Das Programm auf dem Computer des Abos braucht ein Update.",
+      "plan_tools": "{{name}} hat vor der Antwort gestoppt: Die KI des Abos bietet auf diesem Computer eigene Werkzeuge an.",
       "useKey": "API-Schlüssel verwenden"
     },
     "receipt": "Niemand wird antworten: keine KI verbunden",
@@ -12225,6 +12227,8 @@
       "no_ai_computer_away": "Ich kann gerade nicht antworten: Der Computer, auf dem mein Abo angemeldet ist, ist nicht erreichbar.",
       "no_ai_plan_limit": "Ich kann gerade nicht antworten: Das Abo, mit dem ich denke, hat sein Limit erreicht.",
       "no_ai_plan_not_shared": "Über dieses Abo kann ich dir nicht antworten: Es antwortet nur der Person, der es gehört.",
+      "no_ai_runner_outdated": "Ich kann gerade nicht antworten: Das Programm auf dem Computer meines Abos braucht ein Update.",
+      "no_ai_plan_tools": "Ich habe vor der Antwort gestoppt: Die KI meines Abos bietet auf diesem Computer eigene Werkzeuge an.",
       "action_connect_ai": "KI verbinden",
       "action_connect_app": "{{name}} verbinden",
       "action_add_mcp": "Einen MCP-Server hinzufügen",
