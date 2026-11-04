@@ -374,7 +374,7 @@ function ConnectedRow({
     <div className="ac-list__row connected-row">
       <ConnectorIcon def={item.def} image={item.image} label={itemName(t, item)} size="lg" />
       <span className="list-col connected-row__text">
-        <span className="connected-row__name">
+        <span className="list-title">
           <span>{itemName(t, item)}</span>
           {item.needsReconnect ? (
             <Chip icon="alert" tone="waiting">
@@ -394,9 +394,7 @@ function ConnectedRow({
             </Chip>
           )}
         </span>
-        <span className="small muted" title={meta.join(" · ")}>
-          {meta.join(" · ")}
-        </span>
+        <span className="small muted">{meta.join(" · ")}</span>
         {adds && !item.needsReconnect && <span className="small muted">{adds}</span>}
       </span>
       <span className="connected-row__who small muted">

@@ -1334,6 +1334,24 @@ html:not([data-pointer]) .member-row--add:focus-visible {
   flex-direction: column;
 }
 /*
+ * A settings row's title line (a connector, a mailbox, a database, a computer, an AI app): the name and its pills.
+ * A pill is 22px, as tall as the line, so it never makes the line taller; the lines under it start one gap below,
+ * the gap a connected row keeps between its details, its agents and its buttons.
+ */
+:root {
+  --list-part-gap: 10px;
+}
+.list-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-weight: 600;
+}
+.list-title:not(:last-child) {
+  margin-block-end: var(--list-part-gap);
+}
+/*
  * A list row led by a face beside its two lines (a member: the name, the email): the face on the name's 22px line, as
  * an `.ac-iconline` lead (its own line is its initials'); what ends the row stays in its middle. A name alone (an
  * agent in Settings › Computers) stays centred with the rest of the row.
@@ -4294,36 +4312,27 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
 
 /* Settings → Conectores: one row per connected service. */
 /*
- * One grid for every connected row (service, email box, database): icon | name and details | who uses
- * it | actions, so the columns line up row after row. The details stay on one line ("…"). Narrow: the
- * agents and the actions go under the text, the same way on every row.
+ * One grid for every connected row (service, email box, database): the icon beside the name and details, then who
+ * uses it and the actions under them, one gap apart, the same way on every row. The details wrap whole, never cut.
+ * A row with no actions (someone who can't manage connectors) has room for who uses it beside the text when the
+ * list is wide; the actions never do: four or five buttons would leave the name a sliver.
  */
 .connected-list {
   container-type: inline-size;
 }
 .connected-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 10.5rem auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   column-gap: 16px;
-  row-gap: 10px;
+  row-gap: var(--list-part-gap);
 }
 .connected-row__text {
   min-width: 0;
-}
-.connected-row__text > .small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.connected-row__name {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .connected-row__who {
+  grid-column: 2;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4331,21 +4340,17 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   white-space: nowrap;
 }
 .connected-row__actions {
+  grid-column: 2;
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 6px;
 }
-@container (max-width: 720px) {
-  .connected-row {
-    grid-template-columns: auto minmax(0, 1fr);
+@container (width > 720px) {
+  .connected-row:not(:has(> .connected-row__actions)) {
+    grid-template-columns: auto minmax(0, 1fr) 10.5rem;
   }
-  .connected-row__who {
-    grid-column: 2;
-  }
-  .connected-row__actions {
-    grid-column: 2;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+  .connected-row:not(:has(> .connected-row__actions)) > .connected-row__who {
+    grid-column: auto;
   }
 }
 
@@ -7140,7 +7145,6 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
 .machine-row__main {
   flex: 1 1 260px;
   min-width: 0;
-  gap: 4px;
 }
 .machine-row__agents {
   display: inline-flex;

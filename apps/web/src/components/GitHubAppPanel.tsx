@@ -64,7 +64,7 @@ export function GitHubAppPanel() {
           {installations.map((i) => (
             <div key={i.id} className="ac-list__row connected-row">
               <span className="list-col connected-row__text">
-                <span className="connected-row__name">
+                <span className="list-title">
                   <span>{i.accountLogin}</span>
                   {i.suspended ? (
                     <Chip icon="waiting" tone="waiting">
