@@ -43,6 +43,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   onOpen,
   pinned = false,
   holdActions,
+  tinted = false,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -66,6 +67,8 @@ export const ConversationRowView = memo(function ConversationRowView({
   onOpen?: () => void;
   /** The long press's actions for iOS's own menu under the preview (`onHold`'s sheet elsewhere). */
   holdActions?: (row: ConversationRow) => RowAction[];
+  /** On the agent blue's soft tint (the right hand's row, ADR 0137). */
+  tinted?: boolean;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -278,6 +281,7 @@ export const ConversationRowView = memo(function ConversationRowView({
       accessibilityRole="button"
       accessibilityLabel={a11y}
       divider={divider}
+      {...(tinted ? { background: c.agentSoft } : {})}
       unread={r.unread > 0}
       leading={leading}
       title={name}

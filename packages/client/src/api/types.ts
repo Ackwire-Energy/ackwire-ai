@@ -2660,6 +2660,8 @@ export interface DirectMessage {
     authorType: string;
   } | null;
   unread: number;
+  /** False until this person first reads it (server side, so on every device): the right hand waves then. */
+  everRead?: boolean;
 }
 
 /**

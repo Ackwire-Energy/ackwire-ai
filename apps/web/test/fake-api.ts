@@ -269,11 +269,15 @@ export interface FakeState {
   autoReply: Record<string, boolean>;
   /** A channel's exceptions (ADR 0134), by channel id. */
   channelPermissions: Record<string, ChannelOverride[]>;
-  /** `unread`: its count (0 when unset); the last message is the channel's latest in `messages`. */
+  /**
+   * `unread`: its count (0 when unset); the last message is the channel's latest in `messages`. `everRead: false`:
+   * never read by me yet (`dms.markRead` sets it).
+   */
   dms: {
     channelId: string;
     with: { type: "person" | "agent"; id: string; name: string; handle: string | null };
     unread?: number;
+    everRead?: boolean;
   }[];
   calls: { method: string; args: unknown[] }[];
   context?: string;
@@ -3105,7 +3109,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return { channelId };
       },
-      markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
+      markRead: async (orgId, channelId) => {
+        log("dms.markRead", orgId, channelId);
+        const dm = state.dms.find((d) => d.channelId === channelId);
+        if (dm) dm.everRead = true;
+      },
       reads: async () => [],
     },
     reads: {

@@ -41,6 +41,10 @@ const Dm = z
     unread: z.number().openapi({
       description: "Messages since you last read it, not yours; an agent's sticker or GIF after its reply never.",
     }),
+    everRead: z.boolean().openapi({
+      description:
+        "False until you first read it (`POST …/channels/{channelId}/read`): the right hand waves on that first visit.",
+    }),
   })
   .openapi("DirectMessage");
 

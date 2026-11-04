@@ -57,13 +57,15 @@ Amended 2026-11-03: the first version let a greeting or small talk under the nee
 
 The onboarding asks only the workspace's name (its logo and time zone), in Lodi's face, finishes the workspace at once and opens Lodi's DM (`finishOnboarding`), on the web and the phone. A workspace left at any step of the older onboarding is finished and opened there. The top of Lodi's DM is drawn by the app, never stored, so it costs nothing and works before any AI is connected: its greeting, then its cards (`introCards`): Connect AI while there is none. With one, the start card (the ready-made agents, describing the need, an import or the form), for whoever may create agents: with no agent yet, or, while the person is the workspace's only member, the team is only ready-made agents and some are left, each tile its own Criar. With a team and nobody else yet, the next card under it (inviting people and the first task). Neither waits for the person, and none shows after. The workspace context and the computer, which the old onboarding asked for, are lines of the setup checklist.
 
+On a person's first visit to Lodi's DM (they never read it, on any device: no `channel_reads` row of theirs, `everRead` in the DM list), Lodi's waving sticker shows under the greeting: the agents' sticker drawn from its look (`wave`, drawn like a mood but never one anyone sends), playing once, still with reduced motion, decorative, never stored and with no model call. That visit marks the DM read, so the next one, after a message or not, has no wave.
+
 ### 7. Cost
 
 It runs on the workspace's AI through the Model Gateway like any agent: budget checked before each call, usage and cost recorded with `org_id` and its `agent_id`, and stopped by its own budget with the usual card. It never runs on Jev's or the platform's key; a message typed before any AI exists gets the standard no-AI card.
 
 ## Consequences
 
-- Every workspace gets one more agent row. Lists that count "the team" leave it out; its pinned row is its entry (the sidebar on the web, the top of Conversas on the phone), never Mensagens diretas or Agentes.
+- Every workspace gets one more agent row. Lists that count "the team" leave it out; its row is its entry: the first row of Agentes, where the agents' DMs live (the web sidebar and Conversas on the phone), on a soft tint of the agent blue with "seu braço direito", outside the section's sorting and pins, never dragged or hidden, and still shown while Agentes is closed (alone on top of Conversas while there is no Agentes section); never under Mensagens diretas.
 - `agents.coordinator` and its index stay in the database, read and written by nothing, until no running version selects them (`check:migrations`); a later migration drops them. Workspaces that had a coordinator get an ordinary agent back, and nothing is posted.
 - Stored decisions keep their strategy `rule:coordinator`, read as the default rule's line, and still count toward the per-channel cap for their hour.
 - `PATCH …/agents/{agentId}` ignores an incoming `coordinator` and answers 200, because phones without an over-the-air update still send it.
