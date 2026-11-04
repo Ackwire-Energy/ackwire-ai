@@ -24014,7 +24014,7 @@
     "value": "Database address"
   },
   "database.urlHelp": {
-    "value": "Starts with postgres://. Stored encrypted on the server. Nobody sees it again, not even the agents."
+    "value": "Starts with postgres://. The database name at the end is optional. Stored encrypted on the server. Nobody sees it again, not even the agents."
   },
   "database.urlPlaceholder": {
     "value": "postgres://user:password@host/db"
@@ -32118,5 +32118,116 @@
   },
   "taskManager.agentPanel.none": {
     "value": "{{name}} is free now."
+  },
+  "database.scope": {
+    "value": "Which databases"
+  },
+  "database.scopeOne": {
+    "value": "Just this database"
+  },
+  "database.scopeAll": {
+    "value": "Every database on this server"
+  },
+  "database.scopeAllHelp": {
+    "value": "For one database per customer. Agents see the list and pick the database in each query."
+  },
+  "database.prefix": {
+    "value": "Only names starting with"
+  },
+  "database.prefixPlaceholder": {
+    "value": "E.g. customer_"
+  },
+  "database.prefixHelp": {
+    "value": "Leave empty for all. New databases starting this way show up on their own."
+  },
+  "database.databaseOptional": {
+    "value": "Optional for every database."
+  },
+  "database.testing.databases": {
+    "value": "Looking at the databases…"
+  },
+  "database.error.no_databases": {
+    "value": "This user can't open any database on this server. Check its permissions or the start of the name."
+  },
+  "database.connectedToastAll": {
+    "value": {
+      "one": "{{name}} connected with {{count}} database.",
+      "other": "{{name}} connected with {{count}} databases."
+    }
+  },
+  "database.howAll": {
+    "value": "To read every database (Postgres 14 or newer)."
+  },
+  "database.count": {
+    "value": {
+      "one": "{{count}} database",
+      "other": "{{count}} databases"
+    }
+  },
+  "database.prefixRow": {
+    "value": "databases starting with {{prefix}}"
+  },
+  "database.refresh": {
+    "value": "Refresh list"
+  },
+  "database.refreshName": {
+    "value": "Refresh the list of databases of {{name}}"
+  },
+  "database.rule.databases": {
+    "value": "Databases"
+  },
+  "database.rule.databasesAll": {
+    "value": "All"
+  },
+  "database.rule.databasesSome": {
+    "value": "Only these"
+  },
+  "database.rule.databasePlaceholder": {
+    "value": "Database name"
+  },
+  "database.rule.databasesHelp": {
+    "value": "The rules below apply to every database this agent reads."
+  },
+  "database.rule.tablesIn": {
+    "value": "Tables (seen in {{database}})"
+  },
+  "database.rule.capHelpAll": {
+    "value": "Empty = no limit. Counted across every database."
+  },
+  "database.agent.allDatabases": {
+    "value": "Every database of {{name}}"
+  },
+  "database.agent.someDatabases": {
+    "value": {
+      "one": "{{count}} database of {{name}}",
+      "other": "{{count}} databases of {{name}}"
+    }
+  },
+  "database.scopeEdit": {
+    "value": "Databases"
+  },
+  "database.scopeEditName": {
+    "value": "Databases of {{name}}"
+  },
+  "database.scopeSaved": {
+    "value": "{{name}} saved."
+  },
+  "database.widenTitle": {
+    "value": "Open the whole server?"
+  },
+  "database.widenTitlePrefix": {
+    "value": "Open more databases?"
+  },
+  "database.widenText": {
+    "value": {
+      "one": "The agent with access will read every database on this server. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database on this server. You can limit it per agent in Rules."
+    }
+  },
+  "database.widenTextPrefix": {
+    "value": {
+      "one": "The agent with access will read every database starting with {{prefix}}. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database starting with {{prefix}}. You can limit it per agent in Rules."
+    }
   }
 }

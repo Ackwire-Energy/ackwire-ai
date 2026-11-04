@@ -9526,7 +9526,7 @@
     "nameHelp": "Nama database yang tampil untukmu dan untuk agen.",
     "namePlaceholder": "Mis.: Produksi",
     "url": "Alamat database",
-    "urlHelp": "Diawali postgres://. Disimpan terenkripsi di server. Tidak ada yang bisa melihatnya lagi, termasuk agen.",
+    "urlHelp": "Diawali postgres://. Nama database di akhir boleh dikosongkan. Disimpan terenkripsi di server. Tidak ada yang melihatnya lagi, termasuk agen.",
     "urlPlaceholder": "postgres://user:sandi@host/db",
     "urlInvalid": "Tempel alamat yang diawali postgres://, atau isi kolom di bagian Lanjutan.",
     "howTitle": "Bagaimana cara membuat pengguna hanya baca?",
@@ -9579,13 +9579,15 @@
       "unreachable": "Kami tidak bisa menjangkau server database. Periksa alamatnya dan apakah server menerima koneksi dari luar.",
       "blocked_host": "Server ini tidak diizinkan. Pakai alamat publik database (alamat internal, seperti DATABASE_URL di Railway, tidak bisa dipakai dari sini).",
       "tls": "Database tidak menerima koneksi aman. Aktifkan SSL di database, atau pilih Tanpa enkripsi di bagian Lanjutan (hanya untuk database uji coba).",
-      "unknown": "Tidak bisa terhubung sekarang. Coba lagi sebentar lagi."
+      "unknown": "Tidak bisa terhubung sekarang. Coba lagi sebentar lagi.",
+      "no_databases": "Pengguna ini tidak bisa membuka database apa pun di server ini. Periksa izinnya atau awalan namanya."
     },
     "connect": "Hubungkan",
     "connectedToast": "{{name}} terhubung.",
     "testing": {
       "reach": "Menghubungi database…",
-      "tables": "Melihat tabel…"
+      "tables": "Melihat tabel…",
+      "databases": "Melihat database…"
     },
     "canWrite": "User ini bisa mengubah data. Agen tetap hanya membaca, tapi yang paling aman adalah user hanya baca (lihat cara membuatnya di langkah 1).",
     "toolsLead": "Apa yang bisa dilakukan agen di {{name}}. Untuk saat ini mereka hanya membaca: tidak ada yang diubah di database.",
@@ -9632,15 +9634,45 @@
       "capHelp": "Kosong = tanpa batas.",
       "timeout": "Batas waktu per query",
       "timeoutHelp": "Query yang lebih lama dibatalkan, supaya tidak membebani database.",
-      "seconds_other": "{{count}} detik"
+      "seconds_other": "{{count}} detik",
+      "databases": "Database",
+      "databasesAll": "Semua",
+      "databasesSome": "Hanya ini",
+      "databasePlaceholder": "Nama database",
+      "databasesHelp": "Aturan di bawah berlaku untuk setiap database yang dibaca agen ini.",
+      "tablesIn": "Tabel (terlihat di {{database}})",
+      "capHelpAll": "Kosong = tanpa batas. Dihitung dari semua database."
     },
     "agent": {
       "title": "Database",
       "help": "Database yang dihubungkan {{org}}. Agen hanya membaca.",
       "levelText": "Menjalankan query ke tabel yang diizinkan aturan, hanya baca.",
       "rulesOf": "Aturan di {{name}}",
-      "saved": "Akses database {{name}} tersimpan."
-    }
+      "saved": "Akses database {{name}} tersimpan.",
+      "allDatabases": "Semua database {{name}}",
+      "someDatabases_other": "{{count}} database {{name}}"
+    },
+    "scope": "Database mana",
+    "scopeOne": "Hanya database ini",
+    "scopeAll": "Semua database di server ini",
+    "scopeAllHelp": "Untuk satu database per pelanggan. Agen melihat daftarnya dan memilih database di setiap kueri.",
+    "prefix": "Hanya nama yang diawali",
+    "prefixPlaceholder": "Mis. pelanggan_",
+    "prefixHelp": "Kosongkan untuk semua. Database baru dengan awalan ini muncul sendiri.",
+    "databaseOptional": "Opsional untuk semua database.",
+    "connectedToastAll_other": "{{name}} terhubung dengan {{count}} database.",
+    "howAll": "Untuk membaca semua database (Postgres 14 atau lebih baru).",
+    "count_other": "{{count}} database",
+    "prefixRow": "database yang diawali {{prefix}}",
+    "refresh": "Muat ulang daftar",
+    "refreshName": "Muat ulang daftar database {{name}}",
+    "scopeEdit": "Database",
+    "scopeEditName": "Database {{name}}",
+    "scopeSaved": "{{name}} disimpan.",
+    "widenTitle": "Buka seluruh server?",
+    "widenTitlePrefix": "Buka lebih banyak database?",
+    "widenText_other": "{{count}} agen yang punya akses akan membaca semua database di server ini. Kamu bisa membatasinya per agen di Aturan.",
+    "widenTextPrefix_other": "{{count}} agen yang punya akses akan membaca semua database yang diawali {{prefix}}. Kamu bisa membatasinya per agen di Aturan."
   },
   "mail": {
     "choice": {

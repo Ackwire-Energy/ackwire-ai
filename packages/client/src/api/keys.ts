@@ -220,7 +220,10 @@ export const keys = {
   /** Every database read (prefix). */
   databases: (orgId: string) => ["org", orgId, "databases"] as const,
   databaseList: (orgId: string) => ["org", orgId, "databases", "list"] as const,
-  databaseTables: (orgId: string, connectionId: string) => ["org", orgId, "databases", "tables", connectionId] as const,
+  databaseTables: (orgId: string, connectionId: string, database = "") =>
+    ["org", orgId, "databases", "tables", connectionId, database] as const,
+  serverDatabases: (orgId: string, connectionId: string) =>
+    ["org", orgId, "databases", "server", connectionId] as const,
   agentDatabases: (orgId: string, agentId: string) => ["org", orgId, "databases", "agent", agentId] as const,
   /** The agent browser (ADR 0040): an agent's settings, its open request on each screen, one request (prefix). */
   browser: (orgId: string) => ["org", orgId, "browser"] as const,

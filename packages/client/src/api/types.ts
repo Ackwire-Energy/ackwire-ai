@@ -6274,7 +6274,14 @@ export interface DatabaseConnection {
   provider: DatabaseProvider;
   host: string;
   port: number;
+  /** On a whole server, the sample database (where the rules' tables come from). */
   database: string;
+  /** Agents read every database of the server, one per call. */
+  wholeServer: boolean;
+  /** Whole server: only the databases whose names start with this; null = every one. */
+  databasePrefix: string | null;
+  /** Whole server: how many databases agents see, when read in the last minutes; else null. */
+  databaseCount: number | null;
   username: string;
   sslmode: "require" | "disable";
   status: "active" | "needs_reconnect";
@@ -6290,7 +6297,7 @@ export interface DatabaseConnection {
 }
 
 /** Why a database didn't connect (`422 { error }`). */
-export type DatabaseConnectError = "auth" | "unreachable" | "blocked_host" | "tls" | "unknown";
+export type DatabaseConnectError = "auth" | "unreachable" | "blocked_host" | "tls" | "no_databases" | "unknown";
 
 export interface DatabaseConnectionInput {
   label?: string;
@@ -6303,6 +6310,10 @@ export interface DatabaseConnectionInput {
   username?: string;
   password?: string;
   sslmode?: "require" | "disable";
+  /** Every database of the server; the database, if given, is where the rules' tables come from. */
+  wholeServer?: boolean;
+  /** Whole server: only the databases whose names start with this. */
+  databasePrefix?: string;
 }
 
 export interface DatabaseTable {
@@ -6322,6 +6333,8 @@ export interface DatabasePolicy {
   dailyQueryCap: number | null;
   /** Each query is cancelled past this. */
   timeoutSeconds: number;
+  /** Whole-server connections: the only databases it reads; absent or empty = every one. */
+  databases?: string[];
 }
 
 /** An agent's access to one database. */

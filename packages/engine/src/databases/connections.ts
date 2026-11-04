@@ -8,7 +8,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
-import { caches } from "../cache";
+import { caches, TtlCache } from "../cache";
 import { openSecret, sealSecret } from "../crypto";
 import { ConflictError, NotFoundError, ValidationError } from "../errors";
 import { publicHostAddress, type ResolveHost, resolveHostDns } from "../net-guard";
@@ -43,7 +43,7 @@ export const DB_PROVIDERS = ["supabase", "neon", "railway", "rds", "render", "ot
 export type DbProvider = (typeof DB_PROVIDERS)[number];
 
 /** Why a connection test failed. */
-export type DbTestError = "auth" | "unreachable" | "blocked_host" | "tls" | "unknown";
+export type DbTestError = "auth" | "unreachable" | "blocked_host" | "tls" | "no_databases" | "unknown";
 
 export interface DatabaseConnectionView {
   id: string;
@@ -51,7 +51,14 @@ export interface DatabaseConnectionView {
   provider: DbProvider;
   host: string;
   port: number;
+  /** On a whole-server connection, the sample database (where the rules' tables come from). */
   database: string;
+  /** Agents read every database of the server, one per call. */
+  wholeServer: boolean;
+  /** Whole server: only the databases whose names start with this; null = every one. */
+  databasePrefix: string | null;
+  /** Whole server: how many databases agents see, when the list was read in the last minutes; else null. */
+  databaseCount: number | null;
   username: string;
   sslmode: "require" | "disable";
   status: "active" | "needs_reconnect";
@@ -76,6 +83,9 @@ export function dbConnectionView(row: DbConnectionRow, agentIds?: Set<string>): 
     host: row.host,
     port: row.port,
     database: row.database,
+    wholeServer: row.wholeServer,
+    databasePrefix: row.databasePrefix,
+    databaseCount: row.wholeServer ? (discovered.get(discoveryKey(row))?.length ?? null) : null,
     username: row.username,
     sslmode: row.sslmode === "disable" ? "disable" : "require",
     status: row.status === "needs_reconnect" ? "needs_reconnect" : "active",
@@ -158,16 +168,25 @@ export interface DatabaseConnectionInput {
   username?: string;
   password?: string;
   sslmode?: "require" | "disable";
+  /** Every database of the server (one per call); the database, if given, is where the rules' tables come from. */
+  wholeServer?: boolean;
+  /** Whole server: only the databases whose names start with this. */
+  databasePrefix?: string;
 }
 
 interface Settings {
   host: string;
   port: number;
+  /** Whole server: "" when none was given (an entry database is picked when connecting). */
   database: string;
   username: string;
   password: string;
   sslmode: "require" | "disable";
+  wholeServer: boolean;
+  databasePrefix: string | null;
 }
+
+type Address = Omit<Settings, "wholeServer" | "databasePrefix">;
 
 /** The address and fields as one set of settings; throws on anything missing or malformed. */
 export function databaseSettings(input: DatabaseConnectionInput, fallback?: Partial<Settings>): Settings {
@@ -199,7 +218,9 @@ export function databaseSettings(input: DatabaseConnectionInput, fallback?: Part
     .trim()
     .toLowerCase();
   const port = Number(pick("port") ?? 5432);
-  const database = String(pick("database") ?? "").trim() || "postgres";
+  const wholeServer = input.wholeServer ?? fallback?.wholeServer ?? false;
+  const database = String(pick("database") ?? "").trim() || (wholeServer ? "" : "postgres");
+  const prefix = wholeServer ? (input.databasePrefix ?? fallback?.databasePrefix ?? "").trim() : "";
   const username = String(pick("username") ?? "").trim();
   const password = String(pick("password") ?? "");
   const sslmode = pick("sslmode") === "disable" ? "disable" : "require";
@@ -207,9 +228,9 @@ export function databaseSettings(input: DatabaseConnectionInput, fallback?: Part
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new ValidationError("Invalid port", "database.port");
   if (!username) throw new ValidationError("Give the database user", "database.user_required");
   if (!password) throw new ValidationError("Give the database password", "database.password_required");
-  if (host.length > 253 || database.length > 63 || username.length > 63)
+  if (host.length > 253 || database.length > 63 || username.length > 63 || prefix.length > 63)
     throw new ValidationError("Too long", "database.too_long");
-  return { host, port, database, username, password, sslmode };
+  return { host, port, database, username, password, sslmode, wholeServer, databasePrefix: prefix || null };
 }
 
 // ── Opening ─────────────────────────────────────────────────────────────────
@@ -256,11 +277,12 @@ const driverOf = (deps: Pick<DatabaseDeps, "databases">) => {
 /** Where to connect for these settings: a checked public address, or why not. */
 async function targetFor(
   deps: DatabaseDeps,
-  s: Settings,
+  s: Address,
 ): Promise<{ ok: true; target: DatabaseTarget } | { ok: false; error: DbTestError }> {
   const r = await publicHostAddress(s.host, deps.resolveHost ?? resolveHostDns);
   if (!r.ok) return { ok: false, error: r.reason === "blocked" ? "blocked_host" : "unreachable" };
-  return { ok: true, target: { ...s, address: r.address } };
+  const { host, port, database, username, password, sslmode } = s;
+  return { ok: true, target: { host, port, database, username, password, sslmode, address: r.address } };
 }
 
 const testErrorOf = (error: unknown): DbTestError => {
@@ -276,13 +298,15 @@ export interface DatabaseTestResult {
   tables: number;
   canWrite: boolean;
   suggestedHidden: string[];
+  /** Whole server: the sample database read, and every database found. */
+  database?: string;
+  databases?: string[];
 }
 
+type Tested = { ok: true; result: DatabaseTestResult } | { ok: false; error: DbTestError };
+
 /** Connects, reads the version, counts the tables, and checks whether the user can change data. */
-async function testSettings(
-  deps: DatabaseDeps,
-  s: Settings,
-): Promise<{ ok: true; result: DatabaseTestResult } | { ok: false; error: DbTestError }> {
+async function testDatabase(deps: DatabaseDeps, s: Address): Promise<Tested> {
   const t = await targetFor(deps, s);
   if (!t.ok) return t;
   let client: DatabaseClient | null = null;
@@ -302,6 +326,70 @@ async function testSettings(
   }
 }
 
+/**
+ * The databases of a server the role can open (`$1`: a name prefix, '' = all). `pg_database` is shared,
+ * so any database of the server lists them all.
+ */
+export const DATABASES_SQL = `select datname from pg_database
+where not datistemplate and datallowconn
+  and has_database_privilege(datname, 'CONNECT')
+  and ($1::text = '' or starts_with(datname, $1::text))
+order by 1 limit 2000`;
+
+/** Where to read the list when the given database is gone or closed to the role. */
+const ENTRY_DATABASES = ["postgres", "template1"];
+const missingOrDenied = (error: unknown) =>
+  error instanceof DatabaseError && (error.sqlState === "3D000" || error.sqlState === "42501");
+
+async function readDatabases(run: DatabaseRun, prefix: string | null) {
+  return (await run(DATABASES_SQL, [prefix ?? ""])).rows.map((r) => String(r[0]));
+}
+
+/**
+ * Tries each entry database in turn (the next only when one doesn't exist or can't be opened), returning what
+ * `read` returns from the first that works.
+ */
+async function fromEntry<T>(entries: string[], read: (database: string) => Promise<T>): Promise<T> {
+  const list = [...new Set(entries)];
+  for (const [i, database] of list.entries()) {
+    try {
+      return await read(database);
+    } catch (error) {
+      if (i === list.length - 1 || !missingOrDenied(error)) throw error;
+    }
+  }
+  throw new Error("no entry database");
+}
+
+/**
+ * Whole server: lists the databases from an entry database, then runs the usual test on the sample (the
+ * database given, else the first found).
+ */
+async function testSettings(deps: DatabaseDeps, s: Settings): Promise<Tested> {
+  if (!s.wholeServer) return testDatabase(deps, s);
+  const t = await targetFor(deps, s);
+  if (!t.ok) return t;
+  let databases: string[];
+  try {
+    databases = await fromEntry([s.database, ...ENTRY_DATABASES].filter(Boolean), async (database) => {
+      const client = await driverOf(deps).open({ ...t.target, database });
+      try {
+        return await client.readOnly(CATALOG_LIMITS, (run) => readDatabases(run, s.databasePrefix));
+      } finally {
+        await client.close().catch(() => {});
+      }
+    });
+  } catch (error) {
+    return { ok: false, error: testErrorOf(error) };
+  }
+  // The database given is only an entry when agents can't read it (outside the prefix, no CONNECT): the rules'
+  // tables and sensitive columns come from one they can.
+  const sample = s.database && databases.includes(s.database) ? s.database : databases[0];
+  if (!sample) return { ok: false, error: "no_databases" };
+  const tested = await testDatabase(deps, { ...s, database: sample });
+  return tested.ok ? { ok: true, result: { ...tested.result, database: sample, databases } } : tested;
+}
+
 async function sensitiveColumns(run: DatabaseRun) {
   const rows = (await run(COLUMNS_SQL)).rows;
   return rows
@@ -310,9 +398,16 @@ async function sensitiveColumns(run: DatabaseRun) {
     .slice(0, 200);
 }
 
-/** Pooled clients (one per connection version), closed after 5 minutes unused; re-resolved when reopened. */
-const clients = new Map<string, { key: string; client: Promise<DatabaseClient>; usedAt: number }>();
+/**
+ * Pooled clients, one per (connection, database) at the connection's current version, closed after 5 minutes
+ * unused; re-resolved when reopened. A whole-server connection keeps at most `MAX_POOLS_PER_CONNECTION` open
+ * (2 sockets each), closing the least recently used.
+ */
+const clients = new Map<string, { version: number; client: Promise<DatabaseClient>; usedAt: number }>();
 const IDLE_MS = 5 * 60_000;
+export const MAX_POOLS_PER_CONNECTION = 8;
+const poolKey = (connectionId: string, database: string) => `${connectionId}|${database}`;
+const closeClient = (c: { client: Promise<DatabaseClient> }) => void c.client.then((x) => x.close()).catch(() => {});
 
 async function passwordOf(deps: DatabaseDeps, row: DbConnectionRow) {
   return openSecret(
@@ -322,27 +417,40 @@ async function passwordOf(deps: DatabaseDeps, row: DbConnectionRow) {
   );
 }
 
-/** A client for a connection (backend only), from the pool. */
-export async function clientFor(deps: DatabaseDeps, row: DbConnectionRow): Promise<DatabaseClient> {
+/** A client for one database of a connection (backend only; its own database by default), from the pool. */
+export async function clientFor(
+  deps: DatabaseDeps,
+  row: DbConnectionRow,
+  database = row.database,
+): Promise<DatabaseClient> {
   const now = Date.now();
-  for (const [id, c] of clients) {
+  for (const [k, c] of clients) {
     if (now - c.usedAt > IDLE_MS) {
-      clients.delete(id);
-      void c.client.then((x) => x.close()).catch(() => {});
+      clients.delete(k);
+      closeClient(c);
     }
   }
-  const key = `${row.id}:${row.updatedAt.getTime()}`;
-  const cached = clients.get(row.id);
-  if (cached?.key === key) {
+  const key = poolKey(row.id, database);
+  const version = row.updatedAt.getTime();
+  const cached = clients.get(key);
+  if (cached?.version === version) {
     cached.usedAt = now;
     return cached.client;
   }
-  if (cached) void cached.client.then((x) => x.close()).catch(() => {});
+  if (cached) {
+    clients.delete(key);
+    closeClient(cached);
+  }
+  const mine = [...clients].filter(([k]) => k.startsWith(`${row.id}|`)).sort((a, b) => a[1].usedAt - b[1].usedAt);
+  for (const [k, c] of mine.slice(0, Math.max(0, mine.length - MAX_POOLS_PER_CONNECTION + 1))) {
+    clients.delete(k);
+    closeClient(c);
+  }
   const client = (async () => {
-    const s: Settings = {
+    const s: Address = {
       host: row.host,
       port: row.port,
-      database: row.database,
+      database,
       username: row.username,
       password: await passwordOf(deps, row),
       sslmode: row.sslmode === "disable" ? "disable" : "require",
@@ -355,16 +463,63 @@ export async function clientFor(deps: DatabaseDeps, row: DbConnectionRow): Promi
       );
     return driverOf(deps).open(t.target);
   })();
-  clients.set(row.id, { key, client, usedAt: now });
-  client.catch(() => clients.get(row.id)?.client === client && clients.delete(row.id));
+  clients.set(key, { version, client, usedAt: now });
+  client.catch(() => clients.get(key)?.client === client && clients.delete(key));
   return client;
 }
 
-/** Forgets a connection's pooled client (disconnect, new password). */
+/** Forgets a connection's pooled clients, one per database it read (disconnect, new password). */
 export function dropClient(connectionId: string) {
-  const c = clients.get(connectionId);
-  clients.delete(connectionId);
-  void c?.client.then((x) => x.close()).catch(() => {});
+  for (const [k, c] of clients) {
+    if (!k.startsWith(`${connectionId}|`)) continue;
+    clients.delete(k);
+    closeClient(c);
+  }
+}
+
+/** The pools open for a connection, by database (tests). */
+export const openPools = (connectionId: string) =>
+  [...clients.keys()].filter((k) => k.startsWith(`${connectionId}|`)).map((k) => k.slice(connectionId.length + 1));
+
+// ── A whole server's databases ──────────────────────────────────────────────
+
+/**
+ * The databases a whole-server connection sees, kept 5 minutes per connection version. Never stored in the row:
+ * writing it would change `updated_at`, the pools' version, and reopen every pool.
+ */
+const discovered = new TtlCache<string[]>(5 * 60_000, 1000);
+const discoveryKey = (row: Pick<DbConnectionRow, "id" | "updatedAt">) => `${row.id}:${row.updatedAt.getTime()}`;
+const reloadedAt = new Map<string, number>();
+const RELOAD_MS = 60_000;
+
+/** The databases of a whole-server connection (the cached list unless `refresh`). */
+export async function serverDatabases(
+  deps: DatabaseDeps,
+  row: DbConnectionRow,
+  options: { refresh?: boolean } = {},
+): Promise<string[]> {
+  const key = discoveryKey(row);
+  const hit = options.refresh ? undefined : discovered.get(key);
+  if (hit) return hit;
+  // The sample database first; if it was dropped, the server's usual ones.
+  const names = await fromEntry([row.database, ...ENTRY_DATABASES], async (database) => {
+    const client = await clientFor(deps, row, database);
+    return client.readOnly(CATALOG_LIMITS, (run) => readDatabases(run, row.databasePrefix));
+  });
+  discovered.set(key, names);
+  return names;
+}
+
+/**
+ * Whether `name` is one of the connection's databases; a name not in the list reloads it once (at most once a
+ * minute per connection) before saying no, so a customer's new database shows up without waiting.
+ */
+export async function isServerDatabase(deps: DatabaseDeps, row: DbConnectionRow, name: string) {
+  if ((await serverDatabases(deps, row)).includes(name)) return true;
+  const now = Date.now();
+  if (now - (reloadedAt.get(row.id) ?? 0) < RELOAD_MS) return false;
+  reloadedAt.set(row.id, now);
+  return (await serverDatabases(deps, row, { refresh: true })).includes(name);
 }
 
 // ── Changes ─────────────────────────────────────────────────────────────────
@@ -390,16 +545,19 @@ export async function createDatabaseConnection(
   const id = crypto.randomUUID();
   const sealed = await sealSecret(wrapper, s.password, aadFor(orgId, id));
   const provider = (DB_PROVIDERS as readonly string[]).includes(input.provider ?? "") ? input.provider : "other";
+  const database = tested.result.database ?? s.database;
   const [row] = await deps.db
     .insert(dbConnections)
     .values({
       id,
       orgId,
-      label: input.label?.trim().slice(0, 80) || s.database,
+      label: input.label?.trim().slice(0, 80) || (s.wholeServer ? s.host : s.database),
       provider,
       host: s.host,
       port: s.port,
-      database: s.database,
+      database,
+      wholeServer: s.wholeServer,
+      databasePrefix: s.databasePrefix,
       username: s.username,
       sslmode: s.sslmode,
       secretCiphertext: sealed.ciphertext,
@@ -412,17 +570,27 @@ export async function createDatabaseConnection(
     })
     .returning();
   if (!row) throw new Error("database connection insert returned nothing");
+  if (tested.result.databases) discovered.set(discoveryKey(row), tested.result.databases);
   await recordAudit(deps.db, {
     orgId,
     actor: { type: "person", id: actorId },
     action: "database.connected",
     target: { type: "db_connection", id },
-    details: { host: s.host, database: s.database, username: s.username, canWrite: tested.result.canWrite },
+    details: {
+      host: s.host,
+      database,
+      username: s.username,
+      canWrite: tested.result.canWrite,
+      ...wholeServerDetails(s, tested.result),
+    },
   });
   return { ok: true, connection: dbConnectionView(row) };
 }
 
-/** Renames, turns tools on or off, or (tested first) replaces the address or password. */
+const wholeServerDetails = (s: Settings, result: DatabaseTestResult) =>
+  s.wholeServer ? { wholeServer: true, prefix: s.databasePrefix, databases: result.databases?.length ?? 0 } : {};
+
+/** Renames, turns tools on or off, or (tested first) replaces the address or password or which databases it reads. */
 export async function updateDatabaseConnection(
   deps: DatabaseDeps,
   actorId: string,
@@ -433,14 +601,19 @@ export async function updateDatabaseConnection(
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const row = await loadDbConnection(deps.db, orgId, connectionId);
   const set: Partial<typeof dbConnections.$inferInsert> = {};
-  if (input.label !== undefined) set.label = input.label.trim().slice(0, 80) || row.database;
+  if (input.label !== undefined)
+    set.label = input.label.trim().slice(0, 80) || (row.wholeServer ? row.host : row.database);
   if (input.offActions !== undefined) {
     const unknown = input.offActions.filter((a) => !(DB_ACTIONS as readonly string[]).includes(a));
     if (unknown.length > 0) throw new ValidationError(`Unknown actions: ${unknown.join(", ")}`, "database.action");
     set.offActions = [...new Set(input.offActions)];
   }
   const reconnect = [input.url, input.host, input.port, input.database, input.username, input.password, input.sslmode];
-  if (reconnect.some((v) => v !== undefined)) {
+  const scopeChanged =
+    (input.wholeServer !== undefined && input.wholeServer !== row.wholeServer) ||
+    (input.databasePrefix !== undefined && (input.databasePrefix.trim() || null) !== row.databasePrefix);
+  let tested: DatabaseTestResult | null = null;
+  if (scopeChanged || reconnect.some((v) => v !== undefined)) {
     const s = databaseSettings(input, {
       host: row.host,
       port: row.port,
@@ -448,38 +621,48 @@ export async function updateDatabaseConnection(
       username: row.username,
       password: input.password ?? (input.url ? undefined : await passwordOf(deps, row)),
       sslmode: row.sslmode === "disable" ? "disable" : "require",
+      wholeServer: row.wholeServer,
+      databasePrefix: row.databasePrefix,
     });
-    const tested = await testSettings(deps, s);
-    if (!tested.ok) return tested;
+    const test = await testSettings(deps, s);
+    if (!test.ok) return test;
+    tested = test.result;
     const wrapper = deps.keyWrappers[0];
     if (!wrapper) throw new Error("no key wrapper");
     const sealed = await sealSecret(wrapper, s.password, aadFor(orgId, row.id));
     Object.assign(set, {
       host: s.host,
       port: s.port,
-      database: s.database,
+      database: tested.database ?? s.database,
+      wholeServer: s.wholeServer,
+      databasePrefix: s.databasePrefix,
       username: s.username,
       sslmode: s.sslmode,
       secretCiphertext: sealed.ciphertext,
       wrappedDataKey: sealed.wrappedDataKey,
       kekId: sealed.kekId,
-      canWrite: tested.result.canWrite,
+      canWrite: tested.canWrite,
       status: "active",
       lastError: null,
     });
     dropClient(row.id);
   }
   if (Object.keys(set).length > 0) {
+    const updatedAt = new Date();
     await deps.db
       .update(dbConnections)
-      .set({ ...set, updatedAt: new Date() })
+      .set({ ...set, updatedAt })
       .where(eq(dbConnections.id, row.id));
+    if (tested?.databases) discovered.set(discoveryKey({ id: row.id, updatedAt }), tested.databases);
     if (set.secretCiphertext) {
       await recordAudit(deps.db, {
         orgId,
         actor: { type: "person", id: actorId },
         action: "database.reconnected",
         target: { type: "db_connection", id: row.id },
+        ...(set.wholeServer
+          ? { details: { wholeServer: true, prefix: set.databasePrefix, databases: tested?.databases?.length ?? 0 } }
+          : {}),
       });
     }
   }
@@ -529,11 +712,20 @@ export interface DatabaseTable {
   rowsEstimate: number;
 }
 
-/** A database's tables (agents' rules picker) (admins). */
-export async function listDatabaseTables(deps: DatabaseDeps, actorId: string, orgId: string, connectionId: string) {
+/** A database's tables (agents' rules picker) (admins); on a whole server, of `database` (default: the sample). */
+export async function listDatabaseTables(
+  deps: DatabaseDeps,
+  actorId: string,
+  orgId: string,
+  connectionId: string,
+  database?: string,
+) {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
   const row = await loadDbConnection(deps.db, orgId, connectionId);
-  const client = await clientFor(deps, row);
+  const which = row.wholeServer && database ? database : row.database;
+  if (which !== row.database && !(await isServerDatabase(deps, row, which)))
+    throw new NotFoundError("Database not found", "database.not_found");
+  const client = await clientFor(deps, row, which);
   const rows = await client.readOnly(CATALOG_LIMITS, async (run) => (await run(LIST_TABLES_SQL)).rows);
   return rows.map(
     (r): DatabaseTable => ({
@@ -543,6 +735,20 @@ export async function listDatabaseTables(deps: DatabaseDeps, actorId: string, or
       rowsEstimate: Number(r[3] ?? 0),
     }),
   );
+}
+
+/** A whole-server connection's databases (agents' rules picker) (admins); `refresh` reads the list again. */
+export async function listServerDatabases(
+  deps: DatabaseDeps,
+  actorId: string,
+  orgId: string,
+  connectionId: string,
+  options: { refresh?: boolean } = {},
+) {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const row = await loadDbConnection(deps.db, orgId, connectionId);
+  if (!row.wholeServer) return [row.database];
+  return serverDatabases(deps, row, options);
 }
 
 /** Every database connection id of an org, connected or not (grants on them are managed only by the database API). */
