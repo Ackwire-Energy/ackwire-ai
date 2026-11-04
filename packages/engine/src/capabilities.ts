@@ -26,6 +26,7 @@ const GROUPS: Record<string, string> = {
   sandbox: "Code",
   browser: "Browser",
   setup: "Workspace setup",
+  vault: "Vault",
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",
@@ -178,6 +179,7 @@ export function describeCapabilities(
     if (names.has("desktop_do")) {
       lines.push(DESKTOP_GUIDANCE);
     }
+    if (names.has("vault_list")) lines.push(VAULT_GUIDANCE);
     if (loaded.has("schedule_reminder")) {
       lines.push(
         "- You can schedule reminders and routines: `schedule_reminder` (once, in the time zone of whoever asked) and `create_routine` (recurring; with `channel` it posts straight to that channel, not to this conversation). To change a routine that already exists (instructions, time, where it answers), use `list_routines` and `update_routine`, also when the person describes the change as how you handle something a routine does ('quando entrar um erro…'); never say it can't be changed. Confirm the time with the words the tool returns; if the time is ambiguous, ask first with `ask_user`. A routine works while nobody watches, with everything you can use, and speaks only when there is news (`report` when_new); set `report` always when people want a report every time.",
@@ -279,3 +281,10 @@ export function forComputerBrain(system: string) {
 /** Where a computer brain reads what changes per conversation and per turn (`conversationText`, `thisTurnText`). */
 export const COMPUTER_SECTIONS_LINE =
   '"# This turn" and "# This conversation" in your messages come from agentes.chat, not from a person: what holds for this turn, and for this whole conversation.';
+
+/**
+ * The Vault (ADR 0135): what people saved for the agent, found before asking them, and used without the agent ever
+ * seeing a password or a key.
+ */
+export const VAULT_GUIDANCE =
+  "- The Vault holds logins, keys and contact details people saved for you. Before asking a person for a password, a key or contact details (an address, a tax id), look there with `vault_list`. Sign in with a saved login by a `type_secret` step (or `browser_type_secret`) with its `login` id in the password field, and type its username yourself with a `fill` step. Give a saved key to a command only through `run_code`'s `keys` (by its variable name): set for that one command, it never reaches any other shell. Contact details aren't secret: read them and type them. When nothing there fits, ask with `request_secret`: its card lets the person save it to the Vault for next time. You never see a password or a key, so never ask anyone to tell you one.";

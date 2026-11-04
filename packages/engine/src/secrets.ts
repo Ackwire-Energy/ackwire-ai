@@ -43,6 +43,10 @@ export interface SecretRequestView {
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
   site: string | null;
+  /** A site password's username, when the agent gave it: the card shows it and saves it to the Vault (ADR 0135). */
+  username: string | null;
+  /** A one-time code: one box per digit on the card (ADR 0135), never saved. Null for anything else. */
+  codeDigits: number | null;
   /** The connected machine that holds it (ADR 0025). */
   machineId: string | null;
   /** Only useful while pending: the browser seals the value to it. */
@@ -83,6 +87,8 @@ export function secretRequestView(row: SecretRequestRow): SecretRequestView {
     purpose: row.purpose,
     target: targetOf(row),
     site: row.site,
+    username: row.username ?? null,
+    codeDigits: row.codeDigits ?? null,
     machineId: row.machineId,
     publicKey: status === "pending" ? row.publicKey : null,
     status,
@@ -105,8 +111,16 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
   switch (row.status) {
     case "delivered":
       if (target.kind === "site") {
+        const host = new URL(target.site).host;
+        // A one-time code and the account's username, when the request had them (ADR 0135).
+        const code = row.codeDigits
+          ? ` It is a ${row.codeDigits}-digit code: type it now, into the code field; when the site shows one box per digit, give \`targets\` with every box in order.`
+          : "";
+        const user = row.username
+          ? ` The account is ${JSON.stringify(row.username)}: type that yourself (a \`fill\` step) where the site asks for it.`
+          : "";
         return {
-          content: `${row.name} was delivered to your computer for ${new URL(target.site).host}${row.replaces ? ", replacing the one you had" : ""}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.`,
+          content: `${row.name} was delivered to your computer for ${host}${row.replaces ? ", replacing the one you had" : ""}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.${code}${user}`,
         };
       }
       return {

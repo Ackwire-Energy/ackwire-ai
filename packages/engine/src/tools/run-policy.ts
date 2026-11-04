@@ -19,8 +19,8 @@ import type { ToolDefinition } from "./types";
  * - `routine`: nothing that speaks for someone (reactions, GIFs and stickers, questions, reminders,
  *   routines, events, forum, channels, secrets, permissions). It reports through `hand_off`. Otherwise it
  *   works as the agent (ADR 0109: one permission model, the agent's own): reads, the web and the browser,
- *   internal changes people can undo (issues, memory, wiki, Drive, its own branches and pull requests, its
- *   computer); every write to a connected app asks a person, except the actions its creator allowed for its job
+ *   internal changes people can undo (issues, memory, wiki, Drive, Vault contacts, its own branches and pull
+ *   requests, its computer); every write to a connected app asks a person, except the actions its creator allowed for its job
  *   (`routines.own_actions`: the gateway lets those through, `ownJobCovers`). It reaches other agents (`ask_agent`,
  *   `tell_agent`) and posts where its creator can post (`post_message`, `send_dm` to its creator): the
  *   tools hold it to its creator's rooms and agents (ADR 0053 §2, amended 2026-10-31).
@@ -60,7 +60,7 @@ export type ToolKind =
   /** A tool this table doesn't know (no scope it reads): never a routine's. */
   | { kind: "unknown" };
 
-export type InternalArea = "issues" | "memory" | "drive" | "wiki" | "code" | "browser" | "desktop";
+export type InternalArea = "issues" | "memory" | "drive" | "wiki" | "code" | "browser" | "desktop" | "vault";
 
 export type PolicyTool = Pick<ToolDefinition, "name" | "scope" | "connectionId" | "sensitive">;
 
@@ -169,6 +169,8 @@ const INTERNAL_BY_SCOPE: Readonly<Record<string, InternalArea>> = {
   "sandbox:run": "code",
   "browser:use": "browser",
   "desktop:use": "desktop",
+  // Contacts and descriptions in the Vault (ADR 0135): never a value, and an agent deletes only what it saved.
+  "vault:write": "vault",
 };
 
 const isReadScope = (scope: string) => /[:.]read$/.test(scope);

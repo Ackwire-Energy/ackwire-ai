@@ -16,7 +16,9 @@ const { auditLog, agents, approvals, channels, secretRequests, users } = schema;
 
 export const TOOL_CALL = "tool.call";
 
-const SECRET_KEY = /pass(word|wd|phrase)?$|secret|token|api[_-]?key|authorization|cookie|credential|private[_-]?key/i;
+// `contact`: a Vault contact's fields are personal data, kept out of audit rows (ADR 0135).
+const SECRET_KEY =
+  /pass(word|wd|phrase)?$|secret|token|api[_-]?key|authorization|cookie|credential|private[_-]?key|^contact$/i;
 const MAX_STRING = 500;
 const MAX_ITEMS = 20;
 const MAX_DEPTH = 4;

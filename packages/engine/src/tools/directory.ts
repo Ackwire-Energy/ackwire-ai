@@ -371,7 +371,8 @@ export function toolGroupKey(tool: Pick<ToolDefinition, "scope" | "connectionId"
  * prompt). Everything else is loaded when the run needs it.
  */
 export const CORE_GROUPS: ReadonlySet<string> = new Set(["", "context", "memory", "skills"]);
-const CORE_TOOLS: ReadonlySet<string> = new Set(["read_wiki_page", "search_wiki"]);
+/** `vault_list` too (ADR 0135): an agent looks in the Vault before it asks a person for a password, a key or an address. */
+const CORE_TOOLS: ReadonlySet<string> = new Set(["read_wiki_page", "search_wiki", "vault_list"]);
 
 /**
  * Tools of the core groups that few runs use (token-trim B3): a group of their own, loaded on demand like any other.
@@ -417,6 +418,7 @@ const GROUP_LABELS: Record<string, string> = {
   sandbox: "Computer and code",
   browser: "Browser",
   setup: "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents)",
+  vault: "Vault (saving contact details, changing a saved username or description)",
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",
@@ -752,6 +754,10 @@ export function turnMeans(names: ReadonlySet<string>, teammates: string[] = []):
       "your browser (`browser_*`): any website or web app, search engines included, used as a person would, signed in to their account with their help (a service with no connector but a web version)",
     );
   if (names.has("run_code")) out.push("your computer's terminal (`run_code`): commands, scripts, files");
+  if (names.has("vault_list"))
+    out.push(
+      "the Vault (`vault_list`): logins, keys and contact details people saved for you, used without ever seeing a password or a key",
+    );
   if (names.has("find_tools")) out.push("the tool directory (`find_tools`): tools for apps and services");
   const handOver = HAND_OVER_TOOLS.filter((t) => names.has(t));
   if (handOver.length > 0)

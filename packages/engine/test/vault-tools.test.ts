@@ -1,0 +1,601 @@
+import { afterEach, expect, test } from "bun:test";
+import {
+  generateSecretKeyPair,
+  type MachineRequest,
+  openSecret,
+  type SecretBox,
+  VAULT_PROTOCOL,
+  vaultAad,
+} from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
+import {
+  createAgentRuns,
+  createBrowserToolSource,
+  createSandboxToolSource,
+  createVaultItem,
+  createVaultToolSource,
+  grantScopes,
+  insertMessage,
+  type MachineCaller,
+  type MachineStatus,
+  runnerFailureText,
+  secretRequestView,
+  type ToolContext,
+  toolKind,
+  type VaultDeps,
+  vaultListText,
+  vaultTypingRefusal,
+} from "../src";
+import { addMember, type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
+import { agentRunRow, channelRoutine, fire } from "./routine-fixtures";
+
+/**
+ * The Vault's tools (ADR 0135): what the Vault shares with an agent for the person behind its run, listed without a
+ * value; a saved login typed by the browser and a saved key given to one command, each sealed to a one-use key of
+ * the agent's own computer (a fake runner here, which opens the boxes the way the real one does); contacts the agent
+ * keeps for people.
+ */
+
+let f: Fixture;
+afterEach(async () => {
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
+
+const PASSWORD = "acme-Pa55word-xyz";
+const KEY_VALUE = "sk-acme-0123456789abcdef";
+
+type Reply = { success: boolean; data: unknown; error?: string; code?: string };
+const ok = (data: unknown = {}): Reply => ({ success: true, data });
+const page = (snapshot: string, url: string): Reply => ok({ snapshot, origin: url, refs: {} });
+
+/**
+ * The agent's computer: its status as the test sets it, every request it got, and a runner's Vault side: one-use keys
+ * kept in memory, each opened once, a login's box opened with the rule it came with, a key's with its variable.
+ */
+function fakeComputer(at: { machineId: string; orgId: string }) {
+  const calls: MachineRequest[] = [];
+  const keys = new Map<string, string>();
+  const opened: { use: string; value: string }[] = [];
+  const s = {
+    protocol: VAULT_PROTOCOL,
+    url: "https://acme.example/login",
+    /** What the runner answers an `agentes:type_vault` once the box opened (default: typed). */
+    typeVault: (): Reply => ok({ typed: true }),
+  };
+  const open = async (keyId: string, box: SecretBox, agentId: string, use: Parameters<typeof vaultAad>[0]["use"]) => {
+    const privateKey = keys.get(keyId);
+    keys.delete(keyId);
+    if (!privateKey) throw new Error("key_expired");
+    const value = await openSecret(privateKey, box, vaultAad({ keyId, agentId, use }));
+    opened.push({ use: use.kind === "fill" ? `fill:${use.rule}` : `env:${use.name}`, value });
+    return value;
+  };
+  const answer = async (agentId: string, command: string, args: string[]): Promise<Reply> => {
+    if (command === "agentes:type_vault") {
+      const [, rule, json] = args as [string, string, string];
+      const { keyId, box } = JSON.parse(json) as { keyId: string; box: SecretBox };
+      try {
+        await open(keyId, box, agentId, { kind: "fill", rule });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "key_expired";
+        return { success: false, data: null, error: reason, code: "key_expired" };
+      }
+      return s.typeVault();
+    }
+    if (command === "snapshot") return page('- textbox "Password" [ref=e2]\n- button "Sign in" [ref=e3]', s.url);
+    return ok();
+  };
+  const hub: MachineCaller = {
+    async status(id): Promise<MachineStatus | null> {
+      if (id !== at.machineId) return null;
+      return {
+        id,
+        orgId: at.orgId,
+        name: "MacBook",
+        online: true,
+        execAllowed: true,
+        os: "linux",
+        protocol: s.protocol,
+        executors: { browser: { available: true, version: "0.39.1" } },
+        paused: null,
+        access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
+      };
+    },
+    async call(_id, request) {
+      const r = request as MachineRequest;
+      calls.push(r);
+      const agentId = r.agent?.id ?? "";
+      switch (r.op) {
+        case "vault.key": {
+          const pair = await generateSecretKeyPair();
+          const keyId = `key-${keys.size + calls.length}`;
+          keys.set(keyId, pair.privateKey);
+          const expiresAt = new Date(Date.now() + 120_000).toISOString();
+          return { vaultKey: { keyId, publicKey: pair.publicKey, expiresAt } } as never;
+        }
+        case "browser.act":
+          return (await answer(agentId, r.command, r.args)) as never;
+        case "browser.batch": {
+          const answers: Reply[] = [];
+          for (const c of r.commands) {
+            const a = await answer(agentId, c.command, c.args);
+            answers.push(a);
+            if (!a.success && !c.tolerate) break;
+          }
+          return { answers } as never;
+        }
+        case "write":
+          return { size: 1 } as never;
+        case "exec": {
+          for (const k of r.vault?.keys ?? []) {
+            await open(r.vault?.keyId ?? "", k.box, agentId, { kind: "env", name: k.name });
+          }
+          return { exitCode: 0, stdout: "200 OK", stderr: "", timedOut: false } as never;
+        }
+        case "secret":
+          return { publicKey: "pk-computer", sites: true } as never;
+        default:
+          return {} as never;
+      }
+    },
+  };
+  return { hub, calls, opened, keys, s };
+}
+
+async function vaultSetup() {
+  // The sources are made before the database exists: their dependencies are filled in once it does.
+  const holder: { hub?: MachineCaller } = {};
+  const hub: MachineCaller = {
+    status: (id) => (holder.hub as MachineCaller).status(id),
+    call: (id, request, options) => (holder.hub as MachineCaller).call(id, request, options),
+  };
+  const vault = { sources: {} } as unknown as VaultDeps;
+  const sandbox = {
+    machines: { hub },
+    publicUrl: "http://localhost:3000",
+    skills: {},
+    vault,
+  } as unknown as Parameters<typeof createSandboxToolSource>[0];
+  f = await setup({
+    toolSources: [
+      createVaultToolSource(vault),
+      createBrowserToolSource({ machines: { hub }, vault, publicUrl: "http://localhost:3000" }),
+      createSandboxToolSource(sandbox),
+    ],
+  });
+  Object.assign(vault, { db: f.db, keyWrapper: f.keyWrapper, keyWrappers: [f.keyWrapper], pubsub: f.pubsub });
+  Object.assign(sandbox, {
+    db: f.db,
+    artifacts: f.artifactDeps,
+    skills: { blobs: f.artifactDeps.blobs },
+    pubsub: f.pubsub,
+  });
+  const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+  await f.db.update(schema.agents).set({ machineId: paired.machineId }).where(eq(schema.agents.id, f.agent.id));
+  const computer = fakeComputer({ machineId: paired.machineId, orgId: f.org.id });
+  holder.hub = computer.hub;
+  await grantScopes(f.db, f.org.id, f.agent.id, [
+    { connectionId: null, scope: "browser:use" },
+    { connectionId: null, scope: "sandbox:run" },
+  ]);
+  const bruno = await addMember(f.db, f.org.id, "member", "bruno");
+
+  /** A run of Dev answering `userId` in general. */
+  const runFor = async (userId: string): Promise<ToolContext> => {
+    const message = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId },
+      body: "entra no painel da Acme",
+    });
+    const [run] = await f.db.transaction((tx) => createAgentRuns(tx, message, [f.agent.id], "mention"));
+    if (!run) throw new Error("no run");
+    return {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: run.threadRootId,
+      triggerMessageId: run.triggerMessageId,
+    };
+  };
+  const call = async (ctx: ToolContext, name: string, input: Record<string, unknown>) => {
+    const r = await f.tools?.invoke(ctx, { toolUseId: `tu_${crypto.randomUUID()}`, name, input });
+    if (r?.type !== "result") throw new Error(`not a result: ${JSON.stringify(r)}`);
+    return r.output;
+  };
+
+  const dev = { everyone: true, roleIds: [], userIds: [], allAgents: false, agentIds: [f.agent.id] };
+  const login = await createVaultItem(vault, f.owner.id, f.org.id, {
+    kind: "login",
+    scope: "team",
+    title: "Acme admin",
+    website: "https://acme.example",
+    username: "dev@acme.example",
+    secret: PASSWORD,
+    access: dev,
+  });
+  const hidden = await createVaultItem(vault, f.owner.id, f.org.id, {
+    kind: "login",
+    scope: "team",
+    title: "Payroll",
+    website: "https://payroll.example",
+    username: "finance@acme.example",
+    secret: "payroll-secret-value",
+    access: { ...dev, agentIds: [] },
+  });
+  const key = await createVaultItem(vault, f.owner.id, f.org.id, {
+    kind: "key",
+    scope: "personal",
+    title: "Acme API",
+    keyName: "ACME_API_KEY",
+    description: "Read-only key for the Acme API",
+    secret: KEY_VALUE,
+  });
+  const contact = await createVaultItem(vault, f.owner.id, f.org.id, {
+    kind: "contact",
+    scope: "team",
+    title: "Acme billing",
+    contact: { fullName: "Ana Souza", email: "billing@acme.example", city: "Campinas" },
+    access: dev,
+  });
+  const brunos = await createVaultItem(vault, bruno.id, f.org.id, {
+    kind: "login",
+    scope: "personal",
+    title: "Bruno's mail",
+    website: "https://mail.acme.example",
+    username: "bruno@acme.example",
+    secret: "bruno-mail-password",
+  });
+  return { vault, computer, bruno, runFor, call, items: { login, hidden, key, contact, brunos } };
+}
+
+const usesOf = (itemId: string) => f.db.select().from(schema.vaultUses).where(eq(schema.vaultUses.itemId, itemId));
+
+test("vault_list shows what is shared with the agent for the person behind the run, never a value", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const out = await v.call(ana, "vault_list", {});
+  expect(out.isError).toBeFalsy();
+  expect(out.content).toContain(v.items.login.id);
+  expect(out.content).toContain('"Acme admin"');
+  expect(out.content).toContain('username "dev@acme.example"');
+  expect(out.content).toContain("on acme.example");
+  // Ana's own key: by its variable name, for run_code's `keys`.
+  expect(out.content).toContain("ACME_API_KEY");
+  expect(out.content).toContain("Read-only key for the Acme API");
+  // A contact's fields are meant for the agent.
+  expect(out.content).toContain("billing@acme.example");
+  expect(out.content).toContain("Campinas");
+  // Not shared with Dev, and someone else's personal login: as if they didn't exist.
+  expect(out.content).not.toContain(v.items.hidden.id);
+  expect(out.content).not.toContain("Payroll");
+  expect(out.content).not.toContain("Bruno's mail");
+  for (const value of [PASSWORD, KEY_VALUE, "payroll-secret-value", "bruno-mail-password"]) {
+    expect(out.content).not.toContain(value);
+  }
+
+  // Bruno's run: the team's items open to everyone, and his own; never Ana's personal key.
+  const bruno = await v.runFor(v.bruno.id);
+  const his = await v.call(bruno, "vault_list", {});
+  expect(his.content).toContain(v.items.login.id);
+  expect(his.content).toContain("Bruno's mail");
+  expect(his.content).not.toContain("ACME_API_KEY");
+  expect(his.content).not.toContain("bruno-mail-password");
+
+  // Filters narrow it down.
+  const keys = await v.call(ana, "vault_list", { kind: "key" });
+  expect(keys.content).toContain("ACME_API_KEY");
+  expect(keys.content).not.toContain(v.items.login.id);
+  const elsewhere = await v.call(ana, "vault_list", { site: "github.com" });
+  expect(elsewhere.content).toContain("Nothing in the Vault matches that");
+});
+
+test("reading a contact is recorded once per run", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  await v.call(ana, "vault_list", {});
+  await v.call(ana, "vault_list", { kind: "contact" });
+  const reads = (await usesOf(v.items.contact.id)).filter((u) => u.action === "read");
+  expect(reads).toHaveLength(1);
+  expect(reads[0]).toMatchObject({ agentId: f.agent.id, runId: ana.runId, onBehalfOfUserId: f.owner.id });
+  // Listing a login is no use of it.
+  expect((await usesOf(v.items.login.id)).filter((u) => u.action === "read")).toHaveLength(0);
+});
+
+test("a routine's run uses the Vault for the routine's creator", async () => {
+  const v = await vaultSetup();
+  const routine = await channelRoutine(f);
+  const fired = await fire(f, routine.id, new Date());
+  const run = await agentRunRow(f, fired.agentRunId);
+  const ctx: ToolContext = {
+    db: f.db,
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    runId: run.id,
+    channelId: run.channelId,
+    threadRootId: run.threadRootId,
+    triggerMessageId: run.triggerMessageId,
+    background: true,
+  };
+  const out = await v.call(ctx, "vault_list", {});
+  expect(out.isError).toBeFalsy();
+  // Ana created the routine: her personal key is usable there, Bruno's login never.
+  expect(out.content).toContain("ACME_API_KEY");
+  expect(out.content).not.toContain("Bruno's mail");
+});
+
+test("nothing shared: the agent is told how a person adds something", () => {
+  expect(vaultListText([], { name: "Ana" }, false)).toContain("Nothing in the Vault is shared with you for Ana");
+  expect(vaultListText([], { name: "Ana" }, false)).toContain("Settings, Vault");
+  expect(vaultListText([], { name: null }, false)).toContain("Nobody is behind this run");
+  expect(vaultListText([], { name: "Ana" }, true)).toContain("matches that");
+});
+
+test("a saved login is typed by the browser, sealed to a one-use key of the agent's computer, and its use recorded", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  // The agent is on the sign-in page.
+  await v.call(ana, "browser_read", {});
+  const out = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
+  expect(out.isError).toBeFalsy();
+  // The computer made one key, and the box opened only with the rule it was sealed for.
+  expect(v.computer.calls.filter((c) => c.op === "vault.key")).toHaveLength(1);
+  expect(v.computer.opened).toEqual([{ use: "fill:exact:https://acme.example", value: PASSWORD }]);
+  expect(v.computer.keys.size).toBe(0);
+  const typed = v.computer.calls
+    .flatMap((c) => (c.op === "browser.batch" ? c.commands : c.op === "browser.act" ? [c] : []))
+    .find((c) => c.command === "agentes:type_vault");
+  expect(typed?.args.slice(0, 2)).toEqual(["@e2", "exact:https://acme.example"]);
+  // The value went only inside the box: never in a request, a result or a step.
+  expect(JSON.stringify(v.computer.calls)).not.toContain(PASSWORD);
+  expect(out.content).not.toContain(PASSWORD);
+  const fills = (await usesOf(v.items.login.id)).filter((u) => u.action === "fill");
+  expect(fills).toHaveLength(1);
+  expect(fills[0]).toMatchObject({ origin: "https://acme.example", runId: ana.runId, onBehalfOfUserId: f.owner.id });
+
+  // In a plan, the trail names the login by its title.
+  const planned = await v.call(ana, "browser_do", {
+    steps: [{ do: "type_secret", target: "e2", login: v.items.login.id }],
+  });
+  expect(planned.isError).toBeFalsy();
+  expect(planned.data?.browserTrail).toEqual([{ tool: "browser_type_secret", detail: "Acme admin" }]);
+});
+
+test("a login is refused before its value goes out: not shared, another site, an old computer", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const keysAsked = () => v.computer.calls.filter((c) => c.op === "vault.key").length;
+
+  // Not shared with Dev: the same words as an id that doesn't exist.
+  const hidden = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.hidden.id });
+  expect(hidden.isError).toBe(true);
+  expect(hidden.content).toContain("No Vault login like that is shared with you");
+  expect(hidden.content).not.toContain("Payroll");
+  const unknown = await v.call(ana, "browser_type_secret", { target: "e2", login: crypto.randomUUID() });
+  expect(unknown.content).toBe(hidden.content);
+
+  // The page is on another site: the Vault refuses, no key is made.
+  v.computer.s.url = "https://acme-login.example/";
+  await v.call(ana, "browser_read", {});
+  const wrong = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
+  expect(wrong.content).toContain("acme.example");
+  expect(keysAsked()).toBe(0);
+
+  // A computer before protocol 41 never gets a Vault value.
+  v.computer.s.url = "https://acme.example/login";
+  v.computer.s.protocol = VAULT_PROTOCOL - 1;
+  const old = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
+  expect(old.isError).toBe(true);
+  expect(old.content).toContain("agentes-runner update");
+  expect(keysAsked()).toBe(0);
+  expect((await usesOf(v.items.login.id)).filter((u) => u.action === "fill")).toHaveLength(0);
+});
+
+test("the runner's refusals become clear errors, and nothing is recorded", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  // The runner names its refusal in `code` (protocol 41).
+  v.computer.s.typeVault = () => ({
+    success: false,
+    data: null,
+    error: "The field is in a frame on another site",
+    code: "wrong_site",
+  });
+  const out = await v.call(ana, "browser_type_secret", { target: "e2", login: v.items.login.id });
+  expect(out.content).toContain("isn't on acme.example");
+  expect((await usesOf(v.items.login.id)).filter((u) => u.action === "fill")).toHaveLength(0);
+
+  expect(runnerFailureText("typed nothing", "get_blocked")).toContain("stopped that request");
+  expect(runnerFailureText("typed nothing", "not_code_field")).toContain("aren't fields for a code");
+  expect(runnerFailureText("no such ref", undefined)).toBe("The browser said: no such ref");
+  expect(vaultTypingRefusal("The browser said: not_password_field", "acme.example")).toContain(
+    "isn't a password field",
+  );
+  expect(vaultTypingRefusal("The browser said: get_form", "acme.example")).toContain("address");
+  expect(vaultTypingRefusal("The browser said: key_expired", "acme.example")).toContain("run that step again");
+  // Anything else stays as the browser said it: a stale number is found again like any step's.
+  expect(vaultTypingRefusal("stale_ref: unknown ref e2", "acme.example")).toBe("stale_ref: unknown ref e2");
+});
+
+test("a code split in boxes is typed one character per box, only by a runner of protocol 41", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const [machine] = await f.db.select({ id: schema.machines.id }).from(schema.machines);
+  await f.db.insert(schema.secretRequests).values({
+    orgId: f.org.id,
+    runId: ana.runId,
+    agentId: f.agent.id,
+    channelId: f.general.id,
+    toolUseId: "tu_code",
+    requestedForUserId: f.owner.id,
+    name: "ACME_CODE",
+    purpose: "Acme sign-in code",
+    site: "https://acme.example",
+    codeDigits: 6,
+    targetKind: "site",
+    machineId: machine?.id ?? null,
+    publicKey: "pk",
+    status: "delivered",
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+  const boxes = ["e4", "e5", "e6", "e7", "e8", "e9"];
+  const out = await v.call(ana, "browser_type_secret", { targets: boxes, secret: "ACME_CODE" });
+  expect(out.isError).toBeFalsy();
+  const typed = v.computer.calls
+    .flatMap((c) => (c.op === "browser.batch" ? c.commands : []))
+    .find((c) => c.command === "agentes:type_secret");
+  expect(typed?.args).toEqual(["@e4", "ACME_CODE", "https://acme.example", "@e5", "@e6", "@e7", "@e8", "@e9"]);
+
+  v.computer.s.protocol = VAULT_PROTOCOL - 1;
+  const old = await v.call(ana, "browser_type_secret", { targets: boxes, secret: "ACME_CODE" });
+  expect(old.isError).toBe(true);
+  expect(old.content).toContain("agentes-runner update");
+
+  // A login goes into one field; a step names a secret or a login, not both.
+  v.computer.s.protocol = VAULT_PROTOCOL;
+  const both = await v.call(ana, "browser_type_secret", { target: "e2", secret: "ACME_CODE", login: "x" });
+  expect(both.isError).toBe(true);
+  const many = await v.call(ana, "browser_do", {
+    steps: [{ do: "type_secret", targets: boxes, login: v.items.login.id }],
+  });
+  expect(many.content).toContain("one password field");
+});
+
+test("run_code gives saved keys to one command, sealed for the computer, and records their use", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const out = await v.call(ana, "run_code", {
+    language: "bash",
+    code: 'curl -s -H "Authorization: Bearer $ACME_API_KEY" https://api.acme.example/status',
+    keys: ["ACME_API_KEY"],
+  });
+  expect(out.isError).toBeFalsy();
+  expect(out.content).toContain("exit code 0");
+  const exec = v.computer.calls.find((c): c is Extract<MachineRequest, { op: "exec" }> => c.op === "exec");
+  expect(exec?.vault?.keys.map((k) => k.name)).toEqual(["ACME_API_KEY"]);
+  expect(v.computer.opened).toEqual([{ use: "env:ACME_API_KEY", value: KEY_VALUE }]);
+  expect(JSON.stringify(v.computer.calls)).not.toContain(KEY_VALUE);
+  expect(out.content).not.toContain(KEY_VALUE);
+  const used = (await usesOf(v.items.key.id)).filter((u) => u.action === "key");
+  expect(used).toHaveLength(1);
+  // The audit log names the key, never its value.
+  const [audit] = await f.db
+    .select()
+    .from(schema.auditLog)
+    .where(and(eq(schema.auditLog.orgId, f.org.id), eq(schema.auditLog.action, "machine.exec")));
+  expect(JSON.stringify(audit?.details)).toContain("ACME_API_KEY");
+  expect(JSON.stringify(audit?.details)).not.toContain(KEY_VALUE);
+});
+
+test("run_code refuses keys it can't give: unknown, reserved, someone else's, an old computer", async () => {
+  const v = await vaultSetup();
+  const execs = () => v.computer.calls.filter((c) => c.op === "exec").length;
+  const ana = await v.runFor(f.owner.id);
+  const unknown = await v.call(ana, "run_code", { language: "bash", code: "env", keys: ["NOT_SAVED_KEY"] });
+  expect(unknown.isError).toBe(true);
+  const reserved = await v.call(ana, "run_code", { language: "bash", code: "env", keys: ["ANTHROPIC_API_KEY"] });
+  expect(reserved.isError).toBe(true);
+  expect(reserved.content).toContain("ANTHROPIC_API_KEY");
+  // Ana's personal key, in a run Bruno asked for.
+  const bruno = await v.runFor(v.bruno.id);
+  const hers = await v.call(bruno, "run_code", { language: "bash", code: "env", keys: ["ACME_API_KEY"] });
+  expect(hers.isError).toBe(true);
+  expect(hers.content).not.toContain(KEY_VALUE);
+  v.computer.s.protocol = VAULT_PROTOCOL - 1;
+  const old = await v.call(ana, "run_code", { language: "bash", code: "env", keys: ["ACME_API_KEY"] });
+  expect(old.isError).toBe(true);
+  expect(old.content).toContain("agentes-runner update");
+  expect(execs()).toBe(0);
+  expect(v.computer.opened).toEqual([]);
+});
+
+test("vault_save keeps contacts for the person behind the run; vault_delete only what the agent may delete", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const saved = await v.call(ana, "vault_save", {
+    title: "Acme shipping",
+    contact: { fullName: "Ana Souza", address: "Rua das Flores, 10", city: "Campinas" },
+  });
+  expect(saved.isError).toBeFalsy();
+  expect(saved.content).toContain("personal to ana");
+  const id = (saved.data as { vaultItem: { id: string } }).vaultItem.id;
+  const [row] = await f.db.select().from(schema.vaultItems).where(eq(schema.vaultItems.id, id));
+  expect(row).toMatchObject({ kind: "contact", ownerUserId: f.owner.id, createdByAgentId: f.agent.id });
+
+  const changed = await v.call(ana, "vault_save", { id, contact: { phone: "+55 19 0000-0000" } });
+  expect(changed.isError).toBeFalsy();
+  expect(changed.content).toContain("Updated");
+  const listed = await v.call(ana, "vault_list", { kind: "contact" });
+  expect(listed.content).toContain("+55 19 0000-0000");
+  expect(listed.content).toContain("Rua das Flores, 10");
+
+  // A new contact needs a title and a field.
+  const empty = await v.call(ana, "vault_save", { title: "Nothing" });
+  expect(empty.isError).toBe(true);
+
+  // Bruno manages nothing: the team's login stays.
+  const bruno = await v.runFor(v.bruno.id);
+  const refused = await v.call(bruno, "vault_delete", { id: v.items.login.id });
+  expect(refused.isError).toBe(true);
+  const deleted = await v.call(ana, "vault_delete", { id });
+  expect(deleted.isError).toBeFalsy();
+  expect(await f.db.select().from(schema.vaultItems).where(eq(schema.vaultItems.id, id))).toHaveLength(0);
+});
+
+test("request_secret carries a username and a code to the card", async () => {
+  const v = await vaultSetup();
+  const ana = await v.runFor(f.owner.id);
+  const ask = (input: Record<string, unknown>) =>
+    f.tools?.invoke(ana, { toolUseId: `tu_${crypto.randomUUID()}`, name: "request_secret", input });
+  const login = await ask({
+    name: "ACME_PASSWORD",
+    purpose: "Sign in to the Acme panel",
+    target: "env",
+    site: "https://acme.example/login",
+    username: "dev@acme.example",
+  });
+  expect(login?.type).toBe("secret");
+  const code = await ask({
+    name: "ACME_CODE",
+    purpose: "The code Acme sent",
+    target: "env",
+    site: "https://acme.example/login",
+    code: { digits: 6 },
+  });
+  expect(code?.type).toBe("secret");
+  const rows = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.runId, ana.runId));
+  const byName = (n: string) => rows.find((r) => r.name === n);
+  expect(byName("ACME_PASSWORD")).toMatchObject({ username: "dev@acme.example", codeDigits: null, targetKind: "site" });
+  expect(byName("ACME_CODE")).toMatchObject({ username: null, codeDigits: 6 });
+  const view = secretRequestView(byName("ACME_CODE") as NonNullable<ReturnType<typeof byName>>);
+  expect(view).toMatchObject({ codeDigits: 6, username: null, site: "https://acme.example" });
+
+  // Both go with a site only; a code has 4 to 12 digits.
+  const noSite = await ask({ name: "API_TOKEN", purpose: "The API", target: "env", username: "dev" });
+  expect(noSite?.type === "result" && noSite.output.isError).toBe(true);
+  const short = await ask({
+    name: "ACME_PIN",
+    purpose: "PIN",
+    target: "env",
+    site: "https://acme.example",
+    code: { digits: 3 },
+  });
+  expect(short?.type === "result" && short.output.isError).toBe(true);
+});
+
+test("the Vault's tools: reading is a read, editing contacts is an internal change a routine may make", () => {
+  expect(toolKind({ name: "vault_list", scope: "vault:read", connectionId: null }).kind).toBe("read");
+  expect(toolKind({ name: "vault_save", scope: "vault:write", connectionId: null })).toEqual({
+    kind: "internal",
+    area: "vault",
+  });
+  expect(toolKind({ name: "vault_delete", scope: "vault:write", connectionId: null })).toEqual({
+    kind: "internal",
+    area: "vault",
+  });
+});

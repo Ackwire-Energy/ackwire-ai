@@ -7,6 +7,11 @@ import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
+/** A one-time code's boxes on the card (ADR 0135): one per digit. */
+export const CODE_DIGITS = { min: 4, max: 12 } as const;
+/** Longest username a request may carry (the Vault keeps the same). */
+export const MAX_SECRET_USERNAME = 200;
+
 /** A `request_secret` site as its origin (`https://host[:port]`), or null when it isn't a web address. */
 export function secretSite(raw: string): string | null {
   try {
@@ -46,12 +51,27 @@ export function requestSecretTool(opts: {
     description:
       "For a password your browser types (browser_type_secret): the address of the page it goes into (https://…). It will only ever be typed on that site, and it stays out of your commands; leave `site` out for a secret a command uses.",
   } as const;
+  // ADR 0135: what the card shows besides the field, and what it lets the person save to the Vault.
+  const username = {
+    type: "string",
+    maxLength: MAX_SECRET_USERNAME,
+    description:
+      "With `site`: the account's username or email when you know it. The card shows it, and saves it with the password when the person keeps it in the Vault.",
+  } as const;
+  const code = {
+    type: "object",
+    properties: { digits: { type: "integer", minimum: CODE_DIGITS.min, maximum: CODE_DIGITS.max } },
+    required: ["digits"],
+    additionalProperties: false,
+    description:
+      "With `site`: a one-time code (sent by text message or email) instead of a password: the card shows one box per digit. Never saved; type it at once.",
+  } as const;
   return {
     name: REQUEST_SECRET_TOOL,
     description: [
       opts.browserOnly
-        ? "Ask the person who asked you for a password or code to sign in on a site in your browser. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`."
-        : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it.",
+        ? "Ask the person who asked you for a password or code to sign in on a site in your browser. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Give `username` when you know the account, and `code` for a one-time code. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`. Look in the Vault first (`vault_list`) when you have it: a saved login needs no request."
+        : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). For a site your browser signs in to, give `site` (and `username` when you know it, or `code` for a one-time code). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it. Look in the Vault first (`vault_list`) when you have it: a saved login or key needs no request.",
       AGAIN,
     ].join(" "),
     scope: opts.scope,
@@ -67,6 +87,8 @@ export function requestSecretTool(opts: {
               description: "What it is for, shown to the person",
             },
             site,
+            username,
+            code,
           },
           required: ["name", "purpose", "site"],
           additionalProperties: false,
@@ -84,6 +106,8 @@ export function requestSecretTool(opts: {
             target: { enum: ["env", "file"] },
             path: { type: "string", maxLength: 300, description: "With target file: where it goes in your workspace" },
             site,
+            username,
+            code,
           },
           required: ["name", "purpose", "target"],
           additionalProperties: false,
@@ -114,6 +138,21 @@ export function requestSecretTool(opts: {
         const origin = rawSite ? secretSite(rawSite) : null;
         if ((rawSite || opts.browserOnly) && !origin) {
           return { content: "`site` must be a web address (https://example.com/login).", isError: true };
+        }
+        // A username and a code go with a site's sign-in only (ADR 0135).
+        const user = str(input.username).trim().slice(0, MAX_SECRET_USERNAME);
+        const digits = codeDigitsOf(input.code);
+        if ((user || input.code !== undefined) && (!origin || file)) {
+          return {
+            content: "`username` and `code` go with `site` (the sign-in page your browser types it on).",
+            isError: true,
+          };
+        }
+        if (input.code !== undefined && digits === null) {
+          return {
+            content: `\`code\` takes \`digits\`, from ${CODE_DIGITS.min} to ${CODE_DIGITS.max}.`,
+            isError: true,
+          };
         }
         const open = await ctx.db
           .select({ id: schema.secretRequests.id })
@@ -182,6 +221,8 @@ export function requestSecretTool(opts: {
               // The person sees the one site a browser password may be typed on.
               purpose: origin ? `${str(input.purpose).trim()} (${new URL(origin).host})` : str(input.purpose).trim(),
               site: origin,
+              username: user || null,
+              codeDigits: digits,
               targetKind: kind,
               targetPath: file ? path : null,
               machineId: computer.machineId,
@@ -202,6 +243,7 @@ export function requestSecretTool(opts: {
               target: kind === "file" ? { kind, path } : kind === "site" && origin ? { kind, site: origin } : { kind },
               requestedFor: requester,
               ...(held ? { replaces: true } : {}),
+              ...(digits ? { codeDigits: digits } : {}),
             },
           });
           return inserted;
@@ -213,4 +255,15 @@ export function requestSecretTool(opts: {
       }
     },
   };
+}
+
+/** `code.digits` as the request keeps it, or null when it isn't a whole number of boxes the card can show. */
+export function codeDigitsOf(raw: unknown): number | null {
+  const digits = (raw as { digits?: unknown } | null | undefined)?.digits;
+  return typeof digits === "number" &&
+    Number.isInteger(digits) &&
+    digits >= CODE_DIGITS.min &&
+    digits <= CODE_DIGITS.max
+    ? digits
+    : null;
 }

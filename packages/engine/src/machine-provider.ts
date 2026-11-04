@@ -7,6 +7,7 @@ import {
   type SandboxProvider,
   SECRET_ACTIVATE_PROTOCOL,
   SECRETS_PROTOCOL,
+  VAULT_PROTOCOL,
 } from "@agenteschat/adapters";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
@@ -99,6 +100,8 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
           timeoutSeconds: request.timeoutSeconds,
           stream: Boolean(onOutput),
           ...(request.approved ? { approved: true } : {}),
+          // Vault keys for this one command (ADR 0135), sealed to a one-use key of this computer.
+          ...(request.vault ? { vault: request.vault } : {}),
         },
         { signal: request.signal, onOutput },
       );
@@ -176,4 +179,37 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       );
     },
   };
+}
+
+/** What a computer too old for the Vault answers (ADR 0135): its owner updates the runner. */
+export const vaultUpdateText = (machineName: string, what: string) =>
+  `The computer ${machineName} needs an update to ${what}. Its owner can run \`agentes-runner update\`.`;
+
+/** A one-use key on the agent's computer (ADR 0135, protocol 41): a Vault value is sealed to it, never sent bare. */
+export type VaultKey = { keyId: string; publicKey: string; expiresAt: string };
+
+/**
+ * Asks the agent's runner for a one-use key (`vault.key`): the private key stays in that computer's memory (in the
+ * agent's own worker in system mode) for two minutes and one opening. Throws an error the agent reads when the
+ * computer is too old (`what` says what for) or refuses.
+ */
+export async function requestVaultKey(
+  hub: MachineCaller,
+  machineId: string,
+  agent: AgentScope,
+  what: string,
+  signal?: AbortSignal,
+): Promise<VaultKey> {
+  const status = await hub.status(machineId);
+  const name = status?.name ?? "computer";
+  if (!status || status.protocol < VAULT_PROTOCOL) throw new Error(vaultUpdateText(name, what));
+  try {
+    const reply = await hub.call<"vault.key">(machineId, { agent, op: "vault.key" }, { signal, timeoutMs: 30_000 });
+    const key = reply?.vaultKey;
+    if (!key?.keyId || !key.publicKey) throw new Error(`The computer ${name} made no key for the Vault.`);
+    return { keyId: key.keyId, publicKey: key.publicKey, expiresAt: key.expiresAt };
+  } catch (error) {
+    if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
+    throw explain(error, name);
+  }
 }

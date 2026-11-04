@@ -84,6 +84,10 @@ describe("run policy table", () => {
     expect(toolKind(builtIn("start_task")).kind).toBe("mission");
     // A new built-in tool the table doesn't know is never a routine's.
     expect(toolKind(builtIn("brand_new_tool")).kind).toBe("unknown");
+    // The Vault (ADR 0135): looking is a read, keeping contacts an internal change.
+    expect(toolKind(builtIn("vault_list", "vault:read")).kind).toBe("read");
+    expect(toolKind(builtIn("vault_save", "vault:write"))).toEqual({ kind: "internal", area: "vault" });
+    expect(toolKind(builtIn("vault_delete", "vault:write"))).toEqual({ kind: "internal", area: "vault" });
   });
 
   test("routine stored as read (ADR 0109): the same as act, the web and the browser included", () => {
@@ -108,6 +112,9 @@ describe("run policy table", () => {
     const r = routine("act");
     expect(decide(r, builtIn("create_issue", "issues:write"))).toBe("allow");
     expect(decide(r, builtIn("update_wiki_page", "wiki:write"))).toBe("allow");
+    // A routine uses the Vault for its creator, and may keep contacts there (ADR 0135).
+    expect(decide(r, builtIn("vault_list", "vault:read"))).toBe("allow");
+    expect(decide(r, builtIn("vault_save", "vault:write"))).toBe("allow");
     expect(decide(r, app("git_clone", "github:git.read"))).toBe("allow");
     expect(decide(r, app("github_create_issue", "github:issues.write"))).toBe("approve");
     expect(decide(r, app("github_merge_pr", "github:pr.merge", true))).toBe("approve");
