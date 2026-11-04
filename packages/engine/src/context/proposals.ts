@@ -24,6 +24,7 @@ import {
   withAccessLines,
 } from "../access";
 import { UNDO_WINDOW_MS } from "../agent-actions";
+import { type AgentDeletionDeps, deleteAgent } from "../agent-deletion";
 import { type Agent, getAgent, updateAgent } from "../agents";
 import { audienceNotice, canTalkTo, seesAgentDetails, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
@@ -43,6 +44,7 @@ import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
 import {
   applySettings,
+  deletes,
   maySettle,
   recordSettingsReceipt,
   type SettingLine,
@@ -238,7 +240,7 @@ async function proposalsVisible<T extends Proposal>(db: Database, actorId: strin
  * sees how it works (`seesAgentDetails`), `review_memory` or not.
  */
 async function proposalsShown<T extends Proposal>(db: Database, actorId: string, membership: Membership, rows: T[]) {
-  const seen = new Map<string, boolean>();
+  const seen = new Map<string, boolean | null>();
   const out: T[] = [];
   for (const r of rows) {
     if (r.target === "org_context") {
@@ -252,10 +254,11 @@ async function proposalsShown<T extends Proposal>(db: Database, actorId: string,
     let sees = seen.get(r.agentId);
     if (sees === undefined) {
       const agent = await getAgent(db, r.orgId, r.agentId);
-      sees = !!agent && seesAgentDetails(agent, actorId, membership);
+      sees = agent ? seesAgentDetails(agent, actorId, membership) : null;
       seen.set(r.agentId, sees);
     }
-    if (sees) out.push(r);
+    // A deleted agent: the decided rows of a card that changed or deleted it still say how it ended.
+    if (sees ?? (r.target === "agent_settings" && r.status !== "pending")) out.push(r);
   }
   return out;
 }
@@ -335,7 +338,14 @@ export async function decideProposal(
   orgId: string,
   proposalId: string,
   decision: "accept" | "reject",
-  options: { finalText?: string; judge?: Judge; pubsub?: PubSub; blobs?: BlobStoreResolver } = {},
+  options: {
+    finalText?: string;
+    judge?: Judge;
+    pubsub?: PubSub;
+    blobs?: BlobStoreResolver;
+    /** What deleting an agent from a card stops: its computer's work, its routines' mail. */
+    deletion?: Omit<AgentDeletionDeps, "db" | "pubsub">;
+  } = {},
 ): Promise<Proposal> {
   const [p] = await db
     .select()
@@ -421,6 +431,21 @@ export async function decideProposal(
     }
     return row;
   });
+  // Deleting closes its missions and stops its work on its computer, which can't run inside the decision's
+  // transaction; failing, the row is open again so someone can retry.
+  if (decided.status === "accepted" && decided.agentId && deletes(decided)) {
+    try {
+      if (!options.pubsub)
+        throw new ValidationError("Deleting an agent stops its work: the server's events are needed");
+      await deleteAgent({ ...options.deletion, db, pubsub: options.pubsub }, actorId, orgId, decided.agentId);
+    } catch (error) {
+      await db
+        .update(contextProposals)
+        .set({ status: "pending", decidedByUserId: null, decidedAt: null })
+        .where(eq(contextProposals.id, decided.id));
+      throw error;
+    }
+  }
   if (decided.agentId) caches.agents.delete(`${orgId}:${decided.agentId}`);
   caches.orgs.delete(`${orgId}:`);
   // The editors cleared these inside this transaction: a run reading in between may have cached the old ones.

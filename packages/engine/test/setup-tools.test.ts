@@ -112,11 +112,12 @@ describe("the setup group", () => {
       "offer_connect_app",
       "offer_invites",
       "propose_agent",
+      "propose_remove_agents",
     ]);
     expect(deferrableGroups(granted).map((g) => [g.key, g.label])).toEqual([
       [
         "setup",
-        "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents)",
+        "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents, archive or delete agents)",
       ],
     ]);
     // Not loaded: behind find_tools; loaded: as they are.
@@ -127,10 +128,12 @@ describe("the setup group", () => {
       "offer_connect_app",
       "offer_invites",
       "propose_agent",
+      "propose_remove_agents",
     ]);
     const kind = (name: string) => toolKind({ name, scope: SETUP_SCOPE, connectionId: null }).kind;
     expect(kind("offer_connect_ai")).toBe("here");
     expect(kind("propose_agent")).toBe("here");
+    expect(kind("propose_remove_agents")).toBe("here");
     expect(kind("offer_connect_app")).toBe("here");
     expect(kind("offer_invites")).toBe("here");
     expect(kind("create_channel")).toBe("elsewhere");

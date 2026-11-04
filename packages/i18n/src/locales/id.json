@@ -1734,6 +1734,7 @@
         "budget": "Hanya admin yang mengubah anggaran agen",
         "owner": "Hanya admin yang mengubah penanggung jawab agen",
         "archive": "Hanya admin yang mengarsipkan agen",
+        "delete": "Hanya admin yang menghapus agen",
         "audience": "Hanya admin dan penanggung jawabnya yang mengubah siapa yang bicara dengannya",
         "channels": "Hanya admin dan penanggung jawabnya yang mengubah kanalnya",
         "ai_account": "Hanya pemilik akun yang memberikannya",
@@ -1758,9 +1759,19 @@
       "somePeople": "Beberapa orang",
       "active": "Aktif",
       "archived": "Diarsipkan",
+      "deleted": "Dihapus",
       "notIn": "Tidak di kanal",
       "withoutMention": "Atas inisiatif sendiri",
       "mentionOnly": "Hanya saat disebut"
+    },
+    "remove": {
+      "archiveTitle_other": "Arsipkan {{count}} agen?",
+      "deleteTitle_other": "Hapus {{count}} agen selamanya?",
+      "archiveAll": "Arsipkan semua",
+      "deleteAll": "Hapus semua",
+      "archiveSome_other": "Arsipkan {{count}}",
+      "deleteSome_other": "Hapus {{count}}",
+      "deleteHelp": "Instruksi, memori, dan rutinnya hilang selamanya. Pesannya tetap ada."
     }
   },
   "routing": {

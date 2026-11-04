@@ -1877,6 +1877,7 @@
         "budget": "Seuls les admins changent le budget d’un agent",
         "owner": "Seuls les admins changent le responsable d’un agent",
         "archive": "Seuls les admins archivent un agent",
+        "delete": "Seuls les admins suppriment un agent",
         "audience": "Seuls les admins et son responsable changent qui lui parle",
         "channels": "Seuls les admins et son responsable changent ses canaux",
         "ai_account": "Seul le propriétaire du compte l’attribue",
@@ -1901,9 +1902,27 @@
       "somePeople": "Certaines personnes",
       "active": "Actif",
       "archived": "Archivé",
+      "deleted": "Supprimé",
       "notIn": "Pas dans le canal",
       "withoutMention": "De sa propre initiative",
       "mentionOnly": "Seulement quand on le mentionne"
+    },
+    "remove": {
+      "archiveTitle_one": "Archiver {{count}} agent ?",
+      "archiveTitle_many": "Archiver {{count}} agents ?",
+      "archiveTitle_other": "Archiver {{count}} agents ?",
+      "deleteTitle_one": "Supprimer {{count}} agent définitivement ?",
+      "deleteTitle_many": "Supprimer {{count}} agents définitivement ?",
+      "deleteTitle_other": "Supprimer {{count}} agents définitivement ?",
+      "archiveAll": "Tout archiver",
+      "deleteAll": "Tout supprimer",
+      "archiveSome_one": "Archiver {{count}}",
+      "archiveSome_many": "Archiver {{count}}",
+      "archiveSome_other": "Archiver {{count}}",
+      "deleteSome_one": "Supprimer {{count}}",
+      "deleteSome_many": "Supprimer {{count}}",
+      "deleteSome_other": "Supprimer {{count}}",
+      "deleteHelp": "Leurs instructions, leur mémoire et leurs routines disparaissent définitivement. Leurs messages restent."
     }
   },
   "routing": {

@@ -1,6 +1,6 @@
 # 0137. The team's right hand
 
-- Status: Accepted (built: engine, server, the shared client, the web and the phone app); amended 2026-11-03 (§5, a person alone with the team; §4 and §6 written as decided)
+- Status: Accepted (built: engine, server, the shared client, the web and the phone app); amended 2026-11-03 (§5, a person alone with the team; §4 and §6 written as decided); amended 2026-11-04 (§8, agents act on agentes.chat through their tools, never by signing in to it)
 - Date: 2026-11-03
 - Supersedes: ADR 0093 (the team's coordinator)
 - Amends: ADR 0081 (one-click Criar and Criar e testar on the right hand's cards), ADR 0092 §5 (a teammate's settings, on the right hand's card)
@@ -77,3 +77,23 @@ It runs on the workspace's AI through the Model Gateway like any agent: budget c
 - **Keep the coordinator, hide its switch:** an agent answering what nobody took with no screen saying why.
 - **Move the coordinator's routing to the right hand:** it would answer unasked in channels and run on every unclaimed message.
 - **Make it a hidden member of every channel** so mentions reach it: it would show in rosters and need a membership row per channel; reading it in the two mention lookups was smaller.
+
+## Amendment (2026-11-04): agents act on agentes.chat through their tools, never by signing in to it (§8)
+
+### Context
+
+A person asked an agent "Quero apagar todos os outros agentes e vamos reconstruir tudo novamente." The agent had no tool to archive teammates (only the right hand's settings card had an archive row), so, following the rule that a step needing a person is handed over, it opened its browser and asked the person to sign in to agentes.chat there with the admin account. That would put a person's session, with every permission they hold, on the agent's computer, outside the audit, the cards and the permission checks. In other products the agent acts on the other agents directly; here it should too, as a card.
+
+### Decision
+
+1. **A removal card for any agent** (`propose_remove_agents`, under `setup:write`, so every agent with the setup tools and the right hand): one card listing the agents to archive, or to delete for good when the person asked for that (`delete: true`). One `agent_settings` row per agent with a single `archive` or `delete` line, decided by whoever manages agents (`SETTING_GROUP`), applied as whoever clicks, one row at a time. It never names the agent that proposes it, nor the right hand. On the web it reads "Arquivar 5 agentes?" with the agents listed, each with its switch, and "Arquivar todos" (or "Arquivar 3" with some switched off) and Descartar; a person who can't archive reads "Só admins arquivam um agente" and sends every row with "Pedir a um admin"; archived, "Aplicado por você: …" and one Desfazer for the whole card (`undoMessage`). On the phone the rows show as the settings card's rows, each applied on its own.
+2. **Deleting from a card** follows ADR 0082 as it is: `manage_agents`, never the right hand, no Undo (no receipt). The row is marked accepted, then `deleteAgent` runs as the clicker outside the decision's transaction (its missions, routines and work on its computer stop there); if that fails the row is open again. A deleted agent's decided settings rows stay (its other proposals go), so the card still reads how it ended. This replaces §4's "never delete an agent" for the right hand: it still never deletes, a person does from its card.
+3. **Never sign in to agentes.chat itself.** The browser guidance says it: sign in to the account the person names, but never to agentes.chat, the app the agent works in, nor ask a person to; change the workspace with its tools and cards, and where none does it, link the person to the page. `browser_ask_person` and `desktop_ask_person` refuse a hand-off whose instructions name our own app (this server's `PUBLIC_URL` or agentes.chat and its subdomains, an email address there aside), and `browser_ask_person` also when the agent's browser shows one of its pages. The refusal names the cards to use and the links to the team and settings pages (`appPageLink`).
+4. **Rebuilding:** `propose_agent` stays one card per agent: no card proposes several agents yet. A "start over" turn is one removal card, then a `propose_agent` card per new agent, within the cards a run may post (3; 10 for the right hand).
+
+### Consequences
+
+- The tool group label names archiving and deleting, so `find_tools` reaches the card from "apaga os outros agentes" (the eval's `start-over` turn).
+- An agent can no longer use its browser on agentes.chat, even for work a person wants there (testing the product itself on its own Cloud workspace, say).
+- `ProposedSettingLine.field` gains `delete` (no migration: the lines are JSON).
+

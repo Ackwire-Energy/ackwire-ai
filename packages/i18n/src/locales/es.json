@@ -1874,6 +1874,7 @@
         "budget": "Solo los admins cambian el presupuesto de un agente",
         "owner": "Solo los admins cambian el responsable de un agente",
         "archive": "Solo los admins archivan un agente",
+        "delete": "Solo los admins eliminan un agente",
         "audience": "Solo los admins y su responsable cambian quién habla con él",
         "channels": "Solo los admins y su responsable cambian sus canales",
         "ai_account": "Solo el dueño de la cuenta la asigna",
@@ -1898,9 +1899,27 @@
       "somePeople": "Algunas personas",
       "active": "Activo",
       "archived": "Archivado",
+      "deleted": "Eliminado",
       "notIn": "Fuera del canal",
       "withoutMention": "Por su cuenta",
       "mentionOnly": "Solo cuando lo mencionan"
+    },
+    "remove": {
+      "archiveTitle_one": "¿Archivar {{count}} agente?",
+      "archiveTitle_many": "¿Archivar {{count}} agentes?",
+      "archiveTitle_other": "¿Archivar {{count}} agentes?",
+      "deleteTitle_one": "¿Eliminar {{count}} agente para siempre?",
+      "deleteTitle_many": "¿Eliminar {{count}} agentes para siempre?",
+      "deleteTitle_other": "¿Eliminar {{count}} agentes para siempre?",
+      "archiveAll": "Archivar todos",
+      "deleteAll": "Eliminar todos",
+      "archiveSome_one": "Archivar {{count}}",
+      "archiveSome_many": "Archivar {{count}}",
+      "archiveSome_other": "Archivar {{count}}",
+      "deleteSome_one": "Eliminar {{count}}",
+      "deleteSome_many": "Eliminar {{count}}",
+      "deleteSome_other": "Eliminar {{count}}",
+      "deleteHelp": "Sus instrucciones, memoria y rutinas se van para siempre. Sus mensajes se quedan."
     }
   },
   "routing": {

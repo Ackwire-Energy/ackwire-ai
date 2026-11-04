@@ -37,6 +37,7 @@ import {
   MachineRequestError,
   type MachineStatus,
   markPageRead,
+  namesOwnApp,
   openPageInControl,
   postPersonMessage,
   registerPushDevice,
@@ -69,6 +70,10 @@ const lastText = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.cont
 const reply = (req: ModelRequest) => {
   const last = lastText(req);
   if (last.includes("tool_result")) return { chunks: ["Ok."] };
+  if (last.includes("start over")) {
+    const instructions = "Entre no agentes.chat com a conta administradora; deixe o painel aberto para eu continuar.";
+    return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { instructions } }] };
+  }
   if (last.includes("sign in"))
     return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { instructions: "Sign in to Stripe" } }] };
   if (last.includes("probe")) return { chunks: [], toolUses: [{ name: "browser_probe", input: {} }] };
@@ -93,6 +98,8 @@ const probe: ToolSource = {
 
 /** Computers whose browser is ready, as the browser tools see them (no runner socket in these tests). */
 const ready = new Set<string>();
+/** The address the agent's browser shows, when a test sets one. */
+let pageUrl: string | null = null;
 const readyHub: MachineCaller = {
   async status(id): Promise<MachineStatus | null> {
     if (!ready.has(id)) return null;
@@ -109,7 +116,8 @@ const readyHub: MachineCaller = {
       access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
     } as MachineStatus;
   },
-  async call() {
+  async call(_id, request) {
+    if (pageUrl && request.op === "browser.act") return { success: true, data: { url: pageUrl } } as never;
     throw new Error("no runner in these tests");
   },
 };
@@ -117,6 +125,7 @@ const askSource = () => createBrowserHandoffToolSource({ machines: { hub: readyH
 
 async function start() {
   ready.clear();
+  pageUrl = null;
   f = await setup({ reply, machines: true, toolSources: [askSource(), probe] });
   const pubsubDeps = { db: f.db, pubsub: f.pubsub };
   const machine = await pairMachine(pubsubDeps, f.owner.id, f.org.id, { name: "MacBook" });
@@ -579,6 +588,35 @@ describe("browser_ask_person", () => {
     // An open handoff wins.
     await f.db.update(schema.agents).set({ browserMachineId: null }).where(eq(schema.agents.id, f.agent.id));
     expect(await browserMachineOf(f.db, f.org.id, f.agent.id)).toBe(other.machineId);
+  });
+
+  test("never a hand-off to sign in to our own app: named in the instructions, or the page open on it", async () => {
+    await start();
+    await post("@dev start over: delete the other agents");
+    await drainOutbox(f.db, f.handlers);
+    expect(await handoffs()).toEqual([]);
+    const refused = JSON.stringify(f.provider.calls.at(-1)?.request.messages);
+    expect(refused).toContain("Never sign in to it on your computer");
+    expect(refused).toContain("propose_remove_agents");
+    expect(refused).toContain(`/org/${f.org.id}/team`);
+
+    pageUrl = "https://app.agentes.chat/org/x/settings/members";
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    expect(await handoffs()).toEqual([]);
+    pageUrl = "https://dashboard.stripe.com/login";
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    expect(await handoffs()).toHaveLength(1);
+  });
+
+  test("what names our own app: its domains and this server's address, never a mailbox there", () => {
+    expect(namesOwnApp("Entre no agentes.chat com a conta administradora")).toBe(true);
+    expect(namesOwnApp("https://app.agentes.chat/org/1/settings")).toBe(true);
+    expect(namesOwnApp("Open http://localhost:3000/org/1 and sign in")).toBe(true);
+    expect(namesOwnApp("Type the code sent to theo@acme.agentes.chat")).toBe(false);
+    expect(namesOwnApp("Sign in to agentes.chatbot.com")).toBe(false);
+    expect(namesOwnApp("Sign in to Stripe")).toBe(false);
   });
 
   test("browser_ask_person is offered only when the agent's browser is ready", async () => {

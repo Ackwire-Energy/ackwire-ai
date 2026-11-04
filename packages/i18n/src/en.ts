@@ -1801,6 +1801,7 @@ export const en = {
         budget: "Only admins change an agent's budget",
         owner: "Only admins change who owns an agent",
         archive: "Only admins archive an agent",
+        delete: "Only admins delete an agent",
         audience: "Only admins and its owner change who talks to it",
         channels: "Only admins and its owner change its channels",
         ai_account: "Only the account's owner gives it",
@@ -1825,9 +1826,25 @@ export const en = {
       somePeople: "Some people",
       active: "Active",
       archived: "Archived",
+      deleted: "Deleted",
       notIn: "Not in it",
       withoutMention: "On its own",
       mentionOnly: "Only when mentioned",
+    },
+    /** One card that archives or deletes several agents (`propose_remove_agents`), each with its switch. */
+    remove: {
+      archiveTitle_one: "Archive {{count}} agent?",
+      archiveTitle_other: "Archive {{count}} agents?",
+      deleteTitle_one: "Delete {{count}} agent for good?",
+      deleteTitle_other: "Delete {{count}} agents for good?",
+      archiveAll: "Archive all",
+      deleteAll: "Delete all",
+      /** Some switched off: how many it archives. */
+      archiveSome_one: "Archive {{count}}",
+      archiveSome_other: "Archive {{count}}",
+      deleteSome_one: "Delete {{count}}",
+      deleteSome_other: "Delete {{count}}",
+      deleteHelp: "Their instructions, memory and routines go for good. Their messages stay.",
     },
   },
   routing: {

@@ -29,6 +29,7 @@ import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
 import { formatDuration } from "../machine-tasks";
 import { computerDrivers, drivesComputer, getMachine, requireComputerDriver, servesDesktops } from "../machines";
+import { appPageLink, namesOwnApp } from "../message-links";
 import { insertMessage, messageView } from "../messages";
 import { missionOfRun } from "../mission-context";
 import {
@@ -674,6 +675,28 @@ async function afterChange(deps: HandoffDeps, row: BrowserHandoffRow, movedFrom?
  * (`data.pause`) until they press Done or Couldn't, or it expires. The
  * agent then reads the page again and checks.
  */
+/**
+ * Why a hand-off to our own app is refused (ADR 0137 amendment): the agent already works inside it, so a person
+ * never signs it in on its computer. What it changes goes through its tools and cards, else a link to the page.
+ */
+export const ownAppRefusal = (orgId: string) =>
+  `Nothing was asked: that is agentes.chat itself, the app you work in. Never sign in to it on your computer, nor ask a person to. Change the workspace with your own tools, which post cards a person applies as themselves (propose_remove_agents archives or deletes agents, propose_agent creates them, propose_settings_change, offer_invites, offer_connect_app; find_tools finds them). When no tool does it, send the person the link to the page instead: the team ${appPageLink(orgId, "/team")}, settings ${appPageLink(orgId, "/settings/members")} (or /settings/roles, /settings/connectors, /settings/computers, /settings/usage, /settings/keys).`;
+
+/** The address the agent's browser shows, as its computer says (short: it runs before a person is asked). */
+async function browserUrl(hub: MachineCaller, machineId: string, agent: { id: string; handle: string }) {
+  try {
+    const reply = await hub.call<"browser.act">(
+      machineId,
+      { op: "browser.act", agent, command: "get", args: ["url"], timeoutSeconds: 3 },
+      { timeoutMs: 4000 },
+    );
+    const data = reply.success ? (reply.data as { url?: unknown } | null) : null;
+    return typeof data?.url === "string" ? data.url : null;
+  } catch {
+    return null;
+  }
+}
+
 export function createBrowserHandoffToolSource(
   deps: { pubsub?: PubSub; machines?: { hub: MachineCaller } } = {},
 ): ToolSource {
@@ -708,6 +731,7 @@ export function createBrowserHandoffToolSource(
     const s = SCREENS[screen];
     const instructions = String(input.instructions ?? "").trim();
     if (!instructions) return { content: "Say what the person should do.", isError: true };
+    if (namesOwnApp(instructions)) return { content: ownAppRefusal(ctx.orgId), isError: true };
     const minutes =
       typeof input.timeout_minutes === "number"
         ? Math.min(HANDOFF_TIMEOUT_MAX_MINUTES, Math.max(1, Math.floor(input.timeout_minutes)))
@@ -728,6 +752,11 @@ export function createBrowserHandoffToolSource(
         content: `Your computer ${place.name} is offline, so no one can use your ${s.what} now. Say so in your reply.`,
         isError: true,
       };
+    }
+    if (screen === "browser" && hub) {
+      const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+      const url = agent && (await browserUrl(hub, place.machineId, { id: agent.id, handle: agent.handle }));
+      if (url && namesOwnApp(url)) return { content: ownAppRefusal(ctx.orgId), isError: true };
     }
     const [run] = await ctx.db
       .select()

@@ -417,7 +417,8 @@ const GROUP_LABELS: Record<string, string> = {
   wiki: "Organization wiki (writing)",
   sandbox: "Computer and code",
   browser: "Browser",
-  setup: "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents)",
+  setup:
+    "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents, archive or delete agents)",
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",

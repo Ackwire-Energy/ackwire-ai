@@ -1801,6 +1801,7 @@
         "budget": "Bir ajanın bütçesini yalnızca yöneticiler değiştirir",
         "owner": "Bir ajanın sorumlusunu yalnızca yöneticiler değiştirir",
         "archive": "Bir ajanı yalnızca yöneticiler arşivler",
+        "delete": "Bir ajanı yalnızca yöneticiler siler",
         "audience": "Onunla kimin konuşacağını yalnızca yöneticiler ve sorumlusu değiştirir",
         "channels": "Kanallarını yalnızca yöneticiler ve sorumlusu değiştirir",
         "ai_account": "Yalnızca hesabın sahibi verebilir",
@@ -1825,9 +1826,23 @@
       "somePeople": "Bazı kişiler",
       "active": "Etkin",
       "archived": "Arşivlendi",
+      "deleted": "Silindi",
       "notIn": "Kanalda değil",
       "withoutMention": "Kendiliğinden",
       "mentionOnly": "Yalnızca bahsedilince"
+    },
+    "remove": {
+      "archiveTitle_one": "{{count}} ajan arşivlensin mi?",
+      "archiveTitle_other": "{{count}} ajan arşivlensin mi?",
+      "deleteTitle_one": "{{count}} ajan kalıcı olarak silinsin mi?",
+      "deleteTitle_other": "{{count}} ajan kalıcı olarak silinsin mi?",
+      "archiveAll": "Hepsini arşivle",
+      "deleteAll": "Hepsini sil",
+      "archiveSome_one": "{{count}} ajanı arşivle",
+      "archiveSome_other": "{{count}} ajanı arşivle",
+      "deleteSome_one": "{{count}} ajanı sil",
+      "deleteSome_other": "{{count}} ajanı sil",
+      "deleteHelp": "Talimatları, hafızaları ve rutinleri kalıcı olarak silinir. Mesajları kalır."
     }
   },
   "routing": {

@@ -32400,6 +32400,9 @@
   "rightHand.card.only.archive": {
     "value": "Only admins archive an agent"
   },
+  "rightHand.card.only.delete": {
+    "value": "Only admins delete an agent"
+  },
   "rightHand.card.only.audience": {
     "value": "Only admins and its owner change who talks to it"
   },
@@ -32457,6 +32460,9 @@
   "rightHand.value.archived": {
     "value": "Archived"
   },
+  "rightHand.value.deleted": {
+    "value": "Deleted"
+  },
   "rightHand.value.notIn": {
     "value": "Not in it"
   },
@@ -32465,6 +32471,39 @@
   },
   "rightHand.value.mentionOnly": {
     "value": "Only when mentioned"
+  },
+  "rightHand.remove.archiveTitle": {
+    "value": {
+      "one": "Archive {{count}} agent?",
+      "other": "Archive {{count}} agents?"
+    }
+  },
+  "rightHand.remove.deleteTitle": {
+    "value": {
+      "one": "Delete {{count}} agent for good?",
+      "other": "Delete {{count}} agents for good?"
+    }
+  },
+  "rightHand.remove.archiveAll": {
+    "value": "Archive all"
+  },
+  "rightHand.remove.deleteAll": {
+    "value": "Delete all"
+  },
+  "rightHand.remove.archiveSome": {
+    "value": {
+      "one": "Archive {{count}}",
+      "other": "Archive {{count}}"
+    }
+  },
+  "rightHand.remove.deleteSome": {
+    "value": {
+      "one": "Delete {{count}}",
+      "other": "Delete {{count}}"
+    }
+  },
+  "rightHand.remove.deleteHelp": {
+    "value": "Their instructions, memory and routines go for good. Their messages stay."
   },
   "agentActions.agent.settings_changed": {
     "value": "Changed the settings of <b>{{agentName}}</b>"

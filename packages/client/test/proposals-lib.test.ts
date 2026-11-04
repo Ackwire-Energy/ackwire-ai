@@ -11,6 +11,7 @@ import {
   messageProposalCards,
   proposalSections,
   proposerOf,
+  removalOf,
   rowStatus,
   staleCount,
 } from "../src/lib/proposals";
@@ -154,5 +155,17 @@ describe("how a decided card ended", () => {
       accepted: true,
       label: 'proposals.acceptedSome {"done":1,"total":2}',
     });
+  });
+});
+
+describe("removalOf", () => {
+  const line = (field: "archive" | "delete" | "model") => ({ settings: [{ field, from: false, to: true }] });
+  test("a card whose every row archives (or deletes) one agent, else none", () => {
+    expect(removalOf([line("archive"), line("archive")])).toBe("archive");
+    expect(removalOf([line("delete")])).toBe("delete");
+    expect(removalOf([line("archive"), line("delete")])).toBeNull();
+    expect(removalOf([line("archive"), line("model")])).toBeNull();
+    expect(removalOf([{ settings: [...line("archive").settings, ...line("model").settings] }])).toBeNull();
+    expect(removalOf([])).toBeNull();
   });
 });

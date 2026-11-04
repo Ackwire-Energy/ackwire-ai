@@ -1786,7 +1786,8 @@ export type ProposalSettingField =
   | "channel_add"
   | "channel_remove"
   | "reply_mode"
-  | "archive";
+  | "archive"
+  | "delete";
 
 /**
  * One line of a settings card: `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or

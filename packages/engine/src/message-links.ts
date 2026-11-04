@@ -14,6 +14,28 @@ export function setMessageLinkBase(publicUrl: string) {
   base = publicUrl.replace(/\/+$/, "");
 }
 
+/** A page of this workspace in the web app (`/team`, `/settings/members`), as an agent links a person to it. */
+export const appPageLink = (orgId: string, path: string) => `${base}/org/${orgId}${path}`;
+
+/** The Cloud's domain: an address under it is our own app wherever this server runs. */
+const PRODUCT_HOST = "agentes.chat";
+
+/**
+ * Whether an address or a sentence names our own app: this server's address (`PUBLIC_URL`), or agentes.chat and its
+ * subdomains. An email address on those domains (an agent's own mailbox) doesn't count.
+ */
+export function namesOwnApp(text: string): boolean {
+  if (text.includes(base)) return true;
+  const own = new URL(base).hostname;
+  const hosts = own.includes(".") ? [PRODUCT_HOST, own] : [PRODUCT_HOST];
+  return text
+    .toLowerCase()
+    .split(/[^\w.@-]+/)
+    .filter((word) => !word.includes("@"))
+    .map((word) => word.replace(/\.+$/, ""))
+    .some((word) => hosts.some((h) => word === h || word.endsWith(`.${h}`)));
+}
+
 /** A message's permalink on this server, as agents write it and the apps show it as a pill. */
 export const messageLink = (orgId: string, m: MessagePlace) => `${base}${messagePath(orgId, m)}`;
 
