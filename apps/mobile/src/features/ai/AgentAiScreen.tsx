@@ -6,7 +6,7 @@ import { advancedContents } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { brainPlan, isPlanId, planFreeHint, planOf } from "@agenteschat/client/lib/plans";
+import { brainPlan, geminiPersonal, isPlanId, planFreeHint, planOf } from "@agenteschat/client/lib/plans";
 import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { extraUsageOn, limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -237,6 +237,9 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     />
                   ) : null}
                 </GroupedList>
+                {kind === "antigravity" && geminiPersonal(current) ? (
+                  <Note icon="info">{t("connectAi.plan.gemini.warning")}</Note>
+                ) : null}
                 {lockedHere ? (
                   <Note icon="lock">
                     {t("connectAi.accountsLocked", { name: pairer?.name.split(" ")[0] ?? "", computer })}

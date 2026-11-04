@@ -424,3 +424,69 @@ export function probeCodexUsage(p: UsageProbe): Promise<PlanUsage | null> {
     },
   );
 }
+
+const DURATION_UNIT: Record<string, number> = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1000 };
+
+/**
+ * When a quota refreshes, from words like "resets in 2h 13m", "refreshes in 3 days" or "Resets at 2026-11-05T10:00Z":
+ * the ISO time, or undefined.
+ */
+export function resetFromWords(text: string, now = Date.now()): string | undefined {
+  const at = /\b(?:resets?|refresh(?:es)?)\s+(?:at|on)\s+(\d{4}-\d{2}-\d{2}[T ][\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)/i.exec(
+    text,
+  );
+  if (at?.[1]) return resetIso(at[1].replace(" ", "T"));
+  const rel =
+    /\b(?:resets?|refresh(?:es)?)\s+in\s+((?:\d+\s*(?:d(?:ays?)?|h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)[\s,]*)+)/i.exec(
+      text,
+    );
+  if (!rel?.[1]) return undefined;
+  let ms = 0;
+  for (const m of rel[1].matchAll(/(\d+)\s*([dhms])/gi))
+    ms += Number(m[1]) * (DURATION_UNIT[(m[2] ?? "").toLowerCase()] ?? 0);
+  return ms > 0 ? iso(now + ms) : undefined;
+}
+
+/**
+ * The Antigravity CLI's `/usage` report (ADR 0143), printed in print mode: per model group, its "Five Hour Limit
+ * Remaining" and "Weekly Limit Remaining" as percentages left (antigravity.google/docs/models' View Usage panel, read
+ * 2026-11-04), with when each refreshes where it says. The first group's (Gemini's) are the plan's windows; another
+ * group's ("Claude and GPT models") come as `other` with its name.
+ * ponytail: read from the docs' panel, not a real report; the probe drops what it can't read.
+ */
+export function antigravityUsage(text: string, source: PlanUsage["source"], now = Date.now()): PlanUsage | null {
+  const lines = text
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: the CLI's colors
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .split("\n")
+    .map((l) => l.trim());
+  const windows: PlanWindow[] = [];
+  let group = "";
+  let first: string | undefined;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const which = /five[- ]hour/i.test(line) ? "five_hour" : /weekly|seven[- ]day/i.test(line) ? "seven_day" : null;
+    if (!which) {
+      if (/\bmodels?\b/i.test(line) && !/%/.test(line) && line.length <= 60) {
+        group = line.replace(/[:]+$/, "");
+      }
+      continue;
+    }
+    const near = `${line} ${lines[i + 1] ?? ""}`;
+    const left = /(\d{1,3}(?:\.\d+)?)\s*%/.exec(near);
+    if (!left?.[1]) continue;
+    const remaining = /remaining|left/i.test(line);
+    const used = remaining ? 100 - Number(left[1]) : Number(left[1]);
+    const at = resetFromWords(`${near} ${lines[i + 2] ?? ""}`, now);
+    first ??= group;
+    const other = group !== first && group;
+    windows.push({
+      ...(other
+        ? { kind: "other" as const, label: label(`${group} · ${which === "five_hour" ? "5h" : "7d"}`) }
+        : { kind: which }),
+      usedPercent: percent(used),
+      ...(at ? { resetsAt: at } : {}),
+    });
+  }
+  return snapshot(windows, source, now);
+}

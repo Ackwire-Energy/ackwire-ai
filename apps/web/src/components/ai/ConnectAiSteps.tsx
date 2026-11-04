@@ -51,7 +51,7 @@ import {
   planTitle,
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
-import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
+import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
 import {
   AUTO,
   keyLooksValid,
@@ -424,6 +424,9 @@ export function ExistingThinks({ agent, used }: { agent: PlanAgent; used: Existi
       <SettingNote icon="check" live>
         {t("aiAccounts.done.savedAgent", { agent: agent.name, label: used.label })}
       </SettingNote>
+      {a?.kind === "antigravity" && geminiPersonal(a) && (
+        <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+      )}
       {a && (
         <div className="ac-card__foot ac-iconline ai-panel__replies">
           <Icon name={on ? "audienceEveryone" : "audienceOwner"} size={14} />
@@ -578,9 +581,14 @@ export function PlanWithoutAgent({
         sub={t(`connectAi.plan.${choice}.tiers`)}
       />
       {has ? (
-        <SettingNote icon="check" live>
-          {t("connectAi.forNewAgents", { label: has.label })}
-        </SettingNote>
+        <>
+          <SettingNote icon="check" live>
+            {t("connectAi.forNewAgents", { label: has.label })}
+          </SettingNote>
+          {choice === "gemini" && geminiPersonal(has) && (
+            <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+          )}
+        </>
       ) : (
         <>
           <GateWait
@@ -855,7 +863,7 @@ function PlanSteps({
   const ready = gate.state === "ready";
   const brand = planLabel(t, choice);
   const current = view?.accounts.find(
-    (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
+    (a) => a.id === view.account && a.kind === kind && providerFitsChoice(a.provider, choice, coding),
   );
   // The sign-in in play: one just made, the computer's own chosen here, or what the agent already thinks with.
   const signIn = own?.chosen || ownSaved ? OWN_SIGN_IN : view?.brain === kind ? view : undefined;
@@ -983,7 +991,7 @@ function PlanSteps({
               a.mine &&
               a.status === "active" &&
               a.kind === kind &&
-              (coding ? a.provider === choice : !a.provider) &&
+              providerFitsChoice(a.provider, choice, coding) &&
               (everyone || a.id !== view?.account),
           ),
         ).flatMap((g) => g.logins.slice(0, 1))
@@ -1047,6 +1055,9 @@ function PlanSteps({
         </p>
       )}
       {retry}
+      {choice === "gemini" && choosing && !otherChosen && existing.some(geminiPersonal) && (
+        <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
+      )}
       {choosing && (
         // Who shares the sign-in: the computer's own, which any of its pairer's agents there thinks with, an account
         // of this plan the person already has there for all of their agents, or another sign-in (ADR 0059 §2). Small
@@ -1093,7 +1104,11 @@ function PlanSteps({
           kind={kind}
           // The Cloud's one computer goes unnamed in the account choice: the sign-in is about the account, not where.
           computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
-          {...(coding ? { provider: choice } : {})}
+          {...(coding
+            ? { provider: choice }
+            : signInProviderOf(signedOut?.provider)
+              ? { provider: signInProviderOf(signedOut?.provider) }
+              : {})}
           again={login ? login.again : signedOut?.id}
           fresh={existing.length > 0 && otherChosen}
           email={turn && sameAs ? sameAs : login ? login.email : signedOut?.email}

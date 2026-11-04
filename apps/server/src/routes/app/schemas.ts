@@ -292,7 +292,7 @@ export const Agent = z
     brakes: AgentBrakes,
     brain: z
       .object({
-        kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode"]),
+        kind: z.enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]),
         model: z
           .string()
           .nullable()
@@ -639,7 +639,9 @@ export const Model = z
   .openapi("Model");
 
 /** ADR 0032: who thinks for an agent. */
-export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor", "opencode"]).openapi("BrainKind");
+export const BrainKind = z
+  .enum(["model", "claude_code", "codex", "cursor", "opencode", "grok", "antigravity"])
+  .openapi("BrainKind");
 
 export const BrainOption = z
   .object({

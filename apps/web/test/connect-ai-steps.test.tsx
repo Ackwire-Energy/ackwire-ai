@@ -214,7 +214,7 @@ const chatgptPlus = account({
 });
 
 describe("Conectar uma IA: one picker, plans first", () => {
-  test("Settings › AI accounts opens the same picker: eight plans, then the API key, Claude chosen with its sign-in", async () => {
+  test("Settings › AI accounts opens the same picker: ten plans, then the API key, Claude chosen with its sign-in", async () => {
     const { dialog, tile } = await connect();
     const group = within(dialog).getByRole("group", { name: "Qual IA eles vão usar?" });
     const options = [...group.querySelectorAll(":scope > .ac-option")];
@@ -223,6 +223,8 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "ChatGPT",
       "Cursor",
       "OpenCode",
+      "Grok",
+      "Gemini",
       "GLM Coding",
       "Kimi Code",
       "MiniMax",
@@ -232,7 +234,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Each by its maker's mark; the key row by four of them, overlapped.
     expect(
       options.flatMap((o) => [...o.querySelectorAll(".ac-brand--sm")]).map((m) => m.getAttribute("data-mark")),
-    ).toEqual(["claude", "openai", "cursor", "opencode", "zai", "kimi", "minimax", "opencode"]);
+    ).toEqual(["claude", "openai", "cursor", "opencode", "grok", "gemini", "zai", "kimi", "minimax", "opencode"]);
     const stack = tile("Chave de API").querySelector(".ac-brand-stack");
     expect([...(stack?.querySelectorAll(".ac-brand") ?? [])].map((m) => m.getAttribute("data-mark"))).toEqual([
       "claude",
@@ -244,7 +246,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(tile("Claude").getAttribute("aria-pressed")).toBe("true");
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     // Right under the plans: the API key row comes after Claude's steps, never between Claude and them.
-    expect(options[7]?.nextElementSibling).toBe(panel);
+    expect(options[9]?.nextElementSibling).toBe(panel);
     expect(panel.compareDocumentPosition(tile("Chave de API")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(panel.textContent).toContain("Pro, Max, Ultra, Team ou Enterprise");
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
@@ -457,6 +459,32 @@ describe("Conectar uma IA: one picker, plans first", () => {
       { provider: "cursor" },
     ]);
     expect(JSON.stringify(state.calls)).not.toContain("key_fake_0000000000001234");
+  });
+
+  test("Gemini (ADR 0143): Google's warning said plainly on a personal plan, gone for Gemini Enterprise, which signs in as one", async () => {
+    const base = fakeAgentBrain(ADA_ID);
+    const geminiOption = { kind: "antigravity" as const, available: true, models: [], defaultModel: null };
+    const { state, dialog, tile } = await connect({
+      computers: [{ ...MAC, brains: { claude_code: true, codex: true, antigravity: true } }],
+      brain: { options: [...base.options, geminiOption] },
+    });
+    await click(tile("Gemini"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Gemini" });
+    expect(panel.textContent).toContain("Google AI Pro, Google AI Ultra ou Gemini Enterprise");
+    const warning =
+      "O Google diz que usar um plano pessoal do Gemini dentro de outros apps pode suspender a conta. Para não correr esse risco, use uma chave de API ou o Gemini Enterprise.";
+    expect(shownText(panel)).toContain(warning);
+    await click(within(panel).getByRole("button", { name: "Usar o Gemini Enterprise" }));
+    expect(shownText(panel)).not.toContain(warning);
+    expect(shownText(panel)).toContain("A sua conta do Gemini Enterprise");
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com Google" })));
+    await settle(6);
+    expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "antigravity",
+      { provider: "enterprise" },
+    ]);
   });
 
   test("a sign-in starting: the line under its title says the computer is asked, until it answers, and only then", async () => {

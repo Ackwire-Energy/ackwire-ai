@@ -37,7 +37,7 @@ import {
   signsInOnce,
   signsInPerAgent,
 } from "../src/lib/no-ai";
-import { LOGIN_PER_AGENT, OPENCODE_KEY_PLAN, SHARED_SIGN_INS, signInKey } from "../src/lib/plans";
+import { LOGIN_PER_AGENT, OPENCODE_KEY_PLAN, providerFitsChoice, SHARED_SIGN_INS, signInKey } from "../src/lib/plans";
 
 const setup = (patch: Partial<ComputerSetup> = {}) =>
   setupView({
@@ -374,13 +374,26 @@ describe("the agent a plan starts on, and the order of the plans", () => {
     expect(firstAgent([], () => false)).toBeUndefined();
   });
 
-  test("Claude, ChatGPT, Cursor, OpenCode, then the coding plans; ChatGPT signs in through Codex, Cursor and OpenCode through their own CLIs", () => {
-    expect(PLAN_CHOICES).toEqual(["claude", "chatgpt", "cursor", "zen", "zai", "kimi", "minimax", "opencode"]);
+  test("Claude, ChatGPT, Cursor, OpenCode, Grok, Gemini, then the coding plans; ChatGPT signs in through Codex, the others through their own CLIs", () => {
+    expect(PLAN_CHOICES).toEqual([
+      "claude",
+      "chatgpt",
+      "cursor",
+      "zen",
+      "grok",
+      "gemini",
+      "zai",
+      "kimi",
+      "minimax",
+      "opencode",
+    ]);
     expect(PLAN_CHOICES.map((c: PlanChoice) => kindOf(c))).toEqual([
       "claude_code",
       "codex",
       "cursor",
       "opencode",
+      "grok",
+      "antigravity",
       "claude_code",
       "claude_code",
       "claude_code",
@@ -497,6 +510,19 @@ describe("All agents: one login per agent, the key pasted once", () => {
     expect(agentAi({ brain: { kind: "claude_code", model: null } }, "no_ai")).toBe("claude");
     expect(agentAi({ brain: { kind: "claude_code", model: null, provider: "zai" } }, "ready")).toBe("zai");
     expect(agentAi({ brain: { kind: "model", model: null } }, "ready")).toBe("key");
+    expect(agentAi({ brain: { kind: "grok", model: null } }, "ready")).toBe("grok");
+    expect([planOfKind("grok"), planMark("grok")]).toEqual(["grok", "grok"]);
+    expect(agentAi({ brain: { kind: "antigravity", model: null } }, "ready")).toBe("gemini");
+    expect([planOfKind("antigravity"), planMark("gemini"), kindOf("gemini")]).toEqual([
+      "gemini",
+      "gemini",
+      "antigravity",
+    ]);
+    // A Gemini Enterprise seat is an account of the Gemini plan, as a personal Google one; a coding plan, its key's.
+    expect(providerFitsChoice("enterprise", "gemini", false)).toBe(true);
+    expect(providerFitsChoice(null, "gemini", false)).toBe(true);
+    expect(providerFitsChoice("zai", "claude", false)).toBe(false);
+    expect(providerFitsChoice("zai", "zai", true)).toBe(true);
     expect(agentAi({ brain: { kind: "model", model: null } }, "no_ai")).toBeNull();
     expect(agentAi(undefined, undefined)).toBeNull();
   });

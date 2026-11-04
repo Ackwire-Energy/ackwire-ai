@@ -2000,6 +2000,10 @@
       "codex_female": "Codex is niet ingelogd op deze computer. Koppel een ChatGPT-account op de pagina van {{name}}.",
       "cursor": "Cursor is niet ingelogd op deze computer. Koppel een Cursor-account op de pagina van {{name}}.",
       "cursor_female": "Cursor is niet ingelogd op deze computer. Koppel een Cursor-account op de pagina van {{name}}.",
+      "grok": "Grok is niet ingelogd op deze computer. Koppel een Grok-account op de pagina van {{name}}.",
+      "grok_female": "Grok is niet ingelogd op deze computer. Koppel een Grok-account op de pagina van {{name}}.",
+      "antigravity": "Gemini is niet ingelogd op deze computer. Koppel een Gemini-account op de pagina van {{name}}.",
+      "antigravity_female": "Gemini is niet ingelogd op deze computer. Koppel een Gemini-account op de pagina van {{name}}.",
       "opencode": "OpenCode kan niet denken op deze computer. Koppel een OpenCode-sleutel op de pagina van {{name}}.",
       "opencode_female": "OpenCode kan niet denken op deze computer. Koppel een OpenCode-sleutel op de pagina van {{name}}."
     },
@@ -2029,6 +2033,8 @@
       "claude": "Koppel je Claude-abonnement",
       "chatgpt": "Koppel je ChatGPT-abonnement",
       "cursor": "Koppel je Cursor-abonnement",
+      "grok": "Koppel je Grok-abonnement",
+      "gemini": "Koppel je Gemini-abonnement",
       "zen": "Koppel OpenCode",
       "api_key": "Een API-sleutel toevoegen"
     },
@@ -2053,6 +2059,15 @@
       "cursor": {
         "title": "Je Cursor-abonnement",
         "tiers": "Pro, Pro+, Ultra of Teams, of een Cursor-API-sleutel"
+      },
+      "grok": {
+        "title": "Je Grok-abonnement",
+        "tiers": "SuperGrok, SuperGrok Heavy of X Premium+"
+      },
+      "gemini": {
+        "title": "Je Gemini-abonnement",
+        "tiers": "Google AI Pro, Google AI Ultra of Gemini Enterprise",
+        "warning": "Volgens Google kan het gebruik van een persoonlijk Gemini-abonnement in andere apps ertoe leiden dat het account wordt geschorst. Wil je dat risico niet lopen? Gebruik een API-sleutel of Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2135,6 +2150,8 @@
       "claude_code": "Claude is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Claude en probeer het opnieuw.",
       "codex": "ChatGPT is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van ChatGPT en probeer het opnieuw.",
       "cursor": "Cursor is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Cursor en probeer het opnieuw.",
+      "grok": "Grok is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Grok en probeer het opnieuw.",
+      "antigravity": "Gemini is ingelogd als {{email}}, niet als {{account}}. Log uit op de pagina van Google en probeer het opnieuw.",
       "opencode": "OpenCode is ingelogd als {{email}}, niet als {{account}}. Probeer het opnieuw met de juiste sleutel."
     },
     "useAnyway": "{{email}} gebruiken",
@@ -3703,21 +3720,31 @@
             "claude_code": "Claude-account toevoegen",
             "codex": "ChatGPT-account toevoegen",
             "cursor": "Cursor-account toevoegen",
+            "grok": "Grok-account toevoegen",
+            "antigravity": "Gemini-account toevoegen",
             "opencode": "Een OpenCode-sleutel toevoegen"
           },
           "stepOne": {
             "claude_code": "Het account met je abonnement",
             "codex": "Het account met je abonnement",
-            "cursor": "Het account met je abonnement"
+            "cursor": "Het account met je abonnement",
+            "grok": "Het account met je abonnement",
+            "antigravity": "Het Google-account met je abonnement",
+            "antigravityEnterprise": "Je Gemini Enterprise-account"
           },
           "stepOneHint": "Verkeerd account? Log daar uit en probeer het opnieuw. Het account blijft alleen op {{computer}}. Je typt je wachtwoord op de pagina van {{brand}}.",
           "open": {
             "claude_code": "Inloggen met Claude",
             "codex": "Inloggen met ChatGPT",
-            "cursor": "Inloggen met Cursor"
+            "cursor": "Inloggen met Cursor",
+            "grok": "Inloggen met Grok",
+            "antigravity": "Inloggen met Google"
           },
           "opencodeFree": "De gratis modellen van OpenCode hebben geen sleutel nodig. Een sleutel uit de OpenCode-console voegt de betaalde toe.",
           "cursorFinish": "Log in op de pagina van Cursor, dan rondt {{computer}} het inloggen vanzelf af.",
+          "grokFinish": "Log in op de pagina van Grok, dan rondt {{computer}} het inloggen vanzelf af.",
+          "geminiEnterprise": "Gebruik liever Gemini Enterprise",
+          "geminiPersonal": "Gebruik liever een persoonlijk Google-account",
           "cursorKey": "Gebruik liever een Cursor-API-sleutel",
           "copyLink": "Link kopiëren",
           "openAgain": "Opnieuw openen",
@@ -3729,6 +3756,7 @@
           "sent": "Code verstuurd. Inloggen wordt afgerond op {{computer}}.",
           "local": "Zit je op {{computer}} zelf? Als de browser vanzelf openging, geef daar gewoon toestemming.",
           "deviceCode": "Code voor ChatGPT",
+          "grokCode": "Code voor Grok",
           "deviceCodeText": "Typ deze code op de pagina die opent.",
           "starting": "{{computer}} vragen…",
           "waiting": "Wachten",
@@ -3739,6 +3767,8 @@
             "claude_code": "Claude is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Claude en probeer het opnieuw.",
             "codex": "ChatGPT is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van ChatGPT en probeer het opnieuw.",
             "cursor": "Cursor is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Cursor en probeer het opnieuw.",
+            "grok": "Grok is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Grok en probeer het opnieuw.",
+            "antigravity": "Gemini is ingelogd als {{account}}, een account dat je al hebt gekoppeld. Wil je een ander gebruiken? Log uit op de pagina van Google en probeer het opnieuw.",
             "opencode": "Die OpenCode-sleutel is al gekoppeld als {{account}}."
           },
           "startFailed": "Geen antwoord van {{computer}}. Probeer het zo opnieuw.",
@@ -7316,6 +7346,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Werk agentes bij op de computer om de sleutel van een abonnement te gebruiken"
@@ -8734,21 +8766,29 @@
       "claude": "{{model}} op het Claude-abonnement",
       "chatgpt": "{{model}} op het ChatGPT-abonnement",
       "cursor": "{{model}} op het Cursor-abonnement",
+      "grok": "{{model}} op het Grok-abonnement",
+      "gemini": "{{model}} op het Gemini-abonnement",
       "zen": "{{model}} via OpenCode",
       "coding": "{{model}} op {{plan}}",
       "claudeOf": "{{model}} op het Claude-abonnement van {{owner}}",
       "chatgptOf": "{{model}} op het ChatGPT-abonnement van {{owner}}",
       "cursorOf": "{{model}} op het Cursor-abonnement van {{owner}}",
+      "grokOf": "{{model}} op het Grok-abonnement van {{owner}}",
+      "geminiOf": "{{model}} op het Gemini-abonnement van {{owner}}",
       "zenOf": "{{model}} via de OpenCode van {{owner}}",
       "codingOf": "{{model}} op {{plan}} van {{owner}}",
       "claudeAuto": "Claude-abonnement",
       "chatgptAuto": "ChatGPT-abonnement",
       "cursorAuto": "Cursor-abonnement",
+      "grokAuto": "Grok-abonnement",
+      "geminiAuto": "Gemini-abonnement",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Claude-abonnement van {{owner}}",
       "chatgptAutoOf": "ChatGPT-abonnement van {{owner}}",
       "cursorAutoOf": "Cursor-abonnement van {{owner}}",
+      "grokAutoOf": "Grok-abonnement van {{owner}}",
+      "geminiAutoOf": "Gemini-abonnement van {{owner}}",
       "zenAutoOf": "OpenCode van {{owner}}",
       "codingAutoOf": "{{plan}} van {{owner}}",
       "on": "{{line}} op {{computer}}"
@@ -8761,7 +8801,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "Via de API",
@@ -8772,6 +8814,8 @@
     "claude_codeText": "Gebruikt het Claude-abonnement van wie de computer koppelde.",
     "codexText": "Gebruikt het ChatGPT-abonnement van wie de computer koppelde.",
     "cursorText": "Gebruikt het Cursor-abonnement van wie de computer koppelde.",
+    "grokText": "Gebruikt het Grok-abonnement van wie de computer koppelde.",
+    "antigravityText": "Gebruikt het Gemini-abonnement van wie de computer koppelde.",
     "opencodeText": "De gratis modellen van OpenCode, of de OpenCode-sleutel van wie de computer koppelde.",
     "cursorModel": {
       "inPlan": "In je Cursor-abonnement",
@@ -8816,6 +8860,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, zonder terugval op de API"
     },
@@ -11157,6 +11203,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Opdrachten",
         "browser": "Browser"
@@ -11165,6 +11213,8 @@
         "claude": "Schrijft en wijzigt bestanden, alleen in de toegestane mappen.",
         "codex": "Zoals Claude Code, met een ChatGPT-account. Alleen in de toegestane mappen.",
         "cursor": "Zoals Claude Code, met een Cursor-account. Alleen in de toegestane mappen.",
+        "grok": "Zoals Claude Code, met een Grok-account. Alleen in de toegestane mappen.",
+        "antigravity": "Zoals Claude Code, met een Gemini-account. Alleen in de toegestane mappen.",
         "opencode": "Zoals Claude Code, met de gratis modellen van OpenCode of een OpenCode-sleutel. Alleen in de toegestane mappen.",
         "commands": "Voert Terminal-opdrachten uit, zoals tests en builds."
       },

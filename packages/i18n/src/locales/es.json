@@ -2071,6 +2071,8 @@
       "claude_code": "Claude Code no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Claude en la página de {{name}}.",
       "codex": "Codex no tiene la sesión iniciada en esta computadora. Conecta una cuenta de ChatGPT en la página de {{name}}.",
       "cursor": "Cursor no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Cursor en la página de {{name}}.",
+      "grok": "Grok no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Grok en la página de {{name}}.",
+      "antigravity": "Gemini no tiene la sesión iniciada en esta computadora. Conecta una cuenta de Gemini en la página de {{name}}.",
       "opencode": "OpenCode no puede pensar en esta computadora. Conecta una clave de OpenCode en la página de {{name}}."
     },
     "card": {
@@ -2099,6 +2101,8 @@
       "claude": "Conecta tu plan de Claude",
       "chatgpt": "Conecta tu plan de ChatGPT",
       "cursor": "Conecta tu plan de Cursor",
+      "grok": "Conecta tu plan de Grok",
+      "gemini": "Conecta tu plan de Gemini",
       "zen": "Conectar OpenCode",
       "api_key": "Agrega una clave de API"
     },
@@ -2123,6 +2127,15 @@
       "cursor": {
         "title": "Tu plan de Cursor",
         "tiers": "Pro, Pro+, Ultra o Teams, o una clave de API de Cursor"
+      },
+      "grok": {
+        "title": "Tu plan de Grok",
+        "tiers": "SuperGrok, SuperGrok Heavy o X Premium+"
+      },
+      "gemini": {
+        "title": "Tu plan de Gemini",
+        "tiers": "Google AI Pro, Google AI Ultra o Gemini Enterprise",
+        "warning": "Google dice que usar un plan personal de Gemini dentro de otras apps puede hacer que suspendan la cuenta. Para no correr ese riesgo, usa una clave de API o Gemini Enterprise."
       },
       "zen": {
         "title": "OpenCode",
@@ -2205,6 +2218,8 @@
       "claude_code": "Claude inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Claude e intenta de nuevo.",
       "codex": "ChatGPT inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de ChatGPT e intenta de nuevo.",
       "cursor": "Cursor inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Cursor e intenta de nuevo.",
+      "grok": "Grok inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Grok e intenta de nuevo.",
+      "antigravity": "Gemini inició sesión como {{email}}, no como {{account}}. Cierra sesión en la página de Google e intenta de nuevo.",
       "opencode": "OpenCode inició sesión como {{email}}, no como {{account}}. Inténtalo de nuevo con la clave correcta."
     },
     "useAnyway": "Usar {{email}}",
@@ -3798,21 +3813,31 @@
             "claude_code": "Agregar una cuenta de Claude",
             "codex": "Agregar una cuenta de ChatGPT",
             "cursor": "Agregar una cuenta de Cursor",
+            "grok": "Agregar una cuenta de Grok",
+            "antigravity": "Agregar una cuenta de Gemini",
             "opencode": "Agregar una clave de OpenCode"
           },
           "stepOne": {
             "claude_code": "La cuenta con tu plan",
             "codex": "La cuenta con tu plan",
-            "cursor": "La cuenta con tu plan"
+            "cursor": "La cuenta con tu plan",
+            "grok": "La cuenta con tu plan",
+            "antigravity": "La cuenta de Google con tu plan",
+            "antigravityEnterprise": "Tu cuenta de Gemini Enterprise"
           },
           "stepOneHint": "¿Cuenta equivocada? Cierra sesión allí e inténtalo de nuevo. La cuenta queda solo en {{computer}}. Escribes tu contraseña en la página de {{brand}}.",
           "open": {
             "claude_code": "Iniciar sesión con Claude",
             "codex": "Iniciar sesión con ChatGPT",
-            "cursor": "Iniciar sesión con Cursor"
+            "cursor": "Iniciar sesión con Cursor",
+            "grok": "Iniciar sesión con Grok",
+            "antigravity": "Iniciar sesión con Google"
           },
           "opencodeFree": "Los modelos gratis de OpenCode no necesitan clave. Una clave de la consola de OpenCode suma los de pago.",
           "cursorFinish": "Inicia sesión en la página de Cursor y el inicio de sesión termina solo en {{computer}}.",
+          "grokFinish": "Inicia sesión en la página de Grok y el inicio de sesión termina solo en {{computer}}.",
+          "geminiEnterprise": "Usar Gemini Enterprise",
+          "geminiPersonal": "Usar una cuenta personal de Google",
           "cursorKey": "Usar una clave de API de Cursor",
           "copyLink": "Copiar enlace",
           "openAgain": "Abrir de nuevo",
@@ -3824,6 +3849,7 @@
           "sent": "Código enviado. Terminando el inicio de sesión en {{computer}}.",
           "local": "¿Estás en {{computer}}? Si su navegador se abrió solo, autoriza allí.",
           "deviceCode": "Código para ChatGPT",
+          "grokCode": "Código para Grok",
           "deviceCodeText": "Escribe este código en la página que se abre.",
           "starting": "Consultando a {{computer}}…",
           "waiting": "Esperando",
@@ -3834,6 +3860,8 @@
             "claude_code": "Claude inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Claude e inténtalo de nuevo.",
             "codex": "ChatGPT inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de ChatGPT e inténtalo de nuevo.",
             "cursor": "Cursor inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Cursor e inténtalo de nuevo.",
+            "grok": "Grok inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Grok e inténtalo de nuevo.",
+            "antigravity": "Gemini inició sesión como {{account}}, una cuenta que ya conectaste. Para usar otra, cierra sesión en la página de Google e inténtalo de nuevo.",
             "opencode": "Esa clave de OpenCode ya está conectada como {{account}}."
           },
           "startFailed": "{{computer}} no respondió. Inténtalo de nuevo en un momento.",
@@ -7506,6 +7534,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Actualiza agentes en la computadora para usar la clave de un plan"
@@ -8965,21 +8995,29 @@
       "claude": "{{model}} con el plan de Claude",
       "chatgpt": "{{model}} con el plan de ChatGPT",
       "cursor": "{{model}} con el plan de Cursor",
+      "grok": "{{model}} con el plan de Grok",
+      "gemini": "{{model}} con el plan de Gemini",
       "zen": "{{model}} con OpenCode",
       "coding": "{{model}} con {{plan}}",
       "claudeOf": "{{model}} con el plan de Claude de {{owner}}",
       "chatgptOf": "{{model}} con el plan de ChatGPT de {{owner}}",
       "cursorOf": "{{model}} con el plan de Cursor de {{owner}}",
+      "grokOf": "{{model}} con el plan de Grok de {{owner}}",
+      "geminiOf": "{{model}} con el plan de Gemini de {{owner}}",
       "zenOf": "{{model}} con el OpenCode de {{owner}}",
       "codingOf": "{{model}} con {{plan}} de {{owner}}",
       "claudeAuto": "Plan de Claude",
       "chatgptAuto": "Plan de ChatGPT",
       "cursorAuto": "Plan de Cursor",
+      "grokAuto": "Plan de Grok",
+      "geminiAuto": "Plan de Gemini",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "Plan de Claude de {{owner}}",
       "chatgptAutoOf": "Plan de ChatGPT de {{owner}}",
       "cursorAutoOf": "Plan de Cursor de {{owner}}",
+      "grokAutoOf": "Plan de Grok de {{owner}}",
+      "geminiAutoOf": "Plan de Gemini de {{owner}}",
       "zenAutoOf": "OpenCode de {{owner}}",
       "codingAutoOf": "{{plan}} de {{owner}}",
       "on": "{{line}} en {{computer}}"
@@ -8991,7 +9029,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "A través de la API",
@@ -9002,6 +9042,8 @@
     "claude_codeText": "Usa el plan de Claude de quien conectó la computadora.",
     "codexText": "Usa el plan de ChatGPT de quien conectó la computadora.",
     "cursorText": "Usa el plan de Cursor de quien conectó la computadora.",
+    "grokText": "Usa el plan de Grok de quien conectó la computadora.",
+    "antigravityText": "Usa el plan de Gemini de quien conectó la computadora.",
     "opencodeText": "Los modelos gratis de OpenCode, o la clave de OpenCode de quien conectó la computadora.",
     "cursorModel": {
       "inPlan": "Incluido en tu plan de Cursor",
@@ -9046,6 +9088,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, sin respaldo por API"
     },
@@ -11448,6 +11492,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Comandos",
         "browser": "Navegador"
@@ -11456,6 +11502,8 @@
         "claude": "Escribe y cambia archivos, solo en las carpetas permitidas.",
         "codex": "Como Claude Code, con una cuenta de ChatGPT. Solo en las carpetas permitidas.",
         "cursor": "Como Claude Code, con una cuenta de Cursor. Solo en las carpetas permitidas.",
+        "grok": "Como Claude Code, con una cuenta de Grok. Solo en las carpetas permitidas.",
+        "antigravity": "Como Claude Code, con una cuenta de Gemini. Solo en las carpetas permitidas.",
         "opencode": "Como Claude Code, con los modelos gratis de OpenCode o una clave de OpenCode. Solo en las carpetas permitidas.",
         "commands": "Ejecuta comandos en la Terminal, como pruebas y builds."
       },

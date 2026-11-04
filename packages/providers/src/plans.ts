@@ -336,3 +336,50 @@ export const OPENCODE_FREE_MODELS: readonly { id: string; label: string }[] = [
 /** A model of OpenCode's free tier by its `provider/model` id: one OpenCode serves (`opencode/`) named `-free`, or listed. */
 export const isOpencodeFreeModel = (id: string) =>
   /^opencode\/[\w.-]+-free$/.test(id) || OPENCODE_FREE_MODELS.some((m) => m.id === id);
+
+/**
+ * Grok Build's models (ADR 0142) where the agent's computer listed none (`grok models` asks xAI: none offline). What
+ * the CLI lists comes first; with none chosen its own default runs.
+ * ponytail: hand-copied list (grok-4.5 and grok-4.6 as Grok Build 1.0.34 listed them, grok-4.7 as OpenCode Go lists
+ * it, 2026-11-04), the CLI's own listing replaces it wherever the runner reports one.
+ */
+export const GROK_BUILD_MODELS: readonly { id: string; label: string }[] = [
+  { id: "grok-4.7", label: "Grok 4.7" },
+  { id: "grok-4.6", label: "Grok 4.6" },
+  { id: "grok-4.5", label: "Grok 4.5" },
+];
+
+/**
+ * The Antigravity CLI's models (ADR 0143) where the agent's computer listed none (`agy models` asks Google: none
+ * offline), each slug a model at one thinking level, and the plans that include it (antigravity.google/docs/models,
+ * read 2026-11-04): Gemini 4 Argon on paid Google AI Pro, Ultra and Enterprise, Gemini 3.8 Flash on every plan, the
+ * older Flash and 3.1 Pro on Enterprise only. What the CLI lists comes first; with none chosen its own default runs.
+ * ponytail: hand-copied list, the CLI's own listing replaces it wherever the runner reports one.
+ */
+export const ANTIGRAVITY_MODELS: readonly { id: string; label: string }[] = [
+  { id: "gemini-4-argon-high", label: "Gemini 4 Argon (High)" },
+  { id: "gemini-4-argon-medium", label: "Gemini 4 Argon (Medium)" },
+  { id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)" },
+  { id: "gemini-3.8-flash-medium", label: "Gemini 3.8 Flash (Medium)" },
+  { id: "gemini-3.8-flash-low", label: "Gemini 3.8 Flash (Low)" },
+];
+
+/**
+ * An Antigravity CLI account's `provider` when it signs in to Gemini Enterprise (`oauth-business`, ADR 0143); none:
+ * a personal Google account (Google AI Pro or Ultra).
+ */
+export const GEMINI_ENTERPRISE_PROVIDER = "enterprise";
+
+/** What signs an account in again as it was: a coding plan's key, or Gemini Enterprise. */
+export const signInProviderOf = (provider: string | null | undefined): string | undefined =>
+  isPlanId(provider) || provider === GEMINI_ENTERPRISE_PROVIDER ? provider : undefined;
+
+/**
+ * Whether an account's `provider` is the plan chosen: a coding plan's own key, else a sign-in (none, or Gemini
+ * Enterprise's seat, an account of the same plan as a personal Google one).
+ */
+export const providerFitsChoice = (provider: string | null | undefined, choice: string, coding: boolean) =>
+  coding ? provider === choice : !provider || provider === GEMINI_ENTERPRISE_PROVIDER;
+
+/** An Antigravity model slug's model in the catalog: `gemini-4-argon-high` → `gemini-4-argon`. */
+export const antigravityBaseModel = (slug: string) => slug.replace(/-(?:low|medium|high)$/, "");

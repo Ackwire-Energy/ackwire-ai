@@ -1994,6 +1994,8 @@
       "claude_code": "Claude Code bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Claude hesabı bağlayın.",
       "codex": "Codex bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir ChatGPT hesabı bağlayın.",
       "cursor": "Cursor bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Cursor hesabı bağlayın.",
+      "grok": "Grok bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Grok hesabı bağlayın.",
+      "antigravity": "Gemini bu bilgisayarda giriş yapmamış. {{name}} sayfasından bir Gemini hesabı bağlayın.",
       "opencode": "OpenCode bu bilgisayarda düşünemiyor. {{name}} sayfasından bir OpenCode anahtarı bağlayın."
     },
     "card": {
@@ -2022,6 +2024,8 @@
       "claude": "Claude planınızı bağlayın",
       "chatgpt": "ChatGPT planınızı bağlayın",
       "cursor": "Cursor planınızı bağlayın",
+      "grok": "Grok planınızı bağlayın",
+      "gemini": "Gemini planınızı bağlayın",
       "zen": "OpenCode'u bağlayın",
       "api_key": "API anahtarı ekleyin"
     },
@@ -2044,6 +2048,15 @@
       "cursor": {
         "title": "Cursor planınız",
         "tiers": "Pro, Pro+, Ultra veya Teams ya da bir Cursor API anahtarı"
+      },
+      "grok": {
+        "title": "Grok planınız",
+        "tiers": "SuperGrok, SuperGrok Heavy veya X Premium+"
+      },
+      "gemini": {
+        "title": "Gemini planınız",
+        "tiers": "Google AI Pro, Google AI Ultra veya Gemini Enterprise",
+        "warning": "Google, kişisel bir Gemini planını başka uygulamaların içinde kullanmanın hesabın askıya alınmasına yol açabileceğini söylüyor. Bu riski almamak için bir API anahtarı ya da Gemini Enterprise kullanın."
       },
       "zen": {
         "title": "OpenCode",
@@ -2124,6 +2137,8 @@
       "claude_code": "Claude'da {{account}} değil, {{email}} ile giriş yapılmış. Claude sayfasında çıkış yapıp tekrar deneyin.",
       "codex": "ChatGPT'de {{account}} değil, {{email}} ile giriş yapılmış. ChatGPT sayfasında çıkış yapıp tekrar deneyin.",
       "cursor": "Cursor'da {{account}} değil, {{email}} ile giriş yapılmış. Cursor sayfasında çıkış yapıp tekrar deneyin.",
+      "grok": "Grok'ta {{account}} değil, {{email}} ile giriş yapılmış. Grok sayfasında çıkış yapıp tekrar deneyin.",
+      "antigravity": "Gemini'de {{account}} değil, {{email}} ile giriş yapılmış. Google sayfasında çıkış yapıp tekrar deneyin.",
       "opencode": "OpenCode {{account}} değil, {{email}} olarak oturum açtı. Doğru anahtarla tekrar deneyin."
     },
     "useAnyway": "{{email}} kullan",
@@ -3665,21 +3680,31 @@
             "claude_code": "Claude hesabı ekle",
             "codex": "ChatGPT hesabı ekle",
             "cursor": "Cursor hesabı ekle",
+            "grok": "Grok hesabı ekle",
+            "antigravity": "Gemini hesabı ekle",
             "opencode": "OpenCode anahtarı ekleyin"
           },
           "stepOne": {
             "claude_code": "Planınızın olduğu hesap",
             "codex": "Planınızın olduğu hesap",
-            "cursor": "Planınızın olduğu hesap"
+            "cursor": "Planınızın olduğu hesap",
+            "grok": "Planınızın olduğu hesap",
+            "antigravity": "Planınızın olduğu Google hesabı",
+            "antigravityEnterprise": "Gemini Enterprise hesabınız"
           },
           "stepOneHint": "Yanlış hesap mı? Oradan çıkış yapıp tekrar deneyin. Hesap yalnızca {{computer}} üzerinde kalır. Şifrenizi {{brand}} sayfasında yazarsınız.",
           "open": {
             "claude_code": "Claude ile giriş yap",
             "codex": "ChatGPT ile giriş yap",
-            "cursor": "Cursor ile giriş yap"
+            "cursor": "Cursor ile giriş yap",
+            "grok": "Grok ile giriş yap",
+            "antigravity": "Google ile giriş yap"
           },
           "opencodeFree": "OpenCode'un ücretsiz modelleri anahtar istemez. OpenCode konsolundan bir anahtar ücretli modelleri de ekler.",
           "cursorFinish": "Cursor sayfasında giriş yapın, giriş {{computer}} üzerinde kendiliğinden tamamlanır.",
+          "grokFinish": "Grok sayfasında giriş yapın, giriş {{computer}} üzerinde kendiliğinden tamamlanır.",
+          "geminiEnterprise": "Bunun yerine Gemini Enterprise kullan",
+          "geminiPersonal": "Bunun yerine kişisel bir Google hesabı kullan",
           "cursorKey": "Bunun yerine Cursor API anahtarı kullan",
           "copyLink": "Bağlantıyı kopyala",
           "openAgain": "Yeniden aç",
@@ -3691,6 +3716,7 @@
           "sent": "Kod gönderildi. Giriş {{computer}} üzerinde tamamlanıyor.",
           "local": "{{computer}} bilgisayarının başında mısınız? Tarayıcısı kendiliğinden açıldıysa orada yetki vermeniz yeterli.",
           "deviceCode": "ChatGPT kodu",
+          "grokCode": "Grok kodu",
           "deviceCodeText": "Bu kodu açılan sayfaya yazın.",
           "starting": "{{computer}} bilgisayarına soruluyor…",
           "waiting": "Bekleniyor",
@@ -3701,6 +3727,8 @@
             "claude_code": "Claude, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Claude sayfasında çıkış yapıp tekrar deneyin.",
             "codex": "ChatGPT, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için ChatGPT sayfasında çıkış yapıp tekrar deneyin.",
             "cursor": "Cursor, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Cursor sayfasında çıkış yapıp tekrar deneyin.",
+            "grok": "Grok, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Grok sayfasında çıkış yapıp tekrar deneyin.",
+            "antigravity": "Gemini, zaten bağladığınız {{account}} hesabıyla giriş yaptı. Başka bir hesap kullanmak için Google sayfasında çıkış yapıp tekrar deneyin.",
             "opencode": "Bu OpenCode anahtarı zaten {{account}} olarak bağlı."
           },
           "startFailed": "{{computer}} yanıt vermedi. Birazdan tekrar deneyin.",
@@ -7207,6 +7235,8 @@
       "claude_code": "Claude",
       "codex": "ChatGPT",
       "cursor": "Cursor",
+      "grok": "Grok",
+      "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
         "keys": "Plan anahtarı kullanmak için bilgisayardaki agentes uygulamasını güncelleyin"
@@ -8597,21 +8627,29 @@
       "claude": "Claude planında {{model}}",
       "chatgpt": "ChatGPT planında {{model}}",
       "cursor": "Cursor planında {{model}}",
+      "grok": "Grok planında {{model}}",
+      "gemini": "Gemini planında {{model}}",
       "zen": "OpenCode ile {{model}}",
       "coding": "{{plan}} üzerinde {{model}}",
       "claudeOf": "{{owner}} kişisinin Claude planında {{model}}",
       "chatgptOf": "{{owner}} kişisinin ChatGPT planında {{model}}",
       "cursorOf": "{{owner}} kişisinin Cursor planında {{model}}",
+      "grokOf": "{{owner}} kişisinin Grok planında {{model}}",
+      "geminiOf": "{{owner}} kişisinin Gemini planında {{model}}",
       "zenOf": "{{owner}} adlı kişinin OpenCode'u ile {{model}}",
       "codingOf": "{{owner}} kişisinin {{plan}} planında {{model}}",
       "claudeAuto": "Claude planı",
       "chatgptAuto": "ChatGPT planı",
       "cursorAuto": "Cursor planı",
+      "grokAuto": "Grok planı",
+      "geminiAuto": "Gemini planı",
       "zenAuto": "OpenCode",
       "codingAuto": "{{plan}}",
       "claudeAutoOf": "{{owner}} kişisinin Claude planı",
       "chatgptAutoOf": "{{owner}} kişisinin ChatGPT planı",
       "cursorAutoOf": "{{owner}} kişisinin Cursor planı",
+      "grokAutoOf": "{{owner}} kişisinin Grok planı",
+      "geminiAutoOf": "{{owner}} kişisinin Gemini planı",
       "zenAutoOf": "{{owner}} adlı kişinin OpenCode'u",
       "codingAutoOf": "{{owner}} kişisinin {{plan}} planı",
       "on": "{{computer}} üzerinde {{line}}"
@@ -8623,7 +8661,9 @@
       "claude_code": "Claude Code",
       "codex": "Codex",
       "cursor": "Cursor",
-      "opencode": "OpenCode"
+      "opencode": "OpenCode",
+      "grok": "Grok Build",
+      "antigravity": "Antigravity CLI"
     },
     "foot": {
       "api": "API üzerinden",
@@ -8634,6 +8674,8 @@
     "claude_codeText": "Bilgisayarı bağlayan kişinin Claude planını kullanır.",
     "codexText": "Bilgisayarı bağlayan kişinin ChatGPT planını kullanır.",
     "cursorText": "Bilgisayarı bağlayan kişinin Cursor planını kullanır.",
+    "grokText": "Bilgisayarı bağlayan kişinin Grok planını kullanır.",
+    "antigravityText": "Bilgisayarı bağlayan kişinin Gemini planını kullanır.",
     "opencodeText": "OpenCode'un ücretsiz modelleri veya bilgisayarı bağlayan kişinin OpenCode anahtarı.",
     "cursorModel": {
       "inPlan": "Cursor planınıza dahil",
@@ -8678,6 +8720,8 @@
       "claude_code": "Claude Code · {{model}}",
       "codex": "Codex · {{model}}",
       "cursor": "Cursor · {{model}}",
+      "grok": "Grok Build · {{model}}",
+      "antigravity": "Antigravity CLI · {{model}}",
       "opencode": "OpenCode · {{model}}",
       "noFallback": "{{brain}}, API yedeği yok"
     },
@@ -11018,6 +11062,8 @@
         "claude": "Claude Code",
         "codex": "Codex",
         "cursor": "Cursor",
+        "grok": "Grok Build",
+        "antigravity": "Antigravity CLI",
         "opencode": "OpenCode",
         "commands": "Komutlar",
         "browser": "Tarayıcı"
@@ -11026,6 +11072,8 @@
         "claude": "Dosya yazar ve değiştirir, yalnızca izin verilen klasörlerde.",
         "codex": "Claude Code gibi, bir ChatGPT hesabıyla. Yalnızca izin verilen klasörlerde.",
         "cursor": "Claude Code gibi, bir Cursor hesabıyla. Yalnızca izin verilen klasörlerde.",
+        "grok": "Claude Code gibi, bir Grok hesabıyla. Yalnızca izin verilen klasörlerde.",
+        "antigravity": "Claude Code gibi, bir Gemini hesabıyla. Yalnızca izin verilen klasörlerde.",
         "opencode": "Claude Code gibi, OpenCode'un ücretsiz modelleri veya bir OpenCode anahtarıyla. Yalnızca izin verilen klasörlerde.",
         "commands": "Test ve derleme gibi Terminal komutları çalıştırır."
       },

@@ -1995,6 +1995,8 @@ export const en = {
       claude_code: "Claude Code isn't signed in on this computer. Connect a Claude account on {{name}}'s\u00a0page.",
       codex: "Codex isn't signed in on this computer. Connect a ChatGPT account on {{name}}'s\u00a0page.",
       cursor: "Cursor isn't signed in on this computer. Connect a Cursor account on {{name}}'s\u00a0page.",
+      grok: "Grok isn't signed in on this computer. Connect a Grok account on {{name}}'s\u00a0page.",
+      antigravity: "Gemini isn't signed in on this computer. Connect a Gemini account on {{name}}'s\u00a0page.",
       opencode: "OpenCode can't think on this computer. Connect an OpenCode key on {{name}}'s\u00a0page.",
     },
     card: {
@@ -2024,6 +2026,8 @@ export const en = {
       claude: "Connect your Claude plan",
       chatgpt: "Connect your ChatGPT plan",
       cursor: "Connect your Cursor plan",
+      grok: "Connect your Grok plan",
+      gemini: "Connect your Gemini plan",
       zen: "Connect OpenCode",
       api_key: "Add an API key",
     },
@@ -2039,6 +2043,15 @@ export const en = {
       claude: { title: "Your Claude plan", tiers: "Pro, Max, Ultra, Team or Enterprise" },
       chatgpt: { title: "Your ChatGPT plan", tiers: "Plus, Pro, Business or Enterprise" },
       cursor: { title: "Your Cursor plan", tiers: "Pro, Pro+, Ultra or Teams, or a Cursor API key" },
+      grok: { title: "Your Grok plan", tiers: "SuperGrok, SuperGrok Heavy or X Premium+" },
+      /** A personal Google account (Google AI Pro or Ultra) or a Gemini Enterprise seat (ADR 0143). */
+      gemini: {
+        title: "Your Gemini plan",
+        tiers: "Google AI Pro, Google AI Ultra or Gemini Enterprise",
+        /** Shown plainly wherever a personal Gemini plan is connected or chosen: Google's own rule for consumer plans. */
+        warning:
+          "Google says using a personal Gemini plan inside other apps can get the account suspended. To avoid that risk, use an API key or Gemini Enterprise.",
+      },
       /** OpenCode's CLI (ADR 0132): its free models with no sign-in, or a key from OpenCode's console. */
       zen: { title: "OpenCode", tiers: "Free models, or your OpenCode key" },
       zai: { tiers: "Lite, Pro or Max" },
@@ -2107,6 +2120,8 @@ export const en = {
       claude_code: "Claude signed in as {{email}}, not {{account}}. Sign out on Claude's page and try again.",
       codex: "ChatGPT signed in as {{email}}, not {{account}}. Sign out on ChatGPT's page and try again.",
       cursor: "Cursor signed in as {{email}}, not {{account}}. Sign out on Cursor's page and try again.",
+      grok: "Grok signed in as {{email}}, not {{account}}. Sign out on Grok's page and try again.",
+      antigravity: "Gemini signed in as {{email}}, not {{account}}. Sign out on Google's page and try again.",
       opencode: "OpenCode signed in as {{email}}, not {{account}}. Try again with the right key.",
     },
     useAnyway: "Use {{email}}",
@@ -3665,20 +3680,35 @@ export const en = {
             claude_code: "Add a Claude account",
             codex: "Add a ChatGPT account",
             cursor: "Add a Cursor account",
+            grok: "Add a Grok account",
+            antigravity: "Add a Gemini account",
             opencode: "Add an OpenCode key",
           },
           stepOne: {
             claude_code: "The account with your plan",
             codex: "The account with your plan",
             cursor: "The account with your plan",
+            grok: "The account with your plan",
+            antigravity: "The Google account with your plan",
+            antigravityEnterprise: "Your Gemini Enterprise account",
           },
           stepOneHint:
             "Wrong account? Sign out there and try again. The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
-          open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT", cursor: "Sign in with Cursor" },
+          open: {
+            claude_code: "Sign in with Claude",
+            codex: "Sign in with ChatGPT",
+            cursor: "Sign in with Cursor",
+            grok: "Sign in with Grok",
+            antigravity: "Sign in with Google",
+          },
           /** OpenCode thinks with its free models without any key: the key is for its paid models. */
           opencodeFree: "No key needed for OpenCode's free models. A key from OpenCode's console adds its paid ones.",
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
           cursorFinish: "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself.",
+          grokFinish: "Sign in on Grok's page, and the sign-in finishes on {{computer}} by itself.",
+          /** Under the Gemini sign-in: the other kind of Google account. */
+          geminiEnterprise: "Use Gemini Enterprise instead",
+          geminiPersonal: "Use a personal Google account instead",
           cursorKey: "Use a Cursor API key instead",
           /** Beside the sign-in button: its link, to open in another browser or profile. */
           copyLink: "Copy link",
@@ -3691,6 +3721,7 @@ export const en = {
           sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
+          grokCode: "Code for Grok",
           deviceCodeText: "Type this code on the page that opens.",
           starting: "Asking {{computer}}…",
           waiting: "Waiting",
@@ -3704,6 +3735,9 @@ export const en = {
               "ChatGPT signed in as {{account}}, an account you already connected. To use another, sign out on ChatGPT's page and try again.",
             cursor:
               "Cursor signed in as {{account}}, an account you already connected. To use another, sign out on Cursor's page and try again.",
+            grok: "Grok signed in as {{account}}, an account you already connected. To use another, sign out on Grok's page and try again.",
+            antigravity:
+              "Gemini signed in as {{account}}, an account you already connected. To use another, sign out on Google's page and try again.",
             opencode: "That OpenCode key is already connected as {{account}}.",
           },
           startFailed: "No answer from {{computer}}. Try again in a moment.",
@@ -7043,6 +7077,8 @@ export const en = {
       claude_code: "Claude",
       codex: "ChatGPT",
       cursor: "Cursor",
+      grok: "Grok",
+      antigravity: "Gemini",
       opencode: "OpenCode",
       needs: {
         keys: "Update agentes on the computer to use a plan's key",
@@ -7051,7 +7087,7 @@ export const en = {
       addComputer: "Connect a computer",
       /**
        * The Cloud's: why a plan can't sign in on the workspace's computer yet (`gateLine`), with what happens next.
-       * `program`: "Claude Code", "Codex", "Cursor" or "OpenCode" (`brain.card`).
+       * `program`: "Claude Code", "Codex", "Cursor", "Grok Build", "Antigravity CLI" or "OpenCode" (`brain.card`).
        */
       needsCloud: {
         online: "{{computer}} is restarting or reconnecting. This changes by itself once it's back.",
@@ -8401,21 +8437,29 @@ export const en = {
       claude: "{{model}} on the Claude plan",
       chatgpt: "{{model}} on the ChatGPT plan",
       cursor: "{{model}} on the Cursor plan",
+      grok: "{{model}} on the Grok plan",
+      gemini: "{{model}} on the Gemini plan",
       zen: "{{model}} on OpenCode",
       coding: "{{model}} on {{plan}}",
       claudeOf: "{{model}} on {{owner}}'s Claude plan",
       chatgptOf: "{{model}} on {{owner}}'s ChatGPT plan",
       cursorOf: "{{model}} on {{owner}}'s Cursor plan",
+      grokOf: "{{model}} on {{owner}}'s Grok plan",
+      geminiOf: "{{model}} on {{owner}}'s Gemini plan",
       zenOf: "{{model}} on {{owner}}'s OpenCode",
       codingOf: "{{model}} on {{owner}}'s {{plan}}",
       claudeAuto: "Claude plan",
       chatgptAuto: "ChatGPT plan",
       cursorAuto: "Cursor plan",
+      grokAuto: "Grok plan",
+      geminiAuto: "Gemini plan",
       zenAuto: "OpenCode",
       codingAuto: "{{plan}}",
       claudeAutoOf: "{{owner}}'s Claude plan",
       chatgptAutoOf: "{{owner}}'s ChatGPT plan",
       cursorAutoOf: "{{owner}}'s Cursor plan",
+      grokAutoOf: "{{owner}}'s Grok plan",
+      geminiAutoOf: "{{owner}}'s Gemini plan",
       zenAutoOf: "{{owner}}'s OpenCode",
       codingAutoOf: "{{owner}}'s {{plan}}",
       on: "{{line}} on {{computer}}",
@@ -8423,7 +8467,14 @@ export const en = {
     model: "Model (API)",
     modelText: "An AI model through the API, with a workspace key.",
     countsBudget: "Counts against {{name}}'s budget.",
-    card: { claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", opencode: "OpenCode" },
+    card: {
+      claude_code: "Claude Code",
+      codex: "Codex",
+      cursor: "Cursor",
+      opencode: "OpenCode",
+      grok: "Grok Build",
+      antigravity: "Antigravity CLI",
+    },
     foot: {
       api: "Through the API",
       noComputer: "No computer",
@@ -8433,6 +8484,8 @@ export const en = {
     claude_codeText: "Uses the Claude plan of whoever connected the computer.",
     codexText: "Uses the ChatGPT plan of whoever connected the computer.",
     cursorText: "Uses the Cursor plan of whoever connected the computer.",
+    grokText: "Uses the Grok plan of whoever connected the computer.",
+    antigravityText: "Uses the Gemini plan of whoever connected the computer.",
     opencodeText: "OpenCode's free models, or the OpenCode key of whoever connected the computer.",
     /** Cursor's models (ADR 0114), where its CLI said which the plan includes. */
     cursorModel: { inPlan: "In your Cursor plan", apiPrice: "Billed by Cursor at API prices" },
@@ -8482,6 +8535,8 @@ export const en = {
       claude_code: "Claude Code · {{model}}",
       codex: "Codex · {{model}}",
       cursor: "Cursor · {{model}}",
+      grok: "Grok Build · {{model}}",
+      antigravity: "Antigravity CLI · {{model}}",
       opencode: "OpenCode · {{model}}",
       noFallback: "{{brain}}, no API fallback",
     },
@@ -10561,6 +10616,8 @@ export const en = {
         claude: "Claude Code",
         codex: "Codex",
         cursor: "Cursor",
+        grok: "Grok Build",
+        antigravity: "Antigravity CLI",
         opencode: "OpenCode",
         commands: "Commands",
         browser: "Browser",
@@ -10569,6 +10626,8 @@ export const en = {
         claude: "Writes and changes files, only in the allowed folders.",
         codex: "Like Claude Code, with a ChatGPT account. Only in the allowed folders.",
         cursor: "Like Claude Code, with a Cursor account. Only in the allowed folders.",
+        grok: "Like Claude Code, with a Grok account. Only in the allowed folders.",
+        antigravity: "Like Claude Code, with a Gemini account. Only in the allowed folders.",
         opencode: "Like Claude Code, with OpenCode's free models or an OpenCode key. Only in the allowed folders.",
         commands: "Runs Terminal commands, like tests and builds.",
       },

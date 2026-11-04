@@ -1,9 +1,11 @@
 import {
   ACCOUNTS_PROTOCOL,
   type AccountKind,
+  ANTIGRAVITY_PROTOCOL,
   BRAIN_PROTOCOL,
   type BrainEffort,
   CURSOR_PROTOCOL,
+  GROK_PROTOCOL,
   isBrainEffort,
   OPENCODE_PROTOCOL,
   type OwnPlanUsage,
@@ -21,7 +23,16 @@ import {
   isContextLimit,
   MODEL_CATALOG,
 } from "@agenteschat/providers";
-import { claudeCodeModel, isPlanModelId, OPENCODE_FREE_MODELS, planModel, planOf } from "@agenteschat/providers/plans";
+import {
+  ANTIGRAVITY_MODELS,
+  antigravityBaseModel,
+  claudeCodeModel,
+  GROK_BUILD_MODELS,
+  isPlanModelId,
+  OPENCODE_FREE_MODELS,
+  planModel,
+  planOf,
+} from "@agenteschat/providers/plans";
 import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
 import {
   type AgentAudience,
@@ -76,7 +87,15 @@ import { wakeAgentUsageWaits } from "./usage-pause";
  * resolves it per run (`brainFor`).
  */
 
-export const BRAIN_KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor", "opencode"];
+export const BRAIN_KINDS: readonly BrainKind[] = [
+  "model",
+  "claude_code",
+  "codex",
+  "cursor",
+  "opencode",
+  "grok",
+  "antigravity",
+];
 export const isBrainKind = (v: unknown): v is BrainKind =>
   typeof v === "string" && (BRAIN_KINDS as readonly string[]).includes(v);
 /** An effort as stored: a level, or `auto` (the judge picks it per run). */
@@ -144,6 +163,24 @@ export const cursorModels = (listed: readonly { id: string; label?: string; inPl
       }),
     );
 
+/** Grok Build's models (ADR 0142): what its CLI listed on the agent's computer (`grok models`), else `GROK_BUILD_MODELS`. */
+export const grokModels = (listed: readonly { id: string; label?: string }[] = []): BrainModelOption[] =>
+  (listed.length ? listed : GROK_BUILD_MODELS).map((m) => ({
+    value: m.id,
+    label: m.label || m.id,
+    ...(catalogModelOf(m.id) ? { modelId: m.id } : {}),
+  }));
+
+/**
+ * The Antigravity CLI's models (ADR 0143): what it listed on the agent's computer (`agy models`), else
+ * `ANTIGRAVITY_MODELS`. A slug is a model at one thinking level (`gemini-4-argon-high`): its catalog model is the base.
+ */
+export const antigravityModels = (listed: readonly { id: string; label?: string }[] = []): BrainModelOption[] =>
+  (listed.length ? listed : ANTIGRAVITY_MODELS).map((m) => {
+    const base = antigravityBaseModel(m.id);
+    return { value: m.id, label: m.label || m.id, ...(catalogModelOf(base) ? { modelId: base } : {}) };
+  });
+
 /** Claude Code's aliases (`--model opus|sonnet|haiku`), mapped to today's ids in the catalog. */
 export const CLAUDE_CODE_MODELS: readonly BrainModelOption[] = [
   { value: "opus", label: "Opus", modelId: "claude-opus-5-5" },
@@ -175,12 +212,15 @@ function modelChoices(kind: BrainKind, machine?: { executors?: schema.MachineExe
   if (kind === "codex") return codexModels();
   if (kind === "cursor") return cursorModels(machine?.executors?.cursor?.models);
   if (kind === "opencode") return opencodeModels(machine?.executors?.opencode?.models);
+  if (kind === "grok") return grokModels(machine?.executors?.grok?.models);
+  if (kind === "antigravity") return antigravityModels(machine?.executors?.antigravity?.models);
   return [];
 }
 
-/** What a computer brain runs with when nobody chose a model (Cursor, OpenCode: its CLI's own default, null). */
+/** What a computer brain runs with when nobody chose a model (Cursor, OpenCode, Grok, Antigravity: its CLI's own default, null). */
 export function defaultBrainModel(kind: BrainKind): string | null {
-  if (kind === "model" || kind === "cursor" || kind === "opencode") return null;
+  if (kind === "model" || kind === "cursor" || kind === "opencode" || kind === "grok" || kind === "antigravity")
+    return null;
   const options = brainModelOptions(kind);
   return (options.find((o) => o.recommended) ?? options[0])?.value ?? (kind === "codex" ? "gpt-6.1-sol" : "sonnet");
 }
@@ -242,7 +282,16 @@ type MachineLike = Parameters<typeof machineExecutors>[0] & {
   id: string;
   name: string;
   /** Protocol 10: what the machine allows (the app's Ferramentas); absent on older runners. */
-  access?: { tools?: { claude?: boolean; codex?: boolean; cursor?: boolean; opencode?: boolean } } | null;
+  access?: {
+    tools?: {
+      claude?: boolean;
+      codex?: boolean;
+      cursor?: boolean;
+      opencode?: boolean;
+      grok?: boolean;
+      antigravity?: boolean;
+    };
+  } | null;
 } & Parameters<typeof machineOnline>[0];
 
 /**
@@ -275,6 +324,8 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
     computer("codex", "codex"),
     cliOption(machine, "cursor"),
     cliOption(machine, "opencode"),
+    cliOption(machine, "grok"),
+    cliOption(machine, "antigravity"),
   ];
 }
 
@@ -282,12 +333,21 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
  * Cursor (ADR 0114, runner protocol 36) or OpenCode (ADR 0132, protocol 39): the runner's protocol, its switch (or
  * Codex's on a runner before it) and its CLI found there.
  */
-function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode"): BrainOption {
+function cliOption(machine: MachineLike | null, kind: "cursor" | "opencode" | "grok" | "antigravity"): BrainOption {
   const tools = machine?.access?.tools;
   let reason: BrainUnavailable | undefined;
   if (!machine) reason = "no_computer";
   else if (!machine.execAllowed) reason = "exec_off";
-  else if (machine.protocol < (kind === "cursor" ? CURSOR_PROTOCOL : OPENCODE_PROTOCOL)) reason = "runner_old";
+  else if (
+    machine.protocol <
+    {
+      cursor: CURSOR_PROTOCOL,
+      opencode: OPENCODE_PROTOCOL,
+      grok: GROK_PROTOCOL,
+      antigravity: ANTIGRAVITY_PROTOCOL,
+    }[kind]
+  )
+    reason = "runner_old";
   else if (tools && (tools[kind] ?? tools.codex) === false) reason = "tool_off";
   else if (!machine.executors?.[kind]) reason = "not_installed";
   return {
@@ -1288,9 +1348,24 @@ export interface AiComputer {
    * A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's and a
    * coding plan's key.
    */
-  shares: { claude_code: boolean; codex: boolean; cursor: boolean; opencode: boolean; key: boolean };
-  /** What it can think with now: Claude Code (Claude and the coding plans), Codex (ChatGPT) and Cursor. */
-  brains: { claude_code: boolean; codex: boolean; cursor: boolean; opencode: boolean };
+  shares: {
+    claude_code: boolean;
+    codex: boolean;
+    cursor: boolean;
+    opencode: boolean;
+    grok: boolean;
+    antigravity: boolean;
+    key: boolean;
+  };
+  /** What it can think with now: Claude Code (Claude and the coding plans), Codex (ChatGPT), Cursor, OpenCode, Grok, Antigravity. */
+  brains: {
+    claude_code: boolean;
+    codex: boolean;
+    cursor: boolean;
+    opencode: boolean;
+    grok: boolean;
+    antigravity: boolean;
+  };
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the caller connected (it is theirs, and
    * the agents on it think with it when no account is picked). Claude Code when `claude auth status` said it is
@@ -1344,6 +1419,8 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
           codex: sharesSignIns(m, "codex"),
           cursor: sharesSignIns(m, "cursor"),
           opencode: sharesSignIns(m, "opencode"),
+          grok: sharesSignIns(m, "grok"),
+          antigravity: sharesSignIns(m, "antigravity"),
           key: sharesSignIns(m, "key"),
         },
         brains: {
@@ -1351,6 +1428,8 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
           codex: can("codex"),
           cursor: can("cursor"),
           opencode: can("opencode"),
+          grok: can("grok"),
+          antigravity: can("antigravity"),
         },
         own:
           m.pairedByUserId === userId

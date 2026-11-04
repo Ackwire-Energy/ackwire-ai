@@ -69,7 +69,13 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
   if (typeof o.agentId !== "string") return null;
   const signedOut = o.reason === "not_signed_in";
   const own =
-    signedOut && (o.own === "claude_code" || o.own === "codex" || o.own === "cursor" || o.own === "opencode")
+    signedOut &&
+    (o.own === "claude_code" ||
+      o.own === "codex" ||
+      o.own === "cursor" ||
+      o.own === "opencode" ||
+      o.own === "grok" ||
+      o.own === "antigravity")
       ? o.own
       : null;
   return {
@@ -94,17 +100,31 @@ export const opensByItself = (x: { intent?: string; autoOpen?: boolean }) =>
 
 /**
  * The brain a plan thinks with, on the agent's computer: a Claude plan through Claude Code, ChatGPT's through Codex,
- * OpenCode's (`zen`: its free tier or an OpenCode key, ADR 0132) through OpenCode's CLI.
+ * OpenCode's (`zen`: its free tier or an OpenCode key, ADR 0132) through OpenCode's CLI, a SuperGrok or X Premium+ plan
+ * through Grok Build (ADR 0142), a Google AI Pro or Ultra plan or Gemini Enterprise through the Antigravity CLI (ADR
+ * 0143).
  */
-export const PLAN_BRAIN: Record<"claude" | "chatgpt" | "cursor" | "zen", MachineAccountKind> = {
+export const PLAN_BRAIN: Record<"claude" | "chatgpt" | "cursor" | "zen" | "grok" | "gemini", MachineAccountKind> = {
   claude: "claude_code",
   chatgpt: "codex",
   cursor: "cursor",
   zen: "opencode",
+  grok: "grok",
+  gemini: "antigravity",
 };
 /** The plan a CLI signs in to by itself (`PLAN_BRAIN` the other way): ChatGPT's for Codex, Claude's for Claude Code. */
-export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" | "cursor" | "zen" =>
-  kind === "codex" ? "chatgpt" : kind === "cursor" ? "cursor" : kind === "opencode" ? "zen" : "claude";
+export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" | "cursor" | "zen" | "grok" | "gemini" =>
+  kind === "codex"
+    ? "chatgpt"
+    : kind === "cursor"
+      ? "cursor"
+      : kind === "opencode"
+        ? "zen"
+        : kind === "grok"
+          ? "grok"
+          : kind === "antigravity"
+            ? "gemini"
+            : "claude";
 
 type AiState = AiStatus["agents"][number]["state"];
 
@@ -116,14 +136,24 @@ export const aiStateOf = (status: AiStatus | undefined, agentId: string): AiStat
  * A plan a person signs in with, on the agent's computer: Claude's, ChatGPT's, Cursor's (a sign-in or its API key,
  * ADR 0114), OpenCode's (`zen`, its free tier or an OpenCode key, ADR 0132), or a coding plan's key.
  */
-export type PlanChoice = "claude" | "chatgpt" | "cursor" | "zen" | PlanId;
+export type PlanChoice = "claude" | "chatgpt" | "cursor" | "zen" | "grok" | "gemini" | PlanId;
 /** What the picker offers: a plan, or the workspace's API key. */
 export type AiChoice = PlanChoice | "key";
-/** Every picker's order: Claude (chosen first), ChatGPT, Cursor, OpenCode, then the coding plans. */
-export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", "cursor", "zen", ...PLAN_IDS];
+/** Every picker's order: Claude (chosen first), ChatGPT, Cursor, OpenCode, Grok, Gemini, then the coding plans. */
+export const PLAN_CHOICES: readonly PlanChoice[] = [
+  "claude",
+  "chatgpt",
+  "cursor",
+  "zen",
+  "grok",
+  "gemini",
+  ...PLAN_IDS,
+];
 /** The account a plan signs in as: ChatGPT's through Codex, Cursor's and OpenCode's through their CLIs; the rest through Claude Code. */
 export const kindOf = (choice: PlanChoice): MachineAccountKind =>
-  choice === "chatgpt" || choice === "cursor" || choice === "zen" ? PLAN_BRAIN[choice] : PLAN_BRAIN.claude;
+  choice === "chatgpt" || choice === "cursor" || choice === "zen" || choice === "grok" || choice === "gemini"
+    ? PLAN_BRAIN[choice]
+    : PLAN_BRAIN.claude;
 /** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, Cursor's, else Claude's. */
 export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
   isPlanId(a.provider) ? a.provider : planOfKind(a.kind);
@@ -257,8 +287,8 @@ function brainOffReason(
   const tools = m?.access?.tools;
   const on = !tools
     ? undefined
-    : kind === "cursor"
-      ? (tools.cursor ?? tools.codex)
+    : kind === "cursor" || kind === "opencode" || kind === "grok" || kind === "antigravity"
+      ? (tools[kind] ?? tools.codex)
       : tools[kind === "codex" ? "codex" : "claude"];
   return on === false ? "tool_off" : "not_installed";
 }
@@ -427,6 +457,8 @@ export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState 
   if (brain?.kind === "codex") return "chatgpt";
   if (brain?.kind === "cursor") return "cursor";
   if (brain?.kind === "opencode") return "zen";
+  if (brain?.kind === "grok") return "grok";
+  if (brain?.kind === "antigravity") return "gemini";
   if (brain?.kind === "claude_code") return isPlanId(brain.provider) ? brain.provider : "claude";
   return state === undefined || state === "no_ai" ? null : "key";
 }

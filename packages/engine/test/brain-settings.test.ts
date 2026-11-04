@@ -103,6 +103,8 @@ describe("brain settings", () => {
       ["codex", false, "no_computer"],
       ["cursor", false, "no_computer"],
       ["opencode", false, "no_computer"],
+      ["grok", false, "no_computer"],
+      ["antigravity", false, "no_computer"],
     ]);
     expect(reasons(mac())).toEqual([
       ["model", true, null],
@@ -112,6 +114,10 @@ describe("brain settings", () => {
       ["cursor", false, "runner_old"],
       // OpenCode needs runner protocol 39 (`OPENCODE_PROTOCOL`).
       ["opencode", false, "runner_old"],
+      // Grok needs runner protocol 43 (`GROK_PROTOCOL`).
+      ["grok", false, "runner_old"],
+      // The Antigravity CLI needs runner protocol 44 (`ANTIGRAVITY_PROTOCOL`).
+      ["antigravity", false, "runner_old"],
     ]);
     expect(reasons(mac({ execAllowed: false }))[1]).toEqual(["claude_code", false, "exec_off"]);
     expect(reasons(mac({ protocol: MISSION_PROTOCOL - 1 }))[1]).toEqual(["claude_code", false, "runner_old"]);
@@ -127,7 +133,9 @@ describe("brain settings", () => {
       ["codex", false, "outdated"],
     ]);
     const both = mac({ executors: { claude: { version: "2" }, codex: { version: "0.170.0" }, detectedAt: "x" } });
-    expect(brainOptions(both).every((o) => o.available || o.kind === "cursor" || o.kind === "opencode")).toBe(true);
+    expect(
+      brainOptions(both).every((o) => o.available || ["cursor", "opencode", "grok", "antigravity"].includes(o.kind)),
+    ).toBe(true);
     // Installed but turned off in the app's Tools: says so (not "not installed"); turned on, available.
     const off = mac({ ...both, access: { tools: { claude: false, codex: true } } });
     expect(reasons(off).slice(1, 3)).toEqual([

@@ -269,13 +269,14 @@ export type MarkId = keyof typeof MARKS;
 export const PROVIDER_MARKS: Readonly<Record<MarkId, ProviderMark>> = MARKS;
 
 /**
- * Ids that draw another's mark: the computer brains, Moonshot's API (Kimi), and the `anthropic` provider,
+ * Ids that draw another's mark: the computer brains (the Antigravity CLI Gemini's), Moonshot's API (Kimi), and the `anthropic` provider,
  * which people know as Claude.
  */
 const ALIASES: Record<string, MarkId> = {
   anthropic: "claude",
   claude_code: "claude",
   codex: "openai",
+  antigravity: "gemini",
   moonshot: "kimi",
 };
 
