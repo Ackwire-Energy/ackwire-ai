@@ -2684,6 +2684,9 @@
   "contextMenu.copyLink": {
     "value": "Copy link"
   },
+  "contextMenu.openComputer": {
+    "value": "Open the computer"
+  },
   "contextMenu.linkCopied": {
     "value": "Link copied."
   },
@@ -31586,6 +31589,9 @@
   },
   "agentComputer.open": {
     "value": "Open"
+  },
+  "agentComputer.openOf": {
+    "value": "Open {{name}}'s computer"
   },
   "agentComputer.help": {
     "value": "Help"

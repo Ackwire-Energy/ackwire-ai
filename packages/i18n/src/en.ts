@@ -1102,6 +1102,7 @@ export const en = {
     copyText: "Copy text",
     textCopied: "Text copied.",
     copyLink: "Copy link",
+    openComputer: "Open the computer",
     linkCopied: "Link copied.",
     saveToWiki: "Save to wiki",
     pin: "Pin message",
@@ -12796,6 +12797,7 @@ export const en = {
   agentComputer: {
     title: "{{name}}'s computer",
     open: "Open",
+    openOf: "Open {{name}}'s computer",
     help: "Help",
     button: "Computer",
     choose: "Choose a computer",

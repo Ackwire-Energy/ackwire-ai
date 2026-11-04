@@ -1055,6 +1055,7 @@
     "copyText": "テキストをコピー",
     "textCopied": "テキストをコピーしました。",
     "copyLink": "リンクをコピー",
+    "openComputer": "コンピューターを開く",
     "linkCopied": "リンクをコピーしました。",
     "saveToWiki": "Wikiに保存",
     "pin": "メッセージをピン留め",
@@ -12793,6 +12794,7 @@
   "agentComputer": {
     "title": "{{name}}のコンピューター",
     "open": "開く",
+    "openOf": "{{name}}のコンピューターを開く",
     "help": "ヘルプ",
     "button": "コンピューター",
     "choose": "コンピューターを選択",

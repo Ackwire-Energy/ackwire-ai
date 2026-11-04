@@ -61,6 +61,8 @@ import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useOpensComputer } from "@/components/computer/facts";
+import { useOpenComputer } from "@/components/computer/open";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
@@ -160,11 +162,12 @@ export function ProfileTrigger({
   );
 }
 
-/** Discord's shape: the banner, the ⋯ on it, the big face over its edge, then the body. */
+/** Discord's shape: the banner, its round buttons (a shortcut, then ⋯), the big face over its edge, then the body. */
 function CardShell({
   sky,
   face,
   agent,
+  act,
   more,
   onDone,
   children,
@@ -172,6 +175,8 @@ function CardShell({
   sky: ReactNode;
   face: ReactNode;
   agent?: boolean;
+  /** A round button before the ⋯ (an agent's computer). */
+  act?: ReactNode;
   /** The ⋯ menu: the same entries as the right click. */
   more?: MenuEntry[];
   /** Closes the card (a ⋯ entry ran). */
@@ -185,25 +190,28 @@ function CardShell({
       <div className="mcard__banner" aria-hidden="true">
         {sky}
       </div>
-      {entries.length > 0 && (
+      {(act || entries.length > 0) && (
         <div className="mcard__acts">
-          <Menu
-            label={t("profile.more")}
-            side="right"
-            align="start"
-            trigger={
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="more"
-                className="mcard__more"
-                aria-label={t("profile.more")}
-              />
-            }
-          >
-            <MenuEntries entries={entries} onRun={onDone} />
-          </Menu>
+          {act}
+          {entries.length > 0 && (
+            <Menu
+              label={t("profile.more")}
+              side="right"
+              align="start"
+              trigger={
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconOnly
+                  icon="more"
+                  className="mcard__act"
+                  aria-label={t("profile.more")}
+                />
+              }
+            >
+              <MenuEntries entries={entries} onRun={onDone} />
+            </Menu>
+          )}
         </div>
       )}
       <div className={agent ? "mcard__face mcard__face--agent" : "mcard__face"}>{face}</div>
@@ -542,6 +550,8 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const roles = useRoles(org.id).data?.roles ?? [];
   const channels = useChannels(org.id).data;
   const agentEntries = useAgentMenu();
+  const openComputer = useOpenComputer();
+  const opensComputer = useOpensComputer(agent);
   const seesSpend = can(org, "view_usage") || agent.ownerUserId === me.user.id;
   const details = seesDetails(agent);
   const g = agentGrammar(agent.name);
@@ -560,6 +570,12 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const busy = workingIn !== null;
   const here = workingIn ? channels?.find((c) => c.id === workingIn)?.name : undefined;
   const lines = audienceLines(agent, roles, dir.members);
+  const toComputer = opensComputer
+    ? () => {
+        onDone();
+        openComputer(agent.id);
+      }
+    : undefined;
   return (
     <CardShell
       agent
@@ -573,7 +589,21 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
         />
       }
-      more={agentEntries(agent)}
+      act={
+        toComputer && (
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="computer"
+            className="mcard__act"
+            aria-label={t("agentComputer.openOf", g)}
+            title={t("agentComputer.openOf", g)}
+            onClick={toComputer}
+          />
+        )
+      }
+      more={agentEntries(agent, toComputer)}
       onDone={onDone}
     >
       <div className="list-col mcard__names">
@@ -586,8 +616,8 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
             .filter(Boolean)
             .join(" · ")}
         </span>
-        <NoAiChip agentId={agent.id} />
       </div>
+      <NoAiChip agentId={agent.id} />
       {line && shown?.line && (
         <div className="profile-card__status">
           <span className="profile-card__status-emoji" aria-hidden="true">

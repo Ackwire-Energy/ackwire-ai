@@ -1055,6 +1055,7 @@
     "copyText": "Salin teks",
     "textCopied": "Teks disalin.",
     "copyLink": "Salin tautan",
+    "openComputer": "Buka komputer",
     "linkCopied": "Tautan disalin.",
     "saveToWiki": "Simpan ke Wiki",
     "pin": "Sematkan pesan",
@@ -12907,6 +12908,7 @@
   "agentComputer": {
     "title": "Komputer {{name}}",
     "open": "Buka",
+    "openOf": "Buka komputer {{name}}",
     "help": "Bantuan",
     "button": "Komputer",
     "choose": "Pilih komputer",

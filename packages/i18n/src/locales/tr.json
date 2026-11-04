@@ -1091,6 +1091,7 @@
     "copyText": "Metni kopyala",
     "textCopied": "Metin kopyalandı.",
     "copyLink": "Bağlantıyı kopyala",
+    "openComputer": "Bilgisayarı aç",
     "linkCopied": "Bağlantı kopyalandı.",
     "saveToWiki": "Wiki'ye kaydet",
     "pin": "Mesajı sabitle",
@@ -13176,6 +13177,7 @@
   "agentComputer": {
     "title": "{{name}} ajanının bilgisayarı",
     "open": "Aç",
+    "openOf": "{{name}} ajanının bilgisayarını aç",
     "help": "Yardım",
     "button": "Bilgisayar",
     "choose": "Bir bilgisayar seçin",

@@ -1127,6 +1127,7 @@
     "copyText": "Copiar texto",
     "textCopied": "Texto copiado.",
     "copyLink": "Copiar enlace",
+    "openComputer": "Abrir la computadora",
     "linkCopied": "Enlace copiado.",
     "saveToWiki": "Guardar en la wiki",
     "pin": "Fijar mensaje",
@@ -13696,6 +13697,7 @@
   "agentComputer": {
     "title": "Computadora de {{name}}",
     "open": "Abrir",
+    "openOf": "Abrir la computadora de {{name}}",
     "help": "Ayuda",
     "button": "Computadora",
     "choose": "Elige una computadora",

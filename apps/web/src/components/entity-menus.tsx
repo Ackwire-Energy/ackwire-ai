@@ -204,8 +204,9 @@ export function useChannelMenu() {
 }
 
 /**
- * An agent (sidebar row, its face or name in a message, its card's ⋯): talk, its profile, mention, copy @, mark its DM
- * read, edit (its owner and admins), its link, stop while it works, its id.
+ * An agent (sidebar row, its face or name in a message, its card's ⋯): talk, its profile, its computer (`openComputer`,
+ * where the caller knows this person may open it), mention, copy @, mark its DM read, edit (its owner and admins), its
+ * link, stop while it works, its id.
  */
 export function useAgentMenu() {
   const { t } = useTranslation();
@@ -220,7 +221,7 @@ export function useAgentMenu() {
   const copyHandle = useCopyHandle();
   const copyId = useCopyId();
   const mention = useMention();
-  return (a: Pick<Agent, "id" | "name" | "handle" | "ownerUserId">): MenuEntry[] => {
+  return (a: Pick<Agent, "id" | "name" | "handle" | "ownerUserId">, openComputer?: () => void): MenuEntry[] => {
     const dm = dms?.find((d) => d.with.id === a.id);
     const edits = can(org, "manage_agents") || a.ownerUserId === me.user.id;
     const working = Object.values(live.get().streams.runs).filter(
@@ -248,6 +249,17 @@ export function useAgentMenu() {
         icon: "agent",
         run: () => (openPanel ? openPanel(a.id) : page()),
       },
+      ...(openComputer
+        ? ([
+            {
+              kind: "item",
+              id: "computer",
+              label: t("contextMenu.openComputer"),
+              icon: "computer",
+              run: openComputer,
+            },
+          ] satisfies MenuEntry[])
+        : []),
       ...mention(a.handle),
       ...copyHandle(a.handle),
       ...markRead(dm?.channelId, dm?.unread ?? 0),
