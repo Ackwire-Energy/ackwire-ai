@@ -83,3 +83,8 @@ test("the stop square breathes 1 → 0.6 → 1 every 1.6 s, solid when still", (
   expect(stopBreath(1600)).toBeCloseTo(1);
   expect(stopBreath(800, true)).toBe(1);
 });
+
+test("sleep: rest's closed eyes (the zz are drawn over it)", () => {
+  expect(poseFor("sleep", 3, 1, true)).toEqual(poseFor("rest", 3, 1, true));
+  expect(poseFor("sleep", 3, 1).expression).toBe("closed");
+});

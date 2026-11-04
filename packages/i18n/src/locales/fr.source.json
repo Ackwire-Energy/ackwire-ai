@@ -4668,23 +4668,11 @@
   "usageCard.extraHint": {
     "value": "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets."
   },
-  "usageQueue.title": {
-    "value": {
-      "one": "{{agent}} has {{count}} conversation to pick up",
-      "other": "{{agent}} has {{count}} conversations to pick up"
-    }
-  },
-  "usageQueue.line": {
-    "value": "Picks up {{when}}, when the {{plan}} plan resets. One at a time, in this order."
-  },
-  "usageQueue.lineUnknown": {
-    "value": "Picks up as soon as the {{plan}} plan resets. One at a time, in this order."
-  },
-  "usageQueue.lineBudget": {
-    "value": "Picks up {{when}}, when the budget renews, or sooner if an admin raises it. One at a time, in this order."
-  },
   "usageQueue.shared": {
-    "value": "The line belongs to the plan: {{agents}} share the same account."
+    "value": {
+      "one": "{{agents}} uses the same {{plan}} plan. Both agents' conversations go in the same line.",
+      "other": "{{agents}} use the same {{plan}} plan. All their conversations go in the same line."
+    }
   },
   "usageQueue.dm": {
     "value": "DM with {{name}}"
@@ -4707,31 +4695,13 @@
   "usageQueue.paused": {
     "value": "Paused {{ago}}"
   },
-  "usageQueue.after": {
-    "value": {
-      "one": "{{count}} message since",
-      "other": "{{count}} messages since"
-    }
-  },
-  "usageQueue.nothingAfter": {
-    "value": "Nothing since"
-  },
-  "usageQueue.wrote": {
-    "value": {
-      "one": "{{names}} wrote since",
-      "other": "{{names}} wrote since"
-    }
-  },
-  "usageQueue.queued": {
-    "value": "In line"
-  },
   "usageQueue.answering": {
-    "value": "Answering now"
+    "value": "Answering"
   },
   "usageQueue.hidden": {
     "value": {
-      "one": "+{{count}} in conversations you can't see",
-      "other": "+{{count}} in conversations you can't see"
+      "one": "+{{count}} you can't see",
+      "other": "+{{count}} you can't see"
     }
   },
   "usageQueue.dontRunAll": {
@@ -4739,8 +4709,8 @@
   },
   "usageQueue.confirmAll": {
     "value": {
-      "one": "Don't run {{count}} conversation?",
-      "other": "Don't run these {{count}} conversations?"
+      "one": "Don't run this one?",
+      "other": "Don't run all {{count}}?"
     }
   },
   "usageQueue.yesDontRun": {
@@ -4751,12 +4721,12 @@
   },
   "usageQueue.canceledAll": {
     "value": {
-      "one": "{{count}} conversation canceled. {{agent}} won't answer it when the limit is back.",
-      "other": "{{count}} conversations canceled. {{agent}} won't answer them when the limit is back."
+      "one": "{{count}} conversation canceled. {{agent}} won't answer it.",
+      "other": "{{count}} conversations canceled. {{agent}} won't answer them."
     }
   },
   "usageQueue.empty": {
-    "value": "Nothing waiting to pick up."
+    "value": "Nothing waiting on the plan."
   },
   "usageQueue.waiting": {
     "value": {
@@ -4764,29 +4734,47 @@
       "other": "{{count}} conversations waiting"
     }
   },
-  "usageQueue.closedTitle": {
-    "value": {
-      "one": "{{count}} didn't need an answer",
-      "other": "{{count}} didn't need an answer"
-    }
-  },
-  "usageQueue.closedWhy": {
-    "value": "They looked handled, so {{agent}} didn't answer."
-  },
-  "usageQueue.closedLine": {
-    "value": "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway."
-  },
-  "usageQueue.seeConversation": {
-    "value": "See conversation"
-  },
   "usageQueue.answeredAnyway": {
-    "value": "Someone asked for an answer anyway"
-  },
-  "usageQueue.toResume": {
-    "value": "To pick up"
+    "value": "Answering anyway"
   },
   "usageQueue.switchAi": {
     "value": "Change {{name}}'s AI"
+  },
+  "usageQueue.back": {
+    "value": "{{agent}} is back {{when}}"
+  },
+  "usageQueue.backPlan": {
+    "value": "{{agent}} is back when the plan resets"
+  },
+  "usageQueue.backBudget": {
+    "value": "{{agent}} is back when the budget renews"
+  },
+  "usageQueue.resuming": {
+    "value": "{{agent}} is picking up"
+  },
+  "usageQueue.about": {
+    "value": "About the line"
+  },
+  "usageQueue.lists": {
+    "value": "Conversations"
+  },
+  "usageQueue.queuedTab": {
+    "value": "In line"
+  },
+  "usageQueue.skippedTab": {
+    "value": "Skipped"
+  },
+  "usageQueue.skip_solved": {
+    "value": "{{name}} already took care of it"
+  },
+  "usageQueue.skip_withdrawn": {
+    "value": "{{name}} said it's no longer needed"
+  },
+  "usageQueue.skip_task_canceled": {
+    "value": "{{name}} canceled the task"
+  },
+  "usageQueue.skip_mixed": {
+    "value": "Already handled"
   },
   "actionCard.connect_ai.title": {
     "value": "Connect an AI for {{agents}}"

@@ -730,3 +730,38 @@ export function drawAccessory(ctx, s, name, frame, t = 0, active = false) {
     }
   }
 }
+
+/**
+ * The two pixel z's of a sleeping agent, on the body's 16×16 grid: in the cut of the head's rounded top-right corner and
+ * up and right from it. A tile leaves a bare head 4.8 cells above and 4.1 to its right: both fit there.
+ */
+const SLEEP_Z = ["###", "  #", " # ", "###"];
+export const SLEEP_SPOTS = [
+  [14.5, -2.6],
+  [17, -4.8],
+];
+
+/**
+ * A sleeping agent's "zz" (paused until its plan or budget is back), drawn in the body's own space like an accessory
+ * (inside drawAgent's `after`), in `color`. With `t` the high one comes and goes; without it (still frames, reduced
+ * motion) both show.
+ */
+export function drawSleep(ctx, s, frame, color, t) {
+  const u = s / 16;
+  const hx = (frame?.head?.[0] ?? 0) * s;
+  const hy = (frame?.head?.[1] ?? 0) * s;
+  // The high z comes and goes (a third of the time away): both stay readable as "zz", not one "z" alone.
+  const rising = t !== undefined && Math.floor(t / 0.8) % 3 === 0;
+  ctx.fillStyle = color;
+  SLEEP_SPOTS.forEach(([ox, oy], k) => {
+    if (rising && k === 1) return;
+    for (let j = 0; j < SLEEP_Z.length; j++)
+      for (let i = 0; i < SLEEP_Z[j].length; i++)
+        if (SLEEP_Z[j][i] === "#") ctx.fillRect((ox + i) * u + hx, (oy + j) * u + hy, u + 0.6, u + 0.6);
+  });
+}
+
+/** A sleeping agent's pose: eyes closed, the head a little down, breathing slowly (still: no breath). */
+export function sleepPose(t, seed = 0) {
+  return { expression: "closed", turn: [0, 0.15], squash: t === undefined ? 0 : Math.sin(t * 1.1 + seed) * 0.3 };
+}

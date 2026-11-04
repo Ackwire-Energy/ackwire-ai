@@ -8,7 +8,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { COMPACT_QUERY, DESKTOP_QUERY } from "@/components/NavDrawer";
 import { TABLET_QUERY } from "@/components/Sidebar";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState, withRightHand } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 let media: { mockRestore: () => void } | null = null;
@@ -474,5 +474,22 @@ describe("Settings › Papéis: listed apart", () => {
     await act(async () => fireEvent.click(hoist));
     await settle(2);
     expect(state.calls.find((c) => c.method === "roles.update")?.args[2]).toEqual({ hoist: false });
+  });
+});
+
+describe("an agent out of office", () => {
+  test("sleeps in the members column while its plan is spent, and wakes when it is back", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = seedState();
+    const line = { by: "auto" as const, text: null, subject: null, emoji: null, until: null, count: 2 };
+    state.agentStatuses = [
+      { agentId: ADA_ID, presence: "away", status: { ...line, kind: "out_of_plan" }, activeAt: null },
+      { agentId: ATLAS_ID, presence: "online", status: null, activeAt: null },
+    ];
+    await open(state);
+    const ada = row(column() as HTMLElement, "Ada") as HTMLElement;
+    expect(ada.querySelector(".ac-avatar")?.getAttribute("data-state")).toBe("sleeping");
+    const atlas = row(column() as HTMLElement, "Atlas") as HTMLElement;
+    expect(atlas.querySelector(".ac-avatar")?.getAttribute("data-state")).toBe("idle");
   });
 });

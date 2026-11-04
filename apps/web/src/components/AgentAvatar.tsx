@@ -1,5 +1,6 @@
 import type { AgentPresence } from "@agenteschat/client";
 import { agentStateIn } from "@agenteschat/client";
+import { isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { splitAtNames } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
@@ -29,6 +30,8 @@ type AgentAvatarProps = Omit<AvatarProps, "kind" | "running" | "state" | "appear
   state?: AgentState;
   /** Shows the "running" halo (a preview without a live run). */
   running?: boolean;
+  /** Out of office (its plan or budget is spent): asleep while none of its runs works. */
+  asleep?: boolean;
   /**
    * Its presence badge (ADR 0084): `true` reads it live (from its work, offline with no AI), a value draws that one.
    * Only where presence matters (the sidebar, member lists, profile cards, messages), never on the tiny receipts.
@@ -47,7 +50,7 @@ export function AgentAvatar(props: AgentAvatarProps) {
   if (id && props.presence === true) return <PresentAgentAvatar {...props} agentId={id} />;
   const given = typeof props.presence === "string" ? props.presence : null;
   if (id) return <LiveAgentAvatar {...props} presence={given} agentId={id} />;
-  const { agent, appearance, state, running, channelId: _c, agentId: _a, presence: _p, ...rest } = props;
+  const { agent, appearance, state, running, asleep: _s, channelId: _c, agentId: _a, presence: _p, ...rest } = props;
   return (
     <Avatar
       kind="agent"
@@ -93,13 +96,14 @@ export function withAgentFaces(text: string, who: { name: string; agentId?: stri
   );
 }
 
-/** A real agent with its live presence badge. */
+/** A real agent with its live presence badge; out of office, asleep while nothing of its runs. */
 function PresentAgentAvatar(props: AgentAvatarProps & { agentId: string }) {
   const { t } = useTranslation();
   const shown = useAgentPresence(props.agentId);
   return (
     <LiveAgentAvatar
       {...props}
+      asleep={props.asleep ?? isOutOfOffice(shown?.line)}
       presence={shown?.presence ?? null}
       presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
     />
@@ -114,16 +118,18 @@ function LiveAgentAvatar({
   state,
   running,
   presence,
+  asleep,
   ...rest
 }: Omit<AgentAvatarProps, "presence"> & { agentId: string; presence: AgentPresence | null }) {
   const live = useStreams((s) => agentStateIn(s, agentId, channelId));
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const known = dir.anyAgent(agentId);
+  const idle = running ? "thinking" : asleep ? "sleeping" : "idle";
   return (
     <Avatar
       kind="agent"
-      state={state ?? (running && live === "idle" ? "thinking" : live)}
+      state={state ?? (live === "idle" ? idle : live)}
       appearance={appearance ?? lookOf(known ?? agent)}
       initials={dir.agentInitials(agentId)}
       presence={presence}

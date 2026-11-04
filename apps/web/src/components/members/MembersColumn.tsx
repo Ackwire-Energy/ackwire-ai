@@ -3,7 +3,7 @@ import { agentStateIn, useRoles } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
-import { agentStatusShort } from "@agenteschat/client/lib/presence";
+import { agentStatusShort, isOutOfOffice } from "@agenteschat/client/lib/presence";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { Avatar, Button, Icon, matchesWords, RoleMark, SearchField } from "@agenteschat/ui";
 import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
@@ -327,6 +327,7 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
           name={agent.name}
           presence={shown?.presence ?? null}
           presenceLabel={word ?? undefined}
+          asleep={isOutOfOffice(shown?.line)}
         />
         <span className="members-side__text">
           <span className="members-side__name">

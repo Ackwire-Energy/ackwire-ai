@@ -145,3 +145,7 @@ export function drawAccessory(
   t?: number,
   active?: boolean,
 ): void;
+/** Where each z of `drawSleep` starts (its top-left cell), on the body's 16×16 grid; each is 3 wide and 4 tall. */
+export const SLEEP_SPOTS: [number, number][];
+export function drawSleep(ctx: Ctx2D, s: number, frame: BodyFrame | undefined, color: string, t?: number): void;
+export function sleepPose(t?: number, seed?: number): Pose;
