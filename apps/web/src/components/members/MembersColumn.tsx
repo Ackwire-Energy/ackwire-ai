@@ -354,7 +354,12 @@ function AgentRow({
           </span>
           {text &&
             (line ? (
-              <StatusLine emoji={line.emoji} text={line.text} className="members-side__line members-side__work" />
+              <StatusLine
+                emoji={line.emoji}
+                icon={line.icon}
+                text={line.text}
+                className="members-side__line members-side__work"
+              />
             ) : (
               <span className={busy ? "members-side__line members-side__work" : "members-side__line"}>{text}</span>
             ))}

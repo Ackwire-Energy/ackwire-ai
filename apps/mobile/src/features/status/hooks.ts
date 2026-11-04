@@ -10,7 +10,7 @@ import {
 } from "@agenteschat/client";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { agentPresenceShown, agentStatusText, clearsText } from "@agenteschat/client/lib/presence";
+import { agentPresenceShown, agentStatusText, clearsText, type LIMIT_ICON } from "@agenteschat/client/lib/presence";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -31,7 +31,7 @@ export interface PresenceOf {
 export interface AgentShown {
   presence: AgentPresence;
   /** What it says it does, worded ("🛠️ Deploy da v2"); null: no line. */
-  line: { emoji: string; text: string } | null;
+  line: { emoji: string | null; icon?: typeof LIMIT_ICON; text: string } | null;
   status: AgentStatus | undefined;
   noAi: boolean;
 }
@@ -99,7 +99,7 @@ export interface AgentProfileStatus {
   /** "Ocupado · Num trabalho pesado". */
   line: string;
   /** Its line in full, with who wrote it; null: none. */
-  card: { emoji: string; text: string; note: string } | null;
+  card: { emoji: string | null; icon?: typeof LIMIT_ICON; text: string; note: string } | null;
   /** Out of office with conversations waiting for it (ADR 0118): how many, its queue's way in. */
   waiting: number;
 }

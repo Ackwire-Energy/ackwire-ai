@@ -100,6 +100,18 @@ test("an agent out of office with conversations waiting says how many", () => {
   expect(agentStatusText(pt, { ...line, count: undefined }, "pt-BR", now)?.text).toBe("Sem limite no plano");
 });
 
+test("a limit leads with our pause icon, never an emoji; any other line keeps its emoji", () => {
+  const line = { by: "auto" as const, text: null, subject: null, emoji: null, until: null };
+  for (const kind of ["out_of_plan", "out_of_budget", "waiting_plan", "waiting_budget"] as const)
+    expect(agentStatusText(pt, { ...line, kind }, "pt-BR", now)).toMatchObject({ emoji: null, icon: "pause" });
+  expect(agentStatusText(pt, { ...line, kind: "waiting_approval" }, "pt-BR", now)).toMatchObject({ emoji: "⏳" });
+  expect(agentStatusText(pt, { ...line, kind: "waiting_approval" }, "pt-BR", now)?.icon).toBeUndefined();
+  // An emoji someone chose stays theirs.
+  expect(agentStatusText(pt, { ...line, kind: "out_of_plan", emoji: "🌴" }, "pt-BR", now)).toMatchObject({
+    emoji: "🌴",
+  });
+});
+
 test("long work in the agent's line of work reads as in line, not as waiting for your answer", () => {
   const view = receiptView({ routed: true, server: undefined, agents: [["ada", "line"]] } as never);
   expect(view.status).toEqual({ kind: "line", agents: ["ada"] });

@@ -88,8 +88,8 @@ export function clearsText(t: TFunction, language: string, until: string | null,
 /** A person's line as one string: "📅 Em reunião". */
 export const memberStatusText = (s: MemberStatus) => (s.emoji ? `${s.emoji} ${s.text}` : s.text);
 
-/** The emoji of a line the server picked. */
-export const AGENT_KIND_EMOJI: Record<AgentStatusKind, string> = {
+/** The emoji of a line the server picked; a limit (the plan or the budget) draws `LIMIT_ICON` instead. */
+export const AGENT_KIND_EMOJI: Record<Exclude<AgentStatusKind, LimitKind>, string> = {
   task: "🧩",
   routine: "🔁",
   mission: "🚀",
@@ -107,24 +107,35 @@ export const AGENT_KIND_EMOJI: Record<AgentStatusKind, string> = {
   waiting_answer: "⏳",
   waiting_computer: "⏳",
   queued_computer: "⏳",
-  waiting_plan: "⏳",
-  waiting_budget: "⏳",
   provider_down: "⚠️",
-  out_of_plan: "🪫",
-  out_of_budget: "🪫",
   work: "🛠️",
 };
 
+type LimitKind = "out_of_plan" | "out_of_budget" | "waiting_plan" | "waiting_budget";
+const isLimit = (kind: AgentStatusKind): kind is LimitKind =>
+  kind === "out_of_plan" || kind === "out_of_budget" || kind === "waiting_plan" || kind === "waiting_budget";
+
+/** In both apps' icon sets. An emoji there would read as the agent's own words. */
+export const LIMIT_ICON = "pause";
+
+/** What leads a line the server picked: its own emoji, else the limit's icon, else the kind's emoji. */
+const markOf = (line: AgentStatusLine, kind: AgentStatusKind): { emoji: string | null; icon?: typeof LIMIT_ICON } =>
+  line.emoji
+    ? { emoji: line.emoji }
+    : isLimit(kind)
+      ? { emoji: null, icon: LIMIT_ICON }
+      : { emoji: AGENT_KIND_EMOJI[kind] };
+
 /**
- * An agent's line in words (its own, or the server's kind worded in the app's language), with its emoji. Out of
- * office (§12) says when it is back ("Sem limite do plano · volta às 15:00"), in `locale`.
+ * An agent's line in words (its own, or the server's kind worded in the app's language), with its emoji or, for a
+ * limit, our icon. Out of office (§12) says when it is back ("Sem limite do plano · volta às 15:00"), in `locale`.
  */
 export function agentStatusText(
   t: TFunction,
   line: AgentStatusLine,
   locale?: string,
   now = new Date(),
-): { emoji: string; text: string } | null {
+): { emoji: string | null; icon?: typeof LIMIT_ICON; text: string } | null {
   if (line.text) return { emoji: line.emoji ?? AGENT_KIND_EMOJI.task, text: line.text };
   if (!line.kind) return null;
   if (line.kind === "work") return { emoji: line.emoji ?? AGENT_KIND_EMOJI.work, text: workStatusText(t, line) };
@@ -133,13 +144,10 @@ export function agentStatusText(
     const back = line.until ? t("presence.agent.backAt", { when: usageWhen(t, locale, line.until, now) }) : null;
     // How many conversations wait for it (ADR 0118): the same count its queue shows.
     const waiting = line.count ? usageWaitingText(t, line.count) : null;
-    return {
-      emoji: line.emoji ?? AGENT_KIND_EMOJI[line.kind],
-      text: [what, back, waiting].filter(Boolean).join(" · "),
-    };
+    return { ...markOf(line, line.kind), text: [what, back, waiting].filter(Boolean).join(" · ") };
   }
   return {
-    emoji: line.emoji ?? AGENT_KIND_EMOJI[line.kind],
+    ...markOf(line, line.kind),
     text: t(`presence.agent.${line.kind}`, { subject: line.subject ?? "" }),
   };
 }
