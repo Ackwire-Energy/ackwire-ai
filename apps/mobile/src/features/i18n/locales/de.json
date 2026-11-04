@@ -310,6 +310,7 @@
     "failed": "Nicht gesendet · Erneut versuchen",
     "notSent": "Die Nachricht wurde nicht gesendet.",
     "toLatest": "Zu den neuesten Nachrichten",
+    "toLatestNew": "Zu den neuesten Nachrichten: {{text}}",
     "stopAgent": "{{name}} stoppen",
     "offlineWait": "Wird gesendet, sobald die Verbindung zurück ist",
     "turn": {
@@ -341,6 +342,7 @@
       "count_one": "{{count}} neu",
       "count_other": "{{count}} neu",
       "working": "{{names}} schreiben",
+      "mentionsYou": "du wurdest erwähnt",
       "divider": "Neu"
     },
     "connection": {

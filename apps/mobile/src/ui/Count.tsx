@@ -10,6 +10,8 @@ export interface CountProps {
   inverted?: boolean;
   /** Text color override (e.g. on a selected filter). */
   color?: string;
+  /** The badge's pill color, ink by default (red for a count that calls on the person, as a mention). */
+  fill?: string;
   /** Past this, shows "max+" (unread counts: the server stops counting at 100). */
   max?: number;
   /** A rare large hero number: drawn in Doto (ROND 100). Everything else is the system font. */
@@ -22,7 +24,7 @@ export interface CountProps {
  * Every counter in the app: the system font, semibold, tabular figures (badges, section counts). Doto only
  * for the rare hero number (`hero`).
  */
-export function Count({ value, size = 14, inverted = false, color, max, hero = false, weight }: CountProps) {
+export function Count({ value, size = 14, inverted = false, color, fill, max, hero = false, weight }: CountProps) {
   const { colors, fonts } = useTheme();
   const label = max !== undefined && value > max ? `${max}+` : String(value);
   const face = hero
@@ -31,7 +33,7 @@ export function Count({ value, size = 14, inverted = false, color, max, hero = f
   if (inverted) {
     const badge = countBadge(size);
     return (
-      <View style={[badge.box, { backgroundColor: colors.ink }]}>
+      <View style={[badge.box, { backgroundColor: fill ?? colors.ink }]}>
         <RNText style={[face, badge.text, { color: color ?? colors.bg }]} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
           {label}
         </RNText>

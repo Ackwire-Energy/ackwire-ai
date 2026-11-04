@@ -296,6 +296,7 @@
     "failed": "전송 안 됨 · 다시 시도",
     "notSent": "메시지가 전송되지 않았어요.",
     "toLatest": "최신 메시지로 이동",
+    "toLatestNew": "최신 메시지로 이동: {{text}}",
     "stopAgent": "{{name}} 중지",
     "offlineWait": "연결되면 전송돼요",
     "turn": {
@@ -326,6 +327,7 @@
     "unseen": {
       "count_other": "새 메시지 {{count}}개",
       "working": "{{names}} 작성 중",
+      "mentionsYou": "나를 멘션했어요",
       "divider": "새 메시지"
     },
     "connection": {

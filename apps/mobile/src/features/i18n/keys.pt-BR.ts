@@ -321,6 +321,7 @@ export const featureKeysPtBR = {
     failed: "Não foi enviada · Tentar de novo",
     notSent: "A mensagem não foi enviada.",
     toLatest: "Ir para as mensagens mais recentes",
+    toLatestNew: "Ir para as mensagens mais recentes: {{text}}",
     stopAgent: "Parar {{name}}",
     offlineWait: "Sai quando a conexão voltar",
     turn: {
@@ -352,6 +353,7 @@ export const featureKeysPtBR = {
       count_one: "{{count}} nova",
       count_other: "{{count}} novas",
       working: "{{names}} escrevendo",
+      mentionsYou: "mencionaram você",
       divider: "Novas",
     },
     connection: {

@@ -296,6 +296,7 @@
     "failed": "未发送 · 重试",
     "notSent": "消息未发送。",
     "toLatest": "前往最新消息",
+    "toLatestNew": "前往最新消息：{{text}}",
     "stopAgent": "停止 {{name}}",
     "offlineWait": "恢复连接后发送",
     "turn": {
@@ -326,6 +327,7 @@
     "unseen": {
       "count_other": "{{count}} 条新消息",
       "working": "{{names}} 正在输入",
+      "mentionsYou": "有人提及了你",
       "divider": "新消息"
     },
     "connection": {

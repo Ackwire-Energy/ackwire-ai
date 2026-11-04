@@ -338,6 +338,7 @@
     "failed": "Не отправлено · Повторить",
     "notSent": "Сообщение не отправлено.",
     "toLatest": "К последним сообщениям",
+    "toLatestNew": "К последним сообщениям: {{text}}",
     "stopAgent": "Остановить {{name}}",
     "offlineWait": "Отправится, когда появится связь",
     "turn": {
@@ -371,6 +372,7 @@
       "count_many": "{{count}} новых",
       "count_other": "{{count}} нового",
       "working": "{{names}} пишет",
+      "mentionsYou": "вас упомянули",
       "divider": "Новые"
     },
     "connection": {

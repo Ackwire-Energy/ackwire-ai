@@ -310,6 +310,7 @@
     "failed": "Gönderilmedi · Tekrar deneyin",
     "notSent": "Mesaj gönderilmedi.",
     "toLatest": "En son mesajlara git",
+    "toLatestNew": "En son mesajlara git: {{text}}",
     "stopAgent": "{{name}} ajanını durdur",
     "offlineWait": "Bağlantı geri gelince gönderilir",
     "turn": {
@@ -341,6 +342,7 @@
       "count_one": "{{count}} yeni",
       "count_other": "{{count}} yeni",
       "working": "{{names}} yazıyor",
+      "mentionsYou": "sizden bahsedildi",
       "divider": "Yeni"
     },
     "connection": {

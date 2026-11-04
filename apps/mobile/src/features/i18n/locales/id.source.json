@@ -749,6 +749,9 @@
   "chat.toLatest": {
     "value": "Go to the latest messages"
   },
+  "chat.toLatestNew": {
+    "value": "Go to the latest messages: {{text}}"
+  },
   "chat.stopAgent": {
     "value": "Stop {{name}}"
   },
@@ -820,6 +823,9 @@
   },
   "chat.unseen.working": {
     "value": "{{names}} writing"
+  },
+  "chat.unseen.mentionsYou": {
+    "value": "you were mentioned"
   },
   "chat.unseen.divider": {
     "value": "New"
