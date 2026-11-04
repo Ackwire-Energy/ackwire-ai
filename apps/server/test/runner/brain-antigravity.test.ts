@@ -5,7 +5,7 @@ import path from "node:path";
 import { accountCodeAad } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret } from "@agenteschat/adapters/secret-box";
 import { AccountManager, accountEnv, parseAgyLoginUrl, parseAgyStatus } from "../../runner/accounts";
-import { AGY_CHAT_AGENT, AGY_PLANTED, agyAuthOf, prepareAgyHome } from "../../runner/agy-home";
+import { AGY_CHAT_AGENT, AGY_PLANTED, agyAuthOf, agyRuntimeDir, prepareAgyHome } from "../../runner/agy-home";
 import {
   type AntigravityBrainTurnRequest,
   antigravityChatBreach,
@@ -84,6 +84,9 @@ test("the account's home: what a turn planted goes, our settings, our server alo
     useG1Credits: false,
     permissions: { allow: [`mcp(${CODEX_MCP_SERVER}/*)`] },
   });
+  // Turns pass `--disable-slash-commands`; `/usage` and `/logout` must still reach the CLI.
+  expect(settings.disableSlashCommands).toBeUndefined();
+  expect(existsSync(agyRuntimeDir(home))).toBe(true);
   const agent = readFileSync(path.join(home, `.gemini/config/agents/${AGY_CHAT_AGENT}/agent.md`), "utf8");
   expect(agent).toContain("tools: []");
   expect(agent).toContain("subagent: false");
@@ -160,13 +163,34 @@ test("an account's folder is the CLI's whole home: no keyring, no Gemini key or 
     HOME: "/root",
     GEMINI_API_KEY: "AIza-machine",
     GOOGLE_APPLICATION_CREDENTIALS: "/root/sa.json",
+    GOOGLE_CLOUD_PROJECT: "p",
+    CLOUDSDK_CONFIG: "/root/.config/gcloud",
     AGY_ADC_AUTH: "true",
     DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/bus",
+    XDG_RUNTIME_DIR: "/run/user/0",
+    DISPLAY: ":0",
   });
-  expect(env).toMatchObject({ HOME: "/acc/x", XDG_CONFIG_HOME: "/acc/x/.config", AGY_CLI_DISABLE_AUTO_UPDATE: "true" });
-  for (const name of ["GEMINI_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "AGY_ADC_AUTH", "DBUS_SESSION_BUS_ADDRESS"]) {
+  expect(env).toMatchObject({
+    HOME: "/acc/x",
+    XDG_CONFIG_HOME: "/acc/x/.config",
+    XDG_RUNTIME_DIR: "/acc/x/.run",
+    AGY_CLI_DISABLE_AUTO_UPDATE: "true",
+  });
+  for (const name of [
+    "GEMINI_API_KEY",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "GOOGLE_CLOUD_PROJECT",
+    "CLOUDSDK_CONFIG",
+    "AGY_ADC_AUTH",
+    "DBUS_SESSION_BUS_ADDRESS",
+    "DISPLAY",
+  ]) {
     expect(env[name]).toBeUndefined();
   }
+  // Google Cloud's sign-ins stay with an agent on another CLI.
+  const codex = accountEnv("codex", "/acc/y", { GOOGLE_APPLICATION_CREDENTIALS: "/root/sa.json", GEMINI_API_KEY: "k" });
+  expect(codex).toMatchObject({ GOOGLE_APPLICATION_CREDENTIALS: "/root/sa.json" });
+  expect(codex.GEMINI_API_KEY).toBeUndefined();
 });
 
 test.skipIf(!posix)("detection: the CLI's version line and the models it lists", async () => {

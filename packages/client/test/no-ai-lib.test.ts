@@ -34,7 +34,7 @@ import {
   signsInOnce,
   signsInPerAgent,
 } from "../src/lib/no-ai";
-import { LOGIN_PER_AGENT, OPENCODE_KEY_PLAN, SHARED_SIGN_INS, signInKey } from "../src/lib/plans";
+import { LOGIN_PER_AGENT, OPENCODE_KEY_PLAN, providerFitsChoice, SHARED_SIGN_INS, signInKey } from "../src/lib/plans";
 
 const setup = (patch: Partial<ComputerSetup> = {}) =>
   setupView({
@@ -515,6 +515,11 @@ describe("All agents: one login per agent, the key pasted once", () => {
       "gemini",
       "antigravity",
     ]);
+    // A Gemini Enterprise seat is an account of the Gemini plan, as a personal Google one; a coding plan, its key's.
+    expect(providerFitsChoice("enterprise", "gemini", false)).toBe(true);
+    expect(providerFitsChoice(null, "gemini", false)).toBe(true);
+    expect(providerFitsChoice("zai", "claude", false)).toBe(false);
+    expect(providerFitsChoice("zai", "zai", true)).toBe(true);
     expect(agentAi({ brain: { kind: "model", model: null } }, "no_ai")).toBeNull();
     expect(agentAi(undefined, undefined)).toBeNull();
   });

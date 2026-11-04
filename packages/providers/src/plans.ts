@@ -374,5 +374,12 @@ export const GEMINI_ENTERPRISE_PROVIDER = "enterprise";
 export const signInProviderOf = (provider: string | null | undefined): string | undefined =>
   isPlanId(provider) || provider === GEMINI_ENTERPRISE_PROVIDER ? provider : undefined;
 
+/**
+ * Whether an account's `provider` is the plan chosen: a coding plan's own key, else a sign-in (none, or Gemini
+ * Enterprise's seat, an account of the same plan as a personal Google one).
+ */
+export const providerFitsChoice = (provider: string | null | undefined, choice: string, coding: boolean) =>
+  coding ? provider === choice : !provider || provider === GEMINI_ENTERPRISE_PROVIDER;
+
 /** An Antigravity model slug's model in the catalog: `gemini-4-argon-high` → `gemini-4-argon`. */
 export const antigravityBaseModel = (slug: string) => slug.replace(/-(?:low|medium|high)$/, "");

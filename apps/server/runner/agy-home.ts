@@ -51,7 +51,8 @@ function writeIfChanged(file: string, text: string) {
 /**
  * The account's `settings.json`, the same for every turn on it: its sign-in type (and the Google Cloud project the
  * CLI saved for an Enterprise seat) kept, everything else ours. Terminal commands in the sandbox, nothing outside the
- * turn's folder, our server's tools without asking, no AI credits spent past the plan's quota, slash commands off.
+ * turn's folder, our server's tools without asking, no AI credits spent past the plan's quota. Slash commands stay on
+ * here: turns pass `--disable-slash-commands`, and `/usage` and `/logout` must reach the CLI, not the model.
  */
 export function writeAgySettings(home: string, auth?: AgyAuth) {
   const was = readSettings(home);
@@ -63,7 +64,6 @@ export function writeAgySettings(home: string, auth?: AgyAuth) {
     enableTerminalSandbox: true,
     allowNonWorkspaceAccess: false,
     useG1Credits: false,
-    disableSlashCommands: true,
     showTips: false,
     showFeedbackSurvey: false,
     notifications: false,
@@ -71,7 +71,14 @@ export function writeAgySettings(home: string, auth?: AgyAuth) {
     permissions: { allow: [`mcp(${CODEX_MCP_SERVER}/*)`] },
   };
   writeIfChanged(settingsFile(home), `${JSON.stringify(settings, null, 2)}\n`);
+  mkdirSync(agyRuntimeDir(home), { recursive: true, mode: 0o700 });
 }
+
+/**
+ * The account's own `XDG_RUNTIME_DIR`: with the computer user's, a D-Bus client finds its session bus at
+ * `$XDG_RUNTIME_DIR/bus` even with no `DBUS_SESSION_BUS_ADDRESS`, and every account would share one keyring.
+ */
+export const agyRuntimeDir = (home: string) => path.join(home, ".run");
 
 /**
  * What a turn could leave in the account's home that a later turn (another agent's, or Lodi's) would load as its

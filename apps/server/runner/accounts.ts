@@ -35,7 +35,7 @@ import {
   planModel,
   planOf,
 } from "@agenteschat/providers/plans";
-import { agyAuthOf, writeAgySettings } from "./agy-home";
+import { agyAuthOf, agyRuntimeDir, writeAgySettings } from "./agy-home";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
 import {
@@ -201,13 +201,17 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
 
 /**
  * What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. Every
- * `GROK_` switch too (folder trust, memory, managed config, sandbox…): Grok Build gets only `GROK_QUIET_ENV`'s. And
- * every way the Antigravity CLI thinks without its sign-in: a Gemini or Google key, Application Default Credentials,
- * Vertex and Google Cloud switches, another endpoint, the enterprise gateway (`AGY_LLM_GATEWAY_*`) and every other
- * `AGY_` switch (it gets only `AGY_QUIET_ENV`'s).
+ * `GROK_` switch too (folder trust, memory, managed config, sandbox…): Grok Build gets only `GROK_QUIET_ENV`'s. And a
+ * Gemini or Google AI key, another Gemini endpoint, the Antigravity CLI's enterprise gateway (`AGY_LLM_GATEWAY_*`) and
+ * every other `AGY_` switch (it gets only `AGY_QUIET_ENV`'s).
  */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT|XAI_API_KEY|GROK_\w+|GEMINI_API_KEY|GOOGLE_API_KEY|GOOGLE_APPLICATION_CREDENTIALS|GOOGLE_GEMINI_BASE_URL|GOOGLE_GENAI_\w+|GOOGLE_CLOUD_\w+|AGY_\w+)$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY|CURSOR_API_KEY|OPENCODE_API_KEY|OPENCODE_AUTH_CONTENT|XAI_API_KEY|GROK_\w+|GEMINI_API_KEY|GOOGLE_API_KEY|GOOGLE_GEMINI_BASE_URL|GOOGLE_GENAI_\w+|AGY_\w+)$/;
+/**
+ * Google Cloud's own sign-ins (Application Default Credentials, gcloud's config, Vertex's project): kept out of the
+ * Antigravity CLI only, since an agent on another CLI may deploy to Google Cloud with them.
+ */
+const GOOGLE_CLOUD_SIGN_IN = /^(GOOGLE_APPLICATION_CREDENTIALS|GOOGLE_CLOUD_\w+|CLOUDSDK_\w+)$/;
 
 /** `base` without any key, token, endpoint or cloud a CLI would think with instead of its own sign-in. */
 export function withoutSignIns(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -242,7 +246,11 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
     env.XDG_CACHE_HOME = path.join(dir, ".cache");
     env.XDG_DATA_HOME = path.join(dir, ".local", "share");
     env.XDG_STATE_HOME = path.join(dir, ".local", "state");
+    for (const k of Object.keys(env)) if (GOOGLE_CLOUD_SIGN_IN.test(k)) delete env[k];
+    env.XDG_RUNTIME_DIR = agyRuntimeDir(dir);
     delete env.DBUS_SESSION_BUS_ADDRESS;
+    // X11 is the other way a D-Bus client autolaunches (or finds) a session bus shared by the display.
+    delete env.DISPLAY;
     delete env.SSH_AUTH_SOCK;
     Object.assign(env, AGY_QUIET_ENV);
   }
