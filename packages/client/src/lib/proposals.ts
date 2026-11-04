@@ -1,6 +1,8 @@
 import type { TFunction } from "i18next";
-import type { MemoryUpdate, Proposal, ProposalAccessLine } from "../api/types";
+import type { MemoryUpdate, OrgRole, Person, Proposal, ProposalAccessLine, ProposalSettingLine } from "../api/types";
+import { formatTime, formatUsd, joinNames } from "./format";
 import { agentGrammar } from "./grammar";
+import { holdersOf } from "./roles";
 import { scopeText } from "./scopes";
 
 /*
@@ -57,7 +59,7 @@ export function firstChange(lines: ChangedLine[] | undefined): ChangedLine | und
 
 export type ProposalSection =
   | { kind: "text"; lines: ChangedLine[]; rows: Proposal[] }
-  | { kind: "role" | "access"; rows: Proposal[] };
+  | { kind: "role" | "access" | "settings"; rows: Proposal[] };
 
 /**
  * A card's rows by what they change, so each change shows once: text rows (instructions, the org context) that
@@ -67,9 +69,11 @@ export function proposalSections(rows: Proposal[]): ProposalSection[] {
   const text = new Map<string, { kind: "text"; lines: ChangedLine[]; rows: Proposal[] }>();
   const role: Proposal[] = [];
   const access: Proposal[] = [];
+  const settings: Proposal[] = [];
   for (const p of rows) {
     if (p.target.type === "agent_role") role.push(p);
     else if (p.target.type === "agent_access") access.push(p);
+    else if (p.target.type === "agent_settings") settings.push(p);
     else {
       const lines = changedLines(p);
       const key = JSON.stringify(lines);
@@ -82,6 +86,7 @@ export function proposalSections(rows: Proposal[]): ProposalSection[] {
     ...text.values(),
     ...(role.length ? [{ kind: "role" as const, rows: role }] : []),
     ...(access.length ? [{ kind: "access" as const, rows: access }] : []),
+    ...(settings.length ? [{ kind: "settings" as const, rows: settings }] : []),
   ];
 }
 
@@ -129,6 +134,7 @@ export function proposalTarget(t: TFunction, p: Proposal, agentName: (id: string
   const g = agentGrammar(agentName(p.target.agentId));
   if (p.target.type === "agent_role") return t("proposals.targetRole", g);
   if (p.target.type === "agent_access") return t("proposals.targetAccess", g);
+  if (p.target.type === "agent_settings") return t("proposals.targetSettings", g);
   if (p.target.type === "skill") return t("proposals.targetSkill", { skill: p.target.name });
   return t("proposals.targetInstructions", g);
 }
@@ -168,6 +174,7 @@ const TITLE_KEY = {
   agent_instructions: "proposals.titleInstructions",
   agent_role: "proposals.titleRole",
   agent_access: "proposals.titleAccess",
+  agent_settings: "proposals.titleSettings",
   skill: "proposals.titleSkill",
 } as const;
 
@@ -180,4 +187,95 @@ export function proposalTitle(t: TFunction, p: Proposal, orgName: string, agentN
     skill: p.target.type === "skill" ? p.target.name : "",
     defaultValue: p.title,
   });
+}
+
+const NANO_PER_USD = 1_000_000_000;
+
+/** What a settings card's names come from: the viewer's directory and model list. */
+export interface SettingNames {
+  model: (id: string) => string;
+  person: (userId: string) => string | undefined;
+  channel: (channelId: string) => string | undefined;
+  role: (roleId: string) => string | undefined;
+}
+
+/**
+ * One line of the right hand's settings card (ADR 0137) in the person's language: what it changes ("Modelo",
+ * "#suporte") and the value then and proposed ("Haiku 4.5" → "Sonnet 4.5"). A seat in a channel reads as how the
+ * agent answers there, or that it isn't in it.
+ */
+export function settingLineText(
+  t: TFunction,
+  locale: string,
+  line: ProposalSettingLine,
+  names: SettingNames,
+): { field: string; from: string; to: string } {
+  const value = (v: unknown, side: "from" | "to"): string => {
+    const label = line.label?.[side];
+    switch (line.field) {
+      case "model":
+        return typeof v === "string" && v ? names.model(v) : t("rightHand.value.none");
+      case "budget":
+        return typeof v === "number" ? formatUsd(locale, v / NANO_PER_USD) : t("rightHand.value.budgetDefault");
+      case "owner":
+        return (typeof v === "string" ? names.person(v) : undefined) ?? label ?? t("rightHand.value.none");
+      case "ai_account":
+        return label ?? (v ? t("rightHand.value.anAccount") : t("rightHand.value.none"));
+      case "audience": {
+        const a = (v ?? {}) as { mode?: string; userIds?: string[]; roleIds?: string[] };
+        if (!a.mode || a.mode === "everyone") return t("rightHand.value.everyone");
+        if (a.mode === "owner") return t("rightHand.value.ownerOnly");
+        const roles = (a.roleIds ?? []).map((id) => names.role(id)).filter((r): r is string => Boolean(r));
+        return roles.length ? roles.join(", ") : (label ?? t("rightHand.value.somePeople"));
+      }
+      case "archive":
+        return v === true ? t("rightHand.value.archived") : t("rightHand.value.active");
+      default:
+        return v === null || v === undefined
+          ? t("rightHand.value.notIn")
+          : t(v === true ? "rightHand.value.withoutMention" : "rightHand.value.mentionOnly");
+    }
+  };
+  const channel = line.channelId ? names.channel(line.channelId) : undefined;
+  const field =
+    line.field === "channel_add" || line.field === "channel_remove" || line.field === "reply_mode"
+      ? channel
+        ? `#${channel}`
+        : (line.label?.to ?? t("rightHand.field.channel"))
+      : (t as unknown as (key: string) => string)(`rightHand.field.${line.field}`);
+  return { field, from: value(line.from, "from"), to: value(line.to, "to") };
+}
+
+/** Which "Só admins …" line a row the viewer can't decide reads, by what it changes. */
+export function onlyKey(p: Pick<Proposal, "settings">) {
+  const kinds = new Set(
+    (p.settings ?? []).map((l) =>
+      l.field === "channel_add" || l.field === "channel_remove" || l.field === "reply_mode" ? "channels" : l.field,
+    ),
+  );
+  const [only] = kinds;
+  return `rightHand.card.only.${kinds.size === 1 && only ? only : "many"}` as const;
+}
+
+/**
+ * The people a row sent with "Pedir a um admin" went to, as the server picks them: who manages agents, with the agent's
+ * owner where its owner decides too; an AI account's row only its owner (who owns the agent).
+ */
+export function decidersOf<P extends Pick<Person, "userId" | "name" | "role" | "roleIds">>(
+  p: Pick<Proposal, "decider">,
+  people: readonly P[],
+  roles: readonly OrgRole[],
+  agentOwnerId: string | null | undefined,
+): string[] {
+  if (p.decider.type === "account_owner") return people.filter((m) => m.userId === agentOwnerId).map((m) => m.name);
+  const admins = holdersOf(people, roles, "manage_agents").map((m) => m.name);
+  return p.decider.type === "user" ? [...new Set([p.decider.name, ...admins])] : admins;
+}
+
+/** "Enviado para Ana e Bruno · 14:02" under a card someone sent on with "Pedir a um admin" (ADR 0137). */
+export function sentToText(t: TFunction, locale: string, names: readonly string[], askedAt: string): string {
+  const when = formatTime(locale, askedAt);
+  return names.length
+    ? t("rightHand.card.sentTo", { names: joinNames(names, t), when })
+    : t("rightHand.card.sentToAny", { when });
 }

@@ -365,7 +365,7 @@ test("a narrow header fits: the waiting count alone beside the computer, the nam
   const phone = atRule(css, "@media (max-width: 640px)");
   expect(value(phone, ".cq-btn .cq-btn__label", "position")).toBe("absolute");
   expect(value(phone, ".cq-btn .cq-btn__label", "width")).toBe("1px");
-  expect(value(phone, ".cq-btn .cq-btn__count", "display")).toBe("inline-flex");
+  expect(value(phone, ".cq-btn .cq-btn__count", "display")).toBe("inline-block");
   expect(value(phone, ".brw-dm .brw-dm__label", "position")).toBe("absolute");
   // One line: buttons keep their size, the title and its subtitle shrink and end in "…".
   const narrow = atRule(css, "@media (max-width: 760px)");

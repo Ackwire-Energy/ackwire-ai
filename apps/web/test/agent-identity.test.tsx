@@ -46,19 +46,19 @@ describe("the agent's identity as a card", () => {
 
     await click(nameButton());
     expect(nameField().value).toBe("Ada");
-    expect(document.activeElement).toBe(nameField());
+    expect(document.activeElement === nameField()).toBe(true);
     await typeIn(nameField(), "Zé");
     await press(nameField(), "Escape");
     expect(screen().queryByLabelText("Nome")).toBeNull();
     expect(nameButton().textContent).toBe("Ada");
-    expect(document.activeElement).toBe(nameButton());
+    expect(document.activeElement === nameButton()).toBe(true);
     expect(saveBar()).toBeNull();
 
     await click(nameButton());
     await typeIn(nameField(), "Ada Lovelace");
     await press(nameField(), "Enter");
     expect(nameButton().textContent).toBe("Ada Lovelace");
-    expect(document.activeElement).toBe(nameButton());
+    expect(document.activeElement === nameButton()).toBe(true);
     // The @ follows the new name, the hint says the old one keeps working, what it was shows under the line.
     expect(screen().getByRole("button", { name: /^Editar menções/ }).textContent).toBe("@adalovelace");
     expect(card().textContent).toContain("As menções passam a ser por @adalovelace. @ada continua funcionando.");
@@ -87,7 +87,7 @@ describe("the agent's identity as a card", () => {
     await click(roleButton());
     expect(roleField().value).toBe("Dev");
     expect(roleField().getAttribute("aria-expanded")).toBe("true");
-    expect(document.activeElement).toBe(roleField());
+    expect(document.activeElement === roleField()).toBe(true);
     // As it opens, every role "Criar agente" offers, the one it has highlighted and marked.
     expect(options().map((o) => o.textContent)).toEqual([
       "Devatual",
@@ -112,7 +112,7 @@ describe("the agent's identity as a card", () => {
     expect(roleField().getAttribute("aria-activedescendant")).toBe(options()[1]?.id ?? "");
     await press(roleField(), "Enter");
     expect(roleButton().textContent).toBe("Ops");
-    expect(document.activeElement).toBe(roleButton());
+    expect(document.activeElement === roleButton()).toBe(true);
 
     // Typing filters and offers what was typed; Enter takes the highlighted one, the first.
     await click(roleButton());

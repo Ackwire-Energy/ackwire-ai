@@ -109,7 +109,15 @@ function DatabaseRowAccess({
     <LevelRow
       icon={<DatabaseIcon />}
       name={connection.label}
-      description={draft.level === "none" ? t("access.noneText") : t("database.agent.levelText")}
+      description={
+        draft.level === "none"
+          ? t("access.noneText")
+          : connection.wholeServer
+            ? draft.policy.databases?.length
+              ? t("database.agent.someDatabases", { count: draft.policy.databases.length, name: connection.label })
+              : t("database.agent.allDatabases", { name: connection.label })
+            : t("database.agent.levelText")
+      }
       levels={["none", "read"]}
       value={draft.level}
       onChange={editable && !loading ? (level) => change({ level }) : undefined}
@@ -130,7 +138,7 @@ function DatabaseRowAccess({
                 </summary>
                 <DatabaseRulesPanel
                   key={round}
-                  connectionId={connection.id}
+                  connection={connection}
                   policy={draft.policy}
                   onChange={(policy) => change({ policy })}
                   disabled={!editable}

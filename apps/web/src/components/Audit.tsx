@@ -45,12 +45,12 @@ import "./audit.css";
 
 const ANY = "any";
 
-export function AuditSection() {
+export function AuditSection({ agent }: { agent?: string }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const [show, setShow] = useState<AuditShow>("all");
-  const [agentId, setAgentId] = useState(ANY);
+  const [agentId, setAgentId] = useState(agent ?? ANY);
   const [openId, setOpenId] = useState<string | null>(null);
   const audit = useAudit(org.id, auditQueryOf(show, agentId === ANY ? null : agentId));
   const rows = useMemo(() => audit.data?.pages.flatMap((p) => p.rows) ?? [], [audit.data]);

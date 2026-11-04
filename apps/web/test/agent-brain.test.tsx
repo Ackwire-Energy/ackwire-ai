@@ -1059,12 +1059,12 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     const going = busy();
     expect(going.textContent).toBe("Enviando o código ao MacBook…");
     // The focus the field had goes to the line, not to the page.
-    expect(document.activeElement).toBe(going);
+    expect(document.activeElement === going).toBe(true);
     // The send fails: the field is back with the code in it, the error under it, and the focus.
     await act(async () => answer(false));
     await settle(4);
     expect(code().value).toBe("c0de-from-claude#st4te");
-    expect(document.activeElement).toBe(code());
+    expect(document.activeElement === code()).toBe(true);
     expect(shownText(block)).toContain("Não deu para enviar o código. Confira e tente de novo.");
     expect(shownText(block)).not.toContain("Enviando o código");
     // Sent again: the line says the computer is signing in, until the sign-in ends.
@@ -1085,7 +1085,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(shownText(block)).toContain("Não deu para entrar nessa conta. Tente de novo.");
     expect(within(block).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
     expect(within(block).queryByRole("status")).toBeNull();
-    expect(document.activeElement).toBe(block);
+    expect(document.activeElement === block).toBe(true);
   });
 
   test("Claude's code pasted into its field with ⌘V goes to the computer by itself, no click", async () => {
@@ -1793,7 +1793,6 @@ describe("Quem pensa: the draft", () => {
     owner: "u-joao",
     audience: { mode: "everyone", userIds: [] },
     brain: { brain: "model", model: null, fallback: true },
-    coordinator: false,
   };
   const api: BrainChoice = { brain: "model", model: null, fallback: true };
 

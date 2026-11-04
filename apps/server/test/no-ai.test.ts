@@ -20,12 +20,25 @@ test("ai-status per agent; a mention with no key gets the card; answer-now 409, 
   const status = async () => (await (await owner(`${org}/ai-status`)).json()) as Record<string, unknown>;
   // Who picks the agents for a message nobody mentioned: the workspace's small model, on its own key.
   const byModel = { by: "model", mine: "model", model: "claude-haiku-5-5", noSmallModel: null };
-  expect(await status()).toEqual({ any: true, agents: [{ agentId, state: "ready" }], routing: byModel, apiKey: true });
+  // The workspace's right hand (ADR 0137) comes first, on the same key.
+  const lodi = expect.any(String);
+  expect(await status()).toEqual({
+    any: true,
+    agents: [
+      { agentId: lodi, state: "ready" },
+      { agentId, state: "ready" },
+    ],
+    routing: byModel,
+    apiKey: true,
+  });
 
   await t.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
   expect(await status()).toEqual({
     any: false,
-    agents: [{ agentId, state: "no_ai", reason: "no_key" }],
+    agents: [
+      { agentId: lodi, state: "no_ai", reason: "no_key" },
+      { agentId, state: "no_ai", reason: "no_key" },
+    ],
     routing: { by: "rules", mine: "rules", model: null, noSmallModel: null },
     apiKey: false,
   });

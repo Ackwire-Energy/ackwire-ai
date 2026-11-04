@@ -84,3 +84,36 @@ test("a channel for a department: its people see it, join it and lose it with th
   const patched = await api(`/channels/${channel.id}`, { method: "PATCH", json: { audienceRoleIds: [] } });
   expect(((await patched.json()) as { audienceRoleIds: string[] }).audienceRoleIds).toEqual([]);
 });
+
+test("a message link's pill: where it is and who wrote it, only for who can see it", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const created = async (name: string, visibility: "public" | "private") =>
+    ((await (await api("/channels", { json: { name, visibility } })).json()) as { id: string }).id;
+  const say = async (channelId: string, body: string) =>
+    ((await (await api(`/channels/${channelId}/messages`, { json: { body } })).json()) as { id: string }).id;
+  const vendas = await created("vendas", "public");
+  const diretoria = await created("diretoria", "private");
+  const open = await say(vendas, "a meta do mês");
+  const closed = await say(diretoria, "o orçamento");
+
+  const member = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  const asMember = (path: string) => member(`/api/app/organizations/${orgId}${path}`);
+  const card = await asMember(`/messages/${open}/card`);
+  expect(card.status).toBe(200);
+  expect(await card.json()).toMatchObject({
+    id: open,
+    channelId: vendas,
+    threadId: null,
+    kind: "channel",
+    name: "vendas",
+  });
+  // Nothing of the private channel: not its name, not that the message exists.
+  const hidden = await asMember(`/messages/${closed}/card`);
+  expect(hidden.status).toBe(404);
+  expect(await hidden.text()).not.toContain("diretoria");
+  expect((await api(`/messages/${closed}/card`)).status).toBe(200);
+});

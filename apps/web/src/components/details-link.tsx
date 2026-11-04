@@ -3,8 +3,11 @@ import { type AnchorHTMLAttributes, createContext, type ReactNode, useContext } 
 import { useOrg } from "@/components/org-context";
 import { inPlaceClick } from "@/lib/navigate";
 
-/** An item whose details dialog opens over whatever page the person is on (`DetailsHost`). */
-export type DetailsItem = { kind: "routine" | "approval"; id: string };
+/**
+ * An item whose details dialog opens over whatever page the person is on (`DetailsHost`). `usage_queue` is an agent's
+ * line waiting on its plan (its id), which has no page of its own to link to.
+ */
+export type DetailsItem = { kind: "routine" | "approval" | "usage_queue"; id: string };
 
 export const OpenDetailsContext = createContext<((item: DetailsItem) => void) | null>(null);
 
@@ -18,7 +21,10 @@ export function DetailsLink({
   item,
   onClick,
   ...rest
-}: { item: DetailsItem; children: ReactNode } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href">) {
+}: { item: DetailsItem & { kind: keyof typeof PAGE }; children: ReactNode } & Omit<
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  "href"
+>) {
   const { org } = useOrg();
   const open = useContext(OpenDetailsContext);
   return (

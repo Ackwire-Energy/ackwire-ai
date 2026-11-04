@@ -113,7 +113,18 @@ export interface ErrorReportsConfig {
 
 /** A workspace's use against its limits (ADR 0079, `GET …/limits`), for any member; a null limit: none. */
 export interface WorkspaceLimits {
-  members: { used: number; limit: number | null };
+  /**
+   * `limit`: the seats paid for. `max`: the most the plan takes with seats added (null: not said), below which
+   * `canAddSeats`. `payer`: who pays, the only one who adds seats or changes plans (null: not said); `name` only to
+   * anyone else who manages billing, while the payer is in the workspace. All absent from servers older than them.
+   */
+  members: {
+    used: number;
+    limit: number | null;
+    max?: number | null;
+    canAddSeats?: boolean;
+    payer?: { you: boolean; name: string | null } | null;
+  };
   /** `ownStorage`: new files go to the workspace's own bucket, which no limit counts. */
   storage: { usedBytes: number; limitBytes: number | null; ownStorage: boolean };
   uploads: { usedBytes24h: number; limitBytesPerDay: number | null };
@@ -558,8 +569,8 @@ export interface Agent {
   appearance?: AgentLookInput;
   /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
   brain?: AgentBrainLine;
-  /** It coordinates the team (ADR 0093): one per workspace; absent from an older server. */
-  coordinator?: boolean;
+  /** A built-in agent the product ships (ADR 0137): `right_hand`, the team's right hand. Null or absent for the others. */
+  builtin?: "right_hand" | null;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
   /**
@@ -688,8 +699,6 @@ export interface AgentInput {
   /** With `audience`: the mailboxes the person agreed it loses; losing another refuses the save (409). */
   mailLossSeen?: string[];
   appearance?: AgentLookInput;
-  /** Editing only, admins: it coordinates the team (true takes it from whoever had it), ADR 0093. */
-  coordinator?: boolean;
   /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
   proposal?: string;
   /** Its stickers and GIFs after a light reply (ADR 0091); same permission as editing the agent. */
@@ -765,9 +774,12 @@ export interface AgentProposalCard {
   kind: "agent_proposal";
   /** The person behind the run that proposed it. */
   forUserId: string | null;
-  params: { draft: AgentDraft; why: string };
-  /** `creating`: a person is creating it right now. */
-  state: "pending" | "creating" | "created" | "denied";
+  /** `firstTask`: what "Criar e testar" puts in the composer of the clicker's DM with the new agent (ADR 0137). */
+  params: { draft: AgentDraft; why: string; firstTask?: string };
+  /** `creating`: a person is creating it right now; `superseded`: a newer card for the same handle took its place. */
+  state: "pending" | "creating" | "created" | "denied" | "superseded";
+  /** When the person it is for, who can't create agents, sent it to whoever may ("Pedir a um admin"). */
+  askedAt?: string;
   agentId: string | null;
   decidedByUserId: string | null;
   decidedAt: string | null;
@@ -782,7 +794,7 @@ export interface AgentProposalCard {
 /** What a person decided on a proposal: all that `agent.proposal.updated` carries of its card. */
 export type AgentProposalDecision = Pick<
   AgentProposalCard,
-  "state" | "agentId" | "decidedByUserId" | "decidedAt" | "applied" | "routineId"
+  "state" | "agentId" | "decidedByUserId" | "decidedAt" | "applied" | "routineId" | "askedAt"
 >;
 
 /** `GET …/agent-proposals/{messageId}`: the card, where it is and what the viewer may do. */
@@ -874,6 +886,18 @@ export interface ChannelInput {
 }
 
 /** A `#channel` link's card (`chat.card`): what the channel is and who is in it. */
+/** A pasted message link's pill (`GET …/messages/{id}/card`): where the message is and who wrote it, never its text. */
+export interface MessageCard {
+  id: string;
+  channelId: string;
+  /** The thread a reply is in; null for any other message. */
+  threadId: string | null;
+  kind: "channel" | "dm";
+  /** The channel's name, or who else is in the DM. */
+  name: string;
+  author: string;
+}
+
 export interface ChannelCard {
   id: string;
   name: string;
@@ -989,7 +1013,9 @@ export interface MessageReceipts {
     /** `waiting_input` because its AI provider is down: it retries by itself. */
     outage?: true;
     /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-    computer?: "queued" | "away";
+    computer?: "queued" | "away" | "line";
+    /** `waiting_input` on its plan's limit or its budget: it answers when that renews. */
+    usage?: "plan" | "budget";
     /** It ended without answering: passed and posted nothing, or canceled before it started. */
     passed?: true;
   }[];
@@ -1009,14 +1035,14 @@ export interface MessageReceipts {
 
 /**
  * Which step picked the agents for a message nobody mentioned (ADR 0074): Jev, the organization's small model
- * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule (`coordinator`: nobody
- * else took it, so the team's coordinator did, ADR 0093).
+ * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule. `coordinator` is only in
+ * decisions stored before ADR 0137 retired the team's coordinator: the apps read it as `default`.
  */
 export type DecidedBy =
   | { step: "jev" }
   | { step: "model"; model: string; provider: string }
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" | "default" };
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" | "default" | "alone" };
 
 /**
  * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for
@@ -1212,7 +1238,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -1299,7 +1327,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
       passed?: true;
       error?: string;
@@ -1391,7 +1421,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: passed and posted nothing, or canceled before it started. */
       passed?: true;
     }
@@ -1731,6 +1763,32 @@ export interface ProposalAccessLine {
   on: boolean;
 }
 
+/** A setting the right hand's card changes on an agent (ADR 0137). */
+export type ProposalSettingField =
+  | "model"
+  | "ai_account"
+  | "budget"
+  | "owner"
+  | "audience"
+  | "channel_add"
+  | "channel_remove"
+  | "reply_mode"
+  | "archive";
+
+/**
+ * One line of a settings card: `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or
+ * null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` /
+ * `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a
+ * mention); `archive` true. `label`: the server's names for ids.
+ */
+export interface ProposalSettingLine {
+  field: ProposalSettingField;
+  from: unknown;
+  to: unknown;
+  channelId?: string;
+  label?: { from?: string; to?: string };
+}
+
 export interface Proposal {
   id: string;
   /** The agent it changes; empty for the org context. */
@@ -1742,9 +1800,18 @@ export interface Proposal {
     | { type: "org_context" }
     | { type: "agent_role"; agentId: string }
     | { type: "agent_access"; agentId: string }
+    | { type: "agent_settings"; agentId: string }
     | { type: "skill"; agentId: string; skillId: string; name: string };
   /** `agent_access`: each app turned on or off. */
   access?: ProposalAccessLine[] | null;
+  /** `agent_settings` (the right hand's card, ADR 0137): each setting then and proposed. */
+  settings?: ProposalSettingLine[] | null;
+  /** The person who asked for it in conversation (null: memory promotions, older rows). */
+  requestedBy?: { userId: string; name: string } | null;
+  /** When the person who asked sent it to whoever may decide it ("Pedir a um admin"). */
+  askedAt?: string | null;
+  /** `agent_settings` once applied: its receipt, for Desfazer (`agentActions.undo`). */
+  undoActionId?: string | null;
   title: string;
   why: string;
   /** `type` names the source for translation; `where` is the server's English text. */
@@ -1763,7 +1830,7 @@ export interface Proposal {
   /** You may make this change on the agent's page (the org context: you review memory). */
   canDecide: boolean;
   /** Who decides besides admins: the agent's owner, for its instructions and for access it only takes away. */
-  decider: { type: "user"; userId: string; name: string } | { type: "admins" };
+  decider: { type: "user"; userId: string; name: string } | { type: "admins" } | { type: "account_owner" };
   createdAt: string;
   decidedBy: { userId: string; name: string } | null;
   decidedAt: string | null;
@@ -2413,12 +2480,13 @@ export const AGENT_ACTION_KINDS = [
   "thread.closed",
   "skill.created",
   "skill.updated",
+  "agent.settings_changed",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill";
+  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill" | "agent";
   id: string;
   /** Issues. */
   number?: number;
@@ -2444,6 +2512,8 @@ export interface AgentActionTarget {
  * - `channel.created`: `name` (undo archives it)
  * - `wiki.page_created` / `wiki.page_edited`: `title`, `slug`
  * - `thread.renamed`: `from`, `to`; `thread.closed`: `title`
+ * - `agent.settings_changed` (ADR 0137): `agentName`, `fields`, `proposalId` (the right hand's card, applied by the
+ *   person who clicked: Undo puts each setting back)
  */
 export type AgentActionParams = Record<string, string | number | boolean | null | string[] | ApiRule>;
 
@@ -3486,11 +3556,24 @@ export interface Skill {
    * An update from its link waiting for who manages skills: it adds or changes files that run (`scripts`), or would
    * replace what agents changed since (`edited`, left out by older servers).
    */
-  pendingUpdate?: { scripts: string[]; at: string; dismissed: boolean; edited?: boolean } | null;
+  pendingUpdate?: {
+    scripts: string[];
+    at: string;
+    dismissed: boolean;
+    /** When a person kept the skill as it is (`dismissed`); Desfazer makes it wait again (`reopenUpdate`). */
+    dismissedAt?: string | null;
+    edited?: boolean;
+  } | null;
   /** Why its last update from its link failed: a code (`skill.no_skill_md`, `skill.connection_gone`…). */
   updateError?: string | null;
   /** Its last update from its link, or an agent's last change to it (`agentId`), while Desfazer can take it back. */
-  lastUpdate?: { fromVersion: number; at: string; agentId?: string | null } | null;
+  lastUpdate?: {
+    fromVersion: number;
+    at: string;
+    agentId?: string | null;
+    /** A person chose this update while it waited: Desfazer makes it wait again. */
+    waited?: boolean;
+  } | null;
   /** "Agentes melhoram as skills sozinhos" set for this skill; null: the workspace's setting. */
   agentsImprove?: boolean | null;
   createdAt: string;
@@ -3515,10 +3598,41 @@ export interface SkillFile {
   status: "stored" | "ignored" | "script";
 }
 
+/** A changed file that runs in a waiting update: `before` null for a new file; texts null when `large`. */
+export interface SkillPendingFile {
+  path: string;
+  before: string | null;
+  after: string | null;
+  large: boolean;
+}
+
+/** The waiting update's content (`SkillDetail.pending`). */
+export interface SkillPending {
+  body: string;
+  description: string;
+  /** What its link last wrote before agents changed it; null: not known (changed before servers kept it). */
+  base: { body: string; description: string; at: string } | null;
+  files: SkillPendingFile[];
+}
+
+/** An agent's change to a skill's text, newest first. */
+export interface SkillAgentChange {
+  id: string;
+  agentId: string;
+  at: string;
+  before: string;
+  after: string;
+  undone: boolean;
+}
+
 export interface SkillDetail extends Skill {
   /** SKILL.md without the front matter (Markdown). */
   body: string;
   files: SkillFile[];
+  /** The waiting update's content (older servers leave it out). */
+  pending?: SkillPending | null;
+  /** The agents' changes to its text, the last 20 (older servers leave it out). */
+  changes?: SkillAgentChange[];
 }
 
 /** A skill a GitHub link holds, offered to pick when it holds several. */
@@ -3870,6 +3984,70 @@ export interface QueueWaiting {
 }
 
 /** `GET …/machines/{machineId}/queue`: a computer's line; `computer.queue` org events say it changed. */
+/** One conversation (or routine, or long work) an agent picks up when its plan or budget is back (ADR 0118). */
+export interface UsageQueueRow {
+  runId: string;
+  kind: "conversation" | "routine" | "work";
+  channelId: string;
+  threadId: string | null;
+  channelKind: string;
+  /** Null for a DM. */
+  channelName: string | null;
+  /** What it answers ("Ver conversa" opens it). */
+  messageId: string;
+  /** Who asked (people's ids): the trigger's author, then whoever joined. */
+  askers: string[];
+  /** When it first paused. */
+  since: string;
+  /** What was posted after it in its conversation. */
+  after: { count: number; names: string[] };
+  state: "queued" | "answering";
+  /** A routine's or a long work's title. */
+  title: string | null;
+  /** The viewer may say not to run it. */
+  mayStop: boolean;
+}
+
+/** What an agent picks up when its plan or budget is back, in order (`GET …/agents/{agentId}/usage-queue`). */
+export interface UsageQueue {
+  agentId: string;
+  reason: "plan" | "budget" | null;
+  plan: string | null;
+  resetsAt: string | null;
+  /** Other agents in the same plan's line. */
+  sharedWith: string[];
+  rows: UsageQueueRow[];
+  /** Waiting in conversations the viewer can't read. */
+  hidden: number;
+  /** "Don't run any": the agent's owner and admins. */
+  mayStopAll: boolean;
+  /** Skipped in the last day as already handled (ADR 0136), newest first. */
+  closed: UsageQueueClosedRow[];
+}
+
+/** Why a catch-up was skipped (`meta.usageWait.closed`), and who may answer it anyway. */
+export interface CatchUpClosed {
+  reason: "solved" | "withdrawn" | "task_canceled" | "mixed";
+  who?: { name: string; userId?: string; agentId?: string };
+  askers: string[];
+  at: string;
+}
+
+export interface UsageQueueClosedRow {
+  runId: string;
+  channelId: string;
+  threadId: string | null;
+  channelKind: string;
+  channelName: string | null;
+  /** The skipped note ("Ver conversa" opens it). */
+  messageId: string;
+  closed: CatchUpClosed;
+  /** Someone asked it to answer anyway. */
+  continuedRunId: string | null;
+  /** The viewer may press "Responder mesmo assim". */
+  mayAnswer: boolean;
+}
+
 export interface ComputerQueue {
   machineId: string;
   name: string;
@@ -5540,6 +5718,10 @@ export type NotificationKind =
   /** A routine's run waits for its agent's plan to reset (once per outage). Opens it in Rotinas. */
   | "routine_waiting_plan"
   | "plan_reset_unknown"
+  /** ADR 0136: an agent back from its plan or budget skipped catch-ups that looked handled (its owner; `count`). */
+  | "catch_up_closed"
+  /** ADR 0136: who asked, when their catch-up was skipped crediting someone else (`latest.title` who, `latest.reason`). */
+  | "catch_up_closed_asker"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
@@ -5610,7 +5792,13 @@ export type NotificationKind =
    * skills, waiting, the files in `latest.title`) or `failed` (`latest.reason` its code). `source.skillId`, its name in
    * `source.label`. Opens the skill.
    */
-  | "skill_update";
+  | "skill_update"
+  /**
+   * ADR 0137: someone asked the right hand for a change only others decide and sent it ("Pedir a um admin"). Waiting;
+   * `source.proposalId` (or `source.messageId` for a new agent's card), `source.agentId` and `label` the agent,
+   * `latest.text` why. Done once someone decides.
+   */
+  | "change_request";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5637,6 +5825,8 @@ export interface NotificationSource {
   machineId?: string;
   /** `browser_handoff`: the request (its chat card has the same id). */
   handoffId?: string;
+  /** `change_request`: the proposal to decide. */
+  proposalId?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
@@ -5768,6 +5958,8 @@ export interface AuditPage {
 export interface AuditQuery {
   actorType?: "person" | "agent" | "system";
   actorId?: string;
+  /** An agent's id: what it did, and what people applied from its cards. */
+  via?: string;
   outcome?: AuditOutcome[];
   /** Only calls whose approval or secret nobody has answered yet. */
   waiting?: boolean;
@@ -6179,7 +6371,14 @@ export interface DatabaseConnection {
   provider: DatabaseProvider;
   host: string;
   port: number;
+  /** On a whole server, the sample database (where the rules' tables come from). */
   database: string;
+  /** Agents read every database of the server, one per call. */
+  wholeServer: boolean;
+  /** Whole server: only the databases whose names start with this; null = every one. */
+  databasePrefix: string | null;
+  /** Whole server: how many databases agents see, when read in the last minutes; else null. */
+  databaseCount: number | null;
   username: string;
   sslmode: "require" | "disable";
   status: "active" | "needs_reconnect";
@@ -6195,7 +6394,7 @@ export interface DatabaseConnection {
 }
 
 /** Why a database didn't connect (`422 { error }`). */
-export type DatabaseConnectError = "auth" | "unreachable" | "blocked_host" | "tls" | "unknown";
+export type DatabaseConnectError = "auth" | "unreachable" | "blocked_host" | "tls" | "no_databases" | "unknown";
 
 export interface DatabaseConnectionInput {
   label?: string;
@@ -6208,6 +6407,10 @@ export interface DatabaseConnectionInput {
   username?: string;
   password?: string;
   sslmode?: "require" | "disable";
+  /** Every database of the server; the database, if given, is where the rules' tables come from. */
+  wholeServer?: boolean;
+  /** Whole server: only the databases whose names start with this. */
+  databasePrefix?: string;
 }
 
 export interface DatabaseTable {
@@ -6227,6 +6430,8 @@ export interface DatabasePolicy {
   dailyQueryCap: number | null;
   /** Each query is cancelled past this. */
   timeoutSeconds: number;
+  /** Whole-server connections: the only databases it reads; absent or empty = every one. */
+  databases?: string[];
 }
 
 /** An agent's access to one database. */

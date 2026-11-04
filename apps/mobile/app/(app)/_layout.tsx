@@ -163,6 +163,7 @@ function AppStack() {
       {/* The workspace's settings: its page under the sky (from Você), then each section on the grouped gray. */}
       <Stack.Screen name="settings/index" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="settings/general" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/right-hand" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/telemetry" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/access" options={{ ...pushed, ...scrollUnder }} />

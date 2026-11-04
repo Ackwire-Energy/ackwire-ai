@@ -122,7 +122,7 @@ describe("Criar canal in a category made there (ADR 0080)", () => {
 
     // Typing goes to its Nome, not to the Categoria left under it.
     const inner = screen().getByRole("dialog", { name: "Nova categoria" });
-    expect(document.activeElement).toBe(within(inner).getByLabelText("Nome"));
+    expect(document.activeElement === within(inner).getByLabelText("Nome")).toBe(true);
     await type(within(inner).getByLabelText("Nome"), "Produto");
     await click(within(inner).getByRole("button", { name: "Criar categoria" }));
     await settle(6);
@@ -134,7 +134,7 @@ describe("Criar canal in a category made there (ADR 0080)", () => {
     const still = screen().getByRole("dialog", { name: "Criar canal" });
     const picker = within(still).getByRole("combobox", { name: "Categoria" });
     expect(picker.textContent).toContain("Produto");
-    expect(document.activeElement).toBe(picker);
+    expect(document.activeElement === picker).toBe(true);
 
     await click(within(still).getByRole("button", { name: "Criar #vendas" }));
     await settle(6);

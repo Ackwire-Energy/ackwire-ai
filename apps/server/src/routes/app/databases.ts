@@ -4,6 +4,7 @@ import {
   getAgentDatabases,
   listDatabaseConnections,
   listDatabaseTables,
+  listServerDatabases,
   revokeDatabaseConnection,
   setAgentDatabase,
   updateDatabaseConnection,
@@ -23,7 +24,9 @@ import {
 
 const tags = ["Databases"];
 
-const DbTestError = z.enum(["auth", "unreachable", "blocked_host", "tls", "unknown"]).openapi("DatabaseTestError");
+const DbTestError = z
+  .enum(["auth", "unreachable", "blocked_host", "tls", "no_databases", "unknown"])
+  .openapi("DatabaseTestError");
 const DbAction = z.enum(["list_tables", "describe_table", "query"]).openapi("DatabaseAction");
 const DbProvider = z.enum(["supabase", "neon", "railway", "rds", "render", "other"]).openapi("DatabaseProvider");
 
@@ -34,7 +37,15 @@ const DatabaseConnection = z
     provider: DbProvider,
     host: z.string(),
     port: z.number(),
-    database: z.string(),
+    database: z
+      .string()
+      .openapi({ description: "On a whole server, the sample database the rules' tables come from." }),
+    wholeServer: z.boolean().openapi({ description: "Agents read every database of the server, one per call." }),
+    databasePrefix: z.string().nullable(),
+    databaseCount: z
+      .number()
+      .nullable()
+      .openapi({ description: "Whole server: how many databases agents see, when read in the last minutes." }),
     username: z.string(),
     sslmode: z.enum(["require", "disable"]),
     status: z.enum(["active", "needs_reconnect"]),
@@ -57,6 +68,11 @@ const DatabasePolicy = z
     hiddenColumns: z.array(z.string().max(200)).max(500),
     dailyQueryCap: z.number().int().min(1).max(100_000).nullable(),
     timeoutSeconds: z.number().int().min(1).max(60),
+    databases: z
+      .array(z.string().min(1).max(63))
+      .max(2000)
+      .optional()
+      .openapi({ description: "Whole-server connections: the only databases the agent reads; absent = every one." }),
   })
   .openapi("DatabasePolicy");
 
@@ -74,6 +90,8 @@ const ConnectionInput = z.object({
   username: z.string().max(63).optional(),
   password: z.string().min(1).max(500).optional(),
   sslmode: z.enum(["require", "disable"]).optional(),
+  wholeServer: z.boolean().optional(),
+  databasePrefix: z.string().max(63).optional(),
 });
 
 const testFailed = { 422: json(z.object({ error: DbTestError }), "The connection test failed") };
@@ -181,13 +199,33 @@ export function databaseRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "A database's tables (for limiting an agent to some of them) (admins)",
-      request: { params: ConnectionParams },
+      description: "On a whole server, `database` picks one of its databases (default: the sample).",
+      request: { params: ConnectionParams, query: z.object({ database: z.string().min(1).max(63).optional() }) },
       responses: { 200: json(z.object({ tables: z.array(DatabaseTable) })), ...errors },
     }),
     async (c) => {
       const { orgId, connectionId } = c.req.valid("param");
-      const tables = await listDatabaseTables(dbDeps, c.get("user").id, orgId, connectionId);
+      const { database } = c.req.valid("query");
+      const tables = await listDatabaseTables(dbDeps, c.get("user").id, orgId, connectionId, database);
       return c.json({ tables }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/databases/{connectionId}/databases",
+      tags,
+      security,
+      summary: "The databases of a whole-server connection (admins); `refresh=1` reads the list again",
+      request: { params: ConnectionParams, query: z.object({ refresh: z.enum(["0", "1"]).optional() }) },
+      responses: { 200: json(z.object({ databases: z.array(z.string()) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, connectionId } = c.req.valid("param");
+      const refresh = c.req.valid("query").refresh === "1";
+      const databases = await listServerDatabases(dbDeps, c.get("user").id, orgId, connectionId, { refresh });
+      return c.json({ databases }, 200);
     },
   );
 

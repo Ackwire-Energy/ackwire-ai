@@ -38,6 +38,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { clearsText } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import {
@@ -60,7 +61,6 @@ import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
-import { CoordinatorChip } from "@/components/CoordinatorChip";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
@@ -68,6 +68,7 @@ import { LetMeTalkButton, useWidenAsk } from "@/components/ReachLines";
 import { useEmojiLabels } from "@/components/Reactions";
 import { RolesPicker } from "@/components/roles/RolesPicker";
 import { colorOf, ProfileSky } from "@/components/Sky";
+import { SeeUsageQueue } from "@/components/UsageQueue";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { type MenuEntry, tidy } from "@/lib/context-menu";
@@ -445,7 +446,92 @@ function AgentCard({ agentId, onDone }: { agentId: string; onDone: () => void })
       </CardShell>
     );
   }
+  if (isRightHand(agent)) return <RightHandCardBody agent={agent} onDone={onDone} />;
   return <AgentCardBody agent={agent} onDone={onDone} />;
+}
+
+/**
+ * The team's right hand (ADR 0137): who it is ("Assistente do workspace · seu braço direito"), how it works (acts with
+ * your permissions, talks only with you in your DM, replies in channels when called), what thinks for it, then
+ * Mensagem, and Configurar for who manages agents.
+ */
+function RightHandCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const models = useModels();
+  const navigate = useNavigate();
+  const model = isAuto(agent.model)
+    ? t("brain.auto.label")
+    : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
+  const thinks = brainLine(t, agent.brain, model, { agents: dir.agents });
+  const go = (to: () => Promise<void>) => {
+    onDone();
+    void to();
+  };
+  return (
+    <CardShell
+      agent
+      sky={<ProfileSky color={colorOf(agent)} />}
+      face={<AgentAvatar agentId={agent.id} size="lg" name={agent.name} />}
+    >
+      <div className="list-col mcard__names">
+        <span className="profile-card__name">{agent.name}</span>
+        <span className="small muted">
+          {[`@${agent.handle}`, t("rightHand.role"), t("rightHand.label")].join(" · ")}
+        </span>
+      </div>
+      <section className="mcard__section" aria-label={t("rightHand.profile.how")}>
+        <span className="mcard__label">{t("rightHand.profile.how")}</span>
+        <ul className="mcard__facts">
+          <li className="ac-iconline">
+            <Icon name="person" size={16} />
+            {t("rightHand.profile.permissions")}
+          </li>
+          <li className="ac-iconline">
+            <Icon name="lock" size={16} />
+            {t("rightHand.profile.private")}
+          </li>
+          <li className="ac-iconline">
+            <Icon name="message" size={16} />
+            {t("rightHand.profile.channels")}
+          </li>
+        </ul>
+      </section>
+      <dl className="profile-card__facts">
+        <dt>{t("rightHand.profile.model")}</dt>
+        <dd>
+          <span className="profile-card__brain ac-iconline">
+            {thinks.mark && <ProviderLogo id={thinks.mark} size="xs" />}
+            {thinks.text || shortModel(model)}
+          </span>
+        </dd>
+      </dl>
+      <div className="profile-card__actions profile-card__actions--split">
+        <Button
+          variant="primary"
+          icon="message"
+          onClick={() =>
+            go(() => navigate({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: agent.id } }))
+          }
+        >
+          {t("rightHand.profile.message")}
+        </Button>
+        {can(org, "manage_agents") && (
+          <Button
+            icon="cog"
+            onClick={() =>
+              go(() =>
+                navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "right_hand" } }),
+              )
+            }
+          >
+            {t("rightHand.profile.configure")}
+          </Button>
+        )}
+      </div>
+    </CardShell>
+  );
 }
 
 function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) {
@@ -501,7 +587,6 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
             .join(" · ")}
         </span>
         <NoAiChip agentId={agent.id} />
-        <CoordinatorChip agent={agent} />
       </div>
       {line && shown?.line && (
         <div className="profile-card__status">
@@ -517,6 +602,10 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
                   ? t("presence.bySelf", { name: agent.name })
                   : t("presence.byAuto")}
             </small>
+            {/* Out of office with conversations waiting (ADR 0118): what it picks up when it is back, in order. */}
+            {(shown.line.kind === "out_of_plan" || shown.line.kind === "out_of_budget") && shown.line.count ? (
+              <SeeUsageQueue agentId={agent.id} />
+            ) : null}
           </span>
         </div>
       )}

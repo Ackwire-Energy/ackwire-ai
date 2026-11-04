@@ -271,11 +271,11 @@ describe("profile card", () => {
     await wait(500);
     await settle(3);
     expect(within(card()).getByRole("button", { name: "Mais" })).toBeTruthy();
-    expect(document.activeElement).toBe(box);
+    expect(document.activeElement === box).toBe(true);
     await act(async () => fireEvent.pointerLeave(name, { pointerType: "mouse" }));
     await wait(HOVER_CLOSE_MS + 50);
     expect(screen().queryByRole("dialog", { name: "Perfil" })).toBeNull();
-    expect(document.activeElement).toBe(box);
+    expect(document.activeElement === box).toBe(true);
     await click(name);
     await settle(3);
     expect(card().contains(document.activeElement)).toBe(true);

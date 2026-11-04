@@ -47,7 +47,7 @@ describe("the GIPHY key in Configurações › GIFs e figurinhas (ADR 0091)", ()
 
     await click(within(card()).getByRole("button", { name: "Adicionar a chave" }));
     // The button pressed gives way to the steps: the field takes the focus.
-    expect(document.activeElement).toBe(field());
+    expect(document.activeElement === field()).toBe(true);
     expect(within(card()).getByRole("link", { name: "Abrir o GIPHY Developers" }).getAttribute("href")).toBe(
       "https://developers.giphy.com/dashboard/",
     );
@@ -61,7 +61,7 @@ describe("the GIPHY key in Configurações › GIFs e figurinhas (ADR 0091)", ()
     expect(card().querySelector(".ac-chip")?.textContent).toBe("Ligado");
     expect(card().textContent).toContain("Termina em 7a1e");
     expect(within(card()).queryByLabelText("Cole a chave aqui")).toBeNull();
-    expect(document.activeElement).toBe(within(card()).getByRole("button", { name: "Trocar a chave" }));
+    expect(document.activeElement === within(card()).getByRole("button", { name: "Trocar a chave" })).toBe(true);
     // The workspace's settings are read again: GIFs can be turned on without reloading.
     expect(gifsSwitch().hasAttribute("disabled")).toBe(false);
     // The key itself is never on the page.

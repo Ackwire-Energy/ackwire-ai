@@ -159,6 +159,8 @@ export function actionTextValues(
     case "skill.created":
     case "skill.updated":
       return { name: str(p.name) || title };
+    case "agent.settings_changed":
+      return { agentName: str(p.agentName) || title };
     default:
       // A kind the server knows and this build doesn't yet (an open tab, an older app): the key's own words.
       return {};

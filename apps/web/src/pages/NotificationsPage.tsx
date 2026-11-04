@@ -83,6 +83,7 @@ import { useNotificationHref, useNotificationOpener } from "@/components/Notific
 import { type Dir, Face, Headline, joinerOf, nameOf, SystemFace, sayWords } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
 import { AllowTalkButton } from "@/components/ReachLines";
+import { ChangeRequestCard } from "@/components/RightHandCards";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -162,8 +163,9 @@ function SourceChip({
   const { t } = useTranslation();
   const s = n.source;
   const channel = channelOf(n);
-  // Agents failing in many conversations: each says its own when the row opens.
-  if (runFailedGroupOf(n)) return null;
+  // Agents failing in many conversations: each says its own when the row opens. Several skipped catch-ups open
+  // the agent's queue, which lists where each was.
+  if (runFailedGroupOf(n) || (n.kind === "catch_up_closed" && n.count > 1)) return null;
   let icon: IconName = "channel";
   let label = "";
   if (WIDGET_NOTICES.has(n.kind)) [icon, label] = ["grid", t("notifications.source.dashboard")];
@@ -730,6 +732,11 @@ function Row({
                 </Chip>
               </div>
             )}
+            {n.kind === "change_request" && (
+              <div className="nt-wr__card">
+                <ChangeRequestCard n={n} />
+              </div>
+            )}
             {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
               <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
@@ -1095,6 +1102,11 @@ function WaitCard({
     return (
       <WaitRow n={n} s={s} h={h} dir={dir} channelName={channelName} label={label} face={face} tail={tail}>
         {fuse}
+        {n.kind === "change_request" && (
+          <div className="nt-wr__card">
+            <ChangeRequestCard n={n} />
+          </div>
+        )}
       </WaitRow>
     );
   let meta: ReactNode;

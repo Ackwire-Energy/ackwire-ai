@@ -54,6 +54,7 @@ import {
   emailArtFor,
   enableCaches,
   enableOperatorEvents,
+  ensureRightHands,
   type GifKey,
   isAgentesCloud,
   isBlockedAddress,
@@ -61,6 +62,7 @@ import {
   resolveHostDns,
   retireHostTokens,
   retireMillionSendMailboxes,
+  setMessageLinkBase,
   setRestrictionNotices,
   vapidKeys,
   vapidSubject,
@@ -110,6 +112,8 @@ export interface StartOptions {
 export function applyBootSwitches(config: Config) {
   // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
   setRestrictionNotices(config.PUBLIC_URL);
+  // The links to messages that agents write and their tools return.
+  setMessageLinkBase(config.PUBLIC_URL);
   // The operator API's events feed records only while that API is on (ADR 0056).
   enableOperatorEvents(Boolean(config.OPERATOR_API_TOKEN));
 }
@@ -317,6 +321,12 @@ async function boot(
         log.info("MillionSend mailboxes disconnected", { checked: r.checked, webhooksLeft: r.webhooksLeft });
     })
     .catch((error: unknown) => log.warn("MillionSend mailboxes cleanup failed", { error: String(error) }));
+  // Off the boot path: every workspace made before the right hand gets one (ADR 0137); one query once they all have it.
+  void ensureRightHands(database.db)
+    .then((made) => {
+      if (made > 0) log.info("right hands created", { made });
+    })
+    .catch((error: unknown) => log.warn("right hands backfill failed", { error: String(error) }));
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,

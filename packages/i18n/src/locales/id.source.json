@@ -1239,7 +1239,7 @@
     "value": "{{org}} has no seat left right now."
   },
   "invite.fullLead": {
-    "value": "Your invitation still works. When a seat opens, you join through this same link."
+    "value": "Your invitation still works. Ask whoever invited you to open a seat, and you join through this same link."
   },
   "invite.fullFine": {
     "value": "No account was made. There's nothing to do until a seat opens."
@@ -3691,9 +3691,6 @@
   "channel.autoReplyChip": {
     "value": "answers without a mention"
   },
-  "channel.coordinatorChip": {
-    "value": "coordinates the team"
-  },
   "channel.more": {
     "value": "More message actions"
   },
@@ -4033,6 +4030,30 @@
       "other": "{{names}} are waiting for the computer"
     }
   },
+  "receipts.plan": {
+    "value": {
+      "one": "{{names}} answers when the plan resets",
+      "other": "{{names}} answer when the plan resets"
+    }
+  },
+  "receipts.budget": {
+    "value": {
+      "one": "{{names}} answers when the budget renews",
+      "other": "{{names}} answer when the budget renews"
+    }
+  },
+  "receipts.line": {
+    "value": {
+      "one": "{{names}} starts when another work ends",
+      "other": "{{names}} start when other works end"
+    }
+  },
+  "receipts.canceled": {
+    "value": {
+      "one": "{{names}} won't answer",
+      "other": "{{names}} won't answer"
+    }
+  },
   "receipts.queuedNext": {
     "value": "{{names}} is in line for the computer · next"
   },
@@ -4062,6 +4083,18 @@
   },
   "receipts.status.away": {
     "value": "Waiting for the computer"
+  },
+  "receipts.status.plan": {
+    "value": "Answers when the plan resets"
+  },
+  "receipts.status.budget": {
+    "value": "Answers when the budget renews"
+  },
+  "receipts.status.line": {
+    "value": "Starts when another work ends"
+  },
+  "receipts.status.canceled": {
+    "value": "Canceled"
   },
   "receipts.status.handled": {
     "value": "Answered"
@@ -4102,18 +4135,6 @@
   "receipts.picking": {
     "value": "Picking who answers"
   },
-  "receipts.by.jev": {
-    "value": "Picked by Jev"
-  },
-  "receipts.by.model": {
-    "value": "Picked by {{model}}"
-  },
-  "receipts.by.planYours": {
-    "value": "Picked by your {{brand}} plan"
-  },
-  "receipts.by.planOf": {
-    "value": "Picked by {{person}}'s {{brand}} plan"
-  },
   "receipts.by.reply": {
     "value": "A reply to {{name}}"
   },
@@ -4123,36 +4144,8 @@
   "receipts.by.follow_up": {
     "value": "Follows the talk with {{name}}"
   },
-  "receipts.by.coordinator": {
-    "value": "{{name}} coordinates the team"
-  },
   "receipts.by.default": {
     "value": "Nobody was called, so {{name}} answered"
-  },
-  "coordinator.chip": {
-    "value": "Coordinates the team"
-  },
-  "coordinator.help": {
-    "value": "Takes the messages that need an agent when no other agent took them, and hands the work to whoever knows it. Works in channels where he answers on his own.",
-    "female": "Takes the messages that need an agent when no other agent took them, and hands the work to whoever knows it. Works in channels where she answers on her own."
-  },
-  "coordinator.one": {
-    "value": "One agent coordinates at a time."
-  },
-  "coordinator.current": {
-    "value": "{{name}} coordinates the team now."
-  },
-  "coordinator.none": {
-    "value": "Nobody coordinates the team now."
-  },
-  "coordinator.archive": {
-    "value": "{{name}} coordinates the team. After this, nobody does until someone picks another agent."
-  },
-  "coordinator.yes": {
-    "value": "Yes"
-  },
-  "coordinator.no": {
-    "value": "No"
   },
   "routing.title": {
     "value": "Who picks the agents"
@@ -4651,17 +4644,149 @@
   "usageCard.dontRun": {
     "value": "Don't run it"
   },
+  "usageCard.dontRunThese": {
+    "value": "Don't run these {{count}}"
+  },
   "usageCard.dontRunHint": {
     "value": "Cancel it: nothing runs when the limit is back"
   },
   "usageCard.dontRunForbidden": {
     "value": "Only who asked, the agent's owner or an admin can cancel it"
   },
+  "usageCard.answerAnyway": {
+    "value": "Answer anyway"
+  },
+  "usageCard.answerAnywayHint": {
+    "value": "Answers now, reading everything posted since"
+  },
+  "usageCard.answerAnywayForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can ask for this"
+  },
   "usageCard.extraTitle": {
     "value": "Long work may use paid extra usage"
   },
   "usageCard.extraHint": {
     "value": "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets."
+  },
+  "usageQueue.title": {
+    "value": {
+      "one": "{{agent}} has {{count}} conversation to pick up",
+      "other": "{{agent}} has {{count}} conversations to pick up"
+    }
+  },
+  "usageQueue.line": {
+    "value": "Picks up {{when}}, when the {{plan}} plan resets. One at a time, in this order."
+  },
+  "usageQueue.lineUnknown": {
+    "value": "Picks up as soon as the {{plan}} plan resets. One at a time, in this order."
+  },
+  "usageQueue.lineBudget": {
+    "value": "Picks up {{when}}, when the budget renews, or sooner if an admin raises it. One at a time, in this order."
+  },
+  "usageQueue.shared": {
+    "value": "The line belongs to the plan: {{agents}} share the same account."
+  },
+  "usageQueue.dm": {
+    "value": "DM with {{name}}"
+  },
+  "usageQueue.yourDm": {
+    "value": "Your DM"
+  },
+  "usageQueue.thread": {
+    "value": "Thread in #{{channel}}"
+  },
+  "usageQueue.routine": {
+    "value": "Routine {{name}}"
+  },
+  "usageQueue.work": {
+    "value": "Work: {{name}}"
+  },
+  "usageQueue.askedBy": {
+    "value": "Asked by {{names}} · {{ago}}"
+  },
+  "usageQueue.paused": {
+    "value": "Paused {{ago}}"
+  },
+  "usageQueue.after": {
+    "value": {
+      "one": "{{count}} message since",
+      "other": "{{count}} messages since"
+    }
+  },
+  "usageQueue.nothingAfter": {
+    "value": "Nothing since"
+  },
+  "usageQueue.wrote": {
+    "value": {
+      "one": "{{names}} wrote since",
+      "other": "{{names}} wrote since"
+    }
+  },
+  "usageQueue.queued": {
+    "value": "In line"
+  },
+  "usageQueue.answering": {
+    "value": "Answering now"
+  },
+  "usageQueue.hidden": {
+    "value": {
+      "one": "+{{count}} in conversations you can't see",
+      "other": "+{{count}} in conversations you can't see"
+    }
+  },
+  "usageQueue.dontRunAll": {
+    "value": "Don't run any"
+  },
+  "usageQueue.confirmAll": {
+    "value": {
+      "one": "Don't run {{count}} conversation?",
+      "other": "Don't run these {{count}} conversations?"
+    }
+  },
+  "usageQueue.yesDontRun": {
+    "value": "Yes, don't run"
+  },
+  "usageQueue.keep": {
+    "value": "Keep"
+  },
+  "usageQueue.canceledAll": {
+    "value": {
+      "one": "{{count}} conversation canceled. {{agent}} won't answer it when the limit is back.",
+      "other": "{{count}} conversations canceled. {{agent}} won't answer them when the limit is back."
+    }
+  },
+  "usageQueue.empty": {
+    "value": "Nothing waiting to pick up."
+  },
+  "usageQueue.waiting": {
+    "value": {
+      "one": "{{count}} conversation waiting",
+      "other": "{{count}} conversations waiting"
+    }
+  },
+  "usageQueue.closedTitle": {
+    "value": {
+      "one": "{{count}} didn't need an answer",
+      "other": "{{count}} didn't need an answer"
+    }
+  },
+  "usageQueue.closedWhy": {
+    "value": "They looked handled, so {{agent}} didn't answer."
+  },
+  "usageQueue.closedLine": {
+    "value": "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway."
+  },
+  "usageQueue.seeConversation": {
+    "value": "See conversation"
+  },
+  "usageQueue.answeredAnyway": {
+    "value": "Someone asked for an answer anyway"
+  },
+  "usageQueue.toResume": {
+    "value": "To pick up"
+  },
+  "usageQueue.switchAi": {
+    "value": "Change {{name}}'s AI"
   },
   "actionCard.connect_ai.title": {
     "value": "Connect an AI for {{agents}}"
@@ -5454,9 +5579,6 @@
     "value": "Joins the conversation on his own",
     "female": "Joins the conversation on her own"
   },
-  "channelMembers.coordinatorLine": {
-    "value": "Coordinates the team: takes what nobody took"
-  },
   "channelMembers.mentionLine": {
     "value": "Waits for someone to write @{{handle}}"
   },
@@ -5562,6 +5684,9 @@
   "presence.offline": {
     "value": "Offline"
   },
+  "presence.out": {
+    "value": "Out of office"
+  },
   "presence.lower.online": {
     "value": "online"
   },
@@ -5576,6 +5701,9 @@
   },
   "presence.lower.offline": {
     "value": "offline"
+  },
+  "presence.lower.out": {
+    "value": "out of office"
   },
   "presence.setStatus": {
     "value": "Set status"
@@ -5636,6 +5764,9 @@
   },
   "presence.help.busy": {
     "value": "Everyone sees it's better not to interrupt right now."
+  },
+  "presence.help.out": {
+    "value": "Away from work (vacation, a day off): everyone sees it until your status clears."
   },
   "presence.help.hidden": {
     "value": "You show as offline to everyone, and can still use everything."
@@ -5736,6 +5867,15 @@
   "presence.agent.provider_down": {
     "value": "The AI provider is down · retries by itself"
   },
+  "presence.agent.out_of_plan": {
+    "value": "Out of plan limit"
+  },
+  "presence.agent.out_of_budget": {
+    "value": "Monthly budget spent"
+  },
+  "presence.agent.backAt": {
+    "value": "back {{when}}"
+  },
   "presence.agent.work": {
     "value": "In the background: {{subject}}"
   },
@@ -5753,6 +5893,9 @@
   },
   "presence.agentWhy.offline": {
     "value": "Paused"
+  },
+  "presence.agentWhy.out": {
+    "value": "Out of limit for now · answers after the reset"
   },
   "presence.agentWhy.noAi": {
     "value": "No AI connected"
@@ -5834,6 +5977,27 @@
   },
   "channelRefs.open": {
     "value": "Open"
+  },
+  "messageRefs.copy": {
+    "value": "Copy message link"
+  },
+  "messageRefs.message": {
+    "value": "Message"
+  },
+  "messageRefs.thread": {
+    "value": "Thread"
+  },
+  "messageRefs.label": {
+    "value": "Message from {{author}} in #{{name}}"
+  },
+  "messageRefs.threadLabel": {
+    "value": "Message from {{author}} in a thread in #{{name}}"
+  },
+  "messageRefs.dmLabel": {
+    "value": "Message from {{author}} in the DM with {{name}}"
+  },
+  "messageRefs.noAccess": {
+    "value": "Message you can't see"
   },
   "secret.group": {
     "value": "Secret request from {{agent}}"
@@ -6806,6 +6970,24 @@
   },
   "notifications.what.planResetUnknown": {
     "value": "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting."
+  },
+  "notifications.what.catchUpClosed": {
+    "value": {
+      "one": "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
+      "other": "<b>{{name}}</b> is back and skipped {{count}} conversations that didn't need an answer"
+    }
+  },
+  "notifications.what.catchUpClosedAsker": {
+    "value": "<b>{{name}}</b> didn't answer in {{label}}: {{who}} already took care of it"
+  },
+  "notifications.what.catchUpClosedAskerAny": {
+    "value": "<b>{{name}}</b> didn't answer: {{who}} already took care of it"
+  },
+  "notifications.what.catchUpClosedAskerTask": {
+    "value": "<b>{{name}}</b> didn't answer in {{label}}: {{who}} canceled the task"
+  },
+  "notifications.what.catchUpClosedAskerTaskAny": {
+    "value": "<b>{{name}}</b> didn't answer: {{who}} canceled the task"
   },
   "notifications.what.machineConnected": {
     "value": "<b>{{name}}</b> connected the computer <b>{{label}}</b>"
@@ -8334,9 +8516,6 @@
   },
   "agentPage.fields.handle": {
     "value": "Mentions"
-  },
-  "agentPage.fields.coordinator": {
-    "value": "Coordinates the team"
   },
   "agentPage.lines.added": {
     "value": {
@@ -16201,6 +16380,9 @@
   "skills.waitingChip": {
     "value": "Update waiting"
   },
+  "skills.waitingChipEdited": {
+    "value": "Link and agents changed it"
+  },
   "skills.lastUpdate": {
     "value": "Updated from its link {{when}}"
   },
@@ -16225,6 +16407,57 @@
   "skills.undoAgentChange": {
     "value": "Undo change"
   },
+  "skills.undo": {
+    "value": "Undo"
+  },
+  "skills.chosenLink": {
+    "value": "Switched to the link's version {{when}}"
+  },
+  "skills.history.title": {
+    "value": "Agents' changes"
+  },
+  "skills.history.empty": {
+    "value": "No agent has changed this skill yet."
+  },
+  "skills.history.show": {
+    "value": "Show change"
+  },
+  "skills.history.hide": {
+    "value": "Hide change"
+  },
+  "skills.history.undone": {
+    "value": "undone"
+  },
+  "skills.diff.label": {
+    "value": "How to see the changes"
+  },
+  "skills.diff.agents": {
+    "value": "What the agents changed"
+  },
+  "skills.diff.link": {
+    "value": "What changed in the link"
+  },
+  "skills.diff.compare": {
+    "value": "Current × link"
+  },
+  "skills.diff.same": {
+    "value": "The text is the same in both."
+  },
+  "skills.diff.files": {
+    "value": "Files that run"
+  },
+  "skills.diff.newFile": {
+    "value": "new"
+  },
+  "skills.diff.changedFile": {
+    "value": "changed"
+  },
+  "skills.diff.large": {
+    "value": "Too large to show here. Check it in the link."
+  },
+  "skills.diff.unavailable": {
+    "value": "Use Update from link to see what changes."
+  },
   "skills.pending.title": {
     "value": "The update from its link changes files that run: {{files}}"
   },
@@ -16232,10 +16465,10 @@
     "value": "Apply it only if you trust these files. Agents run them on their computers."
   },
   "skills.pending.edited": {
-    "value": "The update from its link would replace what agents changed in it"
+    "value": "The link has a new version, and agents changed this skill too"
   },
   "skills.pending.editedLead": {
-    "value": "Apply it to take its link's version. You can undo it after."
+    "value": "Choose which version stays. You can undo it after."
   },
   "skills.pending.apply": {
     "value": "Apply update"
@@ -16251,6 +16484,36 @@
   },
   "skills.pending.dismissed": {
     "value": "Update not applied. A new change to its link asks again."
+  },
+  "skills.pending.useLink": {
+    "value": "Use the link's version"
+  },
+  "skills.pending.keepAgents": {
+    "value": "Keep the agents' version"
+  },
+  "skills.pending.usedLink": {
+    "value": "{{name}} now uses the link's version."
+  },
+  "skills.pending.keptAgents": {
+    "value": "{{name}} keeps the agents' version."
+  },
+  "skills.pending.reopened": {
+    "value": "The update of {{name}} is waiting again."
+  },
+  "skills.pending.linkSince": {
+    "value": "New version in the link {{when}}"
+  },
+  "skills.pending.keptLine": {
+    "value": "Kept the agents' version {{when}}"
+  },
+  "skills.pending.notAppliedLine": {
+    "value": "Update from the link not applied {{when}}"
+  },
+  "skills.pending.byAgents": {
+    "value": {
+      "one": "{{names}} changed this skill, last {{when}}",
+      "other": "{{names}} changed this skill, last {{when}}"
+    }
   },
   "skills.updateFailed.no_skill_md": {
     "value": "Couldn't update it: its link no longer has a SKILL.md."
@@ -16277,7 +16540,7 @@
     "value": "An update of {{name}} changes its scripts"
   },
   "skills.notice.waitingEdited": {
-    "value": "An update of {{name}} would replace what agents changed"
+    "value": "{{name}} changed in its link and by agents: choose which version stays"
   },
   "skills.notice.failed": {
     "value": "{{name}} couldn't update from its link"
@@ -23738,7 +24001,7 @@
     "value": "Database address"
   },
   "database.urlHelp": {
-    "value": "Starts with postgres://. Stored encrypted on the server. Nobody sees it again, not even the agents."
+    "value": "Starts with postgres://. The database name at the end is optional. Stored encrypted on the server. Nobody sees it again, not even the agents."
   },
   "database.urlPlaceholder": {
     "value": "postgres://user:password@host/db"
@@ -24817,6 +25080,36 @@
   "files.downloadOnly": {
     "value": "No preview for this type of file. Download it to open."
   },
+  "files.zoom.toolbar": {
+    "value": "Zoom"
+  },
+  "files.zoom.in": {
+    "value": "Zoom in"
+  },
+  "files.zoom.out": {
+    "value": "Zoom out"
+  },
+  "files.zoom.fit": {
+    "value": "Fit"
+  },
+  "files.zoom.actual": {
+    "value": "Actual size"
+  },
+  "files.zoom.lens": {
+    "value": "Magnifier"
+  },
+  "files.zoom.hint": {
+    "value": "Click, pinch or use the wheel to zoom in"
+  },
+  "files.zoom.hintZoomed": {
+    "value": "Drag to move around. Esc fits it back"
+  },
+  "files.zoom.hintTouch": {
+    "value": "Tap or pinch to zoom in"
+  },
+  "files.zoom.hintZoomedTouch": {
+    "value": "Drag to move around. Tap to fit it back"
+  },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."
   },
@@ -24980,7 +25273,7 @@
     "value": "New workspaces need an invitation for now."
   },
   "errors.org.membersFull": {
-    "value": "This workspace has no room for more people right now. Let whoever invited you know."
+    "value": "Every seat in this workspace is taken right now. Ask whoever invited you to open a seat."
   },
   "errors.org.deleting": {
     "value": "This workspace is being deleted."
@@ -26414,9 +26707,6 @@
   },
   "apps.dialog.step.install": {
     "value": "Add to {{app}}"
-  },
-  "apps.dialog.note.untested": {
-    "value": "We haven't tested signing in from this app yet. If it fails, let us know."
   },
   "apps.dialog.note.chatgptPlans": {
     "value": "On paid ChatGPT plans, not Free or Go. On Business, only admins can add it."
@@ -29057,6 +29347,24 @@
   "chat.body.usage_wait_canceled": {
     "value": "Canceled. It won't run when the limit is back."
   },
+  "chat.body.usage_wait_archived": {
+    "value": "It won't run: the agent was archived."
+  },
+  "chat.body.usage_wait_closed_solved": {
+    "value": "I didn't answer: {{name}} already took care of it."
+  },
+  "chat.body.usage_wait_closed_withdrawn": {
+    "value": "I didn't answer: {{name}} said it's no longer needed."
+  },
+  "chat.body.usage_wait_closed_task_canceled": {
+    "value": "I didn't answer: {{name}} canceled the task."
+  },
+  "chat.body.usage_wait_closed_mixed": {
+    "value": "I didn't answer: what was asked here was already handled."
+  },
+  "chat.body.usage_wait_anyway": {
+    "value": "{{name}} asked me to answer anyway."
+  },
   "chat.body.usage_paused": {
     "value": "{{agent}} paused this work · {{plan}} plan at {{percent}}% {{window}}"
   },
@@ -30828,6 +31136,12 @@
   "billing.usedOf": {
     "value": "{{used}} of {{limit}}"
   },
+  "billing.seatsPaid": {
+    "value": {
+      "one": "{{count}} paid seat",
+      "other": "{{count}} paid seats"
+    }
+  },
   "billing.noLimit": {
     "value": "No limit"
   },
@@ -30845,6 +31159,33 @@
   },
   "limits.members.fullMember": {
     "value": "Ask whoever runs the workspace to make room."
+  },
+  "limits.members.fullAddSeat": {
+    "value": "Every paid seat is taken. Add a seat in Plan and billing."
+  },
+  "limits.members.fullTop": {
+    "value": "This plan can't take more people. Switch plans in Plan and billing."
+  },
+  "limits.members.fullMemberSeat": {
+    "value": "Ask whoever runs the workspace to add a seat."
+  },
+  "limits.members.fullAskPayerSeat": {
+    "value": "Ask {{payer}}, who pays for this workspace, to add a seat."
+  },
+  "limits.members.fullAskSeat": {
+    "value": "Ask whoever pays for this workspace to add a seat."
+  },
+  "limits.members.fullAskPayerTop": {
+    "value": "Ask {{payer}}, who pays for this workspace, to switch plans."
+  },
+  "limits.members.fullAskTop": {
+    "value": "Ask whoever pays for this workspace to switch plans."
+  },
+  "limits.members.fullPhone": {
+    "value": "Every paid seat is taken. Talk to whoever pays for this workspace."
+  },
+  "limits.members.fullPhonePayer": {
+    "value": "Every paid seat is taken."
   },
   "limits.storage.meter": {
     "value": "You've used {{used}} of {{limit}}."
@@ -32779,25 +33120,412 @@
   "dashboards.errors.notTested": {
     "value": "Test it first: the widget is created once its test works."
   },
-  "presence.out": {
-    "value": "Out of office"
+  "database.scope": {
+    "value": "Which databases"
   },
-  "presence.lower.out": {
-    "value": "out of office"
+  "database.scopeOne": {
+    "value": "Just this database"
   },
-  "presence.agent.out_of_plan": {
-    "value": "Out of plan limit"
+  "database.scopeAll": {
+    "value": "Every database on this server"
   },
-  "presence.agent.out_of_budget": {
-    "value": "Monthly budget spent"
+  "database.scopeAllHelp": {
+    "value": "For one database per customer. Agents see the list and pick the database in each query."
   },
-  "presence.agent.backAt": {
-    "value": "back {{when}}"
+  "database.prefix": {
+    "value": "Only names starting with"
   },
-  "presence.agentWhy.out": {
-    "value": "Out of limit for now · answers after the reset"
+  "database.prefixPlaceholder": {
+    "value": "E.g. customer_"
   },
-  "presence.help.out": {
-    "value": "Away from work (vacation, a day off): everyone sees it until your status clears."
+  "database.prefixHelp": {
+    "value": "Leave empty for all. New databases starting this way show up on their own."
+  },
+  "database.databaseOptional": {
+    "value": "Optional for every database."
+  },
+  "database.testing.databases": {
+    "value": "Looking at the databases…"
+  },
+  "database.error.no_databases": {
+    "value": "This user can't open any database on this server. Check its permissions or the start of the name."
+  },
+  "database.connectedToastAll": {
+    "value": {
+      "one": "{{name}} connected with {{count}} database.",
+      "other": "{{name}} connected with {{count}} databases."
+    }
+  },
+  "database.howAll": {
+    "value": "To read every database (Postgres 14 or newer)."
+  },
+  "database.count": {
+    "value": {
+      "one": "{{count}} database",
+      "other": "{{count}} databases"
+    }
+  },
+  "database.prefixRow": {
+    "value": "databases starting with {{prefix}}"
+  },
+  "database.refresh": {
+    "value": "Refresh list"
+  },
+  "database.refreshName": {
+    "value": "Refresh the list of databases of {{name}}"
+  },
+  "database.rule.databases": {
+    "value": "Databases"
+  },
+  "database.rule.databasesAll": {
+    "value": "All"
+  },
+  "database.rule.databasesSome": {
+    "value": "Only these"
+  },
+  "database.rule.databasePlaceholder": {
+    "value": "Database name"
+  },
+  "database.rule.databasesHelp": {
+    "value": "The rules below apply to every database this agent reads."
+  },
+  "database.rule.tablesIn": {
+    "value": "Tables (seen in {{database}})"
+  },
+  "database.rule.capHelpAll": {
+    "value": "Empty = no limit. Counted across every database."
+  },
+  "database.agent.allDatabases": {
+    "value": "Every database of {{name}}"
+  },
+  "database.agent.someDatabases": {
+    "value": {
+      "one": "{{count}} database of {{name}}",
+      "other": "{{count}} databases of {{name}}"
+    }
+  },
+  "database.scopeEdit": {
+    "value": "Databases"
+  },
+  "database.scopeEditName": {
+    "value": "Databases of {{name}}"
+  },
+  "database.scopeSaved": {
+    "value": "{{name}} saved."
+  },
+  "database.widenTitle": {
+    "value": "Open the whole server?"
+  },
+  "database.widenTitlePrefix": {
+    "value": "Open more databases?"
+  },
+  "database.widenText": {
+    "value": {
+      "one": "The agent with access will read every database on this server. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database on this server. You can limit it per agent in Rules."
+    }
+  },
+  "database.widenTextPrefix": {
+    "value": {
+      "one": "The agent with access will read every database starting with {{prefix}}. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database starting with {{prefix}}. You can limit it per agent in Rules."
+    }
+  },
+  "rightHand.label": {
+    "value": "your right hand"
+  },
+  "rightHand.newDot": {
+    "value": "New"
+  },
+  "rightHand.callWith": {
+    "value": "call with @{{handle}}"
+  },
+  "rightHand.role": {
+    "value": "Workspace assistant"
+  },
+  "rightHand.actsAsYou": {
+    "value": "acts with your permissions"
+  },
+  "rightHand.composerHint": {
+    "value": "nothing changes without you"
+  },
+  "rightHand.intro.greeting": {
+    "value": "Hi, I'm {{name}}. I'll build the team with you."
+  },
+  "rightHand.intro.lead": {
+    "value": "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do."
+  },
+  "rightHand.intro.connect.title": {
+    "value": "Connect an AI for the team"
+  },
+  "rightHand.intro.connect.text": {
+    "value": "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed."
+  },
+  "rightHand.intro.connect.action": {
+    "value": "Connect"
+  },
+  "rightHand.intro.start.question": {
+    "value": "How do you want to start?"
+  },
+  "rightHand.intro.start.createOne": {
+    "value": "Create {{name}}"
+  },
+  "rightHand.intro.start.team": {
+    "value": "Build a starter team"
+  },
+  "rightHand.intro.start.describe": {
+    "value": "Describe what I need"
+  },
+  "rightHand.intro.start.import": {
+    "value": "Import my agents"
+  },
+  "rightHand.intro.start.form": {
+    "value": "Fill in the form"
+  },
+  "rightHand.intro.next.question": {
+    "value": "The team is here. What next?"
+  },
+  "rightHand.intro.next.invite": {
+    "value": "Invite people"
+  },
+  "rightHand.intro.next.firstTask": {
+    "value": "Give {{name}} a first task"
+  },
+  "rightHand.intro.firstTask.theo": {
+    "value": "Plan our first week: what does each of us do first?"
+  },
+  "rightHand.intro.firstTask.ada": {
+    "value": "What could you build or automate for us first?"
+  },
+  "rightHand.intro.firstTask.lia": {
+    "value": "Who are our 5 closest competitors, and what do they do better than us?"
+  },
+  "rightHand.intro.firstTask.atlas": {
+    "value": "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?"
+  },
+  "rightHand.profile.how": {
+    "value": "How it works"
+  },
+  "rightHand.profile.permissions": {
+    "value": "Acts with your permissions"
+  },
+  "rightHand.profile.private": {
+    "value": "Talks only with you in your DM"
+  },
+  "rightHand.profile.channels": {
+    "value": "Replies in channels when called"
+  },
+  "rightHand.profile.model": {
+    "value": "Model"
+  },
+  "rightHand.profile.message": {
+    "value": "Message"
+  },
+  "rightHand.profile.configure": {
+    "value": "Configure"
+  },
+  "rightHand.settings.name": {
+    "value": "Name and look"
+  },
+  "rightHand.settings.nameHelp": {
+    "value": "In the sidebar it always shows as “{{label}}”."
+  },
+  "rightHand.settings.changeLook": {
+    "value": "Change look"
+  },
+  "rightHand.settings.ai": {
+    "value": "AI and model"
+  },
+  "rightHand.settings.aiHelp": {
+    "value": "Automatic picks the cheapest model that does the job."
+  },
+  "rightHand.settings.budget": {
+    "value": "Monthly budget"
+  },
+  "rightHand.settings.perMonth": {
+    "value": "/month"
+  },
+  "rightHand.settings.budgetHelp": {
+    "value": "When it reaches the limit, it stops and tells you, like any agent."
+  },
+  "rightHand.settings.audience": {
+    "value": "Who can use it"
+  },
+  "rightHand.settings.audienceHelp": {
+    "value": "Outside it, a person doesn't see {{name}} in the sidebar."
+  },
+  "rightHand.settings.lock": {
+    "value": "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it."
+  },
+  "rightHand.settings.audit": {
+    "value": "See what {{name}} did"
+  },
+  "rightHand.card.settings": {
+    "value": "{{name}} · Settings"
+  },
+  "rightHand.card.apply": {
+    "value": "Apply"
+  },
+  "rightHand.card.dismiss": {
+    "value": "Dismiss"
+  },
+  "rightHand.card.decline": {
+    "value": "Decline"
+  },
+  "rightHand.card.askAdmin": {
+    "value": "Ask an admin"
+  },
+  "rightHand.card.sentTo": {
+    "value": "Sent to {{names}} · {{when}}"
+  },
+  "rightHand.card.sentToAny": {
+    "value": "Sent to whoever decides · {{when}}"
+  },
+  "rightHand.card.appliedBy": {
+    "value": "Applied by {{name}}"
+  },
+  "rightHand.card.appliedByYou": {
+    "value": "Applied by you"
+  },
+  "rightHand.card.declinedBy": {
+    "value": "Declined by {{name}}"
+  },
+  "rightHand.card.declinedByYou": {
+    "value": "Declined by you"
+  },
+  "rightHand.card.undo": {
+    "value": "Undo"
+  },
+  "rightHand.card.undone": {
+    "value": "Undone"
+  },
+  "rightHand.card.stale": {
+    "value": "Out of date"
+  },
+  "rightHand.card.staleHelp": {
+    "value": "{{name}} changed since this card. Nothing was applied."
+  },
+  "rightHand.card.redo": {
+    "value": "Redo"
+  },
+  "rightHand.card.redoMessage": {
+    "value": "Redo the card for {{name}} with today's values"
+  },
+  "rightHand.card.createTest": {
+    "value": "Create and try it"
+  },
+  "rightHand.card.to": {
+    "value": "to"
+  },
+  "rightHand.card.editFirst": {
+    "value": "Edit first"
+  },
+  "rightHand.card.superseded": {
+    "value": "Replaced by the newer proposal"
+  },
+  "rightHand.card.onlyCreators": {
+    "value": "Only admins create agents"
+  },
+  "rightHand.card.only.model": {
+    "value": "Only admins change an agent's model"
+  },
+  "rightHand.card.only.budget": {
+    "value": "Only admins change an agent's budget"
+  },
+  "rightHand.card.only.owner": {
+    "value": "Only admins change who owns an agent"
+  },
+  "rightHand.card.only.archive": {
+    "value": "Only admins archive an agent"
+  },
+  "rightHand.card.only.audience": {
+    "value": "Only admins and its owner change who talks to it"
+  },
+  "rightHand.card.only.channels": {
+    "value": "Only admins and its owner change its channels"
+  },
+  "rightHand.card.only.ai_account": {
+    "value": "Only the account's owner gives it"
+  },
+  "rightHand.card.only.many": {
+    "value": "Only admins make these changes"
+  },
+  "rightHand.field.model": {
+    "value": "Model"
+  },
+  "rightHand.field.ai_account": {
+    "value": "AI account"
+  },
+  "rightHand.field.budget": {
+    "value": "Monthly budget"
+  },
+  "rightHand.field.owner": {
+    "value": "Owner"
+  },
+  "rightHand.field.audience": {
+    "value": "Who can talk"
+  },
+  "rightHand.field.archive": {
+    "value": "Status"
+  },
+  "rightHand.field.channel": {
+    "value": "Channel"
+  },
+  "rightHand.value.none": {
+    "value": "None"
+  },
+  "rightHand.value.budgetDefault": {
+    "value": "Workspace default"
+  },
+  "rightHand.value.anAccount": {
+    "value": "An AI account"
+  },
+  "rightHand.value.everyone": {
+    "value": "Everyone"
+  },
+  "rightHand.value.ownerOnly": {
+    "value": "Only its owner"
+  },
+  "rightHand.value.somePeople": {
+    "value": "Some people"
+  },
+  "rightHand.value.active": {
+    "value": "Active"
+  },
+  "rightHand.value.archived": {
+    "value": "Archived"
+  },
+  "rightHand.value.notIn": {
+    "value": "Not in it"
+  },
+  "rightHand.value.withoutMention": {
+    "value": "On its own"
+  },
+  "rightHand.value.mentionOnly": {
+    "value": "Only when mentioned"
+  },
+  "agentActions.agent.settings_changed": {
+    "value": "Changed the settings of <b>{{agentName}}</b>"
+  },
+  "notifications.what.changeRequest": {
+    "value": "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>"
+  },
+  "notifications.what.changeRequestAgent": {
+    "value": "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>"
+  },
+  "proposals.targetSettings": {
+    "value": "{{name}}'s settings"
+  },
+  "proposals.titleSettings": {
+    "value": "Change {{name}}'s settings"
+  },
+  "settings.section.right_hand": {
+    "value": "Right hand"
+  },
+  "settings.sectionText.right_hand": {
+    "value": "The assistant that builds the team with each person, in their DM and with their permissions."
+  },
+  "chat.body.settings_proposal": {
+    "value": "Proposed a change to {{names}}"
   }
 }

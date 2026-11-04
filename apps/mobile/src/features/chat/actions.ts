@@ -35,6 +35,7 @@ export const RECEIPT_ICONS: Record<AgentActionKind, IconName> = {
   "thread.closed": "chat",
   "skill.created": "brain",
   "skill.updated": "brain",
+  "agent.settings_changed": "agent",
 };
 
 /** A kind a newer server sends that this build doesn't know yet gets the plain check. */

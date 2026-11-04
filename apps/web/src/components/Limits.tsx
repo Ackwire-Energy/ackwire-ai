@@ -1,7 +1,13 @@
 import { keys, useAuthConfig, useWorkspaceLimits } from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { formatBytes } from "@agenteschat/client/lib/files";
-import { membersFull, membersFullText, STORAGE_NEAR, storageLevel } from "@agenteschat/client/lib/limits";
+import {
+  membersFull,
+  membersFullText,
+  membersFullWho,
+  STORAGE_NEAR,
+  storageLevel,
+} from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Meter, SettingNote, SettingRow } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -26,17 +32,15 @@ function useBillingAccess() {
 export function MembersFull() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const full = membersFull(useWorkspaceLimits(org.id).data);
+  const limits = useWorkspaceLimits(org.id).data;
+  const full = membersFull(limits);
   const billing = useBillingAccess();
   if (!full) return null;
   return (
-    <SettingRow
-      title={membersFullText(t, full.members, full.limit)}
-      description={t(billing ? "limits.members.fullAdmin" : "limits.members.fullMember")}
-    >
+    <SettingRow title={membersFullText(t, full.members, full.limit)} description={membersFullWho(t, limits, billing)}>
       {billing && (
         <BillingLinkButton orgId={org.id} from="invite_full" size="sm">
-          {t("billing.seeOptions")}
+          {t("billing.open")}
         </BillingLinkButton>
       )}
     </SettingRow>
@@ -110,7 +114,10 @@ export function StorageMeter() {
   );
 }
 
-/** Plano e cobrança: people and files against the plan's limits, in plain numbers. */
+/**
+ * Plano e cobrança: people and files against the plan's limits, in plain numbers. People count against the plan's
+ * top when the billing service says one, with the seats paid for under it.
+ */
 export function BillingMeters() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -118,15 +125,15 @@ export function BillingMeters() {
   if (!limits) return null;
   const { members, storage } = limits;
   const bytes = (n: number) => formatBytes(i18n.language, n);
+  const people = members.max ?? members.limit;
   const rows = [
     {
       key: "people",
       used: members.used,
-      limit: members.limit,
-      value:
-        members.limit === null
-          ? t("billing.noLimit")
-          : t("billing.usedOf", { used: members.used, limit: members.limit }),
+      limit: people,
+      value: people === null ? t("billing.noLimit") : t("billing.usedOf", { used: members.used, limit: people }),
+      note:
+        members.limit !== null && people !== members.limit ? t("billing.seatsPaid", { count: members.limit }) : null,
     },
     {
       key: "files",
@@ -137,6 +144,7 @@ export function BillingMeters() {
         : storage.limitBytes === null
           ? t("billing.noLimit")
           : t("billing.usedOf", { used: bytes(storage.usedBytes), limit: bytes(storage.limitBytes) }),
+      note: null,
     },
   ] as const;
   return (
@@ -149,6 +157,7 @@ export function BillingMeters() {
             <span className="small muted tabular">{row.value}</span>
           </div>
           {row.limit !== null && <Meter value={row.used} max={row.limit} label={t(`billing.${row.key}`)} />}
+          {row.note && <span className="small muted tabular">{row.note}</span>}
         </div>
       ))}
     </div>

@@ -1,8 +1,10 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, gte, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { runBrainOf } from "./brains/select";
 import { canceledBy, mayStopRun, runRequester } from "./cancel";
+import { catchUpText } from "./catch-up";
+import { ANSWER_ANYWAY_MS, type ClosedNote } from "./catch-up-triage";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { continuedTranscript, type Transcript } from "./executor";
@@ -50,10 +52,16 @@ export async function continueRun(
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
-  if (!(await mayStopRun(db, userId, membership, row)))
-    throw new ForbiddenError("Only who asked, the agent's owner or an admin can continue it", "run.continue_forbidden");
-
   const stopped = row.run;
+  const carriedAtStart = stopped.transcript as unknown as Transcript | null;
+  // A catch-up the check skipped (ADR 0136): "Responder mesmo assim" on its note, for everyone who asked in it too.
+  const skipped = stopped.status === "done" && carriedAtStart?.catchUpTriage?.outcome === "closed";
+  const asked = skipped && carriedAtStart?.catchUpTriage?.askers?.some((a) => a.userId === userId);
+  if (!asked && !(await mayStopRun(db, userId, membership, row)))
+    throw skipped
+      ? new ForbiddenError("Only who asked, the agent's owner or an admin can ask for this", "run.answer_forbidden")
+      : new ForbiddenError("Only who asked, the agent's owner or an admin can continue it", "run.continue_forbidden");
+
   const notContinuable = () => new ConflictError("This task can't be continued", "run.not_continuable");
   // A forum turn belongs to the topic's order (ADR 0022): it is never picked up by hand.
   const byPerson = stopped.status === "canceled" && Boolean(canceledBy(stopped.error));
@@ -64,14 +72,19 @@ export async function continueRun(
   const [work] = stopped.workId
     ? await db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, stopped.workId))
     : [];
-  const replyId = providerCut ? work?.resultMessageId : stopped.replyMessageId;
+  const replyId = skipped
+    ? await skippedNoteOf(db, stopped)
+    : providerCut
+      ? work?.resultMessageId
+      : stopped.replyMessageId;
   if (!replyId) throw notContinuable();
   const reply = await getMessage(db, orgId, replyId);
-  // Its reply says how it ended: stopped by a person (`meta.canceled`), at its step limit (`meta.stepLimit`), or its
-  // work's end after a provider error (`meta.workEnd`).
-  const ending = byPerson ? "canceled" : providerCut ? "workEnd" : "stepLimit";
-  const ended = reply?.meta[ending] as { continuedRunId?: unknown } | undefined;
+  // Its reply says how it ended: stopped by a person (`meta.canceled`), at its step limit (`meta.stepLimit`), its
+  // work's end after a provider error (`meta.workEnd`), or skipped as handled (`meta.usageWait.closed`).
+  const ending = skipped ? "usageWait" : byPerson ? "canceled" : providerCut ? "workEnd" : "stepLimit";
+  const ended = reply?.meta[ending] as { continuedRunId?: unknown; closed?: ClosedNote } | undefined;
   if (!reply || reply.deletedAt || !ended || ended.continuedRunId) throw notContinuable();
+  if (skipped && !(Date.now() - Date.parse(ended.closed?.at ?? "") < ANSWER_ANYWAY_MS)) throw notContinuable();
 
   // The new run answers where the stopped reply is: its thread, or (flat: a DM) the reply itself. Long work (ADR 0121)
   // goes on in its own thread, as the same work.
@@ -97,11 +110,15 @@ export async function continueRun(
   if (busy) throw new ConflictError("This agent is already working here", "run.agent_busy");
 
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
-  const line = `[${person?.name ?? "A person"} asked you to continue from where you stopped.]`;
   const carried = stopped.transcript as unknown as Transcript;
+  const line = skipped
+    ? await answerAnywayText(db, stopped, carried, ended.closed, person?.name ?? "A person")
+    : `[${person?.name ?? "A person"} asked you to continue from where you stopped.]`;
   const transcript = continuedTranscript(carried, line);
   const request = carried.request ?? row.request;
   if (request) transcript.request = request;
+  // Asked for by name: it answers, never passes.
+  if (skipped) transcript.answerOwed = true;
   const newRunId = Bun.randomUUIDv7();
   const created = await db.transaction(async (tx) => {
     // One continuation per stopped reply: it is the new run's trigger, unique per agent.
@@ -128,13 +145,27 @@ export async function continueRun(
       .returning({ id: agentRuns.id });
     if (!inserted) return false;
     if (work) await reopenWork(tx, work.id);
-    const mark = JSON.stringify({ continuedRunId: newRunId, continuedByUserId: userId });
+    // A skipped note says who asked for the answer, in its own words ("Ana pediu para eu responder mesmo assim").
+    const mark = JSON.stringify({
+      continuedRunId: newRunId,
+      continuedByUserId: userId,
+      ...(skipped ? { continuedByName: person?.name ?? "" } : {}),
+    });
     await tx
       .update(messages)
       .set({
         meta: sql`jsonb_set(${messages.meta}, array[${ending}::text], (${messages.meta}->${ending}::text) || ${mark}::jsonb)`,
       })
       .where(and(eq(messages.orgId, orgId), eq(messages.id, reply.id)));
+    // Overruled: for a while no check skips this agent's catch-ups here, and the workspace's bar learns from it.
+    if (skipped)
+      await tx
+        .update(agentRuns)
+        .set({
+          transcript: sql`jsonb_set(${agentRuns.transcript}, '{catchUpTriage}', (${agentRuns.transcript}->'catchUpTriage')
+            || jsonb_build_object('overruledBy', ${userId}::text, 'overruledAt', ${new Date().toISOString()}::text))`,
+        })
+        .where(eq(agentRuns.id, stopped.id));
     await enqueue(tx, {
       orgId,
       kind: "agent_run.execute",
@@ -147,7 +178,7 @@ export async function continueRun(
       actor: { type: "person", id: userId },
       action: "run.continued",
       target: { type: "agent_run", id: newRunId },
-      details: { agentId: stopped.agentId, continues: stopped.id },
+      details: { agentId: stopped.agentId, continues: stopped.id, ...(skipped ? { answerAnyway: true } : {}) },
     });
     return true;
   });
@@ -168,6 +199,59 @@ export async function continueRun(
   // The new run shows as any live run: "pensando…" right away.
   await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, runId: newRunId });
   return { runId: newRunId };
+}
+
+/** The note of a catch-up the check skipped: it says why, and is where "Responder mesmo assim" goes on from. */
+async function skippedNoteOf(db: Database, run: typeof agentRuns.$inferSelect) {
+  const [note] = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        gte(messages.createdAt, run.createdAt),
+        sql`${messages.meta}->'usageWait'->>'runId' = ${run.id}`,
+        sql`${messages.meta}->'usageWait'->'closed' is not null`,
+      ),
+    )
+    .limit(1);
+  return note?.id ?? null;
+}
+
+/**
+ * What a run answering a skipped catch-up anyway reads: who asked for it and what the check had judged, then the
+ * catch-up block (how long it was paused, everything posted since, asks included) with no `pass`.
+ */
+async function answerAnywayText(
+  db: Database,
+  run: typeof agentRuns.$inferSelect,
+  t: Transcript,
+  closed: ClosedNote | undefined,
+  name: string,
+) {
+  const judged =
+    closed?.reason === "solved"
+      ? `already handled by ${closed.who?.name ?? "someone"}`
+      : closed?.reason === "withdrawn"
+        ? "no longer needed"
+        : closed?.reason === "task_canceled"
+          ? `no longer needed, since ${closed.who?.name ?? "someone"} canceled the task`
+          : "already handled";
+  const anyway = `[${name} asked you to answer this anyway. A quick check had judged it ${judged}.]`;
+  const [trigger] = await db
+    .select({ createdAt: messages.createdAt })
+    .from(messages)
+    .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)));
+  const since = t.usageWait?.since;
+  if (!trigger || since === undefined) return anyway;
+  return catchUpText(db, { ...run, pendingMessageIds: [] }, trigger, {
+    since,
+    why: t.waitingForBrain?.code === "budget" ? "budget" : "plan",
+    ...(t.waitingForBrain?.plan ? { plan: t.waitingForBrain.plan } : {}),
+    mayPass: false,
+    anyway,
+  }).catch(() => anyway);
 }
 
 /** A run error its AI provider caused (an error it returned, or no answer after the retries): worth another try. */

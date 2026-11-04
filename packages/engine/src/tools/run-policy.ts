@@ -122,6 +122,7 @@ const HERE = new Set([
   "offer_invites",
   "offer_install_skill",
   "propose_agent",
+  "propose_settings_change",
   "follow_up",
   "cancel_follow_up",
 ]);

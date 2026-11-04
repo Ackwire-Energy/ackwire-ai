@@ -1,12 +1,13 @@
 /**
  * Test fake — skills (apps/server/src/routes/app/skills.ts), same shapes:
  * - `GET/POST …/skills`, `POST …/skills/import { url } | { url, paths } | { zipBase64 }`,
- *   `GET/PATCH/DELETE …/skills/{id}`, `POST …/skills/{id}/reimport`, `POST …/skills/{id}/update[/approve|/dismiss|/undo]`
+ *   `GET/PATCH/DELETE …/skills/{id}`, `POST …/skills/{id}/reimport`,
+ *   `POST …/skills/{id}/update[/approve|/dismiss|/reopen|/undo]`
  * - `GET/PUT …/agents/{id}/skills` → `{ skills: (Skill & { enabled })[] }`
  * A repository's root holds three skills to pick and one that can't be installed (`{ choices, skipped }`), and `list`
  * lists a folder's one skill. `acme/secret` is private and no connection reaches it; `contoso/skills` is private and the
  * workspace's GitHub connection reads it (`github()`: that connection, none or one GitHub refuses). Scripts are listed
- * as `ignored`.
+ * as `ignored`. "Revisão de PR" was changed by Ada since its link last wrote it, so its update from its link waits.
  */
 import { type ApiClient, ApiError, type SkillDetail } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError, mockId, perOrg } from "./context";
@@ -31,6 +32,8 @@ export function createFakeSkills(
   github: () => "none" | "refused" | "ok" = () => "none",
 ): ApiClient["skills"] {
   const assigned = new Map<string, Set<string>>();
+  /** A waiting update a person chose, as it was: Desfazer makes it wait again. */
+  const chosen = new Map<string, Pick<SkillDetail, "body" | "pendingUpdate" | "pending">>();
   /** "Agentes melhoram as skills sozinhos" per workspace (on unless saved off). */
   const settingsOf = new Map<string, boolean>();
   const store = perOrg(async (orgId) => {
@@ -51,6 +54,17 @@ export function createFakeSkills(
       sourceUrl: "https://github.com/acme/skills/tree/main/pr-review",
       defaultForNewAgents: false,
       body: "# Revisão de PR\n\n1. Leia o diff inteiro.\n2. Rode os testes.\n\n```bash\nbun test\n```",
+      // Ada added the tests step after its link last wrote it: "Atualizar do link" waits for a person.
+      changes: [
+        {
+          id: mockId("change"),
+          agentId: agents[0]?.id ?? "",
+          at: now,
+          before: "# Revisão de PR\n\n1. Leia o diff inteiro.",
+          after: "# Revisão de PR\n\n1. Leia o diff inteiro.\n2. Rode os testes.\n\n```bash\nbun test\n```",
+          undone: false,
+        },
+      ],
       files: [
         { path: "SKILL.md", size: 120, mime: "text/markdown", status: "stored" },
         { path: "checklist.md", size: 40, mime: "text/markdown", status: "stored" },
@@ -78,6 +92,16 @@ export function createFakeSkills(
       body: "# Atendimento\n\nSeja breve e cordial.",
       // An agent improved it by itself (Agentes melhoram as skills sozinhos): Desfazer in its sheet.
       lastUpdate: { fromVersion: 1, at: now, agentId: agents[0]?.id ?? null },
+      changes: [
+        {
+          id: mockId("change"),
+          agentId: agents[0]?.id ?? "",
+          at: now,
+          before: "# Atendimento\n\nSeja cordial.",
+          after: "# Atendimento\n\nSeja breve e cordial.",
+          undone: false,
+        },
+      ],
       files: [
         { path: "SKILL.md", size: 50, mime: "text/markdown", status: "stored" },
         { path: "respostas.txt", size: 20, mime: "text/plain", status: "stored" },
@@ -205,24 +229,60 @@ export function createFakeSkills(
     },
     updateFromSource: async (orgId, id) => {
       log("skills.updateFromSource", orgId, id);
+      const s = await find(orgId, id);
+      // The agents changed it since its link last wrote it, and its link has a new version and script: it waits.
+      const since = s.changes?.find((c) => !c.undone);
+      if (since && s.source === "url" && !s.sourceVia) {
+        const at = ctx.now().toISOString();
+        s.pendingUpdate = { scripts: ["scripts/lint.sh"], at, dismissed: false, dismissedAt: null, edited: true };
+        s.pending = {
+          body: `${since.before}\n2. Rode o lint.`,
+          description: s.description,
+          base: {
+            body: since.before,
+            description: s.description,
+            at: new Date(Date.parse(since.at) - 60_000).toISOString(),
+          },
+          files: [{ path: "scripts/lint.sh", before: "eslint .", after: "biome check .", large: false }],
+        };
+        return { status: "waiting" as const, skill: clone(s), scripts: s.pendingUpdate.scripts };
+      }
       return { status: "updated" as const, skill: await readAgain(orgId, id) };
     },
     approveUpdate: async (orgId, id) => {
       log("skills.approveUpdate", orgId, id);
       const s = await find(orgId, id);
-      Object.assign(s, { pendingUpdate: null, version: s.version + 1 });
+      if (s.pendingUpdate && s.pending)
+        chosen.set(id, { body: s.body, pendingUpdate: s.pendingUpdate, pending: s.pending });
+      Object.assign(s, {
+        body: s.pending?.body ?? s.body,
+        pendingUpdate: null,
+        pending: null,
+        lastUpdate: { fromVersion: s.version, at: ctx.now().toISOString(), agentId: null, waited: true },
+        version: s.version + 1,
+      });
       return { status: "updated" as const, skill: clone(s) };
     },
     dismissUpdate: async (orgId, id) => {
       log("skills.dismissUpdate", orgId, id);
       const s = await find(orgId, id);
-      if (s.pendingUpdate) s.pendingUpdate = { ...s.pendingUpdate, dismissed: true };
+      if (s.pendingUpdate)
+        s.pendingUpdate = { ...s.pendingUpdate, dismissed: true, dismissedAt: ctx.now().toISOString() };
+      return clone(s);
+    },
+    reopenUpdate: async (orgId, id) => {
+      log("skills.reopenUpdate", orgId, id);
+      const s = await find(orgId, id);
+      if (s.pendingUpdate) s.pendingUpdate = { ...s.pendingUpdate, dismissed: false, dismissedAt: null };
       return clone(s);
     },
     undoUpdate: async (orgId, id) => {
       log("skills.undoUpdate", orgId, id);
       const s = await find(orgId, id);
-      Object.assign(s, { lastUpdate: null, version: s.version + 1 });
+      const back = s.lastUpdate?.waited ? chosen.get(id) : undefined;
+      const last = s.lastUpdate?.agentId ? s.changes?.find((c) => !c.undone) : undefined;
+      if (last) last.undone = true;
+      Object.assign(s, { lastUpdate: null, version: s.version + 1, ...(back ?? {}) });
       return clone(s);
     },
     remove: async (orgId, id) => {

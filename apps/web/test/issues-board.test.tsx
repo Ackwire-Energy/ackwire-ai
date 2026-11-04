@@ -218,7 +218,7 @@ describe("Tarefas: moving a card", () => {
     // In Em andamento now, at the place it had in its column: second of three.
     expect(cardTitles(column("Em andamento"))).toContain("Confirmação do agendamento por WhatsApp");
     expect(live()).toBe("#131: Em andamento, posição 2 de 3.");
-    expect(document.activeElement).toBe(cardOf(131));
+    expect(document.activeElement === cardOf(131)).toBe(true);
     await press("ArrowUp");
     expect(live()).toBe("#131: Em andamento, posição 1 de 3.");
     await press("Enter");

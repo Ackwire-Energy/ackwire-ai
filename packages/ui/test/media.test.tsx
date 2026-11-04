@@ -270,7 +270,7 @@ describe("one picker with tabs", () => {
         .map((t) => t.textContent),
     ).toEqual(["Emojis", "GIFs", "Figurinhas"]);
     // It opens on Emojis, searching.
-    expect(document.activeElement).toBe(within(dialog).getByRole("searchbox", { name: "Buscar emoji" }));
+    expect(document.activeElement === within(dialog).getByRole("searchbox", { name: "Buscar emoji" })).toBe(true);
     await act(async () => fireEvent.mouseDown(within(tabs).getByRole("tab", { name: "GIFs" }), { button: 0 }));
     await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "gif-1" })));
     await tick();
@@ -367,7 +367,7 @@ describe("the GIFs tab", () => {
     const log: string[] = [];
     const { container } = render(<Harness log={log} autoFocus />);
     const search = body().getByRole("searchbox", { name: "Buscar GIFs" });
-    expect(document.activeElement).toBe(search);
+    expect(document.activeElement === search).toBe(true);
     const chips = body().getByRole("group", { name: "Categorias" });
     expect(within(chips).getByRole("button", { name: "Em alta" }).getAttribute("aria-pressed")).toBe("true");
     await act(async () => fireEvent.click(within(chips).getByRole("button", { name: "Obrigado" })));
@@ -399,7 +399,7 @@ describe("the GIFs tab", () => {
     await act(async () => fireEvent.keyDown(document.activeElement as Element, { key: "ArrowRight" }));
     expect(document.activeElement?.getAttribute("aria-label")).toBe("GIF: b");
     await act(async () => fireEvent.keyDown(document.activeElement as Element, { key: "ArrowUp" }));
-    expect(document.activeElement).toBe(search);
+    expect(document.activeElement === search).toBe(true);
   });
 
   test("near the end of the list the next page loads", async () => {

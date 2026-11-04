@@ -170,7 +170,7 @@ describe("EmojiPicker", () => {
     expect(document.activeElement?.textContent).toBe(EMOJIS[9]?.emoji);
     await act(async () => fireEvent.keyDown(document.activeElement as Element, { key: "ArrowUp" }));
     await act(async () => fireEvent.keyDown(document.activeElement as Element, { key: "ArrowUp" }));
-    expect(document.activeElement).toBe(search);
+    expect(document.activeElement === search).toBe(true);
     await act(async () => fireEvent.change(search, { target: { value: "tada" } }));
     await act(async () => fireEvent.keyDown(search, { key: "Enter" }));
     expect(picked).toEqual(["🎉"]);
@@ -214,7 +214,7 @@ describe("EmojiPicker", () => {
     });
     await tick();
     expect(body().queryByRole("dialog", { name: "Emojis" })).toBeNull();
-    expect(document.activeElement).toBe(trigger);
+    expect(document.activeElement === trigger).toBe(true);
   });
 });
 
@@ -263,7 +263,7 @@ describe("Composer toolbar", () => {
     );
     await tick();
     expect(box.value).toBe("_deploy_ **amanhã**🚀");
-    expect(document.activeElement).toBe(box);
+    expect(document.activeElement === box).toBe(true);
   });
 
   test("files: attachments only can be sent; uploads in progress hold the send", async () => {

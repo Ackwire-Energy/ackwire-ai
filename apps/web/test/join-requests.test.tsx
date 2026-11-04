@@ -145,7 +145,7 @@ describe("an invitation link asks to join", () => {
     expect(lead()).toBe("Digite os 6 números. Ele vale por 10 minutos.");
     expect(steps()).toBe("Passo 2 de 5");
     const code = codeField() as HTMLInputElement;
-    expect(document.activeElement).toBe(code);
+    expect(document.activeElement === code).toBe(true);
     expect(code.getAttribute("autocomplete")).toBe("one-time-code");
     expect(code.getAttribute("inputmode")).toBe("numeric");
     expect(text()).toMatch(/Reenviar em \d+ segundos/);
@@ -156,7 +156,7 @@ describe("an invitation link asks to join", () => {
     await settle(4);
     expect(screen().getByRole("alert").textContent).toBe("Código errado. Tente de novo.");
     expect(code.value).toBe("");
-    expect(document.activeElement).toBe(code);
+    expect(document.activeElement === code).toBe(true);
 
     // The sixth digit checks at once; spaces and dashes don't count.
     await type(code, "123 45");
@@ -808,7 +808,7 @@ describe("Members › Esperando você", () => {
     cleanup();
 
     await members("?request=r1&do=approve");
-    expect(document.activeElement).toBe(within(card("Ana Souza")).getByRole("button", { name: "Aprovar" }));
+    expect(document.activeElement === within(card("Ana Souza")).getByRole("button", { name: "Aprovar" })).toBe(true);
     cleanup();
 
     await members("?request=r9&do=approve");

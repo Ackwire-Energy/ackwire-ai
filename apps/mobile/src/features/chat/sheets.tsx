@@ -23,6 +23,7 @@ import {
   useToggleReaction,
 } from "@agenteschat/client";
 import { textOrMedia } from "@agenteschat/client/lib/media";
+import { messagePath } from "@agenteschat/client/lib/message-links";
 import { summaryParts } from "@agenteschat/client/lib/missions";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { chartBlocksOf } from "@agenteschat/ui/widgets/spec";
@@ -32,6 +33,7 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { serverUrl } from "@/lib/server";
 import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
 import { useMovesChannel } from "../categories/CategoryScreens";
 import { categoryHrefs } from "../categories/logic";
@@ -187,6 +189,21 @@ export function MessageActions({
             : []),
           ...(!m.local
             ? [
+                {
+                  key: "link",
+                  icon: "link" as const,
+                  label: t("messageRefs.copy"),
+                  onPress: () => {
+                    sheet.close();
+                    void copyText(`${serverUrl()}${messagePath(orgId, m)}`).then((ok) =>
+                      toast(
+                        ok
+                          ? { title: t("contextMenu.linkCopied"), icon: "link" }
+                          : { title: t("mobile.app.failed"), icon: "x" },
+                      ),
+                    );
+                  },
+                },
                 {
                   key: "pin",
                   icon: "pin" as const,

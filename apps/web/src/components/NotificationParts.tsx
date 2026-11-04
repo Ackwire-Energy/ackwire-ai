@@ -156,6 +156,11 @@ type WhatKey =
   | "agentUnreached"
   | "routineWaitingPlan"
   | "planResetUnknown"
+  | "catchUpClosed"
+  | "catchUpClosedAsker"
+  | "catchUpClosedAskerAny"
+  | "catchUpClosedAskerTask"
+  | "catchUpClosedAskerTaskAny"
   | "machineConnected"
   | "machineConnectedAny"
   | "browserHandoff"
@@ -167,6 +172,8 @@ type WhatKey =
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
+  | "changeRequest"
+  | "changeRequestAgent"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -263,6 +270,15 @@ export function Headline({
       return k("routineWaitingPlan", { name });
     case "plan_reset_unknown":
       return k("planResetUnknown", { name, plan: n.latest.title ?? "" });
+    case "catch_up_closed":
+      return k("catchUpClosed", { name, count: n.count });
+    case "catch_up_closed_asker": {
+      const who = n.latest.title ?? "";
+      const task = n.latest.reason === "task_canceled";
+      return label
+        ? k(task ? "catchUpClosedAskerTask" : "catchUpClosedAsker", { name, label, who })
+        : k(task ? "catchUpClosedAskerTaskAny" : "catchUpClosedAskerAny", { name, who });
+    }
     case "machine_connected":
       return n.source.label
         ? k("machineConnected", { name, label: n.source.label })
@@ -287,5 +303,7 @@ export function Headline({
         : k("invitationAcceptedAny", { name: joinerOf(t, dir, n) });
     case "reaction":
       return k("reaction", { names, count });
+    case "change_request":
+      return k(n.source.proposalId ? "changeRequest" : "changeRequestAgent", { name, agent: n.source.label ?? "" });
   }
 }

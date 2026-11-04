@@ -78,9 +78,6 @@ import { ComputerTitle, SetupFacts, useSetupView } from "./WorkspaceComputer";
 const OSES: MachineOs[] = ["linux", "darwin", "windows", "other"];
 export const osOf = (os: string): MachineOs => (OSES.includes(os as MachineOs) ? (os as MachineOs) : "other");
 
-/** Refetch the list this often while waiting for a new computer (events usually arrive first). */
-export const PAIR_POLL_MS = 5000;
-
 /** A connected computer's line icon by its id (its kind from the computers list); the generic one until known. */
 export function MachineIcon({ machineId, size = 14 }: { machineId: string | null | undefined; size?: 14 | 16 }) {
   const { org } = useOrg();

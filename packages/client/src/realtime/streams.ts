@@ -28,7 +28,9 @@ export interface RunSteeredEvent {
   /** The new message asked it to stop: the run is wrapping up (may come in a second event). */
   stop?: boolean;
   /** Into a run waiting for its computer: in line for room (`queued`) or for it to come back (`away`). */
-  computer?: "queued" | "away";
+  computer?: "queued" | "away" | "line";
+  /** Into a run waiting on its plan's limit or its budget. */
+  usage?: "plan" | "budget";
 }
 
 /** `agent.run.read`: the run read these messages sent while it worked ("Leu seu recado"). */

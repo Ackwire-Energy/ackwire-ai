@@ -71,7 +71,7 @@ describe("Select", () => {
     expect(changes).toEqual(["admin"]);
     expect(body().queryByRole("listbox")).toBeNull();
     expect(trigger.textContent).toContain("Admin");
-    expect(document.activeElement).toBe(trigger);
+    expect(document.activeElement === trigger).toBe(true);
   });
 
   test("Escape closes without changing the value", async () => {

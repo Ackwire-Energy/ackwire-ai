@@ -1898,6 +1898,24 @@
       "other": "{{plan}} didn't say when its limit resets"
     }
   },
+  "activity.kind.catch_up_closed": {
+    "value": {
+      "one": "{{names}} skipped {{count}} conversation that didn't need an answer",
+      "other": "{{names}} skipped {{count}} conversations that didn't need an answer"
+    }
+  },
+  "activity.kind.catch_up_closed_asker": {
+    "value": {
+      "one": "{{names}} didn't answer: {{who}} already took care of it",
+      "other": "{{names}} didn't answer: {{who}} already took care of it"
+    }
+  },
+  "activity.kind.catch_up_closed_asker_task": {
+    "value": {
+      "one": "{{names}} didn't answer: {{who}} canceled the task",
+      "other": "{{names}} didn't answer: {{who}} canceled the task"
+    }
+  },
   "activity.kind.reaction": {
     "value": {
       "one": "{{names}} reacted",
@@ -1944,6 +1962,12 @@
     "value": {
       "one": "This workspace used its Composio calls for the month",
       "other": "This workspace used its Composio calls for the month"
+    }
+  },
+  "activity.kind.change_request": {
+    "value": {
+      "one": "{{names}} asks for a change to the team",
+      "other": "{{names}} ask for a change to the team"
     }
   },
   "activity.kind.browser_profile_request": {
@@ -3981,18 +4005,6 @@
   "splash.offline": {
     "value": "No connection. Trying again."
   },
-  "onb.progress": {
-    "value": "Step {{n}} of {{total}}"
-  },
-  "onb.done": {
-    "value": "Done"
-  },
-  "onb.optional": {
-    "value": "optional"
-  },
-  "onb.back": {
-    "value": "Back"
-  },
   "onb.logo": {
     "value": "Logo"
   },
@@ -4005,47 +4017,8 @@
   "onb.zone": {
     "value": "Time zone: {{zone}}"
   },
-  "onb.importSources": {
-    "value": "Where the agents come from"
-  },
-  "onb.importLead": {
-    "value": "Bring them from the web, in Settings › Import and export."
-  },
-  "onb.importSkip": {
-    "value": "I don't, skip"
-  },
-  "onb.agentsAda": {
-    "value": "I'm already here"
-  },
-  "onb.agentsLead": {
-    "value": "Check who else joins."
-  },
-  "onb.share": {
-    "value": "Share an invite link"
-  },
   "onb.shareMessage": {
     "value": "Join {{org}} on agentes.chat: {{url}}"
-  },
-  "onb.shareNote": {
-    "value": "You approve each person who asks."
-  },
-  "onb.emailsPlaceholder": {
-    "value": "name@company.com"
-  },
-  "onb.membersNote": {
-    "value": "They join as members."
-  },
-  "onb.invalidEmail": {
-    "value": "Check this e-mail."
-  },
-  "onb.invitesFailed": {
-    "value": "Couldn't send these invitations. Try again."
-  },
-  "onb.removeEmail": {
-    "value": "Remove {{email}}"
-  },
-  "onb.later": {
-    "value": "Not now"
   },
   "onb.failed": {
     "value": "Couldn't save. Try again."

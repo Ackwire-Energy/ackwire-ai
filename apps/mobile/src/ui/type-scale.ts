@@ -102,6 +102,31 @@ export function countStyle(fontSize: number, fontWeight: Weight = weights.semibo
 }
 
 /**
+ * A count on a pill (`<Count inverted />`: unread badges, tab badges): one line exactly the pill's height, centered
+ * both ways, so "1", "12" and "99+" sit in its middle. Android's extra font padding off, or the figures sit low.
+ */
+export function countBadge(fontSize: number) {
+  const height = Math.round(fontSize * 1.55);
+  return {
+    box: {
+      minWidth: height,
+      // Not a fixed height: the line grows with the person's text size (up to the chrome's cap) and the pill with it.
+      minHeight: height,
+      paddingHorizontal: Math.round(fontSize * 0.45),
+      borderRadius: 999,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    text: {
+      lineHeight: height,
+      includeFontPadding: false,
+      textAlign: "center" as const,
+      textAlignVertical: "center" as const,
+    },
+  };
+}
+
+/**
  * Where the eye reads a line of text, from the top of its line box (points). The letters are centered in the
  * line, but text reads at its small letters (the x-height), a hair under the line's middle: an icon beside
  * text centers there, or it looks too high.

@@ -85,6 +85,13 @@
   line-height: 16px;
   color: var(--faint);
 }
+/* "Ver fila" under an out-of-office line with conversations waiting (UsageQueue.tsx). */
+.profile-card__status .cq-link {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 16px;
+}
 
 /* "Definir status": the preview, the line and its suggestions, when it clears, how you appear. */
 .ac-dialog__body.status-dialog {

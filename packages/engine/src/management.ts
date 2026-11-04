@@ -28,6 +28,7 @@ import {
   mediaSettingsFrom,
 } from "./media";
 import { can, lockOrgMembers, requireActiveMembership, requirePermission } from "./organizations";
+import { isRightHand, rightHandPermanent } from "./right-hand";
 import {
   agentBudgetsThisMonth,
   budgetPercent,
@@ -272,7 +273,8 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
   const [agentCount] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(agents)
-    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
+    // The team's agents: not its right hand (ADR 0137), which every workspace has.
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)));
   const [pending] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)
@@ -392,6 +394,7 @@ export async function setAgentChannels(
   if (!admin && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can change where it works");
   }
+  if (input.length > 0 && isRightHand(agent)) throw rightHandPermanent("added to a channel");
   const wanted = new Map(input.map((c) => [c.channelId, c.autoReply]));
   const ids = [...wanted.keys()];
   const columns = {
