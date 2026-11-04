@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Actor, Issue, IssueActivity, IssuePriority, IssueStatus } from "../api/types";
+import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "../api/types";
 
 export const BOARD: IssueStatus[] = ["todo", "in_progress", "in_review", "done"];
 export const STATUSES: IssueStatus[] = [...BOARD, "canceled"];
@@ -43,25 +43,6 @@ export const isWorking = (i: Pick<Issue, "work">) => Boolean(i.work && i.work.st
 export const isStalled = (i: Pick<Issue, "work">) => i.work?.state === "stalled";
 export const isOpen = (i: Pick<Issue, "status">) => i.status !== "done" && i.status !== "canceled";
 
-/** A card's conversation line, as chat's thread line: its faces, "N mensagens", "Trabalhando" or when. */
-export interface TaskConversationLine {
-  count: number;
-  people: Actor[];
-  /** An agent at work on the task now: "Trabalhando" in place of the time. */
-  working: boolean;
-  at: string | null;
-}
-
-/**
- * The card's conversation line from the task's conversation summary (null before anyone wrote): the one place that
- * reads it, so the board and the phone follow when that source changes.
- */
-export function taskConversationLine(i: Pick<Issue, "conversation" | "work">): TaskConversationLine | null {
-  const c = i.conversation;
-  if (!c || c.count === 0) return null;
-  return { count: c.count, people: c.participants.slice(0, 3), working: c.working || isWorking(i), at: c.lastAt };
-}
-
 /** An issue someone asked an agent to implement, as a message carries it. */
 export interface IssueWorkRef {
   issueId: string;
@@ -86,3 +67,19 @@ function workRef(v: unknown): IssueWorkRef | null {
 export const issueWorkOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.issueWork);
 /** `meta.issueTaken`: the one line where the issue came from ("Ada took issue #24"). */
 export const issueTakenOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.issueTaken);
+
+/**
+ * `meta.taskConversation`: the root of a task's conversation (ADR 0144). It stands for the task and is never drawn:
+ * the task's own screen is right there.
+ */
+export const taskConversationOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.taskConversation);
+
+/**
+ * The conversation line of a task's card and of its dialog's summary: who took part (the first three), how many
+ * messages, and an agent at work or when it last moved. Null for a task nobody wrote in yet.
+ */
+export function conversationLine(i: Pick<Issue, "conversation">) {
+  const c = i.conversation;
+  if (!c || c.count === 0) return null;
+  return { count: c.count, people: c.participants.slice(0, 3), working: c.working, lastAt: c.lastAt };
+}

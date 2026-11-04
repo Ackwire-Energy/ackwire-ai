@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Artifact, Issue, IssueColumn } from "@agenteschat/client";
-import { taskConversationLine } from "@agenteschat/client/lib/issues";
+import { conversationLine } from "@agenteschat/client/lib/issues";
 import { cardPreview, cardShape, driveSections, gridRows, kindKey, matchesType } from "../../src/features/drive/logic";
 import {
   columnChoices,
@@ -442,21 +442,17 @@ describe("a task's number and title on one row; its conversation on the card", (
       participants: ["a", "b", "c", "d"].map((id) => ({ type: "person" as const, id })),
       working,
     });
-    expect(taskConversationLine(issue({ number: 1 }))).toBeNull();
-    expect(taskConversationLine(issue({ number: 2, conversation: null }))).toBeNull();
-    expect(taskConversationLine(issue({ number: 3, conversation: talk(0) }))).toBeNull();
-    const line = taskConversationLine(issue({ number: 4, conversation: talk(4) }));
+    expect(conversationLine(issue({ number: 1 }))).toBeNull();
+    expect(conversationLine(issue({ number: 2, conversation: null }))).toBeNull();
+    expect(conversationLine(issue({ number: 3, conversation: talk(0) }))).toBeNull();
+    const line = conversationLine(issue({ number: 4, conversation: talk(4) }));
     expect(line).toEqual({
       count: 4,
       people: ["a", "b", "c"].map((id) => ({ type: "person", id })),
       working: false,
-      at: at(4, NOW),
+      lastAt: at(4, NOW),
     });
-    expect(taskConversationLine(issue({ number: 5, conversation: talk(2, true) }))?.working).toBe(true);
-    // An agent at work on the task counts too.
-    expect(taskConversationLine(issue({ number: 6, conversation: talk(2), work: work("running") }))?.working).toBe(
-      true,
-    );
+    expect(conversationLine(issue({ number: 5, conversation: talk(2, true) }))?.working).toBe(true);
   });
 
   test("the board card and the task's head: '#N' inside the title's line, the card's conversation last", async () => {
@@ -469,7 +465,7 @@ describe("a task's number and title on one row; its conversation on the card", (
     expect(card.split("#{i.number}")).toHaveLength(2);
     expect(card.indexOf("<AssigneeFace")).toBeLessThan(card.indexOf("<CardConversation issue={i} />"));
     const talk = parts.slice(parts.indexOf("function CardConversation("));
-    expect(talk).toContain("taskConversationLine(issue)");
+    expect(talk).toContain("conversationLine(issue)");
     expect(talk).toContain('t("threads.status.working")');
     expect(talk).toContain("{ color: c.agent }");
     const screen = await read("issues/IssueScreen.tsx");

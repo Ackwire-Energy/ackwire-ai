@@ -118,34 +118,8 @@ describe("Tarefas: how I left it", () => {
 });
 
 describe("Tarefas: a card", () => {
-  test("'#N' and the title on one row, its fields under it; its conversation as chat's thread line", async () => {
-    const state = seedState();
-    const api = createFakeApi(state);
-    const list = api.issues.list;
-    const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
-    const talk = (count: number, working: boolean, lastAt: string) => ({
-      channelId: "c-task",
-      rootId: "m-root",
-      count,
-      lastAt,
-      participants: [
-        { type: "agent" as const, id: ADA_ID },
-        { type: "person" as const, id: "u-walter" },
-      ],
-      working,
-    });
-    api.issues.list = async (...args) =>
-      (await list(...args)).map((i) =>
-        i.number === 128
-          ? { ...i, conversation: talk(2, false, ago(4)) }
-          : i.number === 129
-            ? { ...i, conversation: talk(6, true, ago(1)) }
-            : i.number === 130
-              ? { ...i, conversation: talk(0, false, ago(1)) }
-              : i,
-      );
-    await renderApp(`/org/${ORG_ID}/issues`, { api });
-    await settle(8);
+  test("'#N' and the title on one row, its fields under it", async () => {
+    await go();
     const card = cardOf(128);
     const title = card.querySelector(".issue-card__title") as HTMLElement;
     expect(title.querySelector(".issue-card__number")?.textContent).toBe("#128");
@@ -153,22 +127,6 @@ describe("Tarefas: a card", () => {
     // The fields after the title, the label without its old dot.
     expect(title.nextElementSibling?.classList.contains("issue-card__top")).toBe(true);
     expect(card.querySelector(".issue-card__top")?.textContent).toMatch(/^bug/);
-    const line = card.querySelector(".issue-card__talk") as HTMLElement;
-    expect(line.classList.contains("thread-line")).toBe(true);
-    expect(line.querySelectorAll(".thread-line__who .ac-avatar")).toHaveLength(2);
-    expect(line.querySelector("b")?.textContent).toBe("2 mensagens");
-    expect(line.querySelector("time")?.textContent).toBe("há 4 min");
-    expect(line.querySelector(".thread-line__state")).toBeNull();
-    // Not a control of its own inside the card's link.
-    expect(line.closest("button")).toBeNull();
-    // An agent at work on it: "Trabalhando" in the agent's blue, no time.
-    const busy = cardOf(129).querySelector(".issue-card__talk") as HTMLElement;
-    expect(busy.querySelector("b")?.textContent).toBe("6 mensagens");
-    expect(busy.querySelector(".thread-line__state--working")?.textContent).toBe("Trabalhando");
-    expect(busy.querySelector("time")).toBeNull();
-    // No messages, or no conversation: no line.
-    expect(cardOf(130).querySelector(".issue-card__talk")).toBeNull();
-    expect(cardOf(131).querySelector(".issue-card__talk")).toBeNull();
   });
 });
 

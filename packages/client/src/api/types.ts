@@ -3045,22 +3045,26 @@ export interface Issue {
   blocked?: { reason: string; since: string; text?: string } | null;
   /** The agent's background work this card tracks: its plan, last update and line (ADR 0121). */
   backgroundWork?: WorkView | null;
+  /** Its conversation (ADR 0144), once opened or written: a thread of its own channel. */
+  conversation?: IssueConversation | null;
   /** The issue this one is a sub-issue of (a plan step from the forum). */
   parentIssueId?: string | null;
   /** On the detail: its sub-issues. */
   subIssues?: { id: string; number: number; title: string; status: IssueStatus; assignee: Actor | null }[];
   /** On the detail: forum topics opened from it ("Avaliar no fórum"), oldest first. */
   forumTopics?: { id: string; title: string; status: ForumStatus; format: ForumFormat }[];
-  /** Its conversation (ADR 0144), once someone wrote or opened it; absent from servers that don't send it yet. */
-  conversation?: TaskConversationSummary | null;
   createdAt: string;
   updatedAt: string;
 }
 
-/** What a task's card and dialog show of its conversation: its replies, who took part, an agent at work now. */
-export interface TaskConversationSummary {
+/** Where a task's conversation lives (ADR 0144): the chat's routes read and post to this thread. */
+export interface IssueConversationRef {
   channelId: string;
   rootId: string;
+}
+
+/** A task's conversation as its card and dialog show it: its messages, who took part, an agent at work now. */
+export interface IssueConversation extends IssueConversationRef {
   count: number;
   lastAt: string | null;
   /** The first ones to write, oldest first (at most 5). */

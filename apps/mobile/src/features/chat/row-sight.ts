@@ -5,7 +5,7 @@ import { type Band, cardShows, type Measurable } from "./ask-store";
  * leaves out an agent whose row shows (the row says its step, its time and its stop) and speaks for one whose row is
  * out of view, as on the web. The rows register their views while drawn; the screen measures them against the
  * list's band (below the floating header, above the composer and the keyboard) and says which show. A row not drawn
- * (still waiting its opener's moment, or outside what the list keeps mounted) is out of view.
+ * (no words of its own yet, or outside what the list keeps mounted) is out of view.
  */
 export class RowSight {
   private rows = new Map<string, Measurable>();

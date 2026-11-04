@@ -1,6 +1,6 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
 import { dueLabel } from "@agenteschat/client/lib/format";
-import { taskConversationLine } from "@agenteschat/client/lib/issues";
+import { conversationLine, isWorking } from "@agenteschat/client/lib/issues";
 import { blockedText, workPlanProgress } from "@agenteschat/client/lib/long-work";
 import { stepPhrase } from "@agenteschat/client/lib/work";
 import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
@@ -226,8 +226,9 @@ function CardConversation({ issue }: { issue: Issue }) {
   const { t } = useTranslation();
   const c = useColors();
   const when = useWhen();
-  const line = taskConversationLine(issue);
+  const line = conversationLine(issue);
   if (!line) return null;
+  const working = line.working || isWorking(issue);
   return (
     <View style={styles.talk}>
       <View style={styles.inline}>
@@ -240,16 +241,16 @@ function CardConversation({ issue }: { issue: Issue }) {
       <Text variant="small" tone="ink2" style={styles.bold}>
         {t("threads.messages", { count: line.count })}
       </Text>
-      {line.working ? (
+      {working ? (
         <View style={styles.inline}>
           <Icon name="bolt" size={12} color={c.agent} />
           <Text variant="small" style={[styles.bold, { color: c.agent }]}>
             {t("threads.status.working")}
           </Text>
         </View>
-      ) : line.at ? (
+      ) : line.lastAt ? (
         <Text variant="small" tone="faint" numberOfLines={1} style={styles.step}>
-          · {when.short(line.at)}
+          · {when.short(line.lastAt)}
         </Text>
       ) : null}
     </View>

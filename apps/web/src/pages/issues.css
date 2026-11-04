@@ -481,20 +481,6 @@ html:not([data-pointer]) .issue-card:focus-visible {
   color: var(--faint);
   font-weight: 500;
 }
-/* The card's conversation, as chat's thread line (`.thread-line`), smaller and read-only: the card opens the task. */
-.issue-card .issue-card__talk {
-  margin: 0;
-  padding: 0;
-  font-size: 12px;
-  cursor: inherit;
-}
-.issue-card .issue-card__talk:hover {
-  background: none;
-}
-.issue-card__talk .ac-icon {
-  width: 12px;
-  height: 12px;
-}
 .issue-card[data-status="done"] .issue-card__title,
 .issue-card[data-status="canceled"] .issue-card__title {
   color: var(--muted);

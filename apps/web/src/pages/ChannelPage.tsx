@@ -1405,7 +1405,7 @@ function ChannelView({
 
   // Which agents' blocks are on screen: the line above the composer speaks only for those out of view.
   // By run: a "pensando…" hands its block (same key) to the real run, and that run must count as in view.
-  // A block's row draws only after its opener's delay (`RunBlock`): then it is measured again.
+  // A block's row draws only once it has something to show (`RunBlock`, `rowShows`): then it is measured again.
   const [rowsDrawn, setRowsDrawn] = useState(0);
   const rowDrawn = useCallback(() => setRowsDrawn((n) => n + 1), []);
   const inView = useBlocksInView(scroller, `${slots.map((x) => x.runId).join(" ")} ${rowsDrawn}`);
