@@ -71,12 +71,14 @@ export function ItemChips({ item }: { item: VaultItem }) {
   );
 }
 
-/** Personal or Team, with what it means, as a line. */
+/** Personal or Team, with what it means, as a line: its icon in the access lines' column, so the words line up. */
 export function ScopeLine({ scope }: { scope: VaultScope }) {
   const { t } = useTranslation();
   return (
-    <span className="vlt-scope ac-iconline">
-      <Icon name={scope === "team" ? "members" : "person"} size={18} />
+    <span className="vlt-scope">
+      <span className="vlt-access__lead" aria-hidden="true">
+        <Icon name={scope === "team" ? "members" : "person"} size={18} />
+      </span>
       <span className="vlt-scope__text">
         <b>{t(`vault.scope.${scope}`)}</b>
         <small>{t(`vault.scope.${scope}Text`)}</small>

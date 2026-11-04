@@ -184,8 +184,9 @@ Settings › Vault, on the web and the phone: Team, Personal and Connections, ea
 last use (a contact by its title and description: the list carries no contact's details, so it opens no contact's
 seal); an item's page with its fields (a password or a key always behind its dots, §2; a contact whose saved
 details don't open on this server says so, and is never changed on top of nothing, for a person to save them again),
-who has access in one sentence and its recent uses; a new item by kind; a CSV import from a browser or password manager export (web),
-which keeps nothing of the file; and one card per source to connect, generated from what the source describes.
+who has access in one sentence and its recent uses; a new item on that same page, empty (its kind and fields, who may
+use it beside them); a CSV import from a browser or password manager export (web), which keeps nothing of the file;
+and one card per source to connect, generated from what the source describes.
 The apps reload the Vault on `vault.changed`, sent when an item, a connection or an access changes, never for a use
 alone (a fill, a key or a read): agents at work don't make every open app reload it.
 

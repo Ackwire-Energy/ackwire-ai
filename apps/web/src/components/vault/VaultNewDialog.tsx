@@ -1,9 +1,8 @@
 import type { VaultAccess, VaultItem, VaultItemKind, VaultScope } from "@agenteschat/client";
 import {
   Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
+  DetailsDialog,
+  DetailsSection,
   Field,
   Icon,
   Input,
@@ -11,20 +10,22 @@ import {
   Select,
   SettingNote,
 } from "@agenteschat/ui";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { useVaultItemActions } from "./data";
 import { DEFAULT_MATCH, defaultAccess, hostOf, KIND_ICON, vaultOrigin } from "./lib";
 import { AccessBlock } from "./VaultAccess";
-import { cleanContact, draftErrors, type ItemDraft, ItemFields } from "./VaultItemDialog";
+import { cleanContact, draftErrors, type ItemDraft, ItemFields, VaultTile } from "./VaultItemDialog";
+import "@/pages/issues.css";
 import "./vault.css";
 
 /*
- * "New item" (ADR 0144): what to save (a login, a key, contact details), its fields, and who may use it. A personal
- * item starts usable by any of its owner's agents when the owner asks; a team one starts seen by everyone and used by
- * no agent until someone picks them.
+ * "New item" (ADR 0144): an item's own page, empty. What to save (a login, a key, contact details) and its fields on
+ * the left; who may use it beside them, where an item's page shows who has access. A personal item starts usable by
+ * any of its owner's agents when the owner asks; a team one starts seen by everyone and used by no agent until someone
+ * picks them.
  */
 
 const EMPTY: ItemDraft = {
@@ -59,6 +60,7 @@ export function VaultNewDialog({
   const [scope, setScope] = useState<VaultScope>(canManageTeam ? startScope : "personal");
   const [access, setAccess] = useState<VaultAccess>(() => defaultAccess(canManageTeam ? startScope : "personal"));
   const [tried, setTried] = useState(false);
+  const formId = useId();
   const check = () => draftErrors(t, kind, draft, secret, kind !== "contact");
   const errors = tried ? check() : {};
 
@@ -96,22 +98,34 @@ export function VaultNewDialog({
   };
 
   return (
-    <Dialog
+    <DetailsDialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title={t("vault.new.title")}
-      description={t("vault.new.text")}
       closeLabel={t("common.close")}
-      width={560}
+      className="vlt-details"
+      size="lg"
+      title={t("vault.new.title")}
+      icon={<VaultTile kind={kind} size="lg" />}
+      subtitle={t("vault.new.text")}
+      footer={
+        <>
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          {/* The form's own button, from the footer: Enter in a field saves too. */}
+          <Button type="submit" form={formId} variant="primary" loading={actions.creating} disabled={actions.creating}>
+            {t("vault.new.save")}
+          </Button>
+        </>
+      }
     >
-      <form
-        className="vlt-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        <DialogBody className="vlt-new">
+      <div className="issue-layout">
+        <form
+          id={formId}
+          className="issue-layout__main vlt-details__main"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
           {/* One line to choose what to save: the list says what each kind is (ADR 0144). */}
           <Field label={t("vault.new.what")}>
             <Select<VaultItemKind>
@@ -155,10 +169,10 @@ export function VaultNewDialog({
               )
             }
           />
-          <section className="vlt-new__who" aria-labelledby="vlt-new-who">
-            <h3 id="vlt-new-who" className="vlt-new__title">
-              {t("vault.new.who")}
-            </h3>
+        </form>
+        {/* Who may use it, where an item's page shows who has access (ADR 0144 §7): Personal or Team first. */}
+        <aside className="issue-aside vlt-aside">
+          <DetailsSection title={t("vault.access.title")}>
             <Segmented<VaultScope>
               label={t("vault.new.who")}
               value={scope}
@@ -179,15 +193,9 @@ export function VaultNewDialog({
                 return true;
               }}
             />
-          </section>
-        </DialogBody>
-        <DialogFooter>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button type="submit" variant="primary" loading={actions.creating} disabled={actions.creating}>
-            {t("vault.new.save")}
-          </Button>
-        </DialogFooter>
-      </form>
-    </Dialog>
+          </DetailsSection>
+        </aside>
+      </div>
+    </DetailsDialog>
   );
 }

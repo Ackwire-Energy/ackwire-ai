@@ -258,8 +258,8 @@ export function AgentFaces({ access }: { access: VaultAccess }) {
 }
 
 /**
- * One line of the access block: its icon, what it is, who (after the agents' faces, for the agents), and Edit. The
- * icon keeps one width on every line, so the words line up.
+ * One line of the access block: its icon, then what it is (Edit at its end) over who, across the whole width (after
+ * the agents' faces, for the agents). Every line's icon, the scope's too, keeps one width, so the words line up.
  */
 function AccessLine({
   icon,
@@ -282,18 +282,16 @@ function AccessLine({
       <span className="vlt-access__lead" aria-hidden="true">
         <Icon name={icon} size={18} />
       </span>
-      <span className="vlt-access__text">
-        <b>{label}</b>
-        <span className="vlt-access__value">
-          {faces}
-          <span title={value}>{value}</span>
-        </span>
-      </span>
+      <b className="vlt-access__label">{label}</b>
       {onEdit && (
-        <Button size="sm" variant="ghost" aria-label={editLabel} onClick={onEdit}>
+        <Button size="sm" variant="ghost" className="vlt-access__edit" aria-label={editLabel} onClick={onEdit}>
           {t("vault.access.edit")}
         </Button>
       )}
+      <span className="vlt-access__value">
+        {faces}
+        <span title={value}>{value}</span>
+      </span>
     </div>
   );
 }
