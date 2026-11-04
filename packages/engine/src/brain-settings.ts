@@ -681,10 +681,13 @@ export async function setAgentBrain(
   const lentBy = !accountChanged ? (agent.brainAccountLentBy ?? null) : next.lent || handsOver ? userId : null;
   const lentNow = accountChanged && lentBy !== null;
   const planOwner = lentBy && account ? await accountOwnerOf(deps.db, orgId, account) : agent.ownerUserId;
-  const extraUsage = (input.extraUsage as boolean | undefined) ?? (newPlan || lentNow ? false : agent.brainExtraUsage);
+  // The plan changes hands (someone else's given now, or back from one): it starts as on a new plan.
+  const ownerSwitch = accountChanged && (lentBy !== null || agent.brainAccountLentBy != null);
+  const extraBefore = newPlan || ownerSwitch ? false : agent.brainExtraUsage;
+  const extraUsage = (input.extraUsage as boolean | undefined) ?? extraBefore;
   // Paid extra usage bills the plan's owner (the agent's, unless it was lent): an admin picks the account, not this.
-  // Someone else's plan given now starts with it off, whoever gives it.
-  if (input.extraUsage !== undefined && extraUsage !== agent.brainExtraUsage && planOwner !== userId) {
+  // A plan that changes hands starts with it off, so only its owner may send it on with that change.
+  if (input.extraUsage !== undefined && extraUsage !== extraBefore && planOwner !== userId) {
     throw new ForbiddenError(
       "Only the agent's owner turns its plan's paid extra usage on or off",
       "brain.extra_owner_only",
@@ -703,7 +706,7 @@ export async function setAgentBrain(
   // Onto someone else's plan it starts on its owner alone, as onto a plan (ADR 0059 §5).
   const to = rightHand
     ? audienceOf(agent)
-    : nextAudience(agent, brain, changed || lentNow, input.onlyOwner as boolean | undefined);
+    : nextAudience(agent, brain, changed || ownerSwitch, input.onlyOwner as boolean | undefined);
   const audience = to.mode === agent.audienceMode ? null : to;
   const planForOthers = !rightHand
     ? agent.planForOthers
@@ -781,7 +784,7 @@ export async function setAgentBrain(
         throw error;
       });
     // Onto a plan it answered nobody on it before: one that keeps answering others opens that plan to them.
-    const planFrom = (changed || lentNow) && isComputerBrain(brain) ? OWNER_ONLY : audienceOf(agent);
+    const planFrom = (changed || ownerSwitch) && isComputerBrain(brain) ? OWNER_ONLY : audienceOf(agent);
     // Someone else's plan: its owner hears who gave it to which agent, and may take it back (`queuePlanLent`).
     if (row && lentNow && account && planOwner !== userId) {
       await enqueue(tx, {

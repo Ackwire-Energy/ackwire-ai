@@ -284,13 +284,18 @@ export async function releaseAgents(
   only?: readonly string[],
 ) {
   if (accountIds.length === 0 || only?.length === 0) return [];
+  const ownSignIn = sql`exists (select 1 from ${machines} m where m.id = "agents"."machine_id"
+    and m.paired_by_user_id = "agents"."owner_user_id")`;
+  const lent = sql`"agents"."brain_account_lent_by" is not null`;
   const rows = await db
     .update(agents)
     .set({
       brainAccountId: null,
       brainAccountLentBy: null,
-      brain: sql`case when exists (select 1 from ${machines} m where m.id = "agents"."machine_id"
-        and m.paired_by_user_id = "agents"."owner_user_id") then "agents"."brain" else 'model' end`,
+      brain: sql`case when ${ownSignIn} then "agents"."brain" else 'model' end`,
+      // Someone else's plan leaves with its switches: its owner's own sign-in neither pays extra nor answers others.
+      brainExtraUsage: sql`case when ${lent} then false else "agents"."brain_extra_usage" end`,
+      audienceMode: sql`case when ${lent} and ${ownSignIn} then 'owner' else "agents"."audience_mode" end`,
       updatedAt: now,
     })
     .where(

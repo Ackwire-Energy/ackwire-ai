@@ -284,7 +284,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       label={t("usageCard.extraTitle")}
                       labelLines={2}
                       toggle={view.extraUsage}
-                      disabled={busy || !view.canUsePlans}
+                      disabled={busy || !(current ? current.mine : view.canUsePlans)}
                       onPress={() => void save({ extraUsage: !view.extraUsage }, t("usageCard.extraTitle"))}
                     />
                   ) : null}

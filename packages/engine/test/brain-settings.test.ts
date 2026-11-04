@@ -544,6 +544,28 @@ describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () 
     expect(done?.doneAt).not.toBeNull();
   });
 
+  test("a plan given keeps none of the old switches, and leaves with its own", async () => {
+    const { fx, deps, bia, caio, account, row } = await world();
+    await account(BIAS, bia.id);
+    // Dev's paid extra usage was on (its owner's own sign-in): it is never sent on with Bia's plan by someone else.
+    expect((await row()).brainExtraUsage).toBe(true);
+    const carried = await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, {
+      brain: "claude_code",
+      account: BIAS,
+      extraUsage: true,
+    }).catch((e) => e);
+    expect(carried.code).toBe("brain.extra_owner_only");
+    await setAgentBrain(deps, caio.id, fx.org.id, fx.agent.id, { brain: "claude_code", account: BIAS });
+    // On her plan Bia turned extra usage on and someone let everyone talk to Dev.
+    await fx.db
+      .update(schema.agents)
+      .set({ brainExtraUsage: true, audienceMode: "everyone" })
+      .where(eq(schema.agents.id, fx.agent.id));
+    await takeBackPlan(deps, bia.id, fx.org.id, BIAS, fx.agent.id);
+    // Back on its owner's own sign-in, which neither pays extra nor answers others until its owner says so.
+    expect(await row()).toMatchObject({ brain: "claude_code", brainExtraUsage: false, audienceMode: "owner" });
+  });
+
   test("a login another agent has stays there; taking back from all leaves Bia's own agents alone", async () => {
     const { fx, deps, machineId, bia, caio, account, row } = await world();
     await account(BIAS, bia.id);
