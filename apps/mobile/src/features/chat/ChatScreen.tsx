@@ -66,7 +66,7 @@ import type { LegendListRef, OnViewableItemsChanged } from "@legendapp/list/reac
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect, useIsFocused } from "expo-router";
+import { router, useFocusEffect, useIsFocused, useIsPreview } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -770,12 +770,14 @@ function Chat({
   const markRead = useMarkChannelRead(orgId).mutate;
   const markThreadRead = useMarkThreadRead(orgId).mutate;
   const lastId = list.at(-1)?.id;
+  // Peeked at from the list (iOS's long press preview): nothing is read until it is opened.
+  const peeking = useIsPreview();
   useEffect(() => {
-    if (!member || !lastId || lastId.startsWith("local-")) return;
+    if (peeking || !member || !lastId || lastId.startsWith("local-")) return;
     const mark = readMark(channelId, threadId);
     if (mark.kind === "thread") markThreadRead(mark.id);
     else markRead(mark.id);
-  }, [markRead, markThreadRead, channelId, threadId, member, lastId]);
+  }, [peeking, markRead, markThreadRead, channelId, threadId, member, lastId]);
 
   // ── Older pages (channel view) ──
   const [loadingOlder, setLoadingOlder] = useState(false);

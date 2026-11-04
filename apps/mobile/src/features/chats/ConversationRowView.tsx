@@ -1,8 +1,8 @@
 import { previewBody } from "@agenteschat/client/lib/message-body";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { Count, LIST_AVATAR, LIST_PREVIEW, LineIcon, ListRow, PixelOrbit, Text } from "@/ui";
 import { workTitle } from "../agents/work";
 import { agentIntro } from "../chat/intent";
@@ -223,11 +223,19 @@ export const ConversationRowView = memo(function ConversationRowView({
   }
   if (r.kind === "thread" && r.closed) label = `${t("mobile.chats.closed")}, ${label}`;
 
+  const starts = Boolean(onStart && r.kind === "dm");
+  const href = r.channelId
+    ? chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null)
+    : null;
   const open = () => {
     onOpen?.();
     if (onStart && r.kind === "dm") onStart(r.with.id);
-    else router.push(chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null));
+    else if (href) router.push(href);
   };
+  const holds = Boolean(onHold && r.kind === "channel");
+  // iOS's own long press: the conversation itself in the system preview (tapping it opens it), and the row's menu
+  // ("Move to…") under it. An agent with no conversation yet, and Android, keep the plain press.
+  const peeks = Platform.OS === "ios" && href !== null && !starts;
   const a11y = [
     name,
     meta ?? null,
@@ -244,10 +252,10 @@ export const ConversationRowView = memo(function ConversationRowView({
     .filter(Boolean)
     .join(", ");
 
-  return (
+  const row = (press: () => void) => (
     <ListRow
-      onPress={open}
-      {...(onHold && r.kind === "channel"
+      onPress={press}
+      {...(onHold && r.kind === "channel" && !peeks
         ? {
             onLongPress: () => onHold(r.channelId),
             delayLongPress: 380,
@@ -276,7 +284,39 @@ export const ConversationRowView = memo(function ConversationRowView({
       trailing={badge > 0 ? <Count value={badge} max={99} inverted /> : null}
     />
   );
+  if (!peeks || !href) return row(open);
+  return (
+    <Link href={href} asChild>
+      <Link.Trigger>
+        <RowTrigger row={row} onOpen={onOpen} />
+      </Link.Trigger>
+      <Link.Preview />
+      {holds && onHold ? (
+        <Link.Menu>
+          <Link.MenuAction icon="folder" onPress={() => onHold(r.channelId)}>
+            {holdLabel ?? t("channelCategories.move")}
+          </Link.MenuAction>
+        </Link.Menu>
+      ) : null}
+    </Link>
+  );
 });
+
+/** The row under the link's trigger: the link's press opens the conversation, after the row's own `onOpen`. */
+function RowTrigger({
+  row,
+  onOpen,
+  onPress,
+}: {
+  row: (press: () => void) => ReactNode;
+  onOpen?: (() => void) | undefined;
+  onPress?: () => void;
+}) {
+  return row(() => {
+    onOpen?.();
+    onPress?.();
+  });
+}
 
 const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
