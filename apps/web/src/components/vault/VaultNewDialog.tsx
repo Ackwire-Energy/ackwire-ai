@@ -5,9 +5,10 @@ import {
   DialogBody,
   DialogFooter,
   Field,
+  Icon,
   Input,
-  OptionList,
   Segmented,
+  Select,
   SettingNote,
 } from "@agenteschat/ui";
 import { useState } from "react";
@@ -15,9 +16,9 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { useVaultItemActions } from "./data";
-import { DEFAULT_MATCH, defaultAccess, hostOf, vaultOrigin } from "./lib";
+import { DEFAULT_MATCH, defaultAccess, hostOf, KIND_ICON, vaultOrigin } from "./lib";
 import { AccessBlock } from "./VaultAccess";
-import { cleanContact, draftErrors, type ItemDraft, ItemFields, VaultTile } from "./VaultItemDialog";
+import { cleanContact, draftErrors, type ItemDraft, ItemFields } from "./VaultItemDialog";
 import "./vault.css";
 
 /*
@@ -111,21 +112,28 @@ export function VaultNewDialog({
         }}
       >
         <DialogBody className="vlt-new">
-          <OptionList<VaultItemKind>
-            layout="cards"
-            aria-label={t("vault.new.what")}
-            value={kind}
-            onValueChange={(k) => {
-              setKind(k);
-              setTried(false);
-            }}
-            options={(["login", "key", "contact"] as const).map((k) => ({
-              value: k,
-              leading: <VaultTile kind={k} />,
-              title: t(`vault.kind.${k}`),
-              description: t(`vault.kind.${k}Text`),
-            }))}
-          />
+          {/* One line to choose what to save: the list says what each kind is (ADR 0139). */}
+          <Field label={t("vault.new.what")}>
+            <Select<VaultItemKind>
+              value={kind}
+              onValueChange={(k) => {
+                setKind(k);
+                setTried(false);
+              }}
+              options={(["login", "key", "contact"] as const).map((k) => ({
+                value: k,
+                label: t(`vault.kind.${k}`),
+                description: t(`vault.kind.${k}Text`),
+                leading: <Icon name={KIND_ICON[k]} size={16} />,
+              }))}
+              renderValue={(o) => (
+                <span className="ac-iconline">
+                  <Icon name={KIND_ICON[o.value]} size={16} />
+                  <span>{o.label}</span>
+                </span>
+              )}
+            />
+          </Field>
           <ItemFields
             kind={kind}
             draft={draft}
