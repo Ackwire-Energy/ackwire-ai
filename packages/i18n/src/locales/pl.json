@@ -2623,6 +2623,15 @@
     "join": "Dołącz",
     "open": "Otwórz"
   },
+  "messageRefs": {
+    "copy": "Kopiuj link do wiadomości",
+    "message": "Wiadomość",
+    "thread": "Wątek",
+    "label": "Wiadomość od {{author}} w #{{name}}",
+    "threadLabel": "Wiadomość od {{author}} w wątku na #{{name}}",
+    "dmLabel": "Wiadomość od {{author}} w wiadomości bezpośredniej z {{name}}",
+    "noAccess": "Wiadomość bez dostępu"
+  },
   "secret": {
     "group": "Prośba o sekret od {{agent}}",
     "chip": "Czeka",

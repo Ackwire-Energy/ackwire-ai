@@ -2462,6 +2462,15 @@
     "join": "Lid worden",
     "open": "Openen"
   },
+  "messageRefs": {
+    "copy": "Link naar bericht kopiëren",
+    "message": "Bericht",
+    "thread": "Thread",
+    "label": "Bericht van {{author}} in #{{name}}",
+    "threadLabel": "Bericht van {{author}} in een thread in #{{name}}",
+    "dmLabel": "Bericht van {{author}} in het DM met {{name}}",
+    "noAccess": "Bericht zonder toegang"
+  },
   "secret": {
     "group": "Geheim verzoek van {{agent}}",
     "chip": "Wacht",

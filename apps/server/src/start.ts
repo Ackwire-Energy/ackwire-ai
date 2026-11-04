@@ -61,6 +61,7 @@ import {
   resolveHostDns,
   retireHostTokens,
   retireMillionSendMailboxes,
+  setMessageLinkBase,
   setRestrictionNotices,
   vapidKeys,
   vapidSubject,
@@ -110,6 +111,8 @@ export interface StartOptions {
 export function applyBootSwitches(config: Config) {
   // On agentes.chat Cloud a restriction names its kind and how to contest it, elsewhere it reads as before.
   setRestrictionNotices(config.PUBLIC_URL);
+  // The links to messages that agents write and their tools return.
+  setMessageLinkBase(config.PUBLIC_URL);
   // The operator API's events feed records only while that API is on (ADR 0056).
   enableOperatorEvents(Boolean(config.OPERATOR_API_TOKEN));
 }

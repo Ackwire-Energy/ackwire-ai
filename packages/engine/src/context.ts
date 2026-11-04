@@ -24,6 +24,7 @@ import { NO_PERSON, speakerFor } from "./audience";
 import { runAuthority, UUID } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
+import { peopleAllIn } from "./channels";
 import { type HandOff, handOffsFrom } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { cutText } from "./format";
@@ -31,6 +32,7 @@ import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
 import { type MessageMedia, mediaOf } from "./media";
+import { type DescribedMessage, describeMessages } from "./message-links";
 import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
@@ -624,7 +626,7 @@ export async function buildRunContext(
   const history = samePerson ? samePerson.history : fullHistory;
 
   const listsTeam = options.team && channel.kind !== "forum";
-  const [names, members, zone, talks, appLanguage] = await Promise.all([
+  const [names, members, zone, talks, appLanguage, origins] = await Promise.all([
     authorNames(db, history),
     caches.channelMembers.getOrLoad(`${run.orgId}:${run.channelId}`, () =>
       db
@@ -661,6 +663,7 @@ export async function buildRunContext(
     // Who "# Your team" lists (below) depends on it: read with the rest, not one more round trip before the model call.
     listsTeam ? speakerFor(db, run.orgId, trigger.authorUserId) : NO_PERSON,
     background ? null : appLanguageOf(db, trigger.authorUserId),
+    originNotes(db, run.orgId, agent.id, run.channelId, history, trigger.authorUserId),
   ]);
   // One statement, two parts: what agents already did in this thread (or DM),
   // and this agent's own work in other conversations the requester is in.
@@ -844,7 +847,7 @@ export async function buildRunContext(
           options.blocks && !options.routine && !run.background
             ? "- Something to use rather than read (a what-if, options to see side by side, a view to filter, a short form): show it yourself with show_block, inside your reply; what the person picks comes back to you. A group deciding together: start_poll. Plain numbers stay a table or a chart, and reports and anything to keep stay files."
             : "",
-          "- To point people to a channel, write its name with # (#engineering): it shows as a link to it.",
+          "- To point people to a channel, write its name with # (#engineering): it shows as a link to it. To a message, paste its link: it shows as a pill.",
           "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Inês, from Braga, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
           CONTINUE_THE_CONVERSATION,
           "- Keep it as short as the news: a report with nothing for the person to decide fits in one or two short paragraphs; leave out what didn't change and numbers that don't move the story.",
@@ -1056,6 +1059,7 @@ export async function buildRunContext(
   return {
     system,
     messages: toTurns(history, agent.id, names, trigger.id, {
+      origins,
       canAddAgents: channel.kind === "channel",
       cutOld: options.expand === true,
     }),
@@ -1533,6 +1537,71 @@ export function nowLine(zone: string, who: string | null, previousAt: Date | nul
 /** Where `authorNames` keeps an agent's name alone, for its stickers (ADR 0091). */
 export const stickerNameKey = (agentId: string) => `sticker:${agentId}`;
 
+const ORIGIN_QUOTE = 300;
+
+/**
+ * Why the agent sent its messages here from another conversation (`meta.agentDm` of `send_dm`, `meta.postedFrom` of
+ * `post_message`), one line each, so "where did he ask?" has an answer: who asked and where, with the request quoted
+ * and linked when `requester` (whom this run answers) is in that conversation and, unless it is a public channel, so is
+ * everyone here (the reply is read by all of them); otherwise who asked, and the channel only when it is public
+ * (ADR 0017: a private conversation's name never reaches someone outside it).
+ */
+async function originNotes(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  hereId: string,
+  history: Message[],
+  requester: string | null,
+): Promise<Map<string, string>> {
+  const from = new Map<string, string>();
+  for (const m of history) {
+    const o = (m.meta?.agentDm ?? m.meta?.postedFrom) as { fromMessageId?: unknown } | undefined;
+    if (m.authorAgentId === agentId && typeof o?.fromMessageId === "string" && UUID.test(o.fromMessageId))
+      from.set(m.id, o.fromMessageId);
+  }
+  if (from.size === 0) return new Map();
+  const origins = new Map((await describeMessages(db, orgId, [...from.values()])).map((o) => [o.id, o]));
+  const places = [...new Set([...origins.values()].map((o) => o.channelId))];
+  const inThem =
+    requester && places.length > 0
+      ? await db
+          .select({ id: channelMembers.channelId })
+          .from(channelMembers)
+          .where(
+            and(
+              eq(channelMembers.orgId, orgId),
+              eq(channelMembers.userId, requester),
+              inArray(channelMembers.channelId, places),
+            ),
+          )
+      : [];
+  const isPublic = (o: DescribedMessage) => o.channelKind === "channel" && o.visibility === "public";
+  const member = new Set(inThem.map((r) => r.id));
+  for (const o of origins.values()) {
+    if (member.has(o.channelId) && !isPublic(o) && !(await peopleAllIn(db, orgId, hereId, o.channelId)))
+      member.delete(o.channelId);
+  }
+  const notes = new Map<string, string>();
+  for (const [id, originId] of from) {
+    const o = origins.get(originId);
+    if (!o) continue;
+    const who = o.who.replace(/ \(@[^)]*\)$/, "");
+    if (member.has(o.channelId)) {
+      const said = o.body.replace(/\s+/g, " ").trim();
+      const quote = said.length > ORIGIN_QUOTE ? `${cutText(said, ORIGIN_QUOTE).trimEnd()}…` : said;
+      notes.set(
+        id,
+        `[Why you sent it]: ${who} asked in ${o.where}: "${o.meta?.readOutside === true ? neutralizeUntrusted(quote) : quote}" ${o.link}`,
+      );
+    } else {
+      const where = isPublic(o) ? o.where : "a conversation not everyone here is in";
+      notes.set(id, `[Why you sent it]: ${who} asked in ${where}.`);
+    }
+  }
+  return notes;
+}
+
 async function authorNames(db: Database, history: Message[]) {
   const userIds = [...new Set(history.flatMap((m) => (m.authorUserId ? [m.authorUserId] : [])))];
   const names = new Map<string, string>();
@@ -1925,7 +1994,7 @@ export function toTurns(
   agentId: string,
   names: Map<string, string>,
   currentId?: string,
-  options: { canAddAgents?: boolean; cutOld?: boolean } = {},
+  options: { canAddAgents?: boolean; cutOld?: boolean; origins?: Map<string, string> } = {},
 ): ModelMessage[] {
   const turns: { role: "user" | "assistant"; parts: { id: string; text: string }[] }[] = [];
   const cutIds = new Set<string>();
@@ -2004,6 +2073,7 @@ export function toTurns(
     const news = own
       ? [
           media ? ownMediaNote(media, names) : "",
+          options.origins?.get(m.id) ?? "",
           notes,
           m.id === latestOwn ? unreachedLine(m.meta, options.canAddAgents === true) : "",
         ]

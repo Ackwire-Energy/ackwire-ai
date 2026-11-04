@@ -2546,6 +2546,15 @@
     "join": "Entra",
     "open": "Apri"
   },
+  "messageRefs": {
+    "copy": "Copia link del messaggio",
+    "message": "Messaggio",
+    "thread": "Thread",
+    "label": "Messaggio di {{author}} in #{{name}}",
+    "threadLabel": "Messaggio di {{author}} in un thread di #{{name}}",
+    "dmLabel": "Messaggio di {{author}} nel messaggio diretto con {{name}}",
+    "noAccess": "Messaggio non accessibile"
+  },
   "secret": {
     "group": "Richiesta di un segreto da {{agent}}",
     "chip": "In attesa",

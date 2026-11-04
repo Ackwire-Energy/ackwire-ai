@@ -1,6 +1,8 @@
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
+import { parseMessageLink } from "@agenteschat/client/lib/message-links";
 import { type ReactNode, useMemo } from "react";
+import { MessageRef } from "@/chat/MessageRef";
 import { MermaidOrCode } from "@/components/artifacts/Mermaid";
 import { ChartOrCode } from "@/components/ChartBlock";
 import { CodeBlock } from "@/components/CodeBlock";
@@ -75,11 +77,16 @@ function withMentions(text: string, key: string, mention?: MentionRenderer, word
   return out;
 }
 
-const link = (href: string, key: string, children: ReactNode) => (
-  <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="ac-link">
-    {children}
-  </a>
-);
+/** A link opens in a new tab; one to a message here (`parseMessageLink`) is its pill, opening in the app. */
+function link(href: string, key: string, children: ReactNode) {
+  const message = parseMessageLink(href, [window.location.origin]);
+  if (message) return <MessageRef key={key} link={message} />;
+  return (
+    <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="ac-link">
+      {children}
+    </a>
+  );
+}
 
 export function renderInline(
   text: string,

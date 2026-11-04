@@ -117,12 +117,12 @@ describe("right click on a message", () => {
       "Adicionar reação",
       "Responder",
       "Copiar texto",
-      "Copiar link",
+      "Copiar link da mensagem",
       "Fixar mensagem",
       "Salvar na wiki",
     ]);
 
-    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "Copiar link" })));
+    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "Copiar link da mensagem" })));
     await settle(2);
     expect(copied.at(-1)).toBe(messageLink(window.location.origin, ORG_ID, { id: "m-1", channelId: ENG_ID }));
     expect(screen().queryByRole("menu", { name: "Ações" })).toBeNull();

@@ -2457,6 +2457,15 @@ export const ptBR = {
     join: "Entrar",
     open: "Abrir",
   },
+  messageRefs: {
+    copy: "Copiar link da mensagem",
+    message: "Mensagem",
+    thread: "Thread",
+    label: "Mensagem de {{author}} em #{{name}}",
+    threadLabel: "Mensagem de {{author}} em uma thread de #{{name}}",
+    dmLabel: "Mensagem de {{author}} na DM com {{name}}",
+    noAccess: "Mensagem sem acesso",
+  },
   secret: {
     group: "Pedido de segredo de {{agent}}",
     chip: "Esperando",

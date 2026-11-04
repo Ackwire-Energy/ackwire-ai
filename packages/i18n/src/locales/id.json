@@ -2380,6 +2380,15 @@
     "join": "Gabung",
     "open": "Buka"
   },
+  "messageRefs": {
+    "copy": "Salin tautan pesan",
+    "message": "Pesan",
+    "thread": "Utas",
+    "label": "Pesan dari {{author}} di #{{name}}",
+    "threadLabel": "Pesan dari {{author}} di utas #{{name}}",
+    "dmLabel": "Pesan dari {{author}} di DM dengan {{name}}",
+    "noAccess": "Pesan tanpa akses"
+  },
   "secret": {
     "group": "Permintaan rahasia dari {{agent}}",
     "chip": "Menunggu",

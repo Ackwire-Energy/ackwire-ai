@@ -980,6 +980,17 @@ export const useChannelCard = (orgId: string, channelId: string, enabled = true)
   });
 };
 
+/** A pasted message link's pill: where the message is and who wrote it (an error: one I can't see). */
+export const useMessageCard = (orgId: string, messageId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.messageCard(orgId, messageId),
+    queryFn: () => api.chat.messageCard(orgId, messageId),
+    staleTime: 60_000,
+    retry: false,
+  });
+};
+
 export function useJoinChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();

@@ -2448,6 +2448,15 @@
     "join": "Katıl",
     "open": "Aç"
   },
+  "messageRefs": {
+    "copy": "Mesaj bağlantısını kopyala",
+    "message": "Mesaj",
+    "thread": "İleti dizisi",
+    "label": "#{{name}} kanalında {{author}} tarafından gönderilen mesaj",
+    "threadLabel": "#{{name}} kanalındaki bir ileti dizisinde {{author}} tarafından gönderilen mesaj",
+    "dmLabel": "{{name}} ile doğrudan mesajda {{author}} tarafından gönderilen mesaj",
+    "noAccess": "Erişiminiz olmayan mesaj"
+  },
   "secret": {
     "group": "{{agent}} ajanından gizli bilgi isteği",
     "chip": "Bekliyor",

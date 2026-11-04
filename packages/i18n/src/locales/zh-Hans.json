@@ -2371,6 +2371,15 @@
     "join": "加入",
     "open": "打开"
   },
+  "messageRefs": {
+    "copy": "复制消息链接",
+    "message": "消息",
+    "thread": "话题",
+    "label": "{{author}} 在 #{{name}} 的消息",
+    "threadLabel": "{{author}} 在 #{{name}} 话题中的消息",
+    "dmLabel": "{{author}} 在与 {{name}} 的私信中的消息",
+    "noAccess": "无权查看的消息"
+  },
   "secret": {
     "group": "来自 {{agent}} 的密钥请求",
     "chip": "等待中",

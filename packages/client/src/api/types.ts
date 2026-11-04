@@ -874,6 +874,18 @@ export interface ChannelInput {
 }
 
 /** A `#channel` link's card (`chat.card`): what the channel is and who is in it. */
+/** A pasted message link's pill (`GET …/messages/{id}/card`): where the message is and who wrote it, never its text. */
+export interface MessageCard {
+  id: string;
+  channelId: string;
+  /** The thread a reply is in; null for any other message. */
+  threadId: string | null;
+  kind: "channel" | "dm";
+  /** The channel's name, or who else is in the DM. */
+  name: string;
+  author: string;
+}
+
 export interface ChannelCard {
   id: string;
   name: string;

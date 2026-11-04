@@ -2460,6 +2460,15 @@
     "join": "Beitreten",
     "open": "Öffnen"
   },
+  "messageRefs": {
+    "copy": "Link zur Nachricht kopieren",
+    "message": "Nachricht",
+    "thread": "Thread",
+    "label": "Nachricht von {{author}} in #{{name}}",
+    "threadLabel": "Nachricht von {{author}} in einem Thread in #{{name}}",
+    "dmLabel": "Nachricht von {{author}} in der Direktnachricht mit {{name}}",
+    "noAccess": "Nachricht ohne Zugriff"
+  },
   "secret": {
     "group": "Secret-Anfrage von {{agent}}",
     "chip": "Wartet",

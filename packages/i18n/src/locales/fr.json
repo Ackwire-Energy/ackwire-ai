@@ -2548,6 +2548,15 @@
     "join": "Rejoindre",
     "open": "Ouvrir"
   },
+  "messageRefs": {
+    "copy": "Copier le lien du message",
+    "message": "Message",
+    "thread": "Fil",
+    "label": "Message de {{author}} dans #{{name}}",
+    "threadLabel": "Message de {{author}} dans un fil de #{{name}}",
+    "dmLabel": "Message de {{author}} en message direct avec {{name}}",
+    "noAccess": "Message inaccessible"
+  },
   "secret": {
     "group": "Demande de secret de {{agent}}",
     "chip": "En attente",
