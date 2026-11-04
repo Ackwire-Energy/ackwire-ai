@@ -1460,7 +1460,6 @@
       "thinking": "考え中",
       "writing": "書いています"
     },
-    "autoReplyChip": "メンションなしで返信",
     "more": "メッセージのその他の操作",
     "copyLink": "リンクをコピー",
     "linkCopied": "リンクをコピーしました。",
@@ -2333,6 +2332,7 @@
     "messageTo": "{{name}}へのメッセージ",
     "audienceEdit": "編集",
     "nowIn": "現在 #{{channel}} で作業中",
+    "answersHere": "ここでは@なしで返信します",
     "more": "その他",
     "of": "{{name}}のプロフィール",
     "presence": "ステータス",
@@ -2431,6 +2431,8 @@
       "provider_down": "AIプロバイダーが停止中 · 自動で再試行します",
       "out_of_plan": "プランの上限に達しました",
       "out_of_budget": "今月の予算を使い切りました",
+      "out_of_planShort": "上限に到達",
+      "out_of_budgetShort": "予算切れ",
       "backAt": "復帰: {{when}}",
       "work": "バックグラウンドで作業中: {{subject}}"
     },

@@ -1511,7 +1511,6 @@
       "thinking": "denkt nach",
       "writing": "schreibt"
     },
-    "autoReplyChip": "antwortet ohne Erwähnung",
     "more": "Weitere Nachrichtenaktionen",
     "copyLink": "Link kopieren",
     "linkCopied": "Link kopiert.",
@@ -2422,6 +2421,7 @@
     "messageTo": "Nachricht an {{name}}",
     "audienceEdit": "Bearbeiten",
     "nowIn": "jetzt in #{{channel}}",
+    "answersHere": "Antwortet hier ohne @",
     "more": "Mehr",
     "of": "Profil von {{name}}",
     "presence": "Status",
@@ -2520,6 +2520,8 @@
       "provider_down": "Der KI-Anbieter ist ausgefallen · versucht es von selbst erneut",
       "out_of_plan": "Planlimit erreicht",
       "out_of_budget": "Monatsbudget aufgebraucht",
+      "out_of_planShort": "Limit erreicht",
+      "out_of_budgetShort": "Budget aufgebraucht",
       "backAt": "zurück {{when}}",
       "work": "Im Hintergrund: {{subject}}"
     },

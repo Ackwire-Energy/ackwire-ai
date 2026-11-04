@@ -1613,7 +1613,6 @@
       "thinking": "myśli",
       "writing": "pisze"
     },
-    "autoReplyChip": "odpowiada bez wzmianki",
     "more": "Więcej akcji wiadomości",
     "copyLink": "Kopiuj link",
     "linkCopied": "Skopiowano link.",
@@ -2582,6 +2581,7 @@
     "messageTo": "Wiadomość do: {{name}}",
     "audienceEdit": "Edytuj",
     "nowIn": "teraz, w #{{channel}}",
+    "answersHere": "Odpowiada tutaj bez @",
     "more": "Więcej",
     "of": "Profil: {{name}}",
     "presence": "Obecność",
@@ -2680,6 +2680,8 @@
       "provider_down": "Dostawca AI nie działa · ponowi sam",
       "out_of_plan": "Limit planu wyczerpany",
       "out_of_budget": "Budżet na ten miesiąc wyczerpany",
+      "out_of_planShort": "Limit wyczerpany",
+      "out_of_budgetShort": "Budżet wyczerpany",
       "backAt": "wraca {{when}}",
       "work": "W tle: {{subject}}"
     },

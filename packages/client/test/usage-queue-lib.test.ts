@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
 import type { UsageQueue, UsageQueueRow } from "../src/api/types";
-import { agentStatusText } from "../src/lib/presence";
+import { agentStatusShort, agentStatusText } from "../src/lib/presence";
 import {
   usageQueueFacts,
   usageQueueLine,
@@ -98,6 +98,27 @@ test("an agent out of office with conversations waiting says how many", () => {
   };
   expect(agentStatusText(pt, line, "pt-BR", now)?.text).toBe("Sem limite no plano · 7 conversas esperando");
   expect(agentStatusText(pt, { ...line, count: undefined }, "pt-BR", now)?.text).toBe("Sem limite no plano");
+});
+
+test("the members column says an agent out of office in one short line, no emoji, no count", () => {
+  const line = {
+    by: "auto" as const,
+    text: null,
+    kind: "out_of_plan" as const,
+    subject: null,
+    emoji: null,
+    until: null,
+    count: 4,
+  };
+  expect(agentStatusShort(pt, line, "pt-BR", now)).toEqual({ emoji: null, text: "Sem limite" });
+  const until = new Date(now.getTime() + 60 * 60_000).toISOString();
+  const back = agentStatusShort(pt, { ...line, until }, "pt-BR", now)?.text ?? "";
+  expect(back).toMatch(/^Sem limite · volta às \d{1,2}:\d{2}$/);
+  expect(agentStatusShort(pt, { ...line, kind: "out_of_budget" }, "pt-BR", now)?.text).toBe("Sem orçamento");
+  // Any other line reads as its full words.
+  expect(agentStatusShort(pt, { ...line, kind: "work", subject: "x" }, "pt-BR", now)).toEqual(
+    agentStatusText(pt, { ...line, kind: "work", subject: "x" }, "pt-BR", now),
+  );
 });
 
 test("long work in the agent's line of work reads as in line, not as waiting for your answer", () => {

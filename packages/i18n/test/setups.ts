@@ -184,7 +184,7 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
   // A message nobody mentions still gets an agent: routing.mine (the chip and its help line), routing.by (Settings),
   // or the receipt of a message a rule sent to its one candidate.
   routing: [
-    "channel.autoReplyChip",
+    "profile.answersHere",
     "channelMembers.replyAloneHelp",
     "routing.by.jev",
     "routing.by.model",

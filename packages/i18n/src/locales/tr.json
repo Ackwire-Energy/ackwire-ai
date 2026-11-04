@@ -1511,7 +1511,6 @@
       "thinking": "düşünüyor",
       "writing": "yazıyor"
     },
-    "autoReplyChip": "bahsetme olmadan yanıt verir",
     "more": "Diğer mesaj işlemleri",
     "copyLink": "Bağlantıyı kopyala",
     "linkCopied": "Bağlantı kopyalandı.",
@@ -2411,6 +2410,7 @@
     "messageTo": "{{name}} için mesaj",
     "audienceEdit": "Düzenle",
     "nowIn": "şu an #{{channel}} kanalında",
+    "answersHere": "Burada @ olmadan yanıtlar",
     "more": "Daha fazla",
     "of": "{{name}} profili",
     "presence": "Durum",
@@ -2509,6 +2509,8 @@
       "provider_down": "Yapay zeka sağlayıcısı çalışmıyor · kendi kendine yeniden deniyor",
       "out_of_plan": "Plan limiti doldu",
       "out_of_budget": "Aylık bütçe bitti",
+      "out_of_planShort": "Limit doldu",
+      "out_of_budgetShort": "Bütçe bitti",
       "backAt": "dönüş: {{when}}",
       "work": "Arka planda: {{subject}}"
     },

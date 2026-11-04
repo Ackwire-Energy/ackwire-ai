@@ -2,10 +2,12 @@ import type { Actor, Agent, AgentAudience, DmTarget } from "@agenteschat/client"
 import {
   agentWorkingIn,
   useAgentDetail,
+  useAiStatus,
   useChannels,
   useModels,
   usePeople,
   useRoles,
+  useRoster,
   useSendDm,
   useSetMemberRoles,
   useSettings,
@@ -41,6 +43,7 @@ import { isAuto } from "@agenteschat/client/lib/providers";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
+import { picksForMe } from "@agenteschat/client/lib/routing";
 import {
   Avatar,
   Button,
@@ -55,7 +58,7 @@ import {
   Token,
   useHoverCard,
 } from "@agenteschat/ui";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -74,6 +77,7 @@ import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPres
 import { type MenuEntry, tidy } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
+import { channelOfPath } from "@/lib/start";
 import { useToast } from "@/lib/toast";
 import { AskAccessButton } from "@/pages/agent/PublicCard";
 import { useStreams } from "@/realtime/context";
@@ -560,6 +564,12 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const busy = workingIn !== null;
   const here = workingIn ? channels?.find((c) => c.id === workingIn)?.name : undefined;
   const lines = audienceLines(agent, roles, dir.members);
+  // Opened in a channel where it answers without being mentioned, while something reads my unmentioned messages.
+  const channelHere = channelOfPath(useRouterState({ select: (st) => st.location.pathname }));
+  const roster = useRoster(org.id, channelHere ?? "", channelHere !== null);
+  const routing = useAiStatus(org.id).data?.routing;
+  const answersHere =
+    picksForMe(routing) && (roster.data ?? []).some((r) => r.type === "agent" && r.id === agent.id && r.autoReply);
   return (
     <CardShell
       agent
@@ -587,6 +597,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
             .join(" · ")}
         </span>
         <NoAiChip agentId={agent.id} />
+        {answersHere && <span className="small muted">{t("profile.answersHere")}</span>}
       </div>
       {line && shown?.line && (
         <div className="profile-card__status">

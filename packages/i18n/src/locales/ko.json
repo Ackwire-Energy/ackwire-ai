@@ -1460,7 +1460,6 @@
       "thinking": "생각 중",
       "writing": "작성 중"
     },
-    "autoReplyChip": "멘션 없이 답해요",
     "more": "메시지 작업 더 보기",
     "copyLink": "링크 복사",
     "linkCopied": "링크를 복사했어요.",
@@ -2331,6 +2330,7 @@
     "messageTo": "{{name}}에게 보낼 메시지",
     "audienceEdit": "편집",
     "nowIn": "지금 #{{channel}}에서",
+    "answersHere": "여기서는 @ 없이 답합니다",
     "more": "더 보기",
     "of": "{{name}}의 프로필",
     "presence": "상태",
@@ -2429,6 +2429,8 @@
       "provider_down": "AI 제공업체 장애 · 자동으로 다시 시도해요",
       "out_of_plan": "플랜 한도에 도달함",
       "out_of_budget": "이번 달 예산 소진",
+      "out_of_planShort": "한도 도달",
+      "out_of_budgetShort": "예산 소진",
       "backAt": "복귀: {{when}}",
       "work": "백그라운드: {{subject}}"
     },

@@ -3688,9 +3688,6 @@
   "channel.agentState.writing": {
     "value": "writing"
   },
-  "channel.autoReplyChip": {
-    "value": "answers without a mention"
-  },
   "channel.more": {
     "value": "More message actions"
   },
@@ -5612,6 +5609,9 @@
   "profile.nowIn": {
     "value": "now, in #{{channel}}"
   },
+  "profile.answersHere": {
+    "value": "Answers here without an @"
+  },
   "profile.more": {
     "value": "More"
   },
@@ -5872,6 +5872,12 @@
   },
   "presence.agent.out_of_budget": {
     "value": "Monthly budget spent"
+  },
+  "presence.agent.out_of_planShort": {
+    "value": "Out of limit"
+  },
+  "presence.agent.out_of_budgetShort": {
+    "value": "Out of budget"
   },
   "presence.agent.backAt": {
     "value": "back {{when}}"

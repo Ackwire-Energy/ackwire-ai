@@ -1490,7 +1490,6 @@ export const en = {
     membersAgents: "Agents",
     you: "you",
     agentState: { idle: "available", thinking: "thinking", writing: "writing" },
-    autoReplyChip: "answers without a mention",
     more: "More message actions",
     copyLink: "Copy link",
     linkCopied: "Link copied.",
@@ -2410,6 +2409,8 @@ export const en = {
     messageTo: "Message {{name}}",
     audienceEdit: "Edit",
     nowIn: "now, in #{{channel}}",
+    /** An agent set to answer in this channel without being mentioned (its card opened from the channel). */
+    answersHere: "Answers here without an @",
     more: "More",
     of: "Profile of {{name}}",
     presence: "Presence",
@@ -2509,6 +2510,9 @@ export const en = {
       provider_down: "The AI provider is down · retries by itself",
       out_of_plan: "Out of plan limit",
       out_of_budget: "Monthly budget spent",
+      /** The members column's one line ("Out of limit · back at 1:00 AM"). */
+      out_of_planShort: "Out of limit",
+      out_of_budgetShort: "Out of budget",
       backAt: "back {{when}}",
       work: "In the background: {{subject}}",
     },

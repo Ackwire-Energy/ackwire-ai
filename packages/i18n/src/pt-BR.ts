@@ -1485,7 +1485,6 @@ export const ptBR = {
     membersAgents: "Agentes",
     you: "você",
     agentState: { idle: "disponível", thinking: "pensando", writing: "escrevendo" },
-    autoReplyChip: "responde sem menção",
     more: "Mais ações da mensagem",
     copyLink: "Copiar link",
     linkCopied: "Link copiado.",
@@ -2430,6 +2429,8 @@ export const ptBR = {
     messageTo: "Mensagem para {{name}}",
     audienceEdit: "Editar",
     nowIn: "agora, em #{{channel}}",
+    /** An agent set to answer in this channel without being mentioned (its card opened from the channel). */
+    answersHere: "Responde aqui sem precisar de @",
     more: "Mais",
     of: "Perfil de {{name}}",
     presence: "Presença",
@@ -2532,6 +2533,9 @@ export const ptBR = {
       provider_down: "O provedor de IA está fora do ar · tenta de novo sozinho",
       out_of_plan: "Sem limite no plano",
       out_of_budget: "Orçamento do mês esgotado",
+      /** The members column's one line ("Sem limite · volta às 01:00"). */
+      out_of_planShort: "Sem limite",
+      out_of_budgetShort: "Sem orçamento",
       /** After an out-of-office line: "volta às 15:00", "volta sexta às 9:00" (`chat.usageWhen`). */
       backAt: "volta {{when}}",
       work: "Em segundo plano: {{subject}}",

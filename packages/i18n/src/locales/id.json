@@ -1460,7 +1460,6 @@
       "thinking": "berpikir",
       "writing": "menulis"
     },
-    "autoReplyChip": "menjawab tanpa disebut",
     "more": "Tindakan pesan lainnya",
     "copyLink": "Salin tautan",
     "linkCopied": "Tautan disalin.",
@@ -2342,6 +2341,7 @@
     "messageTo": "Pesan untuk {{name}}",
     "audienceEdit": "Ubah",
     "nowIn": "sekarang, di #{{channel}}",
+    "answersHere": "Menjawab di sini tanpa perlu @",
     "more": "Lainnya",
     "of": "Profil {{name}}",
     "presence": "Kehadiran",
@@ -2440,6 +2440,8 @@
       "provider_down": "Penyedia AI sedang gangguan · mencoba lagi sendiri",
       "out_of_plan": "Batas paket habis",
       "out_of_budget": "Anggaran bulan ini habis",
+      "out_of_planShort": "Batas habis",
+      "out_of_budgetShort": "Anggaran habis",
       "backAt": "kembali {{when}}",
       "work": "Di latar belakang: {{subject}}"
     },
