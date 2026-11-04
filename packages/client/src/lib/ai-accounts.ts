@@ -91,15 +91,22 @@ export function accountChoices<A extends MachineAccount & { machineId?: string }
 /**
  * The person's own account of this plan on that computer, before a new sign-in there: one signed out first, else one
  * signed in. Signing in to it again keeps its id, its folder and its agents, where each new sign-in leaves one more
- * account on the computer (a retry after a failed check made several). `provider`: a coding plan's (or a CLI's key);
- * none for the CLI's own sign-in.
+ * account on the computer (a retry after a failed check made several). Only a login free to take (`freeDuplicate`'s
+ * rule): one for all of their agents there, or one no agent thinks with. Another agent's own login can't think for a
+ * second one, and signing in to it again starts its folder over. `provider`: a coding plan's (or a CLI's key); none
+ * for the CLI's own sign-in.
  */
 export function reusableAccount<A extends MachineAccount & { machineId: string }>(
   accounts: readonly A[] | undefined,
   { machineId, kind, provider }: { machineId: string; kind: MachineAccountKind; provider?: string },
 ): A | undefined {
   const theirs = (accounts ?? []).filter(
-    (a) => a.mine && a.machineId === machineId && a.kind === kind && (a.provider ?? undefined) === provider,
+    (a) =>
+      a.mine &&
+      a.machineId === machineId &&
+      a.kind === kind &&
+      (a.provider ?? undefined) === provider &&
+      (a.shared === true || a.usedBy.length === 0),
   );
   return theirs.find((a) => a.status === "signed_out") ?? theirs[0];
 }

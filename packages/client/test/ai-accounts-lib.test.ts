@@ -375,6 +375,7 @@ describe("a sign-in made again reuses the account (`reusableAccount`), and the c
     const out = chatgpt("out", { status: "signed_out" });
     expect(reusableAccount([active, out], where)?.id).toBe("out");
     expect(reusableAccount([active], where)?.id).toBe("on");
+    expect(reusableAccount([chatgpt("all", { usedBy: ["Ada"], shared: true })], where)?.id).toBe("all");
   });
 
   test("never someone else's, another computer's, another program's or another plan's", () => {
@@ -382,6 +383,8 @@ describe("a sign-in made again reuses the account (`reusableAccount`), and the c
       reusableAccount(
         [
           chatgpt("theirs", { mine: false }),
+          // Another agent's own login: signing in to it again would sign that agent out.
+          chatgpt("ada", { usedBy: ["Ada"], shared: false }),
           chatgpt("mac2", { machineId: "m2" }),
           login("claude", { kind: "claude_code", provider: null }),
           login("glm"),

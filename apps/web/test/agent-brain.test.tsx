@@ -391,6 +391,36 @@ describe("Quem pensa (its dialog)", () => {
     expect(codex.querySelector(".ac-optrow__side")?.textContent).toBe("Nenhum computador tem");
   });
 
+  test("on the Cloud the card says what the workspace's computer is doing, as the plan's panel", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const machines = fakeMachinesOf.get(api);
+    machines?.pair({ id: "machine_1", name: "MacBook", os: "linux", mode: "system" });
+    machines?.setSetup({ state: "ready", machineId: "machine_1" });
+    const base = fakeAgentBrain(ADA_ID);
+    const options = base.options.map((o) =>
+      o.kind === "codex"
+        ? { ...o, available: false, reason: "not_installed" as const }
+        : o.kind === "claude_code"
+          ? { ...o, available: false, reason: "tool_off" as const }
+          : o,
+    );
+    api.agents.brain = async () => ({
+      ...base,
+      options,
+      machines: [{ machineId: "machine_1", name: "MacBook", online: true, options }],
+    });
+    await open(state, api);
+    const dialog = await brainDialog();
+    expect(card(dialog, /^ChatGPT/).textContent).toContain(
+      "O Codex está sendo instalado no MacBook. Isto muda sozinho quando terminar.",
+    );
+    // Never the command for a computer of the person's own.
+    expect(card(dialog, /^Claude/).textContent).toContain(
+      "O Claude Code não está liberado no MacBook. Peça ao suporte para liberar.",
+    );
+  });
+
   test("a tool turned off says where it turns on: the app on a Mac, the app or the command on Linux", async () => {
     const reason = async (os: string, name: string) => {
       cleanup();

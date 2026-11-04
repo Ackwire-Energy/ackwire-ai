@@ -1624,11 +1624,10 @@ describe("All agents: one plan for the team, a login per agent", () => {
     expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)[1]).toEqual([ORG_ID, "machine_1", "codex"]);
   });
 
-  test("a ChatGPT account already signed in there: Entrar de novo first, beside Outra conta, so a retry makes no new one", async () => {
+  test("a ChatGPT account already signed in there for no agent: Entrar de novo first, beside Outra conta, so a retry makes no new one", async () => {
     const gpt = {
       ...account({ id: "acct_gpt", kind: "codex", label: "ChatGPT", provider: null, keyHint: null }),
       email: "walt@acme.com",
-      usedBy: ["Atlas"],
       machineId: "machine_1",
       computer: "MacBook",
     };
@@ -1645,6 +1644,24 @@ describe("All agents: one plan for the team, a login per agent", () => {
     expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([
       [ORG_ID, "machine_1", "codex", { accountId: "acct_gpt" }],
     ]);
+  });
+
+  test("another agent's own ChatGPT login is never offered again: signing in to it would sign that agent out", async () => {
+    const gpt = {
+      ...account({ id: "acct_gpt", kind: "codex", label: "ChatGPT", provider: null, keyHint: null }),
+      email: "walt@acme.com",
+      usedBy: ["Atlas"],
+      shared: false,
+      machineId: "machine_1",
+      computer: "MacBook",
+    };
+    const { state, dialog, tile } = await connect({ accounts: [gpt] });
+    await click(tile("ChatGPT"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(panel.textContent).not.toContain("Você já tem ChatGPT aqui");
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })));
+    await settle(6);
+    expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([[ORG_ID, "machine_1", "codex"]]);
   });
 
   test("signing in again: no address asked, the account's own goes to Claude's sign-in as its hint", async () => {
