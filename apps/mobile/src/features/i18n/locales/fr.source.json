@@ -1994,6 +1994,36 @@
   "activity.kind.usage_limit_refused": {
     "value": "{{names}} turned down your request for more"
   },
+  "activity.kind.approval_cover": {
+    "value": {
+      "one": "{{names}} picked you in Who approves for me",
+      "other": "{{names}} picked you in Who approves for me"
+    }
+  },
+  "activity.kind.approval_cover_declined": {
+    "value": {
+      "one": "{{names}} won't approve for you any more",
+      "other": "{{names}} won't approve for you any more"
+    }
+  },
+  "activity.kind.approval_cover_ended": {
+    "value": {
+      "one": "{{names}} ended who approves for you",
+      "other": "{{names}} ended who approves for you"
+    }
+  },
+  "activity.kind.right_hand_decided": {
+    "value": {
+      "one": "{{names}} approved requests for you today",
+      "other": "{{names}} approved requests for you today"
+    }
+  },
+  "activity.kind.right_hand_paused": {
+    "value": {
+      "one": "{{names}} stopped approving for you",
+      "other": "{{names}} stopped approving for you"
+    }
+  },
   "activity.kind.browser_profile_request": {
     "value": {
       "one": "{{names}} asks for one more browser profile",
@@ -2002,6 +2032,10 @@
   },
   "activity.kind.desktop_taken": {
     "value": {
+      "one": "{{names}} took control of the screen of {{agent}}'s computer",
+      "other": "{{names}} took control of the screen of {{agent}}'s computer"
+    },
+    "female": {
       "one": "{{names}} took control of the screen of {{agent}}'s computer",
       "other": "{{names}} took control of the screen of {{agent}}'s computer"
     }
@@ -4338,35 +4372,5 @@
   },
   "dashboards.notice.card.proposal": {
     "value": "Dashboard"
-  },
-  "activity.kind.approval_cover": {
-    "value": {
-      "one": "{{names}} picked you in Who approves for me",
-      "other": "{{names}} picked you in Who approves for me"
-    }
-  },
-  "activity.kind.approval_cover_declined": {
-    "value": {
-      "one": "{{names}} won't approve for you any more",
-      "other": "{{names}} won't approve for you any more"
-    }
-  },
-  "activity.kind.approval_cover_ended": {
-    "value": {
-      "one": "{{names}} ended who approves for you",
-      "other": "{{names}} ended who approves for you"
-    }
-  },
-  "activity.kind.right_hand_decided": {
-    "value": {
-      "one": "{{names}} approved requests for you today",
-      "other": "{{names}} approved requests for you today"
-    }
-  },
-  "activity.kind.right_hand_paused": {
-    "value": {
-      "one": "{{names}} stopped approving for you",
-      "other": "{{names}} stopped approving for you"
-    }
   }
 }
