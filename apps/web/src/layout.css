@@ -4378,7 +4378,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   gap: 6px;
   list-style: none;
   margin: 0;
-  padding: 0 20px 12px;
+  padding: 0 var(--dialog-pad) 12px;
 }
 .cflow__steps li {
   flex: 1;
@@ -10997,11 +10997,6 @@ html:not([data-pointer]) button.agp-roletag:focus-visible .agp-roletag__pen {
 .agp-spent__stats .ac-icon {
   color: var(--faint);
 }
-.look-dialog__body {
-  gap: 12px;
-  padding-bottom: 12px;
-}
-
 /* A full-screen menu is open (MenuOverlay): the app sinks behind it. */
 html[data-menu-overlay] .shell {
   filter: blur(22px) saturate(1.15);
@@ -13012,13 +13007,6 @@ html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
 .rh-set__face {
   display: flex;
   justify-content: center;
-  margin-bottom: 16px;
-}
-.rh-set__acts {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 24px;
 }
 @media (max-width: 640px) {
   .rh-set__name {
