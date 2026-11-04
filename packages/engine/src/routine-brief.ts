@@ -44,6 +44,11 @@ export interface RoutineBrief {
   trigger: string;
   /** The slot it was due at (ISO); for a manual or event run, when it was asked. */
   dueAt: string;
+  /**
+   * A widget's refresh (ADR 0135 §4–§5): the routine redoes this widget in place and speaks only through
+   * `update_widget`, never in a conversation.
+   */
+  widget?: { widgetId: string; dashboardId: string };
 }
 
 /** The brief of a message's meta (`meta.routineBrief`), when well formed; null for any other message. */
@@ -63,7 +68,15 @@ export function routineBriefOf(meta: Record<string, unknown> | null | undefined)
     report: routineReportOf(b.report),
     trigger: typeof b.trigger === "string" ? b.trigger : "schedule",
     dueAt: typeof b.dueAt === "string" ? b.dueAt : "",
+    ...widgetOf(b.widget),
   };
+}
+
+/** A brief's widget (ADR 0135 §4), when well formed. */
+function widgetOf(raw: unknown): Pick<RoutineBrief, "widget"> {
+  const w = raw as Partial<NonNullable<RoutineBrief["widget"]>> | undefined;
+  if (!w || typeof w !== "object" || typeof w.widgetId !== "string" || typeof w.dashboardId !== "string") return {};
+  return { widget: { widgetId: w.widgetId, dashboardId: w.dashboardId } };
 }
 
 /**

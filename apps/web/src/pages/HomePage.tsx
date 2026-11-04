@@ -23,12 +23,13 @@ import {
   homeDone,
   homeMentions,
   homeWaiting,
+  homeWidgetFailures,
   startingOut,
   stepPermissions,
   upcomingRoutines,
 } from "@agenteschat/client/lib/home";
 import { waitingParts, waitingText } from "@agenteschat/client/lib/missions";
-import { allItems, waitingCardOf } from "@agenteschat/client/lib/notifications";
+import { allItems, waitingCardOf, widgetNoticeOf } from "@agenteschat/client/lib/notifications";
 import { dayPart } from "@agenteschat/client/lib/welcome";
 import { WORKING_POLL_MS, type WorkItem, workByAgent, workingNow } from "@agenteschat/client/lib/working";
 import { Button, Composer, Icon, Select, SkyGlow } from "@agenteschat/ui";
@@ -42,6 +43,8 @@ import { useNotificationOpener } from "@/components/NotificationOpen";
 import { Face, Headline, SystemFace } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { HomeMural } from "@/components/widgets/HomeMural";
+import { WidgetNoticeActions, widgetNoticeLine } from "@/components/widgets/WidgetNotice";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
 import { agentLine, useAgentPresence } from "@/hooks/usePresence";
@@ -79,6 +82,8 @@ export function HomePage() {
 
   const listed = (id: string) => listsAgent(org, dir.agentById.get(id));
   const waiting = homeWaiting(allItems(waitingList.data), now);
+  // My widgets that stopped updating wait on me too (ADR 0135), with Resolve.
+  const failures = homeWidgetFailures(allItems(inbox.data), now);
   const missions = mine.filter((m) => waitingParts(m).length > 0);
   const mentions = homeMentions(allItems(inbox.data), now);
   const done = homeDone(allItems(inbox.data), now);
@@ -87,7 +92,7 @@ export function HomePage() {
     workingNow(runs.data, active.data?.missions).filter((w) => !w.waiting && listed(w.agentId)),
   );
   const upcoming = upcomingRoutines(routines.data ?? [], now);
-  const waitingCount = waiting.length + missions.length + mentions.length;
+  const waitingCount = waiting.length + failures.length + missions.length + mentions.length;
 
   // Who I may ask, the one I talked to last first.
   const lastTalk = new Map((dms.data ?? []).map((d) => [d.with.id, d.lastMessage?.createdAt ?? ""]));
@@ -139,33 +144,65 @@ export function HomePage() {
 
       {askable.length > 0 && <AskAgent agents={askable} composer={composer} />}
 
-      {calm && (
-        <div className="nt-calm home-calm">
-          <div className="nt-calm__glow">
-            <SkyGlow color={colorOf(askable[0] ?? dir.agents[0])} />
-          </div>
-          <b>{t("home.calm.title")}</b>
-          <p>{t("home.calm.text")}</p>
-        </div>
-      )}
-
-      {waitingCount > 0 && (
-        <Section title={t("home.waiting.title")} count={waitingCount} more={waitingCount > HOME_ROWS}>
-          {[
-            ...waiting.map((n) => <InboxRow key={n.id} n={n} dir={dir} now={now} />),
-            ...missions.map((m) => <MissionRow key={m.id} m={m} dir={dir} />),
-            ...mentions.map((n) => <InboxRow key={n.id} n={n} dir={dir} now={now} />),
-          ].slice(0, HOME_ROWS)}
-        </Section>
-      )}
-
-      {working.length > 0 && (
-        <Section title={t("home.working.title")} count={working.length} to="taskManager">
-          {working.slice(0, HOME_ROWS).map((w) => (
-            <WorkRow key={w.key} w={w} dir={dir} now={now} />
-          ))}
-        </Section>
-      )}
+      <HomeMural
+        orgId={org.id}
+        waiting={{
+          title: t("home.waiting.title"),
+          count: waitingCount,
+          action:
+            waitingCount > HOME_ROWS ? (
+              <Link className="home-sec__more" to="/org/$orgId/notifications" params={{ orgId: org.id }}>
+                {t("home.seeAll")}
+              </Link>
+            ) : null,
+          body:
+            waitingCount > 0 ? (
+              <ul className="home-list">
+                {[
+                  ...waiting.map((n) =>
+                    widgetNoticeOf(n) ? (
+                      <WidgetNoticeRow key={n.id} n={n} dir={dir} now={now} />
+                    ) : (
+                      <InboxRow key={n.id} n={n} dir={dir} now={now} />
+                    ),
+                  ),
+                  ...failures.map((n) => <WidgetNoticeRow key={n.id} n={n} dir={dir} now={now} />),
+                  ...missions.map((m) => <MissionRow key={m.id} m={m} dir={dir} />),
+                  ...mentions.map((n) => <InboxRow key={n.id} n={n} dir={dir} now={now} />),
+                ].slice(0, HOME_ROWS)}
+              </ul>
+            ) : calm ? (
+              <div className="nt-calm home-calm">
+                <div className="nt-calm__glow">
+                  <SkyGlow color={colorOf(askable[0] ?? dir.agents[0])} />
+                </div>
+                <b>{t("home.calm.title")}</b>
+                <p>{t("home.calm.text")}</p>
+              </div>
+            ) : (
+              <p className="wg__empty">{t("home.summary.calm")}</p>
+            ),
+        }}
+        working={{
+          title: t("home.working.title"),
+          count: working.length,
+          action: (
+            <Link className="home-sec__more" to="/org/$orgId/task-manager" params={{ orgId: org.id }}>
+              {t("taskManager.actions.openManager")}
+            </Link>
+          ),
+          body:
+            working.length > 0 ? (
+              <ul className="home-list">
+                {working.slice(0, HOME_ROWS).map((w) => (
+                  <WorkRow key={w.key} w={w} dir={dir} now={now} />
+                ))}
+              </ul>
+            ) : (
+              <p className="wg__empty">{t("home.working.none")}</p>
+            ),
+        }}
+      />
 
       {done.length > 0 && (
         <Section title={t("home.done.title")} count={done.length} more={done.length > HOME_ROWS}>
@@ -396,6 +433,56 @@ function InboxRow({ n, dir, now }: { n: AppNotification; dir: Dir; now: number }
           action={card ? t(`home.action.${card.action}`) : t("home.action.open")}
         />
       </button>
+    </li>
+  );
+}
+
+/**
+ * A board's notice (ADR 0135): an agent's alert on a widget, a widget that stopped updating, a request to publish a
+ * board. Who and what, the agent's words (or why), and what can be done right here: Open widget, Resolve, Publish or
+ * Keep only for me.
+ */
+function WidgetNoticeRow({ n, dir, now }: { n: AppNotification; dir: Dir; now: number }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const channels = useChannels(org.id);
+  const read = useNotificationAction(org.id);
+  const opener = useNotificationOpener();
+  const channelName = (id: string) => channels.data?.find((c) => c.id === id)?.name ?? "";
+  const open = () => {
+    if (n.readAt === null) read.mutate({ type: "read", item: n, read: true });
+    opener(n, org.id);
+  };
+  const actor = n.actors[0];
+  // One action sits at the row's end like every other row's ("Review"): an alert opens its widget (the row's own
+  // press), a failure has Resolve there. A request to publish keeps its choices under the text.
+  const kind = widgetNoticeOf(n)?.kind;
+  return (
+    <li className={kind === "proposal" ? "home-wrow" : "home-wrow home-wrow--side"}>
+      <button type="button" className="home-row" onClick={open}>
+        <RowBody
+          action={kind === "alert" ? t("widgets.notice.openWidget") : undefined}
+          face={
+            actor ? (
+              <Face actor={actor} dir={dir} state={n.waiting ? "waiting" : undefined} />
+            ) : (
+              <SystemFace n={n} className="home-row__sys" />
+            )
+          }
+          title={<Headline n={n} dir={dir} channelName={channelName} />}
+          sub={widgetNoticeLine(t, n, dir)}
+          meta={relativeTime(t, i18n.language, n.updatedAt, new Date(now))}
+        />
+      </button>
+      {kind === "proposal" ? (
+        <div className="home-row__acts">
+          <WidgetNoticeActions n={n} onOpen={open} />
+        </div>
+      ) : kind === "failed" ? (
+        <div className="home-row__acts home-row__acts--side">
+          <WidgetNoticeActions n={n} onOpen={open} open={false} quiet />
+        </div>
+      ) : null}
     </li>
   );
 }

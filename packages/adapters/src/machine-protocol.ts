@@ -459,9 +459,10 @@ export const SHARED_CODEX_PROTOCOL = 38;
 export const OPENCODE_PROTOCOL = 39;
 /**
  * From this protocol on: a Claude Code `brain.turn` takes `conversation`, what holds for its conversation only. The
- * runner leaves it, and the checkout's CLAUDE.md and AGENTS.md, out of the appended system text and puts them at the
- * head of the session's first message (again on the first turn after the CLI compacts its history), so the system
- * text is the same in every session of the agent. An older runner gets both in `system`, as before.
+ * runner leaves it out of the appended system text and puts it at the head of the session's first message (again on
+ * the first turn after the CLI compacts its history), so the system text is the same in every session of the agent
+ * in one folder: `system` with that folder's CLAUDE.md and AGENTS.md at its end (the first runners of this protocol
+ * put those in the first message too). An older runner gets both in `system`, as before.
  */
 export const CONVERSATION_PROTOCOL = 40;
 /**

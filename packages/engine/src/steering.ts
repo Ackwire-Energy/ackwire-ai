@@ -69,11 +69,14 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     /** Parked waiting for its computer brain, its plan or its budget (`waitingForBrain`). */
     const parked =
       active.status === "waiting_input"
-        ? ((active.transcript as { waitingForBrain?: { waitId?: string; code?: string } } | null)?.waitingForBrain ??
-          null)
+        ? ((active.transcript as { waitingForBrain?: { waitId?: string; code?: string; source?: string } } | null)
+            ?.waitingForBrain ?? null)
         : null;
     // Long work paused near a limit is no wait a message moves (`holdsMessages`): it isn't woken for it.
     const brainWait = parked?.code === "usage_pause" ? null : parked;
+    // A conversation's catch-up on its plan or budget takes the message and stays in its place in line: a look now
+    // would only ask the plan again, early and out of order.
+    const usageWait = brainWait?.code === "plan_limit" || brainWait?.code === "budget";
     // Gone from its inbox already, the app heard where it went (`agent.run.read`, `agent.run.redispatched`):
     // a late "steered" would move the receipt back onto this run.
     if (active.pendingMessageIds.includes(message.id)) {
@@ -88,6 +91,12 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
         // Into a run waiting for its computer: the message shows that wait, as a reload would.
         ...(active.status === "waiting_input" && active.waitingMachineId
           ? { computer: brainWait?.code === "busy" ? ("queued" as const) : ("away" as const) }
+          : active.status === "waiting_input" && brainWait?.code === "work_queue"
+            ? { computer: "line" as const }
+            : {}),
+        // On its plan or budget (long work paused near one too, by its `source`), as a reload says (`usageWaitSql`).
+        ...(parked?.code === "plan_limit" || parked?.code === "budget" || parked?.code === "usage_pause"
+          ? { usage: parked.code === "budget" || parked.source === "budget" ? ("budget" as const) : ("plan" as const) }
           : {}),
       });
     }
@@ -111,9 +120,9 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     } else if (computer) {
       live = await deliverLive(deps, active, { messageId: message.id, urgent: false }).catch(() => false);
     }
-    // Parked waiting for its computer, its plan or its budget: look again now. Back (or never really away): the
-    // run resumes and reads this message with the rest; still away: it parks again quietly (one answer later).
-    else if (active.status === "waiting_input" && (active.waitingMachineId || brainWait)) {
+    // Parked waiting for its computer: look again now. Back (or never really away): the run resumes and reads this
+    // message with the rest; still away: it parks again quietly (one answer later).
+    else if (active.status === "waiting_input" && (active.waitingMachineId || brainWait) && !usageWait) {
       const wait = brainWait?.waitId;
       if (brainWait?.code === "busy") await frontOfLine(deps.db, active, message.id).catch(() => undefined);
       else

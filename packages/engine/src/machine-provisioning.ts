@@ -598,7 +598,7 @@ export async function onManagedMachineHello(
     const given = await tx
       .update(agents)
       .set({ machineId: machine.id, updatedAt: now })
-      .where(and(eq(agents.orgId, orgId), isNull(agents.machineId), isNull(agents.archivedAt)))
+      .where(and(eq(agents.orgId, orgId), isNull(agents.machineId), isNull(agents.archivedAt), isNull(agents.builtin)))
       .returning({ id: agents.id });
     // The owners were told it would come: it goes out with the ready, or neither happens and the next hello
     // tries both again.

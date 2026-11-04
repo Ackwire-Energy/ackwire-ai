@@ -443,7 +443,7 @@ describe("agent questions (ask_user)", () => {
     expect(card.querySelector(".rq__head")?.textContent).toBe("Perguntaesperando você");
     // With choices, writing another answer is "Outra resposta": a field opens in the card, focused.
     await click(within(card).getByRole("button", { name: "Outra resposta" }));
-    expect(document.activeElement).toBe(within(card).getByRole("textbox", { name: "Sua resposta" }));
+    expect(document.activeElement === within(card).getByRole("textbox", { name: "Sua resposta" })).toBe(true);
     await click(within(card).getByRole("button", { name: "Depois das 18h" }));
     await settle(4);
     // Answered: one line takes its place (another element), the answer bold, the question still in the open.
@@ -490,7 +490,7 @@ describe("agent questions (ask_user)", () => {
     expect(within(card).queryByRole("textbox")).toBeNull();
     await click(within(card).getByRole("button", { name: "Responder" }));
     const field = within(card).getByRole("textbox", { name: "Sua resposta" });
-    expect(document.activeElement).toBe(field);
+    expect(document.activeElement === field).toBe(true);
     await type(field, "https://api.example.test/v1");
     // Enter twice while the first answer is on its way sends it once.
     let release = () => {};

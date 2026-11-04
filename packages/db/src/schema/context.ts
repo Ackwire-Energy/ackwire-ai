@@ -175,6 +175,7 @@ export const proposalTargetEnum = pgEnum("proposal_target", [
   "agent_role",
   "agent_access",
   "skill",
+  "agent_settings",
 ]);
 export const proposalStatusEnum = pgEnum("proposal_status", ["pending", "accepted", "rejected", "stale"]);
 
@@ -184,6 +185,28 @@ export interface ProposedAccessLine {
   /** Its name when proposed (the connection's label, the scope's English label). */
   label: string;
   on: boolean;
+}
+
+/**
+ * One setting of an agent the team's right hand proposes to change (ADR 0137): its value then (`from`) and the one
+ * proposed (`to`). `channel_add` / `channel_remove` / `reply_mode` name their channel in `channelId`; `label` is
+ * what the card shows for a value that is an id (a model's, an account's, a person's or a channel's name).
+ */
+export interface ProposedSettingLine {
+  field:
+    | "model"
+    | "ai_account"
+    | "budget"
+    | "owner"
+    | "audience"
+    | "channel_add"
+    | "channel_remove"
+    | "reply_mode"
+    | "archive";
+  from: unknown;
+  to: unknown;
+  channelId?: string;
+  label?: { from?: string; to?: string };
 }
 
 /**
@@ -212,6 +235,12 @@ export const contextProposals = pgTable(
     diff: text().notNull(),
     /** `agent_access` only. */
     access: jsonb().$type<ProposedAccessLine[]>(),
+    /** `agent_settings` only. */
+    settings: jsonb().$type<ProposedSettingLine[]>(),
+    /** The person who asked for it in conversation; null for memory promotions and older rows. */
+    requestedByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    /** When the person who asked sent it to whoever may decide it ("Pedir a um admin"). */
+    askedAt: timestamp({ withTimezone: true }),
     rationale: text().notNull(),
     /** `skill` only: the skill's file it changes (its whole text in `proposed_text`); null: its body. */
     skillPath: text(),

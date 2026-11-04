@@ -4,6 +4,7 @@ import {
   useCardProposals,
   useDecideProposal,
   useDecideProposals,
+  useModelLabel,
   useSaveSecretToVault,
 } from "@agenteschat/client";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
@@ -22,6 +23,7 @@ import {
   proposalTitle,
   proposerOf,
   rowStatus,
+  settingLineText,
   staleCount,
 } from "@agenteschat/client/lib/proposals";
 import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
@@ -150,9 +152,29 @@ export function MemoryChangeCard({
 
 /** What a role or access proposal changes: "Papel: Dev → Revisora", or a chip per app turned on or off. */
 export function SettingChange({ p }: { p: Proposal }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const modelLabel = useModelLabel();
   if (p.target.type === "agent_role")
     return <span className="proposal-change">{t("proposals.roleLine", { from: p.before, to: p.after })}</span>;
+  // The right hand's settings (ADR 0137): "Modelo: Haiku → Sonnet", a line each.
+  if (p.target.type === "agent_settings")
+    return (
+      <span className="proposal-change">
+        {(p.settings ?? [])
+          .map((l) => {
+            const line = settingLineText(t, i18n.language, l, {
+              model: (id) => modelLabel(id) ?? id,
+              person: (id) => dir.memberById.get(id)?.name,
+              channel: () => undefined,
+              role: dir.roleName,
+            });
+            return `${line.field}: ${line.from} → ${line.to}`;
+          })
+          .join(" · ")}
+      </span>
+    );
   return (
     <span className="proposal-change proposal-change--apps">
       {(p.access ?? []).map((l) => (

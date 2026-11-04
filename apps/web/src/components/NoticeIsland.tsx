@@ -9,7 +9,7 @@ import {
   replyTarget,
   waitingCardOf,
 } from "@agenteschat/client/lib/notifications";
-import { Button, cx, Icon, Kbd, prefersReducedMotion } from "@agenteschat/ui";
+import { Button, CountBadge, cx, Icon, Kbd, prefersReducedMotion } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
@@ -194,7 +194,7 @@ export function NoticeIsland() {
                       <Who key={i.n.id} n={i.n} dir={dir} className="ni__mini" />
                     ))}
                 </span>
-                <span className="ni__count">+{others}</span>
+                <CountBadge className="ni__count">+{others}</CountBadge>
               </>
             )}
           </button>

@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
 import { routineBriefOfRun, routineOfRun } from "./background";
+import { widgetRoutineEnded } from "./dashboards/refresh-ledger";
 import { publishDelivery } from "./delivery";
 import { publishRoutineRuns } from "./events";
 import { deliverRoutineReport, routineDeliveryBlock } from "./hand-off";
@@ -207,8 +208,9 @@ export async function endRoutineRun(
  * streak and resolves its failure and outage notifications; a failure counts in `failures_in_row`
  * (the first after a good run notifies once, with its coded reason for the app to say; the fifth in a
  * row pauses the routine: `failing`); the emails of an email run that didn't finish are released to
- * the next run (§6.8); and the event run gathered while it worked starts (§6.3). Never throws into the
- * ending.
+ * the next run (§6.8); and the event run gathered while it worked starts (§6.3). A widget's routine (ADR 0135 §5)
+ * tells its widget first (`widgetRoutineEnded`): an end without data counts as a failure, and its widget's own
+ * `widget_failed` replaces the routine's notification. Never throws into the ending.
  */
 export async function afterRoutineRunEnded(
   deps: LedgerDeps,
@@ -216,10 +218,16 @@ export async function afterRoutineRunEnded(
 ) {
   const { db } = deps;
   try {
-    if (ended.status === "reported" || ended.status === "silent") {
+    const widget = await widgetRoutineEnded(deps, {
+      ...ended,
+      agentRunId: null,
+      status: ended.status as RoutineRunEndStatus,
+    });
+    const status: string = widget ?? ended.status;
+    if (status === "reported" || status === "silent") {
       await db.update(routines).set({ failuresInRow: 0 }).where(eq(routines.id, ended.routineId));
       await resolveRoutineTrouble(deps, ended.orgId, ended.routineId).catch(() => {});
-    } else if (ended.status === "failed") {
+    } else if (status === "failed") {
       const [r] = await db
         .update(routines)
         .set({ failuresInRow: sql`${routines.failuresInRow} + 1` })
@@ -230,7 +238,7 @@ export async function afterRoutineRunEnded(
           active: routines.active,
           failures: routines.failuresInRow,
         });
-      if (r?.failures === 1) {
+      if (r?.failures === 1 && !widget) {
         await notifyRoutineFailed(deps, {
           orgId: ended.orgId,
           routineId: ended.routineId,

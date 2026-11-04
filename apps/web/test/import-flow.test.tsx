@@ -343,7 +343,7 @@ describe("Configurações → Importar e exportar", () => {
     // Read here, planned there: nothing is written before Importar.
     expect(applies(state).map((i) => i.dryRun)).toEqual([true]);
     const title = screen().getByRole("heading", { name: "Corner Studio" });
-    expect(document.activeElement).toBe(title);
+    expect(document.activeElement === title).toBe(true);
     expect(text()).toContain("Veio do Paperclip");
     for (const group of ["Agentes", "Skills", "Rotinas", "Memória"]) {
       expect(screen().getByRole("region", { name: group })).toBeTruthy();
@@ -377,7 +377,7 @@ describe("Configurações → Importar e exportar", () => {
     expect(applied[0]?.bundle.agents.map((a) => a.key)).toEqual(["ceo", "cto"]);
 
     // The report: what came, with links, and focus on it.
-    expect(document.activeElement).toBe(screen().getByRole("heading", { name: "Chegou tudo" }));
+    expect(document.activeElement === screen().getByRole("heading", { name: "Chegou tudo" })).toBe(true);
     const report = screen().getByRole("region", { name: "Chegou tudo" });
     expect(report.textContent).toContain("1 agente");
     expect(report.textContent).toContain("1 memória");

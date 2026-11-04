@@ -1,12 +1,15 @@
 import { type Message, usePinMessage } from "@agenteschat/client";
+import { messagePath } from "@agenteschat/client/lib/message-links";
 import { can } from "@agenteschat/client/lib/permissions";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { Button, EmojiPickerPopover, Menu } from "@agenteschat/ui";
-import { useState } from "react";
+import { chartBlocksOf, chartBlockToWidgetSpec } from "@agenteschat/ui/widgets/spec";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useChannelActions } from "@/components/channel-actions";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useOrg } from "@/components/org-context";
+import { PinToDashboard } from "@/components/widgets/PinToDashboard";
 import {
   contextMenuHandler,
   copyText,
@@ -20,9 +23,12 @@ import { CorrectionDialog } from "./MessageFeedback";
 import { DOWN, ReactButton, reactionOf, useEmojiLabels, useMessageReactions } from "./Reactions";
 import { SaveToWikiDialog } from "./SaveToWiki";
 
-/** A message's address: the channel with `?m=` (the timeline scrolls to it). */
-export const messageLink = (origin: string, orgId: string, m: Pick<Message, "id" | "channelId">) =>
-  `${origin}/org/${orgId}/c/${m.channelId}?m=${m.id}`;
+/** A message's address (`messagePath`): its conversation, or a reply's thread, with `?m=` (it scrolls to it). */
+export const messageLink = (
+  origin: string,
+  orgId: string,
+  m: Pick<Message, "id" | "channelId"> & { threadId?: string | null },
+) => `${origin}${messagePath(orgId, m)}`;
 
 /** "…" on any message: the same list as its right click (`useMessageMenu`'s `more`). */
 export function MessageMoreMenu({ entries }: { entries: MenuEntry[] }) {
@@ -102,6 +108,15 @@ export function useMessageMenu(
   const [picking, setPicking] = useState(false);
   const labels = useEmojiLabels();
   const pin = usePinMessage(org.id);
+  // An agent's chart can go on a board as a widget (ADR 0135): the first one the message has that reads as one.
+  const chart = useMemo(
+    () =>
+      message.author.type === "agent" && message.author.id && !message.local && !options.readOnly
+        ? (chartBlocksOf(message.body).find((b) => chartBlockToWidgetSpec(b) !== null) ?? null)
+        : null,
+    [message.author.type, message.author.id, message.local, message.body, options.readOnly],
+  );
+  const [pinningChart, setPinningChart] = useState(false);
   const entries = (selected: string, touch = false): MenuEntry[] => {
     if (message.local) return [];
     const copy = (text: string, id: string, label: string): MenuEntry => ({
@@ -125,7 +140,7 @@ export function useMessageMenu(
     const copyLink: MenuEntry = {
       kind: "item",
       id: "copy-link",
-      label: t("contextMenu.copyLink"),
+      label: t("messageRefs.copy"),
       icon: "link",
       run: () =>
         void copyText(messageLink(window.location.origin, org.id, message), () =>
@@ -185,6 +200,17 @@ export function useMessageMenu(
       copyLink,
       { kind: "separator" },
       ...(pinEntry ? [pinEntry] : []),
+      ...(chart
+        ? ([
+            {
+              kind: "item",
+              id: "pin-widget",
+              label: t("widgets.pin.label"),
+              icon: "grid",
+              run: () => setPinningChart(true),
+            },
+          ] satisfies MenuEntry[])
+        : []),
       ...(words ? [wiki(message.body)] : []),
     ];
   };
@@ -200,6 +226,15 @@ export function useMessageMenu(
           text={saving}
           source={{ kind: "message", channelId: message.channelId, messageId: message.id }}
           from={t("wiki.fromMessage", { channel: channelName })}
+        />
+      )}
+      {pinningChart && chart && message.author.id && (
+        <PinToDashboard
+          orgId={org.id}
+          messageId={message.id}
+          agentId={message.author.id}
+          block={chart}
+          onClose={() => setPinningChart(false)}
         />
       )}
       {correcting && (

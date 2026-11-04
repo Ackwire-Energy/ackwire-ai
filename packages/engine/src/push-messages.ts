@@ -49,6 +49,8 @@ export interface PushTextInput {
   screen?: string | null;
   /** `browser_handoff` still unanswered an hour later: the title says the agent still needs them. */
   reminder?: boolean;
+  /** `widget_failed`: its coded reason (ADR 0135 §6); `agent_reported` sends the agent's words in `text`. */
+  reason?: string | null;
 }
 
 const clip = (s: string, max: number) => {
@@ -132,6 +134,15 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "secret_request":
       // What it is for, in the agent's words: the value is typed in the app, sealed there, never here.
       return out(s.secretTitle(actor), text || what || s.secretBody);
+    case "widget_alert":
+      // What the agent saw, in its words; never in the chat (ADR 0135 §6).
+      return out(s.widgetAlertTitle(actor, what), text || s.openBody);
+    case "widget_failed":
+      // The agent's own words when it said why, else its coded reason in words.
+      return out(s.widgetFailedTitle(what), text || s.widgetFailedReasons[input.reason ?? ""] || s.widgetFailedBody);
+    case "dashboard_proposal":
+      // Only the board's name: publishing happens in the app, never from the notification.
+      return out(s.dashboardProposalTitle(actor), s.dashboardProposalBody(what));
     case "join_request": {
       // The name the person typed, never their note: approving happens in the app, never from the notification.
       const who = input.title?.trim() || s.someone;

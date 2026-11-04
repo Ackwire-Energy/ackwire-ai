@@ -1446,12 +1446,25 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   height: 20px;
   padding: 0 6px;
   box-sizing: border-box;
-  display: inline-grid;
-  place-items: center;
   border-radius: var(--radius-full);
   background: var(--sunken);
   color: var(--ink2);
   font-size: 12px;
+}
+/*
+ * Every number on a pill (CountBadge, CountChip, the sidebar's red count, the notice island's +N): the figures' own
+ * box, cap height to baseline (`text-box`), centred on the pill, so "1", "12" and "99+" sit in its middle at any
+ * size. Centring the line box instead puts them where the font's ascent and descent fall, up to 1px high or low
+ * depending on the size. A pill that sets its own size keeps these and sets no line height of its own.
+ */
+.ac-count,
+.ac-countchip {
+  display: inline-block;
+  align-content: center;
+  text-align: center;
+  line-height: 1;
+  text-box: trim-both cap alphabetic;
+  white-space: nowrap;
 }
 
 /* Logo: the agent mark + the wordmark set in Onest */
@@ -1798,6 +1811,16 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
 @supports (top: 1lh) {
   .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc)
     > .ac-menu__leading:has(> .ac-icon, > .ac-brand--xs, > .ac-avatar--xs, > .ac-avatar--sm, > .ac-avatar-stack) {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
+/* A widget's format glyph (the format pickers) leads its option the same way, on the first line. */
+.ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-wglyph) {
+  align-self: flex-start;
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-menu__item:has(> .ac-menu__label > .ac-menu__desc) > .ac-menu__leading:has(> .ac-wglyph) {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
 }
@@ -3964,9 +3987,6 @@ html:not([data-pointer]) .ac-switch:focus-visible {
 .ac-btn--loading > :not(.ac-btn__spinner) {
   visibility: hidden;
 }
-.ac-btn--loading {
-  color: transparent;
-}
 .ac-btn--loading .ac-btn__spinner {
   position: absolute;
   inset: 0;
@@ -3977,7 +3997,6 @@ html:not([data-pointer]) .ac-switch:focus-visible {
   color: var(--on-action);
 }
 .ac-btn--loading[disabled] {
-  color: transparent;
   cursor: progress;
   border-color: var(--line-strong);
   background: var(--surface-raised);
@@ -4332,6 +4351,20 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   gap: 3px;
   margin-left: 2px;
 }
+/*
+ * Loading: the label's text keeps its width but never shows under the spinner, whatever color a variant, a surface
+ * or the disabled state gives the button (those rules come later or weigh more, so the text fill is cleared too).
+ * The spinner is a canvas that reads `color`, so it keeps its own.
+ */
+.ac-btn.ac-btn--loading,
+.ac-btn.ac-btn--loading[disabled],
+.ac-btn.ac-btn--loading[aria-disabled="true"] {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.ac-btn.ac-btn--loading .ac-btn__spinner {
+  -webkit-text-fill-color: currentColor;
+}
 .ac-btn--loading[disabled] {
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
@@ -4466,9 +4499,6 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   --count-h: 18px;
   flex: none;
   align-self: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   box-sizing: border-box;
   height: var(--count-h);
   min-width: var(--count-h);
@@ -4477,9 +4507,6 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
   background: var(--sunken);
   color: var(--muted);
   font-size: 11.5px;
-  /* Centered on its box, not on the label's baseline. */
-  line-height: 1;
-  white-space: nowrap;
 }
 .ac-countchip--sm {
   --count-h: 16px;

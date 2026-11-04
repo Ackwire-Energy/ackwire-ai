@@ -32,6 +32,7 @@ import {
   createClaudeCodeBrain,
   createConnectorToolSource,
   createContextToolSource,
+  createDashboardToolSource,
   createDatabaseToolSource,
   createDesktopControl,
   createDesktopToolSource,
@@ -381,6 +382,8 @@ export function buildEngine(o: EngineOptions) {
         catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
       }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
+      // Dashboards and widgets (ADR 0135 §10): boards for the person, and a widget run's only voice (`update_widget`).
+      createDashboardToolSource({ db, pubsub: adapters.pubsub, context }),
       createSkillToolSource({
         ...skillDeps,
         judge: context.judge,

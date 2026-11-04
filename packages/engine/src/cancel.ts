@@ -225,12 +225,26 @@ export async function cancelRun(
   if (!(await mayStopRun(db, userId, membership, row)))
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
-  const stopped = await stopRun(deps, orgId, row.run, row.channelKind, { type: "person", id: userId }, options);
+  // The agent's owner or an admin decides for the whole conversation; who asked, only for what they sent.
+  const forAll = row.ownerUserId === userId || can(membership, "manage_agents");
+  const stopped = await stopRun(
+    deps,
+    orgId,
+    row.run,
+    row.channelKind,
+    { type: "person", id: userId },
+    {
+      ...options,
+      forAll,
+    },
+  );
   // The agent is told (ADR 0128), unless the stop came with a message to it ("Parar e mandar": that message says it)
   // or the agent stopped it itself on a person's word (`tell: false`).
   if (!options.stopMessageId && options.tell !== false) {
     await tellAgentStopped(deps, row.run, stopped.previousStatus, userId, options.reason).catch(() => null);
   }
+  // Its usage note's "Don't run it" speaks for every turn that note took in, each for who may stop it.
+  for (const id of stopped.joined ?? []) await cancelRun(deps, userId, orgId, id, { tell: false }).catch(() => null);
   return stopped;
 }
 
@@ -249,8 +263,9 @@ export async function stopRun(
   start: typeof agentRuns.$inferSelect,
   channelKind: string | null,
   actor: { type: "person"; id: string } | { type: "system"; reason: string },
-  options: { stopMessageId?: string } = {},
-): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
+  /** `forAll`: the person stops a conversation's catch-up for everyone in it (the agent's owner, an admin). */
+  options: { stopMessageId?: string; forAll?: boolean } = {},
+): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus; joined?: string[] }> {
   const { db } = deps;
   const error = actor.type === "person" ? `canceled_by:${actor.id}` : actor.reason;
   let run = start;
@@ -323,11 +338,44 @@ export async function stopRun(
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
   // Waiting on its plan or budget: its note or card says it won't run when the limit is back.
-  const wait = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain;
+  const wait = (run.transcript as { waitingForBrain?: { code?: string; waitKey?: string } } | null)?.waitingForBrain;
+  let joined: string[] = [];
+  /**
+   * A conversation's catch-up a person said not to run: what they sent it goes with it (`all`: everything it took in,
+   * when the agent's owner or an admin said so). Someone else's ask that joined it still gets its answer.
+   */
+  let dropped: "all" | string[] = [];
   if (previous === "waiting_input" && wait?.code) {
     // Loaded here: the usage pause checks who may stop a run through this module.
-    const { USAGE_WAIT_CODES, usageWaitCanceled } = await import("./usage-pause");
-    if (USAGE_WAIT_CODES.has(wait.code)) await usageWaitCanceled(deps, run).catch(() => null);
+    const { USAGE_WAIT_CODES, lineHeadLooks, usageNoteHandOn, usageWaitCanceled } = await import("./usage-pause");
+    if (USAGE_WAIT_CODES.has(wait.code)) {
+      if (actor.type === "person") {
+        joined = (await usageWaitCanceled(deps, run).catch(() => null)) ?? [];
+        if (wait.code !== "usage_pause") {
+          dropped = options.forAll
+            ? "all"
+            : run.pendingMessageIds.length === 0
+              ? []
+              : (
+                  await db
+                    .select({ id: messages.id })
+                    .from(messages)
+                    .where(
+                      and(
+                        eq(messages.orgId, orgId),
+                        inArray(messages.id, run.pendingMessageIds),
+                        eq(messages.authorUserId, actor.id),
+                      ),
+                    )
+                ).map((m) => m.id);
+        }
+      } else {
+        // Stopped by the system: the turns its note took in still wait, so the note speaks on for them.
+        const reason = actor.reason === "agent_archived" ? "archived" : undefined;
+        await usageNoteHandOn(deps, run, reason ? { reason } : {}).catch(() => null);
+      }
+      if (wait.waitKey) await lineHeadLooks(db, orgId, wait.waitKey).catch(() => null);
+    }
   }
   // Long work (ADR 0121): its end goes home now ("Parado por …"), whoever runs it; the card goes back to A fazer.
   if (run.workId) await endWork(deps, run, "canceled").catch(() => null);
@@ -382,15 +430,15 @@ export async function stopRun(
       await onConsultedRunStopped(deps, run, reason).catch(() => null);
     }
     // Nobody executes it: what was sent to it and not read gets a run of its own now, unless its workspace
-    // stopped it (that run would only fail too).
-    if (!standingErrorDetail(error)) {
-      await releaseInbox(db, deps.pubsub, run, {
-        reason: "canceled",
-        ...(options.stopMessageId ? { exclude: [options.stopMessageId] } : {}),
-      }).catch(() => null);
+    // or its agent's end stopped it (that run would only fail too), or a person said not to run its catch-up.
+    if (!standingErrorDetail(error) && dropped !== "all" && error !== "agent_archived") {
+      const exclude = [...(options.stopMessageId ? [options.stopMessageId] : []), ...dropped];
+      await releaseInbox(db, deps.pubsub, run, { reason: "canceled", ...(exclude.length ? { exclude } : {}) }).catch(
+        () => null,
+      );
     }
   }
-  return { id: run.id, status: run.status, previousStatus: previous };
+  return { id: run.id, status: run.status, previousStatus: previous, ...(joined.length ? { joined } : {}) };
 }
 
 /**

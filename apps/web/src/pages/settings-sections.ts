@@ -10,6 +10,7 @@ export type SettingsSection =
   | "notifications"
   | "apps"
   | "general"
+  | "right_hand"
   | "members"
   | "roles"
   | "vault"
@@ -44,6 +45,8 @@ export const SETTINGS_SECTIONS: {
   // The workspace's sections are for who runs it: a member keeps only their own (above) and what they use themselves
   // (the people, where a member who may not invite suggests someone (ADR 0090), connectors, computers, AI accounts).
   { id: "general", icon: "settings", group: "org", allowed: (o) => can(o, "configure") },
+  // The team's right hand (ADR 0137): its name, AI, budget and audience, for who manages agents.
+  { id: "right_hand", icon: "agent", group: "org", allowed: (o) => can(o, "manage_agents") },
   { id: "members", icon: "members", group: "org", allowed: () => true },
   { id: "roles", icon: "audiencePeople", group: "org", allowed: (o) => can(o, "manage_roles") },
   // Every member keeps their own logins, keys and contacts there; team items show to who they're shared with (ADR 0135).
@@ -83,8 +86,8 @@ export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_
  * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to
  * classify), `?mail=connected|failed&account={id}` (back from Gmail/Outlook),
  * `?request={id}&do=approve|deny` (a request to join, from the admins' email),
- * `?delete=1` (Geral's dialog that deletes the workspace) and `?install={link}` (Skills, back from connecting GitHub
- * in Instalar skill: the link to read again).
+ * `?delete=1` (Geral's dialog that deletes the workspace), `?install={link}` (Skills, back from connecting GitHub
+ * in Instalar skill: the link to read again) and `?agent={id}` (Auditoria filtered to that agent).
  */
 export const settingsSearch = (
   search: Record<string, unknown>,
@@ -99,6 +102,7 @@ export const settingsSearch = (
   delete?: 1;
   install?: string;
   skill?: string;
+  agent?: string;
 } => ({
   connected: typeof search.connected === "string" ? search.connected : undefined,
   outcome: typeof search.outcome === "string" ? search.outcome : undefined,
@@ -110,4 +114,5 @@ export const settingsSearch = (
   delete: search.delete === undefined ? undefined : 1,
   install: typeof search.install === "string" ? search.install : undefined,
   skill: typeof search.skill === "string" ? search.skill : undefined,
+  agent: typeof search.agent === "string" ? search.agent : undefined,
 });

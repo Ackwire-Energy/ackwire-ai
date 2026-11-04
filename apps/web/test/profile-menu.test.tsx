@@ -112,7 +112,7 @@ describe("the account menu", () => {
     expect(document.activeElement?.textContent).toBe("Editar perfil");
     await press("Escape");
     expect(screen().queryByRole("menu")).toBeNull();
-    expect(document.activeElement).toBe(row);
+    expect(document.activeElement === row).toBe(true);
   });
 
   test("Definir status: → opens how I appear (mine checked) and what I'm up to, ← goes back to the item", async () => {
@@ -172,11 +172,11 @@ describe("the account menu", () => {
     const row = account();
     await click(within(await openMenu()).getByRole("menuitem", { name: "Editar perfil" }));
     const dialog = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
-    expect(document.activeElement).toBe(within(dialog).getByLabelText("Seu nome"));
+    expect(document.activeElement === within(dialog).getByLabelText("Seu nome")).toBe(true);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
     await click(within(dialog).getByRole("button", { name: "Cancelar" }));
     expect(screen().queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(row);
+    expect(document.activeElement === row).toBe(true);
   });
 
   test("my name is in my profile: one Salvar saves it, and the directory shows it at once", async () => {

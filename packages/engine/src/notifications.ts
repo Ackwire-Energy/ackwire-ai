@@ -85,6 +85,17 @@ export const NOTIFICATION_KINDS = [
    * once per wait): `latest.title` the plan's name, `source.label` the agent's.
    */
   "plan_reset_unknown",
+  /**
+   * An agent back from its plan or budget skipped catch-ups that looked handled (ADR 0136): its owner, one row per line
+   * (`count` the conversations they can read), opening the latest skipped note. Inbox only (no category, no push).
+   */
+  "catch_up_closed",
+  /**
+   * The person who asked, when the agent skipped their catch-up crediting someone else (ADR 0136): `latest.reason`
+   * `solved` or `task_canceled`, `latest.title` who, `source.label` the conversation. Inbox only, opening the note
+   * with "Responder mesmo assim".
+   */
+  "catch_up_closed_asker",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
@@ -144,6 +155,25 @@ export const NOTIFICATION_KINDS = [
    */
   "app_created",
   /**
+   * A widget's alert condition was met (ADR 0135 §6): whoever turned its alert on hears what the agent saw, waiting,
+   * one row per widget merging while open (`widget-alert:<widgetId>`), `source.widgetId`, `source.dashboardId`,
+   * `source.agentId`, the widget's title in `source.label`, the agent's words in `latest.text`.
+   */
+  "widget_alert",
+  /**
+   * A widget stopped updating (ADR 0135 §6): its creator, once per failure streak (`widget-failed:<widgetId>`), the
+   * coded reason in `latest.reason` (`agent_reported`: the agent's words in `latest.text`). Resolved by its next good
+   * update. Inbox only.
+   */
+  "widget_failed",
+  /**
+   * An agent asks to show a board to more people (ADR 0135 §11): the person it was made for, waiting
+   * (`dashboard-proposal:<dashboardId>`), `source.dashboardId`, `source.agentId`, the board's title in `source.label`,
+   * the audience in `latest.statusTo` (`workspace` or `roles`, the roles' names in `latest.names`) and the agent's
+   * reason in `latest.text`. Resolved by Publish or Keep only for me.
+   */
+  "dashboard_proposal",
+  /**
    * An update of a skill from its link (`skill-updates.ts`), `source.skillId` and its name in `source.label`;
    * `latest.statusTo`: `updated` (who turned "Atualizar sozinha" on), `waiting` (it changes what runs: who manages
    * skills, waiting, the files in `latest.title`, resolved once applied or refused) or `failed` (once per reason, its
@@ -151,6 +181,13 @@ export const NOTIFICATION_KINDS = [
    * one row while unread). Inbox only.
    */
   "skill_update",
+  /**
+   * Someone asked the team's right hand for a change only others may decide, and sent it to them ("Pedir a um
+   * admin", ADR 0137): each person who may decide it, one row per proposal (`source.proposalId`, or `source.messageId`
+   * for a new agent's card), `source.agentId` and its name in `label` the agent it changes, `latest.text` why.
+   * Waiting; done once someone decides it.
+   */
+  "change_request",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -181,13 +218,19 @@ export interface NotificationSource {
   handoffId?: string;
   /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
   screen?: ScreenKind;
+  /** `change_request`: the proposed change to decide (ADR 0137). */
+  proposalId?: string;
   /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
   userId?: string;
-  /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */
+  /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`); a widget's agent. */
   agentId?: string;
+  /** A board (ADR 0135): `widget_alert`, `widget_failed`, `dashboard_proposal`. */
+  dashboardId?: string;
+  /** A widget (ADR 0135): `widget_alert`, `widget_failed`. */
+  widgetId?: string;
   /** A skill of the library (`skill_update`). */
   skillId?: string;
-  /** Channel name, thread title, issue title, topic title, mission or routine name. */
+  /** Channel name, thread title, issue title, topic title, mission or routine name, widget or board title. */
   label?: string;
 }
 
@@ -292,9 +335,13 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   // One per approval card: requests joining it update it, read or not (`notifyApproval`).
   "approval",
   "app_created",
+  // A widget's alerts while one is open: the latest words replace the older ones.
+  "widget_alert",
   // An agent's changes to a skill gather in one row while unread (`notifySkillUpdate` `edited`); its other notices
   // have a key of their own each.
   "skill_update",
+  // An agent's skipped catch-ups of one line gather in one row while unread, counting them.
+  "catch_up_closed",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];

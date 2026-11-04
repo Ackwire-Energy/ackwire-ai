@@ -873,6 +873,18 @@
       "plan_reset_unknown_few": "{{plan}} nie podaje, kiedy limit się odnowi",
       "plan_reset_unknown_many": "{{plan}} nie podaje, kiedy limit się odnowi",
       "plan_reset_unknown_other": "{{plan}} nie podaje, kiedy limit się odnowi",
+      "catch_up_closed_one": "{{names}} pominął {{count}} rozmowę, która nie wymagała odpowiedzi",
+      "catch_up_closed_few": "{{names}} pominął {{count}} rozmowy, które nie wymagały odpowiedzi",
+      "catch_up_closed_many": "{{names}} pominął {{count}} rozmów, które nie wymagały odpowiedzi",
+      "catch_up_closed_other": "{{names}} pominął {{count}} rozmowy, które nie wymagały odpowiedzi",
+      "catch_up_closed_asker_one": "{{names}} nie odpowiedział: {{who}} już się tym zajął",
+      "catch_up_closed_asker_few": "{{names}} nie odpowiedział: {{who}} już się tym zajął",
+      "catch_up_closed_asker_many": "{{names}} nie odpowiedział: {{who}} już się tym zajął",
+      "catch_up_closed_asker_other": "{{names}} nie odpowiedział: {{who}} już się tym zajął",
+      "catch_up_closed_asker_task_one": "{{names}} nie odpowiedział: {{who}} anulował zadanie",
+      "catch_up_closed_asker_task_few": "{{names}} nie odpowiedział: {{who}} anulował zadanie",
+      "catch_up_closed_asker_task_many": "{{names}} nie odpowiedział: {{who}} anulował zadanie",
+      "catch_up_closed_asker_task_other": "{{names}} nie odpowiedział: {{who}} anulował zadanie",
       "reaction_one": "{{names}} reaguje",
       "reaction_few": "{{names}} reagują",
       "reaction_many": "{{names}} reagują",
@@ -905,6 +917,10 @@
       "composio_limit_few": "Ta przestrzeń robocza wykorzystała miesięczny limit wywołań Composio",
       "composio_limit_many": "Ta przestrzeń robocza wykorzystała miesięczny limit wywołań Composio",
       "composio_limit_other": "Ta przestrzeń robocza wykorzystała miesięczny limit wywołań Composio",
+      "change_request_one": "{{names}} prosi o zmianę w zespole",
+      "change_request_few": "{{names}} proszą o zmianę w zespole",
+      "change_request_many": "{{names}} proszą o zmianę w zespole",
+      "change_request_other": "{{names}} proszą o zmianę w zespole",
       "browser_profile_request_one": "{{names}} prosi o jeszcze jeden profil przeglądarki",
       "browser_profile_request_few": "{{names}} proszą o jeszcze jeden profil przeglądarki",
       "browser_profile_request_many": "{{names}} proszą o jeszcze jeden profil przeglądarki",
@@ -1788,28 +1804,11 @@
     "offline": "Brak połączenia. Próbujemy ponownie."
   },
   "onb": {
-    "progress": "Krok {{n}} z {{total}}",
-    "done": "Gotowe",
-    "optional": "opcjonalnie",
-    "back": "Wstecz",
     "logo": "Logo",
     "logoHelp": "Opcjonalnie.",
     "logoPick": "Wybierz",
     "zone": "Strefa czasowa: {{zone}}",
-    "importSources": "Skąd przychodzą agenci",
-    "importLead": "Przenieś ich przez stronę, w Ustawienia › Import i eksport.",
-    "importSkip": "Nie przenoszę, pomiń",
-    "agentsAda": "Ja już tu jestem",
-    "agentsLead": "Sprawdź, kto jeszcze dołącza.",
-    "share": "Udostępnij link z zaproszeniem",
     "shareMessage": "Dołącz do {{org}} w agentes.chat: {{url}}",
-    "shareNote": "Każdą osobę, która poprosi o dołączenie, musisz zatwierdzić.",
-    "emailsPlaceholder": "imie@firma.com",
-    "membersNote": "Dołączą jako członkowie.",
-    "invalidEmail": "Sprawdź ten e-mail.",
-    "invitesFailed": "Nie udało się wysłać tych zaproszeń. Spróbuj ponownie.",
-    "removeEmail": "Usuń {{email}}",
-    "later": "Nie teraz",
     "failed": "Nie udało się zapisać. Spróbuj ponownie."
   },
   "ai": {
@@ -2125,5 +2124,80 @@
     "noEmoji": "Bez emoji",
     "cleared": "Status wyczyszczony",
     "bySelfUntil": "Ustawione przez: {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Tylko ty · twoje własne widżety",
+    "loadFailed": "Nie udało się wczytać dashboardów.",
+    "onlyHome": "Tu pojawią się dashboardy przestrzeni roboczej albo twoich ról.",
+    "create": "Utwórz",
+    "routineTarget": "jego widżet",
+    "pin": {
+      "which": "Który wykres"
+    },
+    "organize": {
+      "hint": "Przytrzymaj widżet i przeciągnij go na nowe miejsce albo użyj strzałek, i wybierz rozmiar każdego z nich. Gotowe zapisuje kolejność.",
+      "holdHint": "Przytrzymaj i przeciągnij, żeby go przenieść.",
+      "up": "Przenieś wyżej",
+      "down": "Przenieś niżej",
+      "position": "{{at}} z {{count}}",
+      "saved": "Uporządkowano dashboard"
+    },
+    "edit": {
+      "saved": "Zapisano dashboard"
+    },
+    "pinned": "Przypięto na górze",
+    "unpinned": "Odpięto",
+    "sizeHint": {
+      "s": "Pół wiersza na telefonie, ćwierć dashboardu w przeglądarce.",
+      "m": "Cały wiersz na telefonie, pół dashboardu w przeglądarce.",
+      "l": "Cały wiersz, w dużym rozmiarze. Pół dashboardu i dwa razy wyżej w przeglądarce."
+    },
+    "widget": {
+      "caresFor": "{{name}} się nim zajmuje",
+      "refreshing": "{{name}} go aktualizuje.",
+      "scheduleSaved": "Teraz aktualizuje się {{schedule}}",
+      "alertSaved": "Zapisano alert",
+      "removed": "Usunięto widżet. Jego rutyna się zatrzymała.",
+      "routine": "Jego rutyna",
+      "onBoard": "Gdzie jest",
+      "title": "Tytuł",
+      "titlePlaceholder": "Krótka nazwa widżetu",
+      "titleSaved": "Zapisano tytuł"
+    },
+    "formatAuto": "{{name}} wybiera najlepszą",
+    "newWidget": {
+      "titleHint": "Tytuł · {{name}} zaproponuje go przy teście",
+      "alerts": "Alert włączony",
+      "realData": "Prawdziwe dane",
+      "editAsk": "Zmień prośbę",
+      "asked": "„{{ask}}”",
+      "autoFormat": "Forma automatyczna"
+    },
+    "agentPick": {
+      "search": "Szukaj agentów",
+      "noMatch": "Brak agenta o tej nazwie lub roli.",
+      "note": "Każdy agent czyta tylko aplikacje, do których ma dostęp.",
+      "reads": "Czyta: {{apps}}",
+      "noApps": "Brak połączonych aplikacji"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}} zgłasza alert widżetu",
+      "widget_alert_few": "{{names}} zgłaszają alert widżetu",
+      "widget_alert_many": "{{names}} zgłaszają alert widżetu",
+      "widget_alert_other": "{{names}} zgłaszają alert widżetu",
+      "widget_failed_one": "{{names}} nie może zaktualizować widżetu",
+      "widget_failed_few": "{{names}} nie mogą zaktualizować widżetu",
+      "widget_failed_many": "{{names}} nie mogą zaktualizować widżetu",
+      "widget_failed_other": "{{names}} nie mogą zaktualizować widżetu",
+      "dashboard_proposal_one": "{{names}} chce opublikować dashboard",
+      "dashboard_proposal_few": "{{names}} chcą opublikować dashboard",
+      "dashboard_proposal_many": "{{names}} chcą opublikować dashboard",
+      "dashboard_proposal_other": "{{names}} chcą opublikować dashboard",
+      "card": {
+        "alert": "Alert",
+        "failed": "Nie zaktualizowano",
+        "proposal": "Dashboard"
+      }
+    }
   }
 }

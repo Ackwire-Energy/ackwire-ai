@@ -124,7 +124,15 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
 }
 
 const styles = StyleSheet.create({
-  card: { overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, borderBottomLeftRadius: 4 },
+  // As wide as the message, under what comes before it (the files' cards keep the same gap).
+  card: {
+    alignSelf: "stretch",
+    marginTop: 8,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+  },
   loading: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14 },
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 8, opacity: 0.7 },
   head: { gap: 1, paddingHorizontal: 14, paddingTop: 12 },

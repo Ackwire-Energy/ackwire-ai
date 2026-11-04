@@ -1515,7 +1515,7 @@ export function managementRoutes(deps: AppDeps) {
       summary:
         "Continue a run a person stopped, or one that reached its step limit or stopped because it got stuck (same people as stopping it): a new run of the agent picks up where it stopped",
       description:
-        "Only for a run stopped by a person while it worked, or one that ended at its step limit (its reply has `meta.stepLimit`, with `stuck: true` when it stopped because it went in circles); once per reply (`meta.canceled.continuedRunId`, `meta.stepLimit.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
+        "Only for a run stopped by a person while it worked, one that ended at its step limit (its reply has `meta.stepLimit`, with `stuck: true` when it stopped because it went in circles), or a catch-up skipped as already handled (\"Responder mesmo assim\" on its note, `meta.usageWait.closed`, ADR 0136: also anyone who asked in it, for 7 days; the new run reads the catch-up and can't pass, and that conversation isn't skipped again for 7 days); once per reply (`meta.canceled.continuedRunId`, `meta.stepLimit.continuedRunId`, `meta.usageWait.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
       request: { params: OrgParams.extend({ runId: z.uuid() }) },
       responses: { 200: json(z.object({ runId: z.uuid() })), ...errors },
     }),

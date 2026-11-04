@@ -4,7 +4,7 @@ import { ConflictError } from "./errors";
 import { formatBytes } from "./format";
 import type { Judge } from "./judge";
 import { recordOperatorEvent } from "./operator-events";
-import { requirePermission } from "./organizations";
+import { can, requirePermission } from "./organizations";
 import { storedBytes, usesOwnBucket } from "./storage";
 import { monthStartUtc } from "./usage";
 
@@ -13,12 +13,17 @@ import { monthStartUtc } from "./usage";
  * without knowing any plan. Null is no limit, all a self-hosted server ever has.
  *
  * - `members`: membership rows, blocked accounts included; agents, invitations and requests to join never count.
+ * - `membersMax`: the most people the plan takes with seats added (`members` up to it); null: the service sets none.
+ * - `payerUserId`: not a limit, the person who pays for the plan, the only one the billing service lets add seats or
+ *   change plans; null: not said.
  * - `storageBytes`: the files kept on this server's storage, files in the trash and the workspace's own bucket left out.
  * - `uploadBytesPerDay`: what was written to that storage in the last 24 hours.
  * - `platformUsdPerMonth`: what the platform's own AI (Jev) may cost for the workspace in a UTC calendar month.
  */
 export interface OrgLimits {
   members: number | null;
+  membersMax: number | null;
+  payerUserId: string | null;
   storageBytes: number | null;
   uploadBytesPerDay: number | null;
   platformUsdPerMonth: number | null;
@@ -31,6 +36,8 @@ const NANO_PER_USD = 1e9;
 
 const LIMIT_COLUMNS = {
   members: organizations.limitMembers,
+  membersMax: organizations.limitMembersMax,
+  payerUserId: organizations.payerUserId,
   storageBytes: organizations.limitStorageBytes,
   uploadBytesPerDay: organizations.limitUploadBytesPerDay,
   platformNanoUsd: organizations.limitPlatformNanoUsd,
@@ -39,12 +46,16 @@ const LIMIT_COLUMNS = {
 
 const limitsOf = (row: {
   members: number | null;
+  membersMax: number | null;
+  payerUserId: string | null;
   storageBytes: number | null;
   uploadBytesPerDay: number | null;
   platformNanoUsd: number | null;
   updatedAt: Date | null;
 }) => ({
   members: row.members,
+  membersMax: row.membersMax,
+  payerUserId: row.payerUserId,
   storageBytes: row.storageBytes,
   uploadBytesPerDay: row.uploadBytesPerDay,
   platformUsdPerMonth: row.platformNanoUsd === null ? null : row.platformNanoUsd / NANO_PER_USD,
@@ -56,11 +67,19 @@ export async function getOrgLimits(db: Executor, orgId: string): Promise<OrgLimi
   const [row] = await db.select(LIMIT_COLUMNS).from(organizations).where(eq(organizations.id, orgId));
   return row
     ? limitsOf(row)
-    : { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null, updatedAt: null };
+    : {
+        members: null,
+        membersMax: null,
+        payerUserId: null,
+        storageBytes: null,
+        uploadBytesPerDay: null,
+        platformUsdPerMonth: null,
+        updatedAt: null,
+      };
 }
 
 /**
- * Sets all four limits (the operator API), whatever the workspace's standing. Setting what is already set changes
+ * Sets all the limits (the operator API), whatever the workspace's standing. Setting what is already set changes
  * nothing, `updatedAt` included. A new platform cap applies at once in this process, within a minute in the others.
  * Null when there is no such workspace.
  */
@@ -74,14 +93,17 @@ export async function setOrgLimits(
     .update(organizations)
     .set({
       limitMembers: limits.members,
+      limitMembersMax: limits.membersMax,
+      payerUserId: limits.payerUserId,
       limitStorageBytes: limits.storageBytes,
       limitUploadBytesPerDay: limits.uploadBytesPerDay,
       limitPlatformNanoUsd: nanoUsd,
       // The right side of SET reads the row as it was.
-      limitsUpdatedAt: sql`case when (${organizations.limitMembers}, ${organizations.limitStorageBytes},
-        ${organizations.limitUploadBytesPerDay}, ${organizations.limitPlatformNanoUsd})
-        is not distinct from (${limits.members}::integer, ${limits.storageBytes}::bigint,
-        ${limits.uploadBytesPerDay}::bigint, ${nanoUsd}::bigint)
+      limitsUpdatedAt: sql`case when (${organizations.limitMembers}, ${organizations.limitMembersMax},
+        ${organizations.payerUserId}, ${organizations.limitStorageBytes}, ${organizations.limitUploadBytesPerDay},
+        ${organizations.limitPlatformNanoUsd})
+        is not distinct from (${limits.members}::integer, ${limits.membersMax}::integer, ${limits.payerUserId}::text,
+        ${limits.storageBytes}::bigint, ${limits.uploadBytesPerDay}::bigint, ${nanoUsd}::bigint)
         then ${organizations.limitsUpdatedAt} else now() end`,
     })
     .where(eq(organizations.id, orgId))
@@ -268,20 +290,46 @@ export async function orgMeters(db: Database, orgId: string) {
   return { storageBytes: usage.usedBytes, uploadBytes24h: usage.uploadBytes24h, ownStorage, platformUsdThisMonth };
 }
 
+/** The payer's name while they are in the workspace, as the members list shows them; else null. */
+async function memberName(db: Executor, orgId: string, userId: string) {
+  const [row] = await db
+    .select({ name: schema.users.name })
+    .from(organizationMembers)
+    .innerJoin(schema.users, eq(schema.users.id, organizationMembers.userId))
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  return row?.name ?? null;
+}
+
 /**
  * People, files and today's uploads against the workspace's limits (null: none), for any member: the apps show a
- * full workspace before anyone tries.
+ * full workspace before anyone tries. `members.payer`, when the billing service said who pays: whether it is the
+ * viewer, and to whoever manages billing, the payer's name while they are in the workspace.
  */
 export async function orgLimitsView(db: Database, actorId: string, orgId: string) {
-  await requirePermission(db, actorId, orgId, "read");
+  const membership = await requirePermission(db, actorId, orgId, "read");
   const [limits, members, usage, ownStorage] = await Promise.all([
     getOrgLimits(db, orgId),
     memberCount(db, orgId),
     storageUsage(db, orgId),
     usesOwnBucket(db, orgId),
   ]);
+  const payerId = limits.payerUserId;
+  const you = payerId === actorId;
+  const payer =
+    payerId === null
+      ? null
+      : {
+          you,
+          name: !you && can(membership, "manage_billing") ? await memberName(db, orgId, payerId) : null,
+        };
   return {
-    members: { used: members, limit: limits.members },
+    members: {
+      used: members,
+      limit: limits.members,
+      max: limits.membersMax,
+      canAddSeats: limits.members !== null && limits.membersMax !== null && limits.members < limits.membersMax,
+      payer,
+    },
     storage: { usedBytes: usage.usedBytes, limitBytes: limits.storageBytes, ownStorage },
     uploads: { usedBytes24h: usage.uploadBytes24h, limitBytesPerDay: limits.uploadBytesPerDay },
   };

@@ -215,45 +215,64 @@ describe("the agents' receipt line under a person's message", () => {
     expect(receiptLine(picking(decided).m1)?.label.key).toBe("receipts.picked");
   });
 
-  test("the sheet's last line: who picked the agents, with its mark; nothing for nobody or a decision from before", async () => {
+  test("the sheet's last line: the rule that picked; nothing for an AI's pick, nobody or a decision from before", async () => {
     const en = await translator("en");
-    const names = {
-      meId: "u1",
-      agent: (id: string) => (id === "ada" ? "Ada" : "Theo"),
-      person: (id: string) => (id === "u2" ? "Walter" : "?"),
-      model: (id: string) => (id === "claude-haiku-5-5" ? "Claude Haiku 5.5" : null),
-    };
+    const names = { agent: (id: string) => (id === "ada" ? "Ada" : "Theo") };
     const by = (decidedBy: DecidedBy, pickedBy = ["ada"]) =>
       deciderOf(en, receiptView(routed({}, { pickedBy, decidedBy }).m1), names);
-    expect(by({ step: "jev" })).toEqual({ mark: { logo: "typesafe" }, text: "Picked by Jev" });
-    expect(by({ step: "model", model: "claude-haiku-5-5", provider: "anthropic" })).toEqual({
-      mark: { logo: "anthropic" },
-      text: "Picked by Claude Haiku 5.5",
-    });
-    expect(by({ step: "model", model: "gpt-9", provider: "openai" })).toBeNull();
-    expect(by({ step: "plan", brand: "claude", ownerId: "u1" })?.text).toBe("Picked by your Claude plan");
-    expect(by({ step: "plan", brand: "chatgpt", ownerId: "u2" })).toEqual({
-      mark: { logo: "openai" },
-      text: "Picked by Walter's ChatGPT plan",
-    });
+    expect(by({ step: "jev" })).toBeNull();
+    expect(by({ step: "model", model: "claude-haiku-5-5", provider: "anthropic" })).toBeNull();
+    expect(by({ step: "plan", brand: "claude", ownerId: "u1" })).toBeNull();
     expect(by({ step: "rule", rule: "only_agent" })).toEqual({
-      mark: { rule: "only_agent" },
+      rule: "only_agent",
       text: "Only Ada answers here without a mention",
     });
-    expect(by({ step: "jev" }, [])).toBeNull();
+    expect(by({ step: "rule", rule: "reply" }, [])).toBeNull();
+    // Alone with the team: the reason says nothing new to the person, so no line (the decision stays stored).
+    expect(by({ step: "rule", rule: "alone" })).toBeNull();
     expect(deciderOf(en, receiptView(routed({}).m1), names)).toBeNull();
     const pt = await translator("pt-BR");
     const reply = receiptView(routed({}, { decidedBy: { step: "rule", rule: "reply" } }).m1);
     expect(deciderOf(pt, reply, names)?.text).toBe("Uma resposta para a Ada");
-    // Nobody else took it, so the team's coordinator did (ADR 0093).
+    // A decision stored before the team's coordinator was retired (ADR 0137) reads as the default rule's line.
     const coordinated = receiptView(
       routed({}, { pickedBy: ["theo"], decidedBy: { step: "rule", rule: "coordinator" } }).m1,
     );
     expect(deciderOf(pt, coordinated, names)).toEqual({
-      mark: { rule: "coordinator" },
-      text: "O Theo coordena o time",
+      rule: "default",
+      text: "Ninguém foi chamado, então o Theo respondeu",
     });
-    expect(deciderOf(en, coordinated, names)?.text).toBe("Theo coordinates the team");
+  });
+
+  test("waiting on its plan: a line under the message that says so, never 'waiting for your answer'; canceled: two ticks", async () => {
+    const waiting = applyReceiptEvent(routed({}), {
+      type: "message.handled",
+      channelId: "c1",
+      messageId: "m1",
+      agentId: "ada",
+      status: "waiting_input",
+      usage: "plan",
+    });
+    const line = receiptLine(waiting.m1);
+    expect(line).toMatchObject({ mark: "none", words: { key: "receipts.plan", agents: ["ada"] }, action: null });
+    expect(line && keepsLine(line)).toBe(true);
+    expect(receiptRows(waiting.m1)).toContainEqual({ agentId: "ada", phase: "plan" });
+    const pt = await translator("pt-BR");
+    expect(pt(phaseKey("plan"))).toBe("Responde quando o plano renovar");
+    expect(pt("receipts.plan", { count: 1, names: "Ada" })).toBe("Ada responde quando o plano renovar");
+    const canceled = applyReceiptEvent(waiting, {
+      type: "message.handled",
+      channelId: "c1",
+      messageId: "m1",
+      agentId: "ada",
+      status: "canceled",
+    });
+    expect(receiptLine(canceled.m1)).toMatchObject({
+      mark: "checks",
+      words: null,
+      label: { key: "receipts.canceled" },
+    });
+    expect(pt(phaseKey("canceled"))).toBe("Cancelado");
   });
 
   test("no AI: the receipt's words and Connect, even when nobody was asked", () => {

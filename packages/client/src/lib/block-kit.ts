@@ -20,9 +20,10 @@ export const blockBoot = (json: string) => `window.__block=${json}`;
 export const BLOCK_KIT_CSS = `:root{--ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;--line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);--raised:#fff;--sunken:#f3f3f0;--well:#fbfbf9;--plate:rgba(127,127,127,.1);--plate2:rgba(127,127,127,.06);--ok:#1f7a45;--warn:#9a5b00;--danger:#b42a20;--cut:4px;--on-s:#fff;--focus:rgba(75,140,245,.35);--e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);--e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);--top:inset 0 1px 0 rgba(255,255,255,.9);--lit:rgba(255,255,255,.18);color-scheme:light}
 html[data-theme=dark]{--ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;--line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.15);--raised:#1c1c1b;--sunken:#0a0a09;--well:#141413;--plate:rgba(127,127,127,.14);--plate2:rgba(127,127,127,.08);--ok:#5fc48a;--warn:#e0a84a;--danger:#f08a80;--focus:rgba(75,140,245,.45);--e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);--top:inset 0 1px 0 rgba(255,255,255,.08);--lit:rgba(255,255,255,.12);color-scheme:dark}
 *{box-sizing:border-box}
-html{overflow:hidden auto}
+html{overflow:hidden auto;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{margin:0;background:transparent}
-body{display:flex;flex-direction:column;gap:14px;padding:6px 16px 16px;color:var(--ink);font:400 14px/1.5 var(--font,Onest),"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body{display:flex;flex-direction:column;gap:14px;padding:6px 16px 16px;color:var(--ink);font:400 14px/1.5 var(--font,Onest),"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+:where(body>*){min-width:0;max-width:100%}
 :where(button){font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
 :where(button:not([class]):not(.ac-seg button)){display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:6px 16px;border-radius:12px;font-size:14px;font-weight:600;line-height:1.25;letter-spacing:-.005em;background:var(--raised);box-shadow:var(--e1),var(--top);transition:transform .18s cubic-bezier(.34,1.4,.5,1),box-shadow .18s cubic-bezier(.2,.8,.2,1),filter .15s}
 :where(button:not([class]):not(.ac-seg button):not([disabled]):hover){box-shadow:var(--e2),var(--top)}
@@ -81,6 +82,7 @@ textarea.ac-in{height:auto;min-height:70px;padding:8px 12px;resize:vertical;line
 .ac-axis{display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:var(--faint)}
 .ac-tip{position:absolute;z-index:2;transform:translate(-50%,-120%);padding:3px 8px;border-radius:8px 8px 8px 3px;background:var(--ink);color:var(--raised);font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none}
 .ac-dot{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:3px;background:var(--raised);box-shadow:0 0 0 2px var(--cink);pointer-events:none}
+ac-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table.ac-t{width:100%;border-collapse:collapse;font-size:13px}
 .ac-t th{padding:0 8px 6px 0;text-align:left;font-weight:550;color:var(--muted)}
 .ac-t td{padding:6px 8px 6px 0;border-top:1px solid var(--line);color:var(--ink2);font-variant-numeric:tabular-nums}
@@ -147,12 +149,13 @@ function mem(){var d={};return{getItem:function(k){return k in d?d[k]:null},setI
 try{void document.cookie}catch(e){try{Object.defineProperty(document,"cookie",{get:function(){return""},set:function(){},configurable:true})}catch(_){}}
 var L=R.labels||{send:"Send",more:"More",thousand:"k"},LOC=R.locale||"en";
 var post=function(m){m.agentes=1;try{var n=window.ReactNativeWebView;if(n)n.postMessage(JSON.stringify(m));else parent.postMessage(m,"*")}catch(_){}};
-var state=Object.assign({},R.state||{}),calc=[],subs=[],derived={},queued=false;
+var state=Object.assign({},R.state||{}),who=R.who||{},used=false,calc=[],subs=[],derived={},queued=false;
+["pointerdown","keydown","input","change"].forEach(function(t){addEventListener(t,function(){used=true},true)});
 var view=function(){return Object.assign({},state,derived)};
 function flush(){queued=false;derived={};calc.forEach(function(f){try{Object.assign(derived,f(view())||{})}catch(e){post({type:"error",message:String(e.message||e).slice(0,200)})}});
   var v=view();subs.forEach(function(f){try{f(v)}catch(e){post({type:"error",message:String(e.message||e).slice(0,200)})}});
   document.querySelectorAll("[when]").forEach(function(el){var m=/^(.+?)(!?=)(.*)$/.exec(el.getAttribute("when"));if(!m)return;var on=String(v[m[1]])===m[3];if(m[2]==="!=")on=!on;on?el.removeAttribute("data-off"):el.setAttribute("data-off","")});
-  lead();post({type:"state",state:state})}
+  lead();post({type:"state",state:state,used:used})}
 function lead(){var all=Array.prototype.slice.call(document.querySelectorAll("button:not([class]):not(.ac-seg button)")),live=all.filter(function(b){return!b.closest("[hidden],[data-off]")});all.forEach(function(b){b.toggleAttribute("data-lead",live.length===1&&live[0]===b);var p=b.previousElementSibling;if(!p||b.hasAttribute("data-air")||!b.offsetParent)return;var gap=b.getBoundingClientRect().top-p.getBoundingClientRect().bottom;if(gap>-1&&gap<8)b.setAttribute("data-air","")})}
 var touch=function(){if(!queued){queued=true;queueMicrotask(flush)}};
 var fmt=function(v,f,u){if(v===undefined||v===null||v!==v)return"–";var n=Number(v),pt=function(x,d){return x.toLocaleString(LOC,{maximumFractionDigits:d===undefined?1:d})};
@@ -161,7 +164,9 @@ var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&
 var opts=function(s){return String(s||"").split("|").map(function(x){return x.trim()}).filter(Boolean)};
 var fill=function(t,v){return t.replace(/\{(\w+)(?::(\w+))?\}/g,function(_,k,f){return fmt(v[k],f)})};
 var agentes=window.agentes={get state(){return view()},set:function(k,v){state[k]=v;touch()},compute:function(f){calc.push(f);touch()},on:function(f){subs.push(f);touch()},fmt:fmt,
-  send:function(text,label,ready){post({type:"draft",text:text,label:label||L.send,ready:ready!==false})}};
+  send:function(text,label,ready){post({type:"draft",text:text,label:label||L.send,ready:ready!==false})},
+  draw:function(name,options){post({type:"draw",name:String(name),options:Array.prototype.slice.call(options||[]),used:used})},
+  who:function(name){var c=who[name];return c?{name:c.name,at:c.at,drawn:!!c.drawn}:null}};
 var ramp=function(){return R.ramp||["#cfe2ff","#9ec5ff","#5aa8ff","#3d8bff","#0063d1","#00408a"]};
 function theme(t){var d=document.documentElement,r=ramp();d.dataset.theme=t;(t==="dark"?[r[3],r[5],r[4],r[2],r[1],r[0]]:[r[4],r[3],r[5],r[2],r[1],r[0]]).forEach(function(c,i){if(c)d.style.setProperty("--s"+(i+1),c)})}
 theme(R.theme||"light");
@@ -204,7 +209,7 @@ E("ac-card",class extends Base{build(){var n=this.a("name"),self=this;if(this.a(
 E("ac-result",class extends Base{build(){this.innerHTML='<div class="ac-result"><span>'+esc(this.a("label",""))+'</span><b></b></div>'}sync(v){var x=this.a("bind")?v[this.a("bind")]:this.a("value");this.querySelector("b").textContent=fmt(x,this.a("format"),this.a("unit"))}});
 E("ac-table",class extends Base{sync(v){var c=opts(this.a("columns")).map(function(x){var p=x.split(":");return{t:p[0],k:p[1],f:p[2]}}),d=v[this.a("bind")]||[];this.innerHTML='<table class="ac-t"><thead><tr>'+c.map(function(x){return'<th>'+esc(x.t)+'</th>'}).join("")+'</tr></thead><tbody>'+d.map(function(r){return'<tr>'+c.map(function(x){return'<td>'+esc(fmt(r[x.k],x.f))+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table>'}});
 function height(){post({type:"height",height:Math.ceil(document.body.getBoundingClientRect().height)})}
-function host(m){if(m&&m.theme){theme(m.theme);repaint.forEach(function(f){f()})}}
+function host(m){if(!m)return;if(m.theme){theme(m.theme);repaint.forEach(function(f){f()})}if(m.state&&typeof m.state==="object"){Object.assign(state,m.state);if(m.who)who=m.who;touch()}}
 window.__agentesHost=host;
 addEventListener("message",function(e){if(e.source===parent&&e.source!==window)host(e.data)});
 addEventListener("error",function(e){post({type:"error",message:String(e.message||"").slice(0,200)})});

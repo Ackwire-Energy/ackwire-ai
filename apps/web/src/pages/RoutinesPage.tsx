@@ -110,7 +110,7 @@ import {
   Toolbar,
   zonedInstant,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -200,7 +200,8 @@ function useTargetLabel() {
   const { org } = useOrg();
   const channels = useChannels(org.id);
   const dms = useDms(org.id);
-  return (target: RoutineTarget) => {
+  // A widget's routine (ADR 0135) is named by its widget's title when the caller has it.
+  return (target: RoutineTarget, widgetTitle?: string) => {
     if (target.type === "channel") {
       const c = channels.data?.find((x) => x.id === target.channelId);
       return c ? `#${c.name}` : "#";
@@ -214,8 +215,22 @@ function useTargetLabel() {
       return t(target.threadId ? "routines.inThread" : "routines.inChannel", { channel: c.name });
     }
     if (target.type === "forum") return t("routines.target.forumShort");
+    if (target.type === "widget")
+      return widgetTitle ? t("routines.target.widgetNamed", { title: widgetTitle }) : t("routines.target.widget");
     return t(target.type === "dm" ? "routines.target.dmShort" : "routines.target.artifactShort");
   };
+}
+
+/** Opens a widget's panel on its board (a home board's opens on Home). */
+function useOpenWidget() {
+  const { org } = useOrg();
+  const navigate = useNavigate();
+  return (widget: { id: string; dashboardId: string }) =>
+    void navigate({
+      to: "/org/$orgId/dashboards/$dashboardId",
+      params: { orgId: org.id, dashboardId: widget.dashboardId },
+      search: { widget: widget.id },
+    });
 }
 
 const targetIcon = (target: RoutineTarget): IconName =>
@@ -229,7 +244,9 @@ const targetIcon = (target: RoutineTarget): IconName =>
         ? "members"
         : target.type === "artifact"
           ? "file"
-          : "channel";
+          : target.type === "widget"
+            ? "grid"
+            : "channel";
 
 /** The agent's look for the pixel pieces (color and eyes). */
 function useLook() {
@@ -460,6 +477,12 @@ export function RoutinesPage() {
     </div>
   );
 }
+
+/**
+ * A widget's own routine (ADR 0135 §4): it redoes its widget in place, so its agent, schedule, instructions and
+ * target change from the widget; here it can be paused, resumed, run, stopped or deleted.
+ */
+const isWidgetRoutine = (r: Pick<Routine, "target">) => r.target.type === "widget";
 
 /** A title for the card: a routine made from a chat message may be named with its whole prompt. */
 export function routineTitle(r: Pick<Routine, "name" | "prompt">) {
@@ -696,12 +719,15 @@ function RoutineRow({
   const action = controls.action;
   const [deleting, setDeleting] = useState(false);
   const target = useTargetLabel();
+  const openWidget = useOpenWidget();
   const when = useWhen();
   const nextText = useNextText();
   const words = useRunWords();
   const look = useLook()(r.agentId);
   const agent = { type: "agent" as const, id: r.agentId };
-  const title = routineTitle(r);
+  const widget = isWidgetRoutine(r) ? r.widget : null;
+  // A widget's routine reads as its widget (ADR 0135 §4).
+  const title = widget?.title || routineTitle(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const done = isDoneOnce(r);
   const fired = hasFired(r);
@@ -743,11 +769,22 @@ function RoutineRow({
           { kind: "separator" },
         ] satisfies MenuEntry[])
       : []),
-    ...(r.canManage
-      ? ([{ kind: "item", id: "edit", label: t("routines.edit"), icon: "edit", run: onEdit }] satisfies MenuEntry[])
-      : []),
+    // A widget's routine changes from its widget: "Open widget" in place of Edit, and no copy of it.
+    ...(widget
+      ? ([
+          {
+            kind: "item",
+            id: "widget",
+            label: t("widgets.notice.openWidget"),
+            icon: "grid",
+            run: () => openWidget(widget),
+          },
+        ] satisfies MenuEntry[])
+      : r.canManage
+        ? ([{ kind: "item", id: "edit", label: t("routines.edit"), icon: "edit", run: onEdit }] satisfies MenuEntry[])
+        : []),
     { kind: "item", id: "runs", label: t("routines.runs"), icon: "waiting", run: () => !selected && onOpen() },
-    ...(r.canManage
+    ...(r.canManage && !widget
       ? ([
           {
             kind: "item",
@@ -807,10 +844,17 @@ function RoutineRow({
         <span className="routine-row__sub">
           <Icon name={targetIcon(r.target)} size={14} />
           <span>
-            {r.target.type === "conversation"
-              ? t("routines.deliversIn", { agent: actors.name(agent), place: target(r.target) })
-              : t("routines.deliversTo", { agent: actors.name(agent), target: target(r.target) })}
+            {widget
+              ? t("routines.widgetLine", { agent: actors.name(agent) })
+              : r.target.type === "conversation"
+                ? t("routines.deliversIn", { agent: actors.name(agent), place: target(r.target) })
+                : t("routines.deliversTo", { agent: actors.name(agent), target: target(r.target) })}
           </span>
+          {widget && (
+            <Chip icon="grid" className="routine-row__chip">
+              {t("routines.widgetChip")}
+            </Chip>
+          )}
           {reminder && (
             <Chip icon="bell" className="routine-row__chip">
               {t("routines.reminder")}
@@ -1099,7 +1143,7 @@ export function RoutineDetailsDialog({ routineId, onClose }: { routineId: string
 function useWhereHint() {
   const { org } = useOrg();
   const dms = useDms(org.id);
-  return (target: RoutineTarget): "thread" | "channel" | "dm" | "forum" | "artifact" => {
+  return (target: RoutineTarget): "thread" | "channel" | "dm" | "forum" | "artifact" | "widget" => {
     if (target.type !== "conversation") return target.type;
     if (dms.data?.some((d) => d.channelId === target.channelId)) return "dm";
     return target.threadId ? "thread" : "channel";
@@ -1374,8 +1418,8 @@ function RoutineName({ routine: r, onSaved }: { routine: Routine; onSaved: () =>
   const sent = useSent<string>(r.name);
   const name = sent.pending ?? r.name;
   const ref = useFocusAtEnd<HTMLInputElement>(draft !== null);
-  const shown = routineTitle({ name, prompt: r.prompt });
-  if (!r.canManage) return <h1 className="issue-details__title">{shown}</h1>;
+  const shown = (isWidgetRoutine(r) && r.widget?.title) || routineTitle({ name, prompt: r.prompt });
+  if (!r.canManage || isWidgetRoutine(r)) return <h1 className="issue-details__title">{shown}</h1>;
   const save = () => {
     if (draft === null) return;
     const next = draft.trim();
@@ -1433,6 +1477,13 @@ function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () 
   const prompt = sent.pending ?? r.prompt ?? "";
   const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
   if (!r.canSeeDetails || r.prompt === null) return <p className="small muted">{t("routines.detailsHidden")}</p>;
+  if (isWidgetRoutine(r))
+    return (
+      <>
+        <p className="routine-details__prompt">{prompt}</p>
+        <p className="small muted">{t("routines.widgetFixed")}</p>
+      </>
+    );
   if (!r.canManage) return <p className="routine-details__prompt">{prompt}</p>;
   const save = () => {
     if (draft === null) return;
@@ -1581,6 +1632,8 @@ function RoutineAside({
   const nextText = useNextText();
   const [part, setPart] = useState<{ part: RoutinePart; target?: string } | null>(null);
   const manage = r.canManage;
+  // A widget's routine is paused or resumed here; its agent, schedule and target change from its widget.
+  const edits = manage && !isWidgetRoutine(r);
   const fired = hasFired(r);
   const agent = { type: "agent" as const, id: r.agentId };
   const update = (patch: RoutinePatch) =>
@@ -1602,7 +1655,7 @@ function RoutineAside({
   ];
   const choice = targetChoice(r.target);
   const channelList = channels.data ?? [];
-  const where = capitalize(targetLabel(r.target), i18n.language);
+  const where = capitalize(targetLabel(r.target, r.widget?.title), i18n.language);
   const targetOptions = [
     ...(choice === TARGET_KEEP || (r.target.type === "channel" && !channelList.some((c) => c.id === choice))
       ? [{ value: choice, label: where }]
@@ -1645,7 +1698,7 @@ function RoutineAside({
           )}
         </div>
       )}
-      {manage ? (
+      {edits ? (
         <Field label={t("routines.panel.who")} id={`rt-who-${r.id}`}>
           <Select
             size="sm"
@@ -1668,7 +1721,7 @@ function RoutineAside({
           />,
         )
       )}
-      {manage ? (
+      {edits ? (
         <Field label={t("routines.panel.when")} id={`rt-when-${r.id}`}>
           <div className="ac-select ac-select--sm routine-sel">
             <button
@@ -1693,7 +1746,7 @@ function RoutineAside({
           <AsideValue label={when(r)} line={isDoneOnce(r) ? undefined : nextText(r, now)} />,
         )
       )}
-      {manage ? (
+      {edits ? (
         <Field
           label={t("routines.panel.where")}
           id={`rt-where-${r.id}`}
@@ -1723,7 +1776,18 @@ function RoutineAside({
           />,
         )
       )}
-      {manage ? (
+      {r.widget && isWidgetRoutine(r) && (
+        <Link
+          to="/org/$orgId/dashboards/$dashboardId"
+          params={{ orgId: org.id, dashboardId: r.widget.dashboardId }}
+          search={{ widget: r.widget.id }}
+          className="routine-runs__open"
+        >
+          {t("widgets.notice.openWidget")}
+        </Link>
+      )}
+      {/* A widget's update never posts, so what it reports doesn't apply (ADR 0135 §5). */}
+      {isWidgetRoutine(r) ? null : edits ? (
         <Field label={t("routines.panel.report")} id={`rt-report-${r.id}`} hint={reportHint}>
           <Select
             size="sm"
@@ -1752,7 +1816,7 @@ function RoutineAside({
       {runsOn &&
         shown(t("routines.panel.runsOn"), <AsideValue lead={<Icon name="computer" size={16} />} label={runsOn} />)}
       {usageText && shown(t("routines.panel.usage"), <span className="small muted">{usageText}</span>)}
-      {manage && part && (
+      {edits && part && (
         <RoutineDialog
           open
           routine={r}

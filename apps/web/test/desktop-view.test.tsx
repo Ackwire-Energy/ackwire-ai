@@ -562,7 +562,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb()).toMatchObject({ viewOnly: false, showDotCursor: true, qualityLevel: 6, focusOnClick: false });
     await connected();
     // The person's keys go to the screen at once, through a field over it.
-    expect(document.activeElement).toBe(view().getByRole("textbox", { name: "Digitar no computador da Ada" }));
+    expect(document.activeElement === view().getByRole("textbox", { name: "Digitar no computador da Ada" })).toBe(true);
     expect(sub()).toBe("Você no controle · a\u00a0Ada espera");
     // What programs there can see, and nothing else: copy and paste work as anywhere.
     expect(line()).toBe("Os programas do computador da Ada veem a tela e o que você digita ou cola.");
@@ -721,7 +721,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(still()).toBeNull();
     expect(screen().queryByText("Assumindo o controle…")).toBeNull();
     const field = view().getByRole("textbox", { name: "Digitar no computador da Ada" });
-    expect(document.activeElement).toBe(field);
+    expect(document.activeElement === field).toBe(true);
     fireEvent.keyDown(field, { key: "b", code: "KeyB" });
     expect(rfb().log).toEqual(["keydown b KeyB"]);
     expect(t.sockets.desktops).toHaveLength(1);
@@ -1119,12 +1119,12 @@ describe("the agent's screen in the computer dialog", () => {
     const t = await controlled();
     const field = t.field();
     // Its keyboard comes up only when asked.
-    expect(document.activeElement).not.toBe(field);
+    expect(document.activeElement === field).toBe(false);
     const keyboard = view().getByRole("button", { name: "Teclado" });
     expect(keyboard.getAttribute("aria-pressed")).toBe("false");
     expect(line()).toBe("Os programas do computador da Ada veem a tela e o que você digita ou cola.");
     await click(keyboard);
-    expect(document.activeElement).toBe(field);
+    expect(document.activeElement === field).toBe(true);
     expect(keyboard.getAttribute("aria-pressed")).toBe("true");
     field.value = "oi";
     await act(async () => void field.dispatchEvent(new InputEvent("input", { inputType: "insertText" })));
@@ -1274,7 +1274,7 @@ describe("the agent's screen in the computer dialog", () => {
     // The keys still go to the computer after a click on the button, which takes the browser's focus.
     await clickFocusing(view().getByRole("button", { name: "Tela cheia" }));
     expect(lock.locked).toBe(1);
-    expect(document.activeElement).toBe(t.field());
+    expect(document.activeElement === t.field()).toBe(true);
     await act(async () =>
       fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape", code: "Escape" }),
     );
@@ -1285,7 +1285,7 @@ describe("the agent's screen in the computer dialog", () => {
     // Leaving it from the bar's button gives the keys back to the computer too, and lets go of the lock.
     await clickFocusing(view().getByRole("button", { name: "Sair da tela cheia" }));
     expect(classes()).not.toContain("is-full");
-    expect(document.activeElement).toBe(t.field());
+    expect(document.activeElement === t.field()).toBe(true);
     expect(lock.unlocked).toBe(1);
   });
 
@@ -1909,7 +1909,7 @@ describe("watching offers control after deliberate interaction", () => {
     await act(async () => fireEvent.keyDown(document.body, { key: "a", code: "KeyA" }));
     await settle(3);
     expect(document.querySelector(".dsk-ask")).not.toBeNull();
-    expect(document.activeElement).toBe(before);
+    expect(document.activeElement === before).toBe(true);
     expect(rfb().log).toEqual([]);
   });
 });

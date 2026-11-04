@@ -57,6 +57,7 @@ import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { pinsIn } from "@agenteschat/client/lib/pins";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
+import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { isIdHandle } from "@agenteschat/ui/names";
@@ -69,7 +70,7 @@ import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Keyboard, type LayoutChangeEvent, StyleSheet, View } from "react-native";
+import { Keyboard, type LayoutChangeEvent, ScrollView, StyleSheet, View } from "react-native";
 import { KeyboardController, KeyboardGestureArea, KeyboardStickyView } from "react-native-keyboard-controller";
 import Animated, {
   FadeIn,
@@ -83,6 +84,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StickerStageContext } from "@/agent/StickerCanvas";
 import { createStickerStage } from "@/agent/sticker-stage";
 import { holdOpenConversation } from "@/lib/push";
+import { rightHandSeen } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
 import {
@@ -107,6 +109,7 @@ import { isOpenMission } from "../missions/logic";
 import { FanStrip } from "../queue/parts";
 import { DmQueueButton, QueueButton, useAgentsQueue, useOpenQueue } from "../queue/QueueSheet";
 import { RemindSheet } from "../reminders/RemindSheet";
+import { RightHandIntro } from "../right-hand/Intro";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, previewOf } from "../shared/logic";
@@ -321,6 +324,12 @@ function Chat({
   const mission = missionQ.data ?? null;
   const dmAgentId = dm?.with.type === "agent" ? dm.with.id : null;
   const dmAgent = dmAgentId ? dir.agentById.get(dmAgentId) : undefined;
+  // The right hand (ADR 0137): its own line and composer hint, no computer, and its greeting on top.
+  const rightHand = isRightHand(dmAgent) && !isThread;
+  // Its DM is open, from its row or any other way in: its row's "Novo" goes.
+  useEffect(() => {
+    if (rightHand && meId) rightHandSeen.mark(rightHandSeenKey(meId, orgId));
+  }, [rightHand, meId, orgId]);
   const member = dm ? true : (channel?.isMember ?? true);
   const roster = useRoster(orgId, channelId, Boolean(channel?.isMember) && !isThread);
   // The computer this conversation's agents share, while turns wait for it: the bar's way into its line.
@@ -1129,7 +1138,9 @@ function Chat({
           )
       : undefined
     : dmAgentId
-      ? dir.agentById.get(dmAgentId)?.role || undefined
+      ? rightHand
+        ? `${t("rightHand.label")} · ${t("rightHand.actsAsYou")}`
+        : dir.agentById.get(dmAgentId)?.role || undefined
       : channel && roster.data
         ? // People and agents counted apart: "1 pessoa · 3 agentes", never "4 membros · 3 agentes".
           `${t("mobile.chat.people", { count: roster.data.length - agentsHere })} · ${t("mobile.chat.agentsHere", { count: agentsHere })}`
@@ -1391,7 +1402,7 @@ function Chat({
   // An agent's DM also opens its tasks while it has some (ADR 0128), pushed like a thread, and its computer (as the
   // web's DM header) for whoever may watch it: one entry, the line while turns wait for the computer (the way on to
   // it inside), else the computer.
-  const dmComputer = dmAgentId && !isThread ? { agentId: dmAgentId, onOpen: leavePlace } : undefined;
+  const dmComputer = dmAgentId && !isThread && !rightHand ? { agentId: dmAgentId, onOpen: leavePlace } : undefined;
   const right =
     (isThread && info) || dm || channel ? (
       <>
@@ -1425,7 +1436,9 @@ function Chat({
   const placeholder = isThread
     ? t("mobile.chat.reply")
     : dm
-      ? t("mobile.chat.messageTo", { name: dm.with.name })
+      ? rightHand
+        ? `${t("mobile.chat.messageTo", { name: dm.with.name })} · ${t("rightHand.composerHint")}`
+        : t("mobile.chat.messageTo", { name: dm.with.name })
       : t("mobile.chat.messageIn", { channel: channel ? `#${channel.name}` : "" });
   // What to say next comes from the latest card: a code change, a file; none
   // while the agent works, asks or waits for an approval.
@@ -1484,13 +1497,15 @@ function Chat({
   const receipts: ReceiptsState = useMemo(() => Object.fromEntries(fanNow.filter(([, r]) => r)), [fanKey]);
   // Above the box: an agent here without an AI, or the whole workspace without one (as on the web).
   const aiStatus = useAiStatus(orgId);
-  const banner = member
-    ? noAiBanner(aiStatus.data, {
-        agentIds: dmAgentId ? [dmAgentId] : channelAgents,
-        dmAgentId,
-        cardShown: endsOnNoAiCard(shownMessages),
-      })
-    : null;
+  // The right hand's greeting says it itself (its Connect AI card).
+  const banner =
+    member && !rightHand
+      ? noAiBanner(aiStatus.data, {
+          agentIds: dmAgentId ? [dmAgentId] : channelAgents,
+          dmAgentId,
+          cardShown: endsOnNoAiCard(shownMessages),
+        })
+      : null;
   const connectInline = banner === null;
   // A thread opens on its root the channel holds (`isPlaceholderData`) when it has no replies to wait for.
   const loading = isThread
@@ -1854,6 +1869,12 @@ function Chat({
                           keyboardOffset={lift}
                           contentInsetEndAdjustment={contentInsetEndAdjustment}
                           contentContainerStyle={listPad}
+                          // The right hand's greeting stays at the conversation's start, once the start is loaded.
+                          ListHeaderComponent={
+                            dmAgent && rightHand && (olderDone || (top.data?.length ?? 0) < MESSAGES_PAGE) ? (
+                              <RightHandIntro agent={dmAgent} channelId={channelId} />
+                            ) : undefined
+                          }
                         />
                       </LiveRowsProvider>
                     </JumpToMessageContext.Provider>
@@ -1864,7 +1885,11 @@ function Chat({
               {showList ? null : (
                 // A conversation with nothing yet: the agent's first day or a quiet line, over the empty list.
                 <View style={StyleSheet.absoluteFill}>
-                  {dmAgent && !isThread ? (
+                  {dmAgent && rightHand ? (
+                    <ScrollView contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: composerHeight }}>
+                      <RightHandIntro agent={dmAgent} channelId={channelId} />
+                    </ScrollView>
+                  ) : dmAgent && !isThread ? (
                     <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
                   ) : channel && helloAgent && !dm && !isThread ? (
                     <ChannelHello
@@ -1898,8 +1923,10 @@ function Chat({
               )
             ) : null}
           </KeyboardStickyView>
-          {!pinned ? (
-            // The conversation fades under the floating header, as it does under the box.
+          {!hasPin ? (
+            // The conversation fades under the floating header, as it does under the box. Not under a pinned bar
+            // or card: the list already starts below them, and a header-tall fade there was a dark band over the
+            // first messages (the pinned bar's own hairline is the edge).
             <LinearGradient
               pointerEvents="none"
               colors={[c.bg, withOpacity(c.bg, 0.86), withOpacity(c.bg, 0)]}

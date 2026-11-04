@@ -83,6 +83,7 @@ import type {
   StorageUsage,
   TaskManagerView,
   TaskSteps,
+  UsageQueue,
   WorkspaceLimits,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
@@ -100,6 +101,7 @@ import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
 import type { MockContext } from "./fakes/context";
 import { createMockCustomConnectors } from "./fakes/custom-connectors";
+import { createFakeDashboards, type FakeDashboards } from "./fakes/dashboards";
 import { createFakeDatabases, type FakeDatabases } from "./fakes/databases";
 import { createFakeForum } from "./fakes/forum";
 import { createFakeMachines, type FakeMachines } from "./fakes/machines";
@@ -244,6 +246,8 @@ export interface FakeState {
   statuses?: Map<string, { availability: Availability; status: MemberStatus | null }>;
   /** `agents.statuses`; unset = every agent online with no line. */
   agentStatuses?: AgentStatus[];
+  /** Per agent: what it picks up when its plan or budget is back (`agents.usageQueue`). */
+  usageQueues?: Record<string, UsageQueue>;
   memories: Memory[];
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
@@ -589,6 +593,28 @@ function mediaSettings(state: FakeState): Pick<OrgSettings, MediaSetting> {
  * A DM of mine with a message in it, so the sidebar's "Mensagens diretas" lists it (`ago`: minutes since that
  * message). The person's are from the seed's members, the agent's from its agents.
  */
+export const LODI_ID = "00000000-0000-4000-8000-0000000000a9";
+
+/** The workspace's right hand (ADR 0137), as the server makes it: Lodi, teal, owned by the workspace owner. */
+export function withRightHand(state: FakeState, extra: Partial<Agent> = {}) {
+  state.agents.push({
+    id: LODI_ID,
+    name: "Lodi",
+    handle: "lodi",
+    role: "",
+    instructions: "",
+    model: "auto",
+    ownerUserId: "u-walter",
+    hasCredential: true,
+    monthlyBudgetUsd: null,
+    createdAt: NOW.toISOString(),
+    appearance: { color: "teal", eyes: "happy", accessory: "headset" },
+    builtin: "right_hand",
+    ...extra,
+  });
+  return state;
+}
+
 export function seedDm(
   state: FakeState,
   partner: { type: "person" | "agent"; id: string },
@@ -1110,6 +1136,7 @@ type FakedParts =
   | "routines"
   | "threads"
   | "missions"
+  | "dashboards"
   | "calendar"
   | "customConnectors"
   | "mail"
@@ -1421,6 +1448,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           isMember: true,
           createdAt: NOW.toISOString(),
         });
+        // Its right hand comes with it (ADR 0137).
+        if (!state.agents.some((a) => a.builtin === "right_hand")) withRightHand(state, { ownerUserId: me.user.id });
         return {
           organization: { id: orgId, name: input.name, role: "owner", context: input.context },
           generalChannelId: general,
@@ -1753,6 +1782,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           (r) =>
             (!query.actorType || r.actor.type === query.actorType) &&
             (!query.actorId || r.actor.id === query.actorId) &&
+            (!query.via || (r.actor.type === "agent" && r.actor.id === query.via) || r.details.via === query.via) &&
             (!query.outcome?.length || (r.outcome !== null && query.outcome.includes(r.outcome))) &&
             (!query.waiting ||
               (r.outcome === "pending" && (r.approval?.status === "pending" || r.secret?.status === "pending"))) &&
@@ -1942,8 +1972,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return proposalView(messageId);
       },
       // As the server: the draft as it is, owned by me, with the lines I may give (my own mailboxes).
-      createProposed: async (orgId, messageId) => {
-        log("agents.createProposed", orgId, messageId);
+      createProposed: async (orgId, messageId, options) => {
+        log("agents.createProposed", orgId, messageId, ...(options ? [options] : []));
         const { card } = proposalCard(messageId);
         if (card.state !== "pending") throw new ApiError(409, "agent_proposal.decided", "Already decided");
         const me = state.me?.user.id ?? null;
@@ -1974,7 +2004,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           },
           routineId: draft.routine ? id("routine") : null,
         });
-        return { agent: { ...agent }, proposal: proposalView(messageId), ai: state.proposalAi ?? draft.ai.kind };
+        const testChannelId = options?.test && card.params.firstTask ? `dm-${agent.id}` : null;
+        return {
+          agent: { ...agent },
+          proposal: proposalView(messageId),
+          ai: state.proposalAi ?? draft.ai.kind,
+          testChannelId,
+        };
+      },
+      askProposal: async (orgId, messageId) => {
+        log("agents.askProposal", orgId, messageId);
+        Object.assign(proposalCard(messageId).card, { askedAt: new Date().toISOString() });
+        return proposalView(messageId);
       },
       proposalRoutine: async (orgId, messageId) => {
         log("agents.proposalRoutine", orgId, messageId);
@@ -2001,8 +2042,6 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (mailLossSeen && (state.mailLoss?.[agentId] ?? []).some((m) => !mailLossSeen.includes(m.accountId))) {
           throw new ApiError(409, "agent.mail_loss_changed", "It holds a mailbox you weren't asked about");
         }
-        // One agent coordinates the team at a time (ADR 0093).
-        if (fields.coordinator) for (const a of state.agents) a.coordinator = false;
         Object.assign(agent, fields);
         return { ...agent };
       },
@@ -2095,6 +2134,29 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
               activeAt: new Date().toISOString(),
             })),
         ),
+      usageQueue: async (orgId, agentId) => {
+        log("agents.usageQueue", orgId, agentId);
+        return structuredClone(
+          state.usageQueues?.[agentId] ?? {
+            agentId,
+            reason: null,
+            plan: null,
+            resetsAt: null,
+            sharedWith: [],
+            rows: [],
+            hidden: 0,
+            mayStopAll: false,
+            closed: [],
+          },
+        );
+      },
+      cancelUsageQueue: async (orgId, agentId) => {
+        log("agents.cancelUsageQueue", orgId, agentId);
+        const q = state.usageQueues?.[agentId];
+        const canceled = q?.rows.filter((r) => r.state === "queued").length ?? 0;
+        if (q) q.rows = q.rows.filter((r) => r.state !== "queued");
+        return { canceled, skipped: 0 };
+      },
       importFromGithub: async (orgId, url) => {
         log("agents.importFromGithub", orgId, url);
         const files = state.githubFiles?.[url];
@@ -2476,6 +2538,25 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           archived: false,
           people: members.filter((m) => m.type === "person").length,
           agents: members.filter((m) => m.type === "agent").length,
+        };
+      },
+      messageCard: async (_orgId, messageId) => {
+        const m = state.messages.find((x) => x.id === messageId);
+        const channel = state.channels.find((c) => c.id === m?.channelId);
+        const dm = state.dms.find((d) => d.channelId === m?.channelId);
+        if (!m || (!dm && (!channel || (channel.visibility === "private" && !channel.isMember))))
+          throw new ApiError(404, "not_found", "Message not found");
+        const author =
+          m.author.type === "agent"
+            ? state.agents.find((a) => a.id === m.author.id)?.name
+            : state.members.find((p) => p.userId === m.author.id)?.name;
+        return {
+          id: m.id,
+          channelId: m.channelId,
+          threadId: m.threadId && m.threadId !== m.id ? m.threadId : null,
+          kind: dm ? "dm" : "channel",
+          name: dm ? dm.with.name : (channel?.name ?? ""),
+          author: author ?? "",
         };
       },
       members: async (_orgId, channelId) => state.channelMembers[channelId] ?? [],
@@ -3013,6 +3094,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return structuredClone(p);
       },
+      ask: async (orgId, id) => {
+        log("proposals.ask", orgId, id);
+        const p = findProposal(id);
+        Object.assign(p, { askedAt: new Date().toISOString() });
+        return structuredClone(p);
+      },
       refuse: async (orgId, id) => {
         log("proposals.refuse", orgId, id);
         const p = findProposal(id);
@@ -3129,7 +3216,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     const message = state.messages.find((m) => m.id === messageId);
     const card = message?.meta?.actionCard as AgentProposalCard | undefined;
     if (!message || card?.kind !== "agent_proposal") throw new ApiError(404, "not_found", "Proposal not found");
-    if (!state.channels.find((c) => c.id === message.channelId)?.isMember) {
+    const inDm = state.dms.some((d) => d.channelId === message.channelId);
+    if (!inDm && !state.channels.find((c) => c.id === message.channelId)?.isMember) {
       throw new ApiError(403, "forbidden", "Join this channel first");
     }
     return { message, card };
@@ -3201,6 +3289,9 @@ export const fakeBrowserOf = new WeakMap<ApiClient, FakeBrowser>();
 /** The AI apps fake behind each `createFakeApi` client (tests add consents and connect apps with it). */
 export const fakeAppsOf = new WeakMap<ApiClient, FakeApps>();
 
+/** The boards and widgets fake behind each `createFakeApi` client (tests add boards and finish widgets with it). */
+export const fakeDashboardsOf = new WeakMap<ApiClient, FakeDashboards>();
+
 /** Full client: fake HTTP + the real in-memory mocks (seeded like development). */
 export function createFakeApi(state: FakeState = seedState(), options: { seed?: boolean } = {}): ApiClient {
   const http = createFakeHttpApi(state);
@@ -3236,6 +3327,11 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     () => state.me?.user.id ?? null,
   );
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const dashboards = createFakeDashboards(
+    (method, ...args) => state.calls.push({ method, args }),
+    ctx.now,
+    () => state.me?.user.id ?? null,
+  );
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const apps = createFakeApps((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const artifacts = createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args }));
@@ -3432,6 +3528,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     customConnectors,
     mail: mail.client,
     databases: databases.client,
+    dashboards: dashboards.client,
     browser: browser.client,
     desktop: browser.desktop,
     // "Trabalhando agora" and the task manager only for a test that gives the task manager (`state.taskManager`).
@@ -3455,6 +3552,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   fakeMachinesOf.set(client, machines);
   fakeMailOf.set(client, mail);
   fakeDatabasesOf.set(client, databases);
+  fakeDashboardsOf.set(client, dashboards);
   fakeBrowserOf.set(client, browser);
   fakeAppsOf.set(client, apps);
   return client;

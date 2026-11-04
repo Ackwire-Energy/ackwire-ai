@@ -27,6 +27,7 @@ test("the channel header's icons never get a plate, sit 14px apart, and a phone 
   expect(last(shipped, ".channel__icon-count.ac-count", "background")).toBe("var(--ink2)");
   expect(last(shipped, ".channel__icon-count.ac-count", "color")).toBe("var(--pane)");
   expect(last(shipped, ".channel__icon-count.ac-count", "font-weight")).toBe("700");
+  expect(last(shipped, ".channel__icon-count.ac-count", "font-size")).toBe("10px");
   expect(last(shipped, ".channel__icon-count.ac-count", "box-shadow")).toBe("0 0 0 2px var(--pane)");
 
   // The field grows while it is used.

@@ -50,6 +50,7 @@ import {
   useChannelThreads,
   useCreateMission,
   useDmReads,
+  useDms,
   useHeldPlaces,
   useJoinChannel,
   useMarkChannelRead,
@@ -187,7 +188,7 @@ import {
   type VoiceNotice,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import {
   Children,
   createContext,
@@ -332,7 +333,7 @@ import {
   ThreadStartLine,
   useChannelThreadsView,
 } from "@/components/threads/ThreadLines";
-import { UsageWaitCancel } from "@/components/UsagePauseCard";
+import { UsageWaitCancel, UsageWaitClosed } from "@/components/UsagePauseCard";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { BarAlsoTyping, BarPhrase, BarStep, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
@@ -414,6 +415,11 @@ export interface ChannelChrome {
   suggestions?: string[];
   /** Above the messages (a thread's origin and context block). */
   top?: ReactNode;
+  /**
+   * Always at the conversation's top, in place of its empty state and of the no-AI banner (the right hand's greeting
+   * and first cards, ADR 0137, which say it themselves).
+   */
+  intro?: ReactNode;
   /** The composer's label and placeholder ("Responder na thread"). */
   composerLabel?: string;
   /** In place of the composer (an archived thread's read-only note). */
@@ -528,10 +534,32 @@ export function ChannelPage({
   const { org } = useOrg();
   const channels = useChannels(org.id);
   const channel = channels.data?.find((c) => c.id === channelId) ?? fallback;
+  // A DM's link (a message link copied there) names its channel: the DM's own page opens it, at the message.
+  const dms = useDms(org.id);
+  const dm = channel ? undefined : dms.data?.find((d) => d.channelId === channelId);
   // "#loja · Acme": the window's name in the app (Window menu, Mission Control), the tab's in a browser.
   useDocumentTitle(channel && !fallback && !thread ? `#${channel.name} · ${org.name}` : undefined);
 
   if (channels.isPending && !fallback) return <ChannelSkeleton />;
+  if (dm) {
+    const search = focusMessageId ? { m: focusMessageId } : {};
+    return dm.with.type === "agent" ? (
+      <Navigate
+        to="/org/$orgId/dm/agent/$agentId"
+        params={{ orgId: org.id, agentId: dm.with.id }}
+        search={search}
+        replace
+      />
+    ) : (
+      <Navigate
+        to="/org/$orgId/dm/person/$userId"
+        params={{ orgId: org.id, userId: dm.with.id }}
+        search={search}
+        replace
+      />
+    );
+  }
+  if (!channel && dms.isPending) return <ChannelSkeleton />;
   if (!channel) {
     return (
       <main className="shell__main">
@@ -1609,6 +1637,14 @@ function ChannelView({
     setFocusTarget(messageId);
     setFocusDone(false);
   };
+  // A message link to this same conversation (a pill) changes only `?m=`: the page stays, so jump to it.
+  const linked = useRef(focusMessageId);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a new `?m=`
+  useEffect(() => {
+    if (!focusMessageId || focusMessageId === linked.current) return;
+    linked.current = focusMessageId;
+    jumpTo(focusMessageId);
+  }, [focusMessageId]);
 
   // Files for the next message: uploaded to the Drive (this channel) right away; sending waits for them.
   const [files, setFiles] = useState<PendingFile[]>([]);
@@ -2094,41 +2130,47 @@ function ChannelView({
                         {/* Pushes short channels down, next to the composer. */}
                         <div className="channel__spacer" aria-hidden="true" />
                         {chrome?.top}
+                        {chrome?.intro}
                         {messages.isLoading && <LoadingConversation />}
                         {messages.isError && !messages.data && (
                           <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
                         )}
-                        {serverRead && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
-                          <div className="channel__empty">
-                            <EmptyState
-                              icon="message"
-                              // A DM with an agent: the light sky, like the other empty screens about agents.
-                              sky={Boolean(chrome?.dmAgentId)}
-                              title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
-                              actions={
-                                emptySuggestions.length > 0 ? (
-                                  <fieldset className="channel__suggestions">
-                                    <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
-                                    {emptySuggestions.map((s) => (
-                                      <Button
-                                        key={s.text}
-                                        size="sm"
-                                        onClick={() => {
-                                          setDraft(s.text);
-                                          composer.current?.focus();
-                                        }}
-                                      >
-                                        {s.label}
-                                      </Button>
-                                    ))}
-                                  </fieldset>
-                                ) : undefined
-                              }
-                            >
-                              {chrome?.emptyText}
-                            </EmptyState>
-                          </div>
-                        )}
+                        {serverRead &&
+                          timeline.length === 0 &&
+                          slots.length === 0 &&
+                          !thread &&
+                          !adjusting &&
+                          !chrome?.intro && (
+                            <div className="channel__empty">
+                              <EmptyState
+                                icon="message"
+                                // A DM with an agent: the light sky, like the other empty screens about agents.
+                                sky={Boolean(chrome?.dmAgentId)}
+                                title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
+                                actions={
+                                  emptySuggestions.length > 0 ? (
+                                    <fieldset className="channel__suggestions">
+                                      <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
+                                      {emptySuggestions.map((s) => (
+                                        <Button
+                                          key={s.text}
+                                          size="sm"
+                                          onClick={() => {
+                                            setDraft(s.text);
+                                            composer.current?.focus();
+                                          }}
+                                        >
+                                          {s.label}
+                                        </Button>
+                                      ))}
+                                    </fieldset>
+                                  ) : undefined
+                                }
+                              >
+                                {chrome?.emptyText}
+                              </EmptyState>
+                            </div>
+                          )}
                         {adjustThreadId ? (
                           <RangeRows
                             adjust={adjust}
@@ -2221,7 +2263,9 @@ function ChannelView({
                     </div>
                     <div className="channel__composer">
                       <ConnectionBanner status={status} />
-                      <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
+                      {!chrome?.intro && (
+                        <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
+                      )}
                       <ActivityBar
                         channelId={channel.id}
                         threadId={thread?.id ?? null}
@@ -4053,6 +4097,11 @@ export const TimelineMessage = memo(function TimelineMessage({
                     wikiLink={wikiLink}
                     channelRefs={channelRefsOf(m.meta)}
                     accent={colorOf(agent)}
+                    pinFrom={
+                      m.author.type === "agent" && m.author.id && !m.local && !readOnly
+                        ? { messageId: m.id, agentId: m.author.id }
+                        : null
+                    }
                   />
                   {talk && openThread && (
                     <button
@@ -4192,7 +4241,11 @@ export const TimelineMessage = memo(function TimelineMessage({
             {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
             {noAi && <NoAiCard message={m} />}
             {actionCard && <ActionCard message={m} />}
-            {usageWait && !usageWait.canceled && !usageWait.ended && <UsageWaitCancel message={m} wait={usageWait} />}
+            {usageWait?.closed ? (
+              <UsageWaitClosed message={m} wait={{ ...usageWait, closed: usageWait.closed }} />
+            ) : (
+              usageWait && !usageWait.canceled && !usageWait.ended && <UsageWaitCancel message={m} wait={usageWait} />
+            )}
             {question && <QuestionCard question={question} />}
             {secretRequest && <SecretCard request={secretRequest} />}
             {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
@@ -4533,9 +4586,7 @@ function ChannelDetails({
                 ? t("channelMembers.mentionLine", { handle: r.handle })
                 : !picksForMe(routing)
                   ? t(replyAloneKey(routing), agentGrammar(r.name))
-                  : dir.agentById.get(r.id)?.coordinator
-                    ? t("channelMembers.coordinatorLine")
-                    : t("channelMembers.aloneLine", agentGrammar(r.name))}
+                  : t("channelMembers.aloneLine", agentGrammar(r.name))}
             </span>
           </span>
           {r.setsReply && (

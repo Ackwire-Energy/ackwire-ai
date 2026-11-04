@@ -306,6 +306,22 @@ export async function deleteRole(
       .update(schema.channels)
       .set({ audienceRoleIds: sql`array_remove(${schema.channels.audienceRoleIds}, ${role.id}::uuid)` })
       .where(and(eq(schema.channels.orgId, orgId), sql`${role.id}::uuid = any(${schema.channels.audienceRoleIds})`));
+    // Boards forget it too: a `roles` board with no role left is its owner's (and admins') alone (ADR 0135 §8).
+    await tx
+      .update(schema.dashboards)
+      .set({ audienceRoleIds: sql`array_remove(${schema.dashboards.audienceRoleIds}, ${role.id}::uuid)` })
+      .where(
+        and(eq(schema.dashboards.orgId, orgId), sql`${role.id}::uuid = any(${schema.dashboards.audienceRoleIds})`),
+      );
+    // And who edits them: a board edited by roles with none left is edited by its owner and admins (`owner`).
+    await tx
+      .update(schema.dashboards)
+      .set({
+        editRoleIds: sql`array_remove(${schema.dashboards.editRoleIds}, ${role.id}::uuid)`,
+        editPolicy: sql`case when cardinality(array_remove(${schema.dashboards.editRoleIds}, ${role.id}::uuid)) = 0
+          and ${schema.dashboards.editPolicy} = 'roles' then 'owner' else ${schema.dashboards.editPolicy} end`,
+      })
+      .where(and(eq(schema.dashboards.orgId, orgId), sql`${role.id}::uuid = any(${schema.dashboards.editRoleIds})`));
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: actorId },

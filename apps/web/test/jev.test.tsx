@@ -185,7 +185,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
 
     await click(within(card()).getByRole("button", { name: "Configurar o Jev" }));
     // The button pressed gives way to the steps: the field takes the focus.
-    expect(document.activeElement).toBe(field());
+    expect(document.activeElement === field()).toBe(true);
     const site = within(card()).getByRole("link", { name: "Abrir a TypeSafe" });
     const keys = within(card()).getByRole("link", { name: "Abrir as chaves de API" });
     expect([site.getAttribute("href"), keys.getAttribute("href")]).toEqual([
@@ -215,7 +215,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(card().querySelector(".ac-chip")?.textContent).toBe("Ligado");
     expect(card().textContent).toContain("Termina em 9f2c");
     expect(within(card()).queryByLabelText("Cole aqui")).toBeNull();
-    expect(document.activeElement).toBe(within(card()).getByRole("button", { name: "Trocar a chave" }));
+    expect(document.activeElement === within(card()).getByRole("button", { name: "Trocar a chave" })).toBe(true);
     // The key itself is never on the page.
     expect(document.body.innerHTML).not.toContain("ts_live_9f2c");
   });
@@ -237,7 +237,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(field().hasAttribute("aria-invalid")).toBe(false);
     await click(within(card()).getByRole("button", { name: "Cancelar" }));
     expect(within(card()).queryByLabelText("Cole aqui")).toBeNull();
-    expect(document.activeElement).toBe(within(card()).getByRole("button", { name: "Configurar o Jev" }));
+    expect(document.activeElement === within(card()).getByRole("button", { name: "Configurar o Jev" })).toBe(true);
   });
 
   test("on: its last 4 and this month's use; Trocar a chave asks only for the new key; Apagar asks first", async () => {
@@ -251,7 +251,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(card().querySelector(".ac-setnote")).toBeNull();
 
     await click(within(card()).getByRole("button", { name: "Trocar a chave" }));
-    expect(document.activeElement).toBe(field());
+    expect(document.activeElement === field()).toBe(true);
     // Steps ② and ③ only, numbered 1 and 2.
     expect(within(card()).queryByRole("link", { name: "Abrir a TypeSafe" })).toBeNull();
     expect([...card().querySelectorAll(".agp-addacct__step > i")].map((n) => n.textContent)).toEqual(["1", "2"]);
@@ -271,7 +271,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     expect(calls(state, "system.removeJev")).toEqual([[]]);
     expect(card().querySelector(".ac-chip")?.textContent).toBe("Desligado");
     expect(within(card()).queryByLabelText("Cole aqui")).toBeNull();
-    expect(document.activeElement).toBe(within(card()).getByRole("button", { name: "Configurar o Jev" }));
+    expect(document.activeElement === within(card()).getByRole("button", { name: "Configurar o Jev" })).toBe(true);
     await click(within(card()).getByRole("button", { name: "Configurar o Jev" }));
     expect(field().value).toBe("");
   });
@@ -395,6 +395,6 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/keys`);
     expect(router.state.location.hash).toBe("jev");
-    expect(document.activeElement).toBe(card());
+    expect(document.activeElement === card()).toBe(true);
   });
 });

@@ -40,6 +40,8 @@ export const AGENT_ACTION_KINDS = [
   "thread.closed",
   "skill.created",
   "skill.updated",
+  /** A teammate's settings changed from the right hand's card (ADR 0137): by the person who clicked, not by an agent. */
+  "agent.settings_changed",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
@@ -63,7 +65,15 @@ export const UNDOABLE_TOOLS = new Set([
   "update_skill",
 ]);
 
-export type AgentActionTargetType = "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill";
+export type AgentActionTargetType =
+  | "issue"
+  | "memory"
+  | "routine"
+  | "channel"
+  | "wiki_page"
+  | "thread"
+  | "skill"
+  | "agent";
 
 /** What the change was made to, with enough to label it ("#23 · Prompt…"). */
 export interface AgentActionTarget {
@@ -284,5 +294,7 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
       return `made the skill${title} from its how-tos`;
     case "skill.updated":
       return `changed the skill${title}`;
+    case "agent.settings_changed":
+      return `changed ${Array.isArray(p.fields) ? p.fields.join(", ") : "settings"} of ${t.title ?? "an agent"} from your card`;
   }
 }

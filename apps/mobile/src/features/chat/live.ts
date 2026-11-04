@@ -7,6 +7,7 @@ import {
   applyMembershipEvent,
   applyReceiptEvent,
   applyTyping,
+  type BlockState,
   type ChannelEvent,
   type ConsultsState,
   cacheAgentProposal,
@@ -49,6 +50,7 @@ import {
   unmarkStopping,
   useApi,
 } from "@agenteschat/client";
+import { newerBlockState } from "@agenteschat/client/lib/blocks";
 import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
@@ -250,6 +252,11 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       break;
     case "poll.updated":
       qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
+      break;
+    case "block.state":
+      qc.setQueryData<BlockState>(keys.blockState(orgId, event.block.id, event.block.version), (old) =>
+        newerBlockState(old, event.block),
+      );
       break;
     case "choices.updated":
       qc.setQueryData(keys.choices(orgId, event.choices.id), event.choices);

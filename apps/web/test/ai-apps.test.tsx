@@ -331,7 +331,7 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
     const chatgpt = screen().getByRole("dialog").textContent ?? "";
     expect(chatgpt).toContain("Clique em + e depois em Add custom MCP server.");
     expect(chatgpt).toContain("Marque “I understand and want to continue” e clique em Create as a plugin.");
-    expect(chatgpt).toContain("Ainda não testamos a entrada por este app.");
+    expect(chatgpt).not.toContain("Ainda não testamos");
     await click(dialog().getByRole("button", { name: "Voltar para os apps" }));
 
     await click(dialog().getByRole("button", { name: /^Continue/ }));
@@ -374,20 +374,6 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
       "Copilot CLI": FIRST,
       "Outro app": "Ele abre esta página para você entrar.",
     };
-    const untested = [
-      "ChatGPT",
-      "Gemini",
-      "Grok",
-      "Perplexity",
-      "Le Chat",
-      "Raycast",
-      "Codex",
-      "Devin Desktop",
-      "JetBrains AI Assistant",
-      "Zed",
-      "Cline",
-      "Copilot CLI",
-    ];
     const names = [...document.querySelectorAll(".apps-client__name")].map((n) => n.textContent ?? "");
     expect(names).toEqual(Object.keys(auth));
     for (const name of names) {
@@ -400,7 +386,7 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
       expect([name, (box.textContent ?? "").includes(auth[name] as string)]).toEqual([name, true]);
       const tokenButton = within(box).queryByRole("button", { name: "Criar um token pessoal" });
       expect([name, !!tokenButton]).toEqual([name, auth[name] === TOKEN || name === "Outro app"]);
-      expect([name, (box.textContent ?? "").includes("Ainda não testamos")]).toEqual([name, untested.includes(name)]);
+      expect([name, (box.textContent ?? "").includes("Ainda não testamos")]).toEqual([name, false]);
       await click(within(box).getByRole("button", { name: "Voltar para os apps" }));
     }
   });

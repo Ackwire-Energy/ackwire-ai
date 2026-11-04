@@ -1,4 +1,4 @@
-import { and, type Database, desc, type Executor, eq, inArray, lt, ne, schema, sql } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
 import { cutText } from "./format";
@@ -158,6 +158,8 @@ export interface AuditFilter {
   actorType?: AuditActorType;
   /** An agent's or a person's id. */
   actorId?: string;
+  /** An agent's id: what it did, and what people applied from its cards (`details.via`). */
+  via?: string;
   /** Any of these endings (`refused` and `failed` together: what went wrong). */
   outcome?: schema.AuditOutcome[];
   /** Only calls whose approval nobody has answered yet. */
@@ -212,6 +214,12 @@ export async function listAudit(
         eq(auditLog.orgId, orgId),
         filter.actorType ? eq(auditLog.actorType, filter.actorType) : undefined,
         filter.actorId ? eq(auditLog.actorId, filter.actorId) : undefined,
+        filter.via
+          ? or(
+              and(eq(auditLog.actorType, "agent"), eq(auditLog.actorId, filter.via)),
+              sql`${auditLog.details}->>'via' = ${filter.via}`,
+            )
+          : undefined,
         filter.outcome?.length ? inArray(auditLog.outcome, filter.outcome) : undefined,
         filter.waiting
           ? and(

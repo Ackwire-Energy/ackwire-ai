@@ -4,7 +4,7 @@ import { autoUpdateText, talkerStatusText, workEndBody } from "./long-work";
 import { mediaKindOf, mediaWord } from "./media";
 import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
-import { usageWindowText } from "./usage-pause";
+import { closedNoteText, usageWaitOf, usageWindowText } from "./usage-pause";
 import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
 /** Notes of an agent waiting on its plan's limit or its budget (`meta.usageWait`): `{{when}}` from its reset. */
@@ -76,12 +76,26 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     return t("chat.body.no_ai_not_signed_in", { brain, defaultValue: body });
   }
   if (USAGE_NOTES.has(code)) {
+    // Skipped as already handled (ADR 0136): why, in place of the promise, and who asked for an answer anyway.
+    const skipped = usageWaitOf(m)?.closed;
+    if (skipped) {
+      const line = closedNoteText(t, skipped);
+      const by = (m.usageWait as { continuedByName?: unknown }).continuedByName;
+      return typeof by === "string" && by
+        ? `${line}\n\n_${t("chat.body.usage_wait_anyway", { name: by, defaultValue: "" })}_`
+        : line;
+    }
     const resetsAt = (m.usageWait as { resetsAt?: unknown } | undefined)?.resetsAt;
     const when = typeof resetsAt === "string" ? usageWhen(t, locale, resetsAt) : "";
     const text = t(`chat.body.${code}`, { ...params, when, defaultValue: body });
-    // Someone said not to run it: the promise above no longer holds.
-    if ((m.usageWait as { canceled?: unknown } | undefined)?.canceled !== true) return text;
-    return `${text}\n\n_${t("chat.body.usage_wait_canceled", { defaultValue: "Canceled. It won't run when the limit is back." })}_`;
+    // Someone said not to run it, or its agent was archived: the promise above no longer holds.
+    const wait = m.usageWait as { canceled?: unknown; reason?: unknown } | undefined;
+    if (wait?.canceled !== true) return text;
+    const why =
+      wait.reason === "archived"
+        ? t("chat.body.usage_wait_archived", { defaultValue: "It won't run: the agent was archived." })
+        : t("chat.body.usage_wait_canceled", { defaultValue: "Canceled. It won't run when the limit is back." });
+    return `${text}\n\n_${why}_`;
   }
   // Long work paused near a limit (ADR 0118): its window in the reader's words.
   if (code === "usage_paused" || code === "usage_paused_budget") {

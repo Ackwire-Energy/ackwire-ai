@@ -23,10 +23,23 @@ export const passedSql = sql<boolean>`((${agentRuns.status} = 'done' and ${agent
   and ${agentRunSteps.kind} = 'context' and ${agentRunSteps.data}->'passed'->>'silent' = 'true'))
   or (${agentRuns.status} = 'canceled' and ${agentRuns.startedAt} is null))`;
 
-/** For a select over `agent_runs`: waiting for its computer, in line for room (`queued`) or for it to be back (`away`). */
-export const computerWaitSql = sql<"queued" | "away" | null>`(case when ${agentRuns.status} = 'waiting_input'
+/**
+ * For a select over `agent_runs`: waiting for its computer, in line for room (`queued`) or for it to be back (`away`),
+ * or long work waiting in the agent's line of work (`line`, ADR 0121): nobody is asked anything.
+ */
+export const computerWaitSql = sql<"queued" | "away" | "line" | null>`(case when ${agentRuns.status} = 'waiting_input'
   and ${agentRuns.waitingMachineId} is not null then (case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'busy'
-  then 'queued' else 'away' end) end)`;
+  then 'queued' else 'away' end)
+  when ${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'work_queue' then 'line' end)`;
+
+/**
+ * For a select over `agent_runs`: waiting on its plan's limit (`plan`) or its budget (`budget`), long work paused near
+ * one too (`usage_pause`, by its `source`): it answers when that renews, nobody is asked.
+ */
+export const usageWaitSql = sql<"plan" | "budget" | null>`(case when ${agentRuns.status} = 'waiting_input'
+  and ${agentRuns.waitingMachineId} is null then (case ${agentRuns.transcript}->'waitingForBrain'->>'code'
+  when 'plan_limit' then 'plan' when 'budget' then 'budget'
+  when 'usage_pause' then coalesce(${agentRuns.transcript}->'waitingForBrain'->>'source', 'plan') end) end)`;
 
 /**
  * Where a run's replies go: asked in the main timeline (a channel, a DM

@@ -1,4 +1,5 @@
-import type { ApiClient } from "@agenteschat/client";
+import type { ApiClient, MessageCard } from "@agenteschat/client";
+import { messagePath } from "@agenteschat/client/lib/message-links";
 import { isSafeId } from "../shared/logic";
 import { chatHref, notificationHref } from "./logic";
 
@@ -74,10 +75,16 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
   const [page = "", id, sub] = rest;
   const m = isSafeId(q.m) ? q.m : null;
   const open = isSafeId(q.open) ? q.open : null;
+  // A widget open on Home or on its dashboard (`?widget=`, ADR 0135): its own screen.
+  const widget = isSafeId(q.widget) ? q.widget : null;
   switch (page) {
     case "":
     case "home":
-      return "/";
+      return widget ? `/widget/${widget}` : "/";
+    case "dashboards":
+      if (widget) return `/widget/${widget}`;
+      if (id === undefined) return "/dashboards";
+      return isSafeId(id) ? `/board/${id}` : null;
     case "c":
       return isSafeId(id) ? { to: m ? `/chat/${id}?m=${m}` : `/chat/${id}` } : null;
     case "dm":
@@ -140,6 +147,16 @@ export function appLinkFromUrl(url: string): AppLink {
   // `web`: the address itself, opened in the browser when the person isn't in that workspace.
   const at = { org: parts[1], web: web.web };
   return { href: linkHref(typeof screen === "string" ? { ...at, to: screen } : { ...at, ...screen }) };
+}
+
+/**
+ * Where a message link's pill opens: the conversation at the message, or, for another workspace's message, through
+ * `/link` (which switches to that workspace first: the card's ids mean nothing in the current one).
+ */
+export function messageRefHref(linkOrgId: string, card: MessageCard, orgId: string, server: string): string {
+  if (linkOrgId === orgId) return chatHref(card.channelId, card.threadId, card.id);
+  const link = appLinkFromUrl(`${server.replace(/\/+$/, "")}${messagePath(linkOrgId, card)}`);
+  return link && "href" in link ? link.href : chatHref(card.channelId, card.threadId, card.id);
 }
 
 /**

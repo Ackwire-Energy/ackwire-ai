@@ -253,7 +253,7 @@ describe("Adicionar conector: one catalog", () => {
     await pressEsc(document.activeElement as Element);
     await settle(2);
     expect(screen().queryByRole("dialog", { name: "Notion" })).toBeNull();
-    expect(document.activeElement).toBe(tile);
+    expect(document.activeElement === tile).toBe(true);
     expect([search.value, docs.getAttribute("aria-checked"), list.scrollTop]).toEqual(["notion", "true", 48]);
     expect(names(dialog)).toEqual(["Notion", "Não achou?"]);
   });

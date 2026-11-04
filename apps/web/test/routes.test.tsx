@@ -5,7 +5,18 @@ setupDom();
 
 import { afterEach } from "bun:test";
 import { cleanup } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  ATLAS_ID,
+  createFakeApi,
+  ENG_ID,
+  GENERAL_ID,
+  LODI_ID,
+  ORG_ID,
+  seedDm,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -32,19 +43,20 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
   });
 
-  test("a workspace still being set up is its owner's onboarding, from / and from its pages; never for someone invited", async () => {
+  test("a workspace still being set up is finished for its owner and opens in its right hand's DM; never for someone invited", async () => {
     const as = (role: "owner" | "member") => {
-      // At the agents' step, its team not made yet.
-      const state = seedState({ agents: [] });
+      // Left at the older onboarding's agents step.
+      const state = withRightHand(seedState({ agents: [] }));
       const onboarding = { step: "agents" as const, generalChannelId: GENERAL_ID };
       if (state.me) state.me.organizations = [{ id: ORG_ID, name: "Acme", role, onboarding }];
       return createFakeApi(state);
     };
     for (const path of ["/", `/org/${ORG_ID}`, `/org/${ORG_ID}/drive`]) {
       const { router } = await renderApp(path, { api: as("owner") });
-      expect(router.state.location.pathname).toBe("/onboarding");
-      // Resumed at its step: never the form that would make another workspace.
-      expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+      await settle(10);
+      expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${LODI_ID}`);
+      // Never the form that would make another workspace.
+      expect(screen().queryByRole("heading", { name: "Como se chama o seu workspace?" })).toBeNull();
       cleanup();
     }
     const { router } = await renderApp(`/org/${ORG_ID}/drive`, { api: as("member") });

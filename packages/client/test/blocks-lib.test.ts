@@ -3,7 +3,18 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Poll } from "../src/api/types";
 import { BLOCK_KIT_CSS, BLOCK_KIT_JS } from "../src/lib/block-kit";
-import { blockEvent, blockPage, pollAnswered, pollIsOpen, pollTally, pollToggle } from "../src/lib/blocks";
+import {
+  BLOCK_VIEWPORT,
+  blockEvent,
+  blockPage,
+  newerBlockState,
+  pollAnswered,
+  pollIsOpen,
+  pollTally,
+  pollToggle,
+  stateChanges,
+  stateForPage,
+} from "../src/lib/blocks";
 
 const HOST = {
   theme: "dark" as const,
@@ -17,9 +28,24 @@ describe("a block's page", () => {
     const page = blockPage('<ac-stat label="x"></ac-stat>', HOST);
     const policy = page.indexOf("Content-Security-Policy");
     expect(policy).toBeGreaterThan(0);
+    expect(page.indexOf('content="off"')).toBeGreaterThan(0);
+    expect(page.indexOf('content="off"')).toBeLessThan(policy);
     expect(policy).toBeLessThan(page.indexOf("window.__block"));
     expect(page.indexOf("window.__block")).toBeLessThan(page.indexOf("customElements.define"));
     expect(page.indexOf("customElements.define")).toBeLessThan(page.indexOf('<ac-stat label="x">'));
+  });
+
+  test("the page is as wide as the phone's web view shows it, and what it holds stays inside that width", () => {
+    const page = blockPage("<p>a</p>", HOST);
+    expect(BLOCK_VIEWPORT).toContain('name="viewport"');
+    expect(BLOCK_VIEWPORT).toContain("width=device-width");
+    // After the policy (nothing comes before it), before what the agent wrote.
+    expect(page.indexOf(BLOCK_VIEWPORT)).toBeGreaterThan(page.indexOf("Content-Security-Policy"));
+    expect(page.indexOf(BLOCK_VIEWPORT)).toBeLessThan(page.indexOf("<p>a</p>"));
+    expect(BLOCK_KIT_CSS).toContain("overflow-wrap:break-word");
+    expect(BLOCK_KIT_CSS).toContain(":where(body>*){min-width:0;max-width:100%}");
+    // A table wider than the block scrolls inside it instead of being cut at the edge.
+    expect(BLOCK_KIT_CSS).toContain("ac-table{overflow-x:auto");
   });
 
   test("what the person set can't close the script it travels in", () => {
@@ -113,6 +139,42 @@ describe("what a frame may say", () => {
       ready: false,
     });
     expect(blockEvent({ agentes: 1, type: "draft", text: "x", ready: true })).toBeNull();
+  });
+});
+
+describe("one state for everyone (ADR 0113)", () => {
+  test("a state says whether the person touched the page; a draw counts only then", () => {
+    expect(blockEvent({ agentes: 1, type: "state", state: { a: 1 } })).toEqual({
+      type: "state",
+      state: { a: 1 },
+      used: false,
+    });
+    expect(blockEvent({ agentes: 1, type: "state", state: [1] })).toBeNull();
+    const draw = { agentes: 1, type: "draw", name: "nome", options: ["Bento", 2] };
+    expect(blockEvent({ ...draw, used: true })).toEqual({ type: "draw", name: "nome", options: ["Bento", "2"] });
+    // A page drawing as it opens would draw again for everyone who opens it.
+    expect(blockEvent(draw)).toBeNull();
+    expect(blockEvent({ ...draw, used: true, options: ["só"] })).toBeNull();
+    expect(blockEvent({ ...draw, used: true, name: "no spaces" })).toBeNull();
+  });
+
+  test("only what the page changed goes out", () => {
+    expect(stateChanges({ a: 1, b: [1, 2], c: "x" }, { a: 1, b: [1, 2] })).toEqual({ c: "x" });
+    expect(stateChanges({ a: 1 }, { a: 1 })).toBeNull();
+    expect(stateChanges({ "bad name": 1, u: undefined }, {})).toBeNull();
+  });
+
+  test("a page isn't told back what the person is still changing; the newest rev wins", () => {
+    const block = { id: "b", version: 1, state: { x: 5, y: 2 }, changes: {}, rev: 4 };
+    expect(stateForPage(block, new Set(["x"]))).toEqual({ state: { y: 2 }, who: {} });
+    expect(newerBlockState({ ...block, rev: 5 }, block).rev).toBe(5);
+    expect(newerBlockState(undefined, block)).toBe(block);
+  });
+
+  test("the kit shares a value only after the person touched the page, and takes everyone's from the app", () => {
+    expect(BLOCK_KIT_JS).toContain('post({type:"state",state:state,used:used})');
+    expect(BLOCK_KIT_JS).toContain("draw:function(name,options)");
+    expect(BLOCK_KIT_JS).toContain('if(m.state&&typeof m.state==="object"){Object.assign(state,m.state)');
   });
 });
 

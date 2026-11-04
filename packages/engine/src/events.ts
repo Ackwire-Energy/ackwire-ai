@@ -4,6 +4,7 @@ import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
+import type { BlockStateView } from "./block-state";
 import type { ChoicesView, PollView } from "./blocks";
 import type { BrowserHandoffView } from "./browser/handoff";
 import type { CalendarEventView } from "./calendar";
@@ -44,17 +45,18 @@ export type DecidedBy =
   /** The author's own plan: `ownerId` is the author. */
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
   /**
-   * `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). `default`: nobody was picked, so
-   * the agent the person talks with, or the best placed one, answered (ADR 0074, R5).
+   * `default`: nobody was picked, so the agent the person talks with, or the best placed one, answered (ADR 0074,
+   * R5). `alone`: nobody was picked and the person is alone here with two or more agents, so the best placed one
+   * answered (ADR 0137 §5). `coordinator` is only read: decisions stored before ADR 0137 retired the team's coordinator (ADR 0093).
    */
   | { step: "rule"; rule: RouterRule };
 
-type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "default";
+type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "default" | "alone";
 
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
-const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default"]);
+const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default", "alone"]);
 
 /**
  * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined
@@ -120,7 +122,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       error?: string;
       /** Stable code of `error` (`run.budget_exceeded`, `run.provider_error`…) and its params. */
       errorCode?: string;
@@ -280,7 +284,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: on every message the run answers (a steered one too), as `message.handled`. */
       passed?: true;
       error?: string;
@@ -304,7 +310,9 @@ export type ChannelEvent =
       now?: true;
       stop?: boolean;
       /** Into a run waiting for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** Into a run waiting on its plan's limit or its budget. */
+      usage?: "plan" | "budget";
     }
   /** The run read these messages sent while it worked (they are in its conversation now): "Ada leu". */
   | {
@@ -427,7 +435,9 @@ export type ChannelEvent =
       /** `waiting_input` parked on a provider outage. */
       outage?: true;
       /** `waiting_input` for its computer: in line for room (`queued`) or for it to come back (`away`). */
-      computer?: "queued" | "away";
+      computer?: "queued" | "away" | "line";
+      /** `waiting_input` on its plan's limit or its budget: it answers when that renews, nobody is asked. */
+      usage?: "plan" | "budget";
       /** It ended without answering: passed and posted nothing, or canceled before it ran. */
       passed?: true;
     }
@@ -506,6 +516,8 @@ export type ChannelEvent =
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: PollView }
+  /** Someone changed what a live block shows, for everyone (ADR 0113): the newest `rev` wins. */
+  | { type: "block.state"; channelId: string; block: BlockStateView }
   /** A choice card was answered (ADR 0124). */
   | { type: "choices.updated"; channelId: string; choices: ChoicesView }
   /** A message was pinned in this channel (`GET …/channels/{id}/pins` lists them, newest first). */
@@ -574,10 +586,12 @@ export type ChannelEvent =
       channelId: string;
       threadId: string | null;
       messageId: string;
-      state: "pending" | "creating" | "created" | "denied";
+      state: "pending" | "creating" | "created" | "denied" | "superseded";
       agentId: string | null;
       decidedByUserId: string | null;
       decidedAt: string | null;
+      /** Sent to whoever may create agents ("Pedir a um admin", ADR 0137). */
+      askedAt?: string;
       /** Created in one click: the lines of its draft it got (ids only). */
       applied?: { channelIds: string[]; connectionIds: string[]; mailAccountIds: string[] };
       /** The routine made with it. */

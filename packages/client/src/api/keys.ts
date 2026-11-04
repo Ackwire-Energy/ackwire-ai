@@ -39,6 +39,7 @@ export const keys = {
   usage: (orgId: string) => ["org", orgId, "usage"] as const,
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
   channelCard: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "card"] as const,
+  messageCard: (orgId: string, messageId: string) => ["org", orgId, "message", messageId, "card"] as const,
   channelCategories: (orgId: string) => ["org", orgId, "channel-categories"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
   channelPermissions: (orgId: string, channelId: string) =>
@@ -79,6 +80,8 @@ export const keys = {
   overview: (orgId: string) => ["org", orgId, "overview"] as const,
   people: (orgId: string) => ["org", orgId, "people"] as const,
   agentStatus: (orgId: string) => ["org", orgId, "agent-status"] as const,
+  /** Under `agentStatus`: an `agent.status` event refetches it too. */
+  usageQueue: (orgId: string, agentId: string) => ["org", orgId, "agent-status", "usage-queue", agentId] as const,
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
   /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
   joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,
@@ -176,6 +179,7 @@ export const keys = {
     ["org", orgId, "artifacts", "one", id, version ?? "latest"] as const,
   artifactVersions: (orgId: string, id: string) => ["org", orgId, "artifacts", "versions", id] as const,
   poll: (orgId: string, id: string) => ["org", orgId, "polls", id] as const,
+  blockState: (orgId: string, id: string, version: number) => ["org", orgId, "blocks", id, version] as const,
   choices: (orgId: string, id: string) => ["org", orgId, "choices", id] as const,
   storageMigration: (orgId: string) => ["org", orgId, "storage", "migration"] as const,
   search: (orgId: string, q: string, kinds: string) => ["org", orgId, "search", q, kinds] as const,
@@ -217,7 +221,10 @@ export const keys = {
   /** Every database read (prefix). */
   databases: (orgId: string) => ["org", orgId, "databases"] as const,
   databaseList: (orgId: string) => ["org", orgId, "databases", "list"] as const,
-  databaseTables: (orgId: string, connectionId: string) => ["org", orgId, "databases", "tables", connectionId] as const,
+  databaseTables: (orgId: string, connectionId: string, database = "") =>
+    ["org", orgId, "databases", "tables", connectionId, database] as const,
+  serverDatabases: (orgId: string, connectionId: string) =>
+    ["org", orgId, "databases", "server", connectionId] as const,
   agentDatabases: (orgId: string, agentId: string) => ["org", orgId, "databases", "agent", agentId] as const,
   /** The agent browser (ADR 0040): an agent's settings, its open request on each screen, one request (prefix). */
   browser: (orgId: string) => ["org", orgId, "browser"] as const,
@@ -239,4 +246,15 @@ export const keys = {
   agentDesktop: (orgId: string, agentId: string) => ["org", orgId, "desktop", agentId] as const,
   /** Every agent's screen (`agentDesktop`'s prefix). */
   agentDesktops: (orgId: string) => ["org", orgId, "desktop"] as const,
+  /** Boards and widgets (ADR 0135): everything below (prefix); `dashboard.*` events refresh it. */
+  dashboards: (orgId: string) => ["org", orgId, "dashboards"] as const,
+  dashboardList: (orgId: string) => ["org", orgId, "dashboards", "list"] as const,
+  dashboard: (orgId: string, dashboardId: string) => ["org", orgId, "dashboards", "one", dashboardId] as const,
+  /** My home board ("My Home", the Home mural). */
+  dashboardHome: (orgId: string) => ["org", orgId, "dashboards", "home"] as const,
+  widget: (orgId: string, widgetId: string) => ["org", orgId, "dashboards", "widget", widgetId] as const,
+  widgetCost: (orgId: string, agentId: string, schedule: string) =>
+    ["org", orgId, "dashboards", "cost", agentId, schedule] as const,
+  widgetSuggestions: (orgId: string, agentId: string) => ["org", orgId, "dashboards", "suggestions", agentId] as const,
+  widgetPinnable: (orgId: string) => ["org", orgId, "dashboards", "pinnable"] as const,
 };

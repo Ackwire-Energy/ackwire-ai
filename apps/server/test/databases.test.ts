@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createFakeDatabaseDriver, DatabaseError } from "@agenteschat/adapters";
+import { DATABASES_SQL } from "@agenteschat/engine";
 import { PGlite } from "@electric-sql/pglite";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -98,4 +99,74 @@ test("databases API: connect (tested), never the password back, agent access and
 
   expect((await api(`/databases/${connection.id}`, { method: "DELETE" })).status).toBe(204);
   expect(await (await api("/databases")).json()).toEqual({ connections: [] });
+});
+
+test("a whole server: connect without a database name, its list, the tables of one, and the agent's databases", async () => {
+  pg = new PGlite();
+  await pg.exec("create table orders (id serial primary key, total int);");
+  const server = { names: ["cliente_a", "cliente_b"] };
+  t = await createTestServer({
+    resolveHost,
+    databases: createFakeDatabaseDriver({
+      db: pg,
+      answer: (text, params) =>
+        text === DATABASES_SQL
+          ? {
+              columns: [{ name: "datname", type: 19 }],
+              rows: server.names.filter((n) => n.startsWith(String(params[0] ?? ""))).map((n) => [n]),
+            }
+          : null,
+    }),
+  });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+
+  const none = await api("/databases", {
+    json: { url: "postgres://reader:s3cret@db.example.com", wholeServer: true, databasePrefix: "x_" },
+  });
+  expect(none.status).toBe(422);
+  expect(await none.json()).toEqual({ error: "no_databases" });
+  const created = await api("/databases", {
+    json: { url: "postgres://reader:s3cret@db.example.com", wholeServer: true },
+  });
+  expect(created.status).toBe(201);
+  const { connection } = (await created.json()) as { connection: { id: string } };
+  expect(connection).toMatchObject({
+    label: "db.example.com",
+    database: "cliente_a",
+    wholeServer: true,
+    databasePrefix: null,
+    databaseCount: 2,
+  });
+  server.names.push("cliente_c");
+  expect(await (await api(`/databases/${connection.id}/databases`)).json()).toEqual({
+    databases: ["cliente_a", "cliente_b"],
+  });
+  expect(await (await api(`/databases/${connection.id}/databases?refresh=1`)).json()).toEqual({
+    databases: ["cliente_a", "cliente_b", "cliente_c"],
+  });
+  const tables = (await (await api(`/databases/${connection.id}/tables?database=cliente_b`)).json()) as {
+    tables: { name: string }[];
+  };
+  expect(tables.tables.map((x) => x.name)).toEqual(["orders"]);
+
+  const put = (databases: unknown) =>
+    api(`/agents/${agentId}/databases/${connection.id}`, {
+      method: "PUT",
+      json: {
+        level: "read",
+        policy: { tables: [], hiddenColumns: [], dailyQueryCap: null, timeoutSeconds: 15, databases },
+      },
+    });
+  const saved = await put(["cliente_b"]);
+  expect(((await saved.json()) as { policy: unknown }).policy).toMatchObject({ databases: ["cliente_b"] });
+  expect((await put(["x".repeat(64)])).status).toBe(400);
+  expect((await put(Array.from({ length: 2001 }, (_, i) => `c${i}`))).status).toBe(400);
+  const access = (await (await api(`/agents/${agentId}/databases`)).json()) as {
+    databases: { policy: { databases?: string[] } }[];
+  };
+  expect(access.databases[0]?.policy.databases).toEqual(["cliente_b"]);
 });

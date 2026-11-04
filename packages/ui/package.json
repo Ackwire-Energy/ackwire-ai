@@ -40,7 +40,8 @@
     "./recurrence": "./src/recurrence.ts",
     "./search": "./src/search.ts",
     "./timezones": "./src/timezones.ts",
-    "./brand/flags": "./src/brand/flags.ts"
+    "./brand/flags": "./src/brand/flags.ts",
+    "./widgets/spec": "./src/widgets/spec.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

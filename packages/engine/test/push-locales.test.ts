@@ -24,6 +24,9 @@ const KINDS = [
   "browser_handoff",
   "secret_request",
   "join_request",
+  "widget_alert",
+  "widget_failed",
+  "dashboard_proposal",
   "something_new",
 ];
 

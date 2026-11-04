@@ -50,3 +50,20 @@ test("a plan's limit never becomes the waiting card that says the computer is ba
   expect(waitsForComputer({ machineId: "m1", code: "busy" })).toBe(false);
   expect(waitsForComputer({ machineId: null, code: "machine_offline" })).toBe(false);
 });
+
+test("a catch-up skipped as already handled says why in place of its promise, and who asked for an answer anyway", () => {
+  const usageWait = {
+    code: "plan_limit",
+    runId: "r1",
+    ended: true,
+    closed: { reason: "solved", who: { name: "Nina" }, askers: ["u1"], at: new Date().toISOString() },
+  };
+  const meta = { bodyCode: "plan_limit_wait", bodyParams: { plan: "Claude" }, usageWait };
+  expect(serverBody(t, "x", meta, "en")).toBe('chat.body.usage_wait_closed_solved {"name":"Nina"}');
+  expect(
+    serverBody(t, "x", { ...meta, usageWait: { ...usageWait, continuedByUserId: "u1", continuedByName: "Ana" } }, "en"),
+  ).toBe('chat.body.usage_wait_closed_solved {"name":"Nina"}\n\n_chat.body.usage_wait_anyway {"name":"Ana"}_');
+  // A reason the app doesn't know: the note keeps its own words.
+  const odd = { ...meta, usageWait: { ...usageWait, closed: { reason: "weird" } } };
+  expect(serverBody(t, "x", odd, "en").startsWith("chat.body.plan_limit_wait ")).toBe(true);
+});

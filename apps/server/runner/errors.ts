@@ -14,6 +14,14 @@ export class RunnerError extends Error {
   }
 }
 
+/** New work for an agent whose computer sessions still use its old network, `drainSeconds` at most. */
+export class NetworkChangingError extends Error {
+  constructor(readonly drainSeconds: number) {
+    super("This agent’s network is changing. New work waits for its computer sessions to restart.");
+    this.name = "NetworkChangingError";
+  }
+}
+
 /** The Node error code (`ENOENT`, `EISDIR`…) of an fs failure, if any. */
 export function errnoCode(err: unknown): string | undefined {
   if (typeof err === "object" && err !== null && "code" in err) {

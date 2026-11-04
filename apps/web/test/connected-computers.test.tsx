@@ -78,8 +78,9 @@ describe("uploaded files in the Drive", () => {
     const dialog = screen().getByRole("dialog", { name: "grafico.png" });
     expect(dialog.textContent).toContain("Arquivo");
     expect(dialog.querySelector(".ac-details__subtitle")?.textContent).toMatch(/7\s?(byte|B)/);
-    const img = within(dialog).getByRole("img", { name: "Imagem: grafico.png" });
-    expect(img.getAttribute("src")).toMatch(/^blob:preview-/);
+    // The picture stays hidden (and nameless) until it has loaded and been fitted: its stage carries the name.
+    const img = within(dialog).getByRole("group", { name: "Imagem: grafico.png" }).querySelector("img");
+    expect(img?.getAttribute("src")).toMatch(/^blob:preview-/);
     // Text kinds' Editar never shows for files; Baixar saves the original with its name.
     expect(within(dialog).queryByRole("button", { name: "Editar" })).toBeNull();
     await click(within(dialog).getByRole("button", { name: "Baixar" }));

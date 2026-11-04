@@ -738,6 +738,9 @@
       "agent_unreached_other": "一项例行工作无法呼叫智能体",
       "routine_waiting_plan_other": "例行工作正在等待套餐额度重置",
       "plan_reset_unknown_other": "{{plan}} 没有说明额度何时重置",
+      "catch_up_closed_other": "{{names}} 跳过了 {{count}} 个无需回复的对话",
+      "catch_up_closed_asker_other": "{{names}} 没有回复：{{who}} 已经处理好了",
+      "catch_up_closed_asker_task_other": "{{names}} 没有回复：{{who}} 取消了任务",
       "reaction_other": "{{names}} 回应了",
       "browser_handoff_other": "{{names}} 需要你在浏览器中操作",
       "secret_request_other": "{{names}} 需要你提供一个密钥",
@@ -746,6 +749,7 @@
       "computer_ready_other": "你的工作区电脑已就绪",
       "invitation_accepted_other": "{{names}} 接受了你的邀请",
       "composio_limit_other": "此工作区已用完本月的 Composio 调用次数",
+      "change_request_other": "{{names}} 请求调整团队",
       "browser_profile_request_other": "{{names}} 请求再增加一个浏览器配置文件",
       "connector_tool_changed_other": "一个已连接的服务器更改了你批准过的工具",
       "computer_disk_full_other": "一台电脑的磁盘快满了",
@@ -1548,28 +1552,11 @@
     "offline": "没有网络连接。正在重试。"
   },
   "onb": {
-    "progress": "第 {{n}} 步，共 {{total}} 步",
-    "done": "完成",
-    "optional": "可选",
-    "back": "返回",
     "logo": "标志",
     "logoHelp": "可选。",
     "logoPick": "选择",
     "zone": "时区：{{zone}}",
-    "importSources": "智能体从哪里来",
-    "importLead": "在网页版的“设置 › 导入和导出”中导入。",
-    "importSkip": "我没有，跳过",
-    "agentsAda": "我已经在这里了",
-    "agentsLead": "看看还有谁加入。",
-    "share": "分享邀请链接",
     "shareMessage": "在 agentes.chat 上加入 {{org}}：{{url}}",
-    "shareNote": "每个申请加入的人都需要你批准。",
-    "emailsPlaceholder": "name@company.com",
-    "membersNote": "他们将以成员身份加入。",
-    "invalidEmail": "请检查这个邮箱地址。",
-    "invitesFailed": "无法发送这些邀请，请重试。",
-    "removeEmail": "移除 {{email}}",
-    "later": "以后再说",
     "failed": "无法保存，请重试。"
   },
   "ai": {
@@ -1861,5 +1848,71 @@
     "noEmoji": "无表情",
     "cleared": "状态已清除",
     "bySelfUntil": "由 {{name}} 填写 · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "仅你自己 · 你自己的小组件",
+    "loadFailed": "无法加载仪表盘。",
+    "onlyHome": "工作区或你的角色的仪表盘会显示在这里。",
+    "create": "创建",
+    "routineTarget": "它的小组件",
+    "pin": {
+      "which": "哪个图表"
+    },
+    "organize": {
+      "hint": "按住小组件拖到新位置，或使用箭头，并为每个选择大小。点“完成”保存顺序。",
+      "holdHint": "按住并拖动即可移动。",
+      "up": "上移",
+      "down": "下移",
+      "position": "第 {{at}} 个，共 {{count}} 个",
+      "saved": "仪表盘已整理"
+    },
+    "edit": {
+      "saved": "仪表盘已保存"
+    },
+    "pinned": "已置顶",
+    "unpinned": "已取消置顶",
+    "sizeHint": {
+      "s": "手机上占半行，网页上占仪表盘的四分之一。",
+      "m": "手机上占整行，网页上占仪表盘的一半。",
+      "l": "占整行，放大显示。网页上占仪表盘的一半，高度加倍。"
+    },
+    "widget": {
+      "caresFor": "{{name}} 负责",
+      "refreshing": "{{name}} 正在更新。",
+      "scheduleSaved": "现在{{schedule}}更新",
+      "alertSaved": "提醒已保存",
+      "removed": "小组件已移除。它的例行工作已停止。",
+      "routine": "它的例行工作",
+      "onBoard": "所在位置",
+      "title": "标题",
+      "titlePlaceholder": "小组件的简短名称",
+      "titleSaved": "标题已保存"
+    },
+    "formatAuto": "{{name}} 会选最合适的",
+    "newWidget": {
+      "titleHint": "标题 · {{name}} 会在测试时建议一个",
+      "alerts": "提醒已开",
+      "realData": "真实数据",
+      "editAsk": "修改需求",
+      "asked": "“{{ask}}”",
+      "autoFormat": "自动形式"
+    },
+    "agentPick": {
+      "search": "搜索智能体",
+      "noMatch": "没有这个名称或角色的智能体。",
+      "note": "每个智能体只读取它有权访问的应用。",
+      "reads": "读取 {{apps}}",
+      "noApps": "没有已连接的应用"
+    },
+    "notice": {
+      "widget_alert_other": "{{names}} 对一个小组件发出了提醒",
+      "widget_failed_other": "{{names}} 未能更新一个小组件",
+      "dashboard_proposal_other": "{{names}} 想发布一个仪表盘",
+      "card": {
+        "alert": "提醒",
+        "failed": "未更新",
+        "proposal": "仪表盘"
+      }
+    }
   }
 }

@@ -309,3 +309,28 @@ describe("an agent whose AI provider is down", () => {
     expect(row("o1").textContent).not.toContain("esperando sua resposta");
   });
 });
+
+describe("an agent waiting on its plan's limit", () => {
+  test("its run parked says so under the message, and its popover too, never that it waits for an answer", async () => {
+    const state = seedState();
+    state.messages = [
+      said("p1", "O build passou?", 2, {
+        receipts: {
+          seenBy: [ADA_ID],
+          pickedBy: [ADA_ID],
+          handled: [{ agentId: ADA_ID, runId: "r-plan", status: "waiting_input", usage: "plan" }],
+          decidedBy: { step: "jev" },
+        },
+      }),
+    ];
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    expect(row("p1").textContent).toContain("Ada responde quando o plano renovar");
+    expect(row("p1").textContent).not.toContain("esperando sua resposta");
+    await act(async () => fireEvent.click(row("p1").querySelector(".ac-receipt__check") as HTMLElement));
+    await settle(2);
+    const popover = screen().getByRole("dialog", { name: "Agentes" });
+    expect(within(popover).getByText("Responde quando o plano renovar")).toBeTruthy();
+    expect(popover.textContent).not.toContain("Escolhido pelo Jev");
+  });
+});

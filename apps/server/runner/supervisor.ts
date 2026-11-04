@@ -42,7 +42,7 @@ import { type BindPolicyOptions, ensureBrowserBindPolicy } from "./browser-bind-
 import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
-import { errnoCode, RunnerError, toMachineError } from "./errors";
+import { errnoCode, NetworkChangingError, RunnerError, toMachineError } from "./errors";
 import { localCloneSlot } from "./git";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
@@ -115,6 +115,8 @@ const SCOPE_ENTERS_PER_MINUTE = 30;
 const SCOPE_SHOW_MS = 2000;
 const SCOPE_POLL_MS = 20;
 const SECRET_INSTALL_MS = 20_000;
+const NETWORK_SWITCH_MARGIN_S = 30;
+const NETWORK_SWITCH_POLL_MS = 500;
 /** Clone slots one worker may hold or wait for at once. */
 const MAX_WORKER_SLOTS = 64;
 /** How long `reclaimBrains` waits for a worker's answer (a close waits up to `RECLAIM_EXIT_MS` for the CLI to exit). */
@@ -455,13 +457,24 @@ export class Supervisor {
   async run(sent: MachineRequest, scope: RequestScope): Promise<unknown> {
     // A grant is root's alone to give: never one the server put in the request.
     const { grant: _forged, ...clean } = sent as MachineRequest & { grant?: unknown };
-    const req = clean as MachineRequest;
+    let req = clean as MachineRequest;
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
     if (this.closed) throw new RunnerError("dropped", STOPPING);
     const now = this.opts.now ?? Date.now;
     const since = now();
     const cold = BROWSER_SETUP_OPS.has(req.op) && this.workers.get(String(req.agent.id))?.ready !== true;
-    const w = this.entry(this.opts.user(req.agent));
+    let w = this.entryNow(req.agent);
+    if (!w) {
+      const started = Date.now();
+      w = await this.entryAfterNetworkSwitch(req.agent, "dropped", scope.signal);
+      // The server's deadline for these is their own timeout plus a fixed slack, so the wait comes out of the
+      // command's time rather than getting it cancelled partway through.
+      if (req.op === "exec" || req.op === "git.sync") {
+        const left = Math.floor(Math.max(1, req.timeoutSeconds) - (Date.now() - started) / 1000);
+        if (left < 1) throw new NetworkChangingError(0);
+        req = { ...req, timeoutSeconds: left };
+      }
+    }
     let grant: AccountGrant | null = null;
     // Its turn, route or Claude Code/Codex task gets the account root keeps with it, or reads the account's folder
     // as the agent's user; a folder it can't have is `account_missing` there.
@@ -508,7 +521,7 @@ export class Supervisor {
   async secret(req: Extract<MachineRequest, { op: "secret" }>, scope: RequestScope): Promise<MachineReplies["secret"]> {
     if (!req.agent) throw new RunnerError("bad_request", "Secrets belong to an agent");
     if (this.closed) throw new RunnerError("internal", STOPPING);
-    const w = this.entry(this.opts.user(req.agent));
+    const w = this.entryNow(req.agent) ?? (await this.entryAfterNetworkSwitch(req.agent, "internal", scope.signal));
     if (req.action === "discard" || req.action === "keypair")
       return handleSecret(this.secretRoot, req.agent, this.opts.home, req, { storageOnly: true });
     if (req.action === "remove") {
@@ -756,7 +769,7 @@ export class Supervisor {
    */
   async showBrowser(agent: AgentScope, installing: () => void): Promise<void> {
     if (this.closed) throw new RunnerError("internal", STOPPING);
-    const w = this.entry(this.opts.user(agent));
+    const w = this.entryNow(agent) ?? (await this.entryAfterNetworkSwitch(agent, "internal"));
     await this.ready(w, new AbortController().signal);
     if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
     const showId = String(++this.seq);
@@ -814,6 +827,41 @@ export class Supervisor {
   }
 
   // ── Workers ────────────────────────────────────────────────────────────────
+
+  /** The agent's worker, or null while its network is switching (`entryAfterNetworkSwitch`). */
+  private entryNow(agent: AgentScope): Worker | null {
+    try {
+      return this.entry(this.opts.user(agent));
+    } catch (error) {
+      if (error instanceof NetworkChangingError) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * The switch completes once the agent's old sessions retire (idle, or forced at the drain deadline), so new work
+   * waits for it instead of failing; past the deadline plus a margin it fails with the switch's own message.
+   */
+  private async entryAfterNetworkSwitch(
+    agent: AgentScope,
+    closedCode: "dropped" | "internal",
+    signal?: AbortSignal,
+  ): Promise<Worker> {
+    let until: number | undefined;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, NETWORK_SWITCH_POLL_MS));
+      // A closing supervisor's workers no longer count as running, so the check alone would hand back a worker
+      // that never starts again.
+      if (this.closed) throw new RunnerError(closedCode, STOPPING);
+      try {
+        return this.entry(this.opts.user(agent));
+      } catch (error) {
+        if (!(error instanceof NetworkChangingError)) throw error;
+        until ??= Date.now() + (error.drainSeconds + NETWORK_SWITCH_MARGIN_S) * 1000;
+        if (signal?.aborted || Date.now() >= until) throw error;
+      }
+    }
+  }
 
   private entry(user: AgentUser, resolveNetwork = true): Worker {
     let w = this.workers.get(user.id);

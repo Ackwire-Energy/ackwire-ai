@@ -30,6 +30,7 @@ import { chatRoutes } from "./routes/app/chat";
 import { connectorRoutes } from "./routes/app/connectors";
 import { customConnectorRoutes } from "./routes/app/connectors-custom";
 import { type AppDeps, agentDetailsGate } from "./routes/app/context";
+import { dashboardRoutes } from "./routes/app/dashboards";
 import { databaseRoutes } from "./routes/app/databases";
 import { desktopRoutes } from "./routes/app/desktop";
 import { dmRoutes } from "./routes/app/dms";
@@ -203,6 +204,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", machineAppRoutes(deps));
     api.route("/app", machineAccountRoutes(deps));
     api.route("/app", planUsageRoutes(deps));
+    api.route("/app", dashboardRoutes(deps));
     api.route("/app", telemetryRoutes(deps));
     api.route("/app", jevRoutes(deps));
     api.route("/app", gifKeyRoutes(deps));

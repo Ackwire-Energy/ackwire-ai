@@ -501,7 +501,7 @@
     "otherLead": "Je bent ingelogd als {{other}}. Log in met het uitgenodigde e-mailadres en je komt in {{org}} terecht.",
     "switch": "Inloggen als {{email}}",
     "fullTitle": "{{org}} heeft nu geen plek meer vrij.",
-    "fullLead": "Je uitnodiging werkt nog. Komt er een plek vrij, dan doe je mee via deze zelfde link.",
+    "fullLead": "Je uitnodiging werkt nog. Vraag wie je heeft uitgenodigd om een plek vrij te maken, en je doet mee via deze zelfde link.",
     "fullFine": "Er is geen account aangemaakt. Je hoeft niets te doen tot er een plek vrijkomt.",
     "usedTitle": "Je zit al in {{org}}.",
     "usedLead": "Deze uitnodiging is gebruikt op {{date}}. Open hem gewoon.",
@@ -1513,7 +1513,6 @@
       "writing": "schrijft"
     },
     "autoReplyChip": "antwoordt zonder vermelding",
-    "coordinatorChip": "coördineert het team",
     "more": "Meer berichtacties",
     "copyLink": "Link kopiëren",
     "linkCopied": "Link gekopieerd.",
@@ -1634,6 +1633,14 @@
     "queued_other": "{{names}} staan in de rij voor de computer",
     "away_one": "{{names}} wacht op de computer",
     "away_other": "{{names}} wachten op de computer",
+    "plan_one": "{{names}} antwoordt als het abonnement opnieuw begint",
+    "plan_other": "{{names}} antwoorden als het abonnement opnieuw begint",
+    "budget_one": "{{names}} antwoordt als het budget vernieuwt",
+    "budget_other": "{{names}} antwoorden als het budget vernieuwt",
+    "line_one": "{{names}} begint als ander werk klaar is",
+    "line_other": "{{names}} beginnen als ander werk klaar is",
+    "canceled_one": "{{names}} antwoordt niet",
+    "canceled_other": "{{names}} antwoorden niet",
     "queuedNext": "{{names}} staat in de wachtrij van de computer · is de volgende",
     "nobody": "Geen agent gaat antwoorden",
     "status": {
@@ -1645,6 +1652,10 @@
       "outage": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
       "queued": "In de rij voor de computer",
       "away": "Wacht op de computer",
+      "plan": "Antwoordt als het abonnement opnieuw begint",
+      "budget": "Antwoordt als het budget vernieuwt",
+      "line": "Begint als ander werk klaar is",
+      "canceled": "Geannuleerd",
       "handled": "Beantwoord",
       "failed": "Mislukt",
       "referenced": "Alleen genoemd",
@@ -1660,29 +1671,126 @@
     "mentionNeededHint": "Geen AI hier kon een agent voor dit bericht kiezen. Noem een agent om hem te roepen.",
     "picking": "Kiest wie antwoordt",
     "by": {
-      "jev": "Gekozen door Jev",
-      "model": "Gekozen door {{model}}",
-      "planYours": "Gekozen door je {{brand}}-abonnement",
-      "planOf": "Gekozen door het {{brand}}-abonnement van {{person}}",
       "reply": "Een antwoord aan {{name}}",
       "only_agent": "Alleen {{name}} antwoordt hier zonder vermelding",
       "follow_up": "Volgt het gesprek met {{name}}",
-      "coordinator": "{{name}} coördineert het team",
       "default": "Niemand werd geroepen, dus {{name}} antwoordde"
     }
   },
-  "coordinator": {
-    "chip": "Coördineert het team",
-    "help": "Neemt de berichten die een agent nodig hebben als geen andere agent ze heeft opgepakt, en geeft het werk aan wie er verstand van heeft. Werkt in kanalen waar hij uit zichzelf antwoordt.",
-    "help_female": "Neemt de berichten die een agent nodig hebben als geen andere agent ze heeft opgepakt, en geeft het werk aan wie er verstand van heeft. Werkt in kanalen waar zij uit zichzelf antwoordt.",
-    "one": "Er coördineert één agent tegelijk.",
-    "current": "{{name}} coördineert nu het team.",
-    "current_female": "{{name}} coördineert nu het team.",
-    "none": "Niemand coördineert nu het team.",
-    "archive": "{{name}} coördineert het team. Hierna doet niemand dat tot iemand een andere agent kiest.",
-    "archive_female": "{{name}} coördineert het team. Hierna doet niemand dat tot iemand een andere agent kiest.",
-    "yes": "Ja",
-    "no": "Nee"
+  "rightHand": {
+    "label": "je rechterhand",
+    "newDot": "Nieuw",
+    "callWith": "roep aan met @{{handle}}",
+    "role": "Workspace-assistent",
+    "actsAsYou": "handelt met jouw rechten",
+    "composerHint": "niets verandert zonder jou",
+    "intro": {
+      "greeting": "Hoi, ik ben {{name}}. Ik bouw het team samen met jou.",
+      "lead": "Ik maak de agents, koppel de apps en nodig de mensen uit. Niets verandert zonder jouw klik, en ik doe alleen wat jij mag doen.",
+      "connect": {
+        "title": "Een AI voor het team koppelen",
+        "text": "De agents denken met de AI van de workspace. Log in met je Claude- of ChatGPT-abonnement, zonder API-sleutel.",
+        "action": "Koppelen"
+      },
+      "start": {
+        "question": "Hoe wil je beginnen?",
+        "createOne": "{{name}} maken",
+        "team": "Een startteam samenstellen",
+        "describe": "Beschrijven wat ik nodig heb",
+        "import": "Mijn agents importeren",
+        "form": "Het formulier invullen"
+      },
+      "next": {
+        "question": "Het team is er. En nu?",
+        "invite": "Mensen uitnodigen",
+        "firstTask": "{{name}} een eerste taak geven"
+      },
+      "firstTask": {
+        "theo": "Maak het plan voor onze eerste week: wat doet ieder van ons eerst?",
+        "ada": "Wat zou je als eerste voor ons kunnen bouwen of automatiseren?",
+        "lia": "Wie zijn onze 5 naaste concurrenten, en wat doen ze beter dan wij?",
+        "atlas": "Wat ga je als eerste volgen in onze fouten, wachtrijen en deploys, en hoe laat je het me weten als er iets stukgaat?"
+      }
+    },
+    "profile": {
+      "how": "Zo werkt het",
+      "permissions": "Handelt met jouw rechten",
+      "private": "Praat alleen met jou in je DM",
+      "channels": "Antwoordt in kanalen als je hem roept",
+      "model": "Model",
+      "message": "Bericht",
+      "configure": "Instellen"
+    },
+    "settings": {
+      "name": "Naam en uiterlijk",
+      "nameHelp": "In de zijbalk staat er altijd “{{label}}” bij.",
+      "changeLook": "Uiterlijk wijzigen",
+      "ai": "AI en model",
+      "aiHelp": "Automatisch kiest het goedkoopste model dat het werk aankan.",
+      "budget": "Maandbudget",
+      "perMonth": "/maand",
+      "budgetHelp": "Bij de limiet stopt hij en laat het weten, zoals elke agent.",
+      "audience": "Wie het mag gebruiken",
+      "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
+      "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Hij plaatst niets zolang niemand met hem praat.",
+      "audit": "Bekijk wat {{name}} deed"
+    },
+    "card": {
+      "settings": "{{name}} · Instellingen",
+      "apply": "Toepassen",
+      "dismiss": "Negeren",
+      "decline": "Weigeren",
+      "askAdmin": "Een admin vragen",
+      "sentTo": "Verstuurd naar {{names}} · {{when}}",
+      "sentToAny": "Verstuurd naar wie beslist · {{when}}",
+      "appliedBy": "Toegepast door {{name}}",
+      "appliedByYou": "Toegepast door jou",
+      "declinedBy": "Geweigerd door {{name}}",
+      "declinedByYou": "Geweigerd door jou",
+      "undo": "Ongedaan maken",
+      "undone": "Ongedaan gemaakt",
+      "stale": "Verouderd",
+      "staleHelp": "{{name}} is veranderd sinds deze kaart. Er is niets toegepast.",
+      "redo": "Opnieuw",
+      "redoMessage": "Maak de kaart voor {{name}} opnieuw met de huidige waarden",
+      "createTest": "Maken en testen",
+      "to": "naar",
+      "editFirst": "Eerst bewerken",
+      "superseded": "Vervangen door het nieuwere voorstel",
+      "onlyCreators": "Alleen admins maken agents",
+      "only": {
+        "model": "Alleen admins wijzigen het model van een agent",
+        "budget": "Alleen admins wijzigen het budget van een agent",
+        "owner": "Alleen admins wijzigen wie verantwoordelijk is voor een agent",
+        "archive": "Alleen admins archiveren een agent",
+        "audience": "Alleen admins en de verantwoordelijke wijzigen wie met hem praat",
+        "channels": "Alleen admins en de verantwoordelijke wijzigen zijn kanalen",
+        "ai_account": "Alleen de eigenaar van het account geeft het",
+        "many": "Alleen admins maken deze wijzigingen"
+      }
+    },
+    "field": {
+      "model": "Model",
+      "ai_account": "AI-account",
+      "budget": "Maandbudget",
+      "owner": "Verantwoordelijke",
+      "audience": "Wie mag praten",
+      "archive": "Status",
+      "channel": "Kanaal"
+    },
+    "value": {
+      "none": "Geen",
+      "budgetDefault": "Standaard van de workspace",
+      "anAccount": "Een AI-account",
+      "everyone": "Iedereen",
+      "ownerOnly": "Alleen de verantwoordelijke",
+      "somePeople": "Sommige mensen",
+      "active": "Actief",
+      "archived": "Gearchiveerd",
+      "notIn": "Niet in het kanaal",
+      "withoutMention": "Uit zichzelf",
+      "mentionOnly": "Alleen bij vermelding"
+    }
   },
   "routing": {
     "title": "Wie de agents kiest",
@@ -1924,10 +2032,56 @@
     "ended": "Dit werk is beëindigd voordat het werd opgepakt",
     "canceled": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
     "dontRun": "Niet uitvoeren",
+    "dontRunThese": "Deze {{count}} niet uitvoeren",
     "dontRunHint": "Annuleren: er draait niets als de limiet opnieuw begint",
     "dontRunForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het annuleren",
+    "answerAnyway": "Toch antwoorden",
+    "answerAnywayHint": "Antwoordt nu en leest alles wat sindsdien is geschreven",
+    "answerAnywayForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan dit vragen",
     "extraTitle": "Lang werk mag betaald extra gebruik gebruiken",
     "extraHint": "Met extra gebruik aan in het abonnement gaat lang werk door na 95%. Uit pauzeert het bij 95% en gaat het verder als het abonnement opnieuw begint."
+  },
+  "usageQueue": {
+    "title_one": "{{agent}} heeft {{count}} gesprek om op te pakken",
+    "title_other": "{{agent}} heeft {{count}} gesprekken om op te pakken",
+    "line": "Gaat {{when}} verder, als het {{plan}}-abonnement opnieuw begint. Eén tegelijk, in deze volgorde.",
+    "lineUnknown": "Gaat verder zodra het {{plan}}-abonnement opnieuw begint. Eén tegelijk, in deze volgorde.",
+    "lineBudget": "Gaat {{when}} verder, als het budget vernieuwt, of eerder als een admin het verhoogt. Eén tegelijk, in deze volgorde.",
+    "shared": "De rij hoort bij het abonnement: {{agents}} delen hetzelfde account.",
+    "dm": "DM met {{name}}",
+    "yourDm": "Jouw DM",
+    "thread": "Thread in #{{channel}}",
+    "routine": "Routine {{name}}",
+    "work": "Werk: {{name}}",
+    "askedBy": "Gevraagd door {{names}} · {{ago}}",
+    "paused": "Gepauzeerd {{ago}}",
+    "after_one": "{{count}} bericht sindsdien",
+    "after_other": "{{count}} berichten sindsdien",
+    "nothingAfter": "Sindsdien niets",
+    "wrote_one": "{{names}} schreef sindsdien",
+    "wrote_other": "{{names}} schreven sindsdien",
+    "queued": "In de rij",
+    "answering": "Antwoordt nu",
+    "hidden_one": "+{{count}} in gesprekken die je niet ziet",
+    "hidden_other": "+{{count}} in gesprekken die je niet ziet",
+    "dontRunAll": "Geen enkele uitvoeren",
+    "confirmAll_one": "{{count}} gesprek niet uitvoeren?",
+    "confirmAll_other": "Deze {{count}} gesprekken niet uitvoeren?",
+    "yesDontRun": "Ja, niet uitvoeren",
+    "keep": "Behouden",
+    "canceledAll_one": "{{count}} gesprek geannuleerd. {{agent}} beantwoordt het niet als de limiet terug is.",
+    "canceledAll_other": "{{count}} gesprekken geannuleerd. {{agent}} beantwoordt ze niet als de limiet terug is.",
+    "empty": "Niets wacht om opgepakt te worden.",
+    "waiting_one": "{{count}} gesprek wacht",
+    "waiting_other": "{{count}} gesprekken wachten",
+    "closedTitle_one": "{{count}} had geen antwoord nodig",
+    "closedTitle_other": "{{count}} hadden geen antwoord nodig",
+    "closedWhy": "Ze leken geregeld, dus {{agent}} heeft niet geantwoord.",
+    "closedLine": "Ze leken geregeld, dus {{agent}} heeft niet geantwoord. Heeft er een nog een antwoord nodig, kies dan Toch antwoorden.",
+    "seeConversation": "Gesprek bekijken",
+    "answeredAnyway": "Iemand vroeg toch om een antwoord",
+    "toResume": "Om op te pakken",
+    "switchAi": "AI van {{name}} wijzigen"
   },
   "actionCard": {
     "connect_ai": {
@@ -2083,6 +2237,9 @@
     "skill": {
       "created": "Wat ik leerde omgezet in de skill <b>{{name}}</b>",
       "updated": "Skill <b>{{name}}</b> verbeterd"
+    },
+    "agent": {
+      "settings_changed": "Heb de instellingen van <b>{{agentName}}</b> gewijzigd"
     },
     "other": "Iets gewijzigd",
     "copyWebhook": "Webhookadres kopiëren",
@@ -2254,7 +2411,6 @@
     "replyMentionHelp": "Antwoordt alleen als iemand @{{handle}} schrijft",
     "aloneLine": "Doet uit zichzelf mee aan het gesprek",
     "aloneLine_female": "Doet uit zichzelf mee aan het gesprek",
-    "coordinatorLine": "Coördineert het team: pakt op wat niemand oppakte",
     "mentionLine": "Wacht tot iemand @{{handle}} schrijft",
     "readOnly": "Alleen de maker van het kanaal en beheerders wijzigen de leden.",
     "people": "Mensen",
@@ -2408,6 +2564,15 @@
     "archived": "Gearchiveerd",
     "join": "Lid worden",
     "open": "Openen"
+  },
+  "messageRefs": {
+    "copy": "Link naar bericht kopiëren",
+    "message": "Bericht",
+    "thread": "Thread",
+    "label": "Bericht van {{author}} in #{{name}}",
+    "threadLabel": "Bericht van {{author}} in een thread in #{{name}}",
+    "dmLabel": "Bericht van {{author}} in het DM met {{name}}",
+    "noAccess": "Bericht zonder toegang"
   },
   "secret": {
     "group": "Geheim verzoek van {{agent}}",
@@ -3004,6 +3169,7 @@
     },
     "working": {
       "title": "Nu bezig",
+      "none": "Er werkt nu geen agent.",
       "dm": "In jouw gesprek",
       "in": "#{{channel}}",
       "mission": "Missie · {{done}} van {{total}}"
@@ -3173,6 +3339,12 @@
       "browserProfileRequest": "<b>{{name}}</b> vraagt om nog een browserprofiel voor <b>{{agent}}</b>",
       "routineWaitingPlan": "<b>{{name}}</b> wacht tot zijn abonnement wordt gereset om een routine uit te voeren",
       "planResetUnknown": "{{plan}} heeft niet gezegd wanneer de limiet wordt gereset. Het werk van <b>{{name}}</b> wacht nog.",
+      "catchUpClosed_one": "<b>{{name}}</b> is terug en heeft {{count}} gesprek overgeslagen dat geen antwoord nodig had",
+      "catchUpClosed_other": "<b>{{name}}</b> is terug en heeft {{count}} gesprekken overgeslagen die geen antwoord nodig hadden",
+      "catchUpClosedAsker": "<b>{{name}}</b> heeft niet geantwoord in {{label}}: {{who}} heeft het al geregeld",
+      "catchUpClosedAskerAny": "<b>{{name}}</b> heeft niet geantwoord: {{who}} heeft het al geregeld",
+      "catchUpClosedAskerTask": "<b>{{name}}</b> heeft niet geantwoord in {{label}}: {{who}} heeft de taak geannuleerd",
+      "catchUpClosedAskerTaskAny": "<b>{{name}}</b> heeft niet geantwoord: {{who}} heeft de taak geannuleerd",
       "machineConnected": "<b>{{name}}</b> heeft de computer <b>{{label}}</b> gekoppeld",
       "machineConnectedAny": "<b>{{name}}</b> heeft een computer gekoppeld",
       "browserHandoff": "<b>{{name}}</b> heeft je nodig in de browser",
@@ -3181,6 +3353,8 @@
       "joinRequest": "<b>{{name}}</b> vraagt om mee te doen",
       "joinRequestMany": "<b>{{names}}</b> vragen om mee te doen",
       "joinSuggestion": "<b>{{by}}</b> stelde <b>{{name}}</b> voor",
+      "changeRequest": "<b>{{name}}</b> vraagt een wijziging voor <b>{{agent}}</b>",
+      "changeRequestAgent": "<b>{{name}}</b> vraagt een nieuwe agent: <b>{{agent}}</b>",
       "invitationAccepted": "<b>{{name}}</b> heeft je uitnodiging geaccepteerd en doet mee in {{org}}",
       "invitationAcceptedAny": "<b>{{name}}</b> heeft je uitnodiging geaccepteerd",
       "reaction_one": "<b>{{names}}</b> heeft op je bericht gereageerd",
@@ -3200,7 +3374,8 @@
       "browser": "Browser",
       "members": "Leden",
       "usage": "Gebruik",
-      "connectors": "Connectors"
+      "connectors": "Connectors",
+      "dashboard": "Dashboard"
     },
     "reactions_one": "{{count}} reactie",
     "reactions_other": "{{count}} reacties",
@@ -3793,8 +3968,7 @@
       "brain": "Wie denkt",
       "repos": "GitHub-repository's",
       "group": "Groep",
-      "handle": "Vermeldingen",
-      "coordinator": "Coördineert het team"
+      "handle": "Vermeldingen"
     },
     "lines": {
       "added_one": "{{count}} nieuwe regel",
@@ -4206,6 +4380,7 @@
     "proposesManyChanges": "<b>{{agent}}</b> stelt voor · wijzigingen voor {{count}} agents",
     "targetInstructions": "instructies van {{name}}",
     "targetRole": "rol van {{name}}",
+    "targetSettings": "instellingen van {{name}}",
     "targetAccess": "toegang van {{name}}",
     "targetSkill": "de skill {{skill}}",
     "targetChanges": "wijzigingen voor {{name}}",
@@ -4251,6 +4426,7 @@
     "titleInstructions": "Instructies van {{name}} bijwerken",
     "titleRole": "Rol van {{name}} wijzigen",
     "titleAccess": "Toegang van {{name}} wijzigen",
+    "titleSettings": "De instellingen van {{name}} wijzigen",
     "titleSkill": "De skill {{skill}} verbeteren",
     "titleContext": "De context van {{org}} bijwerken",
     "evidence": {
@@ -5442,13 +5618,18 @@
     "subtitle": "Wat de agents zelf doen, volgens een schema of als er iets gebeurt.",
     "new": "Nieuwe routine",
     "deliversTo": "{{agent}} · levert in {{target}}",
+    "widgetLine": "{{agent}} · werkt zijn widget bij, zonder bericht",
+    "widgetChip": "Dashboardwidget",
+    "widgetFixed": "Wat hij toont, wanneer hij bijwerkt en wie ervoor zorgt, pas je aan in zijn widget.",
     "target": {
       "forum": "Een forumonderwerp",
       "forumShort": "Forum",
       "dm": "Mijn DM met de agent",
       "artifact": "Een document in de Drive",
       "dmShort": "DM",
-      "artifactShort": "Drive"
+      "artifactShort": "Drive",
+      "widget": "Een dashboardwidget",
+      "widgetNamed": "De widget “{{title}}”"
     },
     "active": "Actief",
     "activeLabel": "Actief: {{name}}",
@@ -5543,7 +5724,8 @@
         "channel": "Iedereen in het kanaal ziet het",
         "dm": "Alleen jij ziet het",
         "forum": "De agents overleggen in een forumonderwerp",
-        "artifact": "Wordt een document in de Drive"
+        "artifact": "Wordt een document in de Drive",
+        "widget": "Werkt zijn widget bij, zonder bericht"
       },
       "ahead": "Klaargezet voor later",
       "createdBy": "Gemaakt door {{name}} · {{date}}",
@@ -7081,6 +7263,7 @@
     "autoUpdateHelp": "Leest de link elke dag. Nieuwe tekst komt erin met Ongedaan maken. Wijzigingen in scripts wachten op iemand die skills beheert.",
     "autoChip": "Werkt zichzelf bij",
     "waitingChip": "Update wacht",
+    "waitingChipEdited": "Link en agents hebben gewijzigd",
     "lastUpdate": "Bijgewerkt vanaf de link {{when}}",
     "undoUpdate": "Update ongedaan maken",
     "undone": "{{name}} is terug naar versie {{version}}.",
@@ -7089,16 +7272,47 @@
     "agentsImproveThis": "Agents verbeteren deze skill zelf",
     "agentChange": "{{agent}} heeft hem gewijzigd {{when}}",
     "undoAgentChange": "Wijziging ongedaan maken",
+    "undo": "Ongedaan maken",
+    "chosenLink": "Versie van de link gekozen {{when}}",
+    "history": {
+      "title": "Wijzigingen door agents",
+      "empty": "Nog geen agent heeft deze skill gewijzigd.",
+      "show": "Wijziging tonen",
+      "hide": "Wijziging verbergen",
+      "undone": "ongedaan gemaakt"
+    },
+    "diff": {
+      "label": "Wijzigingen bekijken",
+      "agents": "Wat agents veranderden",
+      "link": "Wat er in de link veranderde",
+      "compare": "Huidig × link",
+      "same": "De tekst is in beide hetzelfde.",
+      "files": "Bestanden die draaien",
+      "newFile": "nieuw",
+      "changedFile": "gewijzigd",
+      "large": "Te groot om hier te tonen. Bekijk het in de link.",
+      "unavailable": "Gebruik Bijwerken vanaf link om te zien wat er verandert."
+    },
     "pending": {
       "title": "De update vanaf de link wijzigt bestanden die worden uitgevoerd: {{files}}",
       "lead": "Pas het alleen toe als je deze bestanden vertrouwt. Agents voeren ze uit op hun computers.",
-      "edited": "De update via de link zou vervangen wat agents eraan hebben veranderd",
-      "editedLead": "Pas hem toe om de versie van de link te nemen. Je kunt het daarna ongedaan maken.",
+      "edited": "De link heeft een nieuwe versie, en agents hebben deze skill ook gewijzigd",
+      "editedLead": "Kies welke versie blijft. Je kunt het daarna ongedaan maken.",
       "apply": "Update toepassen",
       "dismiss": "Niet toepassen",
       "applied": "{{name}} bijgewerkt vanaf de link.",
       "changedAgain": "De link is weer gewijzigd. Bekijk de nieuwe bestanden.",
-      "dismissed": "Update niet toegepast. Een nieuwe wijziging in de link vraagt het opnieuw."
+      "dismissed": "Update niet toegepast. Een nieuwe wijziging in de link vraagt het opnieuw.",
+      "useLink": "Versie van de link gebruiken",
+      "keepAgents": "Die van de agents houden",
+      "usedLink": "{{name}} gebruikt nu de versie van de link.",
+      "keptAgents": "{{name}} houdt de versie van de agents.",
+      "reopened": "De update van {{name}} wacht weer.",
+      "linkSince": "Nieuwe versie in de link {{when}}",
+      "keptLine": "Versie van de agents gehouden {{when}}",
+      "notAppliedLine": "Update via de link niet toegepast {{when}}",
+      "byAgents_one": "{{names}} heeft deze skill gewijzigd, laatst {{when}}",
+      "byAgents_other": "{{names}} hebben deze skill gewijzigd, laatst {{when}}"
     },
     "updateFailed": {
       "no_skill_md": "Bijwerken lukte niet: de link heeft geen SKILL.md meer.",
@@ -7111,7 +7325,7 @@
     "notice": {
       "updated": "{{name}} is bijgewerkt vanaf de link",
       "waiting": "Een update van {{name}} wijzigt de scripts",
-      "waitingEdited": "Een update van {{name}} zou vervangen wat agents hebben veranderd",
+      "waitingEdited": "{{name}} is veranderd in de link en door agents: kies welke versie blijft",
       "failed": "{{name}} kon niet bijwerken vanaf de link",
       "edited": "Agents hebben {{name}} verbeterd"
     },
@@ -10199,7 +10413,7 @@
     "nameHelp": "Hoe de database er voor jou en de agents uitziet.",
     "namePlaceholder": "Bijv.: Productie",
     "url": "Adres van de database",
-    "urlHelp": "Begint met postgres://. Versleuteld opgeslagen op de server. Niemand ziet het nog, ook de agents niet.",
+    "urlHelp": "Begint met postgres://. De databasenaam aan het eind is optioneel. Versleuteld op de server opgeslagen. Niemand ziet het nog, ook de agents niet.",
     "urlPlaceholder": "postgres://user:wachtwoord@host/db",
     "urlInvalid": "Plak een adres dat begint met postgres://, of vul de velden onder Geavanceerd in.",
     "howTitle": "Hoe maak ik een gebruiker die alleen kan lezen?",
@@ -10252,13 +10466,15 @@
       "unreachable": "We konden de databaseserver niet bereiken. Controleer het adres en of hij verbindingen van buitenaf accepteert.",
       "blocked_host": "Deze server is niet toegestaan. Gebruik het publieke adres van de database (interne adressen, zoals DATABASE_URL van Railway, werken niet vanaf hier).",
       "tls": "De database accepteerde geen beveiligde verbinding. Zet SSL aan in de database, of kies Geen versleuteling onder Geavanceerd (alleen voor testdatabases).",
-      "unknown": "Kon nu geen verbinding maken. Probeer het zo opnieuw."
+      "unknown": "Kon nu geen verbinding maken. Probeer het zo opnieuw.",
+      "no_databases": "Deze gebruiker kan geen enkele database op deze server openen. Controleer de rechten of het begin van de naam."
     },
     "connect": "Koppelen",
     "connectedToast": "{{name}} gekoppeld.",
     "testing": {
       "reach": "De database bereiken…",
-      "tables": "De tabellen bekijken…"
+      "tables": "De tabellen bekijken…",
+      "databases": "Databases bekijken…"
     },
     "canWrite": "Deze gebruiker kan data wijzigen. Agents lezen hoe dan ook alleen, maar het veiligst is een gebruiker die alleen kan lezen (zie in stap 1 hoe je die maakt).",
     "toolsLead": "Wat agents kunnen doen in {{name}}. Voorlopig lezen ze alleen: er wordt niets gewijzigd in de database.",
@@ -10306,15 +10522,50 @@
       "timeout": "Tijdslimiet per query",
       "timeoutHelp": "Een query die langer duurt, wordt geannuleerd, zodat hij de database niet belast.",
       "seconds_one": "{{count}} seconde",
-      "seconds_other": "{{count}} seconden"
+      "seconds_other": "{{count}} seconden",
+      "databases": "Databases",
+      "databasesAll": "Alle",
+      "databasesSome": "Alleen deze",
+      "databasePlaceholder": "Naam van de database",
+      "databasesHelp": "De regels hieronder gelden voor elke database die deze agent leest.",
+      "tablesIn": "Tabellen (gezien in {{database}})",
+      "capHelpAll": "Leeg = geen limiet. Opgeteld over alle databases."
     },
     "agent": {
       "title": "Databases",
       "help": "Databases die {{org}} heeft gekoppeld. De agent leest alleen.",
       "levelText": "Bevraagt de tabellen die de regels toestaan, alleen lezen.",
       "rulesOf": "Regels in {{name}}",
-      "saved": "Databasetoegang van {{name}} opgeslagen."
-    }
+      "saved": "Databasetoegang van {{name}} opgeslagen.",
+      "allDatabases": "Alle databases van {{name}}",
+      "someDatabases_one": "{{count}} database van {{name}}",
+      "someDatabases_other": "{{count}} databases van {{name}}"
+    },
+    "scope": "Welke databases",
+    "scopeOne": "Alleen deze database",
+    "scopeAll": "Alle databases op deze server",
+    "scopeAllHelp": "Voor één database per klant. Agents zien de lijst en kiezen bij elke query de database.",
+    "prefix": "Alleen namen die beginnen met",
+    "prefixPlaceholder": "Bijv. klant_",
+    "prefixHelp": "Leeg laten voor alle. Nieuwe databases met dit begin verschijnen vanzelf.",
+    "databaseOptional": "Optioneel bij alle databases.",
+    "connectedToastAll_one": "{{name}} verbonden met {{count}} database.",
+    "connectedToastAll_other": "{{name}} verbonden met {{count}} databases.",
+    "howAll": "Om alle databases te lezen (Postgres 14 of nieuwer).",
+    "count_one": "{{count}} database",
+    "count_other": "{{count}} databases",
+    "prefixRow": "databases die beginnen met {{prefix}}",
+    "refresh": "Lijst vernieuwen",
+    "refreshName": "Lijst met databases van {{name}} vernieuwen",
+    "scopeEdit": "Databases",
+    "scopeEditName": "Databases van {{name}}",
+    "scopeSaved": "{{name}} opgeslagen.",
+    "widenTitle": "De hele server openen?",
+    "widenTitlePrefix": "Meer databases openen?",
+    "widenText_one": "De agent met toegang leest dan alle databases op deze server. Per agent beperken kan bij Regels.",
+    "widenText_other": "De {{count}} agents met toegang lezen dan alle databases op deze server. Per agent beperken kan bij Regels.",
+    "widenTextPrefix_one": "De agent met toegang leest dan alle databases die beginnen met {{prefix}}. Per agent beperken kan bij Regels.",
+    "widenTextPrefix_other": "De {{count}} agents met toegang lezen dan alle databases die beginnen met {{prefix}}. Per agent beperken kan bij Regels."
   },
   "mail": {
     "choice": {
@@ -10680,7 +10931,19 @@
     "imageAlt": "Afbeelding: {{title}}",
     "pdfFrame": "PDF: {{title}}",
     "tooBigToPreview": "Te groot voor een voorbeeld. Download het om het te openen.",
-    "downloadOnly": "Geen voorbeeld voor dit soort bestand. Download het om het te openen."
+    "downloadOnly": "Geen voorbeeld voor dit soort bestand. Download het om het te openen.",
+    "zoom": {
+      "toolbar": "Zoom",
+      "in": "Inzoomen",
+      "out": "Uitzoomen",
+      "fit": "Passend",
+      "actual": "Ware grootte",
+      "lens": "Vergrootglas",
+      "hint": "Klik, knijp of gebruik het scrollwiel om in te zoomen",
+      "hintZoomed": "Sleep om te verschuiven. Esc maakt het weer passend",
+      "hintTouch": "Tik of knijp om in te zoomen",
+      "hintZoomedTouch": "Sleep om te verschuiven. Tik om het weer passend te maken"
+    }
   },
   "errors": {
     "connector": {
@@ -10758,7 +11021,7 @@
     },
     "org": {
       "createInviteOnly": "Nieuwe werkruimtes hebben voorlopig een uitnodiging nodig.",
-      "membersFull": "Er is nu geen plek meer voor extra mensen in deze werkruimte. Laat het weten aan wie je heeft uitgenodigd.",
+      "membersFull": "Alle plekken in deze werkruimte zijn nu bezet. Vraag wie je heeft uitgenodigd om een plek vrij te maken.",
       "deleting": "Deze werkruimte wordt verwijderd.",
       "notRestorable": "Deze werkruimte kan niet meer hersteld worden."
     },
@@ -11392,7 +11655,6 @@
         "install": "Toevoegen aan {{app}}"
       },
       "note": {
-        "untested": "We hebben inloggen vanuit deze app nog niet getest. Lukt het niet, laat het ons weten.",
         "chatgptPlans": "Op betaalde ChatGPT-abonnementen, niet op Free of Go. Bij Business kunnen alleen admins hem toevoegen.",
         "chatgptPhone": "Toevoegen kan niet vanuit de telefoon-app. Zodra hij op het web is toegevoegd, verschijnt hij ook op desktop en telefoon.",
         "geminiPlans": "Alleen op het web, met een persoonlijk Google-account. Mogelijk is Google AI Pro of Ultra nodig.",
@@ -11680,6 +11942,7 @@
       "account": "Je account",
       "notifications": "Meldingen",
       "general": "Algemeen",
+      "right_hand": "Rechterhand",
       "members": "Leden en uitnodigingen",
       "roles": "Rollen en rechten",
       "vault": "Vault",
@@ -11701,6 +11964,7 @@
       "account": "Je profiel en hoe de app er voor jou uitziet.",
       "notifications": "De inbox bewaart alles. Hier kies je wat je als melding bereikt, in deze werkruimte.",
       "general": "Naam, tijdzone en wat elke agent over de werkruimte weet.",
+      "right_hand": "De assistent die met elke persoon het team samenstelt, in hun DM en met hun rechten.",
       "members": "Wie er in de werkruimte zit, en uitnodigingen.",
       "roles": "Wat iedereen kan doen. Rollen tellen op.",
       "vault": "Wachtwoorden, sleutels en contactgegevens die je agenten gebruiken. Ze typen wachtwoorden en gebruiken sleutels zonder ze ooit te zien.",
@@ -12443,6 +12707,12 @@
       "plan_limit_wait_unknown": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord zodra de limiet reset.",
       "budget_wait": "Mijn budget voor deze maand is op. Ik ga {{when}} verder, of eerder als een beheerder het verhoogt.",
       "usage_wait_canceled": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
+      "usage_wait_archived": "Het draait niet: de agent is gearchiveerd.",
+      "usage_wait_closed_solved": "Ik heb niet geantwoord: {{name}} heeft het al geregeld.",
+      "usage_wait_closed_withdrawn": "Ik heb niet geantwoord: {{name}} zei dat het niet meer nodig is.",
+      "usage_wait_closed_task_canceled": "Ik heb niet geantwoord: {{name}} heeft de taak geannuleerd.",
+      "usage_wait_closed_mixed": "Ik heb niet geantwoord: wat hier gevraagd werd, is al geregeld.",
+      "usage_wait_anyway": "{{name}} vroeg me om toch te antwoorden.",
       "usage_paused": "{{agent}} heeft dit werk gepauzeerd · {{plan}}-abonnement op {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} heeft dit werk gepauzeerd · maandbudget op {{percent}}%",
       "work_auto_moved": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates, de volgende over ongeveer {{minutes}} min.",
@@ -12462,6 +12732,7 @@
       "action_install_skill": "Een skill installeren",
       "action_update_skills": "Skills bijwerken",
       "agent_proposal": "Nieuwe agent voorgesteld: {{name}}",
+      "settings_proposal": "Stelde een wijziging voor {{names}} voor",
       "approval_request": "Goedkeuringsverzoek: {{title}}",
       "secret_request": "{{agent}} vroeg om een sleutel: {{name}}",
       "secret_requestAnon": "Vroeg om een sleutel: {{name}}",
@@ -13318,6 +13589,8 @@
     "people": "Mensen",
     "files": "Bestanden",
     "usedOf": "{{used}} van {{limit}}",
+    "seatsPaid_one": "{{count}} betaalde plek",
+    "seatsPaid_other": "{{count}} betaalde plekken",
     "noLimit": "Geen limiet",
     "ownBucket": "Op je eigen bucket, zonder limiet van ons"
   },
@@ -13326,7 +13599,16 @@
       "full": "Deze werkruimte heeft {{members}} van de {{limit}} mensen.",
       "fullOne": "Het agentes.chat-abonnement van deze werkruimte is voor 1 persoon.",
       "fullAdmin": "Bekijk de opties van het agentes.chat-abonnement om meer mensen toe te voegen.",
-      "fullMember": "Vraag degene die de werkruimte beheert om ruimte te maken."
+      "fullMember": "Vraag degene die de werkruimte beheert om ruimte te maken.",
+      "fullAddSeat": "Alle betaalde plekken zijn bezet. Voeg een plek toe in Abonnement en facturatie.",
+      "fullTop": "Dit abonnement heeft geen ruimte voor meer mensen. Kies een ander abonnement in Abonnement en facturatie.",
+      "fullMemberSeat": "Vraag degene die de werkruimte beheert om een plek toe te voegen.",
+      "fullAskPayerSeat": "Vraag {{payer}}, die voor deze werkruimte betaalt, om een plek toe te voegen.",
+      "fullAskSeat": "Vraag degene die voor deze werkruimte betaalt om een plek toe te voegen.",
+      "fullAskPayerTop": "Vraag {{payer}}, die voor deze werkruimte betaalt, om een ander abonnement te kiezen.",
+      "fullAskTop": "Vraag degene die voor deze werkruimte betaalt om een ander abonnement te kiezen.",
+      "fullPhone": "Alle betaalde plekken zijn bezet. Neem contact op met degene die voor deze werkruimte betaalt.",
+      "fullPhonePayer": "Alle betaalde plekken zijn bezet."
     },
     "storage": {
       "meter": "Je hebt {{used}} van {{limit}} gebruikt.",
@@ -13814,6 +14096,433 @@
         "done": "Vandaag klaar"
       },
       "none": "{{name}} is nu vrij."
+    }
+  },
+  "widgets": {
+    "kinds": {
+      "auto": "Automatisch",
+      "kpi": "Getal",
+      "goal": "Doel",
+      "bars": "Staven",
+      "line": "Lijn",
+      "list": "Lijst",
+      "text": "Samenvatting"
+    },
+    "schedules": {
+      "half": "Elke 30 minuten",
+      "hour": "Elk uur",
+      "day": "Elke dag om 8:00",
+      "week": "Elke maandag om 8:00",
+      "manual": "Alleen als je erom vraagt"
+    },
+    "schedulesShort": {
+      "half": "30 minuten",
+      "hour": "Elk uur",
+      "day": "Elke dag · 8:00",
+      "week": "Elke maandag",
+      "manual": "Op verzoek"
+    },
+    "schedulesInline": {
+      "half": "elke 30 minuten",
+      "hour": "elk uur",
+      "day": "elke dag om 8:00",
+      "week": "elke maandag om 8:00",
+      "manual": "op verzoek"
+    },
+    "sizes": {
+      "label": "Grootte",
+      "s": "S",
+      "m": "M",
+      "l": "L"
+    },
+    "sizeNames": {
+      "s": "Klein",
+      "m": "Middel",
+      "l": "Groot"
+    },
+    "sizeHints": {
+      "s": "Eén vak",
+      "m": "Twee kolommen",
+      "l": "Twee kolommen, twee rijen"
+    },
+    "status": {
+      "building": "{{name}} bouwt de widget en de routine die hem bijwerkt…",
+      "updating": "{{name}} werkt bij…",
+      "failed": "Niet bijgewerkt"
+    },
+    "foot": "{{name}} · {{when}} · {{schedule}}",
+    "failure": {
+      "resolve": "Oplossen",
+      "agent_reported": "{{detail}}",
+      "no_update": "De laatste update eindigde zonder gegevens.",
+      "error": "De laatste update is mislukt.",
+      "budget_exceeded": "{{name}} heeft het budget voor deze maand bereikt.",
+      "waiting_computer": "De computer van {{name}} is niet bereikbaar.",
+      "waiting_plan": "Het abonnement van {{name}} zit aan de limiet.",
+      "waiting_budget": "Het budget van {{name}} zit aan de limiet.",
+      "creator_left": "Wie hem heeft ingesteld, heeft de werkruimte verlaten.",
+      "creator_no_access": "Wie hem heeft ingesteld, kan hem niet meer gebruiken.",
+      "agent_archived": "{{name}} is gearchiveerd.",
+      "audience": "Wie hem heeft ingesteld, kan niet meer met {{name}} praten.",
+      "failing": "Hij is meerdere keren achter elkaar mislukt en gestopt.",
+      "stopped": "De update is gestopt.",
+      "missing_credential": "{{name}} heeft geen AI-sleutel of abonnement om mee te werken.",
+      "timeout": "De update duurde te lang.",
+      "invalid_data": "{{name}} kon de gegevens niet in deze vorm zetten."
+    },
+    "menu": {
+      "label": "Meer",
+      "open": "Openen",
+      "refresh": "Nu bijwerken",
+      "change": "{{name}} om een wijziging vragen",
+      "schedule": "Wijzigen wanneer hij bijwerkt",
+      "removeHome": "Verwijderen van Start",
+      "removeBoard": "Verwijderen van dashboard"
+    },
+    "organize": {
+      "start": "Ordenen",
+      "done": "Klaar",
+      "size": "Grootte",
+      "remove": "Verwijderen",
+      "drag": "Sleep om te verplaatsen",
+      "fixed": "Vast",
+      "role": "verplaatsbare widget",
+      "help": "Spatie of Enter pakt de kaart op, de pijltjes verplaatsen hem, Spatie of Enter zet hem neer en Esc annuleert. Alleen de pijltjes verplaatsen hem één plek.",
+      "picked": "Je hebt “{{title}}” opgepakt. De pijltjes verplaatsen hem, Spatie zet hem neer, Esc annuleert.",
+      "moved": "“{{title}}”: positie {{position}} van {{total}}.",
+      "dropped": "Je hebt “{{title}}” neergezet op positie {{position}} van {{total}}.",
+      "canceled": "“{{title}}” staat weer op zijn plek."
+    },
+    "add": {
+      "label": "Widget toevoegen",
+      "short": "Widget"
+    },
+    "alert": {
+      "label": "Laat het me weten als er iets mis is",
+      "hint": "De melding komt in “Wacht op jou”, met wat er veranderd is.",
+      "condition": "Melden als",
+      "placeholder": "er iets mis is",
+      "line": "Melden als {{condition}}",
+      "lineAny": "Melden als er iets mis is",
+      "where": "In “Wacht op jou”",
+      "none": "Geen meldingen"
+    },
+    "cost": {
+      "day": "≈ {{amount}} per dag van het budget van {{name}}",
+      "week": "≈ {{amount}} per week van het budget van {{name}}",
+      "manual": "Kost alleen iets als je om een update vraagt",
+      "plan": "Gebruikt het abonnement van {{name}}",
+      "unknown": "Elke update gebruikt het budget van {{name}}"
+    },
+    "exposure": "Wie het dashboard ziet, ziet wat de agents hebben opgehaald, ook zonder toegang tot de accounts waar het vandaan komt. Agents maken ook dashboards. Om er een aan meer mensen te tonen dan wie erom vroeg, vragen ze het eerst, in “Wacht op jou”.",
+    "panel": {
+      "caresFor": "{{name}} zorgt voor deze widget",
+      "caresForOn": "{{name}} zorgt voor deze widget · {{board}}",
+      "how": "Hoe hij bijwerkt",
+      "next": "Routine van {{name}} · volgende {{when}}",
+      "noRoutine": "Werkt niet vanzelf bij",
+      "askAnytime": "Je kunt in het menu om een update vragen",
+      "editRoutine": "Routine bewerken",
+      "changeAlert": "Wijzigen",
+      "reads": "Wat {{name}} leest om hem te bouwen",
+      "history": "Laatste updates",
+      "noHistory": "Nog geen updates.",
+      "alerted": "gemeld: {{text}}",
+      "changed": "Gewijzigd: {{text}}",
+      "ask": "Om een wijziging vragen",
+      "askPlaceholder": "Bijv.: splits het per kanaal, of vergelijk met dezelfde week vorig jaar",
+      "askTo": "aan {{name}}",
+      "send": "Versturen",
+      "sent": "{{name}} maakt de widget opnieuw.",
+      "updated": "Bijgewerkt",
+      "rename": "Hernoemen",
+      "titleLabel": "Titel van de widget"
+    },
+    "notice": {
+      "alert": "<b>{{name}}</b> heeft “{{title}}” gemarkeerd",
+      "failed": "“{{title}}” wordt niet meer bijgewerkt",
+      "proposal": "<b>{{name}}</b> wil een dashboard publiceren",
+      "proposalWorkspace": "“{{title}}” voor de hele werkruimte · vandaag zie alleen jij het",
+      "proposalRoles": "“{{title}}” voor {{roles}} · vandaag zie alleen jij het",
+      "openBoard": "Dashboard bekijken",
+      "openWidget": "Widget openen",
+      "resolving": "“{{title}}” wordt opnieuw bijgewerkt"
+    },
+    "example": {
+      "days": {
+        "d1": "wo",
+        "d2": "do",
+        "d3": "vr",
+        "d4": "za",
+        "d5": "zo",
+        "d6": "ma",
+        "d7": "di"
+      },
+      "vsYesterday": "t.o.v. gisteren",
+      "goalLine": "48 van 100",
+      "goalNote": "In dit tempo is het op de 29e bereikt.",
+      "lineNote": "40 gisteren · +48% deze week",
+      "row1": "Eerste item",
+      "row2": "Tweede item",
+      "row3": "Derde item",
+      "meta1": "nu",
+      "meta2": "1 u geleden",
+      "meta3": "gisteren",
+      "item1": "Een korte samenvatting van wat er veranderd is.",
+      "item2": "De agent schrijft hem bij elke update opnieuw."
+    },
+    "preview": {
+      "label": "Voorbeeld",
+      "example": "voorbeeldgegevens"
+    },
+    "pin": {
+      "action": "Vastzetten",
+      "label": "Vastzetten op een dashboard",
+      "done": "Vastgezet op {{where}}",
+      "doneUpdating": "Vastgezet op {{where}} · {{name}} maakt hem {{schedule}} opnieuw",
+      "subtitle": "Hij houdt de gegevens van de grafiek. Zijn agent kan hem ook actueel houden.",
+      "open": "Openen"
+    },
+    "home": "Mijn start",
+    "untitled": "Nieuwe widget",
+    "updatedAgo": "bijgewerkt {{when}}",
+    "removed": {
+      "home": "“{{title}}” staat niet meer op Start en de routine van {{name}} is gestopt",
+      "board": "“{{title}}” staat niet meer op het dashboard en de routine van {{name}} is gestopt"
+    },
+    "removeConfirm": {
+      "title": "“{{title}}” verwijderen?",
+      "textRoutine": "De routine van {{name}} die hem bijwerkt stopt, en zijn updategeschiedenis gaat mee.",
+      "textManual": "Zijn updategeschiedenis gaat mee.",
+      "confirm": "Verwijderen"
+    }
+  },
+  "agentPicker": {
+    "search": "Agents zoeken",
+    "list": "Agents",
+    "empty": "Geen agent past bij “{{q}}”",
+    "noConnectors": "Geen connectors",
+    "more": "+{{count}}"
+  },
+  "dashboards": {
+    "title": "Dashboards",
+    "subtitle": "Getallen en grafieken die de agents actueel houden, voor de werkruimte of alleen voor sommige rollen.",
+    "sidebar": "Dashboards",
+    "navWhat": "Getallen en grafieken die de agents actueel houden",
+    "new": "Nieuw dashboard",
+    "back": "Dashboards",
+    "home": "Mijn start",
+    "seeAll": "Alles bekijken",
+    "useOnHome": "Op Start tonen",
+    "stopOnHome": "Van Start halen",
+    "onHome": "Op Start",
+    "onHomeDone": "Start toont nu dit dashboard",
+    "groups": {
+      "workspace": "Werkruimte",
+      "workspaceHint": "iedereen ziet het",
+      "roles": "Jouw rollen",
+      "rolesHint": "je zit in {{roles}}",
+      "mine": "Alleen van jou",
+      "mineHint": "niemand anders ziet ze"
+    },
+    "audience": {
+      "label": "Wie het ziet",
+      "workspace": "Hele werkruimte",
+      "workspaceHint_one": "{{count}} lid ziet het en vindt het bij Dashboards",
+      "workspaceHint_other": "Alle {{count}} leden zien het en vinden het bij Dashboards",
+      "roles": "Rollen",
+      "rolesHint": "Alleen mensen met een van de gekozen rollen",
+      "private": "Alleen jij",
+      "privateHint": "Niemand anders ziet het tot je het deelt",
+      "noRoles": "De werkruimte heeft nog geen rollen.",
+      "people_one": "{{count}} persoon",
+      "people_other": "{{count}} personen"
+    },
+    "edit": {
+      "label": "Wie bewerkt",
+      "viewers": "Wie het ziet",
+      "owner": "Alleen jij en beheerders",
+      "roles": "Of mensen met deze rollen",
+      "twoRoles": "{{first}} en {{second}}",
+      "manyRoles_one": "{{count}} rol",
+      "manyRoles_other": "{{count}} rollen",
+      "cantSee": "Ziet dit dashboard niet",
+      "someRoles": "Enkele rollen…",
+      "rolesNote": "Mensen met deze rollen bewerken het als ze het ook zien. Jij en beheerders altijd."
+    },
+    "meta": {
+      "by": "Gemaakt door {{name}}",
+      "byYou": "Door jou gemaakt",
+      "widgets_one": "{{count}} widget",
+      "widgets_other": "{{count}} widgets",
+      "updated": "bijgewerkt {{when}}"
+    },
+    "share": {
+      "action": "Delen",
+      "title": "“{{title}}” delen",
+      "access": "Wie toegang heeft",
+      "you": "{{name}} (jij)",
+      "owner": "Eigenaar van de werkruimte",
+      "edits": "Bewerkt",
+      "sees": "Ziet",
+      "none": "Ziet niet",
+      "copyLink": "Link kopiëren",
+      "copied": "Link gekopieerd",
+      "save": "Opslaan",
+      "nowWorkspace": "“{{title}}” is nu van de werkruimte",
+      "nowPrivate": "Alleen jij ziet “{{title}}”",
+      "nowRoles": "{{roles}} zien “{{title}}”"
+    },
+    "proposal": {
+      "title": "{{name}} heeft dit dashboard voor je gemaakt",
+      "workspace": "En stelt voor het in de hele werkruimte te publiceren. Vandaag zie alleen jij het.",
+      "roles": "En stelt voor het aan {{roles}} te tonen. Vandaag zie alleen jij het.",
+      "keep": "Alleen voor mij houden",
+      "publishWorkspace": "In de werkruimte publiceren",
+      "publishRoles": "Aan {{roles}} tonen",
+      "published": "“{{title}}” is gepubliceerd",
+      "kept": "Alleen jij ziet “{{title}}”"
+    },
+    "empty": {
+      "title": "Leeg dashboard",
+      "text": "Voeg widgets toe: vraag het een agent of zet een blok uit de chat vast."
+    },
+    "onlyHome": "Maak met “Nieuw dashboard” een dashboard voor de werkruimte of voor sommige rollen.",
+    "create": {
+      "title": "Nieuw dashboard",
+      "subtitle": "Widgets samen op één pagina, voor jou of voor het team.",
+      "name": "Naam",
+      "namePlaceholder": "Bijv.: Verkoop, Black Friday, Kwartaaldoelen",
+      "askHint": "Je kunt ook in een chat een agent vragen er een te maken.",
+      "submit": "Dashboard maken",
+      "created": "“{{title}}” gemaakt"
+    },
+    "newWidget": {
+      "title": "Nieuwe widget",
+      "subtitle": "Een getal, grafiek of lijst die een agent actueel houdt.",
+      "tabAsk": "Een agent vragen",
+      "tabPin": "Vastzetten uit de chat",
+      "what": "Wat wil je volgen?",
+      "whatPlaceholder": "Bijv.: de verkoop van vandaag vergeleken met gisteren",
+      "who": "Wie ervoor zorgt",
+      "format": "Vorm",
+      "updates": "Bijwerken",
+      "destination": "Toevoegen aan",
+      "create": "Widget maken",
+      "pin": "Vastzetten",
+      "fromChat": "Blokken die de agents in de chat stuurden",
+      "pinHint": "Je kunt ook direct vanuit het bericht vastzetten: “Vastzetten” op het blok.",
+      "keepUpdated": "Actueel houden",
+      "onlyPin": "Nee, alleen vastzetten",
+      "emptyPreview": "Zeg wat je wilt volgen en {{name}} laat hier zien hoe het eruitziet.",
+      "pickBlock": "Kies een blok uit de chat.",
+      "noBlocks": "Nog geen grafieken in je gesprekken.",
+      "suggestions": "Suggesties",
+      "theAgent": "De agent",
+      "noAgents": "Nog geen agent met wie je kunt praten.",
+      "place": {
+        "channel": "{{name}} in #{{channel}} · {{when}}",
+        "thread": "{{name}} in een thread in #{{channel}} · {{when}}",
+        "dm": "{{name}} in jullie gesprek · {{when}}",
+        "unnamed": "{{name}} in een gesprek · {{when}}"
+      },
+      "steps": {
+        "builds": "{{name}} bouwt hem nu, met echte gegevens",
+        "reads": "Leest {{sources}}",
+        "routine": "Maakt de routine “{{title}}”",
+        "routineHint": "{{schedule}} · staat in Routines",
+        "noRoutine": "Geen routine: werkt bij als je erom vraagt",
+        "alert": "Meldt in “Wacht op jou” als {{condition}}",
+        "alertHint": "Anders werkt hij alleen de widget bij, zonder bericht",
+        "noAlert": "Geen meldingen",
+        "noAlertHint": "Werkt alleen de widget bij, zonder bericht",
+        "pinAsIs": "Zet het blok vast zoals het in de chat staat",
+        "redoes": "{{name}} maakt hem {{schedule}} opnieuw",
+        "redoesHint": "Met een routine, zonder bericht in de chat",
+        "noRedo": "Werkt niet vanzelf bij",
+        "noRedoHint": "Je kunt in het menu om een update vragen"
+      },
+      "created": "Widget toegevoegd aan {{where}}",
+      "test": "Testen",
+      "testAgain": "Opnieuw testen",
+      "testing": "{{name}} bouwt hem met echte gegevens…",
+      "tested": "Echte gegevens · {{when}}",
+      "stale": "Gewijzigd sinds de test",
+      "testFailed": "Het is niet gelukt: {{reason}}",
+      "tryAgain": "Opnieuw proberen",
+      "testCost": "Deze test kostte {{cost}}",
+      "testFirst": "Test hem eerst om het echte resultaat te zien",
+      "titleField": "Titel",
+      "titlePlaceholder": "Titel · {{name}} stelt er een voor bij het testen",
+      "cardSubtitle": "Schrijf op de kaart wat je wilt zien. Tik op de onderdelen om te wijzigen wie ervoor zorgt, wanneer hij bijwerkt, de melding en de grootte.",
+      "pinTitle": "Een blok uit de chat vastzetten",
+      "pinSubtitle": "De kaart komt uit de chat. Jij kiest de titel en of hij opnieuw gemaakt wordt.",
+      "pickFromChat": "Kies een blok dat een agent al heeft gestuurd:",
+      "orPin": "Of zet een blok vast dat al in de chat kwam",
+      "repick": "Ander blok kiezen",
+      "formatAuto": "Automatische vorm",
+      "enterTests": "Enter test opnieuw",
+      "quoted": "“{{ask}}”",
+      "editAsk": "Vraag wijzigen",
+      "editAskOf": "Vraag wijzigen: {{ask}}",
+      "testingShort": "Testen…",
+      "buildingFoot": "{{name}} bouwt hem…",
+      "failedTitle": "{{name}} kon hem niet bouwen",
+      "staleHint": "Test opnieuw om te zien hoe het eruitziet.",
+      "whoButton": "Wie ervoor zorgt: {{name}}",
+      "whoHint": "Wie ervoor zorgt, bouwt de widget met wat hij via zijn connectors leest.",
+      "alert": "Melding",
+      "alertOn": "Melding aan",
+      "alertDone": "Klaar",
+      "manual": "Alleen als ik het vraag",
+      "manualInline": "alleen als ik het vraag",
+      "noUpdate": "Niet bijwerken",
+      "noUpdateInline": "werkt niet bij",
+      "inRoutines": "de routine staat in Routines",
+      "pinAsIs": "Blijft zoals hij is, zonder routine",
+      "pinRedoes": "{{name}} maakt hem {{schedule}} opnieuw met een routine",
+      "formatHints": {
+        "auto": "{{name}} kiest de vorm die het het best laat zien",
+        "kpi": "Eén groot getal en hoe het veranderde",
+        "goal": "De voortgang naar een doel",
+        "bars": "Een paar waarden naast elkaar",
+        "line": "Hoe het veranderde in de tijd",
+        "list": "Een korte lijst met items",
+        "text": "Een paar zinnen die het samenvatten"
+      }
+    },
+    "pinTop": "Bovenaan vastzetten",
+    "unpin": "Losmaken",
+    "rename": "Hernoemen",
+    "about": "Beschrijving",
+    "aboutPlaceholder": "Waar dit dashboard voor is",
+    "delete": {
+      "action": "Dashboard verwijderen",
+      "title": "“{{title}}” verwijderen?",
+      "text": "De widgets en hun routines gaan ook weg.",
+      "confirm": "Verwijderen",
+      "done": "“{{title}}” verwijderd"
+    },
+    "errors": {
+      "notFound": "Dit dashboard bestaat niet, of je ziet het niet.",
+      "forbidden": "Alleen wie dit dashboard bewerkt, kan dat doen.",
+      "homeFixed": "Je start wordt niet gedeeld of verwijderd.",
+      "rolesRequired": "Kies minstens één rol.",
+      "roleUnknown": "Een van deze rollen bestaat niet meer in de werkruimte.",
+      "titleRequired": "Geef het dashboard een naam.",
+      "tooMany": "De werkruimte heeft het maximale aantal dashboards. Verwijder er eerst een.",
+      "publishForbidden": "Met je rollen kun je geen dashboards aan anderen tonen.",
+      "proposalNone": "Over dat verzoek is al beslist.",
+      "proposalNotYours": "Alleen de persoon die de agent het vroeg, beslist.",
+      "widgetNotFound": "Deze widget bestaat niet meer.",
+      "widgetTooMany": "Dit dashboard is vol. Verwijder een widget of gebruik een ander dashboard.",
+      "scheduledCap": "De werkruimte houdt al {{max}} widgets volgens schema actueel. Laat er een alleen op verzoek bijwerken, of verwijder er een.",
+      "agentUnreachable": "Je kunt niet met deze agent praten.",
+      "agentArchived": "Deze agent is gearchiveerd.",
+      "blockNotFound": "Die grafiek staat niet meer in het bericht.",
+      "notAgentMessage": "Alleen de grafiek van een agent kan worden vastgezet.",
+      "promptRequired": "Zeg wat de widget moet tonen.",
+      "notTested": "Test hem eerst: de widget wordt gemaakt zodra de test lukt."
     }
   }
 }

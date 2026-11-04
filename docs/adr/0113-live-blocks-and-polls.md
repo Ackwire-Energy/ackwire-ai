@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-11-01
-- Code: `packages/engine/src/blocks.ts` (`show_block`, `start_poll`, `votePoll`, `closePoll`, `replyToBlock`, `BLOCK_MANUAL`), `packages/db/src/schema/storage.ts` (`artifacts.in_drive`, `polls`, `poll_votes`), `packages/client/src/lib/block-kit.ts` (the kit), `packages/client/src/lib/blocks.ts` (the page, what a frame may say), `packages/client/src/lib/isolated-page.ts`, web `apps/web/src/components/blocks/*`, phone `apps/mobile/src/features/blocks/*`
+- Code: `packages/engine/src/blocks.ts` (`show_block`, `start_poll`, `votePoll`, `closePoll`, `replyToBlock`, `BLOCK_MANUAL`), `packages/engine/src/block-state.ts` (`setBlockState`, `drawBlock`, `blockStateNotes`), `packages/db/src/schema/storage.ts` (`artifacts.in_drive`, `polls`, `poll_votes`, `block_states`), `packages/client/src/api/queries.ts` (`useSharedBlock`), `packages/client/src/lib/block-kit.ts` (the kit), `packages/client/src/lib/blocks.ts` (the page, what a frame may say), `packages/client/src/lib/isolated-page.ts`, web `apps/web/src/components/blocks/*`, phone `apps/mobile/src/features/blocks/*`
 
 ## Context
 
@@ -26,7 +26,14 @@ Two questions decide the design: how something an agent wrote can run in the con
 - Web: a sandboxed frame with an opaque origin, the policy of ADR 0019 in a fixed prefix, and `frame-src` on our pages.
 - Phone: the web view is the sandbox. MCP Apps requires a nested proxy frame only of hosts that are web pages, and hosts on React Native map the rules onto web view props. Ours has no cookies, storage or file access, opens no windows, and refuses every navigation in `onShouldStartLoadWithRequest` with `originWhitelist` open: an address refused by that list would be handed to the system to open, which is itself a way out.
 - It doesn't scroll by itself in the list (`scrollEnabled` and `nestedScrollEnabled` off): on Android a web view that takes a drag never gives it back to the list. Its height comes from the page. On its own pushed screen it scrolls.
+- No DNS prefetch (`x-dns-prefetch-control` before the policy): a lookup of a name the page made up would leave where the policy doesn't reach.
+- What people set is data everywhere it goes: the kit writes it as text, the apps read a frame's messages through `blockEvent`, and the agent reads it inside `untrustedBlock`, with the names people chose. The manual tells agents to write values with `textContent`: a page that used `innerHTML` would run someone else's text, though only inside its own frame.
+- A value that looks like a key or a password (`redactCommon`) is refused, because everyone would see it; the manual sends those to `request_secret`.
 - At most three frames run at once on the phone (`withLiveBlock`), and a frame the system ended comes back with what the person had set.
+
+**One block for everyone.** A block in a conversation is one thing that everyone in it looks at, like a whiteboard, not a copy each. What a person sets in it (a slider, a field, a pick) goes to the server (`block_states`, one state per version of the block) and reaches everyone looking at once (`block.state`, the newest `rev` wins); whoever opens it later starts from there. Only what the person touched is shared: the kit marks the state `used` after a pointer, a key or an input in the page, so what a page sets as it opens stays in that page. A random pick is the server's (`agentes.draw`): a page drawing with its own random numbers gave each person a different winner. The server draws once among the options, uniformly from the system's random source, and records who asked.
+
+**The agent sees what people see.** The state of each block a message showed is read by the agents right after that message, as outside data (`untrustedBlock`), with who set each value and which ones the server drew. Nothing is sent to the agent and no run starts: the next time it reads the conversation, the block is as people left it. So "it came out Bento, go on" works without anyone pressing a button in the block.
 
 **The page proposes, the person sends.** `<ac-send>` makes the page state what it would send; the app shows that text and the button outside the frame, where the page can't reach. A text that changed in the last 400 ms doesn't take a click, so a page can't swap it under the pointer. What goes is a normal message of the person's, addressed to the agent that made the block.
 
@@ -36,7 +43,9 @@ Two questions decide the design: how something an agent wrote can run in the con
 
 - A number in a block comes from a formula the model wrote and can be wrong. The manual asks for it to be shown and called an estimate.
 - A block is a snapshot of the data it was written with. Newer data means the agent shows it again (`block_id`).
-- What a person set in a block lives in that session, not on the server.
+- What anyone sets in a block is stored and seen by everyone in the conversation, as a message is. A block is no place for something private; passwords and keys go through `request_secret`, as before.
+- Two people moving the same control at once each see the other's value arrive: the last one in stays.
+- A block made before this kept results in the page alone. Those still differ per person until the agent shows them again.
 - On the phone, a fourth block on screen shows "Tocar para abrir" until tapped.
 - The manual is about 2.5 KB in every run's tool list; it sits in the cached part of the prompt.
 - `webrtc 'block'` is in the policy, but browsers that don't know that directive ignore it. There, a page could still leak a little through a lookup to a STUN or TURN server of its choosing; closing that needs a block at the browser level, which no web page can set.

@@ -14,7 +14,7 @@ import {
   utf8Bytes,
   withExtension,
 } from "../../src/features/files/logic";
-import { clampZoomTranslate, zoomAround } from "../../src/features/files/zoom";
+import { clampZoomTranslate, containSize, doubleTapZoom, MAX_ZOOM, zoomAround } from "../../src/features/files/zoom";
 
 type Input = Pick<ArtifactDetail, "kind" | "title" | "content">;
 const upload = (name: string, contentType: string, size = 1000, text?: string): Input => ({
@@ -157,5 +157,11 @@ describe("viewer", () => {
     expect(zoomAround({ x: 0, y: 0 }, 1, 2, 0, 0)).toEqual({ x: 0, y: 0 });
     expect(clampZoomTranslate(500, -500, 2, 400, 800)).toEqual({ x: 200, y: -400 });
     expect(clampZoomTranslate(30, 10, 1, 400, 800)).toEqual({ x: 0, y: 0 });
+    // A wide banner drawn 400×100: zoomed 4× it is 1600×400, shorter than the screen, so it can't move up or down.
+    expect(clampZoomTranslate(9999, 9999, 4, 400, 800, 400, 100)).toEqual({ x: 600, y: 0 });
+    expect(containSize(3600, 900, 400, 800)).toEqual({ w: 400, h: 100 });
+    expect(containSize(0, 0, 400, 800)).toEqual({ w: 400, h: 800 });
+    expect(doubleTapZoom(400, 100, 400, 800)).toBe(MAX_ZOOM);
+    expect(doubleTapZoom(400, 600, 400, 800)).toBe(2.5);
   });
 });

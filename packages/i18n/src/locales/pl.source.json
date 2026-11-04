@@ -1239,7 +1239,7 @@
     "value": "{{org}} has no seat left right now."
   },
   "invite.fullLead": {
-    "value": "Your invitation still works. When a seat opens, you join through this same link."
+    "value": "Your invitation still works. Ask whoever invited you to open a seat, and you join through this same link."
   },
   "invite.fullFine": {
     "value": "No account was made. There's nothing to do until a seat opens."
@@ -3490,9 +3490,6 @@
   "team.cap.mail": {
     "value": "Email"
   },
-  "team.cap.vault": {
-    "value": "Vault"
-  },
   "team.cap.custom": {
     "value": "Workspace tools"
   },
@@ -3693,9 +3690,6 @@
   },
   "channel.autoReplyChip": {
     "value": "answers without a mention"
-  },
-  "channel.coordinatorChip": {
-    "value": "coordinates the team"
   },
   "channel.more": {
     "value": "More message actions"
@@ -4036,6 +4030,30 @@
       "other": "{{names}} are waiting for the computer"
     }
   },
+  "receipts.plan": {
+    "value": {
+      "one": "{{names}} answers when the plan resets",
+      "other": "{{names}} answer when the plan resets"
+    }
+  },
+  "receipts.budget": {
+    "value": {
+      "one": "{{names}} answers when the budget renews",
+      "other": "{{names}} answer when the budget renews"
+    }
+  },
+  "receipts.line": {
+    "value": {
+      "one": "{{names}} starts when another work ends",
+      "other": "{{names}} start when other works end"
+    }
+  },
+  "receipts.canceled": {
+    "value": {
+      "one": "{{names}} won't answer",
+      "other": "{{names}} won't answer"
+    }
+  },
   "receipts.queuedNext": {
     "value": "{{names}} is in line for the computer · next"
   },
@@ -4065,6 +4083,18 @@
   },
   "receipts.status.away": {
     "value": "Waiting for the computer"
+  },
+  "receipts.status.plan": {
+    "value": "Answers when the plan resets"
+  },
+  "receipts.status.budget": {
+    "value": "Answers when the budget renews"
+  },
+  "receipts.status.line": {
+    "value": "Starts when another work ends"
+  },
+  "receipts.status.canceled": {
+    "value": "Canceled"
   },
   "receipts.status.handled": {
     "value": "Answered"
@@ -4105,18 +4135,6 @@
   "receipts.picking": {
     "value": "Picking who answers"
   },
-  "receipts.by.jev": {
-    "value": "Picked by Jev"
-  },
-  "receipts.by.model": {
-    "value": "Picked by {{model}}"
-  },
-  "receipts.by.planYours": {
-    "value": "Picked by your {{brand}} plan"
-  },
-  "receipts.by.planOf": {
-    "value": "Picked by {{person}}'s {{brand}} plan"
-  },
   "receipts.by.reply": {
     "value": "A reply to {{name}}"
   },
@@ -4126,36 +4144,8 @@
   "receipts.by.follow_up": {
     "value": "Follows the talk with {{name}}"
   },
-  "receipts.by.coordinator": {
-    "value": "{{name}} coordinates the team"
-  },
   "receipts.by.default": {
     "value": "Nobody was called, so {{name}} answered"
-  },
-  "coordinator.chip": {
-    "value": "Coordinates the team"
-  },
-  "coordinator.help": {
-    "value": "Takes the messages that need an agent when no other agent took them, and hands the work to whoever knows it. Works in channels where he answers on his own.",
-    "female": "Takes the messages that need an agent when no other agent took them, and hands the work to whoever knows it. Works in channels where she answers on her own."
-  },
-  "coordinator.one": {
-    "value": "One agent coordinates at a time."
-  },
-  "coordinator.current": {
-    "value": "{{name}} coordinates the team now."
-  },
-  "coordinator.none": {
-    "value": "Nobody coordinates the team now."
-  },
-  "coordinator.archive": {
-    "value": "{{name}} coordinates the team. After this, nobody does until someone picks another agent."
-  },
-  "coordinator.yes": {
-    "value": "Yes"
-  },
-  "coordinator.no": {
-    "value": "No"
   },
   "routing.title": {
     "value": "Who picks the agents"
@@ -4654,17 +4644,149 @@
   "usageCard.dontRun": {
     "value": "Don't run it"
   },
+  "usageCard.dontRunThese": {
+    "value": "Don't run these {{count}}"
+  },
   "usageCard.dontRunHint": {
     "value": "Cancel it: nothing runs when the limit is back"
   },
   "usageCard.dontRunForbidden": {
     "value": "Only who asked, the agent's owner or an admin can cancel it"
   },
+  "usageCard.answerAnyway": {
+    "value": "Answer anyway"
+  },
+  "usageCard.answerAnywayHint": {
+    "value": "Answers now, reading everything posted since"
+  },
+  "usageCard.answerAnywayForbidden": {
+    "value": "Only who asked, the agent's owner or an admin can ask for this"
+  },
   "usageCard.extraTitle": {
     "value": "Long work may use paid extra usage"
   },
   "usageCard.extraHint": {
     "value": "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets."
+  },
+  "usageQueue.title": {
+    "value": {
+      "one": "{{agent}} has {{count}} conversation to pick up",
+      "other": "{{agent}} has {{count}} conversations to pick up"
+    }
+  },
+  "usageQueue.line": {
+    "value": "Picks up {{when}}, when the {{plan}} plan resets. One at a time, in this order."
+  },
+  "usageQueue.lineUnknown": {
+    "value": "Picks up as soon as the {{plan}} plan resets. One at a time, in this order."
+  },
+  "usageQueue.lineBudget": {
+    "value": "Picks up {{when}}, when the budget renews, or sooner if an admin raises it. One at a time, in this order."
+  },
+  "usageQueue.shared": {
+    "value": "The line belongs to the plan: {{agents}} share the same account."
+  },
+  "usageQueue.dm": {
+    "value": "DM with {{name}}"
+  },
+  "usageQueue.yourDm": {
+    "value": "Your DM"
+  },
+  "usageQueue.thread": {
+    "value": "Thread in #{{channel}}"
+  },
+  "usageQueue.routine": {
+    "value": "Routine {{name}}"
+  },
+  "usageQueue.work": {
+    "value": "Work: {{name}}"
+  },
+  "usageQueue.askedBy": {
+    "value": "Asked by {{names}} · {{ago}}"
+  },
+  "usageQueue.paused": {
+    "value": "Paused {{ago}}"
+  },
+  "usageQueue.after": {
+    "value": {
+      "one": "{{count}} message since",
+      "other": "{{count}} messages since"
+    }
+  },
+  "usageQueue.nothingAfter": {
+    "value": "Nothing since"
+  },
+  "usageQueue.wrote": {
+    "value": {
+      "one": "{{names}} wrote since",
+      "other": "{{names}} wrote since"
+    }
+  },
+  "usageQueue.queued": {
+    "value": "In line"
+  },
+  "usageQueue.answering": {
+    "value": "Answering now"
+  },
+  "usageQueue.hidden": {
+    "value": {
+      "one": "+{{count}} in conversations you can't see",
+      "other": "+{{count}} in conversations you can't see"
+    }
+  },
+  "usageQueue.dontRunAll": {
+    "value": "Don't run any"
+  },
+  "usageQueue.confirmAll": {
+    "value": {
+      "one": "Don't run {{count}} conversation?",
+      "other": "Don't run these {{count}} conversations?"
+    }
+  },
+  "usageQueue.yesDontRun": {
+    "value": "Yes, don't run"
+  },
+  "usageQueue.keep": {
+    "value": "Keep"
+  },
+  "usageQueue.canceledAll": {
+    "value": {
+      "one": "{{count}} conversation canceled. {{agent}} won't answer it when the limit is back.",
+      "other": "{{count}} conversations canceled. {{agent}} won't answer them when the limit is back."
+    }
+  },
+  "usageQueue.empty": {
+    "value": "Nothing waiting to pick up."
+  },
+  "usageQueue.waiting": {
+    "value": {
+      "one": "{{count}} conversation waiting",
+      "other": "{{count}} conversations waiting"
+    }
+  },
+  "usageQueue.closedTitle": {
+    "value": {
+      "one": "{{count}} didn't need an answer",
+      "other": "{{count}} didn't need an answer"
+    }
+  },
+  "usageQueue.closedWhy": {
+    "value": "They looked handled, so {{agent}} didn't answer."
+  },
+  "usageQueue.closedLine": {
+    "value": "They looked handled, so {{agent}} didn't answer. If one still needs an answer, choose Answer anyway."
+  },
+  "usageQueue.seeConversation": {
+    "value": "See conversation"
+  },
+  "usageQueue.answeredAnyway": {
+    "value": "Someone asked for an answer anyway"
+  },
+  "usageQueue.toResume": {
+    "value": "To pick up"
+  },
+  "usageQueue.switchAi": {
+    "value": "Change {{name}}'s AI"
   },
   "actionCard.connect_ai.title": {
     "value": "Connect an AI for {{agents}}"
@@ -5457,9 +5579,6 @@
     "value": "Joins the conversation on his own",
     "female": "Joins the conversation on her own"
   },
-  "channelMembers.coordinatorLine": {
-    "value": "Coordinates the team: takes what nobody took"
-  },
   "channelMembers.mentionLine": {
     "value": "Waits for someone to write @{{handle}}"
   },
@@ -5859,6 +5978,27 @@
   "channelRefs.open": {
     "value": "Open"
   },
+  "messageRefs.copy": {
+    "value": "Copy message link"
+  },
+  "messageRefs.message": {
+    "value": "Message"
+  },
+  "messageRefs.thread": {
+    "value": "Thread"
+  },
+  "messageRefs.label": {
+    "value": "Message from {{author}} in #{{name}}"
+  },
+  "messageRefs.threadLabel": {
+    "value": "Message from {{author}} in a thread in #{{name}}"
+  },
+  "messageRefs.dmLabel": {
+    "value": "Message from {{author}} in the DM with {{name}}"
+  },
+  "messageRefs.noAccess": {
+    "value": "Message you can't see"
+  },
   "secret.group": {
     "value": "Secret request from {{agent}}"
   },
@@ -5945,867 +6085,6 @@
   },
   "agentSecrets.removeFailed": {
     "value": "Couldn't remove it. Is the computer on?"
-  },
-  "vault.tab.label": {
-    "value": "What to show"
-  },
-  "vault.tab.team": {
-    "value": "Team"
-  },
-  "vault.tab.personal": {
-    "value": "Personal"
-  },
-  "vault.tab.connections": {
-    "value": "Connections"
-  },
-  "vault.list.search": {
-    "value": "Search the Vault"
-  },
-  "vault.list.clearSearch": {
-    "value": "Clear the search"
-  },
-  "vault.list.kind": {
-    "value": "Kind"
-  },
-  "vault.list.kindAll": {
-    "value": "All kinds"
-  },
-  "vault.list.noMatch": {
-    "value": "Nothing here matches this search."
-  },
-  "vault.list.clearFilters": {
-    "value": "Clear the search"
-  },
-  "vault.list.personalNote": {
-    "value": "Only you see these. Your agents use them only when you ask."
-  },
-  "vault.list.personalEmpty": {
-    "value": "Nothing saved yet"
-  },
-  "vault.list.personalEmptyText": {
-    "value": "Only you see these. Your agents use them only when you ask."
-  },
-  "vault.list.teamEmpty": {
-    "value": "Nothing shared with the team yet"
-  },
-  "vault.list.teamEmptyText": {
-    "value": "Save a login, a key or contact details once, and choose which agents may use it."
-  },
-  "vault.list.sharedEmpty": {
-    "value": "Nothing shared with you yet"
-  },
-  "vault.list.sharedEmptyText": {
-    "value": "When someone shares a team login or key with you, it shows here."
-  },
-  "vault.row.agents": {
-    "value": {
-      "one": "{{count}} agent",
-      "other": "{{count}} agents"
-    }
-  },
-  "vault.row.used": {
-    "value": "Used {{when}}"
-  },
-  "vault.row.never": {
-    "value": "Never used"
-  },
-  "vault.kind.login": {
-    "value": "Login"
-  },
-  "vault.kind.key": {
-    "value": "Key"
-  },
-  "vault.kind.contact": {
-    "value": "Contact"
-  },
-  "vault.kind.loginText": {
-    "value": "A website's username and password"
-  },
-  "vault.kind.keyText": {
-    "value": "A key your agents use in a command"
-  },
-  "vault.kind.contactText": {
-    "value": "Details agents type in forms"
-  },
-  "vault.kindPlural.login": {
-    "value": "logins"
-  },
-  "vault.kindPlural.key": {
-    "value": "keys"
-  },
-  "vault.kindPlural.contact": {
-    "value": "contacts"
-  },
-  "vault.kindPlural.loginTitle": {
-    "value": "Logins"
-  },
-  "vault.kindPlural.keyTitle": {
-    "value": "Keys"
-  },
-  "vault.kindPlural.contactTitle": {
-    "value": "Contacts"
-  },
-  "vault.scope.personal": {
-    "value": "Personal"
-  },
-  "vault.scope.team": {
-    "value": "Team"
-  },
-  "vault.scope.personalText": {
-    "value": "Only you see it"
-  },
-  "vault.scope.teamText": {
-    "value": "Shared with the workspace"
-  },
-  "vault.field.title": {
-    "value": "Name"
-  },
-  "vault.field.contactTitle": {
-    "value": "Name in the Vault"
-  },
-  "vault.field.loginPlaceholder": {
-    "value": "Company email"
-  },
-  "vault.field.keyPlaceholder": {
-    "value": "Payments key"
-  },
-  "vault.field.contactPlaceholder": {
-    "value": "Billing details"
-  },
-  "vault.field.website": {
-    "value": "Website"
-  },
-  "vault.field.websitePlaceholder": {
-    "value": "app.example.com"
-  },
-  "vault.field.match": {
-    "value": "Where agents may type it"
-  },
-  "vault.field.username": {
-    "value": "Username"
-  },
-  "vault.field.usernamePlaceholder": {
-    "value": "Email or username"
-  },
-  "vault.field.password": {
-    "value": "Password"
-  },
-  "vault.field.keyName": {
-    "value": "Variable name"
-  },
-  "vault.field.keyNameHelp": {
-    "value": "Your agents use the key by this name in a command."
-  },
-  "vault.field.keyNamePlaceholder": {
-    "value": "ACME_API_KEY"
-  },
-  "vault.field.value": {
-    "value": "Value"
-  },
-  "vault.field.description": {
-    "value": "Note for your agents"
-  },
-  "vault.field.descriptionHelp": {
-    "value": "When to use it and what it's for. Agents read this to pick the right one."
-  },
-  "vault.field.descriptionPlaceholder.login": {
-    "value": "The account we use to publish posts"
-  },
-  "vault.field.descriptionPlaceholder.key": {
-    "value": "For the payments service, test mode"
-  },
-  "vault.field.descriptionPlaceholder.contact": {
-    "value": "Use it for the company's invoices"
-  },
-  "vault.match.exact": {
-    "value": "Only this address"
-  },
-  "vault.match.site": {
-    "value": "Whole site"
-  },
-  "vault.match.exactHelp": {
-    "value": "Agents type it only on {{origin}}."
-  },
-  "vault.match.exactHelpNone": {
-    "value": "Agents type it only on this exact address."
-  },
-  "vault.match.siteHelp": {
-    "value": "Agents type it on any page of this site, like a sign-in page on another subdomain."
-  },
-  "vault.contact.group": {
-    "value": "Contact details"
-  },
-  "vault.contact.fullName": {
-    "value": "Full name"
-  },
-  "vault.contact.company": {
-    "value": "Company"
-  },
-  "vault.contact.document": {
-    "value": "Tax ID"
-  },
-  "vault.contact.email": {
-    "value": "Email"
-  },
-  "vault.contact.phone": {
-    "value": "Phone"
-  },
-  "vault.contact.address": {
-    "value": "Address"
-  },
-  "vault.contact.address2": {
-    "value": "Address line 2"
-  },
-  "vault.contact.city": {
-    "value": "City"
-  },
-  "vault.contact.region": {
-    "value": "State or region"
-  },
-  "vault.contact.postalCode": {
-    "value": "Postal code"
-  },
-  "vault.contact.country": {
-    "value": "Country"
-  },
-  "vault.error.title": {
-    "value": "Give it a name."
-  },
-  "vault.error.website": {
-    "value": "Use an https address, like app.example.com."
-  },
-  "vault.error.keyName": {
-    "value": "Use capital letters, numbers and _, starting with a letter, like ACME_API_KEY."
-  },
-  "vault.error.password": {
-    "value": "Type the password."
-  },
-  "vault.error.value": {
-    "value": "Type the value."
-  },
-  "vault.error.contact": {
-    "value": "Fill in at least one field."
-  },
-  "vault.item.missing": {
-    "value": "Missing"
-  },
-  "vault.item.missingText": {
-    "value": "It's gone from {{source}}. Agents can't use it until it's back."
-  },
-  "vault.item.editIn": {
-    "value": "Edit it in {{source}}. Changes arrive here at the next sync."
-  },
-  "vault.item.hidden": {
-    "value": "Hidden"
-  },
-  "vault.item.endsIn": {
-    "value": "ends in {{hint}}"
-  },
-  "vault.item.noValue": {
-    "value": "Nothing saved"
-  },
-  "vault.item.show": {
-    "value": "Show"
-  },
-  "vault.item.hide": {
-    "value": "Hide"
-  },
-  "vault.item.change": {
-    "value": "Change"
-  },
-  "vault.item.add": {
-    "value": "Add"
-  },
-  "vault.item.newPassword": {
-    "value": "New password"
-  },
-  "vault.item.newValue": {
-    "value": "New value"
-  },
-  "vault.item.newValueHelp": {
-    "value": "It replaces the saved one when you save."
-  },
-  "vault.item.keepValue": {
-    "value": "Keep the current one"
-  },
-  "vault.item.revealHelp": {
-    "value": "Show and Copy are recorded in its recent uses."
-  },
-  "vault.item.saved": {
-    "value": "Saved"
-  },
-  "vault.item.delete": {
-    "value": "Delete"
-  },
-  "vault.item.deleteTitle": {
-    "value": "Delete {{title}}?"
-  },
-  "vault.item.deleteText": {
-    "value": "Your agents can no longer use it. This can't be undone."
-  },
-  "vault.item.deleted": {
-    "value": "{{title}} deleted from the Vault"
-  },
-  "vault.use.title": {
-    "value": "Recent uses"
-  },
-  "vault.use.none": {
-    "value": "No one has used it yet."
-  },
-  "vault.use.fill": {
-    "value": "{{agent}}, on {{host}}"
-  },
-  "vault.use.fillSomewhere": {
-    "value": "{{agent}} typed it"
-  },
-  "vault.use.key": {
-    "value": "{{agent}}, in a command"
-  },
-  "vault.use.read": {
-    "value": "{{who}} read it"
-  },
-  "vault.use.show": {
-    "value": "{{who}} showed it"
-  },
-  "vault.use.copy": {
-    "value": "{{who}} copied it"
-  },
-  "vault.use.create": {
-    "value": "{{who}} saved it"
-  },
-  "vault.use.edit": {
-    "value": "{{who}} changed it"
-  },
-  "vault.use.for": {
-    "value": "for {{name}}"
-  },
-  "vault.use.routine": {
-    "value": "Routine {{name}}"
-  },
-  "vault.access.title": {
-    "value": "Who has access"
-  },
-  "vault.access.people": {
-    "value": "People"
-  },
-  "vault.access.agents": {
-    "value": "Agents"
-  },
-  "vault.access.edit": {
-    "value": "Edit"
-  },
-  "vault.access.editOf": {
-    "value": "Edit {{what}}"
-  },
-  "vault.access.everyone": {
-    "value": "Everyone in the workspace"
-  },
-  "vault.access.everyoneText": {
-    "value": "Each person sees it, and agents use it when they ask."
-  },
-  "vault.access.managersOnly": {
-    "value": "Only who manages the Vault"
-  },
-  "vault.access.allAgents": {
-    "value": "All agents"
-  },
-  "vault.access.noAgents": {
-    "value": "No agent yet"
-  },
-  "vault.access.more": {
-    "value": {
-      "one": "{{count}} more",
-      "other": "{{count}} more"
-    }
-  },
-  "vault.access.saved": {
-    "value": "Access saved"
-  },
-  "vault.access.peopleTitle": {
-    "value": "Who can see it"
-  },
-  "vault.access.peopleText": {
-    "value": "They see it, and agents use it when one of them asks. Who manages the Vault always sees it."
-  },
-  "vault.access.level.use": {
-    "value": "Can see and use"
-  },
-  "vault.access.level.none": {
-    "value": "No access"
-  },
-  "vault.access.roleDetail": {
-    "value": "Everyone with this role"
-  },
-  "vault.access.roles": {
-    "value": "Roles"
-  },
-  "vault.access.peopleGroup": {
-    "value": "People"
-  },
-  "vault.access.add": {
-    "value": "Add a role or a person"
-  },
-  "vault.access.addSearch": {
-    "value": "Search roles and people"
-  },
-  "vault.access.noMatch": {
-    "value": "No one found"
-  },
-  "vault.access.levelOf": {
-    "value": "What {{name}} can do"
-  },
-  "vault.access.follows": {
-    "value": "It follows the default access of {{source}}."
-  },
-  "vault.access.own": {
-    "value": "It has its own access, not the default of {{source}}."
-  },
-  "vault.access.changeHere": {
-    "value": "Change for this item"
-  },
-  "vault.access.useConnection": {
-    "value": "Use the default again"
-  },
-  "vault.agents.title": {
-    "value": "Which agents can use it"
-  },
-  "vault.agents.textPersonal": {
-    "value": "They use it only when you ask them."
-  },
-  "vault.agents.textTeam": {
-    "value": "They use it when someone who can see it asks."
-  },
-  "vault.agents.all": {
-    "value": "All agents"
-  },
-  "vault.agents.allDetail": {
-    "value": "Also the ones added later"
-  },
-  "vault.summary.noAgents": {
-    "value": "No agent can use it yet."
-  },
-  "vault.summary.allAgents": {
-    "value": "Every agent"
-  },
-  "vault.summary.inRole": {
-    "value": "someone in {{role}}"
-  },
-  "vault.summary.personal": {
-    "value": {
-      "one": "{{agents}} can use it, only when you ask.",
-      "other": "{{agents}} can use it, only when you ask."
-    }
-  },
-  "vault.summary.everyone": {
-    "value": {
-      "one": "{{agents}} can use it when anyone in the workspace asks.",
-      "other": "{{agents}} can use it when anyone in the workspace asks."
-    }
-  },
-  "vault.summary.people": {
-    "value": {
-      "one": "{{agents}} can use it when {{people}} asks.",
-      "other": "{{agents}} can use it when {{people}} asks."
-    }
-  },
-  "vault.summary.nobody": {
-    "value": "No one can ask agents to use it yet. Choose who can see it."
-  },
-  "vault.new.open": {
-    "value": "New item"
-  },
-  "vault.new.title": {
-    "value": "New item"
-  },
-  "vault.new.text": {
-    "value": "Save it once. Your agents use it without seeing a password or a key."
-  },
-  "vault.new.what": {
-    "value": "What do you want to save?"
-  },
-  "vault.new.who": {
-    "value": "Who can use it"
-  },
-  "vault.new.teamLocked": {
-    "value": "Only people who manage the Vault can save team items. This one stays yours."
-  },
-  "vault.new.save": {
-    "value": "Save"
-  },
-  "vault.new.saved": {
-    "value": "Saved to the Vault"
-  },
-  "vault.import.open": {
-    "value": "Import"
-  },
-  "vault.import.title": {
-    "value": "Import passwords"
-  },
-  "vault.import.text": {
-    "value": "From a file your browser or password manager exports (.csv)."
-  },
-  "vault.import.dropTitle": {
-    "value": "Drop the file here"
-  },
-  "vault.import.dropText": {
-    "value": "or click to choose it on your computer"
-  },
-  "vault.import.reading": {
-    "value": "Reading the file…"
-  },
-  "vault.import.choose": {
-    "value": "Choose the file"
-  },
-  "vault.import.where": {
-    "value": "In your browser or password manager, look for Export passwords and choose CSV."
-  },
-  "vault.import.tooLarge": {
-    "value": "This file is too large (2 MB at most)."
-  },
-  "vault.import.notCsv": {
-    "value": "Choose a .csv file."
-  },
-  "vault.import.unreadable": {
-    "value": "Couldn't read this file. Try exporting it again."
-  },
-  "vault.import.format.chrome": {
-    "value": "Read as a Chrome export"
-  },
-  "vault.import.format.1password": {
-    "value": "Read as a 1Password export"
-  },
-  "vault.import.format.bitwarden": {
-    "value": "Read as a Bitwarden export"
-  },
-  "vault.import.format.generic": {
-    "value": "Read as a passwords file"
-  },
-  "vault.import.added": {
-    "value": {
-      "one": "new login",
-      "other": "new logins"
-    }
-  },
-  "vault.import.updated": {
-    "value": {
-      "one": "updated",
-      "other": "updated"
-    }
-  },
-  "vault.import.skipped": {
-    "value": {
-      "one": "left out",
-      "other": "left out"
-    }
-  },
-  "vault.import.reason.duplicate": {
-    "value": {
-      "one": "{{count}} already in the Vault",
-      "other": "{{count}} already in the Vault"
-    }
-  },
-  "vault.import.reason.not_https": {
-    "value": {
-      "one": "{{count}} not on an https address",
-      "other": "{{count}} not on an https address"
-    }
-  },
-  "vault.import.reason.no_password": {
-    "value": {
-      "one": "{{count}} without a password",
-      "other": "{{count}} without a password"
-    }
-  },
-  "vault.import.reason.invalid": {
-    "value": {
-      "one": "{{count}} line we couldn't read",
-      "other": "{{count}} lines we couldn't read"
-    }
-  },
-  "vault.import.as": {
-    "value": "Save them as"
-  },
-  "vault.import.asPersonal": {
-    "value": "Only you will see them."
-  },
-  "vault.import.asTeam": {
-    "value": "Everyone in the workspace sees them. Choose agents for each one afterwards."
-  },
-  "vault.import.deleteFile": {
-    "value": "Delete the file afterwards: it holds your passwords unencrypted."
-  },
-  "vault.import.confirm": {
-    "value": {
-      "one": "Import {{count}}",
-      "other": "Import {{count}}"
-    }
-  },
-  "vault.import.done": {
-    "value": {
-      "one": "{{count}} login imported",
-      "other": "{{count}} logins imported"
-    }
-  },
-  "vault.import.another": {
-    "value": "Choose another file"
-  },
-  "vault.import.close": {
-    "value": "Done"
-  },
-  "vault.connections.none": {
-    "value": "No password manager can be connected here."
-  },
-  "vault.connections.lead": {
-    "value": "Your agents use the {{kinds}} you keep in {{name}}."
-  },
-  "vault.connections.connect": {
-    "value": "Connect"
-  },
-  "vault.connections.reconnect": {
-    "value": "Reconnect"
-  },
-  "vault.connections.reconnectName": {
-    "value": "Reconnect {{name}}"
-  },
-  "vault.connections.open": {
-    "value": "Open {{name}}"
-  },
-  "vault.connections.required": {
-    "value": "Fill this in."
-  },
-  "vault.connections.for": {
-    "value": "Connect for"
-  },
-  "vault.connections.forTeam": {
-    "value": "Its items are the team's. Who manages the Vault decides who uses them."
-  },
-  "vault.connections.forPersonal": {
-    "value": "Its items are yours alone."
-  },
-  "vault.connections.teamLocked": {
-    "value": "Its items will be yours alone. Only who manages the Vault connects one for the team."
-  },
-  "vault.connections.sealed": {
-    "value": "What you type here is encrypted and never shown again."
-  },
-  "vault.connections.connected": {
-    "value": {
-      "one": "{{name}} connected. {{count}} item came in.",
-      "other": "{{name}} connected. {{count}} items came in."
-    }
-  },
-  "vault.connections.ready": {
-    "value": "Connected"
-  },
-  "vault.connections.syncing": {
-    "value": "Syncing"
-  },
-  "vault.connections.reads": {
-    "value": "Reads {{label}}"
-  },
-  "vault.connections.items": {
-    "value": {
-      "one": "{{count}} item",
-      "other": "{{count}} items"
-    }
-  },
-  "vault.connections.synced": {
-    "value": "synced {{when}}"
-  },
-  "vault.connections.syncNow": {
-    "value": "Sync now"
-  },
-  "vault.connections.access": {
-    "value": "Default access"
-  },
-  "vault.connections.accessTitle": {
-    "value": "Default access of {{label}}"
-  },
-  "vault.connections.accessText": {
-    "value": "Its items follow this, unless you change one of them. Each change saves at once."
-  },
-  "vault.connections.actionsName": {
-    "value": "More for {{name}}"
-  },
-  "vault.connections.disconnect": {
-    "value": "Disconnect"
-  },
-  "vault.connections.removeTitle": {
-    "value": "Disconnect {{name}}?"
-  },
-  "vault.connections.removeText": {
-    "value": {
-      "one": "Its item leaves the Vault and your agents stop using it. Nothing changes in {{name}}.",
-      "other": "Its {{count}} items leave the Vault and your agents stop using them. Nothing changes in {{name}}."
-    }
-  },
-  "vault.connections.removed": {
-    "value": "{{name}} disconnected"
-  },
-  "vault.connections.listOf": {
-    "value": "Connections to {{name}}"
-  },
-  "vault.connections.note": {
-    "value": "Your agents read what is there when they need it. Nothing is copied into agentes.chat but names and addresses."
-  },
-  "vault.connections.error.auth_failed": {
-    "value": "Sign-in refused"
-  },
-  "vault.connections.error.locked": {
-    "value": "Wrong password"
-  },
-  "vault.connections.error.many_vaults": {
-    "value": "Sees more than one vault"
-  },
-  "vault.connections.error.no_vault": {
-    "value": "Sees no vault"
-  },
-  "vault.connections.error.folder_missing": {
-    "value": "Folder not found"
-  },
-  "vault.connections.error.not_found": {
-    "value": "Not found"
-  },
-  "vault.connections.error.rate_limited": {
-    "value": "Too many reads"
-  },
-  "vault.connections.error.unreachable": {
-    "value": "Can't reach it"
-  },
-  "vault.connections.error.unsupported": {
-    "value": "Not available here"
-  },
-  "vault.connections.error.invalid_input": {
-    "value": "Check the fields"
-  },
-  "vault.connections.error.too_many_items": {
-    "value": "Vault full"
-  },
-  "vault.connections.error.other": {
-    "value": "Couldn't read it"
-  },
-  "vault.connections.fix.auth_failed": {
-    "value": "The key or token was refused. Reconnect with a new one."
-  },
-  "vault.connections.fix.locked": {
-    "value": "The master password didn't open the account. Reconnect with the right one."
-  },
-  "vault.connections.fix.many_vaults": {
-    "value": "Give the service account access to one vault only, then reconnect."
-  },
-  "vault.connections.fix.no_vault": {
-    "value": "Give the service account access to the agents' vault, then reconnect."
-  },
-  "vault.connections.fix.folder_missing": {
-    "value": "Create the folder for your agents, or reconnect with its name."
-  },
-  "vault.connections.fix.not_found": {
-    "value": "What it read is gone. Reconnect to choose again."
-  },
-  "vault.connections.fix.rate_limited": {
-    "value": "The password manager asked us to wait. It tries again by itself."
-  },
-  "vault.connections.fix.unreachable": {
-    "value": "Its server didn't answer. It tries again by itself."
-  },
-  "vault.connections.fix.unsupported": {
-    "value": "Its settings can't be read here. Try again later or use another account."
-  },
-  "vault.connections.fix.invalid_input": {
-    "value": "Something in the fields was refused. Reconnect and check them."
-  },
-  "vault.connections.fix.too_many_items": {
-    "value": "Remove items before syncing more."
-  },
-  "vault.connections.fix.other": {
-    "value": "Try Sync now, or reconnect."
-  },
-  "vault.source.onepassword.step.1": {
-    "value": "Create a vault in 1Password only for your agents and move into it the logins they may use"
-  },
-  "vault.source.onepassword.step.2": {
-    "value": "Create a service account with access to that vault only"
-  },
-  "vault.source.onepassword.step.3": {
-    "value": "Paste the service account token here"
-  },
-  "vault.source.onepassword.field.token": {
-    "value": "Service account token"
-  },
-  "vault.source.bitwarden.warning": {
-    "value": "Use an account only for your agents. Its master password opens the whole account, so nothing personal should be in it."
-  },
-  "vault.source.bitwarden.step.1": {
-    "value": "Create a Bitwarden account only for your agents and a folder named Agents with the logins they may use"
-  },
-  "vault.source.bitwarden.step.2": {
-    "value": "In that account, open Settings, Security, Keys and copy the API key"
-  },
-  "vault.source.bitwarden.step.3": {
-    "value": "Fill in the fields below"
-  },
-  "vault.source.bitwarden.field.server": {
-    "value": "Server"
-  },
-  "vault.source.bitwarden.field.serverUrl": {
-    "value": "Server address"
-  },
-  "vault.source.bitwarden.field.clientId": {
-    "value": "Client ID"
-  },
-  "vault.source.bitwarden.field.clientSecret": {
-    "value": "Client secret"
-  },
-  "vault.source.bitwarden.field.masterPassword": {
-    "value": "Master password"
-  },
-  "vault.source.bitwarden.field.folder": {
-    "value": "Folder"
-  },
-  "vault.source.bitwarden.choice.server.self": {
-    "value": "My own server"
-  },
-  "vault.card.save": {
-    "value": "Save to the Vault"
-  },
-  "vault.card.saveText": {
-    "value": "Next time your agents use it without asking you."
-  },
-  "vault.card.scope": {
-    "value": "Save as"
-  },
-  "vault.card.personalText": {
-    "value": "Only you see it"
-  },
-  "vault.card.teamText": {
-    "value": "The workspace sees it"
-  },
-  "vault.card.teamLocked": {
-    "value": "Only who manages the Vault saves for the team"
-  },
-  "vault.card.agents": {
-    "value": "Used by"
-  },
-  "vault.card.choose": {
-    "value": "Choose"
-  },
-  "vault.card.saved": {
-    "value": "Saved to the Vault"
-  },
-  "vault.card.notSaved": {
-    "value": "Sent, but not saved to the Vault"
-  },
-  "vault.card.codeBox": {
-    "value": "Digit {{n}} of {{total}}"
-  },
-  "vault.card.codeShort": {
-    "value": {
-      "one": "Type the {{count}} digit.",
-      "other": "Type all {{count}} digits."
-    }
-  },
-  "vault.card.codeWhere": {
-    "value": "Only {{agent}}'s browser types it, on {{host}}."
   },
   "question.answer": {
     "value": "Answer"
@@ -7287,6 +6566,9 @@
   "home.working.title": {
     "value": "Working now"
   },
+  "home.working.none": {
+    "value": "No agent is working right now."
+  },
   "home.working.dm": {
     "value": "In your conversation"
   },
@@ -7689,6 +6971,24 @@
   "notifications.what.planResetUnknown": {
     "value": "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting."
   },
+  "notifications.what.catchUpClosed": {
+    "value": {
+      "one": "<b>{{name}}</b> is back and skipped {{count}} conversation that didn't need an answer",
+      "other": "<b>{{name}}</b> is back and skipped {{count}} conversations that didn't need an answer"
+    }
+  },
+  "notifications.what.catchUpClosedAsker": {
+    "value": "<b>{{name}}</b> didn't answer in {{label}}: {{who}} already took care of it"
+  },
+  "notifications.what.catchUpClosedAskerAny": {
+    "value": "<b>{{name}}</b> didn't answer: {{who}} already took care of it"
+  },
+  "notifications.what.catchUpClosedAskerTask": {
+    "value": "<b>{{name}}</b> didn't answer in {{label}}: {{who}} canceled the task"
+  },
+  "notifications.what.catchUpClosedAskerTaskAny": {
+    "value": "<b>{{name}}</b> didn't answer: {{who}} canceled the task"
+  },
   "notifications.what.machineConnected": {
     "value": "<b>{{name}}</b> connected the computer <b>{{label}}</b>"
   },
@@ -7766,6 +7066,9 @@
   },
   "notifications.source.connectors": {
     "value": "Connectors"
+  },
+  "notifications.source.dashboard": {
+    "value": "Dashboard"
   },
   "notifications.reactions": {
     "value": {
@@ -9213,9 +8516,6 @@
   },
   "agentPage.fields.handle": {
     "value": "Mentions"
-  },
-  "agentPage.fields.coordinator": {
-    "value": "Coordinates the team"
   },
   "agentPage.lines.added": {
     "value": {
@@ -11994,18 +11294,6 @@
   "scopes.setup_write.description": {
     "value": "Offer to connect an AI, an app or an MCP server, or to invite people, with a card a person clicks, and create channels for whoever asked, with Undo."
   },
-  "scopes.vault_read.label": {
-    "value": "See the Vault"
-  },
-  "scopes.vault_read.description": {
-    "value": "See the logins, keys and contact details the Vault shares with it, and use them. It types saved passwords and uses saved keys without ever seeing them."
-  },
-  "scopes.vault_write.label": {
-    "value": "Edit Vault contacts"
-  },
-  "scopes.vault_write.description": {
-    "value": "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved."
-  },
   "scopes.github_git_read.label": {
     "value": "Clone repositories (git)"
   },
@@ -13046,6 +12334,15 @@
   "routines.deliversTo": {
     "value": "{{agent}} · delivers to {{target}}"
   },
+  "routines.widgetLine": {
+    "value": "{{agent}} · updates its widget, with no message"
+  },
+  "routines.widgetChip": {
+    "value": "Dashboard widget"
+  },
+  "routines.widgetFixed": {
+    "value": "What it shows, when it updates and who looks after it change from its widget."
+  },
   "routines.target.forum": {
     "value": "A forum topic"
   },
@@ -13063,6 +12360,12 @@
   },
   "routines.target.artifactShort": {
     "value": "Drive"
+  },
+  "routines.target.widget": {
+    "value": "A dashboard widget"
+  },
+  "routines.target.widgetNamed": {
+    "value": "The widget “{{title}}”"
   },
   "routines.active": {
     "value": "Active"
@@ -13303,6 +12606,9 @@
   },
   "routines.panel.whereHint.artifact": {
     "value": "Becomes a document in the Drive"
+  },
+  "routines.panel.whereHint.widget": {
+    "value": "Updates its widget, with no message"
   },
   "routines.panel.ahead": {
     "value": "Prepared for later"
@@ -17074,6 +16380,9 @@
   "skills.waitingChip": {
     "value": "Update waiting"
   },
+  "skills.waitingChipEdited": {
+    "value": "Link and agents changed it"
+  },
   "skills.lastUpdate": {
     "value": "Updated from its link {{when}}"
   },
@@ -17098,6 +16407,57 @@
   "skills.undoAgentChange": {
     "value": "Undo change"
   },
+  "skills.undo": {
+    "value": "Undo"
+  },
+  "skills.chosenLink": {
+    "value": "Switched to the link's version {{when}}"
+  },
+  "skills.history.title": {
+    "value": "Agents' changes"
+  },
+  "skills.history.empty": {
+    "value": "No agent has changed this skill yet."
+  },
+  "skills.history.show": {
+    "value": "Show change"
+  },
+  "skills.history.hide": {
+    "value": "Hide change"
+  },
+  "skills.history.undone": {
+    "value": "undone"
+  },
+  "skills.diff.label": {
+    "value": "How to see the changes"
+  },
+  "skills.diff.agents": {
+    "value": "What the agents changed"
+  },
+  "skills.diff.link": {
+    "value": "What changed in the link"
+  },
+  "skills.diff.compare": {
+    "value": "Current × link"
+  },
+  "skills.diff.same": {
+    "value": "The text is the same in both."
+  },
+  "skills.diff.files": {
+    "value": "Files that run"
+  },
+  "skills.diff.newFile": {
+    "value": "new"
+  },
+  "skills.diff.changedFile": {
+    "value": "changed"
+  },
+  "skills.diff.large": {
+    "value": "Too large to show here. Check it in the link."
+  },
+  "skills.diff.unavailable": {
+    "value": "Use Update from link to see what changes."
+  },
   "skills.pending.title": {
     "value": "The update from its link changes files that run: {{files}}"
   },
@@ -17105,10 +16465,10 @@
     "value": "Apply it only if you trust these files. Agents run them on their computers."
   },
   "skills.pending.edited": {
-    "value": "The update from its link would replace what agents changed in it"
+    "value": "The link has a new version, and agents changed this skill too"
   },
   "skills.pending.editedLead": {
-    "value": "Apply it to take its link's version. You can undo it after."
+    "value": "Choose which version stays. You can undo it after."
   },
   "skills.pending.apply": {
     "value": "Apply update"
@@ -17124,6 +16484,36 @@
   },
   "skills.pending.dismissed": {
     "value": "Update not applied. A new change to its link asks again."
+  },
+  "skills.pending.useLink": {
+    "value": "Use the link's version"
+  },
+  "skills.pending.keepAgents": {
+    "value": "Keep the agents' version"
+  },
+  "skills.pending.usedLink": {
+    "value": "{{name}} now uses the link's version."
+  },
+  "skills.pending.keptAgents": {
+    "value": "{{name}} keeps the agents' version."
+  },
+  "skills.pending.reopened": {
+    "value": "The update of {{name}} is waiting again."
+  },
+  "skills.pending.linkSince": {
+    "value": "New version in the link {{when}}"
+  },
+  "skills.pending.keptLine": {
+    "value": "Kept the agents' version {{when}}"
+  },
+  "skills.pending.notAppliedLine": {
+    "value": "Update from the link not applied {{when}}"
+  },
+  "skills.pending.byAgents": {
+    "value": {
+      "one": "{{names}} changed this skill, last {{when}}",
+      "other": "{{names}} changed this skill, last {{when}}"
+    }
   },
   "skills.updateFailed.no_skill_md": {
     "value": "Couldn't update it: its link no longer has a SKILL.md."
@@ -17150,7 +16540,7 @@
     "value": "An update of {{name}} changes its scripts"
   },
   "skills.notice.waitingEdited": {
-    "value": "An update of {{name}} would replace what agents changed"
+    "value": "{{name}} changed in its link and by agents: choose which version stays"
   },
   "skills.notice.failed": {
     "value": "{{name}} couldn't update from its link"
@@ -21444,9 +20834,6 @@
   "access.area.desktop": {
     "value": "Desktop"
   },
-  "access.area.vault": {
-    "value": "Vault"
-  },
   "access.areaText.context.read": {
     "value": "Searches messages, summaries and facts in the channels."
   },
@@ -21500,12 +20887,6 @@
   "access.areaText.desktop.write": {
     "value": "Uses any app on his own desktop on his computer, while people watch or take control. Needs Run code too.",
     "female": "Uses any app on her own desktop on her computer, while people watch or take control. Needs Run code too."
-  },
-  "access.areaText.vault.read": {
-    "value": "Sees and uses what the Vault shares with it, without seeing passwords or keys."
-  },
-  "access.areaText.vault.write": {
-    "value": "Also saves and updates contact details in the Vault."
   },
   "artifacts.downloadMenu": {
     "value": "Download"
@@ -24620,7 +24001,7 @@
     "value": "Database address"
   },
   "database.urlHelp": {
-    "value": "Starts with postgres://. Stored encrypted on the server. Nobody sees it again, not even the agents."
+    "value": "Starts with postgres://. The database name at the end is optional. Stored encrypted on the server. Nobody sees it again, not even the agents."
   },
   "database.urlPlaceholder": {
     "value": "postgres://user:password@host/db"
@@ -25699,6 +25080,36 @@
   "files.downloadOnly": {
     "value": "No preview for this type of file. Download it to open."
   },
+  "files.zoom.toolbar": {
+    "value": "Zoom"
+  },
+  "files.zoom.in": {
+    "value": "Zoom in"
+  },
+  "files.zoom.out": {
+    "value": "Zoom out"
+  },
+  "files.zoom.fit": {
+    "value": "Fit"
+  },
+  "files.zoom.actual": {
+    "value": "Actual size"
+  },
+  "files.zoom.lens": {
+    "value": "Magnifier"
+  },
+  "files.zoom.hint": {
+    "value": "Click, pinch or use the wheel to zoom in"
+  },
+  "files.zoom.hintZoomed": {
+    "value": "Drag to move around. Esc fits it back"
+  },
+  "files.zoom.hintTouch": {
+    "value": "Tap or pinch to zoom in"
+  },
+  "files.zoom.hintZoomedTouch": {
+    "value": "Drag to move around. Tap to fit it back"
+  },
   "errors.connector.labelTaken": {
     "value": "Another connector already has this name."
   },
@@ -25862,7 +25273,7 @@
     "value": "New workspaces need an invitation for now."
   },
   "errors.org.membersFull": {
-    "value": "This workspace has no room for more people right now. Let whoever invited you know."
+    "value": "Every seat in this workspace is taken right now. Ask whoever invited you to open a seat."
   },
   "errors.org.deleting": {
     "value": "This workspace is being deleted."
@@ -26163,123 +25574,6 @@
   },
   "errors.handle.takenByAgent": {
     "value": "@{{handle}} belongs to an agent."
-  },
-  "errors.vault.invalid": {
-    "value": "Something in this item isn't right. Check it and try again."
-  },
-  "errors.vault.notFound": {
-    "value": "This item isn't in the Vault anymore."
-  },
-  "errors.vault.titleRequired": {
-    "value": "Give it a name."
-  },
-  "errors.vault.tooLong": {
-    "value": "That's too long. The limit is {{max}}."
-  },
-  "errors.vault.notHttps": {
-    "value": "Use an address that starts with https://"
-  },
-  "errors.vault.keyNameInvalid": {
-    "value": "Use capital letters, digits and _ in the name, like ACME_API_KEY."
-  },
-  "errors.vault.keyNameReserved": {
-    "value": "This name is reserved. Pick another one."
-  },
-  "errors.vault.keyNameTaken": {
-    "value": "A key with this name is already saved here."
-  },
-  "errors.vault.contactEmpty": {
-    "value": "Fill in at least one field."
-  },
-  "errors.vault.teamNeedsPermission": {
-    "value": "Only people who manage credentials can save team items."
-  },
-  "errors.vault.externalReadOnly": {
-    "value": "This comes from a password manager. Change it there."
-  },
-  "errors.vault.changedMeanwhile": {
-    "value": "Someone changed it in the meantime. Open it again."
-  },
-  "errors.vault.noValue": {
-    "value": "Nothing is saved to show."
-  },
-  "errors.vault.missing": {
-    "value": "It's gone from its password manager."
-  },
-  "errors.vault.notAllowed": {
-    "value": "You can't do this with this item."
-  },
-  "errors.vault.tooManyItems": {
-    "value": "The Vault is full. Delete items you no longer use."
-  },
-  "errors.vault.audienceInvalid": {
-    "value": "Someone or a role you picked is no longer in the workspace."
-  },
-  "errors.vault.agentsInvalid": {
-    "value": "An agent you picked is no longer in the workspace."
-  },
-  "errors.vault.tooManyAgents": {
-    "value": "Pick at most 200 agents."
-  },
-  "errors.vault.tooManyRoles": {
-    "value": "Pick at most 100 roles."
-  },
-  "errors.vault.tooManyPeople": {
-    "value": "Pick at most 500 people."
-  },
-  "errors.vault.csvTooLarge": {
-    "value": "The file is too large. The limit is 2 MB."
-  },
-  "errors.vault.csvTooManyRows": {
-    "value": "The file has more than 5,000 rows. Split it and import each part."
-  },
-  "errors.vault.csvUnrecognized": {
-    "value": "This doesn't look like a passwords file. Export it again as CSV."
-  },
-  "errors.vault.requestNotDelivered": {
-    "value": "Send it first, then save it to the Vault."
-  },
-  "errors.vault.requestNotSavable": {
-    "value": "This one can't be saved to the Vault."
-  },
-  "errors.vault.sourceUnknown": {
-    "value": "This password manager isn't available here."
-  },
-  "errors.vault.sourceError": {
-    "value": "Couldn't read it from its password manager. Try again."
-  },
-  "errors.vault.source.authFailed": {
-    "value": "The password manager refused these details. Check them and try again."
-  },
-  "errors.vault.source.locked": {
-    "value": "The master password is wrong."
-  },
-  "errors.vault.source.manyVaults": {
-    "value": "The service account sees more than one vault. Give it access to only one."
-  },
-  "errors.vault.source.noVault": {
-    "value": "The service account sees no vault. Give it access to one."
-  },
-  "errors.vault.source.folderMissing": {
-    "value": "That folder isn't in the account."
-  },
-  "errors.vault.source.notFound": {
-    "value": "It's no longer in its password manager."
-  },
-  "errors.vault.source.rateLimited": {
-    "value": "The password manager asked us to wait. Try again in a few minutes."
-  },
-  "errors.vault.source.unreachable": {
-    "value": "Couldn't reach the password manager. Check the address and try again."
-  },
-  "errors.vault.source.unsupported": {
-    "value": "This password manager can't be connected here."
-  },
-  "errors.vault.source.invalidInput": {
-    "value": "Check the fields and try again."
-  },
-  "errors.vault.source.tooManyItems": {
-    "value": "The Vault is full. Remove items before syncing more."
   },
   "machines.egress.draining": {
     "value": "Network settings are changing. Open computer sessions will restart at {{when}}."
@@ -27414,9 +26708,6 @@
   "apps.dialog.step.install": {
     "value": "Add to {{app}}"
   },
-  "apps.dialog.note.untested": {
-    "value": "We haven't tested signing in from this app yet. If it fails, let us know."
-  },
   "apps.dialog.note.chatgptPlans": {
     "value": "On paid ChatGPT plans, not Free or Go. On Business, only admins can add it."
   },
@@ -27783,36 +27074,6 @@
   "audit.change.apps.message_sent": {
     "value": "Sent a message through {{app}}"
   },
-  "audit.change.vault.item_created": {
-    "value": "Saved an item to the Vault"
-  },
-  "audit.change.vault.item_changed": {
-    "value": "Changed a Vault item"
-  },
-  "audit.change.vault.item_deleted": {
-    "value": "Deleted a Vault item"
-  },
-  "audit.change.vault.item_shown": {
-    "value": "Viewed a password or key in the Vault"
-  },
-  "audit.change.vault.item_copied": {
-    "value": "Copied a password or key from the Vault"
-  },
-  "audit.change.vault.item_used": {
-    "value": "Used a Vault item"
-  },
-  "audit.change.vault.imported": {
-    "value": "Imported passwords into the Vault"
-  },
-  "audit.change.vault.connection_added": {
-    "value": "Connected a password manager to the Vault"
-  },
-  "audit.change.vault.connection_changed": {
-    "value": "Changed a password manager's connection"
-  },
-  "audit.change.vault.connection_removed": {
-    "value": "Disconnected a password manager from the Vault"
-  },
   "audit.change.verb.created": {
     "value": "Created"
   },
@@ -27906,15 +27167,6 @@
   "audit.change.verb.archived": {
     "value": "Archived"
   },
-  "audit.change.verb.shown": {
-    "value": "Viewed"
-  },
-  "audit.change.verb.copied": {
-    "value": "Copied"
-  },
-  "audit.change.verb.used": {
-    "value": "Used"
-  },
   "audit.change.verb.other": {
     "value": "Changed"
   },
@@ -28004,9 +27256,6 @@
   },
   "audit.change.area.credential": {
     "value": "an AI key"
-  },
-  "audit.change.area.vault": {
-    "value": "the Vault"
   },
   "audit.change.area.other": {
     "value": "the workspace"
@@ -28149,9 +27398,6 @@
   "settings.section.roles": {
     "value": "Roles and permissions"
   },
-  "settings.section.vault": {
-    "value": "Vault"
-  },
   "settings.section.access": {
     "value": "Agents and access"
   },
@@ -28205,9 +27451,6 @@
   },
   "settings.sectionText.roles": {
     "value": "What each person can do. Roles add up."
-  },
-  "settings.sectionText.vault": {
-    "value": "Passwords, keys and contact details your agents use. They type passwords and use keys without ever seeing them."
   },
   "settings.sectionText.access": {
     "value": "What each agent can use: one level per connector."
@@ -30104,6 +29347,24 @@
   "chat.body.usage_wait_canceled": {
     "value": "Canceled. It won't run when the limit is back."
   },
+  "chat.body.usage_wait_archived": {
+    "value": "It won't run: the agent was archived."
+  },
+  "chat.body.usage_wait_closed_solved": {
+    "value": "I didn't answer: {{name}} already took care of it."
+  },
+  "chat.body.usage_wait_closed_withdrawn": {
+    "value": "I didn't answer: {{name}} said it's no longer needed."
+  },
+  "chat.body.usage_wait_closed_task_canceled": {
+    "value": "I didn't answer: {{name}} canceled the task."
+  },
+  "chat.body.usage_wait_closed_mixed": {
+    "value": "I didn't answer: what was asked here was already handled."
+  },
+  "chat.body.usage_wait_anyway": {
+    "value": "{{name}} asked me to answer anyway."
+  },
   "chat.body.usage_paused": {
     "value": "{{agent}} paused this work · {{plan}} plan at {{percent}}% {{window}}"
   },
@@ -30244,24 +29505,6 @@
   },
   "builtinTools.ask_user.description": {
     "value": "Asks a short question and waits for the answer."
-  },
-  "builtinTools.vault_list.label": {
-    "value": "Look in the Vault"
-  },
-  "builtinTools.vault_list.description": {
-    "value": "Lists the logins, keys and contacts shared with the agent, never a password or a key."
-  },
-  "builtinTools.vault_save.label": {
-    "value": "Save to the Vault"
-  },
-  "builtinTools.vault_save.description": {
-    "value": "Saves or updates contact details, a login's username or a description."
-  },
-  "builtinTools.vault_delete.label": {
-    "value": "Delete from the Vault"
-  },
-  "builtinTools.vault_delete.description": {
-    "value": "Deletes an item it saved."
   },
   "builtinTools.react.label": {
     "value": "React"
@@ -31893,6 +31136,12 @@
   "billing.usedOf": {
     "value": "{{used}} of {{limit}}"
   },
+  "billing.seatsPaid": {
+    "value": {
+      "one": "{{count}} paid seat",
+      "other": "{{count}} paid seats"
+    }
+  },
   "billing.noLimit": {
     "value": "No limit"
   },
@@ -31910,6 +31159,33 @@
   },
   "limits.members.fullMember": {
     "value": "Ask whoever runs the workspace to make room."
+  },
+  "limits.members.fullAddSeat": {
+    "value": "Every paid seat is taken. Add a seat in Plan and billing."
+  },
+  "limits.members.fullTop": {
+    "value": "This plan can't take more people. Switch plans in Plan and billing."
+  },
+  "limits.members.fullMemberSeat": {
+    "value": "Ask whoever runs the workspace to add a seat."
+  },
+  "limits.members.fullAskPayerSeat": {
+    "value": "Ask {{payer}}, who pays for this workspace, to add a seat."
+  },
+  "limits.members.fullAskSeat": {
+    "value": "Ask whoever pays for this workspace to add a seat."
+  },
+  "limits.members.fullAskPayerTop": {
+    "value": "Ask {{payer}}, who pays for this workspace, to switch plans."
+  },
+  "limits.members.fullAskTop": {
+    "value": "Ask whoever pays for this workspace to switch plans."
+  },
+  "limits.members.fullPhone": {
+    "value": "Every paid seat is taken. Talk to whoever pays for this workspace."
+  },
+  "limits.members.fullPhonePayer": {
+    "value": "Every paid seat is taken."
   },
   "limits.storage.meter": {
     "value": "You've used {{used}} of {{limit}}."
@@ -32829,5 +32105,2528 @@
   },
   "taskManager.agentPanel.none": {
     "value": "{{name}} is free now."
+  },
+  "widgets.kinds.auto": {
+    "value": "Auto"
+  },
+  "widgets.kinds.kpi": {
+    "value": "Number"
+  },
+  "widgets.kinds.goal": {
+    "value": "Goal"
+  },
+  "widgets.kinds.bars": {
+    "value": "Bars"
+  },
+  "widgets.kinds.line": {
+    "value": "Line"
+  },
+  "widgets.kinds.list": {
+    "value": "List"
+  },
+  "widgets.kinds.text": {
+    "value": "Summary"
+  },
+  "widgets.schedules.half": {
+    "value": "Every 30 min"
+  },
+  "widgets.schedules.hour": {
+    "value": "Every hour"
+  },
+  "widgets.schedules.day": {
+    "value": "Every day at 8:00"
+  },
+  "widgets.schedules.week": {
+    "value": "Every Monday at 8:00"
+  },
+  "widgets.schedules.manual": {
+    "value": "Only when you ask"
+  },
+  "widgets.schedulesShort.half": {
+    "value": "30 min"
+  },
+  "widgets.schedulesShort.hour": {
+    "value": "Every hour"
+  },
+  "widgets.schedulesShort.day": {
+    "value": "Every day · 8:00"
+  },
+  "widgets.schedulesShort.week": {
+    "value": "Every Monday"
+  },
+  "widgets.schedulesShort.manual": {
+    "value": "When I ask"
+  },
+  "widgets.schedulesInline.half": {
+    "value": "every 30 min"
+  },
+  "widgets.schedulesInline.hour": {
+    "value": "every hour"
+  },
+  "widgets.schedulesInline.day": {
+    "value": "every day at 8:00"
+  },
+  "widgets.schedulesInline.week": {
+    "value": "every Monday at 8:00"
+  },
+  "widgets.schedulesInline.manual": {
+    "value": "when asked"
+  },
+  "widgets.sizes.label": {
+    "value": "Size"
+  },
+  "widgets.sizes.s": {
+    "value": "S"
+  },
+  "widgets.sizes.m": {
+    "value": "M"
+  },
+  "widgets.sizes.l": {
+    "value": "L"
+  },
+  "widgets.sizeNames.s": {
+    "value": "Small"
+  },
+  "widgets.sizeNames.m": {
+    "value": "Medium"
+  },
+  "widgets.sizeNames.l": {
+    "value": "Large"
+  },
+  "widgets.sizeHints.s": {
+    "value": "One square"
+  },
+  "widgets.sizeHints.m": {
+    "value": "Two columns"
+  },
+  "widgets.sizeHints.l": {
+    "value": "Two columns, two rows"
+  },
+  "widgets.status.building": {
+    "value": "{{name}} is building the widget and the routine that will update it…"
+  },
+  "widgets.status.updating": {
+    "value": "{{name}} updating…"
+  },
+  "widgets.status.failed": {
+    "value": "Didn't update"
+  },
+  "widgets.foot": {
+    "value": "{{name}} · {{when}} · {{schedule}}"
+  },
+  "widgets.failure.resolve": {
+    "value": "Resolve"
+  },
+  "widgets.failure.agent_reported": {
+    "value": "{{detail}}"
+  },
+  "widgets.failure.no_update": {
+    "value": "The last update ended without data."
+  },
+  "widgets.failure.error": {
+    "value": "The last update failed."
+  },
+  "widgets.failure.budget_exceeded": {
+    "value": "{{name}} reached its budget for the month."
+  },
+  "widgets.failure.waiting_computer": {
+    "value": "{{name}}'s computer is away."
+  },
+  "widgets.failure.waiting_plan": {
+    "value": "{{name}}'s plan is at its limit."
+  },
+  "widgets.failure.waiting_budget": {
+    "value": "{{name}}'s budget is at its limit."
+  },
+  "widgets.failure.creator_left": {
+    "value": "Whoever set it up left the workspace."
+  },
+  "widgets.failure.creator_no_access": {
+    "value": "Whoever set it up can no longer use it."
+  },
+  "widgets.failure.agent_archived": {
+    "value": "{{name}} was archived."
+  },
+  "widgets.failure.audience": {
+    "value": "Whoever set it up can no longer talk to {{name}}."
+  },
+  "widgets.failure.failing": {
+    "value": "It failed several times in a row and stopped."
+  },
+  "widgets.failure.stopped": {
+    "value": "The update was stopped."
+  },
+  "widgets.failure.missing_credential": {
+    "value": "{{name}} has no AI key or plan to work with."
+  },
+  "widgets.failure.timeout": {
+    "value": "The update took too long."
+  },
+  "widgets.failure.invalid_data": {
+    "value": "{{name}} couldn't put the data in this format."
+  },
+  "widgets.menu.label": {
+    "value": "More"
+  },
+  "widgets.menu.open": {
+    "value": "Open"
+  },
+  "widgets.menu.refresh": {
+    "value": "Update now"
+  },
+  "widgets.menu.change": {
+    "value": "Ask {{name}} for a change"
+  },
+  "widgets.menu.schedule": {
+    "value": "Change when it updates"
+  },
+  "widgets.menu.removeHome": {
+    "value": "Remove from Home"
+  },
+  "widgets.menu.removeBoard": {
+    "value": "Remove from dashboard"
+  },
+  "widgets.organize.start": {
+    "value": "Organize"
+  },
+  "widgets.organize.done": {
+    "value": "Done"
+  },
+  "widgets.organize.size": {
+    "value": "Size"
+  },
+  "widgets.organize.remove": {
+    "value": "Remove"
+  },
+  "widgets.organize.drag": {
+    "value": "Drag to move"
+  },
+  "widgets.organize.fixed": {
+    "value": "Fixed"
+  },
+  "widgets.organize.role": {
+    "value": "movable widget"
+  },
+  "widgets.organize.help": {
+    "value": "Space or Enter picks the card up, the arrows move it, Space or Enter drops it and Esc cancels. The arrows alone move it one place."
+  },
+  "widgets.organize.picked": {
+    "value": "You picked up “{{title}}”. The arrows move it, Space drops it, Esc cancels."
+  },
+  "widgets.organize.moved": {
+    "value": "“{{title}}”: position {{position}} of {{total}}."
+  },
+  "widgets.organize.dropped": {
+    "value": "You dropped “{{title}}” at position {{position}} of {{total}}."
+  },
+  "widgets.organize.canceled": {
+    "value": "“{{title}}” went back to its place."
+  },
+  "widgets.add.label": {
+    "value": "Add widget"
+  },
+  "widgets.add.short": {
+    "value": "Widget"
+  },
+  "widgets.alert.label": {
+    "value": "Tell me when something is off"
+  },
+  "widgets.alert.hint": {
+    "value": "The alert goes to Waiting on you, with what changed."
+  },
+  "widgets.alert.condition": {
+    "value": "Alert if"
+  },
+  "widgets.alert.placeholder": {
+    "value": "something is off"
+  },
+  "widgets.alert.line": {
+    "value": "Alert if {{condition}}"
+  },
+  "widgets.alert.lineAny": {
+    "value": "Alert when something is off"
+  },
+  "widgets.alert.where": {
+    "value": "In Waiting on you"
+  },
+  "widgets.alert.none": {
+    "value": "No alerts"
+  },
+  "widgets.cost.day": {
+    "value": "≈ {{amount}} a day of {{name}}'s budget"
+  },
+  "widgets.cost.week": {
+    "value": "≈ {{amount}} a week of {{name}}'s budget"
+  },
+  "widgets.cost.manual": {
+    "value": "Only spends when you ask for an update"
+  },
+  "widgets.cost.plan": {
+    "value": "Uses {{name}}'s plan"
+  },
+  "widgets.cost.unknown": {
+    "value": "Each update uses {{name}}'s budget"
+  },
+  "widgets.exposure": {
+    "value": "Whoever sees the dashboard sees what the agents brought, even without access to the accounts it came from. Agents create dashboards too. To show one to more people than whoever asked, they ask first, in Waiting on you."
+  },
+  "widgets.panel.caresFor": {
+    "value": "{{name}} looks after this widget"
+  },
+  "widgets.panel.caresForOn": {
+    "value": "{{name}} looks after this widget · {{board}}"
+  },
+  "widgets.panel.how": {
+    "value": "How it updates"
+  },
+  "widgets.panel.next": {
+    "value": "{{name}}'s routine · next {{when}}"
+  },
+  "widgets.panel.noRoutine": {
+    "value": "Doesn't update by itself"
+  },
+  "widgets.panel.askAnytime": {
+    "value": "You can ask for an update in the menu"
+  },
+  "widgets.panel.editRoutine": {
+    "value": "Edit routine"
+  },
+  "widgets.panel.changeAlert": {
+    "value": "Change"
+  },
+  "widgets.panel.reads": {
+    "value": "What {{name}} reads to build it"
+  },
+  "widgets.panel.history": {
+    "value": "Latest updates"
+  },
+  "widgets.panel.noHistory": {
+    "value": "No updates yet."
+  },
+  "widgets.panel.alerted": {
+    "value": "alerted: {{text}}"
+  },
+  "widgets.panel.changed": {
+    "value": "Changed: {{text}}"
+  },
+  "widgets.panel.ask": {
+    "value": "Ask for a change"
+  },
+  "widgets.panel.askPlaceholder": {
+    "value": "E.g.: split it by channel, or compare with the same week last year"
+  },
+  "widgets.panel.askTo": {
+    "value": "to {{name}}"
+  },
+  "widgets.panel.send": {
+    "value": "Send"
+  },
+  "widgets.panel.sent": {
+    "value": "{{name}} is redoing the widget."
+  },
+  "widgets.panel.updated": {
+    "value": "Updated"
+  },
+  "widgets.panel.rename": {
+    "value": "Rename"
+  },
+  "widgets.panel.titleLabel": {
+    "value": "Widget title"
+  },
+  "widgets.notice.alert": {
+    "value": "<b>{{name}}</b> flagged “{{title}}”"
+  },
+  "widgets.notice.failed": {
+    "value": "“{{title}}” stopped updating"
+  },
+  "widgets.notice.proposal": {
+    "value": "<b>{{name}}</b> wants to publish a dashboard"
+  },
+  "widgets.notice.proposalWorkspace": {
+    "value": "“{{title}}” for the whole workspace · only you see it today"
+  },
+  "widgets.notice.proposalRoles": {
+    "value": "“{{title}}” for {{roles}} · only you see it today"
+  },
+  "widgets.notice.openBoard": {
+    "value": "View dashboard"
+  },
+  "widgets.notice.openWidget": {
+    "value": "Open widget"
+  },
+  "widgets.notice.resolving": {
+    "value": "Updating “{{title}}” again"
+  },
+  "widgets.example.days.d1": {
+    "value": "Wed"
+  },
+  "widgets.example.days.d2": {
+    "value": "Thu"
+  },
+  "widgets.example.days.d3": {
+    "value": "Fri"
+  },
+  "widgets.example.days.d4": {
+    "value": "Sat"
+  },
+  "widgets.example.days.d5": {
+    "value": "Sun"
+  },
+  "widgets.example.days.d6": {
+    "value": "Mon"
+  },
+  "widgets.example.days.d7": {
+    "value": "Tue"
+  },
+  "widgets.example.vsYesterday": {
+    "value": "vs. yesterday"
+  },
+  "widgets.example.goalLine": {
+    "value": "48 of 100"
+  },
+  "widgets.example.goalNote": {
+    "value": "At this pace, it's reached on the 29th."
+  },
+  "widgets.example.lineNote": {
+    "value": "40 yesterday · +48% this week"
+  },
+  "widgets.example.row1": {
+    "value": "First item"
+  },
+  "widgets.example.row2": {
+    "value": "Second item"
+  },
+  "widgets.example.row3": {
+    "value": "Third item"
+  },
+  "widgets.example.meta1": {
+    "value": "now"
+  },
+  "widgets.example.meta2": {
+    "value": "1 h ago"
+  },
+  "widgets.example.meta3": {
+    "value": "yesterday"
+  },
+  "widgets.example.item1": {
+    "value": "A short summary of what changed."
+  },
+  "widgets.example.item2": {
+    "value": "The agent writes it again on every update."
+  },
+  "widgets.preview.label": {
+    "value": "Preview"
+  },
+  "widgets.preview.example": {
+    "value": "example data"
+  },
+  "widgets.pin.action": {
+    "value": "Pin"
+  },
+  "widgets.pin.label": {
+    "value": "Pin to a dashboard"
+  },
+  "widgets.pin.done": {
+    "value": "Pinned to {{where}}"
+  },
+  "widgets.pin.doneUpdating": {
+    "value": "Pinned to {{where}} · {{name}} redoes it {{schedule}}"
+  },
+  "widgets.pin.subtitle": {
+    "value": "It keeps the chart's data. Its agent can also keep it up to date."
+  },
+  "widgets.pin.open": {
+    "value": "Open"
+  },
+  "widgets.home": {
+    "value": "My Home"
+  },
+  "widgets.untitled": {
+    "value": "New widget"
+  },
+  "widgets.updatedAgo": {
+    "value": "updated {{when}}"
+  },
+  "widgets.removed.home": {
+    "value": "“{{title}}” left Home and {{name}}'s routine stopped"
+  },
+  "widgets.removed.board": {
+    "value": "“{{title}}” left the dashboard and {{name}}'s routine stopped"
+  },
+  "widgets.removeConfirm.title": {
+    "value": "Remove “{{title}}”?"
+  },
+  "widgets.removeConfirm.textRoutine": {
+    "value": "{{name}}'s routine that updates it stops, and its update history goes with it."
+  },
+  "widgets.removeConfirm.textManual": {
+    "value": "Its update history goes with it."
+  },
+  "widgets.removeConfirm.confirm": {
+    "value": "Remove"
+  },
+  "agentPicker.search": {
+    "value": "Search agents"
+  },
+  "agentPicker.list": {
+    "value": "Agents"
+  },
+  "agentPicker.empty": {
+    "value": "No agent matches “{{q}}”"
+  },
+  "agentPicker.noConnectors": {
+    "value": "No connectors"
+  },
+  "agentPicker.more": {
+    "value": "+{{count}}"
+  },
+  "dashboards.title": {
+    "value": "Dashboards"
+  },
+  "dashboards.subtitle": {
+    "value": "Numbers and charts the agents keep up to date, for the workspace or only some roles."
+  },
+  "dashboards.sidebar": {
+    "value": "Dashboards"
+  },
+  "dashboards.navWhat": {
+    "value": "Numbers and charts the agents keep up to date"
+  },
+  "dashboards.new": {
+    "value": "New dashboard"
+  },
+  "dashboards.back": {
+    "value": "Dashboards"
+  },
+  "dashboards.home": {
+    "value": "My Home"
+  },
+  "dashboards.seeAll": {
+    "value": "See all"
+  },
+  "dashboards.useOnHome": {
+    "value": "Use on Home"
+  },
+  "dashboards.stopOnHome": {
+    "value": "Remove from Home"
+  },
+  "dashboards.onHome": {
+    "value": "On Home"
+  },
+  "dashboards.onHomeDone": {
+    "value": "Home now shows this dashboard"
+  },
+  "dashboards.groups.workspace": {
+    "value": "Workspace"
+  },
+  "dashboards.groups.workspaceHint": {
+    "value": "everyone sees"
+  },
+  "dashboards.groups.roles": {
+    "value": "Your roles"
+  },
+  "dashboards.groups.rolesHint": {
+    "value": "you're in {{roles}}"
+  },
+  "dashboards.groups.mine": {
+    "value": "Only yours"
+  },
+  "dashboards.groups.mineHint": {
+    "value": "nobody else sees"
+  },
+  "dashboards.audience.label": {
+    "value": "Who sees"
+  },
+  "dashboards.audience.workspace": {
+    "value": "Whole workspace"
+  },
+  "dashboards.audience.workspaceHint": {
+    "value": {
+      "one": "{{count}} member sees it and finds it in Dashboards",
+      "other": "All {{count}} members see it and find it in Dashboards"
+    }
+  },
+  "dashboards.audience.roles": {
+    "value": "Roles"
+  },
+  "dashboards.audience.rolesHint": {
+    "value": "Only people with one of the chosen roles"
+  },
+  "dashboards.audience.private": {
+    "value": "Only you"
+  },
+  "dashboards.audience.privateHint": {
+    "value": "Nobody else sees it until you share it"
+  },
+  "dashboards.audience.noRoles": {
+    "value": "The workspace has no roles yet."
+  },
+  "dashboards.audience.people": {
+    "value": {
+      "one": "{{count}} person",
+      "other": "{{count}} people"
+    }
+  },
+  "dashboards.edit.label": {
+    "value": "Who edits"
+  },
+  "dashboards.edit.viewers": {
+    "value": "Whoever sees it"
+  },
+  "dashboards.edit.owner": {
+    "value": "Only you and admins"
+  },
+  "dashboards.edit.roles": {
+    "value": "Or people with these roles"
+  },
+  "dashboards.edit.twoRoles": {
+    "value": "{{first}} and {{second}}"
+  },
+  "dashboards.edit.manyRoles": {
+    "value": {
+      "one": "{{count}} role",
+      "other": "{{count}} roles"
+    }
+  },
+  "dashboards.edit.cantSee": {
+    "value": "Doesn't see this dashboard"
+  },
+  "dashboards.edit.someRoles": {
+    "value": "Some roles…"
+  },
+  "dashboards.edit.rolesNote": {
+    "value": "People with these roles edit it when they also see it. You and admins always do."
+  },
+  "dashboards.meta.by": {
+    "value": "Created by {{name}}"
+  },
+  "dashboards.meta.byYou": {
+    "value": "Created by you"
+  },
+  "dashboards.meta.widgets": {
+    "value": {
+      "one": "{{count}} widget",
+      "other": "{{count}} widgets"
+    }
+  },
+  "dashboards.meta.updated": {
+    "value": "updated {{when}}"
+  },
+  "dashboards.share.action": {
+    "value": "Share"
+  },
+  "dashboards.share.title": {
+    "value": "Share “{{title}}”"
+  },
+  "dashboards.share.access": {
+    "value": "Who has access"
+  },
+  "dashboards.share.you": {
+    "value": "{{name}} (you)"
+  },
+  "dashboards.share.owner": {
+    "value": "Workspace owner"
+  },
+  "dashboards.share.edits": {
+    "value": "Edits"
+  },
+  "dashboards.share.sees": {
+    "value": "Sees"
+  },
+  "dashboards.share.none": {
+    "value": "Doesn't see"
+  },
+  "dashboards.share.copyLink": {
+    "value": "Copy link"
+  },
+  "dashboards.share.copied": {
+    "value": "Link copied"
+  },
+  "dashboards.share.save": {
+    "value": "Save"
+  },
+  "dashboards.share.nowWorkspace": {
+    "value": "“{{title}}” is the workspace's now"
+  },
+  "dashboards.share.nowPrivate": {
+    "value": "Only you see “{{title}}”"
+  },
+  "dashboards.share.nowRoles": {
+    "value": "{{roles}} see “{{title}}”"
+  },
+  "dashboards.proposal.title": {
+    "value": "{{name}} built this dashboard for you"
+  },
+  "dashboards.proposal.workspace": {
+    "value": "And suggests publishing it to the whole workspace. Only you see it today."
+  },
+  "dashboards.proposal.roles": {
+    "value": "And suggests showing it to {{roles}}. Only you see it today."
+  },
+  "dashboards.proposal.keep": {
+    "value": "Keep only for me"
+  },
+  "dashboards.proposal.publishWorkspace": {
+    "value": "Publish to the workspace"
+  },
+  "dashboards.proposal.publishRoles": {
+    "value": "Show to {{roles}}"
+  },
+  "dashboards.proposal.published": {
+    "value": "“{{title}}” is published"
+  },
+  "dashboards.proposal.kept": {
+    "value": "Only you see “{{title}}”"
+  },
+  "dashboards.empty.title": {
+    "value": "Empty dashboard"
+  },
+  "dashboards.empty.text": {
+    "value": "Add widgets: ask an agent or pin a block from the chat."
+  },
+  "dashboards.onlyHome": {
+    "value": "Make a dashboard for the workspace or some roles with “New dashboard”."
+  },
+  "dashboards.create.title": {
+    "value": "New dashboard"
+  },
+  "dashboards.create.subtitle": {
+    "value": "Widgets together on one page, for you or for the team."
+  },
+  "dashboards.create.name": {
+    "value": "Name"
+  },
+  "dashboards.create.namePlaceholder": {
+    "value": "E.g.: Sales, Black Friday, Quarter goals"
+  },
+  "dashboards.create.askHint": {
+    "value": "You can also ask an agent in a chat to build one."
+  },
+  "dashboards.create.submit": {
+    "value": "Create dashboard"
+  },
+  "dashboards.create.created": {
+    "value": "“{{title}}” created"
+  },
+  "dashboards.newWidget.title": {
+    "value": "New widget"
+  },
+  "dashboards.newWidget.subtitle": {
+    "value": "A number, chart or list an agent keeps up to date."
+  },
+  "dashboards.newWidget.tabAsk": {
+    "value": "Ask an agent"
+  },
+  "dashboards.newWidget.tabPin": {
+    "value": "Pin from chat"
+  },
+  "dashboards.newWidget.what": {
+    "value": "What do you want to follow?"
+  },
+  "dashboards.newWidget.whatPlaceholder": {
+    "value": "E.g.: today's sales compared with yesterday"
+  },
+  "dashboards.newWidget.who": {
+    "value": "Who looks after it"
+  },
+  "dashboards.newWidget.format": {
+    "value": "Format"
+  },
+  "dashboards.newWidget.updates": {
+    "value": "Updates"
+  },
+  "dashboards.newWidget.destination": {
+    "value": "Add to"
+  },
+  "dashboards.newWidget.create": {
+    "value": "Create widget"
+  },
+  "dashboards.newWidget.pin": {
+    "value": "Pin"
+  },
+  "dashboards.newWidget.fromChat": {
+    "value": "Blocks the agents sent in chat"
+  },
+  "dashboards.newWidget.pinHint": {
+    "value": "You can also pin straight from the message: “Pin” on the block."
+  },
+  "dashboards.newWidget.keepUpdated": {
+    "value": "Keep it updated"
+  },
+  "dashboards.newWidget.onlyPin": {
+    "value": "No, just pin"
+  },
+  "dashboards.newWidget.emptyPreview": {
+    "value": "Say what you want to follow and {{name}} shows here how it will look."
+  },
+  "dashboards.newWidget.pickBlock": {
+    "value": "Pick a block from the chat."
+  },
+  "dashboards.newWidget.noBlocks": {
+    "value": "No charts in your conversations yet."
+  },
+  "dashboards.newWidget.suggestions": {
+    "value": "Suggestions"
+  },
+  "dashboards.newWidget.theAgent": {
+    "value": "The agent"
+  },
+  "dashboards.newWidget.noAgents": {
+    "value": "No agent you can talk to yet."
+  },
+  "dashboards.newWidget.place.channel": {
+    "value": "{{name}} in #{{channel}} · {{when}}"
+  },
+  "dashboards.newWidget.place.thread": {
+    "value": "{{name}} in a thread in #{{channel}} · {{when}}"
+  },
+  "dashboards.newWidget.place.dm": {
+    "value": "{{name}} in your conversation · {{when}}"
+  },
+  "dashboards.newWidget.place.unnamed": {
+    "value": "{{name}} in a conversation · {{when}}"
+  },
+  "dashboards.newWidget.steps.builds": {
+    "value": "{{name}} builds it now, with real data"
+  },
+  "dashboards.newWidget.steps.reads": {
+    "value": "Reads {{sources}}"
+  },
+  "dashboards.newWidget.steps.routine": {
+    "value": "Creates the routine “{{title}}”"
+  },
+  "dashboards.newWidget.steps.routineHint": {
+    "value": "{{schedule}} · shows in Routines"
+  },
+  "dashboards.newWidget.steps.noRoutine": {
+    "value": "No routine: updates when you ask"
+  },
+  "dashboards.newWidget.steps.alert": {
+    "value": "Alerts in Waiting on you if {{condition}}"
+  },
+  "dashboards.newWidget.steps.alertHint": {
+    "value": "Otherwise it only updates the widget, no message"
+  },
+  "dashboards.newWidget.steps.noAlert": {
+    "value": "No alerts"
+  },
+  "dashboards.newWidget.steps.noAlertHint": {
+    "value": "Only updates the widget, no message"
+  },
+  "dashboards.newWidget.steps.pinAsIs": {
+    "value": "Pins the block as it is in chat"
+  },
+  "dashboards.newWidget.steps.redoes": {
+    "value": "{{name}} redoes it {{schedule}}"
+  },
+  "dashboards.newWidget.steps.redoesHint": {
+    "value": "With a routine, no chat message"
+  },
+  "dashboards.newWidget.steps.noRedo": {
+    "value": "Doesn't update by itself"
+  },
+  "dashboards.newWidget.steps.noRedoHint": {
+    "value": "You can ask for an update in the menu"
+  },
+  "dashboards.newWidget.created": {
+    "value": "Widget added to {{where}}"
+  },
+  "dashboards.newWidget.test": {
+    "value": "Test"
+  },
+  "dashboards.newWidget.testAgain": {
+    "value": "Test again"
+  },
+  "dashboards.newWidget.testing": {
+    "value": "{{name}} is building it with real data…"
+  },
+  "dashboards.newWidget.tested": {
+    "value": "Real data · {{when}}"
+  },
+  "dashboards.newWidget.stale": {
+    "value": "Changed since the test"
+  },
+  "dashboards.newWidget.testFailed": {
+    "value": "It didn't work: {{reason}}"
+  },
+  "dashboards.newWidget.tryAgain": {
+    "value": "Try again"
+  },
+  "dashboards.newWidget.testCost": {
+    "value": "This test cost {{cost}}"
+  },
+  "dashboards.newWidget.testFirst": {
+    "value": "Test it first to see the real result"
+  },
+  "dashboards.newWidget.titleField": {
+    "value": "Title"
+  },
+  "dashboards.newWidget.titlePlaceholder": {
+    "value": "Title · {{name}} suggests one on the test"
+  },
+  "dashboards.newWidget.cardSubtitle": {
+    "value": "Write on the card what you want to see. Its parts change who looks after it, when it updates, the alert and its size."
+  },
+  "dashboards.newWidget.pinTitle": {
+    "value": "Pin a block from the chat"
+  },
+  "dashboards.newWidget.pinSubtitle": {
+    "value": "The card comes from the chat. You choose its title and whether it is redone."
+  },
+  "dashboards.newWidget.pickFromChat": {
+    "value": "Choose a block an agent already sent:"
+  },
+  "dashboards.newWidget.orPin": {
+    "value": "Or pin a block that already came in the chat"
+  },
+  "dashboards.newWidget.repick": {
+    "value": "Choose another block"
+  },
+  "dashboards.newWidget.formatAuto": {
+    "value": "Automatic format"
+  },
+  "dashboards.newWidget.enterTests": {
+    "value": "Enter tests again"
+  },
+  "dashboards.newWidget.quoted": {
+    "value": "“{{ask}}”"
+  },
+  "dashboards.newWidget.editAsk": {
+    "value": "Change the ask"
+  },
+  "dashboards.newWidget.editAskOf": {
+    "value": "Change the ask: {{ask}}"
+  },
+  "dashboards.newWidget.testingShort": {
+    "value": "Testing…"
+  },
+  "dashboards.newWidget.buildingFoot": {
+    "value": "{{name}} building…"
+  },
+  "dashboards.newWidget.failedTitle": {
+    "value": "{{name}} couldn't build it"
+  },
+  "dashboards.newWidget.staleHint": {
+    "value": "Test again to see how it looks."
+  },
+  "dashboards.newWidget.whoButton": {
+    "value": "Who looks after it: {{name}}"
+  },
+  "dashboards.newWidget.whoHint": {
+    "value": "Whoever looks after it builds the widget from what it reads through its connectors."
+  },
+  "dashboards.newWidget.alert": {
+    "value": "Alert"
+  },
+  "dashboards.newWidget.alertOn": {
+    "value": "Alerts"
+  },
+  "dashboards.newWidget.alertDone": {
+    "value": "Done"
+  },
+  "dashboards.newWidget.manual": {
+    "value": "Only when I ask"
+  },
+  "dashboards.newWidget.manualInline": {
+    "value": "only when I ask"
+  },
+  "dashboards.newWidget.noUpdate": {
+    "value": "Don't update"
+  },
+  "dashboards.newWidget.noUpdateInline": {
+    "value": "doesn't update"
+  },
+  "dashboards.newWidget.inRoutines": {
+    "value": "the routine shows in Routines"
+  },
+  "dashboards.newWidget.pinAsIs": {
+    "value": "Stays as it is, no routine"
+  },
+  "dashboards.newWidget.pinRedoes": {
+    "value": "{{name}} redoes it {{schedule}} with a routine"
+  },
+  "dashboards.newWidget.formatHints.auto": {
+    "value": "{{name}} picks the one that shows it best"
+  },
+  "dashboards.newWidget.formatHints.kpi": {
+    "value": "One big number and how it moved"
+  },
+  "dashboards.newWidget.formatHints.goal": {
+    "value": "Progress toward a target"
+  },
+  "dashboards.newWidget.formatHints.bars": {
+    "value": "A few values side by side"
+  },
+  "dashboards.newWidget.formatHints.line": {
+    "value": "How it changed over time"
+  },
+  "dashboards.newWidget.formatHints.list": {
+    "value": "A short list of items"
+  },
+  "dashboards.newWidget.formatHints.text": {
+    "value": "A few sentences that sum it up"
+  },
+  "dashboards.pinTop": {
+    "value": "Pin to the top"
+  },
+  "dashboards.unpin": {
+    "value": "Unpin"
+  },
+  "dashboards.rename": {
+    "value": "Rename"
+  },
+  "dashboards.about": {
+    "value": "Description"
+  },
+  "dashboards.aboutPlaceholder": {
+    "value": "What this dashboard is for"
+  },
+  "dashboards.delete.action": {
+    "value": "Delete dashboard"
+  },
+  "dashboards.delete.title": {
+    "value": "Delete “{{title}}”?"
+  },
+  "dashboards.delete.text": {
+    "value": "Its widgets and their routines go too."
+  },
+  "dashboards.delete.confirm": {
+    "value": "Delete"
+  },
+  "dashboards.delete.done": {
+    "value": "“{{title}}” deleted"
+  },
+  "dashboards.errors.notFound": {
+    "value": "This dashboard isn't there, or you don't see it."
+  },
+  "dashboards.errors.forbidden": {
+    "value": "Only who edits this dashboard can do that."
+  },
+  "dashboards.errors.homeFixed": {
+    "value": "Your Home isn't shared or deleted."
+  },
+  "dashboards.errors.rolesRequired": {
+    "value": "Pick at least one role."
+  },
+  "dashboards.errors.roleUnknown": {
+    "value": "One of these roles isn't in the workspace anymore."
+  },
+  "dashboards.errors.titleRequired": {
+    "value": "Give the dashboard a name."
+  },
+  "dashboards.errors.tooMany": {
+    "value": "The workspace has as many dashboards as it can. Delete one first."
+  },
+  "dashboards.errors.publishForbidden": {
+    "value": "Your roles don't let you show dashboards to others."
+  },
+  "dashboards.errors.proposalNone": {
+    "value": "That request was already decided."
+  },
+  "dashboards.errors.proposalNotYours": {
+    "value": "Only the person the agent asked decides."
+  },
+  "dashboards.errors.widgetNotFound": {
+    "value": "This widget isn't there anymore."
+  },
+  "dashboards.errors.widgetTooMany": {
+    "value": "This dashboard is full. Remove a widget or use another dashboard."
+  },
+  "dashboards.errors.scheduledCap": {
+    "value": "The workspace already keeps {{max}} widgets updating on a schedule. Set one to update only when asked, or remove one."
+  },
+  "dashboards.errors.agentUnreachable": {
+    "value": "You can't talk to this agent."
+  },
+  "dashboards.errors.agentArchived": {
+    "value": "This agent was archived."
+  },
+  "dashboards.errors.blockNotFound": {
+    "value": "That chart isn't in the message anymore."
+  },
+  "dashboards.errors.notAgentMessage": {
+    "value": "Only an agent's chart can be pinned."
+  },
+  "dashboards.errors.promptRequired": {
+    "value": "Say what the widget should show."
+  },
+  "dashboards.errors.notTested": {
+    "value": "Test it first: the widget is created once its test works."
+  },
+  "database.scope": {
+    "value": "Which databases"
+  },
+  "database.scopeOne": {
+    "value": "Just this database"
+  },
+  "database.scopeAll": {
+    "value": "Every database on this server"
+  },
+  "database.scopeAllHelp": {
+    "value": "For one database per customer. Agents see the list and pick the database in each query."
+  },
+  "database.prefix": {
+    "value": "Only names starting with"
+  },
+  "database.prefixPlaceholder": {
+    "value": "E.g. customer_"
+  },
+  "database.prefixHelp": {
+    "value": "Leave empty for all. New databases starting this way show up on their own."
+  },
+  "database.databaseOptional": {
+    "value": "Optional for every database."
+  },
+  "database.testing.databases": {
+    "value": "Looking at the databases…"
+  },
+  "database.error.no_databases": {
+    "value": "This user can't open any database on this server. Check its permissions or the start of the name."
+  },
+  "database.connectedToastAll": {
+    "value": {
+      "one": "{{name}} connected with {{count}} database.",
+      "other": "{{name}} connected with {{count}} databases."
+    }
+  },
+  "database.howAll": {
+    "value": "To read every database (Postgres 14 or newer)."
+  },
+  "database.count": {
+    "value": {
+      "one": "{{count}} database",
+      "other": "{{count}} databases"
+    }
+  },
+  "database.prefixRow": {
+    "value": "databases starting with {{prefix}}"
+  },
+  "database.refresh": {
+    "value": "Refresh list"
+  },
+  "database.refreshName": {
+    "value": "Refresh the list of databases of {{name}}"
+  },
+  "database.rule.databases": {
+    "value": "Databases"
+  },
+  "database.rule.databasesAll": {
+    "value": "All"
+  },
+  "database.rule.databasesSome": {
+    "value": "Only these"
+  },
+  "database.rule.databasePlaceholder": {
+    "value": "Database name"
+  },
+  "database.rule.databasesHelp": {
+    "value": "The rules below apply to every database this agent reads."
+  },
+  "database.rule.tablesIn": {
+    "value": "Tables (seen in {{database}})"
+  },
+  "database.rule.capHelpAll": {
+    "value": "Empty = no limit. Counted across every database."
+  },
+  "database.agent.allDatabases": {
+    "value": "Every database of {{name}}"
+  },
+  "database.agent.someDatabases": {
+    "value": {
+      "one": "{{count}} database of {{name}}",
+      "other": "{{count}} databases of {{name}}"
+    }
+  },
+  "database.scopeEdit": {
+    "value": "Databases"
+  },
+  "database.scopeEditName": {
+    "value": "Databases of {{name}}"
+  },
+  "database.scopeSaved": {
+    "value": "{{name}} saved."
+  },
+  "database.widenTitle": {
+    "value": "Open the whole server?"
+  },
+  "database.widenTitlePrefix": {
+    "value": "Open more databases?"
+  },
+  "database.widenText": {
+    "value": {
+      "one": "The agent with access will read every database on this server. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database on this server. You can limit it per agent in Rules."
+    }
+  },
+  "database.widenTextPrefix": {
+    "value": {
+      "one": "The agent with access will read every database starting with {{prefix}}. You can limit it per agent in Rules.",
+      "other": "The {{count}} agents with access will read every database starting with {{prefix}}. You can limit it per agent in Rules."
+    }
+  },
+  "rightHand.label": {
+    "value": "your right hand"
+  },
+  "rightHand.newDot": {
+    "value": "New"
+  },
+  "rightHand.callWith": {
+    "value": "call with @{{handle}}"
+  },
+  "rightHand.role": {
+    "value": "Workspace assistant"
+  },
+  "rightHand.actsAsYou": {
+    "value": "acts with your permissions"
+  },
+  "rightHand.composerHint": {
+    "value": "nothing changes without you"
+  },
+  "rightHand.intro.greeting": {
+    "value": "Hi, I'm {{name}}. I'll build the team with you."
+  },
+  "rightHand.intro.lead": {
+    "value": "I create the agents, connect the apps and invite the people. Nothing changes without your click, and I only do what you can do."
+  },
+  "rightHand.intro.connect.title": {
+    "value": "Connect an AI for the team"
+  },
+  "rightHand.intro.connect.text": {
+    "value": "The agents think with the workspace's AI. Sign in with your Claude or ChatGPT plan, no API key needed."
+  },
+  "rightHand.intro.connect.action": {
+    "value": "Connect"
+  },
+  "rightHand.intro.start.question": {
+    "value": "How do you want to start?"
+  },
+  "rightHand.intro.start.createOne": {
+    "value": "Create {{name}}"
+  },
+  "rightHand.intro.start.team": {
+    "value": "Build a starter team"
+  },
+  "rightHand.intro.start.describe": {
+    "value": "Describe what I need"
+  },
+  "rightHand.intro.start.import": {
+    "value": "Import my agents"
+  },
+  "rightHand.intro.start.form": {
+    "value": "Fill in the form"
+  },
+  "rightHand.intro.next.question": {
+    "value": "The team is here. What next?"
+  },
+  "rightHand.intro.next.invite": {
+    "value": "Invite people"
+  },
+  "rightHand.intro.next.firstTask": {
+    "value": "Give {{name}} a first task"
+  },
+  "rightHand.intro.firstTask.theo": {
+    "value": "Plan our first week: what does each of us do first?"
+  },
+  "rightHand.intro.firstTask.ada": {
+    "value": "What could you build or automate for us first?"
+  },
+  "rightHand.intro.firstTask.lia": {
+    "value": "Who are our 5 closest competitors, and what do they do better than us?"
+  },
+  "rightHand.intro.firstTask.atlas": {
+    "value": "What will you watch first in our errors, queues and deploys, and how will you tell me when something breaks?"
+  },
+  "rightHand.profile.how": {
+    "value": "How it works"
+  },
+  "rightHand.profile.permissions": {
+    "value": "Acts with your permissions"
+  },
+  "rightHand.profile.private": {
+    "value": "Talks only with you in your DM"
+  },
+  "rightHand.profile.channels": {
+    "value": "Replies in channels when called"
+  },
+  "rightHand.profile.model": {
+    "value": "Model"
+  },
+  "rightHand.profile.message": {
+    "value": "Message"
+  },
+  "rightHand.profile.configure": {
+    "value": "Configure"
+  },
+  "rightHand.settings.name": {
+    "value": "Name and look"
+  },
+  "rightHand.settings.nameHelp": {
+    "value": "In the sidebar it always shows as “{{label}}”."
+  },
+  "rightHand.settings.changeLook": {
+    "value": "Change look"
+  },
+  "rightHand.settings.ai": {
+    "value": "AI and model"
+  },
+  "rightHand.settings.aiHelp": {
+    "value": "Automatic picks the cheapest model that does the job."
+  },
+  "rightHand.settings.budget": {
+    "value": "Monthly budget"
+  },
+  "rightHand.settings.perMonth": {
+    "value": "/month"
+  },
+  "rightHand.settings.budgetHelp": {
+    "value": "When it reaches the limit, it stops and tells you, like any agent."
+  },
+  "rightHand.settings.audience": {
+    "value": "Who can use it"
+  },
+  "rightHand.settings.audienceHelp": {
+    "value": "Outside it, a person doesn't see {{name}} in the sidebar."
+  },
+  "rightHand.settings.lock": {
+    "value": "{{name}} can't be archived or deleted. It posts nothing unless someone talks to it."
+  },
+  "rightHand.settings.audit": {
+    "value": "See what {{name}} did"
+  },
+  "rightHand.card.settings": {
+    "value": "{{name}} · Settings"
+  },
+  "rightHand.card.apply": {
+    "value": "Apply"
+  },
+  "rightHand.card.dismiss": {
+    "value": "Dismiss"
+  },
+  "rightHand.card.decline": {
+    "value": "Decline"
+  },
+  "rightHand.card.askAdmin": {
+    "value": "Ask an admin"
+  },
+  "rightHand.card.sentTo": {
+    "value": "Sent to {{names}} · {{when}}"
+  },
+  "rightHand.card.sentToAny": {
+    "value": "Sent to whoever decides · {{when}}"
+  },
+  "rightHand.card.appliedBy": {
+    "value": "Applied by {{name}}"
+  },
+  "rightHand.card.appliedByYou": {
+    "value": "Applied by you"
+  },
+  "rightHand.card.declinedBy": {
+    "value": "Declined by {{name}}"
+  },
+  "rightHand.card.declinedByYou": {
+    "value": "Declined by you"
+  },
+  "rightHand.card.undo": {
+    "value": "Undo"
+  },
+  "rightHand.card.undone": {
+    "value": "Undone"
+  },
+  "rightHand.card.stale": {
+    "value": "Out of date"
+  },
+  "rightHand.card.staleHelp": {
+    "value": "{{name}} changed since this card. Nothing was applied."
+  },
+  "rightHand.card.redo": {
+    "value": "Redo"
+  },
+  "rightHand.card.redoMessage": {
+    "value": "Redo the card for {{name}} with today's values"
+  },
+  "rightHand.card.createTest": {
+    "value": "Create and try it"
+  },
+  "rightHand.card.to": {
+    "value": "to"
+  },
+  "rightHand.card.editFirst": {
+    "value": "Edit first"
+  },
+  "rightHand.card.superseded": {
+    "value": "Replaced by the newer proposal"
+  },
+  "rightHand.card.onlyCreators": {
+    "value": "Only admins create agents"
+  },
+  "rightHand.card.only.model": {
+    "value": "Only admins change an agent's model"
+  },
+  "rightHand.card.only.budget": {
+    "value": "Only admins change an agent's budget"
+  },
+  "rightHand.card.only.owner": {
+    "value": "Only admins change who owns an agent"
+  },
+  "rightHand.card.only.archive": {
+    "value": "Only admins archive an agent"
+  },
+  "rightHand.card.only.audience": {
+    "value": "Only admins and its owner change who talks to it"
+  },
+  "rightHand.card.only.channels": {
+    "value": "Only admins and its owner change its channels"
+  },
+  "rightHand.card.only.ai_account": {
+    "value": "Only the account's owner gives it"
+  },
+  "rightHand.card.only.many": {
+    "value": "Only admins make these changes"
+  },
+  "rightHand.field.model": {
+    "value": "Model"
+  },
+  "rightHand.field.ai_account": {
+    "value": "AI account"
+  },
+  "rightHand.field.budget": {
+    "value": "Monthly budget"
+  },
+  "rightHand.field.owner": {
+    "value": "Owner"
+  },
+  "rightHand.field.audience": {
+    "value": "Who can talk"
+  },
+  "rightHand.field.archive": {
+    "value": "Status"
+  },
+  "rightHand.field.channel": {
+    "value": "Channel"
+  },
+  "rightHand.value.none": {
+    "value": "None"
+  },
+  "rightHand.value.budgetDefault": {
+    "value": "Workspace default"
+  },
+  "rightHand.value.anAccount": {
+    "value": "An AI account"
+  },
+  "rightHand.value.everyone": {
+    "value": "Everyone"
+  },
+  "rightHand.value.ownerOnly": {
+    "value": "Only its owner"
+  },
+  "rightHand.value.somePeople": {
+    "value": "Some people"
+  },
+  "rightHand.value.active": {
+    "value": "Active"
+  },
+  "rightHand.value.archived": {
+    "value": "Archived"
+  },
+  "rightHand.value.notIn": {
+    "value": "Not in it"
+  },
+  "rightHand.value.withoutMention": {
+    "value": "On its own"
+  },
+  "rightHand.value.mentionOnly": {
+    "value": "Only when mentioned"
+  },
+  "agentActions.agent.settings_changed": {
+    "value": "Changed the settings of <b>{{agentName}}</b>"
+  },
+  "notifications.what.changeRequest": {
+    "value": "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>"
+  },
+  "notifications.what.changeRequestAgent": {
+    "value": "<b>{{name}}</b> asks for a new agent: <b>{{agent}}</b>"
+  },
+  "proposals.targetSettings": {
+    "value": "{{name}}'s settings"
+  },
+  "proposals.titleSettings": {
+    "value": "Change {{name}}'s settings"
+  },
+  "settings.section.right_hand": {
+    "value": "Right hand"
+  },
+  "settings.sectionText.right_hand": {
+    "value": "The assistant that builds the team with each person, in their DM and with their permissions."
+  },
+  "chat.body.settings_proposal": {
+    "value": "Proposed a change to {{names}}"
+  },
+  "team.cap.vault": {
+    "value": "Vault"
+  },
+  "vault.tab.label": {
+    "value": "What to show"
+  },
+  "vault.tab.team": {
+    "value": "Team"
+  },
+  "vault.tab.personal": {
+    "value": "Personal"
+  },
+  "vault.tab.connections": {
+    "value": "Connections"
+  },
+  "vault.list.search": {
+    "value": "Search the Vault"
+  },
+  "vault.list.clearSearch": {
+    "value": "Clear the search"
+  },
+  "vault.list.kind": {
+    "value": "Kind"
+  },
+  "vault.list.kindAll": {
+    "value": "All kinds"
+  },
+  "vault.list.noMatch": {
+    "value": "Nothing here matches this search."
+  },
+  "vault.list.clearFilters": {
+    "value": "Clear the search"
+  },
+  "vault.list.personalNote": {
+    "value": "Only you see these. Your agents use them only when you ask."
+  },
+  "vault.list.personalEmpty": {
+    "value": "Nothing saved yet"
+  },
+  "vault.list.personalEmptyText": {
+    "value": "Only you see these. Your agents use them only when you ask."
+  },
+  "vault.list.teamEmpty": {
+    "value": "Nothing shared with the team yet"
+  },
+  "vault.list.teamEmptyText": {
+    "value": "Save a login, a key or contact details once, and choose which agents may use it."
+  },
+  "vault.list.sharedEmpty": {
+    "value": "Nothing shared with you yet"
+  },
+  "vault.list.sharedEmptyText": {
+    "value": "When someone shares a team login or key with you, it shows here."
+  },
+  "vault.row.agents": {
+    "value": {
+      "one": "{{count}} agent",
+      "other": "{{count}} agents"
+    }
+  },
+  "vault.row.used": {
+    "value": "Used {{when}}"
+  },
+  "vault.row.never": {
+    "value": "Never used"
+  },
+  "vault.kind.login": {
+    "value": "Login"
+  },
+  "vault.kind.key": {
+    "value": "Key"
+  },
+  "vault.kind.contact": {
+    "value": "Contact"
+  },
+  "vault.kind.loginText": {
+    "value": "A website's username and password"
+  },
+  "vault.kind.keyText": {
+    "value": "A key your agents use in a command"
+  },
+  "vault.kind.contactText": {
+    "value": "Details agents type in forms"
+  },
+  "vault.kindPlural.login": {
+    "value": "logins"
+  },
+  "vault.kindPlural.key": {
+    "value": "keys"
+  },
+  "vault.kindPlural.contact": {
+    "value": "contacts"
+  },
+  "vault.kindPlural.loginTitle": {
+    "value": "Logins"
+  },
+  "vault.kindPlural.keyTitle": {
+    "value": "Keys"
+  },
+  "vault.kindPlural.contactTitle": {
+    "value": "Contacts"
+  },
+  "vault.scope.personal": {
+    "value": "Personal"
+  },
+  "vault.scope.team": {
+    "value": "Team"
+  },
+  "vault.scope.personalText": {
+    "value": "Only you see it"
+  },
+  "vault.scope.teamText": {
+    "value": "Shared with the workspace"
+  },
+  "vault.field.title": {
+    "value": "Name"
+  },
+  "vault.field.contactTitle": {
+    "value": "Name in the Vault"
+  },
+  "vault.field.loginPlaceholder": {
+    "value": "Company email"
+  },
+  "vault.field.keyPlaceholder": {
+    "value": "Payments key"
+  },
+  "vault.field.contactPlaceholder": {
+    "value": "Billing details"
+  },
+  "vault.field.website": {
+    "value": "Website"
+  },
+  "vault.field.websitePlaceholder": {
+    "value": "app.example.com"
+  },
+  "vault.field.match": {
+    "value": "Where agents may type it"
+  },
+  "vault.field.username": {
+    "value": "Username"
+  },
+  "vault.field.usernamePlaceholder": {
+    "value": "Email or username"
+  },
+  "vault.field.password": {
+    "value": "Password"
+  },
+  "vault.field.keyName": {
+    "value": "Variable name"
+  },
+  "vault.field.keyNameHelp": {
+    "value": "Your agents use the key by this name in a command."
+  },
+  "vault.field.keyNamePlaceholder": {
+    "value": "ACME_API_KEY"
+  },
+  "vault.field.value": {
+    "value": "Value"
+  },
+  "vault.field.description": {
+    "value": "Note for your agents"
+  },
+  "vault.field.descriptionHelp": {
+    "value": "When to use it and what it's for. Agents read this to pick the right one."
+  },
+  "vault.field.descriptionPlaceholder.login": {
+    "value": "The account we use to publish posts"
+  },
+  "vault.field.descriptionPlaceholder.key": {
+    "value": "For the payments service, test mode"
+  },
+  "vault.field.descriptionPlaceholder.contact": {
+    "value": "Use it for the company's invoices"
+  },
+  "vault.match.exact": {
+    "value": "Only this address"
+  },
+  "vault.match.site": {
+    "value": "Whole site"
+  },
+  "vault.match.exactHelp": {
+    "value": "Agents type it only on {{origin}}."
+  },
+  "vault.match.exactHelpNone": {
+    "value": "Agents type it only on this exact address."
+  },
+  "vault.match.siteHelp": {
+    "value": "Agents type it on any page of this site, like a sign-in page on another subdomain."
+  },
+  "vault.contact.group": {
+    "value": "Contact details"
+  },
+  "vault.contact.fullName": {
+    "value": "Full name"
+  },
+  "vault.contact.company": {
+    "value": "Company"
+  },
+  "vault.contact.document": {
+    "value": "Tax ID"
+  },
+  "vault.contact.email": {
+    "value": "Email"
+  },
+  "vault.contact.phone": {
+    "value": "Phone"
+  },
+  "vault.contact.address": {
+    "value": "Address"
+  },
+  "vault.contact.address2": {
+    "value": "Address line 2"
+  },
+  "vault.contact.city": {
+    "value": "City"
+  },
+  "vault.contact.region": {
+    "value": "State or region"
+  },
+  "vault.contact.postalCode": {
+    "value": "Postal code"
+  },
+  "vault.contact.country": {
+    "value": "Country"
+  },
+  "vault.error.title": {
+    "value": "Give it a name."
+  },
+  "vault.error.website": {
+    "value": "Use an https address, like app.example.com."
+  },
+  "vault.error.keyName": {
+    "value": "Use capital letters, numbers and _, starting with a letter, like ACME_API_KEY."
+  },
+  "vault.error.password": {
+    "value": "Type the password."
+  },
+  "vault.error.value": {
+    "value": "Type the value."
+  },
+  "vault.error.contact": {
+    "value": "Fill in at least one field."
+  },
+  "vault.item.missing": {
+    "value": "Missing"
+  },
+  "vault.item.missingText": {
+    "value": "It's gone from {{source}}. Agents can't use it until it's back."
+  },
+  "vault.item.editIn": {
+    "value": "Edit it in {{source}}. Changes arrive here at the next sync."
+  },
+  "vault.item.hidden": {
+    "value": "Hidden"
+  },
+  "vault.item.endsIn": {
+    "value": "ends in {{hint}}"
+  },
+  "vault.item.noValue": {
+    "value": "Nothing saved"
+  },
+  "vault.item.show": {
+    "value": "Show"
+  },
+  "vault.item.hide": {
+    "value": "Hide"
+  },
+  "vault.item.change": {
+    "value": "Change"
+  },
+  "vault.item.add": {
+    "value": "Add"
+  },
+  "vault.item.newPassword": {
+    "value": "New password"
+  },
+  "vault.item.newValue": {
+    "value": "New value"
+  },
+  "vault.item.newValueHelp": {
+    "value": "It replaces the saved one when you save."
+  },
+  "vault.item.keepValue": {
+    "value": "Keep the current one"
+  },
+  "vault.item.revealHelp": {
+    "value": "Show and Copy are recorded in its recent uses."
+  },
+  "vault.item.saved": {
+    "value": "Saved"
+  },
+  "vault.item.delete": {
+    "value": "Delete"
+  },
+  "vault.item.deleteTitle": {
+    "value": "Delete {{title}}?"
+  },
+  "vault.item.deleteText": {
+    "value": "Your agents can no longer use it. This can't be undone."
+  },
+  "vault.item.deleted": {
+    "value": "{{title}} deleted from the Vault"
+  },
+  "vault.use.title": {
+    "value": "Recent uses"
+  },
+  "vault.use.none": {
+    "value": "No one has used it yet."
+  },
+  "vault.use.fill": {
+    "value": "{{agent}}, on {{host}}"
+  },
+  "vault.use.fillSomewhere": {
+    "value": "{{agent}} typed it"
+  },
+  "vault.use.key": {
+    "value": "{{agent}}, in a command"
+  },
+  "vault.use.read": {
+    "value": "{{who}} read it"
+  },
+  "vault.use.show": {
+    "value": "{{who}} showed it"
+  },
+  "vault.use.copy": {
+    "value": "{{who}} copied it"
+  },
+  "vault.use.create": {
+    "value": "{{who}} saved it"
+  },
+  "vault.use.edit": {
+    "value": "{{who}} changed it"
+  },
+  "vault.use.for": {
+    "value": "for {{name}}"
+  },
+  "vault.use.routine": {
+    "value": "Routine {{name}}"
+  },
+  "vault.access.title": {
+    "value": "Who has access"
+  },
+  "vault.access.people": {
+    "value": "People"
+  },
+  "vault.access.agents": {
+    "value": "Agents"
+  },
+  "vault.access.edit": {
+    "value": "Edit"
+  },
+  "vault.access.editOf": {
+    "value": "Edit {{what}}"
+  },
+  "vault.access.everyone": {
+    "value": "Everyone in the workspace"
+  },
+  "vault.access.everyoneText": {
+    "value": "Each person sees it, and agents use it when they ask."
+  },
+  "vault.access.managersOnly": {
+    "value": "Only who manages the Vault"
+  },
+  "vault.access.allAgents": {
+    "value": "All agents"
+  },
+  "vault.access.noAgents": {
+    "value": "No agent yet"
+  },
+  "vault.access.more": {
+    "value": {
+      "one": "{{count}} more",
+      "other": "{{count}} more"
+    }
+  },
+  "vault.access.saved": {
+    "value": "Access saved"
+  },
+  "vault.access.peopleTitle": {
+    "value": "Who can see it"
+  },
+  "vault.access.peopleText": {
+    "value": "They see it, and agents use it when one of them asks. Who manages the Vault always sees it."
+  },
+  "vault.access.level.use": {
+    "value": "Can see and use"
+  },
+  "vault.access.level.none": {
+    "value": "No access"
+  },
+  "vault.access.roleDetail": {
+    "value": "Everyone with this role"
+  },
+  "vault.access.roles": {
+    "value": "Roles"
+  },
+  "vault.access.peopleGroup": {
+    "value": "People"
+  },
+  "vault.access.add": {
+    "value": "Add a role or a person"
+  },
+  "vault.access.addSearch": {
+    "value": "Search roles and people"
+  },
+  "vault.access.noMatch": {
+    "value": "No one found"
+  },
+  "vault.access.levelOf": {
+    "value": "What {{name}} can do"
+  },
+  "vault.access.follows": {
+    "value": "It follows the default access of {{source}}."
+  },
+  "vault.access.own": {
+    "value": "It has its own access, not the default of {{source}}."
+  },
+  "vault.access.changeHere": {
+    "value": "Change for this item"
+  },
+  "vault.access.useConnection": {
+    "value": "Use the default again"
+  },
+  "vault.agents.title": {
+    "value": "Which agents can use it"
+  },
+  "vault.agents.textPersonal": {
+    "value": "They use it only when you ask them."
+  },
+  "vault.agents.textTeam": {
+    "value": "They use it when someone who can see it asks."
+  },
+  "vault.agents.all": {
+    "value": "All agents"
+  },
+  "vault.agents.allDetail": {
+    "value": "Also the ones added later"
+  },
+  "vault.summary.noAgents": {
+    "value": "No agent can use it yet."
+  },
+  "vault.summary.allAgents": {
+    "value": "Every agent"
+  },
+  "vault.summary.inRole": {
+    "value": "someone in {{role}}"
+  },
+  "vault.summary.personal": {
+    "value": {
+      "one": "{{agents}} can use it, only when you ask.",
+      "other": "{{agents}} can use it, only when you ask."
+    }
+  },
+  "vault.summary.everyone": {
+    "value": {
+      "one": "{{agents}} can use it when anyone in the workspace asks.",
+      "other": "{{agents}} can use it when anyone in the workspace asks."
+    }
+  },
+  "vault.summary.people": {
+    "value": {
+      "one": "{{agents}} can use it when {{people}} asks.",
+      "other": "{{agents}} can use it when {{people}} asks."
+    }
+  },
+  "vault.summary.nobody": {
+    "value": "No one can ask agents to use it yet. Choose who can see it."
+  },
+  "vault.new.open": {
+    "value": "New item"
+  },
+  "vault.new.title": {
+    "value": "New item"
+  },
+  "vault.new.text": {
+    "value": "Save it once. Your agents use it without seeing a password or a key."
+  },
+  "vault.new.what": {
+    "value": "What do you want to save?"
+  },
+  "vault.new.who": {
+    "value": "Who can use it"
+  },
+  "vault.new.teamLocked": {
+    "value": "Only people who manage the Vault can save team items. This one stays yours."
+  },
+  "vault.new.save": {
+    "value": "Save"
+  },
+  "vault.new.saved": {
+    "value": "Saved to the Vault"
+  },
+  "vault.import.open": {
+    "value": "Import"
+  },
+  "vault.import.title": {
+    "value": "Import passwords"
+  },
+  "vault.import.text": {
+    "value": "From a file your browser or password manager exports (.csv)."
+  },
+  "vault.import.dropTitle": {
+    "value": "Drop the file here"
+  },
+  "vault.import.dropText": {
+    "value": "or click to choose it on your computer"
+  },
+  "vault.import.reading": {
+    "value": "Reading the file…"
+  },
+  "vault.import.choose": {
+    "value": "Choose the file"
+  },
+  "vault.import.where": {
+    "value": "In your browser or password manager, look for Export passwords and choose CSV."
+  },
+  "vault.import.tooLarge": {
+    "value": "This file is too large (2 MB at most)."
+  },
+  "vault.import.notCsv": {
+    "value": "Choose a .csv file."
+  },
+  "vault.import.unreadable": {
+    "value": "Couldn't read this file. Try exporting it again."
+  },
+  "vault.import.format.chrome": {
+    "value": "Read as a Chrome export"
+  },
+  "vault.import.format.1password": {
+    "value": "Read as a 1Password export"
+  },
+  "vault.import.format.bitwarden": {
+    "value": "Read as a Bitwarden export"
+  },
+  "vault.import.format.generic": {
+    "value": "Read as a passwords file"
+  },
+  "vault.import.added": {
+    "value": {
+      "one": "new login",
+      "other": "new logins"
+    }
+  },
+  "vault.import.updated": {
+    "value": {
+      "one": "updated",
+      "other": "updated"
+    }
+  },
+  "vault.import.skipped": {
+    "value": {
+      "one": "left out",
+      "other": "left out"
+    }
+  },
+  "vault.import.reason.duplicate": {
+    "value": {
+      "one": "{{count}} already in the Vault",
+      "other": "{{count}} already in the Vault"
+    }
+  },
+  "vault.import.reason.not_https": {
+    "value": {
+      "one": "{{count}} not on an https address",
+      "other": "{{count}} not on an https address"
+    }
+  },
+  "vault.import.reason.no_password": {
+    "value": {
+      "one": "{{count}} without a password",
+      "other": "{{count}} without a password"
+    }
+  },
+  "vault.import.reason.invalid": {
+    "value": {
+      "one": "{{count}} line we couldn't read",
+      "other": "{{count}} lines we couldn't read"
+    }
+  },
+  "vault.import.as": {
+    "value": "Save them as"
+  },
+  "vault.import.asPersonal": {
+    "value": "Only you will see them."
+  },
+  "vault.import.asTeam": {
+    "value": "Everyone in the workspace sees them. Choose agents for each one afterwards."
+  },
+  "vault.import.deleteFile": {
+    "value": "Delete the file afterwards: it holds your passwords unencrypted."
+  },
+  "vault.import.confirm": {
+    "value": {
+      "one": "Import {{count}}",
+      "other": "Import {{count}}"
+    }
+  },
+  "vault.import.done": {
+    "value": {
+      "one": "{{count}} login imported",
+      "other": "{{count}} logins imported"
+    }
+  },
+  "vault.import.another": {
+    "value": "Choose another file"
+  },
+  "vault.import.close": {
+    "value": "Done"
+  },
+  "vault.connections.none": {
+    "value": "No password manager can be connected here."
+  },
+  "vault.connections.lead": {
+    "value": "Your agents use the {{kinds}} you keep in {{name}}."
+  },
+  "vault.connections.connect": {
+    "value": "Connect"
+  },
+  "vault.connections.reconnect": {
+    "value": "Reconnect"
+  },
+  "vault.connections.reconnectName": {
+    "value": "Reconnect {{name}}"
+  },
+  "vault.connections.open": {
+    "value": "Open {{name}}"
+  },
+  "vault.connections.required": {
+    "value": "Fill this in."
+  },
+  "vault.connections.for": {
+    "value": "Connect for"
+  },
+  "vault.connections.forTeam": {
+    "value": "Its items are the team's. Who manages the Vault decides who uses them."
+  },
+  "vault.connections.forPersonal": {
+    "value": "Its items are yours alone."
+  },
+  "vault.connections.teamLocked": {
+    "value": "Its items will be yours alone. Only who manages the Vault connects one for the team."
+  },
+  "vault.connections.sealed": {
+    "value": "What you type here is encrypted and never shown again."
+  },
+  "vault.connections.connected": {
+    "value": {
+      "one": "{{name}} connected. {{count}} item came in.",
+      "other": "{{name}} connected. {{count}} items came in."
+    }
+  },
+  "vault.connections.ready": {
+    "value": "Connected"
+  },
+  "vault.connections.syncing": {
+    "value": "Syncing"
+  },
+  "vault.connections.reads": {
+    "value": "Reads {{label}}"
+  },
+  "vault.connections.items": {
+    "value": {
+      "one": "{{count}} item",
+      "other": "{{count}} items"
+    }
+  },
+  "vault.connections.synced": {
+    "value": "synced {{when}}"
+  },
+  "vault.connections.syncNow": {
+    "value": "Sync now"
+  },
+  "vault.connections.access": {
+    "value": "Default access"
+  },
+  "vault.connections.accessTitle": {
+    "value": "Default access of {{label}}"
+  },
+  "vault.connections.accessText": {
+    "value": "Its items follow this, unless you change one of them. Each change saves at once."
+  },
+  "vault.connections.actionsName": {
+    "value": "More for {{name}}"
+  },
+  "vault.connections.disconnect": {
+    "value": "Disconnect"
+  },
+  "vault.connections.removeTitle": {
+    "value": "Disconnect {{name}}?"
+  },
+  "vault.connections.removeText": {
+    "value": {
+      "one": "Its item leaves the Vault and your agents stop using it. Nothing changes in {{name}}.",
+      "other": "Its {{count}} items leave the Vault and your agents stop using them. Nothing changes in {{name}}."
+    }
+  },
+  "vault.connections.removed": {
+    "value": "{{name}} disconnected"
+  },
+  "vault.connections.listOf": {
+    "value": "Connections to {{name}}"
+  },
+  "vault.connections.note": {
+    "value": "Your agents read what is there when they need it. Nothing is copied into agentes.chat but names and addresses."
+  },
+  "vault.connections.error.auth_failed": {
+    "value": "Sign-in refused"
+  },
+  "vault.connections.error.locked": {
+    "value": "Wrong password"
+  },
+  "vault.connections.error.many_vaults": {
+    "value": "Sees more than one vault"
+  },
+  "vault.connections.error.no_vault": {
+    "value": "Sees no vault"
+  },
+  "vault.connections.error.folder_missing": {
+    "value": "Folder not found"
+  },
+  "vault.connections.error.not_found": {
+    "value": "Not found"
+  },
+  "vault.connections.error.rate_limited": {
+    "value": "Too many reads"
+  },
+  "vault.connections.error.unreachable": {
+    "value": "Can't reach it"
+  },
+  "vault.connections.error.unsupported": {
+    "value": "Not available here"
+  },
+  "vault.connections.error.invalid_input": {
+    "value": "Check the fields"
+  },
+  "vault.connections.error.too_many_items": {
+    "value": "Vault full"
+  },
+  "vault.connections.error.other": {
+    "value": "Couldn't read it"
+  },
+  "vault.connections.fix.auth_failed": {
+    "value": "The key or token was refused. Reconnect with a new one."
+  },
+  "vault.connections.fix.locked": {
+    "value": "The master password didn't open the account. Reconnect with the right one."
+  },
+  "vault.connections.fix.many_vaults": {
+    "value": "Give the service account access to one vault only, then reconnect."
+  },
+  "vault.connections.fix.no_vault": {
+    "value": "Give the service account access to the agents' vault, then reconnect."
+  },
+  "vault.connections.fix.folder_missing": {
+    "value": "Create the folder for your agents, or reconnect with its name."
+  },
+  "vault.connections.fix.not_found": {
+    "value": "What it read is gone. Reconnect to choose again."
+  },
+  "vault.connections.fix.rate_limited": {
+    "value": "The password manager asked us to wait. It tries again by itself."
+  },
+  "vault.connections.fix.unreachable": {
+    "value": "Its server didn't answer. It tries again by itself."
+  },
+  "vault.connections.fix.unsupported": {
+    "value": "Its settings can't be read here. Try again later or use another account."
+  },
+  "vault.connections.fix.invalid_input": {
+    "value": "Something in the fields was refused. Reconnect and check them."
+  },
+  "vault.connections.fix.too_many_items": {
+    "value": "Remove items before syncing more."
+  },
+  "vault.connections.fix.other": {
+    "value": "Try Sync now, or reconnect."
+  },
+  "vault.source.onepassword.step.1": {
+    "value": "Create a vault in 1Password only for your agents and move into it the logins they may use"
+  },
+  "vault.source.onepassword.step.2": {
+    "value": "Create a service account with access to that vault only"
+  },
+  "vault.source.onepassword.step.3": {
+    "value": "Paste the service account token here"
+  },
+  "vault.source.onepassword.field.token": {
+    "value": "Service account token"
+  },
+  "vault.source.bitwarden.warning": {
+    "value": "Use an account only for your agents. Its master password opens the whole account, so nothing personal should be in it."
+  },
+  "vault.source.bitwarden.step.1": {
+    "value": "Create a Bitwarden account only for your agents and a folder named Agents with the logins they may use"
+  },
+  "vault.source.bitwarden.step.2": {
+    "value": "In that account, open Settings, Security, Keys and copy the API key"
+  },
+  "vault.source.bitwarden.step.3": {
+    "value": "Fill in the fields below"
+  },
+  "vault.source.bitwarden.field.server": {
+    "value": "Server"
+  },
+  "vault.source.bitwarden.field.serverUrl": {
+    "value": "Server address"
+  },
+  "vault.source.bitwarden.field.clientId": {
+    "value": "Client ID"
+  },
+  "vault.source.bitwarden.field.clientSecret": {
+    "value": "Client secret"
+  },
+  "vault.source.bitwarden.field.masterPassword": {
+    "value": "Master password"
+  },
+  "vault.source.bitwarden.field.folder": {
+    "value": "Folder"
+  },
+  "vault.source.bitwarden.choice.server.self": {
+    "value": "My own server"
+  },
+  "vault.card.save": {
+    "value": "Save to the Vault"
+  },
+  "vault.card.saveText": {
+    "value": "Next time your agents use it without asking you."
+  },
+  "vault.card.scope": {
+    "value": "Save as"
+  },
+  "vault.card.personalText": {
+    "value": "Only you see it"
+  },
+  "vault.card.teamText": {
+    "value": "The workspace sees it"
+  },
+  "vault.card.teamLocked": {
+    "value": "Only who manages the Vault saves for the team"
+  },
+  "vault.card.agents": {
+    "value": "Used by"
+  },
+  "vault.card.choose": {
+    "value": "Choose"
+  },
+  "vault.card.saved": {
+    "value": "Saved to the Vault"
+  },
+  "vault.card.notSaved": {
+    "value": "Sent, but not saved to the Vault"
+  },
+  "vault.card.codeBox": {
+    "value": "Digit {{n}} of {{total}}"
+  },
+  "vault.card.codeShort": {
+    "value": {
+      "one": "Type the {{count}} digit.",
+      "other": "Type all {{count}} digits."
+    }
+  },
+  "vault.card.codeWhere": {
+    "value": "Only {{agent}}'s browser types it, on {{host}}."
+  },
+  "scopes.vault_read.label": {
+    "value": "See the Vault"
+  },
+  "scopes.vault_read.description": {
+    "value": "See the logins, keys and contact details the Vault shares with it, and use them. It types saved passwords and uses saved keys without ever seeing them."
+  },
+  "scopes.vault_write.label": {
+    "value": "Edit Vault contacts"
+  },
+  "scopes.vault_write.description": {
+    "value": "Save and update contact details in the Vault, change a saved login's username or a description, and delete what it saved."
+  },
+  "access.area.vault": {
+    "value": "Vault"
+  },
+  "access.areaText.vault.read": {
+    "value": "Sees and uses what the Vault shares with it, without seeing passwords or keys."
+  },
+  "access.areaText.vault.write": {
+    "value": "Also saves and updates contact details in the Vault."
+  },
+  "errors.vault.invalid": {
+    "value": "Something in this item isn't right. Check it and try again."
+  },
+  "errors.vault.notFound": {
+    "value": "This item isn't in the Vault anymore."
+  },
+  "errors.vault.titleRequired": {
+    "value": "Give it a name."
+  },
+  "errors.vault.tooLong": {
+    "value": "That's too long. The limit is {{max}}."
+  },
+  "errors.vault.notHttps": {
+    "value": "Use an address that starts with https://"
+  },
+  "errors.vault.keyNameInvalid": {
+    "value": "Use capital letters, digits and _ in the name, like ACME_API_KEY."
+  },
+  "errors.vault.keyNameReserved": {
+    "value": "This name is reserved. Pick another one."
+  },
+  "errors.vault.keyNameTaken": {
+    "value": "A key with this name is already saved here."
+  },
+  "errors.vault.contactEmpty": {
+    "value": "Fill in at least one field."
+  },
+  "errors.vault.teamNeedsPermission": {
+    "value": "Only people who manage credentials can save team items."
+  },
+  "errors.vault.externalReadOnly": {
+    "value": "This comes from a password manager. Change it there."
+  },
+  "errors.vault.changedMeanwhile": {
+    "value": "Someone changed it in the meantime. Open it again."
+  },
+  "errors.vault.noValue": {
+    "value": "Nothing is saved to show."
+  },
+  "errors.vault.missing": {
+    "value": "It's gone from its password manager."
+  },
+  "errors.vault.notAllowed": {
+    "value": "You can't do this with this item."
+  },
+  "errors.vault.tooManyItems": {
+    "value": "The Vault is full. Delete items you no longer use."
+  },
+  "errors.vault.audienceInvalid": {
+    "value": "Someone or a role you picked is no longer in the workspace."
+  },
+  "errors.vault.agentsInvalid": {
+    "value": "An agent you picked is no longer in the workspace."
+  },
+  "errors.vault.tooManyAgents": {
+    "value": "Pick at most 200 agents."
+  },
+  "errors.vault.tooManyRoles": {
+    "value": "Pick at most 100 roles."
+  },
+  "errors.vault.tooManyPeople": {
+    "value": "Pick at most 500 people."
+  },
+  "errors.vault.csvTooLarge": {
+    "value": "The file is too large. The limit is 2 MB."
+  },
+  "errors.vault.csvTooManyRows": {
+    "value": "The file has more than 5,000 rows. Split it and import each part."
+  },
+  "errors.vault.csvUnrecognized": {
+    "value": "This doesn't look like a passwords file. Export it again as CSV."
+  },
+  "errors.vault.requestNotDelivered": {
+    "value": "Send it first, then save it to the Vault."
+  },
+  "errors.vault.requestNotSavable": {
+    "value": "This one can't be saved to the Vault."
+  },
+  "errors.vault.sourceUnknown": {
+    "value": "This password manager isn't available here."
+  },
+  "errors.vault.sourceError": {
+    "value": "Couldn't read it from its password manager. Try again."
+  },
+  "errors.vault.source.authFailed": {
+    "value": "The password manager refused these details. Check them and try again."
+  },
+  "errors.vault.source.locked": {
+    "value": "The master password is wrong."
+  },
+  "errors.vault.source.manyVaults": {
+    "value": "The service account sees more than one vault. Give it access to only one."
+  },
+  "errors.vault.source.noVault": {
+    "value": "The service account sees no vault. Give it access to one."
+  },
+  "errors.vault.source.folderMissing": {
+    "value": "That folder isn't in the account."
+  },
+  "errors.vault.source.notFound": {
+    "value": "It's no longer in its password manager."
+  },
+  "errors.vault.source.rateLimited": {
+    "value": "The password manager asked us to wait. Try again in a few minutes."
+  },
+  "errors.vault.source.unreachable": {
+    "value": "Couldn't reach the password manager. Check the address and try again."
+  },
+  "errors.vault.source.unsupported": {
+    "value": "This password manager can't be connected here."
+  },
+  "errors.vault.source.invalidInput": {
+    "value": "Check the fields and try again."
+  },
+  "errors.vault.source.tooManyItems": {
+    "value": "The Vault is full. Remove items before syncing more."
+  },
+  "audit.change.vault.item_created": {
+    "value": "Saved an item to the Vault"
+  },
+  "audit.change.vault.item_changed": {
+    "value": "Changed a Vault item"
+  },
+  "audit.change.vault.item_deleted": {
+    "value": "Deleted a Vault item"
+  },
+  "audit.change.vault.item_shown": {
+    "value": "Viewed a password or key in the Vault"
+  },
+  "audit.change.vault.item_copied": {
+    "value": "Copied a password or key from the Vault"
+  },
+  "audit.change.vault.item_used": {
+    "value": "Used a Vault item"
+  },
+  "audit.change.vault.imported": {
+    "value": "Imported passwords into the Vault"
+  },
+  "audit.change.vault.connection_added": {
+    "value": "Connected a password manager to the Vault"
+  },
+  "audit.change.vault.connection_changed": {
+    "value": "Changed a password manager's connection"
+  },
+  "audit.change.vault.connection_removed": {
+    "value": "Disconnected a password manager from the Vault"
+  },
+  "audit.change.verb.shown": {
+    "value": "Viewed"
+  },
+  "audit.change.verb.copied": {
+    "value": "Copied"
+  },
+  "audit.change.verb.used": {
+    "value": "Used"
+  },
+  "audit.change.area.vault": {
+    "value": "the Vault"
+  },
+  "settings.section.vault": {
+    "value": "Vault"
+  },
+  "settings.sectionText.vault": {
+    "value": "Passwords, keys and contact details your agents use. They type passwords and use keys without ever seeing them."
+  },
+  "builtinTools.vault_list.label": {
+    "value": "Look in the Vault"
+  },
+  "builtinTools.vault_list.description": {
+    "value": "Lists the logins, keys and contacts shared with the agent, never a password or a key."
+  },
+  "builtinTools.vault_save.label": {
+    "value": "Save to the Vault"
+  },
+  "builtinTools.vault_save.description": {
+    "value": "Saves or updates contact details, a login's username or a description."
+  },
+  "builtinTools.vault_delete.label": {
+    "value": "Delete from the Vault"
+  },
+  "builtinTools.vault_delete.description": {
+    "value": "Deletes an item it saved."
   }
 }

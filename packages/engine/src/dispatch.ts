@@ -6,8 +6,10 @@ import {
   eq,
   gte,
   inArray,
+  isNotNull,
   isNull,
   ne,
+  or,
   rowsOf,
   schema,
   sql,
@@ -19,9 +21,10 @@ import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
 import { routineCreatorOf } from "./requester";
+import { rightHandReaches } from "./right-hand";
 import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
-import { inChannelRun, workKeepsThread } from "./run-scope";
+import { inChannelRun, waitsOnUsage, workKeepsThread } from "./run-scope";
 import type { AgentRun } from "./runs";
 import { holdOf, hopLimitReached, pauseStretch, personAskedLately, stretchOf, stretchStop } from "./stretch";
 
@@ -130,12 +133,12 @@ export async function startOrJoinRun(
     // next to an unattended one, or one held by a decision): the message joins the newest it may
     // (`mayJoin`). A run waiting on an approval, a secret or a mission's decision takes nothing new
     // (`holdsMessages`): the agent answers this in a run of its own meanwhile.
-    // Its run in the channel waiting for its computer takes the message: one turn per agent there, not one per
-    // mention, each waiting for the same computer. Not a Continuar's: that starts a fresh stretch.
+    // Its run in the channel waiting for its computer, its plan or its budget takes the message: one turn per agent
+    // there, not one per mention, each waiting for the same thing. Not a Continuar's: that starts a fresh stretch.
     const waitingForComputer =
       message.threadId || options.granted
         ? sql<boolean>`false`
-        : sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.waitingMachineId} is not null and ${inChannelRun(sql`${agentRuns}`)}
+        : sql<boolean>`(${agentRuns.status} = 'waiting_input' and (${agentRuns.waitingMachineId} is not null or ${waitsOnUsage(sql`${agentRuns}`)}) and ${inChannelRun(sql`${agentRuns}`)}
           and not exists (select 1 from ${channels} c where c.id = ${message.channelId}::uuid and c.kind = 'dm'))`;
     const active = await tx
       .select({
@@ -489,7 +492,7 @@ export async function mayJoin(
   return behind.kind === "unattended" && behind.reason !== "agent";
 }
 
-/** Active agents among `agentIds` that are members of the channel (re-checked at dispatch time). */
+/** Active agents among `agentIds` that are members of the channel, or the right hand there (re-checked at dispatch time). */
 export async function eligibleChannelAgents(
   db: Executor,
   orgId: string,
@@ -501,12 +504,13 @@ export async function eligibleChannelAgents(
   return db
     .select({ id: agents.id, handle: agents.handle, name: agents.name, role: agents.role })
     .from(agents)
-    .innerJoin(channelMembers, and(eq(channelMembers.agentId, agents.id), eq(channelMembers.channelId, channelId)))
+    .leftJoin(channelMembers, and(eq(channelMembers.agentId, agents.id), eq(channelMembers.channelId, channelId)))
     .where(
       and(
         eq(agents.orgId, orgId),
         inArray(agents.id, agentIds),
         isNull(agents.archivedAt),
+        or(isNotNull(channelMembers.id), rightHandReaches(sql`${agents}`, sql`${channelId}::uuid`)),
         options.autoReplyOnly ? eq(channelMembers.autoReply, true) : undefined,
         // Who can talk to the agent, for the person behind the message.
         options.requesterUserId !== undefined

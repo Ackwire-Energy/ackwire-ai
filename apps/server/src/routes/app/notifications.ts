@@ -41,6 +41,10 @@ const Notification = z
       routineId: z.string().optional(),
       machineId: z.string().optional(),
       handoffId: z.string().optional(),
+      proposalId: z
+        .string()
+        .optional()
+        .openapi({ description: "`change_request`: the proposal to decide (`POST …/proposals/{id}/accept`)." }),
       screen: z.enum(SCREEN_KINDS).optional(),
       agentId: z
         .string()
@@ -50,6 +54,11 @@ const Notification = z
         .string()
         .optional()
         .openapi({ description: "`agent_unreached`: the routine's creator, whom the agent's owner may let in." }),
+      dashboardId: z
+        .string()
+        .optional()
+        .openapi({ description: "`widget_alert`, `widget_failed`, `dashboard_proposal`: the board (ADR 0135)." }),
+      widgetId: z.string().optional().openapi({ description: "`widget_alert`, `widget_failed`: the widget." }),
       label: z.string().optional(),
     }),
     latest: z.object({

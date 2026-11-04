@@ -13,7 +13,7 @@ import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Chip, Icon, PixelOrbit, Text } from "@/ui";
-import { routineHref } from "../links/logic";
+import { routineHref, widgetHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNamesComputers } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -168,9 +168,11 @@ export const RoutineRow = memo(function RoutineRow({
       ? t("routines.deliversIn", { agent, place: targetLabel(r.target) })
       : t("routines.deliversTo", { agent, target: targetLabel(r.target) });
   const next = nextText(r, at);
+  // A widget's routine opens its widget, where it is changed (ADR 0135).
+  const href = r.target.type === "widget" ? widgetHref(r.target.widgetId, r.target.dashboardId) : routineHref(r.id);
   return (
     <Pressable
-      onPress={() => router.push(routineHref(r.id))}
+      onPress={() => router.push(href)}
       onLongPress={menu.open}
       delayLongPress={380}
       accessibilityRole="button"

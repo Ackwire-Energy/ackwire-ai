@@ -1,5 +1,7 @@
 import { keys, useChannelCategories } from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
+import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { WORKING_POLL_MS } from "@agenteschat/client/lib/working";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useIsFocused } from "expo-router";
@@ -15,6 +17,7 @@ import { useOpenStart } from "../me/useStart";
 import { useOpenDm } from "../new/useOpenDm";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
+import { RightHandPin } from "../right-hand/Pin";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
 import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider } from "../shared/SheetHost";
@@ -24,6 +27,7 @@ import { FirstSteps } from "./FirstSteps";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
 import { CollapsibleSection, SeeAllRow, useHomeCollapsed } from "./HomeSection";
 import { HomeServerError, HomeServerNotice } from "./HomeServerError";
+import { HomeWidgets } from "./HomeWidgets";
 import {
   agentStarters,
   type ConversationRow,
@@ -31,6 +35,7 @@ import {
   type HomeBlock,
   homeLayout,
   type ListKind,
+  rightHandPin,
 } from "./logic";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
 import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
@@ -49,7 +54,8 @@ export const openKindList = (kind: ListKind | `category-${string}`) => router.pu
  * (what an agent finished, how many work), the "Esperando você" strip (only while something waits; it opens into
  * the first item's card, and scrolling closes it), then Agentes, Canais and Pessoas by latest activity, each
  * collapsible (remembered), five rows and "Ver todos". Under the greeting, the workspace's own computer while it
- * is being prepared, and a notice per computer that went offline with agents waiting for it. An agent's row says it waits on your ok, waits
+ * is being prepared, and a notice per computer that went offline with agents waiting for it. Above the sections a
+ * Dashboards row pushes the Dashboards list (ADR 0135 §15). An agent's row says it waits on your ok, waits
  * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  * Our notifications sheet opens over it (never inside a conversation), once it has loaded and once more at the
  * first request to approve, while the phone wasn't asked yet (`@agenteschat/client/lib/push-offer`). When the server doesn't answer
@@ -101,15 +107,25 @@ function Home() {
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));
   const openDm = useOpenDm();
   const startDm = useCallback((agentId: string) => void openDm({ agentId }), [openDm]);
-  const starters = useMemo(() => agentStarters(dir.agents, hidden), [dir.agents, hidden]);
-  const sections = homeLayout(list.rows, categories.data ?? [], undefined, starters);
+  // The right hand (ADR 0137) has its own row on top, never one under Agentes; outside its audience, none.
+  const rightHand = rightHandOf(dir.agents);
+  const pinned = rightHandPin(list.rows, rightHand && canTalk(rightHand) ? rightHand : undefined);
+  const starters = useMemo(
+    () =>
+      agentStarters(
+        dir.agents.filter((a) => !isRightHand(a)),
+        hidden,
+      ),
+    [dir.agents, hidden],
+  );
+  const sections = homeLayout(pinned.rows, categories.data ?? [], undefined, starters);
   // A section's title: a fixed one by its key, a category by its name.
   const sectionTitle = (b: HomeBlock) =>
     b.name !== undefined ? b.name : t(`mobile.chats.section.${b.key as ListKind}`);
   // A list that failed to load isn't an empty workspace: it says the server didn't answer.
   const failed = list.failed && list.rows.length === 0;
   // Agents already in the team fill the home (Agentes) instead of the invitation to create the first one.
-  const empty = !list.loading && !failed && list.rows.length === 0 && starters.length === 0;
+  const empty = !list.loading && !failed && pinned.rows.length === 0 && starters.length === 0;
 
   const { offer, markOffered } = usePush();
   const approvalWaits = waiting.items.some((i) => i.kind === "approval");
@@ -143,7 +159,16 @@ function Home() {
       <OutageNotices />
       {list.stale && !failed ? <HomeServerNotice retry={list.refetch} /> : null}
       {strip}
-      {failed || empty || list.loading ? null : <FirstSteps collapsed={collapsed} onToggle={toggle} />}
+      {pinned.pin && !failed && !list.loading ? (
+        <RightHandPin row={pinned.pin} agent={agentStates.get(pinned.pin.key)} onStart={startDm} />
+      ) : null}
+      {failed || empty || list.loading ? null : (
+        <>
+          {/* Início's widgets, and the way to Dashboards ("See all"), not a tab (ADR 0135 §15). */}
+          <HomeWidgets />
+          <FirstSteps collapsed={collapsed} onToggle={toggle} />
+        </>
+      )}
       {failed ? (
         <HomeServerError retry={list.refetch} />
       ) : empty ? (

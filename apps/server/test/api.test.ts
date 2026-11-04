@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
-import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
+import { schema } from "@agenteschat/db";
+import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -128,7 +128,10 @@ describe("organizations, agents and credentials", () => {
     expect(list).not.toContain("sk-ant-api-secret");
     const agents = await (await owner(`/api/app/organizations/${orgId}/agents`)).json();
     expect(agents).toMatchObject({
-      agents: [{ handle: "dev", model: "claude-sonnet-5-5", hasCredential: true, monthlyBudgetUsd: 50 }],
+      agents: [
+        { handle: "lodi", hasCredential: false },
+        { handle: "dev", model: "claude-sonnet-5-5", hasCredential: true, monthlyBudgetUsd: 50 },
+      ],
     });
     const rows = await t.db.select().from(schema.providerCredentials);
     expect(JSON.stringify(rows)).not.toContain("sk-ant-api-secret");
@@ -154,40 +157,29 @@ describe("organizations, agents and credentials", () => {
     expect((await ana(`/api/app/organizations/${orgId}/agents`)).status).toBe(200);
   });
 
-  test("who coordinates the team (ADR 0093): on every agent listed, moved by an admin's PATCH, never by an agent's owner", async () => {
+  test("the team's right hand (ADR 0137): listed with its mark, never archived or deleted; an old app's coordinator is ignored", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
     const { orgId, agentId: devId } = await seedOrg(owner);
     const api = (path: string, init?: Parameters<typeof owner>[1]) =>
       owner(`/api/app/organizations/${orgId}${path}`, init);
-    const coordinators = async () => {
-      const { agents } = (await (await api("/agents")).json()) as {
-        agents: { handle: string; coordinator: boolean }[];
-      };
-      return Object.fromEntries(agents.map((a) => [a.handle, a.coordinator]));
+    const { agents } = (await (await api("/agents")).json()) as {
+      agents: { id: string; handle: string; builtin: string | null }[];
     };
-    const ops = (await (await api("/agents", { json: { name: "Ops", handle: "ops" } })).json()) as { id: string };
-    // The workspace's first agent coordinates it.
-    expect(await coordinators()).toEqual({ dev: true, ops: false });
-    const moved = await api(`/agents/${ops.id}`, { method: "PATCH", json: { coordinator: true } });
-    expect(moved.status).toBe(200);
-    expect(await moved.json()).toMatchObject({ id: ops.id, coordinator: true });
-    expect(await coordinators()).toEqual({ dev: false, ops: true });
-
-    // Bia owns Ops: she changes its look, not who coordinates.
-    const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
-    const [biaUser] = await t.db
-      .select({ id: schema.users.id })
-      .from(schema.users)
-      .where(eq(schema.users.email, "bia@example.com"));
-    expect((await api(`/agents/${ops.id}`, { method: "PATCH", json: { ownerUserId: biaUser?.id } })).status).toBe(200);
-    const asBia = (path: string, json: Record<string, unknown>) =>
-      bia(`/api/app/organizations/${orgId}${path}`, { method: "PATCH", json });
-    const look = { color: "violet", eyes: "sleepy", accessory: "crown" };
-    expect((await asBia(`/agents/${ops.id}`, { appearance: look })).status).toBe(200);
-    expect((await asBia(`/agents/${ops.id}`, { coordinator: false })).status).toBe(403);
-    expect((await asBia(`/agents/${devId}`, { coordinator: true })).status).toBe(403);
-    expect(await coordinators()).toEqual({ dev: false, ops: true });
+    expect(agents.map((a) => [a.handle, a.builtin])).toEqual([
+      ["lodi", "right_hand"],
+      ["dev", null],
+    ]);
+    const lodi = agents[0]?.id;
+    for (const path of [`/agents/${lodi}`, `/agents/${lodi}?purge=true`]) {
+      const refused = await api(path, { method: "DELETE" });
+      expect(refused.status).toBe(403);
+      expect(await refused.json()).toMatchObject({ error: { code: "agent.right_hand_permanent" } });
+    }
+    // Phones without the update still send `coordinator`: 200, and nothing changes.
+    const old = await api(`/agents/${devId}`, { method: "PATCH", json: { coordinator: true } });
+    expect(old.status).toBe(200);
+    expect(await old.json()).toMatchObject({ id: devId, builtin: null });
   });
 
   test("unknown models are rejected", async () => {

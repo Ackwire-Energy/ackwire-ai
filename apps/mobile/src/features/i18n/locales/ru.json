@@ -873,6 +873,18 @@
       "plan_reset_unknown_few": "{{plan}} не сообщил, когда сбросится лимит",
       "plan_reset_unknown_many": "{{plan}} не сообщил, когда сбросится лимит",
       "plan_reset_unknown_other": "{{plan}} не сообщил, когда сбросится лимит",
+      "catch_up_closed_one": "{{names}} пропустил {{count}} разговор, который не требовал ответа",
+      "catch_up_closed_few": "{{names}} пропустил {{count}} разговора, которые не требовали ответа",
+      "catch_up_closed_many": "{{names}} пропустил {{count}} разговоров, которые не требовали ответа",
+      "catch_up_closed_other": "{{names}} пропустил {{count}} разговора, которые не требовали ответа",
+      "catch_up_closed_asker_one": "{{names}} не ответил: {{who}} уже этим занялся",
+      "catch_up_closed_asker_few": "{{names}} не ответил: {{who}} уже этим занялся",
+      "catch_up_closed_asker_many": "{{names}} не ответил: {{who}} уже этим занялся",
+      "catch_up_closed_asker_other": "{{names}} не ответил: {{who}} уже этим занялся",
+      "catch_up_closed_asker_task_one": "{{names}} не ответил: {{who}} отменил задачу",
+      "catch_up_closed_asker_task_few": "{{names}} не ответил: {{who}} отменил задачу",
+      "catch_up_closed_asker_task_many": "{{names}} не ответил: {{who}} отменил задачу",
+      "catch_up_closed_asker_task_other": "{{names}} не ответил: {{who}} отменил задачу",
       "reaction_one": "{{names}} реагирует",
       "reaction_few": "{{names}} реагируют",
       "reaction_many": "{{names}} реагируют",
@@ -905,6 +917,10 @@
       "composio_limit_few": "Рабочее пространство израсходовало вызовы Composio на этот месяц",
       "composio_limit_many": "Рабочее пространство израсходовало вызовы Composio на этот месяц",
       "composio_limit_other": "Рабочее пространство израсходовало вызовы Composio на этот месяц",
+      "change_request_one": "{{names}} просит изменить команду",
+      "change_request_few": "{{names}} просят изменить команду",
+      "change_request_many": "{{names}} просят изменить команду",
+      "change_request_other": "{{names}} просят изменить команду",
       "browser_profile_request_one": "{{names}} просит ещё один профиль браузера",
       "browser_profile_request_few": "{{names}} просят ещё один профиль браузера",
       "browser_profile_request_many": "{{names}} просят ещё один профиль браузера",
@@ -1788,28 +1804,11 @@
     "offline": "Нет подключения. Пробуем снова."
   },
   "onb": {
-    "progress": "Шаг {{n}} из {{total}}",
-    "done": "Готово",
-    "optional": "необязательно",
-    "back": "Назад",
     "logo": "Логотип",
     "logoHelp": "Необязательно.",
     "logoPick": "Выбрать",
     "zone": "Часовой пояс: {{zone}}",
-    "importSources": "Откуда приходят агенты",
-    "importLead": "Перенесите их в веб-версии: Настройки › Импорт и экспорт.",
-    "importSkip": "Не нужно, пропустить",
-    "agentsAda": "Я уже здесь",
-    "agentsLead": "Проверьте, кто ещё присоединится.",
-    "share": "Поделиться ссылкой-приглашением",
     "shareMessage": "Присоединяйтесь к {{org}} в agentes.chat: {{url}}",
-    "shareNote": "Вы одобряете каждого, кто просится.",
-    "emailsPlaceholder": "name@company.com",
-    "membersNote": "Они присоединятся как участники.",
-    "invalidEmail": "Проверьте этот адрес.",
-    "invitesFailed": "Не удалось отправить эти приглашения. Попробуйте снова.",
-    "removeEmail": "Убрать {{email}}",
-    "later": "Не сейчас",
     "failed": "Не удалось сохранить. Попробуйте снова."
   },
   "ai": {
@@ -2125,5 +2124,80 @@
     "noEmoji": "Без эмодзи",
     "cleared": "Статус сброшен",
     "bySelfUntil": "Написано: {{name}} · {{when}}"
+  },
+  "dashboards": {
+    "homeRow": "Только вы · ваши собственные виджеты",
+    "loadFailed": "Не удалось загрузить дашборды.",
+    "onlyHome": "Здесь появятся дашборды рабочего пространства или ваших ролей.",
+    "create": "Создать",
+    "routineTarget": "его виджет",
+    "pin": {
+      "which": "Какой график"
+    },
+    "organize": {
+      "hint": "Нажмите и удерживайте виджет, перетащите его на новое место или используйте стрелки и выберите размер каждого. «Готово» сохраняет порядок.",
+      "holdHint": "Удерживайте и перетащите, чтобы переместить.",
+      "up": "Переместить выше",
+      "down": "Переместить ниже",
+      "position": "{{at}} из {{count}}",
+      "saved": "Дашборд упорядочен"
+    },
+    "edit": {
+      "saved": "Дашборд сохранён"
+    },
+    "pinned": "Закреплён сверху",
+    "unpinned": "Откреплён",
+    "sizeHint": {
+      "s": "Половина строки на телефоне, четверть дашборда в браузере.",
+      "m": "Вся строка на телефоне, половина дашборда в браузере.",
+      "l": "Вся строка, крупно. Половина дашборда и вдвое выше в браузере."
+    },
+    "widget": {
+      "caresFor": "За него отвечает {{name}}",
+      "refreshing": "{{name}} обновляет его.",
+      "scheduleSaved": "Теперь обновляется {{schedule}}",
+      "alertSaved": "Оповещение сохранено",
+      "removed": "Виджет убран. Его регулярная задача остановлена.",
+      "routine": "Его регулярная задача",
+      "onBoard": "Где он",
+      "title": "Название",
+      "titlePlaceholder": "Короткое название виджета",
+      "titleSaved": "Название сохранено"
+    },
+    "formatAuto": "{{name}} выберет лучший",
+    "newWidget": {
+      "titleHint": "Название · {{name}} предложит его при проверке",
+      "alerts": "Оповещает",
+      "realData": "Реальные данные",
+      "editAsk": "Изменить запрос",
+      "asked": "«{{ask}}»",
+      "autoFormat": "Автоматический вид"
+    },
+    "agentPick": {
+      "search": "Поиск агентов",
+      "noMatch": "Нет агента с таким именем или ролью.",
+      "note": "Каждый агент читает только те приложения, к которым у него есть доступ.",
+      "reads": "Читает {{apps}}",
+      "noApps": "Нет подключённых приложений"
+    },
+    "notice": {
+      "widget_alert_one": "{{names}}: оповещение по виджету",
+      "widget_alert_few": "{{names}}: оповещение по виджету",
+      "widget_alert_many": "{{names}}: оповещение по виджету",
+      "widget_alert_other": "{{names}}: оповещение по виджету",
+      "widget_failed_one": "{{names}}: не удалось обновить виджет",
+      "widget_failed_few": "{{names}}: не удалось обновить виджет",
+      "widget_failed_many": "{{names}}: не удалось обновить виджет",
+      "widget_failed_other": "{{names}}: не удалось обновить виджет",
+      "dashboard_proposal_one": "{{names}} хочет опубликовать дашборд",
+      "dashboard_proposal_few": "{{names}} хотят опубликовать дашборд",
+      "dashboard_proposal_many": "{{names}} хотят опубликовать дашборд",
+      "dashboard_proposal_other": "{{names}} хотят опубликовать дашборд",
+      "card": {
+        "alert": "Оповещение",
+        "failed": "Не обновлено",
+        "proposal": "Дашборд"
+      }
+    }
   }
 }

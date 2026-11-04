@@ -1,4 +1,4 @@
-import { useArtifact, useBlockReply, useKeepBlock } from "@agenteschat/client";
+import { type BlockChange, useArtifact, useBlockReply, useKeepBlock, useSharedBlock } from "@agenteschat/client";
 import { type BlockEvent, blockEvent, blockPage, DRAFT_SETTLE_MS } from "@agenteschat/client/lib/blocks";
 import { clockHour } from "@agenteschat/client/lib/format";
 import { chartRamp } from "@agenteschat/ui/sky/chart";
@@ -12,17 +12,22 @@ import { Button, IconButton, Sky, Text, useTheme, useToast } from "@/ui";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader, tapHaptic } from "../shared/parts";
-import { blockMayLoad, INLINE_MAX_HEIGHT, themeScript, withLiveBlock } from "./logic";
+import { blockMayLoad, hostScript, INLINE_MAX_HEIGHT, themeScript, withLiveBlock } from "./logic";
 
 const SYSTEM_FONT = '-apple-system,BlinkMacSystemFont,"SF Pro Text",Roboto,system-ui,sans-serif';
 
 interface Kept {
-  state?: Record<string, unknown>;
   height?: number;
   sent?: { text: string; at: string };
 }
 
-/** What stays when a frame goes away (scrolled out, opened on its screen): the same block comes back as it was. */
+/** What a running page is told: everyone's state, without what this person is still changing. */
+type ForPage = { state: Record<string, unknown>; who: Record<string, BlockChange> };
+
+/**
+ * What stays when a frame goes away (scrolled out, opened on its screen). Its state is everyone's and lives on the
+ * server (`useSharedBlock`); this is only how tall it was and what this person sent from it.
+ */
 const kept = new Map<string, Kept>();
 const keptOf = (key: string): Kept => {
   const found = kept.get(key);
@@ -60,12 +65,17 @@ function BlockWebView({
   html,
   color,
   scrolls,
+  shared,
+  rev,
   onEvent,
 }: {
   blockKey: string;
   html: string;
   color: Parameters<typeof chartRamp>[0];
   scrolls: boolean;
+  /** Everyone's state; the page starts from it and is told each time it moves (`rev`). */
+  shared: ForPage | null;
+  rev: number;
   onEvent: (e: BlockEvent) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -74,6 +84,8 @@ function BlockWebView({
   const [life, setLife] = useState(0);
   const [height, setHeight] = useState(keptOf(blockKey).height ?? 0);
   const theme = scheme === "dark" ? "dark" : "light";
+  const sharedRef = useRef(shared);
+  sharedRef.current = shared;
 
   // Built once per block: a new theme is sent to it, and a rebuild would lose what the person set.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see above; `life`: a page the system ended comes back
@@ -88,7 +100,8 @@ function BlockWebView({
           more: t("mobile.blocks.more"),
           thousand: t("mobile.blocks.thousand"),
         },
-        state: keptOf(blockKey).state,
+        state: sharedRef.current?.state,
+        who: sharedRef.current?.who,
         font: SYSTEM_FONT,
       }),
     [html, blockKey, life],
@@ -97,6 +110,12 @@ function BlockWebView({
   useEffect(() => {
     web.current?.injectJavaScript(themeScript(theme));
   }, [theme]);
+
+  // Someone changed the block: everyone's page shows it at once.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rev` is when it moved; the values come from the ref
+  useEffect(() => {
+    if (sharedRef.current) web.current?.injectJavaScript(hostScript(sharedRef.current));
+  }, [rev]);
 
   const restart = () => setLife((n) => n + 1);
   return (
@@ -134,7 +153,8 @@ function BlockWebView({
           keptOf(blockKey).height = event.height;
           setHeight(event.height);
         }
-        if (event.type === "state") keptOf(blockKey).state = event.state;
+        // What moved while it was starting.
+        if (event.type === "ready" && sharedRef.current) web.current?.injectJavaScript(hostScript(sharedRef.current));
         onEvent(event);
       }}
       onContentProcessDidTerminate={restart}
@@ -170,6 +190,8 @@ export function LiveBlock({
     () => false,
   );
   const reply = useBlockReply(orgId, id);
+  const shared = useSharedBlock(orgId, id, version);
+  const { fromPage, draw } = shared;
   const [draft, setDraft] = useState<Extract<BlockEvent, { type: "draft" }> | null>(null);
   const [sent, setSent] = useState(keptOf(blockKey).sent ?? null);
   const changedAt = useRef(0);
@@ -180,13 +202,18 @@ export function LiveBlock({
     return () => liveStore.release(blockKey);
   }, [screen, blockKey]);
 
-  const onEvent = useCallback((e: BlockEvent) => {
-    if (e.type !== "draft") return;
-    setDraft((old) => {
-      if (old?.text !== e.text) changedAt.current = Date.now();
-      return e;
-    });
-  }, []);
+  const onEvent = useCallback(
+    (e: BlockEvent) => {
+      if (e.type === "state") fromPage(e.state, e.used);
+      if (e.type === "draw") void draw(e.name, e.options);
+      if (e.type !== "draft") return;
+      setDraft((old) => {
+        if (old?.text !== e.text) changedAt.current = Date.now();
+        return e;
+      });
+    },
+    [fromPage, draw],
+  );
 
   const send = () => {
     if (!draft?.ready || reply.isPending) return;
@@ -215,12 +242,19 @@ export function LiveBlock({
     : "";
   return (
     <View style={screen ? styles.fill : undefined}>
-      {screen || allowed ? (
+      {(screen || allowed) && !shared.loaded ? (
+        // Everyone's state first: a page that started from its own would show something else for a moment.
+        <View style={[styles.asleep, { height: Math.min(keptOf(blockKey).height ?? 120, INLINE_MAX_HEIGHT) }]}>
+          <ActivityIndicator color={c.faint} />
+        </View>
+      ) : screen || allowed ? (
         <BlockWebView
           blockKey={blockKey}
           html={html}
           color={agentLook(agent).color}
           scrolls={screen}
+          shared={shared.forPage}
+          rev={shared.block?.rev ?? 0}
           onEvent={onEvent}
         />
       ) : (
@@ -360,7 +394,10 @@ export function BlockScreen({ id, version }: { id: string; version?: number }) {
 }
 
 const styles = StyleSheet.create({
+  // As wide as the message, under what comes before it (the files' cards keep the same gap).
   card: {
+    alignSelf: "stretch",
+    marginTop: 8,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 16,

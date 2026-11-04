@@ -1,6 +1,6 @@
 # 0092. Agents propose changes to their teammates; whoever may make each change decides it
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-11-03 by ADR 0137 (§5): the right hand's own card changes a teammate's model, AI account, budget, owner, audience, channels, reply mode and archiving, each row decided by whoever may make that change, applied as them, out of date on its own and with Undo
 - Date: 2026-10-31
 - Extends: ADR 0017 §6 (proposals with a human gate), ADR 0081 (agents propose, a person decides), ADR 0085 (workspace roles)
 - Code: `packages/engine/src/context/proposals.ts`, `packages/engine/src/context/tools.ts` (`propose_instruction_change`), `packages/engine/src/access.ts` (`resolveApps`, `withAccessLines`, `accessInputOf`), `packages/db/src/schema/context.ts`, `apps/server/src/routes/app/memory.ts`, `packages/client/src/lib/proposals.ts`, `packages/client/src/api/queries.ts` (`useCardProposals`, `useDecideProposals`), `apps/web/src/components/ChatCards.tsx`, `apps/web/src/pages/ProposalsPage.tsx`, `apps/mobile/src/features/agents/InstructionProposalCard.tsx`

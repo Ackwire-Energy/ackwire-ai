@@ -1895,6 +1895,24 @@
       "other": "{{plan}} didn't say when its limit resets"
     }
   },
+  "activity.kind.catch_up_closed": {
+    "value": {
+      "one": "{{names}} skipped {{count}} conversation that didn't need an answer",
+      "other": "{{names}} skipped {{count}} conversations that didn't need an answer"
+    }
+  },
+  "activity.kind.catch_up_closed_asker": {
+    "value": {
+      "one": "{{names}} didn't answer: {{who}} already took care of it",
+      "other": "{{names}} didn't answer: {{who}} already took care of it"
+    }
+  },
+  "activity.kind.catch_up_closed_asker_task": {
+    "value": {
+      "one": "{{names}} didn't answer: {{who}} canceled the task",
+      "other": "{{names}} didn't answer: {{who}} canceled the task"
+    }
+  },
   "activity.kind.reaction": {
     "value": {
       "one": "{{names}} reacted",
@@ -1941,6 +1959,12 @@
     "value": {
       "one": "This workspace used its Composio calls for the month",
       "other": "This workspace used its Composio calls for the month"
+    }
+  },
+  "activity.kind.change_request": {
+    "value": {
+      "one": "{{names}} asks for a change to the team",
+      "other": "{{names}} ask for a change to the team"
     }
   },
   "activity.kind.browser_profile_request": {
@@ -3978,18 +4002,6 @@
   "splash.offline": {
     "value": "No connection. Trying again."
   },
-  "onb.progress": {
-    "value": "Step {{n}} of {{total}}"
-  },
-  "onb.done": {
-    "value": "Done"
-  },
-  "onb.optional": {
-    "value": "optional"
-  },
-  "onb.back": {
-    "value": "Back"
-  },
   "onb.logo": {
     "value": "Logo"
   },
@@ -4002,47 +4014,8 @@
   "onb.zone": {
     "value": "Time zone: {{zone}}"
   },
-  "onb.importSources": {
-    "value": "Where the agents come from"
-  },
-  "onb.importLead": {
-    "value": "Bring them from the web, in Settings › Import and export."
-  },
-  "onb.importSkip": {
-    "value": "I don't, skip"
-  },
-  "onb.agentsAda": {
-    "value": "I'm already here"
-  },
-  "onb.agentsLead": {
-    "value": "Check who else joins."
-  },
-  "onb.share": {
-    "value": "Share an invite link"
-  },
   "onb.shareMessage": {
     "value": "Join {{org}} on agentes.chat: {{url}}"
-  },
-  "onb.shareNote": {
-    "value": "You approve each person who asks."
-  },
-  "onb.emailsPlaceholder": {
-    "value": "name@company.com"
-  },
-  "onb.membersNote": {
-    "value": "They join as members."
-  },
-  "onb.invalidEmail": {
-    "value": "Check this e-mail."
-  },
-  "onb.invitesFailed": {
-    "value": "Couldn't send these invitations. Try again."
-  },
-  "onb.removeEmail": {
-    "value": "Remove {{email}}"
-  },
-  "onb.later": {
-    "value": "Not now"
   },
   "onb.failed": {
     "value": "Couldn't save. Try again."
@@ -4752,5 +4725,152 @@
   },
   "status.bySelfUntil": {
     "value": "Written by {{name}} · {{when}}"
+  },
+  "dashboards.homeRow": {
+    "value": "Only you · your own widgets"
+  },
+  "dashboards.loadFailed": {
+    "value": "Couldn't load the dashboards."
+  },
+  "dashboards.onlyHome": {
+    "value": "Dashboards for the workspace or your roles show up here."
+  },
+  "dashboards.create": {
+    "value": "Create"
+  },
+  "dashboards.routineTarget": {
+    "value": "its widget"
+  },
+  "dashboards.pin.which": {
+    "value": "Which chart"
+  },
+  "dashboards.organize.hint": {
+    "value": "Hold a widget and drag it to its new place, or use the arrows, and pick each one's size. Done saves the order."
+  },
+  "dashboards.organize.holdHint": {
+    "value": "Hold and drag to move it."
+  },
+  "dashboards.organize.up": {
+    "value": "Move up"
+  },
+  "dashboards.organize.down": {
+    "value": "Move down"
+  },
+  "dashboards.organize.position": {
+    "value": "{{at}} of {{count}}"
+  },
+  "dashboards.organize.saved": {
+    "value": "Dashboard organized"
+  },
+  "dashboards.edit.saved": {
+    "value": "Dashboard saved"
+  },
+  "dashboards.pinned": {
+    "value": "Pinned to the top"
+  },
+  "dashboards.unpinned": {
+    "value": "Unpinned"
+  },
+  "dashboards.sizeHint.s": {
+    "value": "Half a row on the phone, a quarter of the board on the web."
+  },
+  "dashboards.sizeHint.m": {
+    "value": "The whole row on the phone, half the board on the web."
+  },
+  "dashboards.sizeHint.l": {
+    "value": "The whole row, drawn big. Half the board and twice as tall on the web."
+  },
+  "dashboards.widget.caresFor": {
+    "value": "{{name}} looks after it"
+  },
+  "dashboards.widget.refreshing": {
+    "value": "{{name}} is updating it."
+  },
+  "dashboards.widget.scheduleSaved": {
+    "value": "It updates {{schedule}} now"
+  },
+  "dashboards.widget.alertSaved": {
+    "value": "Alert saved"
+  },
+  "dashboards.widget.removed": {
+    "value": "Widget removed. Its routine stopped."
+  },
+  "dashboards.widget.routine": {
+    "value": "Its routine"
+  },
+  "dashboards.widget.onBoard": {
+    "value": "Where it is"
+  },
+  "dashboards.widget.title": {
+    "value": "Title"
+  },
+  "dashboards.widget.titlePlaceholder": {
+    "value": "A short name for the widget"
+  },
+  "dashboards.widget.titleSaved": {
+    "value": "Title saved"
+  },
+  "dashboards.formatAuto": {
+    "value": "{{name}} picks the best one"
+  },
+  "dashboards.newWidget.titleHint": {
+    "value": "Title · {{name}} suggests one when testing"
+  },
+  "dashboards.newWidget.alerts": {
+    "value": "Alerts"
+  },
+  "dashboards.newWidget.realData": {
+    "value": "Real data"
+  },
+  "dashboards.newWidget.editAsk": {
+    "value": "Change the ask"
+  },
+  "dashboards.newWidget.asked": {
+    "value": "“{{ask}}”"
+  },
+  "dashboards.newWidget.autoFormat": {
+    "value": "Auto format"
+  },
+  "dashboards.agentPick.search": {
+    "value": "Search agents"
+  },
+  "dashboards.agentPick.noMatch": {
+    "value": "No agent with that name or role."
+  },
+  "dashboards.agentPick.note": {
+    "value": "Each agent reads only the apps it was given access to."
+  },
+  "dashboards.agentPick.reads": {
+    "value": "Reads {{apps}}"
+  },
+  "dashboards.agentPick.noApps": {
+    "value": "No connected apps"
+  },
+  "dashboards.notice.widget_alert": {
+    "value": {
+      "one": "{{names}} flagged a widget",
+      "other": "{{names}} flagged a widget"
+    }
+  },
+  "dashboards.notice.widget_failed": {
+    "value": {
+      "one": "{{names}} couldn't update a widget",
+      "other": "{{names}} couldn't update a widget"
+    }
+  },
+  "dashboards.notice.dashboard_proposal": {
+    "value": {
+      "one": "{{names}} wants to publish a dashboard",
+      "other": "{{names}} want to publish a dashboard"
+    }
+  },
+  "dashboards.notice.card.alert": {
+    "value": "Alert"
+  },
+  "dashboards.notice.card.failed": {
+    "value": "Didn't update"
+  },
+  "dashboards.notice.card.proposal": {
+    "value": "Dashboard"
   }
 }

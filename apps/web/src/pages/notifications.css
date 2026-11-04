@@ -1175,3 +1175,9 @@ html:not([data-pointer]) .nt-fails .nt-rep:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A change someone sent to whoever decides (ADR 0137): its card under the words, decided right here. */
+.nt-wr__card {
+  grid-column: 2;
+  min-width: 0;
+  cursor: auto;
+}
