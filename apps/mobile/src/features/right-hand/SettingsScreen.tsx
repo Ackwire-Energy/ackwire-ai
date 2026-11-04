@@ -127,7 +127,9 @@ function Form({ agent }: { agent: Agent }) {
           <GroupedRow key={r.id} label={r.name} checked={picked.includes(r.id)} onPress={() => toggleRole(r.id)} />
         ))}
       </GroupedList>
-      <GroupedFooter>{`${t("rightHand.settings.audienceHelp", g)} ${t("audience.rolesHint")}`}</GroupedFooter>
+      <GroupedFooter>
+        {t("common.joinSentences", { a: t("rightHand.settings.audienceHelp", g), b: t("audience.rolesHint") })}
+      </GroupedFooter>
 
       <Gap />
       <GroupedList>

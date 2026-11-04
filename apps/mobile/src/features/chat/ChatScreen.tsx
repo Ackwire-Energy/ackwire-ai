@@ -1139,7 +1139,7 @@ function Chat({
       : undefined
     : dmAgentId
       ? rightHand
-        ? `${capitalize(t("rightHand.label"), i18n.language)} · ${t("rightHand.actsAsYou")}`
+        ? `${t("rightHand.label")} · ${t("rightHand.actsAsYou")}`
         : dir.agentById.get(dmAgentId)?.role || undefined
       : channel && roster.data
         ? // People and agents counted apart: "1 pessoa · 3 agentes", never "4 membros · 3 agentes".

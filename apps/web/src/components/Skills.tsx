@@ -723,7 +723,7 @@ function TextDiff({ before, after }: { before: SkillText; after: SkillText }) {
         <Diff
           {...labels}
           code
-          aria-label="SKILL.md"
+          aria-label={t("skills.body")}
           lines={diffLines(before.body.split("\n"), after.body.split("\n"))}
         />
       )}
