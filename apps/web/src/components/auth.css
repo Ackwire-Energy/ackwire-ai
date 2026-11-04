@@ -111,9 +111,12 @@
 .auth__pass .auth__big.ac-input {
   padding-right: 56px;
 }
-.auth__eye {
+/* As far from the field's end as from its top and bottom (56 less the button's 32, halved), its corner the field's 16
+   less that room. */
+.auth__eye.ac-btn {
   position: absolute;
-  right: 10px;
+  right: 12px;
+  border-radius: 4px;
 }
 .auth__who {
   display: inline-flex;

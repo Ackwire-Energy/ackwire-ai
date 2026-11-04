@@ -1802,7 +1802,6 @@ export const ptBR = {
   rightHand: {
     label: "seu braço direito",
     newDot: "Novo",
-    callWith: "chame com @{{handle}}",
     role: "Assistente do workspace",
     actsAsYou: "age com as suas permissões",
     composerHint: "nada muda sem você",

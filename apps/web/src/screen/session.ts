@@ -14,6 +14,8 @@ export type ScreenEvent =
   | { type: "size"; width: number; height: number }
   /** The stream closed or changed mode: what the server says about the screen may have changed. */
   | { type: "changed" }
+  /** noVNC's session took its mode: the app's switch cover ("Assumindo o controle…") waits for it. */
+  | { type: "session"; mode: DesktopMode }
   | { type: "refused"; why: "tooLong" };
 
 /** The keys the app's key row presses, as X keysyms. */
@@ -209,6 +211,7 @@ export class ScreenSession {
       if (this.rfb !== rfb) return;
       this.attempts = 0;
       this.session = mode;
+      this.deps.post({ type: "session", mode });
       const since = Date.now();
       const look = () => {
         const canvas = liveCanvas(this.target);

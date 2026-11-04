@@ -111,7 +111,7 @@ export function useAskControl(offer: boolean) {
   return { asking: open, cancel, stage };
 }
 
-/** The question's buttons: take control (when this person may), and Cancelar beside it (Fechar when it only says so). */
+/** The question's buttons: take control (when this person may), and Cancelar under it (Fechar when it only says so). */
 export function AskActions({ take, onCancel }: { take?: ReactNode; onCancel: () => void }) {
   const { t } = useTranslation();
   return (

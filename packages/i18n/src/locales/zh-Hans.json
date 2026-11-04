@@ -1744,7 +1744,6 @@
   "rightHand": {
     "label": "你的得力助手",
     "newDot": "新",
-    "callWith": "用 @{{handle}} 呼叫",
     "role": "工作区助手",
     "actsAsYou": "以你的权限行事",
     "composerHint": "没有你，什么都不会变",

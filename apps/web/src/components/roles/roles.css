@@ -34,7 +34,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 20px;
+  padding: var(--row-py) 20px;
   cursor: pointer;
   transition: background-color 0.15s;
 }
@@ -182,7 +182,7 @@ html:not([data-pointer]) .roles-back:focus-visible {
 
 /* Areas: the icon on the card head's key column, one level each, item by item behind "Ajustar". */
 .roles-area {
-  padding: 16px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
 }
 .roles-area__top {
@@ -355,7 +355,7 @@ html:not([data-pointer]) .roles-pick__row:focus-visible {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 14px 0;
+  padding: var(--row-py) 0;
   border-top: 1px solid var(--line);
 }
 .roles-look__row:first-child {

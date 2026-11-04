@@ -1954,7 +1954,6 @@
   "rightHand": {
     "label": "ваша правая рука",
     "newDot": "Новое",
-    "callWith": "зовите через @{{handle}}",
     "role": "Ассистент workspace",
     "actsAsYou": "действует с вашими правами",
     "composerHint": "без вас ничего не меняется",

@@ -3,12 +3,14 @@ import { describe, expect, test } from "bun:test";
 import { STREAM_CLOSE } from "../../adapters/src/machine-protocol";
 import type { BrowserHandoff, DesktopStatus } from "../src/index";
 import {
+  askControlWords,
   DESKTOP_CLOSE,
   desktopCloseState,
   desktopMode,
   desktopRetryMs,
   desktopSocketUrl,
   desktopStatusState,
+  desktopSwitch,
   desktopWithHandoff,
   drivesOnDesktop,
 } from "../src/index";
@@ -142,5 +144,39 @@ describe("the agent's screen", () => {
     expect(desktopSocketUrl(base, { orgId: "o1", agentId: "a1", mode: "watch", switches: true })).toBe(
       "wss://agentes.chat/api/desktop?orgId=o1&agentId=a1&switch=1&mode=watch",
     );
+  });
+});
+
+describe("watching, then switching control", () => {
+  test("the question: the computer, the browser alone and why, or only watching", () => {
+    expect(askControlWords(status(), false, true)).toEqual({
+      mayTake: true,
+      browserOnly: false,
+      title: "desktop.ask.title",
+      help: "desktop.ask.working",
+    });
+    expect(askControlWords(status({ canControl: false, controlRefusal: "role" }), true, true)).toMatchObject({
+      browserOnly: true,
+      title: "desktop.ask.titleBrowser",
+      help: "desktop.browserOnly.role",
+    });
+    expect(askControlWords(status({ canControl: false }), false, true)).toMatchObject({
+      mayTake: false,
+      title: "desktop.ask.watching",
+      help: null,
+    });
+  });
+
+  test("a switch shows from the person's step until the screen's session is in the new mode", () => {
+    const at = (over: Partial<Parameters<typeof desktopSwitch>[0]>) =>
+      desktopSwitch({ taking: false, returning: false, mode: "watch", session: "watch", ...over });
+    expect(at({})).toBeNull();
+    expect(at({ taking: true })).toBe("taking");
+    expect(at({ mode: "control" })).toBe("taking");
+    expect(at({ mode: "control", session: "control" })).toBeNull();
+    expect(at({ returning: true, session: "control" })).toBe("returning");
+    expect(at({ session: "control" })).toBe("returning");
+    // A page that never says its session: only the step itself.
+    expect(at({ mode: "control", session: null })).toBeNull();
   });
 });

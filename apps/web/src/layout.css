@@ -2915,9 +2915,18 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
   text-decoration: underline;
 }
 .profile-card {
+  --menu-pad: var(--space-2);
   width: 300px;
   max-height: none;
-  padding: var(--space-3);
+  padding: var(--menu-pad);
+}
+/* A channel's card: its words further in than the room (`.ac-popover`), its buttons back on it. */
+.channel-card > div {
+  padding: var(--popover-in);
+}
+.channel-card .profile-card__actions {
+  margin-inline: calc(-1 * var(--popover-in));
+  margin-bottom: calc(-1 * var(--popover-in));
 }
 .profile-card__body {
   display: flex;
@@ -3519,7 +3528,7 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   top: 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-4);
 }
 .settings__head {
   display: flex;
@@ -3550,7 +3559,7 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 .settings__groups {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-4);
 }
 .settings__group-label {
   display: block;
@@ -3567,13 +3576,14 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   flex-direction: column;
   gap: 2px;
 }
+/* The compact step of the control ruler, as the sidebar's rows; a finger keeps the default step (below). */
 .settings__link {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: var(--control-h-md);
+  min-height: var(--control-h-sm);
   padding: 0 10px;
-  border-radius: var(--control-r-md);
+  border-radius: var(--control-r-sm);
   color: var(--ink2);
   text-decoration: none;
   font-size: 14px;
@@ -3602,6 +3612,12 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
 html:not([data-pointer]) .settings__link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+@media (pointer: coarse) {
+  .settings__link {
+    min-height: var(--control-h-md);
+    border-radius: var(--control-r-md);
+  }
 }
 .settings__body {
   flex: 1 1 560px;
@@ -3647,7 +3663,7 @@ html:not([data-pointer]) .settings__link:focus-visible {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 14px var(--card-pad);
+  padding: var(--row-py) var(--card-pad);
   border-top: 1px solid var(--line);
 }
 .settings-row:first-child {
@@ -3660,6 +3676,11 @@ html:not([data-pointer]) .settings__link:focus-visible {
 }
 .ac-card__head + .settings-rows > .settings-row:first-child {
   border-top: 1px solid var(--line);
+}
+/* Over a card's foot the last row ends on the foot's hairline, as deep below as above (the card's gap is
+   `--space-3`). */
+.settings-rows:has(+ .ac-card__foot) {
+  margin-bottom: calc(-1 * var(--space-3));
 }
 .settings-row__text {
   flex: 1;
@@ -10387,11 +10408,13 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Concentric: the box is its rows' corner plus its room (`.ac-menu`), each row's button its corner less the row's. */
 .agp-changes.ac-popover {
+  --menu-pad: var(--space-2);
   width: min(420px, calc(100vw - 24px));
   max-height: 60vh;
   overflow: auto;
-  padding: 8px;
+  padding: var(--menu-pad);
 }
 .agp-changes__head {
   display: flex;
@@ -10411,7 +10434,7 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   align-items: flex-start;
   gap: 6px;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--radius-item);
 }
 .agp-changes__item:hover {
   background: var(--plate);
@@ -10424,7 +10447,7 @@ html:not([data-pointer]) .agp-subnav__item:focus-visible {
   gap: 2px;
   padding: 5px 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: calc(var(--radius-item) - 4px);
   background: transparent;
   color: var(--ink);
   font: inherit;
@@ -10558,8 +10581,17 @@ html:not([data-pointer]) .msg-mem:focus-visible {
   margin: 0;
 }
 .msg-mem__pop {
+  --menu-pad: var(--space-2);
   width: min(330px, calc(100vw - 24px));
-  padding: 14px;
+  padding: var(--menu-pad);
+}
+/* Its words and fact further in than the room (`.ac-popover`), its buttons back on it. */
+.msg-mem__card {
+  padding: var(--popover-in);
+}
+.msg-mem__card .msg-mem__actions {
+  margin-inline: calc(-1 * var(--popover-in));
+  margin-bottom: calc(-1 * var(--popover-in));
 }
 .msg-mem__head {
   display: flex;
@@ -12792,7 +12824,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px var(--card-pad);
+  padding: var(--row-py) var(--card-pad);
   border-top: 1px solid var(--line);
 }
 .voice-engine__title {

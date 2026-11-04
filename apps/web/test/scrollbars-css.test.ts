@@ -163,13 +163,16 @@ describe("our scrollbars, never the browser's", () => {
     expect(value(kit, "::-webkit-scrollbar-track:vertical", "margin")).toBe("calc(var(--radius-section) / 2) 0");
     expect(value(kit, "::-webkit-scrollbar-track:horizontal", "margin")).toBe("0 calc(var(--radius-section) / 2)");
     // …and nothing that scrolls with a bar rounds its corners more than that.
+    // Each corner's radius (a `calc()` one as the sum of its lengths), the largest.
     const radius = (v: string) =>
       Math.max(
         0,
-        ...v
-          .split(/[\s/]+/)
-          .map((r) => (r.startsWith("var(") ? token(r.slice(4, -1)) : px(r)))
-          .filter(Number.isFinite),
+        ...(v.match(/(?:[^\s/()]|\([^()]*(?:\([^()]*\)[^()]*)*\))+/g) ?? []).map((r) =>
+          (r.match(/var\(--[\w-]+\)|[\d.]+px/g) ?? [])
+            .map((n) => (n.startsWith("var(") ? token(n.slice(4, -1)) : px(n)))
+            .filter(Number.isFinite)
+            .reduce((a, b) => a + b, 0),
+        ),
       );
     const scrollers = new Set(await selectorsWith((p, v) => /^overflow(-[xy])?$/.test(p) && /auto|scroll/.test(v)));
     const strips = await selectorsWith((p, v) => p === "scrollbar-width" && v === "none");

@@ -1815,7 +1815,6 @@
   "rightHand": {
     "label": "je rechterhand",
     "newDot": "Nieuw",
-    "callWith": "roep aan met @{{handle}}",
     "role": "Workspace-assistent",
     "actsAsYou": "handelt met jouw rechten",
     "composerHint": "niets verandert zonder jou",

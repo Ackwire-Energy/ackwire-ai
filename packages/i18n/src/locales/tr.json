@@ -1812,7 +1812,6 @@
   "rightHand": {
     "label": "sağ kolun",
     "newDot": "Yeni",
-    "callWith": "@{{handle}} ile çağır",
     "role": "Çalışma alanı asistanı",
     "actsAsYou": "senin izinlerinle çalışır",
     "composerHint": "sen olmadan hiçbir şey değişmez",

@@ -1967,6 +1967,10 @@ describe("watching offers control after deliberate interaction", () => {
     expect(prompt()).not.toBeNull();
     // Dimmed, not frosted: the screen stays in sight under the question.
     expect(prompt()?.classList.contains("is-clear")).toBe(true);
+    // Stacked: the title, take control, then Cancelar under it.
+    const acts = prompt()?.querySelector(".brw-dim__box > .brw-dim__acts");
+    expect(acts?.previousElementSibling?.classList.contains("brw-dim__row")).toBe(true);
+    expect([...(acts?.children ?? [])].map((b) => b.textContent)).toEqual(["Assumir o controle", "Cancelar"]);
     expect(rfb().viewOnly).toBe(true);
     expect(rfb().log).toEqual([]);
     await act(async () => fireEvent.keyDown(document, { key: "Escape" }));

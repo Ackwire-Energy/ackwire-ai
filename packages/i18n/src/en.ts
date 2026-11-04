@@ -1803,8 +1803,6 @@ export const en = {
     label: "your right hand",
     /** The one-time dot on its row until it is first opened. */
     newDot: "New",
-    /** Under its name in a channel's members column. */
-    callWith: "call with @{{handle}}",
     /** Its role, wherever an agent's role shows. */
     role: "Workspace assistant",
     /** In its DM's header, after the label. */

@@ -1745,7 +1745,6 @@
   "rightHand": {
     "label": "あなたの右腕",
     "newDot": "新規",
-    "callWith": "@{{handle}} で呼べます",
     "role": "ワークスペースのアシスタント",
     "actsAsYou": "あなたの権限で動きます",
     "composerHint": "あなたなしでは何も変わりません",
