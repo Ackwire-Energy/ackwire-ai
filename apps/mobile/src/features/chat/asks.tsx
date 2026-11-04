@@ -209,10 +209,7 @@ function HandoffProbe({
   const h = useBrowserHandoff(orgId, id).data ?? fallback;
   const expired = useExpired(h.expiresAt);
   // The same rule as its card (`HandoffCard`): by ids, never by a name that may not have loaded.
-  const mine =
-    meId !== null &&
-    can(org, "own_browsers") &&
-    handoffIsMine(h, meId, dir.agentById.get(h.agentId)?.ownerUserId, can(org, "control_browsers"));
+  const mine = meId !== null && handoffIsMine(h, meId, dir.agentById.get(h.agentId)?.ownerUserId, org);
   const ask =
     h.status === "pending" && h.kind === "ask" && !expired && mine
       ? {

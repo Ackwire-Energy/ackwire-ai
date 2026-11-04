@@ -445,7 +445,7 @@ describe("the agents' computers by role (ADR 0085 §12): none, the browser, the 
   const BASE = ["post", "create_channels", "talk_to_agents", "assign_work", "pair_computers", "edit_wiki"];
 
   test("a role with every agent's browser only: the browser and its requests, never the screen, control or terminal", async () => {
-    const { open, systemMode } = await start();
+    const { open, systemMode, setMachine } = await start();
     await systemMode();
     const caio = await addMember(f.db, f.org.id, "member", "caio");
     await giveRole(caio.id, ["control_browsers"]);
@@ -470,6 +470,12 @@ describe("the agents' computers by role (ADR 0085 §12): none, the browser, the 
     expect(taken.screen).toBe("browser");
     expect((await open(caio.id, CONTROL)).closed?.code).toBe(STREAM_CLOSE.forbidden);
     await finishHandoff(deps(), caio.id, f.org.id, taken.id, { result: "done" });
+    // A computer whose screen is switched off has none to keep from them: no "browser only".
+    await setMachine({ access: { ...ACCESS, tools: { ...ACCESS.tools, desktop: false } } });
+    expect(await desktopStatus({ db: f.db }, caio.id, f.org.id, f.agent.id)).toMatchObject({
+      reason: "not_allowed",
+      controlRefusal: null,
+    });
   });
 
   test("a role with the whole computer drives every agent's screen and terminal", async () => {

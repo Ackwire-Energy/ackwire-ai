@@ -238,6 +238,7 @@ export interface DesktopDeps {
 
 /** The REST reaches a computer through whichever server holds its socket (`hub.call`), unlike a stream. */
 const ANYWHERE = { isLocal: () => true };
+const NO_SCREEN = ["no_agent", "no_desktop", "no_computer", "not_allowed"];
 
 /**
  * An agent's desktop as one person sees it: whether it can be shown and runs, who controls it, what they may
@@ -277,9 +278,12 @@ export async function desktopStatus(
   const { db } = deps;
   if ((await screenAccess(db, userId, orgId, agentId, undefined, "desktop")).refusal === "level") {
     await requireBrowserAccess(db, userId, orgId, agentId);
+    const served = await desktopTarget(db, ANYWHERE, orgId, agentId, "desktop");
+    // An agent with no screen to show isn't one whose browser alone they get.
+    const none = "refused" in served && NO_SCREEN.includes(served.reason) ? served.reason : null;
     return {
       available: false,
-      reason: "browser_only",
+      reason: none ?? "browser_only",
       detail: null,
       running: false,
       startedAt: null,
@@ -287,7 +291,7 @@ export async function desktopStatus(
       handoff: null,
       viewers: 0,
       canControl: false,
-      controlRefusal: "role",
+      controlRefusal: none ? null : "role",
       held: await standingRefusal(db, orgId, agentId).then((refusal) => refusal !== null),
     };
   }

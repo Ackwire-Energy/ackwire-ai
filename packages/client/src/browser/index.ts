@@ -5,6 +5,7 @@ import { useApi } from "../api/context";
 import { keys } from "../api/keys";
 import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, PageTarget, ScreenKind } from "../api/types";
 import { timeLeft } from "../lib/format";
+import { can } from "../lib/permissions";
 import { isBlankPage } from "../lib/sites";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
@@ -55,18 +56,22 @@ export function isWaitingHandoff(h: Pick<BrowserHandoff, "status" | "expiresAt">
  * Whether a waiting request is this person's to answer (its card says it waits for you, the bar above the
  * composer brings it back, its buttons show): the person it was asked of and the agent's responsible person,
  * who are both notified. Asked of no one in particular (no one behind the run and no responsible person, or a
- * desktop several people may drive), it is for whoever may control the agents' browsers (`control_browsers`). The
- * server checks again when they open it (ADR 0040 §6, ADR 0058 §4); whose roles give them no browser at all
- * (`own_browsers`) answers none, which the callers check first.
+ * desktop several people may drive), it is for whoever may control every agent's screen (`control_browsers`; a
+ * desktop `control_computers`). Whose roles don't give them that screen at all (`own_browsers`, `own_computers`)
+ * answers none. The server checks again when they open it (ADR 0040 §6, ADR 0058 §4).
  */
 export function handoffIsMine(
-  h: Pick<BrowserHandoff, "requestedForUserId">,
+  h: Pick<BrowserHandoff, "requestedForUserId" | "screen">,
   meId: string,
   ownerUserId: string | null | undefined,
-  mayControlComputers: boolean,
+  org: Parameters<typeof can>[0],
 ): boolean {
+  const full = handoffScreen(h) === "desktop";
+  if (!can(org, full ? "own_computers" : "own_browsers")) return false;
   if (ownerUserId && ownerUserId === meId) return true;
-  return h.requestedForUserId ? h.requestedForUserId === meId : mayControlComputers;
+  return h.requestedForUserId
+    ? h.requestedForUserId === meId
+    : can(org, full ? "control_computers" : "control_browsers");
 }
 
 /** The time a waiting request has left ("24 h", "45 min"); null without a deadline or once it passed. */
