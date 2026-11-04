@@ -34,7 +34,7 @@ const repliesIn = async (channelId: string) =>
     .filter((m) => m.threadId)
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-describe("a task's conversation (ADR 0144)", () => {
+describe("a task's conversation (ADR 0145)", () => {
   test("made once on first use; a mention there wakes the agent, which answers in the same thread", async () => {
     f = await setup({ reply: () => ({ chunks: ["Olhei: 18 das 31 usam WhatsApp."] }) });
     const deps = { db: f.db, pubsub: f.pubsub };

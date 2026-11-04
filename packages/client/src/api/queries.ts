@@ -3394,7 +3394,7 @@ export const useIssue = (orgId: string, number: number) => {
 };
 
 /**
- * Where a task's conversation lives (ADR 0144): the one the task already carries, or, once `open`, the one the
+ * Where a task's conversation lives (ADR 0145): the one the task already carries, or, once `open`, the one the
  * server makes on first use. Null until then.
  */
 export function useTaskConversation(orgId: string, issue: Pick<Issue, "id" | "conversation">, open: boolean) {

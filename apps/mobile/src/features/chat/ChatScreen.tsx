@@ -559,7 +559,7 @@ function Chat({
       const root = list.find((m) => m.id === threadId);
       const replies = list.filter((m) => m.id !== threadId);
       const info = thread.data;
-      // A task's conversation (ADR 0144): its root stands for the task, one screen back; only the replies show.
+      // A task's conversation (ADR 0145): its root stands for the task, one screen back; only the replies show.
       const head: Row[] =
         root && !taskConversationOf(root.meta)
           ? [
@@ -1129,7 +1129,7 @@ function Chat({
   // number and title, in the reader's.
   const root = isThread ? list.find((m) => m.id === threadId) : undefined;
   const rootWork = issueWorkOf(root?.meta);
-  // A task's conversation (ADR 0144): "Conversa da tarefa", the task under it.
+  // A task's conversation (ADR 0145): "Conversa da tarefa", the task under it.
   const rootTask = taskConversationOf(root?.meta);
   const title = isThread
     ? rootTask

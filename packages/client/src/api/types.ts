@@ -2735,6 +2735,13 @@ export interface SecretRequest {
   withdrawn?: true;
   /** The agent already held this name on this computer: a delivery replaces that value. */
   replaces?: boolean;
+  /**
+   * A site's password: the username the agent will type with it, prefilled in the card's "Save to the Vault"
+   * (ADR 0144). Absent on cards from before the Vault.
+   */
+  username?: string | null;
+  /** A verification code: how many digits (one box each). Never saved to the Vault. Null or absent otherwise. */
+  codeDigits?: number | null;
 }
 
 /** A secret on an agent's computer, by name (the agent page). */
@@ -3045,7 +3052,7 @@ export interface Issue {
   blocked?: { reason: string; since: string; text?: string } | null;
   /** The agent's background work this card tracks: its plan, last update and line (ADR 0121). */
   backgroundWork?: WorkView | null;
-  /** Its conversation (ADR 0144), once opened or written: a thread of its own channel. */
+  /** Its conversation (ADR 0145), once opened or written: a thread of its own channel. */
   conversation?: IssueConversation | null;
   /** The issue this one is a sub-issue of (a plan step from the forum). */
   parentIssueId?: string | null;
@@ -3057,7 +3064,7 @@ export interface Issue {
   updatedAt: string;
 }
 
-/** Where a task's conversation lives (ADR 0144): the chat's routes read and post to this thread. */
+/** Where a task's conversation lives (ADR 0145): the chat's routes read and post to this thread. */
 export interface IssueConversationRef {
   channelId: string;
   rootId: string;

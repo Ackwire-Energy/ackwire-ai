@@ -433,7 +433,7 @@ export interface ChannelChrome {
   /** A thread view where a person's reply makes it a "Responder" thread (`openThread` on the post). */
   openThread?: boolean;
   /**
-   * A task's conversation (ADR 0144): "@" offers the whole workspace as one list (an agent that sees the task joins
+   * A task's conversation (ADR 0145): "@" offers the whole workspace as one list (an agent that sees the task joins
    * it when mentioned), and the root, which stands for the task, isn't drawn.
    */
   task?: boolean;
@@ -1063,7 +1063,7 @@ function ChannelView({
       // The thread's conversation. One made from a range: not its root (the channel's marker) nor the
       // moved messages (written before the root; the context block lists them).
       const mine = (channelMessages.data ?? []).filter((m) => m.local && m.threadId === thread.id);
-      // A task's conversation: not its root, which stands for the task beside it (ADR 0144).
+      // A task's conversation: not its root, which stands for the task beside it (ADR 0145).
       const list = mergeTimeline(threadMessages.data ?? [], [mine]).filter(
         (m) =>
           !taskConversationOf(m.meta) &&

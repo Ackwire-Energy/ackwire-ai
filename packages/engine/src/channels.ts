@@ -552,7 +552,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
   // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum. A task's
-  // conversation by whoever sees the task (ADR 0144), always checked again: people are never its members.
+  // conversation by whoever sees the task (ADR 0145), always checked again: people are never its members.
   if (
     channel.kind === "task"
       ? !(row.taskReader === true || String(row.taskReader) === "t")

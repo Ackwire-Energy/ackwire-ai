@@ -100,7 +100,7 @@ describe("@mention autocomplete", () => {
 
   test("works in the task conversation's box too", async () => {
     await go("issues/131");
-    // The task's composer lives in its conversation panel (ADR 0144).
+    // The task's composer lives in its conversation panel (ADR 0145).
     await click(screen().getByRole("button", { name: /^Conversa( \d+)?$/ }));
     await settle(6);
     expect(screen().getByRole("heading", { name: "Conversa da tarefa" })).toBeTruthy();

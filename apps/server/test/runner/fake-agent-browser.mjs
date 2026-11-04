@@ -1,6 +1,12 @@
 // A fake `agent-browser` for browser tests: answers `--json` like the real one.
 // Each run appends `{ args, stdin }` to $FAKE_AB_LOG (one JSON line). The page
 // lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, tabTo, noHistory, port, delayMs }`.
+// In a `batch`, `focus` focuses a ref and `eval` runs its script against that field as a page would see it
+// (`attrs[ref]`: `tag`, `type`, `autocomplete`, `method` of its form, `submitMethod`: a submit button's
+// `formmethod`; `frame`: `{ origin, ancestors }` when the session is inside a frame); a script may mark the field
+// (`setAttribute`, kept in `marks` for this page only) and `fill [attr="value"]` finds it by that mark, or nothing
+// (`navigateAfterCheck`: the page goes there right after a check marks a field, as a page that moved on would);
+// `filled` keeps what each fill typed into. With `--bail` the batch stops at the first failure (ADR 0144).
 import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);
@@ -50,6 +56,59 @@ const out = (o) => {
   save();
 };
 
+/** A script run as the page would: its document's focused element, its frame's location, `window` and `top`. */
+const pageEval = (script, focused) => {
+  const field = focused ? (state.attrs?.[focused] ?? {}) : null;
+  const frame = state.frame ?? {};
+  let origin = "null";
+  try {
+    origin = new URL(state.url).origin;
+  } catch {
+    // not a page: an opaque origin
+  }
+  const submit = field?.submitMethod
+    ? [{ tagName: "BUTTON", getAttribute: (name) => (name === "formmethod" ? field.submitMethod : null) }]
+    : [];
+  const el = field
+    ? {
+        tagName: field.tag ?? "INPUT",
+        type: field.type ?? "text",
+        getAttribute: (name) => (name === "autocomplete" ? (field.autocomplete ?? null) : null),
+        setAttribute: (name, value) => {
+          state.marks = { ...(state.marks ?? {}), [name]: { value: String(value), ref: focused, url: state.url } };
+        },
+        form:
+          field.method === undefined && submit.length === 0
+            ? null
+            : { getAttribute: (name) => (name === "method" ? (field.method ?? null) : null), elements: submit },
+      }
+    : null;
+  const marked = (selector) => {
+    const m = /^\[([a-z-]+)="([^"]*)"\]$/.exec(selector);
+    const mark = m ? state.marks?.[m[1]] : undefined;
+    return m && mark && mark.value === m[2] && mark.url === state.url ? { name: m[1], mark } : null;
+  };
+  const document = {
+    activeElement: el,
+    querySelector: (selector) => {
+      const found = marked(selector);
+      return found ? { removeAttribute: (name) => delete state.marks[name] } : null;
+    },
+  };
+  const win = {};
+  const ancestors = frame.ancestors ?? [];
+  const location = { origin: frame.origin ?? origin, ancestorOrigins: ancestors };
+  const run = new Function("document", "location", "window", "top", `return ${script}`);
+  return run(document, location, win, ancestors.length > 0 ? {} : win);
+};
+
+/** The element a mark selector names on this page, or null (another page has none). */
+const markedField = (selector) => {
+  const m = /^\[([a-z-]+)="([^"]*)"\]$/.exec(selector);
+  const mark = m ? state.marks?.[m[1]] : undefined;
+  return m && mark && mark.value === m[2] && mark.url === state.url ? mark.ref : null;
+};
+
 // `delayMs`: every command takes that long (a page busy under it).
 if (state.delayMs) await new Promise((resolve) => setTimeout(resolve, state.delayMs));
 
@@ -93,7 +152,40 @@ switch (command) {
     break;
   case "batch": {
     const list = JSON.parse(stdin || "[]");
-    out(list.map((cmd) => ({ command: cmd, success: true, result: {}, error: null })));
+    const bail = argv.includes("--bail");
+    const results = [];
+    let focused = null;
+    for (const cmd of list) {
+      let result = { command: cmd[0], success: true, result: {}, error: null };
+      if (cmd[0] === "focus") focused = cmd[1];
+      if (cmd[0] === "eval") {
+        const before = JSON.stringify(state.marks ?? {});
+        try {
+          result.result = { result: pageEval(cmd[1], focused) };
+        } catch (err) {
+          result = {
+            command: cmd[0],
+            success: false,
+            result: null,
+            error: `Evaluation failed: ${err?.message ?? err}`,
+          };
+        }
+        // A page that moves on right after its field was marked: the new page has none of its marks.
+        if (state.navigateAfterCheck && JSON.stringify(state.marks ?? {}) !== before) {
+          state.url = state.navigateAfterCheck;
+          state.navigateAfterCheck = undefined;
+        }
+      }
+      if (cmd[0] === "fill" && typeof cmd[1] === "string" && cmd[1].startsWith("[")) {
+        const ref = markedField(cmd[1]);
+        if (ref) state.filled = [...(state.filled ?? []), { ref, url: state.url }];
+        else result = { command: "fill", success: false, result: null, error: `Element not found: ${cmd[1]}` };
+      }
+      results.push(result);
+      if (!result.success && bail) break;
+    }
+    out(results);
+    if (results.some((r) => !r.success)) process.exitCode = 1;
     break;
   }
   case "close":

@@ -616,7 +616,7 @@ export function createMockPlanning(
         });
         return clone(i);
       },
-      // Like the server (ADR 0144): a channel of its own and a root message, made on first use; the chat fake holds them.
+      // Like the server (ADR 0145): a channel of its own and a root message, made on first use; the chat fake holds them.
       conversation: async (orgId, id) => {
         const i = await findIssue(orgId, id);
         if (!i.conversation) {

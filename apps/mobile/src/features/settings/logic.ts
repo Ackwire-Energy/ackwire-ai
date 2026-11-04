@@ -60,7 +60,8 @@ export type SettingsSection =
   | "storage"
   | "computers"
   | "usage"
-  | "import";
+  | "import"
+  | "vault";
 
 export type SettingsGroup = "you" | "org" | "agents" | "costs";
 
@@ -98,6 +99,8 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
   // Papéis e permissões (ADR 0085): who manages roles, as on the web.
   { id: "roles", group: "org", icon: "lock", href: "/settings/roles", allowed: (o) => can(o, "manage_roles") },
+  // The Vault (ADR 0144): every member keeps their own logins and keys there and sees the team's shared with them.
+  { id: "vault", group: "org", icon: "lock", href: "/settings/vault", allowed: (o) => can(o, "read") },
   // What agents did and people changed: who may see the audit (it shows everyone's work).
   { id: "audit", group: "org", icon: "shield", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },
   // GIFs and stickers in chat (ADR 0091): who configures the workspace.

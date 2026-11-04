@@ -439,7 +439,7 @@ function RunFailures({ n, dir, channelName }: { n: AppNotification; dir: Dir; ch
   );
 }
 
-/** The comments of a grouped issue item: the replies in the task's conversation (ADR 0144). */
+/** The comments of a grouped issue item: the replies in the task's conversation (ADR 0145). */
 function IssueComments({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: string | null }) {
   const { org } = useOrg();
   const issueId = n.source.issueId ?? "";

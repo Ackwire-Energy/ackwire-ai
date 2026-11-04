@@ -85,7 +85,7 @@ export interface IssueView {
   blocked: { reason: string; since: string; text?: string } | null;
   /** The agent's background work this card tracks (its plan, last update and line), newest. */
   backgroundWork: WorkView | null;
-  /** Its conversation (ADR 0144), once someone wrote or opened it: replies, who took part, an agent at work. */
+  /** Its conversation (ADR 0145), once someone wrote or opened it: replies, who took part, an agent at work. */
   conversation: TaskConversationSummary | null;
   createdAt: string;
   updatedAt: string;
@@ -222,7 +222,7 @@ async function canSee(
   channelId: string | null,
   /** The issue's assignee: an agent working on it from a DM sees what the person there sees. */
   assignee?: { type: string | null; id: string | null },
-  /** The issue's own conversation (ADR 0144): an agent there sees it (it joined only seeing it, or assigned). */
+  /** The issue's own conversation (ADR 0145): an agent there sees it (it joined only seeing it, or assigned). */
   conversationChannelId?: string | null,
 ) {
   if (!channelId) return true;
@@ -769,7 +769,7 @@ export async function recordIssueForumEvent(
     if (issue.channelId) await publishChannelEvent(deps.pubsub, { ...e, channelId: issue.channelId });
     else await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: e });
   }
-  // The summary and its link: a reply in the task's conversation (ADR 0144).
+  // The summary and its link: a reply in the task's conversation (ADR 0145).
   const comment = options.comment?.trim();
   if (comment && deps.pubsub) {
     const at = await ensureTaskConversation(deps.db, issue.id);
@@ -938,7 +938,7 @@ export async function updateIssue(
     return updated;
   });
   await linkRun(deps, actor, row);
-  // A new agent assignee joins the task's conversation (ADR 0144): a mention there reaches it.
+  // A new agent assignee joins the task's conversation (ADR 0145): a mention there reaches it.
   if (patch.assignee?.type === "agent" && row.conversationChannelId) {
     await admitTaskAgents(db, orgId, row.conversationChannelId, { ids: [patch.assignee.id] });
   }
@@ -1082,7 +1082,7 @@ async function ownFiles(db: Database, actor: IssueActor, orgId: string, attachme
   return ids.flatMap((id) => files.filter((f) => f.id === id));
 }
 /**
- * A comment: a reply in the task's conversation (ADR 0144), on the chat's own path. A person's goes like any
+ * A comment: a reply in the task's conversation (ADR 0145), on the chat's own path. A person's goes like any
  * message there (a mention wakes the agent, receipts, the working line); an agent's (`comment_issue`, a reply
  * mirrored from elsewhere) is its own message there. Drive files uploaded for it show on it and are linked to
  * the issue. Notifications come from the message (`notifications.message`).
@@ -1165,7 +1165,7 @@ async function postInConversation(
 }
 
 /**
- * After a reply in a task's conversation (ADR 0144): its files are linked to the task (its Anexos), and whoever sees
+ * After a reply in a task's conversation (ADR 0145): its files are linked to the task (its Anexos), and whoever sees
  * the task gets its card with the new count.
  */
 export async function announceTaskConversation(deps: IssueDeps, orgId: string, messageId: string) {
@@ -1194,7 +1194,7 @@ export async function announceTaskConversation(deps: IssueDeps, orgId: string, m
   await announce(deps.pubsub, orgId, await one(deps.db, row), "issue.updated");
 }
 
-/** The task's conversation for whoever sees the task, made on first use (opening it, ADR 0144). */
+/** The task's conversation for whoever sees the task, made on first use (opening it, ADR 0145). */
 export async function openTaskConversation(
   db: Database,
   actor: IssueActor,
@@ -1232,7 +1232,7 @@ export async function issueFromMessage(
 }
 
 /**
- * "Ask Ada to implement": assigns the agent and starts its work in the task's own conversation (ADR 0144), where
+ * "Ask Ada to implement": assigns the agent and starts its work in the task's own conversation (ADR 0145), where
  * everyone who sees the task follows it and talks to it, on a short line from the person ("Please implement issue
  * #N", `meta.issueWorkStart`). The instructions never show in the chat: the run's context builds them from the
  * issue (`issueWorkBrief`). Criteria, PR and status stay on the issue. An issue made from a channel message gets one
@@ -1341,7 +1341,7 @@ async function announceTaken(deps: IssueDeps, issue: IssueRow, card: IssueWorkMe
 
 /**
  * An agent's reply to a task it was asked to implement (trigger `meta.issueId`) goes to the task's conversation,
- * unless it was written there already (ADR 0144: where "Pedir ao" works now; older work threads lived in a DM).
+ * unless it was written there already (ADR 0145: where "Pedir ao" works now; older work threads lived in a DM).
  */
 export async function mirrorReplyToIssue(
   deps: IssueDeps,
@@ -1406,7 +1406,7 @@ export async function openTasksBrief(
           isNull(issues.channelId),
           inArray(issues.channelId, visible),
           seenFromDmSql(orgId, channelId, sql`${issues.channelId}`),
-          // From a task's own conversation: that task (ADR 0144).
+          // From a task's own conversation: that task (ADR 0145).
           eq(issues.conversationChannelId, channelId),
         ),
       ),

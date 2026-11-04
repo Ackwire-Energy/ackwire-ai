@@ -225,7 +225,7 @@ export async function currentSubscriptions(
         or(
           eq(schema.channels.kind, "forum"),
           isNotNull(schema.channelMembers.id),
-          // A task's conversation: whoever sees the task (ADR 0144).
+          // A task's conversation: whoever sees the task (ADR 0145).
           and(eq(schema.channels.kind, "task"), taskReaderSql(sql`${schema.channels.id}`, sql`${userId}::text`)),
         ),
       ),

@@ -96,7 +96,7 @@ const Issue = z
       description: "The agent's background work this card tracks: its plan, last update and line (ADR 0121).",
     }),
     conversation: Conversation.nullable().openapi({
-      description: "Its conversation (ADR 0144), once opened or written: a thread the chat's routes read and post to.",
+      description: "Its conversation (ADR 0145), once opened or written: a thread the chat's routes read and post to.",
     }),
     createdAt: z.string(),
     updatedAt: z.string(),

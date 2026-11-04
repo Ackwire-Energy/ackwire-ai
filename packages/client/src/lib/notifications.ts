@@ -450,7 +450,7 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (n.kind === "org_standing" && n.latest.billingHold)
     return { to: "/org/$orgId/settings/$section", params: { section: "billing" } };
   if (s.topicId) return { to: "/org/$orgId/forum/$topicId", params: { topicId: s.topicId } };
-  // A reply in a task's conversation (ADR 0144) opens the task at that message.
+  // A reply in a task's conversation (ADR 0145) opens the task at that message.
   if (s.issueNumber != null)
     return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) }, ...at };
   // A routine that failed, paused or waits for its computer: the routine in Rotinas (its state and fix).

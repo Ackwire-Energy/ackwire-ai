@@ -517,7 +517,7 @@ test("asked to implement an issue: an answer posted before a nudge lands in the 
   const issue = await createIssue(deps, person, f.org.id, { title: "Login breaks on Safari" });
   const at = (await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id)).conversation;
   await drainOutbox(f.db, f.handlers);
-  // Written there once each (ADR 0144: the conversation is where it works, nothing mirrored).
+  // Written there once each (ADR 0145: the conversation is where it works, nothing mirrored).
   const said = (await f.db.select().from(schema.messages))
     .filter((m) => m.authorType === "agent" && m.channelId === at?.channelId && !m.meta.questionId)
     .map((m) => m.body);

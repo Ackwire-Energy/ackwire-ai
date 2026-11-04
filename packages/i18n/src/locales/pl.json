@@ -1655,6 +1655,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "E-mail",
+      "vault": "Vault",
       "custom": "Narzędzia przestrzeni roboczej"
     }
   },
@@ -2984,6 +2985,396 @@
     "removeLabel": "Usuń {{name}}",
     "removed": "Usunięto {{name}} z komputera.",
     "removeFailed": "Nie udało się usunąć. Czy komputer jest włączony?"
+  },
+  "vault": {
+    "tab": {
+      "label": "Co pokazać",
+      "team": "Zespół",
+      "personal": "Osobiste",
+      "connections": "Połączenia"
+    },
+    "list": {
+      "search": "Szukaj w Vault",
+      "clearSearch": "Wyczyść wyszukiwanie",
+      "kind": "Rodzaj",
+      "kindAll": "Wszystkie rodzaje",
+      "noMatch": "Nic tutaj nie pasuje do tego wyszukiwania.",
+      "clearFilters": "Wyczyść wyszukiwanie",
+      "personalNote": "Te elementy widzisz tylko ty. Twoi agenci używają ich tylko wtedy, gdy o to poprosisz.",
+      "personalEmpty": "Jeszcze nic nie zapisano",
+      "personalEmptyText": "Te elementy widzisz tylko ty. Twoi agenci używają ich tylko wtedy, gdy o to poprosisz.",
+      "teamEmpty": "Jeszcze nic nie udostępniono zespołowi",
+      "teamEmptyText": "Zapisz raz login, klucz lub dane kontaktowe i wybierz, którzy agenci mogą tego używać.",
+      "sharedEmpty": "Jeszcze nic ci nie udostępniono",
+      "sharedEmptyText": "Gdy ktoś udostępni ci login lub klucz zespołu, pojawi się tutaj."
+    },
+    "row": {
+      "agents_one": "{{count}} agent",
+      "agents_few": "{{count}} agentów",
+      "agents_many": "{{count}} agentów",
+      "agents_other": "{{count}} agenta",
+      "used": "Użyto {{when}}",
+      "never": "Nigdy nieużywany"
+    },
+    "kind": {
+      "login": "Login",
+      "key": "Klucz",
+      "contact": "Kontakt",
+      "loginText": "Nazwa użytkownika i hasło do strony internetowej",
+      "keyText": "Klucz, którego twoi agenci używają w poleceniu",
+      "contactText": "Dane, które agenci wpisują w formularzach"
+    },
+    "kindPlural": {
+      "login": "loginy",
+      "key": "klucze",
+      "contact": "kontakty",
+      "loginTitle": "Loginy",
+      "keyTitle": "Klucze",
+      "contactTitle": "Kontakty"
+    },
+    "scope": {
+      "personal": "Osobiste",
+      "team": "Zespół",
+      "personalText": "Widzisz to tylko ty",
+      "teamText": "Udostępnione przestrzeni roboczej"
+    },
+    "field": {
+      "title": "Nazwa",
+      "contactTitle": "Nazwa w Vault",
+      "loginPlaceholder": "Firmowy e-mail",
+      "keyPlaceholder": "Klucz płatności",
+      "contactPlaceholder": "Dane do faktury",
+      "website": "Strona internetowa",
+      "websitePlaceholder": "app.example.com",
+      "match": "Gdzie agenci mogą to wpisywać",
+      "username": "Nazwa użytkownika",
+      "usernamePlaceholder": "E-mail lub nazwa użytkownika",
+      "password": "Hasło",
+      "keyName": "Nazwa zmiennej",
+      "keyNameHelp": "Twoi agenci używają klucza pod tą nazwą w poleceniu.",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "value": "Wartość",
+      "description": "Notatka dla twoich agentów",
+      "descriptionHelp": "Kiedy go używać i do czego służy. Agenci czytają to, aby wybrać właściwy.",
+      "descriptionPlaceholder": {
+        "login": "Konto, którego używamy do publikowania postów",
+        "key": "Do usługi płatności, tryb testowy",
+        "contact": "Do faktur firmy"
+      }
+    },
+    "match": {
+      "exact": "Tylko ten adres",
+      "site": "Cała witryna",
+      "exactHelp": "Agenci wpisują to tylko na {{origin}}.",
+      "exactHelpNone": "Agenci wpisują to tylko pod tym dokładnym adresem.",
+      "siteHelp": "Agenci wpisują to na każdej stronie tej witryny, na przykład na stronie logowania w innej subdomenie."
+    },
+    "contact": {
+      "group": "Dane kontaktowe",
+      "fullName": "Imię i nazwisko",
+      "company": "Firma",
+      "document": "NIP",
+      "email": "E-mail",
+      "phone": "Telefon",
+      "address": "Adres",
+      "address2": "Adres, linia 2",
+      "city": "Miasto",
+      "region": "Województwo lub region",
+      "postalCode": "Kod pocztowy",
+      "country": "Kraj"
+    },
+    "error": {
+      "title": "Nadaj mu nazwę.",
+      "website": "Użyj adresu https, na przykład app.example.com.",
+      "keyName": "Użyj wielkich liter, cyfr i _, zaczynając od litery, na przykład ACME_API_KEY.",
+      "password": "Wpisz hasło.",
+      "value": "Wpisz wartość.",
+      "contact": "Wypełnij co najmniej jedno pole."
+    },
+    "item": {
+      "missing": "Brak",
+      "missingText": "Nie ma go już w {{source}}. Agenci nie mogą go używać, dopóki nie wróci.",
+      "editIn": "Edytuj go w {{source}}. Zmiany dotrą tutaj przy następnej synchronizacji.",
+      "unreadable": "Nie można tu odczytać danych tego kontaktu. Osoba, która nim zarządza, może wpisać je ponownie i zapisać.",
+      "hidden": "Ukryte",
+      "endsIn": "kończy się na {{hint}}",
+      "noValue": "Nic nie zapisano",
+      "change": "Zmień",
+      "add": "Dodaj",
+      "newPassword": "Nowe hasło",
+      "newValue": "Nowa wartość",
+      "newValueHelp": "Zastąpi zapisaną wartość, gdy zapiszesz.",
+      "sealedHelp": "Ze względów bezpieczeństwa to, co tu zapisano, nie jest już pokazywane. Aby to zmienić, wpisz ponownie.",
+      "keepValue": "Zachowaj obecną",
+      "saved": "Zapisano",
+      "delete": "Usuń",
+      "deleteTitle": "Usunąć {{title}}?",
+      "deleteText": "Twoi agenci nie będą mogli go już używać. Tego nie da się cofnąć.",
+      "deleted": "Usunięto {{title}} z Vault"
+    },
+    "use": {
+      "title": "Ostatnie użycia",
+      "none": "Nikt jeszcze go nie użył.",
+      "fill": "{{agent}}, na {{host}}",
+      "fillSomewhere": "{{agent}}: wpisanie",
+      "key": "{{agent}}, w poleceniu",
+      "read": "{{who}}: odczyt",
+      "create": "{{who}}: zapisanie",
+      "edit": "{{who}}: zmiana",
+      "for": "dla: {{name}}",
+      "routine": "Rutyna {{name}}"
+    },
+    "access": {
+      "title": "Kto ma dostęp",
+      "people": "Osoby",
+      "agents": "Agenci",
+      "edit": "Edytuj",
+      "editOf": "Edytuj: {{what}}",
+      "everyone": "Wszyscy w przestrzeni roboczej",
+      "everyoneText": "Widzi go każda osoba, a agenci używają go, gdy ona o to poprosi.",
+      "managersOnly": "Tylko zarządzający Vault",
+      "allAgents": "Wszyscy agenci",
+      "noAgents": "Jeszcze żadnego agenta",
+      "more_one": "jeszcze {{count}}",
+      "more_few": "jeszcze {{count}}",
+      "more_many": "jeszcze {{count}}",
+      "more_other": "jeszcze {{count}}",
+      "saved": "Zapisano dostęp",
+      "peopleTitle": "Kto może go widzieć",
+      "peopleText": "Te osoby go widzą, a agenci używają go, gdy poprosi któraś z nich. Zarządzający Vault zawsze go widzą.",
+      "level": {
+        "use": "Widzi i używa",
+        "none": "Brak dostępu"
+      },
+      "roleDetail": "Wszyscy z tą rolą",
+      "roles": "Role",
+      "peopleGroup": "Osoby",
+      "add": "Dodaj rolę lub osobę",
+      "addSearch": "Szukaj ról i osób",
+      "noMatch": "Nikogo nie znaleziono",
+      "levelOf": "Co może {{name}}",
+      "follows": "Stosuje domyślny dostęp z {{source}}.",
+      "own": "Ma własny dostęp, a nie domyślny z {{source}}.",
+      "changeHere": "Zmień dla tego elementu",
+      "useConnection": "Wróć do domyślnego"
+    },
+    "agents": {
+      "title": "Którzy agenci mogą go używać",
+      "textPersonal": "Używają tego tylko wtedy, gdy o to poprosisz.",
+      "textTeam": "Używają go, gdy poprosi ktoś, kto może go widzieć.",
+      "all": "Wszyscy agenci",
+      "allDetail": "Także ci dodani później"
+    },
+    "summary": {
+      "noAgents": "Jeszcze żaden agent nie może go używać.",
+      "allAgents": "Każdy agent",
+      "inRole": "ktoś z rolą {{role}}",
+      "personal_one": "{{agents}} może go używać, tylko gdy o to poprosisz.",
+      "personal_few": "{{agents}} mogą go używać, tylko gdy o to poprosisz.",
+      "personal_many": "{{agents}} mogą go używać, tylko gdy o to poprosisz.",
+      "personal_other": "{{agents}} mogą go używać, tylko gdy o to poprosisz.",
+      "everyone_one": "{{agents}} może go używać, gdy poprosi ktokolwiek z przestrzeni roboczej.",
+      "everyone_few": "{{agents}} mogą go używać, gdy poprosi ktokolwiek z przestrzeni roboczej.",
+      "everyone_many": "{{agents}} mogą go używać, gdy poprosi ktokolwiek z przestrzeni roboczej.",
+      "everyone_other": "{{agents}} mogą go używać, gdy poprosi ktokolwiek z przestrzeni roboczej.",
+      "people_one": "{{agents}} może go używać, gdy poprosi {{people}}.",
+      "people_few": "{{agents}} mogą go używać, gdy poprosi {{people}}.",
+      "people_many": "{{agents}} mogą go używać, gdy poprosi {{people}}.",
+      "people_other": "{{agents}} mogą go używać, gdy poprosi {{people}}.",
+      "nobody": "Nikt jeszcze nie może poprosić agentów o jego użycie. Wybierz, kto może go widzieć."
+    },
+    "new": {
+      "open": "Nowy element",
+      "title": "Nowy element",
+      "text": "Zapisz raz. Twoi agenci używają tego, nie widząc hasła ani klucza.",
+      "what": "Co chcesz zapisać?",
+      "who": "Kto może tego używać",
+      "teamLocked": "Elementy zespołu mogą zapisywać tylko zarządzający Vault. Ten zostaje twój.",
+      "save": "Zapisz",
+      "saved": "Zapisano w Vault"
+    },
+    "import": {
+      "open": "Importuj",
+      "title": "Importuj hasła",
+      "text": "Z pliku eksportowanego przez przeglądarkę lub menedżer haseł (.csv).",
+      "dropTitle": "Upuść plik tutaj",
+      "dropText": "albo kliknij, aby wybrać go na komputerze",
+      "reading": "Odczytywanie pliku…",
+      "choose": "Wybierz plik",
+      "where": "W przeglądarce lub menedżerze haseł poszukaj opcji Eksportuj hasła i wybierz CSV.",
+      "tooLarge": "Ten plik jest za duży (najwyżej 2 MB).",
+      "notCsv": "Wybierz plik .csv.",
+      "unreadable": "Nie udało się odczytać tego pliku. Spróbuj wyeksportować go ponownie.",
+      "format": {
+        "chrome": "Odczytano jako eksport z Chrome",
+        "1password": "Odczytano jako eksport z 1Password",
+        "bitwarden": "Odczytano jako eksport z Bitwarden",
+        "generic": "Odczytano jako plik z hasłami"
+      },
+      "added_one": "nowy login",
+      "added_few": "nowe loginy",
+      "added_many": "nowych loginów",
+      "added_other": "nowego loginu",
+      "updated_one": "zaktualizowany",
+      "updated_few": "zaktualizowane",
+      "updated_many": "zaktualizowanych",
+      "updated_other": "zaktualizowanego",
+      "skipped_one": "pominięty",
+      "skipped_few": "pominięte",
+      "skipped_many": "pominiętych",
+      "skipped_other": "pominiętego",
+      "reason": {
+        "duplicate_one": "{{count}} już jest w Vault",
+        "duplicate_few": "{{count}} już są w Vault",
+        "duplicate_many": "{{count}} już jest w Vault",
+        "duplicate_other": "{{count}} już jest w Vault",
+        "not_https_one": "{{count}} nie pod adresem https",
+        "not_https_few": "{{count}} nie pod adresem https",
+        "not_https_many": "{{count}} nie pod adresem https",
+        "not_https_other": "{{count}} nie pod adresem https",
+        "no_password_one": "{{count}} bez hasła",
+        "no_password_few": "{{count}} bez hasła",
+        "no_password_many": "{{count}} bez hasła",
+        "no_password_other": "{{count}} bez hasła",
+        "invalid_one": "{{count}} wiersz, którego nie udało się odczytać",
+        "invalid_few": "{{count}} wiersze, których nie udało się odczytać",
+        "invalid_many": "{{count}} wierszy, których nie udało się odczytać",
+        "invalid_other": "{{count}} wiersza, którego nie udało się odczytać"
+      },
+      "as": "Zapisz je jako",
+      "asPersonal": "Zobaczysz je tylko ty.",
+      "asTeam": "Widzą je wszyscy w przestrzeni roboczej. Potem wybierz agentów dla każdego z nich.",
+      "deleteFile": "Potem usuń plik: zawiera twoje hasła bez szyfrowania.",
+      "confirm_one": "Importuj {{count}}",
+      "confirm_few": "Importuj {{count}}",
+      "confirm_many": "Importuj {{count}}",
+      "confirm_other": "Importuj {{count}}",
+      "done_one": "Zaimportowano {{count}} login",
+      "done_few": "Zaimportowano {{count}} loginy",
+      "done_many": "Zaimportowano {{count}} loginów",
+      "done_other": "Zaimportowano {{count}} loginu",
+      "another": "Wybierz inny plik",
+      "close": "Gotowe"
+    },
+    "connections": {
+      "none": "Tutaj nie można połączyć żadnego menedżera haseł.",
+      "lead": "Twoi agenci używają tego, co trzymasz w {{name}}: {{kinds}}.",
+      "connect": "Połącz",
+      "reconnect": "Połącz ponownie",
+      "reconnectName": "Połącz ponownie {{name}}",
+      "open": "Otwórz {{name}}",
+      "required": "Wypełnij to pole.",
+      "for": "Połącz dla",
+      "forTeam": "Jego elementy należą do zespołu. Zarządzający Vault decydują, kto ich używa.",
+      "forPersonal": "Jego elementy należą tylko do ciebie.",
+      "teamLocked": "Jego elementy będą należeć tylko do ciebie. Tylko zarządzający Vault łączą menedżer dla zespołu.",
+      "sealed": "To, co tu wpiszesz, zostanie zaszyfrowane i nigdy więcej nie będzie pokazane.",
+      "connected_one": "Połączono z {{name}}. Przyszedł {{count}} element.",
+      "connected_few": "Połączono z {{name}}. Przyszły {{count}} elementy.",
+      "connected_many": "Połączono z {{name}}. Przyszło {{count}} elementów.",
+      "connected_other": "Połączono z {{name}}. Przyszło {{count}} elementu.",
+      "ready": "Połączono",
+      "syncing": "Synchronizowanie",
+      "reads": "Odczytuje: {{label}}",
+      "items_one": "{{count}} element",
+      "items_few": "{{count}} elementy",
+      "items_many": "{{count}} elementów",
+      "items_other": "{{count}} elementu",
+      "synced": "zsynchronizowano {{when}}",
+      "syncNow": "Synchronizuj teraz",
+      "access": "Dostęp domyślny",
+      "accessTitle": "Dostęp domyślny dla {{label}}",
+      "accessText": "Jego elementy stosują się do tego, chyba że zmienisz któryś z nich. Każda zmiana zapisuje się od razu.",
+      "actionsName": "Więcej dla {{name}}",
+      "disconnect": "Rozłącz",
+      "removeTitle": "Rozłączyć {{name}}?",
+      "removeText_one": "Jego element zniknie z Vault, a twoi agenci przestaną go używać. W {{name}} nic się nie zmieni.",
+      "removeText_few": "Jego {{count}} elementy znikną z Vault, a twoi agenci przestaną ich używać. W {{name}} nic się nie zmieni.",
+      "removeText_many": "Jego {{count}} elementów zniknie z Vault, a twoi agenci przestaną ich używać. W {{name}} nic się nie zmieni.",
+      "removeText_other": "Jego {{count}} elementu zniknie z Vault, a twoi agenci przestaną ich używać. W {{name}} nic się nie zmieni.",
+      "removed": "Rozłączono {{name}}",
+      "listOf": "Połączenia z {{name}}",
+      "note": "Twoi agenci czytają to, co tam jest, gdy tego potrzebują. Do agentes.chat nic nie jest kopiowane poza nazwami i adresami.",
+      "error": {
+        "auth_failed": "Odmowa logowania",
+        "locked": "Złe hasło",
+        "many_vaults": "Widzi więcej niż jeden sejf",
+        "no_vault": "Nie widzi sejfu",
+        "folder_missing": "Nie znaleziono folderu",
+        "not_found": "Nie znaleziono",
+        "rate_limited": "Za dużo odczytów",
+        "unreachable": "Brak połączenia",
+        "unsupported": "Niedostępne tutaj",
+        "invalid_input": "Sprawdź pola",
+        "too_many_items": "Vault pełny",
+        "other": "Nie udało się odczytać"
+      },
+      "fix": {
+        "auth_failed": "Klucz lub token został odrzucony. Połącz ponownie z nowym.",
+        "locked": "Hasło główne nie otworzyło konta. Połącz ponownie z właściwym.",
+        "many_vaults": "Daj kontu usługi dostęp tylko do jednego sejfu, potem połącz ponownie.",
+        "no_vault": "Daj kontu usługi dostęp do sejfu agentów, potem połącz ponownie.",
+        "folder_missing": "Utwórz folder dla swoich agentów albo połącz ponownie z jego nazwą.",
+        "not_found": "To, co odczytywał, zniknęło. Połącz ponownie, aby wybrać jeszcze raz.",
+        "rate_limited": "Menedżer haseł poprosił, żeby poczekać. Spróbuje ponownie sam.",
+        "unreachable": "Jego serwer nie odpowiedział. Spróbuje ponownie sam.",
+        "unsupported": "Tutaj nie da się odczytać jego ustawień. Spróbuj później albo użyj innego konta.",
+        "invalid_input": "Coś w polach zostało odrzucone. Połącz ponownie i je sprawdź.",
+        "too_many_items": "Usuń elementy, zanim zsynchronizujesz więcej.",
+        "other": "Spróbuj Synchronizuj teraz albo połącz ponownie."
+      }
+    },
+    "source": {
+      "onepassword": {
+        "step": {
+          "1": "Utwórz w 1Password sejf tylko dla swoich agentów i przenieś do niego loginy, których mogą używać",
+          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu",
+          "3": "Wklej tutaj token konta usługi"
+        },
+        "field": {
+          "token": "Token konta usługi"
+        }
+      },
+      "bitwarden": {
+        "warning": "Użyj konta tylko dla swoich agentów. Jego hasło główne otwiera całe konto, więc nie powinno być na nim nic osobistego.",
+        "step": {
+          "1": "Utwórz konto Bitwarden tylko dla swoich agentów i folder o nazwie Agents z loginami, których mogą używać",
+          "2": "Na tym koncie otwórz Ustawienia, Bezpieczeństwo, Klucze i skopiuj klucz API",
+          "3": "Wypełnij pola poniżej"
+        },
+        "field": {
+          "server": "Serwer",
+          "serverUrl": "Adres serwera",
+          "clientId": "Identyfikator klienta",
+          "clientSecret": "Sekret klienta",
+          "masterPassword": "Hasło główne",
+          "folder": "Folder"
+        },
+        "choice": {
+          "server": {
+            "self": "Mój własny serwer"
+          }
+        }
+      }
+    },
+    "card": {
+      "save": "Zapisz w Vault",
+      "saveText": "Następnym razem twoi agenci użyją tego bez pytania cię.",
+      "scope": "Zapisz jako",
+      "personalText": "Widzisz to tylko ty",
+      "teamText": "Widzi to przestrzeń robocza",
+      "teamLocked": "Dla zespołu zapisują tylko zarządzający Vault",
+      "agents": "Używane przez",
+      "choose": "Wybierz",
+      "saved": "Zapisano w Vault",
+      "notSaved": "Wysłano, ale nie zapisano w Vault",
+      "codeBox": "Cyfra {{n}} z {{total}}",
+      "codeShort_one": "Wpisz cyfrę.",
+      "codeShort_few": "Wpisz wszystkie {{count}} cyfry.",
+      "codeShort_many": "Wpisz wszystkie {{count}} cyfr.",
+      "codeShort_other": "Wpisz wszystkie {{count}} cyfry.",
+      "codeWhere": "Wpisuje to tylko przeglądarka agenta {{agent}}, na {{host}}."
+    }
   },
   "question": {
     "answer": "Odpowiedz",
@@ -5385,6 +5776,14 @@
     "setup_write": {
       "label": "Konfigurowanie przestrzeni roboczej",
       "description": "Proponowanie podłączenia AI, aplikacji lub serwera MCP albo zaproszenia osób kartą, którą klika osoba, i tworzenie kanałów dla tego, kto prosi, z opcją Cofnij."
+    },
+    "vault_read": {
+      "label": "Wgląd w Vault",
+      "description": "Wgląd w loginy, klucze i dane kontaktowe, które Vault mu udostępnia, oraz korzystanie z nich. Wpisuje zapisane hasła i używa zapisanych kluczy, nigdy ich nie widząc."
+    },
+    "vault_write": {
+      "label": "Edycja kontaktów w Vault",
+      "description": "Zapisywanie i aktualizowanie danych kontaktowych w Vault, zmiana nazwy użytkownika zapisanego loginu lub opisu oraz usuwanie tego, co sam zapisał."
     },
     "github_git_read": {
       "label": "Klonowanie repozytoriów (git)",
@@ -9586,7 +9985,8 @@
       "sandbox": "Uruchamianie kodu",
       "browser": "Przeglądarka",
       "setup": "Konfiguracja przestrzeni roboczej",
-      "desktop": "Pulpit"
+      "desktop": "Pulpit",
+      "vault": "Vault"
     },
     "areaText": {
       "context": {
@@ -9632,6 +10032,10 @@
       "desktop": {
         "write": "Używa dowolnej aplikacji na własnym pulpicie swojego komputera, a ludzie mogą patrzeć lub przejąć kontrolę. Wymaga też Uruchamiania kodu.",
         "write_female": "Używa dowolnej aplikacji na własnym pulpicie swojego komputera, a ludzie mogą patrzeć lub przejąć kontrolę. Wymaga też Uruchamiania kodu."
+      },
+      "vault": {
+        "read": "Widzi i używa tego, co Vault mu udostępnia, bez wglądu w hasła i klucze.",
+        "write": "Zapisuje też i aktualizuje dane kontaktowe w Vault."
       }
     }
   },
@@ -11759,6 +12163,49 @@
       "invalid": "@ ma od {{min}} do {{max}} znaków: małe litery, cyfry, - lub _.",
       "taken": "@{{handle}} należy do kogoś innego.",
       "takenByAgent": "@{{handle}} należy do agenta."
+    },
+    "vault": {
+      "invalid": "Coś w tym elemencie jest nie tak. Sprawdź go i spróbuj ponownie.",
+      "notFound": "Tego elementu nie ma już w Vault.",
+      "titleRequired": "Nadaj mu nazwę.",
+      "tooLong": "To jest za długie. Limit to {{max}}.",
+      "notHttps": "Użyj adresu zaczynającego się od https://",
+      "keyNameInvalid": "Użyj w nazwie wielkich liter, cyfr i _, na przykład ACME_API_KEY.",
+      "keyNameReserved": "Ta nazwa jest zarezerwowana. Wybierz inną.",
+      "keyNameTaken": "Klucz o tej nazwie jest tu już zapisany.",
+      "contactEmpty": "Wypełnij co najmniej jedno pole.",
+      "teamNeedsPermission": "Elementy zespołu mogą zapisywać tylko osoby, które zarządzają danymi uwierzytelniającymi.",
+      "externalReadOnly": "To pochodzi z menedżera haseł. Zmień to tam.",
+      "changedMeanwhile": "Ktoś w międzyczasie to zmienił. Otwórz ponownie.",
+      "noValue": "Nie ma nic do zapisania.",
+      "missing": "Zniknął z menedżera haseł.",
+      "notAllowed": "Nie możesz tego zrobić z tym elementem.",
+      "tooManyItems": "Vault jest pełny. Usuń elementy, których już nie używasz.",
+      "audienceInvalid": "Wybrana osoba lub rola nie należy już do przestrzeni roboczej.",
+      "agentsInvalid": "Wybrany agent nie należy już do przestrzeni roboczej.",
+      "tooManyAgents": "Wybierz najwyżej 200 agentów.",
+      "tooManyRoles": "Wybierz najwyżej 100 ról.",
+      "tooManyPeople": "Wybierz najwyżej 500 osób.",
+      "csvTooLarge": "Plik jest za duży. Limit to 2 MB.",
+      "csvTooManyRows": "Plik ma ponad 5000 wierszy. Podziel go i zaimportuj każdą część.",
+      "csvUnrecognized": "To nie wygląda na plik z hasłami. Wyeksportuj go ponownie jako CSV.",
+      "requestNotDelivered": "Najpierw wyślij, potem zapisz w Vault.",
+      "requestNotSavable": "Tego nie można zapisać w Vault.",
+      "sourceUnknown": "Ten menedżer haseł nie jest tu dostępny.",
+      "sourceError": "Nie udało się odczytać z menedżera haseł. Spróbuj ponownie.",
+      "source": {
+        "authFailed": "Menedżer haseł odrzucił te dane. Sprawdź je i spróbuj ponownie.",
+        "locked": "Hasło główne jest nieprawidłowe.",
+        "manyVaults": "Konto usługi widzi więcej niż jeden sejf. Daj mu dostęp tylko do jednego.",
+        "noVault": "Konto usługi nie widzi żadnego sejfu. Daj mu dostęp do jednego.",
+        "folderMissing": "Tego folderu nie ma na koncie.",
+        "notFound": "Nie ma go już w menedżerze haseł.",
+        "rateLimited": "Menedżer haseł poprosił, żeby poczekać. Spróbuj ponownie za kilka minut.",
+        "unreachable": "Nie udało się połączyć z menedżerem haseł. Sprawdź adres i spróbuj ponownie.",
+        "unsupported": "Tego menedżera haseł nie można tu połączyć.",
+        "invalidInput": "Sprawdź pola i spróbuj ponownie.",
+        "tooManyItems": "Vault jest pełny. Usuń elementy, zanim zsynchronizujesz więcej."
+      }
     }
   },
   "machines": {
@@ -12411,6 +12858,16 @@
         "token_revoked": "Unieważniono token osobisty {{app}}",
         "message_sent": "Wysłano wiadomość przez {{app}}"
       },
+      "vault": {
+        "item_created": "Zapisano element w Vault",
+        "item_changed": "Zmieniono element w Vault",
+        "item_deleted": "Usunięto element z Vault",
+        "item_used": "Użyto elementu z Vault",
+        "imported": "Zaimportowano hasła do Vault",
+        "connection_added": "Połączono menedżer haseł z Vault",
+        "connection_changed": "Zmieniono połączenie menedżera haseł",
+        "connection_removed": "Odłączono menedżer haseł od Vault"
+      },
       "verb": {
         "created": "Utworzono",
         "deleted": "Usunięto",
@@ -12443,6 +12900,9 @@
         "resent": "Wysłano ponownie",
         "revoked": "Unieważniono",
         "archived": "Zarchiwizowano",
+        "shown": "Wyświetlono",
+        "copied": "Skopiowano",
+        "used": "Użyto",
         "other": "Zmieniono"
       },
       "area": {
@@ -12475,6 +12935,7 @@
         "member": "członka",
         "invitation": "zaproszenie",
         "credential": "klucz AI",
+        "vault": "Vault",
         "other": "przestrzeń roboczą"
       }
     },
@@ -12534,6 +12995,7 @@
       "right_hand": "Prawa ręka",
       "members": "Członkowie i zaproszenia",
       "roles": "Role i uprawnienia",
+      "vault": "Vault",
       "access": "Agenci i dostęp",
       "connectors": "Konektory i MCP",
       "skills": "Umiejętności",
@@ -12556,6 +13018,7 @@
       "right_hand": "Asystent, który z każdą osobą buduje zespół, w jej DM i z jej uprawnieniami.",
       "members": "Kto jest w przestrzeni roboczej oraz zaproszenia.",
       "roles": "Co może każda osoba. Role się sumują.",
+      "vault": "Hasła, klucze i dane kontaktowe, których używają twoi agenci. Wpisują hasła i używają kluczy, nigdy ich nie widząc.",
       "access": "Z czego może korzystać każdy agent: jeden poziom na konektor.",
       "connectors": "Usługi i serwery MCP podłączone raz dla całej przestrzeni roboczej.",
       "skills": "Instrukcje w Markdown, które agenci otwierają, gdy ich potrzebują.",
@@ -13558,6 +14021,18 @@
     "ask_user": {
       "label": "Zapytaj osobę",
       "description": "Zadaje krótkie pytanie i czeka na odpowiedź."
+    },
+    "vault_list": {
+      "label": "Sprawdź Vault",
+      "description": "Wyświetla loginy, klucze i kontakty udostępnione agentowi, nigdy hasła ani klucza."
+    },
+    "vault_save": {
+      "label": "Zapisz w Vault",
+      "description": "Zapisuje lub aktualizuje dane kontaktowe, nazwę użytkownika loginu lub opis."
+    },
+    "vault_delete": {
+      "label": "Usuń z Vault",
+      "description": "Usuwa element, który sam zapisał."
     },
     "react": {
       "label": "Zareaguj",

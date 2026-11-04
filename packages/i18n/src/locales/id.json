@@ -1508,6 +1508,7 @@
       "sentry": "Sentry",
       "linear": "Linear",
       "mail": "Email",
+      "vault": "Vault",
       "custom": "Alat ruang kerja"
     }
   },
@@ -2725,6 +2726,342 @@
     "removeLabel": "Hapus {{name}}",
     "removed": "{{name}} dihapus dari komputer.",
     "removeFailed": "Tidak bisa menghapusnya. Apakah komputernya menyala?"
+  },
+  "vault": {
+    "tab": {
+      "label": "Yang ditampilkan",
+      "team": "Tim",
+      "personal": "Pribadi",
+      "connections": "Koneksi"
+    },
+    "list": {
+      "search": "Cari di Vault",
+      "clearSearch": "Hapus pencarian",
+      "kind": "Jenis",
+      "kindAll": "Semua jenis",
+      "noMatch": "Tidak ada yang cocok dengan pencarian ini.",
+      "clearFilters": "Hapus pencarian",
+      "personalNote": "Hanya kamu yang melihat item ini. Agenmu hanya menggunakannya saat kamu minta.",
+      "personalEmpty": "Belum ada yang disimpan",
+      "personalEmptyText": "Hanya kamu yang melihat item ini. Agenmu hanya menggunakannya saat kamu minta.",
+      "teamEmpty": "Belum ada yang dibagikan dengan tim",
+      "teamEmptyText": "Simpan login, kunci, atau kontak sekali, lalu pilih agen mana yang boleh menggunakannya.",
+      "sharedEmpty": "Belum ada yang dibagikan kepadamu",
+      "sharedEmptyText": "Saat seseorang membagikan login atau kunci tim kepadamu, item itu muncul di sini."
+    },
+    "row": {
+      "agents_other": "{{count}} agen",
+      "used": "Digunakan {{when}}",
+      "never": "Belum pernah digunakan"
+    },
+    "kind": {
+      "login": "Login",
+      "key": "Kunci",
+      "contact": "Kontak",
+      "loginText": "Nama pengguna dan kata sandi sebuah situs web",
+      "keyText": "Kunci yang dipakai agenmu dalam perintah",
+      "contactText": "Data yang diketik agen di formulir"
+    },
+    "kindPlural": {
+      "login": "login",
+      "key": "kunci",
+      "contact": "kontak",
+      "loginTitle": "Login",
+      "keyTitle": "Kunci",
+      "contactTitle": "Kontak"
+    },
+    "scope": {
+      "personal": "Pribadi",
+      "team": "Tim",
+      "personalText": "Hanya kamu yang melihatnya",
+      "teamText": "Dibagikan dengan ruang kerja"
+    },
+    "field": {
+      "title": "Nama",
+      "contactTitle": "Nama di Vault",
+      "loginPlaceholder": "Email perusahaan",
+      "keyPlaceholder": "Kunci pembayaran",
+      "contactPlaceholder": "Data penagihan",
+      "website": "Situs web",
+      "websitePlaceholder": "app.example.com",
+      "match": "Tempat agen boleh mengetiknya",
+      "username": "Nama pengguna",
+      "usernamePlaceholder": "Email atau nama pengguna",
+      "password": "Kata sandi",
+      "keyName": "Nama variabel",
+      "keyNameHelp": "Agenmu memakai kunci dengan nama ini dalam perintah.",
+      "keyNamePlaceholder": "ACME_API_KEY",
+      "value": "Nilai",
+      "description": "Catatan untuk agenmu",
+      "descriptionHelp": "Kapan digunakan dan untuk apa. Agen membaca ini untuk memilih yang tepat.",
+      "descriptionPlaceholder": {
+        "login": "Akun yang kami pakai untuk menerbitkan postingan",
+        "key": "Untuk layanan pembayaran, mode uji",
+        "contact": "Gunakan untuk faktur perusahaan"
+      }
+    },
+    "match": {
+      "exact": "Hanya alamat ini",
+      "site": "Seluruh situs",
+      "exactHelp": "Agen mengetiknya hanya di {{origin}}.",
+      "exactHelpNone": "Agen mengetiknya hanya di alamat persis ini.",
+      "siteHelp": "Agen mengetiknya di halaman mana pun di situs ini, seperti halaman masuk di subdomain lain."
+    },
+    "contact": {
+      "group": "Data kontak",
+      "fullName": "Nama lengkap",
+      "company": "Perusahaan",
+      "document": "NPWP",
+      "email": "Email",
+      "phone": "Telepon",
+      "address": "Alamat",
+      "address2": "Alamat baris 2",
+      "city": "Kota",
+      "region": "Provinsi atau wilayah",
+      "postalCode": "Kode pos",
+      "country": "Negara"
+    },
+    "error": {
+      "title": "Beri nama.",
+      "website": "Gunakan alamat https, misalnya app.example.com.",
+      "keyName": "Gunakan huruf kapital, angka, dan _, diawali huruf, misalnya ACME_API_KEY.",
+      "password": "Ketik kata sandinya.",
+      "value": "Ketik nilainya.",
+      "contact": "Isi setidaknya satu kolom."
+    },
+    "item": {
+      "missing": "Hilang",
+      "missingText": "Item ini sudah tidak ada di {{source}}. Agen tidak bisa menggunakannya sampai kembali.",
+      "editIn": "Edit di {{source}}. Perubahan masuk ke sini pada sinkronisasi berikutnya.",
+      "unreadable": "Detail kontak ini tidak bisa dibaca di sini. Orang yang mengelolanya bisa mengetiknya lagi lalu menyimpan.",
+      "hidden": "Tersembunyi",
+      "endsIn": "berakhiran {{hint}}",
+      "noValue": "Belum ada yang disimpan",
+      "change": "Ganti",
+      "add": "Tambah",
+      "newPassword": "Kata sandi baru",
+      "newValue": "Nilai baru",
+      "newValueHelp": "Menggantikan yang tersimpan saat kamu menyimpan.",
+      "sealedHelp": "Demi keamanan, yang tersimpan di sini tidak ditampilkan lagi. Untuk mengubahnya, ketik ulang.",
+      "keepValue": "Pertahankan yang sekarang",
+      "saved": "Tersimpan",
+      "delete": "Hapus",
+      "deleteTitle": "Hapus {{title}}?",
+      "deleteText": "Agenmu tidak bisa menggunakannya lagi. Ini tidak bisa diurungkan.",
+      "deleted": "{{title}} dihapus dari Vault"
+    },
+    "use": {
+      "title": "Penggunaan terbaru",
+      "none": "Belum ada yang menggunakannya.",
+      "fill": "{{agent}}, di {{host}}",
+      "fillSomewhere": "{{agent}} mengetiknya",
+      "key": "{{agent}}, dalam perintah",
+      "read": "{{who}} membacanya",
+      "create": "{{who}} menyimpannya",
+      "edit": "{{who}} mengubahnya",
+      "for": "untuk {{name}}",
+      "routine": "Rutinitas {{name}}"
+    },
+    "access": {
+      "title": "Siapa yang punya akses",
+      "people": "Orang",
+      "agents": "Agen",
+      "edit": "Edit",
+      "editOf": "Edit {{what}}",
+      "everyone": "Semua orang di ruang kerja",
+      "everyoneText": "Setiap orang melihatnya, dan agen menggunakannya saat orang itu meminta.",
+      "managersOnly": "Hanya pengelola Vault",
+      "allAgents": "Semua agen",
+      "noAgents": "Belum ada agen",
+      "more_other": "{{count}} lainnya",
+      "saved": "Akses tersimpan",
+      "peopleTitle": "Siapa yang bisa melihatnya",
+      "peopleText": "Mereka melihatnya, dan agen menggunakannya saat salah satu dari mereka meminta. Pengelola Vault selalu melihatnya.",
+      "level": {
+        "use": "Bisa melihat dan menggunakan",
+        "none": "Tanpa akses"
+      },
+      "roleDetail": "Semua orang dengan peran ini",
+      "roles": "Peran",
+      "peopleGroup": "Orang",
+      "add": "Tambahkan peran atau orang",
+      "addSearch": "Cari peran dan orang",
+      "noMatch": "Tidak ada yang ditemukan",
+      "levelOf": "Yang bisa dilakukan {{name}}",
+      "follows": "Mengikuti akses bawaan {{source}}.",
+      "own": "Punya akses sendiri, bukan akses bawaan {{source}}.",
+      "changeHere": "Ubah untuk item ini",
+      "useConnection": "Kembali ke bawaan"
+    },
+    "agents": {
+      "title": "Agen mana yang bisa menggunakannya",
+      "textPersonal": "Mereka hanya menggunakannya saat kamu minta.",
+      "textTeam": "Mereka menggunakannya saat orang yang bisa melihatnya meminta.",
+      "all": "Semua agen",
+      "allDetail": "Juga agen yang ditambahkan nanti"
+    },
+    "summary": {
+      "noAgents": "Belum ada agen yang bisa menggunakannya.",
+      "allAgents": "Setiap agen",
+      "inRole": "seseorang dengan peran {{role}}",
+      "personal_other": "{{agents}} bisa menggunakannya, hanya saat kamu minta.",
+      "everyone_other": "{{agents}} bisa menggunakannya saat siapa pun di ruang kerja meminta.",
+      "people_other": "{{agents}} bisa menggunakannya saat {{people}} meminta.",
+      "nobody": "Belum ada yang bisa meminta agen menggunakannya. Pilih siapa yang bisa melihatnya."
+    },
+    "new": {
+      "open": "Item baru",
+      "title": "Item baru",
+      "text": "Simpan sekali. Agenmu menggunakannya tanpa melihat kata sandi atau kunci.",
+      "what": "Apa yang ingin kamu simpan?",
+      "who": "Siapa yang bisa menggunakannya",
+      "teamLocked": "Hanya pengelola Vault yang bisa menyimpan item tim. Item ini tetap milikmu.",
+      "save": "Simpan",
+      "saved": "Tersimpan di Vault"
+    },
+    "import": {
+      "open": "Impor",
+      "title": "Impor kata sandi",
+      "text": "Dari file yang diekspor browser atau pengelola kata sandimu (.csv).",
+      "dropTitle": "Letakkan file di sini",
+      "dropText": "atau klik untuk memilihnya di komputermu",
+      "reading": "Membaca file…",
+      "choose": "Pilih file",
+      "where": "Di browser atau pengelola kata sandimu, cari Ekspor kata sandi lalu pilih CSV.",
+      "tooLarge": "File ini terlalu besar (paling besar 2 MB).",
+      "notCsv": "Pilih file .csv.",
+      "unreadable": "Tidak bisa membaca file ini. Coba ekspor lagi.",
+      "format": {
+        "chrome": "Dibaca sebagai ekspor Chrome",
+        "1password": "Dibaca sebagai ekspor 1Password",
+        "bitwarden": "Dibaca sebagai ekspor Bitwarden",
+        "generic": "Dibaca sebagai file kata sandi"
+      },
+      "added_other": "login baru",
+      "updated_other": "diperbarui",
+      "skipped_other": "dilewati",
+      "reason": {
+        "duplicate_other": "{{count}} sudah ada di Vault",
+        "not_https_other": "{{count}} tidak di alamat https",
+        "no_password_other": "{{count}} tanpa kata sandi",
+        "invalid_other": "{{count}} baris yang tidak bisa kami baca"
+      },
+      "as": "Simpan sebagai",
+      "asPersonal": "Hanya kamu yang akan melihatnya.",
+      "asTeam": "Semua orang di ruang kerja melihatnya. Pilih agen untuk masing-masing setelah itu.",
+      "deleteFile": "Hapus file setelahnya: file itu berisi kata sandimu tanpa enkripsi.",
+      "confirm_other": "Impor {{count}}",
+      "done_other": "{{count}} login diimpor",
+      "another": "Pilih file lain",
+      "close": "Selesai"
+    },
+    "connections": {
+      "none": "Tidak ada pengelola kata sandi yang bisa dihubungkan di sini.",
+      "lead": "Agenmu menggunakan {{kinds}} yang kamu simpan di {{name}}.",
+      "connect": "Hubungkan",
+      "reconnect": "Hubungkan ulang",
+      "reconnectName": "Hubungkan ulang {{name}}",
+      "open": "Buka {{name}}",
+      "required": "Isi kolom ini.",
+      "for": "Hubungkan untuk",
+      "forTeam": "Item-itemnya milik tim. Pengelola Vault memutuskan siapa yang menggunakannya.",
+      "forPersonal": "Item-itemnya hanya milikmu.",
+      "teamLocked": "Item-itemnya akan hanya milikmu. Hanya pengelola Vault yang menghubungkan satu untuk tim.",
+      "sealed": "Yang kamu ketik di sini dienkripsi dan tidak pernah ditampilkan lagi.",
+      "connected_other": "{{name}} terhubung. {{count}} item masuk.",
+      "ready": "Terhubung",
+      "syncing": "Menyinkronkan",
+      "reads": "Membaca {{label}}",
+      "items_other": "{{count}} item",
+      "synced": "disinkronkan {{when}}",
+      "syncNow": "Sinkronkan sekarang",
+      "access": "Akses bawaan",
+      "accessTitle": "Akses bawaan {{label}}",
+      "accessText": "Item-itemnya mengikuti ini, kecuali kamu mengubah salah satunya. Setiap perubahan langsung tersimpan.",
+      "actionsName": "Lainnya untuk {{name}}",
+      "disconnect": "Putuskan",
+      "removeTitle": "Putuskan {{name}}?",
+      "removeText_other": "{{count}} item keluar dari Vault dan agenmu berhenti menggunakannya. Tidak ada yang berubah di {{name}}.",
+      "removed": "{{name}} diputus",
+      "listOf": "Koneksi ke {{name}}",
+      "note": "Agenmu membaca isinya saat perlu. Tidak ada yang disalin ke agentes.chat selain nama dan alamat.",
+      "error": {
+        "auth_failed": "Masuk ditolak",
+        "locked": "Kata sandi salah",
+        "many_vaults": "Melihat lebih dari satu brankas",
+        "no_vault": "Tidak melihat brankas",
+        "folder_missing": "Folder tidak ditemukan",
+        "not_found": "Tidak ditemukan",
+        "rate_limited": "Terlalu banyak pembacaan",
+        "unreachable": "Tidak terjangkau",
+        "unsupported": "Tidak tersedia di sini",
+        "invalid_input": "Periksa kolomnya",
+        "too_many_items": "Vault penuh",
+        "other": "Tidak bisa dibaca"
+      },
+      "fix": {
+        "auth_failed": "Kunci atau token ditolak. Hubungkan ulang dengan yang baru.",
+        "locked": "Kata sandi utama tidak membuka akun. Hubungkan ulang dengan yang benar.",
+        "many_vaults": "Beri akun layanan akses ke satu brankas saja, lalu hubungkan ulang.",
+        "no_vault": "Beri akun layanan akses ke brankas para agen, lalu hubungkan ulang.",
+        "folder_missing": "Buat folder untuk agenmu, atau hubungkan ulang dengan namanya.",
+        "not_found": "Yang dibacanya sudah tidak ada. Hubungkan ulang untuk memilih lagi.",
+        "rate_limited": "Pengelola kata sandi meminta kami menunggu. Ia mencoba lagi sendiri.",
+        "unreachable": "Servernya tidak menjawab. Ia mencoba lagi sendiri.",
+        "unsupported": "Pengaturannya tidak bisa dibaca di sini. Coba lagi nanti atau pakai akun lain.",
+        "invalid_input": "Ada isi kolom yang ditolak. Hubungkan ulang dan periksa.",
+        "too_many_items": "Hapus item sebelum menyinkronkan lebih banyak.",
+        "other": "Coba Sinkronkan sekarang, atau hubungkan ulang."
+      }
+    },
+    "source": {
+      "onepassword": {
+        "step": {
+          "1": "Buat brankas di 1Password khusus untuk agenmu dan pindahkan ke sana login yang boleh mereka gunakan",
+          "2": "Buat akun layanan yang hanya punya akses ke brankas itu",
+          "3": "Tempel token akun layanan di sini"
+        },
+        "field": {
+          "token": "Token akun layanan"
+        }
+      },
+      "bitwarden": {
+        "warning": "Gunakan akun khusus untuk agenmu. Kata sandi utamanya membuka seluruh akun, jadi jangan simpan hal pribadi di sana.",
+        "step": {
+          "1": "Buat akun Bitwarden khusus untuk agenmu dan folder bernama Agents berisi login yang boleh mereka gunakan",
+          "2": "Di akun itu, buka Pengaturan, Keamanan, Kunci lalu salin kunci API",
+          "3": "Isi kolom di bawah"
+        },
+        "field": {
+          "server": "Server",
+          "serverUrl": "Alamat server",
+          "clientId": "ID klien",
+          "clientSecret": "Rahasia klien",
+          "masterPassword": "Kata sandi utama",
+          "folder": "Folder"
+        },
+        "choice": {
+          "server": {
+            "self": "Server saya sendiri"
+          }
+        }
+      }
+    },
+    "card": {
+      "save": "Simpan ke Vault",
+      "saveText": "Lain kali agenmu menggunakannya tanpa bertanya kepadamu.",
+      "scope": "Simpan sebagai",
+      "personalText": "Hanya kamu yang melihatnya",
+      "teamText": "Ruang kerja melihatnya",
+      "teamLocked": "Hanya pengelola Vault yang menyimpan untuk tim",
+      "agents": "Digunakan oleh",
+      "choose": "Pilih",
+      "saved": "Tersimpan di Vault",
+      "notSaved": "Terkirim, tapi tidak disimpan ke Vault",
+      "codeBox": "Digit {{n}} dari {{total}}",
+      "codeShort_other": "Ketik semua {{count}} digitnya.",
+      "codeWhere": "Hanya browser {{agent}} yang mengetiknya, di {{host}}."
+    }
   },
   "question": {
     "answer": "Jawab",
@@ -4886,6 +5223,14 @@
     "setup_write": {
       "label": "Siapkan ruang kerja",
       "description": "Tawarkan untuk menghubungkan AI, aplikasi, atau server MCP, atau mengundang orang, lewat kartu yang diklik seseorang, dan buat kanal untuk yang meminta, dengan Urungkan."
+    },
+    "vault_read": {
+      "label": "Melihat Vault",
+      "description": "Melihat login, kunci, dan kontak yang dibagikan Vault kepadanya, lalu menggunakannya. Ia mengetik kata sandi tersimpan dan memakai kunci tersimpan tanpa pernah melihatnya."
+    },
+    "vault_write": {
+      "label": "Mengedit kontak Vault",
+      "description": "Menyimpan dan memperbarui kontak di Vault, mengubah nama pengguna login tersimpan atau deskripsi, dan menghapus yang ia simpan."
     },
     "github_git_read": {
       "label": "Kloning repositori (git)",
@@ -8628,7 +8973,8 @@
       "sandbox": "Jalankan kode",
       "browser": "Browser",
       "setup": "Pengaturan ruang kerja",
-      "desktop": "Desktop"
+      "desktop": "Desktop",
+      "vault": "Vault"
     },
     "areaText": {
       "context": {
@@ -8674,6 +9020,10 @@
       "desktop": {
         "write": "Memakai aplikasi apa pun di desktopnya sendiri di komputernya, sementara orang menonton atau mengambil alih. Juga butuh Jalankan kode.",
         "write_female": "Memakai aplikasi apa pun di desktopnya sendiri di komputernya, sementara orang menonton atau mengambil alih. Juga butuh Jalankan kode."
+      },
+      "vault": {
+        "read": "Melihat dan menggunakan apa yang dibagikan Vault kepadanya, tanpa melihat kata sandi atau kunci.",
+        "write": "Juga menyimpan dan memperbarui kontak di Vault."
       }
     }
   },
@@ -10640,6 +10990,49 @@
       "invalid": "@ terdiri dari {{min}} sampai {{max}} huruf kecil, angka, - atau _.",
       "taken": "@{{handle}} sudah dipakai orang lain.",
       "takenByAgent": "@{{handle}} sudah dipakai agen."
+    },
+    "vault": {
+      "invalid": "Ada yang tidak benar di item ini. Periksa lalu coba lagi.",
+      "notFound": "Item ini sudah tidak ada di Vault.",
+      "titleRequired": "Beri nama.",
+      "tooLong": "Terlalu panjang. Batasnya {{max}}.",
+      "notHttps": "Gunakan alamat yang diawali https://",
+      "keyNameInvalid": "Gunakan huruf kapital, angka, dan _ pada nama, misalnya ACME_API_KEY.",
+      "keyNameReserved": "Nama ini dicadangkan. Pilih nama lain.",
+      "keyNameTaken": "Sudah ada kunci tersimpan dengan nama ini di sini.",
+      "contactEmpty": "Isi setidaknya satu kolom.",
+      "teamNeedsPermission": "Hanya orang yang mengelola kredensial yang bisa menyimpan item tim.",
+      "externalReadOnly": "Ini berasal dari pengelola kata sandi. Ubah di sana.",
+      "changedMeanwhile": "Seseorang mengubahnya sementara itu. Buka lagi.",
+      "noValue": "Tidak ada yang bisa disimpan.",
+      "missing": "Item ini hilang dari pengelola kata sandinya.",
+      "notAllowed": "Kamu tidak bisa melakukan ini pada item ini.",
+      "tooManyItems": "Vault penuh. Hapus item yang tidak kamu gunakan lagi.",
+      "audienceInvalid": "Seseorang atau peran yang kamu pilih sudah tidak ada di ruang kerja.",
+      "agentsInvalid": "Agen yang kamu pilih sudah tidak ada di ruang kerja.",
+      "tooManyAgents": "Pilih paling banyak 200 agen.",
+      "tooManyRoles": "Pilih paling banyak 100 peran.",
+      "tooManyPeople": "Pilih paling banyak 500 orang.",
+      "csvTooLarge": "File terlalu besar. Batasnya 2 MB.",
+      "csvTooManyRows": "File memiliki lebih dari 5.000 baris. Pisahkan lalu impor setiap bagian.",
+      "csvUnrecognized": "Ini tidak tampak seperti file kata sandi. Ekspor lagi sebagai CSV.",
+      "requestNotDelivered": "Kirim dulu, lalu simpan ke Vault.",
+      "requestNotSavable": "Ini tidak bisa disimpan ke Vault.",
+      "sourceUnknown": "Pengelola kata sandi ini tidak tersedia di sini.",
+      "sourceError": "Tidak bisa membacanya dari pengelola kata sandinya. Coba lagi.",
+      "source": {
+        "authFailed": "Pengelola kata sandi menolak data ini. Periksa lalu coba lagi.",
+        "locked": "Kata sandi utama salah.",
+        "manyVaults": "Akun layanan melihat lebih dari satu brankas. Beri akses ke satu saja.",
+        "noVault": "Akun layanan tidak melihat brankas apa pun. Beri akses ke satu brankas.",
+        "folderMissing": "Folder itu tidak ada di akun.",
+        "notFound": "Item ini sudah tidak ada di pengelola kata sandinya.",
+        "rateLimited": "Pengelola kata sandi meminta kami menunggu. Coba lagi dalam beberapa menit.",
+        "unreachable": "Tidak bisa menghubungi pengelola kata sandi. Periksa alamatnya lalu coba lagi.",
+        "unsupported": "Pengelola kata sandi ini tidak bisa dihubungkan di sini.",
+        "invalidInput": "Periksa kolom-kolomnya lalu coba lagi.",
+        "tooManyItems": "Vault penuh. Hapus item sebelum menyinkronkan lebih banyak."
+      }
     }
   },
   "machines": {
@@ -11249,6 +11642,16 @@
         "token_revoked": "Mencabut token pribadi {{app}}",
         "message_sent": "Mengirim pesan lewat {{app}}"
       },
+      "vault": {
+        "item_created": "Menyimpan item ke Vault",
+        "item_changed": "Mengubah item Vault",
+        "item_deleted": "Menghapus item Vault",
+        "item_used": "Menggunakan item Vault",
+        "imported": "Mengimpor kata sandi ke Vault",
+        "connection_added": "Menghubungkan pengelola kata sandi ke Vault",
+        "connection_changed": "Mengubah koneksi pengelola kata sandi",
+        "connection_removed": "Memutus pengelola kata sandi dari Vault"
+      },
       "verb": {
         "created": "Membuat",
         "deleted": "Menghapus",
@@ -11281,6 +11684,9 @@
         "resent": "Mengirim ulang",
         "revoked": "Mencabut",
         "archived": "Mengarsipkan",
+        "shown": "Melihat",
+        "copied": "Menyalin",
+        "used": "Menggunakan",
         "other": "Mengubah"
       },
       "area": {
@@ -11313,6 +11719,7 @@
         "member": "anggota",
         "invitation": "undangan",
         "credential": "kunci AI",
+        "vault": "Vault",
         "other": "ruang kerja"
       }
     },
@@ -11372,6 +11779,7 @@
       "right_hand": "Tangan kanan",
       "members": "Anggota dan undangan",
       "roles": "Peran dan izin",
+      "vault": "Vault",
       "access": "Agen dan akses",
       "connectors": "Konektor dan MCP",
       "skills": "Skill",
@@ -11394,6 +11802,7 @@
       "right_hand": "Asisten yang menyusun tim bersama tiap orang, di DM mereka dan dengan izin mereka.",
       "members": "Siapa saja yang ada di ruang kerja, dan undangan.",
       "roles": "Yang bisa dilakukan tiap orang. Peran saling menambah.",
+      "vault": "Kata sandi, kunci, dan kontak yang digunakan agenmu. Mereka mengetik kata sandi dan memakai kunci tanpa pernah melihatnya.",
       "access": "Yang bisa dipakai tiap agen: satu tingkat per konektor.",
       "connectors": "Layanan dan server MCP yang dihubungkan sekali untuk seluruh ruang kerja.",
       "skills": "Instruksi Markdown yang dibuka agen saat dibutuhkan.",
@@ -12315,6 +12724,18 @@
     "ask_user": {
       "label": "Tanya orangnya",
       "description": "Mengajukan pertanyaan singkat dan menunggu jawabannya."
+    },
+    "vault_list": {
+      "label": "Lihat di Vault",
+      "description": "Menampilkan login, kunci, dan kontak yang dibagikan kepada agen, tidak pernah kata sandi atau kunci."
+    },
+    "vault_save": {
+      "label": "Simpan ke Vault",
+      "description": "Menyimpan atau memperbarui kontak, nama pengguna login, atau deskripsi."
+    },
+    "vault_delete": {
+      "label": "Hapus dari Vault",
+      "description": "Menghapus item yang ia simpan."
     },
     "react": {
       "label": "Beri reaksi",

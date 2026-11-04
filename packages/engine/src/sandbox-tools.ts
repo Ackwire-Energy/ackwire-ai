@@ -2,12 +2,17 @@ import {
   ACCESS_PROTOCOL,
   type ExecRequest,
   type ExecResult,
+  isReservedSecretName,
   MAX_INLINE_FILE_BYTES,
   type PubSub,
   policyRefusal,
+  SECRET_NAME,
+  sealSecret,
   TASK_EXECUTORS,
   TASKS_PROTOCOL,
   type TaskExecutor,
+  VAULT_PROTOCOL,
+  vaultAad,
   workspacePath,
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
@@ -26,12 +31,13 @@ import {
   updateArtifact,
 } from "./artifacts";
 import { recordAudit } from "./audit";
+import { fedByRoutine, runAuthorityById } from "./authority";
 import { sniffModelImage } from "./avatars";
 import { publishChannelEvent } from "./events";
 import { cutText, formatBytes, textOfBytes } from "./format";
 import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
-import { notAllowedMessage } from "./machine-provider";
+import { notAllowedMessage, requestVaultKey, vaultUpdateText } from "./machine-provider";
 import {
   enqueueWake,
   formatDuration,
@@ -47,7 +53,13 @@ import {
   taskResumesByItself,
   taskSeconds,
 } from "./machine-tasks";
-import { MachineOfflineError, pausedMessage, REMOVED_COMPUTER_MESSAGE } from "./machines";
+import {
+  MachineDroppedError,
+  MachineOfflineError,
+  MachinePausedError,
+  pausedMessage,
+  REMOVED_COMPUTER_MESSAGE,
+} from "./machines";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
 import { recordTaskFinished } from "./operator-events";
 import { replyThreadOf } from "./runs";
@@ -69,10 +81,19 @@ import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
 import { MAX_RESULT_CHARS } from "./tools/gateway";
 import { WHY_MAX_CHARS } from "./tools/run-policy";
-import { grantedScopeKeys, grantKey, isAllowed, toolAccess, toolAllowScope } from "./tools/scopes";
+import {
+  grantedScopeKeys,
+  grantKey,
+  isAllowed,
+  toolAccess,
+  toolAllowScope,
+  VAULT_LIST_TOOL,
+  VAULT_READ_SCOPE,
+} from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 import { uploadedFile, uploadFromComputer } from "./uploads";
+import { recordVaultUse, releaseVaultKeys, type VaultDeps, VaultRefusal, vaultRefusalOutput } from "./vault";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
@@ -148,6 +169,28 @@ async function missionGate(name: string, input: Record<string, unknown>, ctx: To
   return null;
 }
 
+/** Vault keys one `run_code` may take (ADR 0144). */
+export const MAX_RUN_KEYS = 10;
+
+/**
+ * Why a run a routine feeds gets no Vault key in a command (ADR 0144 §2, ADR 0053 §3). A saved login it may still
+ * type in the browser: that value never reaches the model or a command.
+ */
+export const ROUTINE_KEYS_REFUSAL =
+  "A routine can't use Vault keys in commands. Ask a person to run it, or have the routine's creator run it from a conversation.";
+
+/** `run_code`'s `keys`, checked: distinct variable names, none reserved; or why not. */
+export function runKeysOf(raw: unknown): string[] | string {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw) || raw.some((k) => typeof k !== "string")) return "`keys` is a list of variable names.";
+  const names = [...new Set((raw as string[]).map((k) => k.trim()))];
+  if (names.length > MAX_RUN_KEYS) return `At most ${MAX_RUN_KEYS} keys in one command.`;
+  const bad = names.find((n) => !SECRET_NAME.test(n) || isReservedSecretName(n));
+  if (bad !== undefined)
+    return `${bad || "An empty name"} isn't a Vault key's variable name (UPPER_SNAKE_CASE, as vault_list shows it).`;
+  return names;
+}
+
 /** Live output of one call: at most this much, at most this often. */
 export const LIVE_OUTPUT_CHARS = 64 * 1024;
 const LIVE_OUTPUT_EVERY_MS = 250;
@@ -172,6 +215,53 @@ const whyAsks = (requireApproval: boolean) =>
             "Only when the computer answered that a person approves this first: your reason, for them (what you found and why it's needed). The call then waits for their decision in the chat.",
         },
       };
+
+/**
+ * The runner's refusals of an `exec` that come before it opens the command's Vault keys (`doExec`: a switch, the
+ * folder, a malformed request, the command policy) or instead of opening them (`not_found`: a key it couldn't open),
+ * and `canceled` before it was sent.
+ */
+const REFUSED_BEFORE_KEYS = new Set([
+  "approval_needed",
+  "not_allowed",
+  "exec_disabled",
+  "paused",
+  "bad_request",
+  "not_found",
+  "outside_workspace",
+  "canceled",
+]);
+
+/**
+ * Whether a failed `exec` may have run its command with the Vault keys it carried (ADR 0144 §4), so their use is
+ * recorded: yes when the link dropped mid-request or no answer came in time (it may be running), or for a failure we
+ * can't place; no when it never reached the computer (offline, paused) or the runner refused it first. The machine
+ * provider keeps the runner's error as the `cause` of the words it gives.
+ */
+export function keysMayHaveRun(error: unknown): boolean {
+  if (error instanceof MachineDroppedError) return true;
+  if (error instanceof MachineOfflineError || error instanceof MachinePausedError) return false;
+  const runner =
+    error instanceof MachineRequestError
+      ? error
+      : error instanceof Error && error.cause instanceof MachineRequestError
+        ? error.cause
+        : null;
+  return !(runner && REFUSED_BEFORE_KEYS.has(runner.code));
+}
+
+/** The runner's code behind a failed request, when it answered one (the provider keeps it as the `cause`). */
+function runnerCode(error: unknown): string | null {
+  if (error instanceof MachineRequestError) return error.code;
+  return error instanceof Error && error.cause instanceof MachineRequestError ? error.cause.code : null;
+}
+
+/**
+ * A command that carried Vault keys and came back `not_found`: the runner no longer had the one-use key (it lives two
+ * minutes and opens once, ADR 0144 §4), not a missing file, so the agent reads what happened and runs it again.
+ */
+export const VAULT_KEY_EXPIRED =
+  "The computer's one-use key for the Vault expired before the command ran. Nothing ran. Run it again.";
 
 /**
  * The computer held the command for a person (its message says why and how to ask them), or never runs it (a
@@ -418,7 +508,13 @@ const slug = (s: string) =>
  * `request_secret` (ADR 0027) is secret there.
  */
 export function createSandboxToolSource(
-  deps: SandboxDeps & { artifacts: ArtifactDeps; skills: Pick<SkillDeps, "blobs">; pubsub?: PubSub },
+  deps: SandboxDeps & {
+    artifacts: ArtifactDeps;
+    skills: Pick<SkillDeps, "blobs">;
+    pubsub?: PubSub;
+    /** The Vault (ADR 0144): `run_code` takes saved keys (`keys`) for one command. Without it, no `keys`. */
+    vault?: VaultDeps;
+  },
 ): ToolSource {
   /**
    * Runs a command and, when the provider streams, sends what it prints as
@@ -480,8 +576,73 @@ export function createSandboxToolSource(
 
   const pathProp = { type: "string", minLength: 1, maxLength: 300, description: "Path inside the workspace" };
 
+  /**
+   * Vault keys for one command (ADR 0144): released for the person behind the run, then sealed, each bound to its
+   * variable, to a one-use key the computer just made. The values are in this process only while they are sealed;
+   * the runner opens them into that one command's environment and redacts them from what it prints. A run a routine
+   * feeds gets none (ADR 0053 §3: it never sends a credential, and a command holding a key could send it anywhere).
+   */
+  const vaultKeysFor = async (ctx: ToolContext, computer: ComputerHandle, names: string[]) => {
+    const vault = deps.vault;
+    const hub = deps.machines?.hub;
+    if (!vault || !hub) throw new Error("The Vault isn't available on this server.");
+    if (fedByRoutine(await runAuthorityById(ctx.db, ctx.orgId, ctx.runId))) {
+      throw new VaultRefusal("not_allowed", ROUTINE_KEYS_REFUSAL);
+    }
+    const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+    if (!isAllowed(toolAccess(granted, { name: VAULT_LIST_TOOL, scope: VAULT_READ_SCOPE }))) {
+      throw new Error(
+        'You may not use the Vault ("See the Vault" is off for you). Ask for it with request_permission.',
+      );
+    }
+    // An old computer never gets a value: checked before anything is released (`requestVaultKey` checks again).
+    const status = await hub.status(computer.machineId);
+    if (!status || status.protocol < VAULT_PROTOCOL) {
+      throw new Error(vaultUpdateText(status?.name ?? "computer", "use Vault keys"));
+    }
+    const run = { orgId: ctx.orgId, agentId: ctx.agentId, runId: ctx.runId };
+    const released = await releaseVaultKeys(vault, run, names);
+    const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+    const key = await requestVaultKey(
+      hub,
+      computer.machineId,
+      { id: ctx.agentId, handle: agent?.handle ?? "agent", ...(agent?.name ? { name: agent.name } : {}) },
+      "use Vault keys",
+      ctx.signal,
+    );
+    const keys = await Promise.all(
+      released.map(async (k) => ({
+        name: k.name,
+        box: await sealSecret(
+          key.publicKey,
+          k.value,
+          vaultAad({ keyId: key.keyId, agentId: ctx.agentId, use: { kind: "env", name: k.name } }),
+        ).catch(() => {
+          // Never the sealing's own words: they could name the value's size.
+          throw new Error(`${k.name} couldn't be prepared for your computer.`);
+        }),
+      })),
+    );
+    return {
+      vault: { keyId: key.keyId, keys },
+      /** Each key's use, recorded once the computer took the command with them. */
+      used: () =>
+        Promise.all(
+          [...new Set(released.map((k) => k.itemId))].map((itemId) =>
+            recordVaultUse(vault, run, itemId, { action: "key" }).catch(() => undefined),
+          ),
+        ),
+    };
+  };
+
   /** `machine.exec` in the audit log: what ran on a connected machine (command head and exit code). */
-  const auditMachineExec = async (ctx: ToolContext, computer: ComputerHandle, command: string, r: ExecResult) => {
+  const auditMachineExec = async (
+    ctx: ToolContext,
+    computer: ComputerHandle,
+    command: string,
+    r: ExecResult,
+    vaultKeys: string[] = [],
+  ) => {
     await recordAudit(deps.db, {
       orgId: ctx.orgId,
       actor: { type: "agent", id: ctx.agentId },
@@ -492,6 +653,8 @@ export function createSandboxToolSource(
         exitCode: r.exitCode,
         timedOut: r.timedOut,
         runId: ctx.runId ?? null,
+        // The Vault keys it was given, by name only (ADR 0144).
+        ...(vaultKeys.length > 0 ? { vaultKeys } : {}),
       },
     }).catch(() => undefined);
   };
@@ -509,7 +672,7 @@ export function createSandboxToolSource(
   ): ToolDefinition[] => [
     {
       name: "run_code",
-      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
+      description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; detached tasks need it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.${deps.vault ? " With `keys`, saved Vault keys (their variable names, from vault_list) are set as environment variables of this one command only: use them as `$NAME` (bash) or `os.environ` / `process.env`, never print them (output shows them as [secret:NAME]). A routine's run gets no keys." : ""}`,
       scope: SANDBOX_SCOPE,
       readsOutside: true,
       sensitive: requireApproval,
@@ -520,12 +683,27 @@ export function createSandboxToolSource(
           language: { enum: Object.keys(RUNNERS) },
           code: { type: "string", minLength: 1, maxLength: SANDBOX_LIMITS.codeChars },
           timeout_seconds: { type: "integer", minimum: 1, maximum: maxTimeout },
+          ...(deps.vault
+            ? {
+                keys: {
+                  type: "array",
+                  maxItems: MAX_RUN_KEYS,
+                  items: { type: "string", maxLength: 64 },
+                  description:
+                    "Vault keys this command uses, by variable name (`OPENAI_API_KEY`, as vault_list shows them): set in its environment only, never saved on the computer.",
+                },
+              }
+            : {}),
           ...whyAsks(requireApproval),
         },
         required: ["language", "code"],
         additionalProperties: false,
       },
-      describe: (input) => ({ title: `Run ${str(input.language)} code`, detail: str(input.code).slice(0, 500) }),
+      describe: (input) => {
+        const keys = runKeysOf(input.keys);
+        const named = Array.isArray(keys) && keys.length > 0 ? ` with ${keys.join(", ")}` : "";
+        return { title: `Run ${str(input.language)} code${named}`, detail: str(input.code).slice(0, 500) };
+      },
       rememberCommand: (input) => (str(input.language) === "bash" ? str(input.code).trim() : null),
       async execute(input, ctx) {
         try {
@@ -533,21 +711,38 @@ export function createSandboxToolSource(
           const runner = RUNNERS[lang];
           if (!runner) return { content: "language must be python, node or bash", isError: true };
           const timeout = timeoutOf(input, execTimeout, maxTimeout);
+          const names = runKeysOf(input.keys);
+          if (typeof names === "string") return { content: names, isError: true };
           const file = `.agentes/run-${Date.now()}.${runner.ext}`;
           const started = Date.now();
           const result = await run(ctx, async (computer) => {
             await computer.provider.writeFile(computer.id, file, new TextEncoder().encode(str(input.code)));
-            const r = await execLive(ctx, computer, {
-              command: scriptCommand(runner.bin, file),
-              timeoutSeconds: timeout,
-              ...(ctx.approved ? { approved: true } : {}),
-            });
-            await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r);
+            // Sealed right before the command: the computer's one-use key lives two minutes (ADR 0144).
+            const keys = names.length > 0 ? await vaultKeysFor(ctx, computer, names) : null;
+            let r: ExecResult;
+            try {
+              r = await execLive(ctx, computer, {
+                command: scriptCommand(runner.bin, file),
+                timeoutSeconds: timeout,
+                ...(ctx.approved ? { approved: true } : {}),
+                ...(keys ? { vault: keys.vault } : {}),
+              });
+            } catch (error) {
+              // The command may have run with the keys though no answer came back (the link dropped, no answer in
+              // time): their use is recorded. Not when it never reached the computer or the runner refused it before
+              // opening them (ADR 0144 §4).
+              if (keysMayHaveRun(error)) await keys?.used();
+              if (keys && runnerCode(error) === "not_found") throw new Error(VAULT_KEY_EXPIRED, { cause: error });
+              throw error;
+            }
+            // It ran, whatever its exit code, its timeout or a cancel said.
+            await keys?.used();
+            await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r, names);
             return r;
           });
           return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout);
         } catch (error) {
-          return heldForApproval(error, "Not run") ?? failed(error);
+          return vaultRefusalOutput(error) ?? heldForApproval(error, "Not run") ?? failed(error);
         }
       },
     },

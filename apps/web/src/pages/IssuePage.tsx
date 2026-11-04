@@ -198,7 +198,7 @@ export function IssueDetails({
 }: {
   issue: Issue;
   variant: "page" | "dialog";
-  /** Opens its conversation beside the details (ADR 0144). */
+  /** Opens its conversation beside the details (ADR 0145). */
   onConversation: () => void;
 }) {
   const { t } = useTranslation();

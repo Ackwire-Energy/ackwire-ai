@@ -77,7 +77,7 @@ export async function assessThread(
     .where(and(eq(messages.orgId, orgId), eq(messages.id, threadRootId), isNull(messages.deletedAt)));
   if (!root || root.threadId) return null;
   const channel = await getChannelCached(db, orgId, root.channelId);
-  // A task's conversation is titled by its task (ADR 0144).
+  // A task's conversation is titled by its task (ADR 0145).
   if (!channel || channel.kind === "forum" || channel.kind === "task") return null;
   const [row] = await db
     .select()

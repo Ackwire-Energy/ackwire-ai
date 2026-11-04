@@ -7,6 +7,7 @@ import {
   type SandboxProvider,
   SECRET_ACTIVATE_PROTOCOL,
   SECRETS_PROTOCOL,
+  VAULT_PROTOCOL,
 } from "@agenteschat/adapters";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
@@ -31,39 +32,43 @@ export function notAllowedMessage(name: string, detail: string, path?: string) {
   }`;
 }
 
-/** Runner error codes → what the agent reads (and tells the people). */
+/**
+ * Runner error codes → what the agent reads (and tells the people). The runner's error stays as the `cause` of the
+ * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0144 §4).
+ */
 function explain(error: unknown, name: string, path?: string): Error {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error : new Error(String(error));
+  const said = (message: string) => new Error(message, { cause: error });
   switch (error.code) {
     case "exec_disabled":
-      return new Error(
+      return said(
         `Commands are turned off on the computer ${name} (its runner was started with --no-exec): you can only read, write, list and upload files there. Tell the person; its owner can restart the runner without --no-exec.`,
       );
     case "outside_workspace":
-      return new Error(
+      return said(
         `${path ?? "That path"} is outside the computer's workspace folder (or a link that leaves it); use paths inside the workspace.`,
       );
     case "too_large":
-      return new Error(
+      return said(
         `${path ?? "The file"} is too large to move this way (max ${MB(MAX_INLINE_FILE_BYTES)}); use upload_file to send big files to the Drive.`,
       );
     case "not_found":
-      return new Error(`No file or folder ${path ?? ""} on ${name}.`.replace("  ", " "));
+      return said(`No file or folder ${path ?? ""} on ${name}.`.replace("  ", " "));
     case "not_allowed":
       // The command policy's `never` (a push our git proxy refuses): callers read its code, as below.
-      return policyRefusal(error.message) ? error : new Error(notAllowedMessage(name, error.message, path));
+      return policyRefusal(error.message) ? error : said(notAllowedMessage(name, error.message, path));
     case "paused":
-      return new Error(
+      return said(
         `The owner paused the computer ${name}: nothing new can start there until they resume it. Tell the people.`,
       );
     case "timeout":
     case "canceled":
-      return new Error(error.message);
+      return said(error.message);
     // The command policy held it: its message says why and how to ask a person, and callers read its code.
     case "approval_needed":
       return error;
     default:
-      return new Error(`The computer ${name} failed: ${error.message}`);
+      return said(`The computer ${name} failed: ${error.message}`);
   }
 }
 
@@ -99,6 +104,8 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
           timeoutSeconds: request.timeoutSeconds,
           stream: Boolean(onOutput),
           ...(request.approved ? { approved: true } : {}),
+          // Vault keys for this one command (ADR 0144), sealed to a one-use key of this computer.
+          ...(request.vault ? { vault: request.vault } : {}),
         },
         { signal: request.signal, onOutput },
       );
@@ -176,4 +183,37 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
       );
     },
   };
+}
+
+/** What a computer too old for the Vault answers (ADR 0144): its owner updates the runner. */
+export const vaultUpdateText = (machineName: string, what: string) =>
+  `The computer ${machineName} needs an update to ${what}. Its owner can run \`agentes-runner update\`.`;
+
+/** A one-use key on the agent's computer (ADR 0144, protocol 45): a Vault value is sealed to it, never sent bare. */
+export type VaultKey = { keyId: string; publicKey: string; expiresAt: string };
+
+/**
+ * Asks the agent's runner for a one-use key (`vault.key`): the private key stays in that computer's memory (in the
+ * agent's own worker in system mode) for two minutes and one opening. Throws an error the agent reads when the
+ * computer is too old (`what` says what for) or refuses.
+ */
+export async function requestVaultKey(
+  hub: MachineCaller,
+  machineId: string,
+  agent: AgentScope,
+  what: string,
+  signal?: AbortSignal,
+): Promise<VaultKey> {
+  const status = await hub.status(machineId);
+  const name = status?.name ?? "computer";
+  if (!status || status.protocol < VAULT_PROTOCOL) throw new Error(vaultUpdateText(name, what));
+  try {
+    const reply = await hub.call<"vault.key">(machineId, { agent, op: "vault.key" }, { signal, timeoutMs: 30_000 });
+    const key = reply?.vaultKey;
+    if (!key?.keyId || !key.publicKey) throw new Error(`The computer ${name} made no key for the Vault.`);
+    return { keyId: key.keyId, publicKey: key.publicKey, expiresAt: key.expiresAt };
+  } catch (error) {
+    if (error instanceof MachineOfflineError || error instanceof MachinePausedError) throw error;
+    throw explain(error, name);
+  }
 }

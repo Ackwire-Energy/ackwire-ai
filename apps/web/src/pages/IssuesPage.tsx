@@ -76,7 +76,7 @@ export function IssuesPage() {
   const [q, setQ] = useState("");
   // The open issue lives in the URL (`?open=131`): a reload or a shared link reopens it.
   const [openParam, setOpenParam] = useOpenParam();
-  // A message of the open task's conversation to open at (a notice, a link: ADR 0144).
+  // A message of the open task's conversation to open at (a notice, a link: ADR 0145).
   const [focusParam] = useOpenParam("m");
   const openNumber = openParam && /^\d+$/.test(openParam) ? Number(openParam) : null;
   const copy = useFilterCopy();

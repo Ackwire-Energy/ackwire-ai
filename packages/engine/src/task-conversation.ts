@@ -7,7 +7,7 @@ const { issues, issueActivity, channels, messages, artifacts, users, agents } = 
 type IssueRow = typeof issues.$inferSelect;
 
 /**
- * A task's conversation (ADR 0144): a channel of kind `task` of its own, read by whoever sees the task, and one
+ * A task's conversation (ADR 0145): a channel of kind `task` of its own, read by whoever sees the task, and one
  * thread in it, whose root (`meta.taskConversation`) stands for the task and is never shown; the conversation is
  * that thread's replies, so posting, mentions, runs, receipts, reactions and the thread's screens are the chat's.
  */

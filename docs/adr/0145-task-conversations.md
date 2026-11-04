@@ -1,4 +1,4 @@
-# 0144. A task's conversation is a chat thread of its own
+# 0145. A task's conversation is a chat thread of its own
 
 - Status: Accepted (built)
 - Date: 2026-11-04
@@ -51,9 +51,9 @@ An agent's run in the conversation sees the task (`canSee` with the task's conve
 - **Web**: "Conversa N" on the task dialog's top bar toggles the app's own thread panel (`ThreadPage` in panel mode) as a right column the dialog's full height (`DetailsDialog` `side`); the details keep their width beside it and the dialog's own close gives way to the panel's. Below 960 px the panel takes the dialog. Its header is the task's ("Conversa da tarefa", who took part, "N mensagens", when); its composer is the chat's ("Comentar · use @ para chamar um agente"), never locked while sending; "@" offers the whole workspace as one list. Where "Discussão" was, one line opens it (who, "6 mensagens", "Trabalhando" or when; "Conversar sobre a tarefa" when empty). The task's own page has the same column. `?m=<message>` on either opens the conversation at that message. A board card with a conversation ends with the chat's thread line (who, "N mensagens", "Trabalhando" in the agent's color, else when).
 - **Phone**: the task screen gets a conversation row (the same line) and "Conversar" in its menu, both opening the phone's thread screen for the conversation (`/chat/<channel>?thread=<root>`), titled "Conversa da tarefa" with "#N · title" under it and no root row. The comment box at the bottom of the task screen is gone: the thread screen's composer is the chat's. `/issues/N?m=<id>` opens the conversation at that message.
 
-### 7. Migration 0214 and the old comments
+### 7. Migration 0215 and the old comments
 
-Migration `0214_task_conversations.sql` adds `task` to `channel_kind` and the two columns. Postgres can't use an enum value in the transaction that adds it (Drizzle applies every pending migration in one), so the comments move in code, right after: `moveIssueComments` runs off the boot path (like `ensureRightHands`), one query once every task has moved, and `ensureTaskConversation` moves a task's comments itself when it makes its conversation first. Each comment becomes a reply with its own id and time, its author when still there (a person or an agent gone: no author, the text stays) and its files (`meta.artifacts`, `meta.movedFromIssue`); the moved rows leave `issue_activity` in the same transaction. Moved messages are inserted directly, so nobody is notified again and no agent is woken.
+Migration `0215_task_conversations.sql` adds `task` to `channel_kind` and the two columns. Postgres can't use an enum value in the transaction that adds it (Drizzle applies every pending migration in one), so the comments move in code, right after: `moveIssueComments` runs off the boot path (like `ensureRightHands`), one query once every task has moved, and `ensureTaskConversation` moves a task's comments itself when it makes its conversation first. Each comment becomes a reply with its own id and time, its author when still there (a person or an agent gone: no author, the text stays) and its files (`meta.artifacts`, `meta.movedFromIssue`); the moved rows leave `issue_activity` in the same transaction. Moved messages are inserted directly, so nobody is notified again and no agent is woken.
 
 ## Consequences
 

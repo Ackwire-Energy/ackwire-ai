@@ -63,7 +63,7 @@ export function ThreadPage({
     return onClose ? <section className="thread-panel__missing">{body}</section> : <Main>{body}</Main>;
   }
   const archived = thread.state === "archived";
-  // A task's conversation (ADR 0144): its own header and box; the task's screen around it is its title and state.
+  // A task's conversation (ADR 0145): its own header and box; the task's screen around it is its title and state.
   const task = thread.channelKind === "task";
   return (
     <ChannelPage

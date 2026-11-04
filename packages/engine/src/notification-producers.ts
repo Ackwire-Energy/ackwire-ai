@@ -153,7 +153,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
     .from(channels)
     .where(and(eq(channels.id, message.channelId), eq(channels.orgId, orgId)));
   if (!channel || channel.kind === "forum") return;
-  // A task's conversation (ADR 0144): whoever sees the task, as its comments did.
+  // A task's conversation (ADR 0145): whoever sees the task, as its comments did.
   if (channel.kind === "task") return notifyTaskMessage(deps, message);
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
   const authorUser = message.authorUserId;
@@ -662,7 +662,7 @@ export async function notifyIssueComment(
   issueId: string,
   activityId: string,
   text: string,
-  /** The reply in the task's conversation (ADR 0144): the apps open the task at it. */
+  /** The reply in the task's conversation (ADR 0145): the apps open the task at it. */
   options: { messageId?: string } = {},
 ) {
   const [issue] = await deps.db.select().from(issues).where(eq(issues.id, issueId));

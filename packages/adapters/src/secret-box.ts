@@ -66,6 +66,23 @@ export function secretAad(input: { requestId: string; orgId: string; name: strin
   return `agentes-secret|v${SECRET_BOX_VERSION}|${input.requestId}|${input.orgId}|${input.name}|${target}`;
 }
 
+/**
+ * What a Vault value is for once it reaches the computer (ADR 0144): typed into a login field on the sites a rule
+ * names (`exact:https://host[:port]` or `site:<registrable domain>`, see `vault/site.ts`), or given to one command
+ * as one variable.
+ */
+export type VaultUse = { kind: "fill"; rule: string } | { kind: "env"; name: string };
+
+/**
+ * What binds a Vault box to one in-memory key of one agent and to one use (ADR 0144). The runner rebuilds it from
+ * its own key record, its own agent id and the use it was asked for, so a box replayed onto another key, agent,
+ * site rule or variable doesn't open.
+ */
+export function vaultAad(input: { keyId: string; agentId: string; use: VaultUse }) {
+  const use = input.use.kind === "fill" ? `fill:${input.use.rule}` : `env:${input.use.name}`;
+  return `agentes-vault|v${SECRET_BOX_VERSION}|${input.keyId}|${input.agentId}|${use}`;
+}
+
 /** The computer's side: a fresh pair; the private key (PKCS#8, base64) never leaves it. */
 export async function generateSecretKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
   const pair = (await subtle().generateKey(EC, true, ["deriveBits"])) as CryptoKeyPair;

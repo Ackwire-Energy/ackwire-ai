@@ -278,7 +278,7 @@ describe("Notificações", () => {
     expect(row.textContent).toContain("Você respondeu: Sobe sim, às 17h.");
   });
 
-  test("grouped task comments expand from the task's conversation (ADR 0144)", async () => {
+  test("grouped task comments expand from the task's conversation (ADR 0145)", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const issue = await api.issues.get(ORG_ID, 131);

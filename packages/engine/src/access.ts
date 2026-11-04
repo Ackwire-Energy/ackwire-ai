@@ -58,6 +58,8 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "forum:write": ["suggest_forum_topic", "open_forum_topic", "post_in_forum", "read_forum_topic"],
   "wiki:read": ["search_wiki", "read_wiki_page"],
   "wiki:write": ["create_wiki_page", "update_wiki_page", "link_to_wiki"],
+  "vault:read": ["vault_list"],
+  "vault:write": ["vault_save", "vault_delete"],
   "setup:write": [
     "offer_connect_ai",
     "create_channel",
@@ -113,7 +115,7 @@ export interface AccessTool {
 
 /**
  * Labels and descriptions of the built-in tools (English). The app translates
- * them by tool name (`tools.{name}.label` / `.description`), with these as defaults.
+ * them by tool name (`builtinTools.<name>.label` / `.description`), with these as defaults.
  */
 export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: string }> = {
   ask_user: { label: "Ask the person", description: "Asks a short question and waits for the answer." },
@@ -192,6 +194,18 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
     description: "Adds or rewrites a section when someone asks.",
   },
   link_to_wiki: { label: "Link wiki pages", description: "Links a page to others when someone asks." },
+  vault_list: {
+    label: "Look in the Vault",
+    description: "Lists the logins, keys and contacts shared with the agent, never a password or a key.",
+  },
+  vault_save: {
+    label: "Save to the Vault",
+    description: "Saves or updates contact details, a login's username or a description.",
+  },
+  vault_delete: {
+    label: "Delete from the Vault",
+    description: "Deletes an item it saved.",
+  },
   offer_connect_ai: {
     label: "Offer to connect an AI",
     description: "Posts a card whose button opens the dialog to connect a plan or an API key.",

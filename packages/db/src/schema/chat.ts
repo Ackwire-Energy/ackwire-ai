@@ -21,7 +21,7 @@ import { organizationMembers, organizations, orgRoles } from "./tenancy";
 export const channelVisibilityEnum = pgEnum("channel_visibility", ["public", "private"]);
 /**
  * `channel`: a named channel. `dm`: a direct conversation (person↔person or person↔agent), participants only.
- * `forum`: a forum topic's (ADR 0022). `task`: a task's conversation (ADR 0144): read by whoever sees the task,
+ * `forum`: a forum topic's (ADR 0022). `task`: a task's conversation (ADR 0145): read by whoever sees the task,
  * never listed; only agents are members.
  */
 export const channelKindEnum = pgEnum("channel_kind", ["channel", "dm", "forum", "task"]);

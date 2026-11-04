@@ -5,6 +5,7 @@ import {
   listAgentSecrets,
   NotFoundError,
   removeAgentSecret,
+  saveSecretRequestToVault,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
@@ -18,6 +19,7 @@ import {
   requireSession,
   security,
 } from "./context";
+import { SecretToVaultInput, VaultItem, vaultCall, vaultDepsOf } from "./vault";
 
 const tags = ["Secrets"];
 
@@ -56,6 +58,21 @@ const SecretRequest = z
     expiresAt: z.string(),
     deliveredAt: z.string().nullable(),
     removed: z.boolean(),
+    withdrawn: z
+      .literal(true)
+      .optional()
+      .openapi({ description: "The agent took it back (`withdraw_request`): it no longer needs it." }),
+    replaces: z
+      .boolean()
+      .openapi({ description: "The agent already held this name on this computer: a delivery replaces that value." }),
+    username: z
+      .string()
+      .nullable()
+      .openapi({ description: "For a site's password: the username the agent will type with it (ADR 0144)." }),
+    codeDigits: z.number().int().nullable().openapi({
+      description:
+        "A verification code (ADR 0144): how many digits, one box each on the card. Never saved to the Vault. Null otherwise.",
+    }),
   })
   .openapi("SecretRequest");
 
@@ -87,7 +104,8 @@ const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 /**
  * Secrets agents ask people for (ADR 0027). Only the person asked sees and
  * answers a request; the value travels sealed to the agent's computer and is
- * never stored or shown again.
+ * never stored or shown again, unless that person saves it to the Vault
+ * (ADR 0144), sealed there like every Vault value.
  */
 export function secretRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
@@ -159,6 +177,28 @@ export function secretRoutes(deps: AppDeps) {
       );
       deps.wakeWorkers?.();
       return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/secret-requests/{requestId}/vault",
+      tags,
+      security,
+      summary: "Save to the Vault what you just sent: a site's password as a login, a variable as a key",
+      description:
+        "Only the person the request was for (403), once it is delivered (409 `vault.request_not_delivered`). A file or a verification code is never saved (400 `vault.request_not_savable`). A team item takes `manage_credentials` (403 `vault.team_needs_permission`). Recorded in the audit log, never with the value (ADR 0144).",
+      request: { params: RequestParams, body: body(SecretToVaultInput) },
+      responses: { 200: json(VaultItem), ...errors },
+    }),
+    async (c) => {
+      const { orgId, requestId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      const item = await vaultCall(
+        saveSecretRequestToVault(vaultDepsOf(deps), c.get("user").id, orgId, requestId, input),
+      );
+      return c.json(item, 200);
     },
   );
 

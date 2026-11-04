@@ -1,8 +1,15 @@
-import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest } from "@agenteschat/client";
-import { keys, useCardProposals, useDecideProposal, useDecideProposals, useModelLabel } from "@agenteschat/client";
+import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest, SecretToVaultInput } from "@agenteschat/client";
+import {
+  keys,
+  useCardProposals,
+  useDecideProposal,
+  useDecideProposals,
+  useModelLabel,
+  useSaveSecretToVault,
+} from "@agenteschat/client";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { undoesMemoryChange } from "@agenteschat/client/lib/permissions";
+import { can, undoesMemoryChange } from "@agenteschat/client/lib/permissions";
 import {
   appLabel,
   cardHead,
@@ -22,10 +29,22 @@ import {
 import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
 import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
-import { Button, Chip, Diff, diffLines, Field, Icon, Input, MessageText, Switch, Textarea } from "@agenteschat/ui";
+import {
+  Button,
+  Chip,
+  CodeInput,
+  Diff,
+  diffLines,
+  Field,
+  Icon,
+  Input,
+  MessageText,
+  Switch,
+  Textarea,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -38,7 +57,11 @@ import { useOpenAgentPanel } from "./agent-panel-context";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useOrg } from "./org-context";
 import { RequestCard, RequestDone, RequestTile, useExpired } from "./RequestCard";
+import { savesToVault, VaultSaveBlock, type VaultSaveChoice, vaultSaveDefaults } from "./vault/VaultSave";
 import "./proposals.css";
+
+/** How long a failed "Save to the Vault" keeps the typed value for Retry (ADR 0144), at most. */
+const VAULT_RETRY_MS = 2 * 60_000;
 
 /** The host of a site the request names (`https://host`), or null. */
 const hostOf = (site: string | null | undefined) => {
@@ -712,11 +735,29 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
+  const toast = useToast();
   const dir = useDirectory(org.id);
   const live = useLiveStore();
   const current = useLive((s) => s.secrets[request.id]) ?? request;
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // "Save to the Vault" (ADR 0144): a site's password or a variable, saved after it went to the computer.
+  const [keep, setKeep] = useState<VaultSaveChoice>(() => vaultSaveDefaults(request));
+  // How the save went: saved, failed (Retry while the value is kept), or dropped (failed, and the value is gone).
+  const [vaultSave, setVaultSave] = useState<"saved" | "failed" | "dropped" | null>(null);
+  const store = useSaveSecretToVault(org.id);
+  // A save that failed keeps what it sent, for Retry, while the card is on screen and for two minutes at most. The
+  // mutations themselves forget the typed value as soon as they end (`reset`, `gcTime: 0`).
+  const retryable = useRef<SecretToVaultInput | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(
+    () => () => {
+      retryable.current = null;
+      clearTimeout(retryTimer.current);
+    },
+    [],
+  );
+  const codeDigits = current.codeDigits ?? null;
   const agent = dir.anyAgent(request.agentId);
   const agentName = agent?.name ?? t("channel.unknownAgent");
   const mine = current.requestedForUserId === me.user.id;
@@ -728,17 +769,58 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     const status = (err as { status?: number }).status;
     setError(status === 409 ? t("secret.alreadyAnswered") : t("secret.failed"));
   };
+  const forgetRetry = () => {
+    retryable.current = null;
+    clearTimeout(retryTimer.current);
+  };
+  // Delivered but not saved: the value went where it was asked, so the toast says only the Vault failed, and retries.
+  function saveToVault(input: SecretToVaultInput) {
+    store.mutate(
+      { ...input, requestId: current.id },
+      {
+        onSuccess: () => {
+          forgetRetry();
+          setVaultSave("saved");
+        },
+        onError: () => {
+          if (!retryable.current) {
+            retryable.current = input;
+            retryTimer.current = setTimeout(() => {
+              forgetRetry();
+              setVaultSave((v) => (v === "failed" ? "dropped" : v));
+            }, VAULT_RETRY_MS);
+          }
+          setVaultSave("failed");
+          toast.show(t("vault.card.notSaved"), "warning", { label: t("common.retry"), run: retrySave });
+        },
+        onSettled: () => store.reset(),
+      },
+    );
+  }
+  function retrySave() {
+    if (retryable.current) saveToVault(retryable.current);
+  }
   const deliver = useMutation({
     meta: { silent: true },
-    mutationFn: async (text: string) => {
+    gcTime: 0,
+    mutationFn: async ({ text }: { text: string; choice: VaultSaveChoice | null }) => {
       if (!current.publicKey) throw Object.assign(new Error("closed"), { status: 409 });
       const aad = secretAad({ requestId: current.id, orgId: org.id, name: current.name, target: current.target });
       return api.secrets.deliver(org.id, current.id, await sealSecret(current.publicKey, text, aad));
     },
     onMutate: () => setError(null),
-    onSuccess: (res) => {
+    onSuccess: (res, { text, choice }) => {
       setValue("");
       live.secretAnswered(res);
+      if (choice)
+        saveToVault({
+          value: text,
+          // A site's username always goes: empty means none, even when the agent suggested one (ADR 0144 §6).
+          ...(current.target.kind === "site" ? { username: choice.username.trim() } : {}),
+          scope: choice.scope,
+          allAgents: choice.allAgents,
+          agentIds: choice.allAgents ? [] : choice.agentIds,
+        });
     },
     onError: failed,
   });
@@ -749,10 +831,13 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     onSuccess: (res) => live.secretAnswered(res),
     onError: failed,
   });
+  const savable = mine && savesToVault(current);
   const submit = () => {
     const problem = secretValueProblem(value);
     if (problem) return setError(t(problem));
-    deliver.mutate(value);
+    if (codeDigits && value.length !== codeDigits) return setError(t("vault.card.codeShort", { count: codeDigits }));
+    // Sent (or refused): the typed value leaves the mutation at once.
+    deliver.mutate({ text: value, choice: savable && keep.on ? keep : null }, { onSettled: () => deliver.reset() });
   };
   const where = secretWhere(t, current, agentName);
   const until = t("secret.until", { time: formatTime(i18n.language, current.expiresAt) });
@@ -777,17 +862,30 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           mine ? (
             <>
               <div className="rq__field">
-                <Input
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={value}
-                  placeholder={t("secret.label", { name: current.name })}
-                  aria-label={t("secret.label", { name: current.name })}
-                  invalid={Boolean(error)}
-                  onChange={(e) => setValue(e.target.value)}
-                  data-1p-ignore
-                />
+                {codeDigits ? (
+                  // A verification code (ADR 0144): one box per digit, typed by the agent's browser, never saved.
+                  <CodeInput
+                    length={codeDigits}
+                    value={value}
+                    onChange={setValue}
+                    label={t("secret.label", { name: current.name })}
+                    boxLabel={(n, total) => t("vault.card.codeBox", { n, total })}
+                    invalid={Boolean(error)}
+                    disabled={deliver.isPending}
+                  />
+                ) : (
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={value}
+                    placeholder={t("secret.label", { name: current.name })}
+                    aria-label={t("secret.label", { name: current.name })}
+                    invalid={Boolean(error)}
+                    onChange={(e) => setValue(e.target.value)}
+                    data-1p-ignore
+                  />
+                )}
               </div>
               {error ? (
                 <p className="rq__error" role="alert">
@@ -796,8 +894,19 @@ export function SecretCard({ request }: { request: SecretRequest }) {
               ) : (
                 <p className="rq__note ac-iconline">
                   <Icon name="lock" size={14} />
-                  <span>{t("secret.private")}</span>
+                  <span>
+                    {codeDigits && host ? t("vault.card.codeWhere", { agent: agentName, host }) : t("secret.private")}
+                  </span>
                 </p>
+              )}
+              {savable && (
+                <VaultSaveBlock
+                  request={current}
+                  value={keep}
+                  onChange={setKeep}
+                  canManageTeam={can(org, "manage_credentials")}
+                  disabled={deliver.isPending}
+                />
               )}
             </>
           ) : undefined
@@ -843,7 +952,21 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       >
         {secretOutcome(t, current, mine, person)}: <b>{current.name}</b>
         {ended && ` · ${whenAt(t, i18n.language, ended)}`}
+        {vaultSave === "saved" && ` · ${t("vault.card.saved")}`}
       </RequestDone>
+      {(vaultSave === "failed" || vaultSave === "dropped") && (
+        <div className="vlt-save__failed">
+          <p className="rq__note ac-iconline">
+            <Icon name="alert" size={14} />
+            <span>{t("vault.card.notSaved")}</span>
+          </p>
+          {vaultSave === "failed" && (
+            <Button size="sm" variant="ghost" loading={store.isPending} onClick={retrySave}>
+              {t("common.retry")}
+            </Button>
+          )}
+        </div>
+      )}
       {error && (
         <p className="rq__error" role="alert">
           {error}

@@ -503,7 +503,7 @@ async function personCanRead(db: Database, userId: string, orgId: string, a: Pic
       visibility: channels.visibility,
       kind: channels.kind,
       memberId: channelMembers.id,
-      // A task's conversation: whoever sees the task (ADR 0144).
+      // A task's conversation: whoever sees the task (ADR 0145).
       taskReader: taskReaderSql(sql`${channels.id}`, sql`${userId}::text`),
     })
     .from(channels)

@@ -37,7 +37,7 @@ test("issues API: create, by number, patch, criteria, comments, activity, ask ag
   const activity = (await (await api(`/issues/${issue.id}/activity`)).json()) as {
     activity: { kind: string; event?: string; author: { type: string }; text: string }[];
   };
-  // Comments are the task's conversation now (ADR 0144): the activity keeps its events.
+  // Comments are the task's conversation now (ADR 0145): the activity keeps its events.
   expect(activity.activity.map((a) => a.event ?? a.kind)).toEqual([
     "created",
     "status_changed",

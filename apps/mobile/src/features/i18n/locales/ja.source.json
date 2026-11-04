@@ -4214,6 +4214,573 @@
   "settings.import.failed": {
     "value": "Couldn't download the file. Try again."
   },
+  "vault.newItem": {
+    "value": "New item"
+  },
+  "vault.search": {
+    "value": "Search the Vault"
+  },
+  "vault.noResults": {
+    "value": "Nothing matches “{{q}}”."
+  },
+  "vault.personalText": {
+    "value": "Only you see these. Your agents use them only when you ask."
+  },
+  "vault.teamText": {
+    "value": "The team's logins, keys and contacts. You choose who sees each one and which agents use it."
+  },
+  "vault.teamReadText": {
+    "value": "Shared with you by the people who manage the workspace's keys."
+  },
+  "vault.missing": {
+    "value": "Missing"
+  },
+  "vault.usedAt": {
+    "value": "used {{when}}"
+  },
+  "vault.neverUsed": {
+    "value": "not used yet"
+  },
+  "vault.kindTitle": {
+    "value": "What to save"
+  },
+  "vault.teamAudience": {
+    "value": "Everyone in the workspace sees it. You can narrow it after saving."
+  },
+  "vault.savedToVault": {
+    "value": "Saved to the Vault"
+  },
+  "vault.tab.team": {
+    "value": "Team"
+  },
+  "vault.tab.personal": {
+    "value": "Personal"
+  },
+  "vault.tab.connections": {
+    "value": "Connections"
+  },
+  "vault.kind.login": {
+    "value": "Login"
+  },
+  "vault.kind.key": {
+    "value": "Key"
+  },
+  "vault.kind.contact": {
+    "value": "Contact"
+  },
+  "vault.kinds.all": {
+    "value": "All"
+  },
+  "vault.kinds.login": {
+    "value": "Logins"
+  },
+  "vault.kinds.key": {
+    "value": "Keys"
+  },
+  "vault.kinds.contact": {
+    "value": "Contacts"
+  },
+  "vault.kindText.login": {
+    "value": "A website, username and password. Agents sign in without seeing the password."
+  },
+  "vault.kindText.key": {
+    "value": "An API key or token. Agents use it in a command without seeing it."
+  },
+  "vault.kindText.contact": {
+    "value": "Name, company, email, phone and address agents fill in on forms."
+  },
+  "vault.empty.personalTitle": {
+    "value": "Nothing of yours yet"
+  },
+  "vault.empty.personalText": {
+    "value": "Save a login or a key here and your agents use it when you ask."
+  },
+  "vault.empty.teamTitle": {
+    "value": "Nothing shared yet"
+  },
+  "vault.empty.teamText": {
+    "value": "Save the logins and keys your agents use for the team."
+  },
+  "vault.empty.teamReadText": {
+    "value": "When someone shares a login or a key with you, it shows here."
+  },
+  "vault.import.title": {
+    "value": "Import from a computer"
+  },
+  "vault.import.text": {
+    "value": "To bring passwords from a browser or a password manager, open Settings, Vault on the web and choose Import."
+  },
+  "vault.connections.text": {
+    "value": "Connect a password manager and your agents use the logins kept there. Nothing is copied: a password is read only when it's used."
+  },
+  "vault.connections.connected": {
+    "value": "Connected"
+  },
+  "vault.connections.add": {
+    "value": "Connect"
+  },
+  "vault.connections.none": {
+    "value": "No password manager can be connected here."
+  },
+  "vault.connections.help": {
+    "value": "Use a vault or a folder only for your agents, with just what they need."
+  },
+  "vault.connect.title": {
+    "value": "Connect {{name}}"
+  },
+  "vault.connect.reconnectTitle": {
+    "value": "Reconnect {{name}}"
+  },
+  "vault.connect.action": {
+    "value": "Connect"
+  },
+  "vault.connect.text": {
+    "value": "Your agents will use the logins {{name}} keeps for them, without seeing the passwords."
+  },
+  "vault.connect.steps": {
+    "value": "How to connect"
+  },
+  "vault.connect.guide": {
+    "value": "Open the {{name}} guide"
+  },
+  "vault.connect.fields": {
+    "value": "Details"
+  },
+  "vault.connect.private": {
+    "value": "These details are kept encrypted and never shown again."
+  },
+  "vault.connect.teamHelp": {
+    "value": "Its items start visible to everyone in the workspace and used by no agent. You choose the agents next."
+  },
+  "vault.connect.personalHelp": {
+    "value": "Only you see its items, and your agents use them when you ask."
+  },
+  "vault.connect.checking": {
+    "value": "Checking with {{name}}…"
+  },
+  "vault.connect.connected": {
+    "value": "{{name}} connected"
+  },
+  "vault.connect.reconnected": {
+    "value": "{{name}} reconnected"
+  },
+  "vault.connect.unknown": {
+    "value": "This password manager isn't available here."
+  },
+  "vault.connection.ready": {
+    "value": "Connected"
+  },
+  "vault.connection.syncing": {
+    "value": "Syncing…"
+  },
+  "vault.connection.reads": {
+    "value": "Reads {{label}}"
+  },
+  "vault.connection.items": {
+    "value": {
+      "one": "{{count}} item",
+      "other": "{{count}} items"
+    }
+  },
+  "vault.connection.synced": {
+    "value": "synced {{when}}"
+  },
+  "vault.connection.sync": {
+    "value": "Sync now"
+  },
+  "vault.connection.syncDone": {
+    "value": "Synced"
+  },
+  "vault.connection.reconnect": {
+    "value": "Reconnect"
+  },
+  "vault.connection.change": {
+    "value": "Change sign-in details"
+  },
+  "vault.connection.readOnly": {
+    "value": "Logins from {{name}} change in {{name}}. Here you choose who uses them."
+  },
+  "vault.connection.disconnect": {
+    "value": "Disconnect"
+  },
+  "vault.connection.disconnectTitle": {
+    "value": "Disconnect {{name}}?"
+  },
+  "vault.connection.disconnectText": {
+    "value": {
+      "one": "Its item leaves the Vault and agents stop using it. Nothing changes in {{name}}.",
+      "other": "Its {{count}} items leave the Vault and agents stop using them. Nothing changes in {{name}}."
+    }
+  },
+  "vault.connection.disconnected": {
+    "value": "{{name}} disconnected"
+  },
+  "vault.connection.gone": {
+    "value": "This connection is gone or you can't see it."
+  },
+  "vault.item.gone": {
+    "value": "This item is gone or you can't see it."
+  },
+  "vault.item.missingText": {
+    "value": "It's gone from {{name}} since the last sync. Agents can't use it."
+  },
+  "vault.item.unreadable": {
+    "value": "This contact's details can't be read here. Whoever manages it can type them again and save."
+  },
+  "vault.item.externalText": {
+    "value": "It comes from {{name}}. Change its name, address, username or password there."
+  },
+  "vault.item.noValue": {
+    "value": "No value is saved yet."
+  },
+  "vault.item.sealedHelp": {
+    "value": "For safety, what's saved here never shows again. To change it, type it again."
+  },
+  "vault.item.changePassword": {
+    "value": "Change password"
+  },
+  "vault.item.changeValue": {
+    "value": "Change value"
+  },
+  "vault.item.changeHelp": {
+    "value": "Tap Save to keep it. Agents use the new one from then on."
+  },
+  "vault.item.hidden": {
+    "value": "Hidden"
+  },
+  "vault.item.saved": {
+    "value": "Saved"
+  },
+  "vault.item.delete": {
+    "value": "Delete"
+  },
+  "vault.item.deleteTitle": {
+    "value": "Delete {{title}}?"
+  },
+  "vault.item.deleteText": {
+    "value": "Agents stop using it at once. This can't be undone."
+  },
+  "vault.item.deleteExternal": {
+    "value": "It leaves the Vault and agents stop using it. It stays in {{name}}."
+  },
+  "vault.item.deleted": {
+    "value": "Deleted"
+  },
+  "vault.field.title": {
+    "value": "Name"
+  },
+  "vault.field.titleOptional": {
+    "value": "Optional"
+  },
+  "vault.field.website": {
+    "value": "Website"
+  },
+  "vault.field.websitePlaceholder": {
+    "value": "acme.example"
+  },
+  "vault.field.username": {
+    "value": "Username"
+  },
+  "vault.field.password": {
+    "value": "Password"
+  },
+  "vault.field.newPassword": {
+    "value": "New password"
+  },
+  "vault.field.keyName": {
+    "value": "Variable"
+  },
+  "vault.field.keyNamePlaceholder": {
+    "value": "ACME_API_KEY"
+  },
+  "vault.field.keyNameHelp": {
+    "value": "Capital letters, digits and _, like ACME_API_KEY. Agents ask for the key by this name."
+  },
+  "vault.field.value": {
+    "value": "Value"
+  },
+  "vault.field.newValue": {
+    "value": "New value"
+  },
+  "vault.field.description": {
+    "value": "Description"
+  },
+  "vault.field.descriptionPlaceholder": {
+    "value": "What it's for"
+  },
+  "vault.field.descriptionHelp": {
+    "value": "Agents read this to know when to use it."
+  },
+  "vault.field.loginHelp": {
+    "value": "Agents type the password only on this website, without seeing it."
+  },
+  "vault.field.contactHelp": {
+    "value": "Not a secret: agents read these and fill them in on forms."
+  },
+  "vault.contact.fullName": {
+    "value": "Full name"
+  },
+  "vault.contact.company": {
+    "value": "Company"
+  },
+  "vault.contact.document": {
+    "value": "Tax ID"
+  },
+  "vault.contact.email": {
+    "value": "Email"
+  },
+  "vault.contact.phone": {
+    "value": "Phone"
+  },
+  "vault.contact.address": {
+    "value": "Address"
+  },
+  "vault.contact.address2": {
+    "value": "Address line 2"
+  },
+  "vault.contact.city": {
+    "value": "City"
+  },
+  "vault.contact.region": {
+    "value": "State"
+  },
+  "vault.contact.postalCode": {
+    "value": "Postal code"
+  },
+  "vault.contact.country": {
+    "value": "Country"
+  },
+  "vault.match.title": {
+    "value": "Where agents may type it"
+  },
+  "vault.match.exact": {
+    "value": "Only this address"
+  },
+  "vault.match.exactText": {
+    "value": "The exact address above"
+  },
+  "vault.match.site": {
+    "value": "Whole site"
+  },
+  "vault.match.siteOn": {
+    "value": "Any page on the same site as {{host}}"
+  },
+  "vault.match.siteText": {
+    "value": "Any page on the same site"
+  },
+  "vault.match.help": {
+    "value": "Only on secure pages (https). Anywhere else the agent's computer refuses to type it."
+  },
+  "vault.problem.secret": {
+    "value": "Type the password or the key's value."
+  },
+  "vault.scope.title": {
+    "value": "Who sees it"
+  },
+  "vault.scope.personal": {
+    "value": "Personal"
+  },
+  "vault.scope.personalText": {
+    "value": "Only you see it. Your agents use it only when you ask."
+  },
+  "vault.scope.team": {
+    "value": "Team"
+  },
+  "vault.scope.teamText": {
+    "value": "People with access see it. Agents use it when one of them asks."
+  },
+  "vault.scope.teamLocked": {
+    "value": "Only people who manage the workspace's keys save for the team."
+  },
+  "vault.agents.title": {
+    "value": "Agents that may use it"
+  },
+  "vault.agents.allText": {
+    "value": "Every agent, new ones too"
+  },
+  "vault.agents.personalHelp": {
+    "value": "They use it only when you ask them."
+  },
+  "vault.agents.teamHelp": {
+    "value": "They use it when someone with access asks."
+  },
+  "vault.access.title": {
+    "value": "Who has access"
+  },
+  "vault.access.defaultTitle": {
+    "value": "Default access"
+  },
+  "vault.access.defaultText": {
+    "value": "Its items follow this until someone changes theirs."
+  },
+  "vault.access.teamText": {
+    "value": "Choose who sees it and which agents use it for them."
+  },
+  "vault.access.people": {
+    "value": "People"
+  },
+  "vault.access.persons": {
+    "value": "Specific people"
+  },
+  "vault.access.roles": {
+    "value": "Roles"
+  },
+  "vault.access.agents": {
+    "value": "Agents"
+  },
+  "vault.access.allAgents": {
+    "value": "All agents"
+  },
+  "vault.access.noAgent": {
+    "value": "No agent yet"
+  },
+  "vault.access.onlyYou": {
+    "value": "Only you"
+  },
+  "vault.access.everyone": {
+    "value": "Everyone in the workspace"
+  },
+  "vault.access.everyoneText": {
+    "value": "Anyone here sees it, and agents use it for them."
+  },
+  "vault.access.everyoneIn": {
+    "value": "Yes"
+  },
+  "vault.access.everyoneOut": {
+    "value": "No"
+  },
+  "vault.access.levelIn": {
+    "value": "Has access"
+  },
+  "vault.access.levelOut": {
+    "value": "No access"
+  },
+  "vault.access.everyoneHelp": {
+    "value": "Tap Everyone in the workspace to choose roles and people instead."
+  },
+  "vault.access.managersHelp": {
+    "value": "People who manage the workspace's keys always see team items."
+  },
+  "vault.access.managersOnly": {
+    "value": "Only who manages keys"
+  },
+  "vault.access.inRole": {
+    "value": "people in {{role}}"
+  },
+  "vault.access.saved": {
+    "value": "Access saved"
+  },
+  "vault.access.useConnection": {
+    "value": "Follow the connection's access"
+  },
+  "vault.access.followsConnection": {
+    "value": "It follows the connection's access."
+  },
+  "vault.access.tooManyRoles": {
+    "value": "Pick at most 100 roles."
+  },
+  "vault.access.tooManyPeople": {
+    "value": "Pick at most 500 people."
+  },
+  "vault.access.tooManyAgents": {
+    "value": "Pick at most 200 agents."
+  },
+  "vault.access.sentence.none": {
+    "value": "No agent uses it yet."
+  },
+  "vault.access.sentence.personalAll": {
+    "value": "Your agents use it when you ask."
+  },
+  "vault.access.sentence.everyAgent": {
+    "value": "All agents"
+  },
+  "vault.access.sentence.personal": {
+    "value": {
+      "one": "{{agents}} uses it when you ask.",
+      "other": "{{agents}} use it when you ask."
+    }
+  },
+  "vault.access.sentence.everyone": {
+    "value": {
+      "one": "{{agents}} uses it when anyone in the workspace asks.",
+      "other": "{{agents}} use it when anyone in the workspace asks."
+    }
+  },
+  "vault.access.sentence.managers": {
+    "value": {
+      "one": "{{agents}} uses it when someone who manages keys asks.",
+      "other": "{{agents}} use it when someone who manages keys asks."
+    }
+  },
+  "vault.access.sentence.people": {
+    "value": {
+      "one": "{{agents}} uses it for {{people}}.",
+      "other": "{{agents}} use it for {{people}}."
+    }
+  },
+  "vault.use.fill": {
+    "value": "{{name}} signed in"
+  },
+  "vault.use.fillOn": {
+    "value": "{{name}}, on {{host}}"
+  },
+  "vault.use.key": {
+    "value": "{{name}} used it in a command"
+  },
+  "vault.use.read": {
+    "value": "{{name}} read it"
+  },
+  "vault.use.create": {
+    "value": "{{name}} saved it"
+  },
+  "vault.use.edit": {
+    "value": "{{name}} changed it"
+  },
+  "vault.use.for": {
+    "value": "for {{name}}"
+  },
+  "vault.use.routine": {
+    "value": "routine {{name}}"
+  },
+  "vault.uses.title": {
+    "value": "Recent uses"
+  },
+  "vault.uses.none": {
+    "value": "Not used yet."
+  },
+  "vault.card.save": {
+    "value": "Save to the Vault"
+  },
+  "vault.card.saveText": {
+    "value": "Next time your agents use it without asking you."
+  },
+  "vault.card.personalOnly": {
+    "value": "Saved as personal: only you see it."
+  },
+  "vault.card.choose": {
+    "value": "Choose"
+  },
+  "vault.card.agentsText": {
+    "value": "The agent that asked is already chosen."
+  },
+  "vault.card.as": {
+    "value": "Signs in as {{username}}."
+  },
+  "vault.card.saved": {
+    "value": "Saved to the Vault"
+  },
+  "vault.card.notSaved": {
+    "value": "Sent, but not saved to the Vault"
+  },
+  "vault.card.codeLabel": {
+    "value": "Code for {{name}}"
+  },
+  "vault.card.codeIncomplete": {
+    "value": "Type every digit of the code."
+  },
+  "vault.card.codeNote": {
+    "value": "Sent encrypted straight to the computer. Codes are never saved."
+  },
   "status.title": {
     "value": "Status"
   },

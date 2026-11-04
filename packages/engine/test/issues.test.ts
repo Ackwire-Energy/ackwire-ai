@@ -82,7 +82,7 @@ describe("issues", () => {
       "assigned",
       "criterion_checked",
     ]);
-    // The comment is a reply in the task's conversation (ADR 0144), not an activity row.
+    // The comment is a reply in the task's conversation (ADR 0145), not an activity row.
     expect((await getIssue(f.db, ana, f.org.id, { id: first.id })).conversation?.count).toBe(1);
     expect(activity[1]?.text).toBe("changed the status to In review");
     expect(activity[1]).toMatchObject({ textCode: "status_changed", textParams: { status: "in_review" } });

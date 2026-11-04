@@ -1797,7 +1797,7 @@ html:not([data-pointer]) .issue-files__open:focus-visible {
 }
 
 /*
- * A task's conversation (ADR 0144). The card's last line is the chat's thread line, quiet inside the card (the card
+ * A task's conversation (ADR 0145). The card's last line is the chat's thread line, quiet inside the card (the card
  * opens; the line isn't a button of its own).
  */
 .issue-card__talk {

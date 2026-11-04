@@ -11,7 +11,7 @@ import { useStreams } from "@/realtime/context";
 import "@/components/threads/threads.css";
 
 /*
- * A task's conversation (ADR 0144): the app's own thread panel, as a column of the task's dialog or page. Its
+ * A task's conversation (ADR 0145): the app's own thread panel, as a column of the task's dialog or page. Its
  * messages, composer, runs, receipts and stop are the chat's; the task's card and dialog read its line.
  */
 

@@ -1,4 +1,4 @@
--- A task's conversation (ADR 0144). Its old comments move into it at boot (moveIssueComments): Postgres can't use a
+-- A task's conversation (ADR 0145). Its old comments move into it at boot (moveIssueComments): Postgres can't use a
 -- new enum value ('task') in the transaction that adds it.
 ALTER TYPE "public"."channel_kind" ADD VALUE 'task';--> statement-breakpoint
 ALTER TABLE "issues" ADD COLUMN "conversation_channel_id" uuid;--> statement-breakpoint

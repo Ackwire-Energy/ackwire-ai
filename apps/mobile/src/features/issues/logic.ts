@@ -236,7 +236,7 @@ export function dueDateOf(choice: DueChoice, now = new Date()): string | null {
 }
 
 /**
- * Where "Conversar" goes: the task's own conversation (ADR 0144), the phone's thread screen, at `messageId` when a
+ * Where "Conversar" goes: the task's own conversation (ADR 0145), the phone's thread screen, at `messageId` when a
  * notice or a link named one.
  */
 export const taskConversationHref = (at: IssueConversationRef, messageId?: string | null) =>

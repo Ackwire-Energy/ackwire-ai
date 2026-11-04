@@ -106,7 +106,7 @@ async function applyIssueFields(
   }
 }
 
-/** Another person or agent touched the issue since `since`: its activity, or a reply in its conversation (ADR 0144). */
+/** Another person or agent touched the issue since `since`: its activity, or a reply in its conversation (ADR 0145). */
 async function issueTouchedByOthers(db: Database, issueId: string, agentId: string, since: Date) {
   const [row] = await db
     .select({ id: issueActivity.id })

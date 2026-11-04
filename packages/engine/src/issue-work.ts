@@ -3,7 +3,7 @@ import { and, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db
 const { issues, artifacts } = schema;
 
 /**
- * "Ask Ada to implement" works in the task's own conversation (ADR 0144). Work asked before that lives in the
+ * "Ask Ada to implement" works in the task's own conversation (ADR 0145). Work asked before that lives in the
  * requester's DM with the agent, as a thread whose root is a compact card (`meta.issueWork`). The agent's
  * instructions never show in the chat: they are built from the issue at run time (`issueWorkBrief`). Where the
  * issue came from a channel message, that conversation gets one discreet line (`meta.issueTaken`).
@@ -32,7 +32,7 @@ export function issueWorkOf(
 }
 
 /**
- * The task block of a run in a task's conversation (ADR 0144), or in an older work thread of a DM, read from the
+ * The task block of a run in a task's conversation (ADR 0145), or in an older work thread of a DM, read from the
  * issue now (description, criteria and their state, PRs, files), so each turn sees what the team changed since
  * the last one. The conversation itself is the thread the run reads. `asked`: the agent was asked to implement it
  * (the assignee working on it); else it was called into the task's conversation.

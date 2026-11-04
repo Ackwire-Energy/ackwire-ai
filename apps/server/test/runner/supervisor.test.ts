@@ -14,7 +14,7 @@ import {
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
-import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
+import { sealSecret, secretAad, vaultAad } from "@agenteschat/adapters/secret-box";
 import type { AccountManager } from "../../runner/accounts";
 import { AGENT_USERS_FILE, type AgentUser, systemLauncher } from "../../runner/agent-users";
 import { BrowserManager } from "../../runner/browser";
@@ -27,7 +27,7 @@ import { type HandlerContext, handleRequest, type RequestScope } from "../../run
 import { readLines } from "../../runner/lines";
 import { AgentNetworks } from "../../runner/network-state";
 import type { FetchLike } from "../../runner/push";
-import { agentSecrets } from "../../runner/secrets";
+import { agentSecrets, secretValue } from "../../runner/secrets";
 import { RelayCount } from "../../runner/streams";
 import {
   BROWSER_LEASE_MS,
@@ -2614,6 +2614,60 @@ test.if(posix)(
   },
 );
 
+test.if(posix)(
+  "system broker: a site's password ends in the worker's memory; neither store.json holds it",
+  async () => {
+    const t = realWorkers();
+    t.sup.boot();
+    t.sup.attach();
+    const requestId = "broker-site-0001";
+    const name = "SHOP_PASSWORD";
+    const target = { kind: "site" as const, site: "https://shop.example.com" };
+    const value = "broker-site-password";
+    const key = await t.sup.secret({ op: "secret", agent: ANA, action: "keypair", requestId }, scope().scope);
+    const aad = secretAad({ requestId, orgId: "org-1", name, target });
+    const box = await sealSecret(key.publicKey as string, value, aad);
+    await t.sup.secret(
+      { op: "secret", agent: ANA, action: "deliver", requestId, name, target, aad, box },
+      scope().scope,
+    );
+    const order = `2026-11-03T00:00:00.000Z|${requestId}`;
+    const activate = () =>
+      t.sup.secret({ op: "secret", agent: ANA, action: "activate", requestId, order }, scope().scope);
+    expect(await activate()).toEqual({ size: value.length });
+    // The worker's browser types it from memory (ADR 0144); root handed its copy on.
+    expect(await secretValue(path.join(t.ownHome, "secrets"), ANA, name)).toEqual({ value, site: target.site });
+    expect(await secretValue(path.join(t.home, "secret-broker"), ANA, name)).toBeNull();
+    for (const store of [
+      path.join(t.home, "secret-broker", "a1b2c3d4", "store.json"),
+      path.join(t.ownHome, "secrets", "a1b2c3d4", "store.json"),
+    ]) {
+      expect(existsSync(store) ? readFileSync(store, "utf8") : "").not.toContain(value);
+    }
+    // A lost reply asked again: answered, nothing sent to the worker again.
+    expect(await activate()).toEqual({ size: value.length });
+  },
+);
+
+test.if(posix)("system mode: a Vault key is made in the agent's worker, and its keys open there", async () => {
+  const t = realWorkers();
+  t.sup.boot();
+  t.sup.attach();
+  const { vaultKey } = (await handleRequest(t.ctx, { agent: ANA, op: "vault.key" }, scope().scope)) as {
+    vaultKey: { keyId: string; publicKey: string };
+  };
+  const value = "sk_test_worker_vault_key";
+  const use = { kind: "env" as const, name: "STRIPE_KEY" };
+  const sealed = await sealSecret(vaultKey.publicKey, value, vaultAad({ keyId: vaultKey.keyId, agentId: ANA.id, use }));
+  const vault = { keyId: vaultKey.keyId, keys: [{ name: "STRIPE_KEY", box: sealed }] };
+  const ran = (await handleRequest(
+    t.ctx,
+    { ...exec(ANA, `test "$STRIPE_KEY" = "${value}" && echo "ok $STRIPE_KEY"`), stream: false, vault },
+    scope().scope,
+  )) as { stdout: string };
+  expect(ran.stdout).toBe("ok [secret:STRIPE_KEY]\n");
+});
+
 test.if(posix && process.platform === "linux" && process.getuid?.() === 0)(
   "upgrade retires old pending keys and boxes without following agent symlinks or losing active values",
   async () => {
@@ -3200,6 +3254,8 @@ test.if(posix)(
           .of("pong")
           .some((p) => (p.networkTransition as { state?: string } | undefined)?.state === "restart_required"),
       ).toBe(true);
+      // The in-flight request's failure goes out after the worker's input ends, not in the same tick.
+      await waitFor(() => socket.of("result").some((r) => r.id === "active"), 5000);
       expect(socket.of("result").find((r) => r.id === "active")?.ok).toBe(false);
       await waitFor(() => desktopStops === 2, 5000);
       old.crash(0);

@@ -574,7 +574,7 @@ describe("from issues, the chat and routines", () => {
     const evaluated = activity.find((a) => a.event === "forum_evaluated");
     expect(evaluated).toMatchObject({ textCode: "forum_evaluated", textParams: { topicId: topic.id } });
     expect(activity.some((a) => a.kind === "comment")).toBe(false);
-    // The summary and its link: an agent's reply in the task's conversation (ADR 0144).
+    // The summary and its link: an agent's reply in the task's conversation (ADR 0145).
     const at = await openTaskConversation(f.db, person, f.org.id, issue.id);
     const replies = (
       await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, at.channelId))

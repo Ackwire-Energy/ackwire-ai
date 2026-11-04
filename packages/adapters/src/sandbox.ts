@@ -4,7 +4,7 @@
  * No environment variables of ours go with a command. The only secrets a computer holds are those a person
  * sealed to it (ADR 0027), which we relay without being able to read.
  */
-import type { MachineReplies, SecretRequest } from "./machine-protocol";
+import type { MachineReplies, MachineRequest, SecretRequest } from "./machine-protocol";
 
 export interface ExecRequest {
   command: string;
@@ -15,6 +15,8 @@ export interface ExecRequest {
   signal?: AbortSignal;
   /** A person approved this very command (an approval card): the computer runs it even when its command policy would hold it. */
   approved?: boolean;
+  /** Vault keys sealed to the computer's one-use key, for this command's environment only (ADR 0144). */
+  vault?: Extract<MachineRequest, { op: "exec" }>["vault"];
 }
 
 export interface ExecResult {

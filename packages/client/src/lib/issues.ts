@@ -69,7 +69,7 @@ export const issueWorkOf = (meta: Record<string, unknown> | null | undefined) =>
 export const issueTakenOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.issueTaken);
 
 /**
- * `meta.taskConversation`: the root of a task's conversation (ADR 0144). It stands for the task and is never drawn:
+ * `meta.taskConversation`: the root of a task's conversation (ADR 0145). It stands for the task and is never drawn:
  * the task's own screen is right there.
  */
 export const taskConversationOf = (meta: Record<string, unknown> | null | undefined) => workRef(meta?.taskConversation);

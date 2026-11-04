@@ -157,7 +157,7 @@ function IssueView({ number, focusId }: { number: number; focusId: string | null
   );
 }
 
-/** Opens the task's conversation (ADR 0144), made on first use, at `messageId` when one is named. */
+/** Opens the task's conversation (ADR 0145), made on first use, at `messageId` when one is named. */
 function useOpenConversation() {
   const { t } = useTranslation();
   const orgId = useOrgId();

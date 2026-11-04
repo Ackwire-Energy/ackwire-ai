@@ -101,7 +101,7 @@ export const issues = pgTable(
     /** Long work stopped on something (ADR 0121 §4): a badge on the card, the card stays in its stage. */
     blocked: jsonb().$type<{ reason: string; since: string; text?: string }>(),
     /**
-     * Its conversation (ADR 0144): a channel of kind `task` and the thread root in it, made on first use. No
+     * Its conversation (ADR 0145): a channel of kind `task` and the thread root in it, made on first use. No
      * foreign key to the root (`messages` is partitioned).
      */
     conversationChannelId: uuid().references((): AnyPgColumn => channels.id, { onDelete: "set null" }),

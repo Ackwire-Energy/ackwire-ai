@@ -220,7 +220,14 @@
       "dashboards.meta.widgets",
       "widgets.add.short",
       "widgets.schedulesShort.half",
-      "widgets.sizes.m"
+      "widgets.sizes.m",
+      "vault.connections.items",
+      "vault.field.keyNamePlaceholder",
+      "vault.kind.login",
+      "vault.kindPlural.login",
+      "vault.kindPlural.loginTitle",
+      "vault.source.bitwarden.field.clientId",
+      "vault.source.bitwarden.field.clientSecret"
     ],
     "es": [
       "agent.builtinName",
@@ -400,7 +407,15 @@
       "dashboards.edit.manyRoles",
       "dashboards.meta.widgets",
       "widgets.add.short",
-      "widgets.sizes.m"
+      "widgets.sizes.m",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.access.roles",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.scope.personal",
+      "vault.tab.personal"
     ],
     "fr": [
       "access.agentCol",
@@ -741,7 +756,15 @@
       "dashboards.meta.widgets",
       "dashboards.newWidget.suggestions",
       "widgets.add.short",
-      "widgets.sizes.m"
+      "widgets.sizes.m",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.access.agents",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.row.agents",
+      "vault.use.routine"
     ],
     "de": [
       "access.agentCol",
@@ -1097,7 +1120,20 @@
       "widgets.add.short",
       "widgets.sizes.l",
       "widgets.sizes.m",
-      "widgets.sizes.s"
+      "widgets.sizes.s",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.title",
+      "vault.field.website",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login",
+      "vault.kindPlural.loginTitle",
+      "vault.scope.team",
+      "vault.source.bitwarden.field.server",
+      "vault.tab.team",
+      "vault.use.routine"
     ],
     "it": [
       "access.area.browser",
@@ -1383,7 +1419,19 @@
       "dashboards.newWidget.place.channel",
       "notifications.source.dashboard",
       "widgets.add.short",
-      "widgets.sizes.m"
+      "widgets.sizes.m",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.contact.email",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.password",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login",
+      "vault.scope.team",
+      "vault.source.bitwarden.field.server",
+      "vault.tab.team",
+      "vault.use.routine"
     ],
     "nl": [
       "access.agentCol",
@@ -1872,9 +1920,26 @@
       "widgets.add.short",
       "widgets.sizes.l",
       "widgets.sizes.m",
-      "widgets.sizes.s"
+      "widgets.sizes.s",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.connections.items",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.website",
+      "vault.field.websitePlaceholder",
+      "vault.kind.contact",
+      "vault.kind.login",
+      "vault.kindPlural.login",
+      "vault.kindPlural.loginTitle",
+      "vault.row.agents",
+      "vault.scope.team",
+      "vault.source.bitwarden.field.server",
+      "vault.tab.team",
+      "vault.use.routine"
     ],
     "ja": [
+      "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
       "aiAccounts.connect.antigravity",
@@ -1977,16 +2042,21 @@
       "routines.form.kind.webhook",
       "routines.target.dmShort",
       "routines.webhook.secretPlaceholder",
+      "settings.section.vault",
       "skills.version",
       "storage.onedrive",
       "taskManager.program.agentes",
       "team.cap.linear",
       "team.cap.sentry",
+      "team.cap.vault",
       "toolReview.ok",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
       "wiki.legend.obsidian",
       "wiki.markdown"
     ],
     "ko": [
+      "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
       "aiAccounts.connect.antigravity",
@@ -2087,15 +2157,20 @@
       "onboarding.stepNames.ai",
       "onboarding.team.placeholder",
       "routines.target.dmShort",
+      "settings.section.vault",
       "skills.version",
       "storage.onedrive",
       "taskManager.program.agentes",
       "team.cap.linear",
       "team.cap.sentry",
+      "team.cap.vault",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
       "wiki.legend.obsidian",
       "wiki.markdown"
     ],
     "zh-Hans": [
+      "access.area.vault",
       "agent.builtinName",
       "aiAccounts.connect.cursor",
       "aiAccounts.connect.antigravity",
@@ -2185,12 +2260,16 @@
       "onboarding.stepNames.ai",
       "onboarding.team.placeholder",
       "routines.form.kind.webhook",
+      "settings.section.vault",
       "skills.version",
       "storage.onedrive",
       "taskManager.program.agentes",
       "team.cap.linear",
       "team.cap.sentry",
+      "team.cap.vault",
       "toolNames.order",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
       "wiki.legend.obsidian",
       "wiki.markdown"
     ],
@@ -2410,7 +2489,18 @@
       "widgets.add.short",
       "widgets.sizes.l",
       "widgets.sizes.m",
-      "widgets.sizes.s"
+      "widgets.sizes.s",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.access.edit",
+      "vault.access.editOf",
+      "vault.contact.email",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login",
+      "vault.source.bitwarden.field.folder",
+      "vault.source.bitwarden.field.server"
     ],
     "tr": [
       "access.area.forum",
@@ -2548,7 +2638,12 @@
       "widgets.add.short",
       "widgets.sizes.l",
       "widgets.sizes.m",
-      "widgets.sizes.s"
+      "widgets.sizes.s",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder"
     ],
     "pl": [
       "access.agentCol",
@@ -2773,7 +2868,15 @@
       "notifications.source.dashboard",
       "widgets.sizes.l",
       "widgets.sizes.m",
-      "widgets.sizes.s"
+      "widgets.sizes.s",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login",
+      "vault.row.agents",
+      "vault.source.bitwarden.field.folder"
     ],
     "ru": [
       "agent.builtinName",
@@ -2870,7 +2973,12 @@
       "wiki.markdown",
       "widgets.sizes.l",
       "widgets.sizes.m",
-      "widgets.sizes.s"
+      "widgets.sizes.s",
+      "access.area.vault",
+      "settings.section.vault",
+      "team.cap.vault",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder"
     ]
   },
   "mobile-base": {
@@ -2907,7 +3015,12 @@
       "onb.logo",
       "status.title",
       "tabs.threads",
-      "threads.section.threads"
+      "threads.section.threads",
+      "vault.connection.items",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login",
+      "vault.kinds.login"
     ],
     "es": [
       "ai.rowPlans",
@@ -2925,7 +3038,14 @@
       "mission.plan.section",
       "onb.logo",
       "plus.audio",
-      "tabs.chats"
+      "tabs.chats",
+      "vault.access.everyoneOut",
+      "vault.access.roles",
+      "vault.field.keyName",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.scope.personal",
+      "vault.tab.personal"
     ],
     "fr": [
       "activityNow.kind.question",
@@ -2981,7 +3101,13 @@
       "plus.photos",
       "remind.minute",
       "tabs.agents",
-      "threads.section.missions"
+      "threads.section.missions",
+      "vault.access.agents",
+      "vault.field.description",
+      "vault.field.keyName",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.use.routine"
     ],
     "de": [
       "activityNow.kind.browser",
@@ -3031,7 +3157,17 @@
       "thread.threadIn",
       "threads.section.threads",
       "dashboards.notice.card.proposal",
-      "tabs.dashboards"
+      "tabs.dashboards",
+      "vault.field.keyName",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.title",
+      "vault.field.titleOptional",
+      "vault.field.website",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login",
+      "vault.kinds.login",
+      "vault.scope.team",
+      "vault.tab.team"
     ],
     "it": [
       "activityNow.kind.browser",
@@ -3062,7 +3198,16 @@
       "plus.audio",
       "plus.file",
       "thread.threadIn",
-      "dashboards.notice.card.proposal"
+      "dashboards.notice.card.proposal",
+      "vault.access.everyoneOut",
+      "vault.contact.email",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.password",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login",
+      "vault.scope.team",
+      "vault.tab.team",
+      "vault.use.routine"
     ],
     "nl": [
       "activityNow.kind.browser",
@@ -3114,7 +3259,17 @@
       "thread.threadIn",
       "threads.section.threads",
       "dashboards.notice.card.proposal",
-      "tabs.dashboards"
+      "tabs.dashboards",
+      "vault.connection.items",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.website",
+      "vault.field.websitePlaceholder",
+      "vault.kind.contact",
+      "vault.kind.login",
+      "vault.kinds.login",
+      "vault.scope.team",
+      "vault.tab.team",
+      "vault.use.routine"
     ],
     "ja": [
       "browser.live.key.Enter",
@@ -3123,14 +3278,18 @@
       "files.type.pdf",
       "invitePeople.ok",
       "me.account.save",
-      "onb.emailsPlaceholder"
+      "onb.emailsPlaceholder",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder"
     ],
     "ko": [
       "browser.live.key.Enter",
       "browser.live.key.Escape",
       "browser.live.key.Tab",
       "files.type.pdf",
-      "onb.emailsPlaceholder"
+      "onb.emailsPlaceholder",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder"
     ],
     "zh-Hans": [
       "blocks.thousand",
@@ -3138,7 +3297,9 @@
       "browser.live.key.Escape",
       "browser.live.key.Tab",
       "files.type.pdf",
-      "onb.emailsPlaceholder"
+      "onb.emailsPlaceholder",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder"
     ],
     "id": [
       "activityNow.kind.browser",
@@ -3159,7 +3320,11 @@
       "onb.logo",
       "plus.audio",
       "plus.file",
-      "status.title"
+      "status.title",
+      "vault.contact.email",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login"
     ],
     "tr": [
       "activityNow.kind.limit",
@@ -3170,7 +3335,9 @@
       "files.type.pdf",
       "intentAgents.uses.area.forum",
       "mission.plan.section",
-      "onb.logo"
+      "onb.logo",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder"
     ],
     "pl": [
       "activityNow.kind.limit",
@@ -3191,14 +3358,19 @@
       "plus.audio",
       "status.title",
       "dashboards.notice.card.alert",
-      "dashboards.notice.card.proposal"
+      "dashboards.notice.card.proposal",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder",
+      "vault.kind.login"
     ],
     "ru": [
       "browser.live.key.Enter",
       "browser.live.key.Escape",
       "browser.live.key.Tab",
       "files.type.pdf",
-      "onb.emailsPlaceholder"
+      "onb.emailsPlaceholder",
+      "vault.field.keyNamePlaceholder",
+      "vault.field.websitePlaceholder"
     ]
   },
   "desktop": {

@@ -4,7 +4,7 @@ import { caches } from "./cache";
 const { issues, channels, channelMembers, agents } = schema;
 
 /**
- * A task's conversation (ADR 0144) is read by whoever sees the task, never by its own membership: people are never
+ * A task's conversation (ADR 0145) is read by whoever sees the task, never by its own membership: people are never
  * members of a `task` channel. True when `channelId` is a task's conversation and `userId` sees that task: one of
  * the whole workspace, or one of a channel they are in (or a public channel). The workspace membership is the
  * caller's check. Mirrors `canSee` for people in `issues.ts`.

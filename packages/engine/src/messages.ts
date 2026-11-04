@@ -375,7 +375,7 @@ function channelRefsSql(orgId: string, channelId: string, names: string[]) {
 /**
  * The org's agents an agent's text @mentions that aren't members of `channelId`: a mention reaches only members
  * (`insertMessageWithRuns`), so for them it is plain text that wakes nobody. Handles, lower case; never the author,
- * an archived agent or a handle a person holds (the @ is theirs). In a task's conversation (ADR 0144) the ones that see
+ * an archived agent or a handle a person holds (the @ is theirs). In a task's conversation (ADR 0145) the ones that see
  * the task join it first, as `insertMessageWithRuns` does, so they are reached.
  */
 export async function unreachedAgents(
@@ -576,7 +576,7 @@ export async function insertMessageWithRuns(
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
   const mentions = await currentHandles(tx, input.orgId, parseMentionHandles(body));
   const person = input.author.type === "person";
-  // A task's conversation (ADR 0144): an agent another agent mentions there joins it when it sees the task, as with a
+  // A task's conversation (ADR 0145): an agent another agent mentions there joins it when it sees the task, as with a
   // person's mention (`postPersonMessage`), so the mention wakes it (hop limits as anywhere). Elsewhere it adds no one.
   if (!person && mentions.length > 0) await admitTaskAgents(tx, input.orgId, input.channelId, { handles: mentions });
   // Handles match [a-z0-9_-]: safe as an array literal.
@@ -1018,7 +1018,7 @@ export async function postPersonMessage(
   // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");
-  // A task's conversation (ADR 0144): an agent mentioned there that sees the task joins it, so the mention wakes it.
+  // A task's conversation (ADR 0145): an agent mentioned there that sees the task joins it, so the mention wakes it.
   if (channel.kind === "task") {
     await admitTaskAgents(deps.db, orgId, channelId, {
       handles: await currentHandles(deps.db, orgId, parseMentionHandles(input.body)),
