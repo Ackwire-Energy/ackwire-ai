@@ -1789,7 +1789,8 @@
       "channels": "부르면 채널에서 답해요",
       "model": "모델",
       "message": "메시지",
-      "configure": "설정"
+      "configure": "설정",
+      "nameStory": "이름은 뱃사람의 길잡이 별, lodestar에서 왔어요."
     },
     "settings": {
       "name": "이름과 모습",
@@ -2234,7 +2235,6 @@
   "dm": {
     "subtitle": "{{role}} · 소유자 {{owner}}",
     "subtitleNoOwner": "{{role}} · 소유자 없음",
-    "profile": "프로필 보기",
     "emptyAgent": "기억하거나, 잊거나, 일하는 방식을 바꾸라고 요청해 보세요.",
     "emptyAgent_female": "기억하거나, 잊거나, 일하는 방식을 바꾸라고 요청해 보세요.",
     "opening": "대화를 여는 중…",

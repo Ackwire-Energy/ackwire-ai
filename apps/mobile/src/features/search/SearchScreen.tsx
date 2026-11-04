@@ -1,11 +1,9 @@
-import { useChannels, useDms, useMembers } from "@agenteschat/client";
 import {
   dedupe,
   formatSearch,
   parseSearch,
   rememberSearch,
   type SearchChip,
-  type SearchDirectory,
   type SearchSort,
   searchChipKey,
   searchSortFor,
@@ -16,12 +14,14 @@ import { useIsFocused } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BackHandler, Keyboard, StyleSheet, type TextInputInstance, View } from "react-native";
-import { readValue, STORED, writeValue } from "@/lib/storage";
+import { STORED } from "@/lib/storage";
 import { LargeTitleScreen, SearchField, Text } from "@/ui";
 import { ConversationRowView } from "../chats/ConversationRowView";
 import { kindOf } from "../chats/logic";
-import { useDirectory, useOrgId } from "../shared/hooks";
+import { useOrgId } from "../shared/hooks";
 import { useConversations } from "../shared/queries";
+import { useRecentSearches, useSearchDirectory } from "./hooks";
+import { typeSearch } from "./logic";
 import { FilterChips, FilteredResults, OperatorPicker, SearchOptions } from "./SearchFilters";
 import { SearchResults } from "./SearchResults";
 
@@ -48,45 +48,13 @@ export function SearchScreen() {
   const [sort, setSort] = useState<SearchSort | null>(null);
   const field = useRef<TextInputInstance>(null);
   const orgId = useOrgId();
-  const dir = useDirectory();
-  const members = useMembers(orgId);
-  const channels = useChannels(orgId);
-  const dms = useDms(orgId);
+  const directory = useSearchDirectory();
   const searchingWords = useMemo(() => searchWords(t), [t]);
-  const directory = useMemo<SearchDirectory>(
-    () => ({
-      actors: [
-        ...(members.data ?? []).map((m) => ({ type: "person" as const, id: m.userId, name: m.name, handle: m.handle })),
-        ...dir.agents.map((a) => ({ type: "agent" as const, id: a.id, name: a.name, handle: a.handle })),
-      ],
-      places: [
-        ...(channels.data ?? []).filter((c) => c.isMember).map((c) => ({ id: c.id, name: c.name })),
-        ...(dms.data ?? []).map((d) => ({ id: d.channelId, name: d.with.name, dm: true })),
-      ],
-    }),
-    [members.data, dir.agents, channels.data, dms.data],
-  );
   const text = parseSearch(q, directory, searchingWords).text;
   const words = q.trim().length > 0 || chips.length > 0;
 
-  // Recent searches: this phone's, per workspace (JSON by workspace id).
-  const [recentByOrg, setRecentByOrg] = useState<Record<string, string[]>>({});
-  useEffect(() => {
-    void readValue(STORED.searchRecent).then((v) => {
-      try {
-        const parsed = JSON.parse(v ?? "{}");
-        if (parsed && typeof parsed === "object") setRecentByOrg(parsed);
-      } catch {
-        // Nothing kept.
-      }
-    });
-  }, []);
-  const recent = recentByOrg[orgId] ?? [];
-  const saveRecent = (list: string[]) => {
-    const next = { ...recentByOrg, [orgId]: list };
-    setRecentByOrg(next);
-    void writeValue(STORED.searchRecent, JSON.stringify(next));
-  };
+  // Recent searches: this phone's, per workspace.
+  const [recent, saveRecent] = useRecentSearches(STORED.searchRecent, orgId);
   const remember = () => {
     const s = formatSearch(chips, text);
     if (s) saveRecent(rememberSearch(recent, s));
@@ -97,13 +65,10 @@ export function SearchScreen() {
     setQ(parsed.text);
     saveRecent(rememberSearch(recent, s));
   };
-  // A space after a complete operator makes it a chip.
   const change = (value: string) => {
-    if (!/\s$/.test(value)) return setQ(value);
-    const parsed = parseSearch(value, directory, searchingWords);
-    if (parsed.chips.length === 0) return setQ(value);
-    setChips((cs) => dedupe([...cs, ...parsed.chips]));
-    setQ(parsed.text ? `${parsed.text} ` : "");
+    const next = typeSearch(value, chips, directory, searchingWords);
+    setChips(next.chips);
+    setQ(next.q);
   };
 
   // Selecting the tab puts the cursor in the (empty) field, like the system's search tab; Cancelar doesn't.

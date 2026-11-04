@@ -22,7 +22,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agenteschat/client/lib/repos";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import {
   Button,
   colorKey,
@@ -129,6 +129,7 @@ export function AgentPage(props: AgentPageProps) {
         <header className="page__header">
           <h1 className="page-title">{agent.name}</h1>
           <p className="muted">{t("settings.sectionText.right_hand")}</p>
+          {tellsNameStory(agent) && <p className="small muted">{t("rightHand.profile.nameStory")}</p>}
         </header>
         <RightHandSettingsSection />
       </div>

@@ -1788,7 +1788,8 @@
       "channels": "被呼叫时在频道里回复",
       "model": "模型",
       "message": "发消息",
-      "configure": "设置"
+      "configure": "设置",
+      "nameStory": "名字来自 lodestar，指引水手航向的那颗星。"
     },
     "settings": {
       "name": "名称和外观",
@@ -2239,7 +2240,6 @@
   "dm": {
     "subtitle": "{{role}} · 负责人：{{owner}}",
     "subtitleNoOwner": "{{role}} · 无负责人",
-    "profile": "查看资料",
     "emptyAgent": "让他记住、忘记某些事，或换种方式工作。",
     "emptyAgent_female": "让她记住、忘记某些事，或换种方式工作。",
     "opening": "正在打开对话…",

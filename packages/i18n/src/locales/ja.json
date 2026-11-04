@@ -1789,7 +1789,8 @@
       "channels": "呼ばれたらチャンネルで返信します",
       "model": "モデル",
       "message": "メッセージ",
-      "configure": "設定"
+      "configure": "設定",
+      "nameStory": "名前の由来は lodestar、船乗りを導く星です。"
     },
     "settings": {
       "name": "名前と見た目",
@@ -2236,7 +2237,6 @@
   "dm": {
     "subtitle": "{{role}} · オーナー: {{owner}}",
     "subtitleNoOwner": "{{role}} · オーナーなし",
-    "profile": "プロフィールを見る",
     "emptyAgent": "覚えてほしいこと、忘れてほしいこと、やり方の変更をお願いしてみましょう。",
     "emptyAgent_female": "覚えてほしいこと、忘れてほしいこと、やり方の変更をお願いしてみましょう。",
     "opening": "会話を開いています…",

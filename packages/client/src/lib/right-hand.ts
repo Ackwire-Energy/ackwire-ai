@@ -29,6 +29,10 @@ export const RIGHT_HAND_DEFAULT = {
   appearance: { color: "teal", eyes: "happy", accessory: "headset" },
 } as const;
 
+/** Where its name comes from ("lodestar") is told only while it keeps that name: a renamed one has another story. */
+export const tellsNameStory = (agent: Pick<Agent, "builtin" | "name"> | null | undefined) =>
+  isRightHand(agent) && agent?.name === RIGHT_HAND_DEFAULT.name;
+
 /**
  * Ends a workspace's onboarding, for good, and says where it opens: its right hand's DM (ADR 0137), which takes the
  * setup on from there; the workspace itself (`agentId` null) when there is none to open.

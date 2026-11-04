@@ -1928,7 +1928,8 @@
       "channels": "Risponde nei canali quando lo chiamano",
       "model": "Modello",
       "message": "Messaggio",
-      "configure": "Configura"
+      "configure": "Configura",
+      "nameStory": "Il nome viene da lodestar, la stella che guida i naviganti."
     },
     "settings": {
       "name": "Nome e aspetto",
@@ -2405,7 +2406,6 @@
   "dm": {
     "subtitle": "{{role}} · di {{owner}}",
     "subtitleNoOwner": "{{role}} · senza responsabile",
-    "profile": "Vedi profilo",
     "emptyAgent": "Chiedigli di ricordare, dimenticare o lavorare in modo diverso.",
     "emptyAgent_female": "Chiedile di ricordare, dimenticare o lavorare in modo diverso.",
     "opening": "Apertura della conversazione…",

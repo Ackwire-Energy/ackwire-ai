@@ -1127,8 +1127,9 @@ describe("direct messages with an agent", () => {
     expect(state.calls.find((c) => c.method === "dms.open")?.args).toEqual([ORG_ID, { agentId: ADA_ID }]);
     expect(screen().getByRole("heading", { level: 1, name: "Ada" })).toBeTruthy();
     expect(document.body.textContent).toContain("Dev · de João · Claude Sonnet 5.5");
-    // "Ver perfil": the agent's page in the panel beside the conversation (like a thread's), closed by its ×.
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver perfil" })));
+    // The header's face and name: the agent's page in the panel beside the conversation (like a thread's), closed by its ×.
+    const header = document.querySelector(".channel__header") as HTMLElement;
+    await act(async () => fireEvent.click(within(header).getByRole("button", { name: "Perfil de Ada" })));
     await settle(4);
     const side = screen().getByRole("complementary", { name: "Perfil da Ada" });
     await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Fechar" })));

@@ -995,11 +995,33 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .channel__topic[data-right-hand]::first-letter {
   text-transform: uppercase;
 }
-/* A face beside a name that rises to it (`.ac-captop`, a DM's name with a line under it): both start at one top,
-   whatever else the header holds. A name that doesn't rise stays centred on the face. */
-.channel__header > .ac-avatar:has(+ div > .ac-captop),
-.channel__header > .ac-avatar + div:has(> .ac-captop) {
-  align-self: flex-start;
+/* A DM's face and lines, one button (`DmWho`): it lies over them, its plate shows on hover. The face beside a name
+   that rises to it (`.ac-captop`, a name with a line under it) starts at one top with it. */
+.dm-who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: -4px auto -4px -8px;
+  padding: 4px 8px;
+  border-radius: var(--control-r-md);
+}
+.dm-who:has(.ac-captop) {
+  align-items: flex-start;
+}
+.dm-who__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dm-who__hit.profile-trigger {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.dm-who:has(> .dm-who__hit:hover) {
+  background: var(--plate);
 }
 /* Who thinks, after the owner: "Sonnet pelo plano do Claude" with its mark. */
 /* The engine line (an `.ac-iconline`) inside a line of text. */
@@ -8914,6 +8936,10 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   color: var(--muted);
   font-size: 15px;
   font-weight: 500;
+}
+/* The right hand's name story, its own line under the handle. */
+.agp-story {
+  flex-basis: 100%;
 }
 .agp-chips {
   display: flex;
