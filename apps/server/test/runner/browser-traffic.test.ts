@@ -256,7 +256,7 @@ test("a socket that fails or closes settles the attach and keeps what was counte
   broken.close();
 });
 
-test("the GET guard (ADR 0135): only while armed, every session's requests pause; one carrying the value fails", async () => {
+test("the GET guard (ADR 0139): only while armed, every session's requests pause; one carrying the value fails", async () => {
   const { c, cdp } = counter();
   cdp.onopen?.();
   cdp.reply(1);

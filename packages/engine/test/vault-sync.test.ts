@@ -21,7 +21,7 @@ import { sourceConnection, sourceOf } from "../src/vault/seal";
 import { everythingStored, SOURCE_PASSWORD, SOURCE_TOKEN, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
- * Password managers in the Vault (ADR 0135): connecting checks the credentials and reads the items before it answers;
+ * Password managers in the Vault (ADR 0139): connecting checks the credentials and reads the items before it answers;
  * the credentials are sealed and never come back; each sync adds, updates and marks missing what the source lists;
  * a refusal stays on the connection, in our words.
  */

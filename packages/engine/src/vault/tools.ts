@@ -21,7 +21,7 @@ import {
 } from "./index";
 
 /**
- * The Vault as tools (ADR 0135): what people saved for the agent, found before it asks them (`vault_list`), and the
+ * The Vault as tools (ADR 0139): what people saved for the agent, found before it asks them (`vault_list`), and the
  * contacts it keeps for them (`vault_save`, `vault_delete`). No tool ever returns a password or a key: a login is
  * typed by the browser (`type_secret` with `login`, browser/tools.ts) and a key goes to one command (`run_code` with
  * `keys`, sandbox-tools.ts), each sealed for the agent's own computer. Contact fields aren't secret: they are meant

@@ -1,5 +1,5 @@
 /**
- * A Vault source (ADR 0135): where the values of some Vault items live. The built-in source (Postgres, sealed with
+ * A Vault source (ADR 0139): where the values of some Vault items live. The built-in source (Postgres, sealed with
  * the installation's key wrapper, ADR 0007) lives in the engine; 1Password and Bitwarden are adapters here, and a
  * module can add more through `AgentesModule.adapters()` (`vaultSources`, merged by kind).
  *

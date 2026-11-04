@@ -460,7 +460,7 @@ export async function isGranted(db: Executor, profileId: string, agentId: string
 
 /**
  * Every agent a profile is granted to, read now (never cached): who shares the sessions signed in there, as a Vault
- * login typed in it checks (ADR 0135).
+ * login typed in it checks (ADR 0139).
  */
 export async function profileGrantees(db: Executor, orgId: string, profileId: string): Promise<string[]> {
   const rows = await db

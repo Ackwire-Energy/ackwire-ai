@@ -434,7 +434,7 @@ test("a code split in boxes goes to the runner with every box; a Vault login is 
   expect(actionCommands({ kind: "type_secret", at: { ref: "e4" }, secret: "ACME_PASSWORD" }, site)).toMatchObject([
     { command: "agentes:type_secret", args: ["@e4", "ACME_PASSWORD", "https://acme.example"] },
   ]);
-  // A login is sealed at its step (ADR 0135), never sent by name.
+  // A login is sealed at its step (ADR 0139), never sent by name.
   expect(() =>
     actionCommands({ kind: "type_secret", at: { ref: "e4" }, login: "item-1", url: "https://acme.example/" }, site),
   ).toThrow("Vault");

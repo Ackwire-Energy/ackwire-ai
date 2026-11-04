@@ -234,7 +234,7 @@ async function boot(
         : null,
     // GIFs in chat (ADR 0091), only with a key: without one nothing reaches GIPHY and the app shows no GIFs.
     gifs: gifProvider(config, () => gifKey?.key() ?? null),
-    // The Vault's external sources (ADR 0135): nothing reaches them until a person connects one. A self-hosted
+    // The Vault's external sources (ADR 0139): nothing reaches them until a person connects one. A self-hosted
     // Bitwarden's address is typed by a person, so its requests go only to public addresses, pinned at connect time.
     vaultSources: Object.fromEntries(
       [createOnePasswordSource(), createBitwardenSource({ fetch: publicHttpsFetch() })].map((source) => [

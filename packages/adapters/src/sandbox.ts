@@ -15,7 +15,7 @@ export interface ExecRequest {
   signal?: AbortSignal;
   /** A person approved this very command (an approval card): the computer runs it even when its command policy would hold it. */
   approved?: boolean;
-  /** Vault keys sealed to the computer's one-use key, for this command's environment only (ADR 0135). */
+  /** Vault keys sealed to the computer's one-use key, for this command's environment only (ADR 0139). */
   vault?: Extract<MachineRequest, { op: "exec" }>["vault"];
 }
 

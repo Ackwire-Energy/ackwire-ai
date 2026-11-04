@@ -24,7 +24,7 @@ import { AgentRows, useVaultNames } from "./parts";
 type Level = "in" | "out";
 
 /**
- * Who has access to an item (`?id=`) or, by default, to a connection's items (`?connection=`), ADR 0135 §2: for the
+ * Who has access to an item (`?id=`) or, by default, to a connection's items (`?connection=`), ADR 0139 §2: for the
  * team's, everyone in the workspace or the roles and people chosen (on the shared `AccessList`); for both, the agents
  * that may use it, one switch each. The sentence at the end says what it adds up to before it's saved.
  */

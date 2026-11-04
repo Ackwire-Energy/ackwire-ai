@@ -1,5 +1,5 @@
 /**
- * Every use of a Vault item (ADR 0135): a row in `vault_uses` (the item's "Recent uses") and, for what an agent typed
+ * Every use of a Vault item (ADR 0139): a row in `vault_uses` (the item's "Recent uses") and, for what an agent typed
  * or gave to a command and what a person showed or copied, a line in the audit log. Never the value. A login's
  * place is kept as its origin only: a page's path or query may carry a token.
  */

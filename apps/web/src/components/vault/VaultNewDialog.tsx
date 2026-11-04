@@ -21,7 +21,7 @@ import { cleanContact, draftErrors, type ItemDraft, ItemFields, VaultTile } from
 import "./vault.css";
 
 /*
- * "New item" (ADR 0135): what to save (a login, a key, contact details), its fields, and who may use it. A personal
+ * "New item" (ADR 0139): what to save (a login, a key, contact details), its fields, and who may use it. A personal
  * item starts usable by any of its owner's agents when the owner asks; a team one starts seen by everyone and used by
  * no agent until someone picks them.
  */

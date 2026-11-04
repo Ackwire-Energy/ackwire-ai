@@ -20,7 +20,7 @@ import { ActionList, copyText, MONO, successHaptic } from "../shared/parts";
 import { agentOn, type Names, toggleAgent } from "./logic";
 
 /*
- * What the Vault's screens share (ADR 0135): names for the summaries, a field row, the scope choice, the agents'
+ * What the Vault's screens share (ADR 0139): names for the summaries, a field row, the scope choice, the agents'
  * switches, and a saved value with Show and Copy.
  */
 

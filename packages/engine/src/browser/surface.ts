@@ -163,7 +163,7 @@ export function observationOf(data: unknown): ScreenObservation | null {
   return observeSnapshot({ text: d.snapshot, url, refs: d.refs });
 }
 
-/** A Vault login made ready to type once (ADR 0135): the runner's command and what follows its answer. */
+/** A Vault login made ready to type once (ADR 0139): the runner's command and what follows its answer. */
 export interface VaultTyping {
   /** `agentes:type_vault [ref, rule, box]`: the password sealed to a one-use key of the agent's computer. */
   command: BrowserBatchCommand;
@@ -180,7 +180,7 @@ export interface BrowserSurfaceOptions {
   /** A `type_secret`'s site, from what `request_secret` delivered (never from the agent). */
   secretSite?: (name: string) => string | null;
   /**
-   * A Vault login (ADR 0135), released and sealed at the step that types it, for the field `ref` on the page at `url`
+   * A Vault login (ADR 0139), released and sealed at the step that types it, for the field `ref` on the page at `url`
    * (where it was found); or why it can't be typed. Without it a login step fails.
    */
   vaultLogin?: (login: string, ref: string, url: string | null) => Promise<VaultTyping | string>;

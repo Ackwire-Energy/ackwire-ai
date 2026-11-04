@@ -1,5 +1,5 @@
 /**
- * The Vault for agents (ADR 0135): what a run may list, type, give to a command and change. Every call reads who is
+ * The Vault for agents (ADR 0139): what a run may list, type, give to a command and change. Every call reads who is
  * behind the run (`vaultPersonOfRun`) and checks each item (`runAccess`); a refusal is a `VaultRefusal` with English
  * words for the model, never a hint that an item hidden from the run exists.
  *
@@ -158,7 +158,7 @@ export interface VaultBrowserProfile {
 }
 
 /**
- * Whether a login may be typed in a shared browser profile (ADR 0135 §2, ADR 0110): the session it opens stays in
+ * Whether a login may be typed in a shared browser profile (ADR 0139 §2, ADR 0110): the session it opens stays in
  * the profile for every agent granted it, whoever each one works for. So a personal login never is, nor a team login
  * open only to some people (an agent there working for anyone else would act signed in with it); a team login open
  * to everyone, only when it is shared with all agents or with each agent the profile is granted to.
@@ -306,7 +306,7 @@ function auditByAgent(
  * An agent's change (`vault_save`): a new contact, personal to the person behind the run (none behind it: refused),
  * or, on an item it may use, a contact's title and fields, a login's username or any item's description. A personal
  * item changes for its owner (only their runs see it); a team item only for someone who manages credentials, as in
- * the app (ADR 0135 §2). Only built-in items: an external one changes in its source.
+ * the app (ADR 0139 §2). Only built-in items: an external one changes in its source.
  */
 export async function saveVaultItemByAgent(
   deps: VaultDeps,
@@ -404,7 +404,7 @@ async function createContact(
         title,
         description,
         ...sealed,
-        // A personal item: any agent its owner asks may use it (ADR 0135).
+        // A personal item: any agent its owner asks may use it (ADR 0139).
         allAgents: true,
         createdByAgentId: run.agentId,
       })
@@ -419,7 +419,7 @@ async function createContact(
 }
 
 /**
- * An agent deletes an item it may use (`vault_delete`), only one it saved itself (ADR 0135 §2): anything people saved,
+ * An agent deletes an item it may use (`vault_delete`), only one it saved itself (ADR 0139 §2): anything people saved,
  * personal or the team's, is deleted by people in the app, where they see what goes. Only built-in items.
  */
 export async function deleteVaultItemByAgent(

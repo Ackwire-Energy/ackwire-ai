@@ -18,7 +18,7 @@ import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from
 import { renderApp, screen, settle } from "./render";
 
 /*
- * Settings › Vault and the secret request card's "Save to the Vault" (ADR 0135), against a fake Vault: the lists and
+ * Settings › Vault and the secret request card's "Save to the Vault" (ADR 0139), against a fake Vault: the lists and
  * their counts, what a member without `manage_credentials` can't do, Show and Copy asking the server, the card saving
  * only after it delivered and only when its box is checked, and a code typed one digit per box.
  */
@@ -195,7 +195,7 @@ async function openVault(state = seedState(), overview = overviewOf()) {
 
 const rows = () => [...document.querySelectorAll<HTMLElement>(".vlt-row")];
 
-describe("Settings › Vault (ADR 0135)", () => {
+describe("Settings › Vault (ADR 0139)", () => {
   test("lists the team's items and mine, each view with its count, and the connections", async () => {
     const { t } = await openVault();
     expect(document.querySelector(".settings__body h2")?.textContent).toBe(t("settings.section.vault"));
@@ -363,7 +363,7 @@ async function withRequest(
   return { state, t, card };
 }
 
-describe("the secret request card: Save to the Vault (ADR 0135)", () => {
+describe("the secret request card: Save to the Vault (ADR 0139)", () => {
   test("checked (the default): saved after it was delivered, for Ada, as mine", async () => {
     const { state, t, card } = await withRequest({ kind: "env" });
     const save = within(card()).getByRole("checkbox", { name: t("vault.card.save") });

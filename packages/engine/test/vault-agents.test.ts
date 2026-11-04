@@ -28,7 +28,7 @@ import {
 } from "./vault-fixtures";
 
 /**
- * The Vault for agents (ADR 0135): what a run may list (metadata, contacts' fields), the values it may release to be
+ * The Vault for agents (ADR 0139): what a run may list (metadata, contacts' fields), the values it may release to be
  * sealed for its computer, what it may change, and the words it gets when refused (never a hint of a hidden item).
  */
 

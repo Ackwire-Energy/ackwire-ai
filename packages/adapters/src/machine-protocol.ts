@@ -466,7 +466,7 @@ export const OPENCODE_PROTOCOL = 39;
  */
 export const CONVERSATION_PROTOCOL = 40;
 /**
- * From this protocol on (ADR 0135): the Vault. `vault.key` makes a one-use key pair in the agent's process (its
+ * From this protocol on (ADR 0139): the Vault. `vault.key` makes a one-use key pair in the agent's process (its
  * worker in system mode) and answers its public key; the private key lives only in that process's memory, for two
  * minutes, and goes at its first use. Sealed to it: a login's password, typed by the browser command
  * `agentes:type_vault [ref, rule, boxJson]` only into a password field of a frame the rule allows (refusals answer a
@@ -504,7 +504,7 @@ export type VaultTypeRefusal = (typeof VAULT_TYPE_REFUSALS)[number];
 export const VAULT_EXEC_KEYS = 10;
 
 /**
- * Protocol 41 (ADR 0135): keys from the Vault for one command, each sealed to the agent's `vault.key` with the
+ * Protocol 41 (ADR 0139): keys from the Vault for one command, each sealed to the agent's `vault.key` with the
  * additional data `vaultAad({ keyId, agentId, use: { kind: "env", name } })`. They go into that one command's
  * environment and its output is redacted; they are never written anywhere.
  */
@@ -1586,7 +1586,7 @@ export type MachineRequest = (
       stream: boolean;
       /** A person approved this very command (an approval card): it runs even when the command policy would hold it. */
       approved?: boolean;
-      /** Protocol 41: Vault keys for this command only (ADR 0135). */
+      /** Protocol 41: Vault keys for this command only (ADR 0139). */
       vault?: ExecVault;
     }
   | { op: "read"; path: string; maxBytes: number }
@@ -1696,7 +1696,7 @@ export type MachineRequest = (
   | { op: "desktop.apps" }
   /** Protocol 25: the text on the agent's screen, read on the computer. */
   | { op: "desktop.text" }
-  /** Protocol 41: a one-use key the request's agent's Vault values are sealed to (ADR 0135). */
+  /** Protocol 41: a one-use key the request's agent's Vault values are sealed to (ADR 0139). */
   | { op: "vault.key" }
 ) & {
   agent?: AgentScope;

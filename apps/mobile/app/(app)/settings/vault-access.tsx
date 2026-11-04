@@ -2,7 +2,7 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { textParam, vaultHref } from "@/features/vault/logic";
 import { VaultAccessScreen } from "@/features/vault/VaultAccessScreen";
 
-/** Who has access to a Vault item (`?id=`) or, by default, to a connection's items (`?connection=`; ADR 0135). */
+/** Who has access to a Vault item (`?id=`) or, by default, to a connection's items (`?connection=`; ADR 0139). */
 export default function SettingsVaultAccessRoute() {
   const params = useLocalSearchParams<{ id?: string; connection?: string }>();
   const itemId = textParam(params.id);

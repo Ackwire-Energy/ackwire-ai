@@ -9,7 +9,7 @@ import type {
 import type { IconName } from "@agenteschat/ui";
 
 /*
- * The Vault's words and rules as the web reads them (ADR 0135): what a row says, what a search finds, the access a new
+ * The Vault's words and rules as the web reads them (ADR 0139): what a row says, what a search finds, the access a new
  * item starts with, and the checks a form makes before the server makes them again.
  */
 

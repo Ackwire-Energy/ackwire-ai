@@ -1,5 +1,5 @@
 /**
- * Bitwarden and Vaultwarden as a Vault source (ADR 0135): a client of their API written here, so there is no CLI to
+ * Bitwarden and Vaultwarden as a Vault source (ADR 0139): a client of their API written here, so there is no CLI to
  * download and nothing on disk. It signs in with the account's personal API key, opens the account with its master
  * password, and reads the logins of one folder.
  *
@@ -44,7 +44,7 @@ export const BITWARDEN_SOURCE_KIND = "bitwarden";
 export interface BitwardenSourceOptions {
   /**
    * How the server reaches Bitwarden: the server passes one that connects only to public addresses
-   * (`publicHttpsFetch`, ADR 0135); tests pass a fake. An `OutboundAddressError` it throws is `invalid_input`.
+   * (`publicHttpsFetch`, ADR 0139); tests pass a fake. An `OutboundAddressError` it throws is `invalid_input`.
    */
   fetch?: typeof fetch;
   /** The clock for the key's lifetime and `retryAt` (tests pass a fake). */
@@ -54,7 +54,7 @@ export interface BitwardenSourceOptions {
 }
 
 const TIMEOUT_MS = 15_000;
-/** The longest the user key stays in memory for one connection (ADR 0135). */
+/** The longest the user key stays in memory for one connection (ADR 0139). */
 const KEY_TTL_MS = 10 * 60_000;
 /** An access token is not reused in its last minute. */
 const TOKEN_MARGIN_MS = 60_000;
@@ -385,14 +385,14 @@ async function profileEmail(http: Http, apiUrl: string, accessToken: string, sig
   return email;
 }
 
-/** Key derivations running at once across the process: each Argon2id one holds up to 128 MiB (ADR 0135). */
+/** Key derivations running at once across the process: each Argon2id one holds up to 128 MiB (ADR 0139). */
 const MAX_DERIVATIONS = 2;
 
 /** Runs heavy work in a queue of its own, or stops waiting for it when the caller's signal aborts. */
 export type DerivationQueue = <T>(orgId: string, work: () => Promise<T>, signal?: AbortSignal) => Promise<T>;
 
 /**
- * Key derivations (ADR 0135): one at a time per workspace, `MAX_DERIVATIONS` at most across the process. A workspace
+ * Key derivations (ADR 0139): one at a time per workspace, `MAX_DERIVATIONS` at most across the process. A workspace
  * whose account asks for the heaviest settings waits on itself and takes one slot at most, so the others go on.
  * Work whose caller gave up before its turn (`signal` aborted) never starts.
  */
@@ -623,7 +623,7 @@ const DESCRIPTOR: VaultSourceDescriptor = {
   helpUrl: "https://bitwarden.com/help/personal-api-key/",
 };
 
-/** Bitwarden and Vaultwarden (ADR 0135). One instance serves every connection of the server process. */
+/** Bitwarden and Vaultwarden (ADR 0139). One instance serves every connection of the server process. */
 export function createBitwardenSource(options: BitwardenSourceOptions = {}): VaultSource {
   const http: Http = {
     fetch: options.fetch ?? fetch,

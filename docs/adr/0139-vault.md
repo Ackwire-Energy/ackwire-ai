@@ -1,4 +1,4 @@
-# 0135. The Vault: logins, keys and contacts agents use, personal or the team's, from any source
+# 0139. The Vault: logins, keys and contacts agents use, personal or the team's, from any source
 
 - Status: Accepted (built: the server, the runner, the web and the phone app)
 - Date: 2026-11-03
@@ -8,7 +8,7 @@
 - Builds on: ADR 0007 (sealed values at rest), ADR 0002 (adapters and modules), ADR 0053 (who is behind a run),
   ADR 0085 and 0125 (roles as an audience), ADR 0110 (browser profiles), ADR 0117 (injection hardening)
 - Code: schema `packages/db/src/schema/vault.ts` (`vault_items`, `vault_connections`, `vault_uses`), migration
-  `0199_vault`; engine `packages/engine/src/vault/*` (access, items, connections, sync, CSV import, uses, the agent
+  `0208_vault`; engine `packages/engine/src/vault/*` (access, items, connections, sync, CSV import, uses, the agent
   tools in `tools.ts`); sources `packages/adapters/src/vault/*` (the port `source.ts`, the site rule `site.ts`,
   `onepassword.ts`, `bitwarden.ts`); the box's additional data `vaultAad` in `packages/adapters/src/secret-box.ts`;
   protocol 41 (`VAULT_PROTOCOL`, `vault.key`, `agentes:type_vault`, `exec.vault`) and the runner's in-memory store

@@ -59,7 +59,7 @@ import {
   websiteOrigin,
 } from "../../src/features/vault/logic";
 
-/** A `t` that says which key and values it got, so the logic is tested apart from the words (ADR 0135). */
+/** A `t` that says which key and values it got, so the logic is tested apart from the words (ADR 0139). */
 const t = ((key: string, values?: Record<string, unknown>) =>
   values ? `${key}${JSON.stringify(values)}` : key) as unknown as TFunction;
 

@@ -1,5 +1,5 @@
 /**
- * Vault rows as people and agents see them (ADR 0135). Never a value: a contact's fields are the only thing opened
+ * Vault rows as people and agents see them (ADR 0139). Never a value: a contact's fields are the only thing opened
  * here, since they are meant to be read (by the people who see the item and by the agents who may use it).
  */
 import type { VaultSources } from "@agenteschat/adapters";

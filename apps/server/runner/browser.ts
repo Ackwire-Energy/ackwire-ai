@@ -314,9 +314,9 @@ export interface BrowserAnswer {
 /** An answer's `setup`, only when something was timed. */
 const withSetup = (setup: BrowserSetup) => (Object.keys(setup).length > 0 ? { setup } : {});
 
-/** A Vault refusal (ADR 0135): its `code` (`VAULT_TYPE_REFUSALS`) and a plain reason, never a value. */
+/** A Vault refusal (ADR 0139): its `code` (`VAULT_TYPE_REFUSALS`) and a plain reason, never a value. */
 const refused = (code: VaultTypeRefusal, error: string): BrowserAnswer => ({ success: false, data: null, code, error });
-/** No guard to take back: a code, or a Chrome with no DevTools socket of ours (ADR 0135). */
+/** No guard to take back: a code, or a Chrome with no DevTools socket of ours (ADR 0139). */
 const NO_GUARD = { release: () => {} };
 /** The commands `fillChecked` sends per field: focus, check and mark, fill by the mark, unmark; the fill's place. */
 const FILL_STEPS = 4;
@@ -654,7 +654,7 @@ const OLD_START_PAGE_ID = "mbgkclemiokgppkieijlfaoehgdjlhbl";
  * - New tabs no longer point at the old start page extension, which isn't
  *   loaded anymore (its `extensions.chrome_url_overrides.newtab` entry).
  * - Chrome's own password manager, its sign-in with saved passwords, its leak
- *   check and its address and card autofill are off (ADR 0135): passwords
+ *   check and its address and card autofill are off (ADR 0139): passwords
  *   reach an agent's pages only through the runner's typing, which checks
  *   where it types, and nothing an agent typed is saved in its profile.
  * A Preferences file that isn't JSON is Chrome's to deal with, and neither is
@@ -1081,7 +1081,7 @@ export interface BrowserManagerOptions {
   send: (frame: RunnerFrame) => boolean;
   /** A secret delivered to the agent (ADR 0027), by name, with the one site it was sealed to, or null. */
   secret: (agent: AgentScope, name: string) => Promise<{ value: string; site: string | null } | null>;
-  /** The Vault's keys and redaction in this process (ADR 0135; default: the process's own, `runnerVault`). */
+  /** The Vault's keys and redaction in this process (ADR 0139; default: the process's own, `runnerVault`). */
   vault?: RunnerVault;
   /** System mode: root preguards this UID's fixed CDP and stream listener ports. */
   fixedPorts?: BrowserPorts;
@@ -1204,7 +1204,7 @@ interface Session {
   updatedTo?: string;
   /** When a sweep last found someone watching it or a person's turn open on it. */
   heldAt?: number;
-  /** The GET guard stopped a request carrying a typed password since the agent last heard (ADR 0135). */
+  /** The GET guard stopped a request carrying a typed password since the agent last heard (ADR 0139). */
   guardBlocked?: boolean;
 }
 
@@ -1550,7 +1550,7 @@ export class BrowserManager {
   /**
    * `browser.act`: one command in the agent's session, after the checks, and what it waited on (protocol 27).
    * `actor`: the agent whose turn it is (a browser profile's session is shared, ADR 0110): its Vault keys open
-   * there (ADR 0135).
+   * there (ADR 0139).
    */
   async act(
     agent: AgentScope,
@@ -1624,7 +1624,7 @@ export class BrowserManager {
         answers.push(notice);
         return true;
       };
-      /** A typed password the page tried to send in an address (ADR 0135): told in place of the action under it. */
+      /** A typed password the page tried to send in an address (ADR 0139): told in place of the action under it. */
       const blocked = () => {
         if (acted < 0) return false;
         const notice = this.takeBlocked(session);
@@ -1662,7 +1662,7 @@ export class BrowserManager {
           if ((acted >= 0 && (died() || blocked())) || (!answer.success && !p.tolerate)) break;
         }
       } finally {
-        // Each Vault value this batch opened goes with it (ADR 0135).
+        // Each Vault value this batch opened goes with it (ADR 0139).
         opening.close();
       }
       return { answers, ...withSetup(setup) };
@@ -1797,7 +1797,7 @@ export class BrowserManager {
     const timeoutMs = Math.max(1, Math.min(600, Number(timeoutSeconds) || 60)) * 1000;
     // Checked when it runs (the secret, the site, the field).
     if (command === "agentes:type_secret") return { command, args, timeoutMs };
-    // ADR 0135: a Vault login's shape is checked before anything of the batch runs; its site and field when it runs.
+    // ADR 0139: a Vault login's shape is checked before anything of the batch runs; its site and field when it runs.
     if (command === "agentes:type_vault") {
       parseTypeVault(args);
       return { command, args, timeoutMs };
@@ -2584,7 +2584,7 @@ export class BrowserManager {
   /**
    * `agentes:type_secret [ref, NAME, site, ...moreRefs]`: types a secret delivered with `request_secret` into a
    * password or one-time-code field. The value goes to `agent-browser` on stdin (never on a command line) and never
-   * back. Protocol 41 (ADR 0135): with more refs, a code goes one character per field, in order (`typeCode`).
+   * back. Protocol 41 (ADR 0139): with more refs, a code goes one character per field, in order (`typeCode`).
    */
   private async typeSecret(
     agent: AgentScope,
@@ -2655,7 +2655,7 @@ export class BrowserManager {
         error: `${ref} isn't a password or one-time-code field; secrets are only typed into those`,
       };
     }
-    // A password (not a one-time code) is guarded from leaving in an address, armed before it is typed (ADR 0135).
+    // A password (not a one-time code) is guarded from leaving in an address, armed before it is typed (ADR 0139).
     const password = type === "password" || /\b(current-password|new-password)\b/.test(autocomplete);
     const guard = password ? await this.guardBeforeTyping(session, value) : NO_GUARD;
     if (!guard) return refused("unguarded", UNGUARDED);
@@ -2677,7 +2677,7 @@ export class BrowserManager {
   }
 
   /**
-   * A code from `request_secret` split over one field per character (ADR 0135): each field checked in the page
+   * A code from `request_secret` split over one field per character (ADR 0139): each field checked in the page
    * where it is typed (a text, number or one-time-code input, in a frame on the secret's site) and filled with its
    * character, all in one `agent-browser` invocation (`fillChecked`).
    */
@@ -2738,7 +2738,7 @@ export class BrowserManager {
   }
 
   /**
-   * `agentes:type_vault [ref, rule, boxJson]` (protocol 41, ADR 0135): a Vault login's password, sealed to one of
+   * `agentes:type_vault [ref, rule, boxJson]` (protocol 41, ADR 0139): a Vault login's password, sealed to one of
    * `actor`'s one-use keys for this rule, typed into a password field on a page the rule allows. The page's own
    * address (`get url`, from the browser, not the page) must match the rule; the guard that stops a request carrying
    * the password in its address is armed, and acknowledged by Chrome, before anything is typed
@@ -2813,7 +2813,7 @@ export class BrowserManager {
   }
 
   /**
-   * Types `fields` (a ref and its text each) in ONE `agent-browser` invocation (ADR 0135): each field is focused,
+   * Types `fields` (a ref and its text each) in ONE `agent-browser` invocation (ADR 0139): each field is focused,
    * checked in the page and marked there with a one-time attribute (`vaultFieldScript`), then filled by that mark,
    * not by its ref (which `fill` would look up again: a page that navigated meanwhile, or a ref now pointing
    * elsewhere, has no element with the mark, so nothing is typed), and the mark is taken off. `--bail` stops at the
@@ -2866,7 +2866,7 @@ export class BrowserManager {
   }
 
   /**
-   * A value typed, or about to be (ADR 0135): redacted from what this agent's browser (and a profile's session)
+   * A value typed, or about to be (ADR 0139): redacted from what this agent's browser (and a profile's session)
    * sends back for 10 minutes.
    */
   private typed(session: Session, actor: AgentScope, name: string, value: string) {
@@ -2874,7 +2874,7 @@ export class BrowserManager {
   }
 
   /**
-   * Before a password is typed (ADR 0135): its Chrome stops, for 2 minutes, any request that would carry it in an
+   * Before a password is typed (ADR 0139): its Chrome stops, for 2 minutes, any request that would carry it in an
    * address (`GET_BLOCKED`, told at the next action's answer). Armed and acknowledged by Chrome on every session
    * before the fill, so a page that sends the form the moment the field changes can't get the password out in
    * between. Null when Chrome didn't confirm it: then nothing is typed. A Chrome the runner has no DevTools socket to

@@ -39,7 +39,7 @@ import { pairMachine } from "./machine-fixtures";
 import { agentRunRow, channelRoutine, fire } from "./routine-fixtures";
 
 /**
- * The Vault's tools (ADR 0135): what the Vault shares with an agent for the person behind its run, listed without a
+ * The Vault's tools (ADR 0139): what the Vault shares with an agent for the person behind its run, listed without a
  * value; a saved login typed by the browser and a saved key given to one command, each sealed to a one-use key of
  * the agent's own computer (a fake runner here, which opens the boxes the way the real one does); contacts the agent
  * keeps for people.

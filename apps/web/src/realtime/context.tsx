@@ -468,7 +468,7 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
       // The groups of agents someone changed meanwhile.
       void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
-      // The Vault, whose `vault.changed` may have come while offline (ADR 0135).
+      // The Vault, whose `vault.changed` may have come while offline (ADR 0139).
       void qc.invalidateQueries({ queryKey: keys.vault(orgId) });
     });
     // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
@@ -534,7 +534,7 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
         void qc.invalidateQueries({ queryKey: keys.channelPermissions(orgId, event.channelId) });
       }
-      // The Vault changed (ADR 0135, org broadcast): what this person may see of it refetches. Never a value.
+      // The Vault changed (ADR 0139, org broadcast): what this person may see of it refetches. Never a value.
       if (event.type === "vault.changed") void qc.invalidateQueries({ queryKey: keys.vault(orgId) });
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {

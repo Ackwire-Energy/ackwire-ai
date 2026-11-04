@@ -23,7 +23,7 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /*
- * Who has access to a Vault item, or to a connection's items by default (ADR 0135): the people who see it and on
+ * Who has access to a Vault item, or to a connection's items by default (ADR 0139): the people who see it and on
  * whose behalf agents may use it (team only: a personal item is its owner's), the agents that may use it, and the
  * whole of it said in one sentence.
  */
@@ -62,7 +62,7 @@ export function agentsSummary(t: TFunction, locale: string, dir: Directory, acce
 }
 
 /**
- * The whole of it in one sentence, as the server decides it (ADR 0135 §3): which agents, and when someone asks.
+ * The whole of it in one sentence, as the server decides it (ADR 0139 §3): which agents, and when someone asks.
  * "Dev and Infra can use it when someone in Support or Ana asks."
  */
 export function accessSentence(

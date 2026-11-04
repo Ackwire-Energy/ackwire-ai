@@ -216,7 +216,7 @@ const KNOWN = {
   "widget.not_agent_message": "dashboards.errors.notAgentMessage",
   "widget.prompt_required": "dashboards.errors.promptRequired",
   "widget.not_tested": "dashboards.errors.notTested",
-  // The Vault (ADR 0135): what a person typed, who may see or use an item, an import, a card's "Save to the Vault".
+  // The Vault (ADR 0139): what a person typed, who may see or use an item, an import, a card's "Save to the Vault".
   "vault.invalid": "errors.vault.invalid",
   "vault.not_found": "errors.vault.notFound",
   "vault.title_required": "errors.vault.titleRequired",

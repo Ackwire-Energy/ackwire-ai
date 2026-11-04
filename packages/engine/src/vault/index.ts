@@ -1,5 +1,5 @@
 /**
- * The Vault (ADR 0135). The tools (`tools.ts`) import from here, so this file never exports them: the engine's
+ * The Vault (ADR 0139). The tools (`tools.ts`) import from here, so this file never exports them: the engine's
  * index does.
  */
 export { type VaultRunPerson, type VaultViewer, vaultPersonOfRun } from "./access";

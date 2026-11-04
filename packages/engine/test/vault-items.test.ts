@@ -13,7 +13,7 @@ import { itemAad, openItemValue } from "../src/vault/seal";
 import { everythingStored, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
- * Vault items for people (ADR 0135): saved sealed and bound to their workspace, id, owner and version; never a value
+ * Vault items for people (ADR 0139): saved sealed and bound to their workspace, id, owner and version; never a value
  * in a list, a detail, the audit log, a use or an event; shown or copied only by who manages them, and recorded.
  */
 

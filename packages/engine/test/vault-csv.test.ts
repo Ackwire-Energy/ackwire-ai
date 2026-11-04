@@ -5,7 +5,7 @@ import { csvLayout, parseVaultCsv } from "../src/vault/csv";
 import { everythingStored, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
- * Importing a passwords export (ADR 0135): Chrome, 1Password, Bitwarden or any CSV with a website and a password;
+ * Importing a passwords export (ADR 0139): Chrome, 1Password, Bitwarden or any CSV with a website and a password;
  * HTTPS logins only; the same login again is a duplicate or an update; nothing of the file is kept but the sealed
  * logins.
  */

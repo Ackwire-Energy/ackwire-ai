@@ -83,7 +83,7 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
     const app = auditStr(row.details.app) ?? auditStr(row.details.client);
     if (what && app) return t(`audit.change.apps.${what}`, { app });
   }
-  // The Vault (ADR 0135): its own sentences, since a value shown or copied and a password manager connected don't
+  // The Vault (ADR 0139): its own sentences, since a value shown or copied and a password manager connected don't
   // read as "<verb> <area>".
   if (area === "vault") {
     const what = VAULT_ACTIONS.find((s) => s === rest);
@@ -105,7 +105,7 @@ export function auditSentence(t: TFunction, row: AuditRow, locale: string): { na
   return { name, text: name ? lowerFirst(text, locale) : text };
 }
 
-/** The Vault's actions (ADR 0135), each with a sentence of its own. */
+/** The Vault's actions (ADR 0139), each with a sentence of its own. */
 const VAULT_ACTIONS = [
   "item_created",
   "item_changed",

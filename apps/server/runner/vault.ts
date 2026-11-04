@@ -15,7 +15,7 @@ import { parseVaultRule, type VaultOriginRule } from "@agenteschat/adapters/vaul
 import { RunnerError } from "./errors";
 
 /**
- * What the Vault leaves on a computer (ADR 0135), all of it in this process's memory, never on disk, never in a
+ * What the Vault leaves on a computer (ADR 0139), all of it in this process's memory, never on disk, never in a
  * log, an argument list or an error:
  *
  * - One-use keys (`vault.key`): the server seals a login's password or a key's value to one, for one agent and one
@@ -208,7 +208,7 @@ export class RunnerVault {
 export const runnerVault = new RunnerVault();
 
 /**
- * What one request opened (ADR 0135): each key taken once, at its first use; each value kept until the request
+ * What one request opened (ADR 0139): each key taken once, at its first use; each value kept until the request
  * ends (`close`), so a second field typed with the same box (a password and its confirmation) doesn't need the key
  * again. Every value opened is armed for redaction.
  */
@@ -377,7 +377,7 @@ export interface VaultFieldWant {
 export type VaultFieldVerdict = "wrong_site" | "in_frame" | "not_password_field" | "not_code_field" | "get_form";
 
 /**
- * Whether a field may get the value (null) or why not (ADR 0135). It runs in the page (`vaultFieldScript` sends its
+ * Whether a field may get the value (null) or why not (ADR 0139). It runs in the page (`vaultFieldScript` sends its
  * source), where the page's own scripts run too and can patch any DOM method or accessor the script reads
  * (`activeElement`, a field's `type` and `form`, `getAttribute`). What they can't fake is `location` (its `origin`
  * and `ancestorOrigins`), `window` and `top`, which the platform makes unforgeable. So what this guarantees is where

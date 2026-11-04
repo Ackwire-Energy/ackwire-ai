@@ -4,7 +4,7 @@ import { schema } from "@agenteschat/db";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 /*
- * The Vault's routes (ADR 0135): who sees, edits and reveals what, and that no answer but `reveal` ever carries a
+ * The Vault's routes (ADR 0139): who sees, edits and reveals what, and that no answer but `reveal` ever carries a
  * password or a key.
  */
 

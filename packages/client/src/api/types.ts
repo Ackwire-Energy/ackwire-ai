@@ -2698,7 +2698,7 @@ export interface SecretRequest {
   replaces?: boolean;
   /**
    * A site's password: the username the agent will type with it, prefilled in the card's "Save to the Vault"
-   * (ADR 0135). Absent on cards from before the Vault.
+   * (ADR 0139). Absent on cards from before the Vault.
    */
   username?: string | null;
   /** A verification code: how many digits (one box each). Never saved to the Vault. Null or absent otherwise. */

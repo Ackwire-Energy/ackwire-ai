@@ -5,7 +5,7 @@ import { openItemValue } from "../src/vault/seal";
 import { everythingStored, runAskedBy, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
- * "Save to the Vault" on a secret request's card (ADR 0135): only the person it was asked of, once delivered; a
+ * "Save to the Vault" on a secret request's card (ADR 0139): only the person it was asked of, once delivered; a
  * site's password becomes a login for that site, a variable a key with its name; a file or a code never; saving the
  * same login or key again replaces its value.
  */
@@ -105,7 +105,7 @@ describe("saving what was sent", () => {
     expect(other.id).not.toBe(item.id);
     expect(other.username).toBe("bruno-alt");
 
-    // The card always sends the username it shows: cleared, the agent's suggestion isn't kept (ADR 0135 §6).
+    // The card always sends the username it shows: cleared, the agent's suggestion isn't kept (ADR 0139 §6).
     const cleared = await saveSecretRequestToVault(
       v.deps,
       v.bruno.id,

@@ -43,9 +43,9 @@ export interface SecretRequestView {
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
   site: string | null;
-  /** A site password's username, when the agent gave it: the card shows it and saves it to the Vault (ADR 0135). */
+  /** A site password's username, when the agent gave it: the card shows it and saves it to the Vault (ADR 0139). */
   username: string | null;
-  /** A one-time code: one box per digit on the card (ADR 0135), never saved. Null for anything else. */
+  /** A one-time code: one box per digit on the card (ADR 0139), never saved. Null for anything else. */
   codeDigits: number | null;
   /** The connected machine that holds it (ADR 0025). */
   machineId: string | null;
@@ -112,7 +112,7 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
     case "delivered":
       if (target.kind === "site") {
         const host = new URL(target.site).host;
-        // A one-time code and the account's username, when the request had them (ADR 0135).
+        // A one-time code and the account's username, when the request had them (ADR 0139).
         const code = row.codeDigits
           ? ` It is a ${row.codeDigits}-digit code: type it now, into the code field; when the site shows one box per digit, give \`targets\` with every box in order.`
           : "";

@@ -903,7 +903,7 @@ export class RunnerDaemon implements RequestObserver {
     this.shared = this.prepareShared(workspaceReal, sharedSpec);
     this.measureShared();
     const secretsDir = path.join(home, "secrets");
-    // Site passwords live in memory now (ADR 0135): one an older runner kept on disk goes.
+    // Site passwords live in memory now (ADR 0139): one an older runner kept on disk goes.
     void dropStoredSiteSecrets(secretsDir);
     const socketPath = mcpSocketPath(home);
     const mcpCommand = { socketPath, command: this.self.command };

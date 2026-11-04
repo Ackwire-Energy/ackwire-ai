@@ -39,7 +39,7 @@ import {
 import { InputField, SavedValue, useVaultNames } from "./parts";
 
 /**
- * An item's page (ADR 0135), the web's item dialog as a pushed screen: its fields by kind (a password or a key only
+ * An item's page (ADR 0139), the web's item dialog as a pushed screen: its fields by kind (a password or a key only
  * as dots, shown or copied by who may, each time recorded), "Change" for a new value, who has access in one sentence
  * with the rows that change it, its recent uses, and Delete. An item from a password manager changes there: here
  * only its access, description and a key's name.

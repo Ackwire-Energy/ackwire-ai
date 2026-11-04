@@ -1,5 +1,5 @@
 /**
- * Connecting a password manager to the Vault (ADR 0135). The source checks what the person typed and says what to
+ * Connecting a password manager to the Vault (ADR 0139). The source checks what the person typed and says what to
  * keep: settings safe to show (`config`) and credentials (`secret`), sealed here at once and never sent back. A
  * personal connection is its owner's alone; a team one is for who manages credentials. Its items follow its access
  * by default (`access_from_connection`). A source's refusal comes out as its `VaultSourceError`, for the route to say

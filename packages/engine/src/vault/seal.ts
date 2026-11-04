@@ -1,5 +1,5 @@
 /**
- * Vault values at rest (ADR 0135): envelope encryption with the installation's key wrapper (ADR 0007), each value
+ * Vault values at rest (ADR 0139): envelope encryption with the installation's key wrapper (ADR 0007), each value
  * bound to where it belongs. An item's seal names its workspace, its id, its owner (or the team) and its version, so
  * a row copied to another workspace or another owner, or an old ciphertext put back, doesn't open. A connection's
  * seal names its workspace, id and owner. Nothing here keeps a plaintext.
@@ -119,7 +119,7 @@ export async function sourceConnection(
 
 /**
  * The source of a kind, only when this server has one by that name: a kind comes from a request or a row, so a name
- * like `constructor` or `__proto__` must find nothing rather than something on the object's prototype (ADR 0135).
+ * like `constructor` or `__proto__` must find nothing rather than something on the object's prototype (ADR 0139).
  */
 export function sourceOf(sources: VaultSources, kind: unknown): VaultSource | undefined {
   return typeof kind === "string" && Object.hasOwn(sources, kind) ? sources[kind] : undefined;
@@ -150,7 +150,7 @@ export async function readItemValue(
 }
 
 /**
- * The longest one call into a source may take, all its requests and its key derivation included (ADR 0135): past
+ * The longest one call into a source may take, all its requests and its key derivation included (ADR 0139): past
  * it the signal aborts, the source stops (or never starts) its work, and the call fails as `unreachable`.
  */
 export const VAULT_SOURCE_DEADLINE_MS = 60_000;

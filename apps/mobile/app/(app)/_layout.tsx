@@ -53,7 +53,7 @@ export default function AppLayout() {
 function AppStack() {
   const { colors } = useTheme();
   useUserEvents();
-  // The Vault's screens follow changes made anywhere (ADR 0135).
+  // The Vault's screens follow changes made anywhere (ADR 0139).
   useVaultEvents();
   useVoiceOutbox();
   useAppIconBadge();

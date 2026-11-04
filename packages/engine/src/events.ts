@@ -712,7 +712,7 @@ export const publishRoutineRuns = (pubsub: PubSub | undefined, orgId: string, ro
   publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "routine.runs", orgId, routineId } });
 
 /**
- * Something in the workspace's Vault changed (ADR 0135): an item, a connection, a sync. Nothing else goes out, not
+ * Something in the workspace's Vault changed (ADR 0139): an item, a connection, a sync. Nothing else goes out, not
  * even which item: each app fetches again what its person may see.
  */
 export type VaultChangedEvent = { type: "vault.changed"; orgId: string };

@@ -34,7 +34,7 @@ export function notAllowedMessage(name: string, detail: string, path?: string) {
 
 /**
  * Runner error codes → what the agent reads (and tells the people). The runner's error stays as the `cause` of the
- * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0135 §4).
+ * words given, so a caller can still tell where it failed (a Vault key's use, ADR 0139 §4).
  */
 function explain(error: unknown, name: string, path?: string): Error {
   if (!(error instanceof MachineRequestError)) return error instanceof Error ? error : new Error(String(error));
@@ -104,7 +104,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
           timeoutSeconds: request.timeoutSeconds,
           stream: Boolean(onOutput),
           ...(request.approved ? { approved: true } : {}),
-          // Vault keys for this one command (ADR 0135), sealed to a one-use key of this computer.
+          // Vault keys for this one command (ADR 0139), sealed to a one-use key of this computer.
           ...(request.vault ? { vault: request.vault } : {}),
         },
         { signal: request.signal, onOutput },
@@ -185,11 +185,11 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
   };
 }
 
-/** What a computer too old for the Vault answers (ADR 0135): its owner updates the runner. */
+/** What a computer too old for the Vault answers (ADR 0139): its owner updates the runner. */
 export const vaultUpdateText = (machineName: string, what: string) =>
   `The computer ${machineName} needs an update to ${what}. Its owner can run \`agentes-runner update\`.`;
 
-/** A one-use key on the agent's computer (ADR 0135, protocol 41): a Vault value is sealed to it, never sent bare. */
+/** A one-use key on the agent's computer (ADR 0139, protocol 41): a Vault value is sealed to it, never sent bare. */
 export type VaultKey = { keyId: string; publicKey: string; expiresAt: string };
 
 /**

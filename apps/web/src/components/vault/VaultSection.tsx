@@ -16,7 +16,7 @@ import { VaultNewDialog } from "./VaultNewDialog";
 import "./vault.css";
 
 /*
- * Settings › Vault (ADR 0135): the logins, keys and contact details agents use without seeing a password or a key.
+ * Settings › Vault (ADR 0139): the logins, keys and contact details agents use without seeing a password or a key.
  * One view at a time (Team, Personal, Connections, each with its count), a search and a kind filter over the items, a
  * row per item (what it is, who may use it, when it was last used) that opens its details.
  */

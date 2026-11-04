@@ -2635,7 +2635,7 @@ test.if(posix)(
     const activate = () =>
       t.sup.secret({ op: "secret", agent: ANA, action: "activate", requestId, order }, scope().scope);
     expect(await activate()).toEqual({ size: value.length });
-    // The worker's browser types it from memory (ADR 0135); root handed its copy on.
+    // The worker's browser types it from memory (ADR 0139); root handed its copy on.
     expect(await secretValue(path.join(t.ownHome, "secrets"), ANA, name)).toEqual({ value, site: target.site });
     expect(await secretValue(path.join(t.home, "secret-broker"), ANA, name)).toBeNull();
     for (const store of [

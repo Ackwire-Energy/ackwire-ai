@@ -1,5 +1,5 @@
 /**
- * "Save to the Vault" on a secret request's card (ADR 0135): after the person sent an agent a site's password or a
+ * "Save to the Vault" on a secret request's card (ADR 0139): after the person sent an agent a site's password or a
  * variable (ADR 0027, end to end to the computer), their browser sends the same value here once more to keep it. The
  * delivered box never comes here: the server sees the value only on this call, and only to seal it.
  *

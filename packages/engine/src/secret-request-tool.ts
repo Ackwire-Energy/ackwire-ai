@@ -7,7 +7,7 @@ import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
-/** A one-time code's boxes on the card (ADR 0135): one per digit. */
+/** A one-time code's boxes on the card (ADR 0139): one per digit. */
 export const CODE_DIGITS = { min: 4, max: 12 } as const;
 /** Longest username a request may carry (the Vault keeps the same). */
 export const MAX_SECRET_USERNAME = 200;
@@ -51,7 +51,7 @@ export function requestSecretTool(opts: {
     description:
       "For a password your browser types (browser_type_secret): the address of the page it goes into (https://…). It will only ever be typed on that site, and it stays out of your commands; leave `site` out for a secret a command uses.",
   } as const;
-  // ADR 0135: what the card shows besides the field, and what it lets the person save to the Vault.
+  // ADR 0139: what the card shows besides the field, and what it lets the person save to the Vault.
   const username = {
     type: "string",
     maxLength: MAX_SECRET_USERNAME,
@@ -139,7 +139,7 @@ export function requestSecretTool(opts: {
         if ((rawSite || opts.browserOnly) && !origin) {
           return { content: "`site` must be a web address (https://example.com/login).", isError: true };
         }
-        // A username and a code go with a site's sign-in only (ADR 0135).
+        // A username and a code go with a site's sign-in only (ADR 0139).
         const user = str(input.username).trim().slice(0, MAX_SECRET_USERNAME);
         const digits = codeDigitsOf(input.code);
         if ((user || input.code !== undefined) && (!origin || file)) {

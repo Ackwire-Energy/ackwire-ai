@@ -1,7 +1,7 @@
 import type { ToolOutput } from "../tools/types";
 
 /**
- * Why the Vault refused an agent (ADR 0135). The message is English, for the model, and says what to do next. It
+ * Why the Vault refused an agent (ADR 0139). The message is English, for the model, and says what to do next. It
  * never says that an item the run may not see exists: an item hidden from the person behind the run (or from a run
  * nobody is behind) is `not_found`, the same as one that never existed.
  */

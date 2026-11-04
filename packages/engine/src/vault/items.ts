@@ -1,5 +1,5 @@
 /**
- * The Vault for people (ADR 0135): what the app's Settings, Vault lists, saves, changes, shows and deletes. Every
+ * The Vault for people (ADR 0139): what the app's Settings, Vault lists, saves, changes, shows and deletes. Every
  * function checks the person itself (`access.ts`): an item they may not see is `NotFoundError`, the same as one that
  * doesn't exist, and what they see but don't manage is `ForbiddenError`. Values are sealed before any write
  * (`seal.ts`), and only `revealVaultItem` answers with one, recorded as a use and in the audit log.
@@ -428,7 +428,7 @@ export async function updateVaultItem(
     changed.push("keyName");
   }
   if (patch.title !== undefined) {
-    // An emptied name falls back as on creation: a contact's goes by its (new or saved) fields (ADR 0135).
+    // An emptied name falls back as on creation: a contact's goes by its (new or saved) fields (ADR 0139).
     const contact =
       kind !== "contact" || patch.title.trim()
         ? null
