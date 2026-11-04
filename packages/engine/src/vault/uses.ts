@@ -1,5 +1,5 @@
 /**
- * Every use of a Vault item (ADR 0142): a row in `vault_uses` (the item's "Recent uses") and, for what an agent typed
+ * Every use of a Vault item (ADR 0144): a row in `vault_uses` (the item's "Recent uses") and, for what an agent typed
  * or gave to a command, a line in the audit log. Never the value. A login's
  * place is kept as its origin only: a page's path or query may carry a token.
  */
@@ -64,7 +64,7 @@ export async function recordAgentChange(
  * An agent typed a login (`fill`, after its computer said it did) or gave a key to a command (`key`, once the
  * command started): the use, the item's last use and the audit line (`vault.item_used`, with the origin, the run
  * and the person it worked for). A use isn't a change to the Vault: no `vault.changed` goes to every open app for it
- * (ADR 0142 §7), so agents at work don't make every app reload the list.
+ * (ADR 0144 §7), so agents at work don't make every app reload the list.
  */
 export async function recordVaultUse(
   deps: Pick<VaultDeps, "db" | "now">,

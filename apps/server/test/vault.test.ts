@@ -4,7 +4,7 @@ import { eq, schema } from "@agenteschat/db";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 /*
- * The Vault's routes (ADR 0142): who sees and edits what, and that no answer ever carries a password or a key: once
+ * The Vault's routes (ADR 0144): who sees and edits what, and that no answer ever carries a password or a key: once
  * saved, a value never comes back to an app (§2).
  */
 
@@ -119,7 +119,7 @@ test("team items: who manages credentials creates and edits; a member sees them 
   expect((await w.ana(`${w.vault}/items/${loginId}`, { method: "PATCH", json: { title: "Taken" } })).status).toBe(403);
   expect((await w.ana(`${w.vault}/items/${loginId}`, { method: "DELETE" })).status).toBe(403);
 
-  // Not even its manager gets the value back: there is nothing to ask it of (ADR 0142 §2).
+  // Not even its manager gets the value back: there is nothing to ask it of (ADR 0144 §2).
   for (const purpose of ["show", "copy"]) {
     expect((await w.owner(`${w.vault}/items/${loginId}/reveal`, { json: { purpose } })).status).toBe(404);
   }
@@ -183,7 +183,7 @@ test("personal items are their owner's alone, the workspace's owner included", a
   const anaView = await overviewOf(w.ana, w.vault);
   expect(anaView.text).not.toContain(TOKEN_VALUE);
   expect(anaView.overview.items.map((i) => i.id).sort()).toEqual([id, contact.item?.id ?? ""].sort());
-  // The list carries no contact's fields; its page does (ADR 0142 §7).
+  // The list carries no contact's fields; its page does (ADR 0144 §7).
   expect(anaView.text).not.toContain("Ana Souza");
   const page = await (await w.ana(`${w.vault}/items/${contact.item?.id ?? ""}`)).json();
   expect(page).toMatchObject({ contact: { fullName: "Ana Souza", city: "Recife" }, unreadable: false });
@@ -264,7 +264,7 @@ test("Save to the Vault from a request's card: the person asked, a delivered pas
     hasSecret: true,
     access: { allAgents: false, agentIds: [w.agentId] },
   });
-  // Sealed in its row, and no app ever gets it back (ADR 0142 §2).
+  // Sealed in its row, and no app ever gets it back (ADR 0144 §2).
   const rows = await t.db.select().from(schema.vaultItems).where(eq(schema.vaultItems.id, login.id));
   expect(rows[0]?.secretCiphertext).toBeTruthy();
   expect(JSON.stringify(rows)).not.toContain(SITE_PASSWORD);

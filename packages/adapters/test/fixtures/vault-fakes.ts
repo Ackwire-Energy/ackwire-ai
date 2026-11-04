@@ -1,5 +1,5 @@
 /**
- * Fakes for the Vault's sources (ADR 0142), shared by their tests: a Bitwarden server whose data is encrypted with
+ * Fakes for the Vault's sources (ADR 0144), shared by their tests: a Bitwarden server whose data is encrypted with
  * the same primitives the client decrypts with, and a 1Password SDK. Both put the secrets they hold into their own
  * raw errors on purpose, so the tests can prove a source never passes a provider's text on.
  */

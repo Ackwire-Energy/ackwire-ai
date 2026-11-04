@@ -57,9 +57,9 @@ export interface SecretRequestView {
   target: SecretTarget;
   /** For a browser password: the only site it may be typed on (`https://host`). */
   site: string | null;
-  /** A site password's username, when the agent gave it: the card shows it and saves it to the Vault (ADR 0142). */
+  /** A site password's username, when the agent gave it: the card shows it and saves it to the Vault (ADR 0144). */
   username: string | null;
-  /** A one-time code: one box per digit on the card (ADR 0142), never saved. Null for anything else. */
+  /** A one-time code: one box per digit on the card (ADR 0144), never saved. Null for anything else. */
   codeDigits: number | null;
   /** The connected machine that holds it (ADR 0025). */
   machineId: string | null;
@@ -83,7 +83,7 @@ const targetOf = (row: Pick<SecretRequestRow, "targetKind" | "targetPath" | "sit
       : { kind: "env" };
 
 /**
- * A delivered secret still on its computer, for a select over `secret_requests` (ADR 0142 §6): a site's password
+ * A delivered secret still on its computer, for a select over `secret_requests` (ADR 0144 §6): a site's password
  * lives in the runner's memory only, for `SITE_SECRET_TTL_MS` from its delivery, so an older `site` delivery counts
  * as gone (never told to the agent as held, never listed on its page, never "replaced" by a new request).
  */
@@ -144,7 +144,7 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
     case "delivered":
       if (target.kind === "site") {
         const host = new URL(target.site).host;
-        // A one-time code and the account's username, when the request had them (ADR 0142).
+        // A one-time code and the account's username, when the request had them (ADR 0144).
         const code = row.codeDigits
           ? ` It is a ${row.codeDigits}-digit code: type it now, into the code field; when the site shows one box per digit, give \`targets\` with every box in order.`
           : "";
@@ -720,7 +720,7 @@ export interface AgentSecretView {
 
 /**
  * The secrets on the agent's computers (names only), for its owner and admins. A site's password past the minutes
- * its runner keeps it in memory is gone from there, so it isn't listed (ADR 0142 §6).
+ * its runner keeps it in memory is gone from there, so it isn't listed (ADR 0144 §6).
  */
 export async function listAgentSecrets(db: Database, actorId: string, orgId: string, agentId: string) {
   await requireComputerManager(db, actorId, orgId, agentId);

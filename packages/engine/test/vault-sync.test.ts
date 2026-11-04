@@ -27,7 +27,7 @@ import {
 } from "./vault-fixtures";
 
 /**
- * Password managers in the Vault (ADR 0142): connecting checks the credentials and reads the items before it answers;
+ * Password managers in the Vault (ADR 0144): connecting checks the credentials and reads the items before it answers;
  * the credentials are sealed and never come back; each sync adds, updates and marks missing what the source lists;
  * a refusal stays on the connection, in our words.
  */

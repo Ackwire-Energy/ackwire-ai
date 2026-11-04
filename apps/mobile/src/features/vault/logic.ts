@@ -20,7 +20,7 @@ import type { TFunction } from "i18next";
 import type { IconName } from "@/ui";
 
 /*
- * The Vault on the phone (ADR 0142), as the web's: which items each tab lists, how a row and an item's access read in
+ * The Vault on the phone (ADR 0144), as the web's: which items each tab lists, how a row and an item's access read in
  * words, what a new item needs before it saves, and what a source's connect form asks. Pure, so it is unit-tested;
  * the screens in this folder turn it into views.
  */
@@ -83,7 +83,7 @@ export const CONTACT_FIELDS = CONTACT_ORDER;
 
 /**
  * The line under an item's name: a login's site and username, a key's description, a contact's description (the
- * list carries no contact's fields, only its page does, ADR 0142 §7).
+ * list carries no contact's fields, only its page does, ADR 0144 §7).
  */
 export function itemLine(item: Pick<VaultItem, "kind" | "website" | "username" | "description">): string {
   if (item.kind === "login") return [hostOf(item.website), item.username].filter(Boolean).join(" · ");
@@ -120,7 +120,7 @@ export function kindsIn(items: readonly VaultItem[], tab: Exclude<VaultTab, "con
 
 // ── Access ──────────────────────────────────────────────────────────────────
 
-/** Who may use what (ADR 0142 §2): what the server enforces, mirrored for the screens. */
+/** Who may use what (ADR 0144 §2): what the server enforces, mirrored for the screens. */
 export const ACCESS_CAPS = { roles: 100, people: 500, agents: 200 } as const;
 
 /**
@@ -224,7 +224,7 @@ export function accessSentence(t: TFunction, scope: VaultScope, access: VaultAcc
 
 // ── The item's form ─────────────────────────────────────────────────────────
 
-/** The server's limits (ADR 0142), as the fields' `maxLength`. */
+/** The server's limits (ADR 0144), as the fields' `maxLength`. */
 export const LIMITS = {
   title: 120,
   description: 300,
@@ -475,7 +475,7 @@ const SOURCE_ERRORS = new Set([
   "unreachable",
   "unsupported",
   "invalid_input",
-  // The Vault's own: full, so new items wait (ADR 0142 §3).
+  // The Vault's own: full, so new items wait (ADR 0144 §3).
   "too_many_items",
 ]);
 
@@ -565,7 +565,7 @@ export function fieldKeyboard(f: Pick<VaultConnectField, "kind">) {
 // ── The request card ────────────────────────────────────────────────────────
 
 /**
- * Whether the card offers "Save to the Vault": a site's password or a key, never a file or a code (ADR 0142 §6).
+ * Whether the card offers "Save to the Vault": a site's password or a key, never a file or a code (ADR 0144 §6).
  * Checked by default when offered.
  */
 export function vaultSaveOffered(r: Pick<SecretRequest, "target"> & { codeDigits?: number | null }): boolean {
@@ -574,7 +574,7 @@ export function vaultSaveOffered(r: Pick<SecretRequest, "target"> & { codeDigits
 }
 
 /**
- * What "Save to the Vault" sends (ADR 0142 §6). A site's password always carries the username the person left on the
+ * What "Save to the Vault" sends (ADR 0144 §6). A site's password always carries the username the person left on the
  * card: empty means none, even when the agent suggested one (absent would keep the agent's).
  */
 export function secretToVaultInput(

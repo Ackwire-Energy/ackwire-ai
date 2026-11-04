@@ -1,5 +1,5 @@
 /**
- * Importing a password manager's export (ADR 0142): a CSV from Chrome, 1Password, Bitwarden, or any file with a
+ * Importing a password manager's export (ADR 0144): a CSV from Chrome, 1Password, Bitwarden, or any file with a
  * website and a password column. Only HTTPS logins come in, as built-in items of the scope the person chose. The
  * file is read once and kept nowhere: its rows live only in this call, notes included (they never become a
  * description, which agents read, since notes often hold recovery codes).
@@ -36,7 +36,7 @@ const unrecognized = () =>
 /**
  * RFC 4180: fields split by commas, quoted fields with commas, line breaks and doubled quotes inside, CRLF or LF
  * between rows, a byte order mark at the start. Blank lines are left out. It stops once it holds `maxRows` rows (the
- * header counts), so a file over the import's cap is never parsed whole (ADR 0142): the caller sees one row too many.
+ * header counts), so a file over the import's cap is never parsed whole (ADR 0144): the caller sees one row too many.
  */
 export function parseVaultCsv(text: string, maxRows = Number.POSITIVE_INFINITY): string[][] {
   const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;

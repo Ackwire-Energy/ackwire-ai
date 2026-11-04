@@ -582,7 +582,7 @@ textarea.ac-input {
   color: var(--ink);
   background: transparent;
 }
-/* A code typed one character per box (CodeInput, ADR 0142): fields of the ruler's large height and its radius, as wide
+/* A code typed one character per box (CodeInput, ADR 0144): fields of the ruler's large height and its radius, as wide
    as they fit up to a square-ish 44, the character centred in tabular figures. Twelve boxes still fit a chat card on a
    phone. */
 .ac-code {

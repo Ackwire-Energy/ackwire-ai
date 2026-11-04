@@ -1,4 +1,4 @@
-# 0142. The Vault: logins, keys and contacts agents use, personal or the team's, from any source
+# 0144. The Vault: logins, keys and contacts agents use, personal or the team's, from any source
 
 - Status: Accepted (built: the server, the runner, the web and the phone app)
 - Date: 2026-11-03
@@ -8,10 +8,10 @@
 - Builds on: ADR 0007 (sealed values at rest), ADR 0002 (adapters and modules), ADR 0053 (who is behind a run),
   ADR 0085 and 0125 (roles as an audience), ADR 0110 (browser profiles), ADR 0117 (injection hardening)
 - Code: schema `packages/db/src/schema/vault.ts` (`vault_items`, `vault_connections`, `vault_uses`), migration
-  `0213_vault`; engine `packages/engine/src/vault/*` (access, items, connections, sync, CSV import, uses, the agent
+  `0214_vault`; engine `packages/engine/src/vault/*` (access, items, connections, sync, CSV import, uses, the agent
   tools in `tools.ts`); sources `packages/adapters/src/vault/*` (the port `source.ts`, the site rule `site.ts`,
   `onepassword.ts`, `bitwarden.ts`); the box's additional data `vaultAad` in `packages/adapters/src/secret-box.ts`;
-  protocol 43 (`VAULT_PROTOCOL`, `vault.key`, `agentes:type_vault`, `exec.vault`) and the runner's in-memory store
+  protocol 45 (`VAULT_PROTOCOL`, `vault.key`, `agentes:type_vault`, `exec.vault`) and the runner's in-memory store
   `apps/server/runner/vault.ts`; routes `apps/server/src/routes/app/vault.ts`; client `packages/client/src/vault/*`;
   web `apps/web/src/components/vault/*`; phone `apps/mobile/src/features/vault/*`
 
@@ -109,7 +109,7 @@ A saved login is typed without a person's yes each time. The guards are elsewher
 1. **The model never gets a value.** Tools return names, sites and usernames; a value never enters a tool argument
    or result, a message, a log, an audit row, an event or an outbox payload.
 2. **A one-use key in the computer's memory.** For each fill the engine asks the agent's runner for a key
-   (`vault.key`, protocol 43). The runner keeps the private key in memory only, for 2 minutes and one opening, in the
+   (`vault.key`, protocol 45). The runner keeps the private key in memory only, for 2 minutes and one opening, in the
    agent's own worker in system mode, so root never sees the value. The server seals the password to it with the
    ADR 0027 box and additional data `agentes-vault|v1|key|agent|fill:<rule>`, which the runner rebuilds from its own
    record: a box replayed to another key, agent or site rule doesn't open.
@@ -193,7 +193,7 @@ alone (a fill, a key or a read): agents at work don't make every open app reload
 
 - Agents find what they need before asking (`vault_list`), and a password typed once in a card can serve the next
   time.
-- Old runners (protocol < 43) never receive a Vault value; the agent is told the computer needs an update.
+- Old runners (protocol < 45) never receive a Vault value; the agent is told the computer needs an update.
 - More values pass through the server than with request cards alone. The Vault is opt-in per item, and the card says
   so.
 - Left for later: the browser under its own system user, usage alerts to an item's owner (first use on a new site,

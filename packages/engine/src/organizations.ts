@@ -1157,7 +1157,7 @@ export async function removeMember(
     if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
     // Their AI apps and personal tokens here stop now (ADR 0119).
     await revokeMemberApps(tx, orgId, targetUserId);
-    // Their personal Vault goes with them, and they leave the team items' audiences (ADR 0142 §2). A personal
+    // Their personal Vault goes with them, and they leave the team items' audiences (ADR 0144 §2). A personal
     // connection's items cascade with it.
     await tx
       .delete(schema.vaultConnections)

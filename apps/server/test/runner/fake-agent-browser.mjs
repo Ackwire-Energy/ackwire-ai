@@ -6,7 +6,7 @@
 // `formmethod`; `frame`: `{ origin, ancestors }` when the session is inside a frame); a script may mark the field
 // (`setAttribute`, kept in `marks` for this page only) and `fill [attr="value"]` finds it by that mark, or nothing
 // (`navigateAfterCheck`: the page goes there right after a check marks a field, as a page that moved on would);
-// `filled` keeps what each fill typed into. With `--bail` the batch stops at the first failure (ADR 0142).
+// `filled` keeps what each fill typed into. With `--bail` the batch stops at the first failure (ADR 0144).
 import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);

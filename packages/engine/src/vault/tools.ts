@@ -22,7 +22,7 @@ import {
 } from "./index";
 
 /**
- * The Vault as tools (ADR 0142): what people saved for the agent, found before it asks them (`vault_list`), and the
+ * The Vault as tools (ADR 0144): what people saved for the agent, found before it asks them (`vault_list`), and the
  * contacts it keeps for them (`vault_save`, `vault_delete`). No tool ever returns a password or a key: a login is
  * typed by the browser (`type_secret` with `login`, browser/tools.ts) and a key goes to one command (`run_code` with
  * `keys`, sandbox-tools.ts), each sealed for the agent's own computer. Contact fields aren't secret: they are meant
@@ -278,7 +278,7 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
         const run = runOf(ctx);
         const result = await saveVaultItemByAgent(deps, run, change);
         const item = result.item;
-        // The item by its id, never by what was written on it (ADR 0142 §4): vault_list shows that as data.
+        // The item by its id, never by what was written on it (ADR 0144 §4): vault_list shows that as data.
         if (result.outcome === "created") {
           const person = await vaultPersonOfRun(ctx.db, run);
           const owner = person.personId ? await nameOf(ctx, person.personId) : "the person who asked";

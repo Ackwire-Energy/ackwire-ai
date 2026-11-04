@@ -1,5 +1,5 @@
 /**
- * The Vault as the apps see it (ADR 0142). Never a password or a key: once saved, a value never comes back to an app
+ * The Vault as the apps see it (ADR 0144). Never a password or a key: once saved, a value never comes back to an app
  * (§2); only agents' computers get one, sealed for them.
  */
 

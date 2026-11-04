@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 43;
+export const MACHINE_PROTOCOL_VERSION = 45;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -484,7 +484,7 @@ export const LOCKED_BRAIN_PROTOCOL = 41;
 export const EXECUTORS_CHANGED_PROTOCOL = 42;
 
 /**
- * From this protocol on (ADR 0142): the Vault. `vault.key` makes a one-use key pair in the agent's process (its
+ * From this protocol on (ADR 0144): the Vault. `vault.key` makes a one-use key pair in the agent's process (its
  * worker in system mode) and answers its public key; the private key lives only in that process's memory, for two
  * minutes, and goes at its first use. Sealed to it: a login's password, typed by the browser command
  * `agentes:type_vault [ref, rule, boxJson]` only into a password field of a frame the rule allows (refusals answer a
@@ -493,9 +493,9 @@ export const EXECUTORS_CHANGED_PROTOCOL = 42;
  * `request_secret` stay in memory only, every value opened is redacted from what leaves the computer, and a page
  * that tries to send a typed password in an address is stopped. The server sends none of these to an older runner.
  */
-export const VAULT_PROTOCOL = 43;
+export const VAULT_PROTOCOL = 45;
 /**
- * Protocol 43 (ADR 0142 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
+ * Protocol 45 (ADR 0144 §6): how long a runner keeps a site's password or code from `request_secret`, in its memory
  * only, from the moment it got it (never across its own restart). The server counts a `site` delivery older than this
  * as gone too: it doesn't tell the agent it holds it, nor list it on the agent's page.
  */
@@ -533,7 +533,7 @@ export type VaultTypeRefusal = (typeof VAULT_TYPE_REFUSALS)[number];
 export const VAULT_EXEC_KEYS = 10;
 
 /**
- * Protocol 43 (ADR 0142): keys from the Vault for one command, each sealed to the agent's `vault.key` with the
+ * Protocol 45 (ADR 0144): keys from the Vault for one command, each sealed to the agent's `vault.key` with the
  * additional data `vaultAad({ keyId, agentId, use: { kind: "env", name } })`. They go into that one command's
  * environment and its output is redacted; they are never written anywhere.
  */
@@ -1615,7 +1615,7 @@ export type MachineRequest = (
       stream: boolean;
       /** A person approved this very command (an approval card): it runs even when the command policy would hold it. */
       approved?: boolean;
-      /** Protocol 43: Vault keys for this command only (ADR 0142). */
+      /** Protocol 45: Vault keys for this command only (ADR 0144). */
       vault?: ExecVault;
     }
   | { op: "read"; path: string; maxBytes: number }
@@ -1725,7 +1725,7 @@ export type MachineRequest = (
   | { op: "desktop.apps" }
   /** Protocol 25: the text on the agent's screen, read on the computer. */
   | { op: "desktop.text" }
-  /** Protocol 43: a one-use key the request's agent's Vault values are sealed to (ADR 0142). */
+  /** Protocol 45: a one-use key the request's agent's Vault values are sealed to (ADR 0144). */
   | { op: "vault.key" }
 ) & {
   agent?: AgentScope;
@@ -1839,7 +1839,7 @@ export interface MachineReplies {
   "access.reduce": { access: RunnerAccess };
   /**
    * `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered
-   * click). Protocol 43: `code` names a Vault refusal (`VAULT_TYPE_REFUSALS`).
+   * click). Protocol 45: `code` names a Vault refusal (`VAULT_TYPE_REFUSALS`).
    */
   "browser.act": { success: boolean; data: unknown; error?: string; code?: string; setup?: BrowserSetup };
   /** `false`: there was no session. */
@@ -1895,7 +1895,7 @@ export interface MachineReplies {
   "desktop.apps": { apps: { id: string; name: string; generic?: string }[] };
   /** The screen's text (trimmed, `DESKTOP_TEXT_MAX` at most), or `same`: the capture didn't change since the last read. */
   "desktop.text": { text: string } | { same: true };
-  /** Protocol 43: the key's id, its public key (raw P-256, base64) and when it stops opening anything (ISO). */
+  /** Protocol 45: the key's id, its public key (raw P-256, base64) and when it stops opening anything (ISO). */
   "vault.key": { vaultKey: { keyId: string; publicKey: string; expiresAt: string } };
 }
 

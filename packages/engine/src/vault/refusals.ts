@@ -2,7 +2,7 @@ import { SECRET_NAME, vaultRule, vaultRuleLabel } from "@agenteschat/adapters";
 import type { ToolOutput } from "../tools/types";
 
 /**
- * Why the Vault refused an agent (ADR 0142). The message is English, for the model, and says what to do next. It
+ * Why the Vault refused an agent (ADR 0144). The message is English, for the model, and says what to do next. It
  * never says that an item the run may not see exists: an item hidden from the person behind the run (or from a run
  * nobody is behind) is `not_found`, the same as one that never existed.
  */
@@ -36,7 +36,7 @@ export interface VaultItemNaming {
 }
 
 /**
- * How the agent's tool text names an item outside `vault_list`'s blocks (ADR 0142 §4, ADR 0117): its kind and id, a
+ * How the agent's tool text names an item outside `vault_list`'s blocks (ADR 0144 §4, ADR 0117): its kind and id, a
  * login's site (the host of its rule, parsed from the saved HTTPS origin) and a key's variable name (checked against
  * `SECRET_NAME`). Never its title, description or username, which people, agents, password managers and CSV files
  * write: those reach the model only in an `untrustedBlock`. Lowercase, for the middle of a sentence (`named`

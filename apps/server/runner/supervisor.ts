@@ -418,7 +418,7 @@ export class Supervisor {
   constructor(private readonly opts: SupervisorOptions) {
     this.network = networkConfig(opts.network ?? {});
     this.secretRoot = secureSecretRoot(opts.home, opts.requireRootBroker);
-    // A site's password an older runner kept in the broker's `store.json` goes (ADR 0142).
+    // A site's password an older runner kept in the broker's `store.json` goes (ADR 0144).
     void dropStoredSiteSecrets(this.secretRoot);
     const saved = readJson<Record<string, { agentId?: unknown; startedAt?: unknown } | null>>(this.ownersFile);
     const cutoff = Date.now() - TASK_OWNER_KEEP_MS;
@@ -537,14 +537,14 @@ export class Supervisor {
     await this.ready(w, scope.signal);
     const secret = await activatedSecret(this.secretRoot, req.agent, req.requestId);
     if (!secret) {
-      // A site's password root already handed to the worker (ADR 0142): only the worker's memory keeps it.
+      // A site's password root already handed to the worker (ADR 0144): only the worker's memory keeps it.
       if (handedSiteSecret(this.secretRoot, req.agent, req.requestId)) return result;
       throw new RunnerError("not_found", "This request has no activated secret");
     }
     // The file read can overlap an idle network transition: acquire the current worker again.
     await this.ready(w, scope.signal);
     const installed = await this.install(w, req.agent, secret, scope.signal);
-    // Root keeps a site's password only until the worker has it (ADR 0142).
+    // Root keeps a site's password only until the worker has it (ADR 0144).
     if (secret.target.kind === "site") handOffSiteSecret(this.secretRoot, req.agent, req.requestId);
     return installed;
   }

@@ -1,5 +1,5 @@
 /**
- * The contract every Vault source keeps (ADR 0142), run on each source with a fake provider: `list` is metadata only,
+ * The contract every Vault source keeps (ADR 0144), run on each source with a fake provider: `list` is metadata only,
  * `reveal` gives one value, and every failure is a `VaultSourceError` with a code whose text never carries a token,
  * a password or the provider's own words. The fakes put their secrets into their raw errors on purpose.
  */

@@ -20,7 +20,7 @@ import {
 } from "@agenteschat/client";
 
 /*
- * The Vault's writes as the web's screens call them (ADR 0142), in one place: each resolves to its result, or to
+ * The Vault's writes as the web's screens call them (ADR 0144), in one place: each resolves to its result, or to
  * null when it failed (the app's toast already said why, in the person's words). The hooks invalidate the Vault's
  * queries themselves.
  */

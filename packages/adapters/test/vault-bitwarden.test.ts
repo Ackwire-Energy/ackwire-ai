@@ -232,7 +232,7 @@ describe("Bitwarden crypto: our own fixtures (built with the same primitives)", 
       deriveMasterKey("p", "e", { type: "argon2id", iterations: 3, memoryMiB: 1024, parallelism: 4 }),
     );
     expect(tooMuch.reason).toBe("kdf");
-    // Memory times iterations is capped too (ADR 0142): each within its range, together too slow to run here.
+    // Memory times iterations is capped too (ADR 0144): each within its range, together too slow to run here.
     const tooLong = await cryptoError(() =>
       deriveMasterKey("p", "e", { type: "argon2id", iterations: 3, memoryMiB: 128, parallelism: 4 }),
     );

@@ -136,7 +136,7 @@ export const WORKER_INTERVALS_MS = {
   widgetDrafts: 3600_000,
   /** Skills that update by themselves: each workspace queued once a day (the date in the job's dedupe key). */
   skillUpdates: 3600_000,
-  /** Vault connections last read over 10 minutes ago, queued once per 10-minute window (ADR 0142). */
+  /** Vault connections last read over 10 minutes ago, queued once per 10-minute window (ADR 0144). */
   vaultSyncs: 5 * 60_000,
 };
 

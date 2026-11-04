@@ -48,9 +48,9 @@ const RULE = "exact:https://shop.example.com";
 
 // ── Protocol ─────────────────────────────────────────────────────────────────
 
-test("protocol 43 carries the Vault: vault.key is an op of the agent's own process and new work", () => {
+test("protocol 45 carries the Vault: vault.key is an op of the agent's own process and new work", () => {
   expect(MACHINE_PROTOCOL_VERSION).toBeGreaterThanOrEqual(VAULT_PROTOCOL);
-  expect(VAULT_PROTOCOL).toBe(43);
+  expect(VAULT_PROTOCOL).toBe(45);
   expect(MACHINE_OPS).toContain("vault.key");
   expect(OP_ROUTES["vault.key"]).toBe("agent");
   expect(NEW_WORK_OPS.has("vault.key")).toBe(true);
@@ -142,7 +142,7 @@ test("armed values and site secrets live their time in memory, then go", () => {
   expect(vault.site("/store/a", "SHOP_PASSWORD")?.value).toBe("pw-5678");
   now += 1;
   expect(vault.sitesOf("/store/a")).toEqual([]);
-  // The protocol's own minutes: the server counts a site's password gone when this drops it (ADR 0142 §6).
+  // The protocol's own minutes: the server counts a site's password gone when this drops it (ADR 0144 §6).
   expect(SITE_SECRET_TTL_MS).toBe(PROTOCOL_SITE_SECRET_TTL_MS);
   expect(SITE_SECRET_TTL_MS).toBe(15 * 60_000);
 });

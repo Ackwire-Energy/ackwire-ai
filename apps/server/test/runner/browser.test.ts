@@ -2652,7 +2652,7 @@ test.if(posix)("deleting a profile stops its Chrome and removes its folder; syst
   ).toBe("not_allowed");
 });
 
-// ── The Vault (ADR 0142) ─────────────────────────────────────────────────────
+// ── The Vault (ADR 0144) ─────────────────────────────────────────────────────
 
 /** An agent of these tests only: what it arms in this process's Vault stays its own. */
 const keeper = { id: "5e5e5e5e-0135-7000-8000-000000000003", handle: "keeper" };

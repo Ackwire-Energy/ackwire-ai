@@ -151,7 +151,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "desktop.capture": "agent",
   "desktop.apps": "agent",
   "desktop.text": "agent",
-  // ADR 0142: the key lives in the process that opens the values (the agent's worker), so root never holds one.
+  // ADR 0144: the key lives in the process that opens the values (the agent's worker), so root never holds one.
   "vault.key": "agent",
 };
 
@@ -317,7 +317,7 @@ async function doExec(
     if (!(await stat(resolved.abs)).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
     cwd = resolved.abs;
   }
-  // ADR 0142: Vault keys for this one command, checked whole before anything opens.
+  // ADR 0144: Vault keys for this one command, checked whole before anything opens.
   const sealed = req.vault === undefined ? null : parseExecVault(req.vault);
   if (sealed && !req.agent?.id) throw new RunnerError("bad_request", "Vault keys belong to an agent's command");
   // run_code and skill scripts: the command and the script it runs meet the command policy first, as the
@@ -478,7 +478,7 @@ const workStream = (req: MachineRequest) =>
 
 /**
  * Runs one request; throws RunnerError (or fs errors) on failure. An error's text leaves redacted like an answer
- * (ADR 0142): a page's error can quote what was just typed.
+ * (ADR 0144): a page's error can quote what was just typed.
  */
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   try {
@@ -531,7 +531,7 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
     if (!ctx.workers?.secret) throw new RunnerError("not_allowed", "The root secret broker is unavailable");
     return ctx.workers.secret(req, scope);
   }
-  // Protocol 43 (ADR 0142): a one-use key in this process's memory (the agent's worker in system mode).
+  // Protocol 45 (ADR 0144): a one-use key in this process's memory (the agent's worker in system mode).
   if (req.op === "vault.key") {
     const agentId = req.agent?.id;
     if (typeof agentId !== "string" || !agentId) {
@@ -790,7 +790,7 @@ async function handleBrowser(
     case "browser.capture": {
       requireTool(ctx, "browser");
       const shot = await browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
-      // The page's address, redacted like any answer (ADR 0142); never the image's bytes, which a value could match.
+      // The page's address, redacted like any answer (ADR 0144); never the image's bytes, which a value could match.
       if (!shot.url) return shot;
       return { ...shot, url: await redacted(ctx, req.agent, shot.url) };
     }
@@ -812,11 +812,11 @@ async function redacted<T>(ctx: HandlerContext, agent: AgentScope, reply: T): Pr
   return secrets ? (redactDeep(reply, secrets.redact) as T) : reply;
 }
 
-/** A browser profile's session key (ADR 0110), where what is typed in it is armed too (ADR 0142). */
+/** A browser profile's session key (ADR 0110), where what is typed in it is armed too (ADR 0144). */
 const profileKey = (id: string) => `profile:${id.toLowerCase()}`;
 
 /**
- * A profile session's answer (ADR 0110), redacted like an agent's (ADR 0142): the acting agent's secrets and every
+ * A profile session's answer (ADR 0110), redacted like an agent's (ADR 0144): the acting agent's secrets and every
  * value typed in that session, whoever typed it.
  */
 async function profileRedacted<T>(ctx: HandlerContext, actor: AgentScope, session: AgentScope, reply: T): Promise<T> {
@@ -846,7 +846,7 @@ async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, sc
     handle: req.agent?.handle ?? "profile",
     ...(req.agent?.name ? { name: req.agent.name } : {}),
   };
-  // The agent whose turn it is: its Vault keys open here (ADR 0142); the session isn't its own.
+  // The agent whose turn it is: its Vault keys open here (ADR 0144); the session isn't its own.
   const actor: AgentScope = req.agent && typeof req.agent.id === "string" && req.agent.id ? req.agent : agent;
   const folder = browser.profileFolder(id.toLowerCase());
   switch (req.op) {
@@ -875,7 +875,7 @@ async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, sc
     case "browser.capture": {
       requireTool(ctx, "browser");
       const shot = await browser.capture(agent, folder, req.allowedDomains, scope.signal);
-      // The page's address, redacted like the session's other answers (ADR 0142); never the image's bytes.
+      // The page's address, redacted like the session's other answers (ADR 0144); never the image's bytes.
       if (!shot.url) return shot;
       return { ...shot, url: await profileRedacted(ctx, actor, agent, shot.url) };
     }
@@ -1160,7 +1160,7 @@ function handleTask(
   if (!tasks) throw new RunnerError("bad_request", "This runner runs no background tasks");
   switch (req.op) {
     case "task.start":
-      // ADR 0142: a Vault key goes with one command, never a task that outlives the request (and keeps its env).
+      // ADR 0144: a Vault key goes with one command, never a task that outlives the request (and keeps its env).
       if ((req as { vault?: unknown }).vault !== undefined) {
         throw new RunnerError("bad_request", "Vault keys go with one command (exec), never a background task");
       }
@@ -1188,7 +1188,7 @@ function describeOp(req: MachineRequest): string {
       const head = String(req.command ?? "")
         .replace(/\s+/g, " ")
         .trim();
-      // How many Vault keys it carries, never their values (ADR 0142).
+      // How many Vault keys it carries, never their values (ADR 0144).
       const sealed = req.vault?.keys;
       const keys = Array.isArray(sealed) ? ` (${sealed.length} Vault keys)` : "";
       return `exec ${head.length > 80 ? `${head.slice(0, 80)}…` : head}${req.cwd ? ` (in ${req.cwd})` : ""}${keys}`;

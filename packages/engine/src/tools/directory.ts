@@ -372,7 +372,7 @@ export function toolGroupKey(tool: Pick<ToolDefinition, "scope" | "connectionId"
  * prompt). Everything else is loaded when the run needs it.
  */
 export const CORE_GROUPS: ReadonlySet<string> = new Set(["", "context", "memory", "skills"]);
-/** `vault_list` too (ADR 0142): an agent looks in the Vault before it asks a person for a password, a key or an address. */
+/** `vault_list` too (ADR 0144): an agent looks in the Vault before it asks a person for a password, a key or an address. */
 const CORE_TOOLS: ReadonlySet<string> = new Set(["read_wiki_page", "search_wiki", "vault_list"]);
 
 /**

@@ -34,12 +34,12 @@ import {
 
 const tags = ["Vault"];
 
-/** The most a CSV import may be (ADR 0142): the file as text, and the request that carries it as a JSON string. */
+/** The most a CSV import may be (ADR 0144): the file as text, and the request that carries it as a JSON string. */
 export const VAULT_CSV_MAX_CHARS = 2 * 1024 * 1024;
 /** Escaping a CSV into JSON can grow it (quotes, line breaks): room for that, not for a bigger file. */
 const IMPORT_BODY_BYTES = 5 * 1024 * 1024;
 
-/** Per person, so nobody tests a password manager's credentials in bulk through this server (ADR 0142). */
+/** Per person, so nobody tests a password manager's credentials in bulk through this server (ADR 0144). */
 const SOURCE_CHECKS = { limit: 10, windowMs: 60_000 };
 const IMPORTS = { limit: 10, windowMs: 60_000 };
 
@@ -56,7 +56,7 @@ const Match = z.enum(["exact", "site"]).openapi({
 
 /**
  * May be empty: the engine names the item after its website's host, its variable or its contact's name, and refuses
- * with `vault.title_required` only when there is none (ADR 0142). The apps send an empty title on purpose.
+ * with `vault.title_required` only when there is none (ADR 0144). The apps send an empty title on purpose.
  */
 const Title = z.string().trim().max(120).openapi({
   description: "Empty: named after the login's host, the key's variable name or the contact's name.",
@@ -300,7 +300,7 @@ const ImportResult = z
   .openapi("VaultImportResult");
 
 /**
- * "Save to the Vault" on a secret request's card (ADR 0142): the value once more, sent after its sealed box went to
+ * "Save to the Vault" on a secret request's card (ADR 0144): the value once more, sent after its sealed box went to
  * the computer, so the server can seal it for the Vault.
  */
 export const SecretToVaultInput = z
@@ -320,7 +320,7 @@ const ConnectionParams = OrgParams.extend({ connectionId: z.uuid() });
 
 const tooMany = { 429: errorResponse("Too many tries (`rate_limited`)") };
 
-/** What every Vault call of a person needs (ADR 0142), from the server's adapters (a module's sources included). */
+/** What every Vault call of a person needs (ADR 0144), from the server's adapters (a module's sources included). */
 export function vaultDepsOf(deps: AppDeps): VaultDeps {
   const { adapters } = deps;
   return {
@@ -335,7 +335,7 @@ export function vaultDepsOf(deps: AppDeps): VaultDeps {
 /**
  * A password manager's refusal (`VaultSourceError`) as the API's own error, `vault.source.<code>` (a 429 when it
  * asks us to wait), and an agent-side refusal that reached a person's call as a plain one. The message is ours,
- * never the provider's, which may carry a token (ADR 0142).
+ * never the provider's, which may carry a token (ADR 0144).
  */
 export async function vaultCall<T>(work: Promise<T>): Promise<T> {
   try {
@@ -364,7 +364,7 @@ export async function vaultCall<T>(work: Promise<T>): Promise<T> {
 const noStore = (c: Context) => c.header("Cache-Control", "no-store");
 
 /**
- * The Vault (ADR 0142): logins, keys and contacts the workspace's agents use without seeing a password or a key.
+ * The Vault (ADR 0144): logins, keys and contacts the workspace's agents use without seeing a password or a key.
  * Personal items are their owner's alone (admins included: they never see them); team items are edited by who has
  * `manage_credentials` and seen by their audience. No answer here carries a value: once saved, a password or a key
  * never comes back to an app (§2).

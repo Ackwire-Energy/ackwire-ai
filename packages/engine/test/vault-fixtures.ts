@@ -20,7 +20,7 @@ import { readItemValue } from "../src/vault/seal";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
- * The Vault's tests (ADR 0142): one workspace (Acme) with its owner Ana, Bruno (a member in "Support"), Carla (an
+ * The Vault's tests (ADR 0144): one workspace (Acme) with its owner Ana, Bruno (a member in "Support"), Carla (an
  * admin, so she manages credentials) and Dora (a member in no role); agents Dev and Infra; a fake password manager.
  */
 
@@ -35,7 +35,7 @@ export interface FakeSource extends VaultSource {
   listError: VaultSourceError | Error | null;
   /** The secrets `list` and `reveal` were handed (to prove they were unsealed). */
   seenTokens: string[];
-  /** Every call, with the signal the engine gave it and the workspace `connect` was told (ADR 0142). */
+  /** Every call, with the signal the engine gave it and the workspace `connect` was told (ADR 0144). */
   calls: { op: "connect" | "list" | "reveal"; signal: AbortSignal | undefined; orgId: string | undefined }[];
 }
 
@@ -209,7 +209,7 @@ export async function everythingStored(v: VaultFixture): Promise<string> {
 
 /**
  * What an item holds now, read the way the server reads it to seal it for an agent's computer: no person's screen
- * ever gets it back (ADR 0142 §2), so tests look here.
+ * ever gets it back (ADR 0144 §2), so tests look here.
  */
 export async function storedValue(v: VaultFixture, itemId: string): Promise<string | null> {
   const [item] = await v.f.db.select().from(schema.vaultItems).where(eq(schema.vaultItems.id, itemId));

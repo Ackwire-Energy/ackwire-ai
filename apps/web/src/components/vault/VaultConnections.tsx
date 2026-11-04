@@ -39,7 +39,7 @@ import { ScopeLine, VaultTile } from "./VaultItemDialog";
 import "./vault.css";
 
 /*
- * Settings › Vault › Connections (ADR 0142): one card per password manager the server can read. Not connected: its
+ * Settings › Vault › Connections (ADR 0144): one card per password manager the server can read. Not connected: its
  * steps and fields, from the source's own description. Connected: what it reads, how many items, when it last synced,
  * Sync now, the default access of its items, and Disconnect. A connection that fails says why in plain words and
  * offers Reconnect, which opens the fields again.
@@ -51,7 +51,7 @@ const words = (t: TFunction, key: string, fallback: string) =>
 
 /**
  * Error codes a source may give (`VaultSourceErrorCode`), and the Vault's own `too_many_items` (full: new items wait,
- * ADR 0142 §3); anything else reads as the generic one.
+ * ADR 0144 §3); anything else reads as the generic one.
  */
 const ERRORS = [
   "auth_failed",

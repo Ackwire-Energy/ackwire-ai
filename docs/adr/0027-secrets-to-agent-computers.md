@@ -1,6 +1,6 @@
 # 0027. Secrets delivered to an agent's computer, end to end
 
-- Status: Accepted (built 2026-10-16). Superseded in part by ADR 0077 (2026-10-28): the cloud computer's helper (`packages/engine/src/secret-helper.ts`) and its command wrapper; secrets reach connected computers through the runner (protocol 3). Amended 2026-10-31 (§7): a site's password is the browser's alone, and a request reaches the person where they wait and on the phone. Amended by ADR 0142 (2026-11-03): a site's password stays in the runner's memory only, a request may carry a username and ask for a code, and the card can save the value to the Vault
+- Status: Accepted (built 2026-10-16). Superseded in part by ADR 0077 (2026-10-28): the cloud computer's helper (`packages/engine/src/secret-helper.ts`) and its command wrapper; secrets reach connected computers through the runner (protocol 3). Amended 2026-10-31 (§7): a site's password is the browser's alone, and a request reaches the person where they wait and on the phone. Amended by ADR 0144 (2026-11-03): a site's password stays in the runner's memory only, a request may carry a username and ask for a code, and the card can save the value to the Vault
 - Date: 2026-10-16
 
 ## Context

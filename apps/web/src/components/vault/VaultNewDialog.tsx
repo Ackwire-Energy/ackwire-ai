@@ -22,7 +22,7 @@ import { cleanContact, draftErrors, type ItemDraft, ItemFields } from "./VaultIt
 import "./vault.css";
 
 /*
- * "New item" (ADR 0142): what to save (a login, a key, contact details), its fields, and who may use it. A personal
+ * "New item" (ADR 0144): what to save (a login, a key, contact details), its fields, and who may use it. A personal
  * item starts usable by any of its owner's agents when the owner asks; a team one starts seen by everyone and used by
  * no agent until someone picks them.
  */
@@ -112,7 +112,7 @@ export function VaultNewDialog({
         }}
       >
         <DialogBody className="vlt-new">
-          {/* One line to choose what to save: the list says what each kind is (ADR 0142). */}
+          {/* One line to choose what to save: the list says what each kind is (ADR 0144). */}
           <Field label={t("vault.new.what")}>
             <Select<VaultItemKind>
               value={kind}

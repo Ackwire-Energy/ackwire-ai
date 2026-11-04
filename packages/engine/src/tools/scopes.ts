@@ -206,7 +206,7 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
 };
 
 /**
- * The Vault (ADR 0142): seeing what it shares with the agent and using it (`vault:read`, also what typing a saved
+ * The Vault (ADR 0144): seeing what it shares with the agent and using it (`vault:read`, also what typing a saved
  * login or giving a command a saved key needs), and editing its contacts (`vault:write`).
  */
 export const VAULT_READ_SCOPE = "vault:read";
@@ -222,7 +222,7 @@ export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, s
  * reading and writing Drive files, and reading issues (so any agent can check
  * the org's issues before answering about them; low risk), setting up the
  * workspace for whoever asks (cards a person clicks, channels with Undo), the
- * Vault (what people share with it there, ADR 0142), and its computer (running commands, its own browser and desktop): on a connected
+ * Vault (what people share with it there, ADR 0144), and its computer (running commands, its own browser and desktop): on a connected
  * computer each still needs the switch the person at that computer turned on.
  * Admins and owners can revoke them.
  */

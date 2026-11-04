@@ -8,7 +8,7 @@ import { CSV_MAX_BYTES } from "./lib";
 import "./vault.css";
 
 /*
- * "Import" (ADR 0142): a passwords file exported by a browser or a password manager, read here in the browser, counted
+ * "Import" (ADR 0144): a passwords file exported by a browser or a password manager, read here in the browser, counted
  * by the server first (nothing written), then imported into Personal or Team. The file's text lives in this dialog
  * only, and goes when it closes.
  */

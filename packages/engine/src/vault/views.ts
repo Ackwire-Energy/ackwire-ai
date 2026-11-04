@@ -1,5 +1,5 @@
 /**
- * Vault rows as people and agents see them (ADR 0142). Never a value: a contact's fields are the only thing opened
+ * Vault rows as people and agents see them (ADR 0144). Never a value: a contact's fields are the only thing opened
  * here, since they are meant to be read (by the people who see the item and by the agents who may use it).
  */
 import type { VaultSources } from "@agenteschat/adapters";
@@ -99,7 +99,7 @@ export async function contactOf(deps: Pick<VaultDeps, "keyWrappers">, item: Item
 }
 
 /**
- * A contact's fields, and whether its saved fields can't be read here (ADR 0142): sealed with a key this server no
+ * A contact's fields, and whether its saved fields can't be read here (ADR 0144): sealed with a key this server no
  * longer has, or a row moved onto another owner, or not JSON. Such a contact is never merged onto or shown as empty:
  * a person saves it again. Not a contact, or nothing saved: no fields, and nothing unreadable.
  */
@@ -120,7 +120,7 @@ const iso = (date: Date | null) => (date ? date.toISOString() : null);
 
 /**
  * An item for a person; `viewer` null: nobody's rights (a system call). `contact: false` leaves a contact's fields
- * out (`contact: null`) without opening its seal: the list of the whole Vault (ADR 0142 §7); an item's page has them.
+ * out (`contact: null`) without opening its seal: the list of the whole Vault (ADR 0144 §7); an item's page has them.
  */
 export async function itemView(
   deps: Pick<VaultDeps, "keyWrappers" | "sources">,

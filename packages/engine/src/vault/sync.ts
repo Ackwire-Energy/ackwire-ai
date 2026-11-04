@@ -1,5 +1,5 @@
 /**
- * Reading a connection's items into the Vault (ADR 0142): its source lists metadata (never a value), and each item
+ * Reading a connection's items into the Vault (ADR 0144): its source lists metadata (never a value), and each item
  * becomes a row keyed by (connection, the source's id). New ones follow the connection's access; ones the source no
  * longer lists are marked missing (nobody uses them until they come back). A refusal (`VaultSourceError`) leaves the
  * items as they were and goes on the connection (`status` `error`, `errorCode`), never the source's own words.
@@ -162,7 +162,7 @@ export async function syncConnectionRow(
             website: sql`excluded.website`,
             match: sql`excluded.match`,
             username: sql`excluded.username`,
-            // A variable name a person set here stays; a description too (both are theirs to edit, ADR 0142).
+            // A variable name a person set here stays; a description too (both are theirs to edit, ADR 0144).
             keyName: sql`coalesce(${vaultItems.keyName}, excluded.key_name)`,
             missing: false,
             updatedAt: now,

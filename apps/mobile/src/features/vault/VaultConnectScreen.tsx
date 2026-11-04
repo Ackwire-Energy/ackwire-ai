@@ -21,7 +21,7 @@ import { connectInput, connectMissing, fieldKeyboard, initialValues, shownFields
 import { InputField, ScopeRows } from "./parts";
 
 /**
- * Connecting a password manager (ADR 0142 §3), drawn from what the source describes: a warning when it has one
+ * Connecting a password manager (ADR 0144 §3), drawn from what the source describes: a warning when it has one
  * (Bitwarden's master password opens the whole account), its numbered steps, its fields, personal or the team's,
  * then Connect, which checks with the password manager before anything is kept. With `connection`, the same fields
  * replace a connection's sign-in details (Reconnect).

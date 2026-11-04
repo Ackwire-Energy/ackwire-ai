@@ -20,7 +20,7 @@ import { runnerVault } from "./vault";
  * (mode 700), with `keys/<requestId>` (the private key of a pending request)
  * and `store.json` (delivered values), both mode 600. A site's password or
  * code (target `site`) never goes in `store.json`: this process keeps it in
- * memory for its browser for 15 minutes after activation (ADR 0142,
+ * memory for its browser for 15 minutes after activation (ADR 0144,
  * `vault.ts`), and one an older runner left there is removed.
  */
 interface Stored {
@@ -91,7 +91,7 @@ async function readStore(dir: string): Promise<Stored[]> {
 /** Folders whose `store.json` this process already rid of site secrets. */
 const purged = new Set<string>();
 
-/** ADR 0142: `store.json` rewritten without any `site` entry, once per folder per process (under its queue). */
+/** ADR 0144: `store.json` rewritten without any `site` entry, once per folder per process (under its queue). */
 async function purgeSitesLocked(dir: string) {
   if (purged.has(dir)) return;
   purged.add(dir);
@@ -112,7 +112,7 @@ function purgeSoon(dir: string) {
 }
 
 /**
- * At start: every agent's `store.json` under `root` loses the site passwords an older runner kept there (ADR 0142).
+ * At start: every agent's `store.json` under `root` loses the site passwords an older runner kept there (ADR 0144).
  * Readers skip them meanwhile.
  */
 export async function dropStoredSiteSecrets(root: string): Promise<void> {
@@ -467,7 +467,7 @@ async function installLocked(
   const before = await readStore(dir);
   const next = before.filter((s) => s.name !== req.name);
   if (target.kind === "site") {
-    // ADR 0142: only in this process's memory, for its browser, for 15 minutes; never in `store.json`.
+    // ADR 0144: only in this process's memory, for its browser, for 15 minutes; never in `store.json`.
     runnerVault.putSite(dir, {
       name: req.name,
       site: target.site,
@@ -545,7 +545,7 @@ export async function activatedSecret(
   };
 }
 
-/** Root handed a site's password to the agent's worker (ADR 0142): from here, only the worker's memory has it. */
+/** Root handed a site's password to the agent's worker (ADR 0144): from here, only the worker's memory has it. */
 export function handOffSiteSecret(root: string, agent: AgentScope, requestId: string) {
   runnerVault.handOff(dirOf(root, agent), requestId);
 }
@@ -559,7 +559,7 @@ export function handedSiteSecret(root: string, agent: AgentScope, requestId: str
 /**
  * What commands of this agent get: env values (never a site's password: that one only its browser types), and a
  * redactor for everything that leaves the machine: every value kept, a site's password in memory, and every Vault
- * value opened here in the last 10 minutes (ADR 0142).
+ * value opened here in the last 10 minutes (ADR 0144).
  */
 export async function agentSecrets(root: string | undefined, agent: AgentScope | undefined) {
   if (!agent) return null;
@@ -595,7 +595,7 @@ export async function secretValue(
   if (!root) return null;
   const dir = dirOf(root, agent);
   purgeSoon(dir);
-  // A site's password: in memory only (ADR 0142).
+  // A site's password: in memory only (ADR 0144).
   const site = runnerVault.site(dir, name);
   if (site?.value) return { value: site.value, site: site.site };
   const secrets = await readStore(dir).catch(() => [] as Stored[]);

@@ -316,7 +316,7 @@ export function buildEngine(o: EngineOptions) {
     github: { connectors: connectorDeps, app: githubApp },
     pubsub: adapters.pubsub,
   };
-  // The Vault (ADR 0142): built-in items sealed with the installation's key wrapper, plus the external sources
+  // The Vault (ADR 0144): built-in items sealed with the installation's key wrapper, plus the external sources
   // (1Password, Bitwarden, a module's) the adapters bring.
   const vault: VaultDeps = {
     db,
@@ -327,7 +327,7 @@ export function buildEngine(o: EngineOptions) {
   };
   // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
   // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
-  // A saved login from the Vault is sealed for the agent's computer at the step that types it (ADR 0142).
+  // A saved login from the Vault is sealed for the agent's computer at the step that types it (ADR 0144).
   const browserTools = createBrowserToolSource({
     machines: { hub: machineHub },
     pubsub: adapters.pubsub,
@@ -357,7 +357,7 @@ export function buildEngine(o: EngineOptions) {
       }),
       createFindAgentToolSource({ machines: machineHub }),
       createUsageToolSource(),
-      // What people saved for the agent in the Vault, found before it asks them (ADR 0142).
+      // What people saved for the agent in the Vault, found before it asks them (ADR 0144).
       createVaultToolSource(vault),
       // What the agent says it is doing, next to its name (ADR 0084).
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
@@ -426,7 +426,7 @@ export function buildEngine(o: EngineOptions) {
         artifacts,
         skills: { blobs: artifacts.blobs },
         pubsub: adapters.pubsub,
-        // Saved keys for one command (`run_code` with `keys`, ADR 0142).
+        // Saved keys for one command (`run_code` with `keys`, ADR 0144).
         vault,
       }),
       browserTools,
@@ -631,7 +631,7 @@ export function buildEngine(o: EngineOptions) {
     skills: skillDeps,
     // A workspace's deletion revokes its grants at GitHub and Composio, and leaves a line in the log.
     connectors: connectorDeps,
-    // External Vault sources synced every few minutes (ADR 0142).
+    // External Vault sources synced every few minutes (ADR 0144).
     vault,
     mail: adapters.mail,
     // An agent's GIF after a light reply (ADR 0091): none without the server's GIF provider.
@@ -691,7 +691,7 @@ export function buildEngine(o: EngineOptions) {
     storage,
     artifacts,
     sandbox,
-    /** The Vault (ADR 0142), for its routes. */
+    /** The Vault (ADR 0144), for its routes. */
     vault,
     gitProxy,
     machineHub,

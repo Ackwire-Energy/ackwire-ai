@@ -10,7 +10,7 @@ import { ActionList, MONO } from "../shared/parts";
 import { agentOn, type Names, toggleAgent } from "./logic";
 
 /*
- * What the Vault's screens share (ADR 0142): names for the summaries, a field row, the scope choice, the agents'
+ * What the Vault's screens share (ADR 0144): names for the summaries, a field row, the scope choice, the agents'
  * switches, and a saved value, always behind its dots.
  */
 
@@ -224,7 +224,7 @@ export function AgentPickSheet({
   );
 }
 
-/** A saved password or key, always hidden: once saved, it never comes back to a screen (ADR 0142 §2). */
+/** A saved password or key, always hidden: once saved, it never comes back to a screen (ADR 0144 §2). */
 export function SavedValue({ label }: { label: string }) {
   const { t } = useTranslation();
   return (

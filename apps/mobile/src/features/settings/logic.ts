@@ -81,7 +81,7 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   },
   // Everyone, as on the web: who invites finds the requests there, a member who may not suggests someone (ADR 0090).
   { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
-  // The Vault (ADR 0142): every member keeps their own logins and keys there and sees the team's shared with them.
+  // The Vault (ADR 0144): every member keeps their own logins and keys there and sees the team's shared with them.
   { id: "vault", group: "org", icon: "lock", href: "/settings/vault", allowed: (o) => can(o, "read") },
   // What agents did and people changed: who may see the audit (it shows everyone's work).
   { id: "audit", group: "org", icon: "shield", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },

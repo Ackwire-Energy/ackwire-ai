@@ -542,7 +542,7 @@ describe("Configurações do workspace", () => {
       "Apps de IA",
       // The people, where a member who may not invite suggests someone (ADR 0090).
       "Membros e convites",
-      // Their own logins, keys and contacts (ADR 0142).
+      // Their own logins, keys and contacts (ADR 0144).
       "Cofre",
       "Conectores e MCPs",
       "Computadores",

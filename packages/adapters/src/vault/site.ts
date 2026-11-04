@@ -1,5 +1,5 @@
 /**
- * Where a Vault login may be typed (ADR 0142): one rule, read the same way by the server (before it releases a
+ * Where a Vault login may be typed (ADR 0144): one rule, read the same way by the server (before it releases a
  * value) and by the runner (at the moment it types, against the origin of the frame that owns the field).
  *
  * - `exact`: one origin, `https://host[:port]`. The default.

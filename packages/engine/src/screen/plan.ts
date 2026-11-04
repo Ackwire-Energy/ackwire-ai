@@ -59,9 +59,9 @@ export interface ScreenStep {
   to?: string;
   key?: string;
   secret?: string;
-  /** `type_secret`: a Vault login's id (ADR 0142), typed instead of a named `secret`. */
+  /** `type_secret`: a Vault login's id (ADR 0144), typed instead of a named `secret`. */
   login?: string;
-  /** `type_secret` of a code split in one box per character (ADR 0142): every box in order, instead of `target`. */
+  /** `type_secret` of a code split in one box per character (ADR 0144): every box in order, instead of `target`. */
   targets?: string[];
   direction?: "up" | "down" | "left" | "right";
   pixels?: number;
@@ -141,9 +141,9 @@ export type ScreenAction =
   | { kind: "type"; text: string }
   | { kind: "type"; text: string; at: ActTarget }
   | { kind: "select"; at: ActTarget; value: string }
-  /** A named secret; `more`: the other boxes of a code split in one box per character, in order (ADR 0142). */
+  /** A named secret; `more`: the other boxes of a code split in one box per character, in order (ADR 0144). */
   | { kind: "type_secret"; at: { ref: string }; secret: string; more?: { ref: string }[] }
-  /** A Vault login (ADR 0142): `url` is the page the field was found on, where the login is checked first. */
+  /** A Vault login (ADR 0144): `url` is the page the field was found on, where the login is checked first. */
   | { kind: "type_secret"; at: { ref: string }; login: string; url: string | null }
   | { kind: "press"; key: string }
   | Scroll
@@ -154,7 +154,7 @@ export type ScreenActOutcome =
   | {
       ok: true;
       observation: ScreenObservation | null;
-      /** What was typed, as the report names it (the site a Vault login was typed for, ADR 0142): never a value. */
+      /** What was typed, as the report names it (the site a Vault login was typed for, ADR 0144): never a value. */
       typed?: string;
     }
   | { ok: false; error: string };
@@ -222,7 +222,7 @@ export interface StepReport {
   expected?: { met: boolean | null; p: number };
   /** Its action went through (a failed step with this only failed its `expect`: it must not be done again). */
   ran?: boolean;
-  /** What a `type_secret` typed, by name (the site a Vault login was typed for, ADR 0142): never a value. */
+  /** What a `type_secret` typed, by name (the site a Vault login was typed for, ADR 0144): never a value. */
   typed?: string;
   /** `read` with `find`: the lines that answer it (page text, untrusted), or why there are none. */
   found?: {
@@ -266,7 +266,7 @@ export const needsTarget = (step: ScreenStep) => step.do in USES;
 
 const COVERED = /covered by|intercept|obscured|another element would receive/i;
 const STALE = /stale|unknown ref|ref\b.*\b(not found|no longer|invalid)|no element (for|matches) ref/i;
-/** Most boxes a code split in one box per character fills (ADR 0142). */
+/** Most boxes a code split in one box per character fills (ADR 0144). */
 export const MAX_CODE_BOXES = 12;
 /** Longest a `wait` step waits. */
 export const MAX_WAIT_MS = 120_000;
@@ -538,7 +538,7 @@ export async function runPlan(deps: PlanDeps, steps: ScreenStep[]): Promise<Plan
 
   /** What `step` acts on and how, its fields checked first. */
   function targetsOf(step: ScreenStep): Targets {
-    // A code split in one box per character names every box (ADR 0142); any other step one target.
+    // A code split in one box per character names every box (ADR 0144); any other step one target.
     const boxes =
       step.do === "type_secret" ? (step.targets ?? []).map((t) => t.trim()).filter((t) => t.length > 0) : [];
     const words = boxes[0] ?? step.target?.trim();

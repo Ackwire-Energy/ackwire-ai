@@ -12,7 +12,7 @@ import { accessSentence, agentsSummary, connectionLine, connectionState, peopleS
 import { useVaultNames } from "./parts";
 
 /**
- * A connected password manager (ADR 0142 §3): how it is (connected, syncing, or what went wrong in plain words), what
+ * A connected password manager (ADR 0144 §3): how it is (connected, syncing, or what went wrong in plain words), what
  * it reads and when it last did, "Sync now", Reconnect, the default access its items follow, and Disconnect.
  */
 export function VaultConnectionScreen({ id }: { id: string }) {
@@ -95,7 +95,7 @@ export function VaultConnectionScreen({ id }: { id: string }) {
           <GroupedRow
             icon="pen"
             label={
-              // A full Vault isn't fixed by reconnecting (ADR 0142 §3).
+              // A full Vault isn't fixed by reconnecting (ADR 0144 §3).
               conn.status === "error" && conn.errorCode !== "too_many_items"
                 ? t("mobile.vault.connection.reconnect")
                 : t("mobile.vault.connection.change")

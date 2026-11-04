@@ -42,7 +42,7 @@ import "@/pages/issues.css";
 import "./vault.css";
 
 /*
- * A Vault item, opened (ADR 0142): its fields by kind, the value always behind its dots (Change, for who may), who
+ * A Vault item, opened (ADR 0144): its fields by kind, the value always behind its dots (Change, for who may), who
  * has access in the aside (people, agents, the sentence) and its recent uses. An item from a password manager keeps
  * that manager's fields read-only here: only its note, a key's variable name and its access change in the app.
  */
@@ -297,7 +297,7 @@ export function ItemFields({
 }
 
 /**
- * A saved value, always behind its dots: once saved it never comes back to a screen (ADR 0142 §2). Whoever manages it
+ * A saved value, always behind its dots: once saved it never comes back to a screen (ADR 0144 §2). Whoever manages it
  * types a new one in its place (Change); `value` non-null is that new value being typed.
  */
 function SecretValue({
@@ -408,7 +408,7 @@ function UseRow({ use }: { use: VaultUse }) {
 
 /**
  * Opens an item from the list: its details as the server has them now, the list's copy while they load. A contact's
- * fields come only with its details (the list has none, ADR 0142 §7): its form waits for them, and starts from them.
+ * fields come only with its details (the list has none, ADR 0144 §7): its form waits for them, and starts from them.
  */
 export function VaultItemDialog({
   itemId,
@@ -580,7 +580,7 @@ function ItemDialog({
             />
           )}
         </div>
-        {/* The fields on the left; who has access and its recent uses beside them (ADR 0142 §7). */}
+        {/* The fields on the left; who has access and its recent uses beside them (ADR 0144 §7). */}
         <aside className="issue-aside vlt-aside">
           <DetailsSection title={t("vault.access.title")}>
             <ScopeLine scope={item.scope} />

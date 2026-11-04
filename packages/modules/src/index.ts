@@ -26,7 +26,7 @@ export interface AdapterOverrides extends Partial<Adapters> {
   /** Model providers by id (e.g. `anthropic`), merged over the core ones. */
   modelProviders?: Record<string, ModelProvider>;
   /**
-   * Vault sources by kind (ADR 0142), merged over the core ones: a module adds a source or replaces one of the same
+   * Vault sources by kind (ADR 0144), merged over the core ones: a module adds a source or replaces one of the same
    * kind. null turns every external source off.
    */
   vaultSources?: Adapters["vaultSources"];

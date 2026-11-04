@@ -399,7 +399,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const workspaceReal = prepareWorkspace(o.dir);
   const self = o.self ?? { command: selfCommand(currentProcess()), compiled: isCompiled(currentProcess()) };
   const secretsDir = path.join(home, "secrets");
-  // Site passwords live in memory now (ADR 0142): one an older runner kept on disk goes.
+  // Site passwords live in memory now (ADR 0144): one an older runner kept on disk goes.
   void dropStoredSiteSecrets(secretsDir);
   const socketPath = mcpSocketPath(home);
   const mcpCommand = { socketPath, command: self.command };

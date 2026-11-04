@@ -26,7 +26,7 @@ import { urlCarries } from "./vault";
  * there (`onCrash`), and asks Chrome to quit (`quit`), so each Chrome has one
  * socket of ours.
  *
- * It also guards a password about to be typed (ADR 0142, `guard`): for a
+ * It also guards a password about to be typed (ADR 0144, `guard`): for a
  * while, every request of that Chrome pauses (`Fetch.enable` on each of its
  * sessions, new ones too) and one whose address carries the password fails
  * (`Fetch.failRequest`) instead of leaving; the rest go on at once. The guard
@@ -59,7 +59,7 @@ const FETCH = { patterns: [{ urlPattern: "*", requestStage: "Request" }] };
 /** How long a guard waits for Chrome to acknowledge `Fetch.enable` on its sessions before it gives up. */
 export const GUARD_READY_MS = 3_000;
 
-/** One guarded value set (ADR 0142): until when, and who hears of a request it stopped. */
+/** One guarded value set (ADR 0144): until when, and who hears of a request it stopped. */
 interface Guard {
   values: string[];
   until: number;
@@ -87,7 +87,7 @@ export interface TrafficCounter {
   quit(): void;
   /**
    * For `ms` from now, fails every request whose address carries one of `values` (raw or encoded) and calls
-   * `onBlocked` for each (ADR 0142). Arm it before typing and type once `ready` is true.
+   * `onBlocked` for each (ADR 0144). Arm it before typing and type once `ready` is true.
    */
   guard(values: string[], ms: number, onBlocked: () => void, readyMs?: number): ArmedGuard;
   close(): void;

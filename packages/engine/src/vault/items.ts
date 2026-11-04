@@ -1,5 +1,5 @@
 /**
- * The Vault for people (ADR 0142): what the app's Settings, Vault lists, saves, changes and deletes. Every
+ * The Vault for people (ADR 0144): what the app's Settings, Vault lists, saves, changes and deletes. Every
  * function checks the person itself (`access.ts`): an item they may not see is `NotFoundError`, the same as one that
  * doesn't exist, and what they see but don't manage is `ForbiddenError`. Values are sealed before any write
  * (`seal.ts`) and never come back to a person: no answer carries one, and changing one means typing a new one (§2).
@@ -274,7 +274,7 @@ function auditItem(
 
 /**
  * Everything the person sees in the Vault: their items, the connections they manage, the sources to connect. No
- * contact's fields (`contact: null`): opening every contact's seal for a list is work no row shows (ADR 0142 §7); an
+ * contact's fields (`contact: null`): opening every contact's seal for a list is work no row shows (ADR 0144 §7); an
  * item's page has them (`getVaultItem`).
  */
 export async function listVault(deps: VaultDeps, userId: string, orgId: string): Promise<VaultOverview> {
@@ -439,7 +439,7 @@ export async function updateVaultItem(
     changed.push("keyName");
   }
   if (patch.title !== undefined) {
-    // An emptied name falls back as on creation: a contact's goes by its (new or saved) fields (ADR 0142).
+    // An emptied name falls back as on creation: a contact's goes by its (new or saved) fields (ADR 0144).
     const contact =
       kind !== "contact" || patch.title.trim()
         ? null

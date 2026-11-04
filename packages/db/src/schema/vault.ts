@@ -7,7 +7,7 @@ import { organizations } from "./tenancy";
 import { routines } from "./work";
 
 /**
- * A source the Vault reads items from (ADR 0142): 1Password, Bitwarden or a module's own. What it needs to sign in
+ * A source the Vault reads items from (ADR 0144): 1Password, Bitwarden or a module's own. What it needs to sign in
  * (a token, an API key, a master password) is envelope-encrypted (ADR 0007) and bound to (org, id, owner): it never
  * leaves the server. `ownerUserId` null = a team connection (`manage_credentials`), else only its owner's.
  * The audience columns are the default access of its items (`vault_items.access_from_connection`).
@@ -51,7 +51,7 @@ export const vaultConnections = pgTable(
 );
 
 /**
- * A Vault item (ADR 0142): a login, a key or a contact. Built-in ones (`connection_id` null) keep their value here:
+ * A Vault item (ADR 0144): a login, a key or a contact. Built-in ones (`connection_id` null) keep their value here:
  * the password, the key's value or the contact's fields as JSON, envelope-encrypted (ADR 0007) and bound to
  * (org, id, owner, `secret_version`), so a row moved to another workspace or owner doesn't open. An external one
  * keeps only metadata: its value is read from its source when it is used.
@@ -111,7 +111,7 @@ export const vaultItems = pgTable(
 );
 
 /**
- * Every time a Vault item was used (ADR 0142): typed (`fill`), given to a command (`key`), read by an agent
+ * Every time a Vault item was used (ADR 0144): typed (`fill`), given to a command (`key`), read by an agent
  * (`read`, contacts), shown or copied by a person, created or edited. Never the value.
  */
 export const vaultUses = pgTable(

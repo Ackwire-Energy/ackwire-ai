@@ -5,7 +5,7 @@ import { itemAad, openItemValue } from "../src/vault/seal";
 import { everythingStored, storedValue, type VaultFixture, vaultSetup } from "./vault-fixtures";
 
 /**
- * Vault items for people (ADR 0142): saved sealed and bound to their workspace, id, owner and version; never a value
+ * Vault items for people (ADR 0144): saved sealed and bound to their workspace, id, owner and version; never a value
  * in a list, a detail, the audit log, a use or an event; shown or copied only by who manages them, and recorded.
  */
 
@@ -161,7 +161,7 @@ describe("saving", () => {
     });
     const row = await rowOf(contact.id);
     expect(row.secretCiphertext).not.toContain("12.345.678");
-    // The list opens no contact's seal: its row goes by its title and description (ADR 0142 §7).
+    // The list opens no contact's seal: its row goes by its title and description (ADR 0144 §7).
     const listed = (await listVault(v.deps, v.dora.id, v.f.org.id)).items.find((i) => i.id === contact.id);
     expect(listed).toMatchObject({ title: "Acme Ltda", contact: null });
     const seenByDora = await getVaultItem(v.deps, v.dora.id, v.f.org.id, contact.id);
@@ -276,7 +276,7 @@ describe("changing, showing, deleting", () => {
     expect(detail.hasSecret).toBe(true);
     expect(detail.can).toEqual({ edit: true, delete: true });
     expect(JSON.stringify(detail)).not.toContain(PASSWORD);
-    // Nothing in the engine answers a person with a value (ADR 0142 §2).
+    // Nothing in the engine answers a person with a value (ADR 0144 §2).
     const engine = await import("../src");
     expect(Object.keys(engine).filter((name) => /vault/i.test(name) && /reveal|show|copy/i.test(name))).toEqual([]);
     // Someone who only sees it can't change it, and doesn't see who used it.
